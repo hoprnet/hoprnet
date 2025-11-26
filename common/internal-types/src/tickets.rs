@@ -827,7 +827,7 @@ impl VerifiedTicket {
 
 impl Display for VerifiedTicket {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "verified {}", self.ticket)
+        write!(f, "verified {} in channel {}", self.ticket, self.channel_id)
     }
 }
 

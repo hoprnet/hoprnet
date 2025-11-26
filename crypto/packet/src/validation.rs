@@ -24,6 +24,7 @@ pub fn validate_unacknowledged_ticket(
         .map_err(|ticket| TicketValidationError {
             reason: format!("ticket signer does not match the sender: {ticket}"),
             ticket,
+            issuer: None,
         })?;
 
     let inner_ticket = verified_ticket.verified_ticket();
@@ -36,6 +37,7 @@ pub fn validate_unacknowledged_ticket(
                 inner_ticket.amount
             ),
             ticket: (*inner_ticket).into(),
+            issuer: Some(*verified_ticket.verified_issuer()),
         });
     }
 
@@ -47,6 +49,7 @@ pub fn validate_unacknowledged_ticket(
                 verified_ticket.win_prob()
             ),
             ticket: (*inner_ticket).into(),
+            issuer: Some(*verified_ticket.verified_issuer()),
         });
     }
 
@@ -55,6 +58,7 @@ pub fn validate_unacknowledged_ticket(
         return Err(TicketValidationError {
             reason: format!("payment channel {} is not opened or pending to close", channel.get_id()),
             ticket: (*inner_ticket).into(),
+            issuer: Some(*verified_ticket.verified_issuer()),
         });
     }
 
@@ -68,6 +72,7 @@ pub fn validate_unacknowledged_ticket(
                 channel.get_id()
             ),
             ticket: (*inner_ticket).into(),
+            issuer: Some(*verified_ticket.verified_issuer()),
         });
     }
 
@@ -81,6 +86,7 @@ pub fn validate_unacknowledged_ticket(
                 channel.get_id()
             ),
             ticket: (*inner_ticket).into(),
+            issuer: Some(*verified_ticket.verified_issuer()),
         });
     }
 

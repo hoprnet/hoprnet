@@ -578,9 +578,30 @@ pub(crate) mod tests {
 
     lazy_static::lazy_static! {
         static ref REDEEMABLE_TICKET: RedeemableTicket = bincode::serde::decode_from_slice(&hex!(
-            "20d7f3fa28f0caa757e81226e1ee86a9efdbe7991442286183797296ebaa4d292a0330786101ffffffffffffff04489af55fb30f8f518526ef9b4d9eec639bfed90b01400f20ad1440271e5c4e0ea9938d7fcd02aab18971577c6705686405d8afa040799ac7e1137a654d11394fa96aa0924c3c6d8c13b1d2c22cecf6073e0b04c95bdc20d15db939ae88acd96cf611dd2bb6385c63e631eebff2efd022351280d621972c668430def9eacd2b5064acf85d73fb0b351a1c8c2003e8b27186ce6001cb75328f7ebbca50006517512eb854425c4d5811bca3500f210368dbcf9eba032b0d2fed49650521a845712cfc1826a7222a780876514358b7ef503de2ff68f2492d57148ed100cb45de762d5b42680ff2fe78eb280ee317d80770854f2798ec19ffe622087fa71cee65541e0bdde878023dd8af246e4a66e9e2200000000000000000000000000000000000000000000000000000000000000000"
+            "bea83ba0fcee21da44a30c893f466e6bf0c29bbb0530783365387bffffffffffffff010000000000000000000000000000000000000000014038536c412ff92c3b070d98724a2ac167b7a914aa2151cf71eea3d192b0df195d0184aa92c73bccb27aded5f27fcd1cdcf65889f78cf2e62d2f630f659aa2fba220cba79e6dc2ea1205cb76833c9223cd912f056f3406d73d0d689602afe5e88abc668430def9eacd2b5064acf85d73fb0b351a1c8c20d7f3fa28f0caa757e81226e1ee86a9efdbe7991442286183797296ebaa4d292a2063b332926f56b14bec0c3e8e7dbf15fe43d20f4174fd4481088f8844f096001d2103d14016cbfa555574e8a5a8fbcb52677dfb7e9267e99c05ebe29603e41b3332779676161437dbd7758c07e4c69cad33eab72f0e30bc8b7283a85620d98475ef84c8baa3796ba7b979bcc9c935ce2d68c918755bf61f35bb83a31d3e02cc2f1069200000000000000000000000000000000000000000000000000000000000000000"
         ), bincode::config::standard()).unwrap().0;
     }
+
+    // Use this to generate the REDEEMABLE_TICKET variable above
+    // fn gen_ticket() -> anyhow::Result<()> {
+    // use hopr_crypto_types::crypto_traits::Randomizable;
+    //
+    // let hk1 = HalfKey::random();
+    // let hk2 = HalfKey::random();
+    //
+    // let ticket = TicketBuilder::default()
+    // .counterparty(&ChainKeypair::from_secret(&PRIVATE_KEY_2)?)
+    // .amount(1000)
+    // .index(123)
+    // .channel_epoch(1)
+    // .eth_challenge(EthereumChallenge::default())
+    // .build_signed(&ChainKeypair::from_secret(&PRIVATE_KEY_1)?, &Default::default())?
+    // .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?)
+    // .into_redeemable(&&ChainKeypair::from_secret(&PRIVATE_KEY_2)?, &Default::default())?;
+    //
+    // assert_eq!("", hex::encode(bincode::serde::encode_to_vec(&ticket, bincode::config::standard())?));
+    // Ok(())
+    // }
 
     #[tokio::test]
     async fn test_announce() -> anyhow::Result<()> {
@@ -613,7 +634,7 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn redeem_ticket() -> anyhow::Result<()> {
+    async fn redeem_ticket_basic() -> anyhow::Result<()> {
         let chain_key_bob = ChainKeypair::from_secret(&PRIVATE_KEY_2)?;
 
         let acked_ticket = REDEEMABLE_TICKET.clone();
@@ -626,6 +647,15 @@ pub(crate) mod tests {
             .await?;
 
         insta::assert_snapshot!("redeem_ticket_basic", hex::encode(signed_tx));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn redeem_ticket_safe() -> anyhow::Result<()> {
+        let chain_key_bob = ChainKeypair::from_secret(&PRIVATE_KEY_2)?;
+
+        let acked_ticket = REDEEMABLE_TICKET.clone();
 
         // Bob redeems the ticket
         let generator =

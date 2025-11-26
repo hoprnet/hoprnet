@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use hopr_crypto_packet::errors::TicketValidationError;
-use hopr_internal_types::prelude::Ticket;
 use sea_orm::TransactionError;
 
 #[derive(Debug, thiserror::Error)]
@@ -9,8 +8,8 @@ pub enum NodeDbError {
     #[error("cannot find a surb: {0}")]
     NoSurbAvailable(String),
 
-    #[error("ticket validation error for {}: {}", .0.0, .0.1)]
-    TicketValidationError(Box<(Ticket, String)>),
+    #[error("ticket validation error for {}: {}", .0.ticket, .0.reason)]
+    TicketValidationError(#[from] TicketValidationError),
 
     #[error("failed to process acknowledgement: {0}")]
     AcknowledgementValidationError(String),
@@ -61,11 +60,5 @@ impl<E: std::error::Error + Send + Sync + 'static> From<TransactionError<E>> for
 impl<E: std::error::Error + Send + Sync + 'static> From<Arc<TransactionError<E>>> for NodeDbError {
     fn from(value: Arc<TransactionError<E>>) -> Self {
         Self::Custom(format!("in-cache transaction error: {value}"))
-    }
-}
-
-impl From<TicketValidationError> for NodeDbError {
-    fn from(value: TicketValidationError) -> Self {
-        Self::TicketValidationError(Box::new((*value.ticket, value.reason)))
     }
 }

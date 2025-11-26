@@ -275,7 +275,7 @@ pub trait HoprDbTicketOperations {
     ///
     /// This ticket is not yet stored in the ticket DB;
     /// therefore, only the statistics in the corresponding channel are updated.
-    async fn mark_unsaved_ticket_rejected(&self, ticket: &Ticket) -> Result<(), Self::Error>;
+    async fn mark_unsaved_ticket_rejected(&self, issuer: &Address, ticket: &Ticket) -> Result<(), Self::Error>;
 
     /// Updates the [state](AcknowledgedTicketStatus) of the tickets matching the given `selectors`.
     ///

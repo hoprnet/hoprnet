@@ -5,7 +5,10 @@ use hopr_api::{
     chain::{ChainKeyOperations, ChainReadChannelOperations, ChainValues},
     db::*,
 };
-use hopr_crypto_packet::{errors::PacketError, prelude::*};
+use hopr_crypto_packet::{
+    errors::{PacketError, TicketValidationError},
+    prelude::*,
+};
 use hopr_crypto_types::{crypto_traits::Randomizable, prelude::*};
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::{ResolvedTransportRouting, SurbMatcher};
@@ -654,26 +657,32 @@ impl HoprDbProtocolOperations for HoprNodeDb {
                             ack_key: fwd.ack_key,
                         })
                     }
-                    Err(NodeDbError::TicketValidationError(boxed_error)) => {
-                        let (rejected_ticket, error) = *boxed_error;
-                        let rejected_value = rejected_ticket.amount;
-                        warn!(%rejected_ticket, %rejected_value, %error, "failure to validate during forwarding");
+                    Err(NodeDbError::TicketValidationError(TicketValidationError { ticket, issuer, reason })) => {
+                        let rejected_value = ticket.amount;
+                        warn!(rejected_ticket = %ticket, %rejected_value, %reason, "failure to validate during forwarding");
 
-                        self.mark_unsaved_ticket_rejected(&rejected_ticket)
-                            .await
-                            .map_err(|e| {
-                                NodeDbError::TicketValidationError(Box::new((
-                                    rejected_ticket,
-                                    format!("during validation error '{error}' update another error occurred: {e}"),
-                                )))
-                            })
-                            .map_err(IncomingPacketError::ProcessingError)?;
+                        if let Some(issuer) = issuer {
+                            self.mark_unsaved_ticket_rejected(&issuer, &ticket)
+                                .await
+                                .map_err(|error| {
+                                    NodeDbError::TicketValidationError(TicketValidationError {
+                                        ticket: ticket.clone(),
+                                        reason: format!(
+                                            "during validation error '{reason}' update another error occurred: {error}"
+                                        ),
+                                        issuer: Some(issuer),
+                                    })
+                                })
+                                .map_err(IncomingPacketError::ProcessingError)?;
+                        } else {
+                            tracing::debug!(%ticket, "failed to account ticket as rejected, because the issuer could not be verified");
+                        }
 
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_TICKETS_COUNT.increment(&["rejected"]);
 
                         Err(IncomingPacketError::ProcessingError(
-                            NodeDbError::TicketValidationError(Box::new((rejected_ticket, error))),
+                            NodeDbError::TicketValidationError(TicketValidationError { reason, ticket, issuer }),
                         ))
                     }
                     Err(e) => Err(IncomingPacketError::ProcessingError(e)),

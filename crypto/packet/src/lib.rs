@@ -83,7 +83,7 @@ pub type HoprReplyOpener = (types::HoprSurbId, ReplyOpener);
 /// leaves space for 1460 bytes in the packet payload.
 ///
 /// **DO NOT USE this value for calculations outside of this crate: use `HoprPacket::PAYLOAD_SIZE` instead!**
-pub(crate) const PAYLOAD_SIZE_INT: usize = 1021;
+pub(crate) const PAYLOAD_SIZE_INT: usize = DefaultSphinxPacketSize::USIZE - 1; // minus padding byte
 
 #[cfg(test)]
 mod tests {
@@ -109,7 +109,7 @@ mod tests {
     #[test]
     fn packet_length() {
         let packet_len = HoprPacket::SIZE;
-        assert_eq!(packet_len, 434 + PAYLOAD_SIZE_INT);
+        assert_eq!(packet_len, 422 + PAYLOAD_SIZE_INT);
     }
 
     #[test]

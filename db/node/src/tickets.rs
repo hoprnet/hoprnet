@@ -273,8 +273,8 @@ impl HoprDbTicketOperations for HoprNodeDb {
             .await?)
     }
 
-    async fn mark_unsaved_ticket_rejected(&self, ticket: &Ticket) -> Result<(), NodeDbError> {
-        let channel_id = generate_channel_id(&ticket.counterparty, &self.me_address);
+    async fn mark_unsaved_ticket_rejected(&self, issuer: &Address, ticket: &Ticket) -> Result<(), NodeDbError> {
+        let channel_id = generate_channel_id(issuer, &ticket.counterparty);
         let amount = ticket.amount;
         Ok(self
             .ticket_manager
@@ -744,7 +744,7 @@ mod tests {
         Ok(tickets)
     }
 
-    #[tokio::test]
+    #[test_log::test(tokio::test)]
     async fn test_insert_get_ticket() -> anyhow::Result<()> {
         let db = HoprNodeDb::new_in_memory(ALICE.clone()).await?;
 
@@ -765,7 +765,7 @@ mod tests {
             .await
             .first()
             .cloned()
-            .context("ticket should exist")?;
+            .context("ticket should exist 1")?;
 
         assert_eq!(ack_ticket, db_ticket, "tickets must be equal");
 
@@ -776,7 +776,7 @@ mod tests {
             .await
             .first()
             .cloned()
-            .context("ticket should exist")?;
+            .context("ticket should exist 2")?;
 
         assert_eq!(ack_ticket, db_ticket, "tickets must be equal");
 
@@ -920,7 +920,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[test_log::test(tokio::test)]
     async fn test_mark_unsaved_ticket_rejected() -> anyhow::Result<()> {
         let db = HoprNodeDb::new_in_memory(ALICE.clone()).await?;
 
@@ -935,7 +935,9 @@ mod tests {
             "per channel stats must be same"
         );
 
-        db.mark_unsaved_ticket_rejected(ticket.verified_ticket()).await?;
+        tracing::debug!("marking ticket as rejected");
+        db.mark_unsaved_ticket_rejected(BOB.public().as_ref(), ticket.verified_ticket())
+            .await?;
 
         let stats = db.get_ticket_statistics(None).await?;
         assert_eq!(ticket.verified_ticket().amount, stats.rejected_value());

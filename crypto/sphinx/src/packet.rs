@@ -531,7 +531,7 @@ pub(crate) mod tests {
     use parameterized::parameterized;
 
     use super::*;
-    use crate::{surb::create_surb, tests::WrappedBytes};
+    use crate::{prelude::DefaultSphinxPacketSize, surb::create_surb, tests::WrappedBytes};
 
     #[derive(Debug, Clone, Copy)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -549,7 +549,7 @@ pub(crate) mod tests {
         const MAX_HOPS: NonZeroUsize = NonZeroUsize::new(4).unwrap();
     }
 
-    const PAYLOAD_SIZE: usize = 1021;
+    const PAYLOAD_SIZE: usize = DefaultSphinxPacketSize::USIZE - 1;
 
     #[test]
     fn test_padding() -> anyhow::Result<()> {
