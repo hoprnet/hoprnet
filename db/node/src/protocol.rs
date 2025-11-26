@@ -83,11 +83,6 @@ impl HoprNodeDb {
                 ))
             })?;
 
-        // TODO: Check: is the ticket in the packet really for the given channel?
-        // if !fwd.outgoing.ticket.channel_id.eq(incoming_channel.get_id()) {
-        // return Err(NodeDbError::LogicalError("invalid ticket for channel".into()));
-        // }
-
         let domain_separator = resolver
             .domain_separators()
             .await
