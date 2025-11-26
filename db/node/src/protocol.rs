@@ -5,7 +5,10 @@ use hopr_api::{
     chain::{ChainKeyOperations, ChainReadChannelOperations, ChainValues},
     db::*,
 };
-use hopr_crypto_packet::{errors::PacketError, prelude::*};
+use hopr_crypto_packet::{
+    errors::{PacketError, TicketValidationError},
+    prelude::*,
+};
 use hopr_crypto_types::{crypto_traits::Randomizable, prelude::*};
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::{ResolvedTransportRouting, SurbMatcher};
@@ -82,11 +85,6 @@ impl HoprNodeDb {
                     "no channel found for previous hop address '{previous_hop_addr}'"
                 ))
             })?;
-
-        // Check: is the ticket in the packet really for the given channel?
-        if !fwd.outgoing.ticket.channel_id.eq(incoming_channel.get_id()) {
-            return Err(NodeDbError::LogicalError("invalid ticket for channel".into()));
-        }
 
         let domain_separator = resolver
             .domain_separators()
@@ -175,7 +173,7 @@ impl HoprNodeDb {
             )
             .await?
         } else {
-            TicketBuilder::zero_hop().direction(&self.me_address, &next_hop_addr)
+            TicketBuilder::zero_hop().counterparty(next_hop_addr)
         };
 
         // Finally, replace the ticket in the outgoing packet with a new one
@@ -221,7 +219,7 @@ impl HoprNodeDb {
 
                 // Issuer's channel must have an epoch matching with the unacknowledged ticket
                 if maybe_channel_with_issuer
-                    .is_some_and(|c| c.channel_epoch.as_u32() == unacknowledged.verified_ticket().channel_epoch)
+                    .is_some_and(|c| c.channel_epoch == unacknowledged.verified_ticket().channel_epoch)
                 {
                     let domain_separator = resolver
                         .domain_separators()
@@ -242,9 +240,7 @@ impl HoprNodeDb {
                             Ok(ResolvedAcknowledgement::RelayingWin(ack_ticket))
                         } else {
                             trace!("Found a losing ticket");
-                            Ok(ResolvedAcknowledgement::RelayingLoss(
-                                ack_ticket.ticket.verified_ticket().channel_id,
-                            ))
+                            Ok(ResolvedAcknowledgement::RelayingLoss(*ack_ticket.ticket.channel_id()))
                         }
                     })
                     .await
@@ -279,14 +275,10 @@ impl HoprDbProtocolOperations for HoprNodeDb {
                     METRIC_RECEIVED_ACKS.increment(&["true"]);
                     METRIC_TICKETS_COUNT.increment(&["winning"]);
 
-                    let verified_ticket = ack_ticket.ticket.verified_ticket();
                     crate::tickets::METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
                         &["unredeemed"],
                         self.ticket_manager
-                            .unrealized_value(TicketSelector::new(
-                                verified_ticket.channel_id,
-                                verified_ticket.channel_epoch,
-                            ))
+                            .unrealized_value(ack_ticket.into())
                             .await?
                             .amount()
                             .as_u128() as f64,
@@ -372,7 +364,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
 
         // No-ack packets are always sent as zero-hops with a random pseudonym
         let pseudonym = HoprPseudonym::random();
-        let next_ticket = TicketBuilder::zero_hop().direction(&self.me_address, &next_peer);
+        let next_ticket = TicketBuilder::zero_hop().counterparty(next_peer);
         let domain_separator = resolver
             .domain_separators()
             .await
@@ -494,7 +486,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
             )
             .await?
         } else {
-            TicketBuilder::zero_hop().direction(&self.me_address, &next_peer)
+            TicketBuilder::zero_hop().counterparty(next_peer)
         };
 
         let domain_separator = resolver
@@ -665,26 +657,32 @@ impl HoprDbProtocolOperations for HoprNodeDb {
                             ack_key: fwd.ack_key,
                         })
                     }
-                    Err(NodeDbError::TicketValidationError(boxed_error)) => {
-                        let (rejected_ticket, error) = *boxed_error;
-                        let rejected_value = rejected_ticket.amount;
-                        warn!(%rejected_ticket, %rejected_value, %error, "failure to validate during forwarding");
+                    Err(NodeDbError::TicketValidationError(TicketValidationError { ticket, issuer, reason })) => {
+                        let rejected_value = ticket.amount;
+                        warn!(rejected_ticket = %ticket, %rejected_value, %reason, "failure to validate during forwarding");
 
-                        self.mark_unsaved_ticket_rejected(&rejected_ticket)
-                            .await
-                            .map_err(|e| {
-                                NodeDbError::TicketValidationError(Box::new((
-                                    rejected_ticket,
-                                    format!("during validation error '{error}' update another error occurred: {e}"),
-                                )))
-                            })
-                            .map_err(IncomingPacketError::ProcessingError)?;
+                        if let Some(issuer) = issuer {
+                            self.mark_unsaved_ticket_rejected(&issuer, &ticket)
+                                .await
+                                .map_err(|error| {
+                                    NodeDbError::TicketValidationError(TicketValidationError {
+                                        ticket: ticket.clone(),
+                                        reason: format!(
+                                            "during validation error '{reason}' update another error occurred: {error}"
+                                        ),
+                                        issuer: Some(issuer),
+                                    })
+                                })
+                                .map_err(IncomingPacketError::ProcessingError)?;
+                        } else {
+                            tracing::debug!(%ticket, "failed to account ticket as rejected, because the issuer could not be verified");
+                        }
 
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_TICKETS_COUNT.increment(&["rejected"]);
 
                         Err(IncomingPacketError::ProcessingError(
-                            NodeDbError::TicketValidationError(Box::new((rejected_ticket, error))),
+                            NodeDbError::TicketValidationError(TicketValidationError { reason, ticket, issuer }),
                         ))
                     }
                     Err(e) => Err(IncomingPacketError::ProcessingError(e)),
@@ -762,11 +760,11 @@ impl HoprNodeDb {
         }
 
         let ticket_builder = TicketBuilder::default()
-            .direction(&self.me_address, &destination)
+            .counterparty(destination)
             .balance(amount)
             .index(self.increment_outgoing_ticket_index(channel.get_id()).await?)
             .win_prob(winning_prob)
-            .channel_epoch(channel.channel_epoch.as_u32());
+            .channel_epoch(channel.channel_epoch);
 
         Ok(ticket_builder)
     }

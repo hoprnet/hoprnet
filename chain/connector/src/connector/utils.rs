@@ -69,8 +69,9 @@ pub(crate) fn model_to_graph_entry(
             ),
             blokli_client::api::types::ChannelStatus::Closed => ChannelStatus::Closed,
         },
-        (model.channel.epoch as u32).into(),
+        model.channel.epoch as u32,
     );
+
     Ok((src, dst, channel))
 }
 

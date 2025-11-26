@@ -139,9 +139,9 @@ mod tests {
             *ALICE,
             *DAVE,
             10.into(),
-            0.into(),
+            0,
             ChannelStatus::PendingToClose(SystemTime::now().sub(Duration::from_secs(60))),
-            1.into(),
+            1,
         );
 
         let blokli_sim = BlokliTestStateBuilder::default()
@@ -153,15 +153,15 @@ mod tests {
             )
             .with_channels([
                 // Should leave this channel opened
-                ChannelEntry::new(*ALICE, *BOB, 10.into(), 0.into(), ChannelStatus::Open, 0.into()),
+                ChannelEntry::new(*ALICE, *BOB, 10.into(), 0, ChannelStatus::Open, 0),
                 // Should leave this unfinalized, because the channel closure period has not yet elapsed
                 ChannelEntry::new(
                     *ALICE,
                     *CHARLIE,
                     10.into(),
-                    0.into(),
+                    0,
                     ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(60))),
-                    1.into(),
+                    1,
                 ),
                 // Should finalize closure of this channel
                 channel_to_be_closed,
@@ -170,9 +170,9 @@ mod tests {
                     *ALICE,
                     *EUGENE,
                     10.into(),
-                    0.into(),
+                    0,
                     ChannelStatus::PendingToClose(SystemTime::now().sub(max_closure_overdue * 2)),
-                    1.into(),
+                    1,
                 ),
             ])
             .build_dynamic_client([1; Address::SIZE].into());

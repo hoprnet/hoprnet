@@ -208,8 +208,8 @@ where
                                         &channel,
                                         dir,
                                         ChannelChange::TicketIndex {
-                                            left: channel.ticket_index.as_u64() - 1,
-                                            right: channel.ticket_index.as_u64(),
+                                            left: channel.ticket_index - 1,
+                                            right: channel.ticket_index,
                                         },
                                     )
                                     .await;

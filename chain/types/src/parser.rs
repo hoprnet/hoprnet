@@ -468,7 +468,7 @@ mod tests {
         let resp = Response::from_half_keys(&hk1, &hk2)?;
 
         let ticket = TicketBuilder::default()
-            .direction(&(&cp_1).into(), &(&cp_2).into())
+            .counterparty(&cp_2)
             .amount(123_u32)
             .index(7)
             .challenge(resp.to_challenge()?)

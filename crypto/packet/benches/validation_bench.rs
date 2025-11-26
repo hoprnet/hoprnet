@@ -32,7 +32,7 @@ pub fn validate_ticket_bench(c: &mut Criterion) {
     );
 
     let ticket = TicketBuilder::default()
-        .addresses(source.public().to_address(), dest.public().to_address())
+        .counterparty(dest.public().to_address())
         .balance(HoprBalance::new_base(100))
         .index(1)
         .eth_challenge(Default::default())

@@ -2,7 +2,7 @@ use std::fmt::{Debug, Display, Formatter};
 
 use hopr_crypto_types::errors::CryptoError;
 use hopr_internal_types::{errors::CoreTypesError, prelude::Ticket};
-use hopr_primitive_types::errors::GeneralError;
+use hopr_primitive_types::{errors::GeneralError, prelude::Address};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -44,6 +44,10 @@ pub struct TicketValidationError {
     pub reason: String,
     /// Invalid ticket that failed to validate.
     pub ticket: Box<Ticket>,
+    /// Issuer of the ticket.
+    ///
+    /// This value is present if at least the ticket signature validation succeeded.
+    pub issuer: Option<Address>,
 }
 
 impl Display for TicketValidationError {

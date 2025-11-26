@@ -12,9 +12,11 @@ impl TryFrom<&ticket::Model> for RedeemableTicket {
         let response = Response::try_from(value.response.as_ref())?;
 
         let ticket = TicketBuilder::default()
-            .channel_id(Hash::from_hex(&value.channel_id)?)
+            .counterparty(Address::from_hex(&value.counterparty)?)
             .amount(U256::from_be_bytes(&value.amount))
-            .index(U256::from_be_bytes(&value.index).as_u64())
+            .index(u64::from_be_bytes(value.index.clone().try_into().map_err(|_| {
+                DbEntityError::ConversionError("invalid ticket index".into())
+            })?))
             .win_prob(
                 value
                     .winning_probability
@@ -22,7 +24,13 @@ impl TryFrom<&ticket::Model> for RedeemableTicket {
                     .try_into()
                     .map_err(|_| DbEntityError::ConversionError("invalid winning probability".into()))?,
             )
-            .channel_epoch(U256::from_be_bytes(&value.channel_epoch).as_u32())
+            .channel_epoch(u32::from_be_bytes(
+                value
+                    .channel_epoch
+                    .clone()
+                    .try_into()
+                    .map_err(|_| DbEntityError::ConversionError("invalid channel epoch".into()))?,
+            ))
             .challenge(response.to_challenge()?)
             .signature(
                 value
@@ -60,11 +68,12 @@ impl TryFrom<ticket::Model> for RedeemableTicket {
 impl From<RedeemableTicket> for ticket::ActiveModel {
     fn from(value: RedeemableTicket) -> Self {
         ticket::ActiveModel {
-            channel_id: Set(hex::encode(value.verified_ticket().channel_id)), // serialize without 0x prefix
+            channel_id: Set(hex::encode(value.ticket.channel_id())), // serialize without 0x prefix
+            counterparty: Set(hex::encode(value.verified_ticket().counterparty)), // serialize without 0x prefix
             amount: Set(value.verified_ticket().amount.amount().to_be_bytes().to_vec()),
             index: Set(value.verified_ticket().index.to_be_bytes().to_vec()),
             winning_probability: Set(value.verified_ticket().encoded_win_prob.to_vec()),
-            channel_epoch: Set(U256::from(value.verified_ticket().channel_epoch).to_be_bytes().to_vec()),
+            channel_epoch: Set(value.verified_ticket().channel_epoch.to_be_bytes().to_vec()),
             signature: Set(value.verified_ticket().signature.unwrap().as_ref().to_vec()),
             response: Set(value.response.as_ref().to_vec()),
             vrf_params: Set(value.vrf_params.into_encoded().to_vec()),

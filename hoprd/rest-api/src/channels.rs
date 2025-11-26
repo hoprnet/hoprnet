@@ -72,7 +72,7 @@ pub(crate) struct ChannelInfoResponse {
     #[schema(value_type = String, example = "Open")]
     status: ChannelStatus,
     #[schema(example = 0)]
-    ticket_index: u32,
+    ticket_index: u64,
     #[schema(example = 1)]
     channel_epoch: u32,
     #[schema(example = 0)]
@@ -117,8 +117,8 @@ async fn query_topology_info(channel: ChannelEntry) -> Result<ChannelInfoRespons
         destination: channel.destination,
         balance: channel.balance,
         status: channel.status,
-        ticket_index: channel.ticket_index.as_u32(),
-        channel_epoch: channel.channel_epoch.as_u32(),
+        ticket_index: channel.ticket_index,
+        channel_epoch: channel.channel_epoch,
         closure_time: channel
             .closure_time_at()
             .map(|ct| ct.as_unix_timestamp().as_secs())

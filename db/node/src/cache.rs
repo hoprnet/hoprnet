@@ -9,7 +9,7 @@ use hopr_crypto_packet::{
 };
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
-use hopr_primitive_types::{balance::HoprBalance, prelude::U256};
+use hopr_primitive_types::balance::HoprBalance;
 use moka::{Expiry, future::Cache, notification::RemovalCause};
 use ringbuffer::{AllocRingBuffer, RingBuffer};
 
@@ -103,7 +103,7 @@ pub struct NodeDbCaches {
     pub(crate) ticket_index: Cache<Hash, Arc<AtomicU64>>,
     // key is (channel_id, channel_epoch) to ensure calculation of unrealized value does not
     // include tickets from other epochs
-    pub(crate) unrealized_value: Cache<(Hash, U256), HoprBalance>,
+    pub(crate) unrealized_value: Cache<(ChannelId, u32), HoprBalance>,
     pseudonym_openers: moka::sync::Cache<HoprPseudonym, moka::sync::Cache<HoprSurbId, ReplyOpener>>,
     pub(crate) surbs_per_pseudonym: Cache<HoprPseudonym, SurbRingBuffer<HoprSurb>>,
 }

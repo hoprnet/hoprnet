@@ -82,7 +82,7 @@ pub fn packet_sending_bench(c: &mut Criterion) {
                     },
                     |((sender_addr, destination_addr), forward_path, return_paths, payload)| {
                         // The number of hops for ticket creation does not matter for benchmark purposes
-                        let tb = TicketBuilder::zero_hop().direction(&sender_addr, &destination_addr);
+                        let tb = TicketBuilder::zero_hop().counterparty(destination_addr);
                         HoprPacket::into_outgoing(
                             &payload,
                             &PSEUDONYM,
@@ -117,10 +117,7 @@ pub fn packet_sending_bench(c: &mut Criterion) {
     for hops in [0, 1, 2, 3] {
         group.bench_with_input(BenchmarkId::from_parameter(format!("{hops}_hop")), &hops, |b, &hops| {
             // The number of hops for ticket creation does not matter for benchmark purposes
-            let tb = TicketBuilder::zero_hop().direction(
-                &sender_chain.public().to_address(),
-                &destination_chain.public().to_address(),
-            );
+            let tb = TicketBuilder::zero_hop().counterparty(destination_chain.public().to_address());
             let forward_path = TransportPath::new(path.iter().take(hops + 1).copied()).unwrap();
             let precomputed = PartialHoprPacket::new(
                 &PSEUDONYM,
@@ -179,7 +176,7 @@ pub fn packet_precompute_bench(c: &mut Criterion) {
                     },
                     |((sender_addr, destination_addr), forward_path, return_paths)| {
                         // The number of hops for ticket creation does not matter for benchmark purposes
-                        let tb = TicketBuilder::zero_hop().direction(&sender_addr, &destination_addr);
+                        let tb = TicketBuilder::zero_hop().counterparty(destination_addr);
                         PartialHoprPacket::new(
                             &PSEUDONYM,
                             PacketRouting::ForwardPath {
@@ -214,10 +211,7 @@ pub fn packet_forwarding_bench(c: &mut Criterion) {
     let msg = hopr_crypto_random::random_bytes::<{ HoprPacket::PAYLOAD_SIZE }>();
 
     // The number of hops for ticket creation does not matter for benchmark purposes
-    let tb = TicketBuilder::zero_hop().direction(
-        &sender_chain.public().to_address(),
-        &destination_chain.public().to_address(),
-    );
+    let tb = TicketBuilder::zero_hop().counterparty(destination_chain.public().to_address());
 
     // Sender
     let packet = HoprPacket::into_outgoing(
@@ -276,10 +270,7 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
     let msg = hopr_crypto_random::random_bytes::<{ HoprPacket::PAYLOAD_SIZE }>();
 
     // The number of hops for ticket creation does not matter for benchmark purposes
-    let tb = TicketBuilder::zero_hop().direction(
-        &sender_chain.public().to_address(),
-        &destination_chain.public().to_address(),
-    );
+    let tb = TicketBuilder::zero_hop().counterparty(destination_chain.public().to_address());
 
     // Sender
     let forward_path = TransportPath::new(path).unwrap();

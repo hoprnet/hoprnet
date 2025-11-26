@@ -4459,7 +4459,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "auto_impl",
@@ -4583,7 +4583,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-packet"
-version = "1.0.1"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "bimap",
@@ -4620,7 +4620,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-sphinx"
-version = "0.10.1"
+version = "0.11.0"
 dependencies = [
  "anyhow",
  "bimap",
@@ -4699,7 +4699,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-migration"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "sea-orm-migration",
  "tokio",
@@ -4707,7 +4707,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-node"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "async-lock",
@@ -4740,6 +4740,7 @@ dependencies = [
  "sea-query",
  "smart-default",
  "sqlx",
+ "test-log",
  "thiserror 2.0.17",
  "tokio",
  "tracing",
@@ -4748,7 +4749,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-internal-types"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -5216,7 +5217,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.13.5"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "arrayvec",
