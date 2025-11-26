@@ -606,6 +606,8 @@ where
                                     } else {
                                         tracing::debug!(%rejected, "marked ticket as rejected");
                                     }
+                                } else {
+                                    tracing::debug!(%rejected, "issuer of the rejected ticket could not be determined");
                                 }
                                 None
                             }
