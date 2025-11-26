@@ -542,7 +542,7 @@ fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> payload::Result<
 
         Ok(OnChainRedeemableTicket {
             data: TicketData {
-                channelId: B256::from_slice(off_chain.verified_ticket().channel_id.as_ref()),
+                channelId: B256::from_slice(off_chain.ticket.channel_id().as_ref()),
                 amount: U96::from_be_slice(&off_chain.verified_ticket().amount.amount().to_be_bytes()[32 - 12..]), /* Extract only the last 12 bytes (lowest 96 bits) */
                 ticketIndex: U48::from_be_slice(&off_chain.verified_ticket().index.to_be_bytes()[8 - 6..]),
                 epoch: U24::from_be_slice(&off_chain.verified_ticket().channel_epoch.to_be_bytes()[4 - 3..]),

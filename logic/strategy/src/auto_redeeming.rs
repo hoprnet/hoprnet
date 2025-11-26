@@ -168,7 +168,7 @@ where
         if self.cfg.redeem_on_winning && ack.verified_ticket().amount.ge(&self.cfg.minimum_redeem_ticket_value) {
             if let Some(channel) = self
                 .hopr_chain_actions
-                .channel_by_id(&ack.verified_ticket().channel_id)
+                .channel_by_id(ack.channel_id())
                 .await
                 .map_err(|e| StrategyError::Other(e.into()))?
             {

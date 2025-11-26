@@ -6,7 +6,7 @@ use axum::{
     response::IntoResponse,
 };
 use hopr_lib::{
-    HoprBalance, Ticket, TicketStatistics, ToHex,
+    HoprBalance, TicketStatistics, ToHex,
     errors::{HoprLibError, HoprStatusError},
     prelude::Hash,
 };
@@ -45,19 +45,6 @@ pub(crate) struct ChannelTicket {
         example = "0xe445fcf4e90d25fe3c9199ccfaff85e23ecce8773304d85e7120f1f38787f2329822470487a37f1b5408c8c0b73e874ee9f7594a632713b6096e616857999891"
     )]
     signature: String,
-}
-
-impl From<Ticket> for ChannelTicket {
-    fn from(value: Ticket) -> Self {
-        Self {
-            channel_id: value.channel_id,
-            amount: value.amount,
-            index: value.index,
-            win_prob: value.win_prob().to_string(),
-            channel_epoch: value.channel_epoch,
-            signature: value.signature.expect("impossible to have an unsigned ticket").to_hex(),
-        }
-    }
 }
 
 #[derive(Deserialize)]

@@ -19,6 +19,7 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(ColumnDef::new(Ticket::ChannelId).string_len(64).not_null())
+                    .col(ColumnDef::new(Ticket::Counterparty).string_len(40).not_null())
                     .col(ColumnDef::new(Ticket::Amount).binary_len(12).not_null())
                     .col(ColumnDef::new(Ticket::Index).binary_len(8).not_null())
                     .col(ColumnDef::new(Ticket::WinningProbability).binary_len(7).not_null())
@@ -48,6 +49,17 @@ impl MigrationTrait for Migration {
         manager
             .create_index(
                 Index::create()
+                    .name("idx_ticket_counterparty")
+                    .if_not_exists()
+                    .table(Ticket::Table)
+                    .col(Ticket::Counterparty)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
                     .name("idx_ticket_channel_id_epoch_index")
                     .if_not_exists()
                     .table(Ticket::Table)
@@ -66,6 +78,10 @@ impl MigrationTrait for Migration {
             .await?;
 
         manager
+            .drop_index(Index::drop().name("idx_ticket_counterparty").to_owned())
+            .await?;
+
+        manager
             .drop_index(Index::drop().name("idx_ticket_channel").to_owned())
             .await?;
 
@@ -78,6 +94,7 @@ enum Ticket {
     Table,
     Id,
     ChannelId,
+    Counterparty,
     Amount,
     Index,
     WinningProbability,

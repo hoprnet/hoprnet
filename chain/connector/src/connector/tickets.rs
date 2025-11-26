@@ -17,7 +17,7 @@ where
     async fn prepare_ticket_redeem_payload(&self, ticket: RedeemableTicket) -> Result<P::TxRequest, ConnectorError> {
         self.check_connection_state()?;
 
-        let channel_id = ticket.verified_ticket().channel_id;
+        let channel_id = *ticket.ticket.channel_id();
         if generate_channel_id(ticket.ticket.verified_issuer(), self.chain_key.public().as_ref()) != channel_id {
             tracing::error!(%channel_id, "redeemed ticket is not ours");
             return Err(ConnectorError::InvalidTicket);
@@ -27,7 +27,7 @@ where
         let channel = self
             .client
             .query_channels(blokli_client::api::ChannelSelector {
-                filter: blokli_client::api::ChannelFilter::ChannelId(ticket.verified_ticket().channel_id.into()),
+                filter: blokli_client::api::ChannelFilter::ChannelId(ticket.ticket.channel_id().into()),
                 status: None,
             })
             .await?

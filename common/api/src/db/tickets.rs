@@ -5,7 +5,6 @@ use std::{
 };
 
 use futures::stream::BoxStream;
-use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
@@ -42,7 +41,7 @@ impl Display for TicketIndexSelector {
 #[derive(Clone, Debug)]
 pub struct TicketSelector {
     /// Channel ID and Epoch pair.
-    pub channel_identifier: (Hash, U256),
+    pub channel_identifier: (ChannelId, u32),
     /// If given, will select ticket(s) with the given indices
     /// in the given channel and epoch.
     ///
@@ -102,9 +101,9 @@ impl PartialEq for TicketSelector {
 
 impl TicketSelector {
     /// Create a new ticket selector given the `channel_id` and `epoch`.
-    pub fn new<T: Into<U256>>(channel_id: Hash, epoch: T) -> Self {
+    pub fn new(channel_id: ChannelId, epoch: u32) -> Self {
         Self {
-            channel_identifier: (channel_id, epoch.into()),
+            channel_identifier: (channel_id, epoch),
             index: TicketIndexSelector::None,
             win_prob: (Bound::Unbounded, Bound::Unbounded),
             amount: (Bound::Unbounded, Bound::Unbounded),
@@ -176,27 +175,21 @@ impl TicketSelector {
 
 impl From<&AcknowledgedTicket> for TicketSelector {
     fn from(value: &AcknowledgedTicket) -> Self {
-        Self::from(value.verified_ticket())
+        Self::from(&value.ticket)
     }
 }
 
 impl From<&RedeemableTicket> for TicketSelector {
     fn from(value: &RedeemableTicket) -> Self {
-        Self::from(value.verified_ticket())
+        Self::from(&value.ticket)
     }
 }
 
 impl From<&VerifiedTicket> for TicketSelector {
     fn from(value: &VerifiedTicket) -> Self {
-        Self::from(value.verified_ticket())
-    }
-}
-
-impl From<&Ticket> for TicketSelector {
-    fn from(value: &Ticket) -> Self {
         Self {
-            channel_identifier: (value.channel_id, value.channel_epoch.into()),
-            index: TicketIndexSelector::Single(value.index),
+            channel_identifier: (*value.channel_id(), value.verified_ticket().channel_epoch),
+            index: TicketIndexSelector::Single(value.verified_ticket().index),
             win_prob: (Bound::Unbounded, Bound::Unbounded),
             amount: (Bound::Unbounded, Bound::Unbounded),
             state: None,
@@ -207,7 +200,7 @@ impl From<&Ticket> for TicketSelector {
 impl From<&ChannelEntry> for TicketSelector {
     fn from(value: &ChannelEntry) -> Self {
         Self {
-            channel_identifier: (*value.get_id(), value.channel_epoch),
+            channel_identifier: (*value.get_id(), value.channel_epoch.as_u32()),
             index: TicketIndexSelector::None,
             win_prob: (Bound::Unbounded, Bound::Unbounded),
             amount: (Bound::Unbounded, Bound::Unbounded),

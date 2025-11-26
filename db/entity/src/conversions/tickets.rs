@@ -12,7 +12,7 @@ impl TryFrom<&ticket::Model> for RedeemableTicket {
         let response = Response::try_from(value.response.as_ref())?;
 
         let ticket = TicketBuilder::default()
-            .channel_id(Hash::from_hex(&value.channel_id)?)
+            .counterparty(Address::from_hex(&value.counterparty)?)
             .amount(U256::from_be_bytes(&value.amount))
             .index(U256::from_be_bytes(&value.index).as_u64())
             .win_prob(
@@ -60,7 +60,8 @@ impl TryFrom<ticket::Model> for RedeemableTicket {
 impl From<RedeemableTicket> for ticket::ActiveModel {
     fn from(value: RedeemableTicket) -> Self {
         ticket::ActiveModel {
-            channel_id: Set(hex::encode(value.verified_ticket().channel_id)), // serialize without 0x prefix
+            channel_id: Set(hex::encode(value.ticket.channel_id())), // serialize without 0x prefix
+            counterparty: Set(hex::encode(value.verified_ticket().counterparty)), // serialize without 0x prefix
             amount: Set(value.verified_ticket().amount.amount().to_be_bytes().to_vec()),
             index: Set(value.verified_ticket().index.to_be_bytes().to_vec()),
             winning_probability: Set(value.verified_ticket().encoded_win_prob.to_vec()),

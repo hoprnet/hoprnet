@@ -274,7 +274,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
     }
 
     async fn mark_unsaved_ticket_rejected(&self, ticket: &Ticket) -> Result<(), NodeDbError> {
-        let channel_id = ticket.channel_id;
+        let channel_id = generate_channel_id(&ticket.counterparty, &self.me_address);
         let amount = ticket.amount;
         Ok(self
             .ticket_manager
@@ -601,13 +601,7 @@ impl HoprNodeDb {
             .transaction(|tx| {
                 Box::pin(async move {
                     // For upserting, we must select only by the triplet (channel id, epoch, index)
-                    let selector = WrappedTicketSelector::from(
-                        TicketSelector::new(
-                            acknowledged_ticket.verified_ticket().channel_id,
-                            acknowledged_ticket.verified_ticket().channel_epoch,
-                        )
-                        .with_index(acknowledged_ticket.verified_ticket().index),
-                    );
+                    let selector = WrappedTicketSelector::from(TicketSelector::from(&acknowledged_ticket));
 
                     debug!("upserting ticket {acknowledged_ticket}");
                     let mut model = ticket::ActiveModel::from(acknowledged_ticket);

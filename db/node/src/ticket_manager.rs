@@ -9,7 +9,7 @@ use hopr_api::db::TicketSelector;
 use hopr_async_runtime::prelude::spawn;
 use hopr_db_entity::ticket;
 use hopr_internal_types::prelude::RedeemableTicket;
-use hopr_primitive_types::prelude::{HoprBalance, IntoEndian, ToHex};
+use hopr_primitive_types::prelude::{HoprBalance, IntoEndian};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, IntoActiveModel, QueryFilter, TransactionTrait,
 };
@@ -76,7 +76,7 @@ impl TicketManager {
                         .transaction(|tx| {
                             Box::pin(async move {
                                 // Insertion of a new acknowledged ticket
-                                let channel_id = ticket_to_insert.verified_ticket().channel_id.to_hex();
+                                let channel_id = hex::encode(ticket_to_insert.ticket.channel_id());
 
                                 hopr_db_entity::ticket::ActiveModel::from(ticket_to_insert)
                                     .insert(tx)
@@ -132,7 +132,7 @@ impl TicketManager {
     /// The [`start_ticket_processing`](TicketManager::start_ticket_processing) method
     /// must be called before calling this method, or it will fail.
     pub async fn insert_ticket(&self, ticket: RedeemableTicket) -> Result<(), NodeDbError> {
-        let channel = ticket.verified_ticket().channel_id;
+        let channel = *ticket.ticket.channel_id();
         let value = ticket.verified_ticket().amount;
         let epoch = ticket.verified_ticket().channel_epoch;
 
@@ -157,7 +157,7 @@ impl TicketManager {
 
         self.caches
             .unrealized_value
-            .insert((channel, epoch.into()), unrealized_value + value)
+            .insert((channel, epoch), unrealized_value + value)
             .await;
 
         Ok(())

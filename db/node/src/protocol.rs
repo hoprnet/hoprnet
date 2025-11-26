@@ -83,10 +83,10 @@ impl HoprNodeDb {
                 ))
             })?;
 
-        // Check: is the ticket in the packet really for the given channel?
-        if !fwd.outgoing.ticket.channel_id.eq(incoming_channel.get_id()) {
-            return Err(NodeDbError::LogicalError("invalid ticket for channel".into()));
-        }
+        // TODO: Check: is the ticket in the packet really for the given channel?
+        // if !fwd.outgoing.ticket.channel_id.eq(incoming_channel.get_id()) {
+        // return Err(NodeDbError::LogicalError("invalid ticket for channel".into()));
+        // }
 
         let domain_separator = resolver
             .domain_separators()
@@ -175,7 +175,7 @@ impl HoprNodeDb {
             )
             .await?
         } else {
-            TicketBuilder::zero_hop().direction(&self.me_address, &next_hop_addr)
+            TicketBuilder::zero_hop().counterparty(next_hop_addr)
         };
 
         // Finally, replace the ticket in the outgoing packet with a new one
@@ -242,9 +242,7 @@ impl HoprNodeDb {
                             Ok(ResolvedAcknowledgement::RelayingWin(ack_ticket))
                         } else {
                             trace!("Found a losing ticket");
-                            Ok(ResolvedAcknowledgement::RelayingLoss(
-                                ack_ticket.ticket.verified_ticket().channel_id,
-                            ))
+                            Ok(ResolvedAcknowledgement::RelayingLoss(*ack_ticket.ticket.channel_id()))
                         }
                     })
                     .await
@@ -279,14 +277,10 @@ impl HoprDbProtocolOperations for HoprNodeDb {
                     METRIC_RECEIVED_ACKS.increment(&["true"]);
                     METRIC_TICKETS_COUNT.increment(&["winning"]);
 
-                    let verified_ticket = ack_ticket.ticket.verified_ticket();
                     crate::tickets::METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
                         &["unredeemed"],
                         self.ticket_manager
-                            .unrealized_value(TicketSelector::new(
-                                verified_ticket.channel_id,
-                                verified_ticket.channel_epoch,
-                            ))
+                            .unrealized_value(ack_ticket.into())
                             .await?
                             .amount()
                             .as_u128() as f64,
@@ -372,7 +366,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
 
         // No-ack packets are always sent as zero-hops with a random pseudonym
         let pseudonym = HoprPseudonym::random();
-        let next_ticket = TicketBuilder::zero_hop().direction(&self.me_address, &next_peer);
+        let next_ticket = TicketBuilder::zero_hop().counterparty(next_peer);
         let domain_separator = resolver
             .domain_separators()
             .await
@@ -494,7 +488,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
             )
             .await?
         } else {
-            TicketBuilder::zero_hop().direction(&self.me_address, &next_peer)
+            TicketBuilder::zero_hop().counterparty(next_peer)
         };
 
         let domain_separator = resolver
@@ -762,7 +756,7 @@ impl HoprNodeDb {
         }
 
         let ticket_builder = TicketBuilder::default()
-            .direction(&self.me_address, &destination)
+            .counterparty(destination)
             .balance(amount)
             .index(self.increment_outgoing_ticket_index(channel.get_id()).await?)
             .win_prob(winning_prob)
