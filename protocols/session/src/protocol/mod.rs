@@ -86,7 +86,7 @@ impl<const C: usize> std::fmt::Display for SessionMessage<C> {
 
 impl<const C: usize> SessionMessage<C> {
     /// Header size of the session message.
-    /// This is currently the version byte, the size of [SessionMessageDiscriminants] representation
+    /// This is currently the version byte, the size of [`SessionMessageDiscriminants`] representation
     /// and two bytes for the message length.
     pub const HEADER_SIZE: usize = 1 + size_of::<SessionMessageDiscriminants>() + size_of::<u16>();
     /// Maximum size of the message in v1.
