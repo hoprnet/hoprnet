@@ -145,7 +145,7 @@ where
             .channel_by_parties(unacknowledged.ticket.verified_issuer(), self.chain_key.as_ref())
             .await
             .map_err(|e| HoprProtocolError::ResolverError(e.into()))?
-            .filter(|c| c.channel_epoch.as_u32() == unacknowledged.verified_ticket().channel_epoch)
+            .filter(|c| c.channel_epoch == unacknowledged.verified_ticket().channel_epoch)
             .ok_or(HoprProtocolError::ChannelNotFound(
                 *unacknowledged.ticket.verified_issuer(),
                 *self.chain_key.as_ref(),
@@ -185,7 +185,7 @@ where
             let ticket_value = redeemable.verified_ticket().amount;
             self.in_unrealized_value
                 .entry((
-                    redeemable.verified_ticket().channel_id,
+                    *redeemable.ticket.channel_id(),
                     redeemable.verified_ticket().channel_epoch,
                 ))
                 .and_compute_with(|maybe_value| match maybe_value {

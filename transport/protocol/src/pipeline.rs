@@ -4,6 +4,7 @@ use hopr_async_runtime::{AbortableList, spawn_as_abortable};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_network_types::{prelude::*, timeout::TimeoutSinkExt};
+use hopr_primitive_types::prelude::Address;
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
@@ -47,7 +48,7 @@ pub enum TicketEvent {
     /// A winning ticket was received.
     WinningTicket(Box<RedeemableTicket>),
     /// A ticket has been rejected.
-    RejectedTicket(Box<Ticket>),
+    RejectedTicket(Box<Ticket>, Option<Address>),
 }
 
 /// Performs encoding of outgoing Application protocol packets into HOPR protocol outgoing packets.
@@ -183,7 +184,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                     Ok(Err(IncomingPacketError::InvalidTicket(sender, error))) => {
                         tracing::error!(%peer, %error, "failed to validate ticket on the received packet");
                         if let Err(error) = ticket_events_reject
-                            .send(TicketEvent::RejectedTicket(error.ticket))
+                            .send(TicketEvent::RejectedTicket(error.ticket, error.issuer))
                             .await {
                             tracing::error!(%error, "failed to notify invalid ticket rejection");
                         }

@@ -597,11 +597,15 @@ where
                                 }
                                 Some(winning)
                             }
-                            TicketEvent::RejectedTicket(rejected) => {
-                                if let Err(error) = node_db.mark_unsaved_ticket_rejected(rejected.as_ref()).await {
-                                    tracing::error!(%error, %rejected, "failed to mark ticket as rejected");
-                                } else {
-                                    tracing::debug!(%rejected, "marked ticket as rejected");
+                            TicketEvent::RejectedTicket(rejected, issuer) => {
+                                if let Some(issuer) = &issuer {
+                                    if let Err(error) =
+                                        node_db.mark_unsaved_ticket_rejected(issuer, rejected.as_ref()).await
+                                    {
+                                        tracing::error!(%error, %rejected, "failed to mark ticket as rejected");
+                                    } else {
+                                        tracing::debug!(%rejected, "marked ticket as rejected");
+                                    }
                                 }
                                 None
                             }
@@ -682,7 +686,7 @@ where
                             }
                         },
                         Some(ChannelDirection::Outgoing) => {
-                            if let Err(error) = node_db.remove_outgoing_ticket_index(closed_channel.get_id(), closed_channel.channel_epoch.as_u32()).await {
+                            if let Err(error) = node_db.remove_outgoing_ticket_index(closed_channel.get_id(), closed_channel.channel_epoch).await {
                                 error!(%error, %closed_channel, "failed to reset ticket index on closed outgoing channel");
                             } else {
                                 debug!(%closed_channel, "outgoing ticket index has been resets on outgoing channel closure");

@@ -4,7 +4,7 @@ use std::{
 };
 
 use hopr_api::chain::*;
-use hopr_crypto_packet::{errors::TicketValidationError, prelude::*};
+use hopr_crypto_packet::prelude::*;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -79,15 +79,6 @@ where
             .map_err(|e| HoprProtocolError::ResolverError(e.into()))?
             .ok_or_else(|| HoprProtocolError::ChannelNotFound(previous_hop_addr, *self.chain_key.as_ref()))?;
 
-        // Check: is the ticket in the packet really for the given channel?
-        if !fwd.outgoing.ticket.channel_id.eq(incoming_channel.get_id()) {
-            return Err(TicketValidationError {
-                reason: "channel id on the ticket does not match the channel".into(),
-                ticket: Box::new(fwd.outgoing.ticket),
-            }
-            .into());
-        }
-
         // The ticket price from the oracle times my node's position on the
         // path is the acceptable minimum
         let minimum_ticket_price = self
@@ -99,7 +90,7 @@ where
 
         let remaining_balance = incoming_channel.balance.sub(
             self.tracker
-                .incoming_channel_unrealized_balance(incoming_channel.get_id(), incoming_channel.channel_epoch.as_u32())
+                .incoming_channel_unrealized_balance(incoming_channel.get_id(), incoming_channel.channel_epoch)
                 .await
                 .map_err(|e| HoprProtocolError::TicketTrackerError(e.into()))?,
         );
@@ -173,7 +164,7 @@ where
                     e => HoprProtocolError::TicketTrackerError(e.into()),
                 })?
         } else {
-            TicketBuilder::zero_hop().direction(self.chain_key.as_ref(), &next_hop_addr)
+            TicketBuilder::zero_hop().counterparty(next_hop_addr)
         };
 
         // Finally, replace the ticket in the outgoing packet with a new one

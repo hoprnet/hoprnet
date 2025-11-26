@@ -111,7 +111,7 @@ where
                     e => HoprProtocolError::TicketTrackerError(e.into()),
                 })?
         } else {
-            TicketBuilder::zero_hop().direction(self.chain_key.as_ref(), &next_peer)
+            TicketBuilder::zero_hop().counterparty(next_peer)
         };
 
         // Construct the outgoing packet

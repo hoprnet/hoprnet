@@ -176,7 +176,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
                 &["unredeemed"],
                 self.ticket_manager
                     .unrealized_value(TicketSelector::new(
-                        ticket.verified_ticket().channel_id,
+                        *ticket.ticket.channel_id(),
                         ticket.verified_ticket().channel_epoch,
                     ))
                     .await?

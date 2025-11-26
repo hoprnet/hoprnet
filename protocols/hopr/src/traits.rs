@@ -116,15 +116,15 @@ pub trait TicketTracker {
         }
 
         let ticket_builder = TicketBuilder::default()
-            .channel_id(*channel.get_id())
+            .counterparty(channel.destination)
             .balance(amount)
             .index(
-                self.next_outgoing_ticket_index(channel.get_id(), channel.channel_epoch.as_u32())
+                self.next_outgoing_ticket_index(channel.get_id(), channel.channel_epoch)
                     .await
                     .map_err(TicketCreationError::Other)?,
             )
             .win_prob(winning_prob)
-            .channel_epoch(channel.channel_epoch.as_u32());
+            .channel_epoch(channel.channel_epoch);
 
         Ok(ticket_builder)
     }

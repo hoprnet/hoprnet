@@ -1,5 +1,5 @@
 use hopr_internal_types::prelude::ChannelId;
-use hopr_primitive_types::{balance::HoprBalance, prelude::U256};
+use hopr_primitive_types::balance::HoprBalance;
 use moka::future::Cache;
 
 /// Contains all caches used by the [crate::db::HoprDb].
@@ -7,7 +7,7 @@ use moka::future::Cache;
 pub struct NodeDbCaches {
     // key is (channel_id, channel_epoch) to ensure calculation of unrealized value does not
     // include tickets from other epochs
-    pub(crate) unrealized_value: Cache<(ChannelId, U256), HoprBalance>,
+    pub(crate) unrealized_value: Cache<(ChannelId, u32), HoprBalance>,
 }
 
 impl Default for NodeDbCaches {
