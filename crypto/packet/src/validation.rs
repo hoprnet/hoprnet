@@ -110,7 +110,7 @@ mod tests {
 
     fn create_valid_ticket() -> anyhow::Result<Ticket> {
         Ok(TicketBuilder::default()
-            .addresses(&*SENDER_PRIV_KEY, &*TARGET_PRIV_KEY)
+            .counterparty(&*TARGET_PRIV_KEY)
             .amount(1)
             .index(1)
             .win_prob(1.0.try_into()?)
@@ -125,9 +125,9 @@ mod tests {
             SENDER_PRIV_KEY.public().to_address(),
             TARGET_PRIV_KEY.public().to_address(),
             100.into(),
-            U256::zero(),
+            0,
             ChannelStatus::Open,
-            U256::one(),
+            1,
         )
     }
 
@@ -241,7 +241,7 @@ mod tests {
         let ticket = create_valid_ticket()?;
         let mut channel = create_channel_entry();
         channel.balance = 0.into();
-        channel.channel_epoch = U256::from(ticket.channel_epoch);
+        channel.channel_epoch = ticket.channel_epoch;
 
         let ret =
             validate_unacknowledged_ticket(ticket, &channel, 1.into(), 1.0.try_into()?, 0.into(), &Hash::default());

@@ -251,7 +251,7 @@ mod tests {
         let challenge = Response::from_half_keys(&hk1, &hk2)?.to_challenge()?;
 
         let ticket = TicketBuilder::default()
-            .direction(BOB.public().as_ref(), ALICE.public().as_ref())
+            .counterparty(&*ALICE)
             .amount(TICKET_VALUE)
             .index(index as u64)
             .channel_epoch(4)
@@ -271,9 +271,9 @@ mod tests {
             BOB.public().to_address(),
             ALICE.public().to_address(),
             u32::MAX.into(),
-            1.into(),
+            1,
             ChannelStatus::Open,
-            4_u32.into(),
+            4,
         );
 
         assert_eq!(

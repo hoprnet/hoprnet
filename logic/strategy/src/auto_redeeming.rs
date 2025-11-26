@@ -250,18 +250,18 @@ mod tests {
             ALICE.public().to_address(),
             BOB.public().to_address(),
             *PRICE_PER_PACKET * 10,
-            0.into(),
+            0,
             ChannelStatus::Open,
-            4.into()
+            4
         );
 
         static ref CHANNEL_2: ChannelEntry = ChannelEntry::new(
             CHARLIE.public().to_address(),
             BOB.public().to_address(),
             *PRICE_PER_PACKET * 11,
-            1.into(),
+            1,
             ChannelStatus::Open,
-            4.into()
+            4
         );
 
         static ref CHAIN_CLIENT: BlokliTestClient<StaticState> = BlokliTestStateBuilder::default()
@@ -277,7 +277,7 @@ mod tests {
         let challenge = Response::from_half_keys(&hk1, &hk2)?.to_challenge()?;
 
         Ok(TicketBuilder::default()
-            .addresses(&*ALICE, &*BOB)
+            .counterparty(&*BOB)
             .amount(PRICE_PER_PACKET.div_f64(1.0f64)?.amount() * worth_packets)
             .index(index)
             .win_prob(WinningProbability::ALWAYS)
@@ -369,11 +369,11 @@ mod tests {
             vec![
                 TicketSelector::from(CHANNEL_1.clone())
                     .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
-                    .with_index_range(CHANNEL_1.ticket_index.as_u64()..)
+                    .with_index_range(CHANNEL_1.ticket_index..)
                     .with_state(AcknowledgedTicketStatus::Untouched),
                 TicketSelector::from(CHANNEL_2.clone())
                     .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
-                    .with_index_range(CHANNEL_2.ticket_index.as_u64()..)
+                    .with_index_range(CHANNEL_2.ticket_index..)
                     .with_state(AcknowledgedTicketStatus::Untouched)
             ]
         );
@@ -420,7 +420,7 @@ mod tests {
             vec![
                 TicketSelector::from(CHANNEL_1.clone())
                     .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
-                    .with_index_range(CHANNEL_1.ticket_index.as_u64()..=ack_ticket_at.ticket.verified_ticket().index)
+                    .with_index_range(CHANNEL_1.ticket_index..=ack_ticket_at.ticket.verified_ticket().index)
                     .with_state(AcknowledgedTicketStatus::Untouched)
             ]
         );
@@ -472,7 +472,7 @@ mod tests {
             vec![
                 TicketSelector::from(CHANNEL_1.clone())
                     .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
-                    .with_index_range(CHANNEL_1.ticket_index.as_u64()..)
+                    .with_index_range(CHANNEL_1.ticket_index..)
                     .with_state(AcknowledgedTicketStatus::Untouched)
             ]
         );
@@ -516,7 +516,7 @@ mod tests {
             vec![
                 TicketSelector::from(CHANNEL_1.clone())
                     .with_amount(HoprBalance::zero()..)
-                    .with_index_range(CHANNEL_1.ticket_index.as_u64()..=ack_ticket_1.ticket.verified_ticket().index)
+                    .with_index_range(CHANNEL_1.ticket_index..=ack_ticket_1.ticket.verified_ticket().index)
                     .with_state(AcknowledgedTicketStatus::Untouched),
             ]
         );

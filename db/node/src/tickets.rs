@@ -721,7 +721,7 @@ mod tests {
         let challenge = Response::from_half_keys(&hk1, &hk2)?.to_challenge()?;
 
         Ok(TicketBuilder::default()
-            .addresses(src, dst)
+            .counterparty(dst)
             .amount(TICKET_VALUE)
             .index(index)
             .win_prob(win_prob.try_into()?)
@@ -751,11 +751,7 @@ mod tests {
         let mut tickets = init_db_with_tickets(&db, 1).await?;
         let ack_ticket = tickets.pop().context("ticket should be present")?;
 
-        assert_eq!(
-            *CHANNEL_ID,
-            ack_ticket.verified_ticket().channel_id,
-            "channel ids must match"
-        );
+        assert_eq!(*CHANNEL_ID, *ack_ticket.ticket.channel_id(), "channel ids must match");
         assert_eq!(
             CHANNEL_EPOCH,
             ack_ticket.verified_ticket().channel_epoch,

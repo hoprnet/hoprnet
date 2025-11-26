@@ -914,7 +914,7 @@ where
     }
 
     /// Get all tickets
-    pub async fn all_tickets(&self) -> errors::Result<Vec<Ticket>> {
+    pub async fn all_tickets(&self) -> errors::Result<Vec<VerifiedTicket>> {
         Ok(self.transport_api.all_tickets().await?)
     }
 
