@@ -197,7 +197,7 @@ impl HoprNodeDb {
     pub async fn invalidate_unrealized_value(&self, channel: &ChannelEntry) {
         self.caches
             .unrealized_value
-            .invalidate(&(*channel.get_id(), channel.channel_epoch.as_u32()))
+            .invalidate(&(*channel.get_id(), channel.channel_epoch))
             .await;
     }
 

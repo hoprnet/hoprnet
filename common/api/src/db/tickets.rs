@@ -200,7 +200,7 @@ impl From<&VerifiedTicket> for TicketSelector {
 impl From<&ChannelEntry> for TicketSelector {
     fn from(value: &ChannelEntry) -> Self {
         Self {
-            channel_identifier: (*value.get_id(), value.channel_epoch.as_u32()),
+            channel_identifier: (*value.get_id(), value.channel_epoch),
             index: TicketIndexSelector::None,
             win_prob: (Bound::Unbounded, Bound::Unbounded),
             amount: (Bound::Unbounded, Bound::Unbounded),

@@ -152,7 +152,7 @@ where
                 .map(|channel| {
                     Ok(TicketSelector::from(&channel)
                         .with_amount(self.cfg.minimum_redeem_ticket_value..)
-                        .with_index_range(channel.ticket_index.as_u64()..)
+                        .with_index_range(channel.ticket_index..)
                         .with_state(AcknowledgedTicketStatus::Untouched))
                 })
                 .forward(self.redeem_sink.clone())
@@ -174,14 +174,14 @@ where
             {
                 info!(%ack, "redeeming");
 
-                if ack.verified_ticket().index < channel.ticket_index.as_u64() {
+                if ack.verified_ticket().index < channel.ticket_index {
                     error!(%ack, "acknowledged ticket is older than channel ticket index");
                     return Err(CriteriaNotSatisfied);
                 }
 
                 let selector = TicketSelector::from(channel)
                     .with_amount(self.cfg.minimum_redeem_ticket_value..)
-                    .with_index_range(channel.ticket_index.as_u64()..=ack.verified_ticket().index)
+                    .with_index_range(channel.ticket_index..=ack.verified_ticket().index)
                     .with_state(AcknowledgedTicketStatus::Untouched);
 
                 self.enqueue_redeem_request(selector).await
@@ -212,7 +212,7 @@ where
 
             let selector = TicketSelector::from(channel)
                 .with_amount(self.cfg.minimum_redeem_ticket_value..)
-                .with_index_range(channel.ticket_index.as_u64()..)
+                .with_index_range(channel.ticket_index..)
                 .with_state(AcknowledgedTicketStatus::Untouched);
 
             self.enqueue_redeem_request(selector).await

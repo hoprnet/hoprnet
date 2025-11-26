@@ -221,7 +221,7 @@ impl HoprNodeDb {
 
                 // Issuer's channel must have an epoch matching with the unacknowledged ticket
                 if maybe_channel_with_issuer
-                    .is_some_and(|c| c.channel_epoch.as_u32() == unacknowledged.verified_ticket().channel_epoch)
+                    .is_some_and(|c| c.channel_epoch == unacknowledged.verified_ticket().channel_epoch)
                 {
                     let domain_separator = resolver
                         .domain_separators()
@@ -760,7 +760,7 @@ impl HoprNodeDb {
             .balance(amount)
             .index(self.increment_outgoing_ticket_index(channel.get_id()).await?)
             .win_prob(winning_prob)
-            .channel_epoch(channel.channel_epoch.as_u32());
+            .channel_epoch(channel.channel_epoch);
 
         Ok(ticket_builder)
     }

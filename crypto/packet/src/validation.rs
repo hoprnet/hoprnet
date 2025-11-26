@@ -59,7 +59,7 @@ pub fn validate_unacknowledged_ticket(
     }
 
     // The ticket's channelEpoch MUST match the current channel's epoch
-    if !channel.channel_epoch.eq(&inner_ticket.channel_epoch.into()) {
+    if channel.channel_epoch != inner_ticket.channel_epoch {
         return Err(TicketValidationError {
             reason: format!(
                 "ticket was created for a different channel iteration {} != {} of channel {}",
