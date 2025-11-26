@@ -1,6 +1,6 @@
 [package]
 name = "hopr-crypto-sphinx"
-version = "0.10.1"
+version = "0.11.0"
 description = "Implements Sphinx packet format for the HOPR protocol"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
