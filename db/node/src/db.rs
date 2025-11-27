@@ -5,6 +5,8 @@ use std::{
     time::Duration,
 };
 
+use hopr_internal_types::channels::ChannelId;
+use hopr_primitive_types::prelude::HoprBalance;
 use migration::{MigratorPeers, MigratorTickets, MigratorTrait};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, SqlxSqliteConnector};
 use sqlx::{
@@ -40,6 +42,8 @@ pub struct HoprNodeDb {
     pub(crate) peers_db: sea_orm::DatabaseConnection,
     pub(crate) tickets_write_lock: Arc<async_lock::Mutex<()>>,
     pub(crate) cfg: HoprNodeDbConfig,
+    // This value must be cached here, due to complicated invalidation logic.
+    pub(crate) unrealized_value: moka::future::Cache<(ChannelId, u32), HoprBalance>,
 }
 
 impl HoprNodeDb {
@@ -127,6 +131,9 @@ impl HoprNodeDb {
 
         Ok(Self {
             tickets_write_lock: Arc::new(async_lock::Mutex::new(())),
+            unrealized_value: moka::future::CacheBuilder::new(10_000)
+                .time_to_idle(std::time::Duration::from_secs(30))
+                .build(),
             tickets_db,
             peers_db,
             cfg,

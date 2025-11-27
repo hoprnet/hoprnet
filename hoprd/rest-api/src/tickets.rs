@@ -6,7 +6,7 @@ use axum::{
     response::IntoResponse,
 };
 use hopr_lib::{
-    HoprBalance, TicketStatistics, ToHex,
+    ChannelTicketStatistics, HoprBalance, ToHex,
     errors::{HoprLibError, HoprStatusError},
     prelude::Hash,
 };
@@ -162,14 +162,14 @@ pub(crate) struct NodeTicketStatisticsResponse {
     rejected_value: HoprBalance,
 }
 
-impl From<TicketStatistics> for NodeTicketStatisticsResponse {
-    fn from(value: TicketStatistics) -> Self {
+impl From<ChannelTicketStatistics> for NodeTicketStatisticsResponse {
+    fn from(value: ChannelTicketStatistics) -> Self {
         Self {
-            winning_count: value.winning_count as u64,
+            winning_count: value.winning_tickets as u64,
             unredeemed_value: value.unredeemed_value,
-            redeemed_value: value.redeemed_value,
-            neglected_value: value.neglected_value,
-            rejected_value: value.rejected_value,
+            redeemed_value: value.redeemed_value(),
+            neglected_value: value.neglected_value(),
+            rejected_value: value.rejected_value(),
         }
     }
 }

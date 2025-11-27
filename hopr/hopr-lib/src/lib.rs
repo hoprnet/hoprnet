@@ -82,6 +82,7 @@ use std::{
 };
 
 use futures::{FutureExt, SinkExt, Stream, StreamExt, TryFutureExt, channel::mpsc::channel};
+pub use hopr_api::db::ChannelTicketStatistics;
 use hopr_api::{
     chain::{AccountSelector, AnnouncementError, ChannelSelector, *},
     db::{HoprNodeDbApi, PeerStatus, TicketMarker, TicketSelector},
@@ -961,7 +962,7 @@ where
     }
 
     /// Get statistics for all tickets
-    pub async fn ticket_statistics(&self) -> errors::Result<TicketStatistics> {
+    pub async fn ticket_statistics(&self) -> errors::Result<ChannelTicketStatistics> {
         Ok(self.transport_api.ticket_statistics().await?)
     }
 

@@ -28,12 +28,13 @@ pub const REDEEM_CALL_SELECTOR: [u8; 4] = [101, 227, 250, 114];
 /// Winning probability encoded in 7-byte representation
 pub type EncodedWinProb = [u8; ENCODED_WIN_PROB_LENGTH];
 
-/// Represents a ticket winning probability.
+/// Represents a ticket-winning probability.
 ///
-/// It holds the modified IEEE-754 but behaves like a reduced precision float.
+/// It holds the modified IEEE-754 representation but behaves like a reduced precision float.
 /// It intentionally does not implement `Ord` or `Eq`, as
-/// it can be only [approximately compared](WinningProbability::approx_cmp).
-#[derive(Clone, Copy, Debug)]
+/// it can be either [approximately compared](WinningProbability::approx_cmp) or
+/// [lexicographically compared](WinningProbability::lex_cmp).
+#[derive(Clone, Copy, Debug, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct WinningProbability(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] EncodedWinProb);
 
@@ -121,7 +122,17 @@ impl WinningProbability {
 
     /// Performs approximate equality comparison up to [`Self::EPSILON`].
     pub fn approx_eq(&self, other: &Self) -> bool {
-        self.approx_cmp(other) == Ordering::Equal
+        self.approx_cmp(other).is_eq()
+    }
+
+    /// Performs lexicographical comparison of the [luck values](Self::as_luck).
+    pub fn lex_cmp(&self, other: &Self) -> Ordering {
+        self.as_luck().cmp(&other.as_luck())
+    }
+
+    /// Performs lexicographical equality comparison of the [luck values](Self::as_luck).
+    pub fn lex_eq(&self, other: &Self) -> bool {
+        self.lex_cmp(other).is_eq()
     }
 
     /// Gets the minimum of two winning probabilities.
@@ -204,6 +215,12 @@ impl PartialEq<f64> for WinningProbability {
 impl PartialEq<WinningProbability> for f64 {
     fn eq(&self, other: &WinningProbability) -> bool {
         f64_approx_eq(*self, other.as_f64(), WinningProbability::EPSILON)
+    }
+}
+
+impl PartialEq<EncodedWinProb> for WinningProbability {
+    fn eq(&self, other: &EncodedWinProb) -> bool {
+        self.0.eq(other)
     }
 }
 
@@ -405,12 +422,16 @@ impl TicketBuilder {
             }
         };
 
-        if self.index > (1_u64 << 48) {
-            return Err(InvalidInputData("cannot hold ticket indices larger than 2^48".into()));
+        if self.index >= (1_u64 << 48) {
+            return Err(InvalidInputData(
+                "cannot hold ticket indices larger than 2^48 - 1".into(),
+            ));
         }
 
-        if self.channel_epoch > (1_u32 << 24) {
-            return Err(InvalidInputData("cannot hold channel epoch larger than 2^24".into()));
+        if self.channel_epoch >= (1_u32 << 24) {
+            return Err(InvalidInputData(
+                "cannot hold channel epoch larger than 2^24 - 1".into(),
+            ));
         }
 
         Ok(Ticket {
@@ -1190,8 +1211,12 @@ pub mod tests {
         let wp_0 = WinningProbability(hex!("0020C49BBFFFFF"));
         let wp_1 = WinningProbability(hex!("0020C49BA5E34F"));
 
-        assert_ne!(wp_0.as_ref(), wp_1.as_ref());
+        // These two probabilities are equal up to epsilon, but different lexicographically
+        assert_ne!(wp_0, wp_1.as_encoded());
+        assert!(!wp_0.lex_eq(&wp_1));
+
         assert_eq!(wp_0, wp_1.as_f64());
+        assert!(wp_0.approx_eq(&wp_1));
 
         Ok(())
     }
@@ -1206,7 +1231,7 @@ pub mod tests {
     }
 
     #[test]
-    pub fn test_win_prob_must_be_correctly_ordered() {
+    pub fn test_win_prob_must_be_correctly_approx_ordered() {
         let increment = WinningProbability::EPSILON * 100.0; // Testing the entire range would take too long
         let mut prev = WinningProbability::NEVER;
         while let Ok(next) = WinningProbability::try_from_f64(prev.as_f64() + increment) {
@@ -1216,16 +1241,43 @@ pub mod tests {
     }
 
     #[test]
+    pub fn test_win_prob_must_be_correctly_lex_ordered() {
+        let increment = WinningProbability::EPSILON * 100.0; // Testing the entire range would take too long
+        let mut prev = WinningProbability::NEVER;
+        while let Ok(next) = WinningProbability::try_from_f64(prev.as_f64() + increment) {
+            assert!(prev.lex_cmp(&next).is_lt());
+            prev = next;
+        }
+    }
+
+    #[test]
     pub fn test_win_prob_epsilon_must_be_never() -> anyhow::Result<()> {
         assert!(WinningProbability::NEVER.approx_eq(&WinningProbability::try_from_f64(WinningProbability::EPSILON)?));
+        assert!(WinningProbability::NEVER.lex_eq(&WinningProbability::try_from_f64(WinningProbability::EPSILON)?));
         Ok(())
     }
 
     #[test]
-    pub fn test_win_prob_bounds_must_be_eq() -> anyhow::Result<()> {
+    pub fn test_win_prob_bounds_must_be_approx_eq() -> anyhow::Result<()> {
         let bound = 0.1 + WinningProbability::EPSILON;
         let other = 0.1;
         assert!(WinningProbability::try_from_f64(bound)?.approx_eq(&WinningProbability::try_from_f64(other)?));
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_win_prob_bounds_must_not_be_approx_eq_when_differ_by_more_then_epsilon() -> anyhow::Result<()> {
+        let bound = 0.1 + 1.1 * WinningProbability::EPSILON;
+        let other = 0.1;
+        assert!(!WinningProbability::try_from_f64(bound)?.approx_eq(&WinningProbability::try_from_f64(other)?));
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_win_prob_bounds_must_not_be_lex_eq() -> anyhow::Result<()> {
+        let bound = 0.1 + WinningProbability::EPSILON;
+        let other = 0.1;
+        assert!(!WinningProbability::try_from_f64(bound)?.lex_eq(&WinningProbability::try_from_f64(other)?));
         Ok(())
     }
 

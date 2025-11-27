@@ -19,16 +19,6 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-/// Ticket statistics data exposed by the ticket mechanism.
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct TicketStatistics {
-    pub winning_count: u128,
-    pub unredeemed_value: HoprBalance,
-    pub redeemed_value: HoprBalance,
-    pub neglected_value: HoprBalance,
-    pub rejected_value: HoprBalance,
-}
-
 #[derive(Clone)]
 pub(crate) struct PathPlanner<Surb, R, S> {
     pub(crate) surb_store: Surb,

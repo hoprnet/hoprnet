@@ -37,6 +37,7 @@ use futures::{
     channel::mpsc::{Sender, channel},
 };
 use helpers::PathPlanner;
+pub use hopr_api::db::ChannelTicketStatistics;
 use hopr_api::{
     chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
     db::{HoprDbPeersOperations, HoprDbTicketOperations, PeerOrigin, PeerStatus, TicketSelector},
@@ -82,7 +83,7 @@ pub use hopr_transport_session::{
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
 use tracing::{Instrument, debug, error, info, trace, warn};
 
-pub use crate::{config::HoprTransportConfig, helpers::TicketStatistics};
+pub use crate::config::HoprTransportConfig;
 use crate::{
     constants::SESSION_INITIATION_TIMEOUT_BASE, errors::HoprTransportError, pipeline::HoprPacketPipelineConfig,
     socket::HoprSocket,
@@ -719,20 +720,11 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn ticket_statistics(&self) -> errors::Result<TicketStatistics> {
-        let ticket_stats = self
-            .db
+    pub async fn ticket_statistics(&self) -> errors::Result<ChannelTicketStatistics> {
+        self.db
             .get_ticket_statistics(None)
             .await
-            .map_err(|e| HoprTransportError::Other(e.into()))?;
-
-        Ok(TicketStatistics {
-            winning_count: ticket_stats.winning_tickets,
-            unredeemed_value: ticket_stats.unredeemed_value,
-            redeemed_value: ticket_stats.redeemed_value(),
-            neglected_value: ticket_stats.neglected_value(),
-            rejected_value: ticket_stats.rejected_value(),
-        })
+            .map_err(|e| HoprTransportError::Other(e.into()))
     }
 
     #[tracing::instrument(level = "debug", skip(self))]

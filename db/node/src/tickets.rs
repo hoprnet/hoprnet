@@ -4,12 +4,12 @@ use async_stream::stream;
 use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt, stream::BoxStream};
 use hopr_api::db::*;
-use hopr_crypto_types::prelude::*;
 use hopr_db_entity::{outgoing_ticket_index, ticket, ticket_statistics};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, Set, TransactionTrait,
+    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, QuerySelect, Set,
+    TransactionTrait,
 };
 use sea_query::{Condition, Expr, ExprTrait, IntoCondition, Order};
 use tracing::{debug, error, info, trace};
@@ -190,7 +190,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
 
     async fn insert_ticket(&self, ticket: RedeemableTicket) -> Result<(), Self::Error> {
         let _lock = self.tickets_write_lock.lock().await;
-
+        let unrealized_value = self.unrealized_value.clone();
         self.tickets_db
             .transaction(|tx| {
                 Box::pin(async move {
@@ -216,8 +216,20 @@ impl HoprDbTicketOperations for HoprNodeDb {
                                 .as_u128() as f64,
                         );
                         METRIC_HOPR_TICKETS_INCOMING_STATISTICS.increment(&["winning_count"], 1.0f64);
-                        METRIC_HOPR_TICKETS_INCOMING_STATISTICS.increment(&["losing_count"], 1.0f64);
                     }
+
+                    // Increase the unrealized value in the corresponding channel
+                    unrealized_value
+                        .entry((*ticket.ticket.channel_id(), ticket.verified_ticket().channel_epoch))
+                        .and_compute_with(|value| match value {
+                            Some(value) => futures::future::ready(moka::ops::compute::Op::Put(
+                                value.into_value() + ticket.verified_ticket().amount,
+                            )),
+                            None => {
+                                futures::future::ready(moka::ops::compute::Op::Put(ticket.verified_ticket().amount))
+                            }
+                        })
+                        .await;
 
                     Ok::<_, NodeDbError>(())
                 })
@@ -233,13 +245,15 @@ impl HoprDbTicketOperations for HoprNodeDb {
         mark_as: TicketMarker,
     ) -> Result<usize, Self::Error> {
         let selectors = selectors.into_iter().map(|s| s.into()).collect::<Vec<_>>();
+        let unrealized_value = self.unrealized_value.clone();
         let _lock = self.tickets_write_lock.lock().await;
 
-        Ok(self
+        let (total_count, marked_values) = self
             .tickets_db
             .transaction(|tx| {
                 Box::pin(async move {
                     let mut total_marked_count = 0;
+                    let mut marked_values = Vec::new();
                     for channel_selector in selectors {
                         // Get the number of tickets and their value just for this channel
                         let (marked_count, marked_value) =
@@ -255,7 +269,10 @@ impl HoprDbTicketOperations for HoprNodeDb {
 
                             // Update the stats if successful
                             if deleted.rows_affected == marked_count as u64 {
-                                let mut new_stats = find_stats_for_channel(tx, &channel_selector.channel_identifier.0).await?.into_active_model();
+                                let mut new_stats = find_stats_for_channel(tx, &channel_selector.channel_identifier.0)
+                                    .await?
+                                    .into_active_model();
+
                                 let _current_value = match mark_as {
                                     TicketMarker::Redeemed => {
                                         let current_value = U256::from_be_bytes(new_stats.redeemed_value.as_ref());
@@ -299,8 +316,6 @@ impl HoprDbTicketOperations for HoprNodeDb {
                                         );
                                     }
                                 }
-
-                                // TODO: figure out a way how to invalidate unrealized value after ticket marking
                             } else {
                                 return Err(NodeDbError::LogicalError(format!(
                                     "could not mark {marked_count} ticket as {mark_as}"
@@ -309,20 +324,38 @@ impl HoprDbTicketOperations for HoprNodeDb {
 
                             trace!(marked_count, channel_id = ?channel_selector.channel_identifier.0, ?mark_as, "removed tickets in channel");
                             total_marked_count += marked_count;
+                            marked_values.push((channel_selector.channel_identifier.0, channel_selector.channel_identifier.1, marked_value));
                         }
                     }
 
                     info!(count = total_marked_count, ?mark_as, "removed tickets in channels",);
-                    Ok(total_marked_count)
+                    Ok((total_marked_count, marked_values))
                 })
             })
-            .await?)
+            .await?;
+
+        // Decrease the unrealized value in each channel.
+        // This must happen no matter if tickets have been neglected, rejected or redeemed.
+        for (channel_id, epoch, removed_amount) in marked_values {
+            unrealized_value
+                .entry((channel_id, epoch))
+                .and_compute_with(|value| match value {
+                    Some(value) => {
+                        futures::future::ready(moka::ops::compute::Op::Put(value.into_value() - removed_amount))
+                    }
+                    None => futures::future::ready(moka::ops::compute::Op::Nop),
+                })
+                .await;
+        }
+
+        Ok(total_count)
     }
 
     async fn mark_unsaved_ticket_rejected(&self, issuer: &Address, ticket: &Ticket) -> Result<(), NodeDbError> {
         let channel_id = generate_channel_id(issuer, &ticket.counterparty);
         let amount = ticket.amount;
         let _lock = self.tickets_write_lock.lock().await;
+
         Ok(self
             .tickets_db
             .transaction(|tx| {
@@ -417,7 +450,10 @@ impl HoprDbTicketOperations for HoprNodeDb {
             .await?)
     }
 
-    async fn get_ticket_statistics(&self, channel_id: Option<Hash>) -> Result<ChannelTicketStatistics, NodeDbError> {
+    async fn get_ticket_statistics(
+        &self,
+        channel_id: Option<ChannelId>,
+    ) -> Result<ChannelTicketStatistics, NodeDbError> {
         let res = match channel_id {
             None => {
                 self.tickets_db
@@ -565,8 +601,15 @@ impl HoprDbTicketOperations for HoprNodeDb {
             .await?)
     }
 
-    async fn get_tickets_value(&self, selector: TicketSelector) -> Result<(usize, HoprBalance), NodeDbError> {
-        get_tickets_value_int(&self.tickets_db, selector).await
+    async fn get_tickets_value(&self, id: &ChannelId, epoch: u32) -> Result<HoprBalance, NodeDbError> {
+        Ok(self
+            .unrealized_value
+            .try_get_with((*id, epoch), async {
+                get_tickets_value_int(&self.tickets_db, TicketSelector::new(*id, epoch))
+                    .await
+                    .map(|(_, value)| value)
+            })
+            .await?)
     }
 
     async fn get_or_create_outgoing_ticket_index(
@@ -574,38 +617,74 @@ impl HoprDbTicketOperations for HoprNodeDb {
         channel_id: &ChannelId,
         epoch: u32,
     ) -> Result<Option<u64>, Self::Error> {
-        let maybe_index = outgoing_ticket_index::Entity::find()
-            .filter(
-                outgoing_ticket_index::Column::ChannelId
-                    .eq(hex::encode(channel_id))
-                    .and(outgoing_ticket_index::Column::Epoch.eq(epoch)),
-            )
-            .one(&self.tickets_db)
-            .await?;
+        let _lock = self.tickets_write_lock.lock().await;
+        let channel_id = hex::encode(channel_id);
 
-        Ok(match maybe_index {
-            Some(model) => Some(U256::from_be_bytes(model.index).as_u64()),
-            None => {
-                let _lock = self.tickets_write_lock.lock().await;
+        Ok(self
+            .tickets_db
+            .transaction(|tx| {
+                Box::pin(async move {
+                    // Delete all older epochs
+                    outgoing_ticket_index::Entity::delete_many()
+                        .filter(
+                            outgoing_ticket_index::Column::ChannelId
+                                .eq(&channel_id)
+                                .and(outgoing_ticket_index::Column::Epoch.lt(epoch)),
+                        )
+                        .exec(tx)
+                        .await?;
 
-                let channel_id = *channel_id;
-                self.tickets_db
-                    .transaction(|tx| {
-                        Box::pin(async move {
+                    // Check if there are no newer epochs for this channel
+                    let newer_epoch = outgoing_ticket_index::Entity::find()
+                        .filter(
+                            outgoing_ticket_index::Column::ChannelId
+                                .eq(&channel_id)
+                                .and(outgoing_ticket_index::Column::Epoch.gt(epoch)),
+                        )
+                        .limit(1)
+                        .one(tx)
+                        .await?;
+
+                    if let Some(newer_epoch) = newer_epoch {
+                        return Err(NodeDbError::LogicalError(format!(
+                            "attempted to get or insert outgoing index for older epoch {epoch} < {} in channel \
+                             {channel_id}",
+                            newer_epoch.epoch
+                        )));
+                    }
+
+                    // Look if this epoch already has an existing index
+                    let maybe_index = outgoing_ticket_index::Entity::find()
+                        .filter(
+                            outgoing_ticket_index::Column::ChannelId
+                                .eq(&channel_id)
+                                .and(outgoing_ticket_index::Column::Epoch.eq(epoch)),
+                        )
+                        .order_by_asc(outgoing_ticket_index::Column::Epoch)
+                        .one(tx)
+                        .await?;
+
+                    Ok(match maybe_index {
+                        Some(model) => Some(u64::from_be_bytes(model.index.try_into().map_err(|_| {
+                            NodeDbError::LogicalError(format!(
+                                "could not convert outgoing ticket index to u64 for channel {channel_id}"
+                            ))
+                        })?)),
+                        None => {
                             outgoing_ticket_index::ActiveModel {
-                                channel_id: Set(hex::encode(channel_id)),
+                                channel_id: Set(channel_id),
                                 epoch: Set(epoch as i32),
                                 ..Default::default()
                             }
                             .insert(tx)
                             .await?;
-                            Ok::<_, sea_orm::DbErr>(())
-                        })
+
+                            None
+                        }
                     })
-                    .await?;
-                None
-            }
-        })
+                })
+            })
+            .await?)
     }
 
     async fn update_outgoing_ticket_index(
@@ -615,7 +694,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
         index: u64,
     ) -> Result<(), Self::Error> {
         let _lock = self.tickets_write_lock.lock().await;
-        let channel_id = *channel_id;
+        let channel_id = hex::encode(channel_id);
         Ok(self
             .tickets_db
             .transaction(|tx| {
@@ -623,7 +702,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
                     let maybe_index = outgoing_ticket_index::Entity::find()
                         .filter(
                             outgoing_ticket_index::Column::ChannelId
-                                .eq(hex::encode(channel_id))
+                                .eq(&channel_id)
                                 .and(outgoing_ticket_index::Column::Epoch.eq(epoch)),
                         )
                         .one(tx)
@@ -647,7 +726,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
                             tracing::debug!(%channel_id, %epoch, %index, "updated outgoing ticket index");
                         }
                     } else {
-                        tracing::debug!("ignoring attempt to update outgoing ticket index non-existing entry");
+                        tracing::debug!("ignoring attempt to update outgoing ticket index for non-existing entry");
                     }
 
                     Ok::<_, NodeDbError>(())
@@ -713,7 +792,6 @@ mod tests {
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
-    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
     use crate::{
         db::HoprNodeDb,
@@ -1044,6 +1122,20 @@ mod tests {
         Ok(())
     }
 
+    #[test_log::test(tokio::test)]
+    async fn test_outgoing_ticket_index_should_not_allow_old_epochs() -> anyhow::Result<()> {
+        let db = HoprNodeDb::new_in_memory().await?;
+
+        let hash = Hash::default();
+
+        db.get_or_create_outgoing_ticket_index(&hash, 1).await?;
+        db.get_or_create_outgoing_ticket_index(&hash, 2).await?;
+
+        assert!(db.get_or_create_outgoing_ticket_index(&hash, 1).await.is_err());
+
+        Ok(())
+    }
+
     #[tokio::test]
     async fn test_outgoing_ticket_index_should_be_updated_if_already_present() -> anyhow::Result<()> {
         let db = HoprNodeDb::new_in_memory().await?;
@@ -1090,7 +1182,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_outgoing_ticket_index_should_be_remove() -> anyhow::Result<()> {
+    async fn test_outgoing_ticket_index_should_be_removed() -> anyhow::Result<()> {
         let db = HoprNodeDb::new_in_memory().await?;
 
         let hash = Hash::default();
