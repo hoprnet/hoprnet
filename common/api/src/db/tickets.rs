@@ -136,6 +136,16 @@ impl TicketSelector {
         self
     }
 
+    /// Removes all other restriction except for the channel ID and epoch.
+    #[must_use]
+    pub fn only_channel(mut self) -> Self {
+        self.index = TicketIndexSelector::None;
+        self.win_prob = (Bound::Unbounded, Bound::Unbounded);
+        self.amount = (Bound::Unbounded, Bound::Unbounded);
+        self.state = None;
+        self
+    }
+
     /// Returns this instance with a ticket index upper bound set.
     /// If [`TicketSelector::with_index`] was previously called, it will be replaced.
     #[must_use]
@@ -278,6 +288,9 @@ pub trait HoprDbTicketOperations {
     async fn mark_unsaved_ticket_rejected(&self, issuer: &Address, ticket: &Ticket) -> Result<(), Self::Error>;
 
     /// Updates the [state](AcknowledgedTicketStatus) of the tickets matching the given `selectors`.
+    ///
+    /// The operation should prevent any concurrent changes to the tickets before the stream is fully
+    /// consumed.
     ///
     /// Returns the updated tickets in the new state.
     async fn update_ticket_states_and_fetch<'a, S: Into<TicketSelector>, I: IntoIterator<Item = S> + Send>(

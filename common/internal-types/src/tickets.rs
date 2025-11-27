@@ -485,7 +485,7 @@ impl From<Ticket> for TicketBuilder {
 /// the [`Ticket::verify`] or [`Ticket::sign`] methods are called.
 ///
 /// # Ticket state machine
-/// See the entire state machine describing the relations of different ticket types below:
+/// See the entire state machine describing the relations of the different ticket types below:
 /// ```mermaid
 /// flowchart TB
 ///     A[Ticket] -->|verify| B(VerifiedTicket)
@@ -815,7 +815,6 @@ impl VerifiedTicket {
     }
 
     /// Shorthand to acknowledge the ticket if the matching response is already known.
-    /// This is used upon receiving an aggregated ticket.
     pub fn into_acknowledged(self, response: Response) -> AcknowledgedTicket {
         AcknowledgedTicket {
             status: AcknowledgedTicketStatus::Untouched,

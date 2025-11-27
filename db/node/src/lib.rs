@@ -1,10 +1,7 @@
 mod db;
+pub mod errors;
 mod peers;
 mod tickets;
-
-mod cache;
-pub mod errors;
-mod ticket_manager;
 
 use std::path::PathBuf;
 
@@ -42,18 +39,6 @@ pub async fn init_hopr_node_db(
         log_slow_queries: std::time::Duration::from_millis(150),
     };
     let node_db = HoprNodeDb::new(db_path.as_path(), db_cfg).await?;
-
-    let ack_ticket_channel_capacity = std::env::var("HOPR_INTERNAL_ACKED_TICKET_CHANNEL_CAPACITY")
-        .ok()
-        .and_then(|s| s.trim().parse::<usize>().ok())
-        .filter(|&c| c > 0)
-        .unwrap_or(2048);
-
-    tracing::debug!(
-        capacity = ack_ticket_channel_capacity,
-        "starting winning ticket processing"
-    );
-    node_db.start_ticket_processing(Some(futures::sink::drain()))?;
 
     Ok(node_db)
 }

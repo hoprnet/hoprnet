@@ -329,7 +329,7 @@ mod tests {
     };
 
     use futures::StreamExt;
-    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
+    use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
 
     use super::*;
 

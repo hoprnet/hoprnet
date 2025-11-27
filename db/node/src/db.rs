@@ -5,7 +5,6 @@ use std::{
     time::Duration,
 };
 
-use hopr_internal_types::prelude::ChannelEntry;
 use migration::{MigratorPeers, MigratorTickets, MigratorTrait};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, SqlxSqliteConnector};
 use sqlx::{
@@ -16,7 +15,7 @@ use sqlx::{
 use tracing::{debug, log::LevelFilter};
 use validator::Validate;
 
-use crate::{cache::NodeDbCaches, errors::NodeDbError, ticket_manager::TicketManager};
+use crate::errors::NodeDbError;
 
 /// Filename for the network peers database.
 pub const SQL_DB_PEERS_FILE_NAME: &str = "hopr_peers.db";
@@ -39,8 +38,7 @@ pub struct HoprNodeDbConfig {
 pub struct HoprNodeDb {
     pub(crate) tickets_db: sea_orm::DatabaseConnection,
     pub(crate) peers_db: sea_orm::DatabaseConnection,
-    pub(crate) ticket_manager: Arc<TicketManager>,
-    pub(crate) caches: Arc<NodeDbCaches>,
+    pub(crate) tickets_write_lock: Arc<async_lock::Mutex<()>>,
     pub(crate) cfg: HoprNodeDbConfig,
 }
 
@@ -127,14 +125,10 @@ impl HoprNodeDb {
             .await?;
         debug!(rows = res.rows_affected, "Cleaned up rows from the 'peers' table");
 
-        let caches = Arc::new(NodeDbCaches::default());
-        caches.invalidate_all();
-
         Ok(Self {
-            ticket_manager: Arc::new(TicketManager::new(tickets_db.clone(), caches.clone())),
+            tickets_write_lock: Arc::new(async_lock::Mutex::new(())),
             tickets_db,
             peers_db,
-            caches,
             cfg,
         })
     }
@@ -169,13 +163,6 @@ impl HoprNodeDb {
         let pool = options.connect_with(sqlite_cfg.filename(directory.join(path))).await?;
 
         Ok(pool)
-    }
-
-    pub async fn invalidate_unrealized_value(&self, channel: &ChannelEntry) {
-        self.caches
-            .unrealized_value
-            .invalidate(&(*channel.get_id(), channel.channel_epoch))
-            .await;
     }
 
     pub fn config(&self) -> &HoprNodeDbConfig {
