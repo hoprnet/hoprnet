@@ -253,13 +253,7 @@ where
             hopr_chain_api.clone(),
             hopr_node_db.clone(),
             vec![(&cfg.host).try_into().map_err(HoprLibError::TransportError)?],
-            HoprTransportConfig {
-                transport: cfg.transport.clone(),
-                network: cfg.network_options.clone(),
-                protocol: cfg.protocol,
-                probe: cfg.probe,
-                session: cfg.session,
-            },
+            cfg.hopr,
         );
 
         #[cfg(all(feature = "prometheus", not(test)))]
@@ -403,7 +397,7 @@ where
             .minimum_ticket_price()
             .await
             .map_err(HoprLibError::chain)?;
-        let configured_ticket_price = self.cfg.protocol.outgoing_ticket_price;
+        let configured_ticket_price = self.cfg.hopr.packet.codec.outgoing_ticket_price;
         if configured_ticket_price.is_some_and(|c| c < network_min_ticket_price) {
             return Err(HoprLibError::GeneralError(format!(
                 "configured outgoing ticket price is lower than the network minimum ticket price: \
@@ -417,11 +411,9 @@ where
             .minimum_incoming_ticket_win_prob()
             .await
             .map_err(HoprLibError::chain)?;
-        let configured_win_prob = self.cfg.protocol.outgoing_ticket_winning_prob;
+        let configured_win_prob = self.cfg.hopr.packet.codec.outgoing_win_prob;
         if !std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true")
-            && configured_win_prob
-                .and_then(|c| WinningProbability::try_from(c).ok())
-                .is_some_and(|c| c.approx_cmp(&network_min_win_prob).is_lt())
+            && configured_win_prob.is_some_and(|c| c.approx_cmp(&network_min_win_prob).is_lt())
         {
             return Err(HoprLibError::GeneralError(format!(
                 "configured outgoing ticket winning probability is lower than the network minimum winning \
@@ -820,8 +812,8 @@ where
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         let backoff = backon::ConstantBuilder::default()
-            .with_max_times(self.cfg.session.establish_max_retries as usize)
-            .with_delay(self.cfg.session.establish_retry_timeout)
+            .with_max_times(self.cfg.hopr.session.establish_max_retries as usize)
+            .with_delay(self.cfg.hopr.session.establish_retry_timeout)
             .with_jitter();
 
         use backon::Retryable;

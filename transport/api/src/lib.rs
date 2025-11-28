@@ -54,7 +54,7 @@ pub use hopr_network_types::prelude::RoutingOptions;
 use hopr_network_types::prelude::{DestinationRouting, *};
 use hopr_primitive_types::prelude::*;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
-use hopr_protocol_hopr::{HoprCodecConfig, HoprTicketProcessorConfig, MemorySurbStore};
+use hopr_protocol_hopr::MemorySurbStore;
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId, Protocol};
 use hopr_transport_mixer::MixerConfig;
@@ -84,10 +84,7 @@ use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfi
 use tracing::{Instrument, debug, error, info, trace, warn};
 
 pub use crate::config::HoprTransportConfig;
-use crate::{
-    constants::SESSION_INITIATION_TIMEOUT_BASE, errors::HoprTransportError, pipeline::HoprPacketPipelineConfig,
-    socket::HoprSocket,
-};
+use crate::{constants::SESSION_INITIATION_TIMEOUT_BASE, errors::HoprTransportError, socket::HoprSocket};
 
 pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RANGE;
 
@@ -120,10 +117,10 @@ type CurrentPathSelector = NoPathSelector;
 /// Interface into the physical transport mechanism allowing all off-chain HOPR-related tasks on
 /// the transport.
 pub struct HoprTransport<Chain, Db> {
-    me: OffchainKeypair,
-    me_onchain: ChainKeypair,
+    packet_key: OffchainKeypair,
+    chain_key: ChainKeypair,
     db: Db,
-    resolver: Chain,
+    chain_api: Chain,
     ping: Arc<OnceLock<Pinger>>,
     network: Arc<Network<Db>>,
     path_planner: PathPlanner<MemorySurbStore, Chain, CurrentPathSelector>,
@@ -152,18 +149,18 @@ where
         cfg: HoprTransportConfig,
     ) -> Self {
         Self {
-            me: identity.1.clone(),
-            me_onchain: identity.0.clone(),
+            packet_key: identity.1.clone(),
+            chain_key: identity.0.clone(),
             ping: Arc::new(OnceLock::new()),
             network: Arc::new(Network::new(
                 identity.1.into(),
                 my_multiaddresses.clone(),
-                cfg.network.clone(),
+                cfg.network,
                 db.clone(),
             )),
             path_planner: PathPlanner::new(
                 *identity.0.as_ref(),
-                MemorySurbStore::new(cfg.protocol.surb_store),
+                MemorySurbStore::new(cfg.packet.surb_store),
                 resolver.clone(),
                 CurrentPathSelector::default(),
             ),
@@ -187,13 +184,13 @@ where
                 balancer_sampling_interval: cfg.session.balancer_sampling_interval,
                 initial_return_session_egress_rate: 10,
                 minimum_surb_buffer_duration: Duration::from_secs(5),
-                maximum_surb_buffer_size: cfg.protocol.surb_store.rb_capacity,
+                maximum_surb_buffer_size: cfg.packet.surb_store.rb_capacity,
                 // Allow a 10% increase of the target SURB buffer on incoming Sessions
                 // if the SURB buffer level has surpassed it by at least 10% in the last 2 minutes.
                 growable_target_surb_buffer: Some((Duration::from_secs(120), 0.10)),
             }),
             db,
-            resolver,
+            chain_api: resolver,
             cfg,
         }
     }
@@ -225,7 +222,7 @@ where
     {
         info!("loading initial peers from the chain");
         let public_nodes = self
-            .resolver
+            .chain_api
             .stream_accounts(AccountSelector {
                 public_only: true,
                 ..Default::default()
@@ -254,7 +251,7 @@ where
         let (mut internal_discovery_update_tx, internal_discovery_update_rx) =
             futures::channel::mpsc::channel::<PeerDiscovery>(internal_discovery_updates_capacity);
 
-        let me_peerid: PeerId = self.me.public().into();
+        let me_peerid: PeerId = self.packet_key.public().into();
         let network = self.network.clone();
         let discovery_updates = futures_concurrency::stream::StreamExt::merge(
             discovery_updates,
@@ -321,7 +318,7 @@ where
         let (mixing_channel_tx, mixing_channel_rx) = hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(mixer_cfg);
 
         let transport_layer = HoprSwarm::new(
-            (&self.me).into(),
+            (&self.packet_key).into(),
             discovery_updates,
             self.my_multiaddresses.clone(),
             self.cfg.transport.prefer_local_addresses,
@@ -411,7 +408,7 @@ where
         // We have to resolve DestinationRouting -> ResolvedTransportRouting before
         // sending the external packets to the transport pipeline.
         let path_planner = self.path_planner.clone();
-        let distress_threshold = self.cfg.protocol.surb_store.distress_threshold;
+        let distress_threshold = self.cfg.packet.surb_store.distress_threshold;
         let all_resolved_external_msg_rx = unresolved_routing_msg_rx.filter_map(move |(unresolved, mut data)| {
             let path_planner = path_planner.clone();
             async move {
@@ -457,37 +454,22 @@ where
         });
 
         let channels_dst = self
-            .resolver
+            .chain_api
             .domain_separators()
             .await
             .map_err(HoprTransportError::chain)?
             .channel;
-        let hopr_pipeline_cfg = HoprPacketPipelineConfig {
-            codec_cfg: HoprCodecConfig {
-                outgoing_ticket_price: self.cfg.protocol.outgoing_ticket_price,
-                outgoing_win_prob: self
-                    .cfg
-                    .protocol
-                    .outgoing_ticket_winning_prob
-                    .map(WinningProbability::try_from)
-                    .transpose()?,
-                channels_dst,
-            },
-            ticket_proc_cfg: HoprTicketProcessorConfig {
-                channels_dst,
-                ..Default::default()
-            },
-        };
 
         processes.extend_from(pipeline::run_hopr_packet_pipeline(
-            (self.me.clone(), self.me_onchain.clone()),
+            (self.packet_key.clone(), self.chain_key.clone()),
             (mixing_channel_tx, wire_msg_rx),
             (tx_from_protocol, all_resolved_external_msg_rx),
             ticket_events,
             self.path_planner.surb_store.clone(),
-            self.resolver.clone(),
+            self.chain_api.clone(),
             self.db.clone(),
-            hopr_pipeline_cfg,
+            channels_dst,
+            self.cfg.packet,
         ));
 
         // -- network probing
@@ -594,7 +576,7 @@ where
 
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn ping(&self, peer: &PeerId) -> errors::Result<(std::time::Duration, PeerStatus)> {
-        if peer == &self.me.public().into() {
+        if peer == &self.packet_key.public().into() {
             return Err(HoprTransportError::Api("ping to self does not make sense".into()));
         }
 
@@ -648,7 +630,7 @@ where
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn listening_multiaddresses(&self) -> Vec<Multiaddr> {
         self.network
-            .get(&self.me.public().into())
+            .get(&self.packet_key.public().into())
             .await
             .unwrap_or_else(|e| {
                 error!(error = %e, "failed to obtain listening multi-addresses");

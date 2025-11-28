@@ -15,35 +15,40 @@ use crate::{
     errors::HoprProtocolError, tbf::TagBloomFilter,
 };
 
-pub struct HoprDecoder<R, S, T> {
-    provider: R,
+/// Default [decoder](PacketDecoder) implementation for HOPR packets.
+pub struct HoprDecoder<Chain, S, T> {
+    chain_api: Chain,
     surb_store: std::sync::Arc<S>,
     tracker: T,
     packet_key: OffchainKeypair,
     chain_key: ChainKeypair,
+    channels_dst: Hash,
     cfg: HoprCodecConfig,
     tbf: parking_lot::Mutex<TagBloomFilter>,
     peer_id_cache: moka::future::Cache<PeerId, OffchainPublicKey>,
 }
 
-impl<R, S, T> HoprDecoder<R, S, T>
+impl<Chain, S, T> HoprDecoder<Chain, S, T>
 where
-    R: ChainReadChannelOperations + ChainKeyOperations + ChainValues + Send + Sync,
+    Chain: ChainReadChannelOperations + ChainKeyOperations + ChainValues + Send + Sync,
     S: SurbStore + Send + Sync,
     T: TicketTracker + Send + Sync,
 {
+    /// Creates a new instance of the decoder.
     pub fn new(
-        provider: R,
+        (packet_key, chain_key): (OffchainKeypair, ChainKeypair),
+        chain_api: Chain,
         surb_store: S,
         tracker: T,
-        (packet_key, chain_key): (OffchainKeypair, ChainKeypair),
+        channels_dst: Hash,
         cfg: HoprCodecConfig,
     ) -> Self {
         Self {
-            provider,
+            chain_api,
             surb_store: std::sync::Arc::new(surb_store),
             packet_key,
             chain_key,
+            channels_dst,
             cfg,
             tracker,
             tbf: parking_lot::Mutex::new(TagBloomFilter::default()),
@@ -59,21 +64,21 @@ where
         mut fwd: HoprForwardedPacket,
     ) -> Result<(HoprForwardedPacket, UnacknowledgedTicket), HoprProtocolError> {
         let previous_hop_addr = self
-            .provider
+            .chain_api
             .packet_key_to_chain_key(&fwd.previous_hop)
             .await
             .map_err(|e| HoprProtocolError::ResolverError(e.into()))?
             .ok_or(HoprProtocolError::KeyNotFound)?;
 
         let next_hop_addr = self
-            .provider
+            .chain_api
             .packet_key_to_chain_key(&fwd.outgoing.next_hop)
             .await
             .map_err(|e| HoprProtocolError::ResolverError(e.into()))?
             .ok_or(HoprProtocolError::KeyNotFound)?;
 
         let incoming_channel = self
-            .provider
+            .chain_api
             .channel_by_parties(&previous_hop_addr, self.chain_key.as_ref())
             .await
             .map_err(|e| HoprProtocolError::ResolverError(e.into()))?
@@ -82,7 +87,7 @@ where
         // The ticket price from the oracle times my node's position on the
         // path is the acceptable minimum
         let minimum_ticket_price = self
-            .provider
+            .chain_api
             .minimum_ticket_price()
             .await
             .map_err(|e| HoprProtocolError::ResolverError(e.into()))?
@@ -100,11 +105,11 @@ where
         // (which is equal to `previous_hop_addr`) has issued this
         // ticket.
         let win_prob = self
-            .provider
+            .chain_api
             .minimum_incoming_ticket_win_prob()
             .await
             .map_err(|e| HoprProtocolError::ResolverError(e.into()))?;
-        let domain_separator = self.cfg.channels_dst;
+        let domain_separator = self.channels_dst;
 
         let verified_incoming_ticket = hopr_parallelize::cpu::spawn_fifo_blocking(move || {
             validate_unacknowledged_ticket(
@@ -131,14 +136,14 @@ where
             // If the channel does not exist, the ticket we extracted before cannot be saved,
             // as there would be no way to acknowledge it without the channel.
             let outgoing_channel = self
-                .provider
+                .chain_api
                 .channel_by_parties(self.chain_key.as_ref(), &next_hop_addr)
                 .await
                 .map_err(|e| HoprProtocolError::ResolverError(e.into()))?
                 .ok_or_else(|| HoprProtocolError::ChannelNotFound(*self.chain_key.as_ref(), next_hop_addr))?;
 
             let (outgoing_ticket_win_prob, outgoing_ticket_price) = self
-                .provider
+                .chain_api
                 .outgoing_ticket_values(self.cfg.outgoing_win_prob, self.cfg.outgoing_ticket_price)
                 .await
                 .map_err(|e| HoprProtocolError::ResolverError(e.into()))?;
@@ -182,9 +187,9 @@ where
 }
 
 #[async_trait::async_trait]
-impl<R, S, T> PacketDecoder for HoprDecoder<R, S, T>
+impl<Chain, S, T> PacketDecoder for HoprDecoder<Chain, S, T>
 where
-    R: ChainReadChannelOperations + ChainKeyOperations + ChainValues + Send + Sync,
+    Chain: ChainReadChannelOperations + ChainKeyOperations + ChainValues + Send + Sync,
     S: SurbStore + Send + Sync + 'static,
     T: TicketTracker + Send + Sync,
 {
@@ -214,7 +219,7 @@ where
 
         let offchain_keypair = self.packet_key.clone();
         let surb_store = self.surb_store.clone();
-        let mapper = self.provider.key_id_mapper_ref().clone();
+        let mapper = self.chain_api.key_id_mapper_ref().clone();
 
         // If the following operation fails, it means that the packet is not a valid Hopr packet,
         // and as such should not be acknowledged later.

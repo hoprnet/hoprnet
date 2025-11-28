@@ -168,10 +168,10 @@ impl HoprdConfig {
 
         // hopr.transport
         if cli_args.test_announce_local_addresses > 0 {
-            cfg.hopr.transport.announce_local_addresses = true;
+            cfg.hopr.hopr.transport.announce_local_addresses = true;
         }
         if cli_args.test_prefer_local_addresses > 0 {
-            cfg.hopr.transport.prefer_local_addresses = true;
+            cfg.hopr.hopr.transport.prefer_local_addresses = true;
         }
 
         if let Some(host) = cli_args.default_session_listen_host {
@@ -215,12 +215,12 @@ impl HoprdConfig {
 
         // probe
         if let Some(x) = cli_args.probe_recheck_threshold {
-            cfg.hopr.probe.recheck_threshold = std::time::Duration::from_secs(x)
+            cfg.hopr.hopr.probe.recheck_threshold = std::time::Duration::from_secs(x)
         };
 
         // network options
         if let Some(x) = cli_args.network_quality_threshold {
-            cfg.hopr.network_options.quality_offline_threshold = x
+            cfg.hopr.hopr.network.quality_offline_threshold = x
         };
 
         // identity

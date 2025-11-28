@@ -123,6 +123,7 @@ pub enum IncomingPacket {
 }
 
 impl IncomingPacket {
+    /// Tag identifying the packet.
     pub fn packet_tag(&self) -> &PacketTag {
         match self {
             IncomingPacket::Final(f) => &f.packet_tag,
@@ -131,6 +132,7 @@ impl IncomingPacket {
         }
     }
 
+    /// Previous hop that sent us the packet.
     pub fn previous_hop(&self) -> &OffchainPublicKey {
         match self {
             IncomingPacket::Final(f) => &f.previous_hop,

@@ -10,30 +10,41 @@ use crate::{
     errors::HoprProtocolError,
 };
 
-pub struct HoprEncoder<R, S, T> {
-    provider: R,
+/// Default [encoder](PacketEncoder) implementation for HOPR packets.
+pub struct HoprEncoder<Chain, S, T> {
+    chain_api: Chain,
     surb_store: S,
     tracker: T,
     chain_key: ChainKeypair,
+    channels_dst: Hash,
     cfg: HoprCodecConfig,
 }
 
-impl<R, S, T> HoprEncoder<R, S, T> {
-    pub fn new(provider: R, surb_store: S, tracker: T, chain_key: ChainKeypair, cfg: HoprCodecConfig) -> Self {
+impl<Chain, S, T> HoprEncoder<Chain, S, T> {
+    /// Creates a new instance of the encoder.
+    pub fn new(
+        chain_key: ChainKeypair,
+        chain_api: Chain,
+        surb_store: S,
+        tracker: T,
+        channels_dst: Hash,
+        cfg: HoprCodecConfig,
+    ) -> Self {
         Self {
-            provider,
+            chain_api,
             surb_store,
             tracker,
             chain_key,
+            channels_dst,
             cfg,
         }
     }
 }
 
 #[async_trait::async_trait]
-impl<R, S, T> PacketEncoder for HoprEncoder<R, S, T>
+impl<Chain, S, T> PacketEncoder for HoprEncoder<Chain, S, T>
 where
-    R: ChainKeyOperations + ChainReadChannelOperations + ChainValues + Send + Sync,
+    Chain: ChainKeyOperations + ChainReadChannelOperations + ChainValues + Send + Sync,
     S: SurbStore + Send + Sync,
     T: TicketTracker + Send + Sync,
 {
@@ -62,7 +73,7 @@ where
             ),
             ResolvedTransportRouting::Return(sender_id, surb) => {
                 let next = self
-                    .provider
+                    .chain_api
                     .key_id_mapper_ref()
                     .map_id_to_public(&surb.first_relayer)
                     .ok_or(HoprProtocolError::KeyNotFound)?;
@@ -77,7 +88,7 @@ where
         };
 
         let next_peer = self
-            .provider
+            .chain_api
             .packet_key_to_chain_key(&next_peer)
             .await
             .map_err(|e| HoprProtocolError::ResolverError(e.into()))?
@@ -86,14 +97,14 @@ where
         // Decide whether to create a multi-hop or a zero-hop ticket
         let next_ticket = if num_hops > 1 {
             let channel = self
-                .provider
+                .chain_api
                 .channel_by_parties(self.chain_key.as_ref(), &next_peer)
                 .await
                 .map_err(|e| HoprProtocolError::ResolverError(e.into()))?
                 .ok_or_else(|| HoprProtocolError::ChannelNotFound(*self.chain_key.as_ref(), next_peer))?;
 
             let (outgoing_ticket_win_prob, outgoing_ticket_price) = self
-                .provider
+                .chain_api
                 .outgoing_ticket_values(self.cfg.outgoing_win_prob, self.cfg.outgoing_ticket_price)
                 .await
                 .map_err(|e| HoprProtocolError::ResolverError(e.into()))?;
@@ -116,8 +127,8 @@ where
 
         // Construct the outgoing packet
         let chain_key = self.chain_key.clone();
-        let mapper = self.provider.key_id_mapper_ref().clone();
-        let domain_separator = self.cfg.channels_dst;
+        let mapper = self.chain_api.key_id_mapper_ref().clone();
+        let domain_separator = self.channels_dst;
         let (packet, openers) = hopr_parallelize::cpu::spawn_fifo_blocking(move || {
             HoprPacket::into_outgoing(
                 data.as_ref(),
@@ -164,7 +175,7 @@ where
         peer: &OffchainPublicKey,
     ) -> Result<OutgoingPacket, Self::Error> {
         let chain_key = self
-            .provider
+            .chain_api
             .packet_key_to_chain_key(peer)
             .await
             .map_err(|e| HoprProtocolError::ResolverError(e.into()))?

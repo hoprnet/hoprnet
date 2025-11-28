@@ -10,23 +10,18 @@ use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
 use hopr_transport_protocol::{TicketEvent, run_packet_pipeline};
 
-use crate::HoprTransportProcess;
-
-#[derive(Clone, Copy, Debug, Default)]
-pub struct HoprPacketPipelineConfig {
-    pub codec_cfg: HoprCodecConfig,
-    pub ticket_proc_cfg: HoprTicketProcessorConfig,
-}
+use crate::{HoprTransportProcess, config::HoprPacketPipelineConfig};
 
 #[allow(clippy::too_many_arguments)]
-pub fn run_hopr_packet_pipeline<WIn, WOut, R, S, Db, TEvt, AppOut, AppIn>(
+pub fn run_hopr_packet_pipeline<WIn, WOut, Chain, S, Db, TEvt, AppOut, AppIn>(
     (packet_key, chain_key): (OffchainKeypair, ChainKeypair),
     wire_msg: (WOut, WIn),
     api: (AppOut, AppIn),
     ticket_events: TEvt,
     surb_store: S,
-    provider: R,
+    chain_api: Chain,
     db: Db,
+    channels_dst: Hash,
     cfg: HoprPacketPipelineConfig,
 ) -> AbortableList<HoprTransportProcess>
 where
@@ -34,7 +29,7 @@ where
     WOut::Error: std::fmt::Display,
     WIn: futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + 'static,
     Db: HoprDbTicketOperations + Clone + Send + Sync + 'static,
-    R: ChainKeyOperations + ChainReadChannelOperations + ChainValues + Clone + Send + Sync + 'static,
+    Chain: ChainKeyOperations + ChainReadChannelOperations + ChainValues + Clone + Send + Sync + 'static,
     S: SurbStore + Clone + Send + Sync + 'static,
     TEvt: futures::Sink<TicketEvent> + Clone + Unpin + Send + 'static,
     TEvt::Error: std::fmt::Display,
@@ -42,20 +37,28 @@ where
     AppOut::Error: std::fmt::Display,
     AppIn: futures::Stream<Item = (ResolvedTransportRouting, ApplicationDataOut)> + Send + 'static,
 {
-    let ticket_proc = HoprTicketProcessor::new(provider.clone(), db.clone(), chain_key.clone(), cfg.ticket_proc_cfg);
+    let ticket_proc = HoprTicketProcessor::new(
+        chain_api.clone(),
+        db.clone(),
+        chain_key.clone(),
+        channels_dst,
+        cfg.ticket_processing,
+    );
     let encoder = HoprEncoder::new(
-        provider.clone(),
+        chain_key.clone(),
+        chain_api.clone(),
         surb_store.clone(),
         ticket_proc.clone(),
-        chain_key.clone(),
-        cfg.codec_cfg,
+        channels_dst,
+        cfg.codec,
     );
     let decoder = HoprDecoder::new(
-        provider.clone(),
+        (packet_key.clone(), chain_key.clone()),
+        chain_api.clone(),
         surb_store,
         ticket_proc.clone(),
-        (packet_key.clone(), chain_key.clone()),
-        cfg.codec_cfg,
+        channels_dst,
+        cfg.codec,
     );
 
     let mut processes = AbortableList::default();

@@ -5,36 +5,9 @@ use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::prelude::SurbMatcher;
 use moka::{future::Cache, notification::RemovalCause};
 use ringbuffer::RingBuffer;
+use validator::ValidationError;
 
 use crate::{FoundSurb, traits::SurbStore};
-
-/// Configuration for the SURB cache.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, smart_default::SmartDefault)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-pub struct SurbStoreConfig {
-    /// Size of the SURB ring buffer per pseudonym.
-    #[default(10_000)]
-    pub rb_capacity: usize,
-    /// Threshold for the number of SURBs in the ring buffer, below which it is
-    /// considered low ("SURB distress").
-    #[default(500)]
-    pub distress_threshold: usize,
-
-    #[default(10_000)]
-    pub max_opener_pseudonyms: usize,
-
-    #[default(100_000)]
-    pub max_openers_per_pseudonym: usize,
-
-    #[default(10_000)]
-    pub max_surbs_per_pseudonym: usize,
-
-    #[default(Duration::from_secs(600))]
-    pub surbs_per_pseudonym_lifetime: Duration,
-
-    #[default(Duration::from_secs(3600))]
-    pub reply_opener_lifetime: Duration,
-}
 
 const MINIMUM_SURB_LIFETIME: Duration = Duration::from_secs(30);
 const MINIMUM_OPENER_PSEUDONYMS: usize = 1000;
@@ -43,38 +16,143 @@ const MINIMUM_SURBS_PER_PSEUDONYM: usize = 1000;
 const MINIMUM_OPENER_LIFETIME: Duration = Duration::from_secs(60);
 const MIN_SURB_RB_CAPACITY: usize = 1024;
 
+fn validate_pseudonyms_lifetime(lifetime: &Duration) -> Result<(), ValidationError> {
+    if lifetime < &MINIMUM_SURB_LIFETIME {
+        Err(ValidationError::new("pseudonyms_lifetime is too low"))
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_reply_opener_lifetime(lifetime: &Duration) -> Result<(), ValidationError> {
+    if lifetime < &MINIMUM_OPENER_LIFETIME {
+        Err(ValidationError::new("reply_opener_lifetime is too low"))
+    } else {
+        Ok(())
+    }
+}
+
+/// Configuration for the SURB cache.
+///
+/// The configuration options affect both the sending side (SURB creator) and the
+/// replying side (SURB consumer).
+///
+/// In the classical scenario (`Entry - Relay 1 -... - Exit`), the sending side is
+/// the `Entry` and the replying side is the `Exit`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, smart_default::SmartDefault, validator::Validate)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+pub struct SurbStoreConfig {
+    /// Size of the SURB ring buffer per pseudonym.
+    ///
+    /// Affects only the replying side.
+    ///
+    /// This indicates how many SURBs can be at most held to be used to send a reply
+    /// back to the sending side.
+    ///
+    /// Default is 15 000.
+    #[default(15_000)]
+    #[validate(range(min = 1024, message = "rb_capacity must be at least 1024"))]
+    pub rb_capacity: usize,
+    /// Threshold for the number of SURBs in the ring buffer, below which it is
+    /// considered low ("SURB distress").
+    ///
+    /// Default is 500.
+    #[default(500)]
+    #[validate(range(min = 10, message = "distress_threshold must be at least 10"))]
+    pub distress_threshold: usize,
+    /// Maximum number of reply openers (SURB counterparts) per pseudonym.
+    ///
+    /// Affects only the sending side when decrypting a received reply.
+    ///
+    /// This mostly affects Sessions, as they use a fixed pseudonym.
+    /// It reflects how many reply openers the initiator-side of a Session can hold,
+    /// until the oldest ones are dropped. If the other party uses a SURB corresponding
+    /// to a dropped reply opener, the reply message will be undecryptable by the initiator-side.
+    ///
+    /// Default is 100 000.
+    #[default(100_000)]
+    #[validate(range(min = 100, message = "max_openers_per_pseudonym must be at least 100"))]
+    pub max_openers_per_pseudonym: usize,
+    /// The maximum number of distinct pseudonyms for which we hold a SURB ringbuffer.
+    ///
+    /// Affects only the replying side.
+    ///
+    /// For each pseudonym, there is a ring-buffer with capacity `rb_capacity`.
+    ///
+    /// Default is 10 000.
+    #[default(10_000)]
+    #[validate(range(min = 100, message = "max_pseudonyms must be at least 100"))]
+    pub max_pseudonyms: usize,
+    /// Maximum lifetime of ring-buffer for each pseudonym.
+    ///
+    /// # Effects on sending side
+    /// This is the period for which we hold all reply openers for a pseudonym.
+    /// If no more messages carrying SURBs are sent during this period, the entire stash of
+    /// reply openers is dropped. Preventing receiving any more replies for that pseudonym.
+    ///
+    /// # Effects on replying side
+    /// If a pseudonym has not received any SURBs for this period,
+    /// the entire ring buffer with `rb_capacity` (= all SURBs for this pseudonym) is dropped.
+    /// Preventing from sending any more replies for that pseudonym.
+    ///
+    /// Default is 600 seconds.
+    #[default(Duration::from_secs(600))]
+    #[validate(custom(function = "validate_pseudonyms_lifetime"))]
+    pub pseudonyms_lifetime: Duration,
+
+    /// Maximum lifetime of a reply opener.
+    ///
+    /// Affects only the sending side.
+    ///
+    /// A reply opener is distinguished using [`HoprSurbId`] and a pseudonym it belongs to.
+    /// If a reply opener is not used to decrypt the received packet within this period,
+    /// it is dropped. If the replying side uses the corresponding SURB to send a reply,
+    /// it won't be possible to decrypt it when received.
+    ///
+    /// Default is 3600 seconds.
+    #[default(Duration::from_secs(3600))]
+    #[validate(custom(function = "validate_reply_opener_lifetime"))]
+    pub reply_opener_lifetime: Duration,
+}
+
+/// Basic [`SurbStore`] implementation based on an in-memory cache.
+///
+/// This SURB store offers no persistence, and all SURBs and Reply Openers are lost once dropped.
+///
+/// The instance can be cheaply cloned.
 #[derive(Clone)]
 pub struct MemorySurbStore {
     pseudonym_openers: moka::sync::Cache<HoprPseudonym, moka::sync::Cache<HoprSurbId, ReplyOpener>>,
     surbs_per_pseudonym: Cache<HoprPseudonym, SurbRingBuffer<HoprSurb>>,
-    cfg: SurbStoreConfig,
+    cfg: Arc<SurbStoreConfig>,
 }
 
 impl MemorySurbStore {
+    /// Creates a new instance with the given configuration.
     pub fn new(cfg: SurbStoreConfig) -> Self {
         Self {
             // Reply openers are indexed by entire Sender IDs (Pseudonym + SURB ID)
             // in a cascade fashion, allowing the entire batches (by Pseudonym) to be evicted
             // if not used.
             pseudonym_openers: moka::sync::Cache::builder()
-                .time_to_idle(cfg.surbs_per_pseudonym_lifetime.max(MINIMUM_SURB_LIFETIME))
+                .time_to_idle(cfg.pseudonyms_lifetime.max(MINIMUM_SURB_LIFETIME))
                 .eviction_policy(moka::policy::EvictionPolicy::lru())
                 .eviction_listener(|sender_id, _reply_opener, cause| {
                     tracing::warn!(?sender_id, ?cause, "evicting reply opener for pseudonym");
                 })
-                .max_capacity(cfg.max_opener_pseudonyms.max(MINIMUM_OPENER_PSEUDONYMS) as u64)
+                .max_capacity(cfg.max_openers_per_pseudonym.max(MINIMUM_OPENER_PSEUDONYMS) as u64)
                 .build(),
             // SURBs are indexed only by Pseudonyms, which have longer lifetimes.
             // For each Pseudonym, there's an RB of SURBs and their IDs.
             surbs_per_pseudonym: Cache::builder()
-                .time_to_idle(cfg.surbs_per_pseudonym_lifetime.max(MINIMUM_SURB_LIFETIME))
+                .time_to_idle(cfg.pseudonyms_lifetime.max(MINIMUM_SURB_LIFETIME))
                 .eviction_policy(moka::policy::EvictionPolicy::lru())
                 .eviction_listener(|pseudonym, _reply_opener, cause| {
                     tracing::warn!(%pseudonym, ?cause, "evicting surb for pseudonym");
                 })
-                .max_capacity(cfg.max_surbs_per_pseudonym.max(MINIMUM_SURBS_PER_PSEUDONYM) as u64)
+                .max_capacity(cfg.max_pseudonyms.max(MINIMUM_SURBS_PER_PSEUDONYM) as u64)
                 .build(),
-            cfg,
+            cfg: cfg.into(),
         }
     }
 }
@@ -126,7 +204,7 @@ impl SurbStore for MemorySurbStore {
 
     fn insert_reply_opener(&self, sender_id: HoprSenderId, opener: ReplyOpener) {
         let opener_lifetime = self.cfg.reply_opener_lifetime.max(MINIMUM_OPENER_LIFETIME);
-        let max_openers_per_pseudonym = self.cfg.max_opener_pseudonyms.max(MINIMUM_OPENERS_PER_PSEUDONYM);
+        let max_openers_per_pseudonym = self.cfg.max_openers_per_pseudonym.max(MINIMUM_OPENERS_PER_PSEUDONYM);
         self.pseudonym_openers
             .get_with(sender_id.pseudonym(), move || {
                 moka::sync::Cache::builder()

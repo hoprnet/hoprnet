@@ -1,6 +1,7 @@
 use hopr_primitive_types::prelude::*;
+use hopr_transport::HoprTransportConfig;
 pub use hopr_transport::config::{
-    HostConfig, HostType, NetworkConfig, ProbeConfig, ProtocolConfig, SessionGlobalConfig, TransportConfig,
+    HoprPacketPipelineConfig, HostConfig, HostType, NetworkConfig, ProbeConfig, SessionGlobalConfig, TransportConfig,
     looks_like_domain, validate_external_host,
 };
 use serde::{Deserialize, Serialize};
@@ -59,27 +60,10 @@ pub struct HoprLibConfig {
     /// Determines whether the node should be advertised publicly on-chain.
     #[serde(default)]
     pub publish: bool,
-    /// Configuration of the protocol heartbeat mechanism
+    /// Configuration of the HOPR protocol.
     #[validate(nested)]
     #[serde(default)]
-    pub probe: ProbeConfig,
-    /// Configuration of network properties
-    #[validate(nested)]
-    #[serde(default)]
-    pub network_options: NetworkConfig,
-    /// Configuration specific to transport mechanics
-    #[validate(nested)]
-    #[serde(default)]
-    pub transport: TransportConfig,
-    /// Configuration specific to protocol execution on the p2p layer
-    #[validate(nested)]
-    #[serde(default)]
-    pub protocol: ProtocolConfig,
-    /// Configuration specific to Session management.
-    #[validate(nested)]
-    #[serde(default)]
-    pub session: SessionGlobalConfig,
-    /// Configuration of the `Safe` mechanism
+    pub hopr: HoprTransportConfig,
     #[validate(nested)]
     #[serde(default)]
     pub safe_module: SafeModule,

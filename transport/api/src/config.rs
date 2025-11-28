@@ -6,10 +6,10 @@ use std::{
     time::Duration,
 };
 
+use hopr_protocol_hopr::{HoprCodecConfig, HoprTicketProcessorConfig, SurbStoreConfig};
 use hopr_transport_identity::Multiaddr;
 pub use hopr_transport_network::config::NetworkConfig;
 pub use hopr_transport_probe::config::ProbeConfig;
-pub use hopr_transport_protocol::config::ProtocolConfig;
 use hopr_transport_session::{MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION};
 use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};
@@ -18,12 +18,30 @@ use validator::{Validate, ValidationError};
 
 use crate::errors::HoprTransportError;
 
+/// Complete configuration of the HOPR protocol stack.
+#[derive(Debug, smart_default::SmartDefault, Validate, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct HoprTransportConfig {
+    /// Libp2p-related configuration
     pub transport: TransportConfig,
+    /// Heartbeat configuration
     pub network: NetworkConfig,
-    pub protocol: ProtocolConfig,
+    /// HOPR packet pipeline configuration
+    pub packet: HoprPacketPipelineConfig,
+    /// Probing protocol configuration
     pub probe: ProbeConfig,
+    /// Session protocol global configuration
     pub session: SessionGlobalConfig,
+}
+
+/// Configuration of the HOPR packet pipeline.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Validate, Serialize, Deserialize)]
+pub struct HoprPacketPipelineConfig {
+    /// HOPR packet codec configuration
+    pub codec: HoprCodecConfig,
+    /// HOPR ticket processing configuration
+    pub ticket_processing: HoprTicketProcessorConfig,
+    /// Single Use Reply Block (SURB) handling configuration
+    pub surb_store: SurbStoreConfig,
 }
 
 regex!(is_dns_address_regex "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$");
@@ -180,7 +198,7 @@ pub fn validate_external_host(host: &HostConfig) -> Result<(), ValidationError> 
 }
 
 /// Configuration of the physical transport mechanism.
-#[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
+#[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, Copy, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct TransportConfig {
     /// When true, assume that the node is running in an isolated network and does

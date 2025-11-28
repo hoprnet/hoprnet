@@ -8,30 +8,53 @@ use hopr_primitive_types::balance::HoprBalance;
 
 use crate::{HoprProtocolError, ResolvedAcknowledgement, TicketTracker, UnacknowledgedTicketProcessor};
 
-#[derive(Debug, Clone, Copy, smart_default::SmartDefault)]
+/// Configuration for the HOPR ticket processor within the packet pipeline.
+#[derive(Debug, Clone, Copy, smart_default::SmartDefault, PartialEq, validator::Validate)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct HoprTicketProcessorConfig {
+    /// Time after which an unacknowledged ticket is considered stale and is removed from the cache.
+    ///
+    /// If the counterparty does not send an acknowledgement within this period, the ticket is lost forever.
+    ///
+    /// Default is 30 seconds.
     #[default(std::time::Duration::from_secs(30))]
     pub unack_ticket_timeout: std::time::Duration,
+    /// Maximum number of unacknowledged tickets that can be stored in the cache at any given time.
+    ///
+    /// When more tickets are received, the oldest ones are discarded and lost forever.
+    ///
+    /// Default is 10 000 000.
+    #[default(10_000_000)]
+    #[validate(range(min = 100))]
+    pub max_unack_tickets: usize,
+    /// Period for which the outgoing ticket index is cached in memory for each channel.
+    ///
+    /// Default is 10 seconds.
     #[default(std::time::Duration::from_secs(10))]
     pub outgoing_index_cache_retention: std::time::Duration,
-    #[default(10_000_000)]
-    pub max_unack_tickets: usize,
-    pub channels_dst: Hash,
 }
 
 /// HOPR-specific implementation of [`UnacknowledgedTicketProcessor`] and [`TicketTracker`].
 #[derive(Clone)]
-pub struct HoprTicketProcessor<Db, R> {
+pub struct HoprTicketProcessor<Chain, Db> {
     unacknowledged_tickets: moka::future::Cache<HalfKeyChallenge, UnacknowledgedTicket>,
     out_ticket_index: moka::future::Cache<(ChannelId, u32), Arc<AtomicU64>>,
     db: Db,
-    provider: R,
+    chain_api: Chain,
     chain_key: ChainKeypair,
+    channels_dst: Hash,
     cfg: HoprTicketProcessorConfig,
 }
 
-impl<Db, R> HoprTicketProcessor<Db, R> {
-    pub fn new(provider: R, db: Db, chain_key: ChainKeypair, cfg: HoprTicketProcessorConfig) -> Self {
+impl<Chain, Db> HoprTicketProcessor<Chain, Db> {
+    /// Creates a new instance of the HOPR ticket processor.
+    pub fn new(
+        chain_api: Chain,
+        db: Db,
+        chain_key: ChainKeypair,
+        channels_dst: Hash,
+        cfg: HoprTicketProcessorConfig,
+    ) -> Self {
         Self {
             out_ticket_index: moka::future::Cache::builder()
                 .time_to_idle(cfg.outgoing_index_cache_retention)
@@ -41,22 +64,28 @@ impl<Db, R> HoprTicketProcessor<Db, R> {
                 .time_to_live(cfg.unack_ticket_timeout)
                 .max_capacity(cfg.max_unack_tickets as u64)
                 .build(),
-            provider,
+            chain_api,
             db,
             chain_key,
+            channels_dst,
             cfg,
         }
     }
 }
 
-impl<Db, R> HoprTicketProcessor<Db, R>
+impl<Chain, Db> HoprTicketProcessor<Chain, Db>
 where
     Db: HoprDbTicketOperations + Clone + Send + 'static,
 {
+    /// Task that performs periodic synchronization of the outgoing ticket index cache
+    /// to the underlying database.
+    ///
+    /// If this task is not started, the outgoing ticket indices will not survive a node
+    /// restart and will result in invalid tickets received by the counterparty.
     pub fn outgoing_index_sync_task(
         &self,
         reg: futures::future::AbortRegistration,
-    ) -> impl Future<Output = ()> + use<Db, R> {
+    ) -> impl Future<Output = ()> + use<Db, Chain> {
         let index_save_stream = futures::stream::Abortable::new(
             futures_time::stream::interval(futures_time::time::Duration::from(
                 self.cfg.outgoing_index_cache_retention.div_f32(2.0),
@@ -93,9 +122,9 @@ where
 }
 
 #[async_trait::async_trait]
-impl<Db, R> UnacknowledgedTicketProcessor for HoprTicketProcessor<Db, R>
+impl<Chain, Db> UnacknowledgedTicketProcessor for HoprTicketProcessor<Chain, Db>
 where
-    R: ChainReadChannelOperations + Send + Sync,
+    Chain: ChainReadChannelOperations + Send + Sync,
     Db: Send + Sync,
 {
     type Error = HoprProtocolError;
@@ -128,7 +157,7 @@ where
 
         // Issuer's channel must have an epoch matching with the unacknowledged ticket
         let issuer_channel = self
-            .provider
+            .chain_api
             .channel_by_parties(unacknowledged.ticket.verified_issuer(), self.chain_key.as_ref())
             .await
             .map_err(|e| HoprProtocolError::ResolverError(e.into()))?
@@ -138,7 +167,7 @@ where
                 *self.chain_key.as_ref(),
             ))?;
 
-        let domain_separator = self.cfg.channels_dst;
+        let domain_separator = self.channels_dst;
         let chain_key = self.chain_key.clone();
         let channel_id = *issuer_channel.get_id();
         hopr_parallelize::cpu::spawn_fifo_blocking(move || {
@@ -170,7 +199,11 @@ where
 }
 
 #[async_trait::async_trait]
-impl<R: Send + Sync, Db: HoprDbTicketOperations + Clone + Send + Sync> TicketTracker for HoprTicketProcessor<Db, R> {
+impl<Chain, Db> TicketTracker for HoprTicketProcessor<Chain, Db>
+where
+    Chain: Send + Sync,
+    Db: HoprDbTicketOperations + Clone + Send + Sync + 'static,
+{
     type Error = Arc<Db::Error>;
 
     async fn next_outgoing_ticket_index(&self, channel_id: &ChannelId, epoch: u32) -> Result<u64, Self::Error> {

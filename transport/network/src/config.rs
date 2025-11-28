@@ -22,7 +22,7 @@ pub const DEFAULT_CANNOT_DIAL_PENALTY: Duration = Duration::from_secs(60 * 60); 
 
 /// Configuration for the [`crate::network::Network`] object
 #[serde_as]
-#[derive(Debug, Clone, Serialize, Deserialize, SmartDefault, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, SmartDefault, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct NetworkConfig {
     /// Minimum delay will be multiplied by backoff, it will be half the actual minimum value

@@ -12,8 +12,6 @@
 /// Coder and decoder for the transport binary protocol layer
 mod codec;
 
-/// Configuration of the protocol components.
-pub mod config;
 /// Errors produced by the crate.
 pub mod errors;
 
@@ -21,6 +19,7 @@ pub mod errors;
 /// `heartbeat` p2p protocol
 pub mod heartbeat;
 
+/// Packet pipeline for the HOPR protocol.
 mod pipeline;
 /// Stream processing utilities
 pub mod stream;

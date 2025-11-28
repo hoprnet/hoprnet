@@ -416,7 +416,7 @@ mod tests {
 
         let result = test(interface).await;
 
-        jhs.into_iter().for_each(|(_name, handle)| handle.abort());
+        jhs.abort_all();
 
         result
     }

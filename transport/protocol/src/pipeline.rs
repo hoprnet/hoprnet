@@ -43,7 +43,7 @@ pub enum PacketPipelineProcesses {
 }
 
 /// Ticket events emitted from the packet processing pipeline.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, strum::EnumIs, strum::EnumTryAs)]
 pub enum TicketEvent {
     /// A winning ticket was received.
     WinningTicket(Box<RedeemableTicket>),
