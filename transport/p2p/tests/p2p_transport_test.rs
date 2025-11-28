@@ -133,14 +133,8 @@ async fn p2p_only_communication_quic() -> anyhow::Result<()> {
     api1.update_from_announcements
         .unbounded_send(PeerDiscovery::Announce(api2.me, vec![api2.address.clone()]))
         .context("failed to send announcement")?;
-    api1.update_from_announcements
-        .unbounded_send(PeerDiscovery::Allow(api2.me))
-        .context("failed to send announcement")?;
     api2.update_from_announcements
         .unbounded_send(PeerDiscovery::Announce(api1.me, vec![api1.address.clone()]))
-        .context("failed to send announcement")?;
-    api2.update_from_announcements
-        .unbounded_send(PeerDiscovery::Allow(api1.me))
         .context("failed to send announcement")?;
 
     // Wait for node listen_on and announcements

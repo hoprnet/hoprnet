@@ -270,11 +270,10 @@ async fn main_inner() -> anyhow::Result<()> {
     info!("creating the HOPRd node instance from hopr-lib");
     let node = Arc::new(
         hopr_lib::Hopr::new(
-            cfg.clone().into(),
+            (&hopr_keys).into(),
             chain_connector.clone(),
             node_db,
-            &hopr_keys.packet_key,
-            &hopr_keys.chain_key,
+            cfg.clone().into(),
         )
         .await?,
     );

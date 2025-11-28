@@ -162,6 +162,7 @@ where
             .announce(
                 AnnouncementData::new(key_binding, multiaddrs.first().cloned())
                     .map_err(|e| AnnouncementError::ProcessingError(ConnectorError::OtherError(e.into())))?,
+                // No key-binding fee must be set when the account already exists (with multi-addresses or not)
                 existing_account
                     .map(|_| HoprBalance::zero())
                     .unwrap_or(self.cfg.new_key_binding_fee),

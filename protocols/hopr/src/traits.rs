@@ -92,8 +92,6 @@ pub trait TicketTracker {
         epoch: u32,
     ) -> Result<HoprBalance, Self::Error>;
 
-    // async fn sync_unrealized_balances(&self) -> Result<(), Self::Error>;
-
     /// Convenience function that allows creating multi-hop tickets.
     async fn create_multihop_ticket(
         &self,

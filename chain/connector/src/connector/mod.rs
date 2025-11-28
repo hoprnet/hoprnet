@@ -51,10 +51,10 @@ pub struct BlockchainConnectorConfig {
     pub new_key_binding_fee: HoprBalance,
 }
 
-/// A connector acting as a middleware between the HOPR APIs (see the [`hopr_api`] crate) and the Blokli Client API (see
+/// A connector acting as middleware between the HOPR APIs (see the [`hopr_api`] crate) and the Blokli Client API (see
 /// the [`blokli_client`] crate).
 ///
-/// The connector object cannot be cloned, and shall be used inside an `Arc` if cloning is needed.
+/// The connector object cannot be cloned and shall be used inside an `Arc` if cloning is needed.
 pub struct HoprBlockchainConnector<C, B, P, R> {
     payload_generator: P,
     chain_key: ChainKeypair,
@@ -80,6 +80,11 @@ pub struct HoprBlockchainConnector<C, B, P, R> {
     values: moka::future::Cache<u32, ParsedChainInfo>,
 }
 
+const EXPECTED_NUM_NODES: usize = 10_000;
+const EXPECTED_NUM_CHANNELS: usize = 100_000;
+
+const DEFAULT_CACHE_TIMEOUT: Duration = Duration::from_mins(10);
+
 impl<B, C, P> HoprBlockchainConnector<C, B, P, P::TxRequest>
 where
     B: Backend + Send + Sync + 'static,
@@ -104,8 +109,8 @@ where
         Self {
             payload_generator,
             graph: std::sync::Arc::new(parking_lot::RwLock::new(DiGraphMap::with_capacity_and_hasher(
-                10_000,
-                100_000,
+                EXPECTED_NUM_NODES,
+                EXPECTED_NUM_CHANNELS,
                 ahash::RandomState::default(),
             ))),
             backend: backend.clone(),
@@ -116,28 +121,28 @@ where
             chain_key,
             cfg,
             mapper: HoprKeyMapper {
-                id_to_key: moka::sync::CacheBuilder::new(10_000)
-                    .time_to_idle(Duration::from_secs(600))
+                id_to_key: moka::sync::CacheBuilder::new(EXPECTED_NUM_NODES as u64)
+                    .time_to_idle(DEFAULT_CACHE_TIMEOUT)
                     .build_with_hasher(ahash::RandomState::default()),
-                key_to_id: moka::sync::CacheBuilder::new(10_000)
-                    .time_to_idle(Duration::from_secs(600))
+                key_to_id: moka::sync::CacheBuilder::new(EXPECTED_NUM_NODES as u64)
+                    .time_to_idle(DEFAULT_CACHE_TIMEOUT)
                     .build_with_hasher(ahash::RandomState::default()),
                 backend,
             },
-            chain_to_packet: moka::future::CacheBuilder::new(10_000)
-                .time_to_idle(Duration::from_secs(600))
+            chain_to_packet: moka::future::CacheBuilder::new(EXPECTED_NUM_NODES as u64)
+                .time_to_idle(DEFAULT_CACHE_TIMEOUT)
                 .build_with_hasher(ahash::RandomState::default()),
-            packet_to_chain: moka::future::CacheBuilder::new(10_000)
-                .time_to_idle(Duration::from_secs(600))
+            packet_to_chain: moka::future::CacheBuilder::new(EXPECTED_NUM_NODES as u64)
+                .time_to_idle(DEFAULT_CACHE_TIMEOUT)
                 .build_with_hasher(ahash::RandomState::default()),
-            channel_by_id: moka::future::CacheBuilder::new(100_000)
-                .time_to_idle(Duration::from_secs(600))
+            channel_by_id: moka::future::CacheBuilder::new(EXPECTED_NUM_CHANNELS as u64)
+                .time_to_idle(DEFAULT_CACHE_TIMEOUT)
                 .build_with_hasher(ahash::RandomState::default()),
-            channel_by_parties: moka::future::CacheBuilder::new(100_000)
-                .time_to_idle(Duration::from_secs(600))
+            channel_by_parties: moka::future::CacheBuilder::new(EXPECTED_NUM_CHANNELS as u64)
+                .time_to_idle(DEFAULT_CACHE_TIMEOUT)
                 .build_with_hasher(ahash::RandomState::default()),
             values: moka::future::CacheBuilder::new(1)
-                .time_to_live(Duration::from_secs(600))
+                .time_to_live(DEFAULT_CACHE_TIMEOUT)
                 .build(),
         }
     }

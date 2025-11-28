@@ -20,8 +20,7 @@ pub struct NodeSafeConfig {
 }
 
 pub async fn create_hopr_instance(
-    chain_key: ChainKeypair,
-    offchain_key: OffchainKeypair,
+    identity: (&ChainKeypair, &OffchainKeypair),
     host_port: u16,
     node_db: HoprNodeDb,
     connector: TestingConnector,
@@ -29,7 +28,10 @@ pub async fn create_hopr_instance(
     winn_prob: f64,
 ) -> Hopr<TestingConnector, HoprNodeDb> {
     Hopr::new(
-        crate::config::HoprLibConfig {
+        identity,
+        connector,
+        node_db,
+        HoprLibConfig {
             probe: crate::config::ProbeConfig {
                 timeout: Duration::from_secs(2),
                 max_parallel_probes: 10,
@@ -65,10 +67,6 @@ pub async fn create_hopr_instance(
             publish: true,
             ..Default::default()
         },
-        connector,
-        node_db,
-        &offchain_key,
-        &chain_key,
     )
     .await
     .expect(format!("failed to create hopr instance on port {host_port}").as_str())

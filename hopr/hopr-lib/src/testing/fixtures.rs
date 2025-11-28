@@ -361,8 +361,7 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
                         .expect("failed to connect to HoprBlockchainSafeConnector");
 
                     let instance = create_hopr_instance(
-                        onchain_keys[i].clone(),
-                        offchain_keys[i].clone(),
+                        (&onchain_keys[i], &offchain_keys[i]),
                         3001 + i as u16,
                         node_db,
                         std::sync::Arc::new(connector),

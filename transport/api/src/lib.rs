@@ -40,7 +40,7 @@ use helpers::PathPlanner;
 pub use hopr_api::db::ChannelTicketStatistics;
 use hopr_api::{
     chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
-    db::{HoprDbPeersOperations, HoprDbTicketOperations, PeerOrigin, PeerStatus, TicketSelector},
+    db::{HoprDbPeersOperations, HoprDbTicketOperations, PeerOrigin, PeerStatus},
 };
 use hopr_async_runtime::{AbortableList, prelude::spawn, spawn_as_abortable};
 use hopr_crypto_packet::prelude::PacketSignal;
@@ -118,25 +118,24 @@ pub enum HoprTransportProcess {
 type CurrentPathSelector = NoPathSelector;
 
 /// Interface into the physical transport mechanism allowing all off-chain HOPR-related tasks on
-/// the transport, as well as off-chain ticket manipulation.
-pub struct HoprTransport<Db, R> {
+/// the transport.
+pub struct HoprTransport<Chain, Db> {
     me: OffchainKeypair,
     me_onchain: ChainKeypair,
-    me_peerid: PeerId, // Cache to avoid an expensive conversion: OffchainPublicKey -> PeerId
-    cfg: HoprTransportConfig,
     db: Db,
-    resolver: R,
+    resolver: Chain,
     ping: Arc<OnceLock<Pinger>>,
     network: Arc<Network<Db>>,
-    path_planner: PathPlanner<MemorySurbStore, R, CurrentPathSelector>,
+    path_planner: PathPlanner<MemorySurbStore, Chain, CurrentPathSelector>,
     my_multiaddresses: Vec<Multiaddr>,
     smgr: SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>, Sender<IncomingSession>>,
+    cfg: HoprTransportConfig,
 }
 
-impl<Db, R> HoprTransport<Db, R>
+impl<Chain, Db> HoprTransport<Chain, Db>
 where
     Db: HoprDbTicketOperations + HoprDbPeersOperations + Clone + Send + Sync + 'static,
-    R: ChainReadChannelOperations
+    Chain: ChainReadChannelOperations
         + ChainReadAccountOperations
         + ChainKeyOperations
         + ChainValues
@@ -146,28 +145,24 @@ where
         + 'static,
 {
     pub fn new(
-        me: &OffchainKeypair,
-        me_onchain: &ChainKeypair,
-        cfg: HoprTransportConfig,
+        identity: (&ChainKeypair, &OffchainKeypair),
+        resolver: Chain,
         db: Db,
-        resolver: R,
         my_multiaddresses: Vec<Multiaddr>,
+        cfg: HoprTransportConfig,
     ) -> Self {
-        let me_peerid: PeerId = me.into();
-
         Self {
-            me: me.clone(),
-            me_peerid,
-            me_onchain: me_onchain.clone(),
+            me: identity.1.clone(),
+            me_onchain: identity.0.clone(),
             ping: Arc::new(OnceLock::new()),
             network: Arc::new(Network::new(
-                me_peerid,
+                identity.1.into(),
                 my_multiaddresses.clone(),
                 cfg.network.clone(),
                 db.clone(),
             )),
             path_planner: PathPlanner::new(
-                *me_onchain.as_ref(),
+                *identity.0.as_ref(),
                 MemorySurbStore::new(cfg.protocol.surb_store),
                 resolver.clone(),
                 CurrentPathSelector::default(),
@@ -259,7 +254,7 @@ where
         let (mut internal_discovery_update_tx, internal_discovery_update_rx) =
             futures::channel::mpsc::channel::<PeerDiscovery>(internal_discovery_updates_capacity);
 
-        let me_peerid = self.me_peerid;
+        let me_peerid: PeerId = self.me.public().into();
         let network = self.network.clone();
         let discovery_updates = futures_concurrency::stream::StreamExt::merge(
             discovery_updates,
@@ -293,7 +288,6 @@ where
                             None
                         }
                     }
-                    _ => None,
                 }
             }
         });
@@ -566,31 +560,32 @@ where
         processes.insert(
             HoprTransportProcess::SessionsManagement(0),
             spawn_as_abortable!(
-                StreamExt::filter_map(rx_from_probing, move |(pseudonym, data)| {
-                    let smgr = smgr.clone();
-                    async move {
-                        match smgr.dispatch_message(pseudonym, data).await {
-                            Ok(DispatchResult::Processed) => {
-                                trace!("message dispatch completed");
-                                None
-                            }
-                            Ok(DispatchResult::Unrelated(data)) => {
-                                trace!("unrelated message dispatch completed");
-                                Some(data)
-                            }
-                            Err(e) => {
-                                error!(error = %e, "error while processing packet");
-                                None
+                rx_from_probing
+                    .filter_map(move |(pseudonym, data)| {
+                        let smgr = smgr.clone();
+                        async move {
+                            match smgr.dispatch_message(pseudonym, data).await {
+                                Ok(DispatchResult::Processed) => {
+                                    tracing::trace!("message dispatch completed");
+                                    None
+                                }
+                                Ok(DispatchResult::Unrelated(data)) => {
+                                    tracing::trace!("unrelated message dispatch completed");
+                                    Some(data)
+                                }
+                                Err(error) => {
+                                    tracing::error!(%error, "error while dispatching packet in the session manager");
+                                    None
+                                }
                             }
                         }
-                    }
-                })
-                .map(Ok)
-                .forward(on_incoming_data_tx)
-                .inspect(|_| tracing::warn!(
-                    task = %HoprTransportProcess::SessionsManagement(0),
-                    "long-running background task finished"
-                ))
+                    })
+                    .map(Ok)
+                    .forward(on_incoming_data_tx)
+                    .inspect(|_| tracing::warn!(
+                        task = %HoprTransportProcess::SessionsManagement(0),
+                        "long-running background task finished"
+                    ))
             ),
         );
 
@@ -599,7 +594,7 @@ where
 
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn ping(&self, peer: &PeerId) -> errors::Result<(std::time::Duration, PeerStatus)> {
-        if peer == &self.me_peerid {
+        if peer == &self.me.public().into() {
             return Err(HoprTransportError::Api("ping to self does not make sense".into()));
         }
 
@@ -608,15 +603,17 @@ where
             .get()
             .ok_or_else(|| HoprTransportError::Api("ping processing is not yet initialized".into()))?;
 
-        if let Err(e) = self.network.add(peer, PeerOrigin::ManualPing, vec![]).await {
-            error!(error = %e, "Failed to store the peer observation");
+        if let Err(error) = self.network.add(peer, PeerOrigin::ManualPing, vec![]).await {
+            error!(%error, "failed to store the peer observation");
         }
 
         let latency = (*pinger).ping(*peer).await?;
 
-        let peer_status = self.network.get(peer).await?.ok_or(HoprTransportError::Probe(
-            hopr_transport_probe::errors::ProbeError::NonExistingPeer,
-        ))?;
+        let peer_status = self
+            .network
+            .get(peer)
+            .await?
+            .ok_or(HoprTransportError::Probe(ProbeError::NonExistingPeer))?;
 
         Ok((latency, peer_status))
     }
@@ -651,7 +648,7 @@ where
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn listening_multiaddresses(&self) -> Vec<Multiaddr> {
         self.network
-            .get(&self.me_peerid)
+            .get(&self.me.public().into())
             .await
             .unwrap_or_else(|e| {
                 error!(error = %e, "failed to obtain listening multi-addresses");
@@ -717,51 +714,6 @@ where
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_peer_info(&self, peer: &PeerId) -> errors::Result<Option<PeerStatus>> {
         Ok(self.network.get(peer).await?)
-    }
-
-    #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn ticket_statistics(&self) -> errors::Result<ChannelTicketStatistics> {
-        self.db
-            .get_ticket_statistics(None)
-            .await
-            .map_err(|e| HoprTransportError::Other(e.into()))
-    }
-
-    #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn tickets_in_channel(&self, channel_id: &Hash) -> errors::Result<Option<Vec<RedeemableTicket>>> {
-        if let Some(channel) = self
-            .resolver
-            .channel_by_id(channel_id)
-            .await
-            .map_err(|e| HoprTransportError::Other(e.into()))?
-        {
-            if &channel.destination == self.me_onchain.as_ref() {
-                Ok(Some(
-                    self.db
-                        .stream_tickets([&channel])
-                        .await
-                        .map_err(|e| HoprTransportError::Other(e.into()))?
-                        .collect()
-                        .await,
-                ))
-            } else {
-                Ok(None)
-            }
-        } else {
-            Ok(None)
-        }
-    }
-
-    #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn all_tickets(&self) -> errors::Result<Vec<VerifiedTicket>> {
-        Ok(self
-            .db
-            .stream_tickets(None::<TicketSelector>)
-            .await
-            .map_err(|e| HoprTransportError::Other(e.into()))?
-            .map(|v| v.ticket)
-            .collect()
-            .await)
     }
 }
 

@@ -323,7 +323,6 @@ mod tests {
 
     use async_trait::async_trait;
     use futures::future::BoxFuture;
-    use hopr_crypto_packet::{HoprSurb, prelude::HoprSenderId};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use hopr_protocol_app::prelude::{ApplicationData, Tag};
 

@@ -96,6 +96,7 @@ pub use hopr_network_types::prelude::*;
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_platform::time::native::current_time;
 pub use hopr_primitive_types::prelude::*;
+use hopr_transport::errors::HoprTransportError;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport::transfer_session;
 pub use hopr_transport::*;
@@ -224,7 +225,7 @@ pub struct Hopr<Chain, Db> {
     me: OffchainKeypair,
     cfg: config::HoprLibConfig,
     state: Arc<state::AtomicHoprState>,
-    transport_api: HoprTransport<Db, Chain>,
+    transport_api: HoprTransport<Chain, Db>,
     redeem_requests: OnceLock<futures::channel::mpsc::Sender<TicketSelector>>,
     node_db: Db,
     chain_api: Chain,
@@ -238,23 +239,20 @@ where
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
 {
     pub async fn new(
-        cfg: config::HoprLibConfig,
+        identity: (&ChainKeypair, &OffchainKeypair),
         hopr_chain_api: Chain,
         hopr_node_db: Db,
-        me: &OffchainKeypair,
-        me_onchain: &ChainKeypair,
+        cfg: config::HoprLibConfig,
     ) -> errors::Result<Self> {
         if hopr_crypto_random::is_rng_fixed() {
             warn!("!! FOR TESTING ONLY !! THIS BUILD IS USING AN INSECURE FIXED RNG !!")
         }
 
-        let multiaddress: Multiaddr = (&cfg.host).try_into().map_err(HoprLibError::TransportError)?;
-
-        let my_multiaddresses = vec![multiaddress];
-
         let hopr_transport_api = HoprTransport::new(
-            me,
-            me_onchain,
+            identity,
+            hopr_chain_api.clone(),
+            hopr_node_db.clone(),
+            vec![(&cfg.host).try_into().map_err(HoprLibError::TransportError)?],
             HoprTransportConfig {
                 transport: cfg.transport.clone(),
                 network: cfg.network_options.clone(),
@@ -262,9 +260,6 @@ where
                 probe: cfg.probe,
                 session: cfg.session,
             },
-            hopr_node_db.clone(),
-            hopr_chain_api.clone(),
-            my_multiaddresses,
         );
 
         #[cfg(all(feature = "prometheus", not(test)))]
@@ -292,7 +287,7 @@ where
         new_tickets_tx.set_overflow(true);
 
         Ok(Self {
-            me: me.clone(),
+            me: identity.1.clone(),
             cfg,
             state: Arc::new(state::AtomicHoprState::new(HoprState::Uninitialized)),
             transport_api: hopr_transport_api,
@@ -951,19 +946,46 @@ where
     }
 
     // Ticket ========
-    /// Get all tickets in a channel specified by [`prelude::Hash`]
-    pub async fn tickets_in_channel(&self, channel: &prelude::Hash) -> errors::Result<Option<Vec<RedeemableTicket>>> {
-        Ok(self.transport_api.tickets_in_channel(channel).await?)
+    /// Get all tickets in a channel specified by [`channel_id`](ChannelId).
+    pub async fn tickets_in_channel(&self, channel_id: &ChannelId) -> errors::Result<Option<Vec<RedeemableTicket>>> {
+        if let Some(channel) = self
+            .chain_api
+            .channel_by_id(channel_id)
+            .await
+            .map_err(|e| HoprTransportError::Other(e.into()))?
+        {
+            if &channel.destination == self.chain_api.me() {
+                Ok(Some(
+                    self.node_db
+                        .stream_tickets([&channel])
+                        .await
+                        .map_err(HoprLibError::db)?
+                        .collect()
+                        .await,
+                ))
+            } else {
+                Ok(None)
+            }
+        } else {
+            Ok(None)
+        }
     }
 
     /// Get all tickets
     pub async fn all_tickets(&self) -> errors::Result<Vec<VerifiedTicket>> {
-        Ok(self.transport_api.all_tickets().await?)
+        Ok(self
+            .node_db
+            .stream_tickets(None::<TicketSelector>)
+            .await
+            .map_err(HoprLibError::db)?
+            .map(|v| v.ticket)
+            .collect()
+            .await)
     }
 
     /// Get statistics for all tickets
     pub async fn ticket_statistics(&self) -> errors::Result<ChannelTicketStatistics> {
-        Ok(self.transport_api.ticket_statistics().await?)
+        self.node_db.get_ticket_statistics(None).await.map_err(HoprLibError::db)
     }
 
     /// Reset the ticket metrics to zero

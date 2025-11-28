@@ -137,8 +137,7 @@ pub async fn peer_setup_for(
             outgoing_ticket_price: Some((*DEFAULT_PRICE_PER_PACKET).into()),
         };
 
-        let node_db = HoprNodeDb::new_in_memory(PEERS_CHAIN[i].clone()).await?;
-        node_db.start_ticket_processing(Some(received_ack_tickets_tx))?;
+        let node_db = HoprNodeDb::new_in_memory().await?;
 
         let mut connector = create_trustful_hopr_blokli_connector(
             &PEERS_CHAIN[i],
@@ -149,7 +148,7 @@ pub async fn peer_setup_for(
         .await?;
         connector.connect(Duration::from_secs(3)).await?;
 
-        hopr_transport_protocol::run_msg_ack_protocol(
+        hopr_transport_protocol::run_packet_pipeline(
             packet_cfg,
             node_db,
             Arc::new(connector),
