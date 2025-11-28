@@ -10,7 +10,12 @@ license = "GPL-3.0-only"
 
 [features]
 default = []
-serde = ["dep:serde", "hopr-internal-types/serde", "hopr-crypto-types/serde"]
+serde = [
+  "dep:serde",
+  "dep:humantime-serde",
+  "hopr-internal-types/serde",
+  "hopr-crypto-types/serde",
+]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -24,6 +29,7 @@ moka = { workspace = true }
 parking_lot = { workspace = true }
 ringbuffer = { workspace = true }
 serde = { workspace = true, optional = true }
+humantime-serde = { workspace = true, optional = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }

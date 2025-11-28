@@ -94,6 +94,7 @@ hex = "0.4.3"
 hex-literal = "1.1.0"
 hickory-resolver = "0.25.2"
 human-bandwidth = { version = "0.1.4", features = ["serde"] }
+humantime-serde = "1.1.1"
 insta = { version = "1.44.1", features = ["json", "yaml"] }
 indexmap = { version = "2.12.1", features = ["serde", "rayon"] }
 k256 = { version = "0.13.4", features = [

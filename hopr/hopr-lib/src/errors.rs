@@ -19,6 +19,9 @@ pub enum HoprLibError {
     #[error("HOPR lib Error: '{0}'")]
     GeneralError(String),
 
+    #[error("configuration validation failed: {0}")]
+    ConfigurationError(#[from] validator::ValidationErrors),
+
     #[error(transparent)]
     DbError(anyhow::Error),
 

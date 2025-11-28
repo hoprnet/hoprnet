@@ -101,6 +101,7 @@ use hopr_transport::errors::HoprTransportError;
 pub use hopr_transport::transfer_session;
 pub use hopr_transport::*;
 use tracing::{debug, error, info, warn};
+use validator::Validate;
 
 pub use crate::{
     config::SafeModule,
@@ -247,6 +248,8 @@ where
         if hopr_crypto_random::is_rng_fixed() {
             warn!("!! FOR TESTING ONLY !! THIS BUILD IS USING AN INSECURE FIXED RNG !!")
         }
+
+        cfg.validate()?;
 
         let hopr_transport_api = HoprTransport::new(
             identity,

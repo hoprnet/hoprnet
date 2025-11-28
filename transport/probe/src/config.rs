@@ -1,16 +1,13 @@
 use serde::{Deserialize, Serialize};
-use serde_with::{DurationSeconds, serde_as};
 use validator::Validate;
 
 /// Configuration for the probing mechanism
-#[serde_as]
 #[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProbeConfig {
     /// Maximum number of parallel probes performed by the mechanism
-    #[serde_as(as = "DurationSeconds<u64>")]
     #[default(default_max_probe_timeout())]
-    #[serde(default = "default_max_probe_timeout")]
+    #[serde(default = "default_max_probe_timeout", with = "humantime_serde")]
     pub timeout: std::time::Duration,
 
     /// Maximum number of parallel probes performed by the mechanism
@@ -20,14 +17,12 @@ pub struct ProbeConfig {
     pub max_parallel_probes: usize,
 
     /// The delay between individual probing rounds for neighbor discovery
-    #[serde_as(as = "DurationSeconds<u64>")]
-    #[serde(default = "default_probing_interval")]
+    #[serde(default = "default_probing_interval", with = "humantime_serde")]
     #[default(default_probing_interval())]
     pub interval: std::time::Duration,
 
     /// The time threshold after which it is reasonable to recheck the nearest neighbor
-    #[serde_as(as = "DurationSeconds<u64>")]
-    #[serde(default = "default_recheck_threshold")]
+    #[serde(default = "default_recheck_threshold", with = "humantime_serde")]
     #[default(default_recheck_threshold())]
     pub recheck_threshold: std::time::Duration,
 }

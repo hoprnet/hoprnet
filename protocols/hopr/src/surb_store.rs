@@ -32,6 +32,30 @@ fn validate_reply_opener_lifetime(lifetime: &Duration) -> Result<(), ValidationE
     }
 }
 
+fn default_rb_capacity() -> usize {
+    15_000
+}
+
+fn default_distress_threshold() -> usize {
+    500
+}
+
+fn default_max_openers_per_pseudonym() -> usize {
+    100_000
+}
+
+fn default_max_pseudonyms() -> usize {
+    10_000
+}
+
+fn default_pseudonyms_lifetime() -> Duration {
+    Duration::from_secs(600)
+}
+
+fn default_reply_opener_lifetime() -> Duration {
+    Duration::from_secs(3600)
+}
+
 /// Configuration for the SURB cache.
 ///
 /// The configuration options affect both the sending side (SURB creator) and the
@@ -40,7 +64,11 @@ fn validate_reply_opener_lifetime(lifetime: &Duration) -> Result<(), ValidationE
 /// In the classical scenario (`Entry - Relay 1 -... - Exit`), the sending side is
 /// the `Entry` and the replying side is the `Exit`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, smart_default::SmartDefault, validator::Validate)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Deserialize, serde::Serialize),
+    serde(deny_unknown_fields)
+)]
 pub struct SurbStoreConfig {
     /// Size of the SURB ring buffer per pseudonym.
     ///
@@ -50,15 +78,17 @@ pub struct SurbStoreConfig {
     /// back to the sending side.
     ///
     /// Default is 15 000.
-    #[default(15_000)]
+    #[default(default_rb_capacity())]
     #[validate(range(min = 1024, message = "rb_capacity must be at least 1024"))]
+    #[cfg_attr(feature = "serde", serde(default = "default_rb_capacity"))]
     pub rb_capacity: usize,
     /// Threshold for the number of SURBs in the ring buffer, below which it is
     /// considered low ("SURB distress").
     ///
     /// Default is 500.
-    #[default(500)]
+    #[default(default_distress_threshold())]
     #[validate(range(min = 10, message = "distress_threshold must be at least 10"))]
+    #[cfg_attr(feature = "serde", serde(default = "default_distress_threshold"))]
     pub distress_threshold: usize,
     /// Maximum number of reply openers (SURB counterparts) per pseudonym.
     ///
@@ -70,8 +100,9 @@ pub struct SurbStoreConfig {
     /// to a dropped reply opener, the reply message will be undecryptable by the initiator-side.
     ///
     /// Default is 100 000.
-    #[default(100_000)]
+    #[default(default_max_openers_per_pseudonym())]
     #[validate(range(min = 100, message = "max_openers_per_pseudonym must be at least 100"))]
+    #[cfg_attr(feature = "serde", serde(default = "default_max_openers_per_pseudonym"))]
     pub max_openers_per_pseudonym: usize,
     /// The maximum number of distinct pseudonyms for which we hold a SURB ringbuffer.
     ///
@@ -80,8 +111,9 @@ pub struct SurbStoreConfig {
     /// For each pseudonym, there is a ring-buffer with capacity `rb_capacity`.
     ///
     /// Default is 10 000.
-    #[default(10_000)]
+    #[default(default_max_pseudonyms())]
     #[validate(range(min = 100, message = "max_pseudonyms must be at least 100"))]
+    #[cfg_attr(feature = "serde", serde(default = "default_max_pseudonyms"))]
     pub max_pseudonyms: usize,
     /// Maximum lifetime of ring-buffer for each pseudonym.
     ///
@@ -96,8 +128,12 @@ pub struct SurbStoreConfig {
     /// Preventing from sending any more replies for that pseudonym.
     ///
     /// Default is 600 seconds.
-    #[default(Duration::from_secs(600))]
+    #[default(default_pseudonyms_lifetime())]
     #[validate(custom(function = "validate_pseudonyms_lifetime"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "default_pseudonyms_lifetime", with = "humantime_serde")
+    )]
     pub pseudonyms_lifetime: Duration,
     /// Maximum lifetime of a reply opener.
     ///
@@ -109,8 +145,12 @@ pub struct SurbStoreConfig {
     /// it won't be possible to decrypt it when received.
     ///
     /// Default is 3600 seconds.
-    #[default(Duration::from_secs(3600))]
+    #[default(default_reply_opener_lifetime())]
     #[validate(custom(function = "validate_reply_opener_lifetime"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "default_reply_opener_lifetime", with = "humantime_serde")
+    )]
     pub reply_opener_lifetime: Duration,
 }
 

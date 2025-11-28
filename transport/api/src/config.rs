@@ -13,7 +13,6 @@ pub use hopr_transport_probe::config::ProbeConfig;
 use hopr_transport_session::{MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION};
 use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
 use validator::{Validate, ValidationError};
 
 use crate::errors::HoprTransportError;
@@ -40,6 +39,7 @@ pub struct HoprProtocolConfig {
 
 /// Configuration of the HOPR packet pipeline.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Validate, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct HoprPacketPipelineConfig {
     /// HOPR packet codec configuration
     #[validate(nested)]
@@ -237,7 +237,7 @@ fn default_session_max_sessions() -> u32 {
     DEFAULT_SESSION_MAX_SESSIONS
 }
 
-fn default_session_balancer_buffer_duration() -> std::time::Duration {
+fn default_session_balancer_buffer_duration() -> Duration {
     DEFAULT_SESSION_BALANCER_BUFFER_DURATION
 }
 
@@ -245,19 +245,19 @@ fn default_session_establish_max_retries() -> u32 {
     DEFAULT_SESSION_ESTABLISH_MAX_RETRIES
 }
 
-fn default_session_idle_timeout() -> std::time::Duration {
+fn default_session_idle_timeout() -> Duration {
     DEFAULT_SESSION_IDLE_TIMEOUT
 }
 
-fn default_session_establish_retry_delay() -> std::time::Duration {
+fn default_session_establish_retry_delay() -> Duration {
     DEFAULT_SESSION_ESTABLISH_RETRY_DELAY
 }
 
-fn default_session_balancer_sampling() -> std::time::Duration {
+fn default_session_balancer_sampling() -> Duration {
     DEFAULT_SESSION_BALANCER_SAMPLING
 }
 
-fn validate_session_idle_timeout(value: &std::time::Duration) -> Result<(), ValidationError> {
+fn validate_session_idle_timeout(value: &Duration) -> Result<(), ValidationError> {
     if SESSION_IDLE_MIN_TIMEOUT <= *value {
         Ok(())
     } else {
@@ -265,7 +265,7 @@ fn validate_session_idle_timeout(value: &std::time::Duration) -> Result<(), Vali
     }
 }
 
-fn validate_balancer_sampling(value: &std::time::Duration) -> Result<(), ValidationError> {
+fn validate_balancer_sampling(value: &Duration) -> Result<(), ValidationError> {
     if MIN_BALANCER_SAMPLING_INTERVAL <= *value {
         Ok(())
     } else {
@@ -273,7 +273,7 @@ fn validate_balancer_sampling(value: &std::time::Duration) -> Result<(), Validat
     }
 }
 
-fn validate_balancer_buffer_duration(value: &std::time::Duration) -> Result<(), ValidationError> {
+fn validate_balancer_buffer_duration(value: &Duration) -> Result<(), ValidationError> {
     if MIN_SURB_BUFFER_DURATION <= *value {
         Ok(())
     } else {
@@ -282,7 +282,6 @@ fn validate_balancer_buffer_duration(value: &std::time::Duration) -> Result<(), 
 }
 
 /// Global configuration of Sessions and the Session manager.
-#[serde_as]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Validate, smart_default::SmartDefault)]
 #[serde(deny_unknown_fields)]
 pub struct SessionGlobalConfig {
@@ -291,9 +290,8 @@ pub struct SessionGlobalConfig {
     /// Defaults to 3 minutes.
     #[validate(custom(function = "validate_session_idle_timeout"))]
     #[default(DEFAULT_SESSION_IDLE_TIMEOUT)]
-    #[serde(default = "default_session_idle_timeout")]
-    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
-    pub idle_timeout: std::time::Duration,
+    #[serde(default = "default_session_idle_timeout", with = "humantime_serde")]
+    pub idle_timeout: Duration,
 
     /// The maximum number of outgoing or incoming Sessions that
     /// are allowed by the Session manager.
@@ -318,18 +316,16 @@ pub struct SessionGlobalConfig {
     ///
     /// Default is 2 seconds.
     #[default(DEFAULT_SESSION_ESTABLISH_RETRY_DELAY)]
-    #[serde(default = "default_session_establish_retry_delay")]
-    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
-    pub establish_retry_timeout: std::time::Duration,
+    #[serde(default = "default_session_establish_retry_delay", with = "humantime_serde")]
+    pub establish_retry_timeout: Duration,
 
     /// Sampling interval for SURB balancer in milliseconds.
     ///
     /// Default is 500 milliseconds.
     #[validate(custom(function = "validate_balancer_sampling"))]
     #[default(DEFAULT_SESSION_BALANCER_SAMPLING)]
-    #[serde(default = "default_session_balancer_sampling")]
-    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
-    pub balancer_sampling_interval: std::time::Duration,
+    #[serde(default = "default_session_balancer_sampling", with = "humantime_serde")]
+    pub balancer_sampling_interval: Duration,
 
     /// Minimum runway of received SURBs in seconds.
     ///
@@ -340,9 +336,8 @@ pub struct SessionGlobalConfig {
     /// Default is 5 seconds, minimum is 1 second.
     #[validate(custom(function = "validate_balancer_buffer_duration"))]
     #[default(DEFAULT_SESSION_BALANCER_BUFFER_DURATION)]
-    #[serde(default = "default_session_balancer_buffer_duration")]
-    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
-    pub balancer_minimum_surb_buffer_duration: std::time::Duration,
+    #[serde(default = "default_session_balancer_buffer_duration", with = "humantime_serde")]
+    pub balancer_minimum_surb_buffer_duration: Duration,
 }
 
 #[cfg(test)]

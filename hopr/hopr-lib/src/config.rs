@@ -63,6 +63,7 @@ pub struct HoprLibConfig {
     #[validate(nested)]
     #[serde(default)]
     pub protocol: HoprProtocolConfig,
+    /// Configuration of the node Safe and Module.
     #[validate(nested)]
     #[serde(default)]
     pub safe_module: SafeModule,

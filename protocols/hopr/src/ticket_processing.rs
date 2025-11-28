@@ -28,31 +28,57 @@ fn validate_outgoing_index_retention(retention: &std::time::Duration) -> Result<
     }
 }
 
+fn default_outgoing_index_retention() -> std::time::Duration {
+    std::time::Duration::from_secs(10)
+}
+
+fn default_unack_ticket_timeout() -> std::time::Duration {
+    std::time::Duration::from_secs(30)
+}
+
+fn default_max_unack_tickets() -> usize {
+    10_000_000
+}
+
 /// Configuration for the HOPR ticket processor within the packet pipeline.
+
 #[derive(Debug, Clone, Copy, smart_default::SmartDefault, PartialEq, validator::Validate)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Deserialize, serde::Serialize),
+    serde(deny_unknown_fields)
+)]
 pub struct HoprTicketProcessorConfig {
     /// Time after which an unacknowledged ticket is considered stale and is removed from the cache.
     ///
     /// If the counterparty does not send an acknowledgement within this period, the ticket is lost forever.
     ///
     /// Default is 30 seconds.
-    #[default(std::time::Duration::from_secs(30))]
+    #[default(default_unack_ticket_timeout())]
     #[validate(custom(function = "validate_unack_ticket_timeout"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "default_unack_ticket_timeout", with = "humantime_serde")
+    )]
     pub unack_ticket_timeout: std::time::Duration,
     /// Maximum number of unacknowledged tickets that can be stored in the cache at any given time.
     ///
     /// When more tickets are received, the oldest ones are discarded and lost forever.
     ///
     /// Default is 10 000 000.
-    #[default(10_000_000)]
+    #[default(default_max_unack_tickets())]
     #[validate(range(min = 100))]
+    #[cfg_attr(feature = "serde", serde(default = "default_max_unack_tickets"))]
     pub max_unack_tickets: usize,
     /// Period for which the outgoing ticket index is cached in memory for each channel.
     ///
     /// Default is 10 seconds.
-    #[default(std::time::Duration::from_secs(10))]
+    #[default(default_outgoing_index_retention())]
     #[validate(custom(function = "validate_outgoing_index_retention"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "default_outgoing_index_retention", with = "humantime_serde")
+    )]
     pub outgoing_index_cache_retention: std::time::Duration,
 }
 

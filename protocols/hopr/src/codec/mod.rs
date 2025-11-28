@@ -14,13 +14,22 @@ fn validate_outgoing_ticket_price(
     }
 }
 
+fn default_outgoing_win_prob() -> Option<hopr_internal_types::prelude::WinningProbability> {
+    Some(hopr_internal_types::prelude::WinningProbability::ALWAYS)
+}
+
 /// Configuration of [`HoprEncoder`] and [`HoprDecoder`].
 #[derive(Clone, Copy, Debug, smart_default::SmartDefault, validator::Validate)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(deny_unknown_fields)
+)]
 pub struct HoprCodecConfig {
     /// Optional price of outgoing tickets.
     ///
     /// If not set, the network default will be used, which is the minimum allowed ticket price in the HOPR network.
+    #[cfg_attr(feature = "serde", serde(default))]
     #[validate(custom(function = "validate_outgoing_ticket_price"))]
     pub outgoing_ticket_price: Option<hopr_primitive_types::balance::HoprBalance>,
     /// Optional probability of winning an outgoing ticket.
@@ -29,7 +38,8 @@ pub struct HoprCodecConfig {
     /// network.
     ///
     /// The default is [`WinningProbability::ALWAYS`](hopr_internal_types::prelude::WinningProbability::ALWAYS).
-    #[default(Some(hopr_internal_types::prelude::WinningProbability::ALWAYS))]
+    #[cfg_attr(feature = "serde", serde(default = "default_outgoing_win_prob"))]
+    #[default(default_outgoing_win_prob())]
     pub outgoing_win_prob: Option<hopr_internal_types::prelude::WinningProbability>,
 }
 
