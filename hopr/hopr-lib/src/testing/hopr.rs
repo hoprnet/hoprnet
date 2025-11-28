@@ -5,7 +5,7 @@ use futures::future::join_all;
 use hopr_crypto_types::prelude::*;
 use hopr_db_node::HoprNodeDb;
 use hopr_primitive_types::prelude::*;
-use hopr_transport::Hash;
+use hopr_transport::{Hash, config::HoprCodecConfig};
 use tokio::time::sleep;
 
 use crate::{
@@ -32,17 +32,6 @@ pub async fn create_hopr_instance(
         connector,
         node_db,
         HoprLibConfig {
-            probe: crate::config::ProbeConfig {
-                timeout: Duration::from_secs(2),
-                max_parallel_probes: 10,
-                recheck_threshold: Duration::from_secs(1),
-                ..Default::default()
-            },
-            network_options: crate::config::NetworkConfig {
-                ignore_timeframe: Duration::from_secs(0),
-                allow_private_addresses_in_store: true,
-                ..Default::default()
-            },
             host: crate::config::HostConfig {
                 address: crate::config::HostType::default(),
                 port: host_port,
@@ -52,17 +41,34 @@ pub async fn create_hopr_instance(
                 module_address: safe.module_address,
                 ..Default::default()
             },
-            transport: crate::config::TransportConfig {
-                prefer_local_addresses: true,
-                announce_local_addresses: true,
-            },
-            session: hopr_transport::config::SessionGlobalConfig {
-                idle_timeout: Duration::from_millis(2500),
-                ..Default::default()
-            },
-            protocol: hopr_transport::config::ProtocolConfig {
-                outgoing_ticket_winning_prob: Some(winn_prob),
-                ..Default::default()
+            protocol: crate::config::HoprProtocolConfig {
+                transport: crate::config::TransportConfig {
+                    prefer_local_addresses: true,
+                    announce_local_addresses: true,
+                },
+                session: hopr_transport::config::SessionGlobalConfig {
+                    idle_timeout: Duration::from_millis(2500),
+                    ..Default::default()
+                },
+                probe: crate::config::ProbeConfig {
+                    timeout: Duration::from_secs(2),
+                    max_parallel_probes: 10,
+                    recheck_threshold: Duration::from_secs(1),
+                    ..Default::default()
+                },
+                network: crate::config::NetworkConfig {
+                    ignore_timeframe: Duration::from_secs(0),
+                    allow_private_addresses_in_store: true,
+                    ..Default::default()
+                },
+                packet: crate::config::HoprPacketPipelineConfig {
+                    codec: HoprCodecConfig {
+                        outgoing_win_prob: Some(winn_prob.try_into().expect("invalid winning probability")),
+                        ..Default::default()
+                    },
+                    ticket_processing: Default::default(),
+                    surb_store: Default::default(),
+                },
             },
             publish: true,
             ..Default::default()

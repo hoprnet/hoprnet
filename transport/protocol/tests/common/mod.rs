@@ -18,7 +18,7 @@ use hopr_protocol_hopr::{
     SurbStoreConfig,
 };
 use hopr_transport_mixer::config::MixerConfig;
-use hopr_transport_protocol::{PacketPipelineProcesses, TicketEvent, processor::PacketInteractionConfig};
+use hopr_transport_protocol::TicketEvent;
 use lazy_static::lazy_static;
 use libp2p::PeerId;
 use tokio::time::timeout;

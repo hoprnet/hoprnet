@@ -4,13 +4,24 @@ mod encoder;
 pub use decoder::HoprDecoder;
 pub use encoder::HoprEncoder;
 
+fn validate_outgoing_ticket_price(
+    price: &hopr_primitive_types::balance::HoprBalance,
+) -> Result<(), validator::ValidationError> {
+    if price.is_zero() {
+        Err(validator::ValidationError::new("outgoing_ticket_price cannot be zero"))
+    } else {
+        Ok(())
+    }
+}
+
 /// Configuration of [`HoprEncoder`] and [`HoprDecoder`].
-#[derive(Clone, Copy, Debug, smart_default::SmartDefault)]
+#[derive(Clone, Copy, Debug, smart_default::SmartDefault, validator::Validate)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct HoprCodecConfig {
     /// Optional price of outgoing tickets.
     ///
     /// If not set, the network default will be used, which is the minimum allowed ticket price in the HOPR network.
+    #[validate(custom(function = "validate_outgoing_ticket_price"))]
     pub outgoing_ticket_price: Option<hopr_primitive_types::balance::HoprBalance>,
     /// Optional probability of winning an outgoing ticket.
     ///

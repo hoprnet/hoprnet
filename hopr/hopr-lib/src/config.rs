@@ -1,8 +1,7 @@
 use hopr_primitive_types::prelude::*;
-use hopr_transport::HoprTransportConfig;
 pub use hopr_transport::config::{
-    HoprPacketPipelineConfig, HostConfig, HostType, NetworkConfig, ProbeConfig, SessionGlobalConfig, TransportConfig,
-    looks_like_domain, validate_external_host,
+    HoprPacketPipelineConfig, HoprProtocolConfig, HostConfig, HostType, NetworkConfig, ProbeConfig,
+    SessionGlobalConfig, TransportConfig, looks_like_domain, validate_external_host,
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
@@ -63,7 +62,7 @@ pub struct HoprLibConfig {
     /// Configuration of the HOPR protocol.
     #[validate(nested)]
     #[serde(default)]
-    pub hopr: HoprTransportConfig,
+    pub protocol: HoprProtocolConfig,
     #[validate(nested)]
     #[serde(default)]
     pub safe_module: SafeModule,

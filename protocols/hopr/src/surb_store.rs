@@ -99,7 +99,6 @@ pub struct SurbStoreConfig {
     #[default(Duration::from_secs(600))]
     #[validate(custom(function = "validate_pseudonyms_lifetime"))]
     pub pseudonyms_lifetime: Duration,
-
     /// Maximum lifetime of a reply opener.
     ///
     /// Affects only the sending side.

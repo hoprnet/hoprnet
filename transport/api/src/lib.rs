@@ -83,7 +83,7 @@ pub use hopr_transport_session::{
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
 use tracing::{Instrument, debug, error, info, trace, warn};
 
-pub use crate::config::HoprTransportConfig;
+pub use crate::config::HoprProtocolConfig;
 use crate::{constants::SESSION_INITIATION_TIMEOUT_BASE, errors::HoprTransportError, socket::HoprSocket};
 
 pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RANGE;
@@ -126,7 +126,7 @@ pub struct HoprTransport<Chain, Db> {
     path_planner: PathPlanner<MemorySurbStore, Chain, CurrentPathSelector>,
     my_multiaddresses: Vec<Multiaddr>,
     smgr: SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>, Sender<IncomingSession>>,
-    cfg: HoprTransportConfig,
+    cfg: HoprProtocolConfig,
 }
 
 impl<Chain, Db> HoprTransport<Chain, Db>
@@ -146,7 +146,7 @@ where
         resolver: Chain,
         db: Db,
         my_multiaddresses: Vec<Multiaddr>,
-        cfg: HoprTransportConfig,
+        cfg: HoprProtocolConfig,
     ) -> Self {
         Self {
             packet_key: identity.1.clone(),

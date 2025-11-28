@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use hopr_protocol_hopr::{HoprCodecConfig, HoprTicketProcessorConfig, SurbStoreConfig};
+pub use hopr_protocol_hopr::{HoprCodecConfig, HoprTicketProcessorConfig, SurbStoreConfig};
 use hopr_transport_identity::Multiaddr;
 pub use hopr_transport_network::config::NetworkConfig;
 pub use hopr_transport_probe::config::ProbeConfig;
@@ -20,16 +20,21 @@ use crate::errors::HoprTransportError;
 
 /// Complete configuration of the HOPR protocol stack.
 #[derive(Debug, smart_default::SmartDefault, Validate, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct HoprTransportConfig {
-    /// Libp2p-related configuration
+pub struct HoprProtocolConfig {
+    /// Libp2p-related transport configuration
+    #[validate(nested)]
     pub transport: TransportConfig,
     /// Heartbeat configuration
+    #[validate(nested)]
     pub network: NetworkConfig,
     /// HOPR packet pipeline configuration
+    #[validate(nested)]
     pub packet: HoprPacketPipelineConfig,
     /// Probing protocol configuration
+    #[validate(nested)]
     pub probe: ProbeConfig,
     /// Session protocol global configuration
+    #[validate(nested)]
     pub session: SessionGlobalConfig,
 }
 
@@ -37,10 +42,13 @@ pub struct HoprTransportConfig {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Validate, Serialize, Deserialize)]
 pub struct HoprPacketPipelineConfig {
     /// HOPR packet codec configuration
+    #[validate(nested)]
     pub codec: HoprCodecConfig,
     /// HOPR ticket processing configuration
+    #[validate(nested)]
     pub ticket_processing: HoprTicketProcessorConfig,
     /// Single Use Reply Block (SURB) handling configuration
+    #[validate(nested)]
     pub surb_store: SurbStoreConfig,
 }
 

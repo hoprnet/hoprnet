@@ -5,8 +5,28 @@ use hopr_api::{chain::ChainReadChannelOperations, db::HoprDbTicketOperations};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::balance::HoprBalance;
+use validator::ValidationError;
 
 use crate::{HoprProtocolError, ResolvedAcknowledgement, TicketTracker, UnacknowledgedTicketProcessor};
+
+const MIN_UNACK_TICKET_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+fn validate_unack_ticket_timeout(timeout: &std::time::Duration) -> Result<(), ValidationError> {
+    if timeout < &MIN_UNACK_TICKET_TIMEOUT {
+        Err(ValidationError::new("unack_ticket_timeout too low"))
+    } else {
+        Ok(())
+    }
+}
+
+const MIN_OUTGOING_INDEX_RETENTION: std::time::Duration = std::time::Duration::from_secs(10);
+
+fn validate_outgoing_index_retention(retention: &std::time::Duration) -> Result<(), ValidationError> {
+    if retention < &MIN_OUTGOING_INDEX_RETENTION {
+        Err(ValidationError::new("outgoing_index_cache_retention too low"))
+    } else {
+        Ok(())
+    }
+}
 
 /// Configuration for the HOPR ticket processor within the packet pipeline.
 #[derive(Debug, Clone, Copy, smart_default::SmartDefault, PartialEq, validator::Validate)]
@@ -18,6 +38,7 @@ pub struct HoprTicketProcessorConfig {
     ///
     /// Default is 30 seconds.
     #[default(std::time::Duration::from_secs(30))]
+    #[validate(custom(function = "validate_unack_ticket_timeout"))]
     pub unack_ticket_timeout: std::time::Duration,
     /// Maximum number of unacknowledged tickets that can be stored in the cache at any given time.
     ///
@@ -31,6 +52,7 @@ pub struct HoprTicketProcessorConfig {
     ///
     /// Default is 10 seconds.
     #[default(std::time::Duration::from_secs(10))]
+    #[validate(custom(function = "validate_outgoing_index_retention"))]
     pub outgoing_index_cache_retention: std::time::Duration,
 }
 
