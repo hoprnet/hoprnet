@@ -8,11 +8,18 @@ homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
+[features]
+runtime-tokio = ["dep:tokio", "sea-orm-migration/runtime-tokio"]
 
 [lib]
 name = "migration"
 path = "src/lib.rs"
 
+[[bin]]
+name = "migrator"
+path = "src/main.rs"
+required-features = ["runtime-tokio"]
+
 [dependencies]
-tokio = { workspace = true }
+tokio = { workspace = true, optional = true }
 sea-orm-migration = { workspace = true }

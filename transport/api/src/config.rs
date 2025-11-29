@@ -221,9 +221,9 @@ pub struct TransportConfig {
 
 const DEFAULT_SESSION_MAX_SESSIONS: u32 = 2048;
 
-const DEFAULT_SESSION_IDLE_TIMEOUT: Duration = Duration::from_secs(180);
+const DEFAULT_SESSION_IDLE_TIMEOUT: Duration = Duration::from_mins(3);
 
-const SESSION_IDLE_MIN_TIMEOUT: Duration = Duration::from_secs(60);
+const SESSION_IDLE_MIN_TIMEOUT: Duration = Duration::from_secs(2);
 
 const DEFAULT_SESSION_ESTABLISH_RETRY_DELAY: Duration = Duration::from_secs(2);
 
@@ -231,7 +231,7 @@ const DEFAULT_SESSION_ESTABLISH_MAX_RETRIES: u32 = 3;
 
 const DEFAULT_SESSION_BALANCER_SAMPLING: Duration = Duration::from_millis(500);
 
-const DEFAULT_SESSION_BALANCER_BUFFER_DURATION: Duration = Duration::from_millis(5000);
+const DEFAULT_SESSION_BALANCER_BUFFER_DURATION: Duration = Duration::from_secs(5);
 
 fn default_session_max_sessions() -> u32 {
     DEFAULT_SESSION_MAX_SESSIONS

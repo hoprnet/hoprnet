@@ -1,6 +1,7 @@
 use std::{
     cmp::Ordering,
     fmt::{Display, Formatter},
+    str::FromStr,
 };
 
 use hex_literal::hex;
@@ -163,6 +164,16 @@ impl Default for WinningProbability {
 impl Display for WinningProbability {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:.8}", self.as_f64())
+    }
+}
+
+impl FromStr for WinningProbability {
+    type Err = CoreTypesError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        f64::from_str(s)
+            .map_err(|e| CoreTypesError::ParseError(format!("failed to parse winning probability: {e}")))
+            .and_then(|v| v.try_into())
     }
 }
 

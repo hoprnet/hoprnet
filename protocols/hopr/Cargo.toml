@@ -11,8 +11,10 @@ license = "GPL-3.0-only"
 [features]
 default = []
 serde = [
-  "dep:serde",
+  "dep:cfg_eval",
   "dep:humantime-serde",
+  "dep:serde",
+  "dep:serde_with",
   "hopr-internal-types/serde",
   "hopr-crypto-types/serde",
 ]
@@ -21,6 +23,7 @@ serde = [
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 auto_impl = { workspace = true }
+cfg_eval = { workspace = true, optional = true }
 bloomfilter = { workspace = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
@@ -29,6 +32,7 @@ moka = { workspace = true }
 parking_lot = { workspace = true }
 ringbuffer = { workspace = true }
 serde = { workspace = true, optional = true }
+serde_with = { workspace = true, optional = true }
 humantime-serde = { workspace = true, optional = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
