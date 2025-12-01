@@ -13,6 +13,7 @@
     pre-commit.url = "github:cachix/git-hooks.nix";
     treefmt-nix.url = "github:numtide/treefmt-nix";
     flake-root.url = "github:srid/flake-root";
+    hopli.url = "github:hoprnet/hopli";
 
     flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
     foundry.inputs.flake-utils.follows = "flake-utils";
@@ -21,6 +22,16 @@
     pre-commit.inputs.nixpkgs.follows = "nixpkgs";
     rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
     treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
+    hopli.inputs.flake-utils.follows = "flake-utils";
+    hopli.inputs.flake-parts.follows = "flake-parts";
+    hopli.inputs.nixpkgs.follows = "nixpkgs";
+    hopli.inputs.rust-overlay.follows = "rust-overlay";
+    hopli.inputs.crane.follows = "crane";
+    hopli.inputs.nix-lib.follows = "nix-lib";
+    hopli.inputs.foundry.follows = "foundry";
+    hopli.inputs.pre-commit.follows = "pre-commit";
+    hopli.inputs.treefmt-nix.follows = "treefmt-nix";
+    hopli.inputs.flake-root.follows = "flake-root";
   };
 
   outputs =
@@ -216,31 +227,6 @@
             else
               rust-builder-local.callPackage nixLib.mkRustPackage (hoprdBuildArgs // { runBench = true; });
 
-          hopliBuildArgs = {
-            inherit src depsSrc rev;
-            cargoToml = ./hopli/Cargo.toml;
-          };
-
-          hopli = rust-builder-local.callPackage nixLib.mkRustPackage hopliBuildArgs;
-          # also used for Docker image
-          hopli-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage hopliBuildArgs;
-          # also used for Docker image
-          hopli-x86_64-linux-dev = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage (
-            hopliBuildArgs // { CARGO_PROFILE = "dev"; }
-          );
-          hopli-aarch64-linux = rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage hopliBuildArgs;
-          # CAVEAT: must be built from a darwin system
-          hopli-x86_64-darwin = rust-builder-x86_64-darwin.callPackage nixLib.mkRustPackage hopliBuildArgs;
-          # CAVEAT: must be built from a darwin system
-          hopli-aarch64-darwin = rust-builder-aarch64-darwin.callPackage nixLib.mkRustPackage hopliBuildArgs;
-
-          hopli-clippy = rust-builder-local.callPackage nixLib.mkRustPackage (
-            hopliBuildArgs // { runClippy = true; }
-          );
-
-          hopli-dev = rust-builder-local.callPackage nixLib.mkRustPackage (
-            hopliBuildArgs // { CARGO_PROFILE = "dev"; }
-          );
           profileDeps = with pkgs; [
             gdb
             # FIXME: heaptrack would be useful, but it adds 700MB to the image size (unpacked)
@@ -292,27 +278,11 @@
             fi
           '';
 
-          # build candidate binary as static on Linux amd64 to get more test exposure specifically via smoke tests
-          hopli-candidate =
-            if buildPlatform.isLinux && buildPlatform.isx86_64 then
-              rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage (
-                hopliBuildArgs // { CARGO_PROFILE = "candidate"; }
-              )
-            else
-              rust-builder-local.callPackage nixLib.mkRustPackage (
-                hopliBuildArgs // { CARGO_PROFILE = "candidate"; }
-              );
-
           # Man pages using nix-lib
           hoprd-man = nixLib.mkManPage {
             pname = "hoprd";
             binary = hoprd-dev;
             description = "HOPR node executable";
-          };
-          hopli-man = nixLib.mkManPage {
-            pname = "hopli";
-            binary = hopli-dev;
-            description = "HOPR CLI helper tool";
           };
 
           # FIXME: the docker image built is not working on macOS arm platforms
@@ -348,31 +318,6 @@
             Cmd = [ "hoprd" ];
           };
 
-          hopli-docker = nixLib.mkDockerImage {
-            name = "hopli";
-            extraContents = [ hopli-x86_64-linux ];
-            Entrypoint = [ "/bin/hopli" ];
-            env = [
-              "ETHERSCAN_API_KEY=placeholder"
-            ];
-          };
-          hopli-dev-docker = nixLib.mkDockerImage {
-            name = "hopli";
-            extraContents = [ hopli-x86_64-linux-dev ];
-            Entrypoint = [ "/bin/hopli" ];
-            env = [
-              "ETHERSCAN_API_KEY=placeholder"
-            ];
-          };
-          hopli-profile-docker = nixLib.mkDockerImage {
-            name = "hopli";
-            extraContents = [ hopli-x86_64-linux ] ++ profileDeps;
-            Entrypoint = [ "/bin/hopli" ];
-            env = [
-              "ETHERSCAN_API_KEY=placeholder"
-            ];
-          };
-
           # Docker security scanning and SBOM generation using nix-lib
           hoprd-docker-trivy = nixLib.mkTrivyScan {
             image = hoprd-docker;
@@ -381,14 +326,6 @@
           hoprd-docker-sbom = nixLib.mkSBOM {
             image = hoprd-docker;
             imageName = "hoprd";
-          };
-          hopli-docker-trivy = nixLib.mkTrivyScan {
-            image = hopli-docker;
-            imageName = "hopli";
-          };
-          hopli-docker-sbom = nixLib.mkSBOM {
-            image = hopli-docker;
-            imageName = "hopli";
           };
 
           # Multi-arch Docker manifests using nix-lib
@@ -421,15 +358,6 @@
           hoprd-profile-docker-build-and-upload = flake-utils.lib.mkApp {
             drv = dockerImageUploadScript hoprd-profile-docker;
           };
-          hopli-docker-build-and-upload = flake-utils.lib.mkApp {
-            drv = dockerImageUploadScript hopli-docker;
-          };
-          hopli-dev-docker-build-and-upload = flake-utils.lib.mkApp {
-            drv = dockerImageUploadScript hopli-dev-docker;
-          };
-          hopli-profile-docker-build-and-upload = flake-utils.lib.mkApp {
-            drv = dockerImageUploadScript hopli-profile-docker;
-          };
           docs = rust-builder-local-nightly.callPackage nixLib.mkRustPackage (
             hoprdBuildArgs // { buildDocs = true; }
           );
@@ -448,7 +376,7 @@
               uv
               foundry-bin
               python313
-              hopli-dev
+              hopli.hopli
               hoprd-dev
             ];
             buildPhase = ''
@@ -554,7 +482,7 @@
               python313
               foundry-bin
               hoprd-dev
-              hopli-dev
+              hopli.hopli
             ];
             shellHook = ''
               uv sync --frozen
@@ -573,7 +501,7 @@
               python313
               foundry-bin
               (mkHoprdCandidate "")
-              hopli-candidate
+              hopli.hopli
             ];
             shellHook = ''
               uv sync --frozen
@@ -721,16 +649,13 @@
           };
 
           checks = {
-            inherit hoprd-clippy hopli-clippy;
+            inherit hoprd-clippy;
           };
 
           apps = {
             inherit hoprd-docker-build-and-upload;
             inherit hoprd-dev-docker-build-and-upload;
             inherit hoprd-profile-docker-build-and-upload;
-            inherit hopli-docker-build-and-upload;
-            inherit hopli-dev-docker-build-and-upload;
-            inherit hopli-profile-docker-build-and-upload;
             inherit update-github-labels find-port-ci;
             check = run-check;
             audit = run-audit;
@@ -744,30 +669,18 @@
               hoprd-dev-docker
               hoprd-profile-docker
               ;
-            inherit
-              hopli
-              hopli-dev
-              hopli-docker
-              hopli-dev-docker
-              hopli-profile-docker
-              ;
-            inherit hopli-candidate;
             inherit hopr-test-unit hopr-test-nightly;
             inherit smoke-tests docs;
             inherit pre-commit-check;
             inherit hoprd-bench;
-            inherit hoprd-man hopli-man;
+            inherit hoprd-man;
             # binary packages
             inherit hoprd-x86_64-linux hoprd-x86_64-linux-dev hoprd-x86_64-linux-profile;
             inherit hoprd-aarch64-linux hoprd-aarch64-linux-profile;
-            inherit hopli-x86_64-linux hopli-x86_64-linux-dev;
-            inherit hopli-aarch64-linux;
             # FIXME: Darwin cross-builds are currently broken.
             # Follow https://github.com/nixos/nixpkgs/pull/256590
             inherit hoprd-x86_64-darwin hoprd-x86_64-darwin-profile;
             inherit hoprd-aarch64-darwin hoprd-aarch64-darwin-profile;
-            inherit hopli-x86_64-darwin;
-            inherit hopli-aarch64-darwin;
             default = hoprd;
             hoprd-candidate = (mkHoprdCandidate "");
           };

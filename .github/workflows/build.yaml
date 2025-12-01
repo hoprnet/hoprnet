@@ -29,7 +29,6 @@ jobs:
     strategy:
       matrix:
         package:
-          - hopli
           - hoprd
     name: ${{ matrix.package }}
     uses: ./.github/workflows/build-docker.yaml
@@ -63,7 +62,6 @@ jobs:
       fail-fast: false
       matrix:
         binary:
-          - hopli
           - hoprd
         target:
           - name: x86_64-linux

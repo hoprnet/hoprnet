@@ -182,6 +182,53 @@
         "type": "github"
       }
     },
+    "hopli": {
+      "inputs": {
+        "crane": [
+          "crane"
+        ],
+        "flake-parts": [
+          "flake-parts"
+        ],
+        "flake-root": [
+          "flake-root"
+        ],
+        "flake-utils": [
+          "flake-utils"
+        ],
+        "foundry": [
+          "foundry"
+        ],
+        "nix-lib": [
+          "nix-lib"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "pre-commit": [
+          "pre-commit"
+        ],
+        "rust-overlay": [
+          "rust-overlay"
+        ],
+        "treefmt-nix": [
+          "treefmt-nix"
+        ]
+      },
+      "locked": {
+        "lastModified": 1764607684,
+        "narHash": "sha256-mAkTmEGMX+eJi4DsnLA91W08Onw8GnfLxaDwGesNnfc=",
+        "owner": "hoprnet",
+        "repo": "hopli",
+        "rev": "c4f9bc5dcf385d48b7d48a55a34ee37034d6c5e0",
+        "type": "github"
+      },
+      "original": {
+        "owner": "hoprnet",
+        "repo": "hopli",
+        "type": "github"
+      }
+    },
     "nix-lib": {
       "inputs": {
         "crane": "crane_2",
@@ -267,6 +314,7 @@
         "flake-root": "flake-root",
         "flake-utils": "flake-utils",
         "foundry": "foundry",
+        "hopli": "hopli",
         "nix-lib": "nix-lib",
         "nixpkgs": "nixpkgs",
         "pre-commit": "pre-commit",
