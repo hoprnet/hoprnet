@@ -1,12 +1,4 @@
 ---
-#################################################################################
-# Pipeline triggered on every merged pull request to:
-# 1. Cleanup the pull request cache
-# 2. Update the latest docker tag and the release docker tag if it is part of a release
-# 3. Deploy the pull request in rotsee network
-# 4. Create the github release with changelog if it is labeled with 'release'. Close the associated milestone.
-# 5. Create the new release pull request
-#################################################################################
 name: Merge
 
 on:
@@ -190,7 +182,7 @@ jobs:
           to: "HOPRd"
           topic: "Core"
           content: |
-            The merge pipeline failed for pull request [#${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}](https://github.com/hoprnet/hoprnet/actions/workflows/merge.yaml?query=is%3Afailure)
+            The merge pipeline failed for pull request [#${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}](https://github.com/${{ github.repository }}/actions/workflows/merge.yaml?query=is%3Afailure)
 
   notify:
     name: Notify Changes
