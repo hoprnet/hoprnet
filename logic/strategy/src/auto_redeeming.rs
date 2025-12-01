@@ -367,14 +367,14 @@ mod tests {
         assert_eq!(
             redeem_requests,
             vec![
+                TicketSelector::from(CHANNEL_2.clone())
+                    .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
+                    .with_index_range(CHANNEL_2.ticket_index..)
+                    .with_state(AcknowledgedTicketStatus::Untouched),
                 TicketSelector::from(CHANNEL_1.clone())
                     .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
                     .with_index_range(CHANNEL_1.ticket_index..)
                     .with_state(AcknowledgedTicketStatus::Untouched),
-                TicketSelector::from(CHANNEL_2.clone())
-                    .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
-                    .with_index_range(CHANNEL_2.ticket_index..)
-                    .with_state(AcknowledgedTicketStatus::Untouched)
             ]
         );
 

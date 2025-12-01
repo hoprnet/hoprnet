@@ -6,10 +6,9 @@ pub mod errors;
 mod parser;
 pub mod payload;
 
-use hopr_bindings::exports::alloy;
 #[cfg(feature = "use-bindings")]
 pub use {
-    hopr_bindings::{ContractAddresses, exports},
+    hopr_bindings::{ContractAddresses, exports, exports::alloy::primitives::Address as AlloyAddress},
     parser::ParsedHoprChainAction,
 };
 
@@ -92,6 +91,6 @@ pub fn contract_addresses_for_network(name: &str) -> Option<(u64, ContractAddres
 
 // Used instead of From implementation to avoid alloy being a dependency of the primitive crates
 #[inline]
-pub(crate) fn a2h(a: hopr_primitive_types::prelude::Address) -> alloy::primitives::Address {
-    alloy::primitives::Address::from_slice(a.as_ref())
+pub(crate) fn a2al(a: hopr_primitive_types::prelude::Address) -> AlloyAddress {
+    AlloyAddress::from_slice(a.as_ref())
 }
