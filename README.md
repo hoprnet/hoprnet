@@ -73,8 +73,6 @@ The most relevant components for production use cases are:
    - Utility to generate the OpenAPI spec for the `hoprd` served REST API.
 4. [hoprd-cfg](https://hoprnet.github.io/hoprnet/hoprd_cfg/index.html)
    - Utility for configuration management of the `hoprd`
-5. [hopli](https://hoprnet.github.io/hoprnet/hopli/index.html)
-   - Utility designed to simplify and unify the management of on-chain and identity related tasks.
 
 Unless stated otherwise, the following sections only apply to `hoprd`.
 
@@ -98,7 +96,7 @@ Container image has the format
 `europe-west3-docker.pkg.dev/hoprassociation/docker-images/$PROJECT:$RELEASE`.
 where:
 
-- `$PROJECT` can be either `hopli` or `hoprd`
+- `$PROJECT` can be: `hoprd`
 
 Pull the container image with `docker`:
 
@@ -126,16 +124,12 @@ nix build
 sudo cp result/bin/* /usr/local/bin/
 ```
 
-To build and access man pages for `hoprd` and `hopli`:
+To build and access man pages for `hoprd`:
 
 ```bash
 # Build man page for hoprd
 nix build .#hoprd-man
 man ./result/share/man/man1/hoprd.1.gz
-
-# Build man page for hopli
-nix build .#hopli-man
-man ./result/share/man/man1/hopli.1.gz
 
 # Or install them system-wide
 sudo cp -r result/share/man/man1/* /usr/local/share/man/man1/

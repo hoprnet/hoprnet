@@ -15,7 +15,6 @@ dependencies:
       - any-glob-to-any-file:
           - "Cargo.lock"
           - "**/Cargo.toml"
-          - "vendor/**"
           - "uv.lock"
 documentation:
   - changed-files:
@@ -25,10 +24,6 @@ testing:
   - changed-files:
       - any-glob-to-any-file:
           - "tests/**"
-smart-contracts:
-  - changed-files:
-      - any-glob-to-any-file:
-          - "ethereum/contracts/**"
 crate:hopr-chain-actions:
   - changed-files:
       - any-glob-to-any-file: chain/actions/**
@@ -74,12 +69,6 @@ crate:hopr-db-migration:
 crate:hopr-db-sql:
   - changed-files:
       - any-glob-to-any-file: db/sql/**
-crate:hopr-bindings:
-  - changed-files:
-      - any-glob-to-any-file: ethereum/bindings/**
-crate:hopli:
-  - changed-files:
-      - any-glob-to-any-file: hopli/**
 crate:hopr-lib:
   - changed-files:
       - any-glob-to-any-file: hopr/hopr-lib/**

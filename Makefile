@@ -35,7 +35,6 @@ build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
 
 .PHONY: install
 install:
-	$(cargo) install --path hopli
 	$(cargo) install --path hoprd/hoprd
 
 .PHONY: test
