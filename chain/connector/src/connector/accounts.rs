@@ -231,7 +231,7 @@ mod tests {
 
     use std::time::Duration;
     use hex_literal::hex;
-    use hopr_api::chain::{ChainInfo, ChainReadAccountOperations, ChainWriteAccountOperations};
+    use hopr_api::chain::{ChainReadAccountOperations, ChainWriteAccountOperations};
     use hopr_internal_types::account::AccountType;
 
     use crate::{
@@ -437,10 +437,11 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[test_log::test(tokio::test)]
     async fn connector_should_announce_new_account_without_multiaddresses() -> anyhow::Result<()> {
         let blokli_client = BlokliTestStateBuilder::default()
             .with_hopr_network_chain_info(1, "rotsee")
+            .with_balances([(ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(), XDaiBalance::new_base(1))])
             .build_dynamic_client(MODULE_ADDR.into());
 
         let mut connector = create_connector(blokli_client)?;
@@ -465,13 +466,13 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[test_log::test(tokio::test)]
     async fn connector_should_not_reannounce_when_existing_account_has_same_multiaddresses() -> anyhow::Result<()> {
         let offchain_key = OffchainKeypair::from_secret(&hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"))?;
         let multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/1234".parse()?;
         let account = AccountEntry {
             public_key: *offchain_key.public(),
-            chain_addr: [1u8; Address::SIZE].into(),
+            chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
             entry_type: AccountType::Announced(vec![multiaddr.clone()]),
             safe_address: Some([2u8; Address::SIZE].into()),
             key_id: 1.into(),
@@ -502,7 +503,7 @@ mod tests {
         let multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/1234".parse()?;
         let account = AccountEntry {
             public_key: *offchain_key.public(),
-            chain_addr: [1u8; Address::SIZE].into(),
+            chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
             entry_type: AccountType::NotAnnounced,
             safe_address: Some([2u8; Address::SIZE].into()),
             key_id: 1.into(),
