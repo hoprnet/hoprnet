@@ -111,7 +111,6 @@ jobs:
       matrix:
         binary:
           - hoprd
-          - hopli
     if: github.event.pull_request.draft == false
     steps:
       - name: Harden Runner
@@ -141,9 +140,6 @@ jobs:
   #     fail-fast: false
   #     matrix:
   #       suite: 
-  #         ## NOTE: disabled pending extraction of hopli to a separate repository
-  #         # - hopli
-  #         #
   #         ## NOTE: disabled pending extraction of hoprd to a separate repository
   #         # - websocket_api
   #         # - rest_api

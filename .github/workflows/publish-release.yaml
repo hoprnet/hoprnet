@@ -43,7 +43,7 @@ jobs:
 
       - name: Tag docker images with release name
         run: |
-          images=(hopli hoprd)
+          images=(hoprd)
           for image in "${images[@]}";
           do
             echo "Tagging ${image}"
