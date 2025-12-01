@@ -538,4 +538,71 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn connector_should_withdraw() -> anyhow::Result<()> {
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_balances([([1u8; Address::SIZE].into(), HoprBalance::zero())])
+            .with_balances([([1u8; Address::SIZE].into(), XDaiBalance::zero())])
+            .with_balances([(ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(), XDaiBalance::new_base(10))])
+            .with_balances([(ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(), HoprBalance::new_base(1000))])
+            .with_hopr_network_chain_info(1, "rotsee")
+            .build_dynamic_client(MODULE_ADDR.into());
+
+        let mut connector = create_connector(blokli_client)?;
+        connector.connect(Duration::from_secs(2)).await?;
+
+        connector.withdraw(HoprBalance::new_base(10), &[1u8; Address::SIZE].into()).await?.await?;
+        connector.withdraw(XDaiBalance::new_base(1), &[1u8; Address::SIZE].into()).await?.await?;
+
+        insta::assert_yaml_snapshot!(*connector.client.snapshot());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connector_should_register_safe() -> anyhow::Result<()> {
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_balances([(ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(), XDaiBalance::new_base(10))])
+            .with_hopr_network_chain_info(1, "rotsee")
+            .build_dynamic_client(MODULE_ADDR.into());
+
+        let mut connector = create_connector(blokli_client)?;
+        connector.connect(Duration::from_secs(2)).await?;
+
+        connector.register_safe(&[1u8; Address::SIZE].into()).await?.await?;
+
+        insta::assert_yaml_snapshot!(*connector.client.snapshot());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connector_should_not_re_register_safe() -> anyhow::Result<()> {
+        let offchain_key = OffchainKeypair::from_secret(&hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"))?;
+        let safe_addr: Address = [2u8; Address::SIZE].into();
+        let account = AccountEntry {
+            public_key: *offchain_key.public(),
+            chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
+            entry_type: AccountType::NotAnnounced,
+            safe_address: Some(safe_addr),
+            key_id: 1.into(),
+        };
+
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_accounts([(account, HoprBalance::new_base(100), XDaiBalance::new_base(1))])
+            .with_balances([(ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(), XDaiBalance::new_base(10))])
+            .with_hopr_network_chain_info(1, "rotsee")
+            .build_dynamic_client(MODULE_ADDR.into());
+
+        let mut connector = create_connector(blokli_client)?;
+        connector.connect(Duration::from_secs(2)).await?;
+
+        assert!(matches!(connector.register_safe(&[1u8; Address::SIZE].into()).await, Err(SafeRegistrationError::AlreadyRegistered(a)) if a == safe_addr));
+        assert!(matches!(connector.register_safe(&safe_addr).await, Err(SafeRegistrationError::AlreadyRegistered(a)) if a == safe_addr));
+
+        insta::assert_yaml_snapshot!(*connector.client.snapshot());
+
+        Ok(())
+    }
 }
