@@ -72,7 +72,7 @@ jobs:
           commit-message: "Creating ClusterHoprd for pull request #${{ github.event.pull_request.number }}"
           branch: "deployments/pr-${{ github.event.pull_request.number }}"
           title: "[Deployment] #${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}"
-          body: "This pull request contains the creation of a ClusterHoprd in Kubernetes for testing PR https://github.com/hoprnet/hoprnet/pull/${{ github.event.pull_request.number }}"
+          body: "This pull request contains the creation of a ClusterHoprd in Kubernetes for testing PR https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
           labels: deploy_nodes
           assignees: ${{ github.event.pull_request.user.login }}
 
@@ -120,6 +120,6 @@ jobs:
           commit-message: "Deleting ClusterHoprd for pull request #${{ github.event.pull_request.number }}"
           branch: "undeployments/pr-${{ github.event.pull_request.number }}"
           title: "[Undeployment] #${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}"
-          body: "This pull request contains the deletion of a ClusterHoprd in Kubernetes used for testing PR https://github.com/hoprnet/hoprnet/pull/${{ github.event.pull_request.number }}"
+          body: "This pull request contains the deletion of a ClusterHoprd in Kubernetes used for testing PR https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
           labels: deploy_nodes
           assignees: ${{ github.event.pull_request.user.login }}

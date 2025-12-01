@@ -1,7 +1,4 @@
 ---
-#################################################################################
-# Manual pipeline to clean the cache of a given pull request
-#################################################################################
 name: Cleanup PR
 
 on:
@@ -43,5 +40,5 @@ jobs:
           cacheKeysForPR=($(gh actions-cache list -R ${{ github.repository }} -B refs/pull/${{ github.event.inputs.pr_number }}/merge | cut -f 1 | tr '\n' ' '))
           for cacheKey in $cacheKeysForPR
           do
-            gh actions-cache delete $cacheKey -R hoprnet/hoprnet -B refs/pull/${{ github.event.inputs.pr_number }}/merge --confirm
+            gh actions-cache delete $cacheKey -R ${{ github.repository }} -B refs/pull/${{ github.event.inputs.pr_number }}/merge --confirm
           done
