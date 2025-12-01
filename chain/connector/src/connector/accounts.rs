@@ -29,7 +29,6 @@ where
         let backend = self.backend.clone();
         Ok(futures::stream::iter(accounts).filter_map(move |account_id| {
             let backend = backend.clone();
-            let selector = selector.clone();
             // This avoids the cache on purpose so it does not get spammed
             async move {
                 match hopr_async_runtime::prelude::spawn_blocking(move || backend.get_account_by_id(&account_id)).await
