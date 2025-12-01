@@ -488,4 +488,51 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn connector_should_close_incoming_channel() -> anyhow::Result<()> {
+        let offchain_key_1 = OffchainKeypair::from_secret(&hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"))?;
+        let account_1 = AccountEntry {
+            public_key: *offchain_key_1.public(),
+            chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
+            entry_type: AccountType::NotAnnounced,
+            safe_address: Some([1u8; Address::SIZE].into()),
+            key_id: 1.into(),
+        };
+        let offchain_key_2 = OffchainKeypair::from_secret(&hex!("71bf1f42ebbfcd89c3e197a3fd7cda79b92499e509b6fefa0fe44d02821d146a"))?;
+        let account_2 = AccountEntry {
+            public_key: *offchain_key_2.public(),
+            chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_2)?.public().to_address(),
+            entry_type: AccountType::NotAnnounced,
+            safe_address: Some([2u8; Address::SIZE].into()),
+            key_id: 2.into(),
+        };
+
+        let channel_1 = ChannelEntry::new(
+            ChainKeypair::from_secret(&PRIVATE_KEY_2)?.public().to_address(),
+            ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
+            10.into(),
+            1,
+            ChannelStatus::Open,
+            1
+        );
+
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_accounts([
+                (account_1, HoprBalance::new_base(100), XDaiBalance::new_base(1)),
+                (account_2, HoprBalance::new_base(100), XDaiBalance::new_base(1)),
+            ])
+            .with_channels([channel_1])
+            .with_hopr_network_chain_info(1, "rotsee")
+            .build_dynamic_client(MODULE_ADDR.into());
+
+        let mut connector = create_connector(blokli_client)?;
+        connector.connect(Duration::from_secs(2)).await?;
+
+        connector.close_channel(&channel_1.get_id()).await?.await?;
+
+        insta::assert_yaml_snapshot!(*connector.client().snapshot());
+
+        Ok(())
+    }
 }
