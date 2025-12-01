@@ -15,7 +15,6 @@ members = [
   "crypto/random",
   "crypto/sphinx",
   "crypto/types",
-  "hopli",
   "hopr/hopr-lib",
   "hoprd/hoprd",
   "hoprd/rest-api",

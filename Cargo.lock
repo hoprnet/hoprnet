@@ -2788,7 +2788,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1bf3c259d255ca70051b30e2e95b5446cdb8949ac4cd22c0d7fd634d89f568e2"
 dependencies = [
  "log",
- "regex",
 ]
 
 [[package]]
@@ -2800,7 +2799,6 @@ dependencies = [
  "anstream",
  "anstyle",
  "env_filter",
- "jiff",
  "log",
 ]
 
@@ -4422,39 +4420,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cc627f471c528ff0c4a49e1d5e60450c8f6461dd6d10ba9dcd3a61d3dff7728d"
 dependencies = [
  "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "hopli"
-version = "0.10.0"
-dependencies = [
- "anyhow",
- "clap",
- "env_logger",
- "hex",
- "hex-literal",
- "hopr-bindings",
- "hopr-chain-types",
- "hopr-crypto-keypair",
- "hopr-crypto-random",
- "hopr-crypto-types",
- "hopr-internal-types",
- "hopr-primitive-types",
- "lazy_static",
- "mimalloc",
- "rpassword",
- "serde",
- "serde_json",
- "serde_with",
- "strum 0.27.2",
- "tempfile",
- "thiserror 2.0.17",
- "tikv-jemallocator",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "url",
- "uuid",
 ]
 
 [[package]]
@@ -8261,17 +8226,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rpassword"
-version = "7.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66d4c8b64f049c6721ec8ccec37ddfc3d641c4a7fca57e8f2a89de509c73df39"
-dependencies = [
- "libc",
- "rtoolbox",
- "windows-sys 0.59.0",
-]
-
-[[package]]
 name = "rsa"
 version = "0.9.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8336,16 +8290,6 @@ dependencies = [
  "nix",
  "thiserror 1.0.69",
  "tokio",
-]
-
-[[package]]
-name = "rtoolbox"
-version = "0.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7cc970b249fbe527d6e02e0a227762c9108b2f49d81094fe357ffc6d14d7f6f"
-dependencies = [
- "libc",
- "windows-sys 0.52.0",
 ]
 
 [[package]]
