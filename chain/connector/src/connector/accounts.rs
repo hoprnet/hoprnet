@@ -21,7 +21,11 @@ where
         &self,
         selector: AccountSelector,
     ) -> Result<impl futures::Stream<Item = AccountEntry> + Send + 'static, ConnectorError> {
-        let accounts = self.graph.read().nodes().collect::<Vec<_>>();
+        let mut accounts = self.graph.read().nodes().collect::<Vec<_>>();
+
+        // Ensure the returned accounts are always perfectly ordered by their id.
+        accounts.sort_unstable();
+
         let backend = self.backend.clone();
         Ok(futures::stream::iter(accounts).filter_map(move |account_id| {
             let backend = backend.clone();

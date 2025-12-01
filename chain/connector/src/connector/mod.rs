@@ -554,6 +554,7 @@ pub(crate) mod tests {
     use super::*;
 
     pub const PRIVATE_KEY_1: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");
+    pub const PRIVATE_KEY_2: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
     pub const MODULE_ADDR: [u8; 20] = hex!("1111111111111111111111111111111111111111");
 
     pub type TestConnector<C> = HoprBlockchainConnector<

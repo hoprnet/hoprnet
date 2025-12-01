@@ -1,0 +1,77 @@
+---
+source: chain/connector/src/connector/channels.rs
+expression: "*connector.client().snapshot()"
+---
+accounts:
+  1:
+    chain_key: 668430def9eacd2b5064acf85d73fb0b351a1c8c
+    keyid: 1
+    multi_addresses: []
+    packet_key: 3f6b51c1158631d57d2ecfe0cc49396de92be26bcea89b77cd60223f1023f1a0
+    safe_address: "0101010101010101010101010101010101010101"
+  2:
+    chain_key: bea83ba0fcee21da44a30c893f466e6bf0c29bbb
+    keyid: 2
+    multi_addresses: []
+    packet_key: 4b8f66f9df296e7d7c2280d9c833c879297ee9d435d6e075d46fad5717211b72
+    safe_address: "0202020202020202020202020202020202020202"
+unpaired_safes: {}
+native_balances:
+  668430def9eacd2b5064acf85d73fb0b351a1c8c:
+    __typename: NativeBalance
+    balance: 0.999999999999999999 xDai
+  "0101010101010101010101010101010101010101":
+    __typename: NativeBalance
+    balance: 0 xDai
+  bea83ba0fcee21da44a30c893f466e6bf0c29bbb:
+    __typename: NativeBalance
+    balance: 1 xDai
+  "0202020202020202020202020202020202020202":
+    __typename: NativeBalance
+    balance: 0 xDai
+token_balances:
+  668430def9eacd2b5064acf85d73fb0b351a1c8c:
+    __typename: HoprBalance
+    balance: 0 wxHOPR
+  "0101010101010101010101010101010101010101":
+    __typename: HoprBalance
+    balance: 100 wxHOPR
+  bea83ba0fcee21da44a30c893f466e6bf0c29bbb:
+    __typename: HoprBalance
+    balance: 0 wxHOPR
+  "0202020202020202020202020202020202020202":
+    __typename: HoprBalance
+    balance: 100 wxHOPR
+safe_allowances:
+  "0101010101010101010101010101010101010101":
+    __typename: SafeHoprAllowance
+    allowance: 10000000000000 wxHOPR
+  "0202020202020202020202020202020202020202":
+    __typename: SafeHoprAllowance
+    allowance: 10000000000000 wxHOPR
+tx_counts:
+  668430def9eacd2b5064acf85d73fb0b351a1c8c: 1
+channels:
+  d7f3fa28f0caa757e81226e1ee86a9efdbe7991442286183797296ebaa4d292a:
+    balance: 0.00000000000000001 wxHOPR
+    closure_time: "1970-01-01T00:10:00+00:00"
+    concrete_channel_id: d7f3fa28f0caa757e81226e1ee86a9efdbe7991442286183797296ebaa4d292a
+    destination: 2
+    epoch: 1
+    source: 1
+    status: CLOSED
+    ticket_index: "1"
+chain_info:
+  channel_closure_grace_period: "300"
+  channel_dst: "0000000000000000000000000000000000000000000000000000000000000000"
+  block_number: 1
+  chain_id: 1
+  ledger_dst: "0000000000000000000000000000000000000000000000000000000000000000"
+  min_ticket_winning_probability: 1
+  safe_registry_dst: "0000000000000000000000000000000000000000000000000000000000000000"
+  ticket_price: 1 wxHOPR
+  network: rotsee
+  contract_addresses: "{\"token\":\"0xd4fdec44db9d44b8f2b6d529620f9c0c7066a2c1\",\"channels\":\"0x9680f21d4583ad27f2e6bc3005edf120fff057b7\",\"announcements\":\"0x45b000742a693ab00fa4839a086dfb6155a15d3c\",\"node_safe_registry\":\"0xafa257f2799835d2e29e7ec7ee448530f9d8cb20\",\"ticket_price_oracle\":\"0xfa251d4c367683d6181531afd5964e660acf43a0\",\"winning_probability_oracle\":\"0xa641822a52acbdc0c0123337f715c1d9756c21bd\",\"node_safe_migration\":\"0xe9670b5d87c87111c9050d915971b73b9f5021a9\",\"node_stake_factory\":\"0xcb0841cc3dbde97ac52b945f02ee4f3d8707d977\",\"module_implementation\":\"0x79c3bf06e96a9373765284afb0a35e9529e2b3f2\"}"
+version: "1"
+health: OK
+active_txs: {}
