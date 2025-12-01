@@ -99,7 +99,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
-          node-version: 20.19.5 # Revert to version 20, as the dappnode package is not yet compatible with Node 22
+          node-version: 20.19.6 # Revert to version 20, as the dappnode package is not yet compatible with Node 22
 
       - name: Checkout DAppNodePackage-Hopr
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
