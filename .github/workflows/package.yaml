@@ -66,6 +66,17 @@ jobs:
             -o artifacts.json || { echo "Failed to fetch artifacts metadata"; exit 1; }
           mkdir -p ./dist/bin
 
+          # Extract hopli artifact URL
+          hopli_url=$(jq -r '.artifacts[] | select(.name == "hopli-${{ inputs.target }}").archive_download_url' artifacts.json)
+          if [[ -z "$hopli_url" ]]; then
+            echo "Error: hopli artifact URL not found for target '${{ inputs.target }}'"
+            exit 1
+          fi
+
+          # Download and unzip hopli artifact
+          curl -s -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "$hopli_url" -o hopli-${{ inputs.target }}.zip || { echo "Failed to download hopli artifact"; exit 1; }
+          unzip -o hopli-${{ inputs.target }}.zip -d ./dist/bin || { echo "Failed to unzip hopli artifact"; exit 1; }
+
           # Extract hoprd artifact URL
           hoprd_url=$(jq -r '.artifacts[] | select(.name == "hoprd-${{ inputs.target }}").archive_download_url' artifacts.json)
           if [[ -z "$hoprd_url" ]]; then
@@ -100,6 +111,8 @@ jobs:
         run: |
           help2man --name="HOPR node executable" --no-info --output ./deploy/nfpm/hoprd.1 ./dist/bin/hoprd
           gzip -9n ./deploy/nfpm/hoprd.1
+          help2man --name="HOPR CLI helper tool" --no-info --output ./deploy/nfpm/hopli.1 ./dist/bin/hopli
+          gzip -9n ./deploy/nfpm/hopli.1
 
       - name: Create Changelog
         run: |
