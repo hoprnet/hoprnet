@@ -1578,7 +1578,7 @@ dependencies = [
 [[package]]
 name = "blokli-client"
 version = "0.8.0"
-source = "git+https://github.com/hoprnet/blokli?rev=e2dc682#e2dc682c52bdd4f78fe7899bbbd86356dc1de7d6"
+source = "git+https://github.com/hoprnet/blokli?rev=2bc2aee5265032cbdf57879cf57ef4e03850351f#2bc2aee5265032cbdf57879cf57ef4e03850351f"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -4491,7 +4491,7 @@ dependencies = [
 [[package]]
 name = "hopr-bindings"
 version = "4.0.0"
-source = "git+https://github.com/hoprnet/contracts?rev=cc74253f4226fdca9f3ac4147e7ee0ac9b629c7c#cc74253f4226fdca9f3ac4147e7ee0ac9b629c7c"
+source = "git+https://github.com/hoprnet/contracts?rev=650026715041e8e1372b11ffc544e30fc549f996#650026715041e8e1372b11ffc544e30fc549f996"
 dependencies = [
  "alloy",
  "anyhow",
@@ -4499,7 +4499,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
- "strum 0.27.2",
 ]
 
 [[package]]
