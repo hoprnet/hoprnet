@@ -377,7 +377,7 @@ impl BlokliTestStateMutator for FullStateEmulator {
                     .into());
                 }
 
-                channel.ticket_index = blokli_client::api::types::Uint64(ticket_index.to_string());
+                channel.ticket_index = blokli_client::api::types::Uint64((*ticket_index + 1).to_string());
                 channel.balance = blokli_client::api::types::TokenValueString((balance - *ticket_amount).to_string());
 
                 let channel = channel.clone();

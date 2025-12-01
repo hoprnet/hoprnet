@@ -59,14 +59,14 @@ where
                     async move {
                         // We currently use fixed gas estimation.
                         tx.sign_and_encode_to_eip2718(nonce, GasEstimation::default().into(), &signer)
-                            .map_err(errors::ConnectorError::from)
+                            .map_err(ConnectorError::from)
                             .and_then(move |tx| {
                                 tracing::debug!(nonce, "submitting transaction");
                                 let client = client.clone();
                                 async move {
                                     client
                                         .submit_and_track_transaction(&tx)
-                                        .map_err(errors::ConnectorError::from)
+                                        .map_err(ConnectorError::from)
                                         .await
                                 }
                             })
@@ -148,5 +148,80 @@ impl<C, R> Drop for TransactionSequencer<C, R> {
             // Causes the internally spawned task that drives the queue to terminate
             sender.close_channel();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use hopr_primitive_types::traits::BytesRepresentable;
+    use hopr_chain_types::ContractAddresses;
+    use hopr_chain_types::payload::SafePayloadGenerator;
+    use hopr_chain_types::prelude::PayloadGenerator;
+    use hopr_primitive_types::prelude::*;
+
+    use crate::connector::tests::{MODULE_ADDR, PRIVATE_KEY_1};
+    use crate::testing::BlokliTestStateBuilder;
+    use super::*;
+
+    #[tokio::test]
+    async fn test_sequencer_should_increase_nonce_after_successful_tx() -> anyhow::Result<()> {
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_balances([([1u8; Address::SIZE].into(), HoprBalance::zero())])
+            .with_balances([([1u8; Address::SIZE].into(), XDaiBalance::zero())])
+            .with_balances([(ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(), XDaiBalance::new_base(10))])
+            .with_balances([(ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(), HoprBalance::new_base(1000))])
+            .with_hopr_network_chain_info(1, "rotsee")
+            .build_dynamic_client(MODULE_ADDR.into());
+
+        let blokli_client = std::sync::Arc::new(blokli_client);
+
+        let mut tx_sequencer = TransactionSequencer::<_, <SafePayloadGenerator as PayloadGenerator>::TxRequest>::new(ChainKeypair::from_secret(&PRIVATE_KEY_1)?, blokli_client.clone());
+        tx_sequencer.start().await?;
+
+        let safe_tx_gen = SafePayloadGenerator::new(&ChainKeypair::from_secret(&PRIVATE_KEY_1)?, ContractAddresses::for_network("rotsee").unwrap(), MODULE_ADDR.into());
+
+        let nonce_before = tx_sequencer.nonce.load(std::sync::atomic::Ordering::SeqCst);
+
+        tx_sequencer.enqueue_transaction(
+            safe_tx_gen.transfer([1u8; Address::SIZE].into(), HoprBalance::new_base(100))?,
+            std::time::Duration::from_secs(2)
+        ).await?.await?;
+
+        assert!(nonce_before < tx_sequencer.nonce.load(std::sync::atomic::Ordering::SeqCst), "nonce should be incremented after successful tx");
+
+        insta::assert_yaml_snapshot!(*blokli_client.snapshot());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_sequencer_should_increase_nonce_after_rejected_tx() -> anyhow::Result<()> {
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_balances([([1u8; Address::SIZE].into(), HoprBalance::zero())])
+            .with_balances([([1u8; Address::SIZE].into(), XDaiBalance::zero())])
+            .with_balances([(ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(), XDaiBalance::new_base(10))])
+            .with_balances([(ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(), HoprBalance::new_base(1000))])
+            .with_hopr_network_chain_info(1, "rotsee")
+            .build_dynamic_client(MODULE_ADDR.into());
+
+        let blokli_client = std::sync::Arc::new(blokli_client);
+
+        let mut tx_sequencer = TransactionSequencer::<_, <SafePayloadGenerator as PayloadGenerator>::TxRequest>::new(ChainKeypair::from_secret(&PRIVATE_KEY_1)?, blokli_client.clone());
+        tx_sequencer.start().await?;
+
+        let safe_tx_gen = SafePayloadGenerator::new(&ChainKeypair::from_secret(&PRIVATE_KEY_1)?, ContractAddresses::for_network("rotsee").unwrap(), MODULE_ADDR.into());
+
+        let nonce_before = tx_sequencer.nonce.load(std::sync::atomic::Ordering::SeqCst);
+
+        assert!(tx_sequencer.enqueue_transaction(
+            safe_tx_gen.transfer([1u8; Address::SIZE].into(), HoprBalance::new_base(100000))?,
+            std::time::Duration::from_secs(2)
+        ).await?.await.is_err(), "rejected tx should fail");
+
+        assert!(nonce_before < tx_sequencer.nonce.load(std::sync::atomic::Ordering::SeqCst), "nonce should be incremented after rejected tx");
+
+        insta::assert_yaml_snapshot!(*blokli_client.snapshot());
+
+        Ok(())
     }
 }
