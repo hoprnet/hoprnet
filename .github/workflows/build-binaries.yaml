@@ -31,7 +31,6 @@ on:
         type: choice
         options:
           - hoprd
-          - hopli
       runner:
         type: choice
         options:
