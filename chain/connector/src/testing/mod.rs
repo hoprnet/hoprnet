@@ -3,7 +3,7 @@ mod emulator;
 pub use blokli_client::{BlokliTestClient, BlokliTestState, exports::Entry};
 pub use emulator::{FullStateEmulator, StaticState};
 pub use hopr_api::chain::ChainInfo;
-use hopr_chain_types::{ContractAddresses, ParsedHoprChainAction};
+use hopr_chain_types::{ParsedHoprChainAction, contract_addresses_for_network};
 use hopr_crypto_types::{
     prelude::{Keypair, OffchainKeypair},
     types::Hash,
@@ -233,14 +233,14 @@ impl BlokliTestStateBuilder {
         self
     }
 
-    /// Set chain info based on the known HOPR network name and chain ID.
+    /// Set chain info based on the known HOPR network name.
     ///
     /// Panics if such a network deployment does not exist.
     #[must_use]
-    pub fn with_hopr_network_chain_info(mut self, chain_id: u64, name: &str) -> Self {
+    pub fn with_hopr_network_chain_info(mut self, name: &str) -> Self {
+        let (chain_id, addrs) = contract_addresses_for_network(name).expect("network name not found");
         self.0.chain_info.contract_addresses = blokli_client::api::types::ContractAddressMap(
-            serde_json::to_string(&ContractAddresses::for_network(name).expect("network name not found"))
-                .expect("failed to serialize contract addresses"),
+            serde_json::to_string(&addrs).expect("failed to serialize contract addresses"),
         );
         self.0.chain_info.chain_id = chain_id as i32;
         self

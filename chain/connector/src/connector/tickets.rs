@@ -5,6 +5,7 @@ use hopr_chain_types::prelude::*;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::HoprBalance;
+
 use crate::{backend::Backend, connector::HoprBlockchainConnector, errors::ConnectorError};
 
 impl<B, C, P> HoprBlockchainConnector<C, B, P, P::TxRequest>
@@ -131,17 +132,23 @@ where
 
 #[cfg(test)]
 mod tests {
-    use hex_literal::hex;
-    use hopr_primitive_types::prelude::*;
     use std::time::Duration;
+
     use blokli_client::BlokliTestClient;
+    use hex_literal::hex;
     use hopr_api::chain::{ChainWriteChannelOperations, ChainWriteTicketOperations};
-    use crate::testing::{BlokliTestStateBuilder, FullStateEmulator};
-    use crate::connector::tests::*;
+    use hopr_primitive_types::prelude::*;
+
     use super::*;
+    use crate::{
+        connector::tests::*,
+        testing::{BlokliTestStateBuilder, FullStateEmulator},
+    };
 
     fn prepare_client() -> anyhow::Result<BlokliTestClient<FullStateEmulator>> {
-        let offchain_key_1 = OffchainKeypair::from_secret(&hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"))?;
+        let offchain_key_1 = OffchainKeypair::from_secret(&hex!(
+            "60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"
+        ))?;
         let account_1 = AccountEntry {
             public_key: *offchain_key_1.public(),
             chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
@@ -149,7 +156,9 @@ mod tests {
             safe_address: Some([1u8; Address::SIZE].into()),
             key_id: 1.into(),
         };
-        let offchain_key_2 = OffchainKeypair::from_secret(&hex!("71bf1f42ebbfcd89c3e197a3fd7cda79b92499e509b6fefa0fe44d02821d146a"))?;
+        let offchain_key_2 = OffchainKeypair::from_secret(&hex!(
+            "71bf1f42ebbfcd89c3e197a3fd7cda79b92499e509b6fefa0fe44d02821d146a"
+        ))?;
         let account_2 = AccountEntry {
             public_key: *offchain_key_2.public(),
             chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_2)?.public().to_address(),
@@ -164,7 +173,7 @@ mod tests {
             10.into(),
             1,
             ChannelStatus::Open,
-            1
+            1,
         );
 
         Ok(BlokliTestStateBuilder::default()
@@ -173,10 +182,9 @@ mod tests {
                 (account_2, HoprBalance::new_base(100), XDaiBalance::new_base(1)),
             ])
             .with_channels([channel_1])
-            .with_hopr_network_chain_info(1, "rotsee")
+            .with_hopr_network_chain_info("rotsee")
             .build_dynamic_client(MODULE_ADDR.into())
-            .with_tx_simulation_delay(Duration::from_millis(100))
-        )
+            .with_tx_simulation_delay(Duration::from_millis(100)))
     }
 
     #[tokio::test]
@@ -186,17 +194,30 @@ mod tests {
         let mut connector = create_connector(blokli_client)?;
         connector.connect(Duration::from_secs(2)).await?;
 
-        let hkc1 = ChainKeypair::from_secret(&hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8"))?;
-        let hkc2 = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"))?;
+        let hkc1 = ChainKeypair::from_secret(&hex!(
+            "e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8"
+        ))?;
+        let hkc2 = ChainKeypair::from_secret(&hex!(
+            "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
+        ))?;
 
         let ticket = TicketBuilder::default()
             .counterparty(&ChainKeypair::from_secret(&PRIVATE_KEY_1)?)
             .amount(1)
             .index(1)
             .channel_epoch(1)
-            .eth_challenge(Challenge::from_hint_and_share(&HalfKeyChallenge::new(hkc1.public().as_ref()), &HalfKeyChallenge::new(hkc2.public().as_ref()))?.to_ethereum_challenge())
+            .eth_challenge(
+                Challenge::from_hint_and_share(
+                    &HalfKeyChallenge::new(hkc1.public().as_ref()),
+                    &HalfKeyChallenge::new(hkc2.public().as_ref()),
+                )?
+                .to_ethereum_challenge(),
+            )
             .build_signed(&ChainKeypair::from_secret(&PRIVATE_KEY_2)?, &Hash::default())?
-            .into_acknowledged(Response::from_half_keys(&HalfKey::try_from(hkc1.secret().as_ref())?, &HalfKey::try_from(hkc2.secret().as_ref())?)?)
+            .into_acknowledged(Response::from_half_keys(
+                &HalfKey::try_from(hkc1.secret().as_ref())?,
+                &HalfKey::try_from(hkc2.secret().as_ref())?,
+            )?)
             .into_redeemable(&ChainKeypair::from_secret(&PRIVATE_KEY_1)?, &Hash::default())?;
 
         connector.redeem_ticket(ticket).await?.await?;
@@ -213,20 +234,36 @@ mod tests {
         let mut connector = create_connector(blokli_client)?;
         connector.connect(Duration::from_secs(2)).await?;
 
-        let hkc1 = ChainKeypair::from_secret(&hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8"))?;
-        let hkc2 = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"))?;
+        let hkc1 = ChainKeypair::from_secret(&hex!(
+            "e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8"
+        ))?;
+        let hkc2 = ChainKeypair::from_secret(&hex!(
+            "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
+        ))?;
 
         let ticket = TicketBuilder::default()
             .counterparty(&ChainKeypair::from_secret(&PRIVATE_KEY_2)?)
             .amount(1)
             .index(1)
             .channel_epoch(1)
-            .eth_challenge(Challenge::from_hint_and_share(&HalfKeyChallenge::new(hkc1.public().as_ref()), &HalfKeyChallenge::new(hkc2.public().as_ref()))?.to_ethereum_challenge())
+            .eth_challenge(
+                Challenge::from_hint_and_share(
+                    &HalfKeyChallenge::new(hkc1.public().as_ref()),
+                    &HalfKeyChallenge::new(hkc2.public().as_ref()),
+                )?
+                .to_ethereum_challenge(),
+            )
             .build_signed(&ChainKeypair::from_secret(&PRIVATE_KEY_1)?, &Hash::default())?
-            .into_acknowledged(Response::from_half_keys(&HalfKey::try_from(hkc1.secret().as_ref())?, &HalfKey::try_from(hkc2.secret().as_ref())?)?)
+            .into_acknowledged(Response::from_half_keys(
+                &HalfKey::try_from(hkc1.secret().as_ref())?,
+                &HalfKey::try_from(hkc2.secret().as_ref())?,
+            )?)
             .into_redeemable(&ChainKeypair::from_secret(&PRIVATE_KEY_2)?, &Hash::default())?;
 
-        assert!(matches!(connector.redeem_ticket(ticket).await, Err(TicketRedeemError::Rejected(_, _))));
+        assert!(matches!(
+            connector.redeem_ticket(ticket).await,
+            Err(TicketRedeemError::Rejected(_, _))
+        ));
 
         insta::assert_yaml_snapshot!(*connector.client().snapshot());
 
@@ -240,23 +277,39 @@ mod tests {
         let mut connector = create_connector(blokli_client)?;
         connector.connect(Duration::from_secs(2)).await?;
 
-        let hkc1 = ChainKeypair::from_secret(&hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8"))?;
-        let hkc2 = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"))?;
+        let hkc1 = ChainKeypair::from_secret(&hex!(
+            "e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8"
+        ))?;
+        let hkc2 = ChainKeypair::from_secret(&hex!(
+            "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
+        ))?;
 
         let ticket = TicketBuilder::default()
             .counterparty(&ChainKeypair::from_secret(&PRIVATE_KEY_1)?)
             .amount(1)
             .index(1)
             .channel_epoch(1)
-            .eth_challenge(Challenge::from_hint_and_share(&HalfKeyChallenge::new(hkc1.public().as_ref()), &HalfKeyChallenge::new(hkc2.public().as_ref()))?.to_ethereum_challenge())
+            .eth_challenge(
+                Challenge::from_hint_and_share(
+                    &HalfKeyChallenge::new(hkc1.public().as_ref()),
+                    &HalfKeyChallenge::new(hkc2.public().as_ref()),
+                )?
+                .to_ethereum_challenge(),
+            )
             .build_signed(&ChainKeypair::from_secret(&PRIVATE_KEY_2)?, &Hash::default())?
-            .into_acknowledged(Response::from_half_keys(&HalfKey::try_from(hkc1.secret().as_ref())?, &HalfKey::try_from(hkc2.secret().as_ref())?)?)
+            .into_acknowledged(Response::from_half_keys(
+                &HalfKey::try_from(hkc1.secret().as_ref())?,
+                &HalfKey::try_from(hkc2.secret().as_ref())?,
+            )?)
             .into_redeemable(&ChainKeypair::from_secret(&PRIVATE_KEY_1)?, &Hash::default())?;
 
         // Close the channel from the incoming side
         connector.close_channel(ticket.ticket.channel_id()).await?.await?;
 
-        assert!(matches!(connector.redeem_ticket(ticket).await, Err(TicketRedeemError::Rejected(_, _))));
+        assert!(matches!(
+            connector.redeem_ticket(ticket).await,
+            Err(TicketRedeemError::Rejected(_, _))
+        ));
 
         insta::assert_yaml_snapshot!(*connector.client().snapshot());
 
@@ -270,20 +323,36 @@ mod tests {
         let mut connector = create_connector(blokli_client)?;
         connector.connect(Duration::from_secs(2)).await?;
 
-        let hkc1 = ChainKeypair::from_secret(&hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8"))?;
-        let hkc2 = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"))?;
+        let hkc1 = ChainKeypair::from_secret(&hex!(
+            "e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8"
+        ))?;
+        let hkc2 = ChainKeypair::from_secret(&hex!(
+            "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
+        ))?;
 
         let ticket = TicketBuilder::default()
             .counterparty(&ChainKeypair::from_secret(&PRIVATE_KEY_1)?)
             .amount(1)
             .index(0)
             .channel_epoch(1)
-            .eth_challenge(Challenge::from_hint_and_share(&HalfKeyChallenge::new(hkc1.public().as_ref()), &HalfKeyChallenge::new(hkc2.public().as_ref()))?.to_ethereum_challenge())
+            .eth_challenge(
+                Challenge::from_hint_and_share(
+                    &HalfKeyChallenge::new(hkc1.public().as_ref()),
+                    &HalfKeyChallenge::new(hkc2.public().as_ref()),
+                )?
+                .to_ethereum_challenge(),
+            )
             .build_signed(&ChainKeypair::from_secret(&PRIVATE_KEY_2)?, &Hash::default())?
-            .into_acknowledged(Response::from_half_keys(&HalfKey::try_from(hkc1.secret().as_ref())?, &HalfKey::try_from(hkc2.secret().as_ref())?)?)
+            .into_acknowledged(Response::from_half_keys(
+                &HalfKey::try_from(hkc1.secret().as_ref())?,
+                &HalfKey::try_from(hkc2.secret().as_ref())?,
+            )?)
             .into_redeemable(&ChainKeypair::from_secret(&PRIVATE_KEY_1)?, &Hash::default())?;
 
-        assert!(matches!(connector.redeem_ticket(ticket).await, Err(TicketRedeemError::Rejected(_, _))));
+        assert!(matches!(
+            connector.redeem_ticket(ticket).await,
+            Err(TicketRedeemError::Rejected(_, _))
+        ));
 
         insta::assert_yaml_snapshot!(*connector.client().snapshot());
 
@@ -297,20 +366,36 @@ mod tests {
         let mut connector = create_connector(blokli_client)?;
         connector.connect(Duration::from_secs(2)).await?;
 
-        let hkc1 = ChainKeypair::from_secret(&hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8"))?;
-        let hkc2 = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"))?;
+        let hkc1 = ChainKeypair::from_secret(&hex!(
+            "e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8"
+        ))?;
+        let hkc2 = ChainKeypair::from_secret(&hex!(
+            "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
+        ))?;
 
         let ticket = TicketBuilder::default()
             .counterparty(&ChainKeypair::from_secret(&PRIVATE_KEY_1)?)
             .amount(100000)
             .index(1)
             .channel_epoch(1)
-            .eth_challenge(Challenge::from_hint_and_share(&HalfKeyChallenge::new(hkc1.public().as_ref()), &HalfKeyChallenge::new(hkc2.public().as_ref()))?.to_ethereum_challenge())
+            .eth_challenge(
+                Challenge::from_hint_and_share(
+                    &HalfKeyChallenge::new(hkc1.public().as_ref()),
+                    &HalfKeyChallenge::new(hkc2.public().as_ref()),
+                )?
+                .to_ethereum_challenge(),
+            )
             .build_signed(&ChainKeypair::from_secret(&PRIVATE_KEY_2)?, &Hash::default())?
-            .into_acknowledged(Response::from_half_keys(&HalfKey::try_from(hkc1.secret().as_ref())?, &HalfKey::try_from(hkc2.secret().as_ref())?)?)
+            .into_acknowledged(Response::from_half_keys(
+                &HalfKey::try_from(hkc1.secret().as_ref())?,
+                &HalfKey::try_from(hkc2.secret().as_ref())?,
+            )?)
             .into_redeemable(&ChainKeypair::from_secret(&PRIVATE_KEY_1)?, &Hash::default())?;
 
-        assert!(matches!(connector.redeem_ticket(ticket).await, Err(TicketRedeemError::Rejected(_, _))));
+        assert!(matches!(
+            connector.redeem_ticket(ticket).await,
+            Err(TicketRedeemError::Rejected(_, _))
+        ));
 
         insta::assert_yaml_snapshot!(*connector.client().snapshot());
 
@@ -324,20 +409,36 @@ mod tests {
         let mut connector = create_connector(blokli_client)?;
         connector.connect(Duration::from_secs(2)).await?;
 
-        let hkc1 = ChainKeypair::from_secret(&hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8"))?;
-        let hkc2 = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"))?;
+        let hkc1 = ChainKeypair::from_secret(&hex!(
+            "e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8"
+        ))?;
+        let hkc2 = ChainKeypair::from_secret(&hex!(
+            "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
+        ))?;
 
         let ticket = TicketBuilder::default()
             .counterparty(&ChainKeypair::from_secret(&PRIVATE_KEY_1)?)
             .amount(1)
             .index(1)
             .channel_epoch(0)
-            .eth_challenge(Challenge::from_hint_and_share(&HalfKeyChallenge::new(hkc1.public().as_ref()), &HalfKeyChallenge::new(hkc2.public().as_ref()))?.to_ethereum_challenge())
+            .eth_challenge(
+                Challenge::from_hint_and_share(
+                    &HalfKeyChallenge::new(hkc1.public().as_ref()),
+                    &HalfKeyChallenge::new(hkc2.public().as_ref()),
+                )?
+                .to_ethereum_challenge(),
+            )
             .build_signed(&ChainKeypair::from_secret(&PRIVATE_KEY_2)?, &Hash::default())?
-            .into_acknowledged(Response::from_half_keys(&HalfKey::try_from(hkc1.secret().as_ref())?, &HalfKey::try_from(hkc2.secret().as_ref())?)?)
+            .into_acknowledged(Response::from_half_keys(
+                &HalfKey::try_from(hkc1.secret().as_ref())?,
+                &HalfKey::try_from(hkc2.secret().as_ref())?,
+            )?)
             .into_redeemable(&ChainKeypair::from_secret(&PRIVATE_KEY_1)?, &Hash::default())?;
 
-        assert!(matches!(connector.redeem_ticket(ticket).await, Err(TicketRedeemError::Rejected(_, _))));
+        assert!(matches!(
+            connector.redeem_ticket(ticket).await,
+            Err(TicketRedeemError::Rejected(_, _))
+        ));
 
         insta::assert_yaml_snapshot!(*connector.client().snapshot());
 

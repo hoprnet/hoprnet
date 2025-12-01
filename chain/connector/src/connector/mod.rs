@@ -151,7 +151,7 @@ where
         let server_health = self.client.query_health().await?;
         if !server_health.eq_ignore_ascii_case("OK") {
             tracing::error!(server_health, "blokli server not healthy");
-            return Err(ConnectorError::ServerNotHealthy)
+            return Err(ConnectorError::ServerNotHealthy);
         }
 
         let (abort_handle, abort_reg) = AbortHandle::new_pair();
@@ -547,11 +547,12 @@ where
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use blokli_client::{BlokliTestState};
+    use blokli_client::BlokliTestState;
     use hex_literal::hex;
-    use crate::{InMemoryBackend, testing::BlokliTestStateBuilder};
+    use hopr_chain_types::contract_addresses_for_network;
 
     use super::*;
+    use crate::{InMemoryBackend, testing::BlokliTestStateBuilder};
 
     pub const PRIVATE_KEY_1: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");
     pub const PRIVATE_KEY_2: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
@@ -565,7 +566,9 @@ pub(crate) mod tests {
     >;
 
     pub fn create_connector<C>(blokli_client: C) -> anyhow::Result<TestConnector<C>>
-    where C: BlokliQueryClient + BlokliTransactionClient + BlokliSubscriptionClient + Send + Sync + 'static {
+    where
+        C: BlokliQueryClient + BlokliTransactionClient + BlokliSubscriptionClient + Send + Sync + 'static,
+    {
         let ckp = ChainKeypair::from_secret(&PRIVATE_KEY_1)?;
 
         Ok(HoprBlockchainConnector::new(
@@ -573,14 +576,17 @@ pub(crate) mod tests {
             Default::default(),
             blokli_client,
             InMemoryBackend::default(),
-            SafePayloadGenerator::new(&ckp, ContractAddresses::for_network("rotsee").unwrap(), MODULE_ADDR.into()),
+            SafePayloadGenerator::new(
+                &ckp,
+                contract_addresses_for_network("rotsee").unwrap().1,
+                MODULE_ADDR.into(),
+            ),
         ))
     }
 
     #[tokio::test]
     async fn connector_should_connect() -> anyhow::Result<()> {
-        let blokli_client = BlokliTestStateBuilder::default()
-            .build_static_client();
+        let blokli_client = BlokliTestStateBuilder::default().build_static_client();
 
         let mut connector = create_connector(blokli_client)?;
         connector.connect(Duration::from_secs(2)).await?;
@@ -595,8 +601,7 @@ pub(crate) mod tests {
         let mut state = BlokliTestState::default();
         state.health = "DOWN".into();
 
-        let blokli_client = BlokliTestStateBuilder::from(state)
-            .build_static_client();
+        let blokli_client = BlokliTestStateBuilder::from(state).build_static_client();
 
         let mut connector = create_connector(blokli_client)?;
 

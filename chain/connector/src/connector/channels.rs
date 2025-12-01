@@ -219,16 +219,22 @@ where
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
+
     use hex_literal::hex;
     use hopr_api::chain::{ChainReadChannelOperations, ChainWriteChannelOperations};
     use hopr_crypto_types::keypairs::{ChainKeypair, OffchainKeypair};
-    use crate::connector::tests::{create_connector, MODULE_ADDR, PRIVATE_KEY_1, PRIVATE_KEY_2};
-    use crate::testing::BlokliTestStateBuilder;
+
     use super::*;
+    use crate::{
+        connector::tests::{MODULE_ADDR, PRIVATE_KEY_1, PRIVATE_KEY_2, create_connector},
+        testing::BlokliTestStateBuilder,
+    };
 
     #[tokio::test]
     async fn connector_should_get_and_stream_channels() -> anyhow::Result<()> {
-        let offchain_key_1 = OffchainKeypair::from_secret(&hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"))?;
+        let offchain_key_1 = OffchainKeypair::from_secret(&hex!(
+            "60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"
+        ))?;
         let account_1 = AccountEntry {
             public_key: *offchain_key_1.public(),
             chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
@@ -236,7 +242,9 @@ mod tests {
             safe_address: Some([1u8; Address::SIZE].into()),
             key_id: 1.into(),
         };
-        let offchain_key_2 = OffchainKeypair::from_secret(&hex!("71bf1f42ebbfcd89c3e197a3fd7cda79b92499e509b6fefa0fe44d02821d146a"))?;
+        let offchain_key_2 = OffchainKeypair::from_secret(&hex!(
+            "71bf1f42ebbfcd89c3e197a3fd7cda79b92499e509b6fefa0fe44d02821d146a"
+        ))?;
         let account_2 = AccountEntry {
             public_key: *offchain_key_2.public(),
             chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_2)?.public().to_address(),
@@ -251,7 +259,7 @@ mod tests {
             10.into(),
             1,
             ChannelStatus::Open,
-            1
+            1,
         );
 
         let channel_2 = ChannelEntry::new(
@@ -260,7 +268,7 @@ mod tests {
             15.into(),
             2,
             ChannelStatus::PendingToClose(std::time::SystemTime::UNIX_EPOCH + Duration::from_mins(10)),
-            1
+            1,
         );
 
         let blokli_client = BlokliTestStateBuilder::default()
@@ -269,38 +277,67 @@ mod tests {
                 (account_2, HoprBalance::new_base(100), XDaiBalance::new_base(1)),
             ])
             .with_channels([channel_1, channel_2])
-            .with_hopr_network_chain_info(1, "rotsee")
+            .with_hopr_network_chain_info("rotsee")
             .build_dynamic_client(MODULE_ADDR.into());
 
         let mut connector = create_connector(blokli_client)?;
         connector.connect(Duration::from_secs(2)).await?;
 
-
         assert_eq!(Some(channel_1), connector.channel_by_id(channel_1.get_id()).await?);
-        assert_eq!(Some(channel_1), connector.channel_by_parties(&channel_1.source, &channel_1.destination).await?);
+        assert_eq!(
+            Some(channel_1),
+            connector
+                .channel_by_parties(&channel_1.source, &channel_1.destination)
+                .await?
+        );
         assert_eq!(Some(channel_2), connector.channel_by_id(channel_2.get_id()).await?);
-        assert_eq!(Some(channel_2), connector.channel_by_parties(&channel_2.source, &channel_2.destination).await?);
-
-        assert_eq!(vec![channel_1, channel_2], connector.stream_channels(ChannelSelector::default()).await?.collect::<Vec<_>>().await);
-
-        assert_eq!(vec![channel_1], connector.stream_channels(ChannelSelector::default()
-            .with_allowed_states(&[ChannelStatusDiscriminants::Open]))
-            .await?
-            .collect::<Vec<_>>()
-            .await
+        assert_eq!(
+            Some(channel_2),
+            connector
+                .channel_by_parties(&channel_2.source, &channel_2.destination)
+                .await?
         );
-        assert_eq!(vec![channel_2], connector.stream_channels(ChannelSelector::default()
-            .with_allowed_states(&[ChannelStatusDiscriminants::PendingToClose]))
-            .await?
-            .collect::<Vec<_>>()
-            .await
+
+        assert_eq!(
+            vec![channel_1, channel_2],
+            connector
+                .stream_channels(ChannelSelector::default())
+                .await?
+                .collect::<Vec<_>>()
+                .await
         );
-        assert_eq!(Vec::<ChannelEntry>::new(), connector.stream_channels(ChannelSelector::default()
-            .with_allowed_states(&[ChannelStatusDiscriminants::PendingToClose])
-            .with_closure_time_range(DateTime::from(std::time::SystemTime::UNIX_EPOCH + Duration::from_mins(11))..))
-            .await?
-            .collect::<Vec<_>>()
-            .await
+
+        assert_eq!(
+            vec![channel_1],
+            connector
+                .stream_channels(ChannelSelector::default().with_allowed_states(&[ChannelStatusDiscriminants::Open]))
+                .await?
+                .collect::<Vec<_>>()
+                .await
+        );
+        assert_eq!(
+            vec![channel_2],
+            connector
+                .stream_channels(
+                    ChannelSelector::default().with_allowed_states(&[ChannelStatusDiscriminants::PendingToClose])
+                )
+                .await?
+                .collect::<Vec<_>>()
+                .await
+        );
+        assert_eq!(
+            Vec::<ChannelEntry>::new(),
+            connector
+                .stream_channels(
+                    ChannelSelector::default()
+                        .with_allowed_states(&[ChannelStatusDiscriminants::PendingToClose])
+                        .with_closure_time_range(
+                            DateTime::from(std::time::SystemTime::UNIX_EPOCH + Duration::from_mins(11))..
+                        )
+                )
+                .await?
+                .collect::<Vec<_>>()
+                .await
         );
 
         Ok(())
@@ -308,7 +345,9 @@ mod tests {
 
     #[tokio::test]
     async fn connector_should_open_channel() -> anyhow::Result<()> {
-        let offchain_key_1 = OffchainKeypair::from_secret(&hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"))?;
+        let offchain_key_1 = OffchainKeypair::from_secret(&hex!(
+            "60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"
+        ))?;
         let account_1 = AccountEntry {
             public_key: *offchain_key_1.public(),
             chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
@@ -316,7 +355,9 @@ mod tests {
             safe_address: Some([1u8; Address::SIZE].into()),
             key_id: 1.into(),
         };
-        let offchain_key_2 = OffchainKeypair::from_secret(&hex!("71bf1f42ebbfcd89c3e197a3fd7cda79b92499e509b6fefa0fe44d02821d146a"))?;
+        let offchain_key_2 = OffchainKeypair::from_secret(&hex!(
+            "71bf1f42ebbfcd89c3e197a3fd7cda79b92499e509b6fefa0fe44d02821d146a"
+        ))?;
         let account_2 = AccountEntry {
             public_key: *offchain_key_2.public(),
             chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_2)?.public().to_address(),
@@ -330,7 +371,7 @@ mod tests {
                 (account_1.clone(), HoprBalance::new_base(100), XDaiBalance::new_base(1)),
                 (account_2.clone(), HoprBalance::new_base(100), XDaiBalance::new_base(1)),
             ])
-            .with_hopr_network_chain_info(1, "rotsee")
+            .with_hopr_network_chain_info("rotsee")
             .build_dynamic_client(MODULE_ADDR.into());
 
         let mut connector = create_connector(blokli_client)?;
@@ -345,7 +386,9 @@ mod tests {
 
     #[tokio::test]
     async fn connector_should_fund_channel() -> anyhow::Result<()> {
-        let offchain_key_1 = OffchainKeypair::from_secret(&hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"))?;
+        let offchain_key_1 = OffchainKeypair::from_secret(&hex!(
+            "60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"
+        ))?;
         let account_1 = AccountEntry {
             public_key: *offchain_key_1.public(),
             chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
@@ -353,7 +396,9 @@ mod tests {
             safe_address: Some([1u8; Address::SIZE].into()),
             key_id: 1.into(),
         };
-        let offchain_key_2 = OffchainKeypair::from_secret(&hex!("71bf1f42ebbfcd89c3e197a3fd7cda79b92499e509b6fefa0fe44d02821d146a"))?;
+        let offchain_key_2 = OffchainKeypair::from_secret(&hex!(
+            "71bf1f42ebbfcd89c3e197a3fd7cda79b92499e509b6fefa0fe44d02821d146a"
+        ))?;
         let account_2 = AccountEntry {
             public_key: *offchain_key_2.public(),
             chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_2)?.public().to_address(),
@@ -368,7 +413,7 @@ mod tests {
             10.into(),
             1,
             ChannelStatus::Open,
-            1
+            1,
         );
 
         let blokli_client = BlokliTestStateBuilder::default()
@@ -377,7 +422,7 @@ mod tests {
                 (account_2, HoprBalance::new_base(100), XDaiBalance::new_base(1)),
             ])
             .with_channels([channel_1])
-            .with_hopr_network_chain_info(1, "rotsee")
+            .with_hopr_network_chain_info("rotsee")
             .build_dynamic_client(MODULE_ADDR.into());
 
         let mut connector = create_connector(blokli_client)?;
@@ -392,7 +437,9 @@ mod tests {
 
     #[tokio::test]
     async fn connector_should_initiate_channel_closure() -> anyhow::Result<()> {
-        let offchain_key_1 = OffchainKeypair::from_secret(&hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"))?;
+        let offchain_key_1 = OffchainKeypair::from_secret(&hex!(
+            "60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"
+        ))?;
         let account_1 = AccountEntry {
             public_key: *offchain_key_1.public(),
             chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
@@ -400,7 +447,9 @@ mod tests {
             safe_address: Some([1u8; Address::SIZE].into()),
             key_id: 1.into(),
         };
-        let offchain_key_2 = OffchainKeypair::from_secret(&hex!("71bf1f42ebbfcd89c3e197a3fd7cda79b92499e509b6fefa0fe44d02821d146a"))?;
+        let offchain_key_2 = OffchainKeypair::from_secret(&hex!(
+            "71bf1f42ebbfcd89c3e197a3fd7cda79b92499e509b6fefa0fe44d02821d146a"
+        ))?;
         let account_2 = AccountEntry {
             public_key: *offchain_key_2.public(),
             chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_2)?.public().to_address(),
@@ -415,7 +464,7 @@ mod tests {
             10.into(),
             1,
             ChannelStatus::Open,
-            1
+            1,
         );
 
         let blokli_client = BlokliTestStateBuilder::default()
@@ -424,7 +473,7 @@ mod tests {
                 (account_2, HoprBalance::new_base(100), XDaiBalance::new_base(1)),
             ])
             .with_channels([channel_1])
-            .with_hopr_network_chain_info(1, "rotsee")
+            .with_hopr_network_chain_info("rotsee")
             .build_dynamic_client(MODULE_ADDR.into());
 
         let mut connector = create_connector(blokli_client)?;
@@ -435,7 +484,11 @@ mod tests {
         let mut snapshot = (*connector.client().snapshot()).clone();
 
         // Replace the closure time value to make the snapshot deterministic
-        snapshot.channels.get_mut(&hex::encode(channel_1.get_id())).unwrap().closure_time = Some(blokli_client::api::types::DateTime{ 0: "dummy".into() });
+        snapshot
+            .channels
+            .get_mut(&hex::encode(channel_1.get_id()))
+            .unwrap()
+            .closure_time = Some(blokli_client::api::types::DateTime { 0: "dummy".into() });
 
         insta::assert_yaml_snapshot!(snapshot);
 
@@ -444,7 +497,9 @@ mod tests {
 
     #[tokio::test]
     async fn connector_should_finalize_channel_closure() -> anyhow::Result<()> {
-        let offchain_key_1 = OffchainKeypair::from_secret(&hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"))?;
+        let offchain_key_1 = OffchainKeypair::from_secret(&hex!(
+            "60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"
+        ))?;
         let account_1 = AccountEntry {
             public_key: *offchain_key_1.public(),
             chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
@@ -452,7 +507,9 @@ mod tests {
             safe_address: Some([1u8; Address::SIZE].into()),
             key_id: 1.into(),
         };
-        let offchain_key_2 = OffchainKeypair::from_secret(&hex!("71bf1f42ebbfcd89c3e197a3fd7cda79b92499e509b6fefa0fe44d02821d146a"))?;
+        let offchain_key_2 = OffchainKeypair::from_secret(&hex!(
+            "71bf1f42ebbfcd89c3e197a3fd7cda79b92499e509b6fefa0fe44d02821d146a"
+        ))?;
         let account_2 = AccountEntry {
             public_key: *offchain_key_2.public(),
             chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_2)?.public().to_address(),
@@ -467,7 +524,7 @@ mod tests {
             10.into(),
             1,
             ChannelStatus::PendingToClose(std::time::SystemTime::UNIX_EPOCH + Duration::from_mins(10)),
-            1
+            1,
         );
 
         let blokli_client = BlokliTestStateBuilder::default()
@@ -476,7 +533,7 @@ mod tests {
                 (account_2, HoprBalance::new_base(100), XDaiBalance::new_base(1)),
             ])
             .with_channels([channel_1])
-            .with_hopr_network_chain_info(1, "rotsee")
+            .with_hopr_network_chain_info("rotsee")
             .build_dynamic_client(MODULE_ADDR.into());
 
         let mut connector = create_connector(blokli_client)?;
@@ -491,7 +548,9 @@ mod tests {
 
     #[tokio::test]
     async fn connector_should_close_incoming_channel() -> anyhow::Result<()> {
-        let offchain_key_1 = OffchainKeypair::from_secret(&hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"))?;
+        let offchain_key_1 = OffchainKeypair::from_secret(&hex!(
+            "60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"
+        ))?;
         let account_1 = AccountEntry {
             public_key: *offchain_key_1.public(),
             chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
@@ -499,7 +558,9 @@ mod tests {
             safe_address: Some([1u8; Address::SIZE].into()),
             key_id: 1.into(),
         };
-        let offchain_key_2 = OffchainKeypair::from_secret(&hex!("71bf1f42ebbfcd89c3e197a3fd7cda79b92499e509b6fefa0fe44d02821d146a"))?;
+        let offchain_key_2 = OffchainKeypair::from_secret(&hex!(
+            "71bf1f42ebbfcd89c3e197a3fd7cda79b92499e509b6fefa0fe44d02821d146a"
+        ))?;
         let account_2 = AccountEntry {
             public_key: *offchain_key_2.public(),
             chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_2)?.public().to_address(),
@@ -514,7 +575,7 @@ mod tests {
             10.into(),
             1,
             ChannelStatus::Open,
-            1
+            1,
         );
 
         let blokli_client = BlokliTestStateBuilder::default()
@@ -523,7 +584,7 @@ mod tests {
                 (account_2, HoprBalance::new_base(100), XDaiBalance::new_base(1)),
             ])
             .with_channels([channel_1])
-            .with_hopr_network_chain_info(1, "rotsee")
+            .with_hopr_network_chain_info("rotsee")
             .build_dynamic_client(MODULE_ADDR.into());
 
         let mut connector = create_connector(blokli_client)?;

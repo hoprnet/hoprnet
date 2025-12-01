@@ -231,18 +231,17 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use std::time::Duration;
+
     use hex_literal::hex;
     use hopr_api::chain::{ChainReadAccountOperations, ChainWriteAccountOperations};
     use hopr_internal_types::account::AccountType;
 
+    use super::*;
     use crate::{
-        connector::tests::create_connector,
-        testing::BlokliTestStateBuilder
+        connector::tests::{MODULE_ADDR, PRIVATE_KEY_1, create_connector},
+        testing::BlokliTestStateBuilder,
     };
-    use crate::connector::tests::{PRIVATE_KEY_1, MODULE_ADDR};
 
     #[tokio::test]
     async fn connector_should_stream_and_count_accounts() -> anyhow::Result<()> {
@@ -255,12 +254,7 @@ mod tests {
         };
 
         let blokli_client = BlokliTestStateBuilder::default()
-            .with_accounts([(
-                account.clone(),
-                HoprBalance::new_base(100),
-                XDaiBalance::new_base(1),
-                )
-            ])
+            .with_accounts([(account.clone(), HoprBalance::new_base(100), XDaiBalance::new_base(1))])
             .build_static_client();
 
         let mut connector = create_connector(blokli_client)?;
@@ -269,11 +263,10 @@ mod tests {
         let accounts = connector
             .stream_accounts(AccountSelector::default())
             .await?
-            .collect::<Vec<_>>().await;
+            .collect::<Vec<_>>()
+            .await;
 
-        let count = connector
-            .count_accounts(AccountSelector::default())
-            .await?;
+        let count = connector.count_accounts(AccountSelector::default()).await?;
 
         assert_eq!(accounts.len(), 1);
         assert_eq!(count, 1);
@@ -302,60 +295,33 @@ mod tests {
 
         let blokli_client = BlokliTestStateBuilder::default()
             .with_accounts([
-                (
-                    account_1.clone(),
-                    HoprBalance::new_base(100),
-                    XDaiBalance::new_base(1),
-                ),
-                (
-                    account_2.clone(),
-                    HoprBalance::new_base(100),
-                    XDaiBalance::new_base(1),
-                )
+                (account_1.clone(), HoprBalance::new_base(100), XDaiBalance::new_base(1)),
+                (account_2.clone(), HoprBalance::new_base(100), XDaiBalance::new_base(1)),
             ])
             .build_static_client();
 
         let mut connector = create_connector(blokli_client)?;
         connector.connect(Duration::from_secs(2)).await?;
 
-        let selector = AccountSelector::default()
-            .with_chain_key(account_1.chain_addr);
-        let accounts = connector
-            .stream_accounts(selector)
-            .await?
-            .collect::<Vec<_>>()
-            .await;
-        let count = connector
-            .count_accounts(selector)
-            .await?;
+        let selector = AccountSelector::default().with_chain_key(account_1.chain_addr);
+        let accounts = connector.stream_accounts(selector).await?.collect::<Vec<_>>().await;
+        let count = connector.count_accounts(selector).await?;
 
         assert_eq!(count, 1);
         assert_eq!(accounts.len(), 1);
         assert_eq!(&accounts[0], &account_1);
 
-        let selector = AccountSelector::default()
-            .with_offchain_key(account_1.public_key);
-        let accounts = connector
-            .stream_accounts(selector)
-            .await?
-            .collect::<Vec<_>>().await;
-        let count = connector
-            .count_accounts(selector)
-            .await?;
+        let selector = AccountSelector::default().with_offchain_key(account_1.public_key);
+        let accounts = connector.stream_accounts(selector).await?.collect::<Vec<_>>().await;
+        let count = connector.count_accounts(selector).await?;
 
         assert_eq!(count, 1);
         assert_eq!(accounts.len(), 1);
         assert_eq!(&accounts[0], &account_1);
 
-        let selector = AccountSelector::default()
-            .with_public_only(true);
-        let accounts = connector
-            .stream_accounts(selector)
-            .await?
-            .collect::<Vec<_>>().await;
-        let count = connector
-            .count_accounts(selector)
-            .await?;
+        let selector = AccountSelector::default().with_public_only(true);
+        let accounts = connector.stream_accounts(selector).await?.collect::<Vec<_>>().await;
+        let count = connector.count_accounts(selector).await?;
 
         assert_eq!(count, 1);
         assert_eq!(accounts.len(), 1);
@@ -364,13 +330,8 @@ mod tests {
         let selector = AccountSelector::default()
             .with_chain_key(account_1.chain_addr)
             .with_public_only(true);
-        let accounts = connector
-            .stream_accounts(selector)
-            .await?
-            .collect::<Vec<_>>().await;
-        let count = connector
-            .count_accounts(selector)
-            .await?;
+        let accounts = connector.stream_accounts(selector).await?.collect::<Vec<_>>().await;
+        let count = connector.count_accounts(selector).await?;
 
         assert_eq!(count, 0);
         assert!(accounts.is_empty());
@@ -389,21 +350,25 @@ mod tests {
         };
 
         let blokli_client = BlokliTestStateBuilder::default()
-            .with_accounts([(
-                account.clone(),
-                HoprBalance::new_base(100),
-                XDaiBalance::new_base(1),
-            )
-            ])
+            .with_accounts([(account.clone(), HoprBalance::new_base(100), XDaiBalance::new_base(1))])
             .with_safe_allowances([(account.safe_address.unwrap(), HoprBalance::new_base(10000))])
             .build_static_client();
 
         let mut connector = create_connector(blokli_client)?;
         connector.connect(Duration::from_secs(2)).await?;
 
-        assert_eq!(connector.get_balance(account.safe_address.unwrap()).await?, HoprBalance::new_base(100));
-        assert_eq!(connector.get_balance(account.chain_addr).await?, XDaiBalance::new_base(1));
-        assert_eq!(connector.safe_allowance(account.safe_address.unwrap()).await?, HoprBalance::new_base(10000));
+        assert_eq!(
+            connector.get_balance(account.safe_address.unwrap()).await?,
+            HoprBalance::new_base(100)
+        );
+        assert_eq!(
+            connector.get_balance(account.chain_addr).await?,
+            XDaiBalance::new_base(1)
+        );
+        assert_eq!(
+            connector.safe_allowance(account.safe_address.unwrap()).await?,
+            HoprBalance::new_base(10000)
+        );
 
         Ok(())
     }
@@ -411,23 +376,27 @@ mod tests {
     #[test_log::test(tokio::test)]
     async fn connector_should_announce_new_account_with_multiaddresses() -> anyhow::Result<()> {
         let blokli_client = BlokliTestStateBuilder::default()
-            .with_balances([(ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(), XDaiBalance::new_base(1))])
-            .with_hopr_network_chain_info(1, "rotsee")
+            .with_balances([(
+                ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
+                XDaiBalance::new_base(1),
+            )])
+            .with_hopr_network_chain_info("rotsee")
             .build_dynamic_client(MODULE_ADDR.into());
 
         let mut connector = create_connector(blokli_client)?;
         connector.connect(Duration::from_secs(2)).await?;
 
-        let offchain_key = OffchainKeypair::from_secret(&hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"))?;
+        let offchain_key = OffchainKeypair::from_secret(&hex!(
+            "60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"
+        ))?;
         let multiaddress = Multiaddr::from_str("/ip4/127.0.0.1/tcp/1234")?;
 
-        connector.announce(&[multiaddress], &offchain_key)
-            .await?
-            .await?;
+        connector.announce(&[multiaddress], &offchain_key).await?.await?;
 
         insta::assert_yaml_snapshot!(*connector.client.snapshot());
 
-        let accounts = connector.stream_accounts(AccountSelector::default().with_public_only(true))
+        let accounts = connector
+            .stream_accounts(AccountSelector::default().with_public_only(true))
             .await?
             .collect::<Vec<_>>()
             .await;
@@ -444,22 +413,26 @@ mod tests {
     #[test_log::test(tokio::test)]
     async fn connector_should_announce_new_account_without_multiaddresses() -> anyhow::Result<()> {
         let blokli_client = BlokliTestStateBuilder::default()
-            .with_hopr_network_chain_info(1, "rotsee")
-            .with_balances([(ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(), XDaiBalance::new_base(1))])
+            .with_hopr_network_chain_info("rotsee")
+            .with_balances([(
+                ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
+                XDaiBalance::new_base(1),
+            )])
             .build_dynamic_client(MODULE_ADDR.into());
 
         let mut connector = create_connector(blokli_client)?;
         connector.connect(Duration::from_secs(2)).await?;
 
-        let offchain_key = OffchainKeypair::from_secret(&hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"))?;
+        let offchain_key = OffchainKeypair::from_secret(&hex!(
+            "60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"
+        ))?;
 
-        connector.announce(&[], &offchain_key)
-            .await?
-            .await?;
+        connector.announce(&[], &offchain_key).await?.await?;
 
         insta::assert_yaml_snapshot!(*connector.client.snapshot());
 
-        let accounts = connector.stream_accounts(AccountSelector::default())
+        let accounts = connector
+            .stream_accounts(AccountSelector::default())
             .await?
             .collect::<Vec<_>>()
             .await;
@@ -472,7 +445,9 @@ mod tests {
 
     #[test_log::test(tokio::test)]
     async fn connector_should_not_reannounce_when_existing_account_has_same_multiaddresses() -> anyhow::Result<()> {
-        let offchain_key = OffchainKeypair::from_secret(&hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"))?;
+        let offchain_key = OffchainKeypair::from_secret(&hex!(
+            "60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"
+        ))?;
         let multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/1234".parse()?;
         let account = AccountEntry {
             public_key: *offchain_key.public(),
@@ -483,18 +458,22 @@ mod tests {
         };
 
         let blokli_client = BlokliTestStateBuilder::default()
-            .with_accounts([
-                (account.clone(), HoprBalance::new_base(100), XDaiBalance::new_base(1))
-            ])
-            .with_hopr_network_chain_info(1, "rotsee")
+            .with_accounts([(account.clone(), HoprBalance::new_base(100), XDaiBalance::new_base(1))])
+            .with_hopr_network_chain_info("rotsee")
             .build_dynamic_client(MODULE_ADDR.into());
 
         let mut connector = create_connector(blokli_client)?;
         connector.connect(Duration::from_secs(2)).await?;
 
-        assert!(matches!(connector.announce(&[], &offchain_key).await, Err(AnnouncementError::AlreadyAnnounced)));
+        assert!(matches!(
+            connector.announce(&[], &offchain_key).await,
+            Err(AnnouncementError::AlreadyAnnounced)
+        ));
 
-        assert!(matches!(connector.announce(&[multiaddr], &offchain_key).await, Err(AnnouncementError::AlreadyAnnounced)));
+        assert!(matches!(
+            connector.announce(&[multiaddr], &offchain_key).await,
+            Err(AnnouncementError::AlreadyAnnounced)
+        ));
 
         insta::assert_yaml_snapshot!(*connector.client.snapshot());
 
@@ -503,7 +482,9 @@ mod tests {
 
     #[tokio::test]
     async fn connector_should_reannounce_when_existing_account_has_no_multiaddresses() -> anyhow::Result<()> {
-        let offchain_key = OffchainKeypair::from_secret(&hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"))?;
+        let offchain_key = OffchainKeypair::from_secret(&hex!(
+            "60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"
+        ))?;
         let multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/1234".parse()?;
         let account = AccountEntry {
             public_key: *offchain_key.public(),
@@ -514,31 +495,30 @@ mod tests {
         };
 
         let blokli_client = BlokliTestStateBuilder::default()
-            .with_accounts([
-                (account.clone(), HoprBalance::new_base(100), XDaiBalance::new_base(1))
-            ])
-            .with_hopr_network_chain_info(1, "rotsee")
+            .with_accounts([(account.clone(), HoprBalance::new_base(100), XDaiBalance::new_base(1))])
+            .with_hopr_network_chain_info("rotsee")
             .build_dynamic_client(MODULE_ADDR.into());
 
         let mut connector = create_connector(blokli_client)?;
         connector.connect(Duration::from_secs(2)).await?;
 
-        assert!(matches!(connector.announce(&[], &offchain_key).await, Err(AnnouncementError::AlreadyAnnounced)));
+        assert!(matches!(
+            connector.announce(&[], &offchain_key).await,
+            Err(AnnouncementError::AlreadyAnnounced)
+        ));
 
         connector.announce(&[multiaddr.clone()], &offchain_key).await?.await?;
 
         insta::assert_yaml_snapshot!(*connector.client.snapshot());
 
-        let accounts = connector.stream_accounts(AccountSelector::default().with_public_only(true))
+        let accounts = connector
+            .stream_accounts(AccountSelector::default().with_public_only(true))
             .await?
             .collect::<Vec<_>>()
             .await;
 
         assert_eq!(accounts.len(), 1);
-        assert_eq!(
-            accounts[0].get_multiaddrs(),
-            &[multiaddr]
-        );
+        assert_eq!(accounts[0].get_multiaddrs(), &[multiaddr]);
 
         Ok(())
     }
@@ -548,16 +528,28 @@ mod tests {
         let blokli_client = BlokliTestStateBuilder::default()
             .with_balances([([1u8; Address::SIZE].into(), HoprBalance::zero())])
             .with_balances([([1u8; Address::SIZE].into(), XDaiBalance::zero())])
-            .with_balances([(ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(), XDaiBalance::new_base(10))])
-            .with_balances([(ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(), HoprBalance::new_base(1000))])
-            .with_hopr_network_chain_info(1, "rotsee")
+            .with_balances([(
+                ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
+                XDaiBalance::new_base(10),
+            )])
+            .with_balances([(
+                ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
+                HoprBalance::new_base(1000),
+            )])
+            .with_hopr_network_chain_info("rotsee")
             .build_dynamic_client(MODULE_ADDR.into());
 
         let mut connector = create_connector(blokli_client)?;
         connector.connect(Duration::from_secs(2)).await?;
 
-        connector.withdraw(HoprBalance::new_base(10), &[1u8; Address::SIZE].into()).await?.await?;
-        connector.withdraw(XDaiBalance::new_base(1), &[1u8; Address::SIZE].into()).await?.await?;
+        connector
+            .withdraw(HoprBalance::new_base(10), &[1u8; Address::SIZE].into())
+            .await?
+            .await?;
+        connector
+            .withdraw(XDaiBalance::new_base(1), &[1u8; Address::SIZE].into())
+            .await?
+            .await?;
 
         insta::assert_yaml_snapshot!(*connector.client.snapshot());
 
@@ -567,8 +559,11 @@ mod tests {
     #[tokio::test]
     async fn connector_should_register_safe() -> anyhow::Result<()> {
         let blokli_client = BlokliTestStateBuilder::default()
-            .with_balances([(ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(), XDaiBalance::new_base(10))])
-            .with_hopr_network_chain_info(1, "rotsee")
+            .with_balances([(
+                ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
+                XDaiBalance::new_base(10),
+            )])
+            .with_hopr_network_chain_info("rotsee")
             .build_dynamic_client(MODULE_ADDR.into());
 
         let mut connector = create_connector(blokli_client)?;
@@ -583,7 +578,9 @@ mod tests {
 
     #[tokio::test]
     async fn connector_should_not_re_register_safe() -> anyhow::Result<()> {
-        let offchain_key = OffchainKeypair::from_secret(&hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"))?;
+        let offchain_key = OffchainKeypair::from_secret(&hex!(
+            "60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"
+        ))?;
         let safe_addr: Address = [2u8; Address::SIZE].into();
         let account = AccountEntry {
             public_key: *offchain_key.public(),
@@ -595,15 +592,22 @@ mod tests {
 
         let blokli_client = BlokliTestStateBuilder::default()
             .with_accounts([(account, HoprBalance::new_base(100), XDaiBalance::new_base(1))])
-            .with_balances([(ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(), XDaiBalance::new_base(10))])
-            .with_hopr_network_chain_info(1, "rotsee")
+            .with_balances([(
+                ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
+                XDaiBalance::new_base(10),
+            )])
+            .with_hopr_network_chain_info("rotsee")
             .build_dynamic_client(MODULE_ADDR.into());
 
         let mut connector = create_connector(blokli_client)?;
         connector.connect(Duration::from_secs(2)).await?;
 
-        assert!(matches!(connector.register_safe(&[1u8; Address::SIZE].into()).await, Err(SafeRegistrationError::AlreadyRegistered(a)) if a == safe_addr));
-        assert!(matches!(connector.register_safe(&safe_addr).await, Err(SafeRegistrationError::AlreadyRegistered(a)) if a == safe_addr));
+        assert!(
+            matches!(connector.register_safe(&[1u8; Address::SIZE].into()).await, Err(SafeRegistrationError::AlreadyRegistered(a)) if a == safe_addr)
+        );
+        assert!(
+            matches!(connector.register_safe(&safe_addr).await, Err(SafeRegistrationError::AlreadyRegistered(a)) if a == safe_addr)
+        );
 
         insta::assert_yaml_snapshot!(*connector.client.snapshot());
 
