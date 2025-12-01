@@ -19,7 +19,7 @@ This guide will walk you through the steps required to set up a node on the Rots
 
 Before running a node on the Rotsee network, ensure you complete these steps: create an identity file, set up a safe, configure module instances, and link the identity to those instances.
 
-For detailed instructions, follow [this guide](https://github.com/hoprnet/hoprnet/blob/master/hopli/README.md#create-read-identity-and-make-it-eligible-for-rotsee-network).
+For detailed instructions, follow [this guide](https://github.com/hoprnet/hopli/blob/main/README.md#create-read-identity-and-make-it-eligible-for-rotsee-network).
 
 #### 2. Clone hoprnet repository
 
@@ -44,9 +44,9 @@ Configure the Metrics url:
 Update the `METRICS_PUSH_URL` variable with the following data:
 
 - `<NODE_NAME_FOR_GRAFANA>`: Your node's name for easy identification, example: `node-chaos`.
-- `<NODE_PEER_ID>`: The PeerID, To get the PeerID from your identity file, follow [7th step](https://github.com/hoprnet/hoprnet/blob/master/hopli/README.md#create-read-identity-and-make-it-eligible-for-rotsee-network).
+- `<NODE_PEER_ID>`: The PeerID, To get the PeerID from your identity file, follow [7th step](https://github.com/hoprnet/hopli/blob/main/README.md#create-read-identity-and-make-it-eligible-for-rotsee-network).
 - `<MY_NAMESPACE>`: Adjust the namespace to better categorize. Suggestion: `team`.
-- `<NODE_NATIVE_ADDRESS>`: Native address, to get the native address from your identity file, follow [7th step](https://github.com/hoprnet/hoprnet/blob/master/hopli/README.md#create-read-identity-and-make-it-eligible-for-rotsee-network).
+- `<NODE_NATIVE_ADDRESS>`: Native address, to get the native address from your identity file, follow [7th step](https://github.com/hoprnet/hopli/blob/main/README.md#create-read-identity-and-make-it-eligible-for-rotsee-network).
 
 Example: `https://prometheus-pushgateway.staging.hoprnet.link/metrics/job/node-chaos/hoprd_peer_id/12D3KooWBX5ENqYkKTevwiQXpTFYZTWs3S11bQiueX7QQqapTsaR/namespace/team/hoprd_network/rotsee/hoprd_address/0xb6b099780bdf1c1041783178b88be8c9449e75ab`
 
