@@ -43,7 +43,7 @@ pub trait ChainWriteAccountOperations {
         key: &OffchainKeypair,
     ) -> Result<BoxFuture<'life0, Result<ChainReceipt, Self::Error>>, AnnouncementError<Self::Error>>;
 
-    /// Withdraws native or token currency.
+    /// Withdraws native or token currency from the Safe or node account (depends on the used [`PayloadGenerator`]).
     async fn withdraw<C: Currency + Send>(
         &self,
         balance: Balance<C>,
@@ -60,7 +60,7 @@ pub trait ChainWriteAccountOperations {
 /// Selector for on-chain node accounts.
 ///
 /// See [`ChainReadAccountOperations::stream_accounts`].
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub struct AccountSelector {
     /// Selects accounts that announced with publicly routable multi-addresses.
     pub public_only: bool,

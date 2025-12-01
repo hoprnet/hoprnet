@@ -4504,7 +4504,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4517,6 +4517,7 @@ dependencies = [
  "futures-concurrency",
  "futures-time",
  "hex",
+ "hex-literal",
  "hopr-api",
  "hopr-async-runtime",
  "hopr-chain-connector",
@@ -4524,6 +4525,7 @@ dependencies = [
  "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-primitive-types",
+ "insta",
  "lazy_static",
  "moka",
  "parking_lot",
@@ -4532,6 +4534,7 @@ dependencies = [
  "serde_json",
  "smart-default",
  "tempfile",
+ "test-log",
  "thiserror 2.0.17",
  "tokio",
  "tracing",

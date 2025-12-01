@@ -2,7 +2,7 @@ mod emulator;
 
 pub use blokli_client::{BlokliTestClient, BlokliTestState, exports::Entry};
 pub use emulator::{FullStateEmulator, StaticState};
-use hopr_api::chain::ChainInfo;
+pub use hopr_api::chain::ChainInfo;
 use hopr_chain_types::{ContractAddresses, ParsedHoprChainAction};
 use hopr_crypto_types::{
     prelude::{Keypair, OffchainKeypair},
