@@ -82,8 +82,13 @@ hopr-transport-session = { workspace = true }
 hex-literal = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-protocol-start = { workspace = true }
+hopr-protocol-session = { workspace = true, features = [
+  "session-types",
+  "runtime-tokio",
+] }
 hopr-transport-network = { workspace = true }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-protocol = { workspace = true, features = ["runtime-tokio"] }
 hopr-transport-p2p = { workspace = true, features = ["runtime-tokio"] }
 temp-env = { workspace = true }
+tokio = { workspace = true }

@@ -4,16 +4,6 @@ mod encoder;
 pub use decoder::HoprDecoder;
 pub use encoder::HoprEncoder;
 
-fn validate_outgoing_ticket_price(
-    price: &hopr_primitive_types::balance::HoprBalance,
-) -> Result<(), validator::ValidationError> {
-    if price.is_zero() {
-        Err(validator::ValidationError::new("outgoing_ticket_price cannot be zero"))
-    } else {
-        Ok(())
-    }
-}
-
 fn default_outgoing_win_prob() -> Option<hopr_internal_types::prelude::WinningProbability> {
     Some(hopr_internal_types::prelude::WinningProbability::ALWAYS)
 }
@@ -35,7 +25,6 @@ pub struct HoprCodecConfig {
         serde(default),
         serde_as(as = "Option<serde_with::DisplayFromStr>")
     )]
-    #[validate(custom(function = "validate_outgoing_ticket_price"))]
     pub outgoing_ticket_price: Option<hopr_primitive_types::balance::HoprBalance>,
     /// Optional probability of winning an outgoing ticket.
     ///

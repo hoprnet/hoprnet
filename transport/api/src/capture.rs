@@ -284,7 +284,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default(),
-            orig_len: HOPR_PACKET_SIZE as u32,
+            orig_len: hopr_crypto_packet::prelude::HoprPacket::SIZE as u32,
             data: out.into_boxed_slice(),
         }
     }
@@ -621,7 +621,7 @@ mod tests {
             .to_bytes()
             .to_vec()
             .into(),
-            ticket: ticket.to_vec().into(),
+            ticket: ticket.verified_ticket().into_boxed().into_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
             signals: PacketSignal::OutOfSurbs.into(),
@@ -640,7 +640,7 @@ mod tests {
             .to_bytes()
             .to_vec()
             .into(),
-            ticket: ticket.to_vec().into(),
+            ticket: ticket.verified_ticket().into_boxed().into_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
             signals: None.into(),
@@ -659,7 +659,7 @@ mod tests {
             .to_bytes()
             .to_vec()
             .into(),
-            ticket: ticket.to_vec().into(),
+            ticket: ticket.verified_ticket().into_boxed().into_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
             signals: None.into(),
@@ -685,7 +685,7 @@ mod tests {
             .to_bytes()
             .into_vec()
             .into(),
-            ticket: ticket.to_vec().into(),
+            ticket: ticket.verified_ticket().into_boxed().into_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
             signals: None.into(),
@@ -709,7 +709,7 @@ mod tests {
             .to_bytes()
             .into_vec()
             .into(),
-            ticket: ticket.to_vec().into(),
+            ticket: ticket.verified_ticket().into_boxed().into_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
             signals: None.into(),
@@ -733,7 +733,7 @@ mod tests {
             .to_bytes()
             .into_vec()
             .into(),
-            ticket: ticket.to_vec().into(),
+            ticket: ticket.verified_ticket().into_boxed().into_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
             signals: None.into(),
@@ -758,7 +758,7 @@ mod tests {
             .to_bytes()
             .into_vec()
             .into(),
-            ticket: ticket.to_vec().into(),
+            ticket: ticket.verified_ticket().into_boxed().into_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
             signals: None.into(),
@@ -772,7 +772,7 @@ mod tests {
             next_hop: *OffchainKeypair::random().public(),
             ack_challenge: hk.as_ref().into(),
             data: hex!("deadbeefcafebabe").to_vec().into(),
-            ticket: ticket.to_vec().into(),
+            ticket: ticket.verified_ticket().into_boxed().into_vec().into(),
             num_surbs: 0,
             is_forwarded: true,
             signals: None.into(),

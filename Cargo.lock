@@ -4928,6 +4928,7 @@ dependencies = [
  "hopr-primitive-types",
  "hopr-protocol-app",
  "hopr-protocol-hopr",
+ "hopr-protocol-session",
  "hopr-protocol-start",
  "hopr-transport-identity",
  "hopr-transport-mixer",
@@ -4946,6 +4947,7 @@ dependencies = [
  "strum 0.27.2",
  "temp-env",
  "thiserror 2.0.17",
+ "tokio",
  "tracing",
  "validator",
 ]

@@ -93,14 +93,13 @@ fn default_host() -> HostConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
+    #[cfg(feature = "serde")]
     #[test]
     fn test_config_should_be_serializable_using_serde() -> Result<(), Box<dyn std::error::Error>> {
-        let cfg = HoprLibConfig::default();
+        let cfg = super::HoprLibConfig::default();
 
         let yaml = serde_yaml::to_string(&cfg)?;
-        let cfg_after_serde: HoprLibConfig = serde_yaml::from_str(&yaml)?;
+        let cfg_after_serde: super::HoprLibConfig = serde_yaml::from_str(&yaml)?;
         assert_eq!(cfg, cfg_after_serde);
 
         Ok(())
