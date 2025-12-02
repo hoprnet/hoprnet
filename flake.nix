@@ -473,25 +473,6 @@
             '';
           };
 
-          ciTestDevShell = nixLib.mkDevShell {
-            rustToolchainFile = ./rust-toolchain.toml;
-            shellName = "HOPR CI Test (Dev)";
-            treefmtWrapper = config.treefmt.build.wrapper;
-            treefmtPrograms = pkgs.lib.attrValues config.treefmt.build.programs;
-            extraPackages = with pkgs; [
-              uv
-              python313
-              foundry-bin
-              hoprd-dev
-              hopli.hopli
-            ];
-            shellHook = ''
-              uv sync --frozen
-              unset SOURCE_DATE_EPOCH
-              ${pkgs.lib.optionalString pkgs.stdenv.isLinux "autoPatchelf ./.venv"}
-            '';
-          };
-
           ciTestShell = nixLib.mkDevShell {
             rustToolchainFile = ./rust-toolchain.toml;
             shellName = "HOPR CI Test (Candidate)";
@@ -690,7 +671,6 @@
           devShells.ci = ciShell;
           devShells.test = testShell;
           devShells.citest = ciTestShell;
-          devShells.citestdev = ciTestDevShell;
           devShells.docs = docsShell;
 
           formatter = config.treefmt.build.wrapper;
