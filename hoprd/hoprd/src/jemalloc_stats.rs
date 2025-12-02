@@ -96,45 +96,19 @@ fn read_stats(start_time: Instant) -> Result<String, String> {
     Ok(format!(
         "jemalloc_stats: allocated={} active={} mapped={} retained={} arenas_active={} cache_efficiency={:.3} \
          uptime_secs={}",
-        format_bytes(allocated),
-        format_bytes(active),
-        format_bytes(mapped),
-        format_bytes(retained),
+        humansize::SizeFormatter::new(allocated, humansize::DECIMAL),
+        humansize::SizeFormatter::new(active, humansize::DECIMAL),
+        humansize::SizeFormatter::new(mapped, humansize::DECIMAL),
+        humansize::SizeFormatter::new(retained, humansize::DECIMAL),
         narenas,
         cache_efficiency,
         uptime
     ))
 }
 
-/// Format bytes in human-readable format
-fn format_bytes(bytes: usize) -> String {
-    const GB: usize = 1_073_741_824;
-    const MB: usize = 1_048_576;
-    const KB: usize = 1024;
-
-    if bytes >= GB {
-        format!("{:.1}GB", bytes as f64 / GB as f64)
-    } else if bytes >= MB {
-        format!("{:.1}MB", bytes as f64 / MB as f64)
-    } else if bytes >= KB {
-        format!("{:.1}KB", bytes as f64 / KB as f64)
-    } else {
-        format!("{}B", bytes)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test_log::test]
-    fn test_format_bytes() {
-        assert_eq!(format_bytes(0), "0B");
-        assert_eq!(format_bytes(512), "512B");
-        assert_eq!(format_bytes(1024), "1.0KB");
-        assert_eq!(format_bytes(1_048_576), "1.0MB");
-        assert_eq!(format_bytes(1_073_741_824), "1.0GB");
-    }
 
     #[test_log::test(tokio::test)]
     async fn test_stats_lifecycle() {

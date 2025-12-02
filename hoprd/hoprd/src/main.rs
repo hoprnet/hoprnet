@@ -4,12 +4,16 @@ use async_signal::{Signal, Signals};
 use futures::{FutureExt, StreamExt, future::abortable};
 use hopr_chain_connector::{HoprBlockchainSafeConnector, blokli_client::BlokliClient};
 use hopr_db_node::{HoprNodeDb, init_hopr_node_db};
-use hopr_lib::{AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, exports::api::chain::ChainEvents};
+use hopr_lib::{
+    AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, config::HoprLibConfig,
+    exports::api::chain::ChainEvents,
+};
 use hoprd::{cli::CliArgs, config::HoprdConfig, errors::HoprdError, exit::HoprServerIpForwardingReactor};
 use hoprd_api::{RestApiParameters, serve_api};
 use signal_hook::low_level;
 use tracing::{debug, error, info, warn};
 use tracing_subscriber::prelude::*;
+use validator::Validate;
 #[cfg(feature = "telemetry")]
 use {
     opentelemetry::trace::TracerProvider,
@@ -222,7 +226,8 @@ async fn main_inner() -> anyhow::Result<()> {
     }
 
     let args = <CliArgs as clap::Parser>::parse();
-    let cfg = HoprdConfig::from_cli_args(args, false)?;
+    let cfg = HoprdConfig::try_from(args)?;
+    cfg.validate()?;
 
     let git_hash = option_env!("VERGEN_GIT_SHA").unwrap_or("unknown");
     info!(
@@ -260,23 +265,19 @@ async fn main_inner() -> anyhow::Result<()> {
     let chain_connector = Arc::new(
         init_blokli_connector(
             &hopr_keys.chain_key,
-            cfg.provider.clone(),
+            cfg.blokli_url.clone(),
             cfg.hopr.safe_module.module_address,
         )
         .await?,
     );
 
+    // TODO: load all the environment variables here and use them to configure the hopr-lib config (#7660)
+    let hopr_lib_cfg: HoprLibConfig = cfg.hopr.clone().into();
+
     // Create the node instance
     info!("creating the HOPRd node instance from hopr-lib");
-    let node = Arc::new(
-        hopr_lib::Hopr::new(
-            (&hopr_keys).into(),
-            chain_connector.clone(),
-            node_db,
-            cfg.clone().into(),
-        )
-        .await?,
-    );
+    let node =
+        Arc::new(hopr_lib::Hopr::new((&hopr_keys).into(), chain_connector.clone(), node_db, hopr_lib_cfg).await?);
 
     let mut processes = AbortableList::<HoprdProcess>::default();
 

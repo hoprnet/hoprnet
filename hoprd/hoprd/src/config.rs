@@ -1,22 +1,18 @@
-use std::{
-    collections::HashSet,
-    net::{IpAddr, SocketAddr},
-    str::FromStr,
-    time::Duration,
-};
+use std::{collections::HashSet, net::SocketAddr, time::Duration};
 
 use hopr_lib::{
-    Address,
-    config::{HoprLibConfig, HostConfig, HostType},
+    HoprProtocolConfig, SafeModule, WinningProbability,
+    config::{
+        HoprLibConfig, HoprPacketPipelineConfig, HostConfig, HostType, ProbeConfig, SessionGlobalConfig,
+        TransportConfig,
+    },
+    exports::transport::config::HoprCodecConfig,
 };
 use hoprd_api::config::{Api, Auth};
 use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use tracing::debug;
-use validator::{Validate, ValidationError};
-
-use crate::errors::HoprdError;
+use validator::{Validate, ValidationError, ValidationErrors};
 
 pub const DEFAULT_HOST: &str = "0.0.0.0";
 pub const DEFAULT_PORT: u16 = 9091;
@@ -92,16 +88,157 @@ pub struct Db {
     /// Path to the directory containing the database
     #[serde(default)]
     pub data: String,
+    /// Determines whether the database should be initialized upon startup.
     #[serde(default = "just_true")]
     #[default = true]
     pub initialize: bool,
+    /// Determines whether the database should be forcibly-initialized if it exists upon startup.
     #[serde(default)]
     pub force_initialize: bool,
 }
 
+fn default_session_idle_timeout() -> Duration {
+    HoprLibConfig::default().protocol.session.idle_timeout
+}
+
+fn default_max_sessions() -> usize {
+    HoprLibConfig::default().protocol.session.maximum_sessions as usize
+}
+
+fn default_session_establish_max_retries() -> usize {
+    HoprLibConfig::default().protocol.session.establish_max_retries as usize
+}
+
+fn default_probe_recheck_threshold() -> Duration {
+    HoprLibConfig::default().protocol.probe.recheck_threshold
+}
+
+fn default_probe_interval() -> Duration {
+    HoprLibConfig::default().protocol.probe.interval
+}
+
+fn default_outgoing_ticket_winning_prob() -> Option<f64> {
+    HoprLibConfig::default()
+        .protocol
+        .packet
+        .codec
+        .outgoing_win_prob
+        .map(|p| p.as_f64())
+}
+
+/// Subset of various selected HOPR library network-related configuration options.
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UserHoprNetworkConfig {
+    /// How long it takes before HOPR Session is considered idle and is closed automatically
+    #[default(default_session_idle_timeout())]
+    #[serde(default = "default_session_idle_timeout", with = "humantime_serde")]
+    pub session_idle_timeout: Duration,
+    /// Maximum number of outgoing or incoming Sessions allowed by the Session manager
+    #[default(default_max_sessions())]
+    #[serde(default = "default_max_sessions")]
+    pub maximum_sessions: usize,
+    /// How many retries are made to establish an outgoing HOPR Session
+    #[default(default_session_establish_max_retries())]
+    #[serde(default = "default_session_establish_max_retries")]
+    pub session_establish_max_retries: usize,
+    /// The time interval for which to consider peer re-probing in seconds
+    #[default(default_probe_recheck_threshold())]
+    #[serde(default = "default_probe_recheck_threshold", with = "humantime_serde")]
+    pub probe_recheck_threshold: Duration,
+    /// The delay between individual probing rounds for neighbor discovery
+    #[default(default_probe_interval())]
+    #[serde(default = "default_probe_interval", with = "humantime_serde")]
+    pub probe_interval: Duration,
+    /// Should local addresses be announced on-chain?
+    #[serde(default)]
+    pub announce_local_addresses: bool,
+    /// Should local addresses be preferred when dialing a peer?
+    #[serde(default)]
+    pub prefer_local_addresses: bool,
+    /// Outgoing ticket winning probability.
+    #[default(default_outgoing_ticket_winning_prob())]
+    #[serde(default = "default_outgoing_ticket_winning_prob")]
+    pub outgoing_ticket_winning_prob: Option<f64>,
+}
+
+/// Subset of the [`HoprLibConfig`] that is tuned to be user-facing and more user-friendly.
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UserHoprLibConfig {
+    /// Determines whether the node should be advertised publicly on-chain.
+    #[default(just_true())]
+    #[serde(default = "just_true")]
+    pub announce: bool,
+    /// Configuration related to host specifics
+    #[default(default_host())]
+    #[serde(default = "default_host")]
+    pub host: HostConfig,
+    /// Safe and Module configuration
+    #[serde(default)]
+    pub safe_module: SafeModule,
+    /// Various HOPR-network and transport-related configuration options.
+    #[serde(default)]
+    pub network: UserHoprNetworkConfig,
+}
+
+// NOTE: this intentionally does not validate (0.0.0.0) to force user to specify
+// their external IP.
+#[inline]
+fn default_host() -> HostConfig {
+    HostConfig {
+        address: HostType::IPv4(hopr_lib::config::DEFAULT_HOST.to_owned()),
+        port: hopr_lib::config::DEFAULT_PORT,
+    }
+}
+
+impl From<UserHoprLibConfig> for HoprLibConfig {
+    fn from(value: UserHoprLibConfig) -> Self {
+        HoprLibConfig {
+            host: value.host,
+            publish: value.announce,
+            safe_module: value.safe_module,
+            protocol: HoprProtocolConfig {
+                transport: TransportConfig {
+                    announce_local_addresses: value.network.announce_local_addresses,
+                    prefer_local_addresses: value.network.prefer_local_addresses,
+                },
+                network: Default::default(),
+                packet: HoprPacketPipelineConfig {
+                    codec: HoprCodecConfig {
+                        outgoing_win_prob: value
+                            .network
+                            .outgoing_ticket_winning_prob
+                            .and_then(|v| WinningProbability::try_from_f64(v).ok()),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                probe: ProbeConfig {
+                    timeout: value.network.probe_interval,
+                    recheck_threshold: value.network.probe_recheck_threshold,
+                    ..Default::default()
+                },
+                session: SessionGlobalConfig {
+                    idle_timeout: value.network.session_idle_timeout,
+                    maximum_sessions: value.network.maximum_sessions as u32,
+                    establish_max_retries: value.network.session_establish_max_retries as u32,
+                    ..Default::default()
+                },
+            },
+        }
+    }
+}
+
+impl Validate for UserHoprLibConfig {
+    fn validate(&self) -> Result<(), ValidationErrors> {
+        HoprLibConfig::from(self.clone()).validate()
+    }
+}
+
 /// The main configuration object of the entire node.
 ///
-/// The configuration is composed of individual configuration of corresponding
+/// The configuration is composed of individual configurations of corresponding
 /// component configuration objects.
 ///
 /// An always up-to-date config YAML example can be found in [example_cfg.yaml](https://github.com/hoprnet/hoprnet/tree/master/hoprd/hoprd/example_cfg.yaml)
@@ -109,10 +246,10 @@ pub struct Db {
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq, smart_default::SmartDefault)]
 #[serde(deny_unknown_fields)]
 pub struct HoprdConfig {
-    /// Configuration related to hopr functionality
+    /// Configuration related to hopr-lib functionality
     #[validate(nested)]
     #[serde(default)]
-    pub hopr: HoprLibConfig,
+    pub hopr: UserHoprLibConfig,
     /// Configuration regarding the identity of the node
     #[validate(nested)]
     #[serde(default)]
@@ -129,9 +266,9 @@ pub struct HoprdConfig {
     #[validate(nested)]
     #[serde(default)]
     pub session_ip_forwarding: SessionIpForwardingConfig,
-    /// Blokli provider to connect to.
+    /// Blokli provider URL to connect to.
     #[validate(url)]
-    pub provider: Option<String>,
+    pub blokli_url: Option<String>,
     /// Configuration of underlying node behavior in the form strategies
     ///
     /// Strategies represent automatically executable behavior performed by
@@ -142,141 +279,7 @@ pub struct HoprdConfig {
     pub strategy: hopr_strategy::StrategyConfig,
 }
 
-impl From<HoprdConfig> for HoprLibConfig {
-    fn from(val: HoprdConfig) -> HoprLibConfig {
-        val.hopr
-    }
-}
-
 impl HoprdConfig {
-    pub fn from_cli_args(cli_args: crate::cli::CliArgs, skip_validation: bool) -> crate::errors::Result<HoprdConfig> {
-        let mut cfg: HoprdConfig = if let Some(cfg_path) = cli_args.configuration_file_path {
-            debug!(cfg_path, "fetching configuration from file");
-            let yaml_configuration = std::fs::read_to_string(cfg_path.as_str())
-                .map_err(|e| crate::errors::HoprdError::ConfigError(e.to_string()))?;
-            serde_yaml::from_str(&yaml_configuration)
-                .map_err(|e| crate::errors::HoprdError::SerializationError(e.to_string()))?
-        } else {
-            debug!("loading default configuration");
-            HoprdConfig::default()
-        };
-
-        // host
-        if let Some(x) = cli_args.host {
-            cfg.hopr.host = x
-        };
-
-        // hopr.transport
-        if cli_args.test_announce_local_addresses > 0 {
-            cfg.hopr.protocol.transport.announce_local_addresses = true;
-        }
-        if cli_args.test_prefer_local_addresses > 0 {
-            cfg.hopr.protocol.transport.prefer_local_addresses = true;
-        }
-
-        if let Some(host) = cli_args.default_session_listen_host {
-            cfg.session_ip_forwarding.default_entry_listen_host = match host.address {
-                HostType::IPv4(addr) => IpAddr::from_str(&addr)
-                    .map(|ip| std::net::SocketAddr::new(ip, host.port))
-                    .map_err(|_| HoprdError::ConfigError("invalid default session listen IP address".into())),
-                HostType::Domain(_) => Err(HoprdError::ConfigError("default session listen must be an IP".into())),
-            }?;
-        }
-
-        // db
-        if let Some(data) = cli_args.data {
-            cfg.db.data = data
-        }
-        if cli_args.init > 0 {
-            cfg.db.initialize = true;
-        }
-        if cli_args.force_init > 0 {
-            cfg.db.force_initialize = true;
-        }
-
-        // api
-        if cli_args.api > 0 {
-            cfg.api.enable = true;
-        }
-        if cli_args.disable_api_authentication > 0 && cfg.api.auth != Auth::None {
-            cfg.api.auth = Auth::None;
-        };
-        if let Some(x) = cli_args.api_token {
-            cfg.api.auth = Auth::Token(x);
-        };
-        if let Some(x) = cli_args.api_host {
-            cfg.api.host =
-                HostConfig::from_str(format!("{}:{}", x.as_str(), hoprd_api::config::DEFAULT_API_PORT).as_str())
-                    .map_err(crate::errors::HoprdError::ValidationError)?;
-        }
-        if let Some(x) = cli_args.api_port {
-            cfg.api.host.port = x
-        };
-
-        // probe
-        if let Some(x) = cli_args.probe_recheck_threshold {
-            cfg.hopr.protocol.probe.recheck_threshold = std::time::Duration::from_secs(x)
-        };
-
-        // network options
-        if let Some(x) = cli_args.network_quality_threshold {
-            cfg.hopr.protocol.network.quality_offline_threshold = x
-        };
-
-        // identity
-        if let Some(identity) = cli_args.identity {
-            cfg.identity.file = identity;
-        }
-        if let Some(x) = cli_args.password {
-            cfg.identity.password = x
-        };
-        if let Some(x) = cli_args.private_key {
-            cfg.identity.private_key = Some(x)
-        };
-
-        // chain
-        if cli_args.announce > 0 {
-            cfg.hopr.publish = true;
-        }
-
-        if let Some(x) = cli_args.provider {
-            cfg.provider = Some(x);
-        }
-
-        if let Some(x) = cli_args.safe_address {
-            cfg.hopr.safe_module.safe_address =
-                Address::from_str(&x).map_err(|e| HoprdError::ValidationError(e.to_string()))?
-        };
-        if let Some(x) = cli_args.module_address {
-            cfg.hopr.safe_module.module_address =
-                Address::from_str(&x).map_err(|e| HoprdError::ValidationError(e.to_string()))?
-        };
-
-        // additional updates
-        let home_symbol = '~';
-        if cfg.db.data.starts_with(home_symbol) {
-            cfg.db.data = home::home_dir()
-                .map(|h| h.as_path().display().to_string())
-                .expect("home dir for a user must be specified")
-                + &cfg.db.data[1..];
-        }
-        if cfg.identity.file.starts_with(home_symbol) {
-            cfg.identity.file = home::home_dir()
-                .map(|h| h.as_path().display().to_string())
-                .expect("home dir for a user must be specified")
-                + &cfg.identity.file[1..];
-        }
-
-        if skip_validation {
-            return Ok(cfg);
-        }
-
-        match cfg.validate() {
-            Ok(_) => Ok(cfg),
-            Err(e) => Err(crate::errors::HoprdError::ValidationError(e.to_string())),
-        }
-    }
-
     pub fn as_redacted(&self) -> Self {
         let mut ret = self.clone();
         // redacting sensitive information
@@ -367,10 +370,14 @@ pub struct SessionIpForwardingConfig {
 
 #[cfg(test)]
 mod tests {
-    use std::io::{Read, Write};
+    use std::{
+        io::{Read, Write},
+        str::FromStr,
+    };
 
     use anyhow::Context;
     use clap::{Args, Command, FromArgMatches};
+    use hopr_lib::Address;
     use tempfile::NamedTempFile;
 
     use super::*;
@@ -394,10 +401,10 @@ mod tests {
         };
 
         Ok(HoprdConfig {
-            hopr: HoprLibConfig {
+            hopr: UserHoprLibConfig {
                 host,
                 safe_module,
-                ..HoprLibConfig::default()
+                ..Default::default()
             },
             db: Db {
                 data: "/app/db".to_owned(),
@@ -409,18 +416,17 @@ mod tests {
     }
 
     #[test]
-    fn test_config_should_be_serializable_into_string() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_config_should_be_serializable_into_string() -> anyhow::Result<()> {
         let cfg = example_cfg()?;
 
         let from_yaml: HoprdConfig = serde_yaml::from_str(include_str!("../example_cfg.yaml"))?;
-
         assert_eq!(cfg, from_yaml);
 
         Ok(())
     }
 
     #[test]
-    fn test_config_should_be_deserializable_from_a_string_in_a_file() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_config_should_be_deserializable_from_a_string_in_a_file() -> anyhow::Result<()> {
         let mut config_file = NamedTempFile::new()?;
         let mut prepared_config_file = config_file.reopen()?;
 
@@ -448,7 +454,7 @@ mod tests {
         let mut config_file = NamedTempFile::new()?;
 
         let mut cfg = example_cfg()?;
-        cfg.provider = Some(pwnd.to_owned());
+        cfg.blokli_url = Some(pwnd.to_owned());
 
         let yaml = serde_yaml::to_string(&cfg)?;
         config_file.write_all(yaml.as_bytes())?;
@@ -466,13 +472,9 @@ mod tests {
         let args = crate::cli::CliArgs::from_arg_matches(&derived_matches)?;
 
         // skipping validation
-        let cfg = HoprdConfig::from_cli_args(args, true);
+        let cfg = HoprdConfig::try_from(args)?;
 
-        assert!(cfg.is_ok());
-
-        let cfg = cfg?;
-
-        assert_eq!(cfg.provider, Some(pwnd.to_owned()));
+        assert_eq!(cfg.blokli_url, Some(pwnd.to_owned()));
 
         Ok(())
     }

@@ -167,38 +167,20 @@ Options:
           Set host IP to which the API server will bind [env: HOPRD_API_HOST=]
       --apiPort <PORT>
           Set port to which the API server will bind [env: HOPRD_API_PORT=]
-      --defaultSessionListenHost <DEFAULT_SESSION_LISTEN_HOST>
-          Default Session listening host for Session IP forwarding [env: HOPRD_DEFAULT_SESSION_LISTEN_HOST=]
       --apiToken <TOKEN>
           A REST API token and for user authentication [env: HOPRD_API_TOKEN=]
       --password <PASSWORD>
           A password to encrypt your keys [env: HOPRD_PASSWORD=]
-      --noKeepLogs...
-          Disables keeping RPC logs in the logs database after they were processed. [env: HOPRD_INDEXER_DISABLE_KEEP_LOGS=]
-      --noFastSync...
-          Disables using fast sync at node start. [env: HOPRD_INDEXER_DISABLE_FAST_SYNC=]
-      --enableLogsSnapshot...
-          Enables downloading logs snapshot at node start. If this is set to true, the node will attempt to download logs snapshot from the configured `logsSnapshotUrl`. [env: HOPRD_ENABLE_LOGS_SNAPSHOT=]
-      --logsSnapshotUrl <LOGS_SNAPSHOT_URL>
-          URL to download logs snapshot from. If none is provided or configured in the configuration file, the node will not attempt to download any logs snapshot. [env: HOPRD_LOGS_SNAPSHOT_URL=]
-      --maxBlockRange <MAX_BLOCK_RANGE>
-          Maximum number of blocks that can be fetched in a batch request from the RPC provider. [env: HOPRD_MAX_BLOCK_RANGE=]
-      --maxRequestsPerSec <MAX_RPC_REQUESTS_PER_SEC>
-          Maximum number of RPC requests that can be performed per second. [env: HOPRD_MAX_RPC_REQUESTS_PER_SEC=]
-      --provider <PROVIDER>
-          A custom RPC provider to be used for the node to connect to blockchain [env: HOPRD_PROVIDER=]
+      --blokliUrl <URL>
+          URL for Blokli provider to be used for the node to connect to blockchain [env: HOPRD_BLOKLI_URL=]
       --init...
           initialize a database if it doesn't already exist [env: HOPRD_INIT=]
       --forceInit...
           initialize a database, even if it already exists [env: HOPRD_FORCE_INIT=]
       --probeRecheckThreshold <SECONDS>
           Timeframe in seconds after which it is reasonable to recheck the nearest neighbor [env: HOPRD_PROBE_RECHECK_THRESHOLD=]
-      --networkQualityThreshold <THRESHOLD>
-          Minimum quality of a peer connection to be considered usable [env: HOPRD_NETWORK_QUALITY_THRESHOLD=]
       --configurationFilePath <CONFIG_FILE_PATH>
           Path to a file containing the entire HOPRd configuration [env: HOPRD_CONFIGURATION_FILE_PATH=]
-      --safeTransactionServiceProvider <HOPRD_SAFE_TX_SERVICE_PROVIDER>
-          Base URL for safe transaction service [env: HOPRD_SAFE_TRANSACTION_SERVICE_PROVIDER=]
       --safeAddress <HOPRD_SAFE_ADDR>
           Address of Safe that safeguards tokens [env: HOPRD_SAFE_ADDRESS=]
       --moduleAddress <HOPRD_MODULE_ADDR>

@@ -1,8 +1,13 @@
-use std::str::FromStr;
+use std::{net::IpAddr, str::FromStr};
 
 use clap::{ArgAction, Parser, builder::ValueParser};
-use hopr_lib::config::{HostConfig, looks_like_domain};
+use hopr_chain_connector::Address;
+use hopr_lib::config::{HostConfig, HostType, looks_like_domain};
+use hoprd_api::config::Auth;
 use serde::{Deserialize, Serialize};
+use tracing::debug;
+
+use crate::{config::HoprdConfig, errors::HoprdError};
 
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -42,8 +47,8 @@ fn parse_api_token(mut s: &str) -> Result<String, String> {
 }
 
 /// Takes all CLI arguments whose structure is known at compile-time.
-/// Arguments whose structure, e.g. their default values depend on
-/// file contents need be specified using `clap`s builder API
+/// Arguments whose structure, e.g., their default values depend on
+/// file contents, need to be specified using `clap`'s builder API
 #[derive(Serialize, Deserialize, Clone, Parser)]
 #[command(author, version, about, long_about = None)]
 pub struct CliArgs {
@@ -143,11 +148,11 @@ pub struct CliArgs {
 
     #[arg(
         long,
-        help = "A custom provider to be used for the node to connect to blockchain",
-        env = "HOPRD_PROVIDER",
-        value_name = "PROVIDER"
+        help = "URL for Blokli provider to be used for the node to connect to blockchain",
+        env = "HOPRD_BLOKLI_URL",
+        value_name = "BLOKLI_URL"
     )]
-    pub provider: Option<String>,
+    pub blokli_url: Option<String>,
 
     #[arg(
         long,
@@ -202,15 +207,6 @@ pub struct CliArgs {
     pub probe_recheck_threshold: Option<u64>,
 
     #[arg(
-        long = "networkQualityThreshold",
-        help = "Minimum quality of a peer connection to be considered usable",
-        value_name = "THRESHOLD",
-        value_parser = clap::value_parser ! (f64),
-        env = "HOPRD_NETWORK_QUALITY_THRESHOLD"
-    )]
-    pub network_quality_threshold: Option<f64>,
-
-    #[arg(
         long = "configurationFilePath",
         required = false,
         help = "Path to a file containing the entire HOPRd configuration",
@@ -235,4 +231,124 @@ pub struct CliArgs {
         env = "HOPRD_MODULE_ADDRESS"
     )]
     pub module_address: Option<String>,
+}
+
+impl TryFrom<CliArgs> for HoprdConfig {
+    type Error = HoprdError;
+
+    fn try_from(value: CliArgs) -> Result<Self, Self::Error> {
+        let mut cfg: HoprdConfig = if let Some(cfg_path) = value.configuration_file_path {
+            debug!(cfg_path, "fetching configuration from file");
+            let yaml_configuration = std::fs::read_to_string(cfg_path.as_str())
+                .map_err(|e| crate::errors::HoprdError::ConfigError(e.to_string()))?;
+            serde_yaml::from_str(&yaml_configuration)
+                .map_err(|e| crate::errors::HoprdError::SerializationError(e.to_string()))?
+        } else {
+            debug!("loading default configuration");
+            HoprdConfig::default()
+        };
+
+        // host
+        if let Some(x) = value.host {
+            cfg.hopr.host = x
+        };
+
+        // hopr.transport
+        if value.test_announce_local_addresses > 0 {
+            cfg.hopr.network.announce_local_addresses = true;
+        }
+        if value.test_prefer_local_addresses > 0 {
+            cfg.hopr.network.prefer_local_addresses = true;
+        }
+
+        if let Some(host) = value.default_session_listen_host {
+            cfg.session_ip_forwarding.default_entry_listen_host = match host.address {
+                HostType::IPv4(addr) => IpAddr::from_str(&addr)
+                    .map(|ip| std::net::SocketAddr::new(ip, host.port))
+                    .map_err(|_| HoprdError::ConfigError("invalid default session listen IP address".into())),
+                HostType::Domain(_) => Err(HoprdError::ConfigError("default session listen must be an IP".into())),
+            }?;
+        }
+
+        // db
+        if let Some(data) = value.data {
+            cfg.db.data = data
+        }
+        if value.init > 0 {
+            cfg.db.initialize = true;
+        }
+        if value.force_init > 0 {
+            cfg.db.force_initialize = true;
+        }
+
+        // api
+        if value.api > 0 {
+            cfg.api.enable = true;
+        }
+        if value.disable_api_authentication > 0 && cfg.api.auth != Auth::None {
+            cfg.api.auth = Auth::None;
+        };
+        if let Some(x) = value.api_token {
+            cfg.api.auth = Auth::Token(x);
+        };
+        if let Some(x) = value.api_host {
+            cfg.api.host =
+                HostConfig::from_str(format!("{}:{}", x.as_str(), hoprd_api::config::DEFAULT_API_PORT).as_str())
+                    .map_err(crate::errors::HoprdError::ValidationError)?;
+        }
+        if let Some(x) = value.api_port {
+            cfg.api.host.port = x
+        };
+
+        // probe
+        if let Some(x) = value.probe_recheck_threshold {
+            cfg.hopr.network.probe_recheck_threshold = std::time::Duration::from_secs(x)
+        };
+
+        // identity
+        if let Some(identity) = value.identity {
+            cfg.identity.file = identity;
+        }
+        if let Some(x) = value.password {
+            cfg.identity.password = x
+        };
+        if let Some(x) = value.private_key {
+            cfg.identity.private_key = Some(x)
+        };
+
+        // chain
+        if value.announce > 0 {
+            cfg.hopr.announce = true;
+        }
+
+        if let Some(x) = value.blokli_url {
+            cfg.blokli_url = Some(x);
+        }
+
+        if let Some(x) = value.safe_address {
+            cfg.hopr.safe_module.safe_address =
+                Address::from_str(&x).map_err(|e| HoprdError::ValidationError(e.to_string()))?
+        };
+        if let Some(x) = value.module_address {
+            cfg.hopr.safe_module.module_address =
+                Address::from_str(&x).map_err(|e| HoprdError::ValidationError(e.to_string()))?
+        };
+
+        // additional updates
+        let home_symbol = '~';
+        if cfg.db.data.starts_with(home_symbol) {
+            cfg.db.data = home::home_dir()
+                .map(|h| h.as_path().display().to_string())
+                .expect("home dir for a user must be specified")
+                + &cfg.db.data[1..];
+        }
+        if cfg.identity.file.starts_with(home_symbol) {
+            cfg.identity.file = home::home_dir()
+                .map(|h| h.as_path().display().to_string())
+                .expect("home dir for a user must be specified")
+                + &cfg.identity.file[1..];
+        }
+
+        Ok(cfg)
+    }
 }
