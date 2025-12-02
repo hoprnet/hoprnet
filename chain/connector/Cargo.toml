@@ -1,7 +1,12 @@
 [package]
 name = "hopr-chain-connector"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+description = "Implementation of HOPR Chain APIs using Blokli client"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
 
 [features]
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
@@ -37,9 +42,12 @@ hopr-internal-types = { workspace = true, features = ["serde"] }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
+hex-literal = { workspace = true }
 hopr-chain-connector = { workspace = true, features = [
   "testing",
   "runtime-tokio",
 ] }
+insta = { workspace = true }
 lazy_static = { workspace = true }
+test-log = { workspace = true }
 tokio = { workspace = true }

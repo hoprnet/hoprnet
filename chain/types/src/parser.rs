@@ -19,7 +19,7 @@ use hopr_internal_types::prelude::{ChannelId, generate_channel_id};
 use hopr_primitive_types::prelude::*;
 use multiaddr::Multiaddr;
 
-use crate::{ContractAddresses, errors::ChainTypesError, payload::KeyBindAndAnnouncePayload};
+use crate::{ContractAddresses, a2al, errors::ChainTypesError, payload::KeyBindAndAnnouncePayload};
 
 /// Represents the action previously parsed from an EIP-2718 transaction.
 ///
@@ -88,7 +88,7 @@ impl ParsedHoprChainAction {
             let module_call = execTransactionFromModuleCall::abi_decode(tx.input().as_ref())
                 .map_err(|e| ChainTypesError::ParseError(e.into()))?;
             (module_call.to.0.0.into(), module_call.data, true)
-        } else if contract_addresses.into_iter().any(|addr| addr == tx_target) {
+        } else if contract_addresses.into_iter().any(|addr| addr == a2al(tx_target)) {
             (tx_target, tx.input().clone(), false)
         } else if tx.value() > 0 {
             return Ok((
@@ -100,6 +100,8 @@ impl ParsedHoprChainAction {
                 "failed to determine type of transaction"
             )));
         };
+
+        let target_contract = a2al(target_contract);
 
         if target_contract == contract_addresses.node_safe_registry {
             let register_call = registerSafeByNodeCall::abi_decode(input.as_ref())
@@ -201,7 +203,7 @@ impl ParsedHoprChainAction {
             )))?
         } else if target_contract == contract_addresses.token {
             if let Ok(send) = sendCall::abi_decode(input.as_ref()) {
-                if Address::from(send.recipient.0.0) == contract_addresses.announcements {
+                if send.recipient == contract_addresses.announcements {
                     let mut data = vec![0u8; 32 + send.data.len()];
                     data[31] = 32;
                     data[32..].copy_from_slice(&send.data);

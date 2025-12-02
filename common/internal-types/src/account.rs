@@ -25,8 +25,8 @@ impl Display for AccountType {
     }
 }
 
-/// Represents a node announcement entry on the block chain.
-/// This contains node's public key and optional announcement information (multiaddress).
+/// Represents a node announcement entry on the blockchain.
+/// This contains the node's public key and optional announcement information (multiaddress).
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AccountEntry {
