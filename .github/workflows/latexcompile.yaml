@@ -33,8 +33,10 @@ jobs:
           persist-credentials: false
 
       - name: Configure Git info
-        run: >
-          git config user.email "tech@hoprnet.org" git config user.name "HOPR CI robot" git config pull.rebase false #magic___^_^___line
+        run: |
+          git config user.email "tech@hoprnet.org"
+          git config user.name "HOPR CI robot"
+          git config pull.rebase false #magic___^_^___line
       - name: Install dependencies
         run: >
           sudo apt -y install texlive texlive-latex-extra texlive-science texlive-bibtex-extra latexmk #magic___^_^___line
