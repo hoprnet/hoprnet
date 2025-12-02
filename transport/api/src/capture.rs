@@ -442,7 +442,11 @@ mod tests {
     };
     use hopr_internal_types::prelude::{HoprPseudonym, TicketBuilder, VerifiedAcknowledgement, WinningProbability};
     use hopr_network_types::types::SealedHost;
-    use hopr_primitive_types::{primitives::EthereumChallenge, traits::BytesEncodable};
+    use hopr_primitive_types::{
+        prelude::{Address, BytesRepresentable},
+        primitives::EthereumChallenge,
+        traits::BytesEncodable,
+    };
     use hopr_protocol_app::prelude::ApplicationData;
     use hopr_protocol_session::types::*;
     use hopr_protocol_start::{KeepAliveMessage, StartErrorReason, StartErrorType, StartEstablished, StartInitiation};
@@ -473,7 +477,7 @@ mod tests {
 
         let ticket = TicketBuilder::default()
             .amount(10)
-            .channel_id(Hash::create(&[b"test"]))
+            .counterparty(Address::new(&[10u8; Address::SIZE]))
             .eth_challenge(EthereumChallenge::default())
             .win_prob(WinningProbability::try_from_f64(0.5)?)
             .channel_epoch(1)

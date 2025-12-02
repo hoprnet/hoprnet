@@ -74,3 +74,34 @@ where
         Ok(self.query_cached_chain_info().await?.info)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use hopr_api::chain::ChainValues;
+    use hopr_crypto_types::types::Hash;
+
+    use super::*;
+    use crate::{connector::tests::create_connector, testing::BlokliTestStateBuilder};
+
+    #[tokio::test]
+    async fn connector_should_query_chain_info() -> anyhow::Result<()> {
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_hopr_network_chain_info("rotsee")
+            .build_static_client();
+
+        let mut connector = create_connector(blokli_client)?;
+        connector.connect(Duration::from_secs(2)).await?;
+
+        let chain_info = connector.chain_info().await?;
+
+        assert_eq!(100, chain_info.chain_id);
+        assert_eq!("rotsee", &chain_info.hopr_network_name);
+
+        assert_eq!(Duration::from_mins(5), connector.channel_closure_notice_period().await?);
+        assert_eq!(HoprBalance::new_base(1), connector.minimum_ticket_price().await?);
+        assert!(WinningProbability::ALWAYS.approx_eq(&connector.minimum_incoming_ticket_win_prob().await?));
+        assert_eq!(Hash::default(), connector.domain_separators().await?.channel);
+
+        Ok(())
+    }
+}

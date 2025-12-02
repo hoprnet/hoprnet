@@ -11,6 +11,9 @@ pub enum ConnectorError {
     #[error("invalid state: {0}")]
     InvalidState(&'static str),
 
+    #[error("blokli server is not healthy")]
+    ServerNotHealthy,
+
     #[error("account {0} does not exist")]
     AccountDoesNotExist(HoprKeyIdent),
 

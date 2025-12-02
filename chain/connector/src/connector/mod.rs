@@ -153,6 +153,12 @@ where
         let min_channels = (self.client.count_channels(None).await? as f64 * (1.0 - TOLERANCE)).round() as u32;
         tracing::debug!(min_accounts, min_channels, "connection thresholds");
 
+        let server_health = self.client.query_health().await?;
+        if !server_health.eq_ignore_ascii_case("OK") {
+            tracing::error!(server_health, "blokli server not healthy");
+            return Err(ConnectorError::ServerNotHealthy);
+        }
+
         let (abort_handle, abort_reg) = AbortHandle::new_pair();
 
         let (connection_ready_tx, connection_ready_rx) = futures::channel::oneshot::channel();
@@ -473,6 +479,11 @@ where
     pub fn client(&self) -> &C {
         self.client.as_ref()
     }
+
+    /// Checks if the connector is [connected](HoprBlockchainConnector::connect) to the chain.
+    pub fn is_connected(&self) -> bool {
+        self.check_connection_state().is_ok()
+    }
 }
 
 impl<B, C, P> HoprBlockchainConnector<C, B, P, P::TxRequest>
@@ -536,5 +547,74 @@ where
     /// Returns a [`PathAddressResolver`] using this connector.
     pub fn as_path_resolver(&self) -> ChainPathResolver<'_, Self> {
         self.into()
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use blokli_client::BlokliTestState;
+    use hex_literal::hex;
+    use hopr_chain_types::contract_addresses_for_network;
+
+    use super::*;
+    use crate::{InMemoryBackend, testing::BlokliTestStateBuilder};
+
+    pub const PRIVATE_KEY_1: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");
+    pub const PRIVATE_KEY_2: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
+    pub const MODULE_ADDR: [u8; 20] = hex!("1111111111111111111111111111111111111111");
+
+    pub type TestConnector<C> = HoprBlockchainConnector<
+        C,
+        InMemoryBackend,
+        SafePayloadGenerator,
+        <SafePayloadGenerator as PayloadGenerator>::TxRequest,
+    >;
+
+    pub fn create_connector<C>(blokli_client: C) -> anyhow::Result<TestConnector<C>>
+    where
+        C: BlokliQueryClient + BlokliTransactionClient + BlokliSubscriptionClient + Send + Sync + 'static,
+    {
+        let ckp = ChainKeypair::from_secret(&PRIVATE_KEY_1)?;
+
+        Ok(HoprBlockchainConnector::new(
+            ckp.clone(),
+            Default::default(),
+            blokli_client,
+            InMemoryBackend::default(),
+            SafePayloadGenerator::new(
+                &ckp,
+                contract_addresses_for_network("rotsee").unwrap().1,
+                MODULE_ADDR.into(),
+            ),
+        ))
+    }
+
+    #[tokio::test]
+    async fn connector_should_connect() -> anyhow::Result<()> {
+        let blokli_client = BlokliTestStateBuilder::default().build_static_client();
+
+        let mut connector = create_connector(blokli_client)?;
+        connector.connect(Duration::from_secs(2)).await?;
+
+        assert!(connector.is_connected());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connector_should_not_connect_when_blokli_not_healthy() -> anyhow::Result<()> {
+        let mut state = BlokliTestState::default();
+        state.health = "DOWN".into();
+
+        let blokli_client = BlokliTestStateBuilder::from(state).build_static_client();
+
+        let mut connector = create_connector(blokli_client)?;
+
+        let res = connector.connect(Duration::from_secs(2)).await;
+
+        assert!(matches!(res, Err(ConnectorError::ServerNotHealthy)));
+        assert!(!connector.is_connected());
+
+        Ok(())
     }
 }

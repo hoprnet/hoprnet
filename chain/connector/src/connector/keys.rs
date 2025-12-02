@@ -107,3 +107,54 @@ where
         &self.mapper
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use hex_literal::hex;
+    use hopr_api::chain::{ChainKeyOperations, KeyIdMapper};
+    use hopr_crypto_types::prelude::*;
+    use hopr_internal_types::prelude::*;
+    use hopr_primitive_types::prelude::*;
+
+    use crate::{connector::tests::create_connector, testing::BlokliTestStateBuilder};
+
+    #[tokio::test]
+    async fn connector_should_map_keys_to_ids_and_back() -> anyhow::Result<()> {
+        let offchain_key = OffchainKeypair::from_secret(&hex!(
+            "60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"
+        ))?;
+        let chain_addr: Address = [1u8; Address::SIZE].into();
+        let account = AccountEntry {
+            public_key: *offchain_key.public(),
+            chain_addr,
+            entry_type: AccountType::NotAnnounced,
+            safe_address: Some([2u8; Address::SIZE].into()),
+            key_id: 1.into(),
+        };
+
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_accounts([(account.clone(), HoprBalance::new_base(100), XDaiBalance::new_base(1))])
+            .build_static_client();
+
+        let mut connector = create_connector(blokli_client)?;
+        connector.connect(Duration::from_secs(2)).await?;
+
+        assert_eq!(
+            Some(chain_addr),
+            connector.packet_key_to_chain_key(&offchain_key.public()).await?
+        );
+        assert_eq!(
+            Some(*offchain_key.public()),
+            connector.chain_key_to_packet_key(&chain_addr).await?
+        );
+
+        let mapper = connector.key_id_mapper_ref();
+
+        assert_eq!(Some(account.key_id), mapper.map_key_to_id(&offchain_key.public()));
+        assert_eq!(Some(*offchain_key.public()), mapper.map_id_to_public(&account.key_id));
+
+        Ok(())
+    }
+}
