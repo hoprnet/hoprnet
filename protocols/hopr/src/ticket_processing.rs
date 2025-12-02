@@ -204,17 +204,20 @@ where
         peer: OffchainPublicKey,
         ack: Acknowledgement,
     ) -> Result<Option<ResolvedAcknowledgement>, Self::Error> {
+        // Check if we're even expecting an acknowledgement from this peer
         let Some(awaiting_ack_from_peer) = self.unacknowledged_tickets.get(&peer).await else {
             tracing::trace!(%peer, "not awaiting any acknowledgement from peer");
             return Ok(None);
         };
 
+        // If we do, verify the acknowledgement signature and extract the challenge
         let (half_key, challenge) = hopr_parallelize::cpu::spawn_fifo_blocking(move || {
             ack.verify(&peer)
                 .and_then(|verified| Ok((*verified.ack_key_share(), verified.ack_key_share().to_challenge()?)))
         })
         .await?;
 
+        // Check if we have a ticket to be acknowledged by this peer
         let unacknowledged = awaiting_ack_from_peer
             .remove(&challenge)
             .await

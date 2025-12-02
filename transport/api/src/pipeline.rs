@@ -26,15 +26,15 @@ pub fn run_hopr_packet_pipeline<WIn, WOut, Chain, S, Db, TEvt, AppOut, AppIn>(
 ) -> AbortableList<HoprTransportProcess>
 where
     WOut: futures::Sink<(PeerId, Box<[u8]>)> + Clone + Unpin + Send + 'static,
-    WOut::Error: std::fmt::Display,
+    WOut::Error: std::error::Error,
     WIn: futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + 'static,
     Db: HoprDbTicketOperations + Clone + Send + Sync + 'static,
     Chain: ChainKeyOperations + ChainReadChannelOperations + ChainValues + Clone + Send + Sync + 'static,
     S: SurbStore + Clone + Send + Sync + 'static,
     TEvt: futures::Sink<TicketEvent> + Clone + Unpin + Send + 'static,
-    TEvt::Error: std::fmt::Display,
+    TEvt::Error: std::error::Error,
     AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
-    AppOut::Error: std::fmt::Display,
+    AppOut::Error: std::error::Error,
     AppIn: futures::Stream<Item = (ResolvedTransportRouting, ApplicationDataOut)> + Send + 'static,
 {
     let ticket_proc = HoprTicketProcessor::new(

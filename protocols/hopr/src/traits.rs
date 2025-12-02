@@ -123,8 +123,10 @@ pub trait UnacknowledgedTicketProcessor {
     /// On success, the [resolution](ResolvedAcknowledgement) contains a decision whether the corresponding previously
     /// stored ticket was found, and whether it is winning (and thus also redeemable) or losing.
     ///
-    /// Returns `None` if no ticket with the challenge corresponding to the [`Acknowledgement`] from `peer` was
-    /// expected. Returns an error if acknowledgement was expected from `peer`, but a ticket with the challenge
+    /// Returns `Ok(None)` if no [`Acknowledgement`] from `peer` was
+    /// expected.
+    ///
+    /// Returns an error if acknowledgement was expected from `peer`, but a ticket with the challenge
     /// corresponding to the [`Acknowledgement`] was not found.
     async fn acknowledge_ticket(
         &self,
