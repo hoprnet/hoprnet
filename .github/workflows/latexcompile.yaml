@@ -33,7 +33,10 @@ jobs:
           persist-credentials: false
 
       - name: Configure Git info
-        run: ./scripts/configure-git-info.sh
+        run: |
+          git config user.email "tech@hoprnet.org"
+          git config user.name "HOPR CI robot"
+          git config pull.rebase false
 
       - name: Install dependencies
         run: >

@@ -36,25 +36,17 @@
     - [Code Linting](#code-linting)
     - [Generate the Python SDK](#generate-the-python-sdk)
   - [Building a Docker image](#building-a-docker-image)
-  - [Local node with safe staking service (local network)](#local-node-with-safe-staking-service-local-network)
-  - [Local node with safe staking service (dufour network)](#local-node-with-safe-staking-service-dufour-network)
 - [Local cluster](#local-cluster)
 - [Test](#test)
-  - [Unit testing](#unit-testing)
   - [Github Actions CI](#github-actions-ci)
   - [End-to-End Testing](#end-to-end-testing)
     - [Running Tests Locally](#running-tests-locally)
       - [Test execution](#test-execution)
-- [Using Fast Sync](#using-fast-sync)
-  - [Prerequisites](#prerequisites)
-  - [Database Files](#database-files)
-  - [Configuration Steps](#configuration-steps)
-  - [Post-sync Behavior](#post-sync-behavior)
 - [Profiling \& Instrumentation](#profiling--instrumentation)
   - [`tokio` executor instrumentation](#tokio-executor-instrumentation)
   - [OpenTelemetry tracing](#opentelemetry-tracing)
   - [Profiling Criterion benchmarks via `flamegraph`](#profiling-criterion-benchmarks-via-flamegraph)
-    - [Prerequisites](#prerequisites-1)
+    - [Prerequisites](#prerequisites)
     - [Profiling the benchmarking binaries](#profiling-the-benchmarking-binaries)
   - [HOPR packet capture](#hopr-packet-capture)
 - [Contact](#contact)
@@ -146,13 +138,11 @@ To install on specific distribution, see [detailed information](./deploy/nfpm/RE
 
 ```bash
 $ hoprd --help
-HOPR node executable.
+HOPR node executable
 
 Usage: hoprd [OPTIONS]
 
 Options:
-      --network <NETWORK>
-          ID of the network the node will attempt to connect to [env: HOPRD_NETWORK=]
       --identity <IDENTITY>
           The path to the identity file [env: HOPRD_IDENTITY=]
       --data <DATA>
@@ -173,20 +163,8 @@ Options:
           A REST API token and for user authentication [env: HOPRD_API_TOKEN=]
       --password <PASSWORD>
           A password to encrypt your keys [env: HOPRD_PASSWORD=]
-      --noKeepLogs...
-          Disables keeping RPC logs in the logs database after they were processed. [env: HOPRD_INDEXER_DISABLE_KEEP_LOGS=]
-      --noFastSync...
-          Disables using fast sync at node start. [env: HOPRD_INDEXER_DISABLE_FAST_SYNC=]
-      --enableLogsSnapshot...
-          Enables downloading logs snapshot at node start. If this is set to true, the node will attempt to download logs snapshot from the configured `logsSnapshotUrl`. [env: HOPRD_ENABLE_LOGS_SNAPSHOT=]
-      --logsSnapshotUrl <LOGS_SNAPSHOT_URL>
-          URL to download logs snapshot from. If none is provided or configured in the configuration file, the node will not attempt to download any logs snapshot. [env: HOPRD_LOGS_SNAPSHOT_URL=]
-      --maxBlockRange <MAX_BLOCK_RANGE>
-          Maximum number of blocks that can be fetched in a batch request from the RPC provider. [env: HOPRD_MAX_BLOCK_RANGE=]
-      --maxRequestsPerSec <MAX_RPC_REQUESTS_PER_SEC>
-          Maximum number of RPC requests that can be performed per second. [env: HOPRD_MAX_RPC_REQUESTS_PER_SEC=]
       --provider <PROVIDER>
-          A custom RPC provider to be used for the node to connect to blockchain [env: HOPRD_PROVIDER=]
+          A custom provider to be used for the node to connect to blockchain [env: HOPRD_PROVIDER=]
       --init...
           initialize a database if it doesn't already exist [env: HOPRD_INIT=]
       --forceInit...
@@ -197,14 +175,10 @@ Options:
           Minimum quality of a peer connection to be considered usable [env: HOPRD_NETWORK_QUALITY_THRESHOLD=]
       --configurationFilePath <CONFIG_FILE_PATH>
           Path to a file containing the entire HOPRd configuration [env: HOPRD_CONFIGURATION_FILE_PATH=]
-      --safeTransactionServiceProvider <HOPRD_SAFE_TX_SERVICE_PROVIDER>
-          Base URL for safe transaction service [env: HOPRD_SAFE_TRANSACTION_SERVICE_PROVIDER=]
       --safeAddress <HOPRD_SAFE_ADDR>
           Address of Safe that safeguards tokens [env: HOPRD_SAFE_ADDRESS=]
       --moduleAddress <HOPRD_MODULE_ADDR>
           Address of the node management module [env: HOPRD_MODULE_ADDRESS=]
-      --protocolConfig <HOPRD_PROTOCOL_CONFIG_PATH>
-          Path to the protocol-config.json file [env: HOPRD_PROTOCOL_CONFIG_PATH=]
   -h, --help
           Print help
   -V, --version
@@ -264,7 +238,7 @@ Running the node without any command-line argument might not work depending on t
 Some basic reasonable setup uses a custom identity and enables the REST API of the `hoprd`:
 
 ```bash
-hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --apiToken <MY_TOKEN> --network doufur
+hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --apiToken <MY_TOKEN> --provider "http://blokli-provider.here"
 ```
 
 Here is a short breakdown of each argument.
@@ -283,11 +257,9 @@ hoprd
   --host "0.0.0.0:9091"
   # specify password for accessing REST API
   --apiToken <MY_TOKEN>
-  # a network is defined as a chain plus a number of deployed smart contract addresses to use on that chain
-  --network doufur
+  # blokli provider supplying the HOPR updates
+  --provider "http://blokli-provider.here"
 ```
-
-Special care needs to be given to the `network` argument, which defines the specific network `hoprd` node should join. Only nodes within the same network can communicate using the HOPR protocol.
 
 ### Using Docker Compose with extended HOPR node monitoring
 
@@ -295,7 +267,7 @@ Please follow the documentation for [`docker compose` based deployment](./deploy
 
 ### REST API
 
-`hoprd` running a REST API exposes an endpoint at `/api-docs/openapi.json` with full OpenApi specification of the used REST API, including the current version of the API.
+`hoprd` running a REST API exposes an endpoint at `http://<address>/api-docs/openapi.json` with full OpenApi specification of the used REST API, including the current version of the API.
 
 ## Testnet accessibility
 
@@ -421,90 +393,15 @@ set up properly.
 See [Nix documentation](https://nix.dev/manual/nix/2.28/advanced-topics/distributed-builds.html)
 for more information.
 
-### Local node with safe staking service (local network)
-
-Running one node in test mode, with safe and module attached (in an `anvil-localhost` network)
-
-```bash
-nix run .#lint
-# clean up, e.g.
-# make kill-anvil
-# make clean
-
-# build HOPRd code
-cargo build
-
-# starting network
-make run-anvil args="-p"
-
-# update protocol-config
-scripts/update-protocol-config.sh -n anvil-localhost
-
-# create identity files
-make create-local-identity id_count=1
-
-# create a safe and a node management module instance,
-# and passing the created safe and module as argument to
-# run a test node local (separate terminal)
-# It also register the created pairs in network registry, and
-# approve tokens for channels to move token.
-# fund safe with 2k token and 1 native token
-make run-local-with-safe id_file_path=/tmp
-# or to restart a node and use the same id, safe and module
-# run:
-# make run-local id_path=$(find `pwd` -name ".identity-local*.id" | sort -r | head -n 1)
-
-# fund all your nodes to get started
-make fund-local-all id_dir=`pwd`
-
-# start local HOPR admin in a container (and put into background)
-make run-hopr-admin &
-```
-
-### Local node with safe staking service (dufour network)
-
-Running one node in test mode, with safe and module attached (in dufour network)
-
-```bash
-# HOPRd code
-cargo build
-
-# Fill out the `ethereum/contract/.env` from the `ethereum/contracts/example.env`
-#
-# ensure a private key with enough xDAI is set as PRIVATE_KEY
-# This PRIVATE_KEY is the "admin_key" (i.e. owner of the created safe and node management module)
-#
-# Please use the deployer private key as DEPLOYER_PRIVATE_KEY
-# The Ethereum address to the DEPLOYER_PRIVATE_KEY should be a "manager" of the network registry.
-# Role can be checked in the explorer:
-
-# echo "https://gnosisscan.io/address/$(jq '.networks.dufour.addresses.network_registry' ./ethereum/contracts/contracts-addresses.json)\#readContract"
-
-source ./ethereum/contracts/.env
-
-export HOPR_NETWORK="dufour"
-export IDENTITY_PASSWORD="SOmeranDOmPassHere-DefiniteLyChangeThis!"
-
-# create identity files
-bash scripts/generate-identity.sh
-
-# start local HOPR admin in a container (and put into background)
-make run-hopr-admin &
-```
-
 ## Local cluster
 
 The best way to test with multiple HOPR nodes is by using a [local cluster of interconnected nodes](https://github.com/hoprnet/hoprnet/blob/master/SETUP_LOCAL_CLUSTER.md).
 
 ## Test
 
-### Unit testing
+Run all tests: `cargo test`.
 
-Tests both the Rust and Solidity code.
-
-```bash
-make test
-```
+Run only unit tests: `cargo test --lib`
 
 ### Github Actions CI
 
@@ -535,47 +432,6 @@ With the environment activated, execute the tests locally:
 ```bash
 just run-smoke-test integration
 ```
-
-## Using Fast Sync
-
-Fast sync is a feature that allows the node to sync the blockchain state faster
-than the default sync mode by using a pre-built logs database.
-
-### Prerequisites
-
-To generate the logs database, you need:
-
-- A fully synced node
-- Node configured to keep logs in the database (enabled by default)
-  - Set `hopr -> chain -> keep_logs` in the configuration file
-
-### Database Files
-
-The following files in the node's database folder are required:
-
-- `hopr_logs.db` - Main logs database
-- `hopr_logs.db-shm` - Shared memory file (auxiliary)
-- `hopr_logs.db-wal` - Write-Ahead Log file (auxiliary)
-
-### Configuration Steps
-
-1. Place the pre-built logs database files in the node's database folder
-2. Enable fast sync mode (enabled by default):
-
-- Set `hopr -> chain -> fast_sync` to `true` in the configuration file
-
-3. Remove any existing index data:
-
-   ```bash
-   rm hopr_index.db*
-   ```
-
-### Post-sync Behavior
-
-- If index data exists but is incomplete, the node will resume fast sync at the
-  last processed log
-- If index data exists and is complete, the node will skip fast sync and start in normal sync mode
-- After fast sync completes, the node automatically switches to normal sync mode
 
 ## Profiling & Instrumentation
 

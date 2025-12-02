@@ -1,10 +1,8 @@
-# run all smoke tests
-run-smoke-test-all:
-    nix develop .#citest -c uv run --frozen -m pytest tests/
+run-local-cluster:
+    #!/usr/bin/env bash
+    uv sync --no-dev
+    uv run --no-sync -m sdk.python.localcluster --config ./sdk/python/localcluster.params.yml --fully_connected --exposed
 
-# run a single smoke test
-run-smoke-test TEST:
-    nix develop .#citest -c uv run --frozen -m pytest tests/test_{{TEST}}.py
 
 package packager arch:
     #!/usr/bin/env bash
@@ -61,8 +59,6 @@ sign-file source_file:
 
      # Clean up
     rm -rf "$gnupghome"
-
-
 
 # list all available docker image targets which can be built
 list-docker-images:
