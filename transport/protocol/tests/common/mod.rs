@@ -6,7 +6,7 @@ use hex_literal::hex;
 use hopr_api::chain::*;
 use hopr_async_runtime::AbortableList;
 use hopr_chain_connector::create_trustful_hopr_blokli_connector;
-use hopr_crypto_random::{Randomizable, random_bytes, random_integer};
+use hopr_crypto_random::{random_bytes, random_integer};
 use hopr_crypto_types::prelude::*;
 use hopr_db_node::HoprNodeDb;
 use hopr_internal_types::{errors::PathError, prelude::*};
@@ -244,11 +244,13 @@ pub async fn emulate_channel_communication(pending_packet_count: usize, mut comp
                     panic!("Unexpected destination");
                 };
 
-                components[destination]
+                if let Err(error) = components[destination]
                     .0
                     .send((PEERS[i].public().into(), payload))
-                    .await
-                    .expect("Sending of payload to the peer failed");
+                    .await {
+                    tracing::error!(%error, "failed to send packet to peer");
+                    panic!("Failed to send packet to peer");
+                }
             }
         }
     }
@@ -322,7 +324,7 @@ pub async fn send_relay_receive_channel_of_n_peers(
 
     const TIMEOUT_SECONDS: Duration = Duration::from_secs(10);
 
-    let (wire_apis, mut apis, ticket_channels, processes) = peer_setup_for(peer_count)
+    let (wire_apis, apis, ticket_channels, processes) = peer_setup_for(peer_count)
         .await
         .context("failed to setup peers for test")?;
 
@@ -341,7 +343,7 @@ pub async fn send_relay_receive_channel_of_n_peers(
 
     tokio::task::spawn(emulate_channel_communication(packet_count, wire_apis));
 
-    let pseudonym = HoprPseudonym::random();
+    let pseudonym = SimplePseudonym([0xde, 0xad, 0xbe, 0xef, 0xca, 0xfe, 0xba, 0xbe, 0x11, 0x22]);
     let mut sent_packet_count = 0;
     for test_msg in test_msgs.iter().take(packet_count) {
         let mut sender = apis[0].0.clone();
@@ -363,8 +365,11 @@ pub async fn send_relay_receive_channel_of_n_peers(
         "not all packets were successfully sent"
     );
 
+    let (_apis_send, mut apis_recv): (Vec<_>, Vec<_>) = apis.into_iter().unzip();
+
     let compare_packets = async move {
-        let last_node_recv = apis.remove(peer_count - 1).1;
+        tracing::debug!("comparing packets");
+        let last_node_recv = apis_recv.remove(peer_count - 1);
 
         let mut recv_packets = last_node_recv
             .take(packet_count)
@@ -381,6 +386,9 @@ pub async fn send_relay_receive_channel_of_n_peers(
             recv_packets.into_iter().map(|(_, b)| b.data).collect::<Vec<_>>(),
             test_msgs
         );
+
+        tracing::debug!("comparing packets succeeded");
+        tokio::time::sleep(TIMEOUT_SECONDS/2).await;
     };
 
     let res = timeout(TIMEOUT_SECONDS, compare_packets).await;
@@ -410,6 +418,7 @@ pub async fn send_relay_receive_channel_of_n_peers(
         );
     }
 
+    tracing::trace!("all peers finished");
     processes.abort_all();
     Ok(())
 }

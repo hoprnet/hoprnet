@@ -15,7 +15,6 @@ use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_primitive_types::prelude::HoprBalance;
 use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut};
-use hopr_transport_protocol::processor::PacketInteractionConfig;
 use libp2p::PeerId;
 
 const SAMPLE_SIZE: usize = 50;
@@ -44,12 +43,9 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                     let mut node_dbs = Vec::new();
                     let mut connectors = Vec::new();
                     for i in 0..PEER_COUNT {
-                        let node_db = HoprNodeDb::new_in_memory(PEERS_CHAIN[i].clone())
+                        let node_db = HoprNodeDb::new_in_memory()
                             .await
                             .expect("node db must be constructible");
-                        node_db
-                            .start_ticket_processing(Some(futures::sink::drain()))
-                            .expect("ticket processing must be started");
                         node_dbs.push(node_db);
 
                         let mut connector = create_trustful_hopr_blokli_connector(

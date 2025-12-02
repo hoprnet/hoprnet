@@ -9,7 +9,7 @@ use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::Instrument;
-
+use hopr_network_types::timeout::{SinkTimeoutError, TimeoutStreamExt};
 use crate::PeerId;
 
 const TICKET_ACK_BUFFER_SIZE: usize = 1_000_000;
@@ -52,15 +52,15 @@ pub enum TicketEvent {
 }
 
 /// Performs encoding of outgoing Application protocol packets into HOPR protocol outgoing packets.
-async fn start_outgoing_packet_pipeline<AppOut, E, WOut>(
+async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
     app_outgoing: AppOut,
     encoder: std::sync::Arc<E>,
     wire_outgoing: WOut,
 ) where
     AppOut: futures::Stream<Item = (ResolvedTransportRouting, ApplicationDataOut)> + Send + 'static,
     E: PacketEncoder + Send + 'static,
-    WOut: futures::Sink<(PeerId, Box<[u8]>)> + Clone + Unpin + Send + 'static,
-    WOut::Error: std::fmt::Display,
+    WOut: futures::Sink<(PeerId, Box<[u8]>), Error = SinkTimeoutError<WOutErr>> + Clone + Unpin + Send + 'static,
+    WOutErr: std::error::Error,
 {
     let res = app_outgoing
         .then_concurrent(|(routing, data)| {
@@ -92,7 +92,7 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut>(
         })
         .filter_map(futures::future::ready)
         .map(Ok)
-        .forward(wire_outgoing)
+        .forward_to_timeout(wire_outgoing)
         .instrument(tracing::trace_span!("msg protocol processing - egress"))
         .await;
 
@@ -117,7 +117,7 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut>(
 ///                             | --> `ack_incoming` (forwarded)
 ///                             | --> `app_incoming` (final)
 #[allow(clippy::too_many_arguments)] // Allowed on internal functions
-async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, AppIn>(
+async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, AppIn, AppInErr>(
     wire_incoming: WIn,
     decoder: std::sync::Arc<D>,
     ticket_proc: std::sync::Arc<T>,
@@ -129,17 +129,17 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
 ) where
     WIn: futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + 'static,
     WOut: futures::Sink<(PeerId, Box<[u8]>)> + Clone + Unpin + Send + 'static,
-    WOut::Error: std::fmt::Display,
+    WOut::Error: std::error::Error,
     D: PacketDecoder + Send + 'static,
     T: UnacknowledgedTicketProcessor + Send + 'static,
     TEvt: futures::Sink<TicketEvent> + Clone + Unpin + Send + 'static,
-    TEvt::Error: std::fmt::Display,
+    TEvt::Error: std::error::Error,
     AckIn: futures::Sink<(OffchainPublicKey, Acknowledgement)> + Send + Unpin + Clone + 'static,
-    AckIn::Error: std::fmt::Display,
+    AckIn::Error: std::error::Error,
     AckOut: futures::Sink<(OffchainPublicKey, Option<HalfKey>)> + Send + Unpin + Clone + 'static,
-    AckOut::Error: std::fmt::Display,
-    AppIn: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
-    AppIn::Error: std::fmt::Display,
+    AckOut::Error: std::error::Error,
+    AppIn: futures::Sink<(HoprPseudonym, ApplicationDataIn), Error = SinkTimeoutError<AppInErr>> + Send + 'static,
+    AppInErr: std::error::Error,
 {
     // Create a cache for a CPU-intensive conversion PeerId -> OffchainPublicKey
 
@@ -235,6 +235,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             info,
                             ..
                         } = *final_packet;
+                        tracing::trace!(%previous_hop, "incoming final packet");
 
                         // Send acknowledgement back
                         ack_outgoing_success
@@ -259,7 +260,6 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             received_ticket,
                             ..
                         } = *fwd_packet;
-
                         if let Err(error) = ticket_proc.insert_unacknowledged_ticket(ack_challenge, received_ticket).await {
                             tracing::error!(%previous_hop, %next_hop, %error, "failed to insert unacknowledged ticket into the ticket processor");
                             return None;
@@ -306,7 +306,8 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                     })))
         ))
         .map(Ok)
-        .forward(app_incoming)
+        .inspect(|data| tracing::trace!(?data, "application data in"))
+        .forward_to_timeout(app_incoming)
         .instrument(tracing::trace_span!("msg protocol processing - ingress"))
         .await;
 
@@ -333,7 +334,7 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
     AckOut: futures::Stream<Item = (OffchainPublicKey, Option<HalfKey>)> + Send + 'static,
     E: PacketEncoder + Send + 'static,
     WOut: futures::Sink<(PeerId, Box<[u8]>)> + Clone + Unpin + Send + 'static,
-    WOut::Error: std::fmt::Display,
+    WOut::Error: std::error::Error,
 {
     ack_outgoing
         .for_each_concurrent(
@@ -381,7 +382,7 @@ async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
     AckIn: futures::Stream<Item = (OffchainPublicKey, Acknowledgement)> + Send + 'static,
     T: UnacknowledgedTicketProcessor + Sync + Send + 'static,
     TEvt: futures::Sink<TicketEvent> + Clone + Unpin + Send + 'static,
-    TEvt::Error: std::fmt::Display,
+    TEvt::Error: std::error::Error,
 {
     ack_incoming
         .for_each_concurrent(NUM_CONCURRENT_TICKET_ACK_PROCESSING, move |(peer, ack)| {
@@ -429,15 +430,15 @@ pub fn run_packet_pipeline<WIn, WOut, C, D, T, TEvt, AppOut, AppIn>(
 ) -> AbortableList<PacketPipelineProcesses>
 where
     WOut: futures::Sink<(PeerId, Box<[u8]>)> + Clone + Unpin + Send + 'static,
-    WOut::Error: std::fmt::Display,
+    WOut::Error: std::error::Error,
     WIn: futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + 'static,
     C: PacketEncoder + Sync + Send + 'static,
     D: PacketDecoder + Sync + Send + 'static,
     T: UnacknowledgedTicketProcessor + Sync + Send + 'static,
     TEvt: futures::Sink<TicketEvent> + Clone + Unpin + Send + 'static,
-    TEvt::Error: std::fmt::Display,
+    TEvt::Error: std::error::Error,
     AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
-    AppOut::Error: std::fmt::Display,
+    AppOut::Error: std::error::Error,
     AppIn: futures::Stream<Item = (ResolvedTransportRouting, ApplicationDataOut)> + Send + 'static,
 {
     let mut processes = AbortableList::default();
