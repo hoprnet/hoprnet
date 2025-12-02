@@ -11,7 +11,6 @@ license = "GPL-3.0-only"
 default = ["traits", "sqlite"]
 traits = []
 runtime-tokio = [
-  "hopr-async-runtime/runtime-tokio",
   "hopr-db-entity/runtime-tokio",
   "hopr-db-migration/runtime-tokio",
   "sea-orm/runtime-tokio",
@@ -50,7 +49,6 @@ hopr-crypto-packet = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-db-entity = { workspace = true }
 hopr-db-migration = { workspace = true }
-hopr-async-runtime = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-parallelize = { workspace = true, features = ["rayon"] }

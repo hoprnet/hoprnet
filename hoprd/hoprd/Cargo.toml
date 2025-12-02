@@ -133,3 +133,9 @@ hopr-lib = { workspace = true, features = [
   "utils_parallel",
   "testing",
 ] }
+
+[package.metadata.cargo-machete]
+ignored = ["humantime-serde"]
+
+[package.metadata.cargo-shear]
+ignored = ["humantime-serde"]

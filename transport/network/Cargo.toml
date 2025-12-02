@@ -39,3 +39,9 @@ anyhow = { workspace = true }
 tokio = { workspace = true }
 more-asserts = { workspace = true }
 hopr-db-node = { workspace = true, features = ["runtime-tokio"] }
+
+[package.metadata.cargo-machete]
+ignored = ["humantime-serde"]
+
+[package.metadata.cargo-shear]
+ignored = ["humantime-serde"]

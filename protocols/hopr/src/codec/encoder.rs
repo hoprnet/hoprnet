@@ -123,10 +123,6 @@ where
             "cannot send out packet that is not outgoing",
         ))?;
 
-        // self.unacked_tickets
-        //    .insert(out.ack_challenge, PendingAcknowledgement::WaitingAsSender)
-        //    .await;
-
         let mut transport_payload = Vec::with_capacity(HoprPacket::SIZE);
         transport_payload.extend_from_slice(out.packet.as_ref());
         transport_payload.extend_from_slice(&out.ticket.into_encoded());
