@@ -4594,7 +4594,6 @@ dependencies = [
  "hex",
  "hex-literal",
  "hopr-api",
- "hopr-async-runtime",
  "hopr-crypto-packet",
  "hopr-crypto-random",
  "hopr-crypto-types",

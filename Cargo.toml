@@ -46,7 +46,6 @@ anyhow = "1.0.100"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
 async-lock = "3.4.1"
-async-once-cell = "0.5.4"
 async-signal = "0.2.13"
 async-stream = "0.3.6"
 async-trait = "0.1.89"
@@ -293,4 +292,4 @@ insta.opt-level = 3
 similar.opt-level = 3
 
 [workspace.metadata.cargo-shear]
-ignored = ["oas3", "serde_bytes"]
+ignored = ["oas3", "serde_bytes", "humantime-serde"]
