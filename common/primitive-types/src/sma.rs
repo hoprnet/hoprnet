@@ -43,7 +43,8 @@ pub trait SMA<T> {
 /// Useful mainly for floating-point types, as it does not accumulate floating point error with each sample.
 /// Requires `O(N)` of memory and `O(N)` for average computation, `N` being window size.
 /// The divisor argument `D` is used only for such types `T` that do not implement `From<u32>` (such as `Duration`,...).
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NoSumSMA<T, D = T> {
     window: VecDeque<T>,
     window_size: usize,
@@ -130,7 +131,8 @@ where
 /// Useful mainly for integer types, as it does accumulate floating point error with each sample.
 /// Requires `O(N)` of memory and `O(1)` for average computation, `N` being window size.
 /// The divisor argument `D` is used only for such types `T` that do not implement `From<u32>` (such as `Duration`,...).
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SingleSumSMA<T, D = T> {
     window: VecDeque<T>,
     window_size: usize,

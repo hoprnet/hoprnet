@@ -39,7 +39,8 @@ pub trait Currency: Display + FromStr<Err = GeneralError> + Default + PartialEq 
 }
 
 /// Represents wxHOPR token [`Currency`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct WxHOPR;
 
 impl Display for WxHOPR {
@@ -62,7 +63,8 @@ impl Currency for WxHOPR {
 }
 
 /// Represents xDai coin [`Currency`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct XDai;
 
 impl Display for XDai {
@@ -89,7 +91,8 @@ impl Currency for XDai {
 /// The value is internally always stored in `wei` but always printed in human-readable format.
 ///
 /// All arithmetic on this type is implicitly saturating at bounds given by [`U256`].
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Balance<C: Currency>(U256, C);
 
 const WEI_PREFIX: &str = "wei";

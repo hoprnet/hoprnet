@@ -4,7 +4,8 @@ use crate::prelude::GeneralError;
 
 /// Unsigned integer (`usize`) that has an explicit upper bound.
 /// Trying to convert an integer that's above this bound will fail.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BoundedSize<const B: usize>(usize);
 
 impl<const B: usize> BoundedSize<B> {
@@ -140,7 +141,8 @@ impl<const B: usize> From<BoundedSize<B>> for usize {
 
 /// Wrapper for [`Vec`] that has an explicit upper bound on the number of elements.
 /// The Structure remains heap-allocated to avoid blowing up the size of types where it is used.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BoundedVec<T, const N: usize>(Vec<T>);
 
 impl<T, const N: usize> Default for BoundedVec<T, N> {

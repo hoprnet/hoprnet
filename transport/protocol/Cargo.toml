@@ -16,9 +16,10 @@ serde = [
   "dep:cfg_eval",
   "dep:serde",
   "dep:serde_with",
+  "hopr-internal-types/serde",
+  "hopr-primitive-types/serde",
   "hopr-protocol-hopr/serde",
   "hopr-protocol-app/serde",
-  "hopr-internal-types/serde",
 ]
 
 [dependencies]

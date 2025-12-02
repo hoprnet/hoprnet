@@ -1,6 +1,6 @@
 [package]
 name = "hopr-primitive-types"
-version = "0.9.1"
+version = "0.10.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Generic types used through the entire code base"
@@ -11,6 +11,10 @@ license = "GPL-3.0-only"
 [lib]
 crate-type = ["rlib"]
 
+[features]
+default = []
+serde = ["dep:serde", "dep:serde_bytes", "chrono/serde"]
+
 [dependencies]
 bigdecimal = { workspace = true }
 float-cmp = { workspace = true }
@@ -18,11 +22,11 @@ hex = { workspace = true }
 lazy_static = { workspace = true }
 primitive-types = { workspace = true }
 regex = { workspace = true }
-serde = { workspace = true }
-serde_bytes = { workspace = true }
+serde = { workspace = true, optional = true }
+serde_bytes = { workspace = true, optional = true }
 sha3 = { workspace = true }
 thiserror = { workspace = true }
-chrono = { workspace = true, features = ["serde"] }
+chrono = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
@@ -30,6 +34,3 @@ hex-literal = { workspace = true }
 
 [package.metadata.cargo-machete]
 ignored = ["serde_bytes"]
-
-[features]
-default = []

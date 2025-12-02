@@ -4654,6 +4654,7 @@ dependencies = [
  "atomic_enum",
  "backon",
  "cfg-if",
+ "cfg_eval",
  "const_format",
  "futures",
  "futures-time",
@@ -4752,7 +4753,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-primitive-types"
-version = "0.9.1"
+version = "0.10.0"
 dependencies = [
  "anyhow",
  "bigdecimal",
@@ -4913,7 +4914,6 @@ dependencies = [
  "cfg-if",
  "futures",
  "futures-concurrency",
- "futures-time",
  "hex-literal",
  "hopr-api",
  "hopr-async-runtime",

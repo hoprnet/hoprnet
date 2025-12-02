@@ -1,10 +1,8 @@
 use hopr_primitive_types::prelude::*;
 pub use hopr_transport::config::{
     HoprPacketPipelineConfig, HoprProtocolConfig, HostConfig, HostType, NetworkConfig, ProbeConfig,
-    SessionGlobalConfig, TransportConfig, looks_like_domain, validate_external_host,
+    SessionGlobalConfig, TransportConfig, looks_like_domain,
 };
-use serde::{Deserialize, Serialize};
-use serde_with::{DisplayFromStr, serde_as};
 use validator::{Validate, ValidationError};
 
 pub const DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER: &str = "https://safe-transaction.prod.hoprtech.net/";
@@ -21,20 +19,30 @@ fn default_safe_transaction_service_provider() -> String {
     DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER.to_owned()
 }
 
-#[serde_as]
-#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
-#[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "serde", cfg_eval::cfg_eval, serde_with::serde_as)]
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(deny_unknown_fields)
+)]
 pub struct SafeModule {
     #[validate(url)]
-    #[serde(default = "default_safe_transaction_service_provider")]
+    #[cfg_attr(feature = "serde", serde(default = "default_safe_transaction_service_provider"))]
     #[default(default_safe_transaction_service_provider())]
     pub safe_transaction_service_provider: String,
-    #[serde_as(as = "DisplayFromStr")]
-    #[serde(default = "default_invalid_address")]
+    #[cfg_attr(
+        feature = "serde",
+        serde_as(as = "serde_with::DisplayFromStr"),
+        serde(default = "default_invalid_address")
+    )]
     #[default(default_invalid_address())]
     pub safe_address: Address,
-    #[serde_as(as = "DisplayFromStr")]
-    #[serde(default = "default_invalid_address")]
+    #[cfg_attr(
+        feature = "serde",
+        serde_as(as = "serde_with::DisplayFromStr"),
+        serde(default = "default_invalid_address")
+    )]
     #[default(default_invalid_address())]
     pub module_address: Address,
 }
@@ -48,24 +56,28 @@ fn validate_directory_exists(s: &str) -> Result<(), ValidationError> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(deny_unknown_fields)
+)]
 pub struct HoprLibConfig {
     /// Configuration related to host specifics
     #[validate(nested)]
-    #[validate(custom(function = "validate_external_host"))]
-    #[serde(default = "default_host")]
     #[default(default_host())]
+    #[cfg_attr(feature = "serde", serde(default = "default_host"))]
     pub host: HostConfig,
     /// Determines whether the node should be advertised publicly on-chain.
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub publish: bool,
     /// Configuration of the HOPR protocol.
     #[validate(nested)]
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub protocol: HoprProtocolConfig,
     /// Configuration of the node Safe and Module.
     #[validate(nested)]
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub safe_module: SafeModule,
 }
 
