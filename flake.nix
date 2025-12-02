@@ -426,6 +426,7 @@
               sqlite
               cargo-machete
               cargo-shear
+              cargo-insta
               foundry-bin
               nfpm
               envsubst
