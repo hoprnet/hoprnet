@@ -306,25 +306,22 @@ mod tests {
         let accounts = connector.stream_accounts(selector).await?.collect::<Vec<_>>().await;
         let count = connector.count_accounts(selector).await?;
 
-        assert_eq!(count, 1);
-        assert_eq!(accounts.len(), 1);
-        assert_eq!(&accounts[0], &account_1);
+        assert_eq!(accounts.len(), count);
+        assert_eq!(accounts, vec![account_1.clone()]);
 
         let selector = AccountSelector::default().with_offchain_key(account_1.public_key);
         let accounts = connector.stream_accounts(selector).await?.collect::<Vec<_>>().await;
         let count = connector.count_accounts(selector).await?;
 
-        assert_eq!(count, 1);
-        assert_eq!(accounts.len(), 1);
-        assert_eq!(&accounts[0], &account_1);
+        assert_eq!(accounts.len(), count);
+        assert_eq!(accounts, vec![account_1.clone()]);
 
         let selector = AccountSelector::default().with_public_only(true);
         let accounts = connector.stream_accounts(selector).await?.collect::<Vec<_>>().await;
         let count = connector.count_accounts(selector).await?;
 
-        assert_eq!(count, 1);
-        assert_eq!(accounts.len(), 1);
-        assert_eq!(&accounts[0], &account_2);
+        assert_eq!(accounts.len(), count);
+        assert_eq!(accounts, vec![account_2.clone()]);
 
         let selector = AccountSelector::default()
             .with_chain_key(account_1.chain_addr)
