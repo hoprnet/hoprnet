@@ -36,7 +36,6 @@
     - [Code Linting](#code-linting)
     - [Generate the Python SDK](#generate-the-python-sdk)
   - [Building a Docker image](#building-a-docker-image)
-  - [Local node with safe staking service (local network)](#local-node-with-safe-staking-service-local-network)
 - [Local cluster](#local-cluster)
 - [Test](#test)
   - [Github Actions CI](#github-actions-ci)
@@ -393,46 +392,6 @@ NOTE: Building for different platforms requires nix distributed builds to be
 set up properly.
 See [Nix documentation](https://nix.dev/manual/nix/2.28/advanced-topics/distributed-builds.html)
 for more information.
-
-### Local node with safe staking service (local network)
-
-Running one node in test mode, with safe and module attached (in an `anvil-localhost` network)
-
-```bash
-nix run .#lint
-# clean up, e.g.
-# make kill-anvil
-# make clean
-
-# build HOPRd code
-cargo build
-
-# starting network
-make run-anvil args="-p"
-
-# update protocol-config
-scripts/update-protocol-config.sh -n anvil-localhost
-
-# create identity files
-make create-local-identity id_count=1
-
-# create a safe and a node management module instance,
-# and passing the created safe and module as argument to
-# run a test node local (separate terminal)
-# It also register the created pairs in network registry, and
-# approve tokens for channels to move token.
-# fund safe with 2k token and 1 native token
-make run-local-with-safe id_file_path=/tmp
-# or to restart a node and use the same id, safe and module
-# run:
-# make run-local id_path=$(find `pwd` -name ".identity-local*.id" | sort -r | head -n 1)
-
-# fund all your nodes to get started
-make fund-local-all id_dir=`pwd`
-
-# start local HOPR admin in a container (and put into background)
-make run-hopr-admin &
-```
 
 ## Local cluster
 
