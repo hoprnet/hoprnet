@@ -7,8 +7,6 @@ use futures::StreamExt;
 use hopr_api::db::{HoprDbPeersOperations, PeerOrigin, PeerSelector, PeerStatus, Stats};
 use hopr_network_types::addr::is_public_address;
 use hopr_platform::time::current_time;
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_primitive_types::prelude::*;
 use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
 use tracing::debug;
@@ -28,10 +26,6 @@ lazy_static::lazy_static! {
         ).unwrap();
     static ref METRIC_PEER_COUNT:  hopr_metrics::SimpleGauge =
          hopr_metrics::SimpleGauge::new("hopr_peer_count", "Number of all peers").unwrap();
-    static ref METRIC_NETWORK_HEALTH_TIME_TO_GREEN:  hopr_metrics::SimpleGauge =  hopr_metrics::SimpleGauge::new(
-        "hopr_time_to_green_sec",
-        "Time it takes for a node to transition to the GREEN network state"
-    ).unwrap();
 }
 
 /// Network health represented with colors, where green is the best and red
@@ -86,8 +80,6 @@ pub struct Network<T> {
     am_i_public: bool,
     cfg: NetworkConfig,
     db: T,
-    #[cfg(all(feature = "prometheus", not(test)))]
-    started_at: Duration,
 }
 
 impl<T> Network<T>
@@ -98,7 +90,6 @@ where
         #[cfg(all(feature = "prometheus", not(test)))]
         {
             METRIC_NETWORK_HEALTH.set(0.0);
-            METRIC_NETWORK_HEALTH_TIME_TO_GREEN.set(0.0);
             METRIC_PEERS_BY_QUALITY.set(&["public", "high"], 0.0);
             METRIC_PEERS_BY_QUALITY.set(&["public", "low"], 0.0);
             METRIC_PEERS_BY_QUALITY.set(&["nonPublic", "high"], 0.0);
@@ -111,8 +102,6 @@ where
             am_i_public: true,
             cfg,
             db,
-            #[cfg(all(feature = "prometheus", not(test)))]
-            started_at: current_time().as_unix_timestamp(),
         }
     }
 
@@ -367,11 +356,6 @@ where
     fn refresh_metrics(&self, stats: &Stats) {
         let health = health_from_stats(stats, self.am_i_public);
 
-        if METRIC_NETWORK_HEALTH_TIME_TO_GREEN.get() < 0.5f64 {
-            if let Some(ts) = current_time().checked_sub(self.started_at) {
-                METRIC_NETWORK_HEALTH_TIME_TO_GREEN.set(ts.as_unix_timestamp().as_secs_f64());
-            }
-        }
         METRIC_PEER_COUNT.set(stats.all_count() as f64);
         METRIC_PEERS_BY_QUALITY.set(&["public", "high"], stats.good_quality_public as f64);
         METRIC_PEERS_BY_QUALITY.set(&["public", "low"], stats.bad_quality_public as f64);
