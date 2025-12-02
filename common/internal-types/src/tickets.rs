@@ -906,6 +906,12 @@ impl UnacknowledgedTicket {
     }
 }
 
+impl Display for UnacknowledgedTicket {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "unacknowledged {}", self.ticket)
+    }
+}
+
 /// Status of the acknowledged ticket.
 #[repr(u8)]
 #[derive(

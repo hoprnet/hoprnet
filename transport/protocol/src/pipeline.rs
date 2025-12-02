@@ -3,13 +3,16 @@ use futures_time::future::FutureExt as TimeExt;
 use hopr_async_runtime::{AbortableList, spawn_as_abortable};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
-use hopr_network_types::{prelude::*, timeout::TimeoutSinkExt};
+use hopr_network_types::{
+    prelude::*,
+    timeout::{SinkTimeoutError, TimeoutSinkExt, TimeoutStreamExt},
+};
 use hopr_primitive_types::prelude::Address;
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::Instrument;
-use hopr_network_types::timeout::{SinkTimeoutError, TimeoutStreamExt};
+
 use crate::PeerId;
 
 const TICKET_ACK_BUFFER_SIZE: usize = 1_000_000;
@@ -141,8 +144,6 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
     AppIn: futures::Sink<(HoprPseudonym, ApplicationDataIn), Error = SinkTimeoutError<AppInErr>> + Send + 'static,
     AppInErr: std::error::Error,
 {
-    // Create a cache for a CPU-intensive conversion PeerId -> OffchainPublicKey
-
     let ack_outgoing_success = ack_outgoing.clone();
     let ack_outgoing_failure = ack_outgoing;
     let ticket_proc_success = ticket_proc;
@@ -160,7 +161,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                     .timeout(futures_time::time::Duration::from(PACKET_DECODING_TIMEOUT))
                     .await {
                     Ok(Ok(packet)) => {
-                        tracing::trace!(%peer, "successfully decoded incoming packet");
+                        tracing::trace!(%peer, ?packet, "successfully decoded incoming packet");
                         Some(packet)
                     },
                     Ok(Err(IncomingPacketError::Undecodable(error))) => {
@@ -260,7 +261,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             received_ticket,
                             ..
                         } = *fwd_packet;
-                        if let Err(error) = ticket_proc.insert_unacknowledged_ticket(ack_challenge, received_ticket).await {
+                        if let Err(error) = ticket_proc.insert_unacknowledged_ticket(&next_hop, ack_challenge, received_ticket).await {
                             tracing::error!(%previous_hop, %next_hop, %error, "failed to insert unacknowledged ticket into the ticket processor");
                             return None;
                         }
@@ -355,6 +356,7 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
 
                     match encoder.encode_acknowledgement(ack, &destination).await {
                         Ok(ack_packet) => {
+                            tracing::trace!(%destination, "acknowledgement out");
                             wire_outgoing
                                 .send((ack_packet.next_hop.into(), ack_packet.data))
                                 .await
@@ -389,8 +391,10 @@ async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
             let ticket_proc = ticket_proc.clone();
             let mut ticket_evt = ticket_events.clone();
             async move {
+                tracing::trace!(%peer, "received acknowledgement");
                 match ticket_proc.acknowledge_ticket(peer, ack).await {
-                    Ok(ResolvedAcknowledgement::RelayingWin(redeemable_ticket)) => {
+                    Ok(Some(ResolvedAcknowledgement::RelayingWin(redeemable_ticket))) => {
+                        tracing::trace!(%peer, "received ack for a winning ticket");
                         ticket_evt
                             .send(TicketEvent::WinningTicket(redeemable_ticket))
                             .await
@@ -398,9 +402,14 @@ async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
                                 tracing::error!(%error, "failed to notify winning ticket");
                             });
                     }
-                    Ok(ResolvedAcknowledgement::RelayingLoss(_)) => {
+                    Ok(Some(ResolvedAcknowledgement::RelayingLoss(_))) => {
                         // Losing tickets are not getting accounted for anywhere.
-                        // Possibly in some metric?
+                        tracing::trace!(%peer, "received ack for a losing ticket");
+                    }
+                    Ok(None) => {
+                        // Unexpected acknowledgements naturally happen
+                        // as acknowledgements of 0-hop packets
+                        tracing::trace!(%peer, "received unexpected acknowledgement");
                     }
                     Err(error) => {
                         tracing::error!(%error, "failed to acknowledge ticket");

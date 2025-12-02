@@ -41,52 +41,21 @@ impl<Chain, S, T> HoprEncoder<Chain, S, T> {
     }
 }
 
-#[async_trait::async_trait]
-impl<Chain, S, T> PacketEncoder for HoprEncoder<Chain, S, T>
+impl<Chain, S, T> HoprEncoder<Chain, S, T>
 where
-    Chain: ChainKeyOperations + ChainReadChannelOperations + ChainValues + Send + Sync,
-    S: SurbStore + Send + Sync,
-    T: TicketTracker + Send + Sync,
+    Chain: ChainKeyOperations + ChainReadChannelOperations + ChainValues + Sync,
+    S: SurbStore,
+    T: TicketTracker + Sync,
 {
-    type Error = HoprProtocolError;
-
-    async fn encode_packet<D: AsRef<[u8]> + Send + 'static, Sig: Into<PacketSignals> + Send + 'static>(
+    async fn encode_packet_internal<D: AsRef<[u8]> + Send + 'static, Sig: Into<PacketSignals> + Send + 'static>(
         &self,
+        next_peer: OffchainPublicKey,
         data: D,
-        routing: ResolvedTransportRouting,
+        num_hops: usize,
         signals: Sig,
-    ) -> Result<OutgoingPacket, Self::Error> {
-        // Get necessary packet routing values
-        let (next_peer, num_hops, pseudonym, routing) = match routing {
-            ResolvedTransportRouting::Forward {
-                pseudonym,
-                forward_path,
-                return_paths,
-            } => (
-                forward_path[0],
-                forward_path.num_hops(),
-                pseudonym,
-                PacketRouting::ForwardPath {
-                    forward_path,
-                    return_paths,
-                },
-            ),
-            ResolvedTransportRouting::Return(sender_id, surb) => {
-                let next = self
-                    .chain_api
-                    .key_id_mapper_ref()
-                    .map_id_to_public(&surb.first_relayer)
-                    .ok_or(HoprProtocolError::KeyNotFound)?;
-
-                (
-                    next,
-                    surb.additional_data_receiver.proof_of_relay_values().chain_length() as usize,
-                    sender_id.pseudonym(),
-                    PacketRouting::Surb(sender_id.surb_id(), surb),
-                )
-            }
-        };
-
+        routing: PacketRouting<ValidatedPath>,
+        pseudonym: HoprPseudonym,
+    ) -> Result<OutgoingPacket, HoprProtocolError> {
         let next_peer = self
             .chain_api
             .packet_key_to_chain_key(&next_peer)
@@ -168,27 +137,70 @@ where
             data: transport_payload.into_boxed_slice(),
         })
     }
+}
+
+#[async_trait::async_trait]
+impl<Chain, S, T> PacketEncoder for HoprEncoder<Chain, S, T>
+where
+    Chain: ChainKeyOperations + ChainReadChannelOperations + ChainValues + Send + Sync,
+    S: SurbStore + Send + Sync,
+    T: TicketTracker + Send + Sync,
+{
+    type Error = HoprProtocolError;
+
+    async fn encode_packet<D: AsRef<[u8]> + Send + 'static, Sig: Into<PacketSignals> + Send + 'static>(
+        &self,
+        data: D,
+        routing: ResolvedTransportRouting,
+        signals: Sig,
+    ) -> Result<OutgoingPacket, Self::Error> {
+        // Get necessary packet routing values
+        let (next_peer, num_hops, pseudonym, routing) = match routing {
+            ResolvedTransportRouting::Forward {
+                pseudonym,
+                forward_path,
+                return_paths,
+            } => (
+                forward_path[0],
+                forward_path.num_hops(),
+                pseudonym,
+                PacketRouting::ForwardPath {
+                    forward_path,
+                    return_paths,
+                },
+            ),
+            ResolvedTransportRouting::Return(sender_id, surb) => {
+                let next = self
+                    .chain_api
+                    .key_id_mapper_ref()
+                    .map_id_to_public(&surb.first_relayer)
+                    .ok_or(HoprProtocolError::KeyNotFound)?;
+
+                (
+                    next,
+                    surb.additional_data_receiver.proof_of_relay_values().chain_length() as usize,
+                    sender_id.pseudonym(),
+                    PacketRouting::Surb(sender_id.surb_id(), surb),
+                )
+            }
+        };
+
+        self.encode_packet_internal(next_peer, data, num_hops, signals, routing, pseudonym)
+            .await
+    }
 
     async fn encode_acknowledgement(
         &self,
         ack: VerifiedAcknowledgement,
         peer: &OffchainPublicKey,
     ) -> Result<OutgoingPacket, Self::Error> {
-        let chain_key = self
-            .chain_api
-            .packet_key_to_chain_key(peer)
-            .await
-            .map_err(|e| HoprProtocolError::ResolverError(e.into()))?
-            .ok_or(HoprProtocolError::KeyNotFound)?;
-
-        self.encode_packet(
+        self.encode_packet_internal(
+            *peer,
             ack.leak(),
-            ResolvedTransportRouting::Forward {
-                pseudonym: HoprPseudonym::random(),
-                forward_path: ValidatedPath::direct(*peer, chain_key),
-                return_paths: Vec::with_capacity(0),
-            },
+            0,
             None,
+            PacketRouting::NoAck(*peer),
+            HoprPseudonym::random(),
         )
         .await
     }

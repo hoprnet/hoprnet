@@ -106,15 +106,16 @@ pub trait UnacknowledgedTicketProcessor {
     ///
     /// The [`ticket`](UnacknowledgedTicket) corresponds to the given [`challenge`](HalfKeyChallenge)
     /// and awaits to be [acknowledged](UnacknowledgedTicketProcessor::acknowledge_ticket)
-    /// once an [`Acknowledgement`] is received from the next hop.
+    /// once an [`Acknowledgement`] is received from the `next_hop`.
     async fn insert_unacknowledged_ticket(
         &self,
+        next_hop: &OffchainPublicKey,
         challenge: HalfKeyChallenge,
         ticket: UnacknowledgedTicket,
     ) -> Result<(), Self::Error>;
 
     /// Finds and acknowledges previously inserted ticket, using an [`Acknowledgement`] from the
-    /// next [`peer`](OffchainPublicKey).
+    /// upstream [`peer`](OffchainPublicKey).
     ///
     /// This function must verify the given acknowledgement and find if it contains a solution
     /// to a challenge of a previously [inserted ticket](UnacknowledgedTicketProcessor::insert_unacknowledged_ticket).
@@ -122,12 +123,14 @@ pub trait UnacknowledgedTicketProcessor {
     /// On success, the [resolution](ResolvedAcknowledgement) contains a decision whether the corresponding previously
     /// stored ticket was found, and whether it is winning (and thus also redeemable) or losing.
     ///
-    /// Must return an error if no ticket with the challenge corresponding to the [`Acknowledgement`] was inserted.
+    /// Returns `None` if no ticket with the challenge corresponding to the [`Acknowledgement`] from `peer` was
+    /// expected. Returns an error if acknowledgement was expected from `peer`, but a ticket with the challenge
+    /// corresponding to the [`Acknowledgement`] was not found.
     async fn acknowledge_ticket(
         &self,
         peer: OffchainPublicKey,
         ack: Acknowledgement,
-    ) -> Result<ResolvedAcknowledgement, Self::Error>;
+    ) -> Result<Option<ResolvedAcknowledgement>, Self::Error>;
 }
 
 /// Allows tracking ticket indices of outgoing channels and

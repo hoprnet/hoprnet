@@ -85,7 +85,8 @@ pub struct HoprTicketProcessorConfig {
 /// HOPR-specific implementation of [`UnacknowledgedTicketProcessor`] and [`TicketTracker`].
 #[derive(Clone)]
 pub struct HoprTicketProcessor<Chain, Db> {
-    unacknowledged_tickets: moka::future::Cache<HalfKeyChallenge, UnacknowledgedTicket>,
+    unacknowledged_tickets:
+        moka::future::Cache<OffchainPublicKey, moka::future::Cache<HalfKeyChallenge, UnacknowledgedTicket>>,
     out_ticket_index: moka::future::Cache<(ChannelId, u32), Arc<AtomicU64>>,
     db: Db,
     chain_api: Chain,
@@ -109,8 +110,8 @@ impl<Chain, Db> HoprTicketProcessor<Chain, Db> {
                 .max_capacity(10_000)
                 .build(),
             unacknowledged_tickets: moka::future::Cache::builder()
-                .time_to_live(cfg.unack_ticket_timeout)
-                .max_capacity(cfg.max_unack_tickets as u64)
+                .time_to_idle(cfg.unack_ticket_timeout * 2)
+                .max_capacity(100_000)
                 .build(),
             chain_api,
             db,
@@ -179,10 +180,22 @@ where
 
     async fn insert_unacknowledged_ticket(
         &self,
+        next_hop: &OffchainPublicKey,
         challenge: HalfKeyChallenge,
         ticket: UnacknowledgedTicket,
     ) -> Result<(), Self::Error> {
-        self.unacknowledged_tickets.insert(challenge, ticket).await;
+        tracing::trace!(%ticket, "received unacknowledged ticket");
+        self.unacknowledged_tickets
+            .get_with_by_ref(next_hop, async {
+                moka::future::Cache::builder()
+                    .time_to_live(self.cfg.unack_ticket_timeout)
+                    .max_capacity(self.cfg.max_unack_tickets as u64)
+                    .build()
+            })
+            .await
+            .insert(challenge, ticket)
+            .await;
+
         Ok(())
     }
 
@@ -190,15 +203,19 @@ where
         &self,
         peer: OffchainPublicKey,
         ack: Acknowledgement,
-    ) -> Result<ResolvedAcknowledgement, Self::Error> {
+    ) -> Result<Option<ResolvedAcknowledgement>, Self::Error> {
+        let Some(awaiting_ack_from_peer) = self.unacknowledged_tickets.get(&peer).await else {
+            tracing::trace!(%peer, "not awaiting any acknowledgement from peer");
+            return Ok(None);
+        };
+
         let (half_key, challenge) = hopr_parallelize::cpu::spawn_fifo_blocking(move || {
             ack.verify(&peer)
                 .and_then(|verified| Ok((*verified.ack_key_share(), verified.ack_key_share().to_challenge()?)))
         })
         .await?;
 
-        let unacknowledged = self
-            .unacknowledged_tickets
+        let unacknowledged = awaiting_ack_from_peer
             .remove(&challenge)
             .await
             .ok_or_else(|| HoprProtocolError::UnacknowledgedTicketNotFound(challenge))?;
@@ -230,15 +247,15 @@ where
             match ack_ticket.into_redeemable(&chain_key, &domain_separator) {
                 Ok(redeemable) => {
                     tracing::debug!(%issuer_channel, "found winning ticket");
-                    Ok(ResolvedAcknowledgement::RelayingWin(Box::new(redeemable)))
+                    Ok(Some(ResolvedAcknowledgement::RelayingWin(Box::new(redeemable))))
                 }
                 Err(CoreTypesError::TicketNotWinning) => {
                     tracing::trace!(%issuer_channel, "found losing ticket");
-                    Ok(ResolvedAcknowledgement::RelayingLoss(channel_id))
+                    Ok(Some(ResolvedAcknowledgement::RelayingLoss(channel_id)))
                 }
                 Err(error) => {
                     tracing::error!(%error, %issuer_channel, "error when acknowledging ticket");
-                    Ok(ResolvedAcknowledgement::RelayingLoss(channel_id))
+                    Ok(Some(ResolvedAcknowledgement::RelayingLoss(channel_id)))
                 }
             }
         })

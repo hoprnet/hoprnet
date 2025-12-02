@@ -1,10 +1,10 @@
-use futures::StreamExt;
 use std::{
     future::Future,
     pin::Pin,
     task::{Context, Poll},
 };
-use futures::Stream;
+
+use futures::{Stream, StreamExt};
 
 /// Represents a sink that will time out after a given duration if an item
 /// cannot be sent.

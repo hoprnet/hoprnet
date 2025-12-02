@@ -247,7 +247,8 @@ pub async fn emulate_channel_communication(pending_packet_count: usize, mut comp
                 if let Err(error) = components[destination]
                     .0
                     .send((PEERS[i].public().into(), payload))
-                    .await {
+                    .await
+                {
                     tracing::error!(%error, "failed to send packet to peer");
                     panic!("Failed to send packet to peer");
                 }
@@ -368,7 +369,6 @@ pub async fn send_relay_receive_channel_of_n_peers(
     let (_apis_send, mut apis_recv): (Vec<_>, Vec<_>) = apis.into_iter().unzip();
 
     let compare_packets = async move {
-        tracing::debug!("comparing packets");
         let last_node_recv = apis_recv.remove(peer_count - 1);
 
         let mut recv_packets = last_node_recv
@@ -386,9 +386,6 @@ pub async fn send_relay_receive_channel_of_n_peers(
             recv_packets.into_iter().map(|(_, b)| b.data).collect::<Vec<_>>(),
             test_msgs
         );
-
-        tracing::debug!("comparing packets succeeded");
-        tokio::time::sleep(TIMEOUT_SECONDS/2).await;
     };
 
     let res = timeout(TIMEOUT_SECONDS, compare_packets).await;
