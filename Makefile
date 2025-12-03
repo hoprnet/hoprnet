@@ -31,13 +31,6 @@ build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
 install:
 	$(cargo) install --path hoprd/hoprd
 
-.PHONY: stress-test-local-swarm
-stress-test-local-swarm: ## run stress tests on a local node swarm
-	uv run -m pytest tests/test_stress.py \
-		--stress-request-count=3000 \
-		--stress-sources='[{"url": "localhost:3011", "token": "e2e-API-token^^"}]' \
-		--stress-target='{"url": "localhost:3031", "token": "e2e-API-token^^"}'
-
 .PHONY: localcluster
 localcluster: args=
 localcluster: ## spin up the localcluster using the default configuration file
