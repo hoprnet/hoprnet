@@ -1,6 +1,11 @@
 /// On-chain operations-related API traits.
+#[cfg(feature = "chain")]
 pub mod chain;
+/// Cover traffic related API traits.
+#[cfg(feature = "ct")]
+pub mod ct;
 /// Node database related API traits.
+#[cfg(feature = "db")]
 pub mod db;
 
 pub use hopr_crypto_types::prelude::{OffchainPublicKey, PeerId};

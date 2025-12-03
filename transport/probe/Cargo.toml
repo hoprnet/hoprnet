@@ -33,6 +33,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
+hopr-api = { workspace = true, features = ["ct"]}
 hopr-async-runtime = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
