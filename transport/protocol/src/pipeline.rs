@@ -1,5 +1,5 @@
 use futures::{SinkExt, StreamExt};
-use futures_time::future::FutureExt as TimeExt;
+use futures_time::{future::FutureExt as TimeExt, stream::StreamExt as TimeStreamExt};
 use hopr_async_runtime::{AbortableList, spawn_as_abortable};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
@@ -137,7 +137,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
     T: UnacknowledgedTicketProcessor + Send + 'static,
     TEvt: futures::Sink<TicketEvent> + Clone + Unpin + Send + 'static,
     TEvt::Error: std::error::Error,
-    AckIn: futures::Sink<(OffchainPublicKey, Acknowledgement)> + Send + Unpin + Clone + 'static,
+    AckIn: futures::Sink<(OffchainPublicKey, Vec<Acknowledgement>)> + Send + Unpin + Clone + 'static,
     AckIn::Error: std::error::Error,
     AckOut: futures::Sink<(OffchainPublicKey, Option<HalfKey>)> + Send + Unpin + Clone + 'static,
     AckOut::Error: std::error::Error,
@@ -215,10 +215,10 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
             async move {
                 match packet {
                     IncomingPacket::Acknowledgement(ack) => {
-                        let IncomingAcknowledgementPacket { previous_hop, received_ack: ack, .. } = *ack;
+                        let IncomingAcknowledgementPacket { previous_hop, received_acks, .. } = *ack;
                         tracing::trace!(%previous_hop , "acknowledging ticket using received ack");
                         ack_incoming
-                            .send((previous_hop, ack))
+                            .send((previous_hop, received_acks))
                             .await
                             .unwrap_or_else(|error| {
                                 tracing::error!(%error, "failed dispatching received acknowledgement to the ticket ack queue");
@@ -329,6 +329,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
 async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
     ack_outgoing: AckOut,
     encoder: std::sync::Arc<E>,
+    ack_buffer_interval: std::time::Duration,
     packet_key: OffchainKeypair,
     wire_outgoing: WOut,
 ) where
@@ -338,23 +339,43 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
     WOut::Error: std::error::Error,
 {
     ack_outgoing
+        .then(move |(destination, maybe_ack_key)|{
+            let packet_key = packet_key.clone();
+            async move {
+                 // Sign acknowledgement with the given half-key or generate a signed random one
+                 let ack = hopr_parallelize::cpu::spawn_blocking(move || {
+                     maybe_ack_key
+                         .map(|ack_key| VerifiedAcknowledgement::new(ack_key, &packet_key))
+                         .unwrap_or_else(|| VerifiedAcknowledgement::random(&packet_key))
+                 })
+                 .await;
+                (destination, ack)
+            }
+        })
+        .buffer(futures_time::time::Duration::from(ack_buffer_interval))
+        .flat_map(|buffered_acks| {
+            // Split the acknowledgements into groups based on the sender
+            // The halfbrown hash map will use Vec for a lower number of distinct senders, and possibly transition to
+            // the hashbrown hash map when the number of distinct senders exceeds 32.
+            let mut groups = halfbrown::HashMap::<OffchainPublicKey, Vec<VerifiedAcknowledgement>, ahash::RandomState>::with_capacity_and_hasher(
+                5,
+                ahash::RandomState::default()
+            );
+            for (dst, ack) in buffered_acks {
+                groups
+                    .entry(dst)
+                    .and_modify(|v| v.push(ack))
+                    .or_insert_with(|| vec![ack]);
+            }
+            futures::stream::iter(groups)
+        })
         .for_each_concurrent(
             NUM_CONCURRENT_ACK_OUT_PROCESSING,
-            move |(destination, maybe_ack_key)| {
-                let packet_key = packet_key.clone();
+            move |(destination, acks)| {
                 let encoder = encoder.clone();
                 let mut wire_outgoing = wire_outgoing.clone();
-
                 async move {
-                    // Sign acknowledgement with the given half-key or generate a signed random one
-                    let ack = hopr_parallelize::cpu::spawn_blocking(move || {
-                        maybe_ack_key
-                            .map(|ack_key| VerifiedAcknowledgement::new(ack_key, &packet_key))
-                            .unwrap_or_else(|| VerifiedAcknowledgement::random(&packet_key))
-                    })
-                        .await;
-
-                    match encoder.encode_acknowledgement(ack, &destination).await {
+                    match encoder.encode_acknowledgements(acks, &destination).await {
                         Ok(ack_packet) => {
                             tracing::trace!(%destination, "acknowledgement out");
                             wire_outgoing
@@ -381,19 +402,22 @@ async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
     ticket_events: TEvt,
     ticket_proc: std::sync::Arc<T>,
 ) where
-    AckIn: futures::Stream<Item = (OffchainPublicKey, Acknowledgement)> + Send + 'static,
+    AckIn: futures::Stream<Item = (OffchainPublicKey, Vec<Acknowledgement>)> + Send + 'static,
     T: UnacknowledgedTicketProcessor + Sync + Send + 'static,
     TEvt: futures::Sink<TicketEvent> + Clone + Unpin + Send + 'static,
     TEvt::Error: std::error::Error,
 {
     ack_incoming
+        // TODO: add batch signature verification for reasonably sized batches
+        // This can even group additionally again by sender again
+        .flat_map(|(peer, acks)| futures::stream::iter(acks.into_iter().map(move |ack| (peer, ack))))
         .for_each_concurrent(NUM_CONCURRENT_TICKET_ACK_PROCESSING, move |(peer, ack)| {
             let ticket_proc = ticket_proc.clone();
             let mut ticket_evt = ticket_events.clone();
             async move {
                 tracing::trace!(%peer, "received acknowledgement");
                 match ticket_proc.acknowledge_ticket(peer, ack).await {
-                    Ok(Some(ResolvedAcknowledgement::RelayingWin(redeemable_ticket))) => {
+                    Ok(ResolvedAcknowledgement::RelayingWin(redeemable_ticket)) => {
                         tracing::trace!(%peer, "received ack for a winning ticket");
                         ticket_evt
                             .send(TicketEvent::WinningTicket(redeemable_ticket))
@@ -402,11 +426,11 @@ async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
                                 tracing::error!(%error, "failed to notify winning ticket");
                             });
                     }
-                    Ok(Some(ResolvedAcknowledgement::RelayingLoss(_))) => {
+                    Ok(ResolvedAcknowledgement::RelayingLoss(_)) => {
                         // Losing tickets are not getting accounted for anywhere.
                         tracing::trace!(%peer, "received ack for a losing ticket");
                     }
-                    Ok(None) => {
+                    Err(TicketAcknowledgementError::UnexpectedAcknowledgement) => {
                         // Unexpected acknowledgements naturally happen
                         // as acknowledgements of 0-hop packets
                         tracing::trace!(%peer, "received unexpected acknowledgement");
@@ -462,7 +486,7 @@ where
         futures::channel::mpsc::channel::<(OffchainPublicKey, Option<HalfKey>)>(ACK_OUT_BUFFER_SIZE);
 
     let (incoming_ack_tx, incoming_ack_rx) =
-        futures::channel::mpsc::channel::<(OffchainPublicKey, Acknowledgement)>(TICKET_ACK_BUFFER_SIZE);
+        futures::channel::mpsc::channel::<(OffchainPublicKey, Vec<Acknowledgement>)>(TICKET_ACK_BUFFER_SIZE);
 
     // Attach timeouts to all Sinks so that the pipelines are not blocked when
     // some channel is not being timely processed
@@ -504,6 +528,7 @@ where
         spawn_as_abortable!(start_outgoing_ack_pipeline(
             outgoing_ack_rx,
             encoder,
+            std::time::Duration::from_millis(200),
             packet_key.clone(),
             wire_out,
         )),

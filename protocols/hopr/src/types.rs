@@ -91,14 +91,14 @@ impl std::fmt::Debug for IncomingForwardedPacket {
     }
 }
 
-/// Incoming packet that represents an acknowledgement of a delivered packet.
+/// Incoming packet that contains acknowledgements of delivered packets.
 pub struct IncomingAcknowledgementPacket {
     /// Packet tag.
     pub packet_tag: PacketTag,
-    /// Offchain public key of the previous hop which sent the acknowledgement.
+    /// Offchain public key of the previous hop which sent the acknowledgements.
     pub previous_hop: OffchainPublicKey,
-    /// Unverified acknowledgement.
-    pub received_ack: Acknowledgement,
+    /// Unverified acknowledgements.
+    pub received_acks: Vec<Acknowledgement>,
 }
 
 impl std::fmt::Debug for IncomingAcknowledgementPacket {
@@ -106,7 +106,7 @@ impl std::fmt::Debug for IncomingAcknowledgementPacket {
         f.debug_struct("IncomingAcknowledgementPacket")
             .field("packet_tag", &self.packet_tag)
             .field("previous_hop", &self.previous_hop)
-            .field("ack", &self.received_ack)
+            .field("received_acks", &self.received_acks)
             .finish()
     }
 }
@@ -118,7 +118,7 @@ pub enum IncomingPacket {
     Final(Box<IncomingFinalPacket>),
     /// Packet must be forwarded
     Forwarded(Box<IncomingForwardedPacket>),
-    /// The packet contains an acknowledgement of a delivered packet.
+    /// The packet contains acknowledgements of delivered packets.
     Acknowledgement(Box<IncomingAcknowledgementPacket>),
 }
 

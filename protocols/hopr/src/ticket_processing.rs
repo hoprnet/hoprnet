@@ -7,7 +7,10 @@ use hopr_internal_types::prelude::*;
 use hopr_primitive_types::balance::HoprBalance;
 use validator::ValidationError;
 
-use crate::{HoprProtocolError, ResolvedAcknowledgement, TicketTracker, UnacknowledgedTicketProcessor};
+use crate::{
+    HoprProtocolError, ResolvedAcknowledgement, TicketAcknowledgementError, TicketTracker,
+    UnacknowledgedTicketProcessor,
+};
 
 const MIN_UNACK_TICKET_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 fn validate_unack_ticket_timeout(timeout: &std::time::Duration) -> Result<(), ValidationError> {
@@ -203,11 +206,11 @@ where
         &self,
         peer: OffchainPublicKey,
         ack: Acknowledgement,
-    ) -> Result<Option<ResolvedAcknowledgement>, Self::Error> {
+    ) -> Result<ResolvedAcknowledgement, TicketAcknowledgementError<Self::Error>> {
         // Check if we're even expecting an acknowledgement from this peer
         let Some(awaiting_ack_from_peer) = self.unacknowledged_tickets.get(&peer).await else {
             tracing::trace!(%peer, "not awaiting any acknowledgement from peer");
-            return Ok(None);
+            return Err(TicketAcknowledgementError::UnexpectedAcknowledgement);
         };
 
         // If we do, verify the acknowledgement signature and extract the challenge
@@ -215,25 +218,25 @@ where
             ack.verify(&peer)
                 .and_then(|verified| Ok((*verified.ack_key_share(), verified.ack_key_share().to_challenge()?)))
         })
-        .await?;
+        .await
+        .map_err(TicketAcknowledgementError::inner)?;
 
         // Check if we have a ticket to be acknowledged by this peer
-        let unacknowledged = awaiting_ack_from_peer
-            .remove(&challenge)
-            .await
-            .ok_or_else(|| HoprProtocolError::UnacknowledgedTicketNotFound(challenge))?;
+        let unacknowledged = awaiting_ack_from_peer.remove(&challenge).await.ok_or_else(|| {
+            TicketAcknowledgementError::Inner(HoprProtocolError::UnacknowledgedTicketNotFound(challenge))
+        })?;
 
         // Issuer's channel must have an epoch matching with the unacknowledged ticket
         let issuer_channel = self
             .chain_api
             .channel_by_parties(unacknowledged.ticket.verified_issuer(), self.chain_key.as_ref())
             .await
-            .map_err(|e| HoprProtocolError::ResolverError(e.into()))?
+            .map_err(|e| TicketAcknowledgementError::Inner(HoprProtocolError::ResolverError(e.into())))?
             .filter(|c| c.channel_epoch == unacknowledged.verified_ticket().channel_epoch)
-            .ok_or(HoprProtocolError::ChannelNotFound(
+            .ok_or(TicketAcknowledgementError::Inner(HoprProtocolError::ChannelNotFound(
                 *unacknowledged.ticket.verified_issuer(),
                 *self.chain_key.as_ref(),
-            ))?;
+            )))?;
 
         let domain_separator = self.channels_dst;
         let chain_key = self.chain_key.clone();
@@ -243,22 +246,24 @@ where
             // solves the challenge on the ticket. It must be done before we
             // check that the ticket is winning, which is a lengthy operation
             // and should not be done for bogus unacknowledged tickets
-            let ack_ticket = unacknowledged.acknowledge(&half_key)?;
+            let ack_ticket = unacknowledged
+                .acknowledge(&half_key)
+                .map_err(TicketAcknowledgementError::inner)?;
 
             // This operation checks if the ticket is winning, and if it is, it
             // turns it into a redeemable ticket.
             match ack_ticket.into_redeemable(&chain_key, &domain_separator) {
                 Ok(redeemable) => {
                     tracing::debug!(%issuer_channel, "found winning ticket");
-                    Ok(Some(ResolvedAcknowledgement::RelayingWin(Box::new(redeemable))))
+                    Ok(ResolvedAcknowledgement::RelayingWin(Box::new(redeemable)))
                 }
                 Err(CoreTypesError::TicketNotWinning) => {
                     tracing::trace!(%issuer_channel, "found losing ticket");
-                    Ok(Some(ResolvedAcknowledgement::RelayingLoss(channel_id)))
+                    Ok(ResolvedAcknowledgement::RelayingLoss(channel_id))
                 }
                 Err(error) => {
                     tracing::error!(%error, %issuer_channel, "error when acknowledging ticket");
-                    Ok(Some(ResolvedAcknowledgement::RelayingLoss(channel_id)))
+                    Ok(ResolvedAcknowledgement::RelayingLoss(channel_id))
                 }
             }
         })

@@ -4137,6 +4137,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "halfbrown"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c7ed2f2edad8a14c8186b847909a41fbb9c3eafa44f88bd891114ed5019da09"
+dependencies = [
+ "hashbrown 0.16.1",
+]
+
+[[package]]
 name = "hash32"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5071,8 +5080,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
+ "ahash",
  "anyhow",
  "async-trait",
  "async_channel_io",
@@ -5081,6 +5091,7 @@ dependencies = [
  "criterion",
  "futures",
  "futures-time",
+ "halfbrown",
  "hex-literal",
  "hopr-api",
  "hopr-async-runtime",

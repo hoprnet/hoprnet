@@ -185,14 +185,18 @@ where
             .await
     }
 
-    async fn encode_acknowledgement(
+    async fn encode_acknowledgements(
         &self,
-        ack: VerifiedAcknowledgement,
+        acks: Vec<VerifiedAcknowledgement>,
         peer: &OffchainPublicKey,
     ) -> Result<OutgoingPacket, Self::Error> {
+        let mut all_acks = Vec::<u8>::with_capacity(size_of::<u16>() + acks.len() * Acknowledgement::SIZE);
+        all_acks.extend((acks.len() as u16).to_be_bytes());
+        acks.iter().for_each(|ack| all_acks.extend(ack.leak().as_ref()));
+
         self.encode_packet_internal(
             *peer,
-            ack.leak(),
+            all_acks,
             0,
             None,
             PacketRouting::NoAck(*peer),

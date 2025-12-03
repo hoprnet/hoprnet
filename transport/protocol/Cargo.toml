@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-protocol"
-version = "0.12.0"
+version = "0.13.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"
@@ -24,10 +24,12 @@ serde = [
 
 [dependencies]
 anyhow = { workspace = true }
+ahash = { workspace = true }
 async-trait = { workspace = true }
 cfg_eval = { workspace = true, optional = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
+halfbrown = { workspace = true }
 hex-literal = { workspace = true }
 lazy_static = { workspace = true }
 libp2p = { workspace = true, features = ["noise", "request-response"] }
