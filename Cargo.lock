@@ -5208,6 +5208,7 @@ version = "0.8.1"
 dependencies = [
  "anyhow",
  "async-trait",
+ "backon",
  "futures",
  "hopr-crypto-packet",
  "hopr-crypto-random 0.3.0",

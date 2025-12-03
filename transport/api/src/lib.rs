@@ -356,20 +356,12 @@ where
                     let network = network_clone.clone();
                     async move {
                         match event {
-                            hopr_transport_p2p::DiscoveryEvent::IncomingConnection(peer, multiaddr) => {
+                            hopr_transport_p2p::DiscoveryEvent::DialablePeer(peer, multiaddr) => {
                                 if let Err(error) = network
                                     .add(&peer, PeerOrigin::IncomingConnection, vec![multiaddr])
                                     .await
                                 {
                                     tracing::error!(%peer, %error, "Failed to add incoming connection peer");
-                                }
-                            }
-                            hopr_transport_p2p::DiscoveryEvent::FailedDial(peer) => {
-                                if let Err(error) = network
-                                    .update(&peer, Err(hopr_transport_network::network::UpdateFailure::DialFailure))
-                                    .await
-                                {
-                                    tracing::error!(%peer, %error, "Failed to update peer status after failed dial");
                                 }
                             }
                         }
