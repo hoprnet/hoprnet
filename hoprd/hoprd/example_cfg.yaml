@@ -1,7 +1,7 @@
 ---
 # Blokli provider URL to connect to.
 #
-blokli_url: https://blokli.prod.hoprnet.link
+# blokli_url: https://blokli.prod.hoprnet.link
 #
 # Main node's identity that defined the on-chain and off-chain keys
 identity:
