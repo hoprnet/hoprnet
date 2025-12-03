@@ -2,7 +2,7 @@
 name = "hopr-transport-p2p"
 version = "0.8.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-edition = "2021"
+edition = "2024"
 license = "GPL-3.0-only"
 
 [lib]
@@ -24,6 +24,7 @@ transport-quic = ["libp2p/quic"]
 
 [dependencies]
 async-trait = { workspace = true }
+backon = { workspace = true}
 futures = { workspace = true }
 lazy_static = { workspace = true, optional = true }
 libp2p = { workspace = true, features = [
