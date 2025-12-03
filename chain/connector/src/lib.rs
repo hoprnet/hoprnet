@@ -103,7 +103,7 @@ where
     ))
 }
 
-pub const DEFAULT_BLOKLI_URL: &str = "https://blokli.hoprnet.org";
+pub const DEFAULT_BLOKLI_URL: &str = "https://blokli.prod.hoprnet.org";
 
 pub async fn init_blokli_connector(
     chain_key: &hopr_crypto_types::prelude::ChainKeypair,

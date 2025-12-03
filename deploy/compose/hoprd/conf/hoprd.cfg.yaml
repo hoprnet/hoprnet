@@ -1,5 +1,5 @@
 ---
-blokli_url: https://blokli.hoprnet.link # NOTE: change this value to the URL of your Blokli provider
+blokli_url: https://blokli.prod.hoprnet.link # NOTE: change this value to the URL of your Blokli provider
 db:
   data: /app/hoprd/data
 strategy:
