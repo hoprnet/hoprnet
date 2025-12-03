@@ -12,15 +12,24 @@ use hopr_transport_protocol::{TicketEvent, run_packet_pipeline};
 
 use crate::{HoprTransportProcess, config::HoprPacketPipelineConfig};
 
-#[allow(clippy::too_many_arguments)]
+/// Contains all components required to run the HOPR packet pipeline.
+#[derive(Clone)]
+pub struct HoprPipelineComponents<TEvt, S, Chain, Db> {
+    /// Sink for [`TicketEvents`](TicketEvent).
+    pub ticket_events: TEvt,
+    /// Store for SURBs and Reply Openers.
+    pub surb_store: S,
+    /// Chain API for interacting with the blockchain.
+    pub chain_api: Chain,
+    /// Database for storing tickets and other data.
+    pub db: Db,
+}
+
 pub fn run_hopr_packet_pipeline<WIn, WOut, Chain, S, Db, TEvt, AppOut, AppIn>(
     (packet_key, chain_key): (OffchainKeypair, ChainKeypair),
     wire_msg: (WOut, WIn),
     api: (AppOut, AppIn),
-    ticket_events: TEvt,
-    surb_store: S,
-    chain_api: Chain,
-    db: Db,
+    components: HoprPipelineComponents<TEvt, S, Chain, Db>,
     channels_dst: Hash,
     cfg: HoprPacketPipelineConfig,
 ) -> AbortableList<HoprTransportProcess>
@@ -37,6 +46,13 @@ where
     AppOut::Error: std::error::Error,
     AppIn: futures::Stream<Item = (ResolvedTransportRouting, ApplicationDataOut)> + Send + 'static,
 {
+    let HoprPipelineComponents {
+        ticket_events,
+        surb_store,
+        chain_api,
+        db,
+    } = components;
+
     let ticket_proc = HoprTicketProcessor::new(
         chain_api.clone(),
         db.clone(),
@@ -100,6 +116,7 @@ where
             (encoder, decoder),
             ticket_proc,
             ticket_events,
+            cfg.ack_processing,
             api,
         ),
         HoprTransportProcess::Pipeline,

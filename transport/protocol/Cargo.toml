@@ -13,9 +13,8 @@ default = []
 prometheus = ["dep:hopr-metrics"]
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 serde = [
-  "dep:cfg_eval",
   "dep:serde",
-  "dep:serde_with",
+  "dep:humantime-serde",
   "hopr-internal-types/serde",
   "hopr-primitive-types/serde",
   "hopr-protocol-hopr/serde",
@@ -26,17 +25,16 @@ serde = [
 anyhow = { workspace = true }
 ahash = { workspace = true }
 async-trait = { workspace = true }
-cfg_eval = { workspace = true, optional = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
 halfbrown = { workspace = true }
 hex-literal = { workspace = true }
+humantime-serde = { workspace = true, optional = true }
 lazy_static = { workspace = true }
 libp2p = { workspace = true, features = ["noise", "request-response"] }
 moka = { workspace = true }
 rust-stream-ext-concurrent = { workspace = true }
 serde = { workspace = true, features = ["derive"], optional = true }
-serde_with = { workspace = true, optional = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }

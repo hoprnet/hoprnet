@@ -12,6 +12,7 @@ use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::Instrument;
+use validator::{Validate, ValidationError, ValidationErrors};
 
 use crate::PeerId;
 
@@ -329,7 +330,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
 async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
     ack_outgoing: AckOut,
     encoder: std::sync::Arc<E>,
-    ack_buffer_interval: std::time::Duration,
+    cfg: AcknowledgementPipelineConfig,
     packet_key: OffchainKeypair,
     wire_outgoing: WOut,
 ) where
@@ -352,13 +353,13 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
                 (destination, ack)
             }
         })
-        .buffer(futures_time::time::Duration::from(ack_buffer_interval))
+        .buffer(futures_time::time::Duration::from(cfg.ack_buffer_interval))
         .flat_map(|buffered_acks| {
             // Split the acknowledgements into groups based on the sender
             // The halfbrown hash map will use Vec for a lower number of distinct senders, and possibly transition to
             // the hashbrown hash map when the number of distinct senders exceeds 32.
             let mut groups = halfbrown::HashMap::<OffchainPublicKey, Vec<VerifiedAcknowledgement>, ahash::RandomState>::with_capacity_and_hasher(
-                5,
+                cfg.ack_grouping_capacity,
                 ahash::RandomState::default()
             );
             for (dst, ack) in buffered_acks {
@@ -449,6 +450,52 @@ async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
     );
 }
 
+fn default_ack_buffer_interval() -> std::time::Duration {
+    std::time::Duration::from_millis(200)
+}
+
+fn default_ack_grouping_capacity() -> usize {
+    5
+}
+
+/// Configuration for the acknowledgement processing pipeline.
+#[derive(Debug, Copy, Clone, smart_default::SmartDefault, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+pub struct AcknowledgementPipelineConfig {
+    /// Interval for which to wait to buffer acknowledgements before sending them out.
+    ///
+    /// Default is 200 ms.
+    #[default(default_ack_buffer_interval())]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "default_ack_buffer_interval", with = "humantime_serde")
+    )]
+    pub ack_buffer_interval: std::time::Duration,
+    /// Initial capacity when grouping outgoing acknowledgements.
+    ///
+    /// If set too low, it causes additional reallocations in the outgoing acknowledgement processing pipeline.
+    /// The value should grow if `ack_buffer_interval` grows.
+    ///
+    /// Default is 5.
+    #[default(default_ack_grouping_capacity())]
+    #[cfg_attr(feature = "serde", serde(default = "default_ack_grouping_capacity"))]
+    pub ack_grouping_capacity: usize,
+}
+
+// Requires manual implementation due to https://github.com/Keats/validator/issues/285
+impl Validate for AcknowledgementPipelineConfig {
+    fn validate(&self) -> Result<(), ValidationErrors> {
+        let mut errors = ValidationErrors::new();
+        if self.ack_grouping_capacity == 0 {
+            errors.add("ack_grouping_capacity", ValidationError::new("must be greater than 0"));
+        }
+        if self.ack_buffer_interval < std::time::Duration::from_millis(10) {
+            errors.add("ack_buffer_interval", ValidationError::new("must be at least 10 ms"));
+        }
+        if errors.is_empty() { Ok(()) } else { Err(errors) }
+    }
+}
+
 /// Run all processes responsible for handling the msg and acknowledgment protocols.
 ///
 /// The pipeline does not handle the mixing itself, that needs to be injected as a separate process
@@ -459,6 +506,7 @@ pub fn run_packet_pipeline<WIn, WOut, C, D, T, TEvt, AppOut, AppIn>(
     codec: (C, D),
     ticket_proc: T,
     ticket_events: TEvt,
+    ack_config: AcknowledgementPipelineConfig,
     api: (AppOut, AppIn),
 ) -> AbortableList<PacketPipelineProcesses>
 where
@@ -528,7 +576,7 @@ where
         spawn_as_abortable!(start_outgoing_ack_pipeline(
             outgoing_ack_rx,
             encoder,
-            std::time::Duration::from_millis(200),
+            ack_config,
             packet_key.clone(),
             wire_out,
         )),
