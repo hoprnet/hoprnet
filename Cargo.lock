@@ -5225,7 +5225,6 @@ dependencies = [
  "hopr-crypto-packet",
  "hopr-crypto-random 0.3.0",
  "hopr-crypto-types 0.9.0",
- "hopr-internal-types",
  "hopr-metrics",
  "hopr-network-types",
  "hopr-platform",

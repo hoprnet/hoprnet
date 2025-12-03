@@ -2,8 +2,6 @@ use std::sync::Arc;
 
 use futures::{FutureExt, SinkExt, StreamExt, pin_mut};
 use futures_concurrency::stream::StreamExt as _;
-use libp2p_identity::PeerId;
-
 use hopr_api::ct::{NeighborProbe, NeighborTelemetry, Telemetry, TrafficGeneration};
 use hopr_async_runtime::AbortableList;
 use hopr_crypto_random::Randomizable;
@@ -13,6 +11,7 @@ use hopr_network_types::prelude::*;
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::traits::AsUnixTimestamp;
 use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut, ReservedTag};
+use libp2p_identity::PeerId;
 
 use crate::{HoprProbeProcess, config::ProbeConfig, content::Message, errors::ProbeError, ping::PingQueryReplier};
 

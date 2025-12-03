@@ -4,12 +4,11 @@
 //! an appropriate format.
 use std::{
     cmp::{Ordering, Reverse},
-    collections::{BinaryHeap, HashMap, HashSet, VecDeque},
+    collections::{BinaryHeap, HashMap, VecDeque},
 };
 
 use backon::BackoffBuilder;
 use futures::stream::{BoxStream, Stream, StreamExt};
-use hopr_network_types::addr::is_public_address;
 use hopr_transport_protocol::PeerDiscovery;
 use libp2p::{
     Multiaddr, PeerId,
@@ -28,7 +27,6 @@ pub enum DiscoveryInput {
 #[derive(Debug)]
 pub enum Event {
     DialablePeer(PeerId, Multiaddr),
-    r,
 }
 
 /// Data structure holding the item alongside a release timemestamp.
@@ -90,11 +88,10 @@ pub struct Behaviour {
     connected_peers: HashMap<PeerId, usize>,
     next_dial_attempts: BinaryHeap<Reverse<Delayed<PeerId>>>,
     not_connected_peers: HashMap<PeerId, backon::ExponentialBackoff>,
-    allow_private_addresses: bool,
 }
 
 impl Behaviour {
-    pub fn new<T>(me: PeerId, onchain_events: T, allow_private_addresses: bool) -> Self
+    pub fn new<T>(me: PeerId, onchain_events: T) -> Self
     where
         T: Stream<Item = PeerDiscovery> + Send + 'static,
     {
@@ -106,7 +103,6 @@ impl Behaviour {
             connected_peers: HashMap::new(),
             next_dial_attempts: BinaryHeap::with_capacity(1500),
             not_connected_peers: HashMap::new(),
-            allow_private_addresses,
         }
     }
 
@@ -261,34 +257,23 @@ impl NetworkBehaviour for Behaviour {
         };
 
         let poll_result = self.events.poll_next_unpin(cx).map(|e| {
-            if let Some(DiscoveryInput::Indexer(PeerDiscovery::Announce(peer, multiaddresses))) = e {
-                if peer != self.me {
-                        let multiaddress_count = multiaddresses.len();
-                        tracing::debug!(%peer, addresses = ?&multiaddresses, "Announcement");
+            if let Some(DiscoveryInput::Indexer(PeerDiscovery::Announce(peer, multiaddresses))) = e
+                && peer != self.me
+            {
+                tracing::debug!(%peer, addresses = ?&multiaddresses, "Announcement");
 
-                        // Filter out private addresses before adding to pending events and peer store
-                        let public_addresses: HashSet<_> = multiaddresses.into_iter()
-                            .filter(|a| self.allow_private_addresses || is_public_address(a))
-                            .collect();
+                for multiaddress in &multiaddresses {
+                    self.pending_events.push_back(ToSwarm::NewExternalAddrOfPeer {
+                        peer_id: peer,
+                        address: multiaddress.clone(),
+                    });
+                }
 
-                        let filtered_count = multiaddress_count - public_addresses.len();
-                        if filtered_count > 0 {
-                            tracing::debug!(%peer, filtered_private_addresses = filtered_count, total_addresses = multiaddress_count, "Filtered out private addresses from announcement");
-                        }
-
-                        for multiaddress in &public_addresses {
-                            self.pending_events.push_back(ToSwarm::NewExternalAddrOfPeer {
-                                peer_id: peer,
-                                address: multiaddress.clone(),
-                            });
-                        }
-
-                        // Only store public addresses in bootstrap_peers
-                        if !public_addresses.is_empty() {
-                            self.bootstrap_peers.insert(peer, public_addresses.into_iter().collect::<Vec::<_>>());
-                            self.schedule_dial_with(peer, initial_backoff());
-                        }
-                    }
+                // Only store public addresses in bootstrap_peers
+                if !multiaddresses.is_empty() {
+                    self.bootstrap_peers.insert(peer, multiaddresses);
+                    self.schedule_dial_with(peer, initial_backoff());
+                }
             }
         });
 
