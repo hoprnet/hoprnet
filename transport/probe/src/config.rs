@@ -5,7 +5,7 @@ use validator::Validate;
 #[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProbeConfig {
-    /// Maximum number of parallel probes performed by the mechanism
+    /// The waiting waiting for a reply from the probe.
     #[default(default_max_probe_timeout())]
     #[serde(default = "default_max_probe_timeout", with = "humantime_serde")]
     pub timeout: std::time::Duration,

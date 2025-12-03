@@ -1,4 +1,8 @@
 ---
+# Blokli provider URL to connect to.
+#
+# blokli_url: https://blokli.hoprnet.link
+#
 # Main node's identity that defined the on-chain and off-chain keys
 identity:
   # Path to the identity file
@@ -43,7 +47,7 @@ strategy:
   # Allows nesting strategy chains via !MultiStrategy
   allow_recursive: false
   # Sets the interval between strategy executions in seconds.
-  execution_interval: 60
+  execution_interval: 60s
   # Contains the actual chain of strategies to execute in the given order.
   # If left empty, the node will behave as if only `!Passive` strategy
   # was given.
@@ -97,7 +101,7 @@ strategy:
       #
       # Does not attempt to finalize closure of channels that have been overdue for closure for more than
       # this number of seconds.
-      max_closure_overdue: 300
+      max_closure_overdue: 300s
 # Configuration of the HOPR protocol
 hopr:
   # Determines whether the node should publish itself on-chain.

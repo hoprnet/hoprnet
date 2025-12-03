@@ -4892,6 +4892,7 @@ dependencies = [
  "hopr-crypto-random",
  "hopr-lib",
  "hopr-metrics",
+ "humantime-serde",
  "insta",
  "lazy_static",
  "mockall",

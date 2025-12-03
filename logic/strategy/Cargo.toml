@@ -21,6 +21,7 @@ async-trait = { workspace = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
 futures-concurrency = { workspace = true }
+humantime-serde = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
 lazy_static = { workspace = true }

@@ -29,7 +29,6 @@ use hopr_lib::{
     },
 };
 use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
 #[cfg(all(feature = "prometheus", not(test)))]
 use strum::VariantNames;
 use tracing::{error, warn};
@@ -102,7 +101,6 @@ fn validate_execution_interval(interval: &std::time::Duration) -> std::result::R
 /// Configuration options for the `MultiStrategy` chain.
 /// If `fail_on_continue` is set, the `MultiStrategy` sequence behaves as logical AND chain,
 /// otherwise it behaves like a logical OR chain.
-#[serde_as]
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MultiStrategyConfig {
@@ -126,8 +124,7 @@ pub struct MultiStrategyConfig {
     ///
     /// Default is 60 seconds, minimum is 10 seconds.
     #[default(sixty_seconds())]
-    #[serde(default = "sixty_seconds")]
-    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[serde(default = "sixty_seconds", with = "humantime_serde")]
     #[validate(custom(function = "validate_execution_interval"))]
     pub execution_interval: std::time::Duration,
 

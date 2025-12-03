@@ -10,7 +10,7 @@ hopr:
     ignore_timeframe: 0
   strategy:
     on_fail_continue: true
-    execution_interval: 1
+    execution_interval: 1s
     strategies:
       - !AutoFunding
         funding_amount: "10 wxHOPR"

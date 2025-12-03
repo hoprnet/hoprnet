@@ -234,7 +234,7 @@ Running the node without any command-line argument might not work depending on t
 Some basic reasonable setup uses a custom identity and enables the REST API of the `hoprd`:
 
 ```bash
-hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --apiToken <MY_TOKEN> --provider "http://blokli-provider.here"
+hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --apiToken <MY_TOKEN> --blokliUrl "http://blokli-provider.here"
 ```
 
 Here is a short breakdown of each argument.
@@ -254,7 +254,7 @@ hoprd
   # specify password for accessing REST API
   --apiToken <MY_TOKEN>
   # blokli provider supplying the HOPR updates
-  --provider "http://blokli-provider.here"
+  --blokliUrl "http://blokli-provider.here"
 ```
 
 ### Using Docker Compose with extended HOPR node monitoring

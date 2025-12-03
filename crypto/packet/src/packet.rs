@@ -330,7 +330,7 @@ impl std::fmt::Debug for HoprForwardedPacket {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("HoprForwardedPacket")
             .field("outgoing", &self.outgoing)
-            .field("packet_tag", &self.packet_tag)
+            .field("packet_tag", &hex::encode(self.packet_tag))
             .field("ack_key", &self.ack_key)
             .field("previous_hop", &self.previous_hop)
             .field("own_key", &self.own_key)
