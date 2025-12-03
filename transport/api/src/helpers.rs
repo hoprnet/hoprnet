@@ -1,13 +1,11 @@
 use futures::{TryStreamExt, stream::FuturesUnordered};
-use hopr_api::{
-    chain::{ChainKeyOperations, ChainPathResolver, ChainReadChannelOperations},
-    db::{FoundSurb, HoprDbProtocolOperations},
-};
+use hopr_api::chain::{ChainKeyOperations, ChainPathResolver, ChainReadChannelOperations};
 use hopr_crypto_packet::prelude::*;
 use hopr_crypto_types::crypto_traits::Randomizable;
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+use hopr_protocol_hopr::{FoundSurb, SurbStore};
 use tracing::trace;
 
 use crate::errors::HoprTransportError;
@@ -21,33 +19,23 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-/// Ticket statistics data exposed by the ticket mechanism.
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct TicketStatistics {
-    pub winning_count: u128,
-    pub unredeemed_value: HoprBalance,
-    pub redeemed_value: HoprBalance,
-    pub neglected_value: HoprBalance,
-    pub rejected_value: HoprBalance,
-}
-
 #[derive(Clone)]
-pub(crate) struct PathPlanner<Db, R, S> {
-    db: Db,
+pub(crate) struct PathPlanner<Surb, R, S> {
+    pub(crate) surb_store: Surb,
     resolver: R,
     selector: S,
     me: Address,
 }
 
-impl<Db, R, S> PathPlanner<Db, R, S>
+impl<Surb, R, S> PathPlanner<Surb, R, S>
 where
-    Db: HoprDbProtocolOperations + Send + Sync + 'static,
+    Surb: SurbStore + Send + Sync + 'static,
     R: ChainKeyOperations + ChainReadChannelOperations + Send + Sync + 'static,
     S: PathSelector + Send + Sync,
 {
-    pub(crate) fn new(me: Address, db: Db, resolver: R, selector: S) -> Self {
+    pub(crate) fn new(me: Address, surb_store: Surb, resolver: R, selector: S) -> Self {
         Self {
-            db,
+            surb_store,
             resolver,
             selector,
             me,
@@ -62,11 +50,11 @@ where
                 .packet_key_to_chain_key(key)
                 .await
                 .map_err(|e| {
-                    HoprTransportError::Other(format!("failed to resolve offchain key to chain key: {e}").into())
+                    HoprTransportError::Other(anyhow::anyhow!("failed to resolve offchain key to chain key: {e}"))
                 })?
-                .ok_or(HoprTransportError::Other(
-                    "failed to resolve offchain key to chain key: no chain key found".into(),
-                )),
+                .ok_or(HoprTransportError::Other(anyhow::anyhow!(
+                    "failed to resolve offchain key to chain key: no chain key found"
+                ))),
         }
     }
 
@@ -171,10 +159,10 @@ where
                     surb,
                     remaining,
                 } = self
-                    .db
+                    .surb_store
                     .find_surb(matcher)
                     .await
-                    .map_err(|e| HoprTransportError::Other(e.into()))?;
+                    .ok_or(HoprTransportError::Api("no surb".into()))?;
                 Ok((ResolvedTransportRouting::Return(sender_id, surb), Some(remaining)))
             }
         }

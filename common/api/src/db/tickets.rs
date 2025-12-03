@@ -136,6 +136,16 @@ impl TicketSelector {
         self
     }
 
+    /// Removes all other restriction except for the channel ID and epoch.
+    #[must_use]
+    pub fn only_channel(mut self) -> Self {
+        self.index = TicketIndexSelector::None;
+        self.win_prob = (Bound::Unbounded, Bound::Unbounded);
+        self.amount = (Bound::Unbounded, Bound::Unbounded);
+        self.state = None;
+        self
+    }
+
     /// Returns this instance with a ticket index upper bound set.
     /// If [`TicketSelector::with_index`] was previously called, it will be replaced.
     #[must_use]
@@ -274,10 +284,14 @@ pub trait HoprDbTicketOperations {
     /// been rejected by the packet processing pipeline.
     ///
     /// This ticket is not yet stored in the ticket DB;
-    /// therefore, only the statistics in the corresponding channel are updated.
+    /// therefore, only the statistics in the corresponding channel are updated, and the overall
+    /// unrealized value in the respective channel does not change.
     async fn mark_unsaved_ticket_rejected(&self, issuer: &Address, ticket: &Ticket) -> Result<(), Self::Error>;
 
     /// Updates the [state](AcknowledgedTicketStatus) of the tickets matching the given `selectors`.
+    ///
+    /// The operation should prevent any concurrent changes to the tickets before the stream is fully
+    /// consumed.
     ///
     /// Returns the updated tickets in the new state.
     async fn update_ticket_states_and_fetch<'a, S: Into<TicketSelector>, I: IntoIterator<Item = S> + Send>(
@@ -304,40 +318,35 @@ pub trait HoprDbTicketOperations {
     /// Resets the ticket statistics about neglected, rejected, and redeemed tickets.
     async fn reset_ticket_statistics(&self) -> Result<(), Self::Error>;
 
-    /// Counts the total value of tickets matching the given `selector` on a single channel.
-    async fn get_tickets_value(&self, selector: TicketSelector) -> Result<(usize, HoprBalance), Self::Error>;
-
-    // TODO: outgoing ticket index manipulations APIs will be refactored in #7575
-
-    /// Sets the stored outgoing ticket index to `index`, only if the currently stored value
-    /// is less than `index`. This ensures the stored value can only be growing.
+    /// Counts the total value of tickets matching the channel.
     ///
-    /// Returns the old value.
+    /// Returns the total ticket value.
+    async fn get_tickets_value(&self, id: &ChannelId, epoch: u32) -> Result<HoprBalance, Self::Error>;
+
+    /// Gets the index of the next outgoing ticket for the given channel.
     ///
-    /// If the entry is not yet present for the given ID, it is initialized to 0.
-    async fn compare_and_set_outgoing_ticket_index(
+    /// If such an entry does not exist, it is initialized with 0 and `None` is returned.
+    async fn get_or_create_outgoing_ticket_index(
         &self,
         channel_id: &ChannelId,
+        epoch: u32,
+    ) -> Result<Option<u64>, Self::Error>;
+
+    /// Stores the ticket index of the next outgoing ticket for the given channel.
+    ///
+    /// Does nothing if the entry for the given channel and epoch does not exist.
+    /// Returns an error if the given `index` is less than the current index in the DB.
+    async fn update_outgoing_ticket_index(
+        &self,
+        channel_id: &ChannelId,
+        epoch: u32,
         index: u64,
-    ) -> Result<u64, Self::Error>;
+    ) -> Result<(), Self::Error>;
 
-    /// Resets the outgoing ticket index to 0 for the given channel id.
+    /// Removes the outgoing ticket index for the given channel and epoch.
     ///
-    /// Returns the old value before reset.
-    ///
-    /// If the entry is not yet present for the given ID, it is initialized to 0.
-    async fn reset_outgoing_ticket_index(&self, channel_id: &ChannelId) -> Result<u64, Self::Error>;
-
-    /// Increments the outgoing ticket index in the given channel ID and returns the value before incrementing.
-    ///
-    /// If the entry is not yet present for the given ID, it is initialized to 0 and incremented.
-    async fn increment_outgoing_ticket_index(&self, channel_id: &ChannelId) -> Result<u64, Self::Error>;
-
-    /// Compares outgoing ticket indices in the cache with the stored values
-    /// and updates the stored value where changed.
-    ///
-    /// Returns the number of updated ticket indices.
-    async fn persist_outgoing_ticket_indices(&self) -> Result<usize, Self::Error>;
+    /// Does nothing if the value did not exist
+    async fn remove_outgoing_ticket_index(&self, channel_id: &ChannelId, epoch: u32) -> Result<(), Self::Error>;
 }
 
 /// Contains ticket statistics for one or more channels.

@@ -11,8 +11,8 @@ license = "GPL-3.0-only"
 default = ["traits", "sqlite"]
 traits = []
 runtime-tokio = [
-  "hopr-async-runtime/runtime-tokio",
   "hopr-db-entity/runtime-tokio",
+  "hopr-db-migration/runtime-tokio",
   "sea-orm/runtime-tokio",
   "sea-orm/runtime-tokio-rustls",
   "sqlx/runtime-tokio-rustls",
@@ -32,8 +32,6 @@ futures = { workspace = true }
 hex = { workspace = true }
 lazy_static = { workspace = true, optional = true }
 moka = { workspace = true, features = ["sync"] }
-parking_lot = { workspace = true }
-ringbuffer = { workspace = true }
 sea-orm = { workspace = true }
 sea-query = { workspace = true, default-features = false, features = [
   "with-chrono",
@@ -51,10 +49,8 @@ hopr-crypto-packet = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-db-entity = { workspace = true }
 hopr-db-migration = { workspace = true }
-hopr-async-runtime = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
-hopr-network-types = { workspace = true }
 hopr-parallelize = { workspace = true, features = ["rayon"] }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
@@ -69,7 +65,6 @@ sqlx = { workspace = true, features = ["runtime-tokio"] }
 tokio = { workspace = true }
 test-log = { workspace = true }
 
-hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 hopr-crypto-random = { workspace = true }
 
 [package.metadata.cargo-machete]

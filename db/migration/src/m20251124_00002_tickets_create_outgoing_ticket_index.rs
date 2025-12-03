@@ -24,6 +24,7 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .unique_key(),
                     )
+                    .col(ColumnDef::new(OutgoingTicketIndex::Epoch).integer().not_null())
                     .col(
                         ColumnDef::new(OutgoingTicketIndex::Index)
                             .not_null()
@@ -32,10 +33,25 @@ impl MigrationTrait for Migration {
                     )
                     .to_owned(),
             )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_channel_id_epoch")
+                    .table(OutgoingTicketIndex::Table)
+                    .col(OutgoingTicketIndex::ChannelId)
+                    .col(OutgoingTicketIndex::Epoch)
+                    .to_owned(),
+            )
             .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_index(Index::drop().name("idx_channel_id_epoch").to_owned())
+            .await?;
+
         manager
             .drop_table(Table::drop().table(OutgoingTicketIndex::Table).to_owned())
             .await
@@ -47,5 +63,6 @@ enum OutgoingTicketIndex {
     Table,
     Id,
     ChannelId,
+    Epoch,
     Index,
 }

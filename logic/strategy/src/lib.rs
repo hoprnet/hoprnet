@@ -36,10 +36,7 @@ use std::{ops::Sub, str::FromStr, time::Duration};
 
 use futures::{StreamExt, pin_mut};
 use futures_concurrency::stream::Merge;
-use hopr_lib::{
-    Address, ChannelChange, ChannelStatus, HoprBalance, RedeemableTicket, VerifiedTicket,
-    exports::api::chain::ChainEvent,
-};
+use hopr_lib::{Address, ChannelChange, ChannelStatus, HoprBalance, VerifiedTicket, exports::api::chain::ChainEvent};
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumString, VariantNames};
 
@@ -97,23 +94,23 @@ enum StrategyEvent {
     Ticket(VerifiedTicket),
 }
 
-/// Streams [`ChainEvents`](ChainEvent), [`AcknowledgedTickets`](AcknowledgedTicket) and `tick` at regular time
+/// Streams [`ChainEvents`](ChainEvent), [`VerifiedTickets`](VerifiedTicket) and `tick` at regular time
 /// intervals as events into the given `strategy`.
 pub fn stream_events_to_strategy_with_tick<C, T, S>(
     strategy: std::sync::Arc<S>,
     chain_events: C,
     ticket_events: T,
-    tick: std::time::Duration,
+    tick: Duration,
     me: Address,
 ) -> hopr_async_runtime::AbortHandle
 where
     C: futures::stream::Stream<Item = ChainEvent> + Send + 'static,
-    T: futures::stream::Stream<Item = RedeemableTicket> + Send + 'static,
+    T: futures::stream::Stream<Item = VerifiedTicket> + Send + 'static,
     S: SingularStrategy + Send + Sync + 'static,
 {
     let tick_stream = futures_time::stream::interval(tick.into()).map(|_| StrategyEvent::Tick);
     let chain_stream = chain_events.map(StrategyEvent::ChainEvent).fuse();
-    let ticket_stream = ticket_events.map(|t| StrategyEvent::Ticket(t.ticket)).fuse();
+    let ticket_stream = ticket_events.map(StrategyEvent::Ticket).fuse();
 
     let (stream, abort_handle) = futures::stream::abortable((tick_stream, chain_stream, ticket_stream).merge());
     hopr_async_runtime::prelude::spawn(async move {

@@ -10,16 +10,9 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = ["mixer-channel"]
+capture = ["dep:pcap-file"]
 p2p-announce-quic = []
 p2p-transport-quic = ["hopr-transport-p2p/transport-quic"]
-runtime-tokio = [
-  "hopr-async-runtime/runtime-tokio",
-  "hopr-network-types/runtime-tokio",
-  "hopr-transport-p2p/runtime-tokio",
-  "hopr-transport-protocol/runtime-tokio",
-  "hopr-transport-session/runtime-tokio",
-]
 prometheus = [
   "dep:hopr-metrics",
   "hopr-network-types/prometheus",
@@ -29,20 +22,36 @@ prometheus = [
   "hopr-transport-protocol/prometheus",
   "hopr-transport-session/prometheus",
 ]
-mixer-stream = ["dep:rust-stream-ext-concurrent"]
-mixer-channel = []
-capture = ["hopr-transport-protocol/capture"]
+runtime-tokio = [
+  "hopr-async-runtime/runtime-tokio",
+  "hopr-network-types/runtime-tokio",
+  "hopr-transport-p2p/runtime-tokio",
+  "hopr-transport-protocol/runtime-tokio",
+  "hopr-transport-session/runtime-tokio",
+]
+serde = [
+  "dep:serde",
+  "dep:humantime-serde",
+  "hopr-internal-types/serde",
+  "hopr-network-types/serde",
+  "hopr-primitive-types/serde",
+  "hopr-protocol-app/serde",
+  "hopr-protocol-hopr/serde",
+  "hopr-transport-protocol/serde",
+]
+
 
 [dependencies]
+anyhow = { workspace = true }
 async-trait = { workspace = true }
 cfg-if = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
+humantime-serde = { workspace = true, optional = true }
 lazy_static = { workspace = true }
 proc-macro-regex = { workspace = true }
-rust-stream-ext-concurrent = { workspace = true, optional = true }
-serde = { workspace = true }
-serde_with = { workspace = true }
+pcap-file = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
@@ -56,8 +65,9 @@ hopr-crypto-types = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-primitive-types = { workspace = true }
-hopr-network-types = { workspace = true, features = ["serde"] }
+hopr-network-types = { workspace = true }
 hopr-protocol-app = { workspace = true }
+hopr-protocol-hopr = { workspace = true }
 hopr-transport-identity = { workspace = true }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-network = { workspace = true }
@@ -67,9 +77,22 @@ hopr-transport-protocol = { workspace = true }
 hopr-transport-session = { workspace = true }
 
 [dev-dependencies]
-temp-env = { workspace = true }
-
+hex-literal = { workspace = true }
+hopr-crypto-random = { workspace = true }
+hopr-protocol-start = { workspace = true }
+hopr-protocol-session = { workspace = true, features = [
+  "session-types",
+  "runtime-tokio",
+] }
 hopr-transport-network = { workspace = true }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-protocol = { workspace = true, features = ["runtime-tokio"] }
 hopr-transport-p2p = { workspace = true, features = ["runtime-tokio"] }
+temp-env = { workspace = true }
+tokio = { workspace = true }
+
+[package.metadata.cargo-machete]
+ignored = ["humantime-serde"]
+
+[package.metadata.cargo-shear]
+ignored = ["humantime-serde"]

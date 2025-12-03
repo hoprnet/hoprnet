@@ -4,8 +4,7 @@ use std::{
     str::FromStr,
 };
 
-use chrono::{DateTime, Utc, serde::ts_seconds_option};
-use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
 use sha3::Digest;
 
 use crate::{
@@ -21,7 +20,8 @@ use crate::{
 pub type U256 = primitive_types::U256;
 
 /// Represents an Ethereum address
-#[derive(Clone, Copy, Eq, PartialEq, Default, Serialize, Deserialize, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Eq, PartialEq, Default, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Address([u8; Self::SIZE]);
 
 impl Debug for Address {
@@ -133,7 +133,8 @@ impl FromStr for Address {
 /// Represents and Ethereum challenge.
 ///
 /// This is a one-way encoding of the secp256k1 curve point to an Ethereum address.
-#[derive(Clone, Copy, Eq, PartialEq, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EthereumChallenge(pub Address);
 impl AsRef<[u8]> for EthereumChallenge {
     fn as_ref(&self) -> &[u8] {
@@ -209,10 +210,11 @@ impl UnitaryFloatOps for U256 {
     }
 }
 
-/// A type containing selected fields from  the `eth_getLogs` RPC calls.
+/// A type containing selected fields from the `eth_getLogs` RPC calls.
 ///
 /// This is further restricted to already mined blocks.
-#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SerializableLog {
     /// Contract address
     pub address: Address,
@@ -235,7 +237,7 @@ pub struct SerializableLog {
     /// Processed flag
     pub processed: Option<bool>,
     /// Processed time
-    #[serde(with = "ts_seconds_option")]
+    #[cfg_attr(feature = "serde", serde(with = "chrono::serde::ts_seconds_option"))]
     pub processed_at: Option<DateTime<Utc>>,
     /// Log hashes checksum
     pub checksum: Option<String>,
@@ -278,8 +280,9 @@ impl PartialOrd<Self> for SerializableLog {
 }
 
 /// Identifier of public keys.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
-pub struct KeyIdent<const N: usize = 4>(#[serde(with = "serde_bytes")] [u8; N]);
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct KeyIdent<const N: usize = 4>(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; N]);
 
 impl<const N: usize> Display for KeyIdent<N> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

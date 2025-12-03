@@ -115,7 +115,7 @@ impl<T: Hash + Eq> AbortableList<T> {
     ///
     /// The tasks from `other` are moved to this list without aborting them.
     /// Afterward, `other` will be empty.
-    pub fn flat_map_extend_from<U: Hash + Eq>(&mut self, mut other: AbortableList<U>, key_map: impl Fn(U) -> T) {
+    pub fn flat_map_extend_from<U>(&mut self, mut other: AbortableList<U>, key_map: impl Fn(U) -> T) {
         self.0.extend(other.0.drain(..).map(|(k, v)| (key_map(k), v)));
     }
 }

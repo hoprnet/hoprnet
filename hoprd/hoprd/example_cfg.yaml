@@ -100,6 +100,9 @@ strategy:
       max_closure_overdue: 300
 # Configuration of the HOPR protocol
 hopr:
+  # Determines whether the node should publish itself on-chain.
+  announce: true
+
   # Specifies host to listen on for the HOPR P2P protocol
   host:
     # Specifies the external IP address of the local interface
@@ -108,21 +111,7 @@ hopr:
     address: !IPv4 1.2.3.4
     # Listen TCP port
     port: 9091
-  # Global configuration of Session management
-  session:
-    # How many seconds it takes before Session is considered idle and is closed automatically
-    idle_timeout: 180
-    # Maximum number of outgoing or incoming Sessions allowed by the Session manager
-    maximum_sessions: 2048
-    # How many retries are made to establish an outgoing Session
-    establish_max_retries: 3
-    # How many seconds to wait between retries to establish an outgoing Session
-    # Random jitter is always added to this value for each retry.
-    establish_retry_timeout: 2
-    # Sampling interval for SURB balancer in ms
-    balancer_sampling_interval: 500
-    # Minimum runway of received SURBs in seconds
-    balancer_minimum_surb_buffer_duration: 5
+
   # Configuration of node's Safe
   safe_module:
     # Node's safe transaction provider
@@ -132,57 +121,29 @@ hopr:
     safe_address: "0x0000000000000000000000000000000000000000"
     # Node's safe module address, this must be provided by the user
     module_address: "0x0000000000000000000000000000000000000000"
-  # Configuration of the heartbeat mechanism for probing other nodes in the HOPR network.
-  probe:
-    # The maximum time in seconds to wait for a probe to finish
-    timeout: 3
-    # The maximum number of concurrent heartbeat probes
-    max_parallel_probes: 50
-    # The time interval for which to consider peer reprobing in seconds
-    recheck_threshold: 60
+
+  #  Various HOPR-network and transport-related configuration options.
+  network:
+    # How many seconds it takes before HOPR Session is considered idle and is closed automatically
+    session_idle_timeout: 180s
+    # Maximum number of outgoing or incoming Sessions allowed by the Session manager
+    maximum_sessions: 2048
+    # How many retries are made to establish an outgoing HOPR Session
+    session_establish_max_retries: 3
+    # The time interval for which to consider peer re-probing in seconds
+    probe_recheck_threshold: 60s
     # The delay between individual probing rounds for neighbor discovery
-    interval: 5
-  # Defines how the quality of nodes in the HOPR network
-  # is evaluated and criteria for nodes to be considered of good/bad quality.
-  # This is closely related to the heartbeat mechanism.
-  network_options:
-    # Minimum delay (seconds) will be multiplied by backoff, it will be half the actual minimum value.
-    min_delay: 1
-    # Maximum delay in seconds
-    max_delay: 300
-    # Quality threshold since a node is considered having "bad" connectivity
-    quality_bad_threshold: 0.1
-    # Quality threshold from which a node is considered available enough to be used
-    quality_offline_threshold: 0.0
-    # Quality step on failed/successful ping probe
-    quality_step: 0.1
-    # Size of the quality moving average window.
-    quality_avg_window_size: 25
-    # Minimum score to add a node to the routing table
-    node_score_auto_path_threshold: 0.95
-    # Maximum latency for the first hop in ms
-    max_first_hop_latency_threshold: 250
-    # Indicates how long (in seconds) a node is considered "ignored"
-    ignore_timeframe: 120
-    # Backoff exponent when probing nodes
-    backoff_exponent: 1.5
-    # Minimum backoff (in seconds) when probing nodes
-    backoff_min: 2.0
-    # Maximum backoff (in seconds) when probing nodes
-    backoff_max: 300.0
-  # Transport related configuration
-  transport:
+    probe_interval: 5s
     # Should local addresses be announced on chain?
     # Set to true for testing only
     announce_local_addresses: false
     # Should local addresses be preferred when dialing a peer?
     # Set to true for testing only
     prefer_local_addresses: false
-  # Configuration of various HOPR sub-protocols.
-  protocol:
-  # Outgoing ticket winning probability.
-  # Should not be lower than the minimum ticket winning probability set on-chain
-  # outgoing_ticket_winning_prob: 1.0
+    # Outgoing ticket winning probability.
+    # Should not be lower than the minimum ticket winning probability set on-chain
+    # outgoing_ticket_winning_prob: 1.0
+
 # Session Entry/Exit IP forwarding configuration for this node
 # This applies whenever the node is an Exit node of a Session.
 session_ip_forwarding:

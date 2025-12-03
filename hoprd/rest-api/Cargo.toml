@@ -51,6 +51,7 @@ validator = { workspace = true }
 
 hopr-lib = { workspace = true, features = [
   "runtime-tokio",
+  "serde",
   "session-client",
   "utils_futures",
 ] }

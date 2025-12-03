@@ -129,8 +129,10 @@ impl ClusterGuard {
             .filter(|&n| {
                 n.config()
                     .protocol
-                    .outgoing_ticket_winning_prob
-                    .is_some_and(|p| p > 0.99)
+                    .packet
+                    .codec
+                    .outgoing_win_prob
+                    .is_some_and(|p| p.as_f64() > 0.99)
             })
             .choose_multiple(&mut rand::thread_rng(), N);
 
@@ -149,8 +151,10 @@ impl ClusterGuard {
             .filter(|&n| {
                 n.config()
                     .protocol
-                    .outgoing_ticket_winning_prob
-                    .is_some_and(|p| p < 0.99)
+                    .packet
+                    .codec
+                    .outgoing_win_prob
+                    .is_some_and(|p| p.as_f64() < 0.99)
             })
             .choose_multiple(&mut rand::thread_rng(), N);
 
@@ -171,8 +175,10 @@ impl ClusterGuard {
             .filter(|&n| {
                 n.config()
                     .protocol
-                    .outgoing_ticket_winning_prob
-                    .is_some_and(|p| p > 0.99)
+                    .packet
+                    .codec
+                    .outgoing_win_prob
+                    .is_some_and(|p| p.as_f64() > 0.99)
             })
             .choose_multiple(&mut rand::thread_rng(), N - 2);
 
@@ -195,8 +201,10 @@ impl ClusterGuard {
             .filter(|&n| {
                 n.config()
                     .protocol
-                    .outgoing_ticket_winning_prob
-                    .is_some_and(|p| p < 0.99)
+                    .packet
+                    .codec
+                    .outgoing_win_prob
+                    .is_some_and(|p| p.as_f64() < 0.99)
             })
             .choose_multiple(&mut rand::thread_rng(), N - 2);
 
@@ -339,12 +347,9 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
                     .expect("failed to build Tokio runtime");
 
                 let result = runtime.block_on(async {
-                    let node_db = HoprNodeDb::new_in_memory(onchain_keys[i].clone())
+                    let node_db = HoprNodeDb::new_in_memory()
                         .await
                         .expect("failed to create HoprNodeDb for node");
-                    node_db
-                        .start_ticket_processing(Some(futures::sink::drain()))
-                        .expect("failed to start ticket processing");
 
                     let mut connector = create_trustful_hopr_blokli_connector(
                         &onchain_keys[i],
@@ -361,8 +366,7 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
                         .expect("failed to connect to HoprBlockchainSafeConnector");
 
                     let instance = create_hopr_instance(
-                        onchain_keys[i].clone(),
-                        offchain_keys[i].clone(),
+                        (&onchain_keys[i], &offchain_keys[i]),
                         3001 + i as u16,
                         node_db,
                         std::sync::Arc::new(connector),

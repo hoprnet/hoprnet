@@ -1,7 +1,8 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use futures::{FutureExt, SinkExt, StreamExt, pin_mut};
 use futures_concurrency::stream::StreamExt as _;
+use hopr_async_runtime::AbortableList;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::prelude::*;
@@ -91,7 +92,7 @@ impl Probe {
         manual_events: V, // explicit requests from the API
         move_up: Up,      // forward up non-probing messages from the network
         traffic_generator: Tr,
-    ) -> HashMap<HoprProbeProcess, hopr_async_runtime::AbortHandle>
+    ) -> AbortableList<HoprProbeProcess>
     where
         T: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + 'static,
         T::Error: Send,
@@ -155,7 +156,7 @@ impl Probe {
         let active_probes_rx = active_probes.clone();
         let push_to_network = api.0.clone();
 
-        let mut processes = HashMap::<HoprProbeProcess, hopr_async_runtime::AbortHandle>::new();
+        let mut processes = AbortableList::default();
 
         // -- Emit probes --
         let direct_neighbors =
@@ -415,7 +416,7 @@ mod tests {
 
         let result = test(interface).await;
 
-        jhs.into_iter().for_each(|(_name, handle)| handle.abort());
+        jhs.abort_all();
 
         result
     }

@@ -58,7 +58,11 @@ allocator-mimalloc = [
 allocator-jemalloc = [
   "dep:tikv-jemallocator",
 ] # Use jemalloc as the global allocator on Linux
-allocator-jemalloc-stats = ["allocator-jemalloc", "dep:tikv-jemalloc-ctl"]
+allocator-jemalloc-stats = [
+  "allocator-jemalloc",
+  "dep:tikv-jemalloc-ctl",
+  "dep:humansize",
+]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -68,6 +72,8 @@ clap = { workspace = true }
 console-subscriber = { workspace = true, optional = true }
 futures = { workspace = true }
 home = "0.5.12"
+humansize = { workspace = true, optional = true, features = ["no_alloc"] }
+humantime-serde = { workspace = true }
 proc-macro-regex = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
@@ -127,3 +133,9 @@ hopr-lib = { workspace = true, features = [
   "utils_parallel",
   "testing",
 ] }
+
+[package.metadata.cargo-machete]
+ignored = ["humantime-serde"]
+
+[package.metadata.cargo-shear]
+ignored = ["humantime-serde"]

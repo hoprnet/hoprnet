@@ -329,13 +329,13 @@ mod tests {
     };
 
     use futures::StreamExt;
-    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
+    use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
 
     use super::*;
 
     #[tokio::test]
     async fn test_add_get() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
 
         let peer_id: PeerId = OffchainKeypair::random().public().into();
         let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse()?;
@@ -363,7 +363,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_remove_peer() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
 
         let peer_id: PeerId = OffchainKeypair::random().public().into();
         let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse()?;
@@ -383,7 +383,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_not_remove_non_existing_peer() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
 
         let peer_id: PeerId = OffchainKeypair::random().public().into();
 
@@ -396,7 +396,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_not_add_duplicate_peers() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
 
         let peer_id: PeerId = OffchainKeypair::random().public().into();
         let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse()?;
@@ -412,7 +412,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_return_none_on_non_existing_peer() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
 
         let peer_id: PeerId = OffchainKeypair::random().public().into();
 
@@ -422,7 +422,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
 
         let peer_id: PeerId = OffchainKeypair::random().public().into();
 
@@ -464,7 +464,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_fail_to_update_non_existing_peer() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
 
         let peer_id: PeerId = OffchainKeypair::random().public().into();
 
@@ -486,7 +486,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_multiple_should_return_all_peers() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
 
         let peers = (0..10)
             .map(|_| {
@@ -519,7 +519,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_multiple_should_return_filtered_peers() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
 
         let peer_count = 10;
         let peers = (0..peer_count)
@@ -568,7 +568,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_update_stats_when_updating_peers() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
 
         let peer_id_1: PeerId = OffchainKeypair::random().public().into();
         let peer_id_2: PeerId = OffchainKeypair::random().public().into();

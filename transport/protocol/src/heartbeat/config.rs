@@ -1,15 +1,14 @@
 use std::time::Duration;
 
-use serde::{Deserialize, Serialize};
-use serde_with::{DurationSeconds, serde_as};
 use validator::Validate;
 
 /// Configuration for the `heartbeat` protocol.
-#[serde_as]
-#[derive(Debug, Copy, Clone, smart_default::SmartDefault, Validate, Serialize, Deserialize, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", cfg_eval::cfg_eval, serde_with::serde_as)]
+#[derive(Debug, Copy, Clone, smart_default::SmartDefault, Validate, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct HeartbeatProtocolConfig {
     /// Maximum duration before the request times out
-    #[serde_as(as = "DurationSeconds<u64>")]
+    #[cfg_attr(feature = "serde", serde_as(as = "serde_with::DurationSeconds<u64>"))]
     #[default(Duration::from_secs(6))]
     pub timeout: Duration,
 }

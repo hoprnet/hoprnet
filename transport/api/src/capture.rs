@@ -1,15 +1,16 @@
-use std::{
-    borrow::Cow,
-    fs::File,
-    time::{Duration, Instant},
-};
+use std::{borrow::Cow, fs::File};
 
 use futures::{StreamExt, pin_mut};
-use hopr_api::db::IncomingPacket;
 use hopr_async_runtime::{AbortHandle, spawn_as_abortable};
 use hopr_crypto_packet::prelude::PacketSignals;
 use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_internal_types::prelude::VerifiedAcknowledgement;
+use hopr_internal_types::prelude::{Ticket, VerifiedAcknowledgement};
+use hopr_network_types::prelude::ResolvedTransportRouting;
+use hopr_primitive_types::prelude::BytesEncodable;
+use hopr_protocol_hopr::{
+    IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket, IncomingPacket, IncomingPacketError,
+    OutgoingPacket, PacketDecoder, PacketEncoder,
+};
 use pcap_file::{
     DataLink,
     pcapng::{
@@ -21,7 +22,7 @@ use pcap_file::{
     },
 };
 
-use crate::HOPR_PACKET_SIZE;
+use crate::PeerId;
 
 /// Direction of the packet.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, strum::Display)]
@@ -89,66 +90,30 @@ impl PacketWriter for PcapPacketWriter {
     }
 }
 
-/// A [`PacketWriter`] that sends captured packets over UDP socket.
-pub struct UdpPacketDump(std::net::UdpSocket);
-
-impl UdpPacketDump {
-    pub fn new(addr: std::net::SocketAddr) -> std::io::Result<Self> {
-        let sock = std::net::UdpSocket::bind(("0.0.0.0", 0))?;
-        sock.connect(addr)?;
-        Ok(Self(sock))
-    }
-}
-
-impl PacketWriter for UdpPacketDump {
-    fn write_packet(&mut self, packet: CapturedPacket) -> std::io::Result<()> {
-        let mut sent = 0;
-        let data = packet.data;
-        while sent < data.len() {
-            sent += self.0.send(&data[sent..])?;
-        }
-        Ok(())
-    }
-}
-
 /// Creates a queue that processes captured packets into a [`PacketWriter`].
 pub fn packet_capture_channel(
     writer: Box<dyn PacketWriter + Send>,
-    start_capturing_path: Option<std::path::PathBuf>,
 ) -> (futures::channel::mpsc::Sender<CapturedPacket>, AbortHandle) {
     let (sender, receiver) = futures::channel::mpsc::channel(20_000);
-    let check_interval = Duration::from_secs(5);
-    let mut last_check = Instant::now() - check_interval;
-    let mut capture_enabled = false;
     let writer = std::sync::Arc::new(std::sync::Mutex::new(writer));
     let ah = spawn_as_abortable!(async move {
         pin_mut!(receiver);
         while let Some(packet) = receiver.next().await {
-            if let Some(ref path) = start_capturing_path {
-                // refresh the check if interval elapsed
-                if last_check.elapsed() >= check_interval {
-                    capture_enabled = path.exists();
-                    last_check = Instant::now();
+            let writer = writer.clone();
+            match hopr_async_runtime::prelude::spawn_blocking(move || {
+                writer
+                    .lock()
+                    .map_err(|_| std::io::Error::other("lock poisoned"))
+                    .and_then(|mut w| w.write_packet(packet))
+            })
+            .await
+            .map_err(std::io::Error::other)
+            {
+                Err(error) | Ok(Err(error)) => {
+                    tracing::warn!(%error, "cannot capture more packets due to error");
+                    break;
                 }
-
-                if capture_enabled {
-                    let writer = writer.clone();
-                    match hopr_async_runtime::prelude::spawn_blocking(move || {
-                        writer
-                            .lock()
-                            .map_err(|_| std::io::Error::other("lock poisoned"))
-                            .and_then(|mut w| w.write_packet(packet))
-                    })
-                    .await
-                    .map_err(std::io::Error::other)
-                    {
-                        Err(error) | Ok(Err(error)) => {
-                            tracing::warn!(%error, "cannot capture more packets due to error");
-                            break;
-                        }
-                        _ => {}
-                    }
-                }
+                _ => {}
             }
         }
     });
@@ -165,7 +130,7 @@ enum PacketType {
 }
 
 /// Represents a customized dissection of a HOPR packet before it goes into the transport.
-pub enum PacketBeforeTransit<'a> {
+enum PacketBeforeTransit<'a> {
     OutgoingPacket {
         me: OffchainPublicKey,
         next_hop: OffchainPublicKey,
@@ -185,7 +150,6 @@ pub enum PacketBeforeTransit<'a> {
     IncomingPacket {
         me: OffchainPublicKey,
         packet: &'a IncomingPacket,
-        ticket: Cow<'a, [u8]>,
     },
 }
 
@@ -240,17 +204,17 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
             }
             PacketBeforeTransit::IncomingPacket {
                 me,
-                packet:
-                    IncomingPacket::Final {
-                        packet_tag,
-                        previous_hop,
-                        sender,
-                        plain_text,
-                        ack_key,
-                        info,
-                    },
-                ticket,
+                packet: IncomingPacket::Final(final_packet),
             } => {
+                let IncomingFinalPacket {
+                    packet_tag,
+                    previous_hop,
+                    sender,
+                    plain_text,
+                    ack_key,
+                    info,
+                } = final_packet.as_ref();
+
                 out.push(PacketType::Final as u8);
                 out.extend_from_slice(packet_tag);
                 out.extend_from_slice(previous_hop.as_ref());
@@ -261,24 +225,24 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 out.push(0); // Add null terminator to the string
                 out.extend_from_slice(sender.as_ref());
                 out.extend_from_slice(ack_key.as_ref());
-                out.push(ticket.len() as u8);
-                out.extend_from_slice(ticket.as_ref());
                 out.push(info.packet_signals.bits());
                 out.extend_from_slice((plain_text.len() as u16).to_be_bytes().as_ref());
                 out.extend_from_slice(plain_text.as_ref());
             }
             PacketBeforeTransit::IncomingPacket {
-                packet:
-                    IncomingPacket::Forwarded {
-                        packet_tag,
-                        previous_hop,
-                        next_hop,
-                        data,
-                        ack_key,
-                    },
-                ticket,
+                packet: IncomingPacket::Forwarded(fwd_packet),
                 ..
             } => {
+                let IncomingForwardedPacket {
+                    packet_tag,
+                    previous_hop,
+                    next_hop,
+                    data,
+                    received_ticket: ticket,
+                    ack_key_prev_hop: ack_key,
+                    ..
+                } = fwd_packet.as_ref();
+                let ticket = ticket.verified_ticket().clone().into_encoded();
                 out.push(PacketType::Forwarded as u8);
                 out.extend_from_slice(packet_tag);
                 out.extend_from_slice(previous_hop.as_ref());
@@ -295,14 +259,14 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
             }
             PacketBeforeTransit::IncomingPacket {
                 me,
-                packet:
-                    IncomingPacket::Acknowledgement {
-                        packet_tag,
-                        previous_hop,
-                        ack,
-                    },
+                packet: IncomingPacket::Acknowledgement(ack_packet),
                 ..
             } => {
+                let IncomingAcknowledgementPacket {
+                    packet_tag,
+                    previous_hop,
+                    received_ack: ack,
+                } = ack_packet.as_ref();
                 out.push(PacketType::InAck as u8);
                 out.extend_from_slice(packet_tag);
                 out.extend_from_slice(previous_hop.as_ref());
@@ -320,9 +284,149 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default(),
-            orig_len: HOPR_PACKET_SIZE as u32,
+            orig_len: hopr_crypto_packet::prelude::HoprPacket::SIZE as u32,
             data: out.into_boxed_slice(),
         }
+    }
+}
+
+pub struct CapturePacketCodec<C> {
+    inner: std::sync::Arc<C>,
+    packet_key: OffchainPublicKey,
+    sender: futures::channel::mpsc::Sender<CapturedPacket>,
+}
+
+impl<C> Clone for CapturePacketCodec<C> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            packet_key: self.packet_key,
+            sender: self.sender.clone(),
+        }
+    }
+}
+
+impl<C> CapturePacketCodec<C> {
+    pub fn new(
+        inner: C,
+        packet_key: OffchainPublicKey,
+        sender: futures::channel::mpsc::Sender<CapturedPacket>,
+    ) -> Self {
+        Self {
+            inner: std::sync::Arc::new(inner),
+            packet_key,
+            sender,
+        }
+    }
+}
+
+fn inspect_ticket_data_in_packet(raw_packet: &[u8]) -> &[u8] {
+    if raw_packet.len() >= Ticket::SIZE {
+        &raw_packet[raw_packet.len() - Ticket::SIZE..]
+    } else {
+        &[]
+    }
+}
+
+#[async_trait::async_trait]
+impl<C: PacketDecoder + Send + Sync> PacketDecoder for CapturePacketCodec<C> {
+    type Error = C::Error;
+
+    async fn decode(&self, peer: PeerId, data: Box<[u8]>) -> Result<IncomingPacket, IncomingPacketError<Self::Error>> {
+        let packet = self.inner.decode(peer, data).await?;
+
+        if let Err(error) = self.sender.clone().try_send(
+            PacketBeforeTransit::IncomingPacket {
+                me: self.packet_key,
+                packet: &packet,
+            }
+            .into(),
+        ) {
+            tracing::error!(%error, "failed to send packet to capture");
+        }
+
+        match &packet {
+            IncomingPacket::Forwarded(fwd_packet) => {
+                let IncomingForwardedPacket { next_hop, data, .. } = fwd_packet.as_ref();
+
+                if let Err(error) = self.sender.clone().try_send(
+                    PacketBeforeTransit::OutgoingPacket {
+                        me: self.packet_key,
+                        next_hop: *next_hop,
+                        num_surbs: 0,
+                        is_forwarded: true,
+                        data: data.as_ref().into(),
+                        ack_challenge: Default::default(),
+                        signals: None.into(),
+                        ticket: inspect_ticket_data_in_packet(data.as_ref()).into(),
+                    }
+                    .into(),
+                ) {
+                    tracing::error!(%error, "failed to send packet to capture");
+                }
+            }
+            _ => {}
+        }
+
+        Ok(packet)
+    }
+}
+
+#[async_trait::async_trait]
+impl<C: PacketEncoder + Send + Sync> PacketEncoder for CapturePacketCodec<C> {
+    type Error = C::Error;
+
+    async fn encode_packet<T: AsRef<[u8]> + Send + 'static, S: Into<PacketSignals> + Send + 'static>(
+        &self,
+        data: T,
+        routing: ResolvedTransportRouting,
+        signals: S,
+    ) -> Result<OutgoingPacket, Self::Error> {
+        let data_clone = data.as_ref().to_vec();
+        let signals = signals.into();
+        let num_surbs = routing.count_return_paths() as u8;
+
+        let packet = self.inner.encode_packet(data, routing, signals).await?;
+
+        if let Err(error) = self.sender.clone().try_send(
+            PacketBeforeTransit::OutgoingPacket {
+                me: self.packet_key,
+                next_hop: packet.next_hop,
+                num_surbs,
+                is_forwarded: false,
+                data: data_clone.into(),
+                ack_challenge: packet.ack_challenge.as_ref().into(),
+                signals,
+                ticket: inspect_ticket_data_in_packet(&packet.data).into(),
+            }
+            .into(),
+        ) {
+            tracing::error!(%error, "failed to send packet to capture");
+        }
+
+        Ok(packet)
+    }
+
+    async fn encode_acknowledgement(
+        &self,
+        ack: VerifiedAcknowledgement,
+        peer: &OffchainPublicKey,
+    ) -> Result<OutgoingPacket, Self::Error> {
+        let packet_ack = self.inner.encode_acknowledgement(ack, peer).await?;
+
+        if let Err(error) = self.sender.clone().try_send(
+            PacketBeforeTransit::OutgoingAck {
+                me: self.packet_key,
+                ack,
+                is_random: false,
+                next_hop: *peer,
+            }
+            .into(),
+        ) {
+            tracing::error!(%error, "failed to send packet to capture");
+        }
+
+        Ok(packet_ack)
     }
 }
 
@@ -333,7 +437,7 @@ mod tests {
     use hopr_crypto_packet::prelude::PacketSignal;
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::{
-        prelude::{ChainKeypair, Keypair, OffchainKeypair, SimplePseudonym},
+        prelude::{ChainKeypair, HalfKeyChallenge, Keypair, OffchainKeypair, SimplePseudonym},
         types::{HalfKey, Hash},
     };
     use hopr_internal_types::prelude::{HoprPseudonym, TicketBuilder, VerifiedAcknowledgement, WinningProbability};
@@ -356,20 +460,20 @@ mod tests {
         let me = *OffchainKeypair::random().public();
 
         File::create("/tmp/start_capturing")?;
-        let (pcap, ah) = packet_capture_channel(
-            Box::new(File::create("test.pcap").and_then(PcapPacketWriter::new)?),
-            Some(std::path::PathBuf::from("/tmp/start_capturing")),
-        );
+        let (pcap, ah) = packet_capture_channel(Box::new(File::create("test.pcap").and_then(PcapPacketWriter::new)?));
         pin_mut!(pcap);
 
-        let packet = IncomingPacket::Final {
-            packet_tag: hopr_crypto_random::random_bytes(),
-            previous_hop: *OffchainKeypair::random().public(),
-            sender: SimplePseudonym::random(),
-            plain_text: ApplicationData::new(10u64, &hex!("deadbeef"))?.to_bytes(),
-            ack_key: HalfKey::random(),
-            info: Default::default(),
-        };
+        let packet = IncomingPacket::Final(
+            IncomingFinalPacket {
+                packet_tag: hopr_crypto_random::random_bytes(),
+                previous_hop: *OffchainKeypair::random().public(),
+                sender: SimplePseudonym::random(),
+                plain_text: ApplicationData::new(10u64, &hex!("deadbeef"))?.to_bytes(),
+                ack_key: HalfKey::random(),
+                info: Default::default(),
+            }
+            .into(),
+        );
 
         let ticket = TicketBuilder::default()
             .amount(10)
@@ -378,19 +482,10 @@ mod tests {
             .win_prob(WinningProbability::try_from_f64(0.5)?)
             .channel_epoch(1)
             .index(10)
-            .build_signed(&ChainKeypair::random(), &Hash::default())?
-            .leak()
-            .into_encoded();
+            .build_signed(&ChainKeypair::random(), &Hash::default())?;
 
         let _ = pcap
-            .send(
-                PacketBeforeTransit::IncomingPacket {
-                    me,
-                    packet: &packet,
-                    ticket: ticket.to_vec().into(),
-                }
-                .into(),
-            )
+            .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
             .await;
 
         let msg = SessionMessage::<1000>::Segment(Segment {
@@ -402,24 +497,20 @@ mod tests {
             )),
         });
 
-        let packet = IncomingPacket::Final {
-            packet_tag: hopr_crypto_random::random_bytes(),
-            previous_hop: *OffchainKeypair::random().public(),
-            sender: SimplePseudonym::random(),
-            plain_text: ApplicationData::new(1024_u64, msg.into_encoded().into_vec())?.to_bytes(),
-            ack_key: HalfKey::random(),
-            info: Default::default(),
-        };
+        let packet = IncomingPacket::Final(
+            IncomingFinalPacket {
+                packet_tag: hopr_crypto_random::random_bytes(),
+                previous_hop: *OffchainKeypair::random().public(),
+                sender: SimplePseudonym::random(),
+                plain_text: ApplicationData::new(1024_u64, msg.into_encoded().into_vec())?.to_bytes(),
+                ack_key: HalfKey::random(),
+                info: Default::default(),
+            }
+            .into(),
+        );
 
         let _ = pcap
-            .send(
-                PacketBeforeTransit::IncomingPacket {
-                    me,
-                    packet: &packet,
-                    ticket: ticket.to_vec().into(),
-                }
-                .into(),
-            )
+            .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
             .await;
 
         let msg = SessionMessage::<1000>::Segment(Segment {
@@ -431,46 +522,38 @@ mod tests {
             )),
         });
 
-        let packet = IncomingPacket::Final {
-            packet_tag: hopr_crypto_random::random_bytes(),
-            previous_hop: *OffchainKeypair::random().public(),
-            sender: SimplePseudonym::random(),
-            plain_text: ApplicationData::new(1024_u64, msg.into_encoded().into_vec())?.to_bytes(),
-            ack_key: HalfKey::random(),
-            info: Default::default(),
-        };
+        let packet = IncomingPacket::Final(
+            IncomingFinalPacket {
+                packet_tag: hopr_crypto_random::random_bytes(),
+                previous_hop: *OffchainKeypair::random().public(),
+                sender: SimplePseudonym::random(),
+                plain_text: ApplicationData::new(1024_u64, msg.into_encoded().into_vec())?.to_bytes(),
+                ack_key: HalfKey::random(),
+                info: Default::default(),
+            }
+            .into(),
+        );
 
         let _ = pcap
-            .send(
-                PacketBeforeTransit::IncomingPacket {
-                    me,
-                    packet: &packet,
-                    ticket: ticket.to_vec().into(),
-                }
-                .into(),
-            )
+            .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
             .await;
 
         let msg = SessionMessage::<1000>::Acknowledge(FrameAcknowledgements::try_from(vec![1, 2, 100])?);
 
-        let packet = IncomingPacket::Final {
-            packet_tag: hopr_crypto_random::random_bytes(),
-            previous_hop: *OffchainKeypair::random().public(),
-            sender: SimplePseudonym::random(),
-            plain_text: ApplicationData::new(1024_u64, msg.into_encoded().into_vec())?.to_bytes(),
-            ack_key: HalfKey::random(),
-            info: Default::default(),
-        };
+        let packet = IncomingPacket::Final(
+            IncomingFinalPacket {
+                packet_tag: hopr_crypto_random::random_bytes(),
+                previous_hop: *OffchainKeypair::random().public(),
+                sender: SimplePseudonym::random(),
+                plain_text: ApplicationData::new(1024_u64, msg.into_encoded().into_vec())?.to_bytes(),
+                ack_key: HalfKey::random(),
+                info: Default::default(),
+            }
+            .into(),
+        );
 
         let _ = pcap
-            .send(
-                PacketBeforeTransit::IncomingPacket {
-                    me,
-                    packet: &packet,
-                    ticket: ticket.to_vec().into(),
-                }
-                .into(),
-            )
+            .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
             .await;
 
         let msg = SessionMessage::<1000>::Request(SegmentRequest::from_iter([
@@ -478,61 +561,51 @@ mod tests {
             (11 as FrameId, [0b00100001].into()),
         ]));
 
-        let packet = IncomingPacket::Final {
-            packet_tag: hopr_crypto_random::random_bytes(),
-            previous_hop: *OffchainKeypair::random().public(),
-            sender: SimplePseudonym::random(),
-            plain_text: ApplicationData::new(1024_u64, msg.into_encoded().into_vec())?.to_bytes(),
-            ack_key: HalfKey::random(),
-            info: Default::default(),
-        };
+        let packet = IncomingPacket::Final(
+            IncomingFinalPacket {
+                packet_tag: hopr_crypto_random::random_bytes(),
+                previous_hop: *OffchainKeypair::random().public(),
+                sender: SimplePseudonym::random(),
+                plain_text: ApplicationData::new(1024_u64, msg.into_encoded().into_vec())?.to_bytes(),
+                ack_key: HalfKey::random(),
+                info: Default::default(),
+            }
+            .into(),
+        );
 
         let _ = pcap
-            .send(
-                PacketBeforeTransit::IncomingPacket {
-                    me,
-                    packet: &packet,
-                    ticket: ticket.to_vec().into(),
-                }
-                .into(),
-            )
+            .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
             .await;
 
         let kp = OffchainKeypair::random();
-        let packet = IncomingPacket::Acknowledgement {
-            packet_tag: hopr_crypto_random::random_bytes(),
-            previous_hop: *kp.public(),
-            ack: VerifiedAcknowledgement::random(&kp).leak(),
-        };
+        let packet = IncomingPacket::Acknowledgement(
+            IncomingAcknowledgementPacket {
+                packet_tag: hopr_crypto_random::random_bytes(),
+                previous_hop: *kp.public(),
+                received_ack: VerifiedAcknowledgement::random(&kp).leak(),
+            }
+            .into(),
+        );
 
         let _ = pcap
-            .send(
-                PacketBeforeTransit::IncomingPacket {
-                    me,
-                    packet: &packet,
-                    ticket: ticket.to_vec().into(),
-                }
-                .into(),
-            )
+            .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
             .await;
 
-        let packet = IncomingPacket::Forwarded {
-            packet_tag: hopr_crypto_random::random_bytes(),
-            previous_hop: *OffchainKeypair::random().public(),
-            next_hop: *OffchainKeypair::random().public(),
-            data: Box::new([0x08]),
-            ack_key: HalfKey::random(),
-        };
+        let packet = IncomingPacket::Forwarded(
+            IncomingForwardedPacket {
+                packet_tag: hopr_crypto_random::random_bytes(),
+                previous_hop: *OffchainKeypair::random().public(),
+                next_hop: *OffchainKeypair::random().public(),
+                data: Box::new([0x08]),
+                ack_challenge: HalfKeyChallenge::default(),
+                received_ticket: ticket.into_unacknowledged(HalfKey::random()),
+                ack_key_prev_hop: HalfKey::random(),
+            }
+            .into(),
+        );
 
         let _ = pcap
-            .send(
-                PacketBeforeTransit::IncomingPacket {
-                    me,
-                    packet: &packet,
-                    ticket: ticket.to_vec().into(),
-                }
-                .into(),
-            )
+            .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
             .await;
 
         let hk = HalfKey::random().to_challenge()?;
@@ -548,7 +621,7 @@ mod tests {
             .to_bytes()
             .to_vec()
             .into(),
-            ticket: ticket.to_vec().into(),
+            ticket: ticket.verified_ticket().into_boxed().into_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
             signals: PacketSignal::OutOfSurbs.into(),
@@ -567,7 +640,7 @@ mod tests {
             .to_bytes()
             .to_vec()
             .into(),
-            ticket: ticket.to_vec().into(),
+            ticket: ticket.verified_ticket().into_boxed().into_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
             signals: None.into(),
@@ -586,7 +659,7 @@ mod tests {
             .to_bytes()
             .to_vec()
             .into(),
-            ticket: ticket.to_vec().into(),
+            ticket: ticket.verified_ticket().into_boxed().into_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
             signals: None.into(),
@@ -612,7 +685,7 @@ mod tests {
             .to_bytes()
             .into_vec()
             .into(),
-            ticket: ticket.to_vec().into(),
+            ticket: ticket.verified_ticket().into_boxed().into_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
             signals: None.into(),
@@ -636,7 +709,7 @@ mod tests {
             .to_bytes()
             .into_vec()
             .into(),
-            ticket: ticket.to_vec().into(),
+            ticket: ticket.verified_ticket().into_boxed().into_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
             signals: None.into(),
@@ -660,7 +733,7 @@ mod tests {
             .to_bytes()
             .into_vec()
             .into(),
-            ticket: ticket.to_vec().into(),
+            ticket: ticket.verified_ticket().into_boxed().into_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
             signals: None.into(),
@@ -685,7 +758,7 @@ mod tests {
             .to_bytes()
             .into_vec()
             .into(),
-            ticket: ticket.to_vec().into(),
+            ticket: ticket.verified_ticket().into_boxed().into_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
             signals: None.into(),
@@ -699,7 +772,7 @@ mod tests {
             next_hop: *OffchainKeypair::random().public(),
             ack_challenge: hk.as_ref().into(),
             data: hex!("deadbeefcafebabe").to_vec().into(),
-            ticket: ticket.to_vec().into(),
+            ticket: ticket.verified_ticket().into_boxed().into_vec().into(),
             num_surbs: 0,
             is_forwarded: true,
             signals: None.into(),

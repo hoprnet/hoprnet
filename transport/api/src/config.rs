@@ -6,24 +6,58 @@ use std::{
     time::Duration,
 };
 
+pub use hopr_protocol_hopr::{HoprCodecConfig, HoprTicketProcessorConfig, SurbStoreConfig};
 use hopr_transport_identity::Multiaddr;
 pub use hopr_transport_network::config::NetworkConfig;
 pub use hopr_transport_probe::config::ProbeConfig;
-pub use hopr_transport_protocol::config::ProtocolConfig;
 use hopr_transport_session::{MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION};
 use proc_macro_regex::regex;
-use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
-use validator::{Validate, ValidationError};
+use validator::{Validate, ValidationError, ValidationErrors};
 
 use crate::errors::HoprTransportError;
 
-pub struct HoprTransportConfig {
+/// Complete configuration of the HOPR protocol stack.
+#[derive(Debug, smart_default::SmartDefault, Validate, Clone, Copy, PartialEq)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(deny_unknown_fields)
+)]
+pub struct HoprProtocolConfig {
+    /// Libp2p-related transport configuration
+    #[validate(nested)]
     pub transport: TransportConfig,
+    /// Heartbeat configuration
+    #[validate(nested)]
     pub network: NetworkConfig,
-    pub protocol: ProtocolConfig,
+    /// HOPR packet pipeline configuration
+    #[validate(nested)]
+    pub packet: HoprPacketPipelineConfig,
+    /// Probing protocol configuration
+    #[validate(nested)]
     pub probe: ProbeConfig,
+    /// Session protocol global configuration
+    #[validate(nested)]
     pub session: SessionGlobalConfig,
+}
+
+/// Configuration of the HOPR packet pipeline.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Validate)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(deny_unknown_fields)
+)]
+pub struct HoprPacketPipelineConfig {
+    /// HOPR packet codec configuration
+    #[validate(nested)]
+    pub codec: HoprCodecConfig,
+    /// HOPR ticket processing configuration
+    #[validate(nested)]
+    pub ticket_processing: HoprTicketProcessorConfig,
+    /// Single Use Reply Block (SURB) handling configuration
+    #[validate(nested)]
+    pub surb_store: SurbStoreConfig,
 }
 
 regex!(is_dns_address_regex "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$");
@@ -40,12 +74,30 @@ pub fn is_reachable_domain(host: &str) -> bool {
 }
 
 /// Enumeration of possible host types.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum HostType {
     /// IPv4 based host
     IPv4(String),
     /// DNS based host
     Domain(String),
+}
+
+impl validator::Validate for HostType {
+    fn validate(&self) -> Result<(), ValidationErrors> {
+        match &self {
+            HostType::IPv4(ip4) => validate_ipv4_address(ip4).map_err(|e| {
+                let mut errs = ValidationErrors::new();
+                errs.add("ipv4", e);
+                errs
+            }),
+            HostType::Domain(domain) => validate_dns_address(domain).map_err(|e| {
+                let mut errs = ValidationErrors::new();
+                errs.add("domain", e);
+                errs
+            }),
+        }
+    }
 }
 
 impl Default for HostType {
@@ -59,15 +111,19 @@ impl Default for HostType {
 /// This is used for the P2P and REST API listeners.
 ///
 /// Intentionally has no default because it depends on the use case.
-#[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Validate, Clone, PartialEq)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(deny_unknown_fields)
+)]
 pub struct HostConfig {
     /// Host on which to listen
-    #[serde(default)] // must be defaulted to be mergeable from CLI args
+    #[cfg_attr(feature = "serde", serde(default))]
     pub address: HostType,
     /// Listening TCP or UDP port (mandatory).
     #[validate(range(min = 1u16))]
-    #[serde(default)] // must be defaulted to be mergeable from CLI args
+    #[cfg_attr(feature = "serde", serde(default))]
     pub port: u16,
 }
 
@@ -171,33 +227,29 @@ fn validate_dns_address(s: &str) -> Result<(), ValidationError> {
     }
 }
 
-/// Validates the HostConfig to be used as an external host
-pub fn validate_external_host(host: &HostConfig) -> Result<(), ValidationError> {
-    match &host.address {
-        HostType::IPv4(ip4) => validate_ipv4_address(ip4),
-        HostType::Domain(domain) => validate_dns_address(domain),
-    }
-}
-
 /// Configuration of the physical transport mechanism.
-#[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Default, Validate, Clone, Copy, PartialEq)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(deny_unknown_fields)
+)]
 pub struct TransportConfig {
     /// When true, assume that the node is running in an isolated network and does
     /// not need any connection to nodes outside the subnet
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub announce_local_addresses: bool,
     /// When true, assume a testnet with multiple nodes running on the same machine
     /// or in the same private IPv4 network
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub prefer_local_addresses: bool,
 }
 
 const DEFAULT_SESSION_MAX_SESSIONS: u32 = 2048;
 
-const DEFAULT_SESSION_IDLE_TIMEOUT: Duration = Duration::from_secs(180);
+const DEFAULT_SESSION_IDLE_TIMEOUT: Duration = Duration::from_mins(3);
 
-const SESSION_IDLE_MIN_TIMEOUT: Duration = Duration::from_secs(60);
+const SESSION_IDLE_MIN_TIMEOUT: Duration = Duration::from_secs(2);
 
 const DEFAULT_SESSION_ESTABLISH_RETRY_DELAY: Duration = Duration::from_secs(2);
 
@@ -205,13 +257,13 @@ const DEFAULT_SESSION_ESTABLISH_MAX_RETRIES: u32 = 3;
 
 const DEFAULT_SESSION_BALANCER_SAMPLING: Duration = Duration::from_millis(500);
 
-const DEFAULT_SESSION_BALANCER_BUFFER_DURATION: Duration = Duration::from_millis(5000);
+const DEFAULT_SESSION_BALANCER_BUFFER_DURATION: Duration = Duration::from_secs(5);
 
 fn default_session_max_sessions() -> u32 {
     DEFAULT_SESSION_MAX_SESSIONS
 }
 
-fn default_session_balancer_buffer_duration() -> std::time::Duration {
+fn default_session_balancer_buffer_duration() -> Duration {
     DEFAULT_SESSION_BALANCER_BUFFER_DURATION
 }
 
@@ -219,19 +271,19 @@ fn default_session_establish_max_retries() -> u32 {
     DEFAULT_SESSION_ESTABLISH_MAX_RETRIES
 }
 
-fn default_session_idle_timeout() -> std::time::Duration {
+fn default_session_idle_timeout() -> Duration {
     DEFAULT_SESSION_IDLE_TIMEOUT
 }
 
-fn default_session_establish_retry_delay() -> std::time::Duration {
+fn default_session_establish_retry_delay() -> Duration {
     DEFAULT_SESSION_ESTABLISH_RETRY_DELAY
 }
 
-fn default_session_balancer_sampling() -> std::time::Duration {
+fn default_session_balancer_sampling() -> Duration {
     DEFAULT_SESSION_BALANCER_SAMPLING
 }
 
-fn validate_session_idle_timeout(value: &std::time::Duration) -> Result<(), ValidationError> {
+fn validate_session_idle_timeout(value: &Duration) -> Result<(), ValidationError> {
     if SESSION_IDLE_MIN_TIMEOUT <= *value {
         Ok(())
     } else {
@@ -239,7 +291,7 @@ fn validate_session_idle_timeout(value: &std::time::Duration) -> Result<(), Vali
     }
 }
 
-fn validate_balancer_sampling(value: &std::time::Duration) -> Result<(), ValidationError> {
+fn validate_balancer_sampling(value: &Duration) -> Result<(), ValidationError> {
     if MIN_BALANCER_SAMPLING_INTERVAL <= *value {
         Ok(())
     } else {
@@ -247,7 +299,7 @@ fn validate_balancer_sampling(value: &std::time::Duration) -> Result<(), Validat
     }
 }
 
-fn validate_balancer_buffer_duration(value: &std::time::Duration) -> Result<(), ValidationError> {
+fn validate_balancer_buffer_duration(value: &Duration) -> Result<(), ValidationError> {
     if MIN_SURB_BUFFER_DURATION <= *value {
         Ok(())
     } else {
@@ -256,26 +308,31 @@ fn validate_balancer_buffer_duration(value: &std::time::Duration) -> Result<(), 
 }
 
 /// Global configuration of Sessions and the Session manager.
-#[serde_as]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Validate, smart_default::SmartDefault)]
-#[serde(deny_unknown_fields)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Validate, smart_default::SmartDefault)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(deny_unknown_fields)
+)]
 pub struct SessionGlobalConfig {
     /// Maximum time before an idle Session is closed.
     ///
     /// Defaults to 3 minutes.
     #[validate(custom(function = "validate_session_idle_timeout"))]
-    #[default(DEFAULT_SESSION_IDLE_TIMEOUT)]
-    #[serde(default = "default_session_idle_timeout")]
-    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
-    pub idle_timeout: std::time::Duration,
+    #[default(default_session_idle_timeout())]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "default_session_idle_timeout", with = "humantime_serde")
+    )]
+    pub idle_timeout: Duration,
 
     /// The maximum number of outgoing or incoming Sessions that
     /// are allowed by the Session manager.
     ///
     /// Minimum is 1, the maximum is given by the Session tag range.
     /// Default is 2048.
-    #[default(DEFAULT_SESSION_MAX_SESSIONS)]
-    #[serde(default = "default_session_max_sessions")]
+    #[default(default_session_max_sessions())]
+    #[cfg_attr(feature = "serde", serde(default = "default_session_max_sessions"))]
     #[validate(range(min = 1))]
     pub maximum_sessions: u32,
 
@@ -284,26 +341,30 @@ pub struct SessionGlobalConfig {
     ///
     /// Defaults to 3, maximum is 20.
     #[validate(range(min = 0, max = 20))]
-    #[default(DEFAULT_SESSION_ESTABLISH_MAX_RETRIES)]
-    #[serde(default = "default_session_establish_max_retries")]
+    #[default(default_session_establish_max_retries())]
+    #[cfg_attr(feature = "serde", serde(default = "default_session_establish_max_retries"))]
     pub establish_max_retries: u32,
 
     /// Delay between Session establishment retries.
     ///
     /// Default is 2 seconds.
-    #[default(DEFAULT_SESSION_ESTABLISH_RETRY_DELAY)]
-    #[serde(default = "default_session_establish_retry_delay")]
-    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
-    pub establish_retry_timeout: std::time::Duration,
+    #[default(default_session_establish_retry_delay())]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "default_session_establish_retry_delay", with = "humantime_serde")
+    )]
+    pub establish_retry_timeout: Duration,
 
     /// Sampling interval for SURB balancer in milliseconds.
     ///
     /// Default is 500 milliseconds.
     #[validate(custom(function = "validate_balancer_sampling"))]
-    #[default(DEFAULT_SESSION_BALANCER_SAMPLING)]
-    #[serde(default = "default_session_balancer_sampling")]
-    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
-    pub balancer_sampling_interval: std::time::Duration,
+    #[default(default_session_balancer_sampling())]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "default_session_balancer_sampling", with = "humantime_serde")
+    )]
+    pub balancer_sampling_interval: Duration,
 
     /// Minimum runway of received SURBs in seconds.
     ///
@@ -313,10 +374,12 @@ pub struct SessionGlobalConfig {
     ///
     /// Default is 5 seconds, minimum is 1 second.
     #[validate(custom(function = "validate_balancer_buffer_duration"))]
-    #[default(DEFAULT_SESSION_BALANCER_BUFFER_DURATION)]
-    #[serde(default = "default_session_balancer_buffer_duration")]
-    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
-    pub balancer_minimum_surb_buffer_duration: std::time::Duration,
+    #[default(default_session_balancer_buffer_duration())]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "default_session_balancer_buffer_duration", with = "humantime_serde")
+    )]
+    pub balancer_minimum_surb_buffer_duration: Duration,
 }
 
 #[cfg(test)]

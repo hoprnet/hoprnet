@@ -39,7 +39,20 @@ pub enum HoprTransportError {
     ApplicationLayerError(#[from] hopr_protocol_app::errors::ApplicationLayerError),
 
     #[error(transparent)]
-    Other(Box<dyn std::error::Error + Send + Sync + 'static>),
+    Chain(anyhow::Error),
+
+    #[error(transparent)]
+    Other(anyhow::Error),
+}
+
+impl HoprTransportError {
+    pub fn chain<E: Into<anyhow::Error>>(e: E) -> Self {
+        Self::Chain(e.into())
+    }
+
+    pub fn other<E: Into<anyhow::Error>>(e: E) -> Self {
+        Self::Other(e.into())
+    }
 }
 
 /// Result produced by the crate, uses the [HoprTransportError] as the error type.

@@ -157,22 +157,18 @@ Options:
           Set host IP to which the API server will bind [env: HOPRD_API_HOST=]
       --apiPort <PORT>
           Set port to which the API server will bind [env: HOPRD_API_PORT=]
-      --defaultSessionListenHost <DEFAULT_SESSION_LISTEN_HOST>
-          Default Session listening host for Session IP forwarding [env: HOPRD_DEFAULT_SESSION_LISTEN_HOST=]
       --apiToken <TOKEN>
           A REST API token and for user authentication [env: HOPRD_API_TOKEN=]
       --password <PASSWORD>
           A password to encrypt your keys [env: HOPRD_PASSWORD=]
-      --provider <PROVIDER>
-          A custom provider to be used for the node to connect to blockchain [env: HOPRD_PROVIDER=]
+      --blokliUrl <URL>
+          URL for Blokli provider to be used for the node to connect to blockchain [env: HOPRD_BLOKLI_URL=]
       --init...
           initialize a database if it doesn't already exist [env: HOPRD_INIT=]
       --forceInit...
           initialize a database, even if it already exists [env: HOPRD_FORCE_INIT=]
       --probeRecheckThreshold <SECONDS>
           Timeframe in seconds after which it is reasonable to recheck the nearest neighbor [env: HOPRD_PROBE_RECHECK_THRESHOLD=]
-      --networkQualityThreshold <THRESHOLD>
-          Minimum quality of a peer connection to be considered usable [env: HOPRD_NETWORK_QUALITY_THRESHOLD=]
       --configurationFilePath <CONFIG_FILE_PATH>
           Path to a file containing the entire HOPRd configuration [env: HOPRD_CONFIGURATION_FILE_PATH=]
       --safeAddress <HOPRD_SAFE_ADDR>

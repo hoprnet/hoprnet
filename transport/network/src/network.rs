@@ -453,7 +453,7 @@ mod tests {
     use std::{ops::Add, time::Duration};
 
     use anyhow::Context;
-    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
+    use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
     use hopr_db_node::HoprNodeDb;
     use hopr_platform::time::native::current_time;
     use hopr_primitive_types::prelude::AsUnixTimestamp;
@@ -491,12 +491,7 @@ mod tests {
             quality_offline_threshold: 0.6,
             ..Default::default()
         };
-        Ok(Network::new(
-            *my_id,
-            vec![],
-            cfg,
-            HoprNodeDb::new_in_memory(ChainKeypair::random()).await?,
-        ))
+        Ok(Network::new(*my_id, vec![], cfg, HoprNodeDb::new_in_memory().await?))
     }
 
     #[test]
@@ -892,12 +887,7 @@ mod tests {
             ..Default::default()
         };
 
-        let peers = Network::new(
-            me,
-            vec![],
-            cfg,
-            HoprNodeDb::new_in_memory(ChainKeypair::random()).await?,
-        );
+        let peers = Network::new(me, vec![], cfg, HoprNodeDb::new_in_memory().await?);
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
 
@@ -919,12 +909,7 @@ mod tests {
             ..Default::default()
         };
 
-        let peers = Network::new(
-            me,
-            vec![],
-            cfg,
-            HoprNodeDb::new_in_memory(ChainKeypair::random()).await?,
-        );
+        let peers = Network::new(me, vec![], cfg, HoprNodeDb::new_in_memory().await?);
 
         peers.add(&peer, PeerOrigin::NetworkRegistry, vec![]).await?;
 
@@ -946,12 +931,7 @@ mod tests {
             ..Default::default()
         };
 
-        let peers = Network::new(
-            me,
-            vec![],
-            cfg,
-            HoprNodeDb::new_in_memory(ChainKeypair::random()).await?,
-        );
+        let peers = Network::new(me, vec![], cfg, HoprNodeDb::new_in_memory().await?);
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
 
@@ -979,7 +959,7 @@ mod tests {
             OffchainKeypair::random().public().into(),
             vec![],
             cfg,
-            HoprNodeDb::new_in_memory(ChainKeypair::random()).await?,
+            HoprNodeDb::new_in_memory().await?,
         );
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
@@ -1020,7 +1000,7 @@ mod tests {
             me,
             vec![public_addr.clone()], // Set only public address for self
             Default::default(),
-            HoprNodeDb::new_in_memory(ChainKeypair::random()).await?,
+            HoprNodeDb::new_in_memory().await?,
         );
 
         // Add peer with mixed addresses - private addresses should be filtered out during add
@@ -1075,7 +1055,7 @@ mod tests {
             me,
             mixed_self_addresses,
             Default::default(),
-            HoprNodeDb::new_in_memory(ChainKeypair::random()).await?,
+            HoprNodeDb::new_in_memory().await?,
         );
 
         // Test that get() method filters self addresses as a defensive measure

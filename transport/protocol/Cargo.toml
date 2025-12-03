@@ -10,27 +10,31 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-runtime-tokio = [
-  "hopr-async-runtime/runtime-tokio",
-  "hopr-db-node/runtime-tokio",
+prometheus = ["dep:hopr-metrics"]
+runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
+serde = [
+  "dep:cfg_eval",
+  "dep:serde",
+  "dep:serde_with",
+  "hopr-internal-types/serde",
+  "hopr-primitive-types/serde",
+  "hopr-protocol-hopr/serde",
+  "hopr-protocol-app/serde",
 ]
-prometheus = ["dep:hopr-metrics", "hopr-db-node/prometheus"]
-capture = ["dep:pcap-file"]
 
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+cfg_eval = { workspace = true, optional = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
 hex-literal = { workspace = true }
 lazy_static = { workspace = true }
 libp2p = { workspace = true, features = ["noise", "request-response"] }
 moka = { workspace = true }
-parking_lot = { workspace = true }
-pcap-file = { workspace = true, optional = true }
 rust-stream-ext-concurrent = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
-serde_with = { workspace = true }
+serde = { workspace = true, features = ["derive"], optional = true }
+serde_with = { workspace = true, optional = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
@@ -46,13 +50,13 @@ hopr-async-runtime = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-internal-types = { workspace = true, features = ["serde"] }
+hopr-internal-types = { workspace = true }
 hopr-network-types = { workspace = true }
 hopr-metrics = { optional = true, workspace = true }
 hopr-parallelize = { workspace = true, features = ["rayon"] }
 hopr-primitive-types = { workspace = true }
+hopr-protocol-hopr = { workspace = true }
 hopr-protocol-app = { workspace = true }
-hopr-transport-bloom = { workspace = true }
 hopr-transport-identity = { workspace = true }
 
 
@@ -64,20 +68,12 @@ criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 serial_test = { workspace = true }
 hopr-network-types = { workspace = true }
 test-log = { workspace = true }
-hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 hopr-db-node = { workspace = true, features = ["runtime-tokio"] }
 hopr-chain-connector = { workspace = true, features = [
-  "runtime-tokio",
   "testing",
-] }
-hopr-protocol-session = { workspace = true, features = [
-  "session-types",
   "runtime-tokio",
 ] }
-hopr-protocol-start = { workspace = true }
-hopr-transport-session = { workspace = true, features = ["runtime-tokio"] }
 hopr-transport-mixer = { workspace = true }
-hopr-transport-probe = { workspace = true, features = ["runtime-tokio"] }
 
 [[bench]]
 name = "protocol_throughput_emulated"

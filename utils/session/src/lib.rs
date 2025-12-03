@@ -252,7 +252,7 @@ impl SessionPool {
                 pool: Some(pool),
                 ah: Some(hopr_async_runtime::spawn_as_abortable!(
                     futures_time::stream::interval(futures_time::time::Duration::from(
-                        std::time::Duration::from_secs(1).max(hopr.config().session.idle_timeout / 2)
+                        std::time::Duration::from_secs(1).max(hopr.config().protocol.session.idle_timeout / 2)
                     ))
                     .take_while(move |_| {
                         // Continue the infinite interval stream until there are sessions in the pool

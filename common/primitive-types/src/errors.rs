@@ -1,4 +1,3 @@
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// Type for any possible error, because the traits in this module
@@ -6,7 +5,7 @@ use thiserror::Error;
 pub type AnyError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 /// Listing of some general re-usable errors
-#[derive(Error, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Error, Debug, PartialEq)]
 pub enum GeneralError {
     #[error("failed to parse/deserialize the data: {0}")]
     ParseError(String),

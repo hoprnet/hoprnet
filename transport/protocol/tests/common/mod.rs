@@ -4,16 +4,21 @@ use anyhow::Context;
 use futures::{SinkExt, StreamExt};
 use hex_literal::hex;
 use hopr_api::chain::*;
+use hopr_async_runtime::AbortableList;
 use hopr_chain_connector::create_trustful_hopr_blokli_connector;
-use hopr_crypto_random::{Randomizable, random_bytes, random_integer};
+use hopr_crypto_random::{random_bytes, random_integer};
 use hopr_crypto_types::prelude::*;
 use hopr_db_node::HoprNodeDb;
 use hopr_internal_types::{errors::PathError, prelude::*};
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_primitive_types::prelude::*;
 use hopr_protocol_app::prelude::*;
+use hopr_protocol_hopr::{
+    HoprCodecConfig, HoprDecoder, HoprEncoder, HoprTicketProcessor, HoprTicketProcessorConfig, MemorySurbStore,
+    SurbStoreConfig,
+};
 use hopr_transport_mixer::config::MixerConfig;
-use hopr_transport_protocol::processor::PacketInteractionConfig;
+use hopr_transport_protocol::TicketEvent;
 use lazy_static::lazy_static;
 use libp2p::PeerId;
 use tokio::time::timeout;
@@ -85,12 +90,17 @@ pub type LogicalChannels = (
 );
 
 #[allow(dead_code)]
-pub type TicketChannel = futures::channel::mpsc::UnboundedReceiver<RedeemableTicket>;
+pub type TicketChannel = futures::channel::mpsc::UnboundedReceiver<TicketEvent>;
 
 #[allow(dead_code)]
 pub async fn peer_setup_for(
     count: usize,
-) -> anyhow::Result<(Vec<WireChannels>, Vec<LogicalChannels>, Vec<TicketChannel>)> {
+) -> anyhow::Result<(
+    Vec<WireChannels>,
+    Vec<LogicalChannels>,
+    Vec<TicketChannel>,
+    AbortableList<usize>,
+)> {
     let peer_count = count;
 
     assert!(peer_count <= PEERS.len());
@@ -118,10 +128,10 @@ pub async fn peer_setup_for(
     let mut wire_channels = Vec::new();
     let mut logical_channels = Vec::new();
     let mut ticket_channels = Vec::new();
+    let mut processes = AbortableList::default();
 
     for i in 0..peer_count {
-        let (received_ack_tickets_tx, received_ack_tickets_rx) =
-            futures::channel::mpsc::unbounded::<RedeemableTicket>();
+        let (received_ack_tickets_tx, received_ack_tickets_rx) = futures::channel::mpsc::unbounded::<TicketEvent>();
 
         let (wire_msg_send_tx, wire_msg_send_rx) = futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
         let (mixer_channel_tx, mixer_channel_rx) =
@@ -131,14 +141,7 @@ pub async fn peer_setup_for(
             futures::channel::mpsc::unbounded::<(ResolvedTransportRouting, ApplicationDataOut)>();
         let (api_recv_tx, api_recv_rx) = futures::channel::mpsc::unbounded::<(HoprPseudonym, ApplicationDataIn)>();
 
-        let packet_cfg = PacketInteractionConfig {
-            packet_keypair: PEERS[i].clone(),
-            outgoing_ticket_win_prob: Some(WinningProbability::ALWAYS),
-            outgoing_ticket_price: Some((*DEFAULT_PRICE_PER_PACKET).into()),
-        };
-
-        let node_db = HoprNodeDb::new_in_memory(PEERS_CHAIN[i].clone()).await?;
-        node_db.start_ticket_processing(Some(received_ack_tickets_tx))?;
+        let node_db = HoprNodeDb::new_in_memory().await?;
 
         let mut connector = create_trustful_hopr_blokli_connector(
             &PEERS_CHAIN[i],
@@ -149,22 +152,57 @@ pub async fn peer_setup_for(
         .await?;
         connector.connect(Duration::from_secs(3)).await?;
 
-        hopr_transport_protocol::run_msg_ack_protocol(
-            packet_cfg,
-            node_db,
-            Arc::new(connector),
+        let connector = Arc::new(connector);
+        let surb_store = MemorySurbStore::new(SurbStoreConfig::default());
+        let channels_dst = connector.domain_separators().await?.channel;
+
+        let codec_config = HoprCodecConfig {
+            outgoing_ticket_price: Some((*DEFAULT_PRICE_PER_PACKET).into()),
+            outgoing_win_prob: Some(WinningProbability::ALWAYS),
+        };
+
+        let ticket_proc = HoprTicketProcessor::new(
+            connector.clone(),
+            node_db.clone(),
+            PEERS_CHAIN[i].clone(),
+            channels_dst,
+            HoprTicketProcessorConfig::default(),
+        );
+
+        let encoder = HoprEncoder::new(
+            PEERS_CHAIN[i].clone(),
+            connector.clone(),
+            surb_store.clone(),
+            ticket_proc.clone(),
+            channels_dst,
+            codec_config,
+        );
+
+        let decoder = HoprDecoder::new(
+            (PEERS[i].clone(), PEERS_CHAIN[i].clone()),
+            connector.clone(),
+            surb_store,
+            ticket_proc.clone(),
+            channels_dst,
+            codec_config,
+        );
+
+        let node_processes = hopr_transport_protocol::run_packet_pipeline(
+            PEERS[i].clone(),
             (mixer_channel_tx, wire_msg_send_rx),
+            (encoder, decoder),
+            ticket_proc,
+            received_ack_tickets_tx,
             (api_recv_tx, api_send_rx),
-        )
-        .await;
+        );
 
         wire_channels.push((wire_msg_send_tx, mixer_channel_rx));
-
         logical_channels.push((api_send_tx, api_recv_rx));
-        ticket_channels.push(received_ack_tickets_rx)
+        ticket_channels.push(received_ack_tickets_rx);
+        processes.insert(i, node_processes);
     }
 
-    Ok((wire_channels, logical_channels, ticket_channels))
+    Ok((wire_channels, logical_channels, ticket_channels, processes))
 }
 
 #[tracing::instrument(level = "debug", skip(components))]
@@ -206,11 +244,14 @@ pub async fn emulate_channel_communication(pending_packet_count: usize, mut comp
                     panic!("Unexpected destination");
                 };
 
-                components[destination]
+                if let Err(error) = components[destination]
                     .0
                     .send((PEERS[i].public().into(), payload))
                     .await
-                    .expect("Sending of payload to the peer failed");
+                {
+                    tracing::error!(%error, "failed to send packet to peer");
+                    panic!("Failed to send packet to peer");
+                }
             }
         }
     }
@@ -282,9 +323,9 @@ pub async fn send_relay_receive_channel_of_n_peers(
     assert!(peer_count >= 3, "invalid peer count given");
     assert!(!test_msgs.is_empty(), "at least one packet must be given");
 
-    const TIMEOUT_SECONDS: std::time::Duration = std::time::Duration::from_secs(10);
+    const TIMEOUT_SECONDS: Duration = Duration::from_secs(10);
 
-    let (wire_apis, mut apis, ticket_channels) = peer_setup_for(peer_count)
+    let (wire_apis, apis, ticket_channels, processes) = peer_setup_for(peer_count)
         .await
         .context("failed to setup peers for test")?;
 
@@ -303,7 +344,7 @@ pub async fn send_relay_receive_channel_of_n_peers(
 
     tokio::task::spawn(emulate_channel_communication(packet_count, wire_apis));
 
-    let pseudonym = HoprPseudonym::random();
+    let pseudonym = SimplePseudonym([0xde, 0xad, 0xbe, 0xef, 0xca, 0xfe, 0xba, 0xbe, 0x11, 0x22]);
     let mut sent_packet_count = 0;
     for test_msg in test_msgs.iter().take(packet_count) {
         let mut sender = apis[0].0.clone();
@@ -325,8 +366,10 @@ pub async fn send_relay_receive_channel_of_n_peers(
         "not all packets were successfully sent"
     );
 
+    let (_apis_send, mut apis_recv): (Vec<_>, Vec<_>) = apis.into_iter().unzip();
+
     let compare_packets = async move {
-        let last_node_recv = apis.remove(peer_count - 1).1;
+        let last_node_recv = apis_recv.remove(peer_count - 1);
 
         let mut recv_packets = last_node_recv
             .take(packet_count)
@@ -359,13 +402,20 @@ pub async fn send_relay_receive_channel_of_n_peers(
         let expected_tickets = if i != 0 && i != peer_count - 1 { packet_count } else { 0 };
 
         assert_eq!(
-            timeout(std::time::Duration::from_secs(1), rx.take(expected_tickets).count())
-                .await
-                .context("peer should be able to extract expected tickets")?,
+            timeout(
+                Duration::from_secs(1),
+                rx.take(expected_tickets)
+                    .filter(|e| futures::future::ready(e.is_winning_ticket()))
+                    .count()
+            )
+            .await
+            .context("peer should be able to extract expected tickets")?,
             expected_tickets,
             "peer {i} did not receive the expected amount of tickets",
         );
     }
 
+    tracing::trace!("all peers finished");
+    processes.abort_all();
     Ok(())
 }

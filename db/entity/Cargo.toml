@@ -19,12 +19,12 @@ sqlite = []
 [build-dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }
-sea-orm = { workspace = true }
-sea-orm-cli = { workspace = true }
-sea-orm-migration = { workspace = true }
+sea-orm = { workspace = true, features = ["runtime-tokio"] }
+sea-orm-cli = { workspace = true, features = ["runtime-tokio"] }
+sea-orm-migration = { workspace = true, features = ["runtime-tokio"] }
 tokio = { workspace = true }
 
-hopr-db-migration = { workspace = true }
+hopr-db-migration = { workspace = true, features = ["runtime-tokio"] }
 
 [dependencies]
 sea-orm = { workspace = true }

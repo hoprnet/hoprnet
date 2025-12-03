@@ -1,4 +1,3 @@
-use bloomfilter::Bloom;
 use hopr_crypto_random::random_bytes;
 use hopr_crypto_types::types::PacketTag;
 
@@ -7,13 +6,14 @@ use hopr_crypto_types::types::PacketTag;
 /// In addition, this structure also holds the number of items in the filter
 /// to determine if the filter needs to be refreshed. Once this happens, packet replays
 /// of past packets might be possible.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TagBloomFilter {
-    bloom: Bloom<PacketTag>,
+    bloom: bloomfilter::Bloom<PacketTag>,
     count: usize,
     capacity: usize,
 }
 
+#[allow(unused)]
 impl TagBloomFilter {
     // The default maximum number of packet tags this Bloom filter can hold.
     // After these many packets, the Bloom filter resets and packet replays are possible.
@@ -43,12 +43,17 @@ impl TagBloomFilter {
     }
 
     /// Check if the packet tag is in the Bloom filter.
+    ///
+    /// Returns `true` if the given `tag` was already present in the filter.
     /// False positives are possible.
     pub fn check(&self, tag: &PacketTag) -> bool {
         self.bloom.check(tag)
     }
 
     /// Checks and sets a packet tag (if not present) in a single operation.
+    ///
+    /// Returns `true` if the given `tag` was already present in the filter.
+    /// False positives are possible.
     pub fn check_and_set(&mut self, tag: &PacketTag) -> bool {
         // If we're at full capacity, we do only "check" and conditionally reset with the new entry
         if self.count == self.capacity {
@@ -73,7 +78,7 @@ impl TagBloomFilter {
 
     fn with_capacity(size: usize) -> Self {
         Self {
-            bloom: Bloom::new_for_fp_rate_with_seed(size, Self::FALSE_POSITIVE_RATE, &random_bytes())
+            bloom: bloomfilter::Bloom::new_for_fp_rate_with_seed(size, Self::FALSE_POSITIVE_RATE, &random_bytes())
                 .expect("bloom filter with the specified capacity is constructible"),
             count: 0,
             capacity: size,

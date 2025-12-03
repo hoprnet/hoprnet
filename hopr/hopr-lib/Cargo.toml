@@ -12,11 +12,15 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
+capture = ["hopr-transport/capture"]
 default = []
-session-client = []
-session-server = []
-transport-announce-quic = ["hopr-transport/p2p-announce-quic"]
-transport-use-quic = ["hopr-transport/p2p-transport-quic"]
+fixed-rng = ["hopr-crypto-random/fixed-rng", "hopr-internal-types/fixed-rng"]
+prometheus = [
+  "dep:hopr-metrics",
+  "hopr-transport/prometheus",
+  "hopr-network-types/prometheus",
+  "hopr-db-node/prometheus",
+]
 runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hopr-network-types/runtime-tokio",
@@ -24,14 +28,21 @@ runtime-tokio = [
   "dep:tokio",
   "hopr-chain-connector?/runtime-tokio",
 ]
-prometheus = [
-  "dep:hopr-metrics",
-  "hopr-transport/prometheus",
-  "hopr-network-types/prometheus",
-  "hopr-db-node/prometheus",
+serde = [
+  "dep:cfg_eval",
+  "dep:serde",
+  "dep:serde_with",
+  "hopr-internal-types/serde",
+  "hopr-network-types/serde",
+  "hopr-transport/serde",
+  "hopr-primitive-types/serde",
+  "hopr-crypto-types/serde",
 ]
-capture = ["hopr-transport/capture"]
-fixed-rng = ["hopr-crypto-random/fixed-rng"]
+session-client = []
+session-server = []
+transport-announce-quic = ["hopr-transport/p2p-announce-quic"]
+transport-use-quic = ["hopr-transport/p2p-transport-quic"]
+
 
 # === utility features ===
 utils_futures = []  # utility futures for async adapters
@@ -51,8 +62,10 @@ testing = [
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+async-broadcast = { workspace = true }
 atomic_enum = { workspace = true }
 backon = { workspace = true, features = ["futures-timer-sleep"] }
+cfg_eval = { workspace = true, optional = true }
 cfg-if = { workspace = true }
 const_format = { workspace = true }
 futures = { workspace = true }
@@ -61,8 +74,8 @@ hex-literal = { workspace = true, optional = true }
 lazy_static = { workspace = true }
 rand = { workspace = true, optional = true }
 rstest = { workspace = true, optional = true }
-serde = { workspace = true }
-serde_with = { workspace = true }
+serde = { workspace = true, optional = true }
+serde_with = { workspace = true, optional = true }
 strum = { workspace = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
@@ -96,7 +109,7 @@ serde_yaml = { workspace = true }
 tokio = { workspace = true }
 test-log = { workspace = true }
 
-hopr-db-node = { workspace = true }
+hopr-db-node = { workspace = true, features = ["runtime-tokio"] }
 hopr-lib = { workspace = true, features = [
   "runtime-tokio",
   "session-server",

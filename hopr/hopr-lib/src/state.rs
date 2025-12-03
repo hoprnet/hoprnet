@@ -26,12 +26,12 @@ pub enum HoprLibProcess {
     #[cfg(feature = "session-server")]
     #[strum(to_string = "session server providing the exit node session stream functionality")]
     SessionServer,
-    #[strum(to_string = "flush operation of outgoing ticket indices to the DB")]
-    TicketIndexFlush,
     #[strum(to_string = "ticket redemption queue driver")]
     TicketRedemptions,
     #[strum(to_string = "subscription for on-chain account announcements")]
     AccountAnnouncements,
     #[strum(to_string = "subscription for on-chain channel updates")]
     ChannelEvents,
+    #[strum(to_string = "on received ticket event (winning or rejected)")]
+    TicketEvents,
 }

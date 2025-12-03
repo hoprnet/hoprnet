@@ -272,6 +272,18 @@ pub struct HoprIncomingPacket {
     pub signals: PacketSignals,
 }
 
+impl std::fmt::Debug for HoprIncomingPacket {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HoprIncomingPacket")
+            .field("packet_tag", &self.packet_tag)
+            .field("ack_key", &self.ack_key)
+            .field("previous_hop", &self.previous_hop)
+            .field("sender", &self.sender)
+            .field("signals", &self.signals)
+            .finish_non_exhaustive()
+    }
+}
+
 /// Represents a packet destined for another node.
 #[derive(Clone)]
 pub struct HoprOutgoingPacket {
@@ -283,6 +295,16 @@ pub struct HoprOutgoingPacket {
     pub next_hop: OffchainPublicKey,
     /// Acknowledgement challenge solved once the next hop sends us an acknowledgement.
     pub ack_challenge: HalfKeyChallenge,
+}
+
+impl std::fmt::Debug for HoprOutgoingPacket {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HoprOutgoingPacket")
+            .field("ticket", &self.ticket)
+            .field("next_hop", &self.next_hop)
+            .field("ack_challenge", &self.ack_challenge)
+            .finish_non_exhaustive()
+    }
 }
 
 /// Represents a [`HoprOutgoingPacket`] with additional forwarding information.
@@ -304,12 +326,26 @@ pub struct HoprForwardedPacket {
     pub path_pos: u8,
 }
 
+impl std::fmt::Debug for HoprForwardedPacket {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HoprForwardedPacket")
+            .field("outgoing", &self.outgoing)
+            .field("packet_tag", &self.packet_tag)
+            .field("ack_key", &self.ack_key)
+            .field("previous_hop", &self.previous_hop)
+            .field("own_key", &self.own_key)
+            .field("next_challenge", &self.next_challenge)
+            .field("path_pos", &self.path_pos)
+            .finish_non_exhaustive()
+    }
+}
+
 /// Contains HOPR packet and its variants.
 ///
 /// See [`HoprIncomingPacket`], [`HoprForwardedPacket`] and [`HoprOutgoingPacket`] for details.
 ///
 /// The members are intentionally boxed to equalize the variant sizes.
-#[derive(Clone, strum::EnumTryAs, strum::EnumIs)]
+#[derive(Clone, Debug, strum::EnumTryAs, strum::EnumIs)]
 pub enum HoprPacket {
     /// The packet is intended for us
     Final(Box<HoprIncomingPacket>),
@@ -317,6 +353,17 @@ pub enum HoprPacket {
     Forwarded(Box<HoprForwardedPacket>),
     /// The packet that is being sent out by us
     Outgoing(Box<HoprOutgoingPacket>),
+}
+
+impl HoprPacket {
+    /// Returns the [`PacketTag`] of forwarded or final packets, or `None` for outgoing packets.
+    pub fn packet_tag(&self) -> Option<&PacketTag> {
+        match self {
+            HoprPacket::Final(packet) => Some(&packet.packet_tag),
+            HoprPacket::Forwarded(packet) => Some(&packet.packet_tag),
+            HoprPacket::Outgoing(_) => None,
+        }
+    }
 }
 
 impl Display for HoprPacket {
@@ -496,6 +543,7 @@ impl HoprPacket {
                         signals,
                     } = HoprPacketMessage::from(plain_text).try_into()?;
                     let should_acknowledge = !no_ack;
+                    tracing::trace!(?should_acknowledge, "acknowledgement for final packet");
                     Ok(Self::Final(
                         HoprIncomingPacket {
                             packet_tag,

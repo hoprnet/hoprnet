@@ -3,13 +3,17 @@ use std::{num::NonZeroUsize, str::FromStr, sync::Arc};
 use async_signal::{Signal, Signals};
 use futures::{FutureExt, StreamExt, future::abortable};
 use hopr_chain_connector::{HoprBlockchainSafeConnector, blokli_client::BlokliClient};
-use hopr_db_node::HoprNodeDb;
-use hopr_lib::{AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, exports::api::chain::ChainEvents};
+use hopr_db_node::{HoprNodeDb, init_hopr_node_db};
+use hopr_lib::{
+    AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, config::HoprLibConfig,
+    exports::api::chain::ChainEvents,
+};
 use hoprd::{cli::CliArgs, config::HoprdConfig, errors::HoprdError, exit::HoprServerIpForwardingReactor};
 use hoprd_api::{RestApiParameters, serve_api};
 use signal_hook::low_level;
 use tracing::{debug, error, info, warn};
 use tracing_subscriber::prelude::*;
+use validator::Validate;
 #[cfg(feature = "telemetry")]
 use {
     opentelemetry::trace::TracerProvider,
@@ -222,7 +226,8 @@ async fn main_inner() -> anyhow::Result<()> {
     }
 
     let args = <CliArgs as clap::Parser>::parse();
-    let cfg = HoprdConfig::from_cli_args(args, false)?;
+    let cfg = HoprdConfig::try_from(args)?;
+    cfg.validate()?;
 
     let git_hash = option_env!("VERGEN_GIT_SHA").unwrap_or("unknown");
     info!(
@@ -255,36 +260,24 @@ async fn main_inner() -> anyhow::Result<()> {
         "Node public identifiers"
     );
 
-    // TODO: stored tickets need to be emitted from the Hopr object (addressed in #7575)
-    let (node_db, stored_tickets) = hopr_db_node::init_hopr_node_db(
-        &hopr_keys.chain_key,
-        &cfg.db.data,
-        cfg.db.initialize,
-        cfg.db.force_initialize,
-    )
-    .await?;
+    let node_db = init_hopr_node_db(&cfg.db.data, cfg.db.initialize, cfg.db.force_initialize).await?;
 
     let chain_connector = Arc::new(
         init_blokli_connector(
             &hopr_keys.chain_key,
-            cfg.provider.clone(),
+            cfg.blokli_url.clone(),
             cfg.hopr.safe_module.module_address,
         )
         .await?,
     );
 
+    // TODO: load all the environment variables here and use them to configure the hopr-lib config (#7660)
+    let hopr_lib_cfg: HoprLibConfig = cfg.hopr.clone().into();
+
     // Create the node instance
     info!("creating the HOPRd node instance from hopr-lib");
-    let node = Arc::new(
-        hopr_lib::Hopr::new(
-            cfg.clone().into(),
-            chain_connector.clone(),
-            node_db,
-            &hopr_keys.packet_key,
-            &hopr_keys.chain_key,
-        )
-        .await?,
-    );
+    let node =
+        Arc::new(hopr_lib::Hopr::new((&hopr_keys).into(), chain_connector.clone(), node_db, hopr_lib_cfg).await?);
 
     let mut processes = AbortableList::<HoprdProcess>::default();
 
@@ -313,7 +306,7 @@ async fn main_inner() -> anyhow::Result<()> {
         hopr_strategy::stream_events_to_strategy_with_tick(
             multi_strategy,
             chain_connector.subscribe()?,
-            stored_tickets,
+            node.subscribe_winning_tickets(),
             cfg.strategy.execution_interval,
             hopr_keys.chain_key.public().to_address(),
         ),

@@ -68,7 +68,7 @@ async fn ticket_statistics_should_reset_when_cleaned(#[with(5)] cluster_fixture:
         .await
         .context("failed to get ticket statistics")?;
 
-    assert!(stats_before.winning_count > 0); // As winning prob is set to 1
+    assert!(stats_before.winning_tickets > 0); // As winning prob is set to 1
 
     mid.inner()
         .reset_ticket_statistics()
@@ -82,7 +82,7 @@ async fn ticket_statistics_should_reset_when_cleaned(#[with(5)] cluster_fixture:
         .context("failed to get ticket statistics")?;
 
     assert_ne!(stats_before, stats_after);
-    assert_eq!(stats_after.winning_count, 0);
+    assert_eq!(stats_after.winning_tickets, 0);
 
     Ok(())
 }
@@ -130,7 +130,7 @@ async fn test_reject_relaying_a_message_when_the_channel_is_out_of_funding(
         .ticket_statistics()
         .await
         .context("failed to get ticket statistics")?;
-    assert!(stats_before.rejected_value < stats_after.rejected_value);
+    assert!(stats_before.rejected_value() < stats_after.rejected_value());
 
     Ok(())
 }
@@ -189,7 +189,7 @@ async fn test_redeem_ticket_on_request(#[with(5)] cluster_fixture: ClusterGuard)
         .await
         .context("failed to get ticket statistics")?;
 
-    assert!(stats_after.redeemed_value > stats_before.redeemed_value);
+    assert!(stats_after.redeemed_value() > stats_before.redeemed_value());
 
     Ok(())
 }
@@ -241,7 +241,7 @@ async fn test_neglect_ticket_on_closing(#[with(5)] cluster_fixture: ClusterGuard
         .context("failed to get ticket statistics")?;
 
     assert!(stats_before.unredeemed_value > HoprBalance::zero());
-    assert_eq!(stats_before.neglected_value, HoprBalance::zero());
+    assert_eq!(stats_before.neglected_value(), HoprBalance::zero());
 
     fw_channel.try_close_channels_all_channels().await?;
     bw_channel.try_close_channels_all_channels().await?;
@@ -255,7 +255,7 @@ async fn test_neglect_ticket_on_closing(#[with(5)] cluster_fixture: ClusterGuard
         .context("failed to get ticket statistics")?;
 
     assert_eq!(stats_after.unredeemed_value, HoprBalance::zero());
-    assert!(stats_after.neglected_value > HoprBalance::zero());
+    assert!(stats_after.neglected_value() > HoprBalance::zero());
 
     Ok(())
 }
@@ -316,8 +316,8 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
         .await
         .context("failed to get ticket statistics")?;
 
-    assert!(stats_after.winning_count < stats_before.winning_count + message_count as u128);
-    assert!(stats_after.redeemed_value > stats_before.redeemed_value);
+    assert!(stats_after.winning_tickets < stats_before.winning_tickets + message_count as u128);
+    assert!(stats_after.redeemed_value() > stats_before.redeemed_value());
 
     Ok(())
 }
@@ -406,8 +406,8 @@ async fn relay_with_win_prob_higher_than_min_win_prob_should_succeed(
         .await
         .context("failed to get ticket statistics")?;
 
-    assert!(stats_after.winning_count > stats_before.winning_count);
-    assert!(stats_after.redeemed_value > stats_before.redeemed_value);
+    assert!(stats_after.winning_tickets > stats_before.winning_tickets);
+    assert!(stats_after.redeemed_value() > stats_before.redeemed_value());
 
     Ok(())
 }

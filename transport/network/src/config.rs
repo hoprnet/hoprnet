@@ -1,7 +1,6 @@
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
-use serde_with::{DurationSeconds, serde_as};
 use smart_default::SmartDefault;
 use validator::Validate;
 
@@ -21,19 +20,16 @@ pub const DEFAULT_MAX_FIRST_HOP_LATENCY_THRESHOLD: Duration = Duration::from_mil
 pub const DEFAULT_CANNOT_DIAL_PENALTY: Duration = Duration::from_secs(60 * 60); // 1 hour
 
 /// Configuration for the [`crate::network::Network`] object
-#[serde_as]
-#[derive(Debug, Clone, Serialize, Deserialize, SmartDefault, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, SmartDefault, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct NetworkConfig {
-    /// Minimum delay will be multiplied by backoff, it will be half the actual minimum value
-    #[serde_as(as = "DurationSeconds<u64>")]
-    #[serde(default = "duration_1_s")]
+    /// Backoff will multiply minimum delay, it will be half the actual minimum value
+    #[serde(default = "duration_1_s", with = "humantime_serde")]
     #[default(duration_1_s())]
     pub min_delay: Duration,
 
     /// Maximum delay
-    #[serde_as(as = "DurationSeconds<u64>")]
-    #[serde(default = "duration_5_min")]
+    #[serde(default = "duration_5_min", with = "humantime_serde")]
     #[default(duration_5_min())]
     pub max_delay: Duration,
 
@@ -49,8 +45,7 @@ pub struct NetworkConfig {
     #[default(node_score_auto_path_threshold())]
     pub node_score_auto_path_threshold: f64,
 
-    #[serde_as(as = "Option<serde_with::DurationMilliSeconds<u64>>")]
-    #[serde(default = "max_first_hop_latency_threshold")]
+    #[serde(default = "max_first_hop_latency_threshold", with = "humantime_serde")]
     #[default(max_first_hop_latency_threshold())]
     pub max_first_hop_latency_threshold: Option<Duration>,
 
@@ -62,8 +57,7 @@ pub struct NetworkConfig {
     #[default(quality_average_window_size())]
     pub quality_avg_window_size: u32,
 
-    #[serde_as(as = "DurationSeconds<u64>")]
-    #[serde(default = "duration_2_min")]
+    #[serde(default = "duration_2_min", with = "humantime_serde")]
     #[default(duration_2_min())]
     pub ignore_timeframe: Duration,
 
