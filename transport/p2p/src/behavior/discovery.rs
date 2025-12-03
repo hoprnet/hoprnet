@@ -28,6 +28,7 @@ pub enum DiscoveryInput {
 #[derive(Debug)]
 pub enum Event {
     DialablePeer(PeerId, Multiaddr),
+    r,
 }
 
 /// Data structure holding the item alongside a release timemestamp.
@@ -69,7 +70,7 @@ impl<T> From<(std::time::Instant, T)> for Delayed<T> {
 
 fn initial_backoff() -> backon::ExponentialBackoff {
     backon::ExponentialBuilder::new()
-        .with_min_delay(std::time::Duration::from_secs(1))
+        .with_min_delay(std::time::Duration::from_secs(3))
         .with_max_delay(std::time::Duration::from_secs(120))
         .with_factor(1.5)
         .with_jitter()
