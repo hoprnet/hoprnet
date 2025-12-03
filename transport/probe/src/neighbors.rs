@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use async_stream::stream;
+use hopr_api::ct::{Telemetry, TrafficGeneration, traits::TrafficGenerationError};
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::protocol::HoprPseudonym;
@@ -10,7 +11,7 @@ use rand::seq::SliceRandom;
 
 use crate::{
     config::ProbeConfig,
-    traits::{PeerDiscoveryFetch, ProbeStatusUpdate, TrafficGeneration},
+    traits::{PeerDiscoveryFetch, ProbeStatusUpdate},
 };
 
 struct TelemetrySink<T> {
@@ -25,7 +26,7 @@ impl<T> Clone for TelemetrySink<T> {
     }
 }
 
-impl<T> futures::Sink<crate::errors::Result<crate::types::Telemetry>> for TelemetrySink<T>
+impl<T> futures::Sink<std::result::Result<Telemetry, TrafficGenerationError>> for TelemetrySink<T>
 where
     T: ProbeStatusUpdate + Send + Sync + 'static,
 {
@@ -40,19 +41,19 @@ where
 
     fn start_send(
         self: std::pin::Pin<&mut Self>,
-        item: crate::errors::Result<crate::types::Telemetry>,
+        item: std::result::Result<Telemetry, TrafficGenerationError>,
     ) -> Result<(), Self::Error> {
         let prober = self.prober.clone();
         hopr_async_runtime::prelude::spawn(async move {
             match item {
                 Ok(telemetry) => match telemetry {
-                    crate::types::Telemetry::Loopback(_path_telemetry) => {
+                    Telemetry::Loopback(_path_telemetry) => {
                         tracing::warn!(
                             reason = "feature not implemented",
                             "loopback path telemetry not supported yet"
                         );
                     }
-                    crate::types::Telemetry::Neighbor(neighbor_telemetry) => {
+                    Telemetry::Neighbor(neighbor_telemetry) => {
                         tracing::trace!(
                             peer = %neighbor_telemetry.peer,
                             latency_ms = neighbor_telemetry.rtt.as_millis(),
@@ -64,22 +65,26 @@ where
                     }
                 },
                 Err(error) => match error {
-                    crate::errors::ProbeError::ProbeNeighborTimeout(peer) => {
+                    TrafficGenerationError::ProbeNeighborTimeout(peer) => {
                         tracing::trace!(
                             %peer,
                             "neighbor probe timed out"
                         );
                         prober
-                            .on_finished(&peer, &Err(crate::errors::ProbeError::ProbeNeighborTimeout(peer)))
+                            .on_finished(
+                                &peer,
+                                &Err(crate::errors::ProbeError::TrafficError(
+                                    TrafficGenerationError::ProbeNeighborTimeout(peer),
+                                )),
+                            )
                             .await;
                     }
-                    crate::errors::ProbeError::ProbeLoopbackTimeout(_telemetry) => {
+                    TrafficGenerationError::ProbeLoopbackTimeout(_telemetry) => {
                         tracing::warn!(
                             reason = "feature not implemented",
                             "loopback path telemetry not supported yet"
                         );
                     }
-                    _ => tracing::error!(%error, "unknown error on probe telemetry result evaluation"),
                 },
             }
         });
@@ -123,7 +128,7 @@ where
         self,
     ) -> (
         impl futures::Stream<Item = DestinationRouting> + Send,
-        impl futures::Sink<crate::errors::Result<crate::types::Telemetry>, Error = impl std::error::Error>
+        impl futures::Sink<std::result::Result<Telemetry, TrafficGenerationError>, Error = impl std::error::Error>
         + Send
         + Sync
         + Clone

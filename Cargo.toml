@@ -4,7 +4,6 @@ resolver = "2"
 
 members = [
   "chain/types",
-  "common/api",
   "common/async-runtime",
   "common/internal-types",
   "common/network-types",
@@ -15,6 +14,7 @@ members = [
   "crypto/random",
   "crypto/sphinx",
   "crypto/types",
+  "hopr/api",
   "hopr/hopr-lib",
   "hoprd/hoprd",
   "hoprd/rest-api",
@@ -218,7 +218,7 @@ mimalloc = { version = "0.1.48", default-features = false, features = [
   "secure",
 ] }
 
-hopr-api = { path = "common/api" }
+hopr-api = { path = "hopr/api" }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-bindings = { git = "https://github.com/hoprnet/contracts", rev = "c8fd165", version = "4.0.1" }
 hopr-chain-types = { path = "chain/types" }
@@ -256,6 +256,8 @@ hopr-db-migration = { path = "db/migration" }
 hopr-utils-session = { path = "utils/session" }
 hopr-db-node = { path = "db/node" }
 hopr-chain-connector = { path = "chain/connector" }
+
+hopr-impls-ct-telemetry = { path = "impls/ct/telemetry" }
 
 [profile.dev]
 panic = "abort"

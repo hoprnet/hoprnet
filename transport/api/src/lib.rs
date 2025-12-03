@@ -61,16 +61,11 @@ use hopr_transport_mixer::MixerConfig;
 pub use hopr_transport_network::network::{Health, Network};
 use hopr_transport_p2p::HoprSwarm;
 use hopr_transport_probe::{
-    Probe,
+    Probe, TrafficGeneration,
     neighbors::ImmediateNeighborProber,
     ping::{PingConfig, Pinger},
 };
-pub use hopr_transport_probe::{
-    errors::ProbeError,
-    ping::PingQueryReplier,
-    traits::TrafficGeneration,
-    types::{NeighborTelemetry, Telemetry},
-};
+pub use hopr_transport_probe::{errors::ProbeError, ping::PingQueryReplier};
 pub use hopr_transport_protocol::{PeerDiscovery, TicketEvent};
 pub use hopr_transport_session as session;
 #[cfg(feature = "runtime-tokio")]
@@ -90,6 +85,8 @@ use crate::{
 };
 
 pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RANGE;
+
+pub use hopr_api as api;
 
 // Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
 lazy_static::lazy_static! {

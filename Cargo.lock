@@ -4472,10 +4472,13 @@ dependencies = [
  "auto_impl",
  "chrono",
  "futures",
+ "hex",
  "hopr-chain-types",
  "hopr-crypto-packet",
+ "hopr-crypto-random 0.3.0",
  "hopr-crypto-types 0.9.0",
  "hopr-internal-types",
+ "hopr-network-types",
  "hopr-platform",
  "hopr-primitive-types 0.10.0",
  "multiaddr",
@@ -4792,6 +4795,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-impls-ct-telemetry"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "hopr-api",
+]
+
+[[package]]
 name = "hopr-internal-types"
 version = "0.17.0"
 dependencies = [
@@ -4841,6 +4852,7 @@ dependencies = [
  "hopr-crypto-random 0.3.0",
  "hopr-crypto-types 0.9.0",
  "hopr-db-node",
+ "hopr-impls-ct-telemetry",
  "hopr-internal-types",
  "hopr-lib",
  "hopr-metrics",
@@ -5239,6 +5251,7 @@ dependencies = [
  "futures",
  "futures-concurrency",
  "hex",
+ "hopr-api",
  "hopr-async-runtime",
  "hopr-crypto-packet",
  "hopr-crypto-random 0.3.0",
@@ -5395,6 +5408,7 @@ dependencies = [
  "home",
  "hopr-chain-connector",
  "hopr-db-node",
+ "hopr-impls-ct-telemetry",
  "hopr-lib",
  "hopr-metrics",
  "hopr-strategy",

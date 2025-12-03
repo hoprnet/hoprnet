@@ -1,0 +1,21 @@
+[package]
+name = "hopr-impls-ct-telemetry"
+version = "0.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+description = "Implementation"
+edition = "2021"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+default = []
+
+[dependencies]
+futures = { workspace = true }
+hopr-api = { workspace = true, features = ["ct"] }
+
+[dev-dependencies]

@@ -21,7 +21,7 @@ use tokio::time::sleep;
 use tracing::info;
 
 use crate::{
-    Address, DummyCoverTrafficType,
+    Address,
     state::HoprState,
     testing::{
         dummies::EchoServer,
@@ -396,7 +396,12 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
                     )
                     .await;
 
-                    let socket = instance.run(None::<DummyCoverTrafficType>, EchoServer::new()).await?;
+                    let socket = instance
+                        .run(
+                            None::<hopr_impls_ct_telemetry::DummyCoverTrafficType>,
+                            EchoServer::new(),
+                        )
+                        .await?;
                     anyhow::Ok((instance, socket))
                 });
 

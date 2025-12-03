@@ -3,8 +3,6 @@ use hopr_internal_types::{NodeId, protocol::HoprPseudonym};
 use hopr_network_types::types::{DestinationRouting, RoutingOptions};
 use hopr_primitive_types::bounded::BoundedVec;
 
-use crate::content::PathTelemetry;
-
 pub struct TaggedDestinationRouting {
     /// The destination node.
     pub destination: Box<NodeId>,
@@ -45,14 +43,4 @@ impl From<TaggedDestinationRouting> for DestinationRouting {
             return_options: value.return_options,
         }
     }
-}
-
-pub struct NeighborTelemetry {
-    pub peer: libp2p_identity::PeerId,
-    pub rtt: std::time::Duration,
-}
-
-pub enum Telemetry {
-    Loopback(PathTelemetry),
-    Neighbor(NeighborTelemetry),
 }
