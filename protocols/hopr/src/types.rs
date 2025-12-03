@@ -112,7 +112,7 @@ impl std::fmt::Debug for IncomingAcknowledgementPacket {
 }
 
 /// Incoming HOPR packet.
-#[derive(Debug)]
+#[derive(Debug, strum::EnumTryAs)]
 pub enum IncomingPacket {
     /// Packet is intended for us
     Final(Box<IncomingFinalPacket>),

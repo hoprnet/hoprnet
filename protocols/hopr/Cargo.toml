@@ -51,6 +51,14 @@ hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
+hex-literal = { workspace = true }
+tokio = { workspace = true }
+
+hopr-db-node = { workspace = true, features = ["runtime-tokio"] }
+hopr-chain-connector = { workspace = true, features = [
+  "testing",
+  "runtime-tokio",
+] }
 
 [[bench]]
 name = "bloom_filter"
