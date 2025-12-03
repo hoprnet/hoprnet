@@ -215,7 +215,7 @@ impl From<UserHoprLibConfig> for HoprLibConfig {
                     ..Default::default()
                 },
                 probe: ProbeConfig {
-                    timeout: value.network.probe_interval,
+                    interval: value.network.probe_interval,
                     recheck_threshold: value.network.probe_recheck_threshold,
                     ..Default::default()
                 },

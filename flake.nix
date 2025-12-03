@@ -361,34 +361,6 @@
           docs = rust-builder-local-nightly.callPackage nixLib.mkRustPackage (
             hoprdBuildArgs // { buildDocs = true; }
           );
-          smoke-tests = pkgs.stdenv.mkDerivation {
-            pname = "hoprd-smoke-tests";
-            version = hoprdCrateInfo.version;
-            src = fs.toSource {
-              root = ./.;
-              fileset = fs.unions [
-                ./tests
-                ./scripts
-                ./sdk/python
-              ];
-            };
-            buildInputs = with pkgs; [
-              uv
-              foundry-bin
-              python313
-              hopli.hopli
-              hoprd-dev
-            ];
-            buildPhase = ''
-              uv sync --frozen
-              unset SOURCE_DATE_EPOCH
-            '';
-            checkPhase = ''
-              uv run --frozen -m pytest tests/
-            '';
-            doCheck = true;
-            HOPR_INTERNAL_TRANSPORT_ACCEPT_PRIVATE_NETWORK_IP_ADDRESSES = "true"; # Allow local private IPs in smoke tests
-          };
           pre-commit-check = pre-commit.lib.${system}.run {
             src = ./.;
             hooks = {
@@ -539,7 +511,7 @@
             drv = pkgs.writeShellApplication {
               name = "find-port";
               text = ''
-                ${pkgs.python3}/bin/python ./tests/find_port.py --min-port 3000 --max-port 4000 --skip 30
+                ${pkgs.python3}/bin/python ./scripts/find_port.py --min-port 3000 --max-port 4000 --skip 30
               '';
             };
           };
@@ -585,7 +557,6 @@
               "hoprd/rest-api/.cargo/config"
               "nix/setup-hook-darwin.sh"
               "target/*"
-              "tests/pytest.ini"
             ];
 
             programs.shfmt.enable = true;
@@ -652,7 +623,7 @@
               hoprd-profile-docker
               ;
             inherit hopr-test-unit hopr-test-nightly;
-            inherit smoke-tests docs;
+            inherit docs;
             inherit pre-commit-check;
             inherit hoprd-bench;
             inherit hoprd-man;

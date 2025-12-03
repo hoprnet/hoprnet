@@ -37,7 +37,7 @@ pub enum HoprProtocolError {
     #[error("packet is in invalid state: {0}")]
     InvalidState(&'static str),
 
-    #[error("cannot decoded the sender address of the packet")]
+    #[error("cannot decode the sender address of the packet")]
     InvalidSender,
 
     #[error("failed to resolve chain key or packet key")]

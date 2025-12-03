@@ -1,25 +1,20 @@
 ---
+blokli_url: https://blokli.prod.hoprnet.link # NOTE: change this value to the URL of your Blokli provider
+db:
+  data: /app/hoprd/data
+strategy:
+  on_fail_continue: true
+  allow_recursive: true
+  strategies:
+    - !AutoRedeeming
+      redeem_only_aggregated: false
+      minimum_redeem_ticket_value: "1 wxHOPR"
+    - !ClosureFinalizer
+      max_closure_overdue: 300s
 hopr:
   host:
     address: !IPv4 127.0.0.1 # NOTE: adapt this to reflect your public IP
     port: 9091 # NOTE: adapt this to reflect your public PORT - the value set in HOPRD_P2P_PORT
-  db:
-    data: /app/hoprd/data
-  strategy:
-    on_fail_continue: true
-    allow_recursive: true
-    strategies:
-      - !AutoRedeeming
-        redeem_only_aggregated: false
-        minimum_redeem_ticket_value: "1 wxHOPR"
-      - !ClosureFinalizer
-        max_closure_overdue: 300
-  chain:
-    network: dufour
-    provider: # NOTE: Fill in value. Using a local RPC provider, make sure to always include the http:// prefix, followed by the IP address or localhost.
-    announce: true
-    keep_logs: true
-    fast_sync: true
   safe_module:
     safe_address: # NOTE: fill in value
     module_address: # NOTE: fill in value

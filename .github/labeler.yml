@@ -20,10 +20,6 @@ documentation:
   - changed-files:
       - any-glob-to-any-file:
           - "docs/**"
-testing:
-  - changed-files:
-      - any-glob-to-any-file:
-          - "tests/**"
 crate:hopr-chain-actions:
   - changed-files:
       - any-glob-to-any-file: chain/actions/**

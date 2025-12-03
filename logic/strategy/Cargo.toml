@@ -21,6 +21,7 @@ async-trait = { workspace = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
 futures-concurrency = { workspace = true }
+humantime-serde = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
 lazy_static = { workspace = true }
@@ -49,3 +50,9 @@ insta = { workspace = true }
 mockall = { workspace = true }
 test-log = { workspace = true }
 tokio = { workspace = true }
+
+[package.metadata.cargo-machete]
+ignored = ["humantime-serde"]
+
+[package.metadata.cargo-shear]
+ignored = ["humantime-serde"]

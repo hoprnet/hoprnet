@@ -11,7 +11,6 @@ use hopr_lib::{
     exports::api::chain::{ChainReadChannelOperations, ChainWriteChannelOperations, ChannelSelector},
 };
 use serde::{Deserialize, Serialize};
-use serde_with::{DurationSeconds, serde_as};
 use tracing::{debug, error, info};
 use validator::Validate;
 
@@ -32,15 +31,13 @@ fn default_max_closure_overdue() -> Duration {
 }
 
 /// Contains configuration of the [`ClosureFinalizerStrategy`].
-#[serde_as]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct ClosureFinalizerStrategyConfig {
     /// Do not attempt to finalize closure of channels that have
     /// been overdue for closure for more than this period.
     ///
     /// Default is 300 seconds.
-    #[serde_as(as = "DurationSeconds<u64>")]
-    #[serde(default = "default_max_closure_overdue")]
+    #[serde(default = "default_max_closure_overdue", with = "humantime_serde")]
     #[default(default_max_closure_overdue())]
     pub max_closure_overdue: Duration,
 }

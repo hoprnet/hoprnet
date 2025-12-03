@@ -11,7 +11,7 @@ hopr:
   strategy:
     on_fail_continue: true
     allow_recursive: false
-    execution_interval: 1
+    execution_interval: 1s
     strategies: []
   protocol:
     outgoing_ticket_winning_prob: 1.0

@@ -22,11 +22,6 @@
 /crypto/ @NumberFour8 @Teebor-Choka
 /protocols/ @NumberFour8 @Teebor-Choka
 
-# Blockchain and smart contracts
-/chain/ @Teebor-Choka @tolbrino @NumberFour8 @QYuQianchen
-/ethereum/ @QYuQianchen @tolbrino
-*.sol @QYuQianchen @tolbrino
-
 # Common utilities and logic
 /common/ @NumberFour8 @Teebor-Choka @jeandemeusy @QYuQianchen @tolbrino
 /logic/ @NumberFour8 @Teebor-Choka @jeandemeusy @QYuQianchen @tolbrino
@@ -34,7 +29,6 @@
 /db/ @NumberFour8 @Teebor-Choka
 
 # Testing
-/tests/ @jeandemeusy @Teebor-Choka @QYuQianchen
 /sdk/ @jeandemeusy @Teebor-Choka
 
 # Documentation
