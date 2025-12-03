@@ -37,7 +37,6 @@ use std::fmt::Debug;
 
 pub use behavior::discovery::Event as DiscoveryEvent;
 use futures::{AsyncRead, AsyncWrite, Stream};
-use hopr_internal_types::prelude::*;
 use hopr_transport_identity::PeerId;
 use hopr_transport_protocol::PeerDiscovery;
 use libp2p::{StreamProtocol, autonat, identity::PublicKey, swarm::NetworkBehaviour};
@@ -100,13 +99,13 @@ impl Debug for HoprNetworkBehavior {
 }
 
 impl HoprNetworkBehavior {
-    pub fn new<T>(me: PublicKey, onchain_events: T, allow_private_addresses: bool) -> Self
+    pub fn new<T>(me: PublicKey, onchain_events: T) -> Self
     where
         T: Stream<Item = PeerDiscovery> + Send + 'static,
     {
         Self {
             streams: libp2p_stream::Behaviour::new(),
-            discovery: behavior::discovery::Behaviour::new(me.clone().into(), onchain_events, allow_private_addresses),
+            discovery: behavior::discovery::Behaviour::new(me.clone().into(), onchain_events),
             identify: libp2p::identify::Behaviour::new(libp2p::identify::Config::new(
                 "/hopr/identify/1.0.0".to_string(),
                 me.clone(),
@@ -123,9 +122,6 @@ impl HoprNetworkBehavior {
 #[derive(Debug)]
 pub enum HoprNetworkBehaviorEvent {
     Discovery(behavior::discovery::Event),
-    TicketAggregation(
-        libp2p::request_response::Event<Vec<TransferableWinningTicket>, std::result::Result<Ticket, String>>,
-    ),
     Identify(Box<libp2p::identify::Event>),
     Autonat(autonat::Event),
 }
@@ -140,16 +136,6 @@ impl From<()> for HoprNetworkBehaviorEvent {
 impl From<behavior::discovery::Event> for HoprNetworkBehaviorEvent {
     fn from(event: behavior::discovery::Event) -> Self {
         Self::Discovery(event)
-    }
-}
-
-impl From<libp2p::request_response::Event<Vec<TransferableWinningTicket>, std::result::Result<Ticket, String>>>
-    for HoprNetworkBehaviorEvent
-{
-    fn from(
-        event: libp2p::request_response::Event<Vec<TransferableWinningTicket>, std::result::Result<Ticket, String>>,
-    ) -> Self {
-        Self::TicketAggregation(event)
     }
 }
 

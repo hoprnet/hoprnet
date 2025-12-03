@@ -55,7 +55,7 @@ async fn build_p2p_swarm(announcement: Announcement) -> anyhow::Result<(Interfac
     };
     let multiaddress = Multiaddr::from_str(&multiaddress).context("failed to create a valid multiaddress")?;
 
-    let swarm = HoprSwarm::new(identity, transport_updates_rx, vec![multiaddress.clone()], true).await;
+    let swarm = HoprSwarm::new(identity, transport_updates_rx, vec![multiaddress.clone()]).await;
 
     let msg_proto_control = swarm.build_protocol_control(hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL);
     let msg_codec = hopr_transport_protocol::HoprBinaryCodec {};
@@ -126,8 +126,8 @@ async fn p2p_only_communication_quic() -> anyhow::Result<()> {
 
     let (tx, _rx) = futures::channel::mpsc::channel::<hopr_transport_p2p::DiscoveryEvent>(1000);
 
-    let _sjh1 = SelfClosingJoinHandle::new(swarm1.run(tx.clone()));
-    let _sjh2 = SelfClosingJoinHandle::new(swarm2.run(tx));
+    let _sjh1 = SelfClosingJoinHandle::new(swarm1.run(tx.clone(), true));
+    let _sjh2 = SelfClosingJoinHandle::new(swarm2.run(tx, true));
 
     // Announce nodes to each other
     api1.update_from_announcements

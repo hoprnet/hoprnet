@@ -1,6 +1,5 @@
-use multiaddr::PeerId;
-
 pub use hopr_network_types::types::DestinationRouting;
+use multiaddr::PeerId;
 
 use super::{PathTelemetry, Telemetry};
 

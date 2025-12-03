@@ -1,7 +1,6 @@
 use std::num::NonZeroU8;
 
 use futures::{Sink, SinkExt, Stream, StreamExt, select};
-use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::is_public_address;
 use hopr_transport_identity::{
     Multiaddr,
@@ -11,7 +10,6 @@ use hopr_transport_protocol::PeerDiscovery;
 use libp2p::{
     autonat,
     identity::PublicKey,
-    request_response::{OutboundRequestId, ResponseChannel},
     swarm::{NetworkInfo, SwarmEvent},
 };
 use tracing::{debug, error, info, trace, warn};
@@ -36,22 +34,12 @@ lazy_static::lazy_static! {
 async fn build_p2p_network<T>(
     me: libp2p::identity::Keypair,
     indexer_update_input: T,
-    allow_private_addresses: bool,
 ) -> Result<libp2p::Swarm<HoprNetworkBehavior>>
 where
     T: Stream<Item = PeerDiscovery> + Send + 'static,
 {
     let me_public: PublicKey = me.public();
 
-    // Both features could be enabled during testing; therefore, we only use tokio when it's
-    // exclusively enabled.
-    //
-    // NOTE: Private address filtering is implemented at multiple levels for defense-in-depth:
-    // 1. Discovery behavior filters PeerDiscovery::Allow and PeerDiscovery::Announce events
-    // 2. SwarmEvent::NewExternalAddrOfPeer events are filtered using is_public_address()
-    // 3. Network layer filters addresses in both add() and get() methods (primary protection)
-    // 4. libp2p's global_only transport wrapper could be added here but the above filtering provides equivalent
-    //    protection while maintaining compatibility with the existing code
     #[cfg(feature = "runtime-tokio")]
     let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
         .with_tokio()
@@ -72,7 +60,7 @@ where
 
     Ok(swarm
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
-        .with_behaviour(|_key| HoprNetworkBehavior::new(me_public, indexer_update_input, allow_private_addresses))
+        .with_behaviour(|_key| HoprNetworkBehavior::new(me_public, indexer_update_input))
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
         .with_swarm_config(|cfg| {
             cfg.with_dial_concurrency_factor(
@@ -100,7 +88,6 @@ where
 
 pub struct HoprSwarm {
     pub(crate) swarm: libp2p::Swarm<HoprNetworkBehavior>,
-    pub allow_private_addresses: bool,
 }
 
 impl std::fmt::Debug for HoprSwarm {
@@ -120,12 +107,11 @@ impl HoprSwarm {
         identity: libp2p::identity::Keypair,
         indexer_update_input: T,
         my_multiaddresses: Vec<Multiaddr>,
-        allow_private_addresses: bool,
     ) -> Self
     where
         T: Stream<Item = PeerDiscovery> + Send + 'static,
     {
-        let mut swarm = build_p2p_network(identity, indexer_update_input, allow_private_addresses)
+        let mut swarm = build_p2p_network(identity, indexer_update_input)
             .await
             .expect("swarm must be constructible");
 
@@ -172,10 +158,7 @@ impl HoprSwarm {
         //     "The node failed to listen on at least one of the specified interfaces"
         // );
 
-        Self {
-            swarm,
-            allow_private_addresses,
-        }
+        Self { swarm }
     }
 
     pub fn build_protocol_control(&self, protocol: &'static str) -> crate::HoprStreamProtocolControl {
@@ -188,11 +171,10 @@ impl HoprSwarm {
     /// The function represents the entirety of the business logic of the hopr daemon related to core operations.
     ///
     /// This future can only be resolved by an unrecoverable error or a panic.
-    pub async fn run<T>(self, events: T)
+    pub async fn run<T>(self, events: T, allow_private_addresses: bool)
     where
         T: Sink<crate::behavior::discovery::Event> + Send + 'static,
     {
-        let allow_private_addrs = self.allow_private_addresses;
         let mut swarm: libp2p::Swarm<HoprNetworkBehavior> = self.into();
         futures::pin_mut!(events);
 
@@ -331,7 +313,7 @@ impl HoprSwarm {
                         peer_id, address
                     } => {
                         // Only store public/routable addresses
-                        if allow_private_addrs || is_public_address(&address) {
+                        if allow_private_addresses || is_public_address(&address) {
                             swarm.add_peer_address(peer_id, address.clone());
                             trace!(transport="libp2p", peer = %peer_id, multiaddress = %address, "Public peer address stored in swarm")
                         } else {
@@ -355,6 +337,3 @@ fn print_network_info(network_info: NetworkInfo, event: &str) {
         num_incoming, num_outgoing, "swarm network status after {event}"
     );
 }
-
-pub type TicketAggregationRequestType = OutboundRequestId;
-pub type TicketAggregationResponseType = ResponseChannel<std::result::Result<Ticket, String>>;

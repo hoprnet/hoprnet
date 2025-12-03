@@ -10,8 +10,8 @@ license = "GPL-3.0-only"
 
 
 [features]
-default = ["ct"]    # TODO: disable
-ct = ["dep:hopr-network-types", "dep:hopr-crypto-random","dep:hex"]
+default = ["ct"]                                                     # TODO: disable
+ct = ["dep:hopr-network-types", "dep:hopr-crypto-random", "dep:hex"]
 db = []
 chain = ["db"]
 
@@ -20,7 +20,7 @@ async-trait = { workspace = true }
 auto_impl = { workspace = true }
 chrono = { workspace = true }
 futures = { workspace = true }
-hex = { workspace = true, optional = true}
+hex = { workspace = true, optional = true }
 multiaddr = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
