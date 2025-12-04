@@ -78,3 +78,9 @@ hopr-transport-mixer = { workspace = true }
 [[bench]]
 name = "protocol_throughput_emulated"
 harness = false
+
+[package.metadata.cargo-machete]
+ignored = ["humantime-serde"]
+
+[package.metadata.cargo-shear]
+ignored = ["humantime-serde"]

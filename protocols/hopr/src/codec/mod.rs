@@ -126,7 +126,7 @@ mod tests {
             [10u8; 20].into(),
         )
         .await?;
-        chain_api.connect(std::time::Duration::from_secs(1)).await?;
+        chain_api.connect().await?;
 
         Ok(Node {
             chain_key: PEERS[index].0.clone(),
