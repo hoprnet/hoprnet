@@ -1,7 +1,8 @@
 use std::{str::FromStr, sync::Arc, time::Duration};
-
+use std::collections::HashMap;
 use anyhow::Context;
 use futures::{SinkExt, StreamExt};
+use futures_concurrency::stream::StreamGroup;
 use hex_literal::hex;
 use hopr_api::chain::*;
 use hopr_async_runtime::AbortableList;
@@ -96,7 +97,7 @@ pub type TicketChannel = futures::channel::mpsc::UnboundedReceiver<TicketEvent>;
 pub async fn peer_setup_for(
     count: usize,
 ) -> anyhow::Result<(
-    Vec<WireChannels>,
+    HashMap<PeerId, WireChannels>,
     Vec<LogicalChannels>,
     Vec<TicketChannel>,
     AbortableList<usize>,
@@ -125,7 +126,7 @@ pub async fn peer_setup_for(
         );
     }
 
-    let mut wire_channels = Vec::new();
+    let mut wire_channels = HashMap::new();
     let mut logical_channels = Vec::new();
     let mut ticket_channels = Vec::new();
     let mut processes = AbortableList::default();
@@ -197,7 +198,7 @@ pub async fn peer_setup_for(
             (api_recv_tx, api_send_rx),
         );
 
-        wire_channels.push((wire_msg_send_tx, mixer_channel_rx));
+        wire_channels.insert(PeerId::from(*PEERS[i].public()), (wire_msg_send_tx, mixer_channel_rx));
         logical_channels.push((api_send_tx, api_recv_rx));
         ticket_channels.push(received_ack_tickets_rx);
         processes.insert(i, node_processes);
@@ -207,57 +208,22 @@ pub async fn peer_setup_for(
 }
 
 #[tracing::instrument(level = "debug", skip(components))]
-pub async fn emulate_channel_communication(pending_packet_count: usize, mut components: Vec<WireChannels>) {
-    for i in 0..components.len() {
-        for j in 0..pending_packet_count {
-            debug!("Component: {i} on packet {j}");
+pub async fn emulate_channel_communication(components: HashMap<PeerId, WireChannels>) {
+    let (mut senders, streams): (HashMap<_,_>, Vec<_>) = components
+        .into_iter()
+        .map(|(peer, (tx, rx))| ((peer, tx), rx.map(move |(target ,msg)| (peer, target, msg))))
+        .unzip();
 
-            let count = if i == 0 || i == components.len() - 1 { 1 } else { 2 };
+    let mut stream_group = StreamGroup::from_iter(streams);
+    while let Some((sender, target, msg)) = stream_group.next().await {
+        let target_sender = senders
+            .get_mut(&target)
+            .expect(&format!("peer {target} should be part of the test setup"));
 
-            for _i in 0..count {
-                let (dest, payload) = components[i]
-                    .1
-                    .next()
-                    .await
-                    .expect("MSG relayer should forward a msg to the next");
+        tracing::trace!(%sender, %target, "transporting packet");
 
-                let destination = if i == 0 {
-                    assert_eq!(
-                        dest,
-                        PEERS[i + 1].public().into(),
-                        "first peer should send only data to the next one"
-                    );
-                    i + 1
-                } else if i == components.len() - 1 {
-                    assert_eq!(
-                        dest,
-                        PEERS[i - 1].public().into(),
-                        "last peer should send only ack to the previous one"
-                    );
-                    i - 1
-                } else if dest == PEERS[i + 1].public().into() {
-                    debug!(%dest, "sending data to next");
-                    i + 1
-                } else if dest == PEERS[i - 1].public().into() {
-                    debug!(%dest, "sending ack to previous");
-                    i - 1
-                } else {
-                    panic!("Unexpected destination");
-                };
-
-                if let Err(error) = components[destination]
-                    .0
-                    .send((PEERS[i].public().into(), payload))
-                    .await
-                {
-                    tracing::error!(%error, "failed to send packet to peer");
-                    panic!("Failed to send packet to peer");
-                }
-            }
-        }
+        target_sender.send((sender, msg)).await.expect("failed to send packet to peer");
     }
-
-    futures::future::pending::<()>().await;
 }
 
 struct MockPathResolver;
@@ -343,7 +309,7 @@ pub async fn send_relay_receive_channel_of_n_peers(
 
     assert_eq!(peer_count - 1, packet_path.num_hops(), "path has invalid length");
 
-    tokio::task::spawn(emulate_channel_communication(packet_count, wire_apis));
+    tokio::task::spawn(emulate_channel_communication(wire_apis));
 
     let pseudonym = SimplePseudonym([0xde, 0xad, 0xbe, 0xef, 0xca, 0xfe, 0xba, 0xbe, 0x11, 0x22]);
     let mut sent_packet_count = 0;

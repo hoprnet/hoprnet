@@ -5217,6 +5217,7 @@ dependencies = [
  "bytesize",
  "criterion",
  "futures",
+ "futures-concurrency",
  "futures-time",
  "halfbrown",
  "hex-literal",
