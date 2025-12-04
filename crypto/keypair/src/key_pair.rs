@@ -105,6 +105,7 @@ impl FromStr for HoprKeys {
     /// Deserializes HoprKeys from string
     ///
     /// ```rust
+    /// use std::str::FromStr;
     /// use hopr_crypto_keypair::key_pair::HoprKeys;
     ///
     /// let priv_keys = "0x56b29cefcdf576eea306ba2fd5f32e651c09e0abbc018c47bdc6ef44f6b7506f1050f95137770478f50b456267f761f1b8b341a13da68bc32e5c96984fcd52ae";
