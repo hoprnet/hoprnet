@@ -280,7 +280,7 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
 ) -> anyhow::Result<()> {
     let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1_intermediaries::<3>();
 
-    let message_count = 10;
+    let message_count = 20;
 
     let ticket_price = src
         .inner()
