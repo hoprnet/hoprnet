@@ -28,62 +28,111 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-/// Build objects comprising the p2p network.
+pub struct InactiveNetwork {
+    swarm: libp2p::Swarm<HoprNetworkBehavior>,
+}
+
+/// Build objects comprising an inactive p2p network.
 ///
 /// Returns a built [libp2p::Swarm] object implementing the HoprNetworkBehavior functionality.
-async fn build_p2p_network<T>(
-    me: libp2p::identity::Keypair,
-    indexer_update_input: T,
-) -> Result<libp2p::Swarm<HoprNetworkBehavior>>
-where
-    T: Stream<Item = PeerDiscovery> + Send + 'static,
-{
-    let me_public: PublicKey = me.public();
+impl InactiveNetwork {
+    pub async fn build<T>(me: libp2p::identity::Keypair, external_discovery_events: T) -> Result<Self>
+    where
+        T: Stream<Item = PeerDiscovery> + Send + 'static,
+    {
+        let me_public: PublicKey = me.public();
 
-    #[cfg(feature = "runtime-tokio")]
-    let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
-        .with_tokio()
-        .with_tcp(
-            libp2p::tcp::Config::default().nodelay(true),
-            libp2p::noise::Config::new,
-            // use default yamux configuration to enable auto-tuning
-            // see https://github.com/libp2p/rust-libp2p/pull/4970
-            libp2p::yamux::Config::default,
-        )
-        .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?;
-
-    #[cfg(all(feature = "transport-quic", feature = "runtime-tokio"))]
-    let swarm = swarm.with_quic();
-
-    #[cfg(feature = "runtime-tokio")]
-    let swarm = swarm.with_dns();
-
-    Ok(swarm
-        .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
-        .with_behaviour(|_key| HoprNetworkBehavior::new(me_public, indexer_update_input))
-        .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
-        .with_swarm_config(|cfg| {
-            cfg.with_dial_concurrency_factor(
-                NonZeroU8::new(
-                    std::env::var("HOPR_INTERNAL_LIBP2P_MAX_CONCURRENTLY_DIALED_PEER_COUNT")
-                        .map(|v| v.trim().parse::<u8>().unwrap_or(u8::MAX))
-                        .unwrap_or(constants::HOPR_SWARM_CONCURRENTLY_DIALED_PEER_COUNT),
-                )
-                .expect("concurrently dialed peer count must be > 0"),
+        #[cfg(feature = "runtime-tokio")]
+        let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
+            .with_tokio()
+            .with_tcp(
+                libp2p::tcp::Config::default().nodelay(true),
+                libp2p::noise::Config::new,
+                // use default yamux configuration to enable auto-tuning
+                // see https://github.com/libp2p/rust-libp2p/pull/4970
+                libp2p::yamux::Config::default,
             )
-            .with_max_negotiating_inbound_streams(
-                std::env::var("HOPR_INTERNAL_LIBP2P_MAX_NEGOTIATING_INBOUND_STREAM_COUNT")
-                    .and_then(|v| v.parse::<usize>().map_err(|_e| std::env::VarError::NotPresent))
-                    .unwrap_or(constants::HOPR_SWARM_CONCURRENTLY_NEGOTIATING_INBOUND_PEER_COUNT),
-            )
-            .with_idle_connection_timeout(
-                std::env::var("HOPR_INTERNAL_LIBP2P_SWARM_IDLE_TIMEOUT")
-                    .and_then(|v| v.parse::<u64>().map_err(|_e| std::env::VarError::NotPresent))
-                    .map(std::time::Duration::from_secs)
-                    .unwrap_or(constants::HOPR_SWARM_IDLE_CONNECTION_TIMEOUT),
-            )
+            .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?;
+
+        #[cfg(all(feature = "transport-quic", feature = "runtime-tokio"))]
+        let swarm = swarm.with_quic();
+
+        #[cfg(feature = "runtime-tokio")]
+        let swarm = swarm.with_dns();
+
+        Ok(Self {
+            swarm: swarm
+                .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
+                .with_behaviour(|_key| HoprNetworkBehavior::new(me_public, external_discovery_events))
+                .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
+                .with_swarm_config(|cfg| {
+                    cfg.with_dial_concurrency_factor(
+                        NonZeroU8::new(
+                            std::env::var("HOPR_INTERNAL_LIBP2P_MAX_CONCURRENTLY_DIALED_PEER_COUNT")
+                                .map(|v| v.trim().parse::<u8>().unwrap_or(u8::MAX))
+                                .unwrap_or(constants::HOPR_SWARM_CONCURRENTLY_DIALED_PEER_COUNT),
+                        )
+                        .expect("concurrently dialed peer count must be > 0"),
+                    )
+                    .with_max_negotiating_inbound_streams(
+                        std::env::var("HOPR_INTERNAL_LIBP2P_MAX_NEGOTIATING_INBOUND_STREAM_COUNT")
+                            .and_then(|v| v.parse::<usize>().map_err(|_e| std::env::VarError::NotPresent))
+                            .unwrap_or(constants::HOPR_SWARM_CONCURRENTLY_NEGOTIATING_INBOUND_PEER_COUNT),
+                    )
+                    .with_idle_connection_timeout(
+                        std::env::var("HOPR_INTERNAL_LIBP2P_SWARM_IDLE_TIMEOUT")
+                            .and_then(|v| v.parse::<u64>().map_err(|_e| std::env::VarError::NotPresent))
+                            .map(std::time::Duration::from_secs)
+                            .unwrap_or(constants::HOPR_SWARM_IDLE_CONNECTION_TIMEOUT),
+                    )
+                })
+                .build(),
         })
-        .build())
+    }
+
+    pub fn with_listen_on(mut self, multiaddresses: Vec<Multiaddr>) -> Result<InactiveConfiguredNetwork> {
+        for multiaddress in multiaddresses.iter() {
+            match resolve_dns_if_any(multiaddress) {
+                Ok(ma) => {
+                    if let Err(e) = self.swarm.listen_on(ma.clone()) {
+                        warn!(%multiaddress, listen_on=%ma, error = %e, "Failed to listen_on, will try to use an unspecified address");
+
+                        match replace_transport_with_unspecified(&ma) {
+                            Ok(ma) => {
+                                if let Err(e) = self.swarm.listen_on(ma.clone()) {
+                                    warn!(multiaddress = %ma, error = %e, "Failed to listen_on using the unspecified multiaddress",);
+                                } else {
+                                    info!(
+                                        listen_on = ?ma,
+                                        multiaddress = ?multiaddress,
+                                        "Listening for p2p connections"
+                                    );
+                                    self.swarm.add_external_address(multiaddress.clone());
+                                }
+                            }
+                            Err(e) => {
+                                error!(multiaddress = %ma, error = %e, "Failed to transform the multiaddress")
+                            }
+                        }
+                    } else {
+                        info!(
+                            listen_on = ?ma,
+                            multiaddress = ?multiaddress,
+                            "Listening for p2p connections"
+                        );
+                        self.swarm.add_external_address(multiaddress.clone());
+                    }
+                }
+                Err(error) => error!(%multiaddress, %error, "Failed to transform the multiaddress"),
+            }
+        }
+
+        Ok(InactiveConfiguredNetwork { swarm: self.swarm })
+    }
+}
+
+pub struct InactiveConfiguredNetwork {
+    swarm: libp2p::Swarm<HoprNetworkBehavior>,
 }
 
 pub struct HoprSwarm {
@@ -105,60 +154,21 @@ impl From<HoprSwarm> for libp2p::Swarm<HoprNetworkBehavior> {
 impl HoprSwarm {
     pub async fn new<T>(
         identity: libp2p::identity::Keypair,
-        indexer_update_input: T,
+        external_discovery_events: T,
         my_multiaddresses: Vec<Multiaddr>,
     ) -> Self
     where
         T: Stream<Item = PeerDiscovery> + Send + 'static,
     {
-        let mut swarm = build_p2p_network(identity, indexer_update_input)
+        let swarm = InactiveNetwork::build(identity, external_discovery_events)
             .await
             .expect("swarm must be constructible");
 
-        for multiaddress in my_multiaddresses.iter() {
-            match resolve_dns_if_any(multiaddress) {
-                Ok(ma) => {
-                    if let Err(e) = swarm.listen_on(ma.clone()) {
-                        warn!(%multiaddress, listen_on=%ma, error = %e, "Failed to listen_on, will try to use an unspecified address");
+        let swarm = swarm
+            .with_listen_on(my_multiaddresses)
+            .expect("swarm must be configurable");
 
-                        match replace_transport_with_unspecified(&ma) {
-                            Ok(ma) => {
-                                if let Err(e) = swarm.listen_on(ma.clone()) {
-                                    warn!(multiaddress = %ma, error = %e, "Failed to listen_on using the unspecified multiaddress",);
-                                } else {
-                                    info!(
-                                        listen_on = ?ma,
-                                        multiaddress = ?multiaddress,
-                                        "Listening for p2p connections"
-                                    );
-                                    swarm.add_external_address(multiaddress.clone());
-                                }
-                            }
-                            Err(e) => {
-                                error!(multiaddress = %ma, error = %e, "Failed to transform the multiaddress")
-                            }
-                        }
-                    } else {
-                        info!(
-                            listen_on = ?ma,
-                            multiaddress = ?multiaddress,
-                            "Listening for p2p connections"
-                        );
-                        swarm.add_external_address(multiaddress.clone());
-                    }
-                }
-                Err(e) => error!(%multiaddress, error = %e, "Failed to transform the multiaddress"),
-            }
-        }
-
-        // TODO: perform this check
-        // NOTE: This would be a valid check but is not immediate
-        // assert!(
-        //     swarm.listeners().count() > 0,
-        //     "The node failed to listen on at least one of the specified interfaces"
-        // );
-
-        Self { swarm }
+        Self { swarm: swarm.swarm }
     }
 
     pub fn build_protocol_control(&self, protocol: &'static str) -> crate::HoprStreamProtocolControl {
