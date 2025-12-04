@@ -136,8 +136,7 @@ where
         multiaddrs: &[Multiaddr],
         key: &OffchainKeypair,
     ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, AnnouncementError<Self::Error>> {
-        self.check_connection_state()
-            .map_err(AnnouncementError::processing)?;
+        self.check_connection_state().map_err(AnnouncementError::processing)?;
 
         let new_announced_addrs = ahash::HashSet::from_iter(multiaddrs.iter().map(|a| a.to_string()));
 
@@ -161,11 +160,14 @@ where
         // No key-binding fee must be set when the account already exists (with multi-addresses or not)
         let key_binding = KeyBinding::new(self.chain_key.public().to_address(), key);
         let key_binding_fee = if existing_account.is_none() {
-            self.query_cached_chain_info().await.map_err(AnnouncementError::processing)?.key_binding_fee
+            self.query_cached_chain_info()
+                .await
+                .map_err(AnnouncementError::processing)?
+                .key_binding_fee
         } else {
             HoprBalance::zero()
         };
-        
+
         let tx_req = self
             .payload_generator
             .announce(
@@ -234,8 +236,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
     use hex_literal::hex;
     use hopr_api::chain::{ChainReadAccountOperations, ChainWriteAccountOperations};
     use hopr_internal_types::account::AccountType;

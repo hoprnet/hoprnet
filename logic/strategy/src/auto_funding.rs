@@ -116,7 +116,7 @@ impl<A: ChainWriteChannelOperations + Send + Sync> SingularStrategy for AutoFund
 
 #[cfg(test)]
 mod tests {
-    use std::{str::FromStr, time::Duration};
+    use std::str::FromStr;
 
     use futures::StreamExt;
     use futures_time::future::FutureExt;

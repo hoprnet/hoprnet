@@ -456,8 +456,9 @@ where
 
     /// Connects to the chain using the underlying client, syncs all on-chain data
     /// and subscribes for all future updates.
-    /// 
-    /// If the connection does not finish within [`BlockchainConnectorConfig::connection_timeout`](BlockchainConnectorConfig)
+    ///
+    /// If the connection does not finish within
+    /// [`BlockchainConnectorConfig::connection_timeout`](BlockchainConnectorConfig)
     /// the [`ConnectorError::ConnectionTimeout`] error is returned.
     pub async fn connect(&mut self) -> Result<(), ConnectorError> {
         if self
@@ -469,7 +470,9 @@ where
             return Err(ConnectorError::InvalidState("connector is already connected"));
         }
 
-        let abort_handle = self.do_connect(self.cfg.connection_timeout.max(MIN_CONNECTION_TIMEOUT)).await?;
+        let abort_handle = self
+            .do_connect(self.cfg.connection_timeout.max(MIN_CONNECTION_TIMEOUT))
+            .await?;
 
         if let Err(error) = self.sequencer.start().await {
             abort_handle.abort();

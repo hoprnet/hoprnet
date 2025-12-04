@@ -116,7 +116,6 @@ pub async fn init_blokli_connector(
         BlockchainConnectorConfig {
             tx_confirm_timeout: std::time::Duration::from_secs(30),
             connection_timeout: std::time::Duration::from_mins(1),
-            ..Default::default()
         },
         BlokliClient::new(
             provider.as_deref().unwrap_or(DEFAULT_BLOKLI_URL).parse()?,

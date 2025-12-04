@@ -110,8 +110,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
     use hex_literal::hex;
     use hopr_api::chain::{ChainKeyOperations, KeyIdMapper};
     use hopr_crypto_types::prelude::*;
