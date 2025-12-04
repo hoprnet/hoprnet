@@ -88,6 +88,7 @@ pub(crate) fn model_to_ticket_params(
 pub(crate) struct ParsedChainInfo {
     pub channel_closure_grace_period: Duration,
     pub domain_separators: DomainSeparators,
+    pub key_binding_fee: HoprBalance,
     pub info: ChainInfo,
     pub ticket_win_prob: WinningProbability,
     pub ticket_price: HoprBalance,
@@ -126,6 +127,11 @@ pub(crate) fn model_to_chain_info(
                     Hash::from_hex(&v).map_err(|e| ConnectorError::TypeConversion(format!("invalid channel dst: {e}")))
                 })?,
         },
+        key_binding_fee: model
+            .key_binding_fee
+            .0
+            .parse()
+            .map_err(|e| ConnectorError::TypeConversion(format!("invalid key binding fee: {e}")))?,
         info: ChainInfo {
             chain_id: model.chain_id as u64,
             hopr_network_name: model.network,

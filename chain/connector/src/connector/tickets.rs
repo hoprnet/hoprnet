@@ -192,7 +192,7 @@ mod tests {
         let blokli_client = prepare_client()?;
 
         let mut connector = create_connector(blokli_client)?;
-        connector.connect(Duration::from_secs(2)).await?;
+        connector.connect().await?;
 
         let hkc1 = ChainKeypair::from_secret(&hex!(
             "e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8"
@@ -232,7 +232,7 @@ mod tests {
         let blokli_client = prepare_client()?;
 
         let mut connector = create_connector(blokli_client)?;
-        connector.connect(Duration::from_secs(2)).await?;
+        connector.connect().await?;
 
         let hkc1 = ChainKeypair::from_secret(&hex!(
             "e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8"
@@ -275,7 +275,7 @@ mod tests {
         let blokli_client = prepare_client()?;
 
         let mut connector = create_connector(blokli_client)?;
-        connector.connect(Duration::from_secs(2)).await?;
+        connector.connect().await?;
 
         let hkc1 = ChainKeypair::from_secret(&hex!(
             "e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8"
@@ -321,7 +321,7 @@ mod tests {
         let blokli_client = prepare_client()?;
 
         let mut connector = create_connector(blokli_client)?;
-        connector.connect(Duration::from_secs(2)).await?;
+        connector.connect().await?;
 
         let hkc1 = ChainKeypair::from_secret(&hex!(
             "e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8"
@@ -364,7 +364,7 @@ mod tests {
         let blokli_client = prepare_client()?;
 
         let mut connector = create_connector(blokli_client)?;
-        connector.connect(Duration::from_secs(2)).await?;
+        connector.connect().await?;
 
         let hkc1 = ChainKeypair::from_secret(&hex!(
             "e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8"
@@ -407,7 +407,7 @@ mod tests {
         let blokli_client = prepare_client()?;
 
         let mut connector = create_connector(blokli_client)?;
-        connector.connect(Duration::from_secs(2)).await?;
+        connector.connect().await?;
 
         let hkc1 = ChainKeypair::from_secret(&hex!(
             "e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8"

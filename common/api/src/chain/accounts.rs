@@ -19,7 +19,15 @@ pub enum AnnouncementError<E> {
     #[error("account announcement error: {0}")]
     ProcessingError(E),
 }
-/// Error that can occur when registering node with a Safe.
+
+impl<E> AnnouncementError<E> {
+    /// Constructs a [`AnnouncementError::ProcessingError`].
+    pub fn processing<F: Into<E>>(error: F) -> Self {
+        Self::ProcessingError(error.into())
+    }
+}
+
+/// Error that can occur when registering a node with a Safe.
 #[derive(Debug, strum::EnumIs, strum::EnumTryAs, thiserror::Error)]
 pub enum SafeRegistrationError<E> {
     /// Special error when a Safe is already registered.
@@ -28,6 +36,13 @@ pub enum SafeRegistrationError<E> {
     /// Error that can occur when processing a Safe registration.
     #[error("safe registration error: {0}")]
     ProcessingError(E),
+}
+
+impl<E> SafeRegistrationError<E> {
+    /// Constructs a [`SafeRegistrationError::ProcessingError`].
+    pub fn processing<F: Into<E>>(error: F) -> Self {
+        Self::ProcessingError(error.into())
+    }
 }
 
 /// On-chain write operations regarding on-chain node accounts.

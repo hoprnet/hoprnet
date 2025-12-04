@@ -116,7 +116,7 @@ impl<A: ChainWriteChannelOperations + Send + Sync> SingularStrategy for AutoFund
 
 #[cfg(test)]
 mod tests {
-    use std::{str::FromStr, time::Duration};
+    use std::str::FromStr;
 
     use futures::StreamExt;
     use futures_time::future::FutureExt;
@@ -194,7 +194,7 @@ mod tests {
         let mut chain_connector =
             create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
                 .await?;
-        chain_connector.connect(Duration::from_secs(3)).await?;
+        chain_connector.connect().await?;
         let events = chain_connector.subscribe()?;
 
         let cfg = AutoFundingStrategyConfig {

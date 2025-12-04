@@ -62,6 +62,12 @@ where
         Ok(self.query_cached_chain_info().await?.ticket_price)
     }
 
+    async fn key_binding_fee(&self) -> Result<HoprBalance, Self::Error> {
+        self.check_connection_state()?;
+
+        Ok(self.query_cached_chain_info().await?.key_binding_fee)
+    }
+
     async fn channel_closure_notice_period(&self) -> Result<Duration, Self::Error> {
         self.check_connection_state()?;
 
@@ -77,6 +83,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use hopr_api::chain::ChainValues;
     use hopr_crypto_types::types::Hash;
 
@@ -90,7 +98,7 @@ mod tests {
             .build_static_client();
 
         let mut connector = create_connector(blokli_client)?;
-        connector.connect(Duration::from_secs(2)).await?;
+        connector.connect().await?;
 
         let chain_info = connector.chain_info().await?;
 
@@ -101,6 +109,10 @@ mod tests {
         assert_eq!(HoprBalance::new_base(1), connector.minimum_ticket_price().await?);
         assert!(WinningProbability::ALWAYS.approx_eq(&connector.minimum_incoming_ticket_win_prob().await?));
         assert_eq!(Hash::default(), connector.domain_separators().await?.channel);
+        assert_eq!(
+            HoprBalance::from_str("0.01 wxHOPR")?,
+            connector.key_binding_fee().await?
+        );
 
         Ok(())
     }

@@ -63,10 +63,7 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                         .await
                         .expect("connector must be constructible");
 
-                        connector
-                            .connect(Duration::from_secs(3))
-                            .await
-                            .expect("connector must be connected");
+                        connector.connect().await.expect("connector must be connected");
                         connectors.push(Arc::new(connector));
                     }
                     (node_dbs, connectors)
