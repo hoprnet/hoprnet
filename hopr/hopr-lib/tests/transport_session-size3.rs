@@ -79,12 +79,12 @@ async fn test_keep_alive_session(cluster: &ClusterGuard) -> anyhow::Result<()> {
 async fn test_session_surb_balancer_config(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [src, mid, dst] = cluster.sample_nodes::<3>();
 
-    let _channels_there = ChannelGuard::try_open_channels_for_path(
+    let channels_there = ChannelGuard::try_open_channels_for_path(
         [src.instance.clone(), mid.instance.clone(), dst.instance.clone()],
         FUNDING_AMOUNT.parse::<HoprBalance>()?,
     )
     .await?;
-    let _channels_back = ChannelGuard::try_open_channels_for_path(
+    let channels_back = ChannelGuard::try_open_channels_for_path(
         [dst.instance.clone(), mid.instance.clone(), src.instance.clone()],
         FUNDING_AMOUNT.parse::<HoprBalance>()?,
     )
@@ -138,6 +138,9 @@ async fn test_session_surb_balancer_config(cluster: &ClusterGuard) -> anyhow::Re
         .context("failed to get surb balancer config")?;
 
     assert_eq!(config, Some(SurbBalancerConfig::default()));
+
+    channels_there.try_close_channels_all_channels().await?;
+    channels_back.try_close_channels_all_channels().await?;
 
     Ok(())
 }

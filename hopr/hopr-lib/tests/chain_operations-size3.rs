@@ -89,6 +89,8 @@ async fn channel_funding_should_be_visible_in_channel_stake(cluster: &ClusterGua
 
     assert_eq!(updated_channel.balance, funding_amount.mul(2));
 
+    channel.try_close_channels_all_channels().await?;
+
     Ok(())
 }
 
@@ -131,9 +133,12 @@ async fn test_channel_retrieval(cluster: &ClusterGuard) -> anyhow::Result<()> {
         .map(|c| *c.get_id())
         .collect::<Vec<ChannelId>>();
 
-    assert_eq!(channel_by_parties.get_id(), channel.channel_id(0));
-    assert!(channel_from_ids.contains(&channel.channel_id(0)));
-    assert!(channel_to_ids.contains(&channel.channel_id(0)));
+    let channel_id = channel.channel_id(0);
+    assert_eq!(channel_by_parties.get_id(), channel_id);
+    assert!(channel_from_ids.contains(&channel_id));
+    assert!(channel_to_ids.contains(&channel_id));
+
+    channel.try_close_channels_all_channels().await?;
 
     Ok(())
 }

@@ -33,13 +33,13 @@ async fn test_create_n_hop_session(cluster: &ClusterGuard, #[case] hops: usize) 
         1.. => &path[1..path.len() - 1],
     };
 
-    let _channels_there = ChannelGuard::try_open_channels_for_path(
+    let channels_there = ChannelGuard::try_open_channels_for_path(
         path.iter().map(|node| node.instance.clone()).collect::<Vec<_>>(),
         FUNDING_AMOUNT.parse::<HoprBalance>()?,
     )
     .await?;
 
-    let _channels_back = ChannelGuard::try_open_channels_for_path(
+    let channels_back = ChannelGuard::try_open_channels_for_path(
         path.iter().rev().map(|node| node.instance.clone()).collect::<Vec<_>>(),
         FUNDING_AMOUNT.parse::<HoprBalance>()?,
     )
@@ -71,6 +71,9 @@ async fn test_create_n_hop_session(cluster: &ClusterGuard, #[case] hops: usize) 
         .await?;
 
     // TODO: check here that the destination sees the new session created
+
+    channels_there.try_close_channels_all_channels().await?;
+    channels_back.try_close_channels_all_channels().await?;
 
     Ok(())
 }
