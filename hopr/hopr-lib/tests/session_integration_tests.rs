@@ -69,15 +69,12 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
 
     let addr = *listener.bound_address();
 
-    // tokio::task::spawn(async move {
-    //     transfer_session(&mut alice_session, &mut listener, BUF_LEN, None)
-    //         .await
-    //         .expect("transfer must not fail")
-    let (ready_tx, _) = oneshot::channel();
+    let (ready_tx, ready_rx) = oneshot::channel();
     let transfer_handle = tokio::task::spawn(async move {
         ready_tx.send(()).ok();
         transfer_session(&mut alice_session, &mut listener, BUF_LEN, None).await
     });
+    ready_rx.await.ok();
 
     let msg: [u8; 9183] = hopr_crypto_random::random_bytes();
     let sender = UdpSocket::bind(("127.0.0.1", 0)).await?;
@@ -94,7 +91,10 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
     assert_eq!(recv_msg, msg);
 
     transfer_handle.abort();
-    let _ = transfer_handle.await;
+    match transfer_handle.await {
+        Ok(Err(e)) => panic!("transfer failed: {e}"),
+        _ => {} // Task was aborted (expected)
+    }
 
     Ok(())
 }
