@@ -424,7 +424,11 @@ async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
         // TODO: add batch signature verification for reasonably sized batches
         // This can even group additionally again by sender again
         .flat_map(|(peer, acks)| {
-            tracing::trace!(peer = peer.to_peerid_str(), num_acks = acks.len(), "acknowledgements received");
+            tracing::trace!(
+                peer = peer.to_peerid_str(),
+                num_acks = acks.len(),
+                "acknowledgements received"
+            );
             futures::stream::iter(acks.into_iter().map(move |ack| (peer, ack)))
         })
         .for_each_concurrent(NUM_CONCURRENT_TICKET_ACK_PROCESSING, move |(peer, ack)| {

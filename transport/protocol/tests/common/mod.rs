@@ -1,5 +1,5 @@
-use std::{str::FromStr, sync::Arc, time::Duration};
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr, sync::Arc, time::Duration};
+
 use anyhow::Context;
 use futures::{SinkExt, StreamExt};
 use futures_concurrency::stream::StreamGroup;
@@ -209,9 +209,9 @@ pub async fn peer_setup_for(
 
 #[tracing::instrument(level = "debug", skip(components))]
 pub async fn emulate_channel_communication(components: HashMap<PeerId, WireChannels>) {
-    let (mut senders, streams): (HashMap<_,_>, Vec<_>) = components
+    let (mut senders, streams): (HashMap<_, _>, Vec<_>) = components
         .into_iter()
-        .map(|(peer, (tx, rx))| ((peer, tx), rx.map(move |(target ,msg)| (peer, target, msg))))
+        .map(|(peer, (tx, rx))| ((peer, tx), rx.map(move |(target, msg)| (peer, target, msg))))
         .unzip();
 
     let mut stream_group = StreamGroup::from_iter(streams);
@@ -222,7 +222,10 @@ pub async fn emulate_channel_communication(components: HashMap<PeerId, WireChann
 
         tracing::trace!(%sender, %target, "transporting packet");
 
-        target_sender.send((sender, msg)).await.expect("failed to send packet to peer");
+        target_sender
+            .send((sender, msg))
+            .await
+            .expect("failed to send packet to peer");
     }
 }
 
@@ -292,7 +295,7 @@ pub async fn send_relay_receive_channel_of_n_peers(
 
     const TIMEOUT_SECONDS: Duration = Duration::from_secs(10);
 
-    let (wire_apis, apis, ticket_channels, processes) = peer_setup_for(peer_count)
+    let (wire_apis, mut apis, ticket_channels, processes) = peer_setup_for(peer_count)
         .await
         .context("failed to setup peers for test")?;
 
@@ -311,32 +314,26 @@ pub async fn send_relay_receive_channel_of_n_peers(
 
     tokio::task::spawn(emulate_channel_communication(wire_apis));
 
-    let pseudonym = SimplePseudonym([0xde, 0xad, 0xbe, 0xef, 0xca, 0xfe, 0xba, 0xbe, 0x11, 0x22]);
-    let mut sent_packet_count = 0;
-    for test_msg in test_msgs.iter().take(packet_count) {
-        let mut sender = apis[0].0.clone();
-        let routing = ResolvedTransportRouting::Forward {
-            pseudonym,
-            forward_path: packet_path.clone(),
-            return_paths: vec![],
-        };
+    let out_msgs = test_msgs
+        .iter()
+        .take(packet_count)
+        .map(|msg| {
+            (
+                ResolvedTransportRouting::Forward {
+                    pseudonym: SimplePseudonym([0xde, 0xad, 0xbe, 0xef, 0xca, 0xfe, 0xba, 0xbe, 0x11, 0x22]),
+                    forward_path: packet_path.clone(),
+                    return_paths: vec![],
+                },
+                ApplicationDataOut::with_no_packet_info(msg.clone()),
+            )
+        })
+        .collect::<Vec<_>>();
 
-        sender
-            .send((routing, ApplicationDataOut::with_no_packet_info(test_msg.clone())))
-            .await?;
-
-        sent_packet_count += 1;
-    }
-
-    assert_eq!(
-        sent_packet_count, packet_count,
-        "not all packets were successfully sent"
-    );
+    apis[0].0.send_all(&mut futures::stream::iter(out_msgs).map(Ok)).await?;
 
     let (_apis_send, mut apis_recv): (Vec<_>, Vec<_>) = apis.into_iter().unzip();
 
     let last_node_recv = apis_recv.remove(peer_count - 1);
-
     let mut recv_packets = last_node_recv
         .take(packet_count)
         .map(|packet| packet)
@@ -360,12 +357,12 @@ pub async fn send_relay_receive_channel_of_n_peers(
         let expected_tickets = if i != 0 && i != peer_count - 1 { packet_count } else { 0 };
 
         assert_eq!(
-                rx.take(expected_tickets)
-                  .filter(|e| futures::future::ready(e.is_winning_ticket()))
-                  .count()
-                  .timeout(futures_time::time::Duration::from(TIMEOUT_SECONDS))
-                  .await
-                  .context("peer should be able to extract expected tickets")?,
+            rx.take(expected_tickets)
+                .filter(|e| futures::future::ready(e.is_winning_ticket()))
+                .count()
+                .timeout(futures_time::time::Duration::from(TIMEOUT_SECONDS))
+                .await
+                .context("peer should be able to extract expected tickets")?,
             expected_tickets,
             "peer {i} did not receive the expected amount of tickets",
         );
