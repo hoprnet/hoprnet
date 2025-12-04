@@ -299,6 +299,18 @@ pub fn build_blokli_client() -> BlokliTestClient<FullStateEmulator> {
 }
 
 #[fixture]
+#[once]
+pub fn size_2_cluster_fixture() -> ClusterGuard {
+    cluster_fixture(2)
+}
+
+#[fixture]
+#[once]
+pub fn size_3_cluster_fixture() -> ClusterGuard {
+    cluster_fixture(3)
+}
+
+#[fixture]
 pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
     if !(1..=SWARM_N).contains(&size) {
         panic!("{size} must be between 1 and {SWARM_N}");
