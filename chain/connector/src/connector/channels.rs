@@ -281,7 +281,7 @@ mod tests {
             .build_dynamic_client(MODULE_ADDR.into());
 
         let mut connector = create_connector(blokli_client)?;
-        connector.connect(Duration::from_secs(2)).await?;
+        connector.connect().await?;
 
         assert_eq!(Some(channel_1), connector.channel_by_id(channel_1.get_id()).await?);
         assert_eq!(
@@ -375,7 +375,7 @@ mod tests {
             .build_dynamic_client(MODULE_ADDR.into());
 
         let mut connector = create_connector(blokli_client)?;
-        connector.connect(Duration::from_secs(2)).await?;
+        connector.connect().await?;
 
         connector.open_channel(&account_2.chain_addr, 10.into()).await?.await?;
 
@@ -426,7 +426,7 @@ mod tests {
             .build_dynamic_client(MODULE_ADDR.into());
 
         let mut connector = create_connector(blokli_client)?;
-        connector.connect(Duration::from_secs(2)).await?;
+        connector.connect().await?;
 
         connector.fund_channel(&channel_1.get_id(), 5.into()).await?.await?;
 
@@ -477,7 +477,7 @@ mod tests {
             .build_dynamic_client(MODULE_ADDR.into());
 
         let mut connector = create_connector(blokli_client)?;
-        connector.connect(Duration::from_secs(2)).await?;
+        connector.connect().await?;
 
         connector.close_channel(&channel_1.get_id()).await?.await?;
 
@@ -537,7 +537,7 @@ mod tests {
             .build_dynamic_client(MODULE_ADDR.into());
 
         let mut connector = create_connector(blokli_client)?;
-        connector.connect(Duration::from_secs(2)).await?;
+        connector.connect().await?;
 
         connector.close_channel(&channel_1.get_id()).await?.await?;
 
@@ -588,7 +588,7 @@ mod tests {
             .build_dynamic_client(MODULE_ADDR.into());
 
         let mut connector = create_connector(blokli_client)?;
-        connector.connect(Duration::from_secs(2)).await?;
+        connector.connect().await?;
 
         connector.close_channel(&channel_1.get_id()).await?.await?;
 

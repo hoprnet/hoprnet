@@ -300,7 +300,7 @@ mod tests {
             [1u8; Address::SIZE].into(),
         )
         .await?;
-        connector.connect(Duration::from_secs(3)).await?;
+        connector.connect().await?;
 
         let cfg = AutoRedeemingStrategyConfig {
             minimum_redeem_ticket_value: 0.into(),
@@ -346,7 +346,7 @@ mod tests {
             [1u8; Address::SIZE].into(),
         )
         .await?;
-        connector.connect(Duration::from_secs(3)).await?;
+        connector.connect().await?;
 
         let cfg = AutoRedeemingStrategyConfig {
             minimum_redeem_ticket_value: HoprBalance::from(*PRICE_PER_PACKET * 5),
@@ -394,7 +394,7 @@ mod tests {
             [1u8; Address::SIZE].into(),
         )
         .await?;
-        connector.connect(Duration::from_secs(3)).await?;
+        connector.connect().await?;
 
         let cfg = AutoRedeemingStrategyConfig {
             minimum_redeem_ticket_value: HoprBalance::from(*PRICE_PER_PACKET * 5),
@@ -441,7 +441,7 @@ mod tests {
             [1u8; Address::SIZE].into(),
         )
         .await?;
-        connector.connect(Duration::from_secs(3)).await?;
+        connector.connect().await?;
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_all_on_close: true,
@@ -492,7 +492,7 @@ mod tests {
             [1u8; Address::SIZE].into(),
         )
         .await?;
-        connector.connect(Duration::from_secs(3)).await?;
+        connector.connect().await?;
 
         {
             let cfg = AutoRedeemingStrategyConfig {

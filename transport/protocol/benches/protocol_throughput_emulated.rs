@@ -64,7 +64,7 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                         .expect("connector must be constructible");
 
                         connector
-                            .connect(Duration::from_secs(3))
+                            .connect()
                             .await
                             .expect("connector must be connected");
                         connectors.push(Arc::new(connector));

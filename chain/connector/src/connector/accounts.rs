@@ -261,7 +261,7 @@ mod tests {
             .build_static_client();
 
         let mut connector = create_connector(blokli_client)?;
-        connector.connect(Duration::from_secs(2)).await?;
+        connector.connect().await?;
 
         let accounts = connector
             .stream_accounts(AccountSelector::default())
@@ -304,7 +304,7 @@ mod tests {
             .build_static_client();
 
         let mut connector = create_connector(blokli_client)?;
-        connector.connect(Duration::from_secs(2)).await?;
+        connector.connect().await?;
 
         let selector = AccountSelector::default().with_chain_key(account_1.chain_addr);
         let accounts = connector.stream_accounts(selector).await?.collect::<Vec<_>>().await;
@@ -355,7 +355,7 @@ mod tests {
             .build_static_client();
 
         let mut connector = create_connector(blokli_client)?;
-        connector.connect(Duration::from_secs(2)).await?;
+        connector.connect().await?;
 
         assert_eq!(
             connector.get_balance(account.safe_address.unwrap()).await?,
@@ -384,7 +384,7 @@ mod tests {
             .build_dynamic_client(MODULE_ADDR.into());
 
         let mut connector = create_connector(blokli_client)?;
-        connector.connect(Duration::from_secs(2)).await?;
+        connector.connect().await?;
 
         let offchain_key = OffchainKeypair::from_secret(&hex!(
             "60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"
@@ -421,7 +421,7 @@ mod tests {
             .build_dynamic_client(MODULE_ADDR.into());
 
         let mut connector = create_connector(blokli_client)?;
-        connector.connect(Duration::from_secs(2)).await?;
+        connector.connect().await?;
 
         let offchain_key = OffchainKeypair::from_secret(&hex!(
             "60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"
@@ -463,7 +463,7 @@ mod tests {
             .build_dynamic_client(MODULE_ADDR.into());
 
         let mut connector = create_connector(blokli_client)?;
-        connector.connect(Duration::from_secs(2)).await?;
+        connector.connect().await?;
 
         assert!(matches!(
             connector.announce(&[], &offchain_key).await,
@@ -500,7 +500,7 @@ mod tests {
             .build_dynamic_client(MODULE_ADDR.into());
 
         let mut connector = create_connector(blokli_client)?;
-        connector.connect(Duration::from_secs(2)).await?;
+        connector.connect().await?;
 
         assert!(matches!(
             connector.announce(&[], &offchain_key).await,
@@ -540,7 +540,7 @@ mod tests {
             .build_dynamic_client(MODULE_ADDR.into());
 
         let mut connector = create_connector(blokli_client)?;
-        connector.connect(Duration::from_secs(2)).await?;
+        connector.connect().await?;
 
         connector
             .withdraw(HoprBalance::new_base(10), &[1u8; Address::SIZE].into())
@@ -567,7 +567,7 @@ mod tests {
             .build_dynamic_client(MODULE_ADDR.into());
 
         let mut connector = create_connector(blokli_client)?;
-        connector.connect(Duration::from_secs(2)).await?;
+        connector.connect().await?;
 
         connector.register_safe(&[1u8; Address::SIZE].into()).await?.await?;
 
@@ -600,7 +600,7 @@ mod tests {
             .build_dynamic_client(MODULE_ADDR.into());
 
         let mut connector = create_connector(blokli_client)?;
-        connector.connect(Duration::from_secs(2)).await?;
+        connector.connect().await?;
 
         assert!(
             matches!(connector.register_safe(&[1u8; Address::SIZE].into()).await, Err(SafeRegistrationError::AlreadyRegistered(a)) if a == safe_addr)

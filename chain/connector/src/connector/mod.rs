@@ -40,12 +40,22 @@ type EventsChannel = (
     async_broadcast::InactiveReceiver<ChainEvent>,
 );
 
+const MIN_CONNECTION_TIMEOUT: Duration = Duration::from_millis(100);
+const MIN_TX_CONFIRM_TIMEOUT: Duration = Duration::from_secs(1);
+
 /// Configuration of the [`HoprBlockchainConnector`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, smart_default::SmartDefault)]
 pub struct BlockchainConnectorConfig {
     /// Default time to wait until a transaction is confirmed.
+    ///
+    /// Default is 30 seconds, minimum is 1 second.
     #[default(Duration::from_secs(30))]
     pub tx_confirm_timeout: Duration,
+    /// Time to wait for [connection](HoprBlockchainConnector::connect) to complete.
+    ///
+    /// Default is 30 seconds, minimum is 100 milliseconds.
+    #[default(Duration::from_secs(30))]
+    pub connection_timeout: Duration,
 }
 
 /// A connector acting as middleware between the HOPR APIs (see the [`hopr_api`] crate) and the Blokli Client API (see
@@ -446,10 +456,10 @@ where
 
     /// Connects to the chain using the underlying client, syncs all on-chain data
     /// and subscribes for all future updates.
-    ///
-    /// If the sync of the current state does not happen within `timeout`, a [`ConnectorError::ConnectionTimeout`]
-    /// error is returned.
-    pub async fn connect(&mut self, timeout: Duration) -> Result<(), ConnectorError> {
+    /// 
+    /// If the connection does not finish within [`BlockchainConnectorConfig::connection_timeout`](BlockchainConnectorConfig)
+    /// the [`ConnectorError::ConnectionTimeout`] error is returned.
+    pub async fn connect(&mut self) -> Result<(), ConnectorError> {
         if self
             .connection_handle
             .as_ref()
@@ -459,7 +469,7 @@ where
             return Err(ConnectorError::InvalidState("connector is already connected"));
         }
 
-        let abort_handle = self.do_connect(timeout).await?;
+        let abort_handle = self.do_connect(self.cfg.connection_timeout.max(MIN_CONNECTION_TIMEOUT)).await?;
 
         if let Err(error) = self.sequencer.start().await {
             abort_handle.abort();
@@ -495,7 +505,7 @@ where
     ) -> Result<impl Future<Output = Result<ChainReceipt, ConnectorError>> + Send + 'a, ConnectorError> {
         Ok(self
             .sequencer
-            .enqueue_transaction(tx_req, self.cfg.tx_confirm_timeout)
+            .enqueue_transaction(tx_req, self.cfg.tx_confirm_timeout.max(MIN_TX_CONFIRM_TIMEOUT))
             .await?
             .and_then(|tx| {
                 futures::future::ready(
@@ -591,7 +601,7 @@ pub(crate) mod tests {
         let blokli_client = BlokliTestStateBuilder::default().build_static_client();
 
         let mut connector = create_connector(blokli_client)?;
-        connector.connect(Duration::from_secs(2)).await?;
+        connector.connect().await?;
 
         assert!(connector.is_connected());
 
@@ -607,7 +617,7 @@ pub(crate) mod tests {
 
         let mut connector = create_connector(blokli_client)?;
 
-        let res = connector.connect(Duration::from_secs(2)).await;
+        let res = connector.connect().await;
 
         assert!(matches!(res, Err(ConnectorError::ServerNotHealthy)));
         assert!(!connector.is_connected());

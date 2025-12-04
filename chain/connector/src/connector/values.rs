@@ -95,7 +95,7 @@ mod tests {
             .build_static_client();
 
         let mut connector = create_connector(blokli_client)?;
-        connector.connect(Duration::from_secs(2)).await?;
+        connector.connect().await?;
 
         let chain_info = connector.chain_info().await?;
 
