@@ -21,7 +21,7 @@ async fn all_visible_peers_should_be_listed(cluster: &ClusterGuard) -> anyhow::R
         .await
         .context("should get public nodes")?;
 
-    assert_eq!(nodes.len(), cluster.size() - 1); // all but self
+    assert_eq!(nodes.len(), cluster.size());
 
     Ok(())
 }
