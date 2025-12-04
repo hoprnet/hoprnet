@@ -22,6 +22,8 @@ const FUNDING_AMOUNT: &str = "10 wxHOPR";
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 #[cfg(feature = "session-client")]
+/// Verifies keep-alive semantics by establishing a session without channels,
+/// pinging it before and after expiration and asserting stale sessions vanish.
 async fn test_keep_alive_session(cluster: &ClusterGuard) -> anyhow::Result<()> {
     // Test keepalive as well as sending 0 hop messages without channels
     let [src, dst] = cluster.sample_nodes::<2>();
@@ -72,6 +74,8 @@ async fn test_keep_alive_session(cluster: &ClusterGuard) -> anyhow::Result<()> {
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 #[cfg(feature = "session-client")]
+/// Checks SURB balancer configuration can be set and queried by creating a routed
+/// session, reading the stored config, updating it, and validating the change.
 async fn test_session_surb_balancer_config(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [src, mid, dst] = cluster.sample_nodes::<3>();
 

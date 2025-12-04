@@ -11,6 +11,9 @@ use rstest::*;
 #[rstest]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
+/// Validates a node reports the expected initial balances and safe allowance by
+/// reading every wallet component and comparing against the constants seeded in
+/// the 2-node cluster fixture.
 async fn test_get_balance(cluster: &ClusterGuard) -> anyhow::Result<()> {
     use hopr_lib::{HoprBalance, WxHOPR, XDai, XDaiBalance};
 
@@ -53,6 +56,8 @@ async fn test_get_balance(cluster: &ClusterGuard) -> anyhow::Result<()> {
 #[rstest]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
+/// Verifies that startup automatically sets a non-zero ticket price by querying
+/// a random node immediately after bootstrapping the 2-node cluster.
 async fn ticket_price_is_set_to_non_zero_value_on_start(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [node] = cluster.sample_nodes::<1>();
 
@@ -70,6 +75,8 @@ async fn ticket_price_is_set_to_non_zero_value_on_start(cluster: &ClusterGuard) 
 #[rstest]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
+/// Confirms ticket price derivation matches the oracle by comparing the on-chain
+/// value fetched from a node with the oracle price read from a node.
 async fn ticket_price_is_equal_to_oracle_value(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [node] = cluster.sample_nodes::<1>();
     let oracle_price = cluster.get_oracle_ticket_price().await?;
@@ -88,6 +95,8 @@ async fn ticket_price_is_equal_to_oracle_value(cluster: &ClusterGuard) -> anyhow
 #[rstest]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
+/// Ensures participating nodes honour the configured minimum incoming win probability
+/// by sampling a win-prob-1 node and asserting the reported value matches the constant.
 async fn test_check_win_prob_is_default(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [node] = cluster.sample_nodes_with_win_prob_1::<1>();
 

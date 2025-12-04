@@ -7,6 +7,8 @@ use serial_test::serial;
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
+/// Ensures node APIs can convert peerIDs to chain keys and back by deriving both
+/// representations for a sampled node and asserting the conversions round-trip.
 async fn peerids_should_be_convertible_to_chain_keys_and_vice_versa(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [candidate, tester] = cluster.sample_nodes::<2>();
 

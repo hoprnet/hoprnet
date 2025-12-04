@@ -15,6 +15,8 @@ use tokio::{io::AsyncReadExt, net::UdpSocket};
 
 #[parameterized(cap = { Capabilities::empty(), Capabilities::from(Capability::Segmentation) })]
 #[parameterized_macro(tokio::test)]
+/// Creates paired Hopr sessions bridged to a UDP listener to prove that messages
+/// sent over UDP end up in the remote session buffer regardless of capability set.
 async fn udp_session_bridging(cap: Capabilities) -> anyhow::Result<()> {
     let dst: Address = (&ChainKeypair::random()).into();
     let id = SessionId::new(1u64, HoprPseudonym::random());

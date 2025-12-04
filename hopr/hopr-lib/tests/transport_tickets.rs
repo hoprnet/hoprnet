@@ -17,6 +17,8 @@ const FUNDING_AMOUNT: &str = "10 wxHOPR";
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
+/// Sends data through a 1 hop session to accumulate ticket statistics, then
+/// issues a reset and checks the counters drop back to zero.
 async fn ticket_statistics_should_reset_when_cleaned(#[with(5)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1::<3>();
 
@@ -92,6 +94,8 @@ async fn ticket_statistics_should_reset_when_cleaned(#[with(5)] cluster_fixture:
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 #[cfg(feature = "session-client")]
+/// Exhausts a channel's funds by relaying traffic twice in a row and verifies
+/// the relay rejects additional messages once ticket stats show rejections.
 async fn test_reject_relaying_a_message_when_the_channel_is_out_of_funding(
     #[with(5)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
@@ -140,6 +144,8 @@ async fn test_reject_relaying_a_message_when_the_channel_is_out_of_funding(
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 #[cfg(feature = "session-client")]
+/// Sends a fixed number of messages so tickets accumulate, then calls
+/// `redeem_all_tickets` and asserts unredeemed value shrinks while redeemed grows.
 async fn test_redeem_ticket_on_request(#[with(5)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1::<3>();
     let message_count = 10;
@@ -199,6 +205,8 @@ async fn test_redeem_ticket_on_request(#[with(5)] cluster_fixture: ClusterGuard)
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 #[cfg(feature = "session-client")]
+/// Demonstrates that closing channels without redeeming moves ticket value into
+/// the neglected bucket by closing both paths after traffic has flowed.
 async fn test_neglect_ticket_on_closing(#[with(5)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1::<3>();
 
@@ -265,6 +273,8 @@ async fn test_neglect_ticket_on_closing(#[with(5)] cluster_fixture: ClusterGuard
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 #[cfg(feature = "session-client")]
+/// Lowers the sender's win probability and confirms the relay receives fewer
+/// winning tickets by comparing statistics before and after traffic relay.
 async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
     #[with(5)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
@@ -327,6 +337,8 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 #[cfg(feature = "session-client")]
+/// Drops the cluster-wide minimum win probability threshold and asserts session
+/// creation fails when relay win probability is insufficient.
 async fn ticket_with_win_prob_lower_than_min_win_prob_should_be_rejected(
     #[with(5)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
@@ -357,6 +369,8 @@ async fn ticket_with_win_prob_lower_than_min_win_prob_should_be_rejected(
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 #[cfg(feature = "session-client")]
+/// Keeps relay win probability above the minimum, relays traffic, redeems all
+/// tickets and asserts the statistics reflect the successful redemptions.
 async fn relay_with_win_prob_higher_than_min_win_prob_should_succeed(
     #[with(5)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {

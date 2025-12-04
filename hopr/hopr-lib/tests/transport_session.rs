@@ -18,10 +18,12 @@ const FUNDING_AMOUNT: &str = "10 wxHOPR";
 #[rstest]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
-#[serial]
 #[case(0)]
 #[case(1)]
+#[serial]
 #[cfg(feature = "session-client")]
+/// Spins up clusters of varying hops, funds the channels along the entire
+/// path and ensures the session client can successfully establish multi-hop sessions.
 async fn test_create_n_hop_session(#[case] hops: usize) -> anyhow::Result<()> {
     let mut path = cluster_fixture(hops + 2).cluster;
     path.shuffle(&mut thread_rng());

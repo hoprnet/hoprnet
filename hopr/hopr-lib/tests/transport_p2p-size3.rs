@@ -10,16 +10,18 @@ use serial_test::serial;
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
+/// Ensures nodes expose discoverable peers by fetching the list of public nodes
+/// from a random cluster member and asserting it equals the expected count.
 async fn all_visible_peers_should_be_listed(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [node] = cluster.sample_nodes::<1>();
 
-    let config = node
+    let nodes = node
         .inner()
         .get_public_nodes()
         .await
         .context("should get public nodes")?;
 
-    assert!(!config.is_empty()); // TODO: change to exact number of public nodes
+    assert_eq!(nodes.len(), cluster.size() - 1); // all but self
 
     Ok(())
 }
@@ -27,6 +29,8 @@ async fn all_visible_peers_should_be_listed(cluster: &ClusterGuard) -> anyhow::R
 #[rstest]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
+/// Confirms peer-to-peer reachability by pinging another sampled node and
+/// verifying the transport API reports success.
 async fn ping_should_succeed_for_all_visible_nodes(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [src, dst] = cluster.sample_nodes::<2>();
 
@@ -38,6 +42,8 @@ async fn ping_should_succeed_for_all_visible_nodes(cluster: &ClusterGuard) -> an
 #[rstest]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
+/// Guards against self-pings by attempting to ping the same node and asserting
+/// the operation fails.
 async fn ping_should_fail_for_self(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [random_int] = cluster.sample_nodes::<1>();
     let res = random_int.inner().ping(&random_int.peer_id()).await;
@@ -50,6 +56,8 @@ async fn ping_should_fail_for_self(cluster: &ClusterGuard) -> anyhow::Result<()>
 #[rstest]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
+/// Verifies discovery stays consistent by comparing the announced account list
+/// returned by two nodes and ensuring both contain each other's addresses.
 async fn discovery_should_produce_the_same_public_announcements_inside_the_network(
     cluster: &ClusterGuard,
 ) -> anyhow::Result<()> {

@@ -17,6 +17,8 @@ const FUNDING_AMOUNT: &str = "0.1 wxHOPR";
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
+/// Opens and then closes a channel between two nodes to ensure lifecycle APIs
+/// transition through Open and PendingToClose states as expected.
 async fn test_open_close_channel(cluster: &ClusterGuard) -> anyhow::Result<()> {
     use hopr_lib::{ChannelStatus, HoprBalance};
     use tokio::time::sleep;
@@ -70,6 +72,8 @@ async fn test_open_close_channel(cluster: &ClusterGuard) -> anyhow::Result<()> {
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
+/// Funds a freshly opened channel and asserts the stake reflects the deposit by
+/// re-reading the channel and comparing its balance against the funding amount.
 async fn channel_funding_should_be_visible_in_channel_stake(cluster: &ClusterGuard) -> anyhow::Result<()> {
     use hopr_lib::HoprBalance;
 
@@ -96,6 +100,8 @@ async fn channel_funding_should_be_visible_in_channel_stake(cluster: &ClusterGua
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
+/// Confirms different channel-lookup APIs return the same channel identifier by
+/// having a third node query the channel via parties, sources and destinations.
 async fn test_channel_retrieval(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [src, ext, dst] = cluster.sample_nodes::<3>();
 
@@ -139,6 +145,8 @@ async fn test_channel_retrieval(cluster: &ClusterGuard) -> anyhow::Result<()> {
 #[rstest]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
+/// Exercises the native withdrawal path by sending xDai from one node to another
+/// and asserting recipient balance increases while sender balance decreases.
 async fn test_withdraw_native(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [src, dst] = cluster.sample_nodes::<2>();
 
