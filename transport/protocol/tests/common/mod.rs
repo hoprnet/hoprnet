@@ -404,8 +404,9 @@ pub async fn send_relay_receive_channel_of_n_peers(
 
         assert_eq!(
             timeout(
-                Duration::from_secs(1),
-                rx.take(expected_tickets)
+                Duration::from_secs(TIMEOUT_SECONDS.as_secs()),
+                rx.inspect(|ticket| tracing::trace!(?ticket, "received ticket"))
+                    .take(expected_tickets)
                     .filter(|e| futures::future::ready(e.is_winning_ticket()))
                     .count()
             )

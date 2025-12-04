@@ -195,11 +195,14 @@ where
 {
     type Error = HoprProtocolError;
 
+    #[tracing::instrument(skip(self, sender, data), level = "trace", fields(%sender, me = %self.chain_key.public().to_address()))]
     async fn decode(
         &self,
         sender: PeerId,
         data: Box<[u8]>,
     ) -> Result<IncomingPacket, IncomingPacketError<Self::Error>> {
+        tracing::trace!(data_len = data.len(), "decoding packet");
+
         // Try to retrieve the peer's public key from the cache or compute it if it does not exist yet
         let previous_hop = match self
             .peer_id_cache

@@ -543,7 +543,6 @@ impl HoprPacket {
                         signals,
                     } = HoprPacketMessage::from(plain_text).try_into()?;
                     let should_acknowledge = !no_ack;
-                    tracing::trace!(?should_acknowledge, "acknowledgement for final packet");
                     Ok(Self::Final(
                         HoprIncomingPacket {
                             packet_tag,

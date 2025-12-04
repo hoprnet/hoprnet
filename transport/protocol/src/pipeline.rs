@@ -84,7 +84,7 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_PACKET_COUNT.increment(&["sent"]);
 
-                        tracing::trace!(peer = %packet.next_hop, "protocol message out");
+                        tracing::trace!(peer = packet.next_hop.to_peerid_str(), "protocol message out");
                         Some((packet.next_hop.into(), packet.data))
                     }
                     Err(error) => {
@@ -120,15 +120,12 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
 ///                             | --> `wire_outgoing` (forwarded)
 ///                             | --> `ack_incoming` (forwarded)
 ///                             | --> `app_incoming` (final)
-#[allow(clippy::too_many_arguments)] // Allowed on internal functions
 async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, AppIn, AppInErr>(
-    wire_incoming: WIn,
+    (wire_outgoing, wire_incoming): (WOut, WIn),
     decoder: std::sync::Arc<D>,
     ticket_proc: std::sync::Arc<T>,
     ticket_events: TEvt,
-    ack_outgoing: AckOut,
-    wire_outgoing: WOut,
-    ack_incoming: AckIn,
+    (ack_outgoing, ack_incoming): (AckOut, AckIn),
     app_incoming: AppIn,
 ) where
     WIn: futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + 'static,
@@ -217,7 +214,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                 match packet {
                     IncomingPacket::Acknowledgement(ack) => {
                         let IncomingAcknowledgementPacket { previous_hop, received_acks, .. } = *ack;
-                        tracing::trace!(%previous_hop , "acknowledging ticket using received ack");
+                        tracing::trace!(previous_hop = previous_hop.to_peerid_str(), num_acks = received_acks.len(), "incoming acknowledgements");
                         ack_incoming
                             .send((previous_hop, received_acks))
                             .await
@@ -237,7 +234,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             info,
                             ..
                         } = *final_packet;
-                        tracing::trace!(%previous_hop, "incoming final packet");
+                        tracing::trace!(previous_hop = previous_hop.to_peerid_str(), "incoming final packet");
 
                         // Send acknowledgement back
                         ack_outgoing_success
@@ -263,12 +260,21 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             ..
                         } = *fwd_packet;
                         if let Err(error) = ticket_proc.insert_unacknowledged_ticket(&next_hop, ack_challenge, received_ticket).await {
-                            tracing::error!(%previous_hop, %next_hop, %error, "failed to insert unacknowledged ticket into the ticket processor");
+                            tracing::error!(
+                                previous_hop = previous_hop.to_peerid_str(),
+                                next_hop = next_hop.to_peerid_str(),
+                                %error,
+                                "failed to insert unacknowledged ticket into the ticket processor"
+                            );
                             return None;
                         }
 
                         // First, relay the packet to the next hop
-                        tracing::trace!(%previous_hop, %next_hop, "forwarding packet to the next hop");
+                        tracing::trace!(
+                            previous_hop = previous_hop.to_peerid_str(),
+                            next_hop = next_hop.to_peerid_str(),
+                            "forwarding packet to the next hop"
+                        );
 
                         wire_outgoing
                             .send((next_hop.into(), data))
@@ -281,7 +287,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                         METRIC_PACKET_COUNT.increment(&["forwarded"]);
 
                         // Send acknowledgement back
-                        tracing::trace!(%previous_hop, "acknowledging forwarded packet back");
+                        tracing::trace!(previous_hop = previous_hop.to_peerid_str(), "acknowledging forwarded packet back");
                         ack_outgoing_success
                             .send((previous_hop, Some(ack_key_prev_hop)))
                             .await
@@ -354,6 +360,7 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
             }
         })
         .buffer(futures_time::time::Duration::from(cfg.ack_buffer_interval))
+        .filter(|acks| futures::future::ready(!acks.is_empty()))
         .flat_map(|buffered_acks| {
             // Split the acknowledgements into groups based on the sender
             // The halfbrown hash map will use Vec for a lower number of distinct senders, and possibly transition to
@@ -368,6 +375,11 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
                     .and_modify(|v| v.push(ack))
                     .or_insert_with(|| vec![ack]);
             }
+            tracing::trace!(
+                num_groups = groups.len(),
+                num_acks = groups.values().map(|v| v.len()).sum::<usize>(),
+                "acknowledgements grouped"
+            );
             futures::stream::iter(groups)
         })
         .for_each_concurrent(
@@ -378,13 +390,13 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
                 async move {
                     match encoder.encode_acknowledgements(acks, &destination).await {
                         Ok(ack_packet) => {
-                            tracing::trace!(%destination, "acknowledgement out");
                             wire_outgoing
                                 .send((ack_packet.next_hop.into(), ack_packet.data))
                                 .await
                                 .unwrap_or_else(|error| {
                                     tracing::error!(%error, "failed to forward an acknowledgement to the transport layer");
                                 });
+                            tracing::trace!(destination = destination.to_peerid_str(), "acknowledgements out");
                         }
                         Err(error) => tracing::error!(%error, "failed to create ack packet"),
                     }
@@ -411,33 +423,36 @@ async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
     ack_incoming
         // TODO: add batch signature verification for reasonably sized batches
         // This can even group additionally again by sender again
-        .flat_map(|(peer, acks)| futures::stream::iter(acks.into_iter().map(move |ack| (peer, ack))))
+        .flat_map(|(peer, acks)| {
+            tracing::trace!(peer = peer.to_peerid_str(), num_acks = acks.len(), "acknowledgements received");
+            futures::stream::iter(acks.into_iter().map(move |ack| (peer, ack)))
+        })
         .for_each_concurrent(NUM_CONCURRENT_TICKET_ACK_PROCESSING, move |(peer, ack)| {
             let ticket_proc = ticket_proc.clone();
             let mut ticket_evt = ticket_events.clone();
             async move {
-                tracing::trace!(%peer, "received acknowledgement");
+                tracing::trace!(peer = peer.to_peerid_str(), "received acknowledgement");
                 match ticket_proc.acknowledge_ticket(peer, ack).await {
                     Ok(ResolvedAcknowledgement::RelayingWin(redeemable_ticket)) => {
-                        tracing::trace!(%peer, "received ack for a winning ticket");
+                        tracing::trace!(peer = peer.to_peerid_str(), "received ack for a winning ticket");
                         ticket_evt
                             .send(TicketEvent::WinningTicket(redeemable_ticket))
                             .await
                             .unwrap_or_else(|error| {
-                                tracing::error!(%error, "failed to notify winning ticket");
+                                tracing::error!(peer = peer.to_peerid_str(), %error, "failed to notify winning ticket");
                             });
                     }
                     Ok(ResolvedAcknowledgement::RelayingLoss(_)) => {
                         // Losing tickets are not getting accounted for anywhere.
-                        tracing::trace!(%peer, "received ack for a losing ticket");
+                        tracing::trace!(peer = peer.to_peerid_str(), "received ack for a losing ticket");
                     }
                     Err(TicketAcknowledgementError::UnexpectedAcknowledgement) => {
                         // Unexpected acknowledgements naturally happen
                         // as acknowledgements of 0-hop packets
-                        tracing::trace!(%peer, "received unexpected acknowledgement");
+                        tracing::trace!(peer = peer.to_peerid_str(), "received unexpected acknowledgement");
                     }
                     Err(error) => {
-                        tracing::error!(%error, "failed to acknowledge ticket");
+                        tracing::error!(peer = peer.to_peerid_str(), %error, "failed to acknowledge ticket");
                     }
                 }
             }
@@ -560,13 +575,11 @@ where
     processes.insert(
         PacketPipelineProcesses::MsgIn,
         spawn_as_abortable!(start_incoming_packet_pipeline(
-            wire_in,
+            (wire_out.clone(), wire_in),
             decoder,
             ticket_proc.clone(),
             ticket_events.clone(),
-            outgoing_ack_tx,
-            wire_out.clone(),
-            incoming_ack_tx,
+            (outgoing_ack_tx, incoming_ack_tx),
             app_out,
         )),
     );

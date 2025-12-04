@@ -144,6 +144,7 @@ where
 {
     type Error = HoprProtocolError;
 
+    #[tracing::instrument(skip_all, level = "trace", fields(me = %self.chain_key.public().to_address()))]
     async fn encode_packet<D: AsRef<[u8]> + Send + 'static, Sig: Into<PacketSignals> + Send + 'static>(
         &self,
         data: D,
@@ -181,15 +182,19 @@ where
             }
         };
 
+        tracing::trace!(len = data.as_ref().len(), "encoding packet");
         self.encode_packet_internal(next_peer, data, num_hops, signals, routing, pseudonym)
             .await
     }
 
+    #[tracing::instrument(skip_all, level = "trace", fields(destination = destination.to_peerid_str(), me = %self.chain_key.public().to_address()))]
     async fn encode_acknowledgements(
         &self,
         acks: Vec<VerifiedAcknowledgement>,
         destination: &OffchainPublicKey,
     ) -> Result<OutgoingPacket, Self::Error> {
+        tracing::trace!(num_acks = acks.len(), "encoding acknowledgements");
+
         let mut all_acks = Vec::<u8>::with_capacity(size_of::<u16>() + acks.len() * Acknowledgement::SIZE);
         all_acks.extend((acks.len() as u16).to_be_bytes());
         acks.into_iter().for_each(|ack| all_acks.extend(ack.leak().as_ref()));

@@ -181,6 +181,7 @@ where
 {
     type Error = HoprProtocolError;
 
+    #[tracing::instrument(skip(self, next_hop, challenge, ticket), level = "trace", fields(next_hop = next_hop.to_peerid_str(), me = %self.chain_key.public().to_address()))]
     async fn insert_unacknowledged_ticket(
         &self,
         next_hop: &OffchainPublicKey,
@@ -202,6 +203,7 @@ where
         Ok(())
     }
 
+    #[tracing::instrument(skip(self, peer, ack), level = "trace", fields(peer = peer.to_peerid_str(), me = %self.chain_key.public().to_address()))]
     async fn acknowledge_ticket(
         &self,
         peer: OffchainPublicKey,
@@ -209,7 +211,7 @@ where
     ) -> Result<ResolvedAcknowledgement, TicketAcknowledgementError<Self::Error>> {
         // Check if we're even expecting an acknowledgement from this peer
         let Some(awaiting_ack_from_peer) = self.unacknowledged_tickets.get(&peer).await else {
-            tracing::trace!(%peer, "not awaiting any acknowledgement from peer");
+            tracing::trace!("not awaiting any acknowledgement from peer");
             return Err(TicketAcknowledgementError::UnexpectedAcknowledgement);
         };
 
