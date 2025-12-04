@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use anyhow::Context;
 use futures::{SinkExt, StreamExt};
 use futures_concurrency::stream::StreamGroup;
+use futures_time::future::FutureExt;
 use hex_literal::hex;
 use hopr_api::chain::*;
 use hopr_async_runtime::AbortableList;
@@ -22,7 +23,6 @@ use hopr_transport_mixer::config::MixerConfig;
 use hopr_transport_protocol::{AcknowledgementPipelineConfig, TicketEvent};
 use lazy_static::lazy_static;
 use libp2p::PeerId;
-use tokio::time::timeout;
 use tracing::debug;
 
 lazy_static! {
@@ -335,32 +335,23 @@ pub async fn send_relay_receive_channel_of_n_peers(
 
     let (_apis_send, mut apis_recv): (Vec<_>, Vec<_>) = apis.into_iter().unzip();
 
-    let compare_packets = async move {
-        let last_node_recv = apis_recv.remove(peer_count - 1);
+    let last_node_recv = apis_recv.remove(peer_count - 1);
 
-        let mut recv_packets = last_node_recv
-            .take(packet_count)
-            .map(|packet| packet)
-            .collect::<Vec<_>>()
-            .await;
+    let mut recv_packets = last_node_recv
+        .take(packet_count)
+        .map(|packet| packet)
+        .collect::<Vec<_>>()
+        .timeout(futures_time::time::Duration::from(TIMEOUT_SECONDS))
+        .await?;
 
-        assert_eq!(recv_packets.len(), test_msgs.len());
+    assert_eq!(recv_packets.len(), test_msgs.len());
 
-        test_msgs.sort_by(|a, b| a.plain_text.cmp(&b.plain_text));
-        recv_packets.sort_by(|(_, a), (_, b)| a.data.plain_text.cmp(&b.data.plain_text));
+    test_msgs.sort_by(|a, b| a.plain_text.cmp(&b.plain_text));
+    recv_packets.sort_by(|(_, a), (_, b)| a.data.plain_text.cmp(&b.data.plain_text));
 
-        assert_eq!(
-            recv_packets.into_iter().map(|(_, b)| b.data).collect::<Vec<_>>(),
-            test_msgs
-        );
-    };
-
-    let res = timeout(TIMEOUT_SECONDS, compare_packets).await;
-
-    assert!(
-        res.is_ok(),
-        "test timed out after {} seconds",
-        TIMEOUT_SECONDS.as_secs()
+    assert_eq!(
+        recv_packets.into_iter().map(|(_, b)| b.data).collect::<Vec<_>>(),
+        test_msgs
     );
 
     assert_eq!(ticket_channels.len(), peer_count);
@@ -369,15 +360,12 @@ pub async fn send_relay_receive_channel_of_n_peers(
         let expected_tickets = if i != 0 && i != peer_count - 1 { packet_count } else { 0 };
 
         assert_eq!(
-            timeout(
-                Duration::from_secs(TIMEOUT_SECONDS.as_secs()),
-                rx.inspect(|ticket| tracing::trace!(?ticket, "received ticket"))
-                    .take(expected_tickets)
-                    .filter(|e| futures::future::ready(e.is_winning_ticket()))
-                    .count()
-            )
-            .await
-            .context("peer should be able to extract expected tickets")?,
+                rx.take(expected_tickets)
+                  .filter(|e| futures::future::ready(e.is_winning_ticket()))
+                  .count()
+                  .timeout(futures_time::time::Duration::from(TIMEOUT_SECONDS))
+                  .await
+                  .context("peer should be able to extract expected tickets")?,
             expected_tickets,
             "peer {i} did not receive the expected amount of tickets",
         );
