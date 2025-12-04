@@ -38,11 +38,13 @@ pub trait ChainValues {
     async fn minimum_incoming_ticket_win_prob(&self) -> Result<WinningProbability, Self::Error>;
     /// Retrieves the network-set minimum ticket price.
     async fn minimum_ticket_price(&self) -> Result<HoprBalance, Self::Error>;
+    /// Retrieves the current key binding fee
+    /// used for new key-binding [announcements](crate::chain::ChainWriteAccountOperations::announce).
+    async fn key_binding_fee(&self) -> Result<HoprBalance, Self::Error>;
     /// Gets the grace period for channel closure finalization.
     async fn channel_closure_notice_period(&self) -> Result<Duration, Self::Error>;
     /// Gets the information about the HOPR network on-chain deployment.
     async fn chain_info(&self) -> Result<ChainInfo, Self::Error>;
-
     /// Convenience function to determine the winning probability and ticket price for outgoing
     /// tickets.
     async fn outgoing_ticket_values(

@@ -137,7 +137,7 @@ where
         key: &OffchainKeypair,
     ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, AnnouncementError<Self::Error>> {
         self.check_connection_state()
-            .map_err(AnnouncementError::ProcessingError)?;
+            .map_err(AnnouncementError::processing)?;
 
         let new_announced_addrs = ahash::HashSet::from_iter(multiaddrs.iter().map(|a| a.to_string()));
 
@@ -147,7 +147,7 @@ where
                 self.chain_key.public().to_address().into(),
             ))
             .await
-            .map_err(|e| AnnouncementError::ProcessingError(ConnectorError::from(e)))?
+            .map_err(AnnouncementError::processing)?
             .into_iter()
             .find(|account| OffchainPublicKey::from_str(&account.packet_key).is_ok_and(|k| &k == key.public()));
 
@@ -158,23 +158,26 @@ where
             }
         }
 
+        // No key-binding fee must be set when the account already exists (with multi-addresses or not)
         let key_binding = KeyBinding::new(self.chain_key.public().to_address(), key);
-
+        let key_binding_fee = if existing_account.is_none() {
+            self.query_cached_chain_info().await.map_err(AnnouncementError::processing)?.key_binding_fee
+        } else {
+            HoprBalance::zero()
+        };
+        
         let tx_req = self
             .payload_generator
             .announce(
                 AnnouncementData::new(key_binding, multiaddrs.first().cloned())
                     .map_err(|e| AnnouncementError::ProcessingError(ConnectorError::OtherError(e.into())))?,
-                // No key-binding fee must be set when the account already exists (with multi-addresses or not)
-                existing_account
-                    .map(|_| HoprBalance::zero())
-                    .unwrap_or(self.cfg.new_key_binding_fee),
+                key_binding_fee,
             )
-            .map_err(|e| AnnouncementError::ProcessingError(ConnectorError::from(e)))?;
+            .map_err(AnnouncementError::processing)?;
 
         Ok(self
             .send_tx(tx_req)
-            .map_err(AnnouncementError::ProcessingError)
+            .map_err(AnnouncementError::processing)
             .await?
             .boxed())
     }
@@ -196,7 +199,7 @@ where
         safe_address: &Address,
     ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, SafeRegistrationError<Self::Error>> {
         self.check_connection_state()
-            .map_err(SafeRegistrationError::ProcessingError)?;
+            .map_err(SafeRegistrationError::processing)?;
 
         if let Some(safe) = self
             .client
@@ -204,7 +207,7 @@ where
                 self.chain_key.public().to_address().into(),
             ))
             .await
-            .map_err(|e| SafeRegistrationError::ProcessingError(ConnectorError::from(e)))?
+            .map_err(SafeRegistrationError::processing)?
             .iter()
             .find_map(|account| account.safe_address.clone())
         {
@@ -219,11 +222,11 @@ where
         let tx_req = self
             .payload_generator
             .register_safe_by_node(*safe_address)
-            .map_err(|e| SafeRegistrationError::ProcessingError(ConnectorError::from(e)))?;
+            .map_err(SafeRegistrationError::processing)?;
 
         Ok(self
             .send_tx(tx_req)
-            .map_err(SafeRegistrationError::ProcessingError)
+            .map_err(SafeRegistrationError::processing)
             .await?
             .boxed())
     }

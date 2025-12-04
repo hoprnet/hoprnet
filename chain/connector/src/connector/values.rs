@@ -62,6 +62,11 @@ where
         Ok(self.query_cached_chain_info().await?.ticket_price)
     }
 
+    async fn key_binding_fee(&self) -> Result<HoprBalance, Self::Error> {
+        self.check_connection_state()?;
+        Ok(self.query_cached_chain_info().await?.key_binding_fee)
+    }
+
     async fn channel_closure_notice_period(&self) -> Result<Duration, Self::Error> {
         self.check_connection_state()?;
 

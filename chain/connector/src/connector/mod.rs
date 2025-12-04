@@ -46,9 +46,6 @@ pub struct BlockchainConnectorConfig {
     /// Default time to wait until a transaction is confirmed.
     #[default(Duration::from_secs(30))]
     pub tx_confirm_timeout: Duration,
-    /// Fee to use for new key bindings.
-    #[default(HoprBalance::from_str("0.01 wxHOPR").unwrap())]
-    pub new_key_binding_fee: HoprBalance,
 }
 
 /// A connector acting as middleware between the HOPR APIs (see the [`hopr_api`] crate) and the Blokli Client API (see
