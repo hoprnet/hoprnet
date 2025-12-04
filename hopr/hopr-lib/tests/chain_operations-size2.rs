@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use anyhow::Context;
 use hopr_internal_types::prelude::WinningProbability;
 use hopr_lib::testing::fixtures::{
