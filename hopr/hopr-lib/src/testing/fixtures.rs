@@ -361,7 +361,7 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
                     .expect("failed to create HoprBlockchainSafeConnector for node");
 
                     connector
-                        .connect(Duration::from_secs(3))
+                        .connect()
                         .await
                         .expect("failed to connect to HoprBlockchainSafeConnector");
 

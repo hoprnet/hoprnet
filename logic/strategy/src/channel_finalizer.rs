@@ -177,7 +177,7 @@ mod tests {
         let mut chain_connector =
             create_trustful_hopr_blokli_connector(&ALICE_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
                 .await?;
-        chain_connector.connect(Duration::from_secs(3)).await?;
+        chain_connector.connect().await?;
         let events = chain_connector.subscribe()?;
 
         let cfg = ClosureFinalizerStrategyConfig { max_closure_overdue };

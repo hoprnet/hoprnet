@@ -91,7 +91,7 @@ mod tests {
             .with_tx_simulation_delay(Duration::from_millis(100));
 
         let mut connector = create_connector(blokli_client)?;
-        connector.connect(Duration::from_secs(2)).await?;
+        connector.connect().await?;
 
         let jh = tokio::task::spawn(connector.subscribe()?.take(2).collect::<Vec<_>>());
 
@@ -172,7 +172,7 @@ mod tests {
             .build_static_client();
 
         let mut connector = create_connector(blokli_client)?;
-        connector.connect(Duration::from_secs(2)).await?;
+        connector.connect().await?;
 
         let accounts = connector
             .subscribe_with_state_sync([StateSyncOptions::PublicAccounts])?

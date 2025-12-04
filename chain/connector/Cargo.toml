@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-connector"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implementation of HOPR Chain APIs using Blokli client"
@@ -24,7 +24,7 @@ futures = { workspace = true }
 futures-time = { workspace = true }
 futures-concurrency = { workspace = true }
 hex = { workspace = true, optional = true }
-moka = { workspace = true }
+moka = { workspace = true, features = ["future", "sync"] }
 parking_lot = { workspace = true }
 petgraph = { workspace = true, features = ["rayon", "graphmap"] }
 redb = "3.1.0"

@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use hopr_api::chain::ChainReadAccountOperations;
 use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
 use hopr_crypto_types::prelude::{ChainKeypair, Keypair, OffchainKeypair};
@@ -97,7 +95,7 @@ async fn hopr_block_chain_connector_should_return_channels() -> anyhow::Result<(
     )
     .await?;
 
-    connector.connect(Duration::from_secs(5)).await?;
+    connector.connect().await?;
 
     assert_eq!(
         HoprBalance::from(1000_u32),

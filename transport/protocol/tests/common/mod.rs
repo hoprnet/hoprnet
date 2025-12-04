@@ -150,7 +150,7 @@ pub async fn peer_setup_for(
             Default::default(),
         )
         .await?;
-        connector.connect(Duration::from_secs(3)).await?;
+        connector.connect().await?;
 
         let connector = Arc::new(connector);
         let surb_store = MemorySurbStore::new(SurbStoreConfig::default());

@@ -26,6 +26,7 @@ chain_info:
   chain_id: 100
   ledger_dst: "0000000000000000000000000000000000000000000000000000000000000000"
   min_ticket_winning_probability: 1
+  key_binding_fee: 0.01 wxHOPR
   safe_registry_dst: "0000000000000000000000000000000000000000000000000000000000000000"
   ticket_price: 1 wxHOPR
   network: rotsee
