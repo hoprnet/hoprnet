@@ -3,7 +3,7 @@ use hopr_lib::{
     Address,
     testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster},
 };
-use rstest::rstest;
+use rstest::*;
 use serial_test::serial;
 
 #[rstest]

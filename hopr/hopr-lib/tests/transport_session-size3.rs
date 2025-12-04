@@ -11,7 +11,7 @@ use hopr_lib::{
     },
 };
 use hopr_primitive_types::bounded::BoundedVec;
-use rstest::rstest;
+use rstest::*;
 use serial_test::serial;
 use tokio::time::sleep;
 

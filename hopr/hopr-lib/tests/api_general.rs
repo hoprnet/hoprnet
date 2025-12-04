@@ -1,6 +1,6 @@
 use anyhow::Context;
 use hopr_lib::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_2_cluster_fixture as cluster};
-use rstest::rstest;
+use rstest::*;
 use serial_test::serial;
 
 #[rstest]

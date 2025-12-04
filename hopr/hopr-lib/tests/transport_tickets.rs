@@ -10,7 +10,6 @@ use hopr_primitive_types::prelude::UnitaryFloatOps;
 use rstest::*;
 use serial_test::serial;
 use tokio::time::sleep;
-
 const FUNDING_AMOUNT: &str = "10 wxHOPR";
 
 #[rstest]

@@ -10,7 +10,7 @@ use hopr_lib::{
     },
 };
 use hopr_primitive_types::bounded::BoundedVec;
-use rstest::rstest;
+use rstest::*;
 use serial_test::serial;
 
 const FUNDING_AMOUNT: &str = "10 wxHOPR";
