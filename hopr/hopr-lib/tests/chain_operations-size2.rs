@@ -1,8 +1,11 @@
 use anyhow::Context;
 use hopr_internal_types::prelude::WinningProbability;
-use hopr_lib::testing::fixtures::{
-    ClusterGuard, DEFAULT_SAFE_ALLOWANCE, INITIAL_NODE_NATIVE, INITIAL_NODE_TOKEN, INITIAL_SAFE_NATIVE,
-    INITIAL_SAFE_TOKEN, MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, size_2_cluster_fixture as cluster,
+use hopr_lib::{
+    HoprBalance, WxHOPR, XDai, XDaiBalance,
+    testing::fixtures::{
+        ClusterGuard, DEFAULT_SAFE_ALLOWANCE, INITIAL_NODE_NATIVE, INITIAL_NODE_TOKEN, INITIAL_SAFE_NATIVE,
+        INITIAL_SAFE_TOKEN, MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, size_2_cluster_fixture as cluster,
+    },
 };
 use rstest::*;
 
@@ -13,8 +16,6 @@ use rstest::*;
 /// reading every wallet component and comparing against the constants seeded in
 /// the 2-node cluster fixture.
 async fn test_get_balance(cluster: &ClusterGuard) -> anyhow::Result<()> {
-    use hopr_lib::{HoprBalance, WxHOPR, XDai, XDaiBalance};
-
     let node = &cluster[0];
     let safe_native = node
         .inner()

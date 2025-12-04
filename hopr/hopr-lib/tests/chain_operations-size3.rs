@@ -2,7 +2,7 @@ use std::{ops::Mul, time::Duration};
 
 use anyhow::Context;
 use hopr_lib::{
-    ChannelId,
+    ChannelId, ChannelStatus, HoprBalance,
     testing::{
         fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster},
         hopr::ChannelGuard,
@@ -10,6 +10,7 @@ use hopr_lib::{
 };
 use rstest::*;
 use serial_test::serial;
+use tokio::time::sleep;
 
 const FUNDING_AMOUNT: &str = "0.1 wxHOPR";
 
@@ -20,9 +21,6 @@ const FUNDING_AMOUNT: &str = "0.1 wxHOPR";
 /// Opens and then closes a channel between two nodes to ensure lifecycle APIs
 /// transition through Open and PendingToClose states as expected.
 async fn test_open_close_channel(cluster: &ClusterGuard) -> anyhow::Result<()> {
-    use hopr_lib::{ChannelStatus, HoprBalance};
-    use tokio::time::sleep;
-
     let [src, dst] = cluster.sample_nodes::<2>();
 
     assert!(
@@ -75,8 +73,6 @@ async fn test_open_close_channel(cluster: &ClusterGuard) -> anyhow::Result<()> {
 /// Funds a freshly opened channel and asserts the stake reflects the deposit by
 /// re-reading the channel and comparing its balance against the funding amount.
 async fn channel_funding_should_be_visible_in_channel_stake(cluster: &ClusterGuard) -> anyhow::Result<()> {
-    use hopr_lib::HoprBalance;
-
     let [src, dst] = cluster.sample_nodes::<2>();
     let funding_amount: HoprBalance = FUNDING_AMOUNT.parse()?;
 
