@@ -4818,6 +4818,7 @@ dependencies = [
  "hopr-parallelize",
  "hopr-primitive-types",
  "humantime-serde",
+ "lazy_static",
  "moka",
  "parking_lot",
  "ringbuffer",

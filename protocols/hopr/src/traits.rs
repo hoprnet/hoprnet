@@ -73,11 +73,11 @@ pub trait PacketEncoder {
     ) -> Result<OutgoingPacket, Self::Error>;
 
     /// Encodes the given vector of [`VerifiedAcknowledgements`](VerifiedAcknowledgement) as an outgoing packet to be
-    /// sent to the given [`peer`](OffchainPublicKey).
+    /// sent to the given [`destination`](OffchainPublicKey).
     async fn encode_acknowledgements(
         &self,
         acks: Vec<VerifiedAcknowledgement>,
-        peer: &OffchainPublicKey,
+        destination: &OffchainPublicKey,
     ) -> Result<OutgoingPacket, Self::Error>;
 }
 
