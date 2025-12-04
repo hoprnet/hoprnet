@@ -44,39 +44,29 @@ where
 {
     type Error = ConnectorError;
 
-    async fn domain_separators(&self) -> Result<DomainSeparators, Self::Error> {
-        self.check_connection_state()?;
+    // NOTE: these APIs can be called without calling `connect` first
 
+    async fn domain_separators(&self) -> Result<DomainSeparators, Self::Error> {
         Ok(self.query_cached_chain_info().await?.domain_separators)
     }
 
     async fn minimum_incoming_ticket_win_prob(&self) -> Result<WinningProbability, Self::Error> {
-        self.check_connection_state()?;
-
         Ok(self.query_cached_chain_info().await?.ticket_win_prob)
     }
 
     async fn minimum_ticket_price(&self) -> Result<HoprBalance, Self::Error> {
-        self.check_connection_state()?;
-
         Ok(self.query_cached_chain_info().await?.ticket_price)
     }
 
     async fn key_binding_fee(&self) -> Result<HoprBalance, Self::Error> {
-        self.check_connection_state()?;
-
         Ok(self.query_cached_chain_info().await?.key_binding_fee)
     }
 
     async fn channel_closure_notice_period(&self) -> Result<Duration, Self::Error> {
-        self.check_connection_state()?;
-
         Ok(self.query_cached_chain_info().await?.channel_closure_grace_period)
     }
 
     async fn chain_info(&self) -> Result<ChainInfo, Self::Error> {
-        self.check_connection_state()?;
-
         Ok(self.query_cached_chain_info().await?.info)
     }
 }
@@ -99,6 +89,31 @@ mod tests {
 
         let mut connector = create_connector(blokli_client)?;
         connector.connect().await?;
+
+        let chain_info = connector.chain_info().await?;
+
+        assert_eq!(100, chain_info.chain_id);
+        assert_eq!("rotsee", &chain_info.hopr_network_name);
+
+        assert_eq!(Duration::from_mins(5), connector.channel_closure_notice_period().await?);
+        assert_eq!(HoprBalance::new_base(1), connector.minimum_ticket_price().await?);
+        assert!(WinningProbability::ALWAYS.approx_eq(&connector.minimum_incoming_ticket_win_prob().await?));
+        assert_eq!(Hash::default(), connector.domain_separators().await?.channel);
+        assert_eq!(
+            HoprBalance::from_str("0.01 wxHOPR")?,
+            connector.key_binding_fee().await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connector_should_query_chain_info_without_calling_connect_first() -> anyhow::Result<()> {
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_hopr_network_chain_info("rotsee")
+            .build_static_client();
+
+        let connector = create_connector(blokli_client)?;
 
         let chain_info = connector.chain_info().await?;
 
