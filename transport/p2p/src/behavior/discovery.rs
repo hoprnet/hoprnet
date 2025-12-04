@@ -91,13 +91,13 @@ pub struct Behaviour {
 }
 
 impl Behaviour {
-    pub fn new<T>(me: PeerId, onchain_events: T) -> Self
+    pub fn new<T>(me: PeerId, external_discovery_events: T) -> Self
     where
         T: Stream<Item = PeerDiscovery> + Send + 'static,
     {
         Self {
             me,
-            events: Box::pin(onchain_events.map(DiscoveryInput::Indexer)),
+            events: Box::pin(external_discovery_events.map(DiscoveryInput::Indexer)),
             bootstrap_peers: HashMap::new(),
             pending_events: VecDeque::new(),
             connected_peers: HashMap::new(),

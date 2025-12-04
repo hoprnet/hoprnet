@@ -30,124 +30,14 @@ pub mod errors;
 /// Raw swarm definition for the HOPR network.
 pub mod swarm;
 
+/// Interface stream control objects for the HOPR transport protocols.
+pub mod control;
+
 /// P2P behavior definitions for the transport level interactions not related to the HOPR protocol
 mod behavior;
 
-use std::fmt::Debug;
-
-pub use behavior::discovery::Event as DiscoveryEvent;
-use futures::{AsyncRead, AsyncWrite, Stream};
-use hopr_transport_identity::PeerId;
-use hopr_transport_protocol::PeerDiscovery;
-use libp2p::{StreamProtocol, autonat, identity::PublicKey, swarm::NetworkBehaviour};
-
-// Control object for the streams over the HOPR protocols
-#[derive(Clone)]
-pub struct HoprStreamProtocolControl {
-    control: libp2p_stream::Control,
-    protocol: StreamProtocol,
-}
-
-impl HoprStreamProtocolControl {
-    pub fn new(control: libp2p_stream::Control, protocol: &'static str) -> Self {
-        Self {
-            control,
-            protocol: StreamProtocol::new(protocol),
-        }
-    }
-}
-
-impl std::fmt::Debug for HoprStreamProtocolControl {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("HoprStreamProtocolControl")
-            .field("protocol", &self.protocol)
-            .finish()
-    }
-}
-
-#[async_trait::async_trait]
-impl hopr_transport_protocol::stream::BidirectionalStreamControl for HoprStreamProtocolControl {
-    fn accept(
-        mut self,
-    ) -> Result<impl Stream<Item = (PeerId, impl AsyncRead + AsyncWrite + Send)> + Send, impl std::error::Error> {
-        self.control.accept(self.protocol)
-    }
-
-    async fn open(mut self, peer: PeerId) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error> {
-        self.control.open_stream(peer, self.protocol).await
-    }
-}
-
-/// Network Behavior definition for aggregated HOPR network functionality.
-///
-/// Individual network behaviors from the libp2p perspectives are aggregated
-/// under this type in order to create an aggregated network behavior capable
-/// of generating events for all component behaviors.
-#[derive(NetworkBehaviour)]
-#[behaviour(to_swarm = "HoprNetworkBehaviorEvent")]
-pub struct HoprNetworkBehavior {
-    discovery: behavior::discovery::Behaviour,
-    streams: libp2p_stream::Behaviour,
-    identify: libp2p::identify::Behaviour,
-    autonat: autonat::Behaviour,
-}
-
-impl Debug for HoprNetworkBehavior {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("HoprNetworkBehavior").finish()
-    }
-}
-
-impl HoprNetworkBehavior {
-    pub fn new<T>(me: PublicKey, onchain_events: T) -> Self
-    where
-        T: Stream<Item = PeerDiscovery> + Send + 'static,
-    {
-        Self {
-            streams: libp2p_stream::Behaviour::new(),
-            discovery: behavior::discovery::Behaviour::new(me.clone().into(), onchain_events),
-            identify: libp2p::identify::Behaviour::new(libp2p::identify::Config::new(
-                "/hopr/identify/1.0.0".to_string(),
-                me.clone(),
-            )),
-            autonat: autonat::Behaviour::new(me.into(), autonat::Config::default()),
-        }
-    }
-}
-
-/// Aggregated network behavior event inheriting the component behaviors' events.
-///
-/// Necessary to allow the libp2p handler to properly distribute the events for
-/// processing in the business logic loop.
-#[derive(Debug)]
-pub enum HoprNetworkBehaviorEvent {
-    Discovery(behavior::discovery::Event),
-    Identify(Box<libp2p::identify::Event>),
-    Autonat(autonat::Event),
-}
-
-// Unexpected libp2p_stream event
-impl From<()> for HoprNetworkBehaviorEvent {
-    fn from(_: ()) -> Self {
-        panic!("Unexpected event: ()")
-    }
-}
-
-impl From<behavior::discovery::Event> for HoprNetworkBehaviorEvent {
-    fn from(event: behavior::discovery::Event) -> Self {
-        Self::Discovery(event)
-    }
-}
-
-impl From<libp2p::identify::Event> for HoprNetworkBehaviorEvent {
-    fn from(event: libp2p::identify::Event) -> Self {
-        Self::Identify(Box::new(event))
-    }
-}
-impl From<autonat::Event> for HoprNetworkBehaviorEvent {
-    fn from(event: autonat::Event) -> Self {
-        Self::Autonat(event)
-    }
-}
-
-pub use swarm::HoprSwarm;
+pub use crate::{
+    behavior::{HoprNetworkBehavior, HoprNetworkBehaviorEvent, discovery::Event as DiscoveryEvent},
+    control::HoprStreamProtocolControl,
+    swarm::HoprSwarm,
+};
