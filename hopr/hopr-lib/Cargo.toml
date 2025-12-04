@@ -101,7 +101,6 @@ hopr-chain-connector = { workspace = true, optional = true }
 
 [dev-dependencies]
 hex-literal = { workspace = true }
-parameterized = { workspace = true }
 rand = { workspace = true }
 rstest = { workspace = true }
 serial_test = { workspace = true }
