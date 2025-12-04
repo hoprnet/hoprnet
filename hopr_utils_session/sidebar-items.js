@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["HOPR_TCP_BUFFER_SIZE","HOPR_UDP_BUFFER_SIZE","HOPR_UDP_QUEUE_SIZE"],"enum":["BindError","SessionTargetSpec"],"fn":["build_binding_host","create_tcp_client_binding","create_udp_client_binding","udp_bind_to"],"struct":["ListenerId","ListenerJoinHandles","SessionPool","StoredSessionEntry"]};

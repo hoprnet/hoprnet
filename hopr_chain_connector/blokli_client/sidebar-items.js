@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["BlokliClient","BlokliClientConfig"],"trait":["BlokliQueryClient","BlokliSubscriptionClient","BlokliTransactionClient"]};
