@@ -144,7 +144,7 @@ where
 {
     type Error = HoprProtocolError;
 
-    #[tracing::instrument(skip_all, level = "trace", fields(me = %self.chain_key.public().to_address()))]
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn encode_packet<D: AsRef<[u8]> + Send + 'static, Sig: Into<PacketSignals> + Send + 'static>(
         &self,
         data: D,
@@ -187,7 +187,7 @@ where
             .await
     }
 
-    #[tracing::instrument(skip_all, level = "trace", fields(destination = destination.to_peerid_str(), me = %self.chain_key.public().to_address()))]
+    #[tracing::instrument(skip_all, level = "trace", fields(destination = destination.to_peerid_str()))]
     async fn encode_acknowledgements(
         &self,
         acks: Vec<VerifiedAcknowledgement>,

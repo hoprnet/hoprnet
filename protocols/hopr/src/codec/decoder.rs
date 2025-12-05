@@ -195,7 +195,7 @@ where
 {
     type Error = HoprProtocolError;
 
-    #[tracing::instrument(skip(self, sender, data), level = "trace", fields(%sender, me = %self.chain_key.public().to_address()))]
+    #[tracing::instrument(skip(self, sender, data), level = "trace", fields(%sender))]
     async fn decode(
         &self,
         sender: PeerId,

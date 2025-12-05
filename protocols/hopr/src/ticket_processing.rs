@@ -183,7 +183,7 @@ where
 {
     type Error = HoprProtocolError;
 
-    #[tracing::instrument(skip(self, next_hop, challenge, ticket), level = "trace", fields(next_hop = next_hop.to_peerid_str(), me = %self.chain_key.public().to_address()))]
+    #[tracing::instrument(skip(self, next_hop, challenge, ticket), level = "trace", fields(next_hop = next_hop.to_peerid_str()))]
     async fn insert_unacknowledged_ticket(
         &self,
         next_hop: &OffchainPublicKey,
@@ -225,6 +225,7 @@ where
             #[cfg(not(feature = "rayon"))]
             let iter = acks.into_iter();
 
+            // TODO: use batch signature verification for larger numbers of acks
             iter.map(|ack| {
                 ack.verify(&peer)
                     .and_then(|verified| Ok((*verified.ack_key_share(), verified.ack_key_share().to_challenge()?)))
