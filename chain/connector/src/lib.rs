@@ -9,7 +9,7 @@ use ::blokli_client::{BlokliClient, BlokliClientConfig};
 pub use backend::InMemoryBackend;
 pub use backend::{Backend, TempDbBackend};
 pub use connector::{BlockchainConnectorConfig, HoprBlockchainConnector};
-pub use hopr_chain_types::payload::SafePayloadGenerator;
+pub use hopr_chain_types::payload::{BasicPayloadGenerator, SafePayloadGenerator};
 
 /// Re-exports of the `blokli_client` crate.
 pub mod blokli_client {

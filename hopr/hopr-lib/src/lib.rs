@@ -76,7 +76,6 @@ pub mod prelude {
 
 use std::{
     convert::identity,
-    num::NonZeroUsize,
     sync::{Arc, OnceLock, atomic::Ordering},
     time::Duration,
 };
@@ -160,8 +159,8 @@ impl TrafficGeneration for DummyCoverTrafficType {
 /// to be used for IO-bound and half for CPU-bound tasks.
 #[cfg(feature = "runtime-tokio")]
 pub fn prepare_tokio_runtime(
-    num_cpu_threads: Option<NonZeroUsize>,
-    num_io_threads: Option<NonZeroUsize>,
+    num_cpu_threads: Option<std::num::NonZeroUsize>,
+    num_io_threads: Option<std::num::NonZeroUsize>,
 ) -> anyhow::Result<tokio::runtime::Runtime> {
     use std::str::FromStr;
     let avail_parallelism = std::thread::available_parallelism().ok().map(|v| v.get() / 2);
