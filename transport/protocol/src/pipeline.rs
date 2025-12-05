@@ -458,10 +458,7 @@ async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
                     }
                 }
             }
-            .instrument(tracing::trace_span!(
-                "incoming_ack_batch",
-                peer = peer.to_peerid_str()
-            ))
+            .instrument(tracing::trace_span!("incoming_ack_batch", peer = peer.to_peerid_str()))
         })
         .await;
 

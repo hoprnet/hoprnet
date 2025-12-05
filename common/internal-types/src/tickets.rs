@@ -7,7 +7,7 @@ use std::{
 use hex_literal::hex;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use tracing::{debug, error, instrument};
+use tracing::{error, instrument};
 
 use crate::{
     errors,
@@ -896,7 +896,7 @@ impl UnacknowledgedTicket {
     /// the received acknowledgement of the forwarded packet.
     pub fn acknowledge(self, acknowledgement: &HalfKey) -> crate::errors::Result<AcknowledgedTicket> {
         let response = Response::from_half_keys(&self.own_key, acknowledgement)?;
-        debug!(ticket = %self.ticket, response = response.to_hex(), "acknowledging ticket using response");
+        tracing::trace!(ticket = %self.ticket, response = response.to_hex(), "acknowledging ticket using response");
 
         if self.ticket.verified_ticket().challenge == response.to_challenge()?.to_ethereum_challenge() {
             Ok(self.ticket.into_acknowledged(response))

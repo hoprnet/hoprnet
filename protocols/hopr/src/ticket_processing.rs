@@ -258,7 +258,7 @@ where
                     channel
                 }
                 Ok(None) => {
-                    tracing::error!(%unack_ticket, "received acknowledgement for ticket issued by unknown channel");
+                    tracing::error!(%unack_ticket, "received acknowledgement for ticket issued for unknown channel");
                     continue;
                 }
                 Err(error) => {
@@ -342,5 +342,92 @@ where
         // This value cannot be cached here and must be cached in the DB
         // because the cache invalidation logic can be only done from within the DB.
         self.db.get_tickets_value(channel_id, epoch).await.map_err(Into::into)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use hopr_crypto_random::Randomizable;
+
+    use super::*;
+    use crate::tests::*;
+
+    #[tokio::test]
+    async fn ticket_processor_should_acknowledge_previously_inserted_tickets() -> anyhow::Result<()> {
+        let blokli_client = create_blokli_client()?;
+
+        let node = create_node(1, &blokli_client).await?;
+
+        let ticket_processor = HoprTicketProcessor::new(
+            node.chain_api.clone(),
+            node.node_db.clone(),
+            node.chain_key.clone(),
+            Hash::default(),
+            HoprTicketProcessorConfig::default(),
+        );
+
+        const NUM_TICKETS: usize = 5;
+
+        let mut acks = Vec::with_capacity(5);
+        for index in 0..NUM_TICKETS {
+            let own_share = HalfKey::random();
+            let ack_share = HalfKey::random();
+            let challenge = Challenge::from_own_share_and_half_key(&own_share.to_challenge()?, &ack_share)?;
+
+            let unack_ticket = TicketBuilder::default()
+                .counterparty(&PEERS[1].0)
+                .index(index as u64)
+                .channel_epoch(1)
+                .amount(10_u32)
+                .challenge(challenge)
+                .build_signed(&PEERS[0].0, &Hash::default())?
+                .into_unacknowledged(own_share);
+
+            ticket_processor
+                .insert_unacknowledged_ticket(PEERS[2].1.public(), ack_share.to_challenge()?, unack_ticket)
+                .await?;
+
+            acks.push(VerifiedAcknowledgement::new(ack_share, &PEERS[2].1).leak());
+        }
+
+        let resolutions = ticket_processor.acknowledge_tickets(*PEERS[2].1.public(), acks).await?;
+        assert_eq!(NUM_TICKETS, resolutions.len());
+        assert!(
+            resolutions
+                .iter()
+                .all(|res| matches!(res, ResolvedAcknowledgement::RelayingWin(_)))
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn ticket_processor_should_reject_acknowledgements_from_unexpected_sender() -> anyhow::Result<()> {
+        let blokli_client = create_blokli_client()?;
+
+        let node = create_node(1, &blokli_client).await?;
+
+        let ticket_processor = HoprTicketProcessor::new(
+            node.chain_api.clone(),
+            node.node_db.clone(),
+            node.chain_key.clone(),
+            Hash::default(),
+            HoprTicketProcessorConfig::default(),
+        );
+
+        const NUM_ACKS: usize = 5;
+
+        let mut acks = Vec::with_capacity(5);
+        for _ in 0..NUM_ACKS {
+            let ack_share = HalfKey::random();
+            acks.push(VerifiedAcknowledgement::new(ack_share, &PEERS[2].1).leak());
+        }
+
+        assert!(matches!(
+            ticket_processor.acknowledge_tickets(*PEERS[2].1.public(), acks).await,
+            Err(TicketAcknowledgementError::UnexpectedAcknowledgement)
+        ));
+
+        Ok(())
     }
 }
