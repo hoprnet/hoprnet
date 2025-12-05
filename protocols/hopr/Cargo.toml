@@ -30,6 +30,7 @@ futures-time = { workspace = true }
 hex = { workspace = true }
 moka = { workspace = true }
 parking_lot = { workspace = true }
+rayon = { workspace = true }
 ringbuffer = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_with = { workspace = true, optional = true }

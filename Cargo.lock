@@ -4944,6 +4944,7 @@ dependencies = [
  "lazy_static",
  "moka",
  "parking_lot",
+ "rayon",
  "ringbuffer",
  "serde",
  "serde_with",

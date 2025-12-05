@@ -421,34 +421,28 @@ async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
     TEvt::Error: std::error::Error,
 {
     ack_incoming
-        // TODO: add batch signature verification for reasonably sized batches
-        // This can even group additionally again by sender again
-        .flat_map(|(peer, acks)| {
-            tracing::trace!(
-                peer = peer.to_peerid_str(),
-                num_acks = acks.len(),
-                "acknowledgements received"
-            );
-            futures::stream::iter(acks.into_iter().map(move |ack| (peer, ack)))
-        })
-        .for_each_concurrent(NUM_CONCURRENT_TICKET_ACK_PROCESSING, move |(peer, ack)| {
+        .for_each_concurrent(NUM_CONCURRENT_TICKET_ACK_PROCESSING, move |(peer, acks)| {
             let ticket_proc = ticket_proc.clone();
             let mut ticket_evt = ticket_events.clone();
             async move {
                 tracing::trace!(peer = peer.to_peerid_str(), "received acknowledgement");
-                match ticket_proc.acknowledge_ticket(peer, ack).await {
-                    Ok(ResolvedAcknowledgement::RelayingWin(redeemable_ticket)) => {
-                        tracing::trace!(peer = peer.to_peerid_str(), "received ack for a winning ticket");
-                        ticket_evt
-                            .send(TicketEvent::WinningTicket(redeemable_ticket))
-                            .await
-                            .unwrap_or_else(|error| {
-                                tracing::error!(peer = peer.to_peerid_str(), %error, "failed to notify winning ticket");
-                            });
-                    }
-                    Ok(ResolvedAcknowledgement::RelayingLoss(_)) => {
-                        // Losing tickets are not getting accounted for anywhere.
-                        tracing::trace!(peer = peer.to_peerid_str(), "received ack for a losing ticket");
+                match ticket_proc.acknowledge_tickets(peer, acks).await {
+                    Ok(resolutions) => {
+                        let resolutions_iter = resolutions.into_iter().filter_map(|resolution| match resolution {
+                            ResolvedAcknowledgement::RelayingWin(redeemable_ticket) => {
+                                tracing::trace!(peer = peer.to_peerid_str(), "received ack for a winning ticket");
+                                Some(Ok(TicketEvent::WinningTicket(redeemable_ticket)))
+                            }
+                            ResolvedAcknowledgement::RelayingLoss(_) => {
+                                // Losing tickets are not getting accounted for anywhere.
+                                tracing::trace!(peer = peer.to_peerid_str(), "received ack for a losing ticket");
+                                None
+                            }
+                        });
+
+                        if let Err(error) = ticket_evt.send_all(&mut futures::stream::iter(resolutions_iter)).await {
+                            tracing::error!(peer = peer.to_peerid_str(), %error, "failed to notify ticket resolutions");
+                        }
                     }
                     Err(TicketAcknowledgementError::UnexpectedAcknowledgement) => {
                         // Unexpected acknowledgements naturally happen

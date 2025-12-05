@@ -27,6 +27,7 @@ ahash = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
+futures-concurrency = { workspace = true }
 halfbrown = { workspace = true }
 hex-literal = { workspace = true }
 humantime-serde = { workspace = true, optional = true }
@@ -67,7 +68,6 @@ bytesize = { workspace = true }
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 serial_test = { workspace = true }
 hopr-network-types = { workspace = true }
-futures-concurrency = { workspace = true }
 test-log = { workspace = true }
 hopr-db-node = { workspace = true, features = ["runtime-tokio"] }
 hopr-chain-connector = { workspace = true, features = [

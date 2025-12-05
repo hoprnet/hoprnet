@@ -154,7 +154,7 @@ pub struct FoundSurb {
 }
 
 /// Determines the result of how an acknowledgement was resolved.
-#[derive(Debug)]
+#[derive(Debug, strum::EnumTryAs)]
 pub enum ResolvedAcknowledgement {
     /// The acknowledgement resulted in a winning ticket.
     RelayingWin(Box<RedeemableTicket>),

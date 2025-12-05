@@ -134,23 +134,23 @@ pub trait UnacknowledgedTicketProcessor {
     /// Finds and acknowledges previously inserted tickets, using incoming [`Acknowledgements`](Acknowledgement) from
     /// the upstream [`peer`](OffchainPublicKey).
     ///
-    /// This function must verify each given acknowledgement and find if evaluate to any solutions
+    /// Function should first check if any acknowledgements are expected from the given `peer`.
+    ///
+    /// Furthermore, the function must verify each given acknowledgement and find if it evaluates to any solutions
     /// to challenges of previously [inserted tickets](UnacknowledgedTicketProcessor::insert_unacknowledged_ticket).
     ///
     /// On success, the [resolutions](ResolvedAcknowledgement) contain decisions whether the previously
     /// stored ticket with a matching challenge was found, and whether it is winning (and thus also redeemable) or
     /// losing.
+    /// Challenges for which tickets were not found are skipped.
     ///
-    /// Must return [`TicketAcknowledgementError::UnexpectedAcknowledgement`] if no [`Acknowledgement`] from the given
+    /// Must return [`TicketAcknowledgementError::UnexpectedAcknowledgement`] if no `Acknowledgements` from the given
     /// `peer` was expected.
-    ///
-    /// Returns an error if acknowledgement was expected from `peer`, but a ticket with the challenge
-    /// corresponding to the [`Acknowledgement`] was not found.
-    async fn acknowledge_ticket(
+    async fn acknowledge_tickets(
         &self,
         peer: OffchainPublicKey,
-        acks: Acknowledgement,
-    ) -> Result<ResolvedAcknowledgement, TicketAcknowledgementError<Self::Error>>;
+        acks: Vec<Acknowledgement>,
+    ) -> Result<Vec<ResolvedAcknowledgement>, TicketAcknowledgementError<Self::Error>>;
 }
 
 /// Allows tracking ticket indices of outgoing channels and
