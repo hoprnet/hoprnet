@@ -4808,7 +4808,6 @@ dependencies = [
  "hopr-primitive-types",
  "hopr-transport",
  "lazy_static",
- "parameterized",
  "rand 0.8.5",
  "rstest",
  "serde",

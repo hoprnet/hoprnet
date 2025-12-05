@@ -1,16 +1,16 @@
 use anyhow::Context;
-use hopr_lib::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, cluster_fixture};
-use rstest::rstest;
+use hopr_lib::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_2_cluster_fixture as cluster};
+use rstest::*;
 use serial_test::serial;
 
 #[rstest]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
-async fn peerids_should_be_convertible_to_chain_keys_and_vice_versa(
-    #[with(2)] cluster_fixture: ClusterGuard,
-) -> anyhow::Result<()> {
-    let [candidate, tester] = cluster_fixture.sample_nodes::<2>();
+/// Ensures node APIs can convert peerIDs to chain keys and back by deriving both
+/// representations for a sampled node and asserting the conversions round-trip.
+async fn peerids_should_be_convertible_to_chain_keys_and_vice_versa(cluster: &ClusterGuard) -> anyhow::Result<()> {
+    let [candidate, tester] = cluster.sample_nodes::<2>();
 
     let peer_id = candidate.peer_id();
     let chain_key = candidate.address();
