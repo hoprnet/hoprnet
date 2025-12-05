@@ -61,16 +61,11 @@ use hopr_transport_mixer::MixerConfig;
 pub use hopr_transport_network::network::{Health, Network};
 use hopr_transport_p2p::HoprSwarm;
 use hopr_transport_probe::{
-    Probe,
+    Probe, TrafficGeneration,
     neighbors::ImmediateNeighborProber,
     ping::{PingConfig, Pinger},
 };
-pub use hopr_transport_probe::{
-    errors::ProbeError,
-    ping::PingQueryReplier,
-    traits::TrafficGeneration,
-    types::{NeighborTelemetry, Telemetry},
-};
+pub use hopr_transport_probe::{errors::ProbeError, ping::PingQueryReplier};
 pub use hopr_transport_protocol::{PeerDiscovery, TicketEvent};
 pub use hopr_transport_session as session;
 #[cfg(feature = "runtime-tokio")]
@@ -87,6 +82,8 @@ pub use crate::config::HoprProtocolConfig;
 use crate::{constants::SESSION_INITIATION_TIMEOUT_BASE, errors::HoprTransportError, socket::HoprSocket};
 
 pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RANGE;
+
+pub use hopr_api as api;
 
 // Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
 lazy_static::lazy_static! {
@@ -313,15 +310,32 @@ where
             channel::<(DestinationRouting, ApplicationDataOut)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
 
         // -- transport medium
-        let mixer_cfg = build_mixer_cfg_from_env();
 
-        let (mixing_channel_tx, mixing_channel_rx) = hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(mixer_cfg);
-
+        // NOTE: Private address filtering is implemented at multiple levels for defense-in-depth:
+        // 1. Discovery events are filtered before they reach the transport component
+        // 2. SwarmEvent::NewExternalAddrOfPeer events are filtered using is_public_address()
+        let allow_private_addresses = self.cfg.transport.prefer_local_addresses;
         let transport_layer = HoprSwarm::new(
             (&self.packet_key).into(),
-            discovery_updates,
+            discovery_updates.filter_map(move |event| async move {
+                match event {
+                    PeerDiscovery::Announce(peer, multiaddrs) => {
+                        let multiaddrs = multiaddrs
+                            .into_iter()
+                            .filter(|ma| {
+                                hopr_transport_identity::multiaddrs::is_supported(ma)
+                                    && (allow_private_addresses || is_public_address(ma))
+                            })
+                            .collect::<Vec<_>>();
+                        if multiaddrs.is_empty() {
+                            None
+                        } else {
+                            Some(PeerDiscovery::Announce(peer, multiaddrs))
+                        }
+                    }
+                }
+            }),
             self.my_multiaddresses.clone(),
-            self.cfg.transport.prefer_local_addresses,
         )
         .await;
 
@@ -331,6 +345,10 @@ where
         let (wire_msg_tx, wire_msg_rx) =
             hopr_transport_protocol::stream::process_stream_protocol(msg_codec, msg_proto_control).await?;
 
+        let (mixing_channel_tx, mixing_channel_rx) =
+            hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(build_mixer_cfg_from_env());
+
+        // the process is terminated, when the input stream runs out
         let _mixing_process_before_sending_out = spawn(
             mixing_channel_rx
                 .inspect(|(peer, _)| tracing::trace!(%peer, "moving message from mixer to p2p stream"))
@@ -353,20 +371,12 @@ where
                     let network = network_clone.clone();
                     async move {
                         match event {
-                            hopr_transport_p2p::DiscoveryEvent::IncomingConnection(peer, multiaddr) => {
+                            hopr_transport_p2p::DiscoveryEvent::DialablePeer(peer, multiaddr) => {
                                 if let Err(error) = network
                                     .add(&peer, PeerOrigin::IncomingConnection, vec![multiaddr])
                                     .await
                                 {
                                     tracing::error!(%peer, %error, "Failed to add incoming connection peer");
-                                }
-                            }
-                            hopr_transport_p2p::DiscoveryEvent::FailedDial(peer) => {
-                                if let Err(error) = network
-                                    .update(&peer, Err(hopr_transport_network::network::UpdateFailure::DialFailure))
-                                    .await
-                                {
-                                    tracing::error!(%peer, %error, "Failed to update peer status after failed dial");
                                 }
                             }
                         }
@@ -382,10 +392,14 @@ where
 
         processes.insert(
             HoprTransportProcess::Medium,
-            spawn_as_abortable!(transport_layer.run(transport_events_tx).inspect(|_| tracing::warn!(
-                task = %HoprTransportProcess::Medium,
-                "long-running background task finished"
-            ))),
+            spawn_as_abortable!(
+                transport_layer
+                    .run(transport_events_tx, allow_private_addresses)
+                    .inspect(|_| tracing::warn!(
+                        task = %HoprTransportProcess::Medium,
+                        "long-running background task finished"
+                    ))
+            ),
         );
 
         let msg_protocol_bidirectional_channel_capacity =

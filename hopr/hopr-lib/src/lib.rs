@@ -35,11 +35,11 @@ pub mod state;
 #[cfg(any(feature = "testing", test))]
 pub mod testing;
 
+pub use hopr_api as api;
+
 /// Exports of libraries necessary for API and interface operations.
 #[doc(hidden)]
 pub mod exports {
-    pub use hopr_api as api;
-
     pub mod types {
         pub use hopr_internal_types as internal;
         pub use hopr_primitive_types as primitive;
@@ -85,6 +85,7 @@ use futures::{FutureExt, SinkExt, Stream, StreamExt, TryFutureExt, channel::mpsc
 pub use hopr_api::db::ChannelTicketStatistics;
 use hopr_api::{
     chain::{AccountSelector, AnnouncementError, ChannelSelector, *},
+    ct::TrafficGeneration,
     db::{HoprNodeDbApi, PeerStatus, TicketMarker, TicketSelector},
 };
 use hopr_async_runtime::prelude::spawn;
@@ -127,31 +128,6 @@ lazy_static::lazy_static! {
         "Node on-chain and off-chain addresses",
         &["peerid", "address", "safe_address", "module_address"]
     ).unwrap();
-}
-
-pub struct DummyCoverTrafficType {
-    #[allow(dead_code)]
-    _unconstructable: (),
-}
-
-impl TrafficGeneration for DummyCoverTrafficType {
-    fn build(
-        self,
-    ) -> (
-        impl futures::Stream<Item = DestinationRouting> + Send,
-        impl futures::Sink<
-            std::result::Result<hopr_transport::Telemetry, hopr_transport::ProbeError>,
-            Error = impl std::error::Error,
-        > + Send
-        + Sync
-        + Clone
-        + 'static,
-    ) {
-        (
-            futures::stream::empty(),
-            futures::sink::drain::<std::result::Result<hopr_transport::Telemetry, hopr_transport::ProbeError>>(),
-        )
-    }
 }
 
 /// Prepare an optimized version of the tokio runtime setup for hopr-lib specifically.

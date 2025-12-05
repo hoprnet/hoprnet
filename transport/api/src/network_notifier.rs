@@ -6,20 +6,17 @@ use hopr_transport_network::network::{Network, UpdateFailure};
 use hopr_transport_probe::traits::{PeerDiscoveryFetch, ProbeStatusUpdate};
 use tracing::error;
 
-#[cfg(all(feature = "prometheus", not(test)))]
-lazy_static::lazy_static! {
-    static ref METRIC_TIME_TO_PING:  hopr_metrics::SimpleHistogram =
-         hopr_metrics::SimpleHistogram::new(
-            "hopr_ping_time_sec",
-            "Measures total time it takes to ping a single node (seconds)",
-            vec![0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0],
-        ).unwrap();
-    static ref METRIC_PROBE_COUNT:  hopr_metrics::MultiCounter =  hopr_metrics::MultiCounter::new(
-            "hopr_probe_count",
-            "Total number of pings by result",
-            &["success"]
-        ).unwrap();
-}
+// TODO: replace with telemetry:
+// hopr_metrics::SimpleHistogram::new(
+// "hopr_ping_time_sec",
+// "Measures total time it takes to ping a single node (seconds)",
+// vec![0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0],
+
+// TODO: replace with telemetry:
+// static ref METRIC_PROBE_COUNT:  hopr_metrics::MultiCounter =  hopr_metrics::MultiCounter::new(
+// "hopr_probe_count",
+//             "Total number of pings by result",
+//             &["success"]
 
 /// Implementor of the ping external API.
 ///
@@ -74,19 +71,8 @@ where
         result: &hopr_transport_probe::errors::Result<std::time::Duration>,
     ) {
         let result = match &result {
-            Ok(duration) => {
-                #[cfg(all(feature = "prometheus", not(test)))]
-                {
-                    METRIC_TIME_TO_PING.observe((duration.as_millis() as f64) / 1000.0); // precision for seconds
-                    METRIC_PROBE_COUNT.increment(&["true"]);
-                }
-
-                Ok(*duration)
-            }
+            Ok(duration) => Ok(*duration),
             Err(error) => {
-                #[cfg(all(feature = "prometheus", not(test)))]
-                METRIC_PROBE_COUNT.increment(&["false"]);
-
                 tracing::trace!(%error, "Encountered timeout on peer ping");
                 Err(UpdateFailure::Timeout)
             }

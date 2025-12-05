@@ -28,7 +28,6 @@ async-trait = { workspace = true }
 cfg_eval = { workspace = true, optional = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
-hex-literal = { workspace = true }
 lazy_static = { workspace = true }
 libp2p = { workspace = true, features = ["noise", "request-response"] }
 moka = { workspace = true }
@@ -45,7 +44,6 @@ tokio-util = { workspace = true, default-features = false, features = [
 tracing = { workspace = true }
 validator = { workspace = true }
 
-hopr-api = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-random = { workspace = true }
@@ -65,14 +63,17 @@ tokio = { workspace = true }
 async_channel_io = { version = "0.3.0" }
 bytesize = { workspace = true }
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
+hex-literal = { workspace = true }
 serial_test = { workspace = true }
-hopr-network-types = { workspace = true }
 test-log = { workspace = true }
+
+hopr-api = { workspace = true }
 hopr-db-node = { workspace = true, features = ["runtime-tokio"] }
 hopr-chain-connector = { workspace = true, features = [
   "testing",
   "runtime-tokio",
 ] }
+hopr-network-types = { workspace = true }
 hopr-transport-mixer = { workspace = true }
 
 [[bench]]

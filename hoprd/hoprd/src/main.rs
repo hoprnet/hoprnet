@@ -5,8 +5,7 @@ use futures::{FutureExt, StreamExt, future::abortable};
 use hopr_chain_connector::{HoprBlockchainSafeConnector, blokli_client::BlokliClient};
 use hopr_db_node::{HoprNodeDb, init_hopr_node_db};
 use hopr_lib::{
-    AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, config::HoprLibConfig,
-    exports::api::chain::ChainEvents,
+    AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, api::chain::ChainEvents, config::HoprLibConfig,
 };
 use hoprd::{cli::CliArgs, config::HoprdConfig, errors::HoprdError, exit::HoprServerIpForwardingReactor};
 use hoprd_api::{RestApiParameters, serve_api};
@@ -213,6 +212,7 @@ fn main() -> anyhow::Result<()> {
 #[cfg(feature = "runtime-tokio")]
 async fn main_inner() -> anyhow::Result<()> {
     use hopr_chain_connector::init_blokli_connector;
+    use hopr_impls_ct_telemetry::DummyCoverTrafficType;
 
     init_logger()?;
 
@@ -288,7 +288,7 @@ async fn main_inner() -> anyhow::Result<()> {
 
     let _hopr_socket = node
         .run(
-            None::<hopr_lib::DummyCoverTrafficType>,
+            None::<DummyCoverTrafficType>,
             HoprServerIpForwardingReactor::new(hopr_keys.packet_key.clone(), cfg.session_ip_forwarding),
         )
         .await?;
