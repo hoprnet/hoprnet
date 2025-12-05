@@ -1,6 +1,8 @@
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+#[cfg(feature = "rayon")]
+use rayon::prelude::*;
 
 use crate::{
     errors::{CoreTypesError, Result},
@@ -111,10 +113,13 @@ impl Acknowledgement {
         if optimistic_check {
             optimistic_result
         } else {
-            acknowledgements
-                .into_iter()
-                .map(|(key, ack)| ack.verify(&key))
-                .collect()
+            #[cfg(feature = "rayon")]
+            let iter = acknowledgements.into_par_iter();
+
+            #[cfg(not(feature = "rayon"))]
+            let iter = acknowledgements.into_iter();
+
+            iter.map(|(key, ack)| ack.verify(&key)).collect()
         }
     }
 }

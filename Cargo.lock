@@ -4768,6 +4768,7 @@ dependencies = [
  "multiaddr",
  "num_enum",
  "parameterized",
+ "rayon",
  "serde",
  "serde_bytes",
  "smart-default",

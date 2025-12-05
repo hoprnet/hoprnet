@@ -10,7 +10,7 @@ license = "GPL-3.0-only"
 
 [features]
 default = ["rayon"]
-rayon = ["dep:rayon", "hopr-crypto-packet/rayon"]
+rayon = ["dep:rayon", "hopr-crypto-packet/rayon", "hopr-internal-types/rayon"]
 serde = [
   "dep:cfg_eval",
   "dep:humantime-serde",

@@ -12,7 +12,8 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = []
+default = ["rayon"]
+rayon = ["dep:rayon"]
 serde = [
   "dep:serde",
   "dep:serde_bytes",
@@ -27,6 +28,7 @@ async-trait = { workspace = true }
 hex-literal = { workspace = true }
 num_enum = { workspace = true }
 multiaddr = { workspace = true }
+rayon = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_bytes = { workspace = true, optional = true }
 smart-default = { workspace = true }
