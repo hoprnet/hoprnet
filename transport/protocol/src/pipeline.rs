@@ -425,35 +425,43 @@ async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
             let ticket_proc = ticket_proc.clone();
             let mut ticket_evt = ticket_events.clone();
             async move {
-                tracing::trace!(peer = peer.to_peerid_str(), "received acknowledgement");
+                tracing::trace!(num = acks.len(), "received acknowledgements");
                 match ticket_proc.acknowledge_tickets(peer, acks).await {
-                    Ok(resolutions) => {
+                    Ok(resolutions) if !resolutions.is_empty() => {
                         let resolutions_iter = resolutions.into_iter().filter_map(|resolution| match resolution {
                             ResolvedAcknowledgement::RelayingWin(redeemable_ticket) => {
-                                tracing::trace!(peer = peer.to_peerid_str(), "received ack for a winning ticket");
+                                tracing::trace!("received ack for a winning ticket");
                                 Some(Ok(TicketEvent::WinningTicket(redeemable_ticket)))
                             }
                             ResolvedAcknowledgement::RelayingLoss(_) => {
                                 // Losing tickets are not getting accounted for anywhere.
-                                tracing::trace!(peer = peer.to_peerid_str(), "received ack for a losing ticket");
+                                tracing::trace!("received ack for a losing ticket");
                                 None
                             }
                         });
 
+                        // All acknowledgements that resulted in winning tickets go upstream
                         if let Err(error) = ticket_evt.send_all(&mut futures::stream::iter(resolutions_iter)).await {
-                            tracing::error!(peer = peer.to_peerid_str(), %error, "failed to notify ticket resolutions");
+                            tracing::error!(%error, "failed to notify ticket resolutions");
                         }
+                    }
+                    Ok(_) => {
+                        tracing::warn!("acknowledgement batch could not acknowledge any ticket");
                     }
                     Err(TicketAcknowledgementError::UnexpectedAcknowledgement) => {
                         // Unexpected acknowledgements naturally happen
                         // as acknowledgements of 0-hop packets
-                        tracing::trace!(peer = peer.to_peerid_str(), "received unexpected acknowledgement");
+                        tracing::trace!("received unexpected acknowledgement");
                     }
                     Err(error) => {
-                        tracing::error!(peer = peer.to_peerid_str(), %error, "failed to acknowledge ticket");
+                        tracing::error!(%error, "failed to acknowledge ticket");
                     }
                 }
             }
+            .instrument(tracing::trace_span!(
+                "incoming_ack_batch",
+                peer = peer.to_peerid_str()
+            ))
         })
         .await;
 

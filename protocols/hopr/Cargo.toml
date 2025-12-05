@@ -9,7 +9,8 @@ repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
 [features]
-default = []
+default = ["rayon"]
+rayon = ["dep:rayon", "hopr-crypto-packet/rayon"]
 serde = [
   "dep:cfg_eval",
   "dep:humantime-serde",
@@ -30,7 +31,7 @@ futures-time = { workspace = true }
 hex = { workspace = true }
 moka = { workspace = true }
 parking_lot = { workspace = true }
-rayon = { workspace = true }
+rayon = { workspace = true, optional = true }
 ringbuffer = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_with = { workspace = true, optional = true }
