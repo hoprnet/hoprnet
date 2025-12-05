@@ -3,6 +3,7 @@ use hopr_crypto_types::{
     prelude::{ChainKeypair, Keypair, OffchainKeypair, OffchainSignature, Signature},
     types::Hash,
 };
+use secp256k1::ellswift::ElligatorSwiftParty::B;
 
 // Avoid musl's default allocator due to degraded performance
 //
@@ -78,11 +79,12 @@ pub fn offchain_signature_bench(c: &mut Criterion) {
             .map(|i| format!("test_msg_{i}").as_bytes().to_vec())
             .collect::<Vec<_>>();
 
+        let kps = (0..BATCH_SIZE).map(|_| OffchainKeypair::random()).collect::<Vec<_>>();
+
         let tuples = (0..BATCH_SIZE)
             .map(|i| {
-                let kp = OffchainKeypair::random();
-                let sig = OffchainSignature::sign_message(&msgs[i], &kp);
-                ((msgs[i].as_slice(), sig), *kp.public())
+                let sig = OffchainSignature::sign_message(&msgs[i], &kps[i]);
+                ((msgs[i].as_slice(), sig), kps[i].public())
             })
             .collect::<Vec<_>>();
 

@@ -4650,7 +4650,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-types"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "aes",
  "anyhow",
@@ -4752,7 +4752,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-internal-types"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -4949,7 +4949,6 @@ dependencies = [
  "serde_with",
  "smart-default",
  "strum 0.27.2",
- "test-log",
  "thiserror 2.0.17",
  "tokio",
  "tracing",
