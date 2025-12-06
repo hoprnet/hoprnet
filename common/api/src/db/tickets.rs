@@ -238,7 +238,6 @@ pub enum TicketMarker {
     Neglected,
 }
 
-// TODO: refactor this trait further so that caching responsibility does not lie in the DB (#7575)
 /// Database operations for tickets.
 ///
 /// The redeemable winning tickets enter the DB via [`HoprDb::insert_ticket`] and can only leave the DB

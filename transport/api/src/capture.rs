@@ -144,7 +144,7 @@ enum PacketBeforeTransit<'a> {
     OutgoingAck {
         me: OffchainPublicKey,
         next_hop: OffchainPublicKey,
-        ack: VerifiedAcknowledgement,
+        acks: Vec<VerifiedAcknowledgement>,
         is_random: bool,
     },
     IncomingPacket {
@@ -188,7 +188,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
             PacketBeforeTransit::OutgoingAck {
                 me,
                 next_hop,
-                ack,
+                acks,
                 is_random,
             } => {
                 out.push(PacketType::OutAck as u8);
@@ -199,7 +199,9 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 out.extend_from_slice(next_hop.to_peerid_str().as_bytes());
                 out.push(0); // Add null terminator to the string
                 out.push(if is_random { 1 } else { 0 });
-                out.extend_from_slice(ack.leak().as_ref());
+                out.extend((acks.len() as u16).to_be_bytes());
+                acks.into_iter()
+                    .for_each(|ack| out.extend_from_slice(ack.leak().as_ref()));
                 direction = PacketDirection::Outgoing;
             }
             PacketBeforeTransit::IncomingPacket {
@@ -265,7 +267,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 let IncomingAcknowledgementPacket {
                     packet_tag,
                     previous_hop,
-                    received_ack: ack,
+                    received_acks,
                 } = ack_packet.as_ref();
                 out.push(PacketType::InAck as u8);
                 out.extend_from_slice(packet_tag);
@@ -275,7 +277,8 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 out.extend_from_slice(me.as_ref());
                 out.extend_from_slice(me.to_peerid_str().as_bytes());
                 out.push(0); // Add null terminator to the string
-                out.extend_from_slice(ack.as_ref());
+                out.extend((received_acks.len() as u16).to_be_bytes());
+                received_acks.iter().for_each(|ack| out.extend_from_slice(ack.as_ref()));
             }
         }
 
@@ -407,19 +410,19 @@ impl<C: PacketEncoder + Send + Sync> PacketEncoder for CapturePacketCodec<C> {
         Ok(packet)
     }
 
-    async fn encode_acknowledgement(
+    async fn encode_acknowledgements(
         &self,
-        ack: VerifiedAcknowledgement,
-        peer: &OffchainPublicKey,
+        acks: &[VerifiedAcknowledgement],
+        destination: &OffchainPublicKey,
     ) -> Result<OutgoingPacket, Self::Error> {
-        let packet_ack = self.inner.encode_acknowledgement(ack, peer).await?;
+        let packet_ack = self.inner.encode_acknowledgements(acks, destination).await?;
 
         if let Err(error) = self.sender.clone().try_send(
             PacketBeforeTransit::OutgoingAck {
                 me: self.packet_key,
-                ack,
                 is_random: false,
-                next_hop: *peer,
+                next_hop: *destination,
+                acks: acks.to_vec(),
             }
             .into(),
         ) {
@@ -582,7 +585,10 @@ mod tests {
             IncomingAcknowledgementPacket {
                 packet_tag: hopr_crypto_random::random_bytes(),
                 previous_hop: *kp.public(),
-                received_ack: VerifiedAcknowledgement::random(&kp).leak(),
+                received_acks: vec![
+                    VerifiedAcknowledgement::random(&kp).leak(),
+                    VerifiedAcknowledgement::random(&kp).leak(),
+                ],
             }
             .into(),
         );
@@ -785,7 +791,10 @@ mod tests {
         let packet = PacketBeforeTransit::OutgoingAck {
             me,
             next_hop: *kp.public(),
-            ack: VerifiedAcknowledgement::random(&kp),
+            acks: vec![
+                VerifiedAcknowledgement::random(&kp),
+                VerifiedAcknowledgement::random(&kp),
+            ],
             is_random: false,
         };
 
@@ -794,7 +803,10 @@ mod tests {
         let packet = PacketBeforeTransit::OutgoingAck {
             me,
             next_hop: *kp.public(),
-            ack: VerifiedAcknowledgement::random(&kp),
+            acks: vec![
+                VerifiedAcknowledgement::random(&kp),
+                VerifiedAcknowledgement::random(&kp),
+            ],
             is_random: true,
         };
 

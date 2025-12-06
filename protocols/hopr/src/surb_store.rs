@@ -204,6 +204,7 @@ impl Default for MemorySurbStore {
 
 #[async_trait::async_trait]
 impl SurbStore for MemorySurbStore {
+    #[tracing::instrument(skip_all, level = "trace", fields(?matcher), ret)]
     async fn find_surb(&self, matcher: SurbMatcher) -> Option<FoundSurb> {
         let pseudonym = matcher.pseudonym();
         let surbs_for_pseudonym = self.surbs_per_pseudonym.get(&pseudonym).await?;
@@ -230,6 +231,7 @@ impl SurbStore for MemorySurbStore {
         }
     }
 
+    #[tracing::instrument(skip_all, level = "trace", fields(%pseudonym, num_surbs = surbs.len()))]
     async fn insert_surbs(&self, pseudonym: HoprPseudonym, surbs: Vec<(HoprSurbId, HoprSurb)>) -> usize {
         self.surbs_per_pseudonym
             .entry_by_ref(&pseudonym)
@@ -241,6 +243,7 @@ impl SurbStore for MemorySurbStore {
             .push(surbs)
     }
 
+    #[tracing::instrument(skip_all, level = "trace", fields(?sender_id))]
     fn insert_reply_opener(&self, sender_id: HoprSenderId, opener: ReplyOpener) {
         let opener_lifetime = self.cfg.reply_opener_lifetime.max(MINIMUM_OPENER_LIFETIME);
         let max_openers_per_pseudonym = self.cfg.max_openers_per_pseudonym.max(MINIMUM_OPENERS_PER_PSEUDONYM);
@@ -264,6 +267,7 @@ impl SurbStore for MemorySurbStore {
             .insert(sender_id.surb_id(), opener);
     }
 
+    #[tracing::instrument(skip_all, level = "trace", fields(?sender_id), ret)]
     fn find_reply_opener(&self, sender_id: &HoprSenderId) -> Option<ReplyOpener> {
         self.pseudonym_openers
             .get(&sender_id.pseudonym())

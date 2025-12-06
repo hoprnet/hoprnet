@@ -72,12 +72,12 @@ pub trait PacketEncoder {
         signals: S,
     ) -> Result<OutgoingPacket, Self::Error>;
 
-    /// Encodes the given [`VerifiedAcknowledgement`] as an outgoing packet to be sent to the given
-    /// [`peer`](OffchainPublicKey).
-    async fn encode_acknowledgement(
+    /// Encodes the given vector of [`VerifiedAcknowledgements`](VerifiedAcknowledgement) as an outgoing packet to be
+    /// sent to the given [`destination`](OffchainPublicKey).
+    async fn encode_acknowledgements(
         &self,
-        ack: VerifiedAcknowledgement,
-        peer: &OffchainPublicKey,
+        acks: &[VerifiedAcknowledgement],
+        destination: &OffchainPublicKey,
     ) -> Result<OutgoingPacket, Self::Error>;
 }
 
@@ -96,6 +96,23 @@ pub trait PacketDecoder {
     -> Result<IncomingPacket, IncomingPacketError<Self::Error>>;
 }
 
+/// Defines errors returned by [`UnacknowledgedTicketProcessor::acknowledge_ticket`].
+#[derive(Debug, thiserror::Error)]
+pub enum TicketAcknowledgementError<E> {
+    /// An acknowledgement from a peer was not expected.
+    #[error("acknowledgement from the peer was not expected")]
+    UnexpectedAcknowledgement,
+    /// An error occurred while processing the acknowledgement.
+    #[error(transparent)]
+    Inner(E),
+}
+
+impl<E> TicketAcknowledgementError<E> {
+    pub fn inner<F: Into<E>>(e: F) -> Self {
+        Self::Inner(e.into())
+    }
+}
+
 /// Performs necessary processing of unacknowledged tickets in the HOPR packet processing pipeline.
 #[async_trait::async_trait]
 #[auto_impl::auto_impl(&, Box, Arc)]
@@ -105,7 +122,7 @@ pub trait UnacknowledgedTicketProcessor {
     /// Inserts a verified unacknowledged ticket from a delivered packet into the internal storage.
     ///
     /// The [`ticket`](UnacknowledgedTicket) corresponds to the given [`challenge`](HalfKeyChallenge)
-    /// and awaits to be [acknowledged](UnacknowledgedTicketProcessor::acknowledge_ticket)
+    /// and awaits to be [acknowledged](UnacknowledgedTicketProcessor::acknowledge_tickets)
     /// once an [`Acknowledgement`] is received from the `next_hop`.
     async fn insert_unacknowledged_ticket(
         &self,
@@ -114,25 +131,26 @@ pub trait UnacknowledgedTicketProcessor {
         ticket: UnacknowledgedTicket,
     ) -> Result<(), Self::Error>;
 
-    /// Finds and acknowledges previously inserted ticket, using an [`Acknowledgement`] from the
-    /// upstream [`peer`](OffchainPublicKey).
+    /// Finds and acknowledges previously inserted tickets, using incoming [`Acknowledgements`](Acknowledgement) from
+    /// the upstream [`peer`](OffchainPublicKey).
     ///
-    /// This function must verify the given acknowledgement and find if it contains a solution
-    /// to a challenge of a previously [inserted ticket](UnacknowledgedTicketProcessor::insert_unacknowledged_ticket).
+    /// Function should first check if any acknowledgements are expected from the given `peer`.
     ///
-    /// On success, the [resolution](ResolvedAcknowledgement) contains a decision whether the corresponding previously
-    /// stored ticket was found, and whether it is winning (and thus also redeemable) or losing.
+    /// Furthermore, the function must verify each given acknowledgement and find if it evaluates to any solutions
+    /// to challenges of previously [inserted tickets](UnacknowledgedTicketProcessor::insert_unacknowledged_ticket).
     ///
-    /// Returns `Ok(None)` if no [`Acknowledgement`] from `peer` was
-    /// expected.
+    /// On success, the [resolutions](ResolvedAcknowledgement) contain decisions whether the previously
+    /// stored ticket with a matching challenge was found, and whether it is winning (and thus also redeemable) or
+    /// losing.
+    /// Challenges for which tickets were not found are skipped.
     ///
-    /// Returns an error if acknowledgement was expected from `peer`, but a ticket with the challenge
-    /// corresponding to the [`Acknowledgement`] was not found.
-    async fn acknowledge_ticket(
+    /// Must return [`TicketAcknowledgementError::UnexpectedAcknowledgement`] if no `Acknowledgements` from the given
+    /// `peer` was expected.
+    async fn acknowledge_tickets(
         &self,
         peer: OffchainPublicKey,
-        ack: Acknowledgement,
-    ) -> Result<Option<ResolvedAcknowledgement>, Self::Error>;
+        acks: Vec<Acknowledgement>,
+    ) -> Result<Vec<ResolvedAcknowledgement>, TicketAcknowledgementError<Self::Error>>;
 }
 
 /// Allows tracking ticket indices of outgoing channels and

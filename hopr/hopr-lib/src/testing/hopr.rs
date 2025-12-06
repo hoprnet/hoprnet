@@ -68,6 +68,7 @@ pub async fn create_hopr_instance(
                     },
                     ticket_processing: Default::default(),
                     surb_store: Default::default(),
+                    ack_processing: Default::default(),
                 },
             },
             publish: true,
