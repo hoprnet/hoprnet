@@ -219,16 +219,18 @@ where
 
         // Verify all the acknowledgements and compute challenges from half-keys
         let half_keys_challenges = hopr_parallelize::cpu::spawn_fifo_blocking(move || {
+            // Uses regular verifications for small batches but switches to a more effective
+            // batch verification algorithm for larger ones.
+            let acks = Acknowledgement::verify_batch(acks.into_iter().map(|ack| (peer, ack)));
+
             #[cfg(feature = "rayon")]
             let iter = acks.into_par_iter();
 
             #[cfg(not(feature = "rayon"))]
             let iter = acks.into_iter();
 
-            // TODO: use batch signature verification for larger numbers of acks
-            iter.map(|ack| {
-                ack.verify(&peer)
-                    .and_then(|verified| Ok((*verified.ack_key_share(), verified.ack_key_share().to_challenge()?)))
+            iter.map(|verified| {
+                verified.and_then(|verified| Ok((*verified.ack_key_share(), verified.ack_key_share().to_challenge()?)))
             })
             .filter_map(|res| {
                 res.inspect_err(|error| tracing::error!(%error, "failed to process acknowledgement"))

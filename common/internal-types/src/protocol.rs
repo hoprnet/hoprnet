@@ -54,7 +54,8 @@ impl BytesRepresentable for Acknowledgement {
     const SIZE: usize = HalfKey::SIZE + OffchainSignature::SIZE;
 }
 
-const MIN_BATCH_SIZE: usize = 4;
+/// Minimum batch size of acknowledgements to use EdDSA batch verification algorithm.
+pub const MIN_BATCH_SIZE: usize = 4; // TODO: update this based on benchmarks
 
 impl Acknowledgement {
     /// Attempts to verify the acknowledgement given the `sender_node_key` that sent the acknowledgement.
@@ -72,28 +73,38 @@ impl Acknowledgement {
 
     /// Performs batch verification of acknowledgements received from given senders.
     ///
-    /// For batches of sizes smaller than 4, the regular verification of each signature is performed.
+    /// For batches of sizes smaller than [`MIN_BATCH_SIZE`] or for iterators with an unknown lower bound of size,
+    /// the regular sequential verification of each signature is always performed.
     ///
-    /// For larger batches, this method makes use of EdDSA batch signature verification algorithm,
-    /// which more effectively verifies batch, while being faster than verifying those signatures individually.
-    /// This comes at a cost of not knowing which signature was invalid in the case of failure.
+    /// For larger batches, this method makes use of the EdDSA batch signature verification algorithm,
+    /// which more effectively verifies the batch. This is faster than verifying the signatures individually.
+    /// However, it comes at a cost of not knowing which signature was invalid in the case of a failure.
     ///
     /// This method first tries to verify the batch using the batch signature verification, returning a fast
     /// successful verification result quickly.
+    ///
     /// If one or more of the acknowledgements in the batch were invalid, it preforms individual checks for
     /// each signature in the batch, returning the vector of results.
-    pub fn verify_batch(
-        acknowledgements: Vec<(OffchainPublicKey, Acknowledgement)>,
+    ///
+    /// These individual signature checks could be sequential or parallel if the `rayon` feature is enabled.
+    pub fn verify_batch<I: IntoIterator<Item = (OffchainPublicKey, Self)>>(
+        acknowledgements: I,
     ) -> Vec<Result<VerifiedAcknowledgement>> {
-        if acknowledgements.len() < MIN_BATCH_SIZE {
+        let acknowledgements = acknowledgements.into_iter();
+        let (sz_lower_bound, _) = acknowledgements.size_hint();
+
+        // Use regular verification for batches of small or unknown sizes
+        if sz_lower_bound < MIN_BATCH_SIZE {
             return acknowledgements
                 .into_iter()
                 .map(|(key, ack)| ack.verify(&key))
                 .collect();
         }
 
-        let mut optimistic_result = Vec::with_capacity(acknowledgements.len());
-        let optimistic_check = OffchainSignature::verify_batch(acknowledgements.iter().filter_map(|(key, ack)| {
+        let mut optimistic_result = Vec::with_capacity(sz_lower_bound);
+        let mut keys = Vec::with_capacity(sz_lower_bound);
+
+        let optimistic_check = OffchainSignature::verify_batch(acknowledgements.filter_map(|(key, ack)| {
             let maybe_ack_int = HalfKey::try_from(&ack.0[0..HalfKey::SIZE]).and_then(|ack_key_share| {
                 OffchainSignature::try_from(&ack.0[HalfKey::SIZE..HalfKey::SIZE + OffchainSignature::SIZE])
                     .map(|signature| (ack_key_share, signature))
@@ -105,10 +116,12 @@ impl Acknowledgement {
                         ack_key_share,
                         signature,
                     }));
-                    Some(((&ack.0[0..HalfKey::SIZE], signature), key))
+                    keys.push(Some(key)); // Store the keys in case we need to verify again
+                    Some(((ack_key_share, signature), key))
                 }
                 Err(err) => {
                     optimistic_result.push(Err(err.into()));
+                    keys.push(None);
                     None
                 }
             }
@@ -120,12 +133,14 @@ impl Acknowledgement {
             optimistic_result
         } else {
             #[cfg(feature = "rayon")]
-            let iter = acknowledgements.into_par_iter();
+            let iter = (keys, optimistic_result).into_par_iter();
 
             #[cfg(not(feature = "rayon"))]
-            let iter = acknowledgements.into_iter();
+            let iter = keys.into_iter().zip(optimistic_result.into_iter());
 
-            iter.map(|(key, ack)| ack.verify(&key)).collect()
+            iter.filter_map(|(key, res)| key.zip(res.ok().map(VerifiedAcknowledgement::leak)))
+                .map(|(key, ack)| ack.verify(&key))
+                .collect()
         }
     }
 }

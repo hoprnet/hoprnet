@@ -83,7 +83,7 @@ pub fn offchain_signature_bench(c: &mut Criterion) {
         let tuples = (0..BATCH_SIZE)
             .map(|i| {
                 let sig = OffchainSignature::sign_message(&msgs[i], &kps[i]);
-                ((msgs[i].as_slice(), sig), kps[i].public())
+                ((msgs[i].clone(), sig), *kps[i].public())
             })
             .collect::<Vec<_>>();
 

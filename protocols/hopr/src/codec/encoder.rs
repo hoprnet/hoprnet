@@ -4,6 +4,7 @@ use hopr_crypto_types::{crypto_traits::Randomizable, prelude::*};
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+use tracing::Instrument;
 
 use crate::{
     HoprCodecConfig, OutgoingPacket, PacketEncoder, SurbStore, TicketCreationError, TicketTracker,
@@ -186,6 +187,7 @@ where
 
         tracing::trace!(len = data.as_ref().len(), "encoding packet");
         self.encode_packet_internal(next_peer, data, num_hops, signals, routing, pseudonym)
+            .in_current_span()
             .await
     }
 
@@ -209,6 +211,7 @@ where
             PacketRouting::NoAck(*destination),
             HoprPseudonym::random(),
         )
+        .in_current_span()
         .await
     }
 }
