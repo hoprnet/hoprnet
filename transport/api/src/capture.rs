@@ -412,17 +412,17 @@ impl<C: PacketEncoder + Send + Sync> PacketEncoder for CapturePacketCodec<C> {
 
     async fn encode_acknowledgements(
         &self,
-        acks: Vec<VerifiedAcknowledgement>,
+        acks: &[VerifiedAcknowledgement],
         destination: &OffchainPublicKey,
     ) -> Result<OutgoingPacket, Self::Error> {
-        let packet_ack = self.inner.encode_acknowledgements(acks.clone(), destination).await?;
+        let packet_ack = self.inner.encode_acknowledgements(acks, destination).await?;
 
         if let Err(error) = self.sender.clone().try_send(
             PacketBeforeTransit::OutgoingAck {
                 me: self.packet_key,
                 is_random: false,
                 next_hop: *destination,
-                acks,
+                acks: acks.to_vec(),
             }
             .into(),
         ) {

@@ -3,7 +3,6 @@ use hopr_crypto_types::{
     prelude::{ChainKeypair, Keypair, OffchainKeypair, OffchainSignature, Signature},
     types::Hash,
 };
-use secp256k1::ellswift::ElligatorSwiftParty::B;
 
 // Avoid musl's default allocator due to degraded performance
 //

@@ -9,6 +9,8 @@ use crate::{
     HoprCodecConfig, OutgoingPacket, PacketEncoder, SurbStore, TicketCreationError, TicketTracker,
     errors::HoprProtocolError,
 };
+pub const MAX_ACKNOWLEDGEMENTS_BATCH_SIZE: usize =
+    (HoprPacket::PAYLOAD_SIZE - size_of::<u16>()) / Acknowledgement::SIZE;
 
 /// Default [encoder](PacketEncoder) implementation for HOPR packets.
 pub struct HoprEncoder<Chain, S, T> {
@@ -190,14 +192,14 @@ where
     #[tracing::instrument(skip_all, level = "trace", fields(destination = destination.to_peerid_str()))]
     async fn encode_acknowledgements(
         &self,
-        acks: Vec<VerifiedAcknowledgement>,
+        acks: &[VerifiedAcknowledgement],
         destination: &OffchainPublicKey,
     ) -> Result<OutgoingPacket, Self::Error> {
         tracing::trace!(num_acks = acks.len(), "encoding acknowledgements");
 
         let mut all_acks = Vec::<u8>::with_capacity(size_of::<u16>() + acks.len() * Acknowledgement::SIZE);
         all_acks.extend((acks.len() as u16).to_be_bytes());
-        acks.into_iter().for_each(|ack| all_acks.extend(ack.leak().as_ref()));
+        acks.iter().for_each(|ack| all_acks.extend(ack.leak().as_ref()));
 
         self.encode_packet_internal(
             *destination,

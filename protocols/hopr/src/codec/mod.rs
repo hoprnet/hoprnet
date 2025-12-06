@@ -2,7 +2,7 @@ mod decoder;
 mod encoder;
 
 pub use decoder::HoprDecoder;
-pub use encoder::HoprEncoder;
+pub use encoder::{HoprEncoder, MAX_ACKNOWLEDGEMENTS_BATCH_SIZE};
 
 fn default_outgoing_win_prob() -> Option<hopr_internal_types::prelude::WinningProbability> {
     Some(hopr_internal_types::prelude::WinningProbability::ALWAYS)
@@ -69,7 +69,7 @@ mod tests {
     use super::*;
     use crate::{
         HoprTicketProcessor, HoprTicketProcessorConfig, MemorySurbStore, PacketDecoder, PacketEncoder, SurbStoreConfig,
-        tests::*,
+        codec::encoder::MAX_ACKNOWLEDGEMENTS_BATCH_SIZE, tests::*,
     };
 
     type TestEncoder = HoprEncoder<
@@ -242,12 +242,10 @@ mod tests {
         let encoder = create_encoder(&sender);
         let decoder = create_decoder(&receiver);
 
-        let acks = (0..10)
+        let acks = (0..MAX_ACKNOWLEDGEMENTS_BATCH_SIZE)
             .map(|_| VerifiedAcknowledgement::random(&PEERS[0].1))
             .collect::<Vec<_>>();
-        let out_packet = encoder
-            .encode_acknowledgements(acks.clone(), PEERS[1].1.public())
-            .await?;
+        let out_packet = encoder.encode_acknowledgements(&acks, PEERS[1].1.public()).await?;
 
         let in_packet = decoder
             .decode(sender.offchain_key.public().into(), out_packet.data)
@@ -272,13 +270,13 @@ mod tests {
         let sender = create_node(0, &blokli_client).await?;
 
         let encoder = create_encoder(&sender);
-        let acks = (0..1000)
+        let acks = (0..MAX_ACKNOWLEDGEMENTS_BATCH_SIZE + 1)
             .map(|_| VerifiedAcknowledgement::random(&PEERS[0].1))
             .collect::<Vec<_>>();
 
         assert!(
             encoder
-                .encode_acknowledgements(acks.clone(), PEERS[1].1.public())
+                .encode_acknowledgements(&acks, PEERS[1].1.public())
                 .await
                 .is_err()
         );

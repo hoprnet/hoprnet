@@ -72,7 +72,7 @@ impl Acknowledgement {
 
     /// Performs batch verification of acknowledgements received from given senders.
     ///
-    /// For batches of sizes than 4, the regular verification of each signature is performed.
+    /// For batches of sizes smaller than 4, the regular verification of each signature is performed.
     ///
     /// For larger batches, this method makes use of EdDSA batch signature verification algorithm,
     /// which more effectively verifies batch, while being faster than verifying those signatures individually.
@@ -93,20 +93,26 @@ impl Acknowledgement {
         }
 
         let mut optimistic_result = Vec::with_capacity(acknowledgements.len());
-        let optimistic_check = OffchainSignature::verify_batch(
-            acknowledgements
-                .iter()
-                .map(|(key, ack)| {
-                    let signature =
-                        OffchainSignature::try_from(&ack.0[HalfKey::SIZE..HalfKey::SIZE + OffchainSignature::SIZE])?;
+        let optimistic_check = OffchainSignature::verify_batch(acknowledgements.iter().filter_map(|(key, ack)| {
+            let maybe_ack_int = HalfKey::try_from(&ack.0[0..HalfKey::SIZE]).and_then(|ack_key_share| {
+                OffchainSignature::try_from(&ack.0[HalfKey::SIZE..HalfKey::SIZE + OffchainSignature::SIZE])
+                    .map(|signature| (ack_key_share, signature))
+            });
+
+            match maybe_ack_int {
+                Ok((ack_key_share, signature)) => {
                     optimistic_result.push(Ok(VerifiedAcknowledgement {
-                        ack_key_share: HalfKey::try_from(&ack.0[0..HalfKey::SIZE])?,
+                        ack_key_share,
                         signature,
                     }));
-                    Ok(((&ack.0[0..HalfKey::SIZE], signature), key))
-                })
-                .filter_map(|r: Result<((&[u8], OffchainSignature), &OffchainPublicKey)>| r.ok()),
-        );
+                    Some(((&ack.0[0..HalfKey::SIZE], signature), key))
+                }
+                Err(err) => {
+                    optimistic_result.push(Err(err.into()));
+                    None
+                }
+            }
+        }));
 
         // If the batch verification succeeded, we can return the entire batch as verified.
         // Otherwise, we need to check individual acknowledgements to see which ones failed.

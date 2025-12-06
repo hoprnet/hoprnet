@@ -97,7 +97,7 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
         .filter_map(futures::future::ready)
         .map(Ok)
         .forward_to_timeout(wire_outgoing)
-        .instrument(tracing::trace_span!("msg protocol processing - egress"))
+        .in_current_span()
         .await;
 
     if let Err(error) = res {
@@ -152,25 +152,25 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
             let mut ack_outgoing_failure = ack_outgoing_failure.clone();
             let mut ticket_events_reject = ticket_events.clone();
 
-            tracing::trace!(%peer, "protocol message in");
+            tracing::trace!("protocol message in");
 
             async move {
                 match decoder.decode(peer, data)
                     .timeout(futures_time::time::Duration::from(PACKET_DECODING_TIMEOUT))
                     .await {
                     Ok(Ok(packet)) => {
-                        tracing::trace!(%peer, ?packet, "successfully decoded incoming packet");
+                        tracing::trace!(?packet, "successfully decoded incoming packet");
                         Some(packet)
                     },
                     Ok(Err(IncomingPacketError::Undecodable(error))) => {
                         // Do not send an ack back if the packet could not be decoded at all
                         //
                         // Potentially adversarial behavior
-                        tracing::trace!(%peer, %error, "not sending ack back on undecodable packet - possible adversarial behavior");
+                        tracing::trace!(%error, "not sending ack back on undecodable packet - possible adversarial behavior");
                         None
                     },
                     Ok(Err(IncomingPacketError::ProcessingError(sender, error))) => {
-                        tracing::error!(%peer, %error, "failed to process the decoded packet");
+                        tracing::error!(%error, "failed to process the decoded packet");
                         // On this failure, we send back a random acknowledgement
                         ack_outgoing_failure
                             .send((sender, None))
@@ -198,11 +198,11 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                     }
                     Err(_) => {
                         // If we cannot decode the packet within the time limit, just drop it
-                        tracing::error!(%peer, "dropped incoming packet: failed to decode packet within {:?}", PACKET_DECODING_TIMEOUT);
+                        tracing::error!("dropped incoming packet: failed to decode packet within {:?}", PACKET_DECODING_TIMEOUT);
                         None
                     }
                 }
-            }
+            }.instrument(tracing::debug_span!("incoming_packet_decode", %peer))
         })
         .filter_map(futures::future::ready)
         .then_concurrent(move |packet| {
@@ -314,9 +314,8 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                     })))
         ))
         .map(Ok)
-        .inspect(|data| tracing::trace!(?data, "application data in"))
         .forward_to_timeout(app_incoming)
-        .instrument(tracing::trace_span!("msg protocol processing - ingress"))
+        .in_current_span()
         .await;
 
     if let Err(error) = res {
@@ -388,21 +387,29 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
                 let encoder = encoder.clone();
                 let mut wire_outgoing = wire_outgoing.clone();
                 async move {
-                    match encoder.encode_acknowledgements(acks, &destination).await {
-                        Ok(ack_packet) => {
-                            wire_outgoing
-                                .send((ack_packet.next_hop.into(), ack_packet.data))
-                                .await
-                                .unwrap_or_else(|error| {
-                                    tracing::error!(%error, "failed to forward an acknowledgement to the transport layer");
-                                });
-                            tracing::trace!(destination = destination.to_peerid_str(), "acknowledgements out");
+                    // Make sure that the acknowledgements are sent in batches of at most MAX_ACKNOWLEDGEMENTS_BATCH_SIZE
+                    for ack_chunk in acks.chunks(MAX_ACKNOWLEDGEMENTS_BATCH_SIZE) {
+                        match encoder.encode_acknowledgements(ack_chunk, &destination).await {
+                            Ok(ack_packet) => {
+                                wire_outgoing
+                                    .feed((ack_packet.next_hop.into(), ack_packet.data))
+                                    .await
+                                    .unwrap_or_else(|error| {
+                                        tracing::error!(%error, "failed to forward an acknowledgement to the transport layer");
+                                    });
+                            }
+                            Err(error) => tracing::error!(%error, "failed to create ack packet"),
                         }
-                        Err(error) => tracing::error!(%error, "failed to create ack packet"),
                     }
-                }
+                    if let Err(error) = wire_outgoing.flush().await {
+                        tracing::error!(%error, "failed to flush acknowledgements batch to the transport layer");
+                    }
+                    tracing::trace!("acknowledgements out");
+                }.instrument(tracing::debug_span!("outgoing_ack_batch", peer = destination.to_peerid_str()))
             }
-        ).await;
+        )
+        .in_current_span()
+        .await;
 
     tracing::warn!(
         task = "transport (protocol - ack outgoing)",
@@ -458,8 +465,9 @@ async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
                     }
                 }
             }
-            .instrument(tracing::trace_span!("incoming_ack_batch", peer = peer.to_peerid_str()))
+            .instrument(tracing::debug_span!("incoming_ack_batch", peer = peer.to_peerid_str()))
         })
+        .in_current_span()
         .await;
 
     tracing::warn!(
@@ -518,6 +526,7 @@ impl Validate for AcknowledgementPipelineConfig {
 ///
 /// The pipeline does not handle the mixing itself, that needs to be injected as a separate process
 /// overlay on top of the `wire_msg` Stream or Sink.
+#[tracing::instrument(skip_all, level = "trace", fields(me = packet_key.public().to_peerid_str()))]
 pub fn run_packet_pipeline<WIn, WOut, C, D, T, TEvt, AppOut, AppIn>(
     packet_key: OffchainKeypair,
     wire_msg: (WOut, WIn),
@@ -568,39 +577,37 @@ where
 
     processes.insert(
         PacketPipelineProcesses::MsgOut,
-        spawn_as_abortable!(start_outgoing_packet_pipeline(
-            app_in,
-            encoder.clone(),
-            wire_out.clone(),
-        )),
+        spawn_as_abortable!(
+            start_outgoing_packet_pipeline(app_in, encoder.clone(), wire_out.clone(),).in_current_span()
+        ),
     );
 
     processes.insert(
         PacketPipelineProcesses::MsgIn,
-        spawn_as_abortable!(start_incoming_packet_pipeline(
-            (wire_out.clone(), wire_in),
-            decoder,
-            ticket_proc.clone(),
-            ticket_events.clone(),
-            (outgoing_ack_tx, incoming_ack_tx),
-            app_out,
-        )),
+        spawn_as_abortable!(
+            start_incoming_packet_pipeline(
+                (wire_out.clone(), wire_in),
+                decoder,
+                ticket_proc.clone(),
+                ticket_events.clone(),
+                (outgoing_ack_tx, incoming_ack_tx),
+                app_out,
+            )
+            .in_current_span()
+        ),
     );
 
     processes.insert(
         PacketPipelineProcesses::AckOut,
-        spawn_as_abortable!(start_outgoing_ack_pipeline(
-            outgoing_ack_rx,
-            encoder,
-            ack_config,
-            packet_key.clone(),
-            wire_out,
-        )),
+        spawn_as_abortable!(
+            start_outgoing_ack_pipeline(outgoing_ack_rx, encoder, ack_config, packet_key.clone(), wire_out,)
+                .in_current_span()
+        ),
     );
 
     processes.insert(
         PacketPipelineProcesses::AckIn,
-        spawn_as_abortable!(start_incoming_ack_pipeline(incoming_ack_rx, ticket_events, ticket_proc)),
+        spawn_as_abortable!(start_incoming_ack_pipeline(incoming_ack_rx, ticket_events, ticket_proc).in_current_span()),
     );
 
     processes

@@ -203,7 +203,7 @@ utoipa-swagger-ui = { version = "9.0.2", features = [
   "vendored",
   "debug-embed",
 ] }
-tracing = { version = "0.1.43" }
+tracing = { version = "0.1.43", features = ["release_max_level_debug"] }
 tracing-subscriber = { version = "0.3.22", features = [
   "env-filter",
   "fmt",
