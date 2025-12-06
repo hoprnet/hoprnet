@@ -263,12 +263,25 @@ where
 
                 Ok(match incoming.ack_key {
                     None => {
+                        if incoming.plain_text.len() < size_of::<u16>() {
+                            return Err(IncomingPacketError::Undecodable(
+                                GeneralError::ParseError("invalid acknowledgement packet size".into()).into(),
+                            ));
+                        }
+
                         let num_acks =
                             u16::from_be_bytes(incoming.plain_text[..size_of::<u16>()].try_into().map_err(|_| {
                                 IncomingPacketError::Undecodable(
                                     GeneralError::ParseError("invalid num acks".into()).into(),
                                 )
                             })?);
+
+                        if incoming.plain_text.len() < size_of::<u16>() + (num_acks as usize) * Acknowledgement::SIZE {
+                            return Err(IncomingPacketError::Undecodable(
+                                GeneralError::ParseError("invalid number of acknowledgements in packet".into()).into(),
+                            ));
+                        }
+                        tracing::trace!(num_acks, "received acknowledgement packet");
 
                         // The contained payload represents an Acknowledgement
                         IncomingPacket::Acknowledgement(

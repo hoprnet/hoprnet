@@ -57,8 +57,8 @@ pub struct HoprSenderId(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"
 impl std::fmt::Debug for HoprSenderId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("HoprSenderId")
-            .field(&self.pseudonym())
-            .field(&hex::encode(self.surb_id()))
+            .field(&hex::encode(&self.0[0..HoprPseudonym::SIZE]))
+            .field(&hex::encode(&self.0[HoprPseudonym::SIZE..]))
             .finish()
     }
 }
