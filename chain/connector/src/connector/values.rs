@@ -46,6 +46,29 @@ where
 
     // NOTE: these APIs can be called without calling `connect` first
 
+    async fn balance<Cy: Currency, A: Into<Address> + Send>(&self, address: A) -> Result<Balance<Cy>, Self::Error> {
+        let address = address.into();
+        if Cy::is::<WxHOPR>() {
+            Ok(self
+                .client
+                .query_token_balance(&address.into())
+                .await?
+                .balance
+                .0
+                .parse()?)
+        } else if Cy::is::<XDai>() {
+            Ok(self
+                .client
+                .query_native_balance(&address.into())
+                .await?
+                .balance
+                .0
+                .parse()?)
+        } else {
+            Err(ConnectorError::InvalidState("unsupported currency"))
+        }
+    }
+
     async fn domain_separators(&self) -> Result<DomainSeparators, Self::Error> {
         Ok(self.query_cached_chain_info().await?.domain_separators)
     }
@@ -76,10 +99,38 @@ mod tests {
     use std::str::FromStr;
 
     use hopr_api::chain::ChainValues;
-    use hopr_crypto_types::types::Hash;
+    use hopr_crypto_types::prelude::*;
+    use hopr_internal_types::account::{AccountEntry, AccountType};
 
     use super::*;
     use crate::{connector::tests::create_connector, testing::BlokliTestStateBuilder};
+
+    #[tokio::test]
+    async fn connector_should_get_balance() -> anyhow::Result<()> {
+        let account = AccountEntry {
+            public_key: *OffchainKeypair::random().public(),
+            chain_addr: [1u8; Address::SIZE].into(),
+            entry_type: AccountType::NotAnnounced,
+            safe_address: Some([2u8; Address::SIZE].into()),
+            key_id: 1.into(),
+        };
+
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_accounts([(account.clone(), HoprBalance::new_base(100), XDaiBalance::new_base(1))])
+            .with_safe_allowances([(account.safe_address.unwrap(), HoprBalance::new_base(10000))])
+            .build_static_client();
+
+        let mut connector = create_connector(blokli_client)?;
+        connector.connect().await?;
+
+        assert_eq!(
+            connector.balance(account.safe_address.unwrap()).await?,
+            HoprBalance::new_base(100)
+        );
+        assert_eq!(connector.balance(account.chain_addr).await?, XDaiBalance::new_base(1));
+
+        Ok(())
+    }
 
     #[tokio::test]
     async fn connector_should_query_chain_info() -> anyhow::Result<()> {

@@ -45,17 +45,6 @@ impl<E> SafeRegistrationError<E> {
     }
 }
 
-/// Information about a deployed Safe.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct DeployedSafe {
-    /// Safe address.
-    pub address: Address,
-    /// Address of the Safe owner (typically the node chain key).
-    pub owner: Address,
-    /// Address of the Safe module.
-    pub module: Address,
-}
-
 /// On-chain write operations regarding on-chain node accounts.
 #[async_trait::async_trait]
 #[auto_impl::auto_impl(&, Box, Arc)]
@@ -140,29 +129,11 @@ impl AccountSelector {
     }
 }
 
-/// Selector for [deployed Safes](DeployedSafe).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SafeSelector {
-    /// Selects Safes owned by the given address.
-    Owner(Address),
-    /// Selects Safes with the given address.
-    Address(Address),
-}
-
 /// Chain operations that read on-chain node accounts.
 #[async_trait::async_trait]
 #[auto_impl::auto_impl(&, Box, Arc)]
 pub trait ChainReadAccountOperations {
     type Error: std::error::Error + Send + Sync + 'static;
-
-    /// Returns the native or token currency balance of the given on-chain account.
-    async fn balance<C: Currency, A: Into<Address> + Send>(&self, address: A) -> Result<Balance<C>, Self::Error>;
-
-    /// Returns the native or token currency Safe allowance.
-    async fn safe_allowance<C: Currency, A: Into<Address> + Send>(
-        &self,
-        safe_address: A,
-    ) -> Result<Balance<C>, Self::Error>;
 
     /// Returns on-chain node accounts with the given [`AccountSelector`].
     async fn stream_accounts<'a>(
@@ -175,9 +146,4 @@ pub trait ChainReadAccountOperations {
     /// This is potentially done more effectively than counting more elements of
     /// the stream returned by [`ChainReadAccountOperations::stream_accounts`].
     async fn count_accounts(&self, selector: AccountSelector) -> Result<usize, Self::Error>;
-
-    /// Retrieves [`DeployedSafe`] information using the given [`selector`](SafeSelector).
-    ///
-    /// Returns `None` if no deployed Safe matched the given `selector`.
-    async fn safe_info(&self, selector: SafeSelector) -> Result<Option<DeployedSafe>, Self::Error>;
 }

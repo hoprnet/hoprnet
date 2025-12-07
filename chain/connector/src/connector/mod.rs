@@ -30,6 +30,7 @@ mod accounts;
 mod channels;
 mod events;
 mod keys;
+mod safe;
 mod sequencer;
 mod tickets;
 mod utils;
