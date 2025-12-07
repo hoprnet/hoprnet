@@ -465,10 +465,8 @@ where
     /// Most of the operations with the Connector will fail if it is not connected first.
     ///
     /// There are some notable exceptions that do not require a prior call to `connect`:
-    /// - all the [`ChainValues`](hopr_api::chain::ChainValues) APIs
-    /// - [`balance`](hopr_api::chain::ChainReadAccountOperations::balance)
-    /// - [`safe_allowance`](hopr_api::chain::ChainReadAccountOperations::safe_allowance)
-    /// - [`safe_info`](hopr_api::chain::ChainReadAccountOperations::safe_info)
+    /// - all the [`ChainValues`](hopr_api::chain::ChainValues) methods,
+    /// - all the [`ChainReadSafeOperations`](hopr_api::chain::ChainReadSafeOperations) methods,
     /// - [`me`](hopr_api::chain::ChainReadChannelOperations::me)
     pub async fn connect(&mut self) -> Result<(), ConnectorError> {
         if self
