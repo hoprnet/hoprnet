@@ -457,13 +457,18 @@ where
     /// Connects to the chain using the underlying client, syncs all on-chain data
     /// and subscribes for all future updates.
     ///
-    /// Most of the operations with the Connector will fail if it is not connected first.
-    /// One notable exception is all the [`ChainValues`](hopr_api::chain::ChainValues) APIs,
-    /// which can be called, even without calling [`connect`](HoprBlockchainConnector::connect) prior.
-    ///
     /// If the connection does not finish within
     /// [`BlockchainConnectorConfig::connection_timeout`](BlockchainConnectorConfig)
     /// the [`ConnectorError::ConnectionTimeout`] error is returned.
+    ///
+    /// Most of the operations with the Connector will fail if it is not connected first.
+    ///
+    /// There are some notable exceptions that do not require a prior call to `connect`:
+    /// - all the [`ChainValues`](hopr_api::chain::ChainValues) APIs
+    /// - [`balance`](hopr_api::chain::ChainReadAccountOperations::balance)
+    /// - [`safe_allowance`](hopr_api::chain::ChainReadAccountOperations::safe_allowance)
+    /// - [`safe_info`](hopr_api::chain::ChainReadAccountOperations::safe_info)
+    /// - [`me`](hopr_api::chain::ChainReadChannelOperations::me)
     pub async fn connect(&mut self) -> Result<(), ConnectorError> {
         if self
             .connection_handle

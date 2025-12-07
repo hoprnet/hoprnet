@@ -140,6 +140,15 @@ impl AccountSelector {
     }
 }
 
+/// Selector for [deployed Safes](DeployedSafe).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SafeSelector {
+    /// Selects Safes owned by the given address.
+    Owner(Address),
+    /// Selects Safes with the given address.
+    Address(Address),
+}
+
 /// Chain operations that read on-chain node accounts.
 #[async_trait::async_trait]
 #[auto_impl::auto_impl(&, Box, Arc)]
@@ -147,7 +156,7 @@ pub trait ChainReadAccountOperations {
     type Error: std::error::Error + Send + Sync + 'static;
 
     /// Returns the native or token currency balance of the given on-chain account.
-    async fn get_balance<C: Currency, A: Into<Address> + Send>(&self, address: A) -> Result<Balance<C>, Self::Error>;
+    async fn balance<C: Currency, A: Into<Address> + Send>(&self, address: A) -> Result<Balance<C>, Self::Error>;
 
     /// Returns the native or token currency Safe allowance.
     async fn safe_allowance<C: Currency, A: Into<Address> + Send>(
@@ -167,6 +176,8 @@ pub trait ChainReadAccountOperations {
     /// the stream returned by [`ChainReadAccountOperations::stream_accounts`].
     async fn count_accounts(&self, selector: AccountSelector) -> Result<usize, Self::Error>;
 
-    /// Retrieves [`DeployedSafe`] information by the Safe owner address.
-    async fn get_safe_by_owner(&self, owner: &Address) -> Result<Option<DeployedSafe>, Self::Error>;
+    /// Retrieves [`DeployedSafe`] information using the given [`selector`](SafeSelector).
+    ///
+    /// Returns `None` if no deployed Safe matched the given `selector`.
+    async fn safe_info(&self, selector: SafeSelector) -> Result<Option<DeployedSafe>, Self::Error>;
 }

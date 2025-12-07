@@ -24,7 +24,7 @@ pub async fn wait_for_funds<R: ChainReadAccountOperations>(
     let mut current_delay = Duration::from_secs(2).min(max_delay);
 
     while current_delay <= max_delay {
-        match resolver.get_balance::<XDai, _>(account).await {
+        match resolver.balance::<XDai, _>(account).await {
             Ok(current_balance) => {
                 tracing::info!(balance = %current_balance, "balance status");
                 if current_balance.ge(&min_balance) {

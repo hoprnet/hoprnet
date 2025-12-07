@@ -1,9 +1,9 @@
 use std::str::FromStr;
 
-use blokli_client::api::{BlokliQueryClient, BlokliTransactionClient, v1::SafeSelector};
+use blokli_client::api::{BlokliQueryClient, BlokliTransactionClient};
 use futures::{FutureExt, StreamExt, TryFutureExt, future::BoxFuture, stream::BoxStream};
 use hopr_api::chain::{
-    AccountSelector, AnnouncementError, ChainReceipt, DeployedSafe, Multiaddr, SafeRegistrationError,
+    AccountSelector, AnnouncementError, ChainReceipt, DeployedSafe, Multiaddr, SafeRegistrationError, SafeSelector,
 };
 use hopr_chain_types::prelude::*;
 use hopr_crypto_types::prelude::*;
@@ -13,7 +13,11 @@ use hopr_internal_types::{
 };
 use hopr_primitive_types::prelude::*;
 
-use crate::{backend::Backend, connector::HoprBlockchainConnector, errors::ConnectorError};
+use crate::{
+    backend::Backend,
+    connector::{HoprBlockchainConnector, utils::model_to_deployed_safe},
+    errors::ConnectorError,
+};
 
 impl<B, C, P, R> HoprBlockchainConnector<C, B, P, R>
 where
@@ -60,9 +64,7 @@ where
 {
     type Error = ConnectorError;
 
-    async fn get_balance<Cy: Currency, A: Into<Address> + Send>(&self, address: A) -> Result<Balance<Cy>, Self::Error> {
-        self.check_connection_state()?;
-
+    async fn balance<Cy: Currency, A: Into<Address> + Send>(&self, address: A) -> Result<Balance<Cy>, Self::Error> {
         let address = address.into();
         if Cy::is::<WxHOPR>() {
             Ok(self
@@ -89,8 +91,6 @@ where
         &self,
         address: A,
     ) -> Result<Balance<Cy>, Self::Error> {
-        self.check_connection_state()?;
-
         let address = address.into();
         if Cy::is::<WxHOPR>() {
             Ok(self
@@ -122,13 +122,14 @@ where
         Ok(self.stream_accounts(selector).await?.count().await)
     }
 
-    async fn get_safe_by_owner(&self, owner: &Address) -> Result<Option<DeployedSafe>, Self::Error> {
-        if let Some(safe) = self.client.query_safe(SafeSelector::ChainKey((*owner).into())).await? {
-            Ok(Some(DeployedSafe {
-                address: Address::from_hex(&safe.address)?,
-                owner: *owner,
-                module: Address::from_hex(&safe.module_address)?,
-            }))
+    async fn safe_info(&self, selector: SafeSelector) -> Result<Option<DeployedSafe>, Self::Error> {
+        let selector = match selector {
+            SafeSelector::Owner(owner_address) => blokli_client::api::SafeSelector::ChainKey(owner_address.into()),
+            SafeSelector::Address(safe_address) => blokli_client::api::SafeSelector::SafeAddress(safe_address.into()),
+        };
+
+        if let Some(safe) = self.client.query_safe(selector).await? {
+            Ok(Some(model_to_deployed_safe(safe)?))
         } else {
             Ok(None)
         }
@@ -372,13 +373,10 @@ mod tests {
         connector.connect().await?;
 
         assert_eq!(
-            connector.get_balance(account.safe_address.unwrap()).await?,
+            connector.balance(account.safe_address.unwrap()).await?,
             HoprBalance::new_base(100)
         );
-        assert_eq!(
-            connector.get_balance(account.chain_addr).await?,
-            XDaiBalance::new_base(1)
-        );
+        assert_eq!(connector.balance(account.chain_addr).await?, XDaiBalance::new_base(1));
         assert_eq!(
             connector.safe_allowance(account.safe_address.unwrap()).await?,
             HoprBalance::new_base(10000)
@@ -636,8 +634,9 @@ mod tests {
     #[tokio::test]
     async fn connector_should_query_existing_safe() -> anyhow::Result<()> {
         let me = ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address();
+        let safe_addr = [1u8; Address::SIZE].into();
         let safe = DeployedSafe {
-            address: [1u8; Address::SIZE].into(),
+            address: safe_addr,
             owner: me,
             module: MODULE_ADDR.into(),
         };
@@ -650,7 +649,8 @@ mod tests {
         let mut connector = create_connector(blokli_client)?;
         connector.connect().await?;
 
-        assert_eq!(Some(safe), connector.get_safe_by_owner(&me).await?);
+        assert_eq!(Some(safe), connector.safe_info(SafeSelector::Owner(me)).await?);
+        assert_eq!(Some(safe), connector.safe_info(SafeSelector::Address(safe_addr)).await?);
 
         insta::assert_yaml_snapshot!(*connector.client.snapshot());
 
