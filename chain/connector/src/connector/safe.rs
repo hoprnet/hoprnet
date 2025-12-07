@@ -65,7 +65,7 @@ where
             .subscribe_safe_deployments()?
             .map_err(ConnectorError::from)
             .and_then(|safe| futures::future::ready(model_to_deployed_safe(safe)))
-            .try_skip_while(|deployed_safe| futures::future::ok(selector.satisfies(deployed_safe)))
+            .try_skip_while(|deployed_safe| futures::future::ok(!selector.satisfies(deployed_safe)))
             .take(1)
             .try_collect::<Vec<_>>()
             .timeout(futures_time::time::Duration::from(timeout))
