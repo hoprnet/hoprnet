@@ -54,7 +54,8 @@ mod tests {
     use futures::StreamExt;
     use hex_literal::hex;
     use hopr_api::chain::{
-        ChainEvent, ChainEvents, ChainWriteAccountOperations, ChainWriteChannelOperations, StateSyncOptions,
+        ChainEvent, ChainEvents, ChainWriteAccountOperations, ChainWriteChannelOperations, DeployedSafe,
+        StateSyncOptions,
     };
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::prelude::*;
@@ -86,6 +87,11 @@ mod tests {
             )])
             .with_balances([([3u8; Address::SIZE].into(), HoprBalance::new_base(100))])
             .with_safe_allowances([([3u8; Address::SIZE].into(), HoprBalance::new_base(10000))])
+            .with_deployed_safes([DeployedSafe {
+                address: [3u8; Address::SIZE].into(),
+                owner: ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
+                module: MODULE_ADDR.into(),
+            }])
             .with_hopr_network_chain_info("rotsee")
             .build_dynamic_client(MODULE_ADDR.into())
             .with_tx_simulation_delay(Duration::from_millis(100));

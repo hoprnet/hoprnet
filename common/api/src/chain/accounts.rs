@@ -45,6 +45,17 @@ impl<E> SafeRegistrationError<E> {
     }
 }
 
+/// Information about a deployed Safe.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DeployedSafe {
+    /// Safe address.
+    pub address: Address,
+    /// Address of the Safe owner (typically the node chain key).
+    pub owner: Address,
+    /// Address of the Safe module.
+    pub module: Address,
+}
+
 /// On-chain write operations regarding on-chain node accounts.
 #[async_trait::async_trait]
 #[auto_impl::auto_impl(&, Box, Arc)]
@@ -155,4 +166,7 @@ pub trait ChainReadAccountOperations {
     /// This is potentially done more effectively than counting more elements of
     /// the stream returned by [`ChainReadAccountOperations::stream_accounts`].
     async fn count_accounts(&self, selector: AccountSelector) -> Result<usize, Self::Error>;
+
+    /// Retrieves [`DeployedSafe`] information by the Safe owner address.
+    async fn get_safe_by_owner(&self, owner: &Address) -> Result<Option<DeployedSafe>, Self::Error>;
 }

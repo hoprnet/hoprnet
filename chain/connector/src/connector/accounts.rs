@@ -1,8 +1,10 @@
 use std::str::FromStr;
 
-use blokli_client::api::{BlokliQueryClient, BlokliTransactionClient};
+use blokli_client::api::{BlokliQueryClient, BlokliTransactionClient, v1::SafeSelector};
 use futures::{FutureExt, StreamExt, TryFutureExt, future::BoxFuture, stream::BoxStream};
-use hopr_api::chain::{AccountSelector, AnnouncementError, ChainReceipt, Multiaddr, SafeRegistrationError};
+use hopr_api::chain::{
+    AccountSelector, AnnouncementError, ChainReceipt, DeployedSafe, Multiaddr, SafeRegistrationError,
+};
 use hopr_chain_types::prelude::*;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::{
@@ -118,6 +120,18 @@ where
         self.check_connection_state()?;
 
         Ok(self.stream_accounts(selector).await?.count().await)
+    }
+
+    async fn get_safe_by_owner(&self, owner: &Address) -> Result<Option<DeployedSafe>, Self::Error> {
+        if let Some(safe) = self.client.query_safe(SafeSelector::ChainKey((*owner).into())).await? {
+            Ok(Some(DeployedSafe {
+                address: Address::from_hex(&safe.address)?,
+                owner: *owner,
+                module: Address::from_hex(&safe.module_address)?,
+            }))
+        } else {
+            Ok(None)
+        }
     }
 }
 
@@ -563,6 +577,11 @@ mod tests {
                 ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
                 XDaiBalance::new_base(10),
             )])
+            .with_deployed_safes([DeployedSafe {
+                address: [1u8; Address::SIZE].into(),
+                owner: ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
+                module: MODULE_ADDR.into(),
+            }])
             .with_hopr_network_chain_info("rotsee")
             .build_dynamic_client(MODULE_ADDR.into());
 
@@ -608,6 +627,30 @@ mod tests {
         assert!(
             matches!(connector.register_safe(&safe_addr).await, Err(SafeRegistrationError::AlreadyRegistered(a)) if a == safe_addr)
         );
+
+        insta::assert_yaml_snapshot!(*connector.client.snapshot());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connector_should_query_existing_safe() -> anyhow::Result<()> {
+        let me = ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address();
+        let safe = DeployedSafe {
+            address: [1u8; Address::SIZE].into(),
+            owner: me,
+            module: MODULE_ADDR.into(),
+        };
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_balances([(me, XDaiBalance::new_base(10))])
+            .with_deployed_safes([safe])
+            .with_hopr_network_chain_info("rotsee")
+            .build_dynamic_client(MODULE_ADDR.into());
+
+        let mut connector = create_connector(blokli_client)?;
+        connector.connect().await?;
+
+        assert_eq!(Some(safe), connector.get_safe_by_owner(&me).await?);
 
         insta::assert_yaml_snapshot!(*connector.client.snapshot());
 

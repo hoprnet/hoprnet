@@ -15,7 +15,6 @@ accounts:
     multi_addresses: []
     packet_key: 4b8f66f9df296e7d7c2280d9c833c879297ee9d435d6e075d46fad5717211b72
     safe_address: "0202020202020202020202020202020202020202"
-unpaired_safes: {}
 native_balances:
   668430def9eacd2b5064acf85d73fb0b351a1c8c:
     __typename: NativeBalance
@@ -49,6 +48,15 @@ safe_allowances:
   "0202020202020202020202020202020202020202":
     __typename: SafeHoprAllowance
     allowance: 10000000000000 wxHOPR
+deployed_safes:
+  "0101010101010101010101010101010101010101":
+    address: "0101010101010101010101010101010101010101"
+    chain_key: 668430def9eacd2b5064acf85d73fb0b351a1c8c
+    module_address: 463977c851087dca6e69d488fbd69dbad3ffc7fe
+  "0202020202020202020202020202020202020202":
+    address: "0202020202020202020202020202020202020202"
+    chain_key: bea83ba0fcee21da44a30c893f466e6bf0c29bbb
+    module_address: ff263744a4621e2cac0f4882cc623bee3c9aef8d
 tx_counts:
   668430def9eacd2b5064acf85d73fb0b351a1c8c: 1
 channels:

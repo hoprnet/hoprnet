@@ -2,39 +2,20 @@
 source: chain/connector/src/connector/accounts.rs
 expression: "*connector.client.snapshot()"
 ---
-accounts:
-  1:
-    chain_key: 668430def9eacd2b5064acf85d73fb0b351a1c8c
-    keyid: 1
-    multi_addresses:
-      - /ip4/127.0.0.1/tcp/1234
-    packet_key: 3f6b51c1158631d57d2ecfe0cc49396de92be26bcea89b77cd60223f1023f1a0
-    safe_address: "0202020202020202020202020202020202020202"
+accounts: {}
 native_balances:
   668430def9eacd2b5064acf85d73fb0b351a1c8c:
     __typename: NativeBalance
-    balance: 0.999999999999999999 xDai
-  "0202020202020202020202020202020202020202":
-    __typename: NativeBalance
-    balance: 0 xDai
-token_balances:
-  668430def9eacd2b5064acf85d73fb0b351a1c8c:
-    __typename: HoprBalance
-    balance: 0 wxHOPR
-  "0202020202020202020202020202020202020202":
-    __typename: HoprBalance
-    balance: 100 wxHOPR
-safe_allowances:
-  "0202020202020202020202020202020202020202":
-    __typename: SafeHoprAllowance
-    allowance: 10000000000000 wxHOPR
+    balance: 10 xDai
+token_balances: {}
+safe_allowances: {}
 deployed_safes:
-  "0202020202020202020202020202020202020202":
-    address: "0202020202020202020202020202020202020202"
+  "0101010101010101010101010101010101010101":
+    address: "0101010101010101010101010101010101010101"
     chain_key: 668430def9eacd2b5064acf85d73fb0b351a1c8c
-    module_address: 463977c851087dca6e69d488fbd69dbad3ffc7fe
+    module_address: "1111111111111111111111111111111111111111"
 tx_counts:
-  668430def9eacd2b5064acf85d73fb0b351a1c8c: 1
+  668430def9eacd2b5064acf85d73fb0b351a1c8c: 0
 channels: {}
 chain_info:
   channel_closure_grace_period: "300"

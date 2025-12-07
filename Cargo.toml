@@ -61,7 +61,7 @@ bigdecimal = "0.4.9"
 bimap = "0.6.3"
 bincode = { version = "2.0.1", features = ["serde"] }
 bitvec = "1.0.1"
-blokli-client = { git = "https://github.com/hoprnet/blokli", rev = "4c225d5", version = "0.9.0" }
+blokli-client = { git = "https://github.com/hoprnet/blokli", branch = "lukas/minor-changes", version = "0.10.1" }
 bloomfilter = { version = "3.0.1", features = ["serde"] }
 bytesize = { version = "2.3.1", features = ["serde"] }
 bytes = "1.11.0"
