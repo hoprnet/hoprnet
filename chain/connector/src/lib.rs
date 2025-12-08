@@ -122,6 +122,7 @@ pub async fn init_blokli_connector(
             provider.as_deref().unwrap_or(DEFAULT_BLOKLI_URL).parse()?,
             blokli_client::BlokliClientConfig {
                 timeout: std::time::Duration::from_secs(5),
+                stream_reconnect_timeout: std::time::Duration::from_secs(30),
             },
         ),
         safe_module_address,
