@@ -1,4 +1,4 @@
-use hopr_api::chain::ChainReadAccountOperations;
+use hopr_api::chain::ChainValues;
 use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
 use hopr_crypto_types::prelude::{ChainKeypair, Keypair, OffchainKeypair};
 use hopr_internal_types::{
@@ -97,11 +97,8 @@ async fn hopr_block_chain_connector_should_return_channels() -> anyhow::Result<(
 
     connector.connect().await?;
 
-    assert_eq!(
-        HoprBalance::from(1000_u32),
-        connector.get_balance(&CHAIN_KEYS[0]).await?
-    );
-    assert_eq!(XDaiBalance::from(1_u32), connector.get_balance(&CHAIN_KEYS[0]).await?);
+    assert_eq!(HoprBalance::from(1000_u32), connector.balance(&CHAIN_KEYS[0]).await?);
+    assert_eq!(XDaiBalance::from(1_u32), connector.balance(&CHAIN_KEYS[0]).await?);
 
     Ok(())
 }

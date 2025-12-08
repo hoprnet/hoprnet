@@ -10,7 +10,6 @@ accounts:
       - /ip4/127.0.0.1/tcp/1234
     packet_key: 3f6b51c1158631d57d2ecfe0cc49396de92be26bcea89b77cd60223f1023f1a0
     safe_address: "0202020202020202020202020202020202020202"
-unpaired_safes: {}
 native_balances:
   668430def9eacd2b5064acf85d73fb0b351a1c8c:
     __typename: NativeBalance
@@ -29,6 +28,11 @@ safe_allowances:
   "0202020202020202020202020202020202020202":
     __typename: SafeHoprAllowance
     allowance: 10000000000000 wxHOPR
+deployed_safes:
+  "0202020202020202020202020202020202020202":
+    address: "0202020202020202020202020202020202020202"
+    chain_key: 668430def9eacd2b5064acf85d73fb0b351a1c8c
+    module_address: 463977c851087dca6e69d488fbd69dbad3ffc7fe
 tx_counts:
   668430def9eacd2b5064acf85d73fb0b351a1c8c: 0
 channels: {}

@@ -58,53 +58,6 @@ where
 {
     type Error = ConnectorError;
 
-    async fn get_balance<Cy: Currency, A: Into<Address> + Send>(&self, address: A) -> Result<Balance<Cy>, Self::Error> {
-        self.check_connection_state()?;
-
-        let address = address.into();
-        if Cy::is::<WxHOPR>() {
-            Ok(self
-                .client
-                .query_token_balance(&address.into())
-                .await?
-                .balance
-                .0
-                .parse()?)
-        } else if Cy::is::<XDai>() {
-            Ok(self
-                .client
-                .query_native_balance(&address.into())
-                .await?
-                .balance
-                .0
-                .parse()?)
-        } else {
-            Err(ConnectorError::InvalidState("unsupported currency"))
-        }
-    }
-
-    async fn safe_allowance<Cy: Currency, A: Into<Address> + Send>(
-        &self,
-        address: A,
-    ) -> Result<Balance<Cy>, Self::Error> {
-        self.check_connection_state()?;
-
-        let address = address.into();
-        if Cy::is::<WxHOPR>() {
-            Ok(self
-                .client
-                .query_safe_allowance(&address.into())
-                .await?
-                .allowance
-                .0
-                .parse()?)
-        } else if Cy::is::<XDai>() {
-            Err(ConnectorError::InvalidState("cannot query allowance on xDai"))
-        } else {
-            Err(ConnectorError::InvalidState("unsupported currency"))
-        }
-    }
-
     async fn stream_accounts<'a>(
         &'a self,
         selector: AccountSelector,
@@ -237,7 +190,7 @@ where
 #[cfg(test)]
 mod tests {
     use hex_literal::hex;
-    use hopr_api::chain::{ChainReadAccountOperations, ChainWriteAccountOperations};
+    use hopr_api::chain::{ChainReadAccountOperations, ChainWriteAccountOperations, DeployedSafe};
     use hopr_internal_types::account::AccountType;
 
     use super::*;
@@ -335,40 +288,6 @@ mod tests {
 
         assert_eq!(count, 0);
         assert!(accounts.is_empty());
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn connector_should_get_balance_and_safe_allowance() -> anyhow::Result<()> {
-        let account = AccountEntry {
-            public_key: *OffchainKeypair::random().public(),
-            chain_addr: [1u8; Address::SIZE].into(),
-            entry_type: AccountType::NotAnnounced,
-            safe_address: Some([2u8; Address::SIZE].into()),
-            key_id: 1.into(),
-        };
-
-        let blokli_client = BlokliTestStateBuilder::default()
-            .with_accounts([(account.clone(), HoprBalance::new_base(100), XDaiBalance::new_base(1))])
-            .with_safe_allowances([(account.safe_address.unwrap(), HoprBalance::new_base(10000))])
-            .build_static_client();
-
-        let mut connector = create_connector(blokli_client)?;
-        connector.connect().await?;
-
-        assert_eq!(
-            connector.get_balance(account.safe_address.unwrap()).await?,
-            HoprBalance::new_base(100)
-        );
-        assert_eq!(
-            connector.get_balance(account.chain_addr).await?,
-            XDaiBalance::new_base(1)
-        );
-        assert_eq!(
-            connector.safe_allowance(account.safe_address.unwrap()).await?,
-            HoprBalance::new_base(10000)
-        );
 
         Ok(())
     }
@@ -563,6 +482,11 @@ mod tests {
                 ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
                 XDaiBalance::new_base(10),
             )])
+            .with_deployed_safes([DeployedSafe {
+                address: [1u8; Address::SIZE].into(),
+                owner: ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
+                module: MODULE_ADDR.into(),
+            }])
             .with_hopr_network_chain_info("rotsee")
             .build_dynamic_client(MODULE_ADDR.into());
 

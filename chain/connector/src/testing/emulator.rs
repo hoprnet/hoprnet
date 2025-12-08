@@ -8,6 +8,8 @@ use hopr_primitive_types::{
     prelude::Address,
 };
 
+use crate::testing::Entry;
+
 /// A [`BlokliTestStateMutator`] that does not update the state.
 ///
 /// Any attempt for a state change will raise an error.
@@ -63,14 +65,22 @@ impl BlokliTestStateMutator for FullStateEmulator {
 
         match &action {
             ParsedHoprChainAction::RegisterSafeAddress(safe_address) => {
-                if let Some(account) = state.get_account_mut(&sender.into()) {
-                    account.safe_address = Some(hex::encode(safe_address));
-                    tracing::debug!(%sender, %safe_address, "registered safe address to account");
+                if let Some(safe) = state.deployed_safes.get(&hex::encode(safe_address)) {
+                    if safe.chain_key != hex::encode(sender) {
+                        return Err(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
+                            "safe address {safe_address} is not owned by {sender}"
+                        ))
+                        .into());
+                    }
+                    if let Some(account) = state.get_account_mut(&sender.into()) {
+                        account.safe_address = Some(hex::encode(safe_address));
+                        tracing::debug!(%sender, %safe_address, "registered safe address to account");
+                    }
                 } else {
-                    state
-                        .unpaired_safes
-                        .insert(hex::encode(sender), hex::encode(safe_address));
-                    tracing::debug!(%sender, %safe_address, "registered safe address without account");
+                    return Err(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
+                        "safe address {safe_address} is not a deployed safe"
+                    ))
+                    .into());
                 }
             }
             ParsedHoprChainAction::Announce {
@@ -99,7 +109,7 @@ impl BlokliTestStateMutator for FullStateEmulator {
                             keyid: next_key_id as i32,
                             multi_addresses: multiaddress.iter().map(|a| a.to_string()).collect(),
                             packet_key: hex::encode(packet_key),
-                            safe_address: state.unpaired_safes.shift_remove(&hex::encode(sender)),
+                            safe_address: state.get_safe_by_owner(&sender.into()).map(|s| s.address.clone()),
                         },
                     );
                     tracing::debug!(%sender, %packet_key, ?multiaddress, "node announced");
@@ -127,17 +137,25 @@ impl BlokliTestStateMutator for FullStateEmulator {
 
                 balance.balance = blokli_client::api::types::TokenValueString((balance_num - *amount).to_string());
 
-                if let Some(dst_balance) = state.native_balances.get_mut(&hex::encode(destination)) {
-                    let new_balance = dst_balance.balance.0.parse::<XDaiBalance>().map_err(|_| {
-                        blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
-                            "failed to parse native balance for {destination}"
-                        ))
-                    })? + *amount;
-                    dst_balance.balance = blokli_client::api::types::TokenValueString(new_balance.to_string());
+                match state.native_balances.entry(hex::encode(destination)) {
+                    Entry::Occupied(mut dst_balance) => {
+                        let new_balance = dst_balance.get().balance.0.parse::<XDaiBalance>().map_err(|_| {
+                            blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
+                                "failed to parse native balance for {destination}"
+                            ))
+                        })? + *amount;
+                        dst_balance.get_mut().balance =
+                            blokli_client::api::types::TokenValueString(new_balance.to_string());
 
-                    tracing::debug!(%sender, %amount, %destination, "xdai withdrawn to an existing account");
-                } else {
-                    tracing::debug!(%sender, %amount, %destination, "xdai withdrawn");
+                        tracing::debug!(%sender, %amount, %destination, "xdai withdrawn to an existing account");
+                    }
+                    Entry::Vacant(new_balance) => {
+                        new_balance.insert(blokli_client::api::types::NativeBalance {
+                            __typename: "NativeBalance".into(),
+                            balance: blokli_client::api::types::TokenValueString(amount.to_string()),
+                        });
+                        tracing::debug!(%sender, %amount, %destination, "xdai withdrawn to a new account");
+                    }
                 }
             }
             ParsedHoprChainAction::WithdrawToken(destination, amount) => {
@@ -162,17 +180,25 @@ impl BlokliTestStateMutator for FullStateEmulator {
 
                 balance.balance = blokli_client::api::types::TokenValueString((balance_num - *amount).to_string());
 
-                if let Some(dst_balance) = state.token_balances.get_mut(&hex::encode(destination)) {
-                    let new_balance = dst_balance.balance.0.parse::<HoprBalance>().map_err(|_| {
-                        blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
-                            "failed to parse token balance for {destination}"
-                        ))
-                    })? + *amount;
-                    dst_balance.balance = blokli_client::api::types::TokenValueString(new_balance.to_string());
+                match state.token_balances.entry(hex::encode(destination)) {
+                    Entry::Occupied(mut dst_balance) => {
+                        let new_balance = dst_balance.get().balance.0.parse::<HoprBalance>().map_err(|_| {
+                            blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
+                                "failed to parse token balance for {destination}"
+                            ))
+                        })? + *amount;
+                        dst_balance.get_mut().balance =
+                            blokli_client::api::types::TokenValueString(new_balance.to_string());
 
-                    tracing::debug!(%sender, %amount, %destination, "wxhopr withdrawn to an existing account");
-                } else {
-                    tracing::debug!(%sender, %amount, %destination, "wxhopr withdrawn");
+                        tracing::debug!(%sender, %amount, %destination, "wxhopr withdrawn to an existing account");
+                    }
+                    Entry::Vacant(new_balance) => {
+                        new_balance.insert(blokli_client::api::types::HoprBalance {
+                            __typename: "HoprBalance".into(),
+                            balance: blokli_client::api::types::TokenValueString(amount.to_string()),
+                        });
+                        tracing::debug!(%sender, %amount, %destination, "wxhopr withdrawn to a new account");
+                    }
                 }
             }
             ParsedHoprChainAction::FundChannel(dst_addr, stake) => {

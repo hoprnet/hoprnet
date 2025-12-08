@@ -3,6 +3,7 @@ mod emulator;
 pub use blokli_client::{BlokliTestClient, BlokliTestState, exports::Entry};
 pub use emulator::{FullStateEmulator, StaticState};
 pub use hopr_api::chain::ChainInfo;
+use hopr_api::chain::DeployedSafe;
 use hopr_chain_types::{ParsedHoprChainAction, contract_addresses_for_network};
 use hopr_crypto_types::{
     prelude::{Keypair, OffchainKeypair},
@@ -24,7 +25,7 @@ impl From<BlokliTestState> for BlokliTestStateBuilder {
 }
 
 impl BlokliTestStateBuilder {
-    /// Sets the initial [`ChannelEntries`](ChannelEntry) in the state.
+    /// Appends the initial [`ChannelEntries`](ChannelEntry) in the state.
     ///
     /// The function will panic if any channels refer to accounts which were not previously
     /// present in the state or added via a [`BlokliTestStateBuilder::with_accounts`] call.
@@ -70,7 +71,7 @@ impl BlokliTestStateBuilder {
         self
     }
 
-    /// Sets the initial [`AccountEntries`](AccountEntry) in the state.
+    /// Appends the initial [`AccountEntries`](AccountEntry) in the state.
     #[must_use]
     pub fn with_accounts<I: IntoIterator<Item = (AccountEntry, HoprBalance, XDaiBalance)>>(
         mut self,
@@ -87,7 +88,18 @@ impl BlokliTestStateBuilder {
                         packet_key: hex::encode(account.public_key),
                         safe_address: account.safe_address.map(|a| hex::encode(a)),
                     });
-
+                    if let Some(safe_addr) = account.safe_address.as_ref().map(|a| hex::encode(a)) {
+                        self.0.deployed_safes.insert(
+                            safe_addr.clone(),
+                            blokli_client::api::types::Safe {
+                                address: safe_addr,
+                                chain_key: hex::encode(account.chain_addr),
+                                module_address: hex::encode(
+                                    &Hash::create(&[account.chain_addr.as_ref()]).as_ref()[0..Address::SIZE],
+                                ),
+                            },
+                        );
+                    }
                     self.0.token_balances.insert(
                         hex::encode(account.chain_addr.clone()),
                         blokli_client::api::types::HoprBalance {
@@ -130,6 +142,21 @@ impl BlokliTestStateBuilder {
                 }
             }
         }
+        self
+    }
+
+    /// Appends the initial [`DeployedSafes`](DeployedSafe) to the state.
+    pub fn with_deployed_safes<I: IntoIterator<Item = DeployedSafe>>(mut self, safes: I) -> Self {
+        self.0.deployed_safes.extend(safes.into_iter().map(|safe| {
+            (
+                hex::encode(&safe.address),
+                blokli_client::api::types::Safe {
+                    address: hex::encode(&safe.address),
+                    chain_key: hex::encode(&safe.owner),
+                    module_address: hex::encode(&safe.module),
+                },
+            )
+        }));
         self
     }
 

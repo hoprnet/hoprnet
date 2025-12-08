@@ -1,6 +1,6 @@
 use std::{str::FromStr, time::Duration};
 
-use hopr_api::chain::{ChainInfo, DomainSeparators};
+use hopr_api::chain::{ChainInfo, DeployedSafe, DomainSeparators};
 use hopr_chain_types::chain_events::ChainEvent;
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
@@ -145,6 +145,14 @@ pub(crate) fn model_to_chain_info(
             .0
             .parse()
             .map_err(|e| ConnectorError::TypeConversion(format!("invalid ticket price: {e}")))?,
+    })
+}
+
+pub(crate) fn model_to_deployed_safe(model: blokli_client::api::types::Safe) -> Result<DeployedSafe, ConnectorError> {
+    Ok(DeployedSafe {
+        address: Address::from_hex(&model.address)?,
+        owner: Address::from_hex(&model.chain_key)?,
+        module: Address::from_hex(&model.module_address)?,
     })
 }
 
