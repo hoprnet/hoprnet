@@ -1,6 +1,7 @@
 use std::{ops::Mul, time::Duration};
 
 use anyhow::Context;
+use hopr_chain_connector::blokli_client::BlokliQueryClient;
 use hopr_lib::{
     ChannelId, ChannelStatus, HoprBalance,
     testing::{
@@ -8,6 +9,7 @@ use hopr_lib::{
         hopr::ChannelGuard,
     },
 };
+use hopr_primitive_types::prelude::{Address, BytesRepresentable};
 use rstest::*;
 use serial_test::serial;
 use tokio::time::sleep;
@@ -146,12 +148,22 @@ async fn test_channel_retrieval(cluster: &ClusterGuard) -> anyhow::Result<()> {
 #[rstest]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
-/// Exercises the native withdrawal path by sending xDai from one node to another
-/// and asserting recipient balance increases while sender balance decreases.
+/// Exercises the native withdrawal path by sending xDai from one node to a fixed address
+/// and asserting that the recipient balance increases while the sender balance decreases.
 async fn test_withdraw_native(cluster: &ClusterGuard) -> anyhow::Result<()> {
-    let [src, dst] = cluster.sample_nodes::<2>();
+    let [src] = cluster.sample_nodes::<1>();
 
+    // We use a standalone fixed address to prevent side effects from other tests.
+    let target_addr: Address = [0xad_u8; Address::SIZE].into();
     let withdrawn_amount = "0.005 xDai".parse::<hopr_lib::XDaiBalance>()?;
+
+    let balance = cluster
+        .chain_client
+        .query_native_balance(&target_addr.into())
+        .await
+        .map(|b| b.balance.0)
+        .unwrap_or("0 wxHOPR".into());
+    assert_eq!("0 wxHOPR", &balance);
 
     let initial_balance_src = src
         .inner()
@@ -159,15 +171,9 @@ async fn test_withdraw_native(cluster: &ClusterGuard) -> anyhow::Result<()> {
         .await
         .context("should get node xdai balance")?;
 
-    let initial_balance_dst = dst
-        .inner()
-        .get_balance::<hopr_lib::XDai>()
-        .await
-        .context("should get node xdai balance")?;
-
     let _ = src
         .inner()
-        .withdraw_native(dst.address(), withdrawn_amount)
+        .withdraw_native(target_addr, withdrawn_amount)
         .await
         .context("failed to withdraw native")?;
 
@@ -177,13 +183,14 @@ async fn test_withdraw_native(cluster: &ClusterGuard) -> anyhow::Result<()> {
         .await
         .context("should get node xdai balance")?;
 
-    let final_balance_dst = dst
-        .inner()
-        .get_balance::<hopr_lib::XDai>()
+    let balance = cluster
+        .chain_client
+        .query_native_balance(&target_addr.into())
         .await
-        .context("should get node xdai balance")?;
+        .map(|b| b.balance.0)
+        .unwrap_or("0 wxHOPR".into());
+    assert_eq!(balance, withdrawn_amount.to_string());
 
-    assert_eq!(final_balance_dst, initial_balance_dst + withdrawn_amount);
     assert!(final_balance_src < initial_balance_src - withdrawn_amount); // account for gas
     Ok(())
 }

@@ -4,6 +4,10 @@ pub use hopr_chain_types::ContractAddresses;
 use hopr_crypto_types::prelude::Hash;
 pub use hopr_internal_types::prelude::WinningProbability;
 pub use hopr_primitive_types::balance::HoprBalance;
+use hopr_primitive_types::{
+    balance::{Balance, Currency},
+    prelude::Address,
+};
 
 /// Contains domain separator information.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -32,6 +36,9 @@ pub struct ChainInfo {
 #[auto_impl::auto_impl(&, Box, Arc)]
 pub trait ChainValues {
     type Error: Error + Send + Sync + 'static;
+
+    /// Returns the native or token currency balance of the given on-chain account.
+    async fn balance<C: Currency, A: Into<Address> + Send>(&self, address: A) -> Result<Balance<C>, Self::Error>;
     /// Retrieves the domain separators of HOPR smart contracts.
     async fn domain_separators(&self) -> Result<DomainSeparators, Self::Error>;
     /// Retrieves the network-set minimum incoming ticket winning probability.
