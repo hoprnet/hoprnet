@@ -45,6 +45,10 @@ fn default_max_unack_tickets() -> usize {
     10_000_000
 }
 
+fn just_true() -> bool {
+    true
+}
+
 /// Configuration for the HOPR ticket processor within the packet pipeline.
 
 #[derive(Debug, Clone, Copy, smart_default::SmartDefault, PartialEq, validator::Validate)]
@@ -85,6 +89,14 @@ pub struct HoprTicketProcessorConfig {
         serde(default = "default_outgoing_index_retention", with = "humantime_serde")
     )]
     pub outgoing_index_cache_retention: std::time::Duration,
+    /// Indicates whether to use batch verification algorithm for acknowledgements.
+    ///
+    /// This has a positive performance impact on higher workloads.
+    ///
+    /// Default is true.
+    #[default(just_true())]
+    #[cfg_attr(feature = "serde", serde(default = "just_true"))]
+    pub use_batch_verification: bool,
 }
 
 /// HOPR-specific implementation of [`UnacknowledgedTicketProcessor`] and [`TicketTracker`].
@@ -218,25 +230,45 @@ where
         };
 
         // Verify all the acknowledgements and compute challenges from half-keys
+        let use_batch_verify = self.cfg.use_batch_verification;
         let half_keys_challenges = hopr_parallelize::cpu::spawn_fifo_blocking(move || {
-            // Uses regular verifications for small batches but switches to a more effective
-            // batch verification algorithm for larger ones.
-            let acks = Acknowledgement::verify_batch(acks.into_iter().map(|ack| (peer, ack)));
+            if use_batch_verify {
+                // Uses regular verifications for small batches but switches to a more effective
+                // batch verification algorithm for larger ones.
+                let acks = Acknowledgement::verify_batch(acks.into_iter().map(|ack| (peer, ack)));
 
-            #[cfg(feature = "rayon")]
-            let iter = acks.into_par_iter();
+                #[cfg(feature = "rayon")]
+                let iter = acks.into_par_iter();
 
-            #[cfg(not(feature = "rayon"))]
-            let iter = acks.into_iter();
+                #[cfg(not(feature = "rayon"))]
+                let iter = acks.into_iter();
 
-            iter.map(|verified| {
-                verified.and_then(|verified| Ok((*verified.ack_key_share(), verified.ack_key_share().to_challenge()?)))
-            })
-            .filter_map(|res| {
-                res.inspect_err(|error| tracing::error!(%error, "failed to process acknowledgement"))
-                    .ok()
-            })
-            .collect::<Vec<_>>()
+                iter.map(|verified| {
+                    verified
+                        .and_then(|verified| Ok((*verified.ack_key_share(), verified.ack_key_share().to_challenge()?)))
+                })
+                .filter_map(|res| {
+                    res.inspect_err(|error| tracing::error!(%error, "failed to process acknowledgement"))
+                        .ok()
+                })
+                .collect::<Vec<_>>()
+            } else {
+                #[cfg(feature = "rayon")]
+                let iter = acks.into_par_iter();
+
+                #[cfg(not(feature = "rayon"))]
+                let iter = acks.into_iter();
+
+                iter.map(|ack| {
+                    ack.verify(&peer)
+                        .and_then(|verified| Ok((*verified.ack_key_share(), verified.ack_key_share().to_challenge()?)))
+                })
+                .filter_map(|res| {
+                    res.inspect_err(|error| tracing::error!(%error, "failed to process acknowledgement"))
+                        .ok()
+                })
+                .collect::<Vec<_>>()
+            }
         })
         .await;
 
