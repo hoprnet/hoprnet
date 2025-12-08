@@ -309,14 +309,14 @@ where
 
     pub async fn get_balance<C: Currency + Send>(&self) -> errors::Result<Balance<C>> {
         self.chain_api
-            .get_balance(self.me_onchain())
+            .balance(self.me_onchain())
             .await
             .map_err(HoprLibError::chain)
     }
 
     pub async fn get_safe_balance<C: Currency + Send>(&self) -> errors::Result<Balance<C>> {
         self.chain_api
-            .get_balance(self.cfg.safe_module.safe_address)
+            .balance(self.cfg.safe_module.safe_address)
             .await
             .map_err(HoprLibError::chain)
     }

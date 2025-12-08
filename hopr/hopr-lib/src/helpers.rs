@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use hopr_api::chain::ChainReadAccountOperations;
+use hopr_api::chain::ChainValues;
 use hopr_primitive_types::prelude::{Address, XDai, XDaiBalance};
 
 use crate::errors::HoprLibError;
@@ -8,7 +8,7 @@ use crate::errors::HoprLibError;
 /// Waits until the given address is funded.
 ///
 /// This is done by querying the RPC provider for balance with backoff until `max_delay` argument.
-pub async fn wait_for_funds<R: ChainReadAccountOperations>(
+pub async fn wait_for_funds<R: ChainValues>(
     min_balance: XDaiBalance,
     suggested_balance: XDaiBalance,
     max_delay: Duration,
@@ -24,7 +24,7 @@ pub async fn wait_for_funds<R: ChainReadAccountOperations>(
     let mut current_delay = Duration::from_secs(2).min(max_delay);
 
     while current_delay <= max_delay {
-        match resolver.get_balance::<XDai, _>(account).await {
+        match resolver.balance::<XDai, _>(account).await {
             Ok(current_balance) => {
                 tracing::info!(balance = %current_balance, "balance status");
                 if current_balance.ge(&min_balance) {

@@ -3,7 +3,6 @@ source: chain/connector/src/connector/sequencer.rs
 expression: "*blokli_client.snapshot()"
 ---
 accounts: {}
-unpaired_safes: {}
 native_balances:
   "0101010101010101010101010101010101010101":
     __typename: NativeBalance
@@ -19,6 +18,7 @@ token_balances:
     __typename: HoprBalance
     balance: 900 wxHOPR
 safe_allowances: {}
+deployed_safes: {}
 tx_counts:
   668430def9eacd2b5064acf85d73fb0b351a1c8c: 1
 channels: {}

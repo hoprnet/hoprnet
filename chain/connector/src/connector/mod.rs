@@ -30,6 +30,7 @@ mod accounts;
 mod channels;
 mod events;
 mod keys;
+mod safe;
 mod sequencer;
 mod tickets;
 mod utils;
@@ -460,6 +461,13 @@ where
     /// If the connection does not finish within
     /// [`BlockchainConnectorConfig::connection_timeout`](BlockchainConnectorConfig)
     /// the [`ConnectorError::ConnectionTimeout`] error is returned.
+    ///
+    /// Most of the operations with the Connector will fail if it is not connected first.
+    ///
+    /// There are some notable exceptions that do not require a prior call to `connect`:
+    /// - all the [`ChainValues`](hopr_api::chain::ChainValues) methods,
+    /// - all the [`ChainReadSafeOperations`](hopr_api::chain::ChainReadSafeOperations) methods,
+    /// - [`me`](hopr_api::chain::ChainReadChannelOperations::me)
     pub async fn connect(&mut self) -> Result<(), ConnectorError> {
         if self
             .connection_handle

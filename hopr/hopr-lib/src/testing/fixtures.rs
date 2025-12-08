@@ -2,6 +2,7 @@ use std::{convert::identity, ops::Div, str::FromStr, time::Duration};
 
 use futures_time::future::FutureExt;
 use hex_literal::hex;
+use hopr_api::chain::DeployedSafe;
 use hopr_chain_connector::{
     BlockchainConnectorConfig,
     blokli_client::BlokliQueryClient,
@@ -292,10 +293,30 @@ pub fn build_blokli_client() -> BlokliTestClient<FullStateEmulator> {
                 .iter()
                 .map(|&(safe_addr, _)| (safe_addr, HoprBalance::new_base(DEFAULT_SAFE_ALLOWANCE))),
         )
+        .with_deployed_safes(NODE_SAFES_MODULES.iter().zip(NODE_CHAIN_KEYS.iter()).map(
+            |((safe_address, module_address), chain_key)| DeployedSafe {
+                address: *safe_address,
+                owner: chain_key.public().to_address(),
+                module: *module_address,
+            },
+        ))
         .with_minimum_win_prob(WinningProbability::try_from(MINIMUM_INCOMING_WIN_PROB).unwrap())
         .with_ticket_price(HoprBalance::new_base(1))
         .with_closure_grace_period(Duration::from_secs(1))
-        .build_dynamic_client([0u8; Address::SIZE].into()) // Placeholder module address, to be filled in later
+        .build_dynamic_client(Address::default()) // Placeholder module address, to be filled in later
+        .with_tx_simulation_delay(Duration::from_millis(300))
+}
+
+#[fixture]
+#[once]
+pub fn size_2_cluster_fixture() -> ClusterGuard {
+    cluster_fixture(2)
+}
+
+#[fixture]
+#[once]
+pub fn size_3_cluster_fixture() -> ClusterGuard {
+    cluster_fixture(3)
 }
 
 #[fixture]

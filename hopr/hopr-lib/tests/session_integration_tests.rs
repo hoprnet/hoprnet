@@ -10,12 +10,16 @@ use hopr_lib::{
 };
 use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::Address;
-use parameterized::parameterized;
-use tokio::{io::AsyncReadExt, net::UdpSocket};
+use rstest::*;
+use tokio::{io::AsyncReadExt, net::UdpSocket, sync::oneshot};
 
-#[parameterized(cap = { Capabilities::empty(), Capabilities::from(Capability::Segmentation) })]
-#[parameterized_macro(tokio::test)]
-async fn udp_session_bridging(cap: Capabilities) -> anyhow::Result<()> {
+#[rstest]
+#[case(Capabilities::empty())]
+#[case(Capabilities::from(Capability::Segmentation))]
+#[tokio::test]
+/// Creates paired Hopr sessions bridged to a UDP listener to prove that messages
+/// sent over UDP end up in the remote session buffer regardless of capability set.
+async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
     let dst: Address = (&ChainKeypair::random()).into();
     let id = SessionId::new(1u64, HoprPseudonym::random());
     let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
@@ -65,11 +69,12 @@ async fn udp_session_bridging(cap: Capabilities) -> anyhow::Result<()> {
 
     let addr = *listener.bound_address();
 
-    tokio::task::spawn(async move {
-        transfer_session(&mut alice_session, &mut listener, BUF_LEN, None)
-            .await
-            .expect("transfer must not fail")
+    let (ready_tx, ready_rx) = oneshot::channel();
+    let transfer_handle = tokio::task::spawn(async move {
+        ready_tx.send(()).ok();
+        transfer_session(&mut alice_session, &mut listener, BUF_LEN, None).await
     });
+    ready_rx.await.ok();
 
     let msg: [u8; 9183] = hopr_crypto_random::random_bytes();
     let sender = UdpSocket::bind(("127.0.0.1", 0)).await?;
@@ -84,5 +89,12 @@ async fn udp_session_bridging(cap: Capabilities) -> anyhow::Result<()> {
     bob_session.read_exact(&mut recv_msg).await?;
 
     assert_eq!(recv_msg, msg);
+
+    transfer_handle.abort();
+    match transfer_handle.await {
+        Ok(Err(e)) => panic!("transfer failed: {e}"),
+        _ => {} // Task was aborted (expected)
+    }
+
     Ok(())
 }

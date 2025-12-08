@@ -208,6 +208,21 @@ impl ChannelGuard {
         Ok(stats)
     }
 
+    pub async fn open_channel_between_nodes(
+        src: Arc<Hopr<TestingConnector, HoprNodeDb>>,
+        dst: Arc<Hopr<TestingConnector, HoprNodeDb>>,
+        funding: HoprBalance,
+    ) -> anyhow::Result<Self> {
+        let channel = src
+            .open_channel(&dst.me_onchain(), funding)
+            .await
+            .context("failed to open channel")?;
+
+        Ok(Self {
+            channels: vec![(src.clone(), channel.channel_id)],
+        })
+    }
+
     pub async fn try_close_channels_all_channels(&self) -> anyhow::Result<()> {
         let futures = self.channels.iter().map(|(hopr, channel_id)| {
             let hopr = hopr.clone();
