@@ -10,13 +10,13 @@ accounts:
       - /ip4/127.0.0.1/tcp/1234
     packet_key: 3f6b51c1158631d57d2ecfe0cc49396de92be26bcea89b77cd60223f1023f1a0
     safe_address: ~
-unpaired_safes: {}
 native_balances:
   668430def9eacd2b5064acf85d73fb0b351a1c8c:
     __typename: NativeBalance
     balance: 0.999999999999999999 xDai
 token_balances: {}
 safe_allowances: {}
+deployed_safes: {}
 tx_counts:
   668430def9eacd2b5064acf85d73fb0b351a1c8c: 1
 channels: {}

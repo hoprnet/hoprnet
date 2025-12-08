@@ -4,12 +4,11 @@ pub mod errors;
 #[cfg(feature = "testing")]
 pub mod testing;
 
-use ::blokli_client::{BlokliClient, BlokliClientConfig};
 #[cfg(feature = "testing")]
 pub use backend::InMemoryBackend;
 pub use backend::{Backend, TempDbBackend};
 pub use connector::{BlockchainConnectorConfig, HoprBlockchainConnector};
-pub use hopr_chain_types::payload::SafePayloadGenerator;
+pub use hopr_chain_types::payload::{BasicPayloadGenerator, SafePayloadGenerator};
 
 /// Re-exports of the `blokli_client` crate.
 pub mod blokli_client {
@@ -105,21 +104,23 @@ where
 
 pub const DEFAULT_BLOKLI_URL: &str = "https://blokli.prod.hoprnet.org";
 
+// TODO: move this into utils crate
 pub async fn init_blokli_connector(
-    chain_key: &hopr_crypto_types::prelude::ChainKeypair,
+    chain_key: &ChainKeypair,
     provider: Option<String>,
-    safe_module_address: hopr_api::Address,
-) -> anyhow::Result<HoprBlockchainSafeConnector<BlokliClient>> {
+    safe_module_address: Address,
+) -> anyhow::Result<HoprBlockchainSafeConnector<blokli_client::BlokliClient>> {
     tracing::info!("initiating Blokli connector");
-    let mut connector = crate::create_trustful_hopr_blokli_connector(
+
+    let mut connector = create_trustful_hopr_blokli_connector(
         chain_key,
         BlockchainConnectorConfig {
             tx_confirm_timeout: std::time::Duration::from_secs(30),
             connection_timeout: std::time::Duration::from_mins(1),
         },
-        BlokliClient::new(
+        blokli_client::BlokliClient::new(
             provider.as_deref().unwrap_or(DEFAULT_BLOKLI_URL).parse()?,
-            BlokliClientConfig {
+            blokli_client::BlokliClientConfig {
                 timeout: std::time::Duration::from_secs(5),
             },
         ),
