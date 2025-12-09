@@ -28,7 +28,9 @@ where
         let channel = self
             .client
             .query_channels(blokli_client::api::ChannelSelector {
-                filter: blokli_client::api::ChannelFilter::ChannelId(ticket.ticket.channel_id().into()),
+                filter: Some(blokli_client::api::ChannelFilter::ChannelId(
+                    ticket.ticket.channel_id().into(),
+                )),
                 status: None,
             })
             .await?
