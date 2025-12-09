@@ -4,10 +4,15 @@ use futures::StreamExt;
 use hopr_api::{chain::ChainReadChannelOperations, db::HoprDbTicketOperations};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
+#[cfg(feature = "rayon")]
+use hopr_parallelize::cpu::rayon::prelude::*;
 use hopr_primitive_types::balance::HoprBalance;
 use validator::ValidationError;
 
-use crate::{HoprProtocolError, ResolvedAcknowledgement, TicketTracker, UnacknowledgedTicketProcessor};
+use crate::{
+    HoprProtocolError, ResolvedAcknowledgement, TicketAcknowledgementError, TicketTracker,
+    UnacknowledgedTicketProcessor,
+};
 
 const MIN_UNACK_TICKET_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 fn validate_unack_ticket_timeout(timeout: &std::time::Duration) -> Result<(), ValidationError> {
@@ -38,6 +43,10 @@ fn default_unack_ticket_timeout() -> std::time::Duration {
 
 fn default_max_unack_tickets() -> usize {
     10_000_000
+}
+
+fn just_true() -> bool {
+    true
 }
 
 /// Configuration for the HOPR ticket processor within the packet pipeline.
@@ -80,6 +89,14 @@ pub struct HoprTicketProcessorConfig {
         serde(default = "default_outgoing_index_retention", with = "humantime_serde")
     )]
     pub outgoing_index_cache_retention: std::time::Duration,
+    /// Indicates whether to use batch verification algorithm for acknowledgements.
+    ///
+    /// This has a positive performance impact on higher workloads.
+    ///
+    /// Default is true.
+    #[default(just_true())]
+    #[cfg_attr(feature = "serde", serde(default = "just_true"))]
+    pub use_batch_verification: bool,
 }
 
 /// HOPR-specific implementation of [`UnacknowledgedTicketProcessor`] and [`TicketTracker`].
@@ -178,6 +195,7 @@ where
 {
     type Error = HoprProtocolError;
 
+    #[tracing::instrument(skip(self, next_hop, challenge, ticket), level = "trace", fields(next_hop = next_hop.to_peerid_str()))]
     async fn insert_unacknowledged_ticket(
         &self,
         next_hop: &OffchainPublicKey,
@@ -199,70 +217,134 @@ where
         Ok(())
     }
 
-    async fn acknowledge_ticket(
+    #[tracing::instrument(skip_all, level = "trace", fields(peer = peer.to_peerid_str()))]
+    async fn acknowledge_tickets(
         &self,
         peer: OffchainPublicKey,
-        ack: Acknowledgement,
-    ) -> Result<Option<ResolvedAcknowledgement>, Self::Error> {
+        acks: Vec<Acknowledgement>,
+    ) -> Result<Vec<ResolvedAcknowledgement>, TicketAcknowledgementError<Self::Error>> {
         // Check if we're even expecting an acknowledgement from this peer
         let Some(awaiting_ack_from_peer) = self.unacknowledged_tickets.get(&peer).await else {
-            tracing::trace!(%peer, "not awaiting any acknowledgement from peer");
-            return Ok(None);
+            tracing::trace!("not awaiting any acknowledgement from peer");
+            return Err(TicketAcknowledgementError::UnexpectedAcknowledgement);
         };
 
-        // If we do, verify the acknowledgement signature and extract the challenge
-        let (half_key, challenge) = hopr_parallelize::cpu::spawn_fifo_blocking(move || {
-            ack.verify(&peer)
-                .and_then(|verified| Ok((*verified.ack_key_share(), verified.ack_key_share().to_challenge()?)))
+        // Verify all the acknowledgements and compute challenges from half-keys
+        let use_batch_verify = self.cfg.use_batch_verification;
+        let half_keys_challenges = hopr_parallelize::cpu::spawn_fifo_blocking(move || {
+            if use_batch_verify {
+                // Uses regular verifications for small batches but switches to a more effective
+                // batch verification algorithm for larger ones.
+                let acks = Acknowledgement::verify_batch(acks.into_iter().map(|ack| (peer, ack)));
+
+                #[cfg(feature = "rayon")]
+                let iter = acks.into_par_iter();
+
+                #[cfg(not(feature = "rayon"))]
+                let iter = acks.into_iter();
+
+                iter.map(|verified| {
+                    verified
+                        .and_then(|verified| Ok((*verified.ack_key_share(), verified.ack_key_share().to_challenge()?)))
+                })
+                .filter_map(|res| {
+                    res.inspect_err(|error| tracing::error!(%error, "failed to process acknowledgement"))
+                        .ok()
+                })
+                .collect::<Vec<_>>()
+            } else {
+                #[cfg(feature = "rayon")]
+                let iter = acks.into_par_iter();
+
+                #[cfg(not(feature = "rayon"))]
+                let iter = acks.into_iter();
+
+                iter.map(|ack| {
+                    ack.verify(&peer)
+                        .and_then(|verified| Ok((*verified.ack_key_share(), verified.ack_key_share().to_challenge()?)))
+                })
+                .filter_map(|res| {
+                    res.inspect_err(|error| tracing::error!(%error, "failed to process acknowledgement"))
+                        .ok()
+                })
+                .collect::<Vec<_>>()
+            }
         })
-        .await?;
+        .await;
 
-        // Check if we have a ticket to be acknowledged by this peer
-        let unacknowledged = awaiting_ack_from_peer
-            .remove(&challenge)
-            .await
-            .ok_or_else(|| HoprProtocolError::UnacknowledgedTicketNotFound(challenge))?;
+        // Find all the tickets that we're awaiting acknowledgement for
+        let mut unack_tickets = Vec::with_capacity(half_keys_challenges.len());
+        for (half_key, challenge) in half_keys_challenges {
+            let Some(unack_ticket) = awaiting_ack_from_peer.remove(&challenge).await else {
+                tracing::error!(%challenge, "received acknowledgement for unknown ticket");
+                continue;
+            };
 
-        // Issuer's channel must have an epoch matching with the unacknowledged ticket
-        let issuer_channel = self
-            .chain_api
-            .channel_by_parties(unacknowledged.ticket.verified_issuer(), self.chain_key.as_ref())
-            .await
-            .map_err(|e| HoprProtocolError::ResolverError(e.into()))?
-            .filter(|c| c.channel_epoch == unacknowledged.verified_ticket().channel_epoch)
-            .ok_or(HoprProtocolError::ChannelNotFound(
-                *unacknowledged.ticket.verified_issuer(),
-                *self.chain_key.as_ref(),
-            ))?;
+            let issuer_channel = match self
+                .chain_api
+                .channel_by_parties(unack_ticket.ticket.verified_issuer(), self.chain_key.as_ref())
+                .await
+            {
+                Ok(Some(channel)) => {
+                    if channel.channel_epoch != unack_ticket.verified_ticket().channel_epoch {
+                        tracing::error!(%unack_ticket, "received acknowledgement for ticket issued in a different epoch");
+                        continue;
+                    }
+                    channel
+                }
+                Ok(None) => {
+                    tracing::error!(%unack_ticket, "received acknowledgement for ticket issued for unknown channel");
+                    continue;
+                }
+                Err(error) => {
+                    tracing::error!(%error, %unack_ticket, "failed to resolve channel for unacknowledged ticket");
+                    continue;
+                }
+            };
+
+            unack_tickets.push((issuer_channel, half_key, unack_ticket));
+        }
 
         let domain_separator = self.channels_dst;
         let chain_key = self.chain_key.clone();
-        let channel_id = *issuer_channel.get_id();
-        hopr_parallelize::cpu::spawn_fifo_blocking(move || {
-            // This explicitly checks whether the acknowledgement
-            // solves the challenge on the ticket. It must be done before we
-            // check that the ticket is winning, which is a lengthy operation
-            // and should not be done for bogus unacknowledged tickets
-            let ack_ticket = unacknowledged.acknowledge(&half_key)?;
+        Ok(hopr_parallelize::cpu::spawn_fifo_blocking(move || {
+            #[cfg(feature = "rayon")]
+            let iter = unack_tickets.into_par_iter();
 
-            // This operation checks if the ticket is winning, and if it is, it
-            // turns it into a redeemable ticket.
-            match ack_ticket.into_redeemable(&chain_key, &domain_separator) {
-                Ok(redeemable) => {
-                    tracing::debug!(%issuer_channel, "found winning ticket");
-                    Ok(Some(ResolvedAcknowledgement::RelayingWin(Box::new(redeemable))))
+            #[cfg(not(feature = "rayon"))]
+            let iter = unack_tickets.into_iter();
+
+            iter.filter_map(|(channel, half_key, unack_ticket)| {
+                // This explicitly checks whether the acknowledgement
+                // solves the challenge on the ticket.
+                // It must be done before we check that the ticket is winning,
+                // which is a lengthy operation and should not be done for
+                // bogus unacknowledged tickets
+                let Ok(ack_ticket) = unack_ticket.acknowledge(&half_key) else {
+                    tracing::error!(%unack_ticket, "failed to acknowledge ticket");
+                    return None;
+                };
+
+                // This operation checks if the ticket is winning, and if it is, it
+                // turns it into a redeemable ticket.
+                match ack_ticket.into_redeemable(&chain_key, &domain_separator) {
+                    Ok(redeemable) => {
+                        tracing::debug!(%channel, "found winning ticket");
+                        Some(ResolvedAcknowledgement::RelayingWin(Box::new(redeemable)))
+                    }
+                    Err(CoreTypesError::TicketNotWinning) => {
+                        tracing::trace!(%channel, "found losing ticket");
+                        Some(ResolvedAcknowledgement::RelayingLoss(*channel.get_id()))
+                    }
+                    Err(error) => {
+                        tracing::error!(%error, %channel, "error when acknowledging ticket");
+                        Some(ResolvedAcknowledgement::RelayingLoss(*channel.get_id()))
+                    }
                 }
-                Err(CoreTypesError::TicketNotWinning) => {
-                    tracing::trace!(%issuer_channel, "found losing ticket");
-                    Ok(Some(ResolvedAcknowledgement::RelayingLoss(channel_id)))
-                }
-                Err(error) => {
-                    tracing::error!(%error, %issuer_channel, "error when acknowledging ticket");
-                    Ok(Some(ResolvedAcknowledgement::RelayingLoss(channel_id)))
-                }
-            }
+            })
+            .collect::<Vec<_>>()
         })
-        .await
+        .await)
     }
 }
 
@@ -295,5 +377,92 @@ where
         // This value cannot be cached here and must be cached in the DB
         // because the cache invalidation logic can be only done from within the DB.
         self.db.get_tickets_value(channel_id, epoch).await.map_err(Into::into)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use hopr_crypto_random::Randomizable;
+
+    use super::*;
+    use crate::tests::*;
+
+    #[tokio::test]
+    async fn ticket_processor_should_acknowledge_previously_inserted_tickets() -> anyhow::Result<()> {
+        let blokli_client = create_blokli_client()?;
+
+        let node = create_node(1, &blokli_client).await?;
+
+        let ticket_processor = HoprTicketProcessor::new(
+            node.chain_api.clone(),
+            node.node_db.clone(),
+            node.chain_key.clone(),
+            Hash::default(),
+            HoprTicketProcessorConfig::default(),
+        );
+
+        const NUM_TICKETS: usize = 5;
+
+        let mut acks = Vec::with_capacity(5);
+        for index in 0..NUM_TICKETS {
+            let own_share = HalfKey::random();
+            let ack_share = HalfKey::random();
+            let challenge = Challenge::from_own_share_and_half_key(&own_share.to_challenge()?, &ack_share)?;
+
+            let unack_ticket = TicketBuilder::default()
+                .counterparty(&PEERS[1].0)
+                .index(index as u64)
+                .channel_epoch(1)
+                .amount(10_u32)
+                .challenge(challenge)
+                .build_signed(&PEERS[0].0, &Hash::default())?
+                .into_unacknowledged(own_share);
+
+            ticket_processor
+                .insert_unacknowledged_ticket(PEERS[2].1.public(), ack_share.to_challenge()?, unack_ticket)
+                .await?;
+
+            acks.push(VerifiedAcknowledgement::new(ack_share, &PEERS[2].1).leak());
+        }
+
+        let resolutions = ticket_processor.acknowledge_tickets(*PEERS[2].1.public(), acks).await?;
+        assert_eq!(NUM_TICKETS, resolutions.len());
+        assert!(
+            resolutions
+                .iter()
+                .all(|res| matches!(res, ResolvedAcknowledgement::RelayingWin(_)))
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn ticket_processor_should_reject_acknowledgements_from_unexpected_sender() -> anyhow::Result<()> {
+        let blokli_client = create_blokli_client()?;
+
+        let node = create_node(1, &blokli_client).await?;
+
+        let ticket_processor = HoprTicketProcessor::new(
+            node.chain_api.clone(),
+            node.node_db.clone(),
+            node.chain_key.clone(),
+            Hash::default(),
+            HoprTicketProcessorConfig::default(),
+        );
+
+        const NUM_ACKS: usize = 5;
+
+        let mut acks = Vec::with_capacity(5);
+        for _ in 0..NUM_ACKS {
+            let ack_share = HalfKey::random();
+            acks.push(VerifiedAcknowledgement::new(ack_share, &PEERS[2].1).leak());
+        }
+
+        assert!(matches!(
+            ticket_processor.acknowledge_tickets(*PEERS[2].1.public(), acks).await,
+            Err(TicketAcknowledgementError::UnexpectedAcknowledgement)
+        ));
+
+        Ok(())
     }
 }

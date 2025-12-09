@@ -84,7 +84,10 @@ use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfi
 use tracing::{Instrument, debug, error, info, trace, warn};
 
 pub use crate::config::HoprProtocolConfig;
-use crate::{constants::SESSION_INITIATION_TIMEOUT_BASE, errors::HoprTransportError, socket::HoprSocket};
+use crate::{
+    constants::SESSION_INITIATION_TIMEOUT_BASE, errors::HoprTransportError, pipeline::HoprPipelineComponents,
+    socket::HoprSocket,
+};
 
 pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RANGE;
 
@@ -464,10 +467,12 @@ where
             (self.packet_key.clone(), self.chain_key.clone()),
             (mixing_channel_tx, wire_msg_rx),
             (tx_from_protocol, all_resolved_external_msg_rx),
-            ticket_events,
-            self.path_planner.surb_store.clone(),
-            self.chain_api.clone(),
-            self.db.clone(),
+            HoprPipelineComponents {
+                ticket_events,
+                surb_store: self.path_planner.surb_store.clone(),
+                chain_api: self.chain_api.clone(),
+                db: self.db.clone(),
+            },
             channels_dst,
             self.cfg.packet,
         ));

@@ -50,9 +50,18 @@ pub type HoprSurbId = [u8; SURB_ID_SIZE];
 /// The `surb_id` always identifies a single SURB. The instance can be turned into a pseudorandom
 /// sequence using [`HoprSenderId::into_sequence`] to create identifiers for more SURBs
 /// with the same pseudonym.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct HoprSenderId(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
+
+impl std::fmt::Debug for HoprSenderId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("HoprSenderId")
+            .field(&hex::encode(&self.0[0..HoprPseudonym::SIZE]))
+            .field(&hex::encode(&self.0[HoprPseudonym::SIZE..]))
+            .finish()
+    }
+}
 
 impl HoprSenderId {
     pub fn new(pseudonym: &HoprPseudonym) -> Self {

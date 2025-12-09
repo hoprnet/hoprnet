@@ -20,7 +20,7 @@ use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, HoprTicketProcessor, HoprTicketProcessorConfig, MemorySurbStore,
     SurbStoreConfig,
 };
-use hopr_transport_protocol::TicketEvent;
+use hopr_transport_protocol::{AcknowledgementPipelineConfig, TicketEvent};
 use libp2p::PeerId;
 
 const SAMPLE_SIZE: usize = 50;
@@ -129,6 +129,7 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                             (encoder, decoder),
                             ticket_proc,
                             received_ack_tickets_tx,
+                            AcknowledgementPipelineConfig::default(),
                             (api_recv_tx, api_send_rx),
                         );
 

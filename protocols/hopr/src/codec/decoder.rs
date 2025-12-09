@@ -195,11 +195,14 @@ where
 {
     type Error = HoprProtocolError;
 
+    #[tracing::instrument(skip(self, sender, data), level = "trace", fields(%sender))]
     async fn decode(
         &self,
         sender: PeerId,
         data: Box<[u8]>,
     ) -> Result<IncomingPacket, IncomingPacketError<Self::Error>> {
+        tracing::trace!(data_len = data.len(), "decoding packet");
+
         // Try to retrieve the peer's public key from the cache or compute it if it does not exist yet
         let previous_hop = match self
             .peer_id_cache
@@ -260,15 +263,36 @@ where
 
                 Ok(match incoming.ack_key {
                     None => {
+                        if incoming.plain_text.len() < size_of::<u16>() {
+                            return Err(IncomingPacketError::Undecodable(
+                                GeneralError::ParseError("invalid acknowledgement packet size".into()).into(),
+                            ));
+                        }
+
+                        let num_acks =
+                            u16::from_be_bytes(incoming.plain_text[..size_of::<u16>()].try_into().map_err(|_| {
+                                IncomingPacketError::Undecodable(
+                                    GeneralError::ParseError("invalid num acks".into()).into(),
+                                )
+                            })?);
+
+                        if incoming.plain_text.len() < size_of::<u16>() + (num_acks as usize) * Acknowledgement::SIZE {
+                            return Err(IncomingPacketError::Undecodable(
+                                GeneralError::ParseError("invalid number of acknowledgements in packet".into()).into(),
+                            ));
+                        }
+                        tracing::trace!(num_acks, "received acknowledgement packet");
+
                         // The contained payload represents an Acknowledgement
                         IncomingPacket::Acknowledgement(
                             IncomingAcknowledgementPacket {
                                 packet_tag: incoming.packet_tag,
                                 previous_hop: incoming.previous_hop,
-                                received_ack: incoming
-                                    .plain_text
-                                    .as_ref()
-                                    .try_into()
+                                received_acks: incoming.plain_text
+                                    [size_of::<u16>()..size_of::<u16>() + num_acks as usize * Acknowledgement::SIZE]
+                                    .chunks_exact(Acknowledgement::SIZE)
+                                    .map(Acknowledgement::try_from)
+                                    .collect::<Result<Vec<_>, _>>()
                                     .map_err(|e: GeneralError| IncomingPacketError::Undecodable(e.into()))?,
                             }
                             .into(),

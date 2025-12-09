@@ -3,9 +3,9 @@ use std::fmt::{Display, Formatter};
 use hopr_crypto_sphinx::prelude::*;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::*;
 #[cfg(feature = "rayon")]
-use rayon::prelude::*;
+use hopr_parallelize::cpu::rayon::prelude::*;
+use hopr_primitive_types::prelude::*;
 
 use crate::{
     HoprPseudonym, HoprReplyOpener, HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, PAYLOAD_SIZE_INT,
@@ -66,7 +66,7 @@ impl PathKeyData {
     /// Computes `PathKeyData` for the given paths.
     ///
     /// Uses parallel processing if the `rayon` feature is enabled.
-    fn iter_from_paths(paths: Vec<&[OffchainPublicKey]>) -> Result<impl Iterator<Item = Self>> {
+    fn iter_from_paths(paths: Vec<&[OffchainPublicKey]>) -> Result<impl Iterator<Item = Self> + use<>> {
         #[cfg(not(feature = "rayon"))]
         let paths = paths.into_iter();
 
@@ -543,7 +543,6 @@ impl HoprPacket {
                         signals,
                     } = HoprPacketMessage::from(plain_text).try_into()?;
                     let should_acknowledge = !no_ack;
-                    tracing::trace!(?should_acknowledge, "acknowledgement for final packet");
                     Ok(Self::Final(
                         HoprIncomingPacket {
                             packet_tag,

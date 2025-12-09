@@ -4260,6 +4260,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "halfbrown"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c7ed2f2edad8a14c8186b847909a41fbb9c3eafa44f88bd891114ed5019da09"
+dependencies = [
+ "hashbrown 0.16.1",
+]
+
+[[package]]
 name = "hash32"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4593,11 +4602,11 @@ dependencies = [
  "hopr-crypto-sphinx",
  "hopr-crypto-types",
  "hopr-internal-types",
+ "hopr-parallelize",
  "hopr-primitive-types",
  "lazy_static",
  "mimalloc",
  "parameterized",
- "rayon",
  "serde",
  "serde_bytes",
  "strum 0.27.2",
@@ -4641,7 +4650,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-types"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "aes",
  "anyhow",
@@ -4743,7 +4752,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-internal-types"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -4753,6 +4762,7 @@ dependencies = [
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
+ "hopr-parallelize",
  "hopr-primitive-types",
  "lazy_static",
  "mockall",
@@ -4919,15 +4929,19 @@ dependencies = [
  "futures",
  "futures-time",
  "hex",
+ "hex-literal",
  "hopr-api",
+ "hopr-chain-connector",
  "hopr-crypto-packet",
  "hopr-crypto-random",
  "hopr-crypto-types",
+ "hopr-db-node",
  "hopr-internal-types",
  "hopr-network-types",
  "hopr-parallelize",
  "hopr-primitive-types",
  "humantime-serde",
+ "lazy_static",
  "moka",
  "parking_lot",
  "ringbuffer",
@@ -4936,6 +4950,7 @@ dependencies = [
  "smart-default",
  "strum 0.27.2",
  "thiserror 2.0.17",
+ "tokio",
  "tracing",
  "validator",
 ]
@@ -5193,16 +5208,18 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
+ "ahash",
  "anyhow",
  "async-trait",
  "async_channel_io",
  "bytesize",
- "cfg_eval",
  "criterion",
  "futures",
+ "futures-concurrency",
  "futures-time",
+ "halfbrown",
  "hex-literal",
  "hopr-api",
  "hopr-async-runtime",
@@ -5220,12 +5237,12 @@ dependencies = [
  "hopr-protocol-hopr",
  "hopr-transport-identity",
  "hopr-transport-mixer",
+ "humantime-serde",
  "lazy_static",
  "libp2p",
  "moka",
  "rust-stream-ext-concurrent",
  "serde",
- "serde_with",
  "serial_test",
  "smart-default",
  "strum 0.27.2",

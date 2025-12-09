@@ -247,17 +247,17 @@ impl OffchainSignature {
     }
 
     /// Performs optimized signature verification of multiple signed messages and public keys.
-    pub fn verify_batch<'a, I: IntoIterator<Item = ((&'a [u8], OffchainSignature), OffchainPublicKey)>>(
+    pub fn verify_batch<M: AsRef<[u8]>, I: IntoIterator<Item = ((M, OffchainSignature), OffchainPublicKey)>>(
         entries: I,
     ) -> bool {
-        let (signed_msgs, pub_keys): (Vec<(&[u8], OffchainSignature)>, Vec<ed25519_dalek::VerifyingKey>) = entries
+        let (signed_msgs, pub_keys): (Vec<(M, OffchainSignature)>, Vec<ed25519_dalek::VerifyingKey>) = entries
             .into_iter()
             .map(|(a, b)| (a, ed25519_dalek::VerifyingKey::from(b.edwards)))
             .unzip();
 
         let (msgs, signatures): (Vec<&[u8]>, Vec<ed25519_dalek::Signature>) = signed_msgs
-            .into_iter()
-            .map(|(a, b)| (a, ed25519_dalek::Signature::from_bytes(&b.0)))
+            .iter()
+            .map(|(a, b)| (a.as_ref(), ed25519_dalek::Signature::from_bytes(&b.0)))
             .unzip();
 
         ed25519_dalek::verify_batch(&msgs, &signatures, &pub_keys).is_ok()
@@ -424,11 +424,13 @@ mod tests {
             .map(|i| format!("test_msg_{i}").as_bytes().to_vec())
             .collect::<Vec<_>>();
 
+        let kps = (0..100).map(|_| OffchainKeypair::random()).collect::<Vec<_>>();
+
         let tuples = (0..100)
             .map(|i| {
-                let kp = OffchainKeypair::random();
-                let sig = OffchainSignature::sign_message(&msgs[i], &kp);
-                ((msgs[i].as_slice(), sig), *kp.public())
+                let kp = &kps[i];
+                let sig = OffchainSignature::sign_message(&msgs[i], kp);
+                ((msgs[i].clone(), sig), *kp.public())
             })
             .collect::<Vec<_>>();
 
