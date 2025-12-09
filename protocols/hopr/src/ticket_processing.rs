@@ -4,9 +4,9 @@ use futures::StreamExt;
 use hopr_api::{chain::ChainReadChannelOperations, db::HoprDbTicketOperations};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
-use hopr_primitive_types::balance::HoprBalance;
 #[cfg(feature = "rayon")]
-use rayon::prelude::{IntoParallelIterator, ParallelIterator};
+use hopr_parallelize::cpu::rayon::prelude::*;
+use hopr_primitive_types::balance::HoprBalance;
 use validator::ValidationError;
 
 use crate::{

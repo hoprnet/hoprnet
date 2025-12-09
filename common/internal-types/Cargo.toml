@@ -3,7 +3,7 @@ name = "hopr-internal-types"
 version = "0.17.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains HOPR-specific types required internally by the HOPR node"
-edition = "2021"
+edition = "2024"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
@@ -13,7 +13,7 @@ crate-type = ["rlib"]
 
 [features]
 default = ["rayon"]
-rayon = ["dep:rayon"]
+rayon = ["dep:hopr-parallelize"]
 serde = [
   "dep:serde",
   "dep:serde_bytes",
@@ -28,7 +28,6 @@ async-trait = { workspace = true }
 hex-literal = { workspace = true }
 num_enum = { workspace = true }
 multiaddr = { workspace = true }
-rayon = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_bytes = { workspace = true, optional = true }
 smart-default = { workspace = true }
@@ -39,6 +38,7 @@ tracing = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
+hopr-parallelize = { workspace = true, optional = true }
 
 
 [dev-dependencies]

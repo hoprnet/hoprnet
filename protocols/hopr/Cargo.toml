@@ -10,7 +10,11 @@ license = "GPL-3.0-only"
 
 [features]
 default = ["rayon"]
-rayon = ["dep:rayon", "hopr-crypto-packet/rayon", "hopr-internal-types/rayon"]
+rayon = [
+  "hopr-parallelize/rayon",
+  "hopr-crypto-packet/rayon",
+  "hopr-internal-types/rayon",
+]
 serde = [
   "dep:cfg_eval",
   "dep:humantime-serde",
@@ -31,7 +35,6 @@ futures-time = { workspace = true }
 hex = { workspace = true }
 moka = { workspace = true }
 parking_lot = { workspace = true }
-rayon = { workspace = true, optional = true }
 ringbuffer = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_with = { workspace = true, optional = true }
@@ -48,7 +51,7 @@ hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-network-types = { workspace = true }
-hopr-parallelize = { workspace = true, features = ["rayon"] }
+hopr-parallelize = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
