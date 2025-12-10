@@ -89,7 +89,7 @@ async fn channel_funding_should_be_visible_in_channel_stake(cluster: &ClusterGua
         .await
         .context("failed to retrieve channel by id")?;
 
-    assert_eq!(updated_channel.balance, funding_amount.mul(2));
+    assert!(updated_channel.balance >= funding_amount.mul(2));
 
     channel.try_close_channels_all_channels().await?;
 

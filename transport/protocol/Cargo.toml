@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-protocol"
-version = "0.12.0"
+version = "0.13.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"
@@ -13,9 +13,8 @@ default = []
 prometheus = ["dep:hopr-metrics"]
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 serde = [
-  "dep:cfg_eval",
   "dep:serde",
-  "dep:serde_with",
+  "dep:humantime-serde",
   "hopr-internal-types/serde",
   "hopr-primitive-types/serde",
   "hopr-protocol-hopr/serde",
@@ -24,17 +23,19 @@ serde = [
 
 [dependencies]
 anyhow = { workspace = true }
+ahash = { workspace = true }
 async-trait = { workspace = true }
-cfg_eval = { workspace = true, optional = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
+futures-concurrency = { workspace = true }
+halfbrown = { workspace = true }
 hex-literal = { workspace = true }
+humantime-serde = { workspace = true, optional = true }
 lazy_static = { workspace = true }
 libp2p = { workspace = true, features = ["noise", "request-response"] }
 moka = { workspace = true }
 rust-stream-ext-concurrent = { workspace = true }
 serde = { workspace = true, features = ["derive"], optional = true }
-serde_with = { workspace = true, optional = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
@@ -78,3 +79,9 @@ hopr-transport-mixer = { workspace = true }
 [[bench]]
 name = "protocol_throughput_emulated"
 harness = false
+
+[package.metadata.cargo-machete]
+ignored = ["humantime-serde"]
+
+[package.metadata.cargo-shear]
+ignored = ["humantime-serde"]

@@ -1,6 +1,6 @@
 [package]
 name = "hopr-protocol-hopr"
-version = "4.0.0"
+version = "4.0.1"
 edition = "2024"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains implementation of the HOPR protocol as specified in RFC-0004 & RFC-0005"
@@ -9,7 +9,12 @@ repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
 [features]
-default = []
+default = ["rayon"]
+rayon = [
+  "hopr-parallelize/rayon",
+  "hopr-crypto-packet/rayon",
+  "hopr-internal-types/rayon",
+]
 serde = [
   "dep:cfg_eval",
   "dep:humantime-serde",
@@ -46,11 +51,20 @@ hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-network-types = { workspace = true }
-hopr-parallelize = { workspace = true, features = ["rayon"] }
+hopr-parallelize = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
+hex-literal = { workspace = true }
+lazy_static = { workspace = true }
+tokio = { workspace = true }
+
+hopr-db-node = { workspace = true, features = ["runtime-tokio"] }
+hopr-chain-connector = { workspace = true, features = [
+  "testing",
+  "runtime-tokio",
+] }
 
 [[bench]]
 name = "bloom_filter"

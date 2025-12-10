@@ -4,11 +4,14 @@ use hopr_crypto_types::{crypto_traits::Randomizable, prelude::*};
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+use tracing::Instrument;
 
 use crate::{
     HoprCodecConfig, OutgoingPacket, PacketEncoder, SurbStore, TicketCreationError, TicketTracker,
     errors::HoprProtocolError,
 };
+pub const MAX_ACKNOWLEDGEMENTS_BATCH_SIZE: usize =
+    (HoprPacket::PAYLOAD_SIZE - size_of::<u16>()) / Acknowledgement::SIZE;
 
 /// Default [encoder](PacketEncoder) implementation for HOPR packets.
 pub struct HoprEncoder<Chain, S, T> {
@@ -144,6 +147,7 @@ where
 {
     type Error = HoprProtocolError;
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn encode_packet<D: AsRef<[u8]> + Send + 'static, Sig: Into<PacketSignals> + Send + 'static>(
         &self,
         data: D,
@@ -181,23 +185,33 @@ where
             }
         };
 
+        tracing::trace!(len = data.as_ref().len(), "encoding packet");
         self.encode_packet_internal(next_peer, data, num_hops, signals, routing, pseudonym)
+            .in_current_span()
             .await
     }
 
-    async fn encode_acknowledgement(
+    #[tracing::instrument(skip_all, level = "trace", fields(destination = destination.to_peerid_str()))]
+    async fn encode_acknowledgements(
         &self,
-        ack: VerifiedAcknowledgement,
-        peer: &OffchainPublicKey,
+        acks: &[VerifiedAcknowledgement],
+        destination: &OffchainPublicKey,
     ) -> Result<OutgoingPacket, Self::Error> {
+        tracing::trace!(num_acks = acks.len(), "encoding acknowledgements");
+
+        let mut all_acks = Vec::<u8>::with_capacity(size_of::<u16>() + acks.len() * Acknowledgement::SIZE);
+        all_acks.extend((acks.len() as u16).to_be_bytes());
+        acks.iter().for_each(|ack| all_acks.extend(ack.leak().as_ref()));
+
         self.encode_packet_internal(
-            *peer,
-            ack.leak(),
+            *destination,
+            all_acks,
             0,
             None,
-            PacketRouting::NoAck(*peer),
+            PacketRouting::NoAck(*destination),
             HoprPseudonym::random(),
         )
+        .in_current_span()
         .await
     }
 }
