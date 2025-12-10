@@ -3,21 +3,25 @@ use std::{ops::Mul, time::Duration};
 use anyhow::Context;
 use futures::AsyncWriteExt;
 use hopr_lib::{
-    ChannelId, HoprBalance,
-    testing::fixtures::{ClusterGuard, MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, cluster_fixture},
+    ChannelId, HoprBalance, HoprLibError,
+    testing::{
+        fixtures::{ClusterGuard, MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, cluster_fixture},
+        wait_until,
+    },
 };
 use hopr_primitive_types::prelude::UnitaryFloatOps;
 use rstest::*;
 use serial_test::serial;
 use tokio::time::sleep;
+
 const FUNDING_AMOUNT: &str = "10 wxHOPR";
 
 #[rstest]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
-/// Sends data through a 1 hop session to accumulate ticket statistics, then
-/// issues a reset and checks the counters drop back to zero.
+/// Sends data through a 1-hop session to accumulate ticket statistics, then
+/// issues a reset, and checks the counters drop back to zero.
 async fn ticket_statistics_should_reset_when_cleaned(#[with(5)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1::<3>();
 
@@ -126,14 +130,15 @@ async fn test_reject_relaying_a_message_when_the_channel_is_out_of_funding(
         .await
         .context("write failed")??;
 
-    sleep(Duration::from_secs(2)).await;
-
-    let stats_after = mid
-        .inner()
-        .ticket_statistics()
-        .await
-        .context("failed to get ticket statistics")?;
-    assert!(stats_before.rejected_value() < stats_after.rejected_value());
+    wait_until(
+        || async {
+            let stats_after = mid.inner().ticket_statistics().await?;
+            Ok::<_, HoprLibError>(stats_after.rejected_value() > stats_before.rejected_value())
+        },
+        Duration::from_secs(4),
+    )
+    .await
+    .context("failed to wait for: `stats_after.rejected_value() > stats_before.rejected_value()`")?;
 
     Ok(())
 }
@@ -172,29 +177,32 @@ async fn test_redeem_ticket_on_request(#[with(5)] cluster_fixture: ClusterGuard)
             .context("write failed")??;
     }
 
-    sleep(Duration::from_secs(15)).await;
+    wait_until(
+        || async {
+            let stats_before = mid.inner().ticket_statistics().await?;
+            Ok::<_, HoprLibError>(stats_before.unredeemed_value >= message_count.into())
+        },
+        Duration::from_secs(15),
+    )
+    .await
+    .context("failed to wait for: `stats_before.unredeemed_value > message_count.into()`")?;
 
-    let stats_before = mid
-        .inner()
-        .ticket_statistics()
-        .await
-        .context("failed to get ticket statistics")?;
-    assert!(stats_before.unredeemed_value > HoprBalance::zero());
+    let stats_before = mid.inner().ticket_statistics().await?;
 
     mid.inner()
         .redeem_all_tickets(0)
         .await
         .context("failed to redeem tickets")?;
 
-    sleep(Duration::from_secs(5)).await;
-
-    let stats_after = mid
-        .inner()
-        .ticket_statistics()
-        .await
-        .context("failed to get ticket statistics")?;
-
-    assert!(stats_after.redeemed_value() > stats_before.redeemed_value());
+    wait_until(
+        || async {
+            let stats_after = mid.inner().ticket_statistics().await?;
+            Ok::<_, HoprLibError>(stats_after.redeemed_value() > stats_before.redeemed_value())
+        },
+        Duration::from_secs(5),
+    )
+    .await
+    .context("failed to wait for: `stats_after.redeemed_value() > stats_before.redeemed_value()`")?;
 
     Ok(())
 }
@@ -239,30 +247,39 @@ async fn test_neglect_ticket_on_closing(#[with(5)] cluster_fixture: ClusterGuard
             .context("write failed")??;
     }
 
-    sleep(Duration::from_secs(5)).await;
-
-    let stats_before = mid
-        .inner()
-        .ticket_statistics()
-        .await
-        .context("failed to get ticket statistics")?;
-
-    assert!(stats_before.unredeemed_value > HoprBalance::zero());
-    assert_eq!(stats_before.neglected_value(), HoprBalance::zero());
+    wait_until(
+        || async {
+            let stats = mid.inner().ticket_statistics().await?;
+            Ok::<_, HoprLibError>(
+                stats.unredeemed_value >= message_count.into() && stats.neglected_value() == HoprBalance::zero(),
+            )
+        },
+        Duration::from_secs(5),
+    )
+    .await
+    .context(
+        "failed to wait for: `stats.unredeemed_value > message_count.into() && stats.neglected_value() > \
+         HoprBalance::zero()`",
+    )?;
 
     fw_channel.try_close_channels_all_channels().await?;
     bw_channel.try_close_channels_all_channels().await?;
 
-    sleep(Duration::from_secs(5)).await;
-
-    let stats_after = mid
-        .inner()
-        .ticket_statistics()
-        .await
-        .context("failed to get ticket statistics")?;
-
-    assert_eq!(stats_after.unredeemed_value, HoprBalance::zero());
-    assert!(stats_after.neglected_value() > HoprBalance::zero());
+    wait_until(
+        || async {
+            let stats_after = mid.inner().ticket_statistics().await?;
+            Ok::<_, HoprLibError>(
+                stats_after.unredeemed_value == HoprBalance::zero()
+                    && stats_after.neglected_value() > HoprBalance::zero(),
+            )
+        },
+        Duration::from_secs(5),
+    )
+    .await
+    .context(
+        "failed to wait for: `stats_after.unredeemed_value == HoprBalance::zero() && stats_after.neglected_value() > \
+         HoprBalance::zero()`",
+    )?;
 
     Ok(())
 }
@@ -317,16 +334,21 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
         .await
         .context("failed to redeem tickets")?;
 
-    sleep(Duration::from_secs(5)).await;
-
-    let stats_after = mid
-        .inner()
-        .ticket_statistics()
-        .await
-        .context("failed to get ticket statistics")?;
-
-    assert!(stats_after.winning_tickets < stats_before.winning_tickets + message_count as u128);
-    assert!(stats_after.redeemed_value() > stats_before.redeemed_value());
+    wait_until(
+        || async {
+            let stats_after = mid.inner().ticket_statistics().await?;
+            Ok::<_, HoprLibError>(
+                stats_after.winning_tickets < stats_before.winning_tickets + message_count as u128
+                    && stats_after.redeemed_value() > stats_before.redeemed_value(),
+            )
+        },
+        Duration::from_secs(5),
+    )
+    .await
+    .context(
+        "failed to wait for: `stats_after.winning_tickets < stats_before.winning_tickets + message_count as u128 && \
+         stats_after.redeemed_value() > stats_before.redeemed_value()`",
+    )?;
 
     Ok(())
 }
@@ -411,16 +433,21 @@ async fn relay_with_win_prob_higher_than_min_win_prob_should_succeed(
         .await
         .context("failed to redeem tickets")?;
 
-    sleep(Duration::from_secs(5)).await;
-
-    let stats_after = mid
-        .inner()
-        .ticket_statistics()
-        .await
-        .context("failed to get ticket statistics")?;
-
-    assert!(stats_after.winning_tickets > stats_before.winning_tickets);
-    assert!(stats_after.redeemed_value() > stats_before.redeemed_value());
+    wait_until(
+        || async {
+            let stats_after = mid.inner().ticket_statistics().await?;
+            Ok::<_, HoprLibError>(
+                stats_after.redeemed_value() > stats_before.redeemed_value()
+                    && stats_after.winning_tickets > stats_before.winning_tickets,
+            )
+        },
+        Duration::from_secs(5),
+    )
+    .await
+    .context(
+        "failed to wait for: `stats_after.redeemed_value() > stats_before.redeemed_value() && \
+         stats_after.winning_tickets > stats_before.winning_tickets`",
+    )?;
 
     Ok(())
 }

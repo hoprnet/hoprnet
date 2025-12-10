@@ -453,7 +453,7 @@ async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
                         }
                     }
                     Ok(_) => {
-                        tracing::warn!("acknowledgement batch could not acknowledge any ticket");
+                        tracing::debug!("acknowledgement batch could not acknowledge any ticket");
                     }
                     Err(TicketAcknowledgementError::UnexpectedAcknowledgement) => {
                         // Unexpected acknowledgements naturally happen

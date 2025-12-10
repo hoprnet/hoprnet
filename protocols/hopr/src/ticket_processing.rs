@@ -127,7 +127,7 @@ impl<Chain, Db> HoprTicketProcessor<Chain, Db> {
                 .max_capacity(10_000)
                 .build(),
             unacknowledged_tickets: moka::future::Cache::builder()
-                .time_to_idle(cfg.unack_ticket_timeout * 2)
+                .time_to_idle(cfg.unack_ticket_timeout)
                 .max_capacity(100_000)
                 .build(),
             chain_api,
@@ -223,7 +223,14 @@ where
         peer: OffchainPublicKey,
         acks: Vec<Acknowledgement>,
     ) -> Result<Vec<ResolvedAcknowledgement>, TicketAcknowledgementError<Self::Error>> {
-        // Check if we're even expecting an acknowledgement from this peer
+        // Check if we're even expecting an acknowledgement from this peer:
+        // We need to first do a check that does not update the popularity estimator of `peer` in this cache,
+        // so we actually allow the entry to time out eventually. However, this comes at the cost
+        // double-lookup.
+        if !self.unacknowledged_tickets.contains_key(&peer) {
+            tracing::trace!("not awaiting any acknowledgement from peer");
+            return Err(TicketAcknowledgementError::UnexpectedAcknowledgement);
+        }
         let Some(awaiting_ack_from_peer) = self.unacknowledged_tickets.get(&peer).await else {
             tracing::trace!("not awaiting any acknowledgement from peer");
             return Err(TicketAcknowledgementError::UnexpectedAcknowledgement);
@@ -276,7 +283,7 @@ where
         let mut unack_tickets = Vec::with_capacity(half_keys_challenges.len());
         for (half_key, challenge) in half_keys_challenges {
             let Some(unack_ticket) = awaiting_ack_from_peer.remove(&challenge).await else {
-                tracing::error!(%challenge, "received acknowledgement for unknown ticket");
+                tracing::debug!(%challenge, "received acknowledgement for unknown ticket");
                 continue;
             };
 
