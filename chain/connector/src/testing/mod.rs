@@ -291,7 +291,7 @@ impl BlokliTestStateBuilder {
     #[must_use]
     pub fn with_closure_grace_period(mut self, grace_period: std::time::Duration) -> Self {
         self.0.chain_info.channel_closure_grace_period =
-            Some(blokli_client::api::types::Uint64(grace_period.as_secs().to_string()));
+            blokli_client::api::types::Uint64(grace_period.as_secs().to_string());
         self
     }
 
