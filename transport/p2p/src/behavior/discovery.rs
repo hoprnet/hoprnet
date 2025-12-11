@@ -27,6 +27,7 @@ pub enum DiscoveryInput {
 #[derive(Debug)]
 pub enum Event {
     DialablePeer(PeerId, Multiaddr),
+    UndialablePeer(PeerId),
 }
 
 /// Data structure holding the item alongside a release timemestamp.
@@ -188,7 +189,9 @@ impl NetworkBehaviour for Behaviour {
         role_override: libp2p::core::Endpoint,
         port_use: libp2p::core::transport::PortUse,
     ) -> Result<libp2p::swarm::THandler<Self>, libp2p::swarm::ConnectionDenied> {
-        // cannot connect without the handle_ending_outbound_connection being called first
+        self.pending_events
+            .push_back(ToSwarm::GenerateEvent(Event::DialablePeer(peer, addr.clone())));
+
         Ok(Self::ConnectionHandler {})
     }
 
@@ -227,6 +230,9 @@ impl NetworkBehaviour for Behaviour {
                         initial_backoff()
                     });
                     self.schedule_dial_with(peer, backoff);
+
+                    self.pending_events
+                        .push_back(ToSwarm::GenerateEvent(Event::UndialablePeer(peer)));
                 }
             }
             _ => {}

@@ -1,37 +1,33 @@
-use futures::Stream;
-use hopr_api::{
-    db::PeerStatus,
-    {Multiaddr, PeerId},
-};
+use std::collections::HashSet;
 
-use crate::{Health, errors::Result};
+use hopr_api::{Multiaddr, PeerId};
 
-#[async_trait::async_trait]
+use crate::{Health, track::Observations};
+
 pub trait NetworkView {
-    fn listening_as(&self) -> Vec<Multiaddr>; //local_multiaddresses
+    /// Multiaddresses used for listening by the local node.
+    fn listening_as(&self) -> HashSet<Multiaddr>; //local_multiaddresses
 
-    fn health(&self) -> Health; // network_health
+    /// Translation of the peer into its known multiaddresses.
+    fn multiaddress_of(&self, peer: &PeerId) -> Option<HashSet<Multiaddr>>;
 
-    async fn multiaddress_of(&self, peer: &PeerId) -> Vec<Multiaddr>; //network_observed_multiaddresses
+    /// Peers collected by the network discovery mechanism.
+    fn discovered_peers(&self) -> HashSet<PeerId>;
 
-    async fn peers(&self) -> Result<Vec<PeerId>>; //network_connected_peers
+    /// Peers currently conenected and tracked by the network.
+    fn connected_peers(&self) -> HashSet<PeerId>;
 
-    async fn network_peer_info(&self, peer: &PeerId) -> Result<Option<PeerStatus>>; // TODO: replace with the filtered version of PeerStatus
-}
+    /// Observations related to a specific peer in the network.
+    ///
+    /// The absence of observations means that the peer is currently not connected
+    /// to the network and therefore has no observations.
+    fn observations_for(&self, peer: &PeerId) -> Option<Observations>;
 
-/// Events that can occur in the network
-pub enum NetworkEvent {
-    PeerConnected(PeerId),
-    PeerDisconnected(PeerId),
-}
-
-/// Reader of events corresponding to network changes
-#[async_trait::async_trait]
-pub trait NetworkEventReader {
-    fn subscribe(&self) -> impl Stream<Item = NetworkEvent> + Send;
+    /// Represents perceived health of the network.
+    fn health(&self) -> Health;
 }
 
 /// Writer for network observations used to improve the internal observations by the Network
-pub trait NetworkObservationWriter {
+pub trait NetworkObservations {
     fn update(&self, peer: &PeerId, result: std::result::Result<std::time::Duration, ()>);
 }

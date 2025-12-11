@@ -1,3 +1,5 @@
+use std::{collections::HashSet, sync::Arc};
+
 use hopr_api::{Multiaddr, PeerId};
 
 use crate::errors::{NetworkError, Result};
@@ -10,19 +12,25 @@ lazy_static::lazy_static! {
          hopr_metrics::SimpleGauge::new("hopr_peer_count", "Number of all peers").unwrap();
 }
 
+#[derive(Clone, Debug)]
 pub struct NetworkPeerStore {
     me: PeerId,
-    my_addresses: Vec<Multiaddr>,
-    addresses: dashmap::DashMap<PeerId, Vec<Multiaddr>>,
+    my_addresses: HashSet<Multiaddr>,
+    addresses: Arc<dashmap::DashMap<PeerId, HashSet<Multiaddr>>>,
 }
 
 impl NetworkPeerStore {
-    pub fn new(me: PeerId, my_addresses: Vec<Multiaddr>) -> Self {
+    pub fn new(me: PeerId, my_addresses: HashSet<Multiaddr>) -> Self {
         Self {
             me,
             my_addresses,
-            addresses: dashmap::DashMap::new(),
+            addresses: Arc::new(dashmap::DashMap::new()),
         }
+    }
+
+    #[inline]
+    pub fn me(&self) -> &PeerId {
+        &self.me
     }
 
     /// Check whether the PeerId is present in the network.
@@ -34,13 +42,13 @@ impl NetworkPeerStore {
 
     /// Add a new peer into the network.
     #[tracing::instrument(level = "debug", skip(self), ret(level = "trace"), err)]
-    pub fn add(&self, peer: PeerId, mut addresses: Vec<Multiaddr>) -> Result<()> {
+    pub fn add(&self, peer: PeerId, addresses: HashSet<Multiaddr>) -> Result<()> {
         if peer == self.me {
             return Err(NetworkError::DisallowedOperationOnOwnPeerIdError);
         }
 
         if let Some(mut unit) = self.addresses.get_mut(&peer) {
-            unit.value_mut().append(&mut addresses);
+            unit.value_mut().extend(addresses.into_iter());
         } else {
             self.addresses.insert(peer, addresses);
         }
@@ -53,7 +61,7 @@ impl NetworkPeerStore {
 
     /// Get peer multiaddress.
     #[tracing::instrument(level = "trace", skip(self))]
-    pub fn get(&self, peer: &PeerId) -> Option<Vec<Multiaddr>> {
+    pub fn get(&self, peer: &PeerId) -> Option<HashSet<Multiaddr>> {
         if peer == &self.me {
             Some(self.my_addresses.clone())
         } else {
@@ -75,30 +83,39 @@ impl NetworkPeerStore {
 
         Ok(())
     }
+
+    #[inline]
+    pub fn iter_keys(&self) -> impl Iterator<Item = PeerId> + '_ {
+        self.addresses.iter().map(|entry| *entry.key())
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::NetworkPeerStore;
+    use std::collections::HashSet;
+
     use anyhow::Context;
     use hopr_api::PeerId;
+
+    use super::NetworkPeerStore;
 
     #[test]
     fn network_peer_store_should_recognize_self() {
         let me = PeerId::random();
-        let store = NetworkPeerStore::new(me.clone(), vec![]);
+        let store = NetworkPeerStore::new(me.clone(), HashSet::new());
 
         assert!(store.has(&me));
     }
 
     #[test]
     fn network_peer_store_should_add_and_recognize_peer() {
+        let store = NetworkPeerStore::new(PeerId::random(), HashSet::new());
+
         let peer = PeerId::random();
-        let store = NetworkPeerStore::new(PeerId::random(), vec![]);
 
         assert!(!store.has(&peer));
 
-        assert!(store.add(peer, vec![]).is_ok());
+        assert!(store.add(peer, HashSet::new()).is_ok());
 
         assert!(store.has(&peer));
     }
@@ -106,21 +123,21 @@ mod tests {
     #[test]
     fn network_peer_store_own_peer_should_fail_on_adding() {
         let me = PeerId::random();
-        let store = NetworkPeerStore::new(me.clone(), vec![]);
+        let store = NetworkPeerStore::new(me.clone(), HashSet::new());
 
-        assert!(store.add(me.clone(), vec![]).is_err());
+        assert!(store.add(me, HashSet::new()).is_err());
     }
 
     #[test]
     fn network_peer_store_adding_the_same_peer_should_extend_multiaddresses() -> anyhow::Result<()> {
-        let store = NetworkPeerStore::new(PeerId::random(), vec![]);
+        let store = NetworkPeerStore::new(PeerId::random(), HashSet::new());
 
         let peer = PeerId::random();
-        assert!(store.add(peer.clone(), vec![]).is_ok());
+        assert!(store.add(peer.clone(), HashSet::new()).is_ok());
 
-        assert_eq!(store.get(&peer).context("should contain a value")?, vec![]);
+        assert_eq!(store.get(&peer).context("should contain a value")?, HashSet::new());
 
-        let multiaddresses = vec!["/ip4/127.0.0.1/tcp/12345".try_into()?];
+        let multiaddresses = HashSet::from(["/ip4/127.0.0.1/tcp/12345".try_into()?]);
         assert!(store.add(peer.clone(), multiaddresses.clone()).is_ok());
 
         assert_eq!(store.get(&peer).context("should contain a value")?, multiaddresses);
@@ -131,7 +148,7 @@ mod tests {
     #[test]
     fn network_peer_store_should_return_own_multiaddresses() -> anyhow::Result<()> {
         let me = PeerId::random();
-        let multiaddresses = vec!["/ip4/127.0.0.1/tcp/12345".try_into()?];
+        let multiaddresses = HashSet::from(["/ip4/127.0.0.1/tcp/12345".try_into()?]);
         let store = NetworkPeerStore::new(me.clone(), multiaddresses.clone());
 
         assert_eq!(store.get(&me), Some(multiaddresses));
@@ -141,11 +158,10 @@ mod tests {
 
     #[test]
     fn network_peer_store_should_return_stored_multiaddress() -> anyhow::Result<()> {
-        let me = PeerId::random();
-        let store = NetworkPeerStore::new(me.clone(), vec![]);
+        let store = NetworkPeerStore::new(PeerId::random(), HashSet::new());
 
         let peer = PeerId::random();
-        let multiaddresses = vec!["/ip4/127.0.0.1/tcp/12345".try_into()?];
+        let multiaddresses = HashSet::from(["/ip4/127.0.0.1/tcp/12345".try_into()?]);
         assert!(store.add(peer.clone(), multiaddresses.clone()).is_ok());
 
         assert_eq!(store.get(&peer), Some(multiaddresses));
@@ -156,7 +172,7 @@ mod tests {
     #[test]
     fn network_peer_store_should_fail_on_removing_self() -> anyhow::Result<()> {
         let me = PeerId::random();
-        let multiaddresses = vec!["/ip4/127.0.0.1/tcp/12345".try_into()?];
+        let multiaddresses = HashSet::from(["/ip4/127.0.0.1/tcp/12345".try_into()?]);
         let store = NetworkPeerStore::new(me.clone(), multiaddresses.clone());
 
         assert!(store.remove(&me).is_err());
@@ -166,11 +182,10 @@ mod tests {
 
     #[test]
     fn network_peer_store_should_succeed_on_removing_a_known_peer() -> anyhow::Result<()> {
-        let me = PeerId::random();
-        let store = NetworkPeerStore::new(me.clone(), vec![]);
+        let store = NetworkPeerStore::new(PeerId::random(), HashSet::new());
 
         let peer = PeerId::random();
-        let multiaddresses = vec!["/ip4/127.0.0.1/tcp/12345".try_into()?];
+        let multiaddresses = HashSet::from(["/ip4/127.0.0.1/tcp/12345".try_into()?]);
         assert!(store.add(peer.clone(), multiaddresses.clone()).is_ok());
 
         store.remove(&peer)?;
@@ -180,12 +195,25 @@ mod tests {
 
     #[test]
     fn network_peer_store_should_succeed_on_removing_an_unknown_peer() -> anyhow::Result<()> {
-        let me = PeerId::random();
-        let store = NetworkPeerStore::new(me.clone(), vec![]);
+        let store = NetworkPeerStore::new(PeerId::random(), HashSet::new());
 
         let peer = PeerId::random();
 
         store.remove(&peer)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn network_peer_store_should_be_referencing_the_same_underlying_data() -> anyhow::Result<()> {
+        let store = NetworkPeerStore::new(PeerId::random(), HashSet::new());
+        let store2 = store.clone();
+
+        let peer = PeerId::random();
+
+        store2.add(peer, HashSet::new())?;
+
+        assert_eq!(store.get(&peer).context("should contain a value")?, HashSet::new());
 
         Ok(())
     }

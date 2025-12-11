@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use hopr_api::PeerId;
 
 // TODO: make this a streamable telemetry instead:
@@ -17,13 +19,13 @@ impl<const FACTOR: usize> ExponentialMovingAverage<FACTOR> {
         Self { count: 0, average: 0.0 }
     }
 
-    pub fn update(&mut self, value: u64) {
+    pub fn update(&mut self, value: u128) {
         self.count += 1;
         self.average = self.average + (value as f64 - self.average) / (std::cmp::min(self.count, FACTOR) as f64);
     }
 
-    pub fn get(&self) -> u64 {
-        self.average as u64
+    pub fn get(&self) -> u128 {
+        self.average as u128
     }
 }
 
@@ -32,22 +34,27 @@ pub struct Observations {
     pub msg_sent: u64,
     pub ack_received: u64,
     pub latency_average: ExponentialMovingAverage<3>,
+    pub probes_sent: u64,
+    pub probes_failed: u64,
 }
 
+#[derive(Debug, Default, Clone)]
 pub struct NetworkPeerTracker {
-    peers: dashmap::DashMap<PeerId, Observations>,
+    peers: Arc<dashmap::DashMap<PeerId, Observations>>,
 }
 
 impl NetworkPeerTracker {
     pub fn new() -> Self {
         Self {
-            peers: dashmap::DashMap::new(),
+            peers: Arc::new(dashmap::DashMap::new()),
         }
     }
 
     #[inline]
     pub fn add(&self, peer: PeerId) {
-        self.peers.insert(peer, Observations::default());
+        if !self.peers.contains_key(&peer) {
+            self.peers.insert(peer, Observations::default());
+        }
     }
 
     #[inline]
@@ -67,13 +74,30 @@ impl NetworkPeerTracker {
     pub fn remove(&self, peer: &PeerId) {
         self.peers.remove(peer);
     }
+
+    /// The number of currently tracked peers with results.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.peers.len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.peers.len() == 0
+    }
+
+    #[inline]
+    pub fn iter_keys(&self) -> impl Iterator<Item = PeerId> + '_ {
+        self.peers.iter().map(|entry| *entry.key())
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{NetworkPeerTracker, Observations};
     use anyhow::Context;
     use hopr_api::PeerId;
+
+    use super::{NetworkPeerTracker, Observations};
 
     #[test]
     fn peer_tracker_adding_a_peer_adds_a_default_observation() -> anyhow::Result<()> {

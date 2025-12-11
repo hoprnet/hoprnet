@@ -19,7 +19,7 @@ pub mod constants;
 /// Errors used by the crate.
 pub mod errors;
 mod helpers;
-pub mod network_notifier;
+pub mod prober;
 
 #[cfg(feature = "capture")]
 mod capture;
@@ -40,7 +40,7 @@ use helpers::PathPlanner;
 pub use hopr_api::db::ChannelTicketStatistics;
 use hopr_api::{
     chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
-    db::{HoprDbPeersOperations, HoprDbTicketOperations, PeerOrigin, PeerStatus},
+    db::{HoprDbPeersOperations, HoprDbTicketOperations, PeerStatus},
 };
 use hopr_async_runtime::{AbortableList, prelude::spawn, spawn_as_abortable};
 use hopr_crypto_packet::prelude::PacketSignal;
@@ -58,8 +58,8 @@ use hopr_protocol_hopr::MemorySurbStore;
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId, Protocol};
 use hopr_transport_mixer::MixerConfig;
-pub use hopr_transport_network::{Health, network::Network};
-use hopr_transport_p2p::HoprSwarm;
+pub use hopr_transport_network::{Health, traits::NetworkView};
+use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork};
 use hopr_transport_probe::{
     Probe, TrafficGeneration,
     neighbors::ImmediateNeighborProber,
@@ -122,7 +122,7 @@ pub struct HoprTransport<Chain, Db> {
     db: Db,
     chain_api: Chain,
     ping: Arc<OnceLock<Pinger>>,
-    network: Arc<Network<Db>>,
+    network: Arc<OnceLock<HoprNetwork>>,
     path_planner: PathPlanner<MemorySurbStore, Chain, CurrentPathSelector>,
     my_multiaddresses: Vec<Multiaddr>,
     smgr: SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>, Sender<IncomingSession>>,
@@ -152,12 +152,7 @@ where
             packet_key: identity.1.clone(),
             chain_key: identity.0.clone(),
             ping: Arc::new(OnceLock::new()),
-            network: Arc::new(Network::new(
-                identity.1.into(),
-                my_multiaddresses.clone(),
-                cfg.network,
-                db.clone(),
-            )),
+            network: Arc::new(OnceLock::new()),
             path_planner: PathPlanner::new(
                 *identity.0.as_ref(),
                 MemorySurbStore::new(cfg.packet.surb_store),
@@ -251,43 +246,8 @@ where
         let (mut internal_discovery_update_tx, internal_discovery_update_rx) =
             futures::channel::mpsc::channel::<PeerDiscovery>(internal_discovery_updates_capacity);
 
-        let me_peerid: PeerId = self.packet_key.public().into();
-        let network = self.network.clone();
-        let discovery_updates = futures_concurrency::stream::StreamExt::merge(
-            discovery_updates,
-            internal_discovery_update_rx,
-        )
-        .filter_map(move |event| {
-            let network = network.clone();
-            async move {
-                match event {
-                    PeerDiscovery::Announce(peer, multiaddresses) => {
-                        debug!(%peer, ?multiaddresses, "processing peer discovery event: Announce");
-                        if peer != me_peerid {
-                            // decapsulate the `p2p/<peer_id>` to remove duplicities
-                            let mas = multiaddresses
-                                .into_iter()
-                                .map(|ma| strip_p2p_protocol(&ma))
-                                .filter(|v| !v.is_empty())
-                                .collect::<Vec<_>>();
-
-                            if !mas.is_empty() {
-                                if let Err(error) = network.add(&peer, PeerOrigin::NetworkRegistry, mas.clone()).await {
-                                    error!(%peer, %error, "failed to add peer to the network");
-                                    None
-                                } else {
-                                    Some(PeerDiscovery::Announce(peer, mas))
-                                }
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
-                        }
-                    }
-                }
-            }
-        });
+        let discovery_updates =
+            futures_concurrency::stream::StreamExt::merge(discovery_updates, internal_discovery_update_rx);
 
         info!(
             public_nodes = public_nodes.len(),
@@ -318,7 +278,7 @@ where
         // 1. Discovery events are filtered before they reach the transport component
         // 2. SwarmEvent::NewExternalAddrOfPeer events are filtered using is_public_address()
         let allow_private_addresses = self.cfg.transport.prefer_local_addresses;
-        let transport_layer = HoprSwarm::new(
+        let (transport_network, transport_layer_process) = HoprLibp2pNetworkBuilder::new(
             (&self.packet_key).into(),
             discovery_updates.filter_map(move |event| async move {
                 match event {
@@ -340,13 +300,19 @@ where
             }),
             self.my_multiaddresses.clone(),
         )
-        .await;
+        .await
+        .into_network_with_stream_protocol_process(
+            hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL,
+            allow_private_addresses,
+        );
+        self.network
+            .clone()
+            .set(transport_network.clone())
+            .expect("must set the hopr transport network viewer only once");
 
-        let msg_proto_control =
-            transport_layer.build_protocol_control(hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL);
         let msg_codec = hopr_transport_protocol::HoprBinaryCodec {};
         let (wire_msg_tx, wire_msg_rx) =
-            hopr_transport_protocol::stream::process_stream_protocol(msg_codec, msg_proto_control).await?;
+            hopr_transport_protocol::stream::process_stream_protocol(msg_codec, transport_network.clone()).await?;
 
         let (mixing_channel_tx, mixing_channel_rx) =
             hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(build_mixer_cfg_from_env());
@@ -365,44 +331,12 @@ where
                 }),
         );
 
-        let (transport_events_tx, transport_events_rx) = channel::<hopr_transport_p2p::DiscoveryEvent>(2048);
-
-        let network_clone = self.network.clone();
-        spawn(
-            transport_events_rx
-                .for_each(move |event| {
-                    let network = network_clone.clone();
-                    async move {
-                        match event {
-                            hopr_transport_p2p::DiscoveryEvent::DialablePeer(peer, multiaddr) => {
-                                if let Err(error) = network
-                                    .add(&peer, PeerOrigin::IncomingConnection, vec![multiaddr])
-                                    .await
-                                {
-                                    tracing::error!(%peer, %error, "Failed to add incoming connection peer");
-                                }
-                            }
-                        }
-                    }
-                })
-                .inspect(|_| {
-                    tracing::warn!(
-                        task = "transport events recording",
-                        "long-running background task finished"
-                    )
-                }),
-        );
-
         processes.insert(
             HoprTransportProcess::Medium,
-            spawn_as_abortable!(
-                transport_layer
-                    .run(transport_events_tx, allow_private_addresses)
-                    .inspect(|_| tracing::warn!(
-                        task = %HoprTransportProcess::Medium,
-                        "long-running background task finished"
-                    ))
-            ),
+            spawn_as_abortable!(transport_layer_process.inspect(|_| tracing::warn!(
+                task = %HoprTransportProcess::Medium,
+                "long-running background task finished"
+            ))),
         );
 
         let msg_protocol_bidirectional_channel_capacity =
@@ -527,7 +461,7 @@ where
                     tx_from_probing,
                     ImmediateNeighborProber::new(
                         self.cfg.probe,
-                        network_notifier::ProbeNetworkInteractions::new(self.network.clone()),
+                        prober::ProbeNetworkInteractions::new(transport_network.clone()),
                     ),
                 )
                 .await
@@ -599,24 +533,26 @@ where
             return Err(HoprTransportError::Api("ping to self does not make sense".into()));
         }
 
-        let pinger = self
-            .ping
-            .get()
-            .ok_or_else(|| HoprTransportError::Api("ping processing is not yet initialized".into()))?;
+        // let pinger = self
+        //     .ping
+        //     .get()
+        //     .ok_or_else(|| HoprTransportError::Api("ping processing is not yet initialized".into()))?;
 
-        if let Err(error) = self.network.add(peer, PeerOrigin::ManualPing, vec![]).await {
-            error!(%error, "failed to store the peer observation");
-        }
+        // let network = self
+        //     .network
+        //     .get()
+        //     .ok_or_else(|| HoprTransportError::Api("transport network is not yet initialized".into()))?;
 
-        let latency = (*pinger).ping(*peer).await?;
+        // let latency = (*pinger).ping(*peer).await?;
 
-        let peer_status = self
-            .network
-            .get(peer)
-            .await?
-            .ok_or(HoprTransportError::Probe(ProbeError::NonExistingPeer))?;
+        // let peer_status = network
+        //     .observations_for(peer)
+        //     .ok_or(HoprTransportError::Probe(ProbeError::NonExistingPeer))?;
 
-        Ok((latency, peer_status))
+        // Ok((latency, peer_status))
+
+        // TODO: return observations here
+        Err(HoprTransportError::Probe(ProbeError::NonExistingPeer))
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
@@ -649,13 +585,9 @@ where
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn listening_multiaddresses(&self) -> Vec<Multiaddr> {
         self.network
-            .get(&self.packet_key.public().into())
-            .await
-            .unwrap_or_else(|e| {
-                error!(error = %e, "failed to obtain listening multi-addresses");
-                None
-            })
-            .map(|peer| peer.multiaddresses)
+            .get()
+            .ok_or_else(|| HoprTransportError::Api("transport network is not yet initialized".into()))
+            .map(|network| network.listening_as().into_iter().collect())
             .unwrap_or_default()
     }
 
@@ -689,32 +621,53 @@ where
     }
 
     pub fn local_multiaddresses(&self) -> Vec<Multiaddr> {
-        self.my_multiaddresses.clone()
+        self.network
+            .get()
+            .ok_or_else(|| HoprTransportError::Api("transport network is not yet initialized".into()))
+            .map(|network| network.listening_as().into_iter().collect())
+            .unwrap_or_default()
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_observed_multiaddresses(&self, peer: &PeerId) -> Vec<Multiaddr> {
-        self.network
-            .get(peer)
-            .await
-            .unwrap_or(None)
-            .map(|peer| peer.multiaddresses)
-            .unwrap_or(vec![])
+        match self
+            .network
+            .get()
+            .ok_or_else(|| HoprTransportError::Api("transport network is not yet initialized".into()))
+        {
+            Ok(network) => network.multiaddress_of(peer).unwrap_or_default().into_iter().collect(),
+            Err(error) => {
+                tracing::error!(%error, "failed to get observed multiaddresses");
+                return vec![];
+            }
+        }
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_health(&self) -> Health {
-        self.network.health().await
+        self.network
+            .get()
+            .ok_or_else(|| HoprTransportError::Api("transport network is not yet initialized".into()))
+            .map(|network| network.health())
+            .unwrap_or(Health::Red)
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_connected_peers(&self) -> errors::Result<Vec<PeerId>> {
-        Ok(self.network.connected_peers().await?)
+        Ok(self
+            .network
+            .get()
+            .ok_or_else(|| HoprTransportError::Api("transport network is not yet initialized".into()))?
+            .connected_peers()
+            .into_iter()
+            .collect())
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_peer_info(&self, peer: &PeerId) -> errors::Result<Option<PeerStatus>> {
-        Ok(self.network.get(peer).await?)
+        // Ok(self.network.get(peer).await?)
+        // TODO: implement using Observations
+        Ok(None)
     }
 }
 

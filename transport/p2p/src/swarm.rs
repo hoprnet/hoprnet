@@ -1,6 +1,6 @@
 use std::num::NonZeroU8;
 
-use futures::{Sink, SinkExt, Stream, StreamExt, select};
+use futures::{Stream, StreamExt};
 use hopr_network_types::prelude::is_public_address;
 use hopr_transport_identity::{
     Multiaddr,
@@ -8,13 +8,13 @@ use hopr_transport_identity::{
 };
 use hopr_transport_protocol::PeerDiscovery;
 use libp2p::{
-    autonat,
+    PeerId, autonat,
     identity::PublicKey,
     swarm::{NetworkInfo, SwarmEvent},
 };
 use tracing::{debug, error, info, trace, warn};
 
-use crate::{HoprNetworkBehavior, HoprNetworkBehaviorEvent, constants, errors::Result};
+use crate::{HoprNetwork, HoprNetworkBehavior, HoprNetworkBehaviorEvent, constants, errors::Result};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -135,23 +135,25 @@ pub struct InactiveConfiguredNetwork {
     swarm: libp2p::Swarm<HoprNetworkBehavior>,
 }
 
-pub struct HoprSwarm {
+pub struct HoprLibp2pNetworkBuilder {
     pub(crate) swarm: libp2p::Swarm<HoprNetworkBehavior>,
+    me: PeerId,
+    my_addresses: Vec<Multiaddr>,
 }
 
-impl std::fmt::Debug for HoprSwarm {
+impl std::fmt::Debug for HoprLibp2pNetworkBuilder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("HoprSwarm").finish()
     }
 }
 
-impl From<HoprSwarm> for libp2p::Swarm<HoprNetworkBehavior> {
-    fn from(value: HoprSwarm) -> Self {
+impl From<HoprLibp2pNetworkBuilder> for libp2p::Swarm<HoprNetworkBehavior> {
+    fn from(value: HoprLibp2pNetworkBuilder) -> Self {
         value.swarm
     }
 }
 
-impl HoprSwarm {
+impl HoprLibp2pNetworkBuilder {
     pub async fn new<T>(
         identity: libp2p::identity::Keypair,
         external_discovery_events: T,
@@ -160,61 +162,75 @@ impl HoprSwarm {
     where
         T: Stream<Item = PeerDiscovery> + Send + 'static,
     {
+        let me = identity.public().to_peer_id();
         let swarm = InactiveNetwork::build(identity, external_discovery_events)
             .await
             .expect("swarm must be constructible");
 
         let swarm = swarm
-            .with_listen_on(my_multiaddresses)
+            .with_listen_on(my_multiaddresses.clone())
             .expect("swarm must be configurable");
 
-        Self { swarm: swarm.swarm }
+        Self {
+            swarm: swarm.swarm,
+            me,
+            my_addresses: my_multiaddresses,
+        }
     }
 
-    pub fn build_protocol_control(&self, protocol: &'static str) -> crate::HoprStreamProtocolControl {
-        crate::HoprStreamProtocolControl::new(self.swarm.behaviour().streams.new_control(), protocol)
-    }
+    pub fn into_network_with_stream_protocol_process(
+        self,
+        protocol: &'static str,
+        allow_private_addresses: bool,
+    ) -> (HoprNetwork, impl std::future::Future<Output = ()>) {
+        let tracker = hopr_transport_network::track::NetworkPeerTracker::new();
+        let store =
+            hopr_transport_network::store::NetworkPeerStore::new(self.me, self.my_addresses.into_iter().collect());
 
-    /// Main p2p loop that instantiates a new libp2p::Swarm instance and sets up listening and reacting pipelines
-    /// running in a neverending loop future.
-    ///
-    /// The function represents the entirety of the business logic of the hopr daemon related to core operations.
-    ///
-    /// This future can only be resolved by an unrecoverable error or a panic.
-    pub async fn run<T>(self, events: T, allow_private_addresses: bool)
-    where
-        T: Sink<crate::behavior::discovery::Event> + Send + 'static,
-    {
-        let mut swarm: libp2p::Swarm<HoprNetworkBehavior> = self.into();
-        futures::pin_mut!(events);
+        let network = HoprNetwork {
+            tracker: tracker.clone(),
+            store: store.clone(),
+            control: self.swarm.behaviour().streams.new_control(),
+            protocol: libp2p::StreamProtocol::new(protocol),
+        };
 
-        loop {
-            select! {
-                event = swarm.select_next_some() => match event {
-                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Discovery(event)) => {
-                        if let Err(_error) = events.send(event).await {
-                            tracing::error!("Failed to send discovery event from the transport layer");
-                        }
+        let mut swarm = self.swarm;
+        let process = async move {
+            while let Some(event) = swarm.next().await {
+                match event {
+                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Discovery(event)) => match event {
+                        crate::DiscoveryEvent::DialablePeer(peer_id, multiaddr) => {
+                            if let Err(error) = store.add(peer_id, std::collections::HashSet::from([multiaddr])) {
+                                error!(peer = %peer_id, %error, "Failed to add dialable peer to the peer store");
+                            }
+                            tracker.add(peer_id);
+                        },
+                        crate::DiscoveryEvent::UndialablePeer(peer_id) => {
+                            if let Err(error) = store.remove(&peer_id) {
+                                error!(peer = %peer_id, %error, "Failed to remove undialable peer from the peer store");
+                            }
+                            tracker.remove(&peer_id);
+                        },
                     }
                     SwarmEvent::Behaviour(
                         HoprNetworkBehaviorEvent::Autonat(event)
                     ) => {
-                            match event {
-                                autonat::Event::StatusChanged { old, new } => {
-                                    info!(?old, ?new, "AutoNAT status changed");
-                                    #[cfg(all(feature = "prometheus", not(test)))]
-                                    {
-                                        let value = match new {
-                                            autonat::NatStatus::Unknown => 0.0,
-                                            autonat::NatStatus::Public(_) => 1.0,
-                                            autonat::NatStatus::Private => 2.0,
-                                        };
-                                        METRIC_TRANSPORT_NAT_STATUS.set(value);
-                                    }
+                        match event {
+                            autonat::Event::StatusChanged { old, new } => {
+                                info!(?old, ?new, "AutoNAT status changed");
+                                #[cfg(all(feature = "prometheus", not(test)))]
+                                {
+                                    let value = match new {
+                                        autonat::NatStatus::Unknown => 0.0,
+                                        autonat::NatStatus::Public(_) => 1.0,
+                                        autonat::NatStatus::Private => 2.0,
+                                    };
+                                    METRIC_TRANSPORT_NAT_STATUS.set(value);
                                 }
-                                autonat::Event::InboundProbe { .. } => {}
-                                autonat::Event::OutboundProbe { .. } => {}
                             }
+                            autonat::Event::InboundProbe { .. } => {}
+                            autonat::Event::OutboundProbe { .. } => {}
+                        }
                     }
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Identify(_event)) => {}
                     SwarmEvent::ConnectionEstablished {
@@ -247,6 +263,8 @@ impl HoprSwarm {
 
                         print_network_info(swarm.network_info(), "connection closed");
 
+                        tracker.remove(&peer_id);
+
                         #[cfg(all(feature = "prometheus", not(test)))]
                         {
                             METRIC_TRANSPORT_P2P_OPEN_CONNECTION_COUNT.decrement(1.0);
@@ -266,18 +284,14 @@ impl HoprSwarm {
                         send_back_addr,
                         peer_id
                     } => {
-                        error!(?peer_id, %local_addr, %send_back_addr, %connection_id, transport="libp2p", %error, "incoming connection error");
-
-                        print_network_info(swarm.network_info(), "incoming connection error");
+                        debug!(?peer_id, %local_addr, %send_back_addr, %connection_id, transport="libp2p", %error, "incoming connection error");
                     }
                     SwarmEvent::OutgoingConnectionError {
                         connection_id,
                         error,
                         peer_id
                     } => {
-                        error!(peer = ?peer_id, %connection_id, transport="libp2p", %error, "outgoing connection error");
-
-                        print_network_info(swarm.network_info(), "outgoing connection error");
+                        debug!(peer = ?peer_id, %connection_id, transport="libp2p", %error, "outgoing connection error");
                     }
                     SwarmEvent::NewListenAddr {
                         listener_id,
@@ -333,7 +347,9 @@ impl HoprSwarm {
                     _ => trace!(transport="libp2p", "Unsupported enum option detected")
                 }
             }
-        }
+        };
+
+        (network, process)
     }
 }
 

@@ -10,7 +10,7 @@ use futures::{
 };
 use hopr_crypto_types::{keypairs::Keypair, prelude::OffchainKeypair};
 use hopr_platform::time::native::current_time;
-use hopr_transport_p2p::HoprSwarm;
+use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork};
 use hopr_transport_probe::ping::PingQueryReplier;
 use hopr_transport_protocol::PeerDiscovery;
 use lazy_static::lazy_static;
@@ -38,9 +38,11 @@ pub(crate) enum Announcement {
     QUIC,
 }
 
-pub(crate) type TestSwarm = HoprSwarm;
+pub(crate) type TestSwarm = HoprNetwork;
 
-async fn build_p2p_swarm(announcement: Announcement) -> anyhow::Result<(Interface, TestSwarm)> {
+async fn build_p2p_swarm(
+    announcement: Announcement,
+) -> anyhow::Result<(Interface, (TestSwarm, impl std::future::Future<Output = ()>))> {
     let random_port = random_free_local_ipv4_port().context("could not find a free port")?;
     let random_keypair = OffchainKeypair::random();
     let identity: libp2p::identity::Keypair = (&random_keypair).into();
@@ -55,12 +57,13 @@ async fn build_p2p_swarm(announcement: Announcement) -> anyhow::Result<(Interfac
     };
     let multiaddress = Multiaddr::from_str(&multiaddress).context("failed to create a valid multiaddress")?;
 
-    let swarm = HoprSwarm::new(identity, transport_updates_rx, vec![multiaddress.clone()]).await;
+    let swarm = HoprLibp2pNetworkBuilder::new(identity, transport_updates_rx, vec![multiaddress.clone()]).await;
+    let (network, process) =
+        swarm.into_network_with_stream_protocol_process(hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL, true);
 
-    let msg_proto_control = swarm.build_protocol_control(hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL);
     let msg_codec = hopr_transport_protocol::HoprBinaryCodec {};
     let (wire_msg_tx, wire_msg_rx) =
-        hopr_transport_protocol::stream::process_stream_protocol(msg_codec, msg_proto_control).await?;
+        hopr_transport_protocol::stream::process_stream_protocol(msg_codec, network.clone()).await?;
 
     let api = Interface {
         me: peer_id,
@@ -71,7 +74,7 @@ async fn build_p2p_swarm(announcement: Announcement) -> anyhow::Result<(Interfac
         recv_msg: wire_msg_rx,
     };
 
-    Ok((api, swarm))
+    Ok((api, (network, process)))
 }
 
 const TRANSPORT_PAYLOAD_SIZE: usize = HoprPacket::SIZE;
@@ -121,13 +124,11 @@ use tokio::{
 #[ignore]
 #[tokio::test]
 async fn p2p_only_communication_quic() -> anyhow::Result<()> {
-    let (mut api1, swarm1) = build_p2p_swarm(Announcement::QUIC).await?;
-    let (api2, swarm2) = build_p2p_swarm(Announcement::QUIC).await?;
+    let (mut api1, (_swarm1, process1)) = build_p2p_swarm(Announcement::QUIC).await?;
+    let (api2, (_swarm2, process2)) = build_p2p_swarm(Announcement::QUIC).await?;
 
-    let (tx, _rx) = futures::channel::mpsc::channel::<hopr_transport_p2p::DiscoveryEvent>(1000);
-
-    let _sjh1 = SelfClosingJoinHandle::new(swarm1.run(tx.clone(), true));
-    let _sjh2 = SelfClosingJoinHandle::new(swarm2.run(tx, true));
+    let _sjh1 = SelfClosingJoinHandle::new(process1);
+    let _sjh2 = SelfClosingJoinHandle::new(process2);
 
     // Announce nodes to each other
     api1.update_from_announcements

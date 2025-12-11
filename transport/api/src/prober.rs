@@ -1,10 +1,7 @@
-use std::sync::Arc;
-
 use async_trait::async_trait;
-use hopr_api::db::HoprDbPeersOperations;
-use hopr_transport_network::network::{Network, UpdateFailure};
+use hopr_transport_network::traits::{NetworkObservations, NetworkView};
+use hopr_transport_p2p::HoprNetwork;
 use hopr_transport_probe::traits::{PeerDiscoveryFetch, ProbeStatusUpdate};
-use tracing::error;
 
 // TODO: replace with telemetry:
 // hopr_metrics::SimpleHistogram::new(
@@ -26,44 +23,30 @@ use tracing::error;
 /// `Ping` object and keeping both the adaptor and the ping object OCP and SRP
 /// compliant.
 #[derive(Debug, Clone)]
-pub struct ProbeNetworkInteractions<Db> {
-    network: Arc<Network<Db>>,
+pub struct ProbeNetworkInteractions {
+    network: HoprNetwork,
 }
 
-impl<Db> ProbeNetworkInteractions<Db>
-where
-    Db: HoprDbPeersOperations + Sync + Send + Clone,
-{
-    pub fn new(network: Arc<Network<Db>>) -> Self {
+impl ProbeNetworkInteractions {
+    pub fn new(network: HoprNetwork) -> Self {
         Self { network }
     }
 }
 
 #[async_trait]
-impl<Db> PeerDiscoveryFetch for ProbeNetworkInteractions<Db>
-where
-    Db: HoprDbPeersOperations + Sync + Send + Clone,
-{
+impl PeerDiscoveryFetch for ProbeNetworkInteractions {
     /// Get all peers considered by the `Network` to be pingable.
     ///
     /// After a duration of non-pinging based specified by the configurable threshold.
     #[tracing::instrument(level = "trace", skip(self))]
+    #[allow(unused_variables)]
     async fn get_peers(&self, from_timestamp: std::time::SystemTime) -> Vec<hopr_transport_network::PeerId> {
-        self.network
-            .find_peers_to_ping(from_timestamp)
-            .await
-            .unwrap_or_else(|error| {
-                tracing::error!(%error, "failed to generate peers for the heartbeat procedure");
-                vec![]
-            })
+        self.network.discovered_peers().into_iter().collect::<Vec<_>>()
     }
 }
 
 #[async_trait]
-impl<Db> ProbeStatusUpdate for ProbeNetworkInteractions<Db>
-where
-    Db: HoprDbPeersOperations + Sync + Send + Clone,
-{
+impl ProbeStatusUpdate for ProbeNetworkInteractions {
     #[tracing::instrument(level = "debug", skip(self))]
     async fn on_finished(
         &self,
@@ -74,12 +57,10 @@ where
             Ok(duration) => Ok(*duration),
             Err(error) => {
                 tracing::trace!(%error, "Encountered timeout on peer ping");
-                Err(UpdateFailure::Timeout)
+                Err(())
             }
         };
 
-        if let Err(error) = self.network.update(peer, result).await {
-            error!(%error, "Encountered error on on updating the collected ping data")
-        }
+        self.network.update(peer, result);
     }
 }

@@ -30,14 +30,104 @@ pub mod errors;
 /// Raw swarm definition for the HOPR network.
 pub mod swarm;
 
-/// Interface stream control objects for the HOPR transport protocols.
-pub mod control;
-
 /// P2P behavior definitions for the transport level interactions not related to the HOPR protocol
 mod behavior;
 
+use std::collections::HashSet;
+
+use futures::{AsyncRead, AsyncWrite};
+pub use hopr_transport_network::{Health, track::Observations};
+use libp2p::{Multiaddr, PeerId};
+
 pub use crate::{
     behavior::{HoprNetworkBehavior, HoprNetworkBehaviorEvent, discovery::Event as DiscoveryEvent},
-    control::HoprStreamProtocolControl,
-    swarm::HoprSwarm,
+    swarm::HoprLibp2pNetworkBuilder,
 };
+
+#[derive(Clone)]
+pub struct HoprNetwork {
+    tracker: hopr_transport_network::track::NetworkPeerTracker,
+    store: hopr_transport_network::store::NetworkPeerStore,
+    control: libp2p_stream::Control,
+    protocol: libp2p::StreamProtocol,
+}
+
+impl std::fmt::Debug for HoprNetwork {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HoprNetwork")
+            .field("tracker", &self.tracker)
+            .field("store", &self.store)
+            .field("protocol", &self.protocol)
+            .finish()
+    }
+}
+
+impl hopr_transport_network::traits::NetworkView for HoprNetwork {
+    fn listening_as(&self) -> HashSet<Multiaddr> {
+        self.store.get(self.store.me()).unwrap_or_else(|| {
+            tracing::error!("failed to get own peer info from the peer store");
+            std::collections::HashSet::new()
+        })
+    }
+
+    #[inline]
+    fn discovered_peers(&self) -> HashSet<PeerId> {
+        self.store.iter_keys().collect()
+    }
+
+    #[inline]
+    fn connected_peers(&self) -> HashSet<PeerId> {
+        self.tracker.iter_keys().collect()
+    }
+
+    #[inline]
+    fn multiaddress_of(&self, peer: &PeerId) -> Option<HashSet<Multiaddr>> {
+        self.store.get(peer)
+    }
+
+    #[inline]
+    fn observations_for(&self, peer: &PeerId) -> Option<Observations> {
+        self.tracker.get(peer)
+    }
+
+    fn health(&self) -> Health {
+        match self.tracker.len() {
+            0 => Health::Red,
+            1 => Health::Orange,
+            2..4 => Health::Yellow,
+            _ => Health::Green,
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl hopr_transport_protocol::stream::BidirectionalStreamControl for HoprNetwork {
+    fn accept(
+        mut self,
+    ) -> Result<impl futures::Stream<Item = (PeerId, impl AsyncRead + AsyncWrite + Send)> + Send, impl std::error::Error>
+    {
+        self.control.accept(self.protocol)
+    }
+
+    async fn open(mut self, peer: PeerId) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error> {
+        self.control.open_stream(peer, self.protocol).await
+    }
+}
+
+impl hopr_transport_network::traits::NetworkObservations for HoprNetwork {
+    fn update(&self, peer: &PeerId, result: std::result::Result<std::time::Duration, ()>) {
+        self.tracker.alter(peer, |_, mut o| {
+            match result {
+                Ok(duration) => {
+                    o.latency_average.update(duration.as_millis());
+                    o.probes_sent += 1;
+                }
+                Err(_) => {
+                    o.probes_sent += 1;
+                    o.probes_failed += 1;
+                }
+            }
+            o
+        });
+    }
+}
