@@ -14,6 +14,7 @@ default = ["ct"]                                                     # TODO: dis
 ct = ["dep:hopr-network-types", "dep:hopr-crypto-random", "dep:hex"]
 db = []
 chain = ["db"]
+serde = ["hopr-primitive-types/serde"]
 
 [dependencies]
 async-trait = { workspace = true }

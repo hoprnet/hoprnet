@@ -825,7 +825,7 @@ where
     pub async fn update_session_surb_balancer_config(
         &self,
         id: &SessionId,
-        cfg: SurbBalancerConfig,
+    cfg: SurbBalancerConfig,
     ) -> errors::Result<()> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
         Ok(self.transport_api.update_session_surb_balancing_cfg(id, cfg).await?)

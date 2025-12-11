@@ -5191,6 +5191,8 @@ name = "hopr-transport-network"
 version = "0.8.1"
 dependencies = [
  "anyhow",
+ "async-trait",
+ "dashmap",
  "futures",
  "hopr-api",
  "hopr-crypto-random 0.3.0",

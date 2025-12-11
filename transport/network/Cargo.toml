@@ -14,6 +14,8 @@ compat-ping = []
 prometheus = ["dep:hopr-metrics"]
 
 [dependencies]
+async-trait = { workspace = true }
+dashmap = { workspace = true }
 futures = { workspace = true }
 lazy_static = { workspace = true }
 libp2p-identity = { workspace = true }

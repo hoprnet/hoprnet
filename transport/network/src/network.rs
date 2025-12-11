@@ -12,8 +12,9 @@ use multiaddr::Multiaddr;
 use tracing::debug;
 
 use crate::{
+    Health,
     config::NetworkConfig,
-    errors::{NetworkingError, Result},
+    errors::{NetworkError, Result},
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -26,22 +27,6 @@ lazy_static::lazy_static! {
         ).unwrap();
     static ref METRIC_PEER_COUNT:  hopr_metrics::SimpleGauge =
          hopr_metrics::SimpleGauge::new("hopr_peer_count", "Number of all peers").unwrap();
-}
-
-/// Network health represented with colors, where green is the best and red
-/// is the worst possible observed nework quality.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, strum::Display, strum::EnumString)]
-pub enum Health {
-    /// Unknown health, on application startup
-    Unknown = 0,
-    /// No connection, default
-    Red = 1,
-    /// Low-quality connection to at least 1 public relay
-    Orange = 2,
-    /// High-quality connection to at least 1 public relay
-    Yellow = 3,
-    /// High-quality connection to at least 1 public relay and 1 NAT node
-    Green = 4,
 }
 
 /// Calculate the health factor for network from the available stats
@@ -121,7 +106,7 @@ where
     #[tracing::instrument(level = "debug", skip(self), ret(level = "trace"), err)]
     pub async fn add(&self, peer: &PeerId, origin: PeerOrigin, mut addrs: Vec<Multiaddr>) -> Result<()> {
         if peer == &self.me {
-            return Err(NetworkingError::DisallowedOperationOnOwnPeerIdError);
+            return Err(NetworkError::DisallowedOperationOnOwnPeerIdError);
         }
 
         // Filter out private addresses before storing
@@ -133,7 +118,7 @@ where
             .db
             .get_network_peer(peer)
             .await
-            .map_err(|e| NetworkingError::DbChainError(e.into()))?
+            .map_err(|e| NetworkError::DbChainError(e.into()))?
         {
             debug!(%peer, %origin, multiaddresses = ?addrs, "Updating existing peer in the store");
 
@@ -151,7 +136,7 @@ where
             self.db
                 .update_network_peer(peer_status)
                 .await
-                .map_err(|e| NetworkingError::DbChainError(e.into()))?;
+                .map_err(|e| NetworkError::DbChainError(e.into()))?;
         } else {
             debug!(%peer, %origin, multiaddresses = ?addrs, "Adding peer to the store");
 
@@ -164,7 +149,7 @@ where
                     self.cfg.quality_avg_window_size,
                 )
                 .await
-                .map_err(|e| NetworkingError::DbChainError(e.into()))?;
+                .map_err(|e| NetworkError::DbChainError(e.into()))?;
         }
 
         #[cfg(all(feature = "prometheus", not(test)))]
@@ -173,7 +158,7 @@ where
                 .db
                 .network_peer_stats(self.cfg.quality_bad_threshold)
                 .await
-                .map_err(|e| NetworkingError::DbChainError(e.into()))?;
+                .map_err(|e| NetworkError::DbChainError(e.into()))?;
             self.refresh_metrics(&stats)
         }
 
@@ -205,7 +190,7 @@ where
                 .db
                 .get_network_peer(peer)
                 .await
-                .map_err(|e| NetworkingError::DbChainError(e.into()))?
+                .map_err(|e| NetworkError::DbChainError(e.into()))?
             {
                 Some(mut peer_status) => {
                     // Filter out private addresses from multiaddresses before returning
@@ -226,13 +211,13 @@ where
     #[tracing::instrument(level = "debug", skip(self), ret(level = "trace"), err)]
     pub async fn remove(&self, peer: &PeerId) -> Result<()> {
         if peer == &self.me {
-            return Err(NetworkingError::DisallowedOperationOnOwnPeerIdError);
+            return Err(NetworkError::DisallowedOperationOnOwnPeerIdError);
         }
 
         self.db
             .remove_network_peer(peer)
             .await
-            .map_err(|e| NetworkingError::DbChainError(e.into()))?;
+            .map_err(|e| NetworkError::DbChainError(e.into()))?;
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
@@ -240,7 +225,7 @@ where
                 .db
                 .network_peer_stats(self.cfg.quality_bad_threshold)
                 .await
-                .map_err(|e| NetworkingError::DbChainError(e.into()))?;
+                .map_err(|e| NetworkError::DbChainError(e.into()))?;
             self.refresh_metrics(&stats);
             tracing::trace!(
                 health = %health_from_stats(&stats, self.am_i_public),
@@ -265,14 +250,14 @@ where
     #[tracing::instrument(level = "debug", skip(self), ret(level = "trace"), err)]
     pub async fn update(&self, peer: &PeerId, ping_result: std::result::Result<Duration, UpdateFailure>) -> Result<()> {
         if peer == &self.me {
-            return Err(NetworkingError::DisallowedOperationOnOwnPeerIdError);
+            return Err(NetworkError::DisallowedOperationOnOwnPeerIdError);
         }
 
         if let Some(mut entry) = self
             .db
             .get_network_peer(peer)
             .await
-            .map_err(|e| NetworkingError::DbChainError(e.into()))?
+            .map_err(|e| NetworkError::DbChainError(e.into()))?
         {
             entry.heartbeats_sent += 1;
 
@@ -318,7 +303,7 @@ where
             self.db
                 .update_network_peer(entry)
                 .await
-                .map_err(|e| NetworkingError::DbChainError(e.into()))?;
+                .map_err(|e| NetworkError::DbChainError(e.into()))?;
 
             #[cfg(all(feature = "prometheus", not(test)))]
             {
@@ -326,7 +311,7 @@ where
                     .db
                     .network_peer_stats(self.cfg.quality_bad_threshold)
                     .await
-                    .map_err(|e| NetworkingError::DbChainError(e.into()))?;
+                    .map_err(|e| NetworkError::DbChainError(e.into()))?;
                 self.refresh_metrics(&stats);
                 tracing::trace!(
                     health = %health_from_stats(&stats, self.am_i_public),
@@ -380,7 +365,7 @@ where
             .db
             .get_network_peers(Default::default(), false)
             .await
-            .map_err(|e| NetworkingError::DbChainError(e.into()))?
+            .map_err(|e| NetworkError::DbChainError(e.into()))?
             .filter_map(filter)
             .collect()
             .await)
@@ -402,7 +387,7 @@ where
             .db
             .get_network_peers(PeerSelector::default().with_last_seen_lte(threshold), true)
             .await
-            .map_err(|e| NetworkingError::DbChainError(e.into()))?
+            .map_err(|e| NetworkError::DbChainError(e.into()))?
             .filter_map(|v| async move {
                 if v.id.1 == self.me {
                     return None;
@@ -457,34 +442,12 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_network_health_should_serialize_to_a_proper_string() {
-        assert_eq!(format!("{}", Health::Orange), "Orange".to_owned())
-    }
-
-    #[test]
-    fn test_network_health_should_deserialize_from_proper_string() -> anyhow::Result<()> {
-        let parsed: Health = "Orange".parse()?;
-        assert_eq!(parsed, Health::Orange);
-
-        Ok(())
-    }
-
     async fn basic_network(my_id: &PeerId) -> anyhow::Result<Network<HoprNodeDb>> {
         let cfg = NetworkConfig {
             quality_offline_threshold: 0.6,
             ..Default::default()
         };
         Ok(Network::new(*my_id, vec![], cfg, HoprNodeDb::new_in_memory().await?))
-    }
-
-    #[test]
-    fn test_network_health_should_be_ordered_numerically_for_hopr_metrics_output() {
-        assert_eq!(Health::Unknown as i32, 0);
-        assert_eq!(Health::Red as i32, 1);
-        assert_eq!(Health::Orange as i32, 2);
-        assert_eq!(Health::Yellow as i32, 3);
-        assert_eq!(Health::Green as i32, 4);
     }
 
     #[tokio::test]

@@ -58,7 +58,7 @@ use hopr_protocol_hopr::MemorySurbStore;
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId, Protocol};
 use hopr_transport_mixer::MixerConfig;
-pub use hopr_transport_network::network::{Health, Network};
+pub use hopr_transport_network::{Health, network::Network};
 use hopr_transport_p2p::HoprSwarm;
 use hopr_transport_probe::{
     Probe, TrafficGeneration,

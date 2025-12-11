@@ -8,7 +8,7 @@ repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
 [features]
-default = ["traits", "sqlite"]
+default = ["traits", "sqlite", "serde"]
 traits = []
 runtime-tokio = [
   "hopr-db-entity/runtime-tokio",
@@ -20,6 +20,7 @@ runtime-tokio = [
 ]
 prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
 sqlite = ["sea-query/backend-sqlite"]
+serde = ["hopr-primitive-types/serde"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -44,7 +45,7 @@ tracing = { workspace = true }
 thiserror = { workspace = true }
 validator = { workspace = true }
 
-hopr-api = { workspace = true }
+hopr-api = { workspace = true, features = ["chain", "db"] }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-db-entity = { workspace = true }
