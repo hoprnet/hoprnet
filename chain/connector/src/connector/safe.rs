@@ -75,6 +75,20 @@ where
             .next()
             .ok_or(ConnectorError::InvalidState("safe deployment stream closed"))
     }
+
+    async fn predict_module_address(
+        &self,
+        nonce: u64,
+        owner: &Address,
+        safe_address: &Address,
+    ) -> Result<Address, Self::Error> {
+        Ok(self.client.query_module_address_prediction(blokli_client::api::ModulePredictionInput {
+            nonce,
+            owner: (*owner).into(),
+            safe_address: (*safe_address).into(),
+        })
+        .await?.into())
+    }
 }
 
 #[cfg(test)]
@@ -104,8 +118,7 @@ mod tests {
             .with_safe_allowances([(account.safe_address.unwrap(), HoprBalance::new_base(10000))])
             .build_static_client();
 
-        let mut connector = create_connector(blokli_client)?;
-        connector.connect().await?;
+        let connector = create_connector(blokli_client)?;
 
         assert_eq!(
             connector.safe_allowance(account.safe_address.unwrap()).await?,
@@ -130,13 +143,27 @@ mod tests {
             .with_hopr_network_chain_info("rotsee")
             .build_dynamic_client(MODULE_ADDR.into());
 
-        let mut connector = create_connector(blokli_client)?;
-        connector.connect().await?;
+        let connector = create_connector(blokli_client)?;
 
         assert_eq!(Some(safe), connector.safe_info(SafeSelector::Owner(me)).await?);
         assert_eq!(Some(safe), connector.safe_info(SafeSelector::Address(safe_addr)).await?);
 
         insta::assert_yaml_snapshot!(*connector.client.snapshot());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connector_should_predict_module_address() -> anyhow::Result<()> {
+        let me = ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address();
+        let safe_addr = [1u8; Address::SIZE].into();
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_hopr_network_chain_info("rotsee")
+            .build_dynamic_client(MODULE_ADDR.into());
+
+        let connector = create_connector(blokli_client)?;
+
+        assert_eq!("0xff3dae517c13a59014c79c397de258c9557c04b8", connector.predict_module_address(0, &me, &safe_addr).await?.to_string());
 
         Ok(())
     }

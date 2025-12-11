@@ -157,8 +157,11 @@ where
 
     async fn do_connect(&self, timeout: Duration) -> Result<AbortHandle, ConnectorError> {
         const TOLERANCE: f64 = 0.01;
-        let min_accounts = (self.client.count_accounts(None).await? as f64 * (1.0 - TOLERANCE)).round() as u32;
-        let min_channels = (self.client.count_channels(None).await? as f64 * (1.0 - TOLERANCE)).round() as u32;
+        let min_accounts = (self.client.count_accounts(blokli_client::api::AccountSelector::Any).await? as f64 * (1.0 - TOLERANCE)).round() as u32;
+        let min_channels = (self.client.count_channels(blokli_client::api::ChannelSelector {
+            filter: None,
+            status: None,
+        }).await? as f64 * (1.0 - TOLERANCE)).round() as u32;
         tracing::debug!(min_accounts, min_channels, "connection thresholds");
 
         let server_health = self.client.query_health().await?;
@@ -200,7 +203,7 @@ where
 
         hopr_async_runtime::prelude::spawn(async move {
             let connections = client
-                .subscribe_accounts(None)
+                .subscribe_accounts(blokli_client::api::AccountSelector::Any)
                 .and_then(|accounts| Ok((accounts, client.subscribe_graph()?)))
                 .and_then(|(accounts, channels)| Ok((accounts, channels, client.subscribe_ticket_params()?)));
 

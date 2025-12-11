@@ -55,4 +55,11 @@ pub trait ChainReadSafeOperations {
         selector: SafeSelector,
         timeout: std::time::Duration,
     ) -> Result<DeployedSafe, Self::Error>;
+    /// Predicts the Module address based on the given `nonce`, `owner` and `safe_address` of the Safe.
+    async fn predict_module_address(
+        &self,
+        nonce: u64,
+        owner: &Address,
+        safe_address: &Address,
+    ) -> Result<Address, Self::Error>;
 }
