@@ -7,5 +7,5 @@ pub enum NetworkError {
     DisallowedOperationOnOwnPeerIdError,
 }
 
-/// Result built on top of the crate error [NetworkingError]
+/// Result built on top of the crate error [`NetworkError`]
 pub type Result<T> = core::result::Result<T, NetworkError>;
