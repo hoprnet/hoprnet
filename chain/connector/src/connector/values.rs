@@ -7,11 +7,10 @@ use hopr_internal_types::prelude::WinningProbability;
 use hopr_primitive_types::prelude::*;
 
 use crate::{
-    connector::{
-        HoprBlockchainConnector,
-        utils::{ParsedChainInfo, model_to_chain_info},
-    },
+    HoprBlockchainReader,
+    connector::HoprBlockchainConnector,
     errors::ConnectorError,
+    utils::{ParsedChainInfo, model_to_chain_info},
 };
 
 pub(crate) const CHAIN_INFO_CACHE_KEY: u32 = 0;
@@ -46,27 +45,9 @@ where
 
     // NOTE: these APIs can be called without calling `connect` first
 
+    #[inline]
     async fn balance<Cy: Currency, A: Into<Address> + Send>(&self, address: A) -> Result<Balance<Cy>, Self::Error> {
-        let address = address.into();
-        if Cy::is::<WxHOPR>() {
-            Ok(self
-                .client
-                .query_token_balance(&address.into())
-                .await?
-                .balance
-                .0
-                .parse()?)
-        } else if Cy::is::<XDai>() {
-            Ok(self
-                .client
-                .query_native_balance(&address.into())
-                .await?
-                .balance
-                .0
-                .parse()?)
-        } else {
-            Err(ConnectorError::InvalidState("unsupported currency"))
-        }
+        HoprBlockchainReader(self.client.clone()).balance(address).await
     }
 
     async fn domain_separators(&self) -> Result<DomainSeparators, Self::Error> {

@@ -1,6 +1,6 @@
 [package]
 name = "hopr-api"
-version = "0.5.0"
+version = "0.6.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Common HOPR-related high-level API traits used in the code base"
