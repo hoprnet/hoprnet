@@ -26,6 +26,8 @@ lazy_static::lazy_static! {
         "hopr_transport_p2p_nat_status",
         "Current NAT status as reported by libp2p autonat. 0=Unknown, 1=Public, 2=Private"
     ).unwrap();
+    static ref METRIC_NETWORK_HEALTH: hopr_metrics::SimpleGauge =
+         hopr_metrics::SimpleGauge::new("hopr_network_health", "Connectivity health indicator").unwrap();
 }
 
 pub struct InactiveNetwork {
@@ -162,6 +164,11 @@ impl HoprLibp2pNetworkBuilder {
     where
         T: Stream<Item = PeerDiscovery> + Send + 'static,
     {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        {
+            METRIC_NETWORK_HEALTH.set(0.0);
+        }
+
         let me = identity.public().to_peer_id();
         let swarm = InactiveNetwork::build(identity, external_discovery_events)
             .await
@@ -194,6 +201,8 @@ impl HoprLibp2pNetworkBuilder {
             protocol: libp2p::StreamProtocol::new(protocol),
         };
 
+        #[cfg(all(feature = "prometheus", not(test)))]
+        let network_inner = network.clone();
         let mut swarm = self.swarm;
         let process = async move {
             while let Some(event) = swarm.next().await {
@@ -204,12 +213,18 @@ impl HoprLibp2pNetworkBuilder {
                                 error!(peer = %peer_id, %error, "Failed to add dialable peer to the peer store");
                             }
                             tracker.add(peer_id);
+
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            METRIC_NETWORK_HEALTH.set((hopr_transport_network::traits::NetworkView::health(&network_inner) as i32).into());
                         },
                         crate::DiscoveryEvent::UndialablePeer(peer_id) => {
                             if let Err(error) = store.remove(&peer_id) {
                                 error!(peer = %peer_id, %error, "Failed to remove undialable peer from the peer store");
                             }
                             tracker.remove(&peer_id);
+
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            METRIC_NETWORK_HEALTH.set((hopr_transport_network::traits::NetworkView::health(&network_inner) as i32).into());
                         },
                     }
                     SwarmEvent::Behaviour(
@@ -267,6 +282,7 @@ impl HoprLibp2pNetworkBuilder {
 
                         #[cfg(all(feature = "prometheus", not(test)))]
                         {
+                            METRIC_NETWORK_HEALTH.set((hopr_transport_network::traits::NetworkView::health(&network_inner) as i32).into());
                             METRIC_TRANSPORT_P2P_OPEN_CONNECTION_COUNT.decrement(1.0);
                         }
                     }

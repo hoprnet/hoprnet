@@ -6,8 +6,6 @@ use crate::errors::{NetworkError, Result};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_NETWORK_HEALTH:  hopr_metrics::SimpleGauge =
-         hopr_metrics::SimpleGauge::new("hopr_network_health", "Connectivity health indicator").unwrap();
     static ref METRIC_PEER_COUNT:  hopr_metrics::SimpleGauge =
          hopr_metrics::SimpleGauge::new("hopr_peer_count", "Number of all peers").unwrap();
 }
