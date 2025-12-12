@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use hopr_transport_network::traits::{NetworkObservations, NetworkView};
 use hopr_transport_p2p::HoprNetwork;
 use hopr_transport_probe::traits::{PeerDiscoveryFetch, ProbeStatusUpdate};
+use rand::seq::SliceRandom;
 
 // TODO: replace with telemetry:
 // hopr_metrics::SimpleHistogram::new(
@@ -39,9 +40,11 @@ impl PeerDiscoveryFetch for ProbeNetworkInteractions {
     ///
     /// After a duration of non-pinging based specified by the configurable threshold.
     #[tracing::instrument(level = "trace", skip(self))]
-    #[allow(unused_variables)]
     async fn get_peers(&self, from_timestamp: std::time::SystemTime) -> Vec<hopr_transport_network::PeerId> {
-        self.network.discovered_peers().into_iter().collect::<Vec<_>>()
+        tracing::debug!(?from_timestamp, "fetching peers for probing, ignoring timestamp");
+        let mut vec = self.network.discovered_peers().into_iter().collect::<Vec<_>>();
+        vec.shuffle(&mut rand::thread_rng());
+        vec
     }
 }
 

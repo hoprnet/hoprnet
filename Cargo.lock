@@ -5149,6 +5149,7 @@ dependencies = [
  "lazy_static",
  "pcap-file",
  "proc-macro-regex",
+ "rand 0.8.5",
  "serde",
  "smart-default",
  "strum 0.27.2",

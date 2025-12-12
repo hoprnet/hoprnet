@@ -51,6 +51,7 @@ humantime-serde = { workspace = true, optional = true }
 lazy_static = { workspace = true }
 proc-macro-regex = { workspace = true }
 pcap-file = { workspace = true, optional = true }
+rand = { workspace = true }
 serde = { workspace = true, optional = true }
 smart-default = { workspace = true }
 strum = { workspace = true }

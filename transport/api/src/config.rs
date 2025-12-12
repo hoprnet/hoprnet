@@ -28,7 +28,7 @@ pub struct HoprProtocolConfig {
     /// Libp2p-related transport configuration
     #[validate(nested)]
     pub transport: TransportConfig,
-    /// Heartbeat configuration
+    /// Network configuration
     #[validate(nested)]
     pub network: NetworkConfig,
     /// HOPR packet pipeline configuration
