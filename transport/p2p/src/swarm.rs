@@ -19,8 +19,8 @@ use crate::{HoprNetwork, HoprNetworkBehavior, HoprNetworkBehaviorEvent, constant
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_TRANSPORT_P2P_OPEN_CONNECTION_COUNT:  hopr_metrics::SimpleGauge =  hopr_metrics::SimpleGauge::new(
-        "hopr_transport_p2p_opened_connection_count",
-        "Number of currently open connections"
+        "hopr_transport_p2p_active_connection_count",
+        "Number of currently active connections"
     ).unwrap();
     static ref METRIC_TRANSPORT_NAT_STATUS: hopr_metrics::SimpleGauge = hopr_metrics::SimpleGauge::new(
         "hopr_transport_p2p_nat_status",

@@ -95,7 +95,6 @@ impl Probe {
         Tr: TrafficGeneration + Send + Sync + 'static,
     {
         let max_parallel_probes = self.cfg.max_parallel_probes;
-        let interval_between_rounds = self.cfg.interval;
 
         let (probing_routes, reports) = traffic_generator.build();
 
@@ -179,8 +178,6 @@ impl Probe {
         processes.insert(
             HoprProbeProcess::Emit,
             hopr_async_runtime::spawn_as_abortable!(async move {
-                hopr_async_runtime::prelude::sleep(2 * interval_between_rounds).await; // delay to allow network to stabilize
-
                 direct_neighbors
                     .for_each_concurrent(max_parallel_probes, move |(peer, notifier)| {
                         let active_probes = active_probes.clone();

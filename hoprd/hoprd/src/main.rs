@@ -212,7 +212,7 @@ fn main() -> anyhow::Result<()> {
 #[cfg(feature = "runtime-tokio")]
 async fn main_inner() -> anyhow::Result<()> {
     use hopr_chain_connector::init_blokli_connector;
-    use hopr_impls_ct_telemetry::DummyCoverTrafficType;
+    use hopr_ct_telemetry::DummyCoverTrafficType;
 
     init_logger()?;
 

@@ -38,6 +38,8 @@ members = [
   "chain/connector",
   "db/node",
   "utils/session",
+  # implementations
+  "impls/ct/telemetry",
 ]
 
 [workspace.dependencies]
@@ -258,7 +260,8 @@ hopr-utils-session = { path = "utils/session" }
 hopr-db-node = { path = "db/node" }
 hopr-chain-connector = { path = "chain/connector" }
 
-hopr-impls-ct-telemetry = { path = "impls/ct/telemetry" }
+# referential implementations
+hopr-ct-telemetry = { path = "impls/ct/telemetry" }
 
 [profile.dev]
 panic = "abort"

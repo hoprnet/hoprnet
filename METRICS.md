@@ -23,23 +23,19 @@ scrape_configs:
 ## List of metrics
 
 - `hopr_packets_count`: Number of processed packets of different types (sent, received, forwarded), keys: `type`
-- `hopr_replayed_packet_count`: The total count of replayed packets during the packet processing pipeline run
 - `hopr_mixer_queue_size`: Current mixer queue size
 - `hopr_mixer_average_packet_delay`: Average mixer packet delay averaged over a packet window
-- `hopr_received_ack_count`: Number of received acknowledgements, keys: `valid`
-- `hopr_sent_acks_count`: Number of sent message acknowledgements
-- `hopr_tickets_count`: Number of tickets (winning, losing, rejected), keys: `type`
+- `hopr_protocol_ack_received_count`: Number of received acknowledgements, keys: `valid`    # TODO: missing
+- `hopr_protocol_ack_sent_count`: Number of sent message acknowledgements   # TODO: missing
+- `hopr_tickets_count`: Number of tickets (winning, losing, rejected), keys: `type`   # TODO: missing
 - `hopr_network_health`: Connectivity health indicator
-- `hopr_relayed_packet_processing_time_with_mixing_sec`: Histogram of measured processing and mixing time for a relayed packet in seconds, buckets: 0.01, 0.025, 0.050, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0,
-- `hopr_peers_by_quality`: Number different peer types by quality
 - `hopr_peer_count`: Number of all peers
-- `hopr_channels_count`: Number of channels per direction, keys: `direction`
 - `hopr_path_length`: Distribution of number of hops of sent messages, buckets: 0, 1, 2, 3, 4
 - `hopr_strategy_closure_auto_finalization_count`: Count of channels where closure finalizing was initiated automatically
 - `hopr_strategy_enabled_strategies`: List of enabled strategies, keys: `strategy`
 - `hopr_strategy_auto_funding_funding_count`: Count of initiated automatic fundings
 - `hopr_strategy_auto_redeem_redeem_count`: Count of initiated automatic redemptions
-- `hopr_transport_p2p_opened_connection_count`: Count of the currently active p2p connections as observed from the rust-libp2p events
+- `hopr_transport_p2p_active_connection_count`: Count of the currently active p2p connections as observed from the rust-libp2p events
 - `hopr_http_api_call_count`: Number of different REST API calls and their statuses, keys: `path`, `method`, `status`
 - `hopr_http_api_call_timing_sec`: Timing of different REST API calls in seconds, keys: `path`, `method`, buckets: 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0
 - `hopr_http_api_last_used_time`: The unix timestamp in seconds at which any API endpoint was last fetched
@@ -47,7 +43,6 @@ scrape_configs:
 - `hopr_lib_version`: Executed version of hopr-lib, keys: `version`
 - `hopr_node_addresses`: Node on-chain and off-chain addresses, keys: `peerid`, `address`, `safe_address`, `module_address`
 - `hopr_session_established_sessions_count`: Number of sessions that were successfully established as an Exit node
-- `hopr_session_inner_sizes`: Sizes of data chunks fed from inner session to HOPR protocol, keys: `session_id`, buckets: 20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0
 - `hopr_session_num_active_sessions`: Number of currently active HOPR sessions
 - `hopr_session_received_error_count`: Number of HOPR session errors received from an Exit node, keys: `kind`
 - `hopr_session_sent_error_count`: Number of HOPR session errors sent to an Entry node, keys: `kind`
@@ -61,6 +56,5 @@ scrape_configs:
 - `hopr_surb_balancer_current_buffer_estimate`: Estimated number of SURBs in the buffer, keys: `session_id`
 - `hopr_surb_balancer_current_buffer_target`: Current target (setpoint) number of SURBs in the buffer, keys: `session_id`
 - `hopr_tickets_incoming_statistics`: Ticket statistics with incoming tickets, keys: `statistic`
-- `hopr_tickets_incoming_win_probability`: Observes the winning probabilities on incoming tickets, buckets: 0.0, 0.0001, 0.001, 0.01, 0.05, 0.1, 0.15, 0.25, 0.3, 0.5
 - `hopr_udp_ingress_packet_len`: UDP packet lengths on ingress, buckets: 20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0, 5120.0
 - `hopr_udp_egress_packet_len`: UDP packet lengths on egress, buckets: 20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0, 5120.0

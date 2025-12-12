@@ -112,7 +112,7 @@ hopr-chain-connector = { workspace = true }
 hopr-utils-session = { workspace = true }
 hoprd-api = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
-hopr-impls-ct-telemetry = { workspace = true }
+hopr-ct-telemetry = { workspace = true }
 
 # Target-specific dependencies for memory allocators
 [target.'cfg(target_os = "linux")'.dependencies]

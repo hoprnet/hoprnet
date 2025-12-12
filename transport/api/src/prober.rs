@@ -39,9 +39,9 @@ impl PeerDiscoveryFetch for ProbeNetworkInteractions {
     /// Get all peers considered by the `Network` to be pingable.
     ///
     /// After a duration of non-pinging based specified by the configurable threshold.
-    #[tracing::instrument(level = "trace", skip(self))]
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn get_peers(&self, from_timestamp: std::time::SystemTime) -> Vec<hopr_transport_network::PeerId> {
-        tracing::debug!(?from_timestamp, "fetching peers for probing, ignoring timestamp");
+        tracing::trace!(?from_timestamp, "fetching peers for probing, ignoring timestamp");
         let mut vec = self.network.discovered_peers().into_iter().collect::<Vec<_>>();
         vec.shuffle(&mut rand::thread_rng());
         vec
