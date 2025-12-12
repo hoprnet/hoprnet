@@ -25,9 +25,9 @@ scrape_configs:
 - `hopr_packets_count`: Number of processed packets of different types (sent, received, forwarded), keys: `type`
 - `hopr_mixer_queue_size`: Current mixer queue size
 - `hopr_mixer_average_packet_delay`: Average mixer packet delay averaged over a packet window
-- `hopr_protocol_ack_received_count`: Number of received acknowledgements, keys: `valid`    # TODO: missing
-- `hopr_protocol_ack_sent_count`: Number of sent message acknowledgements   # TODO: missing
-- `hopr_tickets_count`: Number of tickets (winning, losing, rejected), keys: `type`   # TODO: missing
+- `hopr_protocol_ack_received_count`: Number of received acknowledgements, keys: `valid` # TODO: missing
+- `hopr_protocol_ack_sent_count`: Number of sent message acknowledgements # TODO: missing
+- `hopr_tickets_count`: Number of tickets (winning, losing, rejected), keys: `type` # TODO: missing
 - `hopr_network_health`: Connectivity health indicator
 - `hopr_peer_count`: Number of all peers
 - `hopr_path_length`: Distribution of number of hops of sent messages, buckets: 0, 1, 2, 3, 4

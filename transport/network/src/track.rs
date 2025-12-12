@@ -28,7 +28,7 @@ impl Observations {
     }
 
     pub fn average_latency(&self) -> Option<std::time::Duration> {
-        if self.latency_average.get() as u128 == 0 {
+        if self.latency_average.get() <= 0.0 {
             None
         } else {
             Some(std::time::Duration::from_millis(self.latency_average.get() as u64))
@@ -57,9 +57,7 @@ impl NetworkPeerTracker {
 
     #[inline]
     pub fn add(&self, peer: PeerId) {
-        if !self.peers.contains_key(&peer) {
-            self.peers.insert(peer, Observations::default());
-        }
+        self.peers.entry(peer).or_default();
     }
 
     #[inline]
@@ -189,14 +187,14 @@ mod tests {
 
         assert_eq!(observation.last_update, std::time::Duration::default());
 
+        observation.record_probe(Ok(std::time::Duration::from_millis(50)));
+
         let after = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default();
 
-        observation.record_probe(Ok(std::time::Duration::from_millis(50)));
-
         assert_gt!(observation.last_update, std::time::Duration::default());
-        assert_gt!(observation.last_update, after);
+        assert_lt!(observation.last_update, after);
     }
 
     #[test]

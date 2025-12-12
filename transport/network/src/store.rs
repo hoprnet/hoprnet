@@ -49,10 +49,10 @@ impl NetworkPeerStore {
             unit.value_mut().extend(addresses.into_iter());
         } else {
             self.addresses.insert(peer, addresses);
-        }
 
-        #[cfg(all(feature = "prometheus", not(test)))]
-        METRIC_PEER_COUNT.increment(1.0);
+            #[cfg(all(feature = "prometheus", not(test)))]
+            METRIC_PEER_COUNT.increment(1.0);
+        }
 
         Ok(())
     }
@@ -74,10 +74,10 @@ impl NetworkPeerStore {
             return Err(NetworkError::DisallowedOperationOnOwnPeerIdError);
         }
 
-        self.addresses.remove(peer);
-
-        #[cfg(all(feature = "prometheus", not(test)))]
-        METRIC_PEER_COUNT.decrement(1.0);
+        if self.addresses.remove(peer).is_some() {
+            #[cfg(all(feature = "prometheus", not(test)))]
+            METRIC_PEER_COUNT.decrement(1.0);
+        }
 
         Ok(())
     }

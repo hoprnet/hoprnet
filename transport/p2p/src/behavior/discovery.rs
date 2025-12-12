@@ -303,6 +303,11 @@ impl NetworkBehaviour for Behaviour {
                 .0
                 .item;
 
+            // Skip stale entries (peer reconnected or was otherwise unscheduled)
+            if !self.not_connected_peers.contains_key(&peer) {
+                continue;
+            }
+
             tracing::trace!(%peer, "attempting a new dial attempt item");
             self.pending_events.push_back(ToSwarm::Dial {
                 opts: DialOpts::peer_id(peer).build(),

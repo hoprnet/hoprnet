@@ -3,8 +3,6 @@ pub use sea_orm_migration::prelude::*;
 mod m20251124_00001_tickets_create_ticket_stats;
 mod m20251124_00002_tickets_create_outgoing_ticket_index;
 mod m20251124_00003_tickets_create_ticket;
-mod m20251124_00004_peers_create_peers;
-mod m20251212_00005_peers_remove_everything;
 
 pub struct Migrator;
 
@@ -13,22 +11,7 @@ pub struct Migrator;
 #[async_trait::async_trait]
 impl MigratorTrait for Migrator {
     fn migrations() -> Vec<Box<dyn MigrationTrait>> {
-        let mut ret = MigratorTickets::migrations();
-        ret.extend(MigratorPeers::migrations());
-        ret
-    }
-}
-
-pub struct MigratorPeers;
-
-/// Deprecated, no longer in the DB
-#[async_trait::async_trait]
-impl MigratorTrait for MigratorPeers {
-    fn migrations() -> Vec<Box<dyn MigrationTrait>> {
-        vec![
-            Box::new(m20251124_00004_peers_create_peers::Migration),
-            Box::new(m20251212_00005_peers_remove_everything::Migration),
-        ]
+        MigratorTickets::migrations()
     }
 }
 

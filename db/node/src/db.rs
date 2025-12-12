@@ -7,7 +7,7 @@ use std::{
 
 use hopr_internal_types::channels::ChannelId;
 use hopr_primitive_types::prelude::HoprBalance;
-use migration::{MigratorPeers, MigratorTickets, MigratorTrait};
+use migration::{MigratorTickets, MigratorTrait};
 use sea_orm::SqlxSqliteConnector;
 use sqlx::{
     ConnectOptions, SqlitePool,
@@ -19,8 +19,6 @@ use validator::Validate;
 
 use crate::errors::NodeDbError;
 
-/// Filename for the network peers database.
-pub const SQL_DB_PEERS_FILE_NAME: &str = "hopr_peers.db";
 /// Filename for the payment tickets database.
 pub const SQL_DB_TICKETS_FILE_NAME: &str = "hopr_tickets.db";
 
@@ -49,21 +47,6 @@ impl HoprNodeDb {
 
         fs::create_dir_all(directory).map_err(|e| NodeDbError::Other(e.into()))?;
 
-        let peers_options = PoolOptions::new()
-            .acquire_timeout(Duration::from_secs(60)) // Default is 30
-            .idle_timeout(Some(Duration::from_secs(10 * 60))) // This is the default
-            .max_lifetime(Some(Duration::from_secs(30 * 60))); // This is the default
-
-        let peers = Self::create_pool(
-            cfg.clone(),
-            directory.to_path_buf(),
-            peers_options,
-            Some(0),
-            Some(300),
-            SQL_DB_PEERS_FILE_NAME,
-        )
-        .await?;
-
         let tickets = Self::create_pool(
             cfg.clone(),
             directory.to_path_buf(),
@@ -75,15 +58,12 @@ impl HoprNodeDb {
         .await?;
 
         #[cfg(feature = "sqlite")]
-        Self::new_sqlx_sqlite(tickets, peers, cfg).await
+        Self::new_sqlx_sqlite(tickets, cfg).await
     }
 
     #[cfg(feature = "sqlite")]
     pub async fn new_in_memory() -> Result<Self, NodeDbError> {
         Self::new_sqlx_sqlite(
-            SqlitePool::connect(":memory:")
-                .await
-                .map_err(|e| NodeDbError::Other(e.into()))?,
             SqlitePool::connect(":memory:")
                 .await
                 .map_err(|e| NodeDbError::Other(e.into()))?,
@@ -93,16 +73,9 @@ impl HoprNodeDb {
     }
 
     #[cfg(feature = "sqlite")]
-    async fn new_sqlx_sqlite(
-        peers_db_pool: SqlitePool,
-        tickets_db_pool: SqlitePool,
-        cfg: HoprNodeDbConfig,
-    ) -> Result<Self, NodeDbError> {
+    async fn new_sqlx_sqlite(tickets_db_pool: SqlitePool, cfg: HoprNodeDbConfig) -> Result<Self, NodeDbError> {
         let tickets_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(tickets_db_pool);
         MigratorTickets::up(&tickets_db, None).await?;
-
-        let peers_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(peers_db_pool);
-        MigratorPeers::up(&peers_db, None).await?;
 
         Ok(Self {
             tickets_write_lock: Arc::new(async_lock::Mutex::new(())),

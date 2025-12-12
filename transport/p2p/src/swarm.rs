@@ -38,13 +38,13 @@ pub struct InactiveNetwork {
 ///
 /// Returns a built [libp2p::Swarm] object implementing the HoprNetworkBehavior functionality.
 impl InactiveNetwork {
+    #[cfg(feature = "runtime-tokio")]
     pub async fn build<T>(me: libp2p::identity::Keypair, external_discovery_events: T) -> Result<Self>
     where
         T: Stream<Item = PeerDiscovery> + Send + 'static,
     {
         let me_public: PublicKey = me.public();
 
-        #[cfg(feature = "runtime-tokio")]
         let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
             .with_tokio()
             .with_tcp(
@@ -56,10 +56,9 @@ impl InactiveNetwork {
             )
             .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?;
 
-        #[cfg(all(feature = "transport-quic", feature = "runtime-tokio"))]
+        #[cfg(feature = "transport-quic")]
         let swarm = swarm.with_quic();
 
-        #[cfg(feature = "runtime-tokio")]
         let swarm = swarm.with_dns();
 
         Ok(Self {

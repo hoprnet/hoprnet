@@ -14,7 +14,7 @@ pub trait NetworkView {
     /// Peers collected by the network discovery mechanism.
     fn discovered_peers(&self) -> HashSet<PeerId>;
 
-    /// Peers currently conenected and tracked by the network.
+    /// Peers currently connected and tracked by the network.
     fn connected_peers(&self) -> HashSet<PeerId>;
 
     /// Observations related to a specific peer in the network.
