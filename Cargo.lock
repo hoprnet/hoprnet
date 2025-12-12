@@ -5201,12 +5201,9 @@ dependencies = [
  "humantime-serde",
  "lazy_static",
  "libp2p-identity",
- "serde",
- "smart-default",
  "strum 0.27.2",
  "thiserror 2.0.17",
  "tracing",
- "validator",
 ]
 
 [[package]]

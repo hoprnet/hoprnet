@@ -95,5 +95,5 @@ tokio = { workspace = true }
 [package.metadata.cargo-machete]
 ignored = ["humantime-serde"]
 
-[package.metadata.cargo-shear]
-ignored = ["humantime-serde"]
+# [package.metadata.cargo-shear]
+# ignored = ["humantime-serde"]

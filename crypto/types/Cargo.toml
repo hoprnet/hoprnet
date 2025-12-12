@@ -67,8 +67,8 @@ lazy_static = { workspace = true }
 [package.metadata.cargo-machete]
 ignored = ["serde_bytes"]
 
-[package.metadata.cargo-shear]
-ignored = ["serde_bytes"]
+# [package.metadata.cargo-shear]
+# ignored = ["serde_bytes"]
 
 [[bench]]
 name = "hash_bench"
