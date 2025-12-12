@@ -161,7 +161,7 @@ where
             ),
             my_multiaddresses,
             smgr: SessionManager::new(SessionManagerConfig {
-                // TODO(v3.1): Use the entire range of tags properly
+                // TODO(v4.0): Use the entire range of tags properly
                 session_tag_range: (16..65535),
                 maximum_sessions: cfg.session.maximum_sessions as usize,
                 frame_mtu: std::env::var("HOPR_SESSION_FRAME_SIZE")
@@ -662,9 +662,11 @@ where
 
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_peer_observations(&self, peer: &PeerId) -> errors::Result<Option<Observations>> {
-        // Ok(self.network.get(peer).await?)
-        // TODO: implement using Observations
-        Ok(None)
+        Ok(self
+            .network
+            .get()
+            .ok_or_else(|| HoprTransportError::Api("transport network is not yet initialized".into()))?
+            .observations_for(peer))
     }
 }
 
