@@ -10,7 +10,7 @@ license = "GPL-3.0-only"
 
 
 [features]
-default = ["ct"]                                                     # TODO: disable
+default = []                                                         # TODO: disable
 ct = ["dep:hopr-network-types", "dep:hopr-crypto-random", "dep:hex"]
 db = []
 chain = ["db"]

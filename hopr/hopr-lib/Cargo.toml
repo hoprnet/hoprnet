@@ -85,7 +85,7 @@ tokio-util = { workspace = true, features = ["compat"], optional = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
-hopr-api = { workspace = true }
+hopr-api = { workspace = true, features = ["ct"] }
 hopr-async-runtime = { workspace = true }
 hopr-crypto-keypair = { workspace = true }
 hopr-crypto-random = { workspace = true }

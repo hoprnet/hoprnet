@@ -2,7 +2,7 @@
 name = "hopr-ct-telemetry"
 version = "0.1.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-description = "Implementation"
+description = "Basic implementation of the CT Telemetry functionality as specified in the HOPR RFCs describing the probing and cover trafic mechanisms."
 edition = "2021"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
