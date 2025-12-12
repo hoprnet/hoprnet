@@ -4,6 +4,7 @@ use hopr_api::{Multiaddr, PeerId};
 
 use crate::{Health, track::Observations};
 
+/// Trait representing a read-only view of the network state.
 pub trait NetworkView {
     /// Multiaddresses used for listening by the local node.
     fn listening_as(&self) -> HashSet<Multiaddr>; //local_multiaddresses
@@ -27,7 +28,7 @@ pub trait NetworkView {
     fn health(&self) -> Health;
 }
 
-/// Writer for network observations used to improve the internal observations by the Network
+/// Trait representing a reporter of network immediate peer testing observations.
 pub trait NetworkObservations {
     fn update(&self, peer: &PeerId, result: std::result::Result<std::time::Duration, ()>);
 }

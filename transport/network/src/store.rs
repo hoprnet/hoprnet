@@ -10,6 +10,13 @@ lazy_static::lazy_static! {
          hopr_metrics::SimpleGauge::new("hopr_peer_count", "Number of all peers").unwrap();
 }
 
+/// In-memmory store for network peer multiaddresses.
+///
+/// The structure holds the mapping between the [`PeerId`] and its associated reported
+/// multiaddresses recovered from the network discovery mechanism as [`Multiaddr`].
+///
+/// The store can be combined with other data structures to offer a complete view of
+/// the network state in regards to the discovered peers.
 #[derive(Clone, Debug)]
 pub struct NetworkPeerStore {
     me: PeerId,
@@ -31,14 +38,16 @@ impl NetworkPeerStore {
         &self.me
     }
 
-    /// Check whether the PeerId is present in the network.
+    /// Check whether the peer is present in the network.
     #[inline]
     #[tracing::instrument(level = "trace", skip(self), ret(Display))]
     pub fn has(&self, peer: &PeerId) -> bool {
         peer == &self.me || self.addresses.contains_key(peer)
     }
 
-    /// Add a new peer into the network.
+    /// Add a new peer with discovered addresses.
+    ///
+    /// The function is smart and extends the existing multiaddresses if the peer is already present.
     #[tracing::instrument(level = "debug", skip(self), ret(level = "trace"), err)]
     pub fn add(&self, peer: PeerId, addresses: HashSet<Multiaddr>) -> Result<()> {
         if peer == self.me {
@@ -57,7 +66,7 @@ impl NetworkPeerStore {
         Ok(())
     }
 
-    /// Get peer multiaddress.
+    /// Get multiaddresses of a peer.
     #[tracing::instrument(level = "trace", skip(self))]
     pub fn get(&self, peer: &PeerId) -> Option<HashSet<Multiaddr>> {
         if peer == &self.me {
@@ -67,7 +76,7 @@ impl NetworkPeerStore {
         }
     }
 
-    /// Remove peer from the network
+    /// Remove the peer from the store.
     #[tracing::instrument(level = "debug", skip(self))]
     pub fn remove(&self, peer: &PeerId) -> Result<()> {
         if peer == &self.me {
@@ -82,6 +91,7 @@ impl NetworkPeerStore {
         Ok(())
     }
 
+    /// Iterator over [`PeerId`] keys in the store.
     #[inline]
     pub fn iter_keys(&self) -> impl Iterator<Item = PeerId> + '_ {
         self.addresses.iter().map(|entry| *entry.key())

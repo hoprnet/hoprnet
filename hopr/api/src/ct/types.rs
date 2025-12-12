@@ -1,7 +1,7 @@
 use hopr_primitive_types::prelude::GeneralError;
 use multiaddr::PeerId;
 
-/// Serializable and deserializable enum for the probe message content
+/// Serializable and deserializable enum for the probe message content.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, strum::EnumDiscriminants)]
 #[strum_discriminants(vis(pub(crate)))]
 #[strum_discriminants(derive(strum::FromRepr, strum::EnumCount), repr(u8))]
@@ -138,12 +138,22 @@ impl<'a> TryFrom<&'a [u8]> for PathTelemetry {
     }
 }
 
+/// Intermediate neighbor telemetry object.
+///
+/// Represents the finding of an intermediate peer probing operation.
 pub struct NeighborTelemetry {
     pub peer: PeerId,
     pub rtt: std::time::Duration,
 }
 
+/// Enum representing different types of telemetry data used by the CT mechanism..
 pub enum Telemetry {
+    /// Telemetry data looping the traffic through multiple peers back to self.
+    ///
+    /// Does not require a cooperating peer.
     Loopback(PathTelemetry),
+    /// Immediate neighbor telemetry data.
+    ///
+    /// Assumes a cooperating immedate peer to receive responses for telemetry construction
     Neighbor(NeighborTelemetry),
 }

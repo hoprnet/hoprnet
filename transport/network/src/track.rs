@@ -4,6 +4,7 @@ use hopr_api::PeerId;
 
 use crate::utils::ExponentialMovingAverage;
 
+/// Observations related to a specific peer in the network.
 #[derive(Debug, Copy, Clone, Default, PartialEq)]
 pub struct Observations {
     pub msg_sent: u64,
@@ -14,6 +15,7 @@ pub struct Observations {
 }
 
 impl Observations {
+    /// Record a new result of the probe towards the measured peer.
     pub fn record_probe(&mut self, latency: std::result::Result<std::time::Duration, ()>) {
         self.last_update = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -27,6 +29,7 @@ impl Observations {
         }
     }
 
+    /// Return average latency observed for the measured peer.
     pub fn average_latency(&self) -> Option<std::time::Duration> {
         if self.latency_average.get() <= 0.0 {
             None
@@ -35,7 +38,7 @@ impl Observations {
         }
     }
 
-    /// A value between 0.0 and 1.0 representing the score of the peer based on probes.
+    /// A value between 0.0 and 1.0 scoring the observed peer.
     ///
     /// The higher the value, the better the score.
     pub fn score(&self) -> f64 {
@@ -43,6 +46,13 @@ impl Observations {
     }
 }
 
+/// Tracker of [`Observations`] for network peers.
+///
+/// This structure maintains a mapping between [`PeerId`] and their associated
+/// [`Observations`], allowing for efficient tracking and updating of peer telemetry data.
+///
+/// It can be combined with other objects to offer a complete view of the network state in regards
+/// to immediate peer probing.
 #[derive(Debug, Default, Clone)]
 pub struct NetworkPeerTracker {
     peers: Arc<dashmap::DashMap<PeerId, Observations>>,
@@ -84,6 +94,7 @@ impl NetworkPeerTracker {
         self.peers.len()
     }
 
+    /// Check whether there are no tracked peers.
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.peers.len() == 0

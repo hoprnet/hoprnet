@@ -138,6 +138,12 @@ pub struct InactiveConfiguredNetwork {
     swarm: libp2p::Swarm<HoprNetworkBehavior>,
 }
 
+/// Builder of the network view and an actual background process running the libp2p core
+/// event processing loop.
+///
+/// This object is primarily constructed to allow delayed starting of the background process,
+/// as well as setup all the interconnections with the underlying network views to allow complex
+/// functionality and signalling.
 pub struct HoprLibp2pNetworkBuilder {
     pub(crate) swarm: libp2p::Swarm<HoprNetworkBehavior>,
     me: PeerId,
