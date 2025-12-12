@@ -1,7 +1,8 @@
+use futures::Stream;
 pub use hopr_network_types::types::DestinationRouting;
 use multiaddr::PeerId;
 
-use super::{PathTelemetry, Telemetry};
+use super::PathTelemetry;
 
 #[derive(thiserror::Error, Debug)]
 pub enum TrafficGenerationError {
@@ -10,6 +11,14 @@ pub enum TrafficGenerationError {
 
     #[error("timed out for loopback probe")]
     ProbeLoopbackTimeout(PathTelemetry),
+}
+
+/// A trait specifying the graph traversal functionality
+#[async_trait::async_trait]
+pub trait NetworkGraphView {
+    async fn nodes(&self) -> impl Stream<Item = PeerId>;
+
+    async fn find_routes_to(&self, destination: &PeerId, length: usize) -> Vec<DestinationRouting>;
 }
 
 /// A trait for types that can produce a stream of cover traffic routes.
@@ -22,14 +31,7 @@ pub enum TrafficGenerationError {
 /// since the exhaustion of the stream might result in termination of the
 /// cover traffic generation.
 pub trait TrafficGeneration {
-    fn build(
-        self,
-    ) -> (
-        impl futures::Stream<Item = DestinationRouting> + Send,
-        impl futures::Sink<std::result::Result<Telemetry, TrafficGenerationError>, Error = impl std::error::Error>
-        + Send
-        + Sync
-        + Clone
-        + 'static,
-    );
+    fn build<T>(self, network_graph: T) -> impl futures::Stream<Item = DestinationRouting> + Send
+    where
+        T: NetworkGraphView + Send + Sync + 'static;
 }

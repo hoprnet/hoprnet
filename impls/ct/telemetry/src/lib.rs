@@ -1,4 +1,4 @@
-use hopr_api::ct::{DestinationRouting, Telemetry, TrafficGeneration, traits::TrafficGenerationError};
+use hopr_api::ct::{DestinationRouting, NetworkGraphView, TrafficGeneration};
 
 // TODO: replace with impl on usage site
 pub struct DummyCoverTrafficType {
@@ -6,20 +6,16 @@ pub struct DummyCoverTrafficType {
     _unconstructable: (),
 }
 
+pub struct DummyNetworkGraphView {
+    #[allow(dead_code)]
+    _unconstructable: (),
+}
+
 impl TrafficGeneration for DummyCoverTrafficType {
-    fn build(
-        self,
-    ) -> (
-        impl futures::Stream<Item = DestinationRouting> + Send,
-        impl futures::Sink<std::result::Result<Telemetry, TrafficGenerationError>, Error = impl std::error::Error>
-        + Send
-        + Sync
-        + Clone
-        + 'static,
-    ) {
-        (
-            futures::stream::empty(),
-            futures::sink::drain::<std::result::Result<Telemetry, TrafficGenerationError>>(),
-        )
+    fn build<T>(self, _network_graph: T) -> impl futures::Stream<Item = DestinationRouting> + Send
+    where
+        T: NetworkGraphView + Send + Sync + 'static,
+    {
+        futures::stream::empty()
     }
 }
