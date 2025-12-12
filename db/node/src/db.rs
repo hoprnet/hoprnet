@@ -8,13 +8,13 @@ use std::{
 use hopr_internal_types::channels::ChannelId;
 use hopr_primitive_types::prelude::HoprBalance;
 use migration::{MigratorPeers, MigratorTickets, MigratorTrait};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, SqlxSqliteConnector};
+use sea_orm::SqlxSqliteConnector;
 use sqlx::{
     ConnectOptions, SqlitePool,
     pool::PoolOptions,
     sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous},
 };
-use tracing::{debug, log::LevelFilter};
+use tracing::log::LevelFilter;
 use validator::Validate;
 
 use crate::errors::NodeDbError;
@@ -23,8 +23,6 @@ use crate::errors::NodeDbError;
 pub const SQL_DB_PEERS_FILE_NAME: &str = "hopr_peers.db";
 /// Filename for the payment tickets database.
 pub const SQL_DB_TICKETS_FILE_NAME: &str = "hopr_tickets.db";
-
-pub const HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS: u64 = 5 * 60; // 5 minutes
 
 #[derive(Clone, Debug, validator::Validate, smart_default::SmartDefault)]
 pub struct HoprNodeDbConfig {
@@ -105,28 +103,6 @@ impl HoprNodeDb {
 
         let peers_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(peers_db_pool);
         MigratorPeers::up(&peers_db, None).await?;
-
-        // Reset the peer network information
-        let res = hopr_db_entity::network_peer::Entity::delete_many()
-            .filter(
-                sea_orm::Condition::all().add(
-                    hopr_db_entity::network_peer::Column::LastSeen.lt(chrono::DateTime::<chrono::Utc>::from(
-                        hopr_platform::time::native::current_time()
-                            .checked_sub(std::time::Duration::from_secs(
-                                std::env::var("HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS")
-                                    .unwrap_or_else(|_| {
-                                        HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS.to_string()
-                                    })
-                                    .parse::<u64>()
-                                    .unwrap_or(HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS),
-                            ))
-                            .unwrap_or_else(hopr_platform::time::native::current_time),
-                    )),
-                ),
-            )
-            .exec(&peers_db)
-            .await?;
-        debug!(rows = res.rows_affected, "Cleaned up rows from the 'peers' table");
 
         Ok(Self {
             tickets_write_lock: Arc::new(async_lock::Mutex::new(())),
