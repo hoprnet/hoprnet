@@ -68,12 +68,14 @@ impl InactiveNetwork {
                 .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
                 .with_swarm_config(|cfg| {
                     cfg.with_dial_concurrency_factor(
-                        NonZeroU8::new(
-                            std::env::var("HOPR_INTERNAL_LIBP2P_MAX_CONCURRENTLY_DIALED_PEER_COUNT")
-                                .map(|v| v.trim().parse::<u8>().unwrap_or(u8::MAX))
-                                .unwrap_or(constants::HOPR_SWARM_CONCURRENTLY_DIALED_PEER_COUNT),
-                        )
-                        .expect("concurrently dialed peer count must be > 0"),
+                        NonZeroU8::new({
+                            let v = std::env::var("HOPR_INTERNAL_LIBP2P_MAX_CONCURRENTLY_DIALED_PEER_COUNT")
+                                .ok()
+                                .and_then(|v| v.trim().parse::<u8>().ok())
+                                .unwrap_or(constants::HOPR_SWARM_CONCURRENTLY_DIALED_PEER_COUNT);
+                            v.max(1)
+                        })
+                        .expect("clamped to >= 1, will never fail"),
                     )
                     .with_max_negotiating_inbound_streams(
                         std::env::var("HOPR_INTERNAL_LIBP2P_MAX_NEGOTIATING_INBOUND_STREAM_COUNT")
