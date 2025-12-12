@@ -40,7 +40,7 @@ use helpers::PathPlanner;
 pub use hopr_api::db::ChannelTicketStatistics;
 use hopr_api::{
     chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
-    db::{HoprDbPeersOperations, HoprDbTicketOperations, PeerStatus},
+    db::HoprDbTicketOperations,
 };
 use hopr_async_runtime::{AbortableList, prelude::spawn, spawn_as_abortable};
 use hopr_crypto_packet::prelude::PacketSignal;
@@ -58,7 +58,7 @@ use hopr_protocol_hopr::MemorySurbStore;
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId, Protocol};
 use hopr_transport_mixer::MixerConfig;
-pub use hopr_transport_network::{Health, traits::NetworkView};
+pub use hopr_transport_network::{Health, track::Observations, traits::NetworkView};
 use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork};
 use hopr_transport_probe::{
     Probe, TrafficGeneration,
@@ -131,7 +131,7 @@ pub struct HoprTransport<Chain, Db> {
 
 impl<Chain, Db> HoprTransport<Chain, Db>
 where
-    Db: HoprDbTicketOperations + HoprDbPeersOperations + Clone + Send + Sync + 'static,
+    Db: HoprDbTicketOperations + Clone + Send + Sync + 'static,
     Chain: ChainReadChannelOperations
         + ChainReadAccountOperations
         + ChainKeyOperations
@@ -528,31 +528,28 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn ping(&self, peer: &PeerId) -> errors::Result<(std::time::Duration, PeerStatus)> {
+    pub async fn ping(&self, peer: &PeerId) -> errors::Result<(std::time::Duration, Observations)> {
         if peer == &self.packet_key.public().into() {
             return Err(HoprTransportError::Api("ping to self does not make sense".into()));
         }
 
-        // let pinger = self
-        //     .ping
-        //     .get()
-        //     .ok_or_else(|| HoprTransportError::Api("ping processing is not yet initialized".into()))?;
+        let pinger = self
+            .ping
+            .get()
+            .ok_or_else(|| HoprTransportError::Api("ping processing is not yet initialized".into()))?;
 
-        // let network = self
-        //     .network
-        //     .get()
-        //     .ok_or_else(|| HoprTransportError::Api("transport network is not yet initialized".into()))?;
+        let network = self
+            .network
+            .get()
+            .ok_or_else(|| HoprTransportError::Api("transport network is not yet initialized".into()))?;
 
-        // let latency = (*pinger).ping(*peer).await?;
+        let latency = (*pinger).ping(*peer).await?;
 
-        // let peer_status = network
-        //     .observations_for(peer)
-        //     .ok_or(HoprTransportError::Probe(ProbeError::NonExistingPeer))?;
+        let observations = network
+            .observations_for(peer)
+            .ok_or(HoprTransportError::Probe(ProbeError::NonExistingPeer))?;
 
-        // Ok((latency, peer_status))
-
-        // TODO: return observations here
-        Err(HoprTransportError::Probe(ProbeError::NonExistingPeer))
+        Ok((latency, observations))
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
@@ -664,7 +661,7 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn network_peer_info(&self, peer: &PeerId) -> errors::Result<Option<PeerStatus>> {
+    pub async fn network_peer_observations(&self, peer: &PeerId) -> errors::Result<Option<Observations>> {
         // Ok(self.network.get(peer).await?)
         // TODO: implement using Observations
         Ok(None)

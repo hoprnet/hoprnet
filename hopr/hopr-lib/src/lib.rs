@@ -86,7 +86,7 @@ pub use hopr_api::db::ChannelTicketStatistics;
 use hopr_api::{
     chain::{AccountSelector, AnnouncementError, ChannelSelector, *},
     ct::TrafficGeneration,
-    db::{HoprNodeDbApi, PeerStatus, TicketMarker, TicketSelector},
+    db::{HoprNodeDbApi, TicketMarker, TicketSelector},
 };
 use hopr_async_runtime::prelude::spawn;
 pub use hopr_async_runtime::{Abortable, AbortableList};
@@ -773,7 +773,7 @@ where
     /// Ping another node in the network based on the PeerId
     ///
     /// Returns the RTT (round trip time), i.e. how long it took for the ping to return.
-    pub async fn ping(&self, peer: &PeerId) -> errors::Result<(std::time::Duration, PeerStatus)> {
+    pub async fn ping(&self, peer: &PeerId) -> errors::Result<(std::time::Duration, Observations)> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         Ok(self.transport_api.ping(peer).await?)
@@ -885,20 +885,20 @@ where
     }
 
     /// Get all data collected from the network relevant for a PeerId
-    pub async fn network_peer_info(&self, peer: &PeerId) -> errors::Result<Option<PeerStatus>> {
-        Ok(self.transport_api.network_peer_info(peer).await?)
+    pub async fn network_peer_info(&self, peer: &PeerId) -> errors::Result<Option<Observations>> {
+        Ok(self.transport_api.network_peer_observations(peer).await?)
     }
 
     /// Get peers connected peers with quality higher than some value
     pub async fn all_network_peers(
         &self,
-        minimum_quality: f64,
-    ) -> errors::Result<Vec<(Option<Address>, PeerId, PeerStatus)>> {
+        minimum_score: f64,
+    ) -> errors::Result<Vec<(Option<Address>, PeerId, Observations)>> {
         Ok(
             futures::stream::iter(self.transport_api.network_connected_peers().await?)
                 .filter_map(|peer| async move {
-                    if let Ok(Some(info)) = self.transport_api.network_peer_info(&peer).await {
-                        if info.get_average_quality() >= minimum_quality {
+                    if let Ok(Some(info)) = self.transport_api.network_peer_observations(&peer).await {
+                        if info.score() >= minimum_score {
                             Some((peer, info))
                         } else {
                             None

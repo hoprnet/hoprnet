@@ -34,8 +34,7 @@ class Infos(JsonResponse):
 @APIobject
 class ConnectedPeer(JsonResponse):
     address: str = APIfield()
-    version: str = APIfield("reportedVersion")
-    quality: float = APIfield()
+    score: float = APIfield()
 
 
 @APIobject
@@ -105,7 +104,6 @@ class OpenedChannel(JsonResponse):
 @APIobject
 class Ping(JsonResponse):
     latency: float = APIfield()
-    version: str = APIfield("reportedVersion")
 
 
 @APIobject

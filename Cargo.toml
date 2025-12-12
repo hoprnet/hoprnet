@@ -45,6 +45,7 @@ ahash = "0.8.12"
 anyhow = "1.0.100"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
+assertables = "9.8.2"
 async-lock = "3.4.1"
 async-signal = "0.2.13"
 async-stream = "0.3.6"

@@ -30,6 +30,7 @@ hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
+assertables = { workspace = true }
 
 [package.metadata.cargo-machete]
 ignored = ["humantime-serde"]

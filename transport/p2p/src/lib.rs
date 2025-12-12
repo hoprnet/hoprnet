@@ -117,16 +117,7 @@ impl hopr_transport_protocol::stream::BidirectionalStreamControl for HoprNetwork
 impl hopr_transport_network::traits::NetworkObservations for HoprNetwork {
     fn update(&self, peer: &PeerId, result: std::result::Result<std::time::Duration, ()>) {
         self.tracker.alter(peer, |_, mut o| {
-            match result {
-                Ok(duration) => {
-                    o.latency_average.update(duration.as_millis());
-                    o.probes_sent += 1;
-                }
-                Err(_) => {
-                    o.probes_sent += 1;
-                    o.probes_failed += 1;
-                }
-            }
+            o.record_probe(result.map_err(|_| ()));
             o
         });
     }

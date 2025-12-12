@@ -32,6 +32,8 @@ pub mod traits;
 /// Observations related to the peer activity in the network.
 pub mod track;
 
+mod utils;
+
 pub use libp2p_identity::PeerId;
 
 /// Network health represented with colors, where green is the best and red

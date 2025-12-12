@@ -34,4 +34,3 @@ hopr-primitive-types = { workspace = true }
 hopr-chain-types = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-platform = { workspace = true }
