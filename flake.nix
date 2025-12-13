@@ -256,6 +256,9 @@
               export NIX_SSL_CERT_FILE="$ssl_cert_file"
             fi
 
+            # ensure the temporary directory exists
+            mkdir -p ${"TMPDIR:-/app/.tmp"}
+
             # if the default listen host has not been set by the user,
             # we will set it to the container's ip address
             # defaulting to random port
@@ -283,9 +286,6 @@
               # default to hoprd
               exec /bin/hoprd "$@"
             fi
-
-            # ensure the temporary directory exists
-            mkdir -p ${"TMPDIR:-/app/.tmp"}
           '';
 
           # Man pages using nix-lib
