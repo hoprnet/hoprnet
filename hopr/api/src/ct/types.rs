@@ -79,10 +79,17 @@ impl AsRef<[u8]> for NeighborProbe {
     }
 }
 
+/// Path telemetry data for multi-hop loopback probing.
+///
+/// Contains an identifier, path information, and timestamp for tracking
+/// telemetry through the network back to self.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PathTelemetry {
+    /// Unique identifier for the telemetry data
     pub id: [u8; Self::ID_SIZE],
+    /// Path information encoded as bytes
     pub path: [u8; Self::PATH_SIZE],
+    /// Timestamp when the telemetry was created
     pub timestamp: u128,
 }
 
