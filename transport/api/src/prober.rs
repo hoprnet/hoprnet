@@ -6,22 +6,22 @@ use rand::seq::SliceRandom;
 
 // TODO: replace with telemetry:
 // hopr_metrics::SimpleHistogram::new(
-// "hopr_ping_time_sec",
-// "Measures total time it takes to ping a single node (seconds)",
+// "hopr_probe_time_sec",
+// "Measures total time it takes to probe a single node (seconds)",
 // vec![0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0],
 
 // TODO: replace with telemetry:
 // static ref METRIC_PROBE_COUNT:  hopr_metrics::MultiCounter =  hopr_metrics::MultiCounter::new(
 // "hopr_probe_count",
-//             "Total number of pings by result",
+//             "Total number of probes by result",
 //             &["success"]
 
-/// Implementor of the ping external API.
+/// Implementor of the 0-hop probing external API.
 ///
-/// Ping requires functionality from external components in order to obtain
-/// the triggers for its functionality. This class implements the basic API by
-/// aggregating all necessary ping resources without leaking them into the
-/// `Ping` object and keeping both the adaptor and the ping object OCP and SRP
+/// Probing requires functionality from external components in order to obtain
+/// the triggers for its functionality. This struct implements the basic API by
+/// aggregating all necessary network resources without leaking them into the
+/// `Probe` object, keeping both the adaptor and the probe object OCP and SRP
 /// compliant.
 #[derive(Debug, Clone)]
 pub struct ProbeNetworkInteractions {
@@ -36,9 +36,7 @@ impl ProbeNetworkInteractions {
 
 #[async_trait]
 impl PeerDiscoveryFetch for ProbeNetworkInteractions {
-    /// Get all peers considered by the `Network` to be pingable.
-    ///
-    /// After a duration of non-pinging based specified by the configurable threshold.
+    /// Get all peers considered by the `Network` to be probeable.
     #[tracing::instrument(level = "debug", skip(self))]
     async fn get_peers(&self, from_timestamp: std::time::SystemTime) -> Vec<hopr_transport_network::PeerId> {
         tracing::trace!(?from_timestamp, "fetching peers for probing, ignoring timestamp");
@@ -59,7 +57,7 @@ impl ProbeStatusUpdate for ProbeNetworkInteractions {
         let result = match &result {
             Ok(duration) => Ok(*duration),
             Err(error) => {
-                tracing::trace!(%error, "Encountered timeout on peer ping");
+                tracing::trace!(%error, "Encountered timeout on peer probe");
                 Err(())
             }
         };
