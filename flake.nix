@@ -257,7 +257,7 @@
             fi
 
             # ensure the temporary directory exists
-            mkdir -p ${"TMPDIR:-/app/.tmp"}
+            mkdir -p ${TMPDIR:-/app/.tmp}
 
             # if the default listen host has not been set by the user,
             # we will set it to the container's ip address
