@@ -16,9 +16,11 @@ pub enum TrafficGenerationError {
 /// A trait specifying the graph traversal functionality
 #[async_trait::async_trait]
 pub trait NetworkGraphView {
-    async fn nodes(&self) -> impl Stream<Item = PeerId>;
+    /// Returns a stream of all known nodes in the network graph.
+    async fn nodes(&self) -> impl Stream<Item = PeerId> + Send;
 
-    async fn find_routes_to(&self, destination: &PeerId, length: usize) -> Vec<DestinationRouting>;
+    /// Returns a list of all routes to the given destination of the specified length.
+    async fn find_routes(&self, destination: &PeerId, length: usize) -> Vec<DestinationRouting>;
 }
 
 /// A trait for types that can produce a stream of cover traffic routes.

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use futures::{FutureExt, SinkExt, StreamExt, pin_mut};
 use futures_concurrency::stream::StreamExt as _;
-use hopr_api::ct::{NeighborProbe, NeighborTelemetry, Telemetry, TrafficGeneration};
+use hopr_api::ct::{NeighborProbe, NeighborTelemetry, NetworkGraphView, Telemetry, TrafficGeneration};
 use hopr_async_runtime::AbortableList;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::types::OffchainPublicKey;
@@ -13,7 +13,10 @@ use hopr_primitive_types::traits::AsUnixTimestamp;
 use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut, ReservedTag};
 use libp2p_identity::PeerId;
 
-use crate::{HoprProbeProcess, config::ProbeConfig, content::Message, errors::ProbeError, ping::PingQueryReplier};
+use crate::{
+    HoprProbeProcess, config::ProbeConfig, content::Message, errors::ProbeError,
+    neighbors::ImmediateNeighborChannelGraph, ping::PingQueryReplier,
+};
 
 #[inline(always)]
 fn to_nonce(message: &Message) -> String {
@@ -79,12 +82,13 @@ impl Probe {
     }
 
     /// The main function that assembles and starts the probing process.
-    pub async fn continuously_scan<T, U, V, Up, Tr>(
+    pub async fn continuously_scan<T, U, V, Up, Tr, G>(
         self,
         api: (T, U),      // lower (tx, rx) channels for sending and receiving messages
         manual_events: V, // explicit requests from the API
         move_up: Up,      // forward up non-probing messages from the network
         traffic_generator: Tr,
+        network_graph: G,
     ) -> AbortableList<HoprProbeProcess>
     where
         T: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + 'static,
@@ -93,13 +97,14 @@ impl Probe {
         V: futures::Stream<Item = (PeerId, PingQueryReplier)> + Send + Sync + 'static,
         Up: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Clone + Send + Sync + 'static,
         Tr: TrafficGeneration + Send + Sync + 'static,
+        G: NetworkGraphView + Send + Sync + 'static,
     {
         let max_parallel_probes = self.cfg.max_parallel_probes;
 
-        let (probing_routes, reports) = traffic_generator.build();
+        let probing_routes = traffic_generator.build(network_graph);
 
         // Currently active probes
-        let store_eviction = reports.clone();
+        // let store_eviction = reports.clone();    // TODO
         let timeout = self.cfg.timeout;
         let active_probes: moka::future::Cache<CacheKey, CacheValue> = moka::future::Cache::builder()
             .time_to_live(timeout)
@@ -111,7 +116,7 @@ impl Probe {
                       -> moka::notification::ListenerFuture {
                     if matches!(cause, moka::notification::RemovalCause::Expired) {
                         // If the eviction cause is expiration => record as a failed probe
-                        let store = store_eviction.clone();
+                        // let store = store_eviction.clone();      // TODO
                         let (peer, _start, notifier) = v;
 
                         tracing::debug!(%peer, pseudonym = %k.0, probe = %k.1, reason = "timeout", "probe failed");
@@ -131,15 +136,16 @@ impl Probe {
                         if let NodeId::Offchain(opk) = peer.as_ref() {
                             let peer: PeerId = opk.into();
                             futures::FutureExt::boxed(async move {
-                                pin_mut!(store);
-                                if let Err(error) = store
-                                    .send(Err(hopr_api::ct::traits::TrafficGenerationError::ProbeNeighborTimeout(
-                                        peer,
-                                    )))
-                                    .await
-                                {
-                                    tracing::error!(%peer, %error, "failed to record probe timeout");
-                                }
+                                // pin_mut!(store);
+                                // if let Err(error) = store
+                                //     .send(Err(hopr_api::ct::traits::TrafficGenerationError::ProbeNeighborTimeout(
+                                //         peer,
+                                //     )))
+                                //     .await
+                                // {
+                                //     tracing::error!(%peer, %error, "failed to record probe timeout");
+                                // }
+                                // TODO
                             })
                         } else {
                             futures::FutureExt::boxed(futures::future::ready(()))
@@ -243,7 +249,7 @@ impl Probe {
                 let active_probes = active_probes_rx.clone();
                 let push_to_network = Sender { downstream: api.0.clone() };
                 let move_up = move_up.clone();
-                let store = reports.clone();
+                // let store = reports.clone();   // TODO
 
                 async move {
                     // TODO(v3.1): compare not only against ping tag, but also against telemetry that will be occurring on random tags
@@ -254,10 +260,11 @@ impl Probe {
                             Ok(message) => {
                                 match message {
                                     Message::Telemetry(path_telemetry) => {
-                                        pin_mut!(store);
-                                        if let Err(error) = store.send(Ok(Telemetry::Loopback(path_telemetry))).await {
-                                            tracing::error!(%pseudonym, %error, "failed to record probe success");
-                                        }
+                                        // TODO
+                                        // pin_mut!(store);
+                                        // if let Err(error) = store.send(Ok(Telemetry::Loopback(path_telemetry))).await {
+                                        //     tracing::error!(%pseudonym, %error, "failed to record probe success");
+                                        // }
                                     },
                                     Message::Probe(NeighborProbe::Ping(ping)) => {
                                         tracing::debug!(%pseudonym, nonce = hex::encode(ping), "received ping");
@@ -277,13 +284,14 @@ impl Probe {
 
                                             if let NodeId::Offchain(opk) = peer.as_ref() {
                                                 tracing::info!(%pseudonym, nonce = hex::encode(pong), latency_ms = latency.as_millis(), "probe successful");
-                                                pin_mut!(store);
-                                                if let Err(error) = store.send(Ok(Telemetry::Neighbor(NeighborTelemetry {
-                                                    peer: opk.into(),
-                                                    rtt: latency,
-                                                }))).await {
-                                                    tracing::error!(%pseudonym, %error, "failed to record probe success");
-                                                }
+                                                // pin_mut!(store);
+                                                // if let Err(error) = store.send(Ok(Telemetry::Neighbor(NeighborTelemetry {
+                                                //     peer: opk.into(),
+                                                //     rtt: latency,
+                                                // }))).await {
+                                                //     tracing::error!(%pseudonym, %error, "failed to record probe success");
+                                                // }
+                                                // TODO
                                             } else {
                                                 tracing::warn!(%pseudonym, nonce = hex::encode(pong), latency_ms = latency.as_millis(), "probe successful to non-offchain peer");
                                             }
@@ -385,7 +393,7 @@ mod tests {
         F: Fn(TestInterface) -> Fut + Send + Sync + 'static,
         St: ProbeStatusUpdate + PeerDiscoveryFetch + Clone + Send + Sync + 'static,
     {
-        let probe = Probe::new(cfg);
+        let probe = Probe::new(cfg.clone());
 
         let (from_probing_up_tx, from_probing_up_rx) =
             futures::channel::mpsc::channel::<(HoprPseudonym, ApplicationDataIn)>(100);
@@ -410,7 +418,8 @@ mod tests {
                 (from_probing_to_network_tx, from_network_to_probing_rx),
                 manual_probe_rx,
                 from_probing_up_tx,
-                ImmediateNeighborProber::new(cfg, store),
+                ImmediateNeighborProber::new(cfg),
+                ImmediateNeighborChannelGraph::new(store, cfg.recheck_threshold),
             )
             .await;
 

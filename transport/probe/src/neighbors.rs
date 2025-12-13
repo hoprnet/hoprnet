@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use async_stream::stream;
-use hopr_api::ct::{Telemetry, TrafficGeneration, traits::TrafficGenerationError};
+use futures::StreamExt;
+use hopr_api::ct::{NetworkGraphView, TrafficGeneration};
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::protocol::HoprPseudonym;
@@ -14,140 +15,121 @@ use crate::{
     traits::{PeerDiscoveryFetch, ProbeStatusUpdate},
 };
 
-struct TelemetrySink<T> {
+// let prober = self.prober.clone();
+// hopr_async_runtime::prelude::spawn(async move {
+//     match item {
+//         Ok(telemetry) => match telemetry {
+//             Telemetry::Loopback(_path_telemetry) => {
+//                 tracing::warn!(
+//                     reason = "feature not implemented",
+//                     "loopback path telemetry not supported yet"
+//                 );
+//             }
+//             Telemetry::Neighbor(neighbor_telemetry) => {
+//                 tracing::trace!(
+//                     peer = %neighbor_telemetry.peer,
+//                     latency_ms = neighbor_telemetry.rtt.as_millis(),
+//                     "neighbor probe successful"
+//                 );
+//                 prober
+//                     .on_finished(&neighbor_telemetry.peer, &Ok(neighbor_telemetry.rtt))
+//                     .await;
+//             }
+//         },
+//         Err(error) => match error {
+//             TrafficGenerationError::ProbeNeighborTimeout(peer) => {
+//                 tracing::trace!(
+//                     %peer,
+//                     "neighbor probe timed out"
+//                 );
+//                 prober
+//                     .on_finished(
+//                         &peer,
+//                         &Err(crate::errors::ProbeError::TrafficError(
+//                             TrafficGenerationError::ProbeNeighborTimeout(peer),
+//                         )),
+//                     )
+//                     .await;
+//             }
+//             TrafficGenerationError::ProbeLoopbackTimeout(_telemetry) => {
+//                 tracing::warn!(
+//                     reason = "feature not implemented",
+//                     "loopback path telemetry not supported yet"
+//                 );
+//             }
+//         },
+//     }
+// });
+// Ok(())
+
+pub struct ImmediateNeighborChannelGraph<T> {
     prober: Arc<T>,
+    recheck_threshold: std::time::Duration,
 }
 
-impl<T> Clone for TelemetrySink<T> {
-    fn clone(&self) -> Self {
+impl<T> ImmediateNeighborChannelGraph<T> {
+    pub fn new(prober: T, recheck_threshold: std::time::Duration) -> Self {
         Self {
-            prober: self.prober.clone(),
-        }
-    }
-}
-
-impl<T> futures::Sink<std::result::Result<Telemetry, TrafficGenerationError>> for TelemetrySink<T>
-where
-    T: ProbeStatusUpdate + Send + Sync + 'static,
-{
-    type Error = std::convert::Infallible;
-
-    fn poll_ready(
-        self: std::pin::Pin<&mut Self>,
-        _cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), Self::Error>> {
-        std::task::Poll::Ready(Ok(()))
-    }
-
-    fn start_send(
-        self: std::pin::Pin<&mut Self>,
-        item: std::result::Result<Telemetry, TrafficGenerationError>,
-    ) -> Result<(), Self::Error> {
-        let prober = self.prober.clone();
-        hopr_async_runtime::prelude::spawn(async move {
-            match item {
-                Ok(telemetry) => match telemetry {
-                    Telemetry::Loopback(_path_telemetry) => {
-                        tracing::warn!(
-                            reason = "feature not implemented",
-                            "loopback path telemetry not supported yet"
-                        );
-                    }
-                    Telemetry::Neighbor(neighbor_telemetry) => {
-                        tracing::trace!(
-                            peer = %neighbor_telemetry.peer,
-                            latency_ms = neighbor_telemetry.rtt.as_millis(),
-                            "neighbor probe successful"
-                        );
-                        prober
-                            .on_finished(&neighbor_telemetry.peer, &Ok(neighbor_telemetry.rtt))
-                            .await;
-                    }
-                },
-                Err(error) => match error {
-                    TrafficGenerationError::ProbeNeighborTimeout(peer) => {
-                        tracing::trace!(
-                            %peer,
-                            "neighbor probe timed out"
-                        );
-                        prober
-                            .on_finished(
-                                &peer,
-                                &Err(crate::errors::ProbeError::TrafficError(
-                                    TrafficGenerationError::ProbeNeighborTimeout(peer),
-                                )),
-                            )
-                            .await;
-                    }
-                    TrafficGenerationError::ProbeLoopbackTimeout(_telemetry) => {
-                        tracing::warn!(
-                            reason = "feature not implemented",
-                            "loopback path telemetry not supported yet"
-                        );
-                    }
-                },
-            }
-        });
-        Ok(())
-    }
-
-    fn poll_flush(
-        self: std::pin::Pin<&mut Self>,
-        _cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), Self::Error>> {
-        std::task::Poll::Ready(Ok(()))
-    }
-
-    fn poll_close(
-        self: std::pin::Pin<&mut Self>,
-        _cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), Self::Error>> {
-        std::task::Poll::Ready(Ok(()))
-    }
-}
-
-pub struct ImmediateNeighborProber<T> {
-    cfg: ProbeConfig,
-    prober: Arc<T>,
-}
-
-impl<T> ImmediateNeighborProber<T> {
-    pub fn new(cfg: ProbeConfig, prober: T) -> Self {
-        Self {
-            cfg,
             prober: Arc::new(prober),
+            recheck_threshold,
         }
     }
 }
 
-impl<T> TrafficGeneration for ImmediateNeighborProber<T>
+#[async_trait::async_trait]
+impl<T> NetworkGraphView for ImmediateNeighborChannelGraph<T>
 where
-    T: PeerDiscoveryFetch + ProbeStatusUpdate + Send + Sync + 'static,
+    T: PeerDiscoveryFetch + Send + Sync + 'static,
 {
-    fn build(
-        self,
-    ) -> (
-        impl futures::Stream<Item = DestinationRouting> + Send,
-        impl futures::Sink<std::result::Result<Telemetry, TrafficGenerationError>, Error = impl std::error::Error>
-        + Send
-        + Sync
-        + Clone
-        + 'static,
-    ) {
+    async fn nodes(&self) -> impl futures::Stream<Item = PeerId> + Send {
+        let prober = self.prober.clone();
+        let recheck_threshold = self.recheck_threshold;
+
+        stream! {
+            let now = std::time::SystemTime::now();
+            let peers = prober.get_peers(now.checked_sub(recheck_threshold).unwrap_or(now)).await;
+            for peer in peers {
+                yield peer;
+            }
+        }
+    }
+
+    async fn find_routes(&self, _destination: &PeerId, _length: usize) -> Vec<DestinationRouting> {
+        vec![]
+    }
+}
+
+pub struct ImmediateNeighborProber {
+    cfg: ProbeConfig,
+}
+
+impl ImmediateNeighborProber {
+    pub fn new(cfg: ProbeConfig) -> Self {
+        Self { cfg }
+    }
+}
+
+impl TrafficGeneration for ImmediateNeighborProber
+// where
+//     T: PeerDiscoveryFetch + ProbeStatusUpdate + Send + Sync + 'static,
+{
+    fn build<U>(self, network_graph: U) -> impl futures::Stream<Item = DestinationRouting> + Send
+    where
+        U: NetworkGraphView + Send + Sync + 'static,
+    {
         // For each probe target a cached version of transport routing is stored
         let cache_peer_routing: moka::future::Cache<PeerId, DestinationRouting> = moka::future::Cache::builder()
             .time_to_live(std::time::Duration::from_secs(600))
             .max_capacity(100_000)
             .build();
 
-        let prober = self.prober.clone();
+        let cfg = self.cfg;
 
         let route_stream = stream! {
             let mut rng = hopr_crypto_random::rng();
             loop {
-                let now = std::time::SystemTime::now();
-
-                let mut peers = prober.get_peers(now.checked_sub(self.cfg.recheck_threshold).unwrap_or(now)).await;
+                //
+                let mut peers = network_graph.nodes().await.collect::<Vec<_>>().await;
                 peers.shuffle(&mut rng);    // shuffle peers to randomize order between rounds
 
                 for peer in peers {
@@ -165,13 +147,11 @@ where
                         }
                 }
 
-                hopr_async_runtime::prelude::sleep(self.cfg.interval).await;
+                hopr_async_runtime::prelude::sleep(cfg.interval).await;
             }
         };
 
-        let result_sink = TelemetrySink { prober: self.prober };
-
-        (route_stream, result_sink)
+        route_stream
     }
 }
 
@@ -204,8 +184,13 @@ mod tests {
         let mut fetcher = MockScanInteraction::new();
         fetcher.expect_get_peers().returning(|_| vec![]);
 
-        let prober = ImmediateNeighborProber::new(Default::default(), fetcher);
-        let (stream, _sink) = prober.build();
+        let channel_graph = ImmediateNeighborChannelGraph {
+            prober: Arc::new(fetcher),
+            recheck_threshold: ProbeConfig::default().recheck_threshold,
+        };
+
+        let prober = ImmediateNeighborProber::new(Default::default());
+        let stream = prober.build(channel_graph);
         pin_mut!(stream);
 
         assert!(timeout(TINY_TIMEOUT, stream.next()).await.is_err());
@@ -225,8 +210,13 @@ mod tests {
         let mut fetcher = MockScanInteraction::new();
         fetcher.expect_get_peers().returning(|_| RANDOM_PEERS.clone());
 
-        let prober = ImmediateNeighborProber::new(Default::default(), fetcher);
-        let (stream, _sink) = prober.build();
+        let channel_graph = ImmediateNeighborChannelGraph {
+            prober: Arc::new(fetcher),
+            recheck_threshold: ProbeConfig::default().recheck_threshold,
+        };
+
+        let prober = ImmediateNeighborProber::new(Default::default());
+        let stream = prober.build(channel_graph);
         pin_mut!(stream);
 
         let actual = timeout(
@@ -270,8 +260,13 @@ mod tests {
         });
         fetcher.expect_get_peers().returning(|_| vec![]);
 
-        let prober = ImmediateNeighborProber::new(cfg, fetcher);
-        let (stream, _sink) = prober.build();
+        let channel_graph = ImmediateNeighborChannelGraph {
+            prober: Arc::new(fetcher),
+            recheck_threshold: cfg.recheck_threshold,
+        };
+
+        let prober = ImmediateNeighborProber::new(cfg);
+        let stream = prober.build(channel_graph);
         pin_mut!(stream);
 
         assert!(timeout(TINY_TIMEOUT, stream.next()).await?.is_some());
