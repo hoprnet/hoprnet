@@ -10,7 +10,7 @@ lazy_static::lazy_static! {
          hopr_metrics::SimpleGauge::new("hopr_peer_count", "Number of all peers").unwrap();
 }
 
-/// In-memmory store for network peer multiaddresses.
+/// In-memory store for network peer multiaddresses.
 ///
 /// The structure holds the mapping between the [`PeerId`] and its associated reported
 /// multiaddresses recovered from the network discovery mechanism as [`Multiaddr`].
