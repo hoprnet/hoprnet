@@ -20,8 +20,8 @@ use rand::seq::SliceRandom;
 ///
 /// Probing requires functionality from external components in order to obtain
 /// the triggers for its functionality. This struct implements the basic API by
-/// aggregating all necessary probe resources without leaking them into the
-/// `Probe` object and keeping both the adaptor and the probe object OCP and SRP
+/// aggregating all necessary network resources without leaking them into the
+/// `Probe` object, keeping both the adaptor and the probe object OCP and SRP
 /// compliant.
 #[derive(Debug, Clone)]
 pub struct ProbeNetworkInteractions {
@@ -38,7 +38,7 @@ impl ProbeNetworkInteractions {
 impl PeerDiscoveryFetch for ProbeNetworkInteractions {
     /// Get all peers considered by the `Network` to be probeable.
     ///
-    /// After a duration of non-probing based specified by the configurable threshold.
+    /// After a configurable threshold duration of non-probing activity.
     #[tracing::instrument(level = "debug", skip(self))]
     async fn get_peers(&self, from_timestamp: std::time::SystemTime) -> Vec<hopr_transport_network::PeerId> {
         tracing::trace!(?from_timestamp, "fetching peers for probing, ignoring timestamp");
