@@ -283,6 +283,9 @@
               # default to hoprd
               exec /bin/hoprd "$@"
             fi
+
+            # ensure the temporary directory exists
+            mkdir -p ${"TMPDIR:-/app/.tmp"}
           '';
 
           # Man pages using nix-lib
@@ -305,7 +308,7 @@
             ];
             Entrypoint = [ "/bin/docker-entrypoint.sh" ];
             Cmd = [ "hoprd" ];
-            env = [ "TMPDIR=/app" ];
+            env = [ "TMPDIR=/app/.tmp" ];
           };
           hoprd-dev-docker = nixLib.mkDockerImage {
             name = "hoprd";
@@ -316,7 +319,7 @@
             ];
             Entrypoint = [ "/bin/docker-entrypoint.sh" ];
             Cmd = [ "hoprd" ];
-            env = [ "TMPDIR=/app" ];
+            env = [ "TMPDIR=/app/.tmp" ];
           };
           hoprd-profile-docker = nixLib.mkDockerImage {
             name = "hoprd";
@@ -328,7 +331,7 @@
             ++ profileDeps;
             Entrypoint = [ "/bin/docker-entrypoint.sh" ];
             Cmd = [ "hoprd" ];
-            env = [ "TMPDIR=/app" ];
+            env = [ "TMPDIR=/app/.tmp" ];
           };
 
           # Docker security scanning and SBOM generation using nix-lib
