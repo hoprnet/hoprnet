@@ -161,6 +161,7 @@ pub enum Telemetry {
     Loopback(PathTelemetry),
     /// Immediate neighbor telemetry data.
     ///
-    /// Assumes a cooperating immedate peer to receive responses for telemetry construction
+    /// Assumes a cooperating immediate peer to receive responses for telemetry construction
+     Neighbor(NeighborTelemetry),
     Neighbor(NeighborTelemetry),
 }
