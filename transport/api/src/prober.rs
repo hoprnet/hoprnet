@@ -37,8 +37,6 @@ impl ProbeNetworkInteractions {
 #[async_trait]
 impl PeerDiscoveryFetch for ProbeNetworkInteractions {
     /// Get all peers considered by the `Network` to be probeable.
-    ///
-    /// After a configurable threshold duration of non-probing activity.
     #[tracing::instrument(level = "debug", skip(self))]
     async fn get_peers(&self, from_timestamp: std::time::SystemTime) -> Vec<hopr_transport_network::PeerId> {
         tracing::trace!(?from_timestamp, "fetching peers for probing, ignoring timestamp");
