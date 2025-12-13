@@ -16,7 +16,7 @@ impl NeighborProbe {
     pub const NONCE_SIZE: usize = 32;
     pub const SIZE: usize = 1 + Self::NONCE_SIZE;
 
-    /// Returns the nonce of the message
+    /// Creates a new Ping probe with a random nonce
     pub fn random_nonce() -> Self {
         Self::Ping(hopr_crypto_random::random_bytes::<{ Self::NONCE_SIZE }>())
     }
@@ -153,7 +153,7 @@ pub struct NeighborTelemetry {
     pub rtt: std::time::Duration,
 }
 
-/// Enum representing different types of telemetry data used by the CT mechanism..
+/// Enum representing different types of telemetry data used by the CT mechanism.
 pub enum Telemetry {
     /// Telemetry data looping the traffic through multiple peers back to self.
     ///
@@ -162,6 +162,5 @@ pub enum Telemetry {
     /// Immediate neighbor telemetry data.
     ///
     /// Assumes a cooperating immediate peer to receive responses for telemetry construction
-     Neighbor(NeighborTelemetry),
     Neighbor(NeighborTelemetry),
 }
