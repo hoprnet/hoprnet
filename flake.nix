@@ -249,6 +249,13 @@
           dockerHoprdEntrypoint = pkgs.writeShellScriptBin "docker-entrypoint.sh" ''
             set -euo pipefail
 
+            # ensure TLS clients can locate the CA bundle inside the container
+            ssl_cert_file="/etc/ssl/certs/ca-bundle.crt"
+            if [ -f "$ssl_cert_file" ]; then
+              export SSL_CERT_FILE="$ssl_cert_file"
+              export NIX_SSL_CERT_FILE="$ssl_cert_file"
+            fi
+
             # if the default listen host has not been set by the user,
             # we will set it to the container's ip address
             # defaulting to random port
@@ -294,28 +301,34 @@
             extraContents = [
               dockerHoprdEntrypoint
               hoprd-x86_64-linux
+              pkgs.cacert
             ];
             Entrypoint = [ "/bin/docker-entrypoint.sh" ];
             Cmd = [ "hoprd" ];
+            env = [ "TMPDIR=/app" ];
           };
           hoprd-dev-docker = nixLib.mkDockerImage {
             name = "hoprd";
             extraContents = [
               dockerHoprdEntrypoint
               hoprd-x86_64-linux-dev
+              pkgs.cacert
             ];
             Entrypoint = [ "/bin/docker-entrypoint.sh" ];
             Cmd = [ "hoprd" ];
+            env = [ "TMPDIR=/app" ];
           };
           hoprd-profile-docker = nixLib.mkDockerImage {
             name = "hoprd";
             extraContents = [
               dockerHoprdEntrypoint
               hoprd-x86_64-linux-profile
+              pkgs.cacert
             ]
             ++ profileDeps;
             Entrypoint = [ "/bin/docker-entrypoint.sh" ];
             Cmd = [ "hoprd" ];
+            env = [ "TMPDIR=/app" ];
           };
 
           # Docker security scanning and SBOM generation using nix-lib
