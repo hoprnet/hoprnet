@@ -20,14 +20,13 @@ runtime-tokio = [
 ]
 prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
 sqlite = ["sea-query/backend-sqlite"]
+serde = ["hopr-primitive-types/serde"]
 
 [dependencies]
 anyhow = { workspace = true }
 async-lock = { workspace = true }
 async-stream = { workspace = true }
 async-trait = { workspace = true }
-bincode = { workspace = true }
-chrono = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
 lazy_static = { workspace = true, optional = true }
@@ -44,22 +43,19 @@ tracing = { workspace = true }
 thiserror = { workspace = true }
 validator = { workspace = true }
 
-hopr-api = { workspace = true }
+hopr-api = { workspace = true, features = ["chain", "db"] }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-db-entity = { workspace = true }
 hopr-db-migration = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
-hopr-parallelize = { workspace = true, features = ["rayon"] }
-hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
 hex-literal = { workspace = true }
 lazy_static = { workspace = true }
-rand = { workspace = true }
 sea-orm = { workspace = true }
 sqlx = { workspace = true, features = ["runtime-tokio"] }
 tokio = { workspace = true }

@@ -203,7 +203,6 @@ impl From<UserHoprLibConfig> for HoprLibConfig {
                     announce_local_addresses: value.network.announce_local_addresses,
                     prefer_local_addresses: value.network.prefer_local_addresses,
                 },
-                network: Default::default(),
                 packet: HoprPacketPipelineConfig {
                     codec: HoprCodecConfig {
                         outgoing_win_prob: value

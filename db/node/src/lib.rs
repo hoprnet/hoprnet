@@ -1,6 +1,5 @@
 mod db;
 pub mod errors;
-mod peers;
 mod tickets;
 
 use std::path::PathBuf;

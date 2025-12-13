@@ -7,24 +7,20 @@ use std::{
 
 use hopr_internal_types::channels::ChannelId;
 use hopr_primitive_types::prelude::HoprBalance;
-use migration::{MigratorPeers, MigratorTickets, MigratorTrait};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, SqlxSqliteConnector};
+use migration::{MigratorTickets, MigratorTrait};
+use sea_orm::SqlxSqliteConnector;
 use sqlx::{
     ConnectOptions, SqlitePool,
     pool::PoolOptions,
     sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous},
 };
-use tracing::{debug, log::LevelFilter};
+use tracing::log::LevelFilter;
 use validator::Validate;
 
 use crate::errors::NodeDbError;
 
-/// Filename for the network peers database.
-pub const SQL_DB_PEERS_FILE_NAME: &str = "hopr_peers.db";
 /// Filename for the payment tickets database.
 pub const SQL_DB_TICKETS_FILE_NAME: &str = "hopr_tickets.db";
-
-pub const HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS: u64 = 5 * 60; // 5 minutes
 
 #[derive(Clone, Debug, validator::Validate, smart_default::SmartDefault)]
 pub struct HoprNodeDbConfig {
@@ -39,7 +35,6 @@ pub struct HoprNodeDbConfig {
 #[derive(Clone)]
 pub struct HoprNodeDb {
     pub(crate) tickets_db: sea_orm::DatabaseConnection,
-    pub(crate) peers_db: sea_orm::DatabaseConnection,
     pub(crate) tickets_write_lock: Arc<async_lock::Mutex<()>>,
     pub(crate) cfg: HoprNodeDbConfig,
     // This value must be cached here, due to complicated invalidation logic.
@@ -52,21 +47,6 @@ impl HoprNodeDb {
 
         fs::create_dir_all(directory).map_err(|e| NodeDbError::Other(e.into()))?;
 
-        let peers_options = PoolOptions::new()
-            .acquire_timeout(Duration::from_secs(60)) // Default is 30
-            .idle_timeout(Some(Duration::from_secs(10 * 60))) // This is the default
-            .max_lifetime(Some(Duration::from_secs(30 * 60))); // This is the default
-
-        let peers = Self::create_pool(
-            cfg.clone(),
-            directory.to_path_buf(),
-            peers_options,
-            Some(0),
-            Some(300),
-            SQL_DB_PEERS_FILE_NAME,
-        )
-        .await?;
-
         let tickets = Self::create_pool(
             cfg.clone(),
             directory.to_path_buf(),
@@ -78,15 +58,12 @@ impl HoprNodeDb {
         .await?;
 
         #[cfg(feature = "sqlite")]
-        Self::new_sqlx_sqlite(tickets, peers, cfg).await
+        Self::new_sqlx_sqlite(tickets, cfg).await
     }
 
     #[cfg(feature = "sqlite")]
     pub async fn new_in_memory() -> Result<Self, NodeDbError> {
         Self::new_sqlx_sqlite(
-            SqlitePool::connect(":memory:")
-                .await
-                .map_err(|e| NodeDbError::Other(e.into()))?,
             SqlitePool::connect(":memory:")
                 .await
                 .map_err(|e| NodeDbError::Other(e.into()))?,
@@ -96,38 +73,9 @@ impl HoprNodeDb {
     }
 
     #[cfg(feature = "sqlite")]
-    async fn new_sqlx_sqlite(
-        peers_db_pool: SqlitePool,
-        tickets_db_pool: SqlitePool,
-        cfg: HoprNodeDbConfig,
-    ) -> Result<Self, NodeDbError> {
+    async fn new_sqlx_sqlite(tickets_db_pool: SqlitePool, cfg: HoprNodeDbConfig) -> Result<Self, NodeDbError> {
         let tickets_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(tickets_db_pool);
         MigratorTickets::up(&tickets_db, None).await?;
-
-        let peers_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(peers_db_pool);
-        MigratorPeers::up(&peers_db, None).await?;
-
-        // Reset the peer network information
-        let res = hopr_db_entity::network_peer::Entity::delete_many()
-            .filter(
-                sea_orm::Condition::all().add(
-                    hopr_db_entity::network_peer::Column::LastSeen.lt(chrono::DateTime::<chrono::Utc>::from(
-                        hopr_platform::time::native::current_time()
-                            .checked_sub(std::time::Duration::from_secs(
-                                std::env::var("HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS")
-                                    .unwrap_or_else(|_| {
-                                        HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS.to_string()
-                                    })
-                                    .parse::<u64>()
-                                    .unwrap_or(HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS),
-                            ))
-                            .unwrap_or_else(hopr_platform::time::native::current_time),
-                    )),
-                ),
-            )
-            .exec(&peers_db)
-            .await?;
-        debug!(rows = res.rows_affected, "Cleaned up rows from the 'peers' table");
 
         Ok(Self {
             tickets_write_lock: Arc::new(async_lock::Mutex::new(())),
@@ -135,7 +83,6 @@ impl HoprNodeDb {
                 .time_to_idle(std::time::Duration::from_secs(30))
                 .build(),
             tickets_db,
-            peers_db,
             cfg,
         })
     }
@@ -179,113 +126,12 @@ impl HoprNodeDb {
 
 #[cfg(test)]
 mod tests {
-    use hopr_api::{db::*, *};
-    use hopr_crypto_types::{keypairs::OffchainKeypair, prelude::Keypair};
-    use hopr_primitive_types::prelude::SingleSumSMA;
-    use rand::{Rng, distributions::Alphanumeric};
-
     use super::*;
 
     #[tokio::test]
     async fn test_basic_db_init() -> anyhow::Result<()> {
         let db = HoprNodeDb::new_in_memory().await?;
         MigratorTickets::status(&db.tickets_db).await?;
-        MigratorPeers::status(&db.peers_db).await?;
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn peers_without_any_recent_updates_should_be_discarded_on_restarts() -> anyhow::Result<()> {
-        let random_filename: String = rand::thread_rng()
-            .sample_iter(&Alphanumeric)
-            .take(15)
-            .map(char::from)
-            .collect();
-        let random_tmp_file = format!("/tmp/{random_filename}.sqlite");
-
-        let peer_id: PeerId = OffchainKeypair::random().public().into();
-        let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse()?;
-        let ma_2: Multiaddr = format!("/ip4/127.0.0.1/tcp/10002/p2p/{peer_id}").parse()?;
-
-        let path = std::path::Path::new(&random_tmp_file);
-
-        {
-            let db = HoprNodeDb::new(path, HoprNodeDbConfig::default()).await?;
-
-            db.add_network_peer(
-                &peer_id,
-                PeerOrigin::IncomingConnection,
-                vec![ma_1.clone(), ma_2.clone()],
-                0.0,
-                25,
-            )
-            .await?;
-        }
-
-        {
-            let db = HoprNodeDb::new(path, HoprNodeDbConfig::default()).await?;
-
-            let not_found_peer = db.get_network_peer(&peer_id).await?;
-
-            assert_eq!(not_found_peer, None);
-        }
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn peers_with_a_recent_update_should_be_retained_in_the_database() -> anyhow::Result<()> {
-        let random_filename: String = rand::thread_rng()
-            .sample_iter(&Alphanumeric)
-            .take(15)
-            .map(char::from)
-            .collect();
-        let random_tmp_file = format!("/tmp/{random_filename}.sqlite");
-
-        let ofk = OffchainKeypair::random();
-        let peer_id: PeerId = (*ofk.public()).into();
-        let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse()?;
-        let ma_2: Multiaddr = format!("/ip4/127.0.0.1/tcp/10002/p2p/{peer_id}").parse()?;
-
-        let path = std::path::Path::new(&random_tmp_file);
-
-        {
-            let db = HoprNodeDb::new(path, HoprNodeDbConfig::default()).await?;
-
-            db.add_network_peer(
-                &peer_id,
-                PeerOrigin::IncomingConnection,
-                vec![ma_1.clone(), ma_2.clone()],
-                0.0,
-                25,
-            )
-            .await?;
-
-            let ten_seconds_ago = std::time::SystemTime::now() - std::time::Duration::from_secs(10);
-
-            db.update_network_peer(PeerStatus {
-                id: (*ofk.public(), peer_id),
-                origin: PeerOrigin::Initialization,
-                last_seen: ten_seconds_ago,
-                last_seen_latency: std::time::Duration::from_millis(10),
-                heartbeats_sent: 1,
-                heartbeats_succeeded: 1,
-                backoff: 1.0,
-                ignored_until: None,
-                multiaddresses: vec![ma_1.clone(), ma_2.clone()],
-                quality: 1.0,
-                quality_avg: SingleSumSMA::new(2),
-            })
-            .await?;
-        }
-        {
-            let db = HoprNodeDb::new(path, HoprNodeDbConfig::default()).await?;
-
-            let found_peer = db.get_network_peer(&peer_id).await?.map(|p| p.id.1);
-
-            assert_eq!(found_peer, Some(peer_id));
-        }
 
         Ok(())
     }

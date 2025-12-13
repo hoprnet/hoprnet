@@ -35,11 +35,11 @@ pub mod state;
 #[cfg(any(feature = "testing", test))]
 pub mod testing;
 
+pub use hopr_api as api;
+
 /// Exports of libraries necessary for API and interface operations.
 #[doc(hidden)]
 pub mod exports {
-    pub use hopr_api as api;
-
     pub mod types {
         pub use hopr_internal_types as internal;
         pub use hopr_primitive_types as primitive;
@@ -85,7 +85,8 @@ use futures::{FutureExt, SinkExt, Stream, StreamExt, TryFutureExt, channel::mpsc
 pub use hopr_api::db::ChannelTicketStatistics;
 use hopr_api::{
     chain::{AccountSelector, AnnouncementError, ChannelSelector, *},
-    db::{HoprNodeDbApi, PeerStatus, TicketMarker, TicketSelector},
+    ct::TrafficGeneration,
+    db::{HoprNodeDbApi, TicketMarker, TicketSelector},
 };
 use hopr_async_runtime::prelude::spawn;
 pub use hopr_async_runtime::{Abortable, AbortableList};
@@ -127,31 +128,6 @@ lazy_static::lazy_static! {
         "Node on-chain and off-chain addresses",
         &["peerid", "address", "safe_address", "module_address"]
     ).unwrap();
-}
-
-pub struct DummyCoverTrafficType {
-    #[allow(dead_code)]
-    _unconstructable: (),
-}
-
-impl TrafficGeneration for DummyCoverTrafficType {
-    fn build(
-        self,
-    ) -> (
-        impl futures::Stream<Item = DestinationRouting> + Send,
-        impl futures::Sink<
-            std::result::Result<hopr_transport::Telemetry, hopr_transport::ProbeError>,
-            Error = impl std::error::Error,
-        > + Send
-        + Sync
-        + Clone
-        + 'static,
-    ) {
-        (
-            futures::stream::empty(),
-            futures::sink::drain::<std::result::Result<hopr_transport::Telemetry, hopr_transport::ProbeError>>(),
-        )
-    }
 }
 
 /// Prepare an optimized version of the tokio runtime setup for hopr-lib specifically.
@@ -797,7 +773,7 @@ where
     /// Ping another node in the network based on the PeerId
     ///
     /// Returns the RTT (round trip time), i.e. how long it took for the ping to return.
-    pub async fn ping(&self, peer: &PeerId) -> errors::Result<(std::time::Duration, PeerStatus)> {
+    pub async fn ping(&self, peer: &PeerId) -> errors::Result<(std::time::Duration, Observations)> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         Ok(self.transport_api.ping(peer).await?)
@@ -909,20 +885,20 @@ where
     }
 
     /// Get all data collected from the network relevant for a PeerId
-    pub async fn network_peer_info(&self, peer: &PeerId) -> errors::Result<Option<PeerStatus>> {
-        Ok(self.transport_api.network_peer_info(peer).await?)
+    pub async fn network_peer_info(&self, peer: &PeerId) -> errors::Result<Option<Observations>> {
+        Ok(self.transport_api.network_peer_observations(peer).await?)
     }
 
     /// Get peers connected peers with quality higher than some value
     pub async fn all_network_peers(
         &self,
-        minimum_quality: f64,
-    ) -> errors::Result<Vec<(Option<Address>, PeerId, PeerStatus)>> {
+        minimum_score: f64,
+    ) -> errors::Result<Vec<(Option<Address>, PeerId, Observations)>> {
         Ok(
             futures::stream::iter(self.transport_api.network_connected_peers().await?)
                 .filter_map(|peer| async move {
-                    if let Ok(Some(info)) = self.transport_api.network_peer_info(&peer).await {
-                        if info.get_average_quality() >= minimum_quality {
+                    if let Ok(Some(info)) = self.transport_api.network_peer_observations(&peer).await {
+                        if info.score() >= minimum_score {
                             Some((peer, info))
                         } else {
                             None

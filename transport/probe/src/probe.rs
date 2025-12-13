@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use futures::{FutureExt, SinkExt, StreamExt, pin_mut};
 use futures_concurrency::stream::StreamExt as _;
+use hopr_api::ct::{NeighborProbe, NeighborTelemetry, Telemetry, TrafficGeneration};
 use hopr_async_runtime::AbortableList;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::types::OffchainPublicKey;
@@ -12,15 +13,7 @@ use hopr_primitive_types::traits::AsUnixTimestamp;
 use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut, ReservedTag};
 use libp2p_identity::PeerId;
 
-use crate::{
-    HoprProbeProcess,
-    config::ProbeConfig,
-    content::{Message, NeighborProbe},
-    errors::ProbeError,
-    ping::PingQueryReplier,
-    traits::TrafficGeneration,
-    types::{NeighborTelemetry, Telemetry},
-};
+use crate::{HoprProbeProcess, config::ProbeConfig, content::Message, errors::ProbeError, ping::PingQueryReplier};
 
 #[inline(always)]
 fn to_nonce(message: &Message) -> String {
@@ -102,7 +95,6 @@ impl Probe {
         Tr: TrafficGeneration + Send + Sync + 'static,
     {
         let max_parallel_probes = self.cfg.max_parallel_probes;
-        let interval_between_rounds = self.cfg.interval;
 
         let (probing_routes, reports) = traffic_generator.build();
 
@@ -125,7 +117,9 @@ impl Probe {
                         tracing::debug!(%peer, pseudonym = %k.0, probe = %k.1, reason = "timeout", "probe failed");
                         if let Some(replier) = notifier {
                             if let NodeId::Offchain(opk) = peer.as_ref() {
-                                replier.notify(Err(ProbeError::ProbeNeighborTimeout(opk.into())));
+                                replier.notify(Err(ProbeError::TrafficError(
+                                    hopr_api::ct::traits::TrafficGenerationError::ProbeNeighborTimeout(opk.into()),
+                                )));
                             } else {
                                 tracing::warn!(
                                     reason = "non-offchain peer",
@@ -138,7 +132,12 @@ impl Probe {
                             let peer: PeerId = opk.into();
                             futures::FutureExt::boxed(async move {
                                 pin_mut!(store);
-                                if let Err(error) = store.send(Err(ProbeError::ProbeNeighborTimeout(peer))).await {
+                                if let Err(error) = store
+                                    .send(Err(hopr_api::ct::traits::TrafficGenerationError::ProbeNeighborTimeout(
+                                        peer,
+                                    )))
+                                    .await
+                                {
                                     tracing::error!(%peer, %error, "failed to record probe timeout");
                                 }
                             })
@@ -179,8 +178,6 @@ impl Probe {
         processes.insert(
             HoprProbeProcess::Emit,
             hopr_async_runtime::spawn_as_abortable!(async move {
-                hopr_async_runtime::prelude::sleep(2 * interval_between_rounds).await; // delay to allow network to stabilize
-
                 direct_neighbors
                     .for_each_concurrent(max_parallel_probes, move |(peer, notifier)| {
                         let active_probes = active_probes.clone();
@@ -323,6 +320,7 @@ mod tests {
 
     use async_trait::async_trait;
     use futures::future::BoxFuture;
+    use hopr_api::ct::traits::TrafficGenerationError;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use hopr_protocol_app::prelude::{ApplicationData, Tag};
 
@@ -358,7 +356,9 @@ mod tests {
                 *peer,
                 match result {
                     Ok(duration) => Ok(*duration),
-                    Err(_e) => Err(ProbeError::ProbeNeighborTimeout(peer.clone())),
+                    Err(_e) => Err(ProbeError::TrafficError(TrafficGenerationError::ProbeNeighborTimeout(
+                        peer.clone(),
+                    ))),
                 },
             ));
         }

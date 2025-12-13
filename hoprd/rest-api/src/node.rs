@@ -6,7 +6,7 @@ use axum::{
     response::IntoResponse,
 };
 use futures::{StreamExt, stream::FuturesUnordered};
-use hopr_lib::{Address, AsUnixTimestamp, Health, Multiaddr};
+use hopr_lib::{Address, Health, Multiaddr};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
@@ -80,7 +80,7 @@ pub(crate) struct NodePeersQueryRequest {
     #[serde(default)]
     #[schema(required = false, example = 0.7)]
     /// Minimum peer quality to be included in the response.
-    quality: f64,
+    score: f64,
 }
 
 #[derive(Debug, Default, Clone, Serialize, utoipa::ToSchema)]
@@ -103,39 +103,27 @@ pub(crate) struct HeartbeatInfo {
 #[schema(example = json!({
     "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
     "multiaddr": "/ip4/178.12.1.9/tcp/19092",
-    "heartbeats": {
-        "sent": 10,
-        "success": 10
-    },
+    "probeRate": 0.476,
     "lastSeen": 1690000000,
-    "lastSeenLatency": 100,
-    "quality": 0.7,
-    "backoff": 0.5,
-    "isNew": true,
+    "averageLatency": 100,
+    "score": 0.7,
 }))]
 /// All information about a known peer.
-pub(crate) struct PeerInfo {
+pub(crate) struct PeerObservations {
     #[serde(serialize_with = "option_checksum_address_serializer")]
     #[schema(value_type = Option<String>, example = "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe")]
     address: Option<Address>,
     #[serde_as(as = "Option<DisplayFromStr>")]
     #[schema(value_type = Option<String>, example = "/ip4/178.12.1.9/tcp/19092")]
     multiaddr: Option<Multiaddr>,
-    #[schema(example = json!({
-        "sent": 10,
-        "success": 10
-    }))]
-    heartbeats: HeartbeatInfo,
+    #[schema(example = 0.476)]
+    probe_rate: f64,
     #[schema(example = 1690000000)]
-    last_seen: u128,
+    last_update: u128,
     #[schema(example = 100)]
-    last_seen_latency: u128,
+    average_latency: u128,
     #[schema(example = 0.7)]
-    quality: f64,
-    #[schema(example = 0.5)]
-    backoff: f64,
-    #[schema(example = true)]
-    is_new: bool,
+    score: f64,
 }
 
 #[serde_as]
@@ -191,7 +179,7 @@ pub(crate) struct NodePeersResponse {
         "backoff": 0.5,
         "isNew": true,
     }]))]
-    connected: Vec<PeerInfo>,
+    connected: Vec<PeerObservations>,
     #[schema(example = json!([{
         "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
         "multiaddr": "/ip4/178.12.1.9/tcp/19092"
@@ -223,10 +211,10 @@ pub(crate) struct NodePeersResponse {
         tag = "Node"
     )]
 pub(super) async fn peers(
-    Query(NodePeersQueryRequest { quality }): Query<NodePeersQueryRequest>,
+    Query(NodePeersQueryRequest { score }): Query<NodePeersQueryRequest>,
     State(state): State<Arc<InternalState>>,
 ) -> Result<impl IntoResponse, ApiError> {
-    if !(0.0f64..=1.0f64).contains(&quality) {
+    if !(0.0f64..=1.0f64).contains(&score) {
         return Ok((StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidQuality).into_response());
     }
 
@@ -238,8 +226,7 @@ pub(super) async fn peers(
 
             async move {
                 if let Ok(Some(info)) = hopr.network_peer_info(&peer).await {
-                    let avg_quality = info.get_average_quality();
-                    if avg_quality >= quality {
+                    if info.score() >= score {
                         Some((peer, info))
                     } else {
                         None
@@ -261,18 +248,13 @@ pub(super) async fn peers(
                 Some((address, multiaddresses, info))
             }
         })
-        .map(|(address, mas, info)| PeerInfo {
+        .map(|(address, mas, info)| PeerObservations {
             address,
             multiaddr: mas.first().cloned(),
-            heartbeats: HeartbeatInfo {
-                sent: info.heartbeats_sent,
-                success: info.heartbeats_succeeded,
-            },
-            last_seen: info.last_seen.as_unix_timestamp().as_millis(),
-            last_seen_latency: info.last_seen_latency.as_millis() / 2,
-            quality: info.get_average_quality(),
-            backoff: info.backoff,
-            is_new: info.heartbeats_sent == 0u64,
+            last_update: info.last_update.as_millis(),
+            average_latency: info.average_latency().map_or(0, |d| d.as_millis()),
+            score: info.score(),
+            probe_rate: info.score(),
         })
         .collect::<Vec<_>>()
         .await;

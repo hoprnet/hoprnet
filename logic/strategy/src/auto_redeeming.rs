@@ -13,7 +13,7 @@ use futures::{SinkExt, StreamExt, pin_mut};
 use hopr_lib::{
     AcknowledgedTicketStatus, ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus, ChannelStatusDiscriminants,
     HoprBalance, Utc, VerifiedTicket,
-    exports::api::{
+    api::{
         chain::{ChainReadChannelOperations, ChannelSelector},
         db::TicketSelector,
     },

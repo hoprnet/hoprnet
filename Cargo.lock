@@ -1100,6 +1100,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "assertables"
+version = "9.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "59051ec02907378a67b0ba1b8631121f5388c8dbbb3cec8c749d8f93c2c3c211"
+
+[[package]]
 name = "async-broadcast"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4472,11 +4478,13 @@ dependencies = [
  "auto_impl",
  "chrono",
  "futures",
+ "hex",
  "hopr-chain-types",
  "hopr-crypto-packet",
+ "hopr-crypto-random 0.3.0",
  "hopr-crypto-types 0.9.0",
  "hopr-internal-types",
- "hopr-platform",
+ "hopr-network-types",
  "hopr-primitive-types 0.10.0",
  "multiaddr",
  "strum 0.27.2",
@@ -4728,6 +4736,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-ct-telemetry"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "hopr-api",
+]
+
+[[package]]
 name = "hopr-db-entity"
 version = "0.6.0"
 dependencies = [
@@ -4761,8 +4777,6 @@ dependencies = [
  "async-lock",
  "async-stream",
  "async-trait",
- "bincode",
- "chrono",
  "futures",
  "hex",
  "hex-literal",
@@ -4774,12 +4788,9 @@ dependencies = [
  "hopr-db-migration",
  "hopr-internal-types",
  "hopr-metrics",
- "hopr-parallelize",
- "hopr-platform",
  "hopr-primitive-types 0.10.0",
  "lazy_static",
  "moka",
- "rand 0.8.5",
  "sea-orm",
  "sea-query",
  "smart-default",
@@ -4840,6 +4851,7 @@ dependencies = [
  "hopr-crypto-keypair",
  "hopr-crypto-random 0.3.0",
  "hopr-crypto-types 0.9.0",
+ "hopr-ct-telemetry",
  "hopr-db-node",
  "hopr-internal-types",
  "hopr-lib",
@@ -5135,6 +5147,7 @@ dependencies = [
  "lazy_static",
  "pcap-file",
  "proc-macro-regex",
+ "rand 0.8.5",
  "serde",
  "smart-default",
  "strum 0.27.2",
@@ -5179,27 +5192,16 @@ name = "hopr-transport-network"
 version = "0.8.1"
 dependencies = [
  "anyhow",
- "futures",
+ "assertables",
+ "dashmap",
  "hopr-api",
- "hopr-crypto-random 0.3.0",
- "hopr-crypto-types 0.9.0",
- "hopr-db-node",
  "hopr-metrics",
- "hopr-network-types",
- "hopr-platform",
- "hopr-primitive-types 0.10.0",
  "humantime-serde",
  "lazy_static",
  "libp2p-identity",
- "more-asserts",
- "multiaddr",
- "serde",
- "smart-default",
  "strum 0.27.2",
  "thiserror 2.0.17",
- "tokio",
  "tracing",
- "validator",
 ]
 
 [[package]]
@@ -5208,15 +5210,16 @@ version = "0.8.1"
 dependencies = [
  "anyhow",
  "async-trait",
+ "backon",
  "futures",
  "hopr-crypto-packet",
  "hopr-crypto-random 0.3.0",
  "hopr-crypto-types 0.9.0",
- "hopr-internal-types",
  "hopr-metrics",
  "hopr-network-types",
  "hopr-platform",
  "hopr-transport-identity",
+ "hopr-transport-network",
  "hopr-transport-probe",
  "hopr-transport-protocol",
  "lazy_static",
@@ -5238,6 +5241,7 @@ dependencies = [
  "futures",
  "futures-concurrency",
  "hex",
+ "hopr-api",
  "hopr-async-runtime",
  "hopr-crypto-packet",
  "hopr-crypto-random 0.3.0",
@@ -5393,6 +5397,7 @@ dependencies = [
  "futures",
  "home",
  "hopr-chain-connector",
+ "hopr-ct-telemetry",
  "hopr-db-node",
  "hopr-lib",
  "hopr-metrics",
