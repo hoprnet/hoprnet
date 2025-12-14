@@ -281,7 +281,7 @@ mod tests {
     use futures::future::BoxFuture;
     use hopr_api::ct::types::TrafficGenerationError;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-    use hopr_ct_telemetry::ImmediateNeighborProber;
+    use hopr_ct_telemetry::{ImmediateNeighborProber, ProberConfig};
     use hopr_protocol_app::prelude::{ApplicationData, Tag};
 
     use super::*;
@@ -381,7 +381,10 @@ mod tests {
                 (from_probing_to_network_tx, from_network_to_probing_rx),
                 manual_probe_rx,
                 from_probing_up_tx,
-                ImmediateNeighborProber::new(Default::default()),
+                ImmediateNeighborProber::new(ProberConfig {
+                    interval: cfg.interval,
+                    recheck_threshold: cfg.recheck_threshold,
+                }),
                 store,
             )
             .await;
