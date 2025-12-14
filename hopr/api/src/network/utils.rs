@@ -25,3 +25,28 @@ impl<const FACTOR: usize> ExponentialMovingAverage<FACTOR> {
         self.average
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn running_average_should_compute_the_windowed_average_correctly() {
+        let mut avg = super::ExponentialMovingAverage::<5>::default();
+
+        for i in 1..=10 {
+            avg.update(i);
+        }
+
+        assertables::assert_in_delta!(avg.get(), 6.6, 0.1);
+    }
+
+    #[test]
+    fn running_average_should_compute_the_average_from_constant_correctly() {
+        let mut avg = super::ExponentialMovingAverage::<5>::default();
+
+        for _ in 1..=10 {
+            avg.update(3);
+        }
+
+        assertables::assert_f64_eq!(avg.get(), 3.0);
+    }
+}

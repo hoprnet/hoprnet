@@ -1,50 +1,6 @@
 use std::sync::Arc;
 
-use hopr_api::PeerId;
-
-use crate::utils::ExponentialMovingAverage;
-
-/// Observations related to a specific peer in the network.
-#[derive(Debug, Copy, Clone, Default, PartialEq)]
-pub struct Observations {
-    pub msg_sent: u64,
-    pub ack_received: u64,
-    pub last_update: std::time::Duration,
-    latency_average: ExponentialMovingAverage<3>,
-    probe_success_rate: ExponentialMovingAverage<5>,
-}
-
-impl Observations {
-    /// Record a new result of the probe towards the measured peer.
-    pub fn record_probe(&mut self, latency: std::result::Result<std::time::Duration, ()>) {
-        self.last_update = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default();
-
-        if let Ok(latency) = latency {
-            self.latency_average.update(latency.as_millis() as f64);
-            self.probe_success_rate.update(1.0);
-        } else {
-            self.probe_success_rate.update(0.0);
-        }
-    }
-
-    /// Return average latency observed for the measured peer.
-    pub fn average_latency(&self) -> Option<std::time::Duration> {
-        if self.latency_average.get() <= 0.0 {
-            None
-        } else {
-            Some(std::time::Duration::from_millis(self.latency_average.get() as u64))
-        }
-    }
-
-    /// A value between 0.0 and 1.0 scoring the observed peer.
-    ///
-    /// The higher the value, the better the score.
-    pub fn score(&self) -> f64 {
-        self.probe_success_rate.get()
-    }
-}
+use hopr_api::{PeerId, network::Observations};
 
 /// Tracker of [`Observations`] for network peers.
 ///
@@ -109,10 +65,9 @@ impl NetworkPeerTracker {
 #[cfg(test)]
 mod tests {
     use anyhow::Context;
-    use assertables::{assert_gt, assert_in_delta, assert_lt};
-    use hopr_api::PeerId;
+    use hopr_api::{PeerId, network::Observations};
 
-    use super::{NetworkPeerTracker, Observations};
+    use super::NetworkPeerTracker;
 
     #[test]
     fn peer_tracker_adding_a_peer_adds_a_default_observation() -> anyhow::Result<()> {
@@ -142,14 +97,9 @@ mod tests {
             o
         });
 
-        assert_eq!(
-            tracker.get(&peer).context("should contain a value")?,
-            Observations {
-                msg_sent: 1,
-                ack_received: 0,
-                ..Default::default()
-            }
-        );
+        let obs = tracker.get(&peer).context("should contain a value")?;
+        assert_eq!(obs.msg_sent, 1);
+        assert_eq!(obs.ack_received, 0);
 
         Ok(())
     }
@@ -168,90 +118,5 @@ mod tests {
         assert!(tracker.get(&peer).is_none());
 
         Ok(())
-    }
-
-    #[test]
-    fn running_average_should_compute_the_windowed_average_correctly() {
-        let mut avg = super::ExponentialMovingAverage::<5>::default();
-
-        for i in 1..=10 {
-            avg.update(i);
-        }
-
-        assertables::assert_in_delta!(avg.get(), 6.6, 0.1);
-    }
-
-    #[test]
-    fn running_average_should_compute_the_average_from_constant_correctly() {
-        let mut avg = super::ExponentialMovingAverage::<5>::default();
-
-        for _ in 1..=10 {
-            avg.update(3);
-        }
-
-        assertables::assert_f64_eq!(avg.get(), 3.0);
-    }
-
-    #[test]
-    fn observations_should_update_the_timestamp_on_latency_update() {
-        let mut observation = Observations::default();
-
-        assert_eq!(observation.last_update, std::time::Duration::default());
-
-        observation.record_probe(Ok(std::time::Duration::from_millis(50)));
-
-        let after = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default();
-
-        assert_gt!(observation.last_update, std::time::Duration::default());
-        assert_lt!(observation.last_update, after);
-    }
-
-    #[test]
-    fn observations_should_store_an_average_latency_value_after_multiple_updates() -> anyhow::Result<()> {
-        let big_latency = std::time::Duration::from_millis(300);
-        let small_latency = std::time::Duration::from_millis(10);
-
-        let mut observation = Observations::default();
-
-        for _ in 0..10 {
-            observation.record_probe(Ok(small_latency));
-        }
-
-        assert_eq!(
-            observation.average_latency().context("should contain a value")?,
-            small_latency
-        );
-
-        observation.record_probe(Ok(big_latency));
-
-        assert_gt!(
-            observation.average_latency().context("should contain a value")?,
-            small_latency
-        );
-        assert_lt!(
-            observation.average_latency().context("should contain a value")?,
-            big_latency
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn observations_should_store_the_averaged_success_rate_of_the_probes() {
-        let small_latency = std::time::Duration::from_millis(10);
-
-        let mut observation = Observations::default();
-
-        for i in 0..10 {
-            if i % 2 == 0 {
-                observation.record_probe(Err(()));
-            } else {
-                observation.record_probe(Ok(small_latency));
-            }
-        }
-
-        assert_in_delta!(observation.score(), 0.5, 0.05);
     }
 }

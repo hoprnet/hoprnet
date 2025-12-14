@@ -4,7 +4,7 @@ use futures::{
     StreamExt,
     channel::mpsc::{Sender, channel},
 };
-use hopr_api::ct::traits::TrafficGenerationError;
+use hopr_api::ct::types::TrafficGenerationError;
 use hopr_async_runtime::prelude::timeout_fut;
 use libp2p_identity::PeerId;
 use tracing::{debug, warn};

@@ -19,7 +19,6 @@ pub mod constants;
 /// Errors used by the crate.
 pub mod errors;
 mod helpers;
-pub mod prober;
 
 #[cfg(feature = "capture")]
 mod capture;
@@ -37,10 +36,13 @@ use futures::{
     channel::mpsc::{Sender, channel},
 };
 use helpers::PathPlanner;
-pub use hopr_api::db::ChannelTicketStatistics;
 use hopr_api::{
     chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
     db::HoprDbTicketOperations,
+};
+pub use hopr_api::{
+    db::ChannelTicketStatistics,
+    network::{Health, Observations, traits::NetworkView},
 };
 use hopr_async_runtime::{AbortableList, prelude::spawn, spawn_as_abortable};
 use hopr_crypto_packet::prelude::PacketSignal;
@@ -48,6 +50,7 @@ pub use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     types::{HalfKeyChallenge, Hash, OffchainPublicKey},
 };
+use hopr_ct_telemetry::ImmediateNeighborChannelGraph;
 pub use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_internal_types::prelude::*;
 pub use hopr_network_types::prelude::RoutingOptions;
@@ -58,11 +61,9 @@ use hopr_protocol_hopr::MemorySurbStore;
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId, Protocol};
 use hopr_transport_mixer::MixerConfig;
-pub use hopr_transport_network::{Health, track::Observations, traits::NetworkView};
 use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork};
 use hopr_transport_probe::{
     Probe, TrafficGeneration,
-    neighbors::ImmediateNeighborProber,
     ping::{PingConfig, Pinger},
 };
 pub use hopr_transport_probe::{errors::ProbeError, ping::PingQueryReplier};
@@ -198,7 +199,7 @@ where
     /// are waiting for a trigger from this piece of code.
     pub async fn run<S, T, Ct>(
         &self,
-        cover_traffic: Option<Ct>,
+        cover_traffic: Ct,
         discovery_updates: S,
         ticket_events: T,
         on_incoming_session: Sender<IncomingSession>,
@@ -444,28 +445,16 @@ where
         let (manual_ping_tx, manual_ping_rx) = channel::<(PeerId, PingQueryReplier)>(manual_ping_channel_capacity);
 
         let probe = Probe::new(self.cfg.probe);
-        let probing_processes = if let Some(ct) = cover_traffic {
-            probe
-                .continuously_scan(
-                    (unresolved_routing_msg_tx.clone(), rx_from_protocol),
-                    manual_ping_rx,
-                    tx_from_probing,
-                    ct,
-                )
-                .await
-        } else {
-            probe
-                .continuously_scan(
-                    (unresolved_routing_msg_tx.clone(), rx_from_protocol),
-                    manual_ping_rx,
-                    tx_from_probing,
-                    ImmediateNeighborProber::new(
-                        self.cfg.probe,
-                        prober::ProbeNetworkInteractions::new(transport_network.clone()),
-                    ),
-                )
-                .await
-        };
+
+        let probing_processes = probe
+            .continuously_scan(
+                (unresolved_routing_msg_tx.clone(), rx_from_protocol),
+                manual_ping_rx,
+                tx_from_probing,
+                cover_traffic,
+                ImmediateNeighborChannelGraph::new(transport_network.clone(), self.cfg.probe.recheck_threshold),
+            )
+            .await;
 
         processes.flat_map_extend_from(probing_processes, HoprTransportProcess::Probing);
 

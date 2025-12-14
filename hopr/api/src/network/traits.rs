@@ -1,13 +1,12 @@
 use std::collections::HashSet;
 
-use hopr_api::{Multiaddr, PeerId};
-
-use crate::{Health, track::Observations};
+use super::{Health, Observations};
+use crate::{Multiaddr, PeerId};
 
 /// Trait representing a read-only view of the network state.
 pub trait NetworkView {
     /// Multiaddresses used for listening by the local node.
-    fn listening_as(&self) -> HashSet<Multiaddr>; //local_multiaddresses
+    fn listening_as(&self) -> HashSet<Multiaddr>;
 
     /// Translation of the peer into its known multiaddresses.
     fn multiaddress_of(&self, peer: &PeerId) -> Option<HashSet<Multiaddr>>;

@@ -222,7 +222,7 @@ impl HoprLibp2pNetworkBuilder {
                             tracker.add(peer_id);
 
                             #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_NETWORK_HEALTH.set((hopr_transport_network::traits::NetworkView::health(&network_inner) as i32).into());
+                            METRIC_NETWORK_HEALTH.set((hopr_api::network::NetworkView::health(&network_inner) as i32).into());
                         },
                         crate::DiscoveryEvent::UndialablePeer(peer_id) => {
                             if let Err(error) = store.remove(&peer_id) {
@@ -231,7 +231,7 @@ impl HoprLibp2pNetworkBuilder {
                             tracker.remove(&peer_id);
 
                             #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_NETWORK_HEALTH.set((hopr_transport_network::traits::NetworkView::health(&network_inner) as i32).into());
+                            METRIC_NETWORK_HEALTH.set((hopr_api::network::NetworkView::health(&network_inner) as i32).into());
                         },
                     }
                     SwarmEvent::Behaviour(
@@ -289,7 +289,7 @@ impl HoprLibp2pNetworkBuilder {
 
                         #[cfg(all(feature = "prometheus", not(test)))]
                         {
-                            METRIC_NETWORK_HEALTH.set((hopr_transport_network::traits::NetworkView::health(&network_inner) as i32).into());
+                            METRIC_NETWORK_HEALTH.set((hopr_api::network::NetworkView::health(&network_inner) as i32).into());
                             METRIC_TRANSPORT_P2P_OPEN_CONNECTION_COUNT.decrement(1.0);
                         }
                     }

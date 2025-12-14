@@ -36,7 +36,8 @@ mod behavior;
 use std::collections::HashSet;
 
 use futures::{AsyncRead, AsyncWrite};
-pub use hopr_transport_network::{Health, track::Observations};
+pub use hopr_api::network::{Health, types::Observations};
+use hopr_api::network::{NetworkObservations, NetworkView};
 use libp2p::{Multiaddr, PeerId};
 
 pub use crate::{
@@ -62,7 +63,7 @@ impl std::fmt::Debug for HoprNetwork {
     }
 }
 
-impl hopr_transport_network::traits::NetworkView for HoprNetwork {
+impl NetworkView for HoprNetwork {
     fn listening_as(&self) -> HashSet<Multiaddr> {
         self.store.get(self.store.me()).unwrap_or_else(|| {
             tracing::error!("failed to get own peer info from the peer store");
@@ -114,7 +115,7 @@ impl hopr_transport_protocol::stream::BidirectionalStreamControl for HoprNetwork
     }
 }
 
-impl hopr_transport_network::traits::NetworkObservations for HoprNetwork {
+impl NetworkObservations for HoprNetwork {
     fn update(&self, peer: &PeerId, result: std::result::Result<std::time::Duration, ()>) {
         self.tracker.alter(peer, |_, mut o| {
             o.record_probe(result.map_err(|_| ()));

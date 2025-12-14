@@ -17,7 +17,6 @@ runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 
 [dependencies]
 anyhow = { workspace = true }
-async-stream = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
@@ -45,12 +44,12 @@ hopr-protocol-app = { workspace = true }
 
 [dev-dependencies]
 lazy_static = { workspace = true }
-mockall = { workspace = true }
 more-asserts = { workspace = true }
 tokio = { workspace = true }
 
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 hopr-crypto-packet = { workspace = true }
+hopr-ct-telemetry = { workspace = true }
 
 [package.metadata.cargo-machete]
 ignored = ["humantime-serde"]

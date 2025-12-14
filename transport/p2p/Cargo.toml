@@ -42,6 +42,7 @@ libp2p-stream = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
+hopr-api = { workspace = true, features = ["ct"] }
 hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true }
 hopr-transport-identity = { workspace = true }

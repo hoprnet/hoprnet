@@ -4,6 +4,7 @@ use futures::{FutureExt, SinkExt, StreamExt, pin_mut};
 use futures_concurrency::stream::StreamExt as _;
 use hopr_api::ct::{
     NeighborProbe, NeighborTelemetry, NetworkGraphView, Telemetry, TrafficGeneration, traits::NetworkGraphUpdate,
+    types::TrafficGenerationError,
 };
 use hopr_async_runtime::AbortableList;
 use hopr_crypto_random::Randomizable;
@@ -15,9 +16,7 @@ use hopr_primitive_types::traits::AsUnixTimestamp;
 use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut, ReservedTag};
 use libp2p_identity::PeerId;
 
-use crate::{
-    HoprProbeProcess, config::ProbeConfig, content::Message, errors::ProbeError, ping::PingQueryReplier,
-};
+use crate::{HoprProbeProcess, config::ProbeConfig, content::Message, errors::ProbeError, ping::PingQueryReplier};
 
 #[inline(always)]
 fn to_nonce(message: &Message) -> String {
@@ -124,7 +123,7 @@ impl Probe {
                         if let Some(replier) = notifier {
                             if let NodeId::Offchain(opk) = peer.as_ref() {
                                 replier.notify(Err(ProbeError::TrafficError(
-                                    hopr_api::ct::traits::TrafficGenerationError::ProbeNeighborTimeout(opk.into()),
+                                    TrafficGenerationError::ProbeNeighborTimeout(opk.into()),
                                 )));
                             } else {
                                 tracing::warn!(
@@ -138,9 +137,7 @@ impl Probe {
                             let peer: PeerId = opk.into();
                             futures::FutureExt::boxed(async move {
                                 store
-                                    .record(Err(hopr_api::ct::traits::TrafficGenerationError::ProbeNeighborTimeout(
-                                        peer,
-                                    )))
+                                    .record(Err(TrafficGenerationError::ProbeNeighborTimeout(peer)))
                                     .await
                             })
                         } else {
@@ -279,7 +276,7 @@ impl Probe {
                                                 store.record(Ok(Telemetry::Neighbor(NeighborTelemetry {
                                                     peer: opk.into(),
                                                     rtt: latency,
-                                                }))).await 
+                                                }))).await
                                             } else {
                                                 tracing::warn!(%pseudonym, nonce = hex::encode(pong), latency_ms = latency.as_millis(), "probe successful to non-offchain peer");
                                             }
@@ -316,15 +313,12 @@ mod tests {
 
     use async_trait::async_trait;
     use futures::future::BoxFuture;
-    use hopr_api::ct::traits::TrafficGenerationError;
+    use hopr_api::ct::types::TrafficGenerationError;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
+    use hopr_ct_telemetry::ImmediateNeighborProber;
     use hopr_protocol_app::prelude::{ApplicationData, Tag};
 
     use super::*;
-    use crate::{
-        neighbors::{ImmediateNeighborChannelGraph, ImmediateNeighborProber},
-        traits::{PeerDiscoveryFetch, ProbeStatusUpdate},
-    };
 
     lazy_static::lazy_static!(
         static ref OFFCHAIN_KEYPAIR: OffchainKeypair = OffchainKeypair::random();
@@ -345,26 +339,41 @@ mod tests {
     }
 
     #[async_trait]
-    impl ProbeStatusUpdate for PeerStore {
-        async fn on_finished(&self, peer: &PeerId, result: &crate::errors::Result<Duration>) {
+    impl NetworkGraphUpdate for PeerStore {
+        async fn record(&self, telemetry: std::result::Result<Telemetry, TrafficGenerationError>) {
             let mut on_finished = self.on_finished.write().unwrap();
-            on_finished.push((
-                *peer,
-                match result {
-                    Ok(duration) => Ok(*duration),
-                    Err(_e) => Err(ProbeError::TrafficError(TrafficGenerationError::ProbeNeighborTimeout(
+
+            match telemetry {
+                Ok(Telemetry::Neighbor(neighbor_telemetry)) => {
+                    let peer: PeerId = neighbor_telemetry.peer.into();
+                    let duration = neighbor_telemetry.rtt;
+                    on_finished.push((peer, Ok(duration)));
+                }
+                Err(TrafficGenerationError::ProbeNeighborTimeout(peer)) => {
+                    on_finished.push((
                         peer.clone(),
-                    ))),
-                },
-            ));
+                        Err(ProbeError::TrafficError(TrafficGenerationError::ProbeNeighborTimeout(
+                            peer,
+                        ))),
+                    ));
+                }
+                _ => panic!("unexpected telemetry type, unimplemented"),
+            }
         }
     }
 
     #[async_trait]
-    impl PeerDiscoveryFetch for PeerStore {
-        async fn get_peers(&self, _from_timestamp: std::time::SystemTime) -> Vec<PeerId> {
+    impl NetworkGraphView for PeerStore {
+        /// Returns a stream of all known nodes in the network graph.
+        fn nodes(&self) -> futures::stream::BoxStream<'static, PeerId> {
             let mut get_peers = self.get_peers.write().unwrap();
-            get_peers.pop_front().unwrap_or_default()
+            Box::pin(futures::stream::iter(get_peers.pop_front().unwrap_or_default()))
+        }
+
+        /// Returns a list of all routes to the given destination of the specified length.
+        async fn find_routes(&self, destination: &PeerId, length: usize) -> Vec<DestinationRouting> {
+            tracing::debug!(%destination, %length, "finding routes in test peer store");
+            vec![]
         }
     }
 
@@ -379,7 +388,7 @@ mod tests {
     where
         Fut: std::future::Future<Output = anyhow::Result<()>>,
         F: Fn(TestInterface) -> Fut + Send + Sync + 'static,
-        St: ProbeStatusUpdate + PeerDiscoveryFetch + Clone + Send + Sync + 'static,
+        St: NetworkGraphUpdate + NetworkGraphView + Clone + Send + Sync + 'static,
     {
         let probe = Probe::new(cfg.clone());
 
@@ -406,8 +415,8 @@ mod tests {
                 (from_probing_to_network_tx, from_network_to_probing_rx),
                 manual_probe_rx,
                 from_probing_up_tx,
-                ImmediateNeighborProber::new(cfg),
-                ImmediateNeighborChannelGraph::new(store, cfg.recheck_threshold),
+                ImmediateNeighborProber::new(Default::default()),
+                store,
             )
             .await;
 

@@ -1,6 +1,15 @@
 use hopr_primitive_types::prelude::GeneralError;
 use multiaddr::PeerId;
 
+#[derive(thiserror::Error, Debug)]
+pub enum TrafficGenerationError {
+    #[error("timed out for near neighbor probe '{0:?}'")]
+    ProbeNeighborTimeout(PeerId),
+
+    #[error("timed out for loopback probe")]
+    ProbeLoopbackTimeout(PathTelemetry),
+}
+
 /// Serializable and deserializable enum for the probe message content.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, strum::EnumDiscriminants)]
 #[strum_discriminants(vis(pub(crate)))]
@@ -148,12 +157,14 @@ impl<'a> TryFrom<&'a [u8]> for PathTelemetry {
 /// Intermediate neighbor telemetry object.
 ///
 /// Represents the finding of an intermediate peer probing operation.
+#[derive(Debug, Clone)]
 pub struct NeighborTelemetry {
     pub peer: PeerId,
     pub rtt: std::time::Duration,
 }
 
 /// Enum representing different types of telemetry data used by the CT mechanism.
+#[derive(Debug, Clone)]
 pub enum Telemetry {
     /// Telemetry data looping the traffic through multiple peers back to self.
     ///

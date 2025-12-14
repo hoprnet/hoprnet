@@ -397,7 +397,10 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
                     .await;
 
                     let socket = instance
-                        .run(None::<hopr_ct_telemetry::DummyCoverTrafficType>, EchoServer::new())
+                        .run(
+                            hopr_ct_telemetry::ImmediateNeighborProber::new(Default::default()),
+                            EchoServer::new(),
+                        )
                         .await?;
                     anyhow::Ok((instance, socket))
                 });

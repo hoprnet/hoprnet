@@ -320,7 +320,7 @@ where
         #[cfg(feature = "session-server")] T: traits::session::HoprSessionServer + Clone + Send + 'static,
     >(
         &self,
-        cover_traffic: Option<Ct>,
+        cover_traffic: Ct,
         #[cfg(feature = "session-server")] serve_handler: T,
     ) -> errors::Result<HoprTransportIO>
     where

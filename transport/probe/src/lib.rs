@@ -21,15 +21,13 @@
 pub mod config;
 pub mod content;
 pub mod errors;
-pub mod neighbors;
 pub mod ping;
 pub mod probe;
-pub mod traits;
 pub mod types;
 
 pub use hopr_api::ct::{
-    traits::{TrafficGeneration, TrafficGenerationError},
-    types::{NeighborTelemetry, Telemetry},
+    traits::TrafficGeneration,
+    types::{NeighborTelemetry, Telemetry, TrafficGenerationError},
 };
 
 pub use crate::{config::ProbeConfig, content::Message as TrafficReturnedObservation, probe::Probe};

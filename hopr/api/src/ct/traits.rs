@@ -1,16 +1,7 @@
 pub use hopr_network_types::types::DestinationRouting;
 use multiaddr::PeerId;
 
-use super::{PathTelemetry, Telemetry};
-
-#[derive(thiserror::Error, Debug)]
-pub enum TrafficGenerationError {
-    #[error("timed out for near neighbor probe '{0:?}'")]
-    ProbeNeighborTimeout(PeerId),
-
-    #[error("timed out for loopback probe")]
-    ProbeLoopbackTimeout(PathTelemetry),
-}
+use super::{Telemetry, TrafficGenerationError};
 
 /// A trait specifying the graph traversal functionality
 #[async_trait::async_trait]

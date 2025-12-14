@@ -14,6 +14,7 @@ default = []
 ct = ["dep:hopr-network-types", "dep:hopr-crypto-random", "dep:hex"]
 db = []
 chain = ["db"]
+network = []
 serde = ["hopr-primitive-types/serde"]
 
 [dependencies]
@@ -34,3 +35,7 @@ hopr-primitive-types = { workspace = true }
 hopr-chain-types = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-types = { workspace = true }
+
+[dev-dependencies]
+anyhow = { workspace = true }
+assertables = { workspace = true }

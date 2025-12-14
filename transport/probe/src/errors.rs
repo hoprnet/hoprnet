@@ -1,4 +1,4 @@
-use hopr_api::ct::traits::TrafficGenerationError;
+use hopr_api::ct::types::TrafficGenerationError;
 use libp2p_identity::PeerId;
 use thiserror::Error;
 
