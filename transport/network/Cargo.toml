@@ -21,7 +21,7 @@ humantime-serde = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
-hopr-api = { workspace = true, features = ["db", "network"] }
+hopr-api = { workspace = true, features = ["network"] }
 hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]

@@ -44,7 +44,7 @@ impl NetworkPeerTracker {
         self.peers.remove(peer);
     }
 
-    /// The number of currently tracked peers with results.
+    /// The number of currently tracked peers.
     #[inline]
     pub fn len(&self) -> usize {
         self.peers.len()
@@ -81,6 +81,21 @@ mod tests {
             tracker.get(&peer).context("should contain a value")?,
             Observations::default()
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn peer_tracker_adding_multiple_different_peers_results_in_higher_count() -> anyhow::Result<()> {
+        let tracker = NetworkPeerTracker::new();
+
+        const NUM_PEERS: usize = 10;
+
+        for _ in 0..NUM_PEERS {
+            tracker.add(PeerId::random());
+        }
+
+        assert_eq!(tracker.len(), NUM_PEERS);
 
         Ok(())
     }

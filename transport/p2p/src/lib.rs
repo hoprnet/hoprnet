@@ -41,7 +41,7 @@ use hopr_api::network::{NetworkObservations, NetworkView};
 use libp2p::{Multiaddr, PeerId};
 
 pub use crate::{
-    behavior::{HoprNetworkBehavior, HoprNetworkBehaviorEvent, discovery::Event as DiscoveryEvent},
+    behavior::{HoprNetworkBehavior, HoprNetworkBehaviorEvent},
     swarm::HoprLibp2pNetworkBuilder,
 };
 

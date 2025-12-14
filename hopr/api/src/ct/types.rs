@@ -12,8 +12,7 @@ pub enum TrafficGenerationError {
 
 /// Serializable and deserializable enum for the probe message content.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, strum::EnumDiscriminants)]
-#[strum_discriminants(vis(pub(crate)))]
-#[strum_discriminants(derive(strum::FromRepr, strum::EnumCount), repr(u8))]
+#[strum_discriminants(vis(pub(crate)), derive(strum::FromRepr, strum::EnumCount), repr(u8))]
 pub enum NeighborProbe {
     /// Ping message with random nonce
     Ping([u8; Self::NONCE_SIZE]),

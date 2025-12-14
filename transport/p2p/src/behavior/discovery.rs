@@ -24,12 +24,6 @@ pub enum DiscoveryInput {
     Indexer(PeerDiscovery),
 }
 
-#[derive(Debug)]
-pub enum Event {
-    DialablePeer(PeerId, Multiaddr),
-    UndialablePeer(PeerId),
-}
-
 /// Data structure holding the item alongside a release timemestamp.
 ///
 /// The ordering functionality is defined only over the release timestamp.
@@ -122,7 +116,7 @@ impl Behaviour {
 
 impl NetworkBehaviour for Behaviour {
     type ConnectionHandler = ConnectionHandler;
-    type ToSwarm = Event;
+    type ToSwarm = ();
 
     #[tracing::instrument(
         level = "debug",
@@ -138,9 +132,6 @@ impl NetworkBehaviour for Behaviour {
         local_addr: &libp2p::Multiaddr,
         remote_addr: &libp2p::Multiaddr,
     ) -> Result<libp2p::swarm::THandler<Self>, libp2p::swarm::ConnectionDenied> {
-        self.pending_events
-            .push_back(ToSwarm::GenerateEvent(Event::DialablePeer(peer, remote_addr.clone())));
-
         Some(Self::ConnectionHandler {}).ok_or_else(|| {
             libp2p::swarm::ConnectionDenied::new(crate::errors::P2PError::Logic(format!(
                 "Connection from '{peer}' is not allowed"
@@ -189,9 +180,6 @@ impl NetworkBehaviour for Behaviour {
         role_override: libp2p::core::Endpoint,
         port_use: libp2p::core::transport::PortUse,
     ) -> Result<libp2p::swarm::THandler<Self>, libp2p::swarm::ConnectionDenied> {
-        self.pending_events
-            .push_back(ToSwarm::GenerateEvent(Event::DialablePeer(peer, addr.clone())));
-
         Ok(Self::ConnectionHandler {})
     }
 
@@ -230,9 +218,6 @@ impl NetworkBehaviour for Behaviour {
                         initial_backoff()
                     });
                     self.schedule_dial_with(peer, backoff);
-
-                    self.pending_events
-                        .push_back(ToSwarm::GenerateEvent(Event::UndialablePeer(peer)));
                 }
             }
             _ => {}
@@ -275,10 +260,12 @@ impl NetworkBehaviour for Behaviour {
                     });
                 }
 
-                // Only store public addresses in bootstrap_peers
+                // Store announced addresses for later dialing / protocol use
                 if !multiaddresses.is_empty() {
                     self.bootstrap_peers.insert(peer, multiaddresses);
-                    self.schedule_dial_with(peer, initial_backoff());
+                    if !self.connected_peers.contains_key(&peer) {
+                        self.schedule_dial_with(peer, initial_backoff());
+                    }
                 }
             }
         });
@@ -293,7 +280,7 @@ impl NetworkBehaviour for Behaviour {
         while self
             .next_dial_attempts
             .peek()
-            .map(|x| x.0.release_at < now)
+            .map(|x| x.0.release_at <= now)
             .unwrap_or(false)
         {
             let peer = self

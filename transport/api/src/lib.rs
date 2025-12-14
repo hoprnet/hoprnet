@@ -309,7 +309,7 @@ where
         self.network
             .clone()
             .set(transport_network.clone())
-            .expect("must set the hopr transport network viewer only once");
+            .map_err(|_| HoprTransportError::Api("transport network viewer already set".into()))?;
 
         let msg_codec = hopr_transport_protocol::HoprBinaryCodec {};
         let (wire_msg_tx, wire_msg_rx) =
@@ -467,12 +467,12 @@ where
                 },
                 manual_ping_tx,
             ))
-            .expect("must set the ticket aggregation writer only once");
+            .map_err(|_| HoprTransportError::Api("must set the ticket aggregation writer only once".into()))?;
 
         // -- session management
         self.smgr
             .start(unresolved_routing_msg_tx.clone(), on_incoming_session)
-            .expect("failed to start session manager")
+            .map_err(|_| HoprTransportError::Api("failed to start session manager".into()))?
             .into_iter()
             .enumerate()
             .map(|(i, jh)| (HoprTransportProcess::SessionsManagement(i + 1), jh))
@@ -606,12 +606,15 @@ where
         mas
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub fn local_multiaddresses(&self) -> Vec<Multiaddr> {
         self.network
             .get()
-            .ok_or_else(|| HoprTransportError::Api("transport network is not yet initialized".into()))
             .map(|network| network.listening_as().into_iter().collect())
-            .unwrap_or_default()
+            .unwrap_or_else(|| {
+                tracing::error!("transport network is not yet initialized, cannot fetch announced multiaddresses");
+                self.my_multiaddresses.clone()
+            })
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
@@ -638,12 +641,14 @@ where
             .unwrap_or(Health::Red)
     }
 
-    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_connected_peers(&self) -> errors::Result<Vec<PeerId>> {
         Ok(self
             .network
             .get()
-            .ok_or_else(|| HoprTransportError::Api("transport network is not yet initialized".into()))?
+            .ok_or_else(|| {
+                tracing::error!("transport network is not yet initialized");
+                HoprTransportError::Api("transport network is not yet initialized".into())
+            })?
             .connected_peers()
             .into_iter()
             .collect())

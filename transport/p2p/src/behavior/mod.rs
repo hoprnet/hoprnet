@@ -52,20 +52,13 @@ impl HoprNetworkBehavior {
 /// processing in the business logic loop.
 #[derive(Debug)]
 pub enum HoprNetworkBehaviorEvent {
-    Discovery(discovery::Event),
+    Discovery(()),
     Identify(Box<libp2p::identify::Event>),
     Autonat(libp2p::autonat::Event),
 }
 
-// Unexpected libp2p_stream event
 impl From<()> for HoprNetworkBehaviorEvent {
-    fn from(_: ()) -> Self {
-        panic!("Unexpected event: ()")
-    }
-}
-
-impl From<discovery::Event> for HoprNetworkBehaviorEvent {
-    fn from(event: discovery::Event) -> Self {
+    fn from(event: ()) -> Self {
         Self::Discovery(event)
     }
 }

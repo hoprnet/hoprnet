@@ -214,26 +214,7 @@ impl HoprLibp2pNetworkBuilder {
         let process = async move {
             while let Some(event) = swarm.next().await {
                 match event {
-                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Discovery(event)) => match event {
-                        crate::DiscoveryEvent::DialablePeer(peer_id, multiaddr) => {
-                            if let Err(error) = store.add(peer_id, std::collections::HashSet::from([multiaddr])) {
-                                error!(peer = %peer_id, %error, "Failed to add dialable peer to the peer store");
-                            }
-                            tracker.add(peer_id);
-
-                            #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_NETWORK_HEALTH.set((hopr_api::network::NetworkView::health(&network_inner) as i32).into());
-                        },
-                        crate::DiscoveryEvent::UndialablePeer(peer_id) => {
-                            if let Err(error) = store.remove(&peer_id) {
-                                error!(peer = %peer_id, %error, "Failed to remove undialable peer from the peer store");
-                            }
-                            tracker.remove(&peer_id);
-
-                            #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_NETWORK_HEALTH.set((hopr_api::network::NetworkView::health(&network_inner) as i32).into());
-                        },
-                    }
+                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Discovery(_)) => {}
                     SwarmEvent::Behaviour(
                         HoprNetworkBehaviorEvent::Autonat(event)
                     ) => {
@@ -260,16 +241,32 @@ impl HoprLibp2pNetworkBuilder {
                         connection_id,
                         num_established,
                         established_in,
+                        endpoint,
                         ..
                         // concurrent_dial_errors,
-                        // endpoint,
                     } => {
                         debug!(%peer_id, %connection_id, num_established, established_in_ms = established_in.as_millis(), transport="libp2p", "connection established");
+
+                        match endpoint {
+                            libp2p::core::ConnectedPoint::Dialer { address, .. } => {
+                                if let Err(error) = store.add(peer_id, std::collections::HashSet::from([address])) {
+                                    error!(peer = %peer_id, %error, direction = "outgoing", "failed to add connected peer to the peer store");
+                                }
+                            },
+                            libp2p::core::ConnectedPoint::Listener { send_back_addr, .. } => {
+                                if let Err(error) = store.add(peer_id, std::collections::HashSet::from([send_back_addr])) {
+                                    error!(peer = %peer_id, %error, direction = "incoming", "failed to add connected peer to the peer store");
+                                }
+                            },
+                        }
+
+                        tracker.add(peer_id);
 
                         print_network_info(swarm.network_info(), "connection established");
 
                         #[cfg(all(feature = "prometheus", not(test)))]
                         {
+                            METRIC_NETWORK_HEALTH.set((hopr_api::network::NetworkView::health(&network_inner) as i32).into());
                             METRIC_TRANSPORT_P2P_OPEN_CONNECTION_COUNT.increment(1.0);
                         }
                     }
@@ -283,9 +280,9 @@ impl HoprLibp2pNetworkBuilder {
                     } => {
                         debug!(%peer_id, %connection_id, num_established, transport="libp2p", "connection closed: {cause:?}");
 
-                        print_network_info(swarm.network_info(), "connection closed");
-
                         tracker.remove(&peer_id);
+
+                        print_network_info(swarm.network_info(), "connection closed");
 
                         #[cfg(all(feature = "prometheus", not(test)))]
                         {
@@ -315,6 +312,18 @@ impl HoprLibp2pNetworkBuilder {
                         peer_id
                     } => {
                         debug!(peer = ?peer_id, %connection_id, transport="libp2p", %error, "outgoing connection error");
+
+                        if let Some(peer_id) = peer_id {
+                            if let Err(error) = store.remove(&peer_id) {
+                                error!(peer = %peer_id, %error, "failed to remove undialable peer from the peer store");
+                            }
+                            tracker.remove(&peer_id);
+                        }
+
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        {
+                            METRIC_NETWORK_HEALTH.set((hopr_api::network::NetworkView::health(&network_inner) as i32).into());
+                        }
                     }
                     SwarmEvent::NewListenAddr {
                         listener_id,

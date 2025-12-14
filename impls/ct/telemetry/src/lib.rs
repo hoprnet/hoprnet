@@ -16,9 +16,8 @@ use serde::{Deserialize, Serialize};
 use validator::Validate;
 
 /// Configuration for the probing mechanism
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, Validate)]
-#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(deny_unknown_fields))]
 pub struct ProberConfig {
     /// The delay between individual probing rounds for neighbor discovery
     #[cfg_attr(
