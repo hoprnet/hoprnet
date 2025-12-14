@@ -36,7 +36,7 @@ pub fn create_blokli_client() -> anyhow::Result<BlokliTestClient<StaticState>> {
                     public_key: *offchain_key.public(),
                     chain_addr: chain_key.public().to_address(),
                     entry_type: AccountType::NotAnnounced,
-                    safe_address: Some([1u8; 20].into()),
+                    safe_address: Some([(i + 10) as u8; 20].into()),
                     key_id: ((i + 1) as u32).into(),
                 },
                 HoprBalance::new_base(100),
@@ -75,6 +75,10 @@ pub fn create_blokli_client() -> anyhow::Result<BlokliTestClient<StaticState>> {
 }
 
 pub async fn create_node(index: usize, blokli_client: &BlokliTestClient<StaticState>) -> anyhow::Result<Node> {
+    if index >= PEERS.len() {
+        return Err(anyhow::anyhow!("invalid index"));
+    }
+
     let mut chain_api = create_trustful_hopr_blokli_connector(
         &PEERS[index].0,
         Default::default(),
