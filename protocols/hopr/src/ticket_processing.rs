@@ -392,7 +392,7 @@ mod tests {
     use hopr_crypto_random::Randomizable;
 
     use super::*;
-    use crate::tests::*;
+    use crate::utils::*;
 
     #[tokio::test]
     async fn ticket_processor_should_acknowledge_previously_inserted_tickets() -> anyhow::Result<()> {

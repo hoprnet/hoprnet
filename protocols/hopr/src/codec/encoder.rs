@@ -10,6 +10,11 @@ use crate::{
     HoprCodecConfig, OutgoingPacket, PacketEncoder, SurbStore, TicketCreationError, TicketTracker,
     errors::HoprProtocolError,
 };
+
+/// Maximum number of acknowledgements that can be packed into a single HOPR packet.
+///
+/// Currently, the [`HoprPacket::PAYLOAD_SIZE`] minus 16-bit acknowledgement batch size counter
+/// divided by [`Acknowledgement::SIZE`].
 pub const MAX_ACKNOWLEDGEMENTS_BATCH_SIZE: usize =
     (HoprPacket::PAYLOAD_SIZE - size_of::<u16>()) / Acknowledgement::SIZE;
 
