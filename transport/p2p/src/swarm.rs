@@ -247,20 +247,22 @@ impl HoprLibp2pNetworkBuilder {
                     } => {
                         debug!(%peer_id, %connection_id, num_established, established_in_ms = established_in.as_millis(), transport="libp2p", "connection established");
 
-                        match endpoint {
-                            libp2p::core::ConnectedPoint::Dialer { address, .. } => {
-                                if let Err(error) = store.add(peer_id, std::collections::HashSet::from([address])) {
-                                    error!(peer = %peer_id, %error, direction = "outgoing", "failed to add connected peer to the peer store");
-                                }
-                            },
-                            libp2p::core::ConnectedPoint::Listener { send_back_addr, .. } => {
-                                if let Err(error) = store.add(peer_id, std::collections::HashSet::from([send_back_addr])) {
-                                    error!(peer = %peer_id, %error, direction = "incoming", "failed to add connected peer to the peer store");
-                                }
-                            },
-                        }
+                        if num_established == std::num::NonZero::<u32>::new(1).expect("must be a non-zero value") {
+                            match endpoint {
+                                libp2p::core::ConnectedPoint::Dialer { address, .. } => {
+                                    if let Err(error) = store.add(peer_id, std::collections::HashSet::from([address])) {
+                                        error!(peer = %peer_id, %error, direction = "outgoing", "failed to add connected peer to the peer store");
+                                    }
+                                },
+                                libp2p::core::ConnectedPoint::Listener { send_back_addr, .. } => {
+                                    if let Err(error) = store.add(peer_id, std::collections::HashSet::from([send_back_addr])) {
+                                        error!(peer = %peer_id, %error, direction = "incoming", "failed to add connected peer to the peer store");
+                                    }
+                                },
+                            }
 
-                        tracker.add(peer_id);
+                            tracker.add(peer_id);
+                        }
 
                         print_network_info(swarm.network_info(), "connection established");
 
@@ -280,7 +282,9 @@ impl HoprLibp2pNetworkBuilder {
                     } => {
                         debug!(%peer_id, %connection_id, num_established, transport="libp2p", "connection closed: {cause:?}");
 
-                        tracker.remove(&peer_id);
+                        if num_established == 0 {
+                            tracker.remove(&peer_id);
+                        }
 
                         print_network_info(swarm.network_info(), "connection closed");
 
@@ -314,10 +318,12 @@ impl HoprLibp2pNetworkBuilder {
                         debug!(peer = ?peer_id, %connection_id, transport="libp2p", %error, "outgoing connection error");
 
                         if let Some(peer_id) = peer_id {
-                            if let Err(error) = store.remove(&peer_id) {
-                                error!(peer = %peer_id, %error, "failed to remove undialable peer from the peer store");
+                            if !swarm.is_connected(&peer_id) {
+                                if let Err(error) = store.remove(&peer_id) {
+                                    error!(peer = %peer_id, %error, "failed to remove undialable peer from the peer store");
+                                }
+                                tracker.remove(&peer_id);
                             }
-                            tracker.remove(&peer_id);
                         }
 
                         #[cfg(all(feature = "prometheus", not(test)))]
