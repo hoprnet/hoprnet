@@ -54,16 +54,68 @@ impl PartialEq for HoprCodecConfig {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use hopr_chain_connector::{
+        HoprBlockchainSafeConnector,
+        testing::{BlokliTestClient, StaticState},
+    };
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::prelude::*;
-
+    use hopr_db_node::HoprNodeDb;
     use hopr_internal_types::prelude::*;
     use hopr_network_types::prelude::ResolvedTransportRouting;
 
     use crate::{
-        PacketDecoder, PacketEncoder,
-        codec::encoder::MAX_ACKNOWLEDGEMENTS_BATCH_SIZE, utils::*,
+        HoprCodecConfig, HoprDecoder, HoprEncoder, HoprTicketProcessor, HoprTicketProcessorConfig, MemorySurbStore,
+        PacketDecoder, PacketEncoder, SurbStoreConfig, codec::encoder::MAX_ACKNOWLEDGEMENTS_BATCH_SIZE, utils::*,
     };
+
+    type TestEncoder = HoprEncoder<
+        Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>,
+        MemorySurbStore,
+        HoprTicketProcessor<Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>, HoprNodeDb>,
+    >;
+
+    type TestDecoder = HoprDecoder<
+        Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>,
+        MemorySurbStore,
+        HoprTicketProcessor<Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>, HoprNodeDb>,
+    >;
+
+    pub fn create_encoder(sender: &Node) -> TestEncoder {
+        HoprEncoder::new(
+            sender.chain_key.clone(),
+            sender.chain_api.clone(),
+            MemorySurbStore::new(SurbStoreConfig::default()),
+            HoprTicketProcessor::new(
+                sender.chain_api.clone(),
+                sender.node_db.clone(),
+                sender.chain_key.clone(),
+                Hash::default(),
+                HoprTicketProcessorConfig::default(),
+            ),
+            Hash::default(),
+            HoprCodecConfig::default(),
+        )
+    }
+
+    pub fn create_decoder(receiver: &Node) -> TestDecoder {
+        HoprDecoder::new(
+            (receiver.offchain_key.clone(), receiver.chain_key.clone()),
+            receiver.chain_api.clone(),
+            MemorySurbStore::new(SurbStoreConfig::default()),
+            HoprTicketProcessor::new(
+                receiver.chain_api.clone(),
+                receiver.node_db.clone(),
+                receiver.chain_key.clone(),
+                Hash::default(),
+                HoprTicketProcessorConfig::default(),
+            ),
+            Hash::default(),
+            HoprCodecConfig::default(),
+        )
+    }
 
     #[tokio::test]
     async fn encode_decode_packet() -> anyhow::Result<()> {

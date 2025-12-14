@@ -1,13 +1,14 @@
 use std::sync::Arc;
+
 use hex_literal::hex;
-use hopr_chain_connector::{create_trustful_hopr_blokli_connector, HoprBlockchainSafeConnector};
-use hopr_chain_connector::testing::{BlokliTestClient, BlokliTestStateBuilder, StaticState};
+use hopr_chain_connector::{
+    HoprBlockchainSafeConnector, create_trustful_hopr_blokli_connector,
+    testing::{BlokliTestClient, BlokliTestStateBuilder, StaticState},
+};
 use hopr_crypto_types::prelude::*;
 use hopr_db_node::HoprNodeDb;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-
-use hopr_protocol_hopr::{HoprCodecConfig, HoprDecoder, HoprEncoder, HoprTicketProcessor, HoprTicketProcessorConfig, MemorySurbStore, SurbStoreConfig};
 
 lazy_static::lazy_static! {
     pub static ref PEERS: [(ChainKeypair, OffchainKeypair); 5] = [
@@ -19,6 +20,7 @@ lazy_static::lazy_static! {
     ].map(|(p1,p2)| (ChainKeypair::from_secret(&p1).expect("lazy static keypair should be valid"), OffchainKeypair::from_secret(&p2).expect("lazy static keypair should be valid")));
 }
 
+#[derive(Clone)]
 pub struct Node {
     pub chain_key: ChainKeypair,
     pub offchain_key: OffchainKeypair,
@@ -41,16 +43,34 @@ pub fn create_blokli_client() -> anyhow::Result<BlokliTestClient<StaticState>> {
                 XDaiBalance::new_base(1),
             )
         }))
-        .with_channels(PEERS.iter().enumerate().map(|(i, (chain_key, _))| {
-            ChannelEntry::new(
-                chain_key.public().to_address(),
-                PEERS[(i + 1) % PEERS.len()].0.public().to_address(),
-                HoprBalance::new_base(100),
-                0,
-                ChannelStatus::Open,
-                1,
-            )
-        }))
+        .with_channels(
+            PEERS
+                .iter()
+                .enumerate()
+                .map(|(i, (chain_key, _))| {
+                    ChannelEntry::new(
+                        chain_key.public().to_address(),
+                        PEERS[(i + 1) % PEERS.len()].0.public().to_address(),
+                        HoprBalance::new_base(100),
+                        0,
+                        ChannelStatus::Open,
+                        1,
+                    )
+                })
+                .chain(PEERS.iter().enumerate().rev().map(|(i, (chain_key, _))| {
+                    ChannelEntry::new(
+                        chain_key.public().to_address(),
+                        PEERS[if i > 0 { i - 1 } else { PEERS.len() - 1 }]
+                            .0
+                            .public()
+                            .to_address(),
+                        HoprBalance::new_base(100),
+                        0,
+                        ChannelStatus::Open,
+                        1,
+                    )
+                })),
+        )
         .build_static_client())
 }
 
@@ -61,7 +81,7 @@ pub async fn create_node(index: usize, blokli_client: &BlokliTestClient<StaticSt
         blokli_client.clone(),
         [10u8; 20].into(),
     )
-        .await?;
+    .await?;
     chain_api.connect().await?;
 
     Ok(Node {
@@ -70,50 +90,4 @@ pub async fn create_node(index: usize, blokli_client: &BlokliTestClient<StaticSt
         node_db: HoprNodeDb::new_in_memory().await?,
         chain_api: Arc::new(chain_api),
     })
-}
-
-type TestEncoder = HoprEncoder<
-    Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>,
-    MemorySurbStore,
-    HoprTicketProcessor<Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>, HoprNodeDb>,
->;
-
-type TestDecoder = HoprDecoder<
-    Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>,
-    MemorySurbStore,
-    HoprTicketProcessor<Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>, HoprNodeDb>,
->;
-
-pub fn create_encoder(sender: &Node) -> TestEncoder {
-    HoprEncoder::new(
-        sender.chain_key.clone(),
-        sender.chain_api.clone(),
-        MemorySurbStore::new(SurbStoreConfig::default()),
-        HoprTicketProcessor::new(
-            sender.chain_api.clone(),
-            sender.node_db.clone(),
-            sender.chain_key.clone(),
-            Hash::default(),
-            HoprTicketProcessorConfig::default(),
-        ),
-        Hash::default(),
-        HoprCodecConfig::default(),
-    )
-}
-
-pub fn create_decoder(receiver: &Node) -> TestDecoder {
-    HoprDecoder::new(
-        (receiver.offchain_key.clone(), receiver.chain_key.clone()),
-        receiver.chain_api.clone(),
-        MemorySurbStore::new(SurbStoreConfig::default()),
-        HoprTicketProcessor::new(
-            receiver.chain_api.clone(),
-            receiver.node_db.clone(),
-            receiver.chain_key.clone(),
-            Hash::default(),
-            HoprTicketProcessorConfig::default(),
-        ),
-        Hash::default(),
-        HoprCodecConfig::default(),
-    )
 }
