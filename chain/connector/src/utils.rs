@@ -100,12 +100,10 @@ pub(crate) fn model_to_chain_info(
     Ok(ParsedChainInfo {
         channel_closure_grace_period: model
             .channel_closure_grace_period
-            .ok_or(ConnectorError::TypeConversion("missing channel grace period".into()))
-            .and_then(|v| {
-                v.0.parse()
-                    .map(Duration::from_secs)
-                    .map_err(|e| ConnectorError::TypeConversion(format!("invalid channel grace period: {e}")))
-            })?,
+            .0
+            .parse()
+            .map(Duration::from_secs)
+            .map_err(|e| ConnectorError::TypeConversion(format!("invalid channel grace period: {e}")))?,
         domain_separators: DomainSeparators {
             ledger: model
                 .ledger_dst

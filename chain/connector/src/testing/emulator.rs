@@ -310,13 +310,8 @@ impl BlokliTestStateMutator for FullStateEmulator {
                 }
             }
             ParsedHoprChainAction::InitializeChannelClosure(channel_id) => {
-                let grace_period = state
-                    .chain_info
-                    .channel_closure_grace_period
-                    .clone()
-                    .map(|p| p.0)
-                    .unwrap_or("10".into());
-                let grace_period = u64::from_str(&grace_period)
+                let grace_period = &state.chain_info.channel_closure_grace_period.0;
+                let grace_period = u64::from_str(grace_period)
                     .map(|p| std::time::Duration::from_secs(p).max(std::time::Duration::from_secs(2)))
                     .map_err(|_| {
                         blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(

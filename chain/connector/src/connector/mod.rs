@@ -14,16 +14,12 @@ use petgraph::prelude::DiGraphMap;
 
 use crate::{
     backend::Backend,
-    connector::{
-        keys::HoprKeyMapper,
-        sequencer::TransactionSequencer,
-        utils::{
-            ParsedChainInfo, model_to_account_entry, model_to_graph_entry, model_to_ticket_params,
-            process_channel_changes_into_events,
-        },
-        values::CHAIN_INFO_CACHE_KEY,
-    },
+    connector::{keys::HoprKeyMapper, sequencer::TransactionSequencer, values::CHAIN_INFO_CACHE_KEY},
     errors::ConnectorError,
+    utils::{
+        ParsedChainInfo, model_to_account_entry, model_to_graph_entry, model_to_ticket_params,
+        process_channel_changes_into_events,
+    },
 };
 
 mod accounts;
@@ -33,7 +29,6 @@ mod keys;
 mod safe;
 mod sequencer;
 mod tickets;
-mod utils;
 mod values;
 
 type EventsChannel = (
@@ -157,8 +152,21 @@ where
 
     async fn do_connect(&self, timeout: Duration) -> Result<AbortHandle, ConnectorError> {
         const TOLERANCE: f64 = 0.01;
-        let min_accounts = (self.client.count_accounts(None).await? as f64 * (1.0 - TOLERANCE)).round() as u32;
-        let min_channels = (self.client.count_channels(None).await? as f64 * (1.0 - TOLERANCE)).round() as u32;
+        let min_accounts = (self
+            .client
+            .count_accounts(blokli_client::api::AccountSelector::Any)
+            .await? as f64
+            * (1.0 - TOLERANCE))
+            .round() as u32;
+        let min_channels = (self
+            .client
+            .count_channels(blokli_client::api::ChannelSelector {
+                filter: None,
+                status: None,
+            })
+            .await? as f64
+            * (1.0 - TOLERANCE))
+            .round() as u32;
         tracing::debug!(min_accounts, min_channels, "connection thresholds");
 
         let server_health = self.client.query_health().await?;
@@ -200,7 +208,7 @@ where
 
         hopr_async_runtime::prelude::spawn(async move {
             let connections = client
-                .subscribe_accounts(None)
+                .subscribe_accounts(blokli_client::api::AccountSelector::Any)
                 .and_then(|accounts| Ok((accounts, client.subscribe_graph()?)))
                 .and_then(|(accounts, channels)| Ok((accounts, channels, client.subscribe_ticket_params()?)));
 
@@ -455,7 +463,7 @@ where
             .await
     }
 
-    /// Connects to the chain using the underlying client, syncs all on-chain data
+    /// Connects to the chain using the underlying client, syncs all on-chain data,
     /// and subscribes for all future updates.
     ///
     /// If the connection does not finish within
@@ -468,6 +476,9 @@ where
     /// - all the [`ChainValues`](hopr_api::chain::ChainValues) methods,
     /// - all the [`ChainReadSafeOperations`](hopr_api::chain::ChainReadSafeOperations) methods,
     /// - [`me`](hopr_api::chain::ChainReadChannelOperations::me)
+    ///
+    /// If you wish to only call operations from the above Chain APIs, consider constructing
+    /// the [`HoprBlockchainReader`](crate::HoprBlockchainReader) instead.
     pub async fn connect(&mut self) -> Result<(), ConnectorError> {
         if self
             .connection_handle

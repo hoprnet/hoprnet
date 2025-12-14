@@ -1,12 +1,10 @@
 use std::time::Duration;
 
 use blokli_client::api::{BlokliQueryClient, BlokliSubscriptionClient};
-use futures::{StreamExt, TryStreamExt};
-use futures_time::future::FutureExt as FuturesTimeExt;
 use hopr_api::chain::{DeployedSafe, SafeSelector};
 use hopr_primitive_types::prelude::*;
 
-use crate::{Backend, HoprBlockchainConnector, connector::utils::model_to_deployed_safe, errors::ConnectorError};
+use crate::{Backend, HoprBlockchainConnector, HoprBlockchainReader, errors::ConnectorError};
 
 #[async_trait::async_trait]
 impl<B, C, P, R> hopr_api::chain::ChainReadSafeOperations for HoprBlockchainConnector<C, B, P, R>
@@ -18,62 +16,44 @@ where
 {
     type Error = ConnectorError;
 
+    // NOTE: these APIs can be called without calling `connect` first
+
+    #[inline]
     async fn safe_allowance<Cy: Currency, A: Into<Address> + Send>(
         &self,
-        address: A,
+        safe_address: A,
     ) -> Result<Balance<Cy>, Self::Error> {
-        let address = address.into();
-        if Cy::is::<WxHOPR>() {
-            Ok(self
-                .client
-                .query_safe_allowance(&address.into())
-                .await?
-                .allowance
-                .0
-                .parse()?)
-        } else if Cy::is::<XDai>() {
-            Err(ConnectorError::InvalidState("cannot query allowance on xDai"))
-        } else {
-            Err(ConnectorError::InvalidState("unsupported currency"))
-        }
+        HoprBlockchainReader(self.client.clone())
+            .safe_allowance(safe_address)
+            .await
     }
 
+    #[inline]
     async fn safe_info(&self, selector: SafeSelector) -> Result<Option<DeployedSafe>, Self::Error> {
-        let selector = match selector {
-            SafeSelector::Owner(owner_address) => blokli_client::api::SafeSelector::ChainKey(owner_address.into()),
-            SafeSelector::Address(safe_address) => blokli_client::api::SafeSelector::SafeAddress(safe_address.into()),
-        };
-
-        if let Some(safe) = self.client.query_safe(selector).await? {
-            Ok(Some(model_to_deployed_safe(safe)?))
-        } else {
-            Ok(None)
-        }
+        HoprBlockchainReader(self.client.clone()).safe_info(selector).await
     }
 
+    #[inline]
     async fn await_safe_deployment(
         &self,
         selector: SafeSelector,
         timeout: Duration,
     ) -> Result<DeployedSafe, Self::Error> {
-        if let Some(safe) = self.safe_info(selector).await? {
-            return Ok(safe);
-        }
+        HoprBlockchainReader(self.client.clone())
+            .await_safe_deployment(selector, timeout)
+            .await
+    }
 
-        let res = self
-            .client
-            .subscribe_safe_deployments()?
-            .map_err(ConnectorError::from)
-            .and_then(|safe| futures::future::ready(model_to_deployed_safe(safe)))
-            .try_skip_while(|deployed_safe| futures::future::ok(!selector.satisfies(deployed_safe)))
-            .take(1)
-            .try_collect::<Vec<_>>()
-            .timeout(futures_time::time::Duration::from(timeout))
-            .await??;
-
-        res.into_iter()
-            .next()
-            .ok_or(ConnectorError::InvalidState("safe deployment stream closed"))
+    #[inline]
+    async fn predict_module_address(
+        &self,
+        nonce: u64,
+        owner: &Address,
+        safe_address: &Address,
+    ) -> Result<Address, Self::Error> {
+        HoprBlockchainReader(self.client.clone())
+            .predict_module_address(nonce, owner, safe_address)
+            .await
     }
 }
 
@@ -104,8 +84,7 @@ mod tests {
             .with_safe_allowances([(account.safe_address.unwrap(), HoprBalance::new_base(10000))])
             .build_static_client();
 
-        let mut connector = create_connector(blokli_client)?;
-        connector.connect().await?;
+        let connector = create_connector(blokli_client)?;
 
         assert_eq!(
             connector.safe_allowance(account.safe_address.unwrap()).await?,
@@ -130,13 +109,30 @@ mod tests {
             .with_hopr_network_chain_info("rotsee")
             .build_dynamic_client(MODULE_ADDR.into());
 
-        let mut connector = create_connector(blokli_client)?;
-        connector.connect().await?;
+        let connector = create_connector(blokli_client)?;
 
         assert_eq!(Some(safe), connector.safe_info(SafeSelector::Owner(me)).await?);
         assert_eq!(Some(safe), connector.safe_info(SafeSelector::Address(safe_addr)).await?);
 
         insta::assert_yaml_snapshot!(*connector.client.snapshot());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connector_should_predict_module_address() -> anyhow::Result<()> {
+        let me = ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address();
+        let safe_addr = [1u8; Address::SIZE].into();
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_hopr_network_chain_info("rotsee")
+            .build_dynamic_client(MODULE_ADDR.into());
+
+        let connector = create_connector(blokli_client)?;
+
+        assert_eq!(
+            "0xff3dae517c13a59014c79c397de258c9557c04b8",
+            connector.predict_module_address(0, &me, &safe_addr).await?.to_string()
+        );
 
         Ok(())
     }
