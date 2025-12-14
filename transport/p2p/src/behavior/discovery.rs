@@ -263,9 +263,7 @@ impl NetworkBehaviour for Behaviour {
                 // Store announced addresses for later dialing / protocol use
                 if !multiaddresses.is_empty() {
                     self.bootstrap_peers.insert(peer, multiaddresses);
-                    if !self.connected_peers.contains_key(&peer) {
-                        self.schedule_dial_with(peer, initial_backoff());
-                    }
+                    self.schedule_dial_with(peer, initial_backoff());
                 }
             }
         });
