@@ -18,52 +18,6 @@ use libp2p_identity::PeerId;
 
 use crate::{HoprProbeProcess, config::ProbeConfig, content::Message, errors::ProbeError, ping::PingQueryReplier};
 
-#[inline(always)]
-fn to_nonce(message: &Message) -> String {
-    match message {
-        Message::Probe(NeighborProbe::Ping(ping)) => hex::encode(ping),
-        Message::Probe(NeighborProbe::Pong(pong)) => hex::encode(pong),
-        _ => "<telemetry>".to_string(),
-    }
-}
-
-#[inline(always)]
-fn to_pseudonym(path: &DestinationRouting) -> Option<HoprPseudonym> {
-    match path {
-        DestinationRouting::Forward { pseudonym, .. } => *pseudonym,
-        DestinationRouting::Return(matcher) => match matcher {
-            hopr_network_types::types::SurbMatcher::Exact(sender_id) => Some(sender_id.pseudonym()),
-            hopr_network_types::types::SurbMatcher::Pseudonym(pseudonym) => Some(*pseudonym),
-        },
-    }
-}
-
-#[derive(Clone, Debug)]
-struct Sender<T> {
-    downstream: T,
-}
-
-impl<T> Sender<T>
-where
-    T: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + 'static,
-{
-    #[tracing::instrument(level = "debug", skip(self, path, message), fields(message=%message, nonce=%to_nonce(&message), pseudonym=?to_pseudonym(&path)), ret(level = tracing::Level::TRACE), err(Display))]
-    async fn send_message(self, path: DestinationRouting, message: Message) -> crate::errors::Result<()> {
-        let push_to_network = self.downstream;
-        pin_mut!(push_to_network);
-        if push_to_network
-            .as_mut()
-            .send((path, ApplicationDataOut::with_no_packet_info(message.try_into()?)))
-            .await
-            .is_ok()
-        {
-            Ok(())
-        } else {
-            Err(ProbeError::SendError("transport error".to_string()))
-        }
-    }
-}
-
 type CacheKey = (HoprPseudonym, NeighborProbe);
 type CacheValue = (Box<NodeId>, std::time::Duration, Option<PingQueryReplier>);
 
@@ -180,9 +134,7 @@ impl Probe {
                 direct_neighbors
                     .for_each_concurrent(max_parallel_probes, move |(peer, notifier)| {
                         let active_probes = active_probes.clone();
-                        let push_to_network = Sender {
-                            downstream: push_to_network.clone(),
-                        };
+                        let push_to_network = push_to_network.clone();
 
                         async move {
                             match peer {
@@ -196,26 +148,32 @@ impl Probe {
 
                                     let message = Message::Probe(nonce);
 
-                                    let routing = DestinationRouting::Forward {
-                                        destination: destination.clone(),
-                                        pseudonym,
-                                        forward_options,
-                                        return_options,
-                                    };
-
-                                    if let Err(error) = push_to_network.send_message(routing, message).await {
-                                        tracing::error!(?destination, %error, "failed to send out a probe");
+                                    if let Ok(data) = message.try_into() {
+                                        let routing = DestinationRouting::Forward {
+                                            destination: destination.clone(),
+                                            pseudonym,
+                                            forward_options,
+                                            return_options,
+                                        };
+                                        let data = ApplicationDataOut::with_no_packet_info(data);
+                                        pin_mut!(push_to_network);
+                                        
+                                        if let Err(_error) = push_to_network.send((routing, data)).await {
+                                            tracing::error!("failed to send out a ping");
+                                        } else {
+                                            active_probes
+                                                .insert(
+                                                    (
+                                                        pseudonym
+                                                            .expect("the pseudonym must be present in Forward routing"),
+                                                        nonce,
+                                                    ),
+                                                    (destination, current_time().as_unix_timestamp(), notifier),
+                                                )
+                                                .await;
+                                        }
                                     } else {
-                                        active_probes
-                                            .insert(
-                                                (
-                                                    pseudonym
-                                                        .expect("the pseudonym must be present in Forward routing"),
-                                                    nonce,
-                                                ),
-                                                (destination, current_time().as_unix_timestamp(), notifier),
-                                            )
-                                            .await;
+                                        tracing::error!("failed to convert ping message into data");
                                     }
                                 }
                                 DestinationRouting::Return(_surb_matcher) => tracing::error!(
@@ -240,7 +198,7 @@ impl Probe {
             HoprProbeProcess::Process,
             hopr_async_runtime::spawn_as_abortable!(api.1.for_each_concurrent(max_parallel_probes, move |(pseudonym, in_data)| {
                 let active_probes = active_probes_rx.clone();
-                let push_to_network = Sender { downstream: api.0.clone() };
+                let push_to_network = api.0.clone();
                 let move_up = move_up.clone();
                 let store = network_graph.clone();
 
@@ -260,8 +218,16 @@ impl Probe {
                                         tracing::trace!(%pseudonym, nonce = hex::encode(ping), "wrapping a pong in the found SURB");
 
                                         let message = Message::Probe(NeighborProbe::Pong(ping));
-                                        if let Err(error) = push_to_network.send_message(DestinationRouting::Return(pseudonym.into()), message).await {
-                                            tracing::error!(%pseudonym, %error, "failed to send back a pong");
+                                        if let Ok(data) = message.try_into() {
+                                            let routing = DestinationRouting::Return(pseudonym.into());
+                                            let data = ApplicationDataOut::with_no_packet_info(data);
+                                            pin_mut!(push_to_network);
+                                            
+                                            if let Err(_error) = push_to_network.send((routing, data)).await {
+                                                tracing::error!(%pseudonym, "failed to send back a pong");
+                                            }
+                                        } else {
+                                            tracing::error!(%pseudonym, "failed to convert pong message into data");
                                         }
                                     },
                                     Message::Probe(NeighborProbe::Pong(pong)) => {

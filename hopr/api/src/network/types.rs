@@ -95,6 +95,8 @@ mod tests {
 
         observation.record_probe(Ok(std::time::Duration::from_millis(50)));
 
+        std::thread::sleep(std::time::Duration::from_millis(10));
+
         let after = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default();
