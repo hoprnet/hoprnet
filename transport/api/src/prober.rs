@@ -1,20 +1,11 @@
+//! Deprecated: glue layer for the code that connects probing to the new network API
+//! defined by the `hopr_api`.
+
 use async_trait::async_trait;
 use hopr_transport_network::traits::{NetworkObservations, NetworkView};
 use hopr_transport_p2p::HoprNetwork;
 use hopr_transport_probe::traits::{PeerDiscoveryFetch, ProbeStatusUpdate};
 use rand::seq::SliceRandom;
-
-// TODO: replace with telemetry:
-// hopr_metrics::SimpleHistogram::new(
-// "hopr_probe_time_sec",
-// "Measures total time it takes to probe a single node (seconds)",
-// vec![0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0],
-
-// TODO: replace with telemetry:
-// static ref METRIC_PROBE_COUNT:  hopr_metrics::MultiCounter =  hopr_metrics::MultiCounter::new(
-// "hopr_probe_count",
-//             "Total number of probes by result",
-//             &["success"]
 
 /// Implementor of the 0-hop probing external API.
 ///

@@ -2,7 +2,9 @@ use std::sync::Arc;
 
 use futures::{FutureExt, SinkExt, StreamExt, pin_mut};
 use futures_concurrency::stream::StreamExt as _;
-use hopr_api::ct::{NeighborProbe, NeighborTelemetry, NetworkGraphView, Telemetry, TrafficGeneration};
+use hopr_api::ct::{
+    NeighborProbe, NeighborTelemetry, NetworkGraphView, Telemetry, TrafficGeneration, traits::NetworkGraphUpdate,
+};
 use hopr_async_runtime::AbortableList;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::types::OffchainPublicKey;
@@ -14,8 +16,7 @@ use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut, Reserved
 use libp2p_identity::PeerId;
 
 use crate::{
-    HoprProbeProcess, config::ProbeConfig, content::Message, errors::ProbeError,
-    neighbors::ImmediateNeighborChannelGraph, ping::PingQueryReplier,
+    HoprProbeProcess, config::ProbeConfig, content::Message, errors::ProbeError, ping::PingQueryReplier,
 };
 
 #[inline(always)]
@@ -97,14 +98,14 @@ impl Probe {
         V: futures::Stream<Item = (PeerId, PingQueryReplier)> + Send + Sync + 'static,
         Up: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Clone + Send + Sync + 'static,
         Tr: TrafficGeneration + Send + Sync + 'static,
-        G: NetworkGraphView + Send + Sync + 'static,
+        G: NetworkGraphView + NetworkGraphUpdate + Clone + Send + Sync + 'static,
     {
         let max_parallel_probes = self.cfg.max_parallel_probes;
 
-        let probing_routes = traffic_generator.build(network_graph);
+        let probing_routes = traffic_generator.build(network_graph.clone());
 
         // Currently active probes
-        // let store_eviction = reports.clone();    // TODO
+        let network_graph_internal = network_graph.clone();
         let timeout = self.cfg.timeout;
         let active_probes: moka::future::Cache<CacheKey, CacheValue> = moka::future::Cache::builder()
             .time_to_live(timeout)
@@ -116,7 +117,7 @@ impl Probe {
                       -> moka::notification::ListenerFuture {
                     if matches!(cause, moka::notification::RemovalCause::Expired) {
                         // If the eviction cause is expiration => record as a failed probe
-                        // let store = store_eviction.clone();      // TODO
+                        let store = network_graph_internal.clone();
                         let (peer, _start, notifier) = v;
 
                         tracing::debug!(%peer, pseudonym = %k.0, probe = %k.1, reason = "timeout", "probe failed");
@@ -136,16 +137,11 @@ impl Probe {
                         if let NodeId::Offchain(opk) = peer.as_ref() {
                             let peer: PeerId = opk.into();
                             futures::FutureExt::boxed(async move {
-                                // pin_mut!(store);
-                                // if let Err(error) = store
-                                //     .send(Err(hopr_api::ct::traits::TrafficGenerationError::ProbeNeighborTimeout(
-                                //         peer,
-                                //     )))
-                                //     .await
-                                // {
-                                //     tracing::error!(%peer, %error, "failed to record probe timeout");
-                                // }
-                                // TODO
+                                store
+                                    .record(Err(hopr_api::ct::traits::TrafficGenerationError::ProbeNeighborTimeout(
+                                        peer,
+                                    )))
+                                    .await
                             })
                         } else {
                             futures::FutureExt::boxed(futures::future::ready(()))
@@ -249,7 +245,7 @@ impl Probe {
                 let active_probes = active_probes_rx.clone();
                 let push_to_network = Sender { downstream: api.0.clone() };
                 let move_up = move_up.clone();
-                // let store = reports.clone();   // TODO
+                let store = network_graph.clone();
 
                 async move {
                     // TODO(v3.1): compare not only against ping tag, but also against telemetry that will be occurring on random tags
@@ -260,11 +256,7 @@ impl Probe {
                             Ok(message) => {
                                 match message {
                                     Message::Telemetry(path_telemetry) => {
-                                        // TODO
-                                        // pin_mut!(store);
-                                        // if let Err(error) = store.send(Ok(Telemetry::Loopback(path_telemetry))).await {
-                                        //     tracing::error!(%pseudonym, %error, "failed to record probe success");
-                                        // }
+                                        store.record(Ok(Telemetry::Loopback(path_telemetry))).await
                                     },
                                     Message::Probe(NeighborProbe::Ping(ping)) => {
                                         tracing::debug!(%pseudonym, nonce = hex::encode(ping), "received ping");
@@ -284,14 +276,10 @@ impl Probe {
 
                                             if let NodeId::Offchain(opk) = peer.as_ref() {
                                                 tracing::info!(%pseudonym, nonce = hex::encode(pong), latency_ms = latency.as_millis(), "probe successful");
-                                                // pin_mut!(store);
-                                                // if let Err(error) = store.send(Ok(Telemetry::Neighbor(NeighborTelemetry {
-                                                //     peer: opk.into(),
-                                                //     rtt: latency,
-                                                // }))).await {
-                                                //     tracing::error!(%pseudonym, %error, "failed to record probe success");
-                                                // }
-                                                // TODO
+                                                store.record(Ok(Telemetry::Neighbor(NeighborTelemetry {
+                                                    peer: opk.into(),
+                                                    rtt: latency,
+                                                }))).await 
                                             } else {
                                                 tracing::warn!(%pseudonym, nonce = hex::encode(pong), latency_ms = latency.as_millis(), "probe successful to non-offchain peer");
                                             }
@@ -334,7 +322,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        neighbors::ImmediateNeighborProber,
+        neighbors::{ImmediateNeighborChannelGraph, ImmediateNeighborProber},
         traits::{PeerDiscoveryFetch, ProbeStatusUpdate},
     };
 
