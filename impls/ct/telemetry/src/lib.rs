@@ -267,7 +267,10 @@ mod tests {
             recheck_threshold: ProberConfig::default().recheck_threshold,
         };
 
-        let prober = ImmediateNeighborProber::new(Default::default());
+        let prober = ImmediateNeighborProber::new(ProberConfig {
+            interval: std::time::Duration::from_millis(1),
+            ..Default::default()
+        });
         let stream = prober.build(channel_graph);
         pin_mut!(stream);
 

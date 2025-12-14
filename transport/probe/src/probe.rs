@@ -157,7 +157,7 @@ impl Probe {
                                         };
                                         let data = ApplicationDataOut::with_no_packet_info(data);
                                         pin_mut!(push_to_network);
-                                        
+
                                         if let Err(_error) = push_to_network.send((routing, data)).await {
                                             tracing::error!("failed to send out a ping");
                                         } else {
@@ -222,7 +222,7 @@ impl Probe {
                                             let routing = DestinationRouting::Return(pseudonym.into());
                                             let data = ApplicationDataOut::with_no_packet_info(data);
                                             pin_mut!(push_to_network);
-                                            
+
                                             if let Err(_error) = push_to_network.send((routing, data)).await {
                                                 tracing::error!(%pseudonym, "failed to send back a pong");
                                             }
