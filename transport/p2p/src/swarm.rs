@@ -250,18 +250,24 @@ impl HoprLibp2pNetworkBuilder {
                         if num_established == std::num::NonZero::<u32>::new(1).expect("must be a non-zero value") {
                             match endpoint {
                                 libp2p::core::ConnectedPoint::Dialer { address, .. } => {
-                                    if let Err(error) = store.add(peer_id, std::collections::HashSet::from([address])) {
-                                        error!(peer = %peer_id, %error, direction = "outgoing", "failed to add connected peer to the peer store");
+                                    if allow_private_addresses || is_public_address(&address) {
+                                        if let Err(error) = store.add(peer_id, std::collections::HashSet::from([address])) {
+                                            error!(peer = %peer_id, %error, direction = "outgoing", "failed to add connected peer to the peer store");
+                                        }
+                                        tracker.add(peer_id);
                                     }
                                 },
                                 libp2p::core::ConnectedPoint::Listener { send_back_addr, .. } => {
-                                    if let Err(error) = store.add(peer_id, std::collections::HashSet::from([send_back_addr])) {
-                                        error!(peer = %peer_id, %error, direction = "incoming", "failed to add connected peer to the peer store");
+                                    if allow_private_addresses || is_public_address(&send_back_addr) {
+                                        if let Err(error) = store.add(peer_id, std::collections::HashSet::from([send_back_addr])) {
+                                            error!(peer = %peer_id, %error, direction = "incoming", "failed to add connected peer to the peer store");
+                                        }
+                                        tracker.add(peer_id);
                                     }
-                                },
+                                }
                             }
-
-                            tracker.add(peer_id);
+                        } else {
+                            trace!(transport="libp2p", peer = %peer_id, "Private/local peer address ignored")
                         }
 
                         print_network_info(swarm.network_info(), "connection established");
@@ -317,14 +323,13 @@ impl HoprLibp2pNetworkBuilder {
                     } => {
                         debug!(peer = ?peer_id, %connection_id, transport="libp2p", %error, "outgoing connection error");
 
-                        if let Some(peer_id) = peer_id {
-                            if !swarm.is_connected(&peer_id) {
+                        if let Some(peer_id) = peer_id
+                            && !swarm.is_connected(&peer_id) {
                                 if let Err(error) = store.remove(&peer_id) {
                                     error!(peer = %peer_id, %error, "failed to remove undialable peer from the peer store");
                                 }
                                 tracker.remove(&peer_id);
                             }
-                        }
 
                         #[cfg(all(feature = "prometheus", not(test)))]
                         {
