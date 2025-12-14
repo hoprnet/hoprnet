@@ -250,11 +250,14 @@
             set -euo pipefail
 
             # ensure TLS clients can locate the CA bundle inside the container
-            ssl_cert_file="/etc/ssl/certs/ca-bundle.crt"
+            ssl_cert_file="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
             if [ -f "$ssl_cert_file" ]; then
               export SSL_CERT_FILE="$ssl_cert_file"
               export NIX_SSL_CERT_FILE="$ssl_cert_file"
             fi
+
+            # ensure the temporary directory exists
+            mkdir -p $TMPDIR
 
             # if the default listen host has not been set by the user,
             # we will set it to the container's ip address
@@ -283,9 +286,6 @@
               # default to hoprd
               exec /bin/hoprd "$@"
             fi
-
-            # ensure the temporary directory exists
-            mkdir -p ${"TMPDIR:-/app/.tmp"}
           '';
 
           # Man pages using nix-lib
