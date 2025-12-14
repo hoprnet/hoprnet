@@ -66,10 +66,9 @@ mod tests {
     use hopr_internal_types::prelude::*;
     use hopr_network_types::prelude::ResolvedTransportRouting;
 
-    use super::*;
     use crate::{
-        HoprTicketProcessor, HoprTicketProcessorConfig, MemorySurbStore, PacketDecoder, PacketEncoder, SurbStoreConfig,
-        codec::encoder::MAX_ACKNOWLEDGEMENTS_BATCH_SIZE, tests::*,
+        HoprCodecConfig, HoprDecoder, HoprEncoder, HoprTicketProcessor, HoprTicketProcessorConfig, MemorySurbStore,
+        PacketDecoder, PacketEncoder, SurbStoreConfig, codec::encoder::MAX_ACKNOWLEDGEMENTS_BATCH_SIZE, utils::*,
     };
 
     type TestEncoder = HoprEncoder<
@@ -84,7 +83,7 @@ mod tests {
         HoprTicketProcessor<Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>, HoprNodeDb>,
     >;
 
-    fn create_encoder(sender: &Node) -> TestEncoder {
+    pub fn create_encoder(sender: &Node) -> TestEncoder {
         HoprEncoder::new(
             sender.chain_key.clone(),
             sender.chain_api.clone(),
@@ -101,7 +100,7 @@ mod tests {
         )
     }
 
-    fn create_decoder(receiver: &Node) -> TestDecoder {
+    pub fn create_decoder(receiver: &Node) -> TestDecoder {
         HoprDecoder::new(
             (receiver.offchain_key.clone(), receiver.chain_key.clone()),
             receiver.chain_api.clone(),
