@@ -1,8 +1,10 @@
-use hopr_api::ct::{NeighborProbe, PathTelemetry};
 use hopr_primitive_types::prelude::GeneralError;
 use hopr_protocol_app::prelude::{ApplicationData, ReservedTag, Tag};
 
-use crate::errors::ProbeError;
+use crate::{
+    errors::ProbeError,
+    types::{NeighborProbe, PathTelemetry},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, strum::EnumDiscriminants, strum::Display)]
 #[strum_discriminants(vis(pub(crate)))]

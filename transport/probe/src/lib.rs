@@ -27,10 +27,12 @@ pub mod types;
 
 pub use hopr_api::ct::{
     traits::TrafficGeneration,
-    types::{NeighborTelemetry, Telemetry, TrafficGenerationError},
+    types::{Telemetry, TrafficGenerationError},
 };
 
-pub use crate::{config::ProbeConfig, content::Message as TrafficReturnedObservation, probe::Probe};
+pub use crate::{
+    config::ProbeConfig, content::Message as TrafficReturnedObservation, probe::Probe, types::NeighborTelemetry,
+};
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, strum::Display)]
 pub enum HoprProbeProcess {

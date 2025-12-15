@@ -3,8 +3,7 @@ use std::sync::Arc;
 use futures::{FutureExt, SinkExt, StreamExt, pin_mut};
 use futures_concurrency::stream::StreamExt as _;
 use hopr_api::ct::{
-    NeighborProbe, NeighborTelemetry, NetworkGraphView, Telemetry, TrafficGeneration, traits::NetworkGraphUpdate,
-    types::TrafficGenerationError,
+    NetworkGraphView, Telemetry, TrafficGeneration, traits::NetworkGraphUpdate, types::TrafficGenerationError,
 };
 use hopr_async_runtime::AbortableList;
 use hopr_crypto_random::Randomizable;
@@ -16,7 +15,14 @@ use hopr_primitive_types::traits::AsUnixTimestamp;
 use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut, ReservedTag};
 use libp2p_identity::PeerId;
 
-use crate::{HoprProbeProcess, config::ProbeConfig, content::Message, errors::ProbeError, ping::PingQueryReplier};
+use crate::{
+    HoprProbeProcess,
+    config::ProbeConfig,
+    content::Message,
+    errors::ProbeError,
+    ping::PingQueryReplier,
+    types::{NeighborProbe, NeighborTelemetry, PathTelemetry},
+};
 
 type CacheKey = (HoprPseudonym, NeighborProbe);
 type CacheValue = (Box<NodeId>, std::time::Duration, Option<PingQueryReplier>);
@@ -91,7 +97,9 @@ impl Probe {
                             let peer: PeerId = opk.into();
                             futures::FutureExt::boxed(async move {
                                 store
-                                    .record(Err(TrafficGenerationError::ProbeNeighborTimeout(peer)))
+                                    .record::<NeighborTelemetry, PathTelemetry>(Err(
+                                        TrafficGenerationError::ProbeNeighborTimeout(peer),
+                                    ))
                                     .await
                             })
                         } else {
@@ -211,7 +219,7 @@ impl Probe {
                             Ok(message) => {
                                 match message {
                                     Message::Telemetry(path_telemetry) => {
-                                        store.record(Ok(Telemetry::Loopback(path_telemetry))).await
+                                        store.record::<NeighborTelemetry, PathTelemetry>(Ok(Telemetry::Loopback(path_telemetry))).await
                                     },
                                     Message::Probe(NeighborProbe::Ping(ping)) => {
                                         tracing::debug!(%pseudonym, nonce = hex::encode(ping), "received ping");
@@ -239,7 +247,7 @@ impl Probe {
 
                                             if let NodeId::Offchain(opk) = peer.as_ref() {
                                                 tracing::info!(%pseudonym, nonce = hex::encode(pong), latency_ms = latency.as_millis(), "probe successful");
-                                                store.record(Ok(Telemetry::Neighbor(NeighborTelemetry {
+                                                store.record::<NeighborTelemetry, PathTelemetry>(Ok(Telemetry::Neighbor(NeighborTelemetry {
                                                     peer: opk.into(),
                                                     rtt: latency,
                                                 }))).await
@@ -306,13 +314,17 @@ mod tests {
 
     #[async_trait]
     impl NetworkGraphUpdate for PeerStore {
-        async fn record(&self, telemetry: std::result::Result<Telemetry, TrafficGenerationError>) {
+        async fn record<N, P>(&self, telemetry: std::result::Result<Telemetry<N, P>, TrafficGenerationError<P>>)
+        where
+            N: hopr_api::ct::MeasurableNeighbor + Send + Clone,
+            P: hopr_api::ct::MeasurablePath + Send + Clone,
+        {
             let mut on_finished = self.on_finished.write().unwrap();
 
             match telemetry {
                 Ok(Telemetry::Neighbor(neighbor_telemetry)) => {
-                    let peer: PeerId = neighbor_telemetry.peer.into();
-                    let duration = neighbor_telemetry.rtt;
+                    let peer: PeerId = neighbor_telemetry.peer().clone();
+                    let duration = neighbor_telemetry.rtt();
                     on_finished.push((peer, Ok(duration)));
                 }
                 Err(TrafficGenerationError::ProbeNeighborTimeout(peer)) => {

@@ -1,7 +1,7 @@
 pub use hopr_network_types::types::DestinationRouting;
 use multiaddr::PeerId;
 
-use super::{Telemetry, TrafficGenerationError};
+use super::{MeasurableNeighbor, MeasurablePath, Telemetry, TrafficGenerationError};
 
 /// A trait specifying the graph traversal functionality
 #[async_trait::async_trait]
@@ -17,7 +17,10 @@ pub trait NetworkGraphView {
 #[async_trait::async_trait]
 pub trait NetworkGraphUpdate {
     /// Update the observation for the telemetry.
-    async fn record(&self, telemetry: std::result::Result<Telemetry, TrafficGenerationError>);
+    async fn record<N, P>(&self, telemetry: std::result::Result<Telemetry<N, P>, TrafficGenerationError<P>>)
+    where
+        N: MeasurableNeighbor + Clone + Send + Sync + 'static,
+        P: MeasurablePath + Clone + Send + Sync + 'static;
 }
 
 /// A trait for types that can produce a stream of cover traffic routes.

@@ -11,7 +11,7 @@ license = "GPL-3.0-only"
 
 [features]
 default = []
-ct = ["dep:hopr-network-types", "dep:hopr-crypto-random", "dep:hex"]
+ct = ["dep:hopr-network-types"]
 db = []
 chain = ["db"]
 network = []
@@ -22,13 +22,10 @@ async-trait = { workspace = true }
 auto_impl = { workspace = true }
 chrono = { workspace = true }
 futures = { workspace = true }
-hex = { workspace = true, optional = true }
 multiaddr = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
-
-hopr-crypto-random = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }
 hopr-network-types = { workspace = true, optional = true }
 hopr-primitive-types = { workspace = true }

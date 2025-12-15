@@ -125,21 +125,24 @@ impl<T> hopr_api::ct::NetworkGraphUpdate for ImmediateNeighborChannelGraph<T>
 where
     T: NetworkObservations + Send + Sync,
 {
-    async fn record(
+    async fn record<N, P>(
         &self,
-        telemetry: std::result::Result<hopr_api::ct::Telemetry, hopr_api::ct::TrafficGenerationError>,
-    ) {
+        telemetry: std::result::Result<hopr_api::ct::Telemetry<N, P>, hopr_api::ct::TrafficGenerationError<P>>,
+    ) where
+        N: hopr_api::ct::MeasurableNeighbor + Send + Clone,
+        P: hopr_api::ct::MeasurablePath + Send + Clone,
+    {
         match telemetry {
             Ok(hopr_api::ct::Telemetry::Neighbor(telemetry)) => {
                 tracing::trace!(
-                    peer = %telemetry.peer,
-                    latency_ms = telemetry.rtt.as_millis(),
+                    peer = %telemetry.peer(),
+                    latency_ms = telemetry.rtt().as_millis(),
                     "neighbor probe successful"
                 );
                 hopr_api::network::NetworkObservations::update(
                     self.network.as_ref(),
-                    &telemetry.peer,
-                    Ok(telemetry.rtt / 2),
+                    telemetry.peer(),
+                    Ok(telemetry.rtt() / 2),
                 );
             }
             Ok(hopr_api::ct::Telemetry::Loopback(_)) => {
