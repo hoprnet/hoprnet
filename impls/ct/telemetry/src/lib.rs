@@ -193,7 +193,7 @@ mod tests {
     use futures::{StreamExt, pin_mut};
     use hopr_api::{
         Multiaddr,
-        network::{Health, Observations},
+        network::{Health, Observable},
     };
     use hopr_internal_types::NodeId;
     use tokio::time::timeout;
@@ -201,6 +201,22 @@ mod tests {
     use super::*;
 
     const TINY_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(20);
+
+    mockall::mock! {
+        Observed {}
+
+        impl Observable for Observed {
+            fn record_probe(&mut self, latency: std::result::Result<std::time::Duration, ()>);
+
+            fn last_update(&self) -> std::time::Duration;
+
+            fn average_latency(&self) -> Option<std::time::Duration>;
+
+            fn average_probe_rate(&self) -> f64;
+
+            fn score(&self) -> f64;
+        }
+    }
 
     mockall::mock! {
         ScanInteraction {}
@@ -220,7 +236,8 @@ mod tests {
 
             fn connected_peers(&self) -> HashSet<PeerId>;
 
-            fn observations_for(&self, peer: &PeerId) -> Option<Observations>;
+            #[allow(refining_impl_trait)]
+            fn observations_for(&self, peer: &PeerId) -> Option<MockObserved>;
 
             fn health(&self) -> Health;
         }

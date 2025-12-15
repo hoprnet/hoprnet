@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use super::{Health, Observations};
+use super::{Health, Observable};
 use crate::{Multiaddr, PeerId};
 
 /// Trait representing a read-only view of the network state.
@@ -17,11 +17,10 @@ pub trait NetworkView {
     /// Peers currently connected and tracked by the network.
     fn connected_peers(&self) -> HashSet<PeerId>;
 
-    /// Observations related to a specific peer in the network.
+    /// Observables related to a specific peer in the network.
     ///
-    /// The absence of observations means that the peer is currently not connected
-    /// to the network and therefore has no observations.
-    fn observations_for(&self, peer: &PeerId) -> Option<Observations>;
+    /// In the absence of Observables
+    fn observations_for<'a>(&'a self, peer: &'a PeerId) -> Option<impl Observable + 'static>;
 
     /// Represents perceived health of the network.
     fn health(&self) -> Health;

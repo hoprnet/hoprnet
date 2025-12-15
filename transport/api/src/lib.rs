@@ -42,7 +42,7 @@ use hopr_api::{
 };
 pub use hopr_api::{
     db::ChannelTicketStatistics,
-    network::{Health, Observations, traits::NetworkView},
+    network::{Health, Observable, traits::NetworkView},
 };
 use hopr_async_runtime::{AbortableList, prelude::spawn, spawn_as_abortable};
 use hopr_crypto_packet::prelude::PacketSignal;
@@ -61,6 +61,7 @@ use hopr_protocol_hopr::MemorySurbStore;
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId, Protocol};
 use hopr_transport_mixer::MixerConfig;
+pub use hopr_transport_network::observation::Observations;
 use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork};
 use hopr_transport_probe::{
     Probe, TrafficGeneration,

@@ -35,8 +35,6 @@ hopr-primitive-types = { workspace = true }
 hopr-chain-types = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-statistics = { workspace = true, features = ["moving"] }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-assertables = { workspace = true }

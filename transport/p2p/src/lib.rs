@@ -36,8 +36,9 @@ mod behavior;
 use std::collections::HashSet;
 
 use futures::{AsyncRead, AsyncWrite};
-pub use hopr_api::network::{Health, types::Observations};
+pub use hopr_api::network::{Health, Observable};
 use hopr_api::network::{NetworkObservations, NetworkView};
+use hopr_transport_network::observation::Observations;
 use libp2p::{Multiaddr, PeerId};
 
 pub use crate::{
@@ -86,6 +87,7 @@ impl NetworkView for HoprNetwork {
         self.store.get(peer)
     }
 
+    #[allow(refining_impl_trait_reachable)]
     #[inline]
     fn observations_for(&self, peer: &PeerId) -> Option<Observations> {
         self.tracker.get(peer)

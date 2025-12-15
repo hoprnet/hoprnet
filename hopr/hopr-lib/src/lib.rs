@@ -82,12 +82,12 @@ use std::{
 };
 
 use futures::{FutureExt, SinkExt, Stream, StreamExt, TryFutureExt, channel::mpsc::channel};
-pub use hopr_api::db::ChannelTicketStatistics;
 use hopr_api::{
     chain::{AccountSelector, AnnouncementError, ChannelSelector, *},
     ct::TrafficGeneration,
     db::{HoprNodeDbApi, TicketMarker, TicketSelector},
 };
+pub use hopr_api::{db::ChannelTicketStatistics, network::Observable};
 use hopr_async_runtime::prelude::spawn;
 pub use hopr_async_runtime::{Abortable, AbortableList};
 pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};

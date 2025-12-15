@@ -6,7 +6,7 @@ use axum::{
     response::IntoResponse,
 };
 use futures::{StreamExt, stream::FuturesUnordered};
-use hopr_lib::{Address, Health, Multiaddr};
+use hopr_lib::{Address, Health, Multiaddr, api::network::Observable};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
@@ -251,10 +251,10 @@ pub(super) async fn peers(
         .map(|(address, mas, info)| PeerObservations {
             address,
             multiaddr: mas.first().cloned(),
-            last_update: info.last_update.as_millis(),
+            last_update: info.last_update().as_millis(),
             average_latency: info.average_latency().map_or(0, |d| d.as_millis()),
+            probe_rate: info.average_probe_rate(),
             score: info.score(),
-            probe_rate: info.score(),
         })
         .collect::<Vec<_>>()
         .await;

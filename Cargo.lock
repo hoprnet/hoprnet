@@ -4467,7 +4467,6 @@ name = "hopr-api"
 version = "0.6.0"
 dependencies = [
  "anyhow",
- "assertables",
  "async-trait",
  "auto_impl",
  "chrono",
@@ -4480,7 +4479,6 @@ dependencies = [
  "hopr-internal-types",
  "hopr-network-types",
  "hopr-primitive-types 0.10.0",
- "hopr-statistics",
  "multiaddr",
  "strum 0.27.2",
  "thiserror 2.0.17",
@@ -5212,9 +5210,11 @@ name = "hopr-transport-network"
 version = "0.8.1"
 dependencies = [
  "anyhow",
+ "assertables",
  "dashmap",
  "hopr-api",
  "hopr-metrics",
+ "hopr-statistics",
  "humantime-serde",
  "lazy_static",
  "libp2p-identity",

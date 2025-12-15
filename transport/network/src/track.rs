@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use hopr_api::{PeerId, network::Observations};
+use hopr_api::PeerId;
+
+use super::observation::Observations;
 
 /// Tracker of [`Observations`] for network peers.
 ///
@@ -65,9 +67,8 @@ impl NetworkPeerTracker {
 #[cfg(test)]
 mod tests {
     use anyhow::Context;
-    use hopr_api::{PeerId, network::Observations};
 
-    use super::NetworkPeerTracker;
+    use super::*;
 
     #[test]
     fn peer_tracker_adding_a_peer_adds_a_default_observation() -> anyhow::Result<()> {
