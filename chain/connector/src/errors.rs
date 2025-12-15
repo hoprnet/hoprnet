@@ -33,7 +33,7 @@ pub enum ConnectorError {
     ConnectionTimeout,
 
     #[error("backend error: {0}")]
-    BackendError(anyhow::Error),
+    BackendError(#[source] anyhow::Error),
 
     #[error(transparent)]
     CacheError(#[from] std::sync::Arc<Self>),
@@ -54,7 +54,7 @@ pub enum ConnectorError {
     IoError(#[from] std::io::Error),
 
     #[error("undefined error: {0}")]
-    OtherError(anyhow::Error),
+    OtherError(#[source] anyhow::Error),
 }
 
 impl ConnectorError {

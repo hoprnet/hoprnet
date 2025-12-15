@@ -22,11 +22,11 @@ pub enum HoprLibError {
     #[error("configuration validation failed: {0}")]
     ConfigurationError(#[from] validator::ValidationErrors),
 
-    #[error(transparent)]
-    DbError(anyhow::Error),
+    #[error("database error: {0}")]
+    DbError(#[source] anyhow::Error),
 
-    #[error(transparent)]
-    ChainError(anyhow::Error),
+    #[error("chain error: {0}")]
+    ChainError(#[source] anyhow::Error),
 
     #[error(transparent)]
     StatusError(#[from] HoprStatusError),
@@ -40,8 +40,8 @@ pub enum HoprLibError {
     #[error(transparent)]
     NetworkTypeError(#[from] hopr_network_types::errors::NetworkTypeError),
 
-    #[error(transparent)]
-    Other(anyhow::Error),
+    #[error("unspecified error: {0}")]
+    Other(#[source] anyhow::Error),
 }
 
 pub type Result<T> = std::result::Result<T, HoprLibError>;
