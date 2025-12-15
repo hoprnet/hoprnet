@@ -29,7 +29,7 @@ type Result<T> = std::result::Result<T, crate::errors::ChainTypesError>;
 pub struct GasEstimation {
     /// Gas limit for the transaction.
     ///
-    /// Defaults to 17 000 000.
+    /// Defaults to 27 000 000.
     pub gas_limit: u64,
     /// Maximal fee per gas for the transaction.
     ///
@@ -44,7 +44,7 @@ pub struct GasEstimation {
 impl Default for GasEstimation {
     fn default() -> Self {
         Self {
-            gas_limit: 17_000_000,
+            gas_limit: 27_000_000,
             max_fee_per_gas: 10_000_000,         // 0.01 Gwei
             max_priority_fee_per_gas: 2_000_000, // 0.002 Gwei
         }
