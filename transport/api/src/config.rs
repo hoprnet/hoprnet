@@ -8,7 +8,6 @@ use std::{
 
 pub use hopr_protocol_hopr::{HoprCodecConfig, HoprTicketProcessorConfig, SurbStoreConfig};
 use hopr_transport_identity::Multiaddr;
-pub use hopr_transport_network::config::NetworkConfig;
 pub use hopr_transport_probe::config::ProbeConfig;
 use hopr_transport_protocol::AcknowledgementPipelineConfig;
 use hopr_transport_session::{MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION};
@@ -28,9 +27,6 @@ pub struct HoprProtocolConfig {
     /// Libp2p-related transport configuration
     #[validate(nested)]
     pub transport: TransportConfig,
-    /// Heartbeat configuration
-    #[validate(nested)]
-    pub network: NetworkConfig,
     /// HOPR packet pipeline configuration
     #[validate(nested)]
     pub packet: HoprPacketPipelineConfig,

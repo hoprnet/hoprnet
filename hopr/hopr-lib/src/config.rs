@@ -1,7 +1,7 @@
 use hopr_primitive_types::prelude::*;
 pub use hopr_transport::config::{
-    HoprPacketPipelineConfig, HoprProtocolConfig, HostConfig, HostType, NetworkConfig, ProbeConfig,
-    SessionGlobalConfig, TransportConfig, looks_like_domain,
+    HoprPacketPipelineConfig, HoprProtocolConfig, HostConfig, HostType, ProbeConfig, SessionGlobalConfig,
+    TransportConfig, looks_like_domain,
 };
 use validator::{Validate, ValidationError};
 

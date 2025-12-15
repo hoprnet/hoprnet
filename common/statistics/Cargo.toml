@@ -1,0 +1,23 @@
+[package]
+name = "hopr-statistics"
+version = "0.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+description = "Types and functionality used for statistical analysis."
+edition = "2024"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+default = []
+serde = ["dep:serde"]
+moving = []
+
+[dependencies]
+serde = { workspace = true, optional = true }
+
+[dev-dependencies]
+assertables = { workspace = true }

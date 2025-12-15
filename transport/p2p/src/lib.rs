@@ -33,44 +33,82 @@ pub mod swarm;
 /// P2P behavior definitions for the transport level interactions not related to the HOPR protocol
 mod behavior;
 
-use std::fmt::Debug;
+use std::collections::HashSet;
 
-pub use behavior::discovery::Event as DiscoveryEvent;
-use futures::{AsyncRead, AsyncWrite, Stream};
-use hopr_internal_types::prelude::*;
-use hopr_transport_identity::PeerId;
-use hopr_transport_protocol::PeerDiscovery;
-use libp2p::{StreamProtocol, autonat, identity::PublicKey, swarm::NetworkBehaviour};
+use futures::{AsyncRead, AsyncWrite};
+pub use hopr_api::network::{Health, Observable};
+use hopr_api::network::{NetworkObservations, NetworkView};
+use hopr_transport_network::observation::Observations;
+use libp2p::{Multiaddr, PeerId};
 
-// Control object for the streams over the HOPR protocols
+pub use crate::{
+    behavior::{HoprNetworkBehavior, HoprNetworkBehaviorEvent},
+    swarm::HoprLibp2pNetworkBuilder,
+};
+
 #[derive(Clone)]
-pub struct HoprStreamProtocolControl {
+pub struct HoprNetwork {
+    tracker: hopr_transport_network::track::NetworkPeerTracker,
+    store: hopr_transport_network::store::NetworkPeerStore,
     control: libp2p_stream::Control,
-    protocol: StreamProtocol,
+    protocol: libp2p::StreamProtocol,
 }
 
-impl HoprStreamProtocolControl {
-    pub fn new(control: libp2p_stream::Control, protocol: &'static str) -> Self {
-        Self {
-            control,
-            protocol: StreamProtocol::new(protocol),
-        }
-    }
-}
-
-impl std::fmt::Debug for HoprStreamProtocolControl {
+impl std::fmt::Debug for HoprNetwork {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("HoprStreamProtocolControl")
+        f.debug_struct("HoprNetwork")
+            .field("tracker", &self.tracker)
+            .field("store", &self.store)
             .field("protocol", &self.protocol)
             .finish()
     }
 }
 
+impl NetworkView for HoprNetwork {
+    fn listening_as(&self) -> HashSet<Multiaddr> {
+        self.store.get(self.store.me()).unwrap_or_else(|| {
+            tracing::error!("failed to get own peer info from the peer store");
+            std::collections::HashSet::new()
+        })
+    }
+
+    #[inline]
+    fn discovered_peers(&self) -> HashSet<PeerId> {
+        self.store.iter_keys().collect()
+    }
+
+    #[inline]
+    fn connected_peers(&self) -> HashSet<PeerId> {
+        self.tracker.iter_keys().collect()
+    }
+
+    #[inline]
+    fn multiaddress_of(&self, peer: &PeerId) -> Option<HashSet<Multiaddr>> {
+        self.store.get(peer)
+    }
+
+    #[allow(refining_impl_trait_reachable)]
+    #[inline]
+    fn observations_for(&self, peer: &PeerId) -> Option<Observations> {
+        self.tracker.get(peer)
+    }
+
+    fn health(&self) -> Health {
+        match self.tracker.len() {
+            0 => Health::Red,
+            1 => Health::Orange,
+            2..4 => Health::Yellow,
+            _ => Health::Green,
+        }
+    }
+}
+
 #[async_trait::async_trait]
-impl hopr_transport_protocol::stream::BidirectionalStreamControl for HoprStreamProtocolControl {
+impl hopr_transport_protocol::stream::BidirectionalStreamControl for HoprNetwork {
     fn accept(
         mut self,
-    ) -> Result<impl Stream<Item = (PeerId, impl AsyncRead + AsyncWrite + Send)> + Send, impl std::error::Error> {
+    ) -> Result<impl futures::Stream<Item = (PeerId, impl AsyncRead + AsyncWrite + Send)> + Send, impl std::error::Error>
+    {
         self.control.accept(self.protocol)
     }
 
@@ -79,89 +117,11 @@ impl hopr_transport_protocol::stream::BidirectionalStreamControl for HoprStreamP
     }
 }
 
-/// Network Behavior definition for aggregated HOPR network functionality.
-///
-/// Individual network behaviors from the libp2p perspectives are aggregated
-/// under this type in order to create an aggregated network behavior capable
-/// of generating events for all component behaviors.
-#[derive(NetworkBehaviour)]
-#[behaviour(to_swarm = "HoprNetworkBehaviorEvent")]
-pub struct HoprNetworkBehavior {
-    discovery: behavior::discovery::Behaviour,
-    streams: libp2p_stream::Behaviour,
-    identify: libp2p::identify::Behaviour,
-    autonat: autonat::Behaviour,
-}
-
-impl Debug for HoprNetworkBehavior {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("HoprNetworkBehavior").finish()
+impl NetworkObservations for HoprNetwork {
+    fn update(&self, peer: &PeerId, result: std::result::Result<std::time::Duration, ()>) {
+        self.tracker.alter(peer, |_, mut o| {
+            o.record_probe(result.map_err(|_| ()));
+            o
+        });
     }
 }
-
-impl HoprNetworkBehavior {
-    pub fn new<T>(me: PublicKey, onchain_events: T, allow_private_addresses: bool) -> Self
-    where
-        T: Stream<Item = PeerDiscovery> + Send + 'static,
-    {
-        Self {
-            streams: libp2p_stream::Behaviour::new(),
-            discovery: behavior::discovery::Behaviour::new(me.clone().into(), onchain_events, allow_private_addresses),
-            identify: libp2p::identify::Behaviour::new(libp2p::identify::Config::new(
-                "/hopr/identify/1.0.0".to_string(),
-                me.clone(),
-            )),
-            autonat: autonat::Behaviour::new(me.into(), autonat::Config::default()),
-        }
-    }
-}
-
-/// Aggregated network behavior event inheriting the component behaviors' events.
-///
-/// Necessary to allow the libp2p handler to properly distribute the events for
-/// processing in the business logic loop.
-#[derive(Debug)]
-pub enum HoprNetworkBehaviorEvent {
-    Discovery(behavior::discovery::Event),
-    TicketAggregation(
-        libp2p::request_response::Event<Vec<TransferableWinningTicket>, std::result::Result<Ticket, String>>,
-    ),
-    Identify(Box<libp2p::identify::Event>),
-    Autonat(autonat::Event),
-}
-
-// Unexpected libp2p_stream event
-impl From<()> for HoprNetworkBehaviorEvent {
-    fn from(_: ()) -> Self {
-        panic!("Unexpected event: ()")
-    }
-}
-
-impl From<behavior::discovery::Event> for HoprNetworkBehaviorEvent {
-    fn from(event: behavior::discovery::Event) -> Self {
-        Self::Discovery(event)
-    }
-}
-
-impl From<libp2p::request_response::Event<Vec<TransferableWinningTicket>, std::result::Result<Ticket, String>>>
-    for HoprNetworkBehaviorEvent
-{
-    fn from(
-        event: libp2p::request_response::Event<Vec<TransferableWinningTicket>, std::result::Result<Ticket, String>>,
-    ) -> Self {
-        Self::TicketAggregation(event)
-    }
-}
-
-impl From<libp2p::identify::Event> for HoprNetworkBehaviorEvent {
-    fn from(event: libp2p::identify::Event) -> Self {
-        Self::Identify(Box::new(event))
-    }
-}
-impl From<autonat::Event> for HoprNetworkBehaviorEvent {
-    fn from(event: autonat::Event) -> Self {
-        Self::Autonat(event)
-    }
-}
-
-pub use swarm::HoprSwarm;

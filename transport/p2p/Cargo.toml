@@ -2,7 +2,8 @@
 name = "hopr-transport-p2p"
 version = "0.8.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-edition = "2021"
+description = "rust-libp2p based p2p transport implementation"
+edition = "2024"
 license = "GPL-3.0-only"
 
 [lib]
@@ -14,6 +15,7 @@ prometheus = [
   "dep:lazy_static",
   "dep:hopr-metrics",
   "hopr-transport-protocol/prometheus",
+  "hopr-transport-network/prometheus",
 ]
 runtime-tokio = [
   "libp2p/tokio",
@@ -24,6 +26,7 @@ transport-quic = ["libp2p/quic"]
 
 [dependencies]
 async-trait = { workspace = true }
+backon = { workspace = true }
 futures = { workspace = true }
 lazy_static = { workspace = true, optional = true }
 libp2p = { workspace = true, features = [
@@ -39,15 +42,15 @@ libp2p-stream = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
-hopr-internal-types = { workspace = true }
+hopr-api = { workspace = true, features = ["ct"] }
 hopr-metrics = { workspace = true, optional = true }
+hopr-network-types = { workspace = true }
 hopr-transport-identity = { workspace = true }
 hopr-transport-protocol = { workspace = true }
-hopr-network-types = { workspace = true }
+hopr-transport-network = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-async-trait = { workspace = true }
 lazy_static = { workspace = true }
 more-asserts = { workspace = true }
 tokio = { workspace = true }

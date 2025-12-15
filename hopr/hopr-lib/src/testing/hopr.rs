@@ -56,11 +56,6 @@ pub async fn create_hopr_instance(
                     recheck_threshold: Duration::from_secs(1),
                     ..Default::default()
                 },
-                network: crate::config::NetworkConfig {
-                    ignore_timeframe: Duration::from_secs(0),
-                    allow_private_addresses_in_store: true,
-                    ..Default::default()
-                },
                 packet: crate::config::HoprPacketPipelineConfig {
                     codec: HoprCodecConfig {
                         outgoing_win_prob: Some(winn_prob.try_into().expect("invalid winning probability")),
