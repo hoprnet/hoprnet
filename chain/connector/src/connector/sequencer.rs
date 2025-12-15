@@ -41,6 +41,8 @@ where
             .await?;
         self.nonce.store(tx_count, std::sync::atomic::Ordering::SeqCst);
 
+        let chain_id = self.client.query_chain_info().await?.chain_id as u64;
+
         let (sender, receiver) = futures::channel::mpsc::channel(TX_QUEUE_CAPACITY);
         self.sender = Some(sender);
 
@@ -58,7 +60,7 @@ where
                     let nonce = nonce_load.load(std::sync::atomic::Ordering::SeqCst);
                     async move {
                         // We currently use fixed gas estimation.
-                        tx.sign_and_encode_to_eip2718(nonce, GasEstimation::default().into(), &signer)
+                        tx.sign_and_encode_to_eip2718(nonce, chain_id, GasEstimation::default().into(), &signer)
                             .map_err(ConnectorError::from)
                             .and_then(move |tx| {
                                 tracing::debug!(nonce, "submitting transaction");

@@ -281,7 +281,7 @@ mod tests {
         let safe_gen = SafePayloadGenerator::new(&cp, *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
         let signed_tx = safe_gen
             .announce(ad, 10_u32.into())?
-            .sign_and_encode_to_eip2718(1, None, &cp)
+            .sign_and_encode_to_eip2718(1, 1, None, &cp)
             .await?;
 
         let (action, signer) =
@@ -305,7 +305,7 @@ mod tests {
         let basic_gen = BasicPayloadGenerator::new(cp.public().to_address(), *CONTRACT_ADDRS);
         let signed_tx = basic_gen
             .fund_channel([2u8; Address::SIZE].into(), 123_u32.into())?
-            .sign_and_encode_to_eip2718(1, None, &cp)
+            .sign_and_encode_to_eip2718(1, 1, None, &cp)
             .await?;
 
         let (action, signer) =
@@ -319,7 +319,7 @@ mod tests {
         let safe_gen = SafePayloadGenerator::new(&cp, *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
         let signed_tx = safe_gen
             .fund_channel([2u8; Address::SIZE].into(), 123_u32.into())?
-            .sign_and_encode_to_eip2718(1, None, &cp)
+            .sign_and_encode_to_eip2718(1, 1, None, &cp)
             .await?;
 
         let (action, signer) =
@@ -340,7 +340,7 @@ mod tests {
         let basic_gen = BasicPayloadGenerator::new(cp.public().to_address(), *CONTRACT_ADDRS);
         let signed_tx = basic_gen
             .initiate_outgoing_channel_closure([2u8; Address::SIZE].into())?
-            .sign_and_encode_to_eip2718(1, None, &cp)
+            .sign_and_encode_to_eip2718(1, 1, None, &cp)
             .await?;
 
         let channel_id = generate_channel_id(&cp.public().to_address(), &[2u8; Address::SIZE].into());
@@ -353,7 +353,7 @@ mod tests {
         let safe_gen = SafePayloadGenerator::new(&cp, *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
         let signed_tx = safe_gen
             .initiate_outgoing_channel_closure([2u8; Address::SIZE].into())?
-            .sign_and_encode_to_eip2718(1, None, &cp)
+            .sign_and_encode_to_eip2718(1, 1, None, &cp)
             .await?;
 
         let (action, signer) =
@@ -371,7 +371,7 @@ mod tests {
         let basic_gen = BasicPayloadGenerator::new(cp.public().to_address(), *CONTRACT_ADDRS);
         let signed_tx = basic_gen
             .finalize_outgoing_channel_closure([2u8; Address::SIZE].into())?
-            .sign_and_encode_to_eip2718(1, None, &cp)
+            .sign_and_encode_to_eip2718(1, 1, None, &cp)
             .await?;
 
         let channel_id = generate_channel_id(&cp.public().to_address(), &[2u8; Address::SIZE].into());
@@ -384,7 +384,7 @@ mod tests {
         let safe_gen = SafePayloadGenerator::new(&cp, *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
         let signed_tx = safe_gen
             .finalize_outgoing_channel_closure([2u8; Address::SIZE].into())?
-            .sign_and_encode_to_eip2718(1, None, &cp)
+            .sign_and_encode_to_eip2718(1, 1, None, &cp)
             .await?;
 
         let (action, signer) =
@@ -402,7 +402,7 @@ mod tests {
         let basic_gen = BasicPayloadGenerator::new(cp.public().to_address(), *CONTRACT_ADDRS);
         let signed_tx = basic_gen
             .close_incoming_channel([2u8; Address::SIZE].into())?
-            .sign_and_encode_to_eip2718(1, None, &cp)
+            .sign_and_encode_to_eip2718(1, 1, None, &cp)
             .await?;
 
         let channel_id = generate_channel_id(&[2u8; Address::SIZE].into(), &cp.public().to_address());
@@ -415,7 +415,7 @@ mod tests {
         let safe_gen = SafePayloadGenerator::new(&cp, *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
         let signed_tx = safe_gen
             .close_incoming_channel([2u8; Address::SIZE].into())?
-            .sign_and_encode_to_eip2718(1, None, &cp)
+            .sign_and_encode_to_eip2718(1, 1, None, &cp)
             .await?;
 
         let (action, signer) =
@@ -433,7 +433,7 @@ mod tests {
         let basic_gen = BasicPayloadGenerator::new(cp.public().to_address(), *CONTRACT_ADDRS);
         let signed_tx = basic_gen
             .register_safe_by_node([2u8; Address::SIZE].into())?
-            .sign_and_encode_to_eip2718(1, None, &cp)
+            .sign_and_encode_to_eip2718(1, 1, None, &cp)
             .await?;
 
         let (action, signer) =
@@ -447,7 +447,7 @@ mod tests {
         let safe_gen = SafePayloadGenerator::new(&cp, *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
         let signed_tx = safe_gen
             .register_safe_by_node([2u8; Address::SIZE].into())?
-            .sign_and_encode_to_eip2718(1, None, &cp)
+            .sign_and_encode_to_eip2718(1, 1, None, &cp)
             .await?;
 
         let (action, signer) =
@@ -481,7 +481,7 @@ mod tests {
         let basic_gen = BasicPayloadGenerator::new(cp_2.public().to_address(), *CONTRACT_ADDRS);
         let signed_tx = basic_gen
             .redeem_ticket(ticket.clone())?
-            .sign_and_encode_to_eip2718(1, None, &cp_2)
+            .sign_and_encode_to_eip2718(1, 1, None, &cp_2)
             .await?;
 
         let (action, signer) =
@@ -499,7 +499,7 @@ mod tests {
         let safe_gen = SafePayloadGenerator::new(&cp_2, *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
         let signed_tx = safe_gen
             .redeem_ticket(ticket.clone())?
-            .sign_and_encode_to_eip2718(1, None, &cp_2)
+            .sign_and_encode_to_eip2718(1, 1, None, &cp_2)
             .await?;
 
         let (action, signer) =
@@ -524,7 +524,7 @@ mod tests {
         let basic_gen = BasicPayloadGenerator::new(cp.public().to_address(), *CONTRACT_ADDRS);
         let signed_tx = basic_gen
             .transfer::<XDai>([2u8; Address::SIZE].into(), 123_u32.into())?
-            .sign_and_encode_to_eip2718(1, None, &cp)
+            .sign_and_encode_to_eip2718(1, 1, None, &cp)
             .await?;
 
         let (action, signer) =
@@ -538,7 +538,7 @@ mod tests {
         let safe_gen = SafePayloadGenerator::new(&cp, *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
         let signed_tx = safe_gen
             .transfer::<XDai>([2u8; Address::SIZE].into(), 123_u32.into())?
-            .sign_and_encode_to_eip2718(1, None, &cp)
+            .sign_and_encode_to_eip2718(1, 1, None, &cp)
             .await?;
 
         let (action, signer) =
@@ -559,7 +559,7 @@ mod tests {
         let basic_gen = BasicPayloadGenerator::new(cp.public().to_address(), *CONTRACT_ADDRS);
         let signed_tx = basic_gen
             .transfer::<WxHOPR>([2u8; Address::SIZE].into(), 123_u32.into())?
-            .sign_and_encode_to_eip2718(1, None, &cp)
+            .sign_and_encode_to_eip2718(1, 1, None, &cp)
             .await?;
 
         let (action, signer) =
@@ -573,7 +573,7 @@ mod tests {
         let safe_gen = SafePayloadGenerator::new(&cp, *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
         let signed_tx = safe_gen
             .transfer::<WxHOPR>([2u8; Address::SIZE].into(), 123_u32.into())?
-            .sign_and_encode_to_eip2718(1, None, &cp)
+            .sign_and_encode_to_eip2718(1, 1, None, &cp)
             .await?;
 
         let (action, signer) =
