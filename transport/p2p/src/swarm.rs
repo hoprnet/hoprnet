@@ -255,6 +255,8 @@ impl HoprLibp2pNetworkBuilder {
                                             error!(peer = %peer_id, %error, direction = "outgoing", "failed to add connected peer to the peer store");
                                         }
                                         tracker.add(peer_id);
+                                    } else {
+                                        debug!(transport="libp2p", peer = %peer_id, multiaddress = %address, "Private/local peer address ignored")
                                     }
                                 },
                                 libp2p::core::ConnectedPoint::Listener { send_back_addr, .. } => {
@@ -263,11 +265,13 @@ impl HoprLibp2pNetworkBuilder {
                                             error!(peer = %peer_id, %error, direction = "incoming", "failed to add connected peer to the peer store");
                                         }
                                         tracker.add(peer_id);
+                                    } else {
+                                        debug!(transport="libp2p", peer = %peer_id, multiaddress = %send_back_addr, "Private/local peer address ignored")
                                     }
                                 }
                             }
                         } else {
-                            trace!(transport="libp2p", peer = %peer_id, "Private/local peer address ignored")
+                            trace!(transport="libp2p", peer = %peer_id, num_established, "Additional connection established")
                         }
 
                         print_network_info(swarm.network_info(), "connection established");
