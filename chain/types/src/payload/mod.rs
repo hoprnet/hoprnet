@@ -58,6 +58,7 @@ pub trait SignableTransaction {
     async fn sign_and_encode_to_eip2718(
         self,
         nonce: u64,
+        chain_id: u64,
         max_gas: Option<GasEstimation>,
         chain_keypair: &ChainKeypair,
     ) -> Result<Box<[u8]>>;
