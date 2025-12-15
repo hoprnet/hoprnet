@@ -1,3 +1,5 @@
+use hopr_statistics::ExponentialMovingAverage;
+
 /// Network health represented with colors, where green is the best and red
 /// is the worst possible observed network quality.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, strum::Display, strum::EnumString)]
@@ -13,8 +15,6 @@ pub enum Health {
     /// High-quality connection to at least 1 public relay and 1 NAT node
     Green = 4,
 }
-
-use super::utils::ExponentialMovingAverage;
 
 /// Observations related to a specific peer in the network.
 #[derive(Debug, Copy, Clone, Default, PartialEq)]

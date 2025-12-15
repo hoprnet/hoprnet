@@ -10,8 +10,6 @@ pub mod errors;
 /// Implements the most primitive types, such as [U256](crate::primitives::U256) or
 /// [Address](crate::primitives::Address).
 pub mod primitives;
-/// Contains various implementations of Simple Moving Average.
-pub mod sma;
 /// Defines commonly used traits across the entire code base.
 pub mod traits;
 
@@ -46,9 +44,7 @@ pub fn to_hex_shortened<const M: usize>(data: &impl AsRef<[u8]>) -> String {
 pub mod prelude {
     pub use chrono::{DateTime, Utc};
 
-    pub use super::{
-        balance::*, errors::GeneralError, f64_approx_eq, primitives::*, sma::*, to_hex_shortened, traits::*,
-    };
+    pub use super::{balance::*, errors::GeneralError, f64_approx_eq, primitives::*, to_hex_shortened, traits::*};
 }
 
 #[cfg(test)]

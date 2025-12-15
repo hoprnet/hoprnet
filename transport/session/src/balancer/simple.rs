@@ -1,4 +1,4 @@
-use hopr_primitive_types::{prelude::SMA, sma::NoSumSMA};
+use hopr_statistics::moving::simple::{NoSumSMA, SMA};
 
 use crate::balancer::{BalancerControllerBounds, SurbBalancerController};
 

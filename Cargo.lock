@@ -4480,6 +4480,7 @@ dependencies = [
  "hopr-internal-types",
  "hopr-network-types",
  "hopr-primitive-types 0.10.0",
+ "hopr-statistics",
  "multiaddr",
  "strum 0.27.2",
  "thiserror 2.0.17",
@@ -5094,6 +5095,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-statistics"
+version = "0.1.0"
+dependencies = [
+ "assertables",
+ "serde",
+]
+
+[[package]]
 name = "hopr-strategy"
 version = "0.16.0"
 dependencies = [
@@ -5346,6 +5355,7 @@ dependencies = [
  "hopr-protocol-app",
  "hopr-protocol-session",
  "hopr-protocol-start",
+ "hopr-statistics",
  "lazy_static",
  "mimalloc",
  "mockall",
