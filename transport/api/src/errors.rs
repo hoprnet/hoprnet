@@ -38,11 +38,11 @@ pub enum HoprTransportError {
     #[error(transparent)]
     ApplicationLayerError(#[from] hopr_protocol_app::errors::ApplicationLayerError),
 
-    #[error(transparent)]
-    Chain(anyhow::Error),
+    #[error("chain error: {0}")]
+    Chain(#[source] anyhow::Error),
 
-    #[error(transparent)]
-    Other(anyhow::Error),
+    #[error("unspecified error: {0}")]
+    Other(#[source] anyhow::Error),
 }
 
 impl HoprTransportError {

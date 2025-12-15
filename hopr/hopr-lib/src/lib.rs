@@ -463,7 +463,10 @@ where
         match self.chain_api.register_safe(&safe_addr).await {
             Ok(awaiter) => {
                 // Wait until the registration is confirmed on-chain, otherwise we cannot proceed.
-                awaiter.await.map_err(HoprLibError::chain)?;
+                awaiter.await.map_err(|error| {
+                    error!(%safe_addr, %error, "safe registration failed with error");
+                    HoprLibError::chain(error)
+                })?;
                 info!(%safe_addr, "safe successfully registered with this node");
             }
             Err(SafeRegistrationError::AlreadyRegistered(registered_safe)) if registered_safe == safe_addr => {
@@ -488,7 +491,7 @@ where
         multiaddresses_to_announce
             .iter()
             .filter(|a| !is_public_address(a))
-            .for_each(|multi_addr| tracing::warn!(?multi_addr, "announcing private multiaddress"));
+            .for_each(|multi_addr| warn!(?multi_addr, "announcing private multiaddress"));
 
         // At this point the node is already registered with Safe, so
         // we can announce via Safe-compliant TX
@@ -496,7 +499,10 @@ where
         match self.chain_api.announce(&multiaddresses_to_announce, &self.me).await {
             Ok(awaiter) => {
                 // Wait until the announcement is confirmed on-chain, otherwise we cannot proceed.
-                awaiter.await.map_err(HoprLibError::chain)?;
+                awaiter.await.map_err(|error| {
+                    error!(?multiaddresses_to_announce, %error, "node announcement failed");
+                    HoprLibError::chain(error)
+                })?;
                 info!(?multiaddresses_to_announce, "node has been successfully announced");
             }
             Err(AnnouncementError::AlreadyAnnounced) => {
