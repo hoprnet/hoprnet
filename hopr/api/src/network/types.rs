@@ -30,12 +30,12 @@ pub trait Observable {
 
     /// A value representing the average success rate of probes.
     ///
-    /// It is fom the range [0.0, 1.0]. The higher the value, the better the score.
+    /// It is from the range [0.0, 1.0]. The higher the value, the better the score.
     fn average_probe_rate(&self) -> f64;
 
     /// A value scoring the observed peer.
     ///
-    /// It is fom the range [0.0, 1.0]. The higher the value, the better the score.
+    /// It is from the range [0.0, 1.0]. The higher the value, the better the score.
     fn score(&self) -> f64;
 }
 
