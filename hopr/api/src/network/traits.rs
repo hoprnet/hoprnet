@@ -19,7 +19,7 @@ pub trait NetworkView {
 
     /// Observables related to a specific peer in the network.
     ///
-    /// In the absence of Observables
+    /// Returns `None` if no observations have been recorded for the peer.
     fn observations_for<'a>(&'a self, peer: &'a PeerId) -> Option<impl Observable + 'static>;
 
     /// Represents perceived health of the network.
