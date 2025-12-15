@@ -70,6 +70,10 @@ hopr-chain-connector = { workspace = true, features = [
 name = "bloom_filter"
 harness = false
 
+[[bench]]
+name = "codec"
+harness = false
+
 [package.metadata.cargo-machete]
 ignored = ["humantime-serde"]
 
