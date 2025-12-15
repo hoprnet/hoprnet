@@ -1,5 +1,6 @@
 use std::{num::NonZeroUsize, str::FromStr, sync::Arc};
 
+use anyhow::Context;
 use async_signal::{Signal, Signals};
 use futures::{FutureExt, StreamExt, future::abortable};
 use hopr_chain_connector::{HoprBlockchainSafeConnector, blokli_client::BlokliClient};
@@ -206,7 +207,9 @@ fn main() -> anyhow::Result<()> {
             .ok()
     });
 
-    hopr_lib::prepare_tokio_runtime(num_cpu_threads, num_io_threads)?.block_on(main_inner())
+    hopr_lib::prepare_tokio_runtime(num_cpu_threads, num_io_threads)?
+        .block_on(main_inner())
+        .context("hoprd exited with an error")
 }
 
 #[cfg(feature = "runtime-tokio")]
