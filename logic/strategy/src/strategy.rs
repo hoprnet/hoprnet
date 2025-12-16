@@ -23,7 +23,7 @@ use std::fmt::{Debug, Display, Formatter};
 use async_trait::async_trait;
 use hopr_lib::{
     ChannelChange, ChannelDirection, ChannelEntry, VerifiedTicket,
-    exports::api::{
+    api::{
         chain::{ChainReadChannelOperations, ChainWriteChannelOperations},
         db::TicketSelector,
     },

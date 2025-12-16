@@ -1,12 +1,12 @@
 use std::{num::NonZeroUsize, str::FromStr, sync::Arc};
 
+use anyhow::Context;
 use async_signal::{Signal, Signals};
 use futures::{FutureExt, StreamExt, future::abortable};
 use hopr_chain_connector::{HoprBlockchainSafeConnector, blokli_client::BlokliClient};
 use hopr_db_node::{HoprNodeDb, init_hopr_node_db};
 use hopr_lib::{
-    AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, config::HoprLibConfig,
-    exports::api::chain::ChainEvents,
+    AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, api::chain::ChainEvents, config::HoprLibConfig,
 };
 use hoprd::{cli::CliArgs, config::HoprdConfig, errors::HoprdError, exit::HoprServerIpForwardingReactor};
 use hoprd_api::{RestApiParameters, serve_api};
@@ -207,7 +207,9 @@ fn main() -> anyhow::Result<()> {
             .ok()
     });
 
-    hopr_lib::prepare_tokio_runtime(num_cpu_threads, num_io_threads)?.block_on(main_inner())
+    hopr_lib::prepare_tokio_runtime(num_cpu_threads, num_io_threads)?
+        .block_on(main_inner())
+        .context("hoprd exited with an error")
 }
 
 #[cfg(feature = "runtime-tokio")]
@@ -288,7 +290,7 @@ async fn main_inner() -> anyhow::Result<()> {
 
     let _hopr_socket = node
         .run(
-            None::<hopr_lib::DummyCoverTrafficType>,
+            hopr_ct_telemetry::ImmediateNeighborProber::new(Default::default()),
             HoprServerIpForwardingReactor::new(hopr_keys.packet_key.clone(), cfg.session_ip_forwarding),
         )
         .await?;

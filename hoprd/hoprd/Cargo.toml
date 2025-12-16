@@ -96,6 +96,7 @@ opentelemetry-otlp = { workspace = true, default-features = false, features = [
   "http-proto",
   "grpc-tonic",
 ], optional = true }
+lazy_static = { workspace = true, optional = true }
 opentelemetry_sdk = { workspace = true, optional = true }
 tracing-opentelemetry = { workspace = true, optional = true }
 
@@ -106,12 +107,12 @@ hopr-lib = { workspace = true, features = [
   "session-server",
   "utils_parallel",
 ] }
+hopr-ct-telemetry = { workspace = true }
 hopr-db-node = { workspace = true }
 hopr-chain-connector = { workspace = true }
 hopr-utils-session = { workspace = true }
-hoprd-api = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
-lazy_static = { workspace = true, optional = true }
+hoprd-api = { workspace = true }
 
 # Target-specific dependencies for memory allocators
 [target.'cfg(target_os = "linux")'.dependencies]

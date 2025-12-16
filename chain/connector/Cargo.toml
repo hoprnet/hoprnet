@@ -34,7 +34,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 tempfile = { workspace = true }
 
-hopr-api = { workspace = true }
+hopr-api = { workspace = true, features = ["chain"] }
 hopr-async-runtime = { workspace = true }
 hopr-chain-types = { workspace = true }
 hopr-crypto-types = { workspace = true }

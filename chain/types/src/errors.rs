@@ -14,7 +14,7 @@ pub enum ChainTypesError {
     InvalidArguments(&'static str),
 
     #[error("signing error: {0}")]
-    SigningError(anyhow::Error),
+    SigningError(#[source] anyhow::Error),
 
     /// An error occurred while signing a hash.
     #[cfg(feature = "use-bindings")]
@@ -28,5 +28,5 @@ pub enum ChainTypesError {
 
     /// An error occurred while parsing an EIP-2718 transaction.
     #[error("error while parsing an EIP-2718 transaction: {0}")]
-    ParseError(anyhow::Error),
+    ParseError(#[source] anyhow::Error),
 }
