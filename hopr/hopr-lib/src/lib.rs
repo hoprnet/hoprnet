@@ -41,6 +41,7 @@ pub use hopr_api as api;
 #[doc(hidden)]
 pub mod exports {
     pub mod types {
+        pub use hopr_chain_types as chain;
         pub use hopr_internal_types as internal;
         pub use hopr_primitive_types as primitive;
     }
