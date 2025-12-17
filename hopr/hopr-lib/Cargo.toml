@@ -1,6 +1,6 @@
 [package]
 name = "hopr-lib"
-version = "4.0.0"
+version = "4.0.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "HOPR library containing the entire functionality importable without the HOPRd daemon"
@@ -57,6 +57,7 @@ testing = [
   "dep:hopr-db-node",
   "dep:hopr-chain-connector",
   "hopr-chain-connector/testing",
+  "dep:hopr-ct-telemetry",
 ] # testing related functionality
 
 [dependencies]
@@ -84,7 +85,7 @@ tokio-util = { workspace = true, features = ["compat"], optional = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
-hopr-api = { workspace = true }
+hopr-api = { workspace = true, features = ["ct"] }
 hopr-async-runtime = { workspace = true }
 hopr-crypto-keypair = { workspace = true }
 hopr-crypto-random = { workspace = true }
@@ -98,6 +99,7 @@ hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-transport = { workspace = true }
 hopr-chain-connector = { workspace = true, optional = true }
+hopr-ct-telemetry = { workspace = true, optional = true }
 
 [dev-dependencies]
 hex-literal = { workspace = true }

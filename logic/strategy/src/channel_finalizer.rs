@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use futures::StreamExt;
 use hopr_lib::{
     ChannelStatusDiscriminants, Utc,
-    exports::api::chain::{ChainReadChannelOperations, ChainWriteChannelOperations, ChannelSelector},
+    api::chain::{ChainReadChannelOperations, ChainWriteChannelOperations, ChannelSelector},
 };
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info};
@@ -110,7 +110,7 @@ mod tests {
     use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
     use hopr_lib::{
         Address, BytesRepresentable, ChainKeypair, ChannelEntry, ChannelStatus, HoprBalance, Keypair, XDaiBalance,
-        exports::api::chain::{ChainEvent, ChainEvents},
+        api::chain::{ChainEvent, ChainEvents},
     };
     use lazy_static::lazy_static;
 

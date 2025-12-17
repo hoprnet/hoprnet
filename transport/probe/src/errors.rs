@@ -1,13 +1,13 @@
+use hopr_api::ct::types::TrafficGenerationError;
 use libp2p_identity::PeerId;
 use thiserror::Error;
 
+use crate::types::PathTelemetry;
+
 #[derive(Error, Debug)]
 pub enum ProbeError {
-    #[error("the network operation timed out for peer {0:?}")]
-    ProbeNeighborTimeout(PeerId),
-
-    #[error("failed loopback probe")]
-    ProbeLoopbackTimeout(crate::content::PathTelemetry),
+    #[error("probing traffic error: {0}")]
+    TrafficError(TrafficGenerationError<PathTelemetry>),
 
     #[error("error while decoding message data")]
     DecodingError,
@@ -20,6 +20,7 @@ pub enum ProbeError {
 
     #[error("error sending probe: {0}")]
     SendError(String),
+
     #[error(transparent)]
     ApplicationLayerError(#[from] hopr_protocol_app::errors::ApplicationLayerError),
 }

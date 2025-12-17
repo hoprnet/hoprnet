@@ -8,8 +8,7 @@ use std::fmt::{Debug, Display, Formatter};
 
 use async_trait::async_trait;
 use hopr_lib::{
-    ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus, HoprBalance,
-    exports::api::chain::ChainWriteChannelOperations,
+    ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus, HoprBalance, api::chain::ChainWriteChannelOperations,
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
@@ -124,7 +123,7 @@ mod tests {
     use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
     use hopr_lib::{
         Address, BytesRepresentable, ChainKeypair, Keypair, XDaiBalance,
-        exports::api::chain::{ChainEvent, ChainEvents},
+        api::chain::{ChainEvent, ChainEvents},
     };
 
     use super::*;

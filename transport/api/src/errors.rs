@@ -1,5 +1,5 @@
 use hopr_crypto_packet::errors::PacketError;
-pub use hopr_transport_network::errors::NetworkingError;
+pub use hopr_transport_network::errors::NetworkError;
 pub use hopr_transport_probe::errors::ProbeError;
 pub use hopr_transport_protocol::errors::ProtocolError;
 use hopr_transport_session::errors::TransportSessionError;
@@ -33,16 +33,16 @@ pub enum HoprTransportError {
     Types(#[from] hopr_internal_types::errors::CoreTypesError),
 
     #[error("Network monitoring error: {0}")]
-    NetworkError(#[from] NetworkingError),
+    NetworkError(#[from] NetworkError),
 
     #[error(transparent)]
     ApplicationLayerError(#[from] hopr_protocol_app::errors::ApplicationLayerError),
 
-    #[error(transparent)]
-    Chain(anyhow::Error),
+    #[error("chain error: {0}")]
+    Chain(#[source] anyhow::Error),
 
-    #[error(transparent)]
-    Other(anyhow::Error),
+    #[error("unspecified error: {0}")]
+    Other(#[source] anyhow::Error),
 }
 
 impl HoprTransportError {

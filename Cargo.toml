@@ -4,17 +4,18 @@ resolver = "2"
 
 members = [
   "chain/types",
-  "common/api",
   "common/async-runtime",
   "common/internal-types",
   "common/network-types",
   "common/parallelize",
   "common/primitive-types",
+  "common/statistics",
   "crypto/keypair",
   "crypto/packet",
   "crypto/random",
   "crypto/sphinx",
   "crypto/types",
+  "hopr/api",
   "hopr/hopr-lib",
   "hoprd/hoprd",
   "hoprd/rest-api",
@@ -38,6 +39,8 @@ members = [
   "chain/connector",
   "db/node",
   "utils/session",
+  # implementations
+  "impls/ct/telemetry",
 ]
 
 [workspace.dependencies]
@@ -45,11 +48,12 @@ ahash = "0.8.12"
 anyhow = "1.0.100"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
+assertables = "9.8.2"
 async-lock = "3.4.1"
 async-signal = "0.2.13"
 async-stream = "0.3.6"
 async-trait = "0.1.89"
-asynchronous-codec = { version = "0.7.0", features = ["cbor"] }
+asynchronous-codec = { version = "0.7.0" }
 async-broadcast = "0.7.2"
 atomic_enum = "0.3.0"
 auto_impl = "1.3.0"
@@ -61,7 +65,7 @@ bigdecimal = "0.4.9"
 bimap = "0.6.3"
 bincode = { version = "2.0.1", features = ["serde"] }
 bitvec = "1.0.1"
-blokli-client = { git = "https://github.com/hoprnet/blokli", rev = "b08b1f1", version = "0.11.1" }
+blokli-client = { git = "https://github.com/hoprnet/blokli", version = "0.14.0" }
 bloomfilter = { version = "3.0.1", features = ["serde"] }
 bytesize = { version = "2.3.1", features = ["serde"] }
 bytes = "1.11.0"
@@ -218,7 +222,7 @@ mimalloc = { version = "0.1.48", default-features = false, features = [
   "secure",
 ] }
 
-hopr-api = { path = "common/api" }
+hopr-api = { path = "hopr/api" }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-bindings = { git = "https://github.com/hoprnet/contracts", rev = "c8fd165", version = "4.0.1" }
 hopr-chain-types = { path = "chain/types" }
@@ -256,6 +260,10 @@ hopr-db-migration = { path = "db/migration" }
 hopr-utils-session = { path = "utils/session" }
 hopr-db-node = { path = "db/node" }
 hopr-chain-connector = { path = "chain/connector" }
+hopr-statistics = { path = "common/statistics" }
+
+# referential implementations
+hopr-ct-telemetry = { path = "impls/ct/telemetry" }
 
 [profile.dev]
 panic = "abort"

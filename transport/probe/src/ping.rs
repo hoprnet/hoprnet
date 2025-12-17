@@ -4,6 +4,7 @@ use futures::{
     StreamExt,
     channel::mpsc::{Sender, channel},
 };
+use hopr_api::ct::types::TrafficGenerationError;
 use hopr_async_runtime::prelude::timeout_fut;
 use libp2p_identity::PeerId;
 use tracing::{debug, warn};
@@ -94,7 +95,9 @@ impl Pinger {
             }
             Err(_) => {
                 debug!(%peer, "Ping failed due to timeout");
-                Err(ProbeError::ProbeNeighborTimeout(peer))
+                Err(ProbeError::TrafficError(TrafficGenerationError::ProbeNeighborTimeout(
+                    peer,
+                )))
             }
         }
     }
@@ -115,7 +118,9 @@ mod tests {
 
         let replier = PingQueryReplier::new(tx);
 
-        replier.notify(Err(ProbeError::ProbeNeighborTimeout(PeerId::random())));
+        replier.notify(Err(ProbeError::TrafficError(
+            TrafficGenerationError::ProbeNeighborTimeout(PeerId::random()),
+        )));
 
         assert!(rx.next().await.is_some_and(|r| r.is_err()));
 

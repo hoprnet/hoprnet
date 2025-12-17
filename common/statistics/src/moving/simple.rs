@@ -148,10 +148,10 @@ where
     fn push(&mut self, sample: T) {
         self.sum += sample;
 
-        if self.is_window_full() {
-            if let Some(shifted_sample) = self.window.pop_front() {
-                self.sum -= shifted_sample;
-            }
+        if self.is_window_full()
+            && let Some(shifted_sample) = self.window.pop_front()
+        {
+            self.sum -= shifted_sample;
         }
 
         self.window.push_back(sample);
@@ -223,7 +223,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::sma::{NoSumSMA, SMA, SingleSumSMA};
+    use super::{NoSumSMA, SMA, SingleSumSMA};
 
     fn test_sma<T: SMA<u32>>(mut sma: T, window_size: usize) {
         assert_eq!(window_size, sma.window_size(), "invalid windows size");
