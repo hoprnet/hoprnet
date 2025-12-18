@@ -56,10 +56,10 @@ pub enum HoprProtocolError {
     UnacknowledgedTicketNotFound(HalfKeyChallenge),
 
     #[error("chain resolver error: {0}")]
-    ResolverError(anyhow::Error),
+    ResolverError(#[source] anyhow::Error),
 
     #[error("ticket tracker error: {0}")]
-    TicketTrackerError(anyhow::Error),
+    TicketTrackerError(#[source] anyhow::Error),
 
     #[error(transparent)]
     TicketValidationError(#[from] TicketValidationError),

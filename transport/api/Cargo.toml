@@ -75,6 +75,7 @@ hopr-transport-p2p = { workspace = true }
 hopr-transport-probe = { workspace = true }
 hopr-transport-protocol = { workspace = true }
 hopr-transport-session = { workspace = true }
+hopr-ct-telemetry = { workspace = true }
 
 [dev-dependencies]
 hex-literal = { workspace = true }
