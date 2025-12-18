@@ -298,6 +298,7 @@ pub fn build_blokli_client() -> BlokliTestClient<FullStateEmulator> {
                 address: *safe_address,
                 owner: chain_key.public().to_address(),
                 module: *module_address,
+                registered_nodes: vec![],
             },
         ))
         .with_minimum_win_prob(WinningProbability::try_from(MINIMUM_INCOMING_WIN_PROB).unwrap())
