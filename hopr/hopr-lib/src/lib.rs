@@ -472,6 +472,11 @@ where
             Err(SafeRegistrationError::AlreadyRegistered(registered_safe)) if registered_safe == safe_addr => {
                 info!(%safe_addr, "this safe is already registered with this node");
             }
+            Err(SafeRegistrationError::AlreadyRegistered(registered_safe)) if registered_safe != safe_addr => {
+                // TODO: support safe deregistration flow
+                error!(%safe_addr, %registered_safe, "this node is currently registered with different safe");
+                return Err(HoprLibError::GeneralError("node registered with different safe".into()));
+            }
             Err(error) => {
                 error!(%safe_addr, %error, "safe registration failed");
                 return Err(HoprLibError::chain(error));

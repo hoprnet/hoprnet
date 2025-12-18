@@ -102,16 +102,17 @@ mod tests {
             address: safe_addr,
             owner: me,
             module: MODULE_ADDR.into(),
+            registered_nodes: vec![],
         };
         let blokli_client = BlokliTestStateBuilder::default()
             .with_balances([(me, XDaiBalance::new_base(10))])
-            .with_deployed_safes([safe])
+            .with_deployed_safes([safe.clone()])
             .with_hopr_network_chain_info("rotsee")
             .build_dynamic_client(MODULE_ADDR.into());
 
         let connector = create_connector(blokli_client)?;
 
-        assert_eq!(Some(safe), connector.safe_info(SafeSelector::Owner(me)).await?);
+        assert_eq!(Some(safe.clone()), connector.safe_info(SafeSelector::Owner(me)).await?);
         assert_eq!(Some(safe), connector.safe_info(SafeSelector::Address(safe_addr)).await?);
 
         insta::assert_yaml_snapshot!(*connector.client.snapshot());
