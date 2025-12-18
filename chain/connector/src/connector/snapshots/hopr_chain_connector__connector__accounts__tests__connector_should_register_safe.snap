@@ -14,6 +14,8 @@ deployed_safes:
     address: "0101010101010101010101010101010101010101"
     chain_key: 668430def9eacd2b5064acf85d73fb0b351a1c8c
     module_address: "1111111111111111111111111111111111111111"
+    registered_nodes:
+      - 668430def9eacd2b5064acf85d73fb0b351a1c8c
 tx_counts:
   668430def9eacd2b5064acf85d73fb0b351a1c8c: 1
 channels: {}

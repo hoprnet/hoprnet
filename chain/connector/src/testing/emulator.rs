@@ -65,13 +65,15 @@ impl BlokliTestStateMutator for FullStateEmulator {
 
         match &action {
             ParsedHoprChainAction::RegisterSafeAddress(safe_address) => {
-                if let Some(safe) = state.deployed_safes.get(&hex::encode(safe_address)) {
-                    if safe.chain_key != hex::encode(sender) {
+                if let Some(safe) = state.deployed_safes.get_mut(&hex::encode(safe_address)) {
+                    if safe.registered_nodes.contains(&hex::encode(sender)) {
                         return Err(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
-                            "safe address {safe_address} is not owned by {sender}"
+                            "node {sender} already registered at safe address {safe_address}"
                         ))
                         .into());
                     }
+                    safe.registered_nodes.push(hex::encode(sender));
+
                     if let Some(account) = state.get_account_mut(&sender.into()) {
                         account.safe_address = Some(hex::encode(safe_address));
                         tracing::debug!(%sender, %safe_address, "registered safe address to account");

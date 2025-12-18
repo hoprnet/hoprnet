@@ -1591,8 +1591,8 @@ dependencies = [
 
 [[package]]
 name = "blokli-client"
-version = "0.14.0"
-source = "git+https://github.com/hoprnet/blokli#eeddf08dd817cfaf8c7289dcb874d69d23542ccf"
+version = "0.15.0"
+source = "git+https://github.com/hoprnet/blokli#6cee3f8e1b8d91f4519875b4b3254db1778e55c0"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -4510,7 +4510,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "ahash",
  "anyhow",

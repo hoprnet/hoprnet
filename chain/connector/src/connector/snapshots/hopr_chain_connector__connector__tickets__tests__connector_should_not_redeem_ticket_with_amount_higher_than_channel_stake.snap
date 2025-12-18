@@ -53,10 +53,12 @@ deployed_safes:
     address: "0101010101010101010101010101010101010101"
     chain_key: 668430def9eacd2b5064acf85d73fb0b351a1c8c
     module_address: 463977c851087dca6e69d488fbd69dbad3ffc7fe
+    registered_nodes: []
   "0202020202020202020202020202020202020202":
     address: "0202020202020202020202020202020202020202"
     chain_key: bea83ba0fcee21da44a30c893f466e6bf0c29bbb
     module_address: ff263744a4621e2cac0f4882cc623bee3c9aef8d
+    registered_nodes: []
 tx_counts:
   668430def9eacd2b5064acf85d73fb0b351a1c8c: 0
 channels:
