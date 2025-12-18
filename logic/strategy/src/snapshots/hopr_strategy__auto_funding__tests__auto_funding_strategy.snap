@@ -95,18 +95,22 @@ deployed_safes:
     address: 93534e8ca82510a346dd329115ce7aefd4d35583
     chain_key: 18f8ae833c85c51fbeba29cef9fbfb53b3bad950
     module_address: c2ac223dbf64edf995c70c5a3d5599c3fb6d6291
+    registered_nodes: []
   259bed99d230648d7c8a116af59abdd15c9f4f1e:
     address: 259bed99d230648d7c8a116af59abdd15c9f4f1e
     chain_key: bea83ba0fcee21da44a30c893f466e6bf0c29bbb
     module_address: ff263744a4621e2cac0f4882cc623bee3c9aef8d
+    registered_nodes: []
   0f944bc36fdcf97fff6807174eeb839ecd6035bd:
     address: 0f944bc36fdcf97fff6807174eeb839ecd6035bd
     chain_key: b6021e0860dd9d96c9ff0a73e2e5ba3a466ba234
     module_address: 1613d5898cae268775bb85aa0b7e6e7fbc9dcd47
+    registered_nodes: []
   f982b19d6920ee93a267aec482349ab4a6c8a150:
     address: f982b19d6920ee93a267aec482349ab4a6c8a150
     chain_key: 68499f50ff68d523385dc60686069935d17d762a
     module_address: c6cf223b5fa5a0002e5f975453407134b848c312
+    registered_nodes: []
 tx_counts:
   bea83ba0fcee21da44a30c893f466e6bf0c29bbb: 1
 channels:

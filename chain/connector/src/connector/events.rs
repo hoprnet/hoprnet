@@ -91,6 +91,7 @@ mod tests {
                 address: [3u8; Address::SIZE].into(),
                 owner: ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
                 module: MODULE_ADDR.into(),
+                registered_nodes: vec![],
             }])
             .with_hopr_network_chain_info("rotsee")
             .build_dynamic_client(MODULE_ADDR.into())
