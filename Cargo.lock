@@ -4511,8 +4511,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-bindings"
-version = "4.0.1"
-source = "git+https://github.com/hoprnet/contracts?rev=c8fd165#c8fd1659dac83fa328d17e9cfffea307466b8109"
+version = "4.2.0"
+source = "git+https://github.com/hoprnet/contracts?branch=main#f16b9d689e6e39f04773bee2f8ccc9297a040e09"
 dependencies = [
  "alloy",
  "anyhow",
