@@ -63,7 +63,7 @@ backon = { version = "1.6.0", default-features = false }
 base64 = "0.22.1"
 bigdecimal = "0.4.9"
 bimap = "0.6.3"
-bincode = { version = "2.0.1", features = ["serde"] }
+bincode = { version = "3.0.0", features = ["serde"] }
 bitvec = "1.0.1"
 blokli-client = { git = "https://github.com/hoprnet/blokli", version = "0.15.0" }
 bloomfilter = { version = "3.0.1", features = ["serde"] }
