@@ -1,5 +1,5 @@
 {
-  description = "hoprnet monorepo";
+  description = "hopr-lib and hoprd repository";
 
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
@@ -19,6 +19,11 @@
     foundry.inputs.flake-utils.follows = "flake-utils";
     foundry.inputs.nixpkgs.follows = "nixpkgs";
     nix-lib.inputs.nixpkgs.follows = "nixpkgs";
+    nix-lib.inputs.flake-utils.follows = "flake-utils";
+    nix-lib.inputs.crane.follows = "crane";
+    nix-lib.inputs.flake-parts.follows = "flake-parts";
+    nix-lib.inputs.rust-overlay.follows = "rust-overlay";
+    nix-lib.inputs.treefmt-nix.follows = "treefmt-nix";
     pre-commit.inputs.nixpkgs.follows = "nixpkgs";
     rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
     treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
