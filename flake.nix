@@ -1,10 +1,11 @@
 {
-  description = "hoprnet monorepo";
+  description = "hopr-lib and hoprd repository";
 
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
     flake-parts.url = "github:hercules-ci/flake-parts";
     nixpkgs.url = "github:NixOS/nixpkgs/release-25.05";
+    nixpkgs-unstable.url = "github:NixOS/nixpkgs/master";
     rust-overlay.url = "github:oxalica/rust-overlay/master";
     crane.url = "github:ipetkov/crane/v0.21.0";
     nix-lib.url = "github:hoprnet/nix-lib";
@@ -19,6 +20,11 @@
     foundry.inputs.flake-utils.follows = "flake-utils";
     foundry.inputs.nixpkgs.follows = "nixpkgs";
     nix-lib.inputs.nixpkgs.follows = "nixpkgs";
+    nix-lib.inputs.flake-utils.follows = "flake-utils";
+    nix-lib.inputs.crane.follows = "crane";
+    nix-lib.inputs.flake-parts.follows = "flake-parts";
+    nix-lib.inputs.rust-overlay.follows = "rust-overlay";
+    nix-lib.inputs.treefmt-nix.follows = "treefmt-nix";
     pre-commit.inputs.nixpkgs.follows = "nixpkgs";
     rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
     treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
@@ -38,6 +44,7 @@
     {
       self,
       nixpkgs,
+      nixpkgs-unstable,
       flake-utils,
       flake-parts,
       rust-overlay,
@@ -68,6 +75,7 @@
             foundry.overlay
           ];
           pkgs = import nixpkgs { inherit localSystem overlays; };
+          pkgs-unstable = import nixpkgs-unstable { inherit localSystem overlays; };
           buildPlatform = pkgs.stdenv.buildPlatform;
 
           # Import nix-lib for shared Nix utilities
@@ -412,6 +420,7 @@
             treefmtPrograms = pkgs.lib.attrValues config.treefmt.build.programs;
             extraPackages = with pkgs; [
               sqlite
+              pkgs-unstable.cargo-audit
               cargo-machete
               cargo-shear
               cargo-insta
@@ -433,6 +442,7 @@
               act
               gh
               google-cloud-sdk
+              pkgs-unstable.cargo-audit
               cargo-machete
               cargo-shear
               graphviz
@@ -515,7 +525,7 @@
               name = "audit";
               runtimeInputs = [
                 pkgs.cargo
-                pkgs.cargo-audit
+                pkgs-unstable.cargo-audit
               ];
               text = ''
                 cargo audit
