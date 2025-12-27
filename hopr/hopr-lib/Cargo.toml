@@ -87,6 +87,7 @@ validator = { workspace = true }
 
 hopr-api = { workspace = true, features = ["ct"] }
 hopr-async-runtime = { workspace = true }
+hopr-chain-types = { workspace = true }
 hopr-crypto-keypair = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
