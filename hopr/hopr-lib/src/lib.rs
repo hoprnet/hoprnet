@@ -469,13 +469,13 @@ where
                 })?;
                 info!(%safe_addr, "safe successfully registered with this node");
             }
-            Err(SafeRegistrationError::AlreadyRegistered(registered_safe)) if registered_safe == safe_addr => {
+            Err(SafeRegistrationError::AlreadyRegistered(registered_node)) if registered_node == self.me_onchain() => {
                 info!(%safe_addr, "this safe is already registered with this node");
             }
-            Err(SafeRegistrationError::AlreadyRegistered(registered_safe)) if registered_safe != safe_addr => {
+            Err(SafeRegistrationError::AlreadyRegistered(registered_node)) if registered_node != self.me_onchain() => {
                 // TODO: support safe deregistration flow
-                error!(%safe_addr, %registered_safe, "this node is currently registered with different safe");
-                return Err(HoprLibError::GeneralError("node registered with different safe".into()));
+                error!(%safe_addr, %registered_node, "given safe is currently registered with different node");
+                return Err(HoprLibError::GeneralError("safe registered with different node".into()));
             }
             Err(error) => {
                 error!(%safe_addr, %error, "safe registration failed");
