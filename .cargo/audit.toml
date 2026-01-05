@@ -8,6 +8,8 @@ ignore = [
   "RUSTSEC-2025-0052", # 'async-std' in 'async-tar' [unmaintained]
   "RUSTSEC-2025-0073", # 'alloy-dyn-abi' in 'alloy' - will be removed in 4.0
   "RUSTSEC-2025-0134", # `rustls-pemfile` [unmaintained], blokli-client needs to avoid rust-tls, see https://github.com/hoprnet/blokli/issues/107
+  "RUSTSEC-2025-0140", # `gix-date` stems from `vergen-gix` which has no new major release just yet
+  "RUSTSEC-2025-0137", # `alloy` - held back until removed, see https://github.com/hoprnet/hoprnet/issues/7707
 ]
 informational_warnings = ["unmaintained"]
 severity_threshold = "low"

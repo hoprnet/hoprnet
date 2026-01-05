@@ -1,0 +1,30 @@
+---
+source: chain/connector/src/connector/accounts.rs
+expression: "*connector.client.snapshot()"
+---
+accounts: {}
+native_balances:
+  668430def9eacd2b5064acf85d73fb0b351a1c8c:
+    __typename: NativeBalance
+    balance: 10 xDai
+token_balances: {}
+safe_allowances: {}
+deployed_safes: {}
+tx_counts:
+  668430def9eacd2b5064acf85d73fb0b351a1c8c: 0
+channels: {}
+chain_info:
+  channel_closure_grace_period: "300"
+  channel_dst: "0000000000000000000000000000000000000000000000000000000000000000"
+  block_number: 1
+  chain_id: 100
+  ledger_dst: "0000000000000000000000000000000000000000000000000000000000000000"
+  min_ticket_winning_probability: 1
+  key_binding_fee: 0.01 wxHOPR
+  safe_registry_dst: "0000000000000000000000000000000000000000000000000000000000000000"
+  ticket_price: 1 wxHOPR
+  network: rotsee
+  contract_addresses: "{\"announcements\":\"0x5afe60f4f74159f8F68dadCE6202b938cDa80Dad\",\"channels\":\"0x5bD809bDBAa8D3d5f37743Ae86BFef766dEE56b6\",\"module_implementation\":\"0x1167FB204298799B0B9E98896D58958cAEd164B0\",\"node_safe_migration\":\"0xe95b481AA95e1d071a4B250Ea5F9dD498A19646b\",\"node_safe_registry\":\"0x0e4e1a2D851663462523bF38Ca56259aceCCBc76\",\"node_stake_factory\":\"0x878Ea9591726E70AA06f820c3bA5142A0C8ab58B\",\"ticket_price_oracle\":\"0x147899Ca57111d9081df125C2bcbd839981f04c2\",\"token\":\"0x9C312F8997F215ada9802DA9fb281206350EAd2b\",\"winning_probability_oracle\":\"0x74329f8153cBb33aABdEd79Ee84748fE8923c5E3\"}"
+version: "1"
+health: OK
+active_txs: {}
