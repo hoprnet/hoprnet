@@ -31,7 +31,7 @@ impl<E> AnnouncementError<E> {
 #[derive(Debug, strum::EnumIs, strum::EnumTryAs, thiserror::Error)]
 pub enum SafeRegistrationError<E> {
     /// Special error when a Safe is already registered.
-    #[error("safe is already registered with node {0}")]
+    #[error("node is already registered with safe {0}")]
     AlreadyRegistered(Address),
     /// Error that can occur when processing a Safe registration.
     #[error("safe registration error: {0}")]
