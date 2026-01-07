@@ -85,7 +85,7 @@ where
 
         let selector = blokli_client::api::v1::AccountSelector::PacketKey((*offchain_key).into());
         if let Some(node) = self.client.query_accounts(selector.clone()).await?.first().cloned() {
-            return Ok(model_to_account_entry(node)?);
+            return model_to_account_entry(node);
         }
 
         let stream = self.client.subscribe_accounts(selector)?.map_err(ConnectorError::from);
@@ -97,7 +97,7 @@ where
             ))
             .await??
         {
-            Ok(model_to_account_entry(node)?)
+            model_to_account_entry(node)
         } else {
             Err(ConnectorError::AccountDoesNotExist(format!(
                 "with packet key {offchain_key}"
