@@ -14,6 +14,7 @@ deployed_safes:
     address: "0101010101010101010101010101010101010101"
     chain_key: 668430def9eacd2b5064acf85d73fb0b351a1c8c
     module_address: "1111111111111111111111111111111111111111"
+    registered_nodes: []
 tx_counts: {}
 channels: {}
 chain_info:
@@ -27,7 +28,7 @@ chain_info:
   safe_registry_dst: "0000000000000000000000000000000000000000000000000000000000000000"
   ticket_price: 1 wxHOPR
   network: rotsee
-  contract_addresses: "{\"announcements\":\"0x45b000742a693AB00fA4839a086dfB6155a15D3C\",\"channels\":\"0x9680F21d4583ad27F2e6bc3005EDF120FFf057B7\",\"module_implementation\":\"0x79C3bF06E96A9373765284aFb0a35e9529E2B3F2\",\"node_safe_migration\":\"0xe9670B5D87c87111C9050D915971B73b9f5021a9\",\"node_safe_registry\":\"0xaFa257f2799835D2E29e7eC7ee448530F9d8Cb20\",\"node_stake_factory\":\"0xcB0841cc3DBDE97aC52B945F02Ee4F3D8707d977\",\"ticket_price_oracle\":\"0xFA251d4C367683d6181531afd5964E660aCf43A0\",\"token\":\"0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1\",\"winning_probability_oracle\":\"0xa641822a52AcbDc0c0123337f715C1d9756c21bD\"}"
+  contract_addresses: "{\"announcements\":\"0x5afe60f4f74159f8F68dadCE6202b938cDa80Dad\",\"channels\":\"0x5bD809bDBAa8D3d5f37743Ae86BFef766dEE56b6\",\"module_implementation\":\"0x1167FB204298799B0B9E98896D58958cAEd164B0\",\"node_safe_migration\":\"0xe95b481AA95e1d071a4B250Ea5F9dD498A19646b\",\"node_safe_registry\":\"0x0e4e1a2D851663462523bF38Ca56259aceCCBc76\",\"node_stake_factory\":\"0x878Ea9591726E70AA06f820c3bA5142A0C8ab58B\",\"ticket_price_oracle\":\"0x147899Ca57111d9081df125C2bcbd839981f04c2\",\"token\":\"0x9C312F8997F215ada9802DA9fb281206350EAd2b\",\"winning_probability_oracle\":\"0x74329f8153cBb33aABdEd79Ee84748fE8923c5E3\"}"
 version: "1"
 health: OK
 active_txs: {}

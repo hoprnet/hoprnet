@@ -1,6 +1,7 @@
 use blokli_client::errors::{ErrorKind, TrackingErrorKind};
 use hopr_api::chain::HoprKeyIdent;
 use hopr_internal_types::prelude::ChannelId;
+use hopr_primitive_types::prelude::Address;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -16,6 +17,9 @@ pub enum ConnectorError {
 
     #[error("account {0} does not exist")]
     AccountDoesNotExist(HoprKeyIdent),
+
+    #[error("safe {0} does not exist")]
+    SafeDoesNotExist(Address),
 
     #[error("channel {0} does not exist")]
     ChannelDoesNotExist(ChannelId),

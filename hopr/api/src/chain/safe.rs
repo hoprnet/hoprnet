@@ -4,7 +4,7 @@ use hopr_primitive_types::{
 };
 
 /// Information about a deployed Safe.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DeployedSafe {
     /// Safe address.
     pub address: Address,
@@ -12,6 +12,8 @@ pub struct DeployedSafe {
     pub owner: Address,
     /// Address of the Safe module.
     pub module: Address,
+    /// Addresses of nodes that have been registered with this Safe.
+    pub registered_nodes: Vec<Address>,
 }
 
 /// Selector for [deployed Safes](DeployedSafe).

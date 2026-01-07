@@ -22,7 +22,7 @@ jobs:
     if: github.event.label.name == 'deploy_nodes' && github.event.action == 'labeled'
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@95d9a5deda9de15063e7595e9719c11c38c90ae2 # v2.13.2
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -30,7 +30,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
         with:
-          python-version: 3.14.0
+          python-version: 3.14.2
 
       - name: Checkout hoprnet
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
@@ -65,7 +65,7 @@ jobs:
           python3 ./sync-deployment.py -a deploy -n ${network} -v ${docker_tag}
 
       - name: Create Deploy Pull Request
-        uses: peter-evans/create-pull-request@84ae59a2cdc2258d6fa0732dd66352dddae2a412 # v7.0.9
+        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7.0.11
         with:
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           path: "./products-ci"
@@ -82,7 +82,7 @@ jobs:
     if: github.event.label.name == 'deploy_nodes' && github.event.action == 'unlabeled'
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@95d9a5deda9de15063e7595e9719c11c38c90ae2 # v2.13.2
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -90,7 +90,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
         with:
-          python-version: 3.14.0
+          python-version: 3.14.2
 
       - name: Checkout hoprnet
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
@@ -113,7 +113,7 @@ jobs:
           pip install -r ./requirements.txt
           python3 ./sync-deployment.py -a undeploy -v ${docker_tag}
       - name: Create Undeploy Pull Request
-        uses: peter-evans/create-pull-request@84ae59a2cdc2258d6fa0732dd66352dddae2a412 # v7.0.9
+        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7.0.11
         with:
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           path: "./products-ci"

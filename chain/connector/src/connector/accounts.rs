@@ -156,22 +156,35 @@ where
         self.check_connection_state()
             .map_err(SafeRegistrationError::processing)?;
 
-        if let Some(safe) = self
+        // Check if the node isn't already registered with some Safe
+        let my_node_addr = self.chain_key.public().to_address();
+        if let Some(safe_with_node) = self
             .client
-            .query_accounts(blokli_client::api::v1::AccountSelector::Address(
-                self.chain_key.public().to_address().into(),
+            .query_safe(blokli_client::api::v1::SafeSelector::RegisteredNode(
+                my_node_addr.into(),
             ))
             .await
             .map_err(SafeRegistrationError::processing)?
-            .iter()
-            .find_map(|account| account.safe_address.clone())
         {
-            return Err(SafeRegistrationError::AlreadyRegistered(safe.parse().unwrap_or_else(
-                |e| {
-                    tracing::error!("failed to parse safe {safe} address: {e}");
-                    Address::default()
-                },
-            )));
+            // If already registered, return which Safe it is registered with
+            let registered_safe_addr =
+                Address::from_hex(&safe_with_node.address).map_err(SafeRegistrationError::processing)?;
+            return Err(SafeRegistrationError::AlreadyRegistered(registered_safe_addr));
+        }
+
+        // Check if Safe with this address even exists (has been deployed)
+        if self
+            .client
+            .query_safe(blokli_client::api::v1::SafeSelector::SafeAddress(
+                (*safe_address).into(),
+            ))
+            .await
+            .map_err(SafeRegistrationError::processing)?
+            .is_none()
+        {
+            return Err(SafeRegistrationError::ProcessingError(
+                ConnectorError::SafeDoesNotExist(*safe_address),
+            ));
         }
 
         let tx_req = self
@@ -195,7 +208,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        connector::tests::{MODULE_ADDR, PRIVATE_KEY_1, create_connector},
+        connector::tests::{MODULE_ADDR, PRIVATE_KEY_1, PRIVATE_KEY_2, create_connector},
         testing::BlokliTestStateBuilder,
     };
 
@@ -486,6 +499,7 @@ mod tests {
                 address: [1u8; Address::SIZE].into(),
                 owner: ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
                 module: MODULE_ADDR.into(),
+                registered_nodes: vec![],
             }])
             .with_hopr_network_chain_info("rotsee")
             .build_dynamic_client(MODULE_ADDR.into());
@@ -501,21 +515,39 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn connector_should_not_re_register_safe() -> anyhow::Result<()> {
-        let offchain_key = OffchainKeypair::from_secret(&hex!(
-            "60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"
-        ))?;
+    async fn connector_should_register_safe_that_has_nodes_registered_already() -> anyhow::Result<()> {
         let safe_addr: Address = [2u8; Address::SIZE].into();
-        let account = AccountEntry {
-            public_key: *offchain_key.public(),
-            chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
-            entry_type: AccountType::NotAnnounced,
-            safe_address: Some(safe_addr),
-            key_id: 1.into(),
-        };
+        let other_registered_node = ChainKeypair::from_secret(&PRIVATE_KEY_2)?.public().to_address();
 
         let blokli_client = BlokliTestStateBuilder::default()
-            .with_accounts([(account, HoprBalance::new_base(100), XDaiBalance::new_base(1))])
+            .with_balances([(
+                ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
+                XDaiBalance::new_base(10),
+            )])
+            .with_deployed_safes([DeployedSafe {
+                address: safe_addr,
+                owner: ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
+                module: MODULE_ADDR.into(),
+                registered_nodes: vec![other_registered_node],
+            }])
+            .with_hopr_network_chain_info("rotsee")
+            .build_dynamic_client(MODULE_ADDR.into());
+
+        let mut connector = create_connector(blokli_client)?;
+        connector.connect().await?;
+
+        connector.register_safe(&safe_addr).await?.await?;
+
+        insta::assert_yaml_snapshot!(*connector.client.snapshot());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connector_should_not_register_safe_that_does_not_exist() -> anyhow::Result<()> {
+        let safe_addr: Address = [2u8; Address::SIZE].into();
+
+        let blokli_client = BlokliTestStateBuilder::default()
             .with_balances([(
                 ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
                 XDaiBalance::new_base(10),
@@ -526,11 +558,42 @@ mod tests {
         let mut connector = create_connector(blokli_client)?;
         connector.connect().await?;
 
+        assert!(connector.register_safe(&safe_addr).await.is_err());
+
+        insta::assert_yaml_snapshot!(*connector.client.snapshot());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connector_should_not_register_any_safe_when_node_already_registered() -> anyhow::Result<()> {
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_balances([(
+                ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
+                XDaiBalance::new_base(10),
+            )])
+            .with_deployed_safes([
+                DeployedSafe {
+                    address: [2u8; Address::SIZE].into(),
+                    owner: ChainKeypair::from_secret(&PRIVATE_KEY_2)?.public().to_address(),
+                    module: MODULE_ADDR.into(),
+                    registered_nodes: vec![ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address()],
+                },
+                DeployedSafe {
+                    address: [1u8; Address::SIZE].into(),
+                    owner: ChainKeypair::from_secret(&PRIVATE_KEY_2)?.public().to_address(),
+                    module: MODULE_ADDR.into(),
+                    registered_nodes: vec![],
+                },
+            ])
+            .with_hopr_network_chain_info("rotsee")
+            .build_dynamic_client(MODULE_ADDR.into());
+
+        let mut connector = create_connector(blokli_client)?;
+        connector.connect().await?;
+
         assert!(
-            matches!(connector.register_safe(&[1u8; Address::SIZE].into()).await, Err(SafeRegistrationError::AlreadyRegistered(a)) if a == safe_addr)
-        );
-        assert!(
-            matches!(connector.register_safe(&safe_addr).await, Err(SafeRegistrationError::AlreadyRegistered(a)) if a == safe_addr)
+            matches!(connector.register_safe(&[1u8; Address::SIZE].into()).await, Err(SafeRegistrationError::AlreadyRegistered(a)) if a == [2u8; Address::SIZE].into())
         );
 
         insta::assert_yaml_snapshot!(*connector.client.snapshot());

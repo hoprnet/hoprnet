@@ -151,6 +151,11 @@ pub(crate) fn model_to_deployed_safe(model: blokli_client::api::types::Safe) -> 
         address: Address::from_hex(&model.address)?,
         owner: Address::from_hex(&model.chain_key)?,
         module: Address::from_hex(&model.module_address)?,
+        registered_nodes: model
+            .registered_nodes
+            .into_iter()
+            .map(|addr| Address::from_hex(&addr))
+            .collect::<Result<Vec<_>, _>>()?,
     })
 }
 

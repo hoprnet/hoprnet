@@ -4,23 +4,14 @@ expression: "*connector.client.snapshot()"
 ---
 accounts: {}
 native_balances:
-  "0101010101010101010101010101010101010101":
-    __typename: NativeBalance
-    balance: 1 xDai
   668430def9eacd2b5064acf85d73fb0b351a1c8c:
     __typename: NativeBalance
-    balance: 8.999999999999999998 xDai
-token_balances:
-  "0101010101010101010101010101010101010101":
-    __typename: HoprBalance
-    balance: 10 wxHOPR
-  668430def9eacd2b5064acf85d73fb0b351a1c8c:
-    __typename: HoprBalance
-    balance: 990 wxHOPR
+    balance: 10 xDai
+token_balances: {}
 safe_allowances: {}
 deployed_safes: {}
 tx_counts:
-  668430def9eacd2b5064acf85d73fb0b351a1c8c: 2
+  668430def9eacd2b5064acf85d73fb0b351a1c8c: 0
 channels: {}
 chain_info:
   channel_closure_grace_period: "300"
