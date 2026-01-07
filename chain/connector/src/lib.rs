@@ -153,7 +153,8 @@ where
 ///
 /// This instantiation explicitly trusts the contract address information retrieved from the
 /// [`blokli_client::BlokliClient`].
-/// If you wish to provide your own deployment information, use the [`create_trustless_hopr_blokli_connector`] function.
+/// If you wish to provide your own deployment information, use the [`create_trustless_safeless_hopr_blokli_connector`]
+/// function.
 ///
 /// The returned instance uses [`TempDbBackend`] and [`BasicPayloadGenerator`].
 pub async fn create_trustful_safeless_hopr_blokli_connector<C>(

@@ -61,7 +61,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<B, C, P> hopr_api::chain::ChainSafeWriteOperations for HoprBlockchainConnector<C, B, P, P::TxRequest>
+impl<B, C, P> hopr_api::chain::ChainWriteSafeOperations for HoprBlockchainConnector<C, B, P, P::TxRequest>
 where
     B: Send + Sync + 'static,
     C: BlokliQueryClient + BlokliTransactionClient + Send + Sync + 'static,
@@ -75,6 +75,15 @@ where
         balance: HoprBalance,
     ) -> Result<BoxFuture<'a, Result<ChainReceipt, Self::Error>>, Self::Error> {
         let admin = self.chain_key.public().to_address();
+        if self
+            .client
+            .query_safe(blokli_client::api::SafeSelector::ChainKey(admin.into()))
+            .await?
+            .is_some()
+        {
+            return Err(ConnectorError::InvalidState("safe already deployed for this signer"));
+        }
+
         if self.balance(admin).await? < balance {
             return Err(ConnectorError::InvalidState("insufficient token balance at the signer"));
         }

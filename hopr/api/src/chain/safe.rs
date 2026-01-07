@@ -72,12 +72,13 @@ pub trait ChainReadSafeOperations {
 /// Operations for writing Safe information.
 #[async_trait::async_trait]
 #[auto_impl::auto_impl(&, Box, Arc)]
-pub trait ChainSafeWriteOperations {
+pub trait ChainWriteSafeOperations {
     type Error: std::error::Error + Send + Sync + 'static;
 
     /// Deploys Safe with the given `balance` of wxHOPR tokens.
     ///
-    /// The admin of the deployed Safe is always only the Connector's own signer.
+    /// The admin of the deployed Safe is always only the Connector's own signer. Only one Safe
+    /// can be deployed per signer.
     async fn deploy_safe<'a>(
         &'a self,
         balance: HoprBalance,
