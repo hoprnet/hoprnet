@@ -1,7 +1,8 @@
 use std::str::FromStr;
 
-use blokli_client::api::{BlokliQueryClient, BlokliTransactionClient};
-use futures::{FutureExt, StreamExt, TryFutureExt, future::BoxFuture, stream::BoxStream};
+use blokli_client::api::{BlokliQueryClient, BlokliSubscriptionClient, BlokliTransactionClient};
+use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt, future::BoxFuture, pin_mut, stream::BoxStream};
+use futures_time::future::FutureExt as TimeFutureExt;
 use hopr_api::chain::{AccountSelector, AnnouncementError, ChainReceipt, Multiaddr, SafeRegistrationError};
 use hopr_chain_types::prelude::*;
 use hopr_crypto_types::prelude::*;
@@ -11,7 +12,9 @@ use hopr_internal_types::{
 };
 use hopr_primitive_types::prelude::*;
 
-use crate::{backend::Backend, connector::HoprBlockchainConnector, errors::ConnectorError};
+use crate::{
+    backend::Backend, connector::HoprBlockchainConnector, errors::ConnectorError, utils::model_to_account_entry,
+};
 
 impl<B, C, P, R> HoprBlockchainConnector<C, B, P, R>
 where
@@ -52,7 +55,7 @@ where
 impl<B, C, P, R> hopr_api::chain::ChainReadAccountOperations for HoprBlockchainConnector<C, B, P, R>
 where
     B: Backend + Send + Sync + 'static,
-    C: BlokliQueryClient + Send + Sync + 'static,
+    C: BlokliQueryClient + BlokliSubscriptionClient + Send + Sync + 'static,
     P: Send + Sync + 'static,
     R: Send + Sync,
 {
@@ -71,6 +74,35 @@ where
         self.check_connection_state()?;
 
         Ok(self.stream_accounts(selector).await?.count().await)
+    }
+
+    async fn await_key_binding(
+        &self,
+        offchain_key: &OffchainPublicKey,
+        timeout: std::time::Duration,
+    ) -> Result<AccountEntry, Self::Error> {
+        self.check_connection_state()?;
+
+        let selector = blokli_client::api::v1::AccountSelector::PacketKey((*offchain_key).into());
+        if let Some(node) = self.client.query_accounts(selector.clone()).await?.first().cloned() {
+            return model_to_account_entry(node);
+        }
+
+        let stream = self.client.subscribe_accounts(selector)?.map_err(ConnectorError::from);
+        pin_mut!(stream);
+        if let Some(node) = stream
+            .try_next()
+            .timeout(futures_time::time::Duration::from(
+                timeout.max(std::time::Duration::from_secs(1)),
+            ))
+            .await??
+        {
+            model_to_account_entry(node)
+        } else {
+            Err(ConnectorError::AccountDoesNotExist(format!(
+                "with packet key {offchain_key}"
+            )))
+        }
     }
 }
 
