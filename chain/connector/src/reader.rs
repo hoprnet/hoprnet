@@ -146,7 +146,7 @@ where
             .try_skip_while(|deployed_safe| futures::future::ok(!selector.satisfies(deployed_safe)))
             .take(1)
             .try_collect::<Vec<_>>()
-            .timeout(futures_time::time::Duration::from(timeout))
+            .timeout(futures_time::time::Duration::from(timeout.max(Duration::from_secs(1))))
             .await??;
 
         res.into_iter()
