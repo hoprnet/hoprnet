@@ -1,7 +1,10 @@
 use std::time::Duration;
 
-use blokli_client::api::{BlokliQueryClient, BlokliSubscriptionClient};
-use hopr_api::chain::{DeployedSafe, SafeSelector};
+use blokli_client::api::{BlokliQueryClient, BlokliSubscriptionClient, BlokliTransactionClient};
+use futures::{FutureExt, future::BoxFuture};
+use hopr_api::chain::{ChainReceipt, ChainValues, DeployedSafe, SafeSelector};
+use hopr_chain_types::prelude::PayloadGenerator;
+use hopr_crypto_types::prelude::Keypair;
 use hopr_primitive_types::prelude::*;
 
 use crate::{Backend, HoprBlockchainConnector, HoprBlockchainReader, errors::ConnectorError};
@@ -54,6 +57,34 @@ where
         HoprBlockchainReader(self.client.clone())
             .predict_module_address(nonce, owner, safe_address)
             .await
+    }
+}
+
+#[async_trait::async_trait]
+impl<B, C, P> hopr_api::chain::ChainSafeWriteOperations for HoprBlockchainConnector<C, B, P, P::TxRequest>
+where
+    B: Send + Sync + 'static,
+    C: BlokliQueryClient + BlokliTransactionClient + Send + Sync + 'static,
+    P: PayloadGenerator + Send + Sync + 'static,
+    P::TxRequest: Send + Sync + 'static,
+{
+    type Error = ConnectorError;
+
+    async fn deploy_safe<'a>(
+        &'a self,
+        balance: HoprBalance,
+    ) -> Result<BoxFuture<'a, Result<ChainReceipt, Self::Error>>, Self::Error> {
+        let admin = self.chain_key.public().to_address();
+        if self.balance(admin).await? < balance {
+            return Err(ConnectorError::InvalidState("insufficient token balance at the signer"));
+        }
+
+        let tx_req = self
+            .payload_generator
+            .deploy_safe(balance, &[admin], true, hopr_crypto_random::random_bytes())?;
+        tracing::debug!(%balance, %admin, "deploying safe");
+
+        Ok(self.send_tx(tx_req).await?.boxed())
     }
 }
 

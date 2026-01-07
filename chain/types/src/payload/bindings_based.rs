@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 pub use hopr_bindings::exports::alloy::rpc::types::TransactionRequest;
 use hopr_bindings::{
     exports::alloy::{
@@ -8,6 +10,7 @@ use hopr_bindings::{
         primitives::{
             B256, U256,
             aliases::{U24, U48, U56, U96},
+            b256,
         },
         signers::local::PrivateKeySigner,
         sol,
@@ -32,7 +35,10 @@ use hopr_primitive_types::prelude::*;
 
 use crate::{
     ContractAddresses, a2al,
-    errors::ChainTypesError::{InvalidArguments, InvalidState, SigningError},
+    errors::{
+        ChainTypesError,
+        ChainTypesError::{InvalidArguments, InvalidState, SigningError},
+    },
     payload,
     payload::{GasEstimation, PayloadGenerator, SignableTransaction},
 };
@@ -49,6 +55,16 @@ sol! {
         string  multiaddress;
     }
 }
+
+sol! (
+    #![sol(all_derives)]
+    struct UserData {
+        bytes32 functionIdentifier;
+        uint256 nonce;
+        bytes32 defaultTarget;
+        address[] memory admins;
+    }
+);
 
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -282,6 +298,58 @@ impl PayloadGenerator for BasicPayloadGenerator {
     fn deregister_node_by_safe(&self) -> payload::Result<Self::TxRequest> {
         Err(InvalidState("Can only deregister an address if Safe is activated"))
     }
+
+    fn deploy_safe(
+        &self,
+        balance: HoprBalance,
+        admins: &[Address],
+        include_node: bool,
+        nonce: [u8; 64],
+    ) -> crate::payload::Result<Self::TxRequest> {
+        const DEFAULT_CAPABILITY_PERMISSIONS: &str = "010103030303030303030303";
+        let nonce = U256::from_be_slice(&nonce);
+        let admins = admins
+            .iter()
+            .map(|a| alloy::primitives::Address::new((*a).into()))
+            .collect::<Vec<_>>();
+        let default_target = alloy::primitives::U256::from_str(&format!(
+            "{:?}{DEFAULT_CAPABILITY_PERMISSIONS}",
+            self.contract_addrs.channels
+        ))
+        .map_err(|e| ChainTypesError::ParseError(e.into()))?;
+
+        let user_data = if include_node {
+            UserData {
+                functionIdentifier: b256!("0105b97dcdf19d454ebe36f91ed516c2b90ee79f4a46af96a0138c1f5403c1cc"),
+                nonce,
+                defaultTarget: default_target.into(),
+                admins,
+            }
+            .abi_encode()[32..]
+                .to_vec()
+        } else {
+            UserData {
+                functionIdentifier: b256!("dd24c144db91d1bc600aac99393baf8f8c664ba461188f057e37f2c37b962b45"),
+                nonce,
+                defaultTarget: default_target.into(),
+                admins,
+            }
+            .abi_encode()[32..]
+                .to_vec()
+        };
+
+        let tx_payload = sendCall {
+            recipient: self.contract_addrs.node_stake_factory,
+            amount: alloy::primitives::U256::from_be_slice(&balance.amount().to_be_bytes()),
+            data: user_data.into(),
+        }
+        .abi_encode();
+
+        let tx = TransactionRequest::default()
+            .with_to(self.contract_addrs.token)
+            .with_input(tx_payload);
+        Ok(tx)
+    }
 }
 
 /// Payload generator that generates Safe-compliant ABI
@@ -497,6 +565,16 @@ impl PayloadGenerator for SafePayloadGenerator {
             .with_gas_limit(DEFAULT_TX_GAS);
 
         Ok(tx)
+    }
+
+    fn deploy_safe(
+        &self,
+        _: HoprBalance,
+        _: &[Address],
+        _: bool,
+        _: [u8; 64],
+    ) -> crate::payload::Result<Self::TxRequest> {
+        Err(InvalidState("cannot deploy Safe from SafePayloadGenerator"))
     }
 }
 

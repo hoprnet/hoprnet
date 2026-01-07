@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-connector"
-version = "0.6.0"
+version = "0.8.0"
 edition = "2024"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implementation of HOPR Chain APIs using Blokli client"
@@ -38,6 +38,7 @@ hopr-api = { workspace = true, features = ["chain"] }
 hopr-async-runtime = { workspace = true }
 hopr-chain-types = { workspace = true }
 hopr-crypto-types = { workspace = true }
+hopr-crypto-random = { workspace = true }
 hopr-internal-types = { workspace = true, features = ["serde"] }
 hopr-primitive-types = { workspace = true }
 

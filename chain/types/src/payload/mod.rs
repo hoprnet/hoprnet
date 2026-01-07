@@ -104,6 +104,21 @@ pub trait PayloadGenerator {
     /// Creates a transaction payload to remove the Safe instance. Once succeeded,
     /// the node no longer manages the funds.
     fn deregister_node_by_safe(&self) -> Result<Self::TxRequest>;
+
+    /// Creates a transaction payload to deploy a new Safe instance with the initial
+    /// `balance` transferred from the signer and `admins` as Safe owners.
+    ///
+    /// If `include_node` is true, the signer will be included in the module after deployment.
+    ///
+    /// The resulting transaction requires that the signer owns at least the `balance` of wxHOPR tokens. The given
+    /// `nonce` must be randomly generated for each deployment.
+    fn deploy_safe(
+        &self,
+        balance: HoprBalance,
+        admins: &[Address],
+        include_node: bool,
+        nonce: [u8; 64],
+    ) -> Result<Self::TxRequest>;
 }
 
 #[cfg(test)]

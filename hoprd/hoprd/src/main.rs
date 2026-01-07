@@ -3,7 +3,10 @@ use std::{num::NonZeroUsize, str::FromStr, sync::Arc};
 use anyhow::Context;
 use async_signal::{Signal, Signals};
 use futures::{FutureExt, StreamExt, future::abortable};
-use hopr_chain_connector::{HoprBlockchainSafeConnector, blokli_client::BlokliClient};
+use hopr_chain_connector::{
+    BlockchainConnectorConfig, HoprBlockchainSafeConnector, blokli_client, blokli_client::BlokliClient,
+    create_trustful_hopr_blokli_connector,
+};
 use hopr_db_node::{HoprNodeDb, init_hopr_node_db};
 use hopr_lib::{
     AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, api::chain::ChainEvents, config::HoprLibConfig,
@@ -35,6 +38,8 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 #[cfg(all(target_os = "linux", feature = "allocator-jemalloc-stats"))]
 mod jemalloc_stats;
+
+const DEFAULT_BLOKLI_URL: &str = "https://blokli.prod.hoprnet.link";
 
 fn init_logger() -> anyhow::Result<()> {
     let env_filter = match tracing_subscriber::EnvFilter::try_from_default_env() {
@@ -214,8 +219,6 @@ fn main() -> anyhow::Result<()> {
 
 #[cfg(feature = "runtime-tokio")]
 async fn main_inner() -> anyhow::Result<()> {
-    use hopr_chain_connector::init_blokli_connector;
-
     init_logger()?;
 
     #[cfg(all(target_os = "linux", feature = "allocator-jemalloc-stats"))]
@@ -264,14 +267,27 @@ async fn main_inner() -> anyhow::Result<()> {
 
     let node_db = init_hopr_node_db(&cfg.db.data, cfg.db.initialize, cfg.db.force_initialize).await?;
 
-    let chain_connector = Arc::new(
-        init_blokli_connector(
-            &hopr_keys.chain_key,
-            cfg.blokli_url.clone(),
-            cfg.hopr.safe_module.module_address,
-        )
-        .await?,
-    );
+    let mut chain_connector = create_trustful_hopr_blokli_connector(
+        &hopr_keys.chain_key,
+        BlockchainConnectorConfig {
+            tx_confirm_timeout: std::time::Duration::from_secs(30),
+            connection_timeout: std::time::Duration::from_mins(1),
+        },
+        BlokliClient::new(
+            cfg.blokli_url
+                .clone()
+                .unwrap_or(DEFAULT_BLOKLI_URL.to_string())
+                .parse()?,
+            blokli_client::BlokliClientConfig {
+                timeout: std::time::Duration::from_secs(30),
+                stream_reconnect_timeout: std::time::Duration::from_secs(30),
+            },
+        ),
+        cfg.hopr.safe_module.module_address,
+    )
+    .await?;
+    chain_connector.connect().await?;
+    let chain_connector = Arc::new(chain_connector);
 
     // TODO: load all the environment variables here and use them to configure the hopr-lib config (#7660)
     let hopr_lib_cfg: HoprLibConfig = cfg.hopr.clone().into();

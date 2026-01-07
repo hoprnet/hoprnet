@@ -1,7 +1,10 @@
+use futures::future::BoxFuture;
 use hopr_primitive_types::{
     balance::{Balance, Currency},
-    prelude::Address,
+    prelude::{Address, HoprBalance},
 };
+
+use crate::chain::ChainReceipt;
 
 /// Information about a deployed Safe.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -64,4 +67,19 @@ pub trait ChainReadSafeOperations {
         owner: &Address,
         safe_address: &Address,
     ) -> Result<Address, Self::Error>;
+}
+
+/// Operations for writing Safe information.
+#[async_trait::async_trait]
+#[auto_impl::auto_impl(&, Box, Arc)]
+pub trait ChainSafeWriteOperations {
+    type Error: std::error::Error + Send + Sync + 'static;
+
+    /// Deploys Safe with the given `balance` of wxHOPR tokens.
+    ///
+    /// The admin of the deployed Safe is always only the Connector's own signer.
+    async fn deploy_safe<'a>(
+        &'a self,
+        balance: HoprBalance,
+    ) -> Result<BoxFuture<'a, Result<ChainReceipt, Self::Error>>, Self::Error>;
 }
