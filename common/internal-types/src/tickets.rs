@@ -1180,11 +1180,6 @@ pub mod tests {
         static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).expect("lazy static keypair should be constructible");
     }
 
-    #[cfg(feature = "serde")]
-    const BINCODE_CONFIGURATION: bincode::config::Configuration = bincode::config::standard()
-        .with_little_endian()
-        .with_variable_int_encoding();
-
     #[test]
     pub fn test_win_prob_to_f64() -> anyhow::Result<()> {
         assert_eq!(0.0f64, WinningProbability::NEVER.as_f64());
@@ -1346,11 +1341,7 @@ pub mod tests {
 
         assert_eq!(
             initial_ticket,
-            bincode::serde::decode_from_slice(
-                &bincode::serde::encode_to_vec(&initial_ticket, BINCODE_CONFIGURATION)?,
-                BINCODE_CONFIGURATION
-            )
-            .map(|v| v.0)?
+            postcard::from_bytes(&postcard::to_allocvec(&initial_ticket)?)?
         );
         Ok(())
     }
@@ -1453,11 +1444,7 @@ pub mod tests {
 
         let acked_ticket = ticket.into_acknowledged(response);
 
-        let mut deserialized_ticket = bincode::serde::decode_from_slice(
-            &bincode::serde::encode_to_vec(&acked_ticket, BINCODE_CONFIGURATION)?,
-            BINCODE_CONFIGURATION,
-        )
-        .map(|v| v.0)?;
+        let mut deserialized_ticket = postcard::from_bytes(&postcard::to_allocvec(&acked_ticket)?)?;
         assert_eq!(acked_ticket, deserialized_ticket);
 
         assert!(deserialized_ticket.is_winning(&BOB, &dst));
@@ -1466,11 +1453,7 @@ pub mod tests {
 
         assert_eq!(
             deserialized_ticket,
-            bincode::serde::decode_from_slice(
-                &bincode::serde::encode_to_vec(&deserialized_ticket, BINCODE_CONFIGURATION)?,
-                BINCODE_CONFIGURATION,
-            )
-            .map(|v| v.0)?
+            postcard::from_bytes(&postcard::to_allocvec(&deserialized_ticket)?,)?
         );
         Ok(())
     }
