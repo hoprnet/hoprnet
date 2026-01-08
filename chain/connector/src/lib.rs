@@ -31,6 +31,7 @@ pub mod reexports {
 
 pub use hopr_chain_types::prelude::{ContractAddresses, PayloadGenerator};
 pub use hopr_crypto_types::prelude::ChainKeypair;
+use hopr_crypto_types::prelude::Keypair;
 pub use hopr_primitive_types::prelude::Address;
 
 /// Connector to HOPR on-chain contracts that uses multisig Safe as a signer and [`TempDbBackend`].
@@ -41,7 +42,15 @@ pub type HoprBlockchainSafeConnector<C> = HoprBlockchainConnector<
     <SafePayloadGenerator as PayloadGenerator>::TxRequest,
 >;
 
-/// Convenience function to create [`HoprBlokliConnector`] with own contract addresses.
+/// Connector to HOPR on-chain contracts that uses standard EOA as a signer and [`TempDbBackend`].
+pub type HoprBlockchainBasicConnector<C> = HoprBlockchainConnector<
+    C,
+    TempDbBackend,
+    BasicPayloadGenerator,
+    <BasicPayloadGenerator as PayloadGenerator>::TxRequest,
+>;
+
+/// Convenience function to create [`HoprBlockchainConnector`] with own contract addresses.
 ///
 /// The returned instance uses [`TempDbBackend`] and [`hopr_chain_types::payload::bindings_based::SafePayloadGenerator`]
 pub fn create_trustless_hopr_blokli_connector<C>(
@@ -70,13 +79,44 @@ where
     ))
 }
 
-/// Convenience function to create [`HoprBlokliConnector`] with contract addresses retrieved from the given `client`.
+/// Convenience function to create [`HoprBlockchainConnector`] with own contract addresses.
+///
+/// The transactions generated using this Connector are simply signed using the `chain_key` EOA.
+///
+/// The returned instance uses [`TempDbBackend`] and [`BasicPayloadGenerator`]
+pub fn create_trustless_safeless_hopr_blokli_connector<C>(
+    chain_key: &ChainKeypair,
+    cfg: BlockchainConnectorConfig,
+    client: C,
+    contracts: ContractAddresses,
+) -> Result<HoprBlockchainBasicConnector<C>, errors::ConnectorError>
+where
+    C: blokli_client::BlokliSubscriptionClient
+        + blokli_client::BlokliQueryClient
+        + blokli_client::BlokliTransactionClient
+        + Send
+        + Sync
+        + 'static,
+{
+    let payload_gen = BasicPayloadGenerator::new(chain_key.public().to_address(), contracts);
+
+    Ok(HoprBlockchainConnector::new(
+        chain_key.clone(),
+        cfg,
+        client,
+        TempDbBackend::new()?,
+        payload_gen,
+    ))
+}
+
+/// Convenience function to create [`HoprBlockchainConnector`] with contract addresses retrieved from the given
+/// `client`.
 ///
 /// This instantiation explicitly trusts the contract address information retrieved from the
 /// [`blokli_client::BlokliClient`].
 /// If you wish to provide your own deployment information, use the [`create_trustless_hopr_blokli_connector`] function.
 ///
-/// The returned instance uses [`TempDbBackend`] and [`hopr_chain_types::payload::bindings_based::SafePayloadGenerator`]
+/// The returned instance uses [`TempDbBackend`] and [`SafePayloadGenerator`].
 pub async fn create_trustful_hopr_blokli_connector<C>(
     chain_key: &ChainKeypair,
     cfg: BlockchainConnectorConfig,
@@ -106,33 +146,41 @@ where
     ))
 }
 
-pub const DEFAULT_BLOKLI_URL: &str = "https://blokli.prod.hoprnet.org";
-
-// TODO: move this into utils crate
-pub async fn init_blokli_connector(
+/// Convenience function to create [`HoprBlockchainConnector`] with contract addresses retrieved from the given
+/// `client`.
+///
+/// The transactions generated using this Connector are simply signed using the `chain_key` EOA.
+///
+/// This instantiation explicitly trusts the contract address information retrieved from the
+/// [`blokli_client::BlokliClient`].
+/// If you wish to provide your own deployment information, use the [`create_trustless_safeless_hopr_blokli_connector`]
+/// function.
+///
+/// The returned instance uses [`TempDbBackend`] and [`BasicPayloadGenerator`].
+pub async fn create_trustful_safeless_hopr_blokli_connector<C>(
     chain_key: &ChainKeypair,
-    provider: Option<String>,
-    safe_module_address: Address,
-) -> anyhow::Result<HoprBlockchainSafeConnector<blokli_client::BlokliClient>> {
-    tracing::info!("initiating Blokli connector");
+    cfg: BlockchainConnectorConfig,
+    client: C,
+) -> Result<HoprBlockchainBasicConnector<C>, errors::ConnectorError>
+where
+    C: blokli_client::BlokliSubscriptionClient
+        + blokli_client::BlokliQueryClient
+        + blokli_client::BlokliTransactionClient
+        + Send
+        + Sync
+        + 'static,
+{
+    let info = client.query_chain_info().await?;
+    let contract_addrs = serde_json::from_str(&info.contract_addresses.0)
+        .map_err(|e| errors::ConnectorError::TypeConversion(format!("contract addresses not a valid JSON: {e}")))?;
 
-    let mut connector = create_trustful_hopr_blokli_connector(
-        chain_key,
-        BlockchainConnectorConfig {
-            tx_confirm_timeout: std::time::Duration::from_secs(30),
-            connection_timeout: std::time::Duration::from_mins(1),
-        },
-        blokli_client::BlokliClient::new(
-            provider.as_deref().unwrap_or(DEFAULT_BLOKLI_URL).parse()?,
-            blokli_client::BlokliClientConfig {
-                timeout: std::time::Duration::from_secs(5),
-                stream_reconnect_timeout: std::time::Duration::from_secs(30),
-            },
-        ),
-        safe_module_address,
-    )
-    .await?;
-    connector.connect().await?;
+    let payload_gen = BasicPayloadGenerator::new(chain_key.public().to_address(), contract_addrs);
 
-    Ok(connector)
+    Ok(HoprBlockchainConnector::new(
+        chain_key.clone(),
+        cfg,
+        client,
+        TempDbBackend::new()?,
+        payload_gen,
+    ))
 }

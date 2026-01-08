@@ -4480,7 +4480,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4524,7 +4524,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4542,6 +4542,7 @@ dependencies = [
  "hopr-async-runtime",
  "hopr-chain-connector",
  "hopr-chain-types",
+ "hopr-crypto-random 0.3.0",
  "hopr-crypto-types 0.9.0",
  "hopr-internal-types",
  "hopr-primitive-types 0.10.0",
@@ -4562,7 +4563,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-types"
-version = "0.12.1"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "async-trait",
