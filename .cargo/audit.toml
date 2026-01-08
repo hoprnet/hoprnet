@@ -10,6 +10,8 @@ ignore = [
   "RUSTSEC-2025-0134", # `rustls-pemfile` [unmaintained], blokli-client needs to avoid rust-tls, see https://github.com/hoprnet/blokli/issues/107
   "RUSTSEC-2025-0140", # `gix-date` stems from `vergen-gix` which has no new major release just yet
   "RUSTSEC-2025-0137", # `alloy` - held back until removed, see https://github.com/hoprnet/hoprnet/issues/7707
+  "RUSTSEC-2026-0002", # `lru` warning, fixed once `libp2p` is updated and `alloy` removed, see #7707
+  "RUSTSEC-2025-0141", # `bincode` [unmaintaned] - fixed once bincode is removed from the code, see https://github.com/hoprnet/hoprnet/issues/7711
 ]
 informational_warnings = ["unmaintained"]
 severity_threshold = "low"
