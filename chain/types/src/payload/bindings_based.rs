@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 pub use hopr_bindings::exports::alloy::rpc::types::TransactionRequest;
 use hopr_bindings::{
     exports::alloy::{
@@ -8,6 +10,7 @@ use hopr_bindings::{
         primitives::{
             B256, U256,
             aliases::{U24, U48, U56, U96},
+            b256,
         },
         signers::local::PrivateKeySigner,
         sol,
@@ -32,7 +35,10 @@ use hopr_primitive_types::prelude::*;
 
 use crate::{
     ContractAddresses, a2al,
-    errors::ChainTypesError::{InvalidArguments, InvalidState, SigningError},
+    errors::{
+        ChainTypesError,
+        ChainTypesError::{InvalidArguments, InvalidState, SigningError},
+    },
     payload,
     payload::{GasEstimation, PayloadGenerator, SignableTransaction},
 };
@@ -49,6 +55,16 @@ sol! {
         string  multiaddress;
     }
 }
+
+sol! (
+    #![sol(all_derives)]
+    struct UserData {
+        bytes32 functionIdentifier;
+        uint256 nonce;
+        bytes32 defaultTarget;
+        address[] memory admins;
+    }
+);
 
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -282,6 +298,58 @@ impl PayloadGenerator for BasicPayloadGenerator {
     fn deregister_node_by_safe(&self) -> payload::Result<Self::TxRequest> {
         Err(InvalidState("Can only deregister an address if Safe is activated"))
     }
+
+    fn deploy_safe(
+        &self,
+        balance: HoprBalance,
+        admins: &[Address],
+        include_node: bool,
+        nonce: [u8; 64],
+    ) -> crate::payload::Result<Self::TxRequest> {
+        const DEFAULT_CAPABILITY_PERMISSIONS: &str = "010103030303030303030303";
+        let nonce = U256::from_be_slice(&nonce);
+        let admins = admins
+            .iter()
+            .map(|a| alloy::primitives::Address::new((*a).into()))
+            .collect::<Vec<_>>();
+        let default_target = alloy::primitives::U256::from_str(&format!(
+            "{:?}{DEFAULT_CAPABILITY_PERMISSIONS}",
+            self.contract_addrs.channels
+        ))
+        .map_err(|e| ChainTypesError::ParseError(e.into()))?;
+
+        let user_data = if include_node {
+            UserData {
+                functionIdentifier: b256!("0105b97dcdf19d454ebe36f91ed516c2b90ee79f4a46af96a0138c1f5403c1cc"),
+                nonce,
+                defaultTarget: default_target.into(),
+                admins,
+            }
+            .abi_encode()[32..]
+                .to_vec()
+        } else {
+            UserData {
+                functionIdentifier: b256!("dd24c144db91d1bc600aac99393baf8f8c664ba461188f057e37f2c37b962b45"),
+                nonce,
+                defaultTarget: default_target.into(),
+                admins,
+            }
+            .abi_encode()[32..]
+                .to_vec()
+        };
+
+        let tx_payload = sendCall {
+            recipient: self.contract_addrs.node_stake_factory,
+            amount: alloy::primitives::U256::from_be_slice(&balance.amount().to_be_bytes()),
+            data: user_data.into(),
+        }
+        .abi_encode();
+
+        let tx = TransactionRequest::default()
+            .with_to(self.contract_addrs.token)
+            .with_input(tx_payload);
+        Ok(tx)
+    }
 }
 
 /// Payload generator that generates Safe-compliant ABI
@@ -498,6 +566,16 @@ impl PayloadGenerator for SafePayloadGenerator {
 
         Ok(tx)
     }
+
+    fn deploy_safe(
+        &self,
+        _: HoprBalance,
+        _: &[Address],
+        _: bool,
+        _: [u8; 64],
+    ) -> crate::payload::Result<Self::TxRequest> {
+        Err(InvalidState("cannot deploy Safe from SafePayloadGenerator"))
+    }
 }
 
 /// Converts off-chain representation of VRF parameters into a representation
@@ -579,12 +657,13 @@ pub(crate) mod tests {
     const PRIVATE_KEY_2: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
 
     lazy_static::lazy_static! {
-        static ref REDEEMABLE_TICKET: RedeemableTicket = bincode::serde::decode_from_slice(&hex!(
-            "bea83ba0fcee21da44a30c893f466e6bf0c29bbb0530783365387bffffffffffffff010000000000000000000000000000000000000000014038536c412ff92c3b070d98724a2ac167b7a914aa2151cf71eea3d192b0df195d0184aa92c73bccb27aded5f27fcd1cdcf65889f78cf2e62d2f630f659aa2fba220cba79e6dc2ea1205cb76833c9223cd912f056f3406d73d0d689602afe5e88abc668430def9eacd2b5064acf85d73fb0b351a1c8c20d7f3fa28f0caa757e81226e1ee86a9efdbe7991442286183797296ebaa4d292a2063b332926f56b14bec0c3e8e7dbf15fe43d20f4174fd4481088f8844f096001d2103d14016cbfa555574e8a5a8fbcb52677dfb7e9267e99c05ebe29603e41b3332779676161437dbd7758c07e4c69cad33eab72f0e30bc8b7283a85620d98475ef84c8baa3796ba7b979bcc9c935ce2d68c918755bf61f35bb83a31d3e02cc2f1069200000000000000000000000000000000000000000000000000000000000000000"
-        ), bincode::config::standard()).unwrap().0;
+        static ref REDEEMABLE_TICKET: RedeemableTicket = postcard::from_bytes(&hex!(
+            "bea83ba0fcee21da44a30c893f466e6bf0c29bbb0530783365387bffffffffffffff010000000000000000000000000000000000000000014038536c412ff92c3b070d98724a2ac167b7a914aa2151cf71eea3d192b0df195d0184aa92c73bccb27aded5f27fcd1cdcf65889f78cf2e62d2f630f659aa2fba220cba79e6dc2ea1205cb76833c9223cd912f056f3406d73d0d689602afe5e88abc668430def9eacd2b5064acf85d73fb0b351a1c8c20d7f3fa28f0caa757e81226e1ee86a9efdbe7991442286183797296ebaa4d292a2005a089ed04b7dbb28ad1c9074f13d10115b0002ca88f4d68ce14549099773c192103d14016cbfa555574e8a5a8fbcb52677dfb7e9267e99c05ebe29603e41b33327705ddecfc569b0125d1ae9a3d3cb637a3c8c9eaafe90e6a1877292227065fbdcc897e95962ce1604fb644782e9029a046650ed84c4f1043b753959d7819f53cec200000000000000000000000000000000000000000000000000000000000000000"
+        )).unwrap();
     }
 
     // Use this to generate the REDEEMABLE_TICKET variable above
+    // #[test]
     // fn gen_ticket() -> anyhow::Result<()> {
     // use hopr_crypto_types::crypto_traits::Randomizable;
     //
@@ -601,7 +680,7 @@ pub(crate) mod tests {
     // .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?)
     // .into_redeemable(&&ChainKeypair::from_secret(&PRIVATE_KEY_2)?, &Default::default())?;
     //
-    // assert_eq!("", hex::encode(bincode::serde::encode_to_vec(&ticket, bincode::config::standard())?));
+    // assert_eq!("", hex::encode(postcard::to_allocvec(&ticket)?));
     // Ok(())
     // }
 

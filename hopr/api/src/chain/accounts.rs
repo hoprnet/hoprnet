@@ -146,4 +146,11 @@ pub trait ChainReadAccountOperations {
     /// This is potentially done more effectively than counting more elements of
     /// the stream returned by [`ChainReadAccountOperations::stream_accounts`].
     async fn count_accounts(&self, selector: AccountSelector) -> Result<usize, Self::Error>;
+
+    /// Waits for the account with the key-binding on the `offchain_key` to appear on-chain or the `timeout` expires.
+    async fn await_key_binding(
+        &self,
+        offchain_key: &OffchainPublicKey,
+        timeout: std::time::Duration,
+    ) -> Result<AccountEntry, Self::Error>;
 }
