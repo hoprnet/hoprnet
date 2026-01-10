@@ -27,6 +27,7 @@ pub trait HoprChainApi:
     + ChainReadChannelOperations<Error = Self::ChainError>
     + ChainWriteChannelOperations<Error = Self::ChainError>
     + ChainReadSafeOperations<Error = Self::ChainError>
+    + ChainWriteSafeOperations<Error = Self::ChainError>
     + ChainEvents<Error = Self::ChainError>
     + ChainKeyOperations<Error = Self::ChainError>
     + ChainValues<Error = Self::ChainError>
@@ -42,6 +43,7 @@ where
         + ChainReadChannelOperations<Error = E>
         + ChainWriteChannelOperations<Error = E>
         + ChainReadSafeOperations<Error = E>
+        + ChainWriteSafeOperations<Error = E>
         + ChainEvents<Error = E>
         + ChainKeyOperations<Error = E>
         + ChainValues<Error = E>

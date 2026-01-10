@@ -1483,26 +1483,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "230c5f1ca6a325a32553f8640d31ac9b49f2411e901e427570154868b46da4f7"
 
 [[package]]
-name = "bincode"
-version = "2.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "36eaf5d7b090263e8150820482d5d93cd964a81e4019913c972f4edcc6edb740"
-dependencies = [
- "bincode_derive",
- "serde",
- "unty",
-]
-
-[[package]]
-name = "bincode_derive"
-version = "2.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf95709a440f45e986983918d0e8a1f30a9b1df04918fc828670606804ac3c09"
-dependencies = [
- "virtue",
-]
-
-[[package]]
 name = "bit-set"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1928,6 +1908,15 @@ name = "clru"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cbd0f76e066e64fdc5631e3bb46381254deab9ef1158292f27c8c57e3bf3fe59"
+
+[[package]]
+name = "cobs"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0fa961b519f0b462e3a3b4a34b64d119eeaca1d59af726fe450bbba07a9fc0a1"
+dependencies = [
+ "thiserror 2.0.17",
+]
 
 [[package]]
 name = "colorchoice"
@@ -2775,6 +2764,18 @@ dependencies = [
  "subtle",
  "zeroize",
 ]
+
+[[package]]
+name = "embedded-io"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef1a6892d9eef45c8fa6b9e0086428a2cca8491aca8f787c534a3d6d0bcb3ced"
+
+[[package]]
+name = "embedded-io"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "edd0f118536f44f5ccd48bcb8b111bdc3de888b58c74639dfb034a357d0f206d"
 
 [[package]]
 name = "encode_unicode"
@@ -4483,7 +4484,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "0.6.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4531,13 +4532,12 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.6.0"
+version = "0.9.0"
 dependencies = [
  "ahash",
  "anyhow",
  "async-broadcast",
  "async-trait",
- "bincode",
  "blokli-client",
  "dashmap",
  "futures",
@@ -4549,6 +4549,7 @@ dependencies = [
  "hopr-async-runtime",
  "hopr-chain-connector",
  "hopr-chain-types",
+ "hopr-crypto-random 0.3.0",
  "hopr-crypto-types 0.9.0",
  "hopr-internal-types",
  "hopr-primitive-types 0.10.0",
@@ -4557,6 +4558,7 @@ dependencies = [
  "moka",
  "parking_lot",
  "petgraph",
+ "postcard",
  "redb",
  "serde_json",
  "smart-default",
@@ -4569,11 +4571,10 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-types"
-version = "0.12.1"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "bincode",
  "hex",
  "hex-literal",
  "hopr-bindings",
@@ -4583,6 +4584,7 @@ dependencies = [
  "insta",
  "lazy_static",
  "multiaddr",
+ "postcard",
  "serde",
  "serde_json",
  "serde_with",
@@ -4663,7 +4665,6 @@ version = "0.11.0"
 dependencies = [
  "anyhow",
  "bimap",
- "bincode",
  "curve25519-dalek",
  "elliptic-curve",
  "generic-array 1.3.5",
@@ -4673,6 +4674,7 @@ dependencies = [
  "hopr-primitive-types 0.10.0",
  "k256",
  "parameterized",
+ "postcard",
  "serde",
  "serde_bytes",
  "subtle",
@@ -4841,7 +4843,6 @@ dependencies = [
  "aquamarine",
  "async-trait",
  "bimap",
- "bincode",
  "hex-literal",
  "hopr-crypto-random 0.3.0",
  "hopr-crypto-types 0.9.0",
@@ -4852,6 +4853,7 @@ dependencies = [
  "multiaddr",
  "num_enum",
  "parameterized",
+ "postcard",
  "serde",
  "serde_bytes",
  "smart-default",
@@ -4863,7 +4865,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-lib"
-version = "4.0.3"
+version = "4.0.4"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -7794,6 +7796,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "postcard"
+version = "1.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6764c3b5dd454e283a30e6dfe78e9b31096d9e32036b5d1eaac7a6119ccb9a24"
+dependencies = [
+ "cobs",
+ "embedded-io 0.4.0",
+ "embedded-io 0.6.1",
+ "serde",
+]
+
+[[package]]
 name = "potential_utf"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10643,12 +10657,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 
 [[package]]
-name = "unty"
-version = "0.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d49784317cd0d1ee7ec5c716dd598ec5b4483ea832a2dced265471cc0f690ae"
-
-[[package]]
 name = "url"
 version = "2.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10843,12 +10851,6 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
-
-[[package]]
-name = "virtue"
-version = "0.0.18"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "051eb1abcf10076295e815102942cc58f9d5e3b4560e46e53c21e8ff6f3af7b1"
 
 [[package]]
 name = "wait-timeout"

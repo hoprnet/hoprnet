@@ -43,7 +43,7 @@ hopr-parallelize = { workspace = true, optional = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-bincode = { workspace = true }
+postcard = { workspace = true }
 bimap = { workspace = true }
 mockall = { workspace = true }
 lazy_static = { workspace = true }

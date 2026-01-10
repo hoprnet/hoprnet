@@ -187,6 +187,9 @@ type NewTicketEvents = (
     async_broadcast::InactiveReceiver<VerifiedTicket>,
 );
 
+/// Time to wait until the node's keybinding appears on-chain
+const NODE_READY_TIMEOUT: Duration = Duration::from_secs(30);
+
 /// HOPR main object providing the entire HOPR node functionality
 ///
 /// Instantiating this object creates all processes and objects necessary for
@@ -498,6 +501,10 @@ where
             .filter(|a| !is_public_address(a))
             .for_each(|multi_addr| warn!(?multi_addr, "announcing private multiaddress"));
 
+        let chain_api = self.chain_api.clone();
+        let me_offchain = *self.me.public();
+        let node_ready = spawn(async move { chain_api.await_key_binding(&me_offchain, NODE_READY_TIMEOUT).await });
+
         // At this point the node is already registered with Safe, so
         // we can announce via Safe-compliant TX
         info!(?multiaddresses_to_announce, "announcing node on chain");
@@ -518,6 +525,20 @@ where
                 return Err(HoprLibError::chain(error));
             }
         }
+
+        // Wait for the node key-binding readiness to return
+        let this_node_account = node_ready
+            .await
+            .map_err(HoprLibError::other)?
+            .map_err(HoprLibError::chain)?;
+        if this_node_account.chain_addr != self.me_onchain()
+            || this_node_account.safe_address.is_none_or(|a| a != safe_addr)
+        {
+            error!(%this_node_account, "account bound to offchain key does not match this node");
+            return Err(HoprLibError::GeneralError("account key-binding mismatch".into()));
+        }
+
+        info!(%this_node_account, "node account is ready");
 
         let incoming_session_channel_capacity = std::env::var("HOPR_INTERNAL_SESSION_INCOMING_CAPACITY")
             .ok()
