@@ -73,6 +73,14 @@ impl ConnectorError {
             _ => None,
         }
     }
+
+    pub fn other(e: impl Into<anyhow::Error>) -> Self {
+        Self::OtherError(e.into())
+    }
+
+    pub fn io(e: impl Into<std::io::Error>) -> Self {
+        Self::IoError(e.into())
+    }
 }
 
 pub type Result<T> = std::result::Result<T, ConnectorError>;
