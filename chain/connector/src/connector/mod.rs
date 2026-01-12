@@ -224,7 +224,7 @@ where
             // Stream of Account events (Announcements)
             let graph_clone = graph.clone();
             let account_stream = account_stream
-                .inspect_ok(|entry| tracing::trace!(?entry, "new account entry"))
+                .inspect_ok(|entry| tracing::trace!(?entry, "new account event"))
                 .map_err(ConnectorError::from)
                 .try_filter_map(|account| futures::future::ready(model_to_account_entry(account).map(Some)))
                 .and_then(move |account| {
@@ -262,7 +262,7 @@ where
             // Stream of channel graph updates
             let channel_stream = channel_stream
                 .map_err(ConnectorError::from)
-                .inspect_ok(|entry| tracing::trace!(?entry, "new graph entry"))
+                .inspect_ok(|entry| tracing::trace!(?entry, "new graph event"))
                 .try_filter_map(|graph_event| futures::future::ready(model_to_graph_entry(graph_event).map(Some)))
                 .and_then(move |(src, dst, channel)| {
                     let graph = graph.clone();

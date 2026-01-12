@@ -117,7 +117,7 @@ pub trait PayloadGenerator {
         balance: HoprBalance,
         admins: &[Address],
         include_node: bool,
-        nonce: [u8; 64],
+        nonce: [u8; 32],
     ) -> Result<Self::TxRequest>;
 }
 
