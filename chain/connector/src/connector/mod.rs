@@ -472,9 +472,10 @@ where
     ///
     /// Most of the operations with the Connector will fail if it is not connected first.
     ///
-    /// There are some notable exceptions that do not require a prior call to `connect`:
+    /// There are some notable exceptions that DO NOT require a prior call to `connect`:
     /// - all the [`ChainValues`](hopr_api::chain::ChainValues) methods,
     /// - all the [`ChainReadSafeOperations`](hopr_api::chain::ChainReadSafeOperations) methods,
+    /// - all the [`ChainWriteSafeOperations`](hopr_api::chain::ChainWriteSafeOperations) methods,
     /// - [`me`](hopr_api::chain::ChainReadChannelOperations::me)
     ///
     /// If you wish to only call operations from the above Chain APIs, consider constructing
