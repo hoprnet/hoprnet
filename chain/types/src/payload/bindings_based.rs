@@ -304,7 +304,7 @@ impl PayloadGenerator for BasicPayloadGenerator {
         balance: HoprBalance,
         admins: &[Address],
         include_node: bool,
-        nonce: [u8; 64],
+        nonce: [u8; 32],
     ) -> crate::payload::Result<Self::TxRequest> {
         const DEFAULT_CAPABILITY_PERMISSIONS: &str = "010103030303030303030303";
         let nonce = U256::from_be_slice(&nonce);
@@ -572,7 +572,7 @@ impl PayloadGenerator for SafePayloadGenerator {
         _: HoprBalance,
         _: &[Address],
         _: bool,
-        _: [u8; 64],
+        _: [u8; 32],
     ) -> crate::payload::Result<Self::TxRequest> {
         Err(InvalidState("cannot deploy Safe from SafePayloadGenerator"))
     }
