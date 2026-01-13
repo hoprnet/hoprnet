@@ -65,7 +65,7 @@ where
                         {
                             Ok(tx_count) => {
                                 tracing::debug!(tx_count, "transaction count retrieved");
-                                tx_count.max(1)
+                                tx_count
                             }
                             Err(e) => return (Err(e), notifier),
                         };
