@@ -4525,11 +4525,12 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.9.1"
+version = "0.10.0"
 dependencies = [
  "ahash",
  "anyhow",
  "async-broadcast",
+ "async-lock",
  "async-trait",
  "blokli-client",
  "dashmap",
