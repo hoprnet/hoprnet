@@ -494,11 +494,6 @@ where
             .do_connect(self.cfg.connection_timeout.max(MIN_CONNECTION_TIMEOUT))
             .await?;
 
-        if let Err(error) = self.sequencer.start().await {
-            abort_handle.abort();
-            return Err(error);
-        }
-
         self.connection_handle = Some(abort_handle);
 
         tracing::info!(node = %self.chain_key.public().to_address(), "connected to chain as node");
