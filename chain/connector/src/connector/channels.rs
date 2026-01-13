@@ -1,5 +1,5 @@
 use blokli_client::api::{BlokliQueryClient, BlokliTransactionClient};
-use futures::{FutureExt, StreamExt, TryFutureExt, future::BoxFuture, stream::BoxStream};
+use futures::{FutureExt, StreamExt, future::BoxFuture, stream::BoxStream};
 use hopr_api::chain::{ChainReceipt, ChannelSelector};
 use hopr_chain_types::prelude::*;
 use hopr_crypto_types::prelude::Keypair;
@@ -137,18 +137,13 @@ where
         &'a self,
         dst: &'a Address,
         amount: HoprBalance,
-    ) -> Result<BoxFuture<'a, Result<(ChannelId, ChainReceipt), Self::Error>>, Self::Error> {
+    ) -> Result<BoxFuture<'a, Result<ChainReceipt, Self::Error>>, Self::Error> {
         self.check_connection_state()?;
 
-        let id = generate_channel_id(self.chain_key.public().as_ref(), dst);
         let tx_req = self.payload_generator.fund_channel(*dst, amount)?;
-        tracing::debug!(channel_id = %id, %dst, %amount, "opening channel");
+        tracing::debug!( %dst, %amount, "opening channel");
 
-        Ok(self
-            .send_tx(tx_req)
-            .await?
-            .and_then(move |tx_hash| futures::future::ok((id, tx_hash)))
-            .boxed())
+        Ok(self.send_tx(tx_req).await?.boxed())
     }
 
     async fn fund_channel<'a>(

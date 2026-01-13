@@ -76,12 +76,14 @@ pub mod prelude {
 
 use std::{
     convert::identity,
+    future::Future,
     num::NonZeroUsize,
     sync::{Arc, OnceLock, atomic::Ordering},
     time::Duration,
 };
 
-use futures::{FutureExt, SinkExt, Stream, StreamExt, TryFutureExt, channel::mpsc::channel};
+use futures::{FutureExt, SinkExt, Stream, StreamExt, TryFutureExt, channel::mpsc::channel, pin_mut};
+use futures_time::future::FutureExt as FuturesTimeFutureExt;
 use hopr_api::{
     chain::{AccountSelector, AnnouncementError, ChannelSelector, *},
     ct::TrafficGeneration,
@@ -189,6 +191,9 @@ type NewTicketEvents = (
 
 /// Time to wait until the node's keybinding appears on-chain
 const NODE_READY_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Timeout to wait until an on-chain event is received in response to a successful on-chain operation resolution.
+const ON_CHAIN_RESOLUTION_EVENT_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// HOPR main object providing the entire HOPR node functionality
 ///
@@ -1134,38 +1139,102 @@ where
             .await
     }
 
+    /// Spawns a one-shot awaiter that hooks up to the [`ChainEvent`] bus and either matching the given `predicate`
+    /// successfully or timing out after `timeout`.
+    fn spawn_wait_for_on_chain_event(
+        &self,
+        context: impl std::fmt::Display,
+        predicate: impl Fn(&ChainEvent) -> bool + Send + Sync + 'static,
+        timeout: Duration,
+    ) -> errors::Result<impl Future<Output = errors::Result<ChainEvent>>> {
+        let event_stream = self
+            .chain_api
+            .subscribe()
+            .map_err(HoprLibError::chain)?
+            .skip_while(move |event| futures::future::ready(!predicate(event)));
+
+        let ctx = context.to_string();
+        Ok(spawn(async move {
+            pin_mut!(event_stream);
+            event_stream
+                .next()
+                .timeout(futures_time::time::Duration::from(timeout))
+                .map_err(|_| HoprLibError::GeneralError(format!("{ctx} timed out after {timeout:?}")))
+                .await?
+                .ok_or(HoprLibError::GeneralError(format!(
+                    "failed to yield an on-chain event for {ctx}"
+                )))
+        })
+        .map_err(move |_| HoprLibError::GeneralError(format!("failed to spawn future for {context}")))
+        .and_then(futures::future::ready))
+    }
+
     pub async fn open_channel(&self, destination: &Address, amount: HoprBalance) -> errors::Result<OpenChannelResult> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        let (channel_id, tx_hash) = self
+        let channel_id = generate_channel_id(&self.me_onchain(), destination);
+
+        let event_awaiter = self.spawn_wait_for_on_chain_event(
+            format!("open channel to {destination}"),
+            move |event| matches!(event, ChainEvent::ChannelBalanceIncreased(c, a) if c.get_id() == &channel_id && a == &amount),
+            ON_CHAIN_RESOLUTION_EVENT_TIMEOUT
+        )?;
+
+        let tx_hash = self
             .chain_api
             .open_channel(destination, amount)
             .and_then(identity)
             .map_err(HoprLibError::chain)
             .await?;
 
+        let event = event_awaiter.await?;
+        debug!(%event, "open channel event received");
+
         Ok(OpenChannelResult { tx_hash, channel_id })
     }
 
-    pub async fn fund_channel(&self, channel_id: &prelude::Hash, amount: HoprBalance) -> errors::Result<prelude::Hash> {
+    pub async fn fund_channel(&self, channel_id: &ChannelId, amount: HoprBalance) -> errors::Result<Hash> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        self.chain_api
-            .fund_channel(channel_id, amount)
+        let channel_id = *channel_id;
+        let event_awaiter = self.spawn_wait_for_on_chain_event(
+            format!("fund channel {channel_id}"),
+            move |event| matches!(event, ChainEvent::ChannelBalanceIncreased(c, a) if c.get_id() == &channel_id && a == &amount),
+            ON_CHAIN_RESOLUTION_EVENT_TIMEOUT
+        )?;
+
+        let res = self
+            .chain_api
+            .fund_channel(&channel_id, amount)
             .and_then(identity)
             .map_err(HoprLibError::chain)
-            .await
+            .await?;
+
+        let event = event_awaiter.await?;
+        debug!(%event, "fund channel event received");
+
+        Ok(res)
     }
 
     pub async fn close_channel_by_id(&self, channel_id: &ChannelId) -> errors::Result<CloseChannelResult> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
+        let channel_id = *channel_id;
+        let event_awaiter = self.spawn_wait_for_on_chain_event(
+            format!("close channel {channel_id}"),
+            move |event| matches!(event, ChainEvent::ChannelClosed(c) if c.get_id() == &channel_id),
+            ON_CHAIN_RESOLUTION_EVENT_TIMEOUT,
+        )?;
+
         let tx_hash = self
             .chain_api
-            .close_channel(channel_id)
+            .close_channel(&channel_id)
             .and_then(identity)
             .map_err(HoprLibError::chain)
             .await?;
+
+        let event = event_awaiter.await?;
+        debug!(%event, "close channel event received");
 
         Ok(CloseChannelResult { tx_hash })
     }
@@ -1292,7 +1361,7 @@ impl<Chain, Db> Hopr<Chain, Db> {
     pub fn collect_hopr_metrics() -> errors::Result<String> {
         cfg_if::cfg_if! {
             if #[cfg(all(feature = "prometheus", not(test)))] {
-                hopr_metrics::gather_all_metrics().map_err(|e| HoprLibError::Other(e.into()))
+                hopr_metrics::gather_all_metrics().map_err(HoprLibError::other)
             } else {
                 Err(HoprLibError::GeneralError("BUILT WITHOUT METRICS SUPPORT".into()))
             }
