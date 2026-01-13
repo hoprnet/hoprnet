@@ -1176,8 +1176,8 @@ where
 
         let event_awaiter = self.spawn_wait_for_on_chain_event(
             format!("open channel to {destination}"),
-            move |event| matches!(event, ChainEvent::ChannelBalanceIncreased(c, a) if c.get_id() == &channel_id && a == &amount),
-            ON_CHAIN_RESOLUTION_EVENT_TIMEOUT
+            move |event| matches!(event, ChainEvent::ChannelOpened(c) if c.get_id() == &channel_id),
+            ON_CHAIN_RESOLUTION_EVENT_TIMEOUT,
         )?;
 
         let tx_hash = self
@@ -1222,7 +1222,10 @@ where
         let channel_id = *channel_id;
         let event_awaiter = self.spawn_wait_for_on_chain_event(
             format!("close channel {channel_id}"),
-            move |event| matches!(event, ChainEvent::ChannelClosed(c) if c.get_id() == &channel_id),
+            move |event| {
+                matches!(event, ChainEvent::ChannelClosed(c) if c.get_id() == &channel_id)
+                    || matches!(event, ChainEvent::ChannelClosureInitiated(c) if c.get_id() == &channel_id)
+            },
             ON_CHAIN_RESOLUTION_EVENT_TIMEOUT,
         )?;
 
