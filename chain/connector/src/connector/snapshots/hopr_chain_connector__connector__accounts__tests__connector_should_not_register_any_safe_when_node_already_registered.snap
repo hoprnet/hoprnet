@@ -21,8 +21,7 @@ deployed_safes:
     chain_key: bea83ba0fcee21da44a30c893f466e6bf0c29bbb
     module_address: "1111111111111111111111111111111111111111"
     registered_nodes: []
-tx_counts:
-  668430def9eacd2b5064acf85d73fb0b351a1c8c: 0
+tx_counts: {}
 channels: {}
 chain_info:
   channel_closure_grace_period: "300"

@@ -10,8 +10,7 @@ native_balances:
 token_balances: {}
 safe_allowances: {}
 deployed_safes: {}
-tx_counts:
-  668430def9eacd2b5064acf85d73fb0b351a1c8c: 0
+tx_counts: {}
 channels: {}
 chain_info:
   channel_closure_grace_period: "300"

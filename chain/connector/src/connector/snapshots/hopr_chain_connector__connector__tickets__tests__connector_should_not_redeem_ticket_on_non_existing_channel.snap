@@ -59,8 +59,7 @@ deployed_safes:
     chain_key: bea83ba0fcee21da44a30c893f466e6bf0c29bbb
     module_address: ff263744a4621e2cac0f4882cc623bee3c9aef8d
     registered_nodes: []
-tx_counts:
-  668430def9eacd2b5064acf85d73fb0b351a1c8c: 0
+tx_counts: {}
 channels:
   e555945b137ef926702c021fa24104e2268de40641e63b8b747019b09e100802:
     balance: 0.00000000000000001 wxHOPR
