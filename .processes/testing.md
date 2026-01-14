@@ -10,7 +10,6 @@ For the overall overview of individual testing phases, please refer to the
 - _Release Person (RP)_ = _CORE_ team member responsible for the build & releasing of the new release
 
 1. Meeting is scheduled by the RP for 1 hour max and consists of two Stages (30 mins each):
-
    - **Stage 1 (fixed form)**: always the same set of Basic Tests (see below)
 
    - **Stage 2 (free form)**: devoted to test various new features/bug-fixes of the release and should be defined before the meeting (by RP).
