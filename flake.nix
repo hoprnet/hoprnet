@@ -313,7 +313,7 @@
               dockerHoprdEntrypoint
               hoprd-x86_64-linux
               pkgs.cacert
-              curl # Required by docker-compose healthcheck
+              pkgs.curl # Required by docker-compose healthcheck
             ];
             Entrypoint = [ "/bin/docker-entrypoint.sh" ];
             Cmd = [ "hoprd" ];
@@ -325,7 +325,7 @@
               dockerHoprdEntrypoint
               hoprd-x86_64-linux-dev
               pkgs.cacert
-              curl # Required by docker-compose healthcheck
+              pkgs.curl # Required by docker-compose healthcheck
             ];
             Entrypoint = [ "/bin/docker-entrypoint.sh" ];
             Cmd = [ "hoprd" ];
@@ -337,7 +337,7 @@
               dockerHoprdEntrypoint
               hoprd-x86_64-linux-profile
               pkgs.cacert
-              curl # Required by docker-compose healthcheck
+              pkgs.curl # Required by docker-compose healthcheck
             ]
             ++ profileDeps;
             Entrypoint = [ "/bin/docker-entrypoint.sh" ];
