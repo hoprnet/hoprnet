@@ -140,7 +140,7 @@ pub trait ChainWriteChannelOperations {
         &'a self,
         dst: &'a Address,
         amount: HoprBalance,
-    ) -> Result<BoxFuture<'a, Result<(ChannelId, ChainReceipt), Self::Error>>, Self::Error>;
+    ) -> Result<BoxFuture<'a, Result<ChainReceipt, Self::Error>>, Self::Error>;
 
     /// Funds an existing channel.
     async fn fund_channel<'a>(
