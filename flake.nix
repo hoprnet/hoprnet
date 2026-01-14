@@ -130,10 +130,10 @@
           rust-builder-aarch64-darwin = builders.aarch64-darwin;
 
           # Nightly builder for docs and specific features
+          # Uses a pinned nightly version to avoid ICE bugs in latest nightly
           rust-builder-local-nightly = nixLib.mkRustBuilder {
             inherit localSystem;
-            rustToolchainFile = ./rust-toolchain.toml;
-            useRustNightly = true;
+            rustToolchainFile = ./rust-toolchain-nightly.toml;
           };
 
           hoprdBuildArgs = {
