@@ -40,48 +40,27 @@
     hopli.inputs.flake-root.follows = "flake-root";
   };
 
-  outputs =
-    {
-      self,
-      nixpkgs,
-      nixpkgs-unstable,
-      flake-utils,
-      flake-parts,
-      rust-overlay,
-      crane,
-      nix-lib,
-      foundry,
-      pre-commit,
-      ...
-    }@inputs:
+  outputs = { self, nixpkgs, nixpkgs-unstable, flake-utils, flake-parts
+    , rust-overlay, crane, nix-lib, foundry, pre-commit, ... }@inputs:
     flake-parts.lib.mkFlake { inherit inputs; } {
-      imports = [
-        inputs.treefmt-nix.flakeModule
-        inputs.flake-root.flakeModule
-      ];
-      perSystem =
-        {
-          config,
-          lib,
-          system,
-          ...
-        }:
+      imports =
+        [ inputs.treefmt-nix.flakeModule inputs.flake-root.flakeModule ];
+      perSystem = { config, lib, system, ... }:
         let
           rev = toString (self.shortRev or self.dirtyShortRev);
           fs = lib.fileset;
           localSystem = system;
-          overlays = [
-            (import rust-overlay)
-            foundry.overlay
-          ];
+          overlays = [ (import rust-overlay) foundry.overlay ];
           pkgs = import nixpkgs { inherit localSystem overlays; };
-          pkgs-unstable = import nixpkgs-unstable { inherit localSystem overlays; };
+          pkgs-unstable =
+            import nixpkgs-unstable { inherit localSystem overlays; };
           buildPlatform = pkgs.stdenv.buildPlatform;
 
           # Import nix-lib for shared Nix utilities
           nixLib = nix-lib.lib.${system};
 
-          craneLib = (crane.mkLib pkgs).overrideToolchain (p: p.rust-bin.stable.latest.default);
+          craneLib = (crane.mkLib pkgs).overrideToolchain
+            (p: p.rust-bin.stable.latest.default);
           hoprdCrateInfoOriginal = craneLib.crateNameFromCargoToml {
             cargoToml = ./hopr/hopr-lib/Cargo.toml;
           };
@@ -89,9 +68,9 @@
             pname = "hoprd";
             # normalize the version to not include any suffixes so the cache
             # does not get busted
-            version = pkgs.lib.strings.concatStringsSep "." (
-              pkgs.lib.lists.take 3 (builtins.splitVersion hoprdCrateInfoOriginal.version)
-            );
+            version = pkgs.lib.strings.concatStringsSep "."
+              (pkgs.lib.lists.take 3
+                (builtins.splitVersion hoprdCrateInfoOriginal.version));
           };
 
           # Use nix-lib's source filtering for better rebuild performance
@@ -102,9 +81,7 @@
           src = nixLib.mkSrc {
             root = ./.;
             inherit fs;
-            extraFiles = [
-              ./hoprd/hoprd/example_cfg.yaml
-            ];
+            extraFiles = [ ./hoprd/hoprd/example_cfg.yaml ];
           };
           testSrc = nixLib.mkTestSrc {
             root = ./.;
@@ -142,98 +119,97 @@
             cargoToml = ./hoprd/hoprd/Cargo.toml;
           };
 
-          hoprd = rust-builder-local.callPackage nixLib.mkRustPackage hoprdBuildArgs;
+          hoprd =
+            rust-builder-local.callPackage nixLib.mkRustPackage hoprdBuildArgs;
           # also used for Docker image
-          hoprd-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage hoprdBuildArgs;
+          hoprd-x86_64-linux =
+            rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage
+            hoprdBuildArgs;
           # also used for Docker image
-          hoprd-x86_64-linux-profile = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
-          );
+          hoprd-x86_64-linux-profile =
+            rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage
+            (hoprdBuildArgs // { cargoExtraArgs = "-F capture"; });
           # also used for Docker image
-          hoprd-x86_64-linux-dev = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs
-            // {
+          hoprd-x86_64-linux-dev =
+            rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage
+            (hoprdBuildArgs // {
               CARGO_PROFILE = "dev";
               cargoExtraArgs = "-F capture";
-            }
-          );
-          hoprd-aarch64-linux = rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage hoprdBuildArgs;
-          hoprd-aarch64-linux-profile = rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
-          );
+            });
+          hoprd-aarch64-linux =
+            rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage
+            hoprdBuildArgs;
+          hoprd-aarch64-linux-profile =
+            rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage
+            (hoprdBuildArgs // { cargoExtraArgs = "-F capture"; });
 
           # CAVEAT: must be built from a darwin system
-          hoprd-x86_64-darwin = rust-builder-x86_64-darwin.callPackage nixLib.mkRustPackage hoprdBuildArgs;
-          hoprd-x86_64-darwin-profile = rust-builder-x86_64-darwin.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
-          );
+          hoprd-x86_64-darwin =
+            rust-builder-x86_64-darwin.callPackage nixLib.mkRustPackage
+            hoprdBuildArgs;
+          hoprd-x86_64-darwin-profile =
+            rust-builder-x86_64-darwin.callPackage nixLib.mkRustPackage
+            (hoprdBuildArgs // { cargoExtraArgs = "-F capture"; });
           # CAVEAT: must be built from a darwin system
-          hoprd-aarch64-darwin = rust-builder-aarch64-darwin.callPackage nixLib.mkRustPackage hoprdBuildArgs;
-          hoprd-aarch64-darwin-profile = rust-builder-aarch64-darwin.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
-          );
+          hoprd-aarch64-darwin =
+            rust-builder-aarch64-darwin.callPackage nixLib.mkRustPackage
+            hoprdBuildArgs;
+          hoprd-aarch64-darwin-profile =
+            rust-builder-aarch64-darwin.callPackage nixLib.mkRustPackage
+            (hoprdBuildArgs // { cargoExtraArgs = "-F capture"; });
 
-          hopr-test-unit = rust-builder-local.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs
-            // {
+          hopr-test-unit = rust-builder-local.callPackage nixLib.mkRustPackage
+            (hoprdBuildArgs // {
               src = testSrc;
               runTests = true;
               cargoExtraArgs = "--lib";
-            }
-          );
+            });
 
-          hopr-test-nightly = rust-builder-local-nightly.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs
-            // {
+          hopr-test-nightly =
+            rust-builder-local-nightly.callPackage nixLib.mkRustPackage
+            (hoprdBuildArgs // {
               src = testSrc;
               runTests = true;
               cargoExtraArgs = "-Z panic-abort-tests --lib";
-            }
-          );
+            });
 
-          hoprd-clippy = rust-builder-local.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs // { runClippy = true; }
-          );
-          hoprd-dev = rust-builder-local.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs
-            // {
+          hoprd-clippy = rust-builder-local.callPackage nixLib.mkRustPackage
+            (hoprdBuildArgs // { runClippy = true; });
+          hoprd-dev = rust-builder-local.callPackage nixLib.mkRustPackage
+            (hoprdBuildArgs // {
               CARGO_PROFILE = "dev";
               cargoExtraArgs = "-F capture";
-            }
-          );
+            });
           # build candidate binary as static on Linux amd64 to get more test exposure specifically via smoke tests
-          mkHoprdCandidate =
-            cargoExtraArgs:
+          mkHoprdCandidate = cargoExtraArgs:
             if buildPlatform.isLinux && buildPlatform.isx86_64 then
-              rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage (
-                hoprdBuildArgs
-                // {
-                  inherit cargoExtraArgs;
-                  CARGO_PROFILE = "candidate";
-                }
-              )
+              rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage
+              (hoprdBuildArgs // {
+                inherit cargoExtraArgs;
+                CARGO_PROFILE = "candidate";
+              })
             else
-              rust-builder-local.callPackage nixLib.mkRustPackage (
-                hoprdBuildArgs
-                // {
-                  inherit cargoExtraArgs;
-                  CARGO_PROFILE = "candidate";
-                }
-              );
+              rust-builder-local.callPackage nixLib.mkRustPackage
+              (hoprdBuildArgs // {
+                inherit cargoExtraArgs;
+                CARGO_PROFILE = "candidate";
+              });
           # Use cross-compilation environment when possible to have the same setup as our production builds when benchmarking.
-          hoprd-bench =
-            if buildPlatform.isLinux && buildPlatform.isx86_64 then
-              rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage (hoprdBuildArgs // { runBench = true; })
-            else if buildPlatform.isLinux && buildPlatform.isAarch64 then
-              rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage (hoprdBuildArgs // { runBench = true; })
-            else if buildPlatform.isDarwin && buildPlatform.isx86_64 then
-              rust-builder-x86_64-darwin.callPackage nixLib.mkRustPackage (hoprdBuildArgs // { runBench = true; })
-            else if buildPlatform.isDarwin && buildPlatform.isAarch64 then
-              rust-builder-aarch64-darwin.callPackage nixLib.mkRustPackage (
-                hoprdBuildArgs // { runBench = true; }
-              )
-            else
-              rust-builder-local.callPackage nixLib.mkRustPackage (hoprdBuildArgs // { runBench = true; });
+          hoprd-bench = if buildPlatform.isLinux && buildPlatform.isx86_64 then
+            rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage
+            (hoprdBuildArgs // { runBench = true; })
+          else if buildPlatform.isLinux && buildPlatform.isAarch64 then
+            rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage
+            (hoprdBuildArgs // { runBench = true; })
+          else if buildPlatform.isDarwin && buildPlatform.isx86_64 then
+            rust-builder-x86_64-darwin.callPackage nixLib.mkRustPackage
+            (hoprdBuildArgs // { runBench = true; })
+          else if buildPlatform.isDarwin && buildPlatform.isAarch64 then
+            rust-builder-aarch64-darwin.callPackage nixLib.mkRustPackage
+            (hoprdBuildArgs // { runBench = true; })
+          else
+            rust-builder-local.callPackage nixLib.mkRustPackage
+            (hoprdBuildArgs // { runBench = true; });
 
           profileDeps = with pkgs; [
             gdb
@@ -254,47 +230,48 @@
             nethogs
           ];
 
-          dockerHoprdEntrypoint = pkgs.writeShellScriptBin "docker-entrypoint.sh" ''
-            set -euo pipefail
+          dockerHoprdEntrypoint =
+            pkgs.writeShellScriptBin "docker-entrypoint.sh" ''
+              set -euo pipefail
 
-            # ensure TLS clients can locate the CA bundle inside the container
-            ssl_cert_file="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
-            if [ -f "$ssl_cert_file" ]; then
-              export SSL_CERT_FILE="$ssl_cert_file"
-              export NIX_SSL_CERT_FILE="$ssl_cert_file"
-            fi
-
-            # ensure the temporary directory exists
-            mkdir -p $TMPDIR
-
-            # if the default listen host has not been set by the user,
-            # we will set it to the container's ip address
-            # defaulting to random port
-
-            listen_host="''${HOPRD_DEFAULT_SESSION_LISTEN_HOST:-}"
-            listen_host_preset_ip="''${listen_host%%:*}"
-            listen_host_preset_port="''${listen_host#*:}"
-
-            if [ -z "''${listen_host_preset_ip:-}" ]; then
-              listen_host_ip="$(hostname -i)"
-
-              if [ -z "''${listen_host_preset_port:-}" ]; then
-                listen_host="''${listen_host_ip}:0"
-              else
-                listen_host="''${listen_host_ip}:''${listen_host_preset_port}"
+              # ensure TLS clients can locate the CA bundle inside the container
+              ssl_cert_file="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+              if [ -f "$ssl_cert_file" ]; then
+                export SSL_CERT_FILE="$ssl_cert_file"
+                export NIX_SSL_CERT_FILE="$ssl_cert_file"
               fi
-            fi
 
-            export HOPRD_DEFAULT_SESSION_LISTEN_HOST="''${listen_host}"
+              # ensure the temporary directory exists
+              mkdir -p $TMPDIR
 
-            if [ -n "''${1:-}" ] && [ -f "/bin/''${1:-}" ] && [ -x "/bin/''${1:-}" ]; then
-              # allow execution of auxiliary commands
-              exec "$@"
-            else
-              # default to hoprd
-              exec /bin/hoprd "$@"
-            fi
-          '';
+              # if the default listen host has not been set by the user,
+              # we will set it to the container's ip address
+              # defaulting to random port
+
+              listen_host="''${HOPRD_DEFAULT_SESSION_LISTEN_HOST:-}"
+              listen_host_preset_ip="''${listen_host%%:*}"
+              listen_host_preset_port="''${listen_host#*:}"
+
+              if [ -z "''${listen_host_preset_ip:-}" ]; then
+                listen_host_ip="$(hostname -i)"
+
+                if [ -z "''${listen_host_preset_port:-}" ]; then
+                  listen_host="''${listen_host_ip}:0"
+                else
+                  listen_host="''${listen_host_ip}:''${listen_host_preset_port}"
+                fi
+              fi
+
+              export HOPRD_DEFAULT_SESSION_LISTEN_HOST="''${listen_host}"
+
+              if [ -n "''${1:-}" ] && [ -f "/bin/''${1:-}" ] && [ -x "/bin/''${1:-}" ]; then
+                # allow execution of auxiliary commands
+                exec "$@"
+              else
+                # default to hoprd
+                exec /bin/hoprd "$@"
+              fi
+            '';
 
           # Man pages using nix-lib
           hoprd-man = nixLib.mkManPage {
@@ -309,34 +286,25 @@
           # Docker images using nix-lib
           hoprd-docker = nixLib.mkDockerImage {
             name = "hoprd";
-            extraContents = [
-              dockerHoprdEntrypoint
-              hoprd-x86_64-linux
-              pkgs.cacert
-            ];
+            extraContents =
+              [ dockerHoprdEntrypoint hoprd-x86_64-linux pkgs.cacert ];
             Entrypoint = [ "/bin/docker-entrypoint.sh" ];
             Cmd = [ "hoprd" ];
             env = [ "TMPDIR=/app/.tmp" ];
           };
           hoprd-dev-docker = nixLib.mkDockerImage {
             name = "hoprd";
-            extraContents = [
-              dockerHoprdEntrypoint
-              hoprd-x86_64-linux-dev
-              pkgs.cacert
-            ];
+            extraContents =
+              [ dockerHoprdEntrypoint hoprd-x86_64-linux-dev pkgs.cacert ];
             Entrypoint = [ "/bin/docker-entrypoint.sh" ];
             Cmd = [ "hoprd" ];
             env = [ "TMPDIR=/app/.tmp" ];
           };
           hoprd-profile-docker = nixLib.mkDockerImage {
             name = "hoprd";
-            extraContents = [
-              dockerHoprdEntrypoint
-              hoprd-x86_64-linux-profile
-              pkgs.cacert
-            ]
-            ++ profileDeps;
+            extraContents =
+              [ dockerHoprdEntrypoint hoprd-x86_64-linux-profile pkgs.cacert ]
+              ++ profileDeps;
             Entrypoint = [ "/bin/docker-entrypoint.sh" ];
             Cmd = [ "hoprd" ];
             env = [ "TMPDIR=/app/.tmp" ];
@@ -363,8 +331,7 @@
           #   ];
           # };
 
-          dockerImageUploadScript =
-            image:
+          dockerImageUploadScript = image:
             pkgs.writeShellScriptBin "docker-image-upload" ''
               set -eu
               OCI_ARCHIVE="$(nix build --no-link --print-out-paths ${image})"
@@ -382,9 +349,8 @@
           hoprd-profile-docker-build-and-upload = flake-utils.lib.mkApp {
             drv = dockerImageUploadScript hoprd-profile-docker;
           };
-          docs = rust-builder-local-nightly.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs // { buildDocs = true; }
-          );
+          docs = rust-builder-local-nightly.callPackage nixLib.mkRustPackage
+            (hoprdBuildArgs // { buildDocs = true; });
           pre-commit-check = pre-commit.lib.${system}.run {
             src = ./.;
             hooks = {
@@ -407,9 +373,7 @@
               };
             };
             tools = pkgs;
-            excludes = [
-              ".gcloudignore"
-            ];
+            excludes = [ ".gcloudignore" ];
           };
 
           # Development shells using nix-lib
@@ -459,15 +423,12 @@
             shellName = "HOPR Testing";
             treefmtWrapper = config.treefmt.build.wrapper;
             treefmtPrograms = pkgs.lib.attrValues config.treefmt.build.programs;
-            extraPackages = with pkgs; [
-              uv
-              python313
-              foundry-bin
-            ];
+            extraPackages = with pkgs; [ uv python313 foundry-bin ];
             shellHook = ''
               uv sync --frozen
               unset SOURCE_DATE_EPOCH
-              ${pkgs.lib.optionalString pkgs.stdenv.isLinux "autoPatchelf ./.venv"}
+              ${pkgs.lib.optionalString pkgs.stdenv.isLinux
+              "autoPatchelf ./.venv"}
             '';
           };
 
@@ -486,7 +447,8 @@
             shellHook = ''
               uv sync --frozen
               unset SOURCE_DATE_EPOCH
-              ${pkgs.lib.optionalString pkgs.stdenv.isLinux "autoPatchelf ./.venv"}
+              ${pkgs.lib.optionalString pkgs.stdenv.isLinux
+              "autoPatchelf ./.venv"}
             '';
           };
 
@@ -505,7 +467,8 @@
             shellHook = ''
               ${pre-commit-check.shellHook}
             '';
-            rustToolchain = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default);
+            rustToolchain = pkgs.rust-bin.selectLatestNightlyWith
+              (toolchain: toolchain.default);
           };
           run-check = flake-utils.lib.mkApp {
             drv = pkgs.writeShellScriptBin "run-check" ''
@@ -523,10 +486,7 @@
           run-audit = flake-utils.lib.mkApp {
             drv = pkgs.writeShellApplication {
               name = "audit";
-              runtimeInputs = [
-                pkgs.cargo
-                pkgs-unstable.cargo-audit
-              ];
+              runtimeInputs = [ pkgs.cargo pkgs-unstable.cargo-audit ];
               text = ''
                 cargo audit
               '';
@@ -556,8 +516,7 @@
               mv labeler.yml.new .github/labeler.yml
             '';
           };
-        in
-        {
+        in {
           treefmt = {
             inherit (config.flake-root) projectRootFile;
 
@@ -593,10 +552,8 @@
             ];
 
             programs.yamlfmt.enable = true;
-            settings.formatter.yamlfmt.includes = [
-              ".github/labeler.yml"
-              ".github/workflows/*.yaml"
-            ];
+            settings.formatter.yamlfmt.includes =
+              [ ".github/labeler.yml" ".github/workflows/*.yaml" ];
             # trying setting from https://github.com/google/yamlfmt/blob/main/docs/config-file.md
             settings.formatter.yamlfmt.settings = {
               formatter.type = "basic";
@@ -607,14 +564,8 @@
             };
 
             programs.prettier.enable = true;
-            settings.formatter.prettier.includes = [
-              "*.md"
-              "*.json"
-            ];
-            settings.formatter.prettier.excludes = [
-              "*.yml"
-              "*.yaml"
-            ];
+            settings.formatter.prettier.includes = [ "*.md" "*.json" ];
+            settings.formatter.prettier.excludes = [ "*.yml" "*.yaml" ];
             programs.rustfmt.enable = true;
             # using the official Nixpkgs formatting
             # see https://github.com/NixOS/rfcs/blob/master/rfcs/0166-nix-formatting.md
@@ -623,13 +574,14 @@
             programs.ruff-format.enable = true;
 
             settings.formatter.rustfmt = {
-              command = "${pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default)}/bin/rustfmt";
+              command = "${
+                  pkgs.rust-bin.selectLatestNightlyWith
+                  (toolchain: toolchain.default)
+                }/bin/rustfmt";
             };
           };
 
-          checks = {
-            inherit hoprd-clippy;
-          };
+          checks = { inherit hoprd-clippy; };
 
           apps = {
             inherit hoprd-docker-build-and-upload;
@@ -641,20 +593,16 @@
           };
 
           packages = {
-            inherit
-              hoprd
-              hoprd-dev
-              hoprd-docker
-              hoprd-dev-docker
-              hoprd-profile-docker
-              ;
+            inherit hoprd hoprd-dev hoprd-docker hoprd-dev-docker
+              hoprd-profile-docker;
             inherit hopr-test-unit hopr-test-nightly;
             inherit docs;
             inherit pre-commit-check;
             inherit hoprd-bench;
             inherit hoprd-man;
             # binary packages
-            inherit hoprd-x86_64-linux hoprd-x86_64-linux-dev hoprd-x86_64-linux-profile;
+            inherit hoprd-x86_64-linux hoprd-x86_64-linux-dev
+              hoprd-x86_64-linux-profile;
             inherit hoprd-aarch64-linux hoprd-aarch64-linux-profile;
             # FIXME: Darwin cross-builds are currently broken.
             # Follow https://github.com/nixos/nixpkgs/pull/256590
@@ -673,11 +621,7 @@
           formatter = config.treefmt.build.wrapper;
         };
       # platforms which are supported as build environments
-      systems = [
-        "x86_64-linux"
-        "aarch64-linux"
-        "aarch64-darwin"
-        "x86_64-darwin"
-      ];
+      systems =
+        [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" "x86_64-darwin" ];
     };
 }
