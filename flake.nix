@@ -25,6 +25,7 @@
     nix-lib.inputs.flake-parts.follows = "flake-parts";
     nix-lib.inputs.rust-overlay.follows = "rust-overlay";
     nix-lib.inputs.treefmt-nix.follows = "treefmt-nix";
+    nix-lib.inputs.nixpkgs-unstable.follows = "nixpkgs-unstable";
     pre-commit.inputs.nixpkgs.follows = "nixpkgs";
     rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
     treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
@@ -38,6 +39,7 @@
     hopli.inputs.pre-commit.follows = "pre-commit";
     hopli.inputs.treefmt-nix.follows = "treefmt-nix";
     hopli.inputs.flake-root.follows = "flake-root";
+    hopli.inputs.nixpkgs-unstable.follows = "nixpkgs-unstable";
   };
 
   outputs = { self, nixpkgs, nixpkgs-unstable, flake-utils, flake-parts
