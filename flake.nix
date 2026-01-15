@@ -4,10 +4,10 @@
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
     flake-parts.url = "github:hercules-ci/flake-parts";
-    nixpkgs.url = "github:NixOS/nixpkgs/release-25.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/release-25.11";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/master";
     rust-overlay.url = "github:oxalica/rust-overlay/master";
-    crane.url = "github:ipetkov/crane/v0.21.0";
+    crane.url = "github:ipetkov/crane/v0.23.0";
     nix-lib.url = "github:hoprnet/nix-lib";
     # pin it to a version which we are compatible with
     foundry.url = "github:hoprnet/foundry.nix/tb/202505-add-xz";
@@ -107,10 +107,10 @@
           rust-builder-aarch64-darwin = builders.aarch64-darwin;
 
           # Nightly builder for docs and specific features
+          # Uses a pinned nightly version to avoid ICE bugs in latest nightly
           rust-builder-local-nightly = nixLib.mkRustBuilder {
             inherit localSystem;
-            rustToolchainFile = ./rust-toolchain.toml;
-            useRustNightly = true;
+            rustToolchainFile = ./rust-toolchain-nightly.toml;
           };
 
           hoprdBuildArgs = {
@@ -286,25 +286,37 @@
           # Docker images using nix-lib
           hoprd-docker = nixLib.mkDockerImage {
             name = "hoprd";
-            extraContents =
-              [ dockerHoprdEntrypoint hoprd-x86_64-linux pkgs.cacert ];
+            extraContents = [
+              dockerHoprdEntrypoint
+              hoprd-x86_64-linux
+              pkgs.cacert
+              pkgs.curl # Required by docker-compose healthcheck
+            ];
             Entrypoint = [ "/bin/docker-entrypoint.sh" ];
             Cmd = [ "hoprd" ];
             env = [ "TMPDIR=/app/.tmp" ];
           };
           hoprd-dev-docker = nixLib.mkDockerImage {
             name = "hoprd";
-            extraContents =
-              [ dockerHoprdEntrypoint hoprd-x86_64-linux-dev pkgs.cacert ];
+            extraContents = [
+              dockerHoprdEntrypoint
+              hoprd-x86_64-linux-dev
+              pkgs.cacert
+              pkgs.curl # Required by docker-compose healthcheck
+            ];
             Entrypoint = [ "/bin/docker-entrypoint.sh" ];
             Cmd = [ "hoprd" ];
             env = [ "TMPDIR=/app/.tmp" ];
           };
           hoprd-profile-docker = nixLib.mkDockerImage {
             name = "hoprd";
-            extraContents =
-              [ dockerHoprdEntrypoint hoprd-x86_64-linux-profile pkgs.cacert ]
-              ++ profileDeps;
+            extraContents = [
+              dockerHoprdEntrypoint
+              hoprd-x86_64-linux-profile
+              pkgs.cacert
+              pkgs.curl # Required by docker-compose healthcheck
+            ]
+            ++ profileDeps;
             Entrypoint = [ "/bin/docker-entrypoint.sh" ];
             Cmd = [ "hoprd" ];
             env = [ "TMPDIR=/app/.tmp" ];

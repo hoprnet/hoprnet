@@ -147,7 +147,8 @@ where
             .take(1)
             .try_collect::<Vec<_>>()
             .timeout(futures_time::time::Duration::from(timeout.max(Duration::from_secs(1))))
-            .await??;
+            .await
+            .map_err(|_| ConnectorError::other(anyhow::anyhow!("timeout while waiting for safe deployment")))??;
 
         res.into_iter()
             .next()

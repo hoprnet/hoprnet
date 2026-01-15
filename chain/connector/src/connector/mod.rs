@@ -224,7 +224,7 @@ where
             // Stream of Account events (Announcements)
             let graph_clone = graph.clone();
             let account_stream = account_stream
-                .inspect_ok(|entry| tracing::trace!(?entry, "new account entry"))
+                .inspect_ok(|entry| tracing::trace!(?entry, "new account event"))
                 .map_err(ConnectorError::from)
                 .try_filter_map(|account| futures::future::ready(model_to_account_entry(account).map(Some)))
                 .and_then(move |account| {
@@ -262,7 +262,7 @@ where
             // Stream of channel graph updates
             let channel_stream = channel_stream
                 .map_err(ConnectorError::from)
-                .inspect_ok(|entry| tracing::trace!(?entry, "new graph entry"))
+                .inspect_ok(|entry| tracing::trace!(?entry, "new graph event"))
                 .try_filter_map(|graph_event| futures::future::ready(model_to_graph_entry(graph_event).map(Some)))
                 .and_then(move |(src, dst, channel)| {
                     let graph = graph.clone();
@@ -472,9 +472,10 @@ where
     ///
     /// Most of the operations with the Connector will fail if it is not connected first.
     ///
-    /// There are some notable exceptions that do not require a prior call to `connect`:
+    /// There are some notable exceptions that DO NOT require a prior call to `connect`:
     /// - all the [`ChainValues`](hopr_api::chain::ChainValues) methods,
     /// - all the [`ChainReadSafeOperations`](hopr_api::chain::ChainReadSafeOperations) methods,
+    /// - all the [`ChainWriteSafeOperations`](hopr_api::chain::ChainWriteSafeOperations) methods,
     /// - [`me`](hopr_api::chain::ChainReadChannelOperations::me)
     ///
     /// If you wish to only call operations from the above Chain APIs, consider constructing
@@ -492,11 +493,6 @@ where
         let abort_handle = self
             .do_connect(self.cfg.connection_timeout.max(MIN_CONNECTION_TIMEOUT))
             .await?;
-
-        if let Err(error) = self.sequencer.start().await {
-            abort_handle.abort();
-            return Err(error);
-        }
 
         self.connection_handle = Some(abort_handle);
 

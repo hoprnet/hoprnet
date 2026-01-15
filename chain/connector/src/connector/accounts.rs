@@ -95,7 +95,8 @@ where
             .timeout(futures_time::time::Duration::from(
                 timeout.max(std::time::Duration::from_secs(1)),
             ))
-            .await??
+            .await
+            .map_err(|_| ConnectorError::other(anyhow::anyhow!("timeout while waiting for key binding")))??
         {
             model_to_account_entry(node)
         } else {

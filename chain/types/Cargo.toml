@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-types"
-version = "0.13.0"
+version = "0.14.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Core-Ethereum-specific interaction with the backend database"
