@@ -192,7 +192,7 @@
         "nixpkgs": [
           "nixpkgs"
         ],
-        "nixpkgs-unstable": "nixpkgs-unstable",
+        "nixpkgs-unstable": "nixpkgs-unstable_2",
         "rust-overlay": [
           "rust-overlay"
         ],
