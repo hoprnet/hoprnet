@@ -11,6 +11,7 @@ pub(crate) mod utils;
 pub use backend::InMemoryBackend;
 pub use backend::{Backend, TempDbBackend};
 pub use connector::{BlockchainConnectorConfig, HoprBlockchainConnector};
+pub use hopr_api::chain as api;
 pub use hopr_chain_types::payload::{BasicPayloadGenerator, SafePayloadGenerator};
 pub use reader::HoprBlockchainReader;
 
@@ -18,15 +19,13 @@ pub use reader::HoprBlockchainReader;
 pub mod blokli_client {
     pub use blokli_client::{
         BlokliClient, BlokliClientConfig,
-        api::{BlokliQueryClient, BlokliSubscriptionClient, BlokliTransactionClient},
+        api::{BlokliQueryClient, BlokliSubscriptionClient, BlokliTransactionClient, types},
     };
 }
 
 #[doc(hidden)]
 pub mod reexports {
     pub use hopr_chain_types;
-    /// Export of relevant types for easier integration.
-    pub use hopr_chain_types::exports::alloy;
 }
 
 pub use hopr_chain_types::prelude::{ContractAddresses, PayloadGenerator};

@@ -3,6 +3,7 @@
 resolver = "2"
 
 members = [
+  "chain/connector",
   "chain/types",
   "common/async-runtime",
   "common/internal-types",
@@ -36,7 +37,6 @@ members = [
   "transport/session",
   "db/entity",
   "db/migration",
-  "chain/connector",
   "db/node",
   "utils/session",
   # implementations
