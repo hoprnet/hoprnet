@@ -462,7 +462,7 @@
             treefmtPrograms = pkgs.lib.attrValues config.treefmt.build.programs;
             extraPackages = with pkgs; [
               uv
-              python313
+              python314
               foundry-bin
             ];
             shellHook = ''
@@ -479,7 +479,7 @@
             treefmtPrograms = pkgs.lib.attrValues config.treefmt.build.programs;
             extraPackages = with pkgs; [
               uv
-              python313
+              python314
               foundry-bin
               (mkHoprdCandidate "")
               hopli.hopli
