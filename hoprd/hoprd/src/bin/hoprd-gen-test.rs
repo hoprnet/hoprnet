@@ -191,7 +191,7 @@ async fn main() -> anyhow::Result<()> {
             },
             db: Db {
                 data: home_path
-                    .join("db")
+                    .join(format!("db_{id}"))
                     .to_str()
                     .ok_or(anyhow::anyhow!("Invalid path"))?
                     .to_owned(),
