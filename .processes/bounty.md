@@ -23,7 +23,6 @@ A bounty usually serves multiple purposes.
 4. The bounty admin assignes the dedicated bounty label to the issue.
 
 5. The bounty admin makes a comment in the GitHub issue (tagging the program owner) with an estimate of:
-
    - The time required to complete the bounty (in hours).
    - A guestimate of the bounty reward (in USD) based on a rate of ~50 USD per hour.
 
@@ -49,7 +48,6 @@ A bounty usually serves multiple purposes.
 3. Program owner publishes the bounty via [Gitcoin](https://gitcoin.co/)
 
 4. Program owner reviews bounty applications and selects a bounty hunter.
-
    - program owner might consult with the bounty admin (optinally: bounty expert) before making a decision.
 
 5. Program owner establishes a communication channel with the bounty hunter (Discord, Telegram, GitHub, etc..)
@@ -82,15 +80,12 @@ Bounty rewards are set in US Dollar. However, the program owner pays out the bou
 ## Recommendation to program owner
 
 1. Bounty hunter submits a satisfactory solution that fullfills all deliverables outlined in the github issue within the specified deadlines (if any)
-
    - Pay out the promised bounty reward
 
 2. Bounty hunter submits a solution of extraordinary quality exceeding the expectations outlined in the github issue
-
    - Pay out the promised bounty reward and tip the bounty hunter.
 
 3. Bounty hunter submits a dis-satisfactory solution but it technically fullfills the deliverables outlined in the github issue.
-
    - Ask the bounty hunter to implement changes where the changes need to be specified by the bounty admin (optinally: bounty expert)
    - In case the bounty hunter refuses to implement the changes: Pay out the promised bounty reward.
    - Program owner and bounty admin schedule a **_what went wrong_** assessment of the github issue to minimize the probability that this happens again in the future.

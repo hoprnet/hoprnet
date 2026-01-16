@@ -224,9 +224,18 @@ impl ChannelGuard {
             let hopr = hopr.clone();
             let channel_id = channel_id.clone();
             async move {
-                hopr.close_channel_by_id(&channel_id)
-                    .await
-                    .context("closing channel must succeed")
+                if hopr
+                    .channel_from_hash(&channel_id)
+                    .await?
+                    .is_some_and(|c| matches!(c.status, ChannelStatus::Open))
+                {
+                    hopr.close_channel_by_id(&channel_id)
+                        .await
+                        .map(|_| ())
+                        .context("channel closure initiation must succeed")
+                } else {
+                    Ok(())
+                }
             }
         });
 
@@ -238,9 +247,18 @@ impl ChannelGuard {
             let hopr = hopr.clone();
             let channel_id = channel_id.clone();
             async move {
-                hopr.close_channel_by_id(&channel_id)
-                    .await
-                    .context("closing channel must succeed")
+                if hopr
+                    .channel_from_hash(&channel_id)
+                    .await?
+                    .is_some_and(|c| matches!(c.status, ChannelStatus::PendingToClose(_)))
+                {
+                    hopr.close_channel_by_id(&channel_id)
+                        .await
+                        .map(|_| ())
+                        .context("closing channel must succeed")
+                } else {
+                    Ok(())
+                }
             }
         });
 
