@@ -383,7 +383,6 @@ mod tests {
 
     pub fn example_cfg() -> anyhow::Result<HoprdConfig> {
         let safe_module = hopr_lib::config::SafeModule {
-            safe_transaction_service_provider: "https:://provider.com/".to_owned(),
             safe_address: Address::from_str("0x0000000000000000000000000000000000000000")?,
             module_address: Address::from_str("0x0000000000000000000000000000000000000000")?,
         };
