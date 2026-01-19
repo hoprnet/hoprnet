@@ -18,7 +18,7 @@ tests = { workspace = true }
 members = ["sdk/python/localcluster", "sdk/python/api", "tests"]
 
 [dependency-groups]
-dev = ["ruff>=0.14.11", "tests"]
+dev = ["ruff>=0.14.13", "tests"]
 lint = ["black==26.1.0"]
 
 [tool.black]
