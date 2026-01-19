@@ -118,9 +118,6 @@ hopr:
 
   # Configuration of node's Safe
   safe_module:
-    # Node's safe transaction provider
-    # Such as https://safe-transaction.prod.hoprtech.net/
-    safe_transaction_service_provider: https:://provider.com/
     # Node's safe address, this must be provided by the user
     safe_address: "0x0000000000000000000000000000000000000000"
     # Node's safe module address, this must be provided by the user

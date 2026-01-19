@@ -4402,7 +4402,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.11.0"
+version = "0.12.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4466,7 +4466,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-keypair"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "hex",
@@ -5308,6 +5308,7 @@ dependencies = [
  "clap",
  "console-subscriber",
  "futures",
+ "hex",
  "home",
  "hopr-chain-connector",
  "hopr-ct-telemetry",
