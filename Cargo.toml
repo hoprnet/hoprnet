@@ -177,7 +177,7 @@ strum = { version = "0.27.2", features = ["derive"] }
 subtle = "2.6.1"
 tempfile = "3.24.0"
 test-log = { version = "0.2.19", features = ["trace"] }
-thiserror = "2.0.17"
+thiserror = "2.0.18"
 tikv-jemallocator = "0.6.1"
 tikv-jemalloc-ctl = { version = "0.6.1", features = ["stats"] }
 tokio = { version = "1.49.0", features = [
