@@ -195,6 +195,11 @@ async fn init_rest_api(
 
 #[cfg(feature = "runtime-tokio")]
 fn main() -> ExitCode {
+    if let Err(error) = init_logger() {
+        tracing::error!(%error, "failed to initialize the logger");
+        return ExitCode::FAILURE;
+    }
+
     let num_cpu_threads = std::env::var("HOPRD_NUM_CPU_THREADS").ok().and_then(|v| {
         usize::from_str(&v)
             .map_err(anyhow::Error::from)
@@ -225,8 +230,6 @@ fn main() -> ExitCode {
 
 #[cfg(feature = "runtime-tokio")]
 async fn main_inner() -> anyhow::Result<()> {
-    init_logger()?;
-
     #[cfg(all(target_os = "linux", feature = "allocator-jemalloc-stats"))]
     let _jemalloc_stats = jemalloc_stats::JemallocStats::start().await;
 
