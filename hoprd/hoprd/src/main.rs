@@ -1,6 +1,5 @@
-use std::{num::NonZeroUsize, str::FromStr, sync::Arc};
+use std::{num::NonZeroUsize, process::ExitCode, str::FromStr, sync::Arc};
 
-use anyhow::Context;
 use async_signal::{Signal, Signals};
 use futures::{FutureExt, StreamExt, future::abortable};
 use hopr_chain_connector::{
@@ -195,7 +194,7 @@ async fn init_rest_api(
 }
 
 #[cfg(feature = "runtime-tokio")]
-fn main() -> anyhow::Result<()> {
+fn main() -> ExitCode {
     let num_cpu_threads = std::env::var("HOPRD_NUM_CPU_THREADS").ok().and_then(|v| {
         usize::from_str(&v)
             .map_err(anyhow::Error::from)
@@ -212,9 +211,16 @@ fn main() -> anyhow::Result<()> {
             .ok()
     });
 
-    hopr_lib::prepare_tokio_runtime(num_cpu_threads, num_io_threads)?
-        .block_on(main_inner())
-        .context("hoprd exited with an error")
+    hopr_lib::prepare_tokio_runtime(num_cpu_threads, num_io_threads)
+        .and_then(|runtime| runtime.block_on(main_inner()))
+        .map(|_| {
+            info!("hoprd exited successfully");
+            ExitCode::SUCCESS
+        })
+        .unwrap_or_else(|error| {
+            tracing::error!(%error, backtrace = ?error.backtrace(), "hoprd exited with an error");
+            ExitCode::FAILURE
+        })
 }
 
 #[cfg(feature = "runtime-tokio")]
