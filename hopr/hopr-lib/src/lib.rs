@@ -193,7 +193,8 @@ type NewTicketEvents = (
 const NODE_READY_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Timeout to wait until an on-chain event is received in response to a successful on-chain operation resolution.
-const ON_CHAIN_RESOLUTION_EVENT_TIMEOUT: Duration = Duration::from_secs(30);
+// TODO: use the value from ChainInfo instead (once available via https://github.com/hoprnet/blokli/issues/200)
+const ON_CHAIN_RESOLUTION_EVENT_TIMEOUT: Duration = Duration::from_secs(90);
 
 /// HOPR main object providing the entire HOPR node functionality
 ///
@@ -1147,6 +1148,7 @@ where
         predicate: impl Fn(&ChainEvent) -> bool + Send + Sync + 'static,
         timeout: Duration,
     ) -> errors::Result<impl Future<Output = errors::Result<ChainEvent>>> {
+        debug!(%context, "registering wait for on-chain event");
         let event_stream = self
             .chain_api
             .subscribe()
@@ -1156,14 +1158,16 @@ where
         let ctx = context.to_string();
         Ok(spawn(async move {
             pin_mut!(event_stream);
-            event_stream
+            let res = event_stream
                 .next()
                 .timeout(futures_time::time::Duration::from(timeout))
                 .map_err(|_| HoprLibError::GeneralError(format!("{ctx} timed out after {timeout:?}")))
                 .await?
                 .ok_or(HoprLibError::GeneralError(format!(
                     "failed to yield an on-chain event for {ctx}"
-                )))
+                )));
+            debug!(%ctx, ?res, "on-chain event waiting done");
+            res
         })
         .map_err(move |_| HoprLibError::GeneralError(format!("failed to spawn future for {context}")))
         .and_then(futures::future::ready))
@@ -1175,7 +1179,7 @@ where
         let channel_id = generate_channel_id(&self.me_onchain(), destination);
 
         let event_awaiter = self.spawn_wait_for_on_chain_event(
-            format!("open channel to {destination}"),
+            format!("open channel to {destination} ({channel_id})"),
             move |event| matches!(event, ChainEvent::ChannelOpened(c) if c.get_id() == &channel_id),
             ON_CHAIN_RESOLUTION_EVENT_TIMEOUT,
         )?;
