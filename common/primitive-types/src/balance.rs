@@ -16,7 +16,7 @@ use crate::{
 };
 
 /// Represents a general currency - like a token or a coin.
-pub trait Currency: Display + FromStr<Err = GeneralError> + Default + PartialEq + Eq {
+pub trait Currency: Display + FromStr<Err = GeneralError> + Default + PartialEq + Eq + PartialOrd + Ord {
     /// Name of the currency.
     const NAME: &'static str;
 

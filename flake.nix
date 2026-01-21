@@ -25,6 +25,7 @@
     nix-lib.inputs.flake-parts.follows = "flake-parts";
     nix-lib.inputs.rust-overlay.follows = "rust-overlay";
     nix-lib.inputs.treefmt-nix.follows = "treefmt-nix";
+    nix-lib.inputs.nixpkgs-unstable.follows = "nixpkgs-unstable";
     pre-commit.inputs.nixpkgs.follows = "nixpkgs";
     rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
     treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
@@ -38,6 +39,7 @@
     hopli.inputs.pre-commit.follows = "pre-commit";
     hopli.inputs.treefmt-nix.follows = "treefmt-nix";
     hopli.inputs.flake-root.follows = "flake-root";
+    hopli.inputs.nixpkgs-unstable.follows = "nixpkgs-unstable";
   };
 
   outputs =
@@ -102,9 +104,7 @@
           src = nixLib.mkSrc {
             root = ./.;
             inherit fs;
-            extraFiles = [
-              ./hoprd/hoprd/example_cfg.yaml
-            ];
+            extraFiles = [ ./hoprd/hoprd/example_cfg.yaml ];
           };
           testSrc = nixLib.mkTestSrc {
             root = ./.;
@@ -410,9 +410,7 @@
               };
             };
             tools = pkgs;
-            excludes = [
-              ".gcloudignore"
-            ];
+            excludes = [ ".gcloudignore" ];
           };
 
           # Development shells using nix-lib
@@ -464,7 +462,7 @@
             treefmtPrograms = pkgs.lib.attrValues config.treefmt.build.programs;
             extraPackages = with pkgs; [
               uv
-              python313
+              python314
               foundry-bin
             ];
             shellHook = ''
@@ -481,7 +479,7 @@
             treefmtPrograms = pkgs.lib.attrValues config.treefmt.build.programs;
             extraPackages = with pkgs; [
               uv
-              python313
+              python314
               foundry-bin
               (mkHoprdCandidate "")
               hopli.hopli
@@ -630,9 +628,7 @@
             };
           };
 
-          checks = {
-            inherit hoprd-clippy;
-          };
+          checks = { inherit hoprd-clippy; };
 
           apps = {
             inherit hoprd-docker-build-and-upload;
@@ -657,7 +653,11 @@
             inherit hoprd-bench;
             inherit hoprd-man;
             # binary packages
-            inherit hoprd-x86_64-linux hoprd-x86_64-linux-dev hoprd-x86_64-linux-profile;
+            inherit
+              hoprd-x86_64-linux
+              hoprd-x86_64-linux-dev
+              hoprd-x86_64-linux-profile
+              ;
             inherit hoprd-aarch64-linux hoprd-aarch64-linux-profile;
             # FIXME: Darwin cross-builds are currently broken.
             # Follow https://github.com/nixos/nixpkgs/pull/256590

@@ -64,6 +64,7 @@ pub enum IdentityRetrievalModes<'a> {
     },
 }
 
+#[derive(Clone)]
 pub struct HoprKeys {
     pub packet_key: OffchainKeypair,
     pub chain_key: ChainKeypair,

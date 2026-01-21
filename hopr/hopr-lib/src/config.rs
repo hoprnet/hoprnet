@@ -5,18 +5,12 @@ pub use hopr_transport::config::{
 };
 use validator::{Validate, ValidationError};
 
-pub const DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER: &str = "https://safe-transaction.prod.hoprtech.net/";
 pub const DEFAULT_HOST: &str = "0.0.0.0";
 pub const DEFAULT_PORT: u16 = 9091;
 
 #[inline]
 fn default_invalid_address() -> Address {
     Address::default()
-}
-
-#[inline]
-fn default_safe_transaction_service_provider() -> String {
-    DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER.to_owned()
 }
 
 #[cfg_attr(feature = "serde", cfg_eval::cfg_eval, serde_with::serde_as)]
@@ -27,10 +21,6 @@ fn default_safe_transaction_service_provider() -> String {
     serde(deny_unknown_fields)
 )]
 pub struct SafeModule {
-    #[validate(url)]
-    #[cfg_attr(feature = "serde", serde(default = "default_safe_transaction_service_provider"))]
-    #[default(default_safe_transaction_service_provider())]
-    pub safe_transaction_service_provider: String,
     #[cfg_attr(
         feature = "serde",
         serde_as(as = "serde_with::DisplayFromStr"),
