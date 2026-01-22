@@ -31,17 +31,13 @@ where
         let client_clone = client.clone();
         let (sender, receiver) = futures::channel::mpsc::channel::<TxRequest<R>>(TX_QUEUE_CAPACITY);
         let chain_info_cache = std::sync::Arc::new(async_lock::OnceCell::new());
-        let current_nonce = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
-        let current_nonce_clone = current_nonce.clone();
         hopr_async_runtime::prelude::spawn(
             receiver
                 .then(move |(tx, notifier): (R, _)| {
                     let client = client_clone.clone();
                     let signer = signer.clone();
                     let chain_info_cache = chain_info_cache.clone();
-                    let current_nonce = current_nonce.clone();
                     async move {
-                        // The chain ID is fetched only once and cached for the lifetime of the sequencer.
                         let chain_id = match chain_info_cache
                             .get_or_try_init(|| {
                                 client
@@ -62,23 +58,18 @@ where
                         let gas_estimation = GasEstimation::default();
                         tracing::debug!(?gas_estimation, "gas estimation used for tx");
 
-                        // We always query the transaction count for the signer and use
-                        // the maximum between this value and the local counter
-                        match client
+                        let nonce = match client
                             .query_transaction_count(&signer.public().to_address().into())
                             .map_err(ConnectorError::from)
                             .await
                         {
                             Ok(tx_count) => {
-                                let prev_nonce =
-                                    current_nonce.fetch_max(tx_count, std::sync::atomic::Ordering::Relaxed);
-                                tracing::debug!(prev_nonce, tx_count, "transaction count retrieved");
+                                tracing::debug!(tx_count, "transaction count retrieved");
+                                tx_count
                             }
                             Err(e) => return (Err(e), notifier),
-                        }
+                        };
 
-                        let nonce = current_nonce.load(std::sync::atomic::Ordering::Relaxed);
-                        tracing::debug!(nonce, "nonce used for the tx");
                         tx.sign_and_encode_to_eip2718(nonce, chain_id, gas_estimation.into(), &signer)
                             .map_err(ConnectorError::from)
                             .and_then(move |tx| {
@@ -96,19 +87,6 @@ where
                     }
                 })
                 .for_each(move |(res, notifier)| {
-                    // The nonce is incremented when the transaction succeeded or failed due to on-chain
-                    // rejection.
-                    if res.is_ok()
-                        || res
-                            .as_ref()
-                            .is_err_and(|error| error.as_transaction_rejection_error().is_some())
-                    {
-                        let prev_nonce = current_nonce_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                        tracing::debug!(prev_nonce, ?res, "nonce incremented due to tx success or rejection");
-                    } else {
-                        tracing::warn!(?res, "nonce not incremented due to tx failure other than rejection");
-                    }
-
                     if notifier.send(res).is_err() {
                         tracing::debug!(
                             "failed to notify transaction result - the caller may not want to await the result \
