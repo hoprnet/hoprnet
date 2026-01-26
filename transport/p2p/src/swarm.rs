@@ -309,7 +309,7 @@ impl HoprLibp2pNetworkBuilder {
                         local_addr,
                         send_back_addr,
                     } => {
-                        trace!(%local_addr, %send_back_addr, %connection_id, transport="libp2p",  "incoming connection");
+                        trace!(%local_addr, %send_back_addr, %connection_id, transport="libp2p", "incoming connection");
                     }
                     SwarmEvent::IncomingConnectionError {
                         local_addr,
