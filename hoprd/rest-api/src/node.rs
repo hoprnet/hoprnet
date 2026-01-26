@@ -288,6 +288,7 @@ pub(super) async fn peers(
             "/ip4/10.0.2.100/tcp/19092"
         ],
         "providerUrl": "https://staging.blokli.hoprnet.link",
+        "hoprNetworkName": "rotsee",
         "channelClosurePeriod": 15,
         "connectivityStatus": "Green",
         "hoprNodeSafe": "0x42bc901b1d040f984ed626eff550718498a6798a",
@@ -307,6 +308,8 @@ pub(crate) struct NodeInfoResponse {
     listening_address: Vec<Multiaddr>,
     #[schema(value_type = String, example = "https://staging.blokli.hoprnet.link")]
     provider_url: String,
+    #[schema(value_type = String, example = "rotsee")]
+    hopr_network_name: String,
     #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String, example = "0x42bc901b1d040f984ed626eff550718498a6798a")]
     hopr_node_safe: Address,
@@ -344,12 +347,13 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
         .and_then(|cfg| cfg.get("blokli_url"))
         .and_then(|v| v.as_str());
 
-    match hopr.get_channel_closure_notice_period().await {
-        Ok(channel_closure_notice_period) => {
+    match futures::try_join!(hopr.chain_info(), hopr.get_channel_closure_notice_period()) {
+        Ok((info, channel_closure_notice_period)) => {
             let body = NodeInfoResponse {
                 announced_address: hopr.local_multiaddresses(),
                 listening_address: hopr.local_multiaddresses(),
                 provider_url: provider_url.unwrap_or("n/a").to_owned(),
+                hopr_network_name: info.hopr_network_name,
                 hopr_node_safe: safe_config.safe_address,
                 connectivity_status: hopr.network_health().await,
                 channel_closure_period: channel_closure_notice_period.as_secs(),
