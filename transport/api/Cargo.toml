@@ -47,6 +47,7 @@ async-trait = { workspace = true }
 cfg-if = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
+futures-time = { workspace = true }
 humantime-serde = { workspace = true, optional = true }
 lazy_static = { workspace = true }
 proc-macro-regex = { workspace = true }

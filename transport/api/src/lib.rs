@@ -35,6 +35,7 @@ use futures::{
     FutureExt, SinkExt, StreamExt,
     channel::mpsc::{Sender, channel},
 };
+use futures_time::future::FutureExt as _;
 use helpers::PathPlanner;
 use hopr_api::{
     chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
@@ -535,9 +536,17 @@ where
 
         let latency = (*pinger).ping(*peer).await?;
 
-        let observations = network
-            .observations_for(peer)
-            .ok_or(HoprTransportError::Probe(ProbeError::NonExistingPeer))?;
+        let observations = match network.observations_for(peer) {
+            Some(observations) => observations,
+            None => {
+                // artificial delay to allow the observations to be recorded
+                async { () }.delay(futures_time::time::Duration::from_millis(250)).await;
+
+                network
+                    .observations_for(peer)
+                    .ok_or(HoprTransportError::Probe(ProbeError::NonExistingPeer))?
+            }
+        };
 
         Ok((latency, observations))
     }

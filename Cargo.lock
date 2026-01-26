@@ -5034,6 +5034,7 @@ dependencies = [
  "cfg-if",
  "futures",
  "futures-concurrency",
+ "futures-time",
  "hex-literal",
  "hopr-api",
  "hopr-async-runtime",
