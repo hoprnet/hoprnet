@@ -254,20 +254,20 @@ impl HoprLibp2pNetworkBuilder {
                                         if let Err(error) = store.add(peer_id, std::collections::HashSet::from([address])) {
                                             error!(peer = %peer_id, %error, direction = "outgoing", "failed to add connected peer to the peer store");
                                         }
-                                        tracker.add(peer_id);
                                     } else {
-                                        debug!(transport="libp2p", peer = %peer_id, multiaddress = %address, "Private/local peer address ignored")
+                                        debug!(transport="libp2p", peer = %peer_id, multiaddress = %address, "Private/local peer address encountered")
                                     }
+                                    tracker.add(peer_id);
                                 },
                                 libp2p::core::ConnectedPoint::Listener { send_back_addr, .. } => {
                                     if allow_private_addresses || is_public_address(&send_back_addr) {
                                         if let Err(error) = store.add(peer_id, std::collections::HashSet::from([send_back_addr])) {
                                             error!(peer = %peer_id, %error, direction = "incoming", "failed to add connected peer to the peer store");
                                         }
-                                        tracker.add(peer_id);
                                     } else {
                                         debug!(transport="libp2p", peer = %peer_id, multiaddress = %send_back_addr, "Private/local peer address ignored")
                                     }
+                                    tracker.add(peer_id);
                                 }
                             }
                         } else {

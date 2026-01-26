@@ -540,7 +540,7 @@ where
             Some(observations) => observations,
             None => {
                 // artificial delay to allow the observations to be recorded
-                async { () }.delay(futures_time::time::Duration::from_millis(250)).await;
+                async {}.delay(futures_time::time::Duration::from_millis(50)).await;
 
                 network
                     .observations_for(peer)
