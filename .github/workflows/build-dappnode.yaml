@@ -82,7 +82,7 @@ jobs:
           sudo apt-get install -y docker-compose
 
       - name: Checkout hoprnet repository
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
           repository: ${{ steps.vars.outputs.source_repo }}
@@ -102,7 +102,7 @@ jobs:
           node-version: 20.20.0 # Revert to version 20, as the dappnode package is not yet compatible with Node 22
 
       - name: Checkout DAppNodePackage-Hopr
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
           repository: dappnode/${{ steps.vars.outputs.dappnode_repository }}
