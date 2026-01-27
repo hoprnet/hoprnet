@@ -137,6 +137,7 @@ prometheus = "0.14.0"
 rand = "0.8.5" # ignored in renovate, cannot be updated, dependencies reference old ones
 rayon = "1.11.0"
 regex = "1.12.2"
+reqwest = { version = "0.12.12", default-features = false, features = ["json", "rustls-tls"] }
 ringbuffer = "0.16.0"
 rust-stream-ext-concurrent = "1.0.0"
 rstest = { version = "0.26.1" }

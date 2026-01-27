@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use futures::StreamExt;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::prelude::*;
@@ -5,7 +7,7 @@ use hopr_internal_types::prelude::*;
 use hopr_lib::{
     ApplicationDataIn, ApplicationDataOut,
     exports::transport::session::{
-        Capabilities, Capability, HoprSession, HoprSessionConfig, SessionId, transfer_session,
+        Capabilities, Capability, HoprSession, HoprSessionConfig, SessionId, SessionMetrics, transfer_session,
     },
 };
 use hopr_network_types::prelude::*;
@@ -25,13 +27,34 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
     let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
     let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
 
+    let alice_cfg = HoprSessionConfig {
+        capabilities: cap,
+        ..Default::default()
+    };
+    let bob_cfg = HoprSessionConfig {
+        capabilities: cap,
+        ..Default::default()
+    };
+
+    let alice_metrics = Arc::new(SessionMetrics::new(
+        id,
+        None,
+        alice_cfg.frame_mtu,
+        alice_cfg.frame_timeout,
+        16384,
+    ));
+    let bob_metrics = Arc::new(SessionMetrics::new(
+        id,
+        None,
+        bob_cfg.frame_mtu,
+        bob_cfg.frame_timeout,
+        16384,
+    ));
+
     let mut alice_session = HoprSession::new(
         id,
         DestinationRouting::forward_only(dst, RoutingOptions::Hops(0_u32.try_into()?)),
-        HoprSessionConfig {
-            capabilities: cap,
-            ..Default::default()
-        },
+        alice_cfg,
         (
             alice_tx,
             alice_rx.map(|(_, d)| ApplicationDataIn {
@@ -39,16 +62,14 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
                 packet_info: Default::default(),
             }),
         ),
+        alice_metrics,
         None,
     )?;
 
     let mut bob_session = HoprSession::new(
         id,
         DestinationRouting::Return(id.pseudonym().into()),
-        HoprSessionConfig {
-            capabilities: cap,
-            ..Default::default()
-        },
+        bob_cfg,
         (
             bob_tx,
             bob_rx.map(|(_, d)| ApplicationDataIn {
@@ -56,6 +77,7 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
                 packet_info: Default::default(),
             }),
         ),
+        bob_metrics,
         None,
     )?;
 

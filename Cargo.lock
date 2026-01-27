@@ -5381,6 +5381,7 @@ dependencies = [
  "lazy_static",
  "oas3",
  "regex",
+ "reqwest",
  "serde",
  "serde_json",
  "serde_with",
@@ -5576,6 +5577,7 @@ dependencies = [
  "tokio",
  "tokio-rustls 0.26.4",
  "tower-service",
+ "webpki-roots 1.0.5",
 ]
 
 [[package]]
@@ -8242,6 +8244,8 @@ dependencies = [
  "native-tls",
  "percent-encoding",
  "pin-project-lite",
+ "quinn",
+ "rustls 0.23.36",
  "rustls-pki-types",
  "serde",
  "serde_json",
@@ -8249,6 +8253,7 @@ dependencies = [
  "sync_wrapper",
  "tokio",
  "tokio-native-tls",
+ "tokio-rustls 0.26.4",
  "tower",
  "tower-http",
  "tower-service",
@@ -8256,6 +8261,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+ "webpki-roots 1.0.5",
 ]
 
 [[package]]

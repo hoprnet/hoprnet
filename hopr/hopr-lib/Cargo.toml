@@ -55,6 +55,7 @@ testing = [
   "dep:tokio-util",
   "dep:hex-literal",
   "dep:hopr-db-node",
+  "hopr-db-node/runtime-tokio",
   "dep:hopr-chain-connector",
   "hopr-chain-connector/testing",
   "dep:hopr-ct-telemetry",

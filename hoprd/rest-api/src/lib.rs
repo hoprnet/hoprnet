@@ -57,7 +57,13 @@ use crate::config::Auth;
 
 pub(crate) const BASE_PATH: &str = const_format::formatcp!("/api/v{}", env!("CARGO_PKG_VERSION_MAJOR"));
 
+#[cfg(not(feature = "test-fixtures"))]
 type HoprBlokliConnector = HoprBlockchainSafeConnector<hopr_chain_connector::blokli_client::BlokliClient>;
+
+#[cfg(feature = "test-fixtures")]
+type HoprBlokliConnector = HoprBlockchainSafeConnector<
+    hopr_chain_connector::testing::BlokliTestClient<hopr_chain_connector::testing::FullStateEmulator>,
+>;
 
 #[derive(Clone)]
 pub(crate) struct AppState {
@@ -105,6 +111,7 @@ pub(crate) struct InternalState {
         session::list_clients,
         session::adjust_session,
         session::session_config,
+        session::session_metrics,
         session::close_client,
         tickets::redeem_all_tickets,
         tickets::redeem_tickets_in_channel,
@@ -125,6 +132,7 @@ pub(crate) struct InternalState {
             node::HeartbeatInfo, node::PeerObservations, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse,
             peers::NodePeerInfoResponse, peers::PingResponse,
             session::SessionClientRequest, session::SessionCapability, session::RoutingOptions, session::SessionTargetSpec, session::SessionClientResponse, session::IpProtocol, session::SessionConfig,
+            session::SessionMetricsResponse, session::SessionMetricsLifetime, session::SessionMetricsFrameBuffer, session::SessionMetricsAck, session::SessionMetricsSurb, session::SessionMetricsTransport, session::SessionMetricsState, session::SessionMetricsAckMode,
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
         )
     ),
@@ -304,6 +312,7 @@ async fn build_api(
                 .route("/peers/{destination}/ping", post(peers::ping_peer))
                 .route("/session/config/{id}", get(session::session_config))
                 .route("/session/config/{id}", post(session::adjust_session))
+                .route("/session/metrics/{id}", get(session::session_metrics))
                 .route("/session/websocket", get(session::websocket))
                 .route("/session/{protocol}", post(session::create_client))
                 .route("/session/{protocol}", get(session::list_clients))

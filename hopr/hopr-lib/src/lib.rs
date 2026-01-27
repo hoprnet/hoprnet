@@ -860,6 +860,12 @@ where
     }
 
     #[cfg(feature = "session-client")]
+    pub async fn get_session_metrics(&self, id: &SessionId) -> errors::Result<SessionMetricsSnapshot> {
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
+        Ok(self.transport_api.session_metrics(id).await?)
+    }
+
+    #[cfg(feature = "session-client")]
     pub async fn update_session_surb_balancer_config(
         &self,
         id: &SessionId,

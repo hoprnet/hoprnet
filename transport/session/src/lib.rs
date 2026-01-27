@@ -10,12 +10,17 @@
 pub(crate) mod balancer;
 pub mod errors;
 mod manager;
+mod metrics;
 mod types;
 mod utils;
 
 pub use balancer::{MIN_BALANCER_SAMPLING_INTERVAL, SurbBalancerConfig};
 pub use hopr_network_types::types::*;
 pub use manager::{DispatchResult, MIN_SURB_BUFFER_DURATION, SessionManager, SessionManagerConfig};
+pub use metrics::{
+    AckSnapshot, FrameBufferSnapshot, MetricsState, SessionAckMode, SessionLifecycleState, SessionLifetimeSnapshot,
+    SessionMetrics, SessionMetricsSnapshot, SurbSnapshot, TransportSnapshot,
+};
 pub use types::{
     ByteCapabilities, HoprSession, HoprSessionConfig, IncomingSession, ServiceId, SessionId, SessionTarget,
 };

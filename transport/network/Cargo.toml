@@ -23,7 +23,7 @@ tracing = { workspace = true }
 
 hopr-api = { workspace = true, features = ["network"] }
 hopr-metrics = { workspace = true, optional = true }
-hopr-statistics = { workspace = true }
+hopr-statistics = { workspace = true, features = ["moving"] }
 
 [dev-dependencies]
 assertables = { workspace = true }

@@ -125,6 +125,10 @@ impl FrameInspector {
     pub fn missing_segments(&self, frame_id: &FrameId) -> Option<MissingSegmentsBitmap> {
         self.0.0.get(frame_id).map(|f| f.as_missing())
     }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
 }
 
 /// Trait describing an occupied entry in a [`FrameMap`].

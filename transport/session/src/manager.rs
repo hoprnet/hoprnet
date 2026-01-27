@@ -1,3 +1,4 @@
+use std::sync::atomic::Ordering;
 use std::{
     ops::Range,
     sync::{Arc, OnceLock},
@@ -31,6 +32,7 @@ use crate::{
         simple::SimpleBalancerController,
     },
     errors::{SessionManagerError, TransportSessionError},
+    metrics::{SessionLifecycleState, SessionMetrics, SessionMetricsSnapshot},
     types::{ByteCapabilities, ClosureReason, HoprSessionConfig, HoprStartProtocol},
     utils,
     utils::insert_into_next_slot,
@@ -64,6 +66,11 @@ lazy_static::lazy_static! {
 
 fn close_session(session_id: SessionId, session_data: SessionSlot, reason: ClosureReason) {
     debug!(?session_id, ?reason, "closing session");
+
+    if let Some(metrics) = session_data.metrics.as_ref() {
+        metrics.set_state(SessionLifecycleState::Closed);
+        metrics.touch_activity();
+    }
 
     if reason != ClosureReason::EmptyRead {
         // Closing the data sender will also cause it to close from the read side
@@ -107,6 +114,7 @@ struct SessionSlot {
     session_tx: Arc<UnboundedSender<ApplicationDataIn>>,
     routing_opts: DestinationRouting,
     abort_handles: Vec<AbortHandle>,
+    metrics: Option<Arc<SessionMetrics>>,
     // Allows reconfiguring of the SURB balancer on-the-fly
     // Set on both Entry and Exit sides.
     surb_mgmt: Option<SurbBalancerConfig>,
@@ -703,6 +711,26 @@ where
                     })
                     .ok_or(SessionManagerError::NotStarted)?;
 
+                let ack_mode = if cfg.capabilities.contains(Capability::RetransmissionAck)
+                    || cfg.capabilities.contains(Capability::RetransmissionNack)
+                {
+                    Some(crate::types::caps_to_ack_mode(cfg.capabilities))
+                } else {
+                    None
+                };
+                let frame_capacity = if cfg.capabilities.contains(Capability::Segmentation) {
+                    16384
+                } else {
+                    0
+                };
+                let metrics = Arc::new(SessionMetrics::new(
+                    session_id,
+                    ack_mode,
+                    self.cfg.frame_mtu,
+                    self.cfg.max_frame_timeout,
+                    frame_capacity,
+                ));
+
                 // NOTE: the Exit node can have different `max_surb_buffer_size`
                 // setting on the Session manager, so it does not make sense to cap it here
                 // with our maximum value.
@@ -748,6 +776,7 @@ where
                     let (ka_controller, ka_abort_handle) =
                         utils::spawn_keep_alive_stream(session_id, full_surb_scoring_sender, forward_routing.clone());
                     abort_handles.push(ka_abort_handle);
+                    metrics.set_refill_in_flight(true);
 
                     // Spawn the SURB balancer, which will decide on the initial SURB rate.
                     debug!(%session_id, ?balancer_config ,"spawning entry SURB balancer");
@@ -774,8 +803,9 @@ where
                             session_tx: Arc::new(tx),
                             routing_opts: forward_routing.clone(),
                             abort_handles,
+                            metrics: Some(metrics.clone()),
                             surb_mgmt: Some(balancer_config),
-                            surb_estimator: None,
+                            surb_estimator: Some(surb_estimator.clone()),
                         },
                     )
                     .await?;
@@ -821,6 +851,7 @@ where
                                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                             }),
                         ),
+                        metrics,
                         Some(notifier),
                     )
                 } else {
@@ -832,6 +863,7 @@ where
                             session_tx: Arc::new(tx),
                             routing_opts: forward_routing.clone(),
                             abort_handles: vec![],
+                            metrics: Some(metrics.clone()),
                             surb_mgmt: None,
                             surb_estimator: None,
                         },
@@ -863,6 +895,7 @@ where
                             frame_timeout: self.cfg.max_frame_timeout,
                         },
                         (reduced_surb_sender, rx),
+                        metrics,
                         Some(notifier),
                     )
                 }
@@ -970,6 +1003,30 @@ where
         }
     }
 
+    pub async fn get_session_metrics(&self, id: &SessionId) -> crate::errors::Result<SessionMetricsSnapshot> {
+        match self.sessions.get(id).await {
+            Some(session) => {
+                let metrics = session
+                    .metrics
+                    .as_ref()
+                    .ok_or_else(|| SessionManagerError::Other("missing session metrics".into()))?;
+                let produced = session
+                    .surb_estimator
+                    .as_ref()
+                    .map(|e| e.produced.load(Ordering::Relaxed))
+                    .unwrap_or(0);
+                let consumed = session
+                    .surb_estimator
+                    .as_ref()
+                    .map(|e| e.consumed.load(Ordering::Relaxed))
+                    .unwrap_or(0);
+                let target = session.surb_mgmt.map(|cfg| cfg.target_surb_buffer_size);
+                Ok(metrics.snapshot(produced, consumed, target))
+            }
+            None => Err(SessionManagerError::NonExistingSession.into()),
+        }
+    }
+
     /// The main method to be called whenever data are received.
     ///
     /// It tries to recognize the message and correctly dispatches either
@@ -1059,6 +1116,7 @@ where
                     session_tx: Arc::new(tx_session_data),
                     routing_opts: reply_routing.clone(),
                     abort_handles: vec![],
+                    metrics: None,
                     surb_mgmt: None,
                     surb_estimator: None,
                 },
@@ -1073,6 +1131,45 @@ where
         // but will be later re-claimed when it expires.
         if let Some(session_id) = allocated_slot {
             debug!(%session_id, ?session_req, "assigned a new session");
+
+            let ack_mode = if session_req.capabilities.0.contains(Capability::RetransmissionAck)
+                || session_req.capabilities.0.contains(Capability::RetransmissionNack)
+            {
+                Some(crate::types::caps_to_ack_mode(session_req.capabilities.into()))
+            } else {
+                None
+            };
+            let frame_capacity = if session_req.capabilities.0.contains(Capability::Segmentation) {
+                16384
+            } else {
+                0
+            };
+            let metrics = Arc::new(SessionMetrics::new(
+                session_id,
+                ack_mode,
+                self.cfg.frame_mtu,
+                self.cfg.max_frame_timeout,
+                frame_capacity,
+            ));
+
+            if let moka::ops::compute::CompResult::ReplacedWith(_) = self
+                .sessions
+                .entry(session_id)
+                .and_compute_with(|entry| {
+                    futures::future::ready(match entry.map(|e| e.into_value()) {
+                        None => moka::ops::compute::Op::Nop,
+                        Some(mut slot) => {
+                            slot.metrics = Some(metrics.clone());
+                            moka::ops::compute::Op::Put(slot)
+                        }
+                    })
+                })
+                .await
+            {
+                metrics.set_state(SessionLifecycleState::Active);
+            } else {
+                return Err(SessionManagerError::Other("failed to attach metrics to session slot".into()).into());
+            }
 
             let closure_notifier = Box::new(move |session_id: SessionId, reason: ClosureReason| {
                 if let Err(error) = close_session_notifier.try_send((session_id, reason)) {
@@ -1130,6 +1227,7 @@ where
                                 .fetch_add(data.num_surbs_with_msg() as u64, std::sync::atomic::Ordering::Relaxed);
                         }),
                     ),
+                    metrics.clone(),
                     Some(closure_notifier),
                 )?;
 
@@ -1160,6 +1258,7 @@ where
                             cached_session.abort_handles.push(balancer_abort_handle);
                             cached_session.surb_mgmt = Some(balancer_config);
                             cached_session.surb_estimator = Some(surb_estimator.clone());
+                            cached_session.metrics = Some(metrics.clone());
                             futures::future::ready(moka::ops::compute::Op::Put(cached_session))
                         } else {
                             futures::future::ready(moka::ops::compute::Op::Nop)
@@ -1213,6 +1312,7 @@ where
                         frame_timeout: self.cfg.max_frame_timeout,
                     },
                     (msg_sender.clone(), rx_session_data),
+                    metrics,
                     Some(closure_notifier),
                 )?
             };
@@ -1765,6 +1865,13 @@ mod tests {
                     session_tx: Arc::new(dummy_tx),
                     routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
                     abort_handles: Vec::new(),
+                    metrics: Some(Arc::new(SessionMetrics::new(
+                        session_id,
+                        None,
+                        SESSION_MTU,
+                        Duration::from_millis(800),
+                        0,
+                    ))),
                     surb_mgmt: Some(balancer_cfg.clone()),
                     surb_estimator: None,
                 },
@@ -1816,6 +1923,13 @@ mod tests {
                     session_tx: Arc::new(dummy_tx),
                     routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
                     abort_handles: Vec::new(),
+                    metrics: Some(Arc::new(SessionMetrics::new(
+                        SessionId::new(16u64, alice_pseudonym),
+                        None,
+                        SESSION_MTU,
+                        Duration::from_millis(800),
+                        0,
+                    ))),
                     surb_mgmt: None,
                     surb_estimator: None,
                 },
@@ -1932,6 +2046,13 @@ mod tests {
                     session_tx: Arc::new(dummy_tx),
                     routing_opts: DestinationRouting::Return(alice_pseudonym.into()),
                     abort_handles: Vec::new(),
+                    metrics: Some(Arc::new(SessionMetrics::new(
+                        SessionId::new(16u64, alice_pseudonym),
+                        None,
+                        SESSION_MTU,
+                        Duration::from_millis(800),
+                        0,
+                    ))),
                     surb_mgmt: None,
                     surb_estimator: None,
                 },

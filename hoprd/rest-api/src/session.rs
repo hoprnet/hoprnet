@@ -13,9 +13,12 @@ use axum_extra::extract::Query;
 use base64::Engine;
 use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt};
 use futures_concurrency::stream::Merge;
+#[cfg(feature = "explicit-path")]
+use hopr_lib::NodeId;
 use hopr_lib::{
-    Address, HoprSession, NodeId, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities, SessionClientConfig,
-    SessionId, SessionManagerError, SessionTarget, SurbBalancerConfig, TransportSessionError,
+    Address, HoprSession, SESSION_MTU, SURB_SIZE, ServiceId, SessionAckMode, SessionCapabilities, SessionClientConfig,
+    SessionId, SessionLifecycleState, SessionManagerError, SessionMetricsSnapshot, SessionTarget, SurbBalancerConfig,
+    TransportSessionError,
     errors::{HoprLibError, HoprTransportError},
     utils::futures::AsyncReadStreamer,
 };
@@ -357,9 +360,15 @@ impl RoutingOptions {
 impl From<hopr_lib::RoutingOptions> for RoutingOptions {
     fn from(opts: hopr_lib::RoutingOptions) -> Self {
         match opts {
-            #[cfg(feature = "explicit-path")]
             hopr_lib::RoutingOptions::IntermediatePath(path) => {
-                RoutingOptions::IntermediatePath(path.into_iter().collect())
+                #[cfg(feature = "explicit-path")]
+                {
+                    RoutingOptions::IntermediatePath(path.into_iter().collect())
+                }
+                #[cfg(not(feature = "explicit-path"))]
+                {
+                    RoutingOptions::Hops(path.as_ref().len())
+                }
             }
             hopr_lib::RoutingOptions::Hops(hops) => RoutingOptions::Hops(usize::from(hops)),
         }
@@ -918,6 +927,195 @@ pub(crate) async fn session_config(
             Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::OK, Json(SessionConfig::from(cfg))).into_response())
         }
         Ok(None) => Err((StatusCode::NOT_FOUND, ApiErrorStatus::SessionNotFound)),
+        Err(e) => Err((
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ApiErrorStatus::UnknownFailure(e.to_string()),
+        )),
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum SessionMetricsState {
+    Active,
+    Closing,
+    Closed,
+}
+
+impl From<SessionLifecycleState> for SessionMetricsState {
+    fn from(value: SessionLifecycleState) -> Self {
+        match value {
+            SessionLifecycleState::Active => SessionMetricsState::Active,
+            SessionLifecycleState::Closing => SessionMetricsState::Closing,
+            SessionLifecycleState::Closed => SessionMetricsState::Closed,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum SessionMetricsAckMode {
+    None,
+    Partial,
+    Full,
+    Both,
+}
+
+impl From<SessionAckMode> for SessionMetricsAckMode {
+    fn from(value: SessionAckMode) -> Self {
+        match value {
+            SessionAckMode::None => SessionMetricsAckMode::None,
+            SessionAckMode::Partial => SessionMetricsAckMode::Partial,
+            SessionAckMode::Full => SessionMetricsAckMode::Full,
+            SessionAckMode::Both => SessionMetricsAckMode::Both,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SessionMetricsLifetime {
+    pub created_at_ms: u64,
+    pub last_activity_at_ms: u64,
+    pub uptime_ms: u64,
+    pub idle_ms: u64,
+    pub state: SessionMetricsState,
+}
+
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SessionMetricsFrameBuffer {
+    pub frame_mtu: usize,
+    pub frame_timeout_ms: u64,
+    pub frame_capacity: usize,
+    pub incomplete_frames: usize,
+    pub frames_completed: u64,
+    pub frames_emitted: u64,
+    pub frames_discarded: u64,
+}
+
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SessionMetricsAck {
+    pub mode: SessionMetricsAckMode,
+    pub incoming_segments: u64,
+    pub outgoing_segments: u64,
+    pub retransmission_requests: u64,
+    pub acknowledged_frames: u64,
+}
+
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SessionMetricsSurb {
+    pub produced_total: u64,
+    pub consumed_total: u64,
+    pub buffer_estimate: u64,
+    pub target_buffer: Option<u64>,
+    pub rate_per_sec: f64,
+    pub refill_in_flight: bool,
+}
+
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SessionMetricsTransport {
+    pub bytes_in: u64,
+    pub bytes_out: u64,
+    pub packets_in: u64,
+    pub packets_out: u64,
+}
+
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SessionMetricsResponse {
+    pub session_id: String,
+    pub snapshot_at_ms: u64,
+    pub lifetime: SessionMetricsLifetime,
+    pub frame_buffer: SessionMetricsFrameBuffer,
+    pub ack: SessionMetricsAck,
+    pub surb: SessionMetricsSurb,
+    pub transport: SessionMetricsTransport,
+}
+
+impl From<SessionMetricsSnapshot> for SessionMetricsResponse {
+    fn from(value: SessionMetricsSnapshot) -> Self {
+        Self {
+            session_id: value.session_id.to_string(),
+            snapshot_at_ms: value.snapshot_at_ms,
+            lifetime: SessionMetricsLifetime {
+                created_at_ms: value.lifetime.created_at_ms,
+                last_activity_at_ms: value.lifetime.last_activity_at_ms,
+                uptime_ms: value.lifetime.uptime_ms,
+                idle_ms: value.lifetime.idle_ms,
+                state: value.lifetime.state.into(),
+            },
+            frame_buffer: SessionMetricsFrameBuffer {
+                frame_mtu: value.frame_buffer.frame_mtu,
+                frame_timeout_ms: value.frame_buffer.frame_timeout_ms,
+                frame_capacity: value.frame_buffer.frame_capacity,
+                incomplete_frames: value.frame_buffer.incomplete_frames,
+                frames_completed: value.frame_buffer.frames_completed,
+                frames_emitted: value.frame_buffer.frames_emitted,
+                frames_discarded: value.frame_buffer.frames_discarded,
+            },
+            ack: SessionMetricsAck {
+                mode: value.ack.mode.into(),
+                incoming_segments: value.ack.incoming_segments,
+                outgoing_segments: value.ack.outgoing_segments,
+                retransmission_requests: value.ack.retransmission_requests,
+                acknowledged_frames: value.ack.acknowledged_frames,
+            },
+            surb: SessionMetricsSurb {
+                produced_total: value.surb.produced_total,
+                consumed_total: value.surb.consumed_total,
+                buffer_estimate: value.surb.buffer_estimate,
+                target_buffer: value.surb.target_buffer,
+                rate_per_sec: value.surb.rate_per_sec,
+                refill_in_flight: value.surb.refill_in_flight,
+            },
+            transport: SessionMetricsTransport {
+                bytes_in: value.transport.bytes_in,
+                bytes_out: value.transport.bytes_out,
+                packets_in: value.transport.packets_in,
+                packets_out: value.transport.packets_out,
+            },
+        }
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = const_format::formatcp!("{BASE_PATH}/session/metrics/{{id}}"),
+    description = "Gets metrics for an existing active session.",
+    params(
+        ("id" = String, Path, description = "Session ID", example = "0x5112D584a1C72Fc25017:487"),
+    ),
+    responses(
+            (status = 200, description = "Retrieved session metrics.", body = SessionMetricsResponse),
+            (status = 400, description = "Invalid session ID.", body = ApiError),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 404, description = "Given session ID does not refer to an existing Session", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError),
+    ),
+    security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+    ),
+    tag = "Session"
+)]
+pub(crate) async fn session_metrics(
+    State(state): State<Arc<InternalState>>,
+    Path(session_id): Path<String>,
+) -> Result<impl IntoResponse, impl IntoResponse> {
+    let session_id =
+        SessionId::from_str(&session_id).map_err(|_| (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidSessionId))?;
+
+    match state.hopr.get_session_metrics(&session_id).await {
+        Ok(metrics) => Ok::<_, (StatusCode, ApiErrorStatus)>(
+            (StatusCode::OK, Json(SessionMetricsResponse::from(metrics))).into_response(),
+        ),
+        Err(HoprLibError::TransportError(HoprTransportError::Session(TransportSessionError::Manager(
+            SessionManagerError::NonExistingSession,
+        )))) => Err((StatusCode::NOT_FOUND, ApiErrorStatus::SessionNotFound)),
         Err(e) => Err((
             StatusCode::UNPROCESSABLE_ENTITY,
             ApiErrorStatus::UnknownFailure(e.to_string()),

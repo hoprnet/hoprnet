@@ -74,7 +74,8 @@ pub use hopr_transport_session as session;
 pub use hopr_transport_session::transfer_session;
 pub use hopr_transport_session::{
     Capabilities as SessionCapabilities, Capability as SessionCapability, HoprSession, IncomingSession, SESSION_MTU,
-    SURB_SIZE, ServiceId, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
+    SURB_SIZE, ServiceId, SessionAckMode, SessionClientConfig, SessionId, SessionLifecycleState,
+    SessionMetricsSnapshot, SessionTarget, SurbBalancerConfig,
     errors::{SessionManagerError, TransportSessionError},
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
@@ -567,6 +568,10 @@ where
 
     pub async fn session_surb_balancing_cfg(&self, id: &SessionId) -> errors::Result<Option<SurbBalancerConfig>> {
         Ok(self.smgr.get_surb_balancer_config(id).await?)
+    }
+
+    pub async fn session_metrics(&self, id: &SessionId) -> errors::Result<SessionMetricsSnapshot> {
+        Ok(self.smgr.get_session_metrics(id).await?)
     }
 
     pub async fn update_session_surb_balancing_cfg(
