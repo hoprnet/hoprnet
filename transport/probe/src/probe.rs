@@ -246,7 +246,7 @@ impl Probe {
                                                 .saturating_sub(start);
 
                                             if let NodeId::Offchain(opk) = peer.as_ref() {
-                                                tracing::info!(%pseudonym, nonce = hex::encode(pong), latency_ms = latency.as_millis(), "probe successful");
+                                                tracing::debug!(%pseudonym, nonce = hex::encode(pong), latency_ms = latency.as_millis(), "probe successful");
                                                 store.record::<NeighborTelemetry, PathTelemetry>(Ok(Telemetry::Neighbor(NeighborTelemetry {
                                                     peer: opk.into(),
                                                     rtt: latency,
