@@ -23,7 +23,7 @@ frame_buffer:
   frames_emitted: 0
   frames_discarded: 0
 ack:
-  mode: Full
+  mode: Partial
   incoming_segments: 0
   outgoing_segments: 13
   retransmission_requests: 0

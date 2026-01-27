@@ -5379,6 +5379,7 @@ dependencies = [
  "hopr-metrics",
  "hopr-utils-session",
  "human-bandwidth",
+ "insta",
  "lazy_static",
  "oas3",
  "regex",

@@ -10,7 +10,8 @@ use hopr_internal_types::prelude::*;
 use hopr_lib::{
     ApplicationDataIn, ApplicationDataOut,
     exports::transport::session::{
-        Capabilities, Capability, HoprSession, HoprSessionConfig, SessionId, SessionMetrics, transfer_session,
+        AcknowledgementMode, Capabilities, Capability, HoprSession, HoprSessionConfig, SessionId, SessionMetrics,
+        transfer_session,
     },
 };
 use hopr_network_types::prelude::*;
@@ -49,16 +50,43 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
         ..Default::default()
     };
 
+    let alice_ack_mode = if alice_cfg
+        .capabilities
+        .contains(Capability::RetransmissionAck | Capability::RetransmissionNack)
+    {
+        Some(AcknowledgementMode::Both)
+    } else if alice_cfg.capabilities.contains(Capability::RetransmissionAck) {
+        Some(AcknowledgementMode::Full)
+    } else if alice_cfg.capabilities.contains(Capability::RetransmissionNack) {
+        Some(AcknowledgementMode::Partial)
+    } else {
+        None
+    };
+
     let alice_metrics = Arc::new(SessionMetrics::new(
         id,
-        None,
+        alice_ack_mode,
         alice_cfg.frame_mtu,
         alice_cfg.frame_timeout,
         BUF_LEN,
     ));
+
+    let bob_ack_mode = if bob_cfg
+        .capabilities
+        .contains(Capability::RetransmissionAck | Capability::RetransmissionNack)
+    {
+        Some(AcknowledgementMode::Both)
+    } else if bob_cfg.capabilities.contains(Capability::RetransmissionAck) {
+        Some(AcknowledgementMode::Full)
+    } else if bob_cfg.capabilities.contains(Capability::RetransmissionNack) {
+        Some(AcknowledgementMode::Partial)
+    } else {
+        None
+    };
+
     let bob_metrics = Arc::new(SessionMetrics::new(
         id,
-        None,
+        bob_ack_mode,
         bob_cfg.frame_mtu,
         bob_cfg.frame_timeout,
         BUF_LEN,
@@ -190,6 +218,8 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
 #[case(Capabilities::empty())]
 #[case(Capabilities::from(Capability::Segmentation))]
 #[case(Capabilities::from(Capability::RetransmissionAck))]
+#[case(Capabilities::from(Capability::RetransmissionNack))]
+#[case(Capabilities::from(Capability::RetransmissionAck) | Capability::RetransmissionNack)]
 #[tokio::test]
 /// Creates paired Hopr sessions bridged to a TCP listener to prove that messages
 /// sent over TCP end up in the remote session buffer regardless of capability set.
@@ -213,16 +243,43 @@ async fn tcp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
         ..Default::default()
     };
 
+    let alice_ack_mode = if alice_cfg
+        .capabilities
+        .contains(Capability::RetransmissionAck | Capability::RetransmissionNack)
+    {
+        Some(AcknowledgementMode::Both)
+    } else if alice_cfg.capabilities.contains(Capability::RetransmissionAck) {
+        Some(AcknowledgementMode::Full)
+    } else if alice_cfg.capabilities.contains(Capability::RetransmissionNack) {
+        Some(AcknowledgementMode::Partial)
+    } else {
+        None
+    };
+
     let alice_metrics = Arc::new(SessionMetrics::new(
         id,
-        None,
+        alice_ack_mode,
         alice_cfg.frame_mtu,
         alice_cfg.frame_timeout,
         BUF_LEN,
     ));
+
+    let bob_ack_mode = if bob_cfg
+        .capabilities
+        .contains(Capability::RetransmissionAck | Capability::RetransmissionNack)
+    {
+        Some(AcknowledgementMode::Both)
+    } else if bob_cfg.capabilities.contains(Capability::RetransmissionAck) {
+        Some(AcknowledgementMode::Full)
+    } else if bob_cfg.capabilities.contains(Capability::RetransmissionNack) {
+        Some(AcknowledgementMode::Partial)
+    } else {
+        None
+    };
+
     let bob_metrics = Arc::new(SessionMetrics::new(
         id,
-        None,
+        bob_ack_mode,
         bob_cfg.frame_mtu,
         bob_cfg.frame_timeout,
         BUF_LEN,
@@ -306,8 +363,12 @@ async fn tcp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
 
     let cap_suffix = if cap.is_empty() {
         "plain"
+    } else if cap.contains(Capability::RetransmissionAck | Capability::RetransmissionNack) {
+        "both"
     } else if cap.contains(Capability::RetransmissionAck) {
         "ack"
+    } else if cap.contains(Capability::RetransmissionNack) {
+        "nack"
     } else {
         "seg"
     };

@@ -68,3 +68,4 @@ oas3 = { workspace = true }
 anyhow = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
 hopr-lib = { workspace = true, features = ["testing", "session-server"] }
+insta = { workspace = true, features = ["yaml", "redactions"] }

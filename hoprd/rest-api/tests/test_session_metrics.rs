@@ -12,7 +12,7 @@ use hoprd_api::{
     config::{Api, Auth},
     serve_api,
 };
-use serde_json::Value;
+use insta::assert_yaml_snapshot;
 use tokio::net::TcpListener;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -50,10 +50,16 @@ async fn session_metrics_endpoint_returns_snapshot() -> anyhow::Result<()> {
     let response = client.get(url).send().await?;
     assert!(response.status().is_success());
 
-    let body: Value = response.json().await?;
-    assert_eq!(body["sessionId"], session_id);
-    assert!(body["snapshotAtMs"].as_u64().is_some());
-    assert!(body["lifetime"]["createdAtMs"].as_u64().is_some());
+    let body: serde_json::Value = response.json().await?;
+    assert_yaml_snapshot!(body, {
+        ".sessionId" => "[session_id]",
+        ".snapshotAtMs" => "[timestamp]",
+        ".lifetime.createdAtMs" => "[timestamp]",
+        ".lifetime.terminatedAtMs" => "[timestamp]",
+        ".lifetime.lastActivityAtMs" => "[timestamp]",
+        ".lifetime.idleMs" => "[duration]",
+        ".lifetime.uptimeMs" => "[duration]",
+    });
 
     server_handle.abort();
     Ok(())

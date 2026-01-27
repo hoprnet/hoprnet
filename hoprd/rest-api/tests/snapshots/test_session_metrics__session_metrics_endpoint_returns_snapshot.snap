@@ -1,0 +1,38 @@
+---
+source: hoprd/rest-api/tests/test_session_metrics.rs
+expression: body
+---
+ack:
+  acknowledgedFrames: 0
+  incomingSegments: 0
+  mode: none
+  outgoingSegments: 0
+  retransmissionRequests: 0
+frameBuffer:
+  frameCapacity: 0
+  frameMtu: 1500
+  frameTimeoutMs: 800
+  framesCompleted: 0
+  framesDiscarded: 0
+  framesEmitted: 0
+  incompleteFrames: 0
+lifetime:
+  createdAtMs: "[timestamp]"
+  idleMs: "[duration]"
+  lastActivityAtMs: "[timestamp]"
+  state: active
+  uptimeMs: "[duration]"
+sessionId: "[session_id]"
+snapshotAtMs: "[timestamp]"
+surb:
+  bufferEstimate: 0
+  consumedTotal: 0
+  producedTotal: 0
+  ratePerSec: 0
+  refillInFlight: false
+  targetBuffer: ~
+transport:
+  bytesIn: 0
+  bytesOut: 0
+  packetsIn: 0
+  packetsOut: 0
