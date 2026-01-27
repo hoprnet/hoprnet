@@ -43,7 +43,7 @@ jobs:
           repository: ${{ inputs.source_repo }}
           ref: ${{ inputs.source_branch }}
 
-      - uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # v16
+      - uses: cachix/cachix-action@3ba601ff5bbb07c7220846facfa2cd81eeee15a1 # v16
         if: env.needs_nix_setup == true
         with:
           name: hoprnet
