@@ -61,6 +61,7 @@ impl<T> From<(std::time::Instant, T)> for Delayed<T> {
     }
 }
 
+#[inline]
 fn initial_backoff() -> backon::ExponentialBackoff {
     backon::ExponentialBuilder::new()
         .with_min_delay(std::time::Duration::from_secs(3))
