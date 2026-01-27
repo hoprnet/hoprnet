@@ -974,65 +974,105 @@ impl From<SessionAckMode> for SessionMetricsAckMode {
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
+/// Session lifetime metrics.
 pub(crate) struct SessionMetricsLifetime {
+    /// Time when the session was created (in milliseconds since UNIX epoch).
     pub created_at_ms: u64,
+    /// Time of the last read or write activity (in milliseconds since UNIX epoch).
     pub last_activity_at_ms: u64,
+    /// Total duration the session has been alive (in milliseconds).
     pub uptime_ms: u64,
+    /// Duration since the last activity (in milliseconds).
     pub idle_ms: u64,
+    /// Current lifecycle state of the session.
     pub state: SessionMetricsState,
 }
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
+/// Session frame buffer metrics.
 pub(crate) struct SessionMetricsFrameBuffer {
+    /// Maximum Transmission Unit for frames.
     pub frame_mtu: usize,
+    /// Configured timeout for frame reassembly/acknowledgement (in milliseconds).
     pub frame_timeout_ms: u64,
+    /// Configured capacity of the frame buffer.
     pub frame_capacity: usize,
+    /// Number of frames currently being assembled (incomplete).
     pub incomplete_frames: usize,
+    /// Total number of frames successfully completed/assembled.
     pub frames_completed: u64,
+    /// Total number of frames emitted to the application.
     pub frames_emitted: u64,
+    /// Total number of frames discarded (e.g. due to timeout or errors).
     pub frames_discarded: u64,
 }
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
+/// Session acknowledgement metrics.
 pub(crate) struct SessionMetricsAck {
+    /// Configured acknowledgement mode.
     pub mode: SessionMetricsAckMode,
+    /// Total incoming segments received.
     pub incoming_segments: u64,
+    /// Total outgoing segments sent.
     pub outgoing_segments: u64,
+    /// Total retransmission requests received.
     pub retransmission_requests: u64,
+    /// Total frames acknowledged by the peer.
     pub acknowledged_frames: u64,
 }
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
+/// Session SURB (Single Use Reply Block) metrics.
 pub(crate) struct SessionMetricsSurb {
+    /// Total SURBs produced/minted.
     pub produced_total: u64,
+    /// Total SURBs consumed/used.
     pub consumed_total: u64,
+    /// Estimated number of SURBs currently available.
     pub buffer_estimate: u64,
+    /// Target number of SURBs to maintain in buffer (if configured).
     pub target_buffer: Option<u64>,
+    /// Rate of SURB consumption/production per second.
     pub rate_per_sec: f64,
+    /// Whether a SURB refill request is currently in flight.
     pub refill_in_flight: bool,
 }
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
+/// Session transport-level metrics.
 pub(crate) struct SessionMetricsTransport {
+    /// Total bytes received.
     pub bytes_in: u64,
+    /// Total bytes sent.
     pub bytes_out: u64,
+    /// Total packets received.
     pub packets_in: u64,
+    /// Total packets sent.
     pub packets_out: u64,
 }
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
+/// Complete snapshot of session metrics.
 pub(crate) struct SessionMetricsResponse {
+    /// The session ID.
     pub session_id: String,
+    /// Time when this snapshot was taken (in milliseconds since UNIX epoch).
     pub snapshot_at_ms: u64,
+    /// Lifetime metrics.
     pub lifetime: SessionMetricsLifetime,
+    /// Frame buffer metrics.
     pub frame_buffer: SessionMetricsFrameBuffer,
+    /// Acknowledgement metrics.
     pub ack: SessionMetricsAck,
+    /// SURB metrics.
     pub surb: SessionMetricsSurb,
+    /// Transport metrics.
     pub transport: SessionMetricsTransport,
 }
 

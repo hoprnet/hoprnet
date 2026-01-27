@@ -1,3 +1,9 @@
+//! Session metrics tracking and snapshotting.
+//!
+//! This module provides functionality to track various metrics of a HOPR session,
+//! including data throughput, packet counts, frame events, and session lifecycle.
+//! It allows creating immutable snapshots of the metrics state for monitoring and reporting.
+
 use std::sync::{
     Arc, OnceLock,
     atomic::{AtomicBool, AtomicU8, AtomicU64, AtomicUsize, Ordering},
@@ -11,18 +17,27 @@ use hopr_protocol_session::{
 
 use crate::SessionId;
 
+/// The lifecycle state of a session from the perspective of metrics.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SessionLifecycleState {
+    /// Session is active and running.
     Active,
+    /// Session is in the process of closing (e.g. sending/receiving close frames).
     Closing,
+    /// Session has been fully closed.
     Closed,
 }
 
+/// The acknowledgement mode configured for the session.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SessionAckMode {
+    /// No acknowledgements.
     None,
+    /// Partial acknowledgements (some frames/segments).
     Partial,
+    /// Full acknowledgements (all frames/segments).
     Full,
+    /// Both (if applicable, though typically maps to Full in some contexts).
     Both,
 }
 
@@ -55,64 +70,107 @@ impl SessionLifecycleState {
     }
 }
 
+/// Snapshot of session lifetime metrics.
 #[derive(Debug, Clone)]
 pub struct SessionLifetimeSnapshot {
+    /// Time when the session was created.
     pub created_at: SystemTime,
+    /// Time of the last read or write activity.
     pub last_activity_at: SystemTime,
+    /// Total duration the session has been alive.
     pub uptime: Duration,
+    /// Duration since the last activity.
     pub idle: Duration,
+    /// Current lifecycle state of the session.
     pub state: SessionLifecycleState,
 }
 
+/// Snapshot of frame buffer metrics.
 #[derive(Debug, Clone)]
 pub struct FrameBufferSnapshot {
+    /// Maximum Transmission Unit for frames.
     pub frame_mtu: usize,
+    /// Configured timeout for frame reassembly/acknowledgement.
     pub frame_timeout: Duration,
+    /// Configured capacity of the frame buffer.
     pub frame_capacity: usize,
+    /// Number of frames currently being assembled (incomplete).
     pub incomplete_frames: usize,
+    /// Total number of frames successfully completed/assembled.
     pub frames_completed: u64,
+    /// Total number of frames emitted to the application.
     pub frames_emitted: u64,
+    /// Total number of frames discarded (e.g. due to timeout or errors).
     pub frames_discarded: u64,
 }
 
+/// Snapshot of acknowledgement metrics.
 #[derive(Debug, Clone)]
 pub struct AckSnapshot {
+    /// Configured acknowledgement mode.
     pub mode: SessionAckMode,
+    /// Total incoming segments received.
     pub incoming_segments: u64,
+    /// Total outgoing segments sent.
     pub outgoing_segments: u64,
+    /// Total retransmission requests received.
     pub retransmission_requests: u64,
+    /// Total frames acknowledged by the peer.
     pub acknowledged_frames: u64,
 }
 
+/// Snapshot of SURB (Single Use Reply Block) metrics.
 #[derive(Debug, Clone)]
 pub struct SurbSnapshot {
+    /// Total SURBs produced/minted.
     pub produced_total: u64,
+    /// Total SURBs consumed/used.
     pub consumed_total: u64,
+    /// Estimated number of SURBs currently available.
     pub buffer_estimate: u64,
+    /// Target number of SURBs to maintain in buffer (if configured).
     pub target_buffer: Option<u64>,
+    /// Rate of SURB consumption/production per second.
     pub rate_per_sec: f64,
+    /// Whether a SURB refill request is currently in flight.
     pub refill_in_flight: bool,
 }
 
+/// Snapshot of transport-level data metrics.
 #[derive(Debug, Clone)]
 pub struct TransportSnapshot {
+    /// Total bytes received.
     pub bytes_in: u64,
+    /// Total bytes sent.
     pub bytes_out: u64,
+    /// Total packets received.
     pub packets_in: u64,
+    /// Total packets sent.
     pub packets_out: u64,
 }
 
+/// Complete snapshot of all session metrics at a point in time.
 #[derive(Debug, Clone)]
 pub struct SessionMetricsSnapshot {
+    /// The ID of the session.
     pub session_id: SessionId,
+    /// Time when this snapshot was taken.
     pub snapshot_at: SystemTime,
+    /// Lifetime related metrics.
     pub lifetime: SessionLifetimeSnapshot,
+    /// Frame buffer related metrics.
     pub frame_buffer: FrameBufferSnapshot,
+    /// Acknowledgement related metrics.
     pub ack: AckSnapshot,
+    /// SURB management related metrics.
     pub surb: SurbSnapshot,
+    /// Transport level metrics (bytes/packets).
     pub transport: TransportSnapshot,
 }
 
+/// Internal metrics tracker for a session.
+///
+/// This struct uses atomic counters to allow lock-free updates from multiple threads/tasks.
 #[derive(Debug)]
 pub struct SessionMetrics {
     session_id: SessionId,
