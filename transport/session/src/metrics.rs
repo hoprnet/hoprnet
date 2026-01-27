@@ -18,7 +18,7 @@ use hopr_protocol_session::{
 use crate::SessionId;
 
 /// The lifecycle state of a session from the perspective of metrics.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
 pub enum SessionLifecycleState {
     /// Session is active and running.
     Active,
@@ -29,7 +29,7 @@ pub enum SessionLifecycleState {
 }
 
 /// The acknowledgement mode configured for the session.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
 pub enum SessionAckMode {
     /// No acknowledgements.
     None,
@@ -71,7 +71,7 @@ impl SessionLifecycleState {
 }
 
 /// Snapshot of session lifetime metrics.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct SessionLifetimeSnapshot {
     /// Time when the session was created.
     pub created_at: SystemTime,
@@ -86,7 +86,7 @@ pub struct SessionLifetimeSnapshot {
 }
 
 /// Snapshot of frame buffer metrics.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct FrameBufferSnapshot {
     /// Maximum Transmission Unit for frames.
     pub frame_mtu: usize,
@@ -105,7 +105,7 @@ pub struct FrameBufferSnapshot {
 }
 
 /// Snapshot of acknowledgement metrics.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct AckSnapshot {
     /// Configured acknowledgement mode.
     pub mode: SessionAckMode,
@@ -120,7 +120,7 @@ pub struct AckSnapshot {
 }
 
 /// Snapshot of SURB (Single Use Reply Block) metrics.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct SurbSnapshot {
     /// Total SURBs produced/minted.
     pub produced_total: u64,
@@ -137,7 +137,7 @@ pub struct SurbSnapshot {
 }
 
 /// Snapshot of transport-level data metrics.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct TransportSnapshot {
     /// Total bytes received.
     pub bytes_in: u64,
@@ -150,7 +150,7 @@ pub struct TransportSnapshot {
 }
 
 /// Complete snapshot of all session metrics at a point in time.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct SessionMetricsSnapshot {
     /// The ID of the session.
     pub session_id: SessionId,
@@ -236,18 +236,30 @@ impl SessionMetrics {
         }
     }
 
+    /// Returns a reference to the session ID.
     pub fn session_id(&self) -> &SessionId {
         &self.session_id
     }
 
+    /// Updates the session lifecycle state.
+    ///
+    /// This method atomically stores the new state, which affects the metrics snapshot
+    /// and indicates the session's current phase (Active, Closing, or Closed).
     pub fn set_state(&self, state: SessionLifecycleState) {
         self.state.store(state.as_u8(), Ordering::Relaxed);
     }
 
+    /// Records activity on the session by updating the last activity timestamp.
+    ///
+    /// This is called on read/write operations to track session idleness.
     pub fn touch_activity(&self) {
         self.last_activity_ms.store(now_ms(), Ordering::Relaxed);
     }
 
+    /// Records an incoming read operation with the specified number of bytes.
+    ///
+    /// Increments byte and packet counters, and updates activity timestamp.
+    /// Zero-byte reads are ignored.
     pub fn record_read(&self, bytes: usize) {
         if bytes == 0 {
             return;
@@ -257,6 +269,10 @@ impl SessionMetrics {
         self.packets_in.fetch_add(1, Ordering::Relaxed);
     }
 
+    /// Records an outgoing write operation with the specified number of bytes.
+    ///
+    /// Increments byte and packet counters, and updates activity timestamp.
+    /// Zero-byte writes are ignored.
     pub fn record_write(&self, bytes: usize) {
         if bytes == 0 {
             return;
@@ -266,48 +282,70 @@ impl SessionMetrics {
         self.packets_out.fetch_add(1, Ordering::Relaxed);
     }
 
+    /// Sets whether a SURB (Single Use Reply Block) refill request is currently in flight.
     pub fn set_refill_in_flight(&self, active: bool) {
         self.surb_refill_in_flight.store(active, Ordering::Relaxed);
     }
 
+    /// Sets the frame inspector for tracking incomplete frames.
+    ///
+    /// The inspector is initialized only once via `OnceLock`.
     pub fn set_inspector(&self, inspector: FrameInspector) {
         let _ = self.inspector.set(inspector);
     }
 
+    /// Updates the count of incomplete frames from the frame inspector.
     fn record_incomplete_frames(&self) {
         if let Some(inspector) = self.inspector.get() {
             self.incomplete_frames.store(inspector.len(), Ordering::Relaxed);
         }
     }
 
+    /// Records the receipt of an incoming segment.
     fn record_incoming_segment(&self) {
         self.incoming_segments.fetch_add(1, Ordering::Relaxed);
     }
 
+    /// Records the transmission of an outgoing segment.
     fn record_outgoing_segment(&self) {
         self.outgoing_segments.fetch_add(1, Ordering::Relaxed);
     }
 
+    /// Records retransmission requests with the specified count.
     fn record_retransmission_request(&self, count: usize) {
         self.retransmission_requests.fetch_add(count as u64, Ordering::Relaxed);
     }
 
+    /// Records acknowledged frames with the specified count.
     fn record_acknowledged_frames(&self, count: usize) {
         self.acknowledged_frames.fetch_add(count as u64, Ordering::Relaxed);
     }
 
+    /// Records a frame completion event.
     fn record_frame_complete(&self) {
         self.frames_completed.fetch_add(1, Ordering::Relaxed);
     }
 
+    /// Records a frame emission event.
     fn record_frame_emitted(&self) {
         self.frames_emitted.fetch_add(1, Ordering::Relaxed);
     }
 
+    /// Records a frame discard event.
     fn record_frame_discarded(&self) {
         self.frames_discarded.fetch_add(1, Ordering::Relaxed);
     }
 
+    /// Creates a snapshot of all current metrics.
+    ///
+    /// This method atomically reads all metric counters and creates an immutable snapshot
+    /// that includes lifetime, frame buffer, acknowledgement, SURB, and transport metrics.
+    ///
+    /// # Arguments
+    ///
+    /// * `produced` - Total number of SURBs produced/minted
+    /// * `consumed` - Total number of SURBs consumed/used
+    /// * `target` - Target SURB buffer size (if configured)
     pub fn snapshot(&self, produced: u64, consumed: u64, target: Option<u64>) -> SessionMetricsSnapshot {
         self.record_incomplete_frames();
 
@@ -364,6 +402,10 @@ impl SessionMetrics {
         }
     }
 
+    /// Computes the SURB consumption/production rate in items per second.
+    ///
+    /// This uses a sliding window approach, tracking the delta since the last computation
+    /// and the elapsed time to calculate the current rate. Returns 0.0 if no time has elapsed.
     fn compute_rate_per_sec(&self, produced: u64, consumed: u64, now_ms: u64) -> f64 {
         let total = produced.saturating_sub(consumed);
         let last_total = self.last_rate_total.swap(total, Ordering::Relaxed);
@@ -377,6 +419,11 @@ impl SessionMetrics {
     }
 }
 
+/// A wrapper that adds metrics tracking to a socket state implementation.
+///
+/// This struct wraps any `SocketState` implementation and intercepts lifecycle and data events
+/// to record them in the associated `SessionMetrics`. It maintains a transparent interface
+/// to the wrapped state while collecting comprehensive metrics.
 #[derive(Clone)]
 pub struct MetricsState<S> {
     inner: S,
@@ -384,16 +431,24 @@ pub struct MetricsState<S> {
 }
 
 impl<S> MetricsState<S> {
+    /// Creates a new metrics-tracking state wrapper.
+    ///
+    /// # Arguments
+    ///
+    /// * `inner` - The underlying socket state implementation
+    /// * `metrics` - The metrics tracker shared across clones
     pub fn new(inner: S, metrics: Arc<SessionMetrics>) -> Self {
         Self { inner, metrics }
     }
 }
 
 impl<const C: usize, S: SocketState<C> + Clone> SocketState<C> for MetricsState<S> {
+    /// Delegates to the inner state's session ID.
     fn session_id(&self) -> &str {
         self.inner.session_id()
     }
 
+    /// Initializes the socket with components, recording the frame inspector for metrics.
     fn run(&mut self, components: SocketComponents<C>) -> Result<(), hopr_protocol_session::errors::SessionError> {
         if let Some(inspector) = components.inspector.clone() {
             self.metrics.set_inspector(inspector);
@@ -401,11 +456,13 @@ impl<const C: usize, S: SocketState<C> + Clone> SocketState<C> for MetricsState<
         self.inner.run(components)
     }
 
+    /// Stops the session and records the state transition to Closing.
     fn stop(&mut self) -> Result<(), hopr_protocol_session::errors::SessionError> {
         self.metrics.set_state(SessionLifecycleState::Closing);
         self.inner.stop()
     }
 
+    /// Records an incoming segment event and delegates to the inner state.
     fn incoming_segment(
         &mut self,
         id: &SegmentId,
@@ -415,6 +472,7 @@ impl<const C: usize, S: SocketState<C> + Clone> SocketState<C> for MetricsState<
         self.inner.incoming_segment(id, ind)
     }
 
+    /// Records retransmission requests and delegates to the inner state.
     fn incoming_retransmission_request(
         &mut self,
         request: SegmentRequest<C>,
@@ -423,6 +481,7 @@ impl<const C: usize, S: SocketState<C> + Clone> SocketState<C> for MetricsState<
         self.inner.incoming_retransmission_request(request)
     }
 
+    /// Records acknowledged frames and delegates to the inner state.
     fn incoming_acknowledged_frames(
         &mut self,
         ack: FrameAcknowledgements<C>,
@@ -431,27 +490,32 @@ impl<const C: usize, S: SocketState<C> + Clone> SocketState<C> for MetricsState<
         self.inner.incoming_acknowledged_frames(ack)
     }
 
+    /// Records a frame completion event and delegates to the inner state.
     fn frame_complete(&mut self, id: FrameId) -> Result<(), hopr_protocol_session::errors::SessionError> {
         self.metrics.record_frame_complete();
         self.inner.frame_complete(id)
     }
 
+    /// Records a frame emission event and delegates to the inner state.
     fn frame_emitted(&mut self, id: FrameId) -> Result<(), hopr_protocol_session::errors::SessionError> {
         self.metrics.record_frame_emitted();
         self.inner.frame_emitted(id)
     }
 
+    /// Records a frame discard event and delegates to the inner state.
     fn frame_discarded(&mut self, id: FrameId) -> Result<(), hopr_protocol_session::errors::SessionError> {
         self.metrics.record_frame_discarded();
         self.inner.frame_discarded(id)
     }
 
+    /// Records an outgoing segment transmission and delegates to the inner state.
     fn segment_sent(&mut self, segment: &Segment) -> Result<(), hopr_protocol_session::errors::SessionError> {
         self.metrics.record_outgoing_segment();
         self.inner.segment_sent(segment)
     }
 }
 
+/// Returns the current time as milliseconds since the Unix epoch.
 fn now_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)

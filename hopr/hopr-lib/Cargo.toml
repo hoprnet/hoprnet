@@ -113,6 +113,7 @@ tokio = { workspace = true }
 test-log = { workspace = true }
 
 hopr-db-node = { workspace = true, features = ["runtime-tokio"] }
+insta = { workspace = true, features = ["yaml"] }
 hopr-lib = { workspace = true, features = [
   "runtime-tokio",
   "session-server",

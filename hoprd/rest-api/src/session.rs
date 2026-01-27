@@ -140,6 +140,7 @@ impl From<SessionCapability> for hopr_lib::SessionCapabilities {
     }
 }
 
+/// Request parameters for creating a websocket session.
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -169,6 +170,7 @@ fn default_protocol() -> IpProtocol {
 }
 
 impl SessionWebsocketClientQueryRequest {
+    /// Converts the websocket session request into protocol-level session configuration.
     pub(crate) async fn into_protocol_session_config(
         self,
     ) -> Result<(Address, SessionTarget, SessionClientConfig), ApiErrorStatus> {
@@ -262,14 +264,21 @@ pub(crate) async fn websocket(
     Ok::<_, (StatusCode, ApiErrorStatus)>(ws.on_upgrade(move |socket| websocket_connection(socket, session)))
 }
 
+/// Incoming input from either the network session or the websocket client.
 enum WebSocketInput {
+    /// Data received from the network session.
     Network(Result<Box<[u8]>, std::io::Error>),
+    /// Message received from the websocket client.
     WsInput(Result<Message, Error>),
 }
 
 /// The maximum number of bytes read from a Session that WS can transfer within a single message.
 const WS_MAX_SESSION_READ_SIZE: usize = 4096;
 
+/// Manages bidirectional data forwarding between a websocket client and a network session.
+///
+/// This function bridges communication by receiving data from either source and forwarding
+/// to the other, until either side closes the connection or an error occurs.
 #[tracing::instrument(level = "debug", skip(socket, session))]
 async fn websocket_connection(socket: WebSocket, session: HoprSession) {
     let session_id = *session.id();
@@ -336,10 +345,10 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
     info!(%session_id, bytes_from_session, bytes_to_session, "WS session connection ended");
 }
 
+/// Routing options for the Session.
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({ "Hops": 1 }))]
-/// Routing options for the Session.
 pub enum RoutingOptions {
     #[cfg(feature = "explicit-path")]
     #[schema(value_type = Vec<String>)]
@@ -348,6 +357,7 @@ pub enum RoutingOptions {
 }
 
 impl RoutingOptions {
+    /// Converts the API routing options into protocol-level routing options.
     pub(crate) async fn resolve(self) -> Result<hopr_lib::RoutingOptions, ApiErrorStatus> {
         Ok(match self {
             #[cfg(feature = "explicit-path")]
@@ -455,6 +465,7 @@ pub(crate) struct SessionClientRequest {
 }
 
 impl SessionClientRequest {
+    /// Converts the API client session request into protocol-level session configuration.
     pub(crate) async fn into_protocol_session_config(
         self,
         target_protocol: IpProtocol,
@@ -814,6 +825,7 @@ pub(crate) struct SessionConfig {
 }
 
 impl From<SessionConfig> for Option<SurbBalancerConfig> {
+    /// Converts the API session config into protocol-level SURB balancer config.
     fn from(value: SessionConfig) -> Self {
         match value.response_buffer {
             // Buffer worth at least 2 reply packets
@@ -834,6 +846,7 @@ impl From<SessionConfig> for Option<SurbBalancerConfig> {
 }
 
 impl From<SurbBalancerConfig> for SessionConfig {
+    /// Converts protocol-level SURB balancer config into the API session config format.
     fn from(value: SurbBalancerConfig) -> Self {
         Self {
             response_buffer: Some(bytesize::ByteSize::b(
@@ -934,15 +947,20 @@ pub(crate) async fn session_config(
     }
 }
 
+/// Session lifecycle state for metrics.
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum SessionMetricsState {
+    /// Session is active and running.
     Active,
+    /// Session is in the process of closing.
     Closing,
+    /// Session has been fully closed.
     Closed,
 }
 
 impl From<SessionLifecycleState> for SessionMetricsState {
+    /// Converts protocol-level lifecycle state into the API metrics state format.
     fn from(value: SessionLifecycleState) -> Self {
         match value {
             SessionLifecycleState::Active => SessionMetricsState::Active,
@@ -952,16 +970,22 @@ impl From<SessionLifecycleState> for SessionMetricsState {
     }
 }
 
+/// Session acknowledgement mode for metrics.
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum SessionMetricsAckMode {
+    /// No acknowledgements.
     None,
+    /// Partial acknowledgements.
     Partial,
+    /// Full acknowledgements.
     Full,
+    /// Both (if applicable).
     Both,
 }
 
 impl From<SessionAckMode> for SessionMetricsAckMode {
+    /// Converts protocol-level acknowledgement mode into the API metrics mode format.
     fn from(value: SessionAckMode) -> Self {
         match value {
             SessionAckMode::None => SessionMetricsAckMode::None,
@@ -1077,6 +1101,7 @@ pub(crate) struct SessionMetricsResponse {
 }
 
 impl From<SessionMetricsSnapshot> for SessionMetricsResponse {
+    /// Converts protocol-level metrics snapshot into the API response format.
     fn from(value: SessionMetricsSnapshot) -> Self {
         Self {
             session_id: value.session_id.to_string(),
