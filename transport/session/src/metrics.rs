@@ -57,17 +57,17 @@ impl SessionLifecycleState {
 
 #[derive(Debug, Clone)]
 pub struct SessionLifetimeSnapshot {
-    pub created_at_ms: u64,
-    pub last_activity_at_ms: u64,
-    pub uptime_ms: u64,
-    pub idle_ms: u64,
+    pub created_at: SystemTime,
+    pub last_activity_at: SystemTime,
+    pub uptime: Duration,
+    pub idle: Duration,
     pub state: SessionLifecycleState,
 }
 
 #[derive(Debug, Clone)]
 pub struct FrameBufferSnapshot {
     pub frame_mtu: usize,
-    pub frame_timeout_ms: u64,
+    pub frame_timeout: Duration,
     pub frame_capacity: usize,
     pub incomplete_frames: usize,
     pub frames_completed: u64,
@@ -105,7 +105,7 @@ pub struct TransportSnapshot {
 #[derive(Debug, Clone)]
 pub struct SessionMetricsSnapshot {
     pub session_id: SessionId,
-    pub snapshot_at_ms: u64,
+    pub snapshot_at: SystemTime,
     pub lifetime: SessionLifetimeSnapshot,
     pub frame_buffer: FrameBufferSnapshot,
     pub ack: AckSnapshot,
@@ -121,7 +121,7 @@ pub struct SessionMetrics {
     state: AtomicU8,
     ack_mode: SessionAckMode,
     frame_mtu: usize,
-    frame_timeout_ms: u64,
+    frame_timeout: Duration,
     frame_capacity: usize,
     incomplete_frames: AtomicUsize,
     frames_completed: AtomicU64,
@@ -157,7 +157,7 @@ impl SessionMetrics {
             state: AtomicU8::new(SessionLifecycleState::Active.as_u8()),
             ack_mode: SessionAckMode::from_ack_mode(ack_mode),
             frame_mtu,
-            frame_timeout_ms: frame_timeout.as_millis() as u64,
+            frame_timeout,
             frame_capacity,
             incomplete_frames: AtomicUsize::new(0),
             frames_completed: AtomicU64::new(0),
@@ -265,17 +265,17 @@ impl SessionMetrics {
 
         SessionMetricsSnapshot {
             session_id: self.session_id,
-            snapshot_at_ms,
+            snapshot_at: UNIX_EPOCH + Duration::from_millis(snapshot_at_ms),
             lifetime: SessionLifetimeSnapshot {
-                created_at_ms,
-                last_activity_at_ms: last_activity_ms,
-                uptime_ms,
-                idle_ms,
+                created_at: UNIX_EPOCH + Duration::from_millis(created_at_ms),
+                last_activity_at: UNIX_EPOCH + Duration::from_millis(last_activity_ms),
+                uptime: Duration::from_millis(uptime_ms),
+                idle: Duration::from_millis(idle_ms),
                 state,
             },
             frame_buffer: FrameBufferSnapshot {
                 frame_mtu: self.frame_mtu,
-                frame_timeout_ms: self.frame_timeout_ms,
+                frame_timeout: self.frame_timeout,
                 frame_capacity: self.frame_capacity,
                 incomplete_frames: self.incomplete_frames.load(Ordering::Relaxed),
                 frames_completed: self.frames_completed.load(Ordering::Relaxed),

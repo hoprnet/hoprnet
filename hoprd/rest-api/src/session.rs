@@ -1040,17 +1040,31 @@ impl From<SessionMetricsSnapshot> for SessionMetricsResponse {
     fn from(value: SessionMetricsSnapshot) -> Self {
         Self {
             session_id: value.session_id.to_string(),
-            snapshot_at_ms: value.snapshot_at_ms,
+            snapshot_at_ms: value
+                .snapshot_at
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64,
             lifetime: SessionMetricsLifetime {
-                created_at_ms: value.lifetime.created_at_ms,
-                last_activity_at_ms: value.lifetime.last_activity_at_ms,
-                uptime_ms: value.lifetime.uptime_ms,
-                idle_ms: value.lifetime.idle_ms,
+                created_at_ms: value
+                    .lifetime
+                    .created_at
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as u64,
+                last_activity_at_ms: value
+                    .lifetime
+                    .last_activity_at
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as u64,
+                uptime_ms: value.lifetime.uptime.as_millis() as u64,
+                idle_ms: value.lifetime.idle.as_millis() as u64,
                 state: value.lifetime.state.into(),
             },
             frame_buffer: SessionMetricsFrameBuffer {
                 frame_mtu: value.frame_buffer.frame_mtu,
-                frame_timeout_ms: value.frame_buffer.frame_timeout_ms,
+                frame_timeout_ms: value.frame_buffer.frame_timeout.as_millis() as u64,
                 frame_capacity: value.frame_buffer.frame_capacity,
                 incomplete_frames: value.frame_buffer.incomplete_frames,
                 frames_completed: value.frame_buffer.frames_completed,
