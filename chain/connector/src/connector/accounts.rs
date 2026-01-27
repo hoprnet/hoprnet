@@ -220,6 +220,8 @@ where
             ));
         }
 
+        tracing::debug!(%safe_address, %my_node_addr, "safe exists, proceeding with registration");
+
         let tx_req = self
             .payload_generator
             .register_safe_by_node(*safe_address)

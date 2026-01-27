@@ -535,9 +535,17 @@ where
 
         let latency = (*pinger).ping(*peer).await?;
 
-        let observations = network
-            .observations_for(peer)
-            .ok_or(HoprTransportError::Probe(ProbeError::NonExistingPeer))?;
+        let observations = match network.observations_for(peer) {
+            Some(observations) => observations,
+            None => {
+                // artificial delay to allow the observations to be recorded, the 50ms is random value
+                futures_time::task::sleep(futures_time::time::Duration::from_millis(50)).await;
+
+                network
+                    .observations_for(peer)
+                    .ok_or(HoprTransportError::Probe(ProbeError::NonExistingPeer))?
+            }
+        };
 
         Ok((latency, observations))
     }
