@@ -287,27 +287,14 @@ pub(super) async fn peers(
         "announcedAddress": [
             "/ip4/10.0.2.100/tcp/19092"
         ],
-        "chain": "anvil-localhost",
-        "provider": "http://127.0.0.1:8545",
+        "providerUrl": "https://staging.blokli.hoprnet.link",
+        "hoprNetworkName": "rotsee",
         "channelClosurePeriod": 15,
         "connectivityStatus": "Green",
-        "hoprChannels": "0x9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae",
-        "hoprManagementModule": "0xa51c1fc2f0d1a1b8494ed1fe312d7c3a78ed91c0",
-        "hoprNetworkRegistry": "0x3aa5ebb10dc797cac828524e59a333d0a371443c",
         "hoprNodeSafe": "0x42bc901b1d040f984ed626eff550718498a6798a",
-        "hoprNodeSafeRegistry": "0x0dcd1bf9a1b36ce34237eeafef220932846bcd82",
-        "hoprToken": "0x9a676e781a523b5d0c0e43731313a708cb607508",
-        "isEligible": true,
         "listeningAddress": [
             "/ip4/10.0.2.100/tcp/19092"
         ],
-        "network": "anvil-localhost",
-        "indexerBlock": 123456,
-        "indexerChecksum": "0000000000000000000000000000000000000000000000000000000000000000",
-        "indexBlockPrevChecksum": 0,
-        "indexerLastLogBlock": 123450,
-        "indexerLastLogChecksum": "cfde556a7e9ff0848998aa4a9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae",
-        "isIndexerCorrupted": false,
     }))]
 #[serde(rename_all = "camelCase")]
 /// Information about the current node. Covers network, addresses, eligibility, connectivity status, contracts addresses
@@ -319,20 +306,10 @@ pub(crate) struct NodeInfoResponse {
     #[serde_as(as = "Vec<DisplayFromStr>")]
     #[schema(value_type = Vec<String>, example = json!(["/ip4/10.0.2.100/tcp/19092"]))]
     listening_address: Vec<Multiaddr>,
-    #[schema(example = "anvil-localhost")]
-    chain: String,
-    #[serde(serialize_with = "checksum_address_serializer")]
-    #[schema(value_type = String, example = "0x9a676e781a523b5d0c0e43731313a708cb607508")]
-    hopr_token: Address,
-    #[serde(serialize_with = "checksum_address_serializer")]
-    #[schema(value_type = String, example = "0x9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae")]
-    hopr_channels: Address,
-    #[serde(serialize_with = "checksum_address_serializer")]
-    #[schema(value_type = String, example = "0x0dcd1bf9a1b36ce34237eeafef220932846bcd82")]
-    hopr_node_safe_registry: Address,
-    #[serde(serialize_with = "checksum_address_serializer")]
-    #[schema(value_type = String, example = "0xa51c1fc2f0d1a1b8494ed1fe312d7c3a78ed91c0")]
-    hopr_management_module: Address,
+    #[schema(value_type = String, example = "https://staging.blokli.hoprnet.link")]
+    provider_url: String,
+    #[schema(value_type = String, example = "rotsee")]
+    hopr_network_name: String,
     #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String, example = "0x42bc901b1d040f984ed626eff550718498a6798a")]
     hopr_node_safe: Address,
@@ -364,18 +341,19 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
 
     let safe_config = hopr.get_safe_config();
 
-    let chain_data = futures::try_join!(hopr.get_channel_closure_notice_period(), hopr.chain_info());
+    let provider_url = state
+        .hoprd_cfg
+        .as_object()
+        .and_then(|cfg| cfg.get("blokli_url"))
+        .and_then(|v| v.as_str());
 
-    match chain_data {
-        Ok((channel_closure_notice_period, chain_info)) => {
+    match futures::try_join!(hopr.chain_info(), hopr.get_channel_closure_notice_period()) {
+        Ok((info, channel_closure_notice_period)) => {
             let body = NodeInfoResponse {
                 announced_address: hopr.local_multiaddresses(),
                 listening_address: hopr.local_multiaddresses(),
-                chain: chain_info.chain_id.to_string(),
-                hopr_token: Address::new(&chain_info.contract_addresses.token.0.0),
-                hopr_channels: Address::new(&chain_info.contract_addresses.channels.0.0),
-                hopr_node_safe_registry: Address::new(&chain_info.contract_addresses.node_safe_registry.0.0),
-                hopr_management_module: Address::new(&chain_info.contract_addresses.module_implementation.0.0),
+                provider_url: provider_url.unwrap_or("n/a").to_owned(),
+                hopr_network_name: info.hopr_network_name,
                 hopr_node_safe: safe_config.safe_address,
                 connectivity_status: hopr.network_health().await,
                 channel_closure_period: channel_closure_notice_period.as_secs(),

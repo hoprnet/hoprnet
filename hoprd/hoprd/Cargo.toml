@@ -23,7 +23,6 @@ prometheus = [
   "hopr-db-node/prometheus",
   "hopr-strategy/prometheus",
   "dep:hopr-metrics",
-  "dep:lazy_static",
 ]
 runtime-tokio = [
   "dep:tokio",
@@ -71,6 +70,7 @@ async-trait = { workspace = true }
 clap = { workspace = true }
 console-subscriber = { workspace = true, optional = true }
 futures = { workspace = true }
+hex = { workspace = true }
 home = "0.5.12"
 humansize = { workspace = true, optional = true, features = ["no_alloc"] }
 humantime-serde = { workspace = true }
@@ -96,7 +96,7 @@ opentelemetry-otlp = { workspace = true, default-features = false, features = [
   "http-proto",
   "grpc-tonic",
 ], optional = true }
-lazy_static = { workspace = true, optional = true }
+lazy_static = { workspace = true }
 opentelemetry_sdk = { workspace = true, optional = true }
 tracing-opentelemetry = { workspace = true, optional = true }
 

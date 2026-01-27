@@ -95,7 +95,8 @@ where
             .timeout(futures_time::time::Duration::from(
                 timeout.max(std::time::Duration::from_secs(1)),
             ))
-            .await??
+            .await
+            .map_err(|_| ConnectorError::other(anyhow::anyhow!("timeout while waiting for key binding")))??
         {
             model_to_account_entry(node)
         } else {
@@ -218,6 +219,8 @@ where
                 ConnectorError::SafeDoesNotExist(*safe_address),
             ));
         }
+
+        tracing::debug!(%safe_address, %my_node_addr, "safe exists, proceeding with registration");
 
         let tx_req = self
             .payload_generator

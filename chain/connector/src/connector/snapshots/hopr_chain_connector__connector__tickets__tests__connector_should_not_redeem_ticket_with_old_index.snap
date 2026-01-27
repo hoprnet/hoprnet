@@ -59,8 +59,7 @@ deployed_safes:
     chain_key: bea83ba0fcee21da44a30c893f466e6bf0c29bbb
     module_address: ff263744a4621e2cac0f4882cc623bee3c9aef8d
     registered_nodes: []
-tx_counts:
-  668430def9eacd2b5064acf85d73fb0b351a1c8c: 0
+tx_counts: {}
 channels:
   e555945b137ef926702c021fa24104e2268de40641e63b8b747019b09e100802:
     balance: 0.00000000000000001 wxHOPR
@@ -82,7 +81,8 @@ chain_info:
   safe_registry_dst: "0000000000000000000000000000000000000000000000000000000000000000"
   ticket_price: 1 wxHOPR
   network: rotsee
-  contract_addresses: "{\"announcements\":\"0x5afe60f4f74159f8F68dadCE6202b938cDa80Dad\",\"channels\":\"0x5bD809bDBAa8D3d5f37743Ae86BFef766dEE56b6\",\"module_implementation\":\"0x1167FB204298799B0B9E98896D58958cAEd164B0\",\"node_safe_migration\":\"0xe95b481AA95e1d071a4B250Ea5F9dD498A19646b\",\"node_safe_registry\":\"0x0e4e1a2D851663462523bF38Ca56259aceCCBc76\",\"node_stake_factory\":\"0x878Ea9591726E70AA06f820c3bA5142A0C8ab58B\",\"ticket_price_oracle\":\"0x147899Ca57111d9081df125C2bcbd839981f04c2\",\"token\":\"0x9C312F8997F215ada9802DA9fb281206350EAd2b\",\"winning_probability_oracle\":\"0x74329f8153cBb33aABdEd79Ee84748fE8923c5E3\"}"
+  contract_addresses: "{\"announcements\":\"0x225b4b6FFe08228db1182946b5F9e905f1A19A4D\",\"channels\":\"0x69E63A01a2209F733C83ECa619ddDa2BEA4d5Cdf\",\"module_implementation\":\"0x1167FB204298799B0B9E98896D58958cAEd164B0\",\"node_safe_migration\":\"0x74dfCdF50340b772696cAeF3F3Bc4cD776D37E8A\",\"node_safe_registry\":\"0x0e4e1a2D851663462523bF38Ca56259aceCCBc76\",\"node_stake_factory\":\"0xE9A9cf50534Eb0817F9fBb115E00Bf8463E973Db\",\"ticket_price_oracle\":\"0x147899Ca57111d9081df125C2bcbd839981f04c2\",\"token\":\"0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1\",\"winning_probability_oracle\":\"0x74329f8153cBb33aABdEd79Ee84748fE8923c5E3\"}"
+  expected_block_time: "5"
 version: "1"
 health: OK
 active_txs: {}

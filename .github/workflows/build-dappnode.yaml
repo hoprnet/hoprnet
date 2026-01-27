@@ -97,9 +97,9 @@ jobs:
           install-sdk: 'true'
 
       - name: Setup Node.js
-        uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
-          node-version: 20.19.6 # Revert to version 20, as the dappnode package is not yet compatible with Node 22
+          node-version: 20.20.0 # Revert to version 20, as the dappnode package is not yet compatible with Node 22
 
       - name: Checkout DAppNodePackage-Hopr
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
