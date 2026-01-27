@@ -539,8 +539,8 @@ where
         let observations = match network.observations_for(peer) {
             Some(observations) => observations,
             None => {
-                // artificial delay to allow the observations to be recorded
-                async {}.delay(futures_time::time::Duration::from_millis(50)).await;
+                // artificial delay to allow the observations to be recorded, the 50ms is random value
+                futures_time::task::sleep(futures_time::time::Duration::from_millis(50)).await;
 
                 network
                     .observations_for(peer)
