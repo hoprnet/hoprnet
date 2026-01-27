@@ -1,7 +1,7 @@
 [package]
 name = "hopr-db-entity"
 description = "Contains all HOPR database entities"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2021"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
@@ -10,9 +10,9 @@ license = "GPL-3.0-only"
 [features]
 default = ["sqlite"]
 runtime-tokio = [
-  "sea-orm/runtime-tokio-rustls",
-  "sea-orm-cli/runtime-tokio-rustls",
-  "sea-orm-migration/runtime-tokio-rustls",
+  "sea-orm/runtime-tokio-native-tls",
+  "sea-orm-cli/runtime-tokio-native-tls",
+  "sea-orm-migration/runtime-tokio-native-tls",
 ]
 sqlite = []
 
