@@ -189,6 +189,7 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
 #[rstest]
 #[case(Capabilities::empty())]
 #[case(Capabilities::from(Capability::Segmentation))]
+#[case(Capabilities::from(Capability::RetransmissionAck))]
 #[tokio::test]
 /// Creates paired Hopr sessions bridged to a TCP listener to prove that messages
 /// sent over TCP end up in the remote session buffer regardless of capability set.
@@ -303,7 +304,13 @@ async fn tcp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
     );
     assert!(snapshot.lifetime.uptime > Duration::ZERO, "uptime should be positive");
 
-    let cap_suffix = if cap.is_empty() { "plain" } else { "seg" };
+    let cap_suffix = if cap.is_empty() {
+        "plain"
+    } else if cap.contains(Capability::RetransmissionAck) {
+        "ack"
+    } else {
+        "seg"
+    };
     insta::assert_yaml_snapshot!(format!("alice_metrics_tcp_{}", cap_suffix), snapshot, {
     ".snapshot_at" => "[snapshot_ts]",
     ".lifetime.created_at" => "[created_at]",
