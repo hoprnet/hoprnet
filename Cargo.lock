@@ -1576,7 +1576,7 @@ dependencies = [
 [[package]]
 name = "blokli-client"
 version = "0.17.0"
-source = "git+https://github.com/hoprnet/blokli#5c8af859639ac8b92047a6415acc5ec73be8a698"
+source = "git+https://github.com/hoprnet/blokli#81e751e1f4cce0b465e97c46abcaec83490f50ec"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -1755,9 +1755,9 @@ checksum = "37b2a672a2cb129a2e41c10b1224bb368f9f37a2b16b612598138befd7b37eb5"
 
 [[package]]
 name = "cc"
-version = "1.2.52"
+version = "1.2.53"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd4932aefd12402b36c60956a4fe0035421f544799057659ff86f923657aada3"
+checksum = "755d2fce177175ffca841e9a06afdb2c4ab0f593d53b4dee48147dfaade85932"
 dependencies = [
  "find-msvc-tools",
  "jobserver",
@@ -2960,21 +2960,20 @@ checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
 
 [[package]]
 name = "filetime"
-version = "0.2.26"
+version = "0.2.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc0505cd1b6fa6580283f6bdf70a73fcf4aba1184038c90902b92b3dd0df63ed"
+checksum = "f98844151eee8917efc50bd9e8318cb963ae8b297431495d3f758616ea5c57db"
 dependencies = [
  "cfg-if",
  "libc",
  "libredox",
- "windows-sys 0.60.2",
 ]
 
 [[package]]
 name = "find-msvc-tools"
-version = "0.1.7"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f449e6c6c08c865631d4890cfacf252b3d396c9bcc83adb6623cdb02a8336c41"
+checksum = "8591b0bcc8a98a64310a2fae1bb3e9b8564dd10e381e6e28010fde8e8e8568db"
 
 [[package]]
 name = "fixed-hash"
@@ -4524,7 +4523,7 @@ dependencies = [
 [[package]]
 name = "hopr-crypto-random"
 version = "0.3.0"
-source = "git+https://github.com/hoprnet/hoprnet?branch=master#763ab4bd34eba522d526e48b1310db959a6af6ce"
+source = "git+https://github.com/hoprnet/hoprnet?branch=master#a3291889aa08ad6babaf7ac60764be2758c0f1c9"
 dependencies = [
  "generic-array 1.3.5",
  "rand 0.8.5",
@@ -4594,7 +4593,7 @@ dependencies = [
 [[package]]
 name = "hopr-crypto-types"
 version = "0.9.0"
-source = "git+https://github.com/hoprnet/hoprnet?branch=master#763ab4bd34eba522d526e48b1310db959a6af6ce"
+source = "git+https://github.com/hoprnet/hoprnet?branch=master#a3291889aa08ad6babaf7ac60764be2758c0f1c9"
 dependencies = [
  "aes",
  "blake3",
@@ -4863,7 +4862,7 @@ dependencies = [
 [[package]]
 name = "hopr-primitive-types"
 version = "0.10.0"
-source = "git+https://github.com/hoprnet/hoprnet?branch=master#763ab4bd34eba522d526e48b1310db959a6af6ce"
+source = "git+https://github.com/hoprnet/hoprnet?branch=master#a3291889aa08ad6babaf7ac60764be2758c0f1c9"
 dependencies = [
  "bigdecimal",
  "chrono",
@@ -5625,7 +5624,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.6.2",
  "system-configuration",
  "tokio",
  "tower-service",
@@ -7951,7 +7950,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash",
  "rustls 0.23.36",
- "socket2 0.5.10",
+ "socket2 0.6.2",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -7988,7 +7987,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.5.10",
+ "socket2 0.6.2",
  "tracing",
  "windows-sys 0.60.2",
 ]
@@ -11455,9 +11454,9 @@ checksum = "40990edd51aae2c2b6907af74ffb635029d5788228222c4bb811e9351c0caad3"
 
 [[package]]
 name = "zmij"
-version = "1.0.14"
+version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd8f3f50b848df28f887acb68e41201b5aea6bc8a8dacc00fb40635ff9a72fea"
+checksum = "94f63c051f4fe3c1509da62131a678643c5b6fbdc9273b2b79d4378ebda003d2"
 
 [[package]]
 name = "zopfli"

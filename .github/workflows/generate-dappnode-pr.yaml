@@ -63,7 +63,7 @@ jobs:
             fi
 
       - name: Checkout hoprnet repository
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
           repository: ${{ steps.vars.outputs.source_repo }}
@@ -71,14 +71,14 @@ jobs:
 
       - name: Setup GCP
         id: gcp
-        uses: hoprnet/hopr-workflows/actions/setup-gcp@12c56020e16036982e6cc529848edeedfc705865 # master
+        uses: hoprnet/hopr-workflows/actions/setup-gcp@644d936de4e1c8f5c50ba50f8526209455c28b4a # master
         with:
           google-credentials: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
           login-artifact-registry: 'false'
           install-sdk: 'true'
 
       - name: Checkout DAppNodePackage-Hopr
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
           repository: ${{ steps.vars.outputs.dappnode_repository }}
@@ -100,7 +100,7 @@ jobs:
         working-directory: "./DAppNodePackage-Hopr-repo"
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7.0.11
+        uses: peter-evans/create-pull-request@c0f553fe549906ede9cf27b5156039d195d2ece0 # v8.1.0
         with:
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           commit-message: "Update to release ${{ steps.setup.outputs.current_version }}"
