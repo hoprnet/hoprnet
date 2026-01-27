@@ -1,6 +1,6 @@
 [package]
 name = "hopr-db-node"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 description = "Contains SQL Node DB functionality implementing the DB API traits"
 homepage = "https://hoprnet.org/"
@@ -14,8 +14,8 @@ runtime-tokio = [
   "hopr-db-entity/runtime-tokio",
   "hopr-db-migration/runtime-tokio",
   "sea-orm/runtime-tokio",
-  "sea-orm/runtime-tokio-rustls",
-  "sqlx/runtime-tokio-rustls",
+  "sea-orm/runtime-tokio-native-tls",
+  "sqlx/runtime-tokio-native-tls",
   "sqlx/runtime-tokio",
 ]
 prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
