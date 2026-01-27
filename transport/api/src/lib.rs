@@ -35,7 +35,6 @@ use futures::{
     FutureExt, SinkExt, StreamExt,
     channel::mpsc::{Sender, channel},
 };
-use futures_time::future::FutureExt as _;
 use helpers::PathPlanner;
 use hopr_api::{
     chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
