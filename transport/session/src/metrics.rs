@@ -174,8 +174,8 @@ pub struct SessionMetricsSnapshot {
 #[derive(Debug)]
 pub struct SessionMetrics {
     session_id: SessionId,
-    created_at_ms: AtomicU64,
-    last_activity_ms: AtomicU64,
+    created_at_us: AtomicU64,
+    last_activity_us: AtomicU64,
     state: AtomicU8,
     ack_mode: SessionAckMode,
     frame_mtu: usize,
@@ -195,7 +195,7 @@ pub struct SessionMetrics {
     packets_out: AtomicU64,
     surb_refill_in_flight: AtomicBool,
     last_rate_total: AtomicU64,
-    last_rate_ms: AtomicU64,
+    last_rate_us: AtomicU64,
     inspector: OnceLock<FrameInspector>,
 }
 
@@ -207,11 +207,11 @@ impl SessionMetrics {
         frame_timeout: Duration,
         frame_capacity: usize,
     ) -> Self {
-        let now = now_ms();
+        let now = now_us();
         Self {
             session_id,
-            created_at_ms: AtomicU64::new(now),
-            last_activity_ms: AtomicU64::new(now),
+            created_at_us: AtomicU64::new(now),
+            last_activity_us: AtomicU64::new(now),
             state: AtomicU8::new(SessionLifecycleState::Active.as_u8()),
             ack_mode: SessionAckMode::from_ack_mode(ack_mode),
             frame_mtu,
@@ -231,7 +231,7 @@ impl SessionMetrics {
             packets_out: AtomicU64::new(0),
             surb_refill_in_flight: AtomicBool::new(false),
             last_rate_total: AtomicU64::new(0),
-            last_rate_ms: AtomicU64::new(now),
+            last_rate_us: AtomicU64::new(now),
             inspector: OnceLock::new(),
         }
     }
@@ -253,7 +253,7 @@ impl SessionMetrics {
     ///
     /// This is called on read/write operations to track session idleness.
     pub fn touch_activity(&self) {
-        self.last_activity_ms.store(now_ms(), Ordering::Relaxed);
+        self.last_activity_us.store(now_us(), Ordering::Relaxed);
     }
 
     /// Records an incoming read operation with the specified number of bytes.
@@ -349,24 +349,24 @@ impl SessionMetrics {
     pub fn snapshot(&self, produced: u64, consumed: u64, target: Option<u64>) -> SessionMetricsSnapshot {
         self.record_incomplete_frames();
 
-        let snapshot_at_ms = now_ms();
-        let created_at_ms = self.created_at_ms.load(Ordering::Relaxed);
-        let last_activity_ms = self.last_activity_ms.load(Ordering::Relaxed);
+        let snapshot_at_us = now_us();
+        let created_at_us = self.created_at_us.load(Ordering::Relaxed);
+        let last_activity_us = self.last_activity_us.load(Ordering::Relaxed);
         let state = SessionLifecycleState::from_u8(self.state.load(Ordering::Relaxed));
-        let uptime_ms = snapshot_at_ms.saturating_sub(created_at_ms);
-        let idle_ms = snapshot_at_ms.saturating_sub(last_activity_ms);
+        let uptime_us = snapshot_at_us.saturating_sub(created_at_us);
+        let idle_us = snapshot_at_us.saturating_sub(last_activity_us);
 
         let buffer_estimate = produced.saturating_sub(consumed);
-        let rate_per_sec = self.compute_rate_per_sec(produced, consumed, snapshot_at_ms);
+        let rate_per_sec = self.compute_rate_per_sec(produced, consumed, snapshot_at_us);
 
         SessionMetricsSnapshot {
             session_id: self.session_id,
-            snapshot_at: UNIX_EPOCH + Duration::from_millis(snapshot_at_ms),
+            snapshot_at: UNIX_EPOCH + Duration::from_micros(snapshot_at_us),
             lifetime: SessionLifetimeSnapshot {
-                created_at: UNIX_EPOCH + Duration::from_millis(created_at_ms),
-                last_activity_at: UNIX_EPOCH + Duration::from_millis(last_activity_ms),
-                uptime: Duration::from_millis(uptime_ms),
-                idle: Duration::from_millis(idle_ms),
+                created_at: UNIX_EPOCH + Duration::from_micros(created_at_us),
+                last_activity_at: UNIX_EPOCH + Duration::from_micros(last_activity_us),
+                uptime: Duration::from_micros(uptime_us),
+                idle: Duration::from_micros(idle_us),
                 state,
             },
             frame_buffer: FrameBufferSnapshot {
@@ -406,16 +406,16 @@ impl SessionMetrics {
     ///
     /// This uses a sliding window approach, tracking the delta since the last computation
     /// and the elapsed time to calculate the current rate. Returns 0.0 if no time has elapsed.
-    fn compute_rate_per_sec(&self, produced: u64, consumed: u64, now_ms: u64) -> f64 {
+    fn compute_rate_per_sec(&self, produced: u64, consumed: u64, now_us: u64) -> f64 {
         let total = produced.saturating_sub(consumed);
         let last_total = self.last_rate_total.swap(total, Ordering::Relaxed);
-        let last_ms = self.last_rate_ms.swap(now_ms, Ordering::Relaxed);
+        let last_us = self.last_rate_us.swap(now_us, Ordering::Relaxed);
         let delta = total.saturating_sub(last_total);
-        let elapsed_ms = now_ms.saturating_sub(last_ms);
-        if elapsed_ms == 0 {
+        let elapsed_us = now_us.saturating_sub(last_us);
+        if elapsed_us == 0 {
             return 0.0;
         }
-        (delta as f64) / (elapsed_ms as f64 / 1000.0)
+        (delta as f64) / (elapsed_us as f64 / 1_000_000.0)
     }
 }
 
@@ -515,12 +515,12 @@ impl<const C: usize, S: SocketState<C> + Clone> SocketState<C> for MetricsState<
     }
 }
 
-/// Returns the current time as milliseconds since the Unix epoch.
-fn now_ms() -> u64 {
+/// Returns the current time as microseconds since the Unix epoch.
+fn now_us() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
-        .as_millis() as u64
+        .as_micros() as u64
 }
 
 #[cfg(test)]

@@ -145,8 +145,9 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
     ".lifetime.created_at" => "[created_at]",
     ".lifetime.last_activity_at" => "[last_activity_at]",
     ".lifetime.uptime" => "[uptime]",
-    ".lifetime.idle" => "[idle]"
-       });
+    ".lifetime.idle" => "[idle]",
+    ".session_id.pseudonym" => "[pseudonym]",
+        });
 
     let snapshot = bob_metrics.snapshot(0, 0, None);
 
@@ -167,7 +168,8 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
         ".lifetime.created_at" => "[created_at]",
         ".lifetime.last_activity_at" => "[last_activity_at]",
         ".lifetime.uptime" => "[uptime]",
-        ".lifetime.idle" => "[idle]"
+        ".lifetime.idle" => "[idle]",
+        ".session_id.pseudonym" => "[pseudonym]",
     });
 
     transfer_handle.abort();
