@@ -5027,13 +5027,14 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.15.0"
+version = "0.15.1"
 dependencies = [
  "anyhow",
  "async-trait",
  "cfg-if",
  "futures",
  "futures-concurrency",
+ "futures-time",
  "hex-literal",
  "hopr-api",
  "hopr-async-runtime",
@@ -5118,7 +5119,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-p2p"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "anyhow",
  "async-trait",
