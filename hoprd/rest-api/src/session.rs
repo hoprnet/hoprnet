@@ -17,7 +17,7 @@ use futures_concurrency::stream::Merge;
 use hopr_lib::NodeId;
 use hopr_lib::{
     Address, HoprSession, SESSION_MTU, SURB_SIZE, ServiceId, SessionAckMode, SessionCapabilities, SessionClientConfig,
-    SessionId, SessionLifecycleState, SessionManagerError, SessionMetricsSnapshot, SessionTarget, SurbBalancerConfig,
+    SessionId, SessionLifecycleState, SessionManagerError, SessionStatsSnapshot, SessionTarget, SurbBalancerConfig,
     TransportSessionError,
     errors::{HoprLibError, HoprTransportError},
     utils::futures::AsyncReadStreamer,
@@ -1100,9 +1100,9 @@ pub(crate) struct SessionStatsResponse {
     pub transport: SessionStatsTransport,
 }
 
-impl From<SessionMetricsSnapshot> for SessionStatsResponse {
+impl From<SessionStatsSnapshot> for SessionStatsResponse {
     /// Converts protocol-level metrics snapshot into the API response format.
-    fn from(value: SessionMetricsSnapshot) -> Self {
+    fn from(value: SessionStatsSnapshot) -> Self {
         Self {
             session_id: value.session_id.to_string(),
             snapshot_at_ms: value

@@ -29,7 +29,7 @@ use tracing::{debug, instrument};
 use crate::{
     Capabilities, Capability,
     errors::TransportSessionError,
-    metrics::{MetricsState, SessionMetrics},
+    stats::{StatsState, SessionStats},
 };
 
 /// Wrapper for [`Capabilities`] that makes conversion to/from `u8` possible.
@@ -346,7 +346,7 @@ pub struct HoprSession {
     routing: DestinationRouting,
     cfg: HoprSessionConfig,
     on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
-    metrics: Arc<SessionMetrics>,
+    metrics: Arc<SessionStats>,
 }
 
 impl HoprSession {
@@ -363,7 +363,7 @@ impl HoprSession {
         routing: DestinationRouting,
         cfg: HoprSessionConfig,
         hopr: (Tx, Rx),
-        metrics: Arc<SessionMetrics>,
+        metrics: Arc<SessionStats>,
         on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
     ) -> Result<Self, TransportSessionError>
     where
@@ -424,7 +424,7 @@ impl HoprSession {
 
                 debug!(?socket_cfg, ?ack_cfg, "opening new stateful session socket");
 
-                let state = MetricsState::new(
+                let state = StatsState::new(
                     AcknowledgementState::<{ ApplicationData::PAYLOAD_SIZE }>::new(id, ack_cfg),
                     metrics.clone(),
                 );
@@ -432,7 +432,7 @@ impl HoprSession {
             } else {
                 debug!(?socket_cfg, "opening new stateless session socket");
 
-                let state = MetricsState::new(Stateless::<{ ApplicationData::PAYLOAD_SIZE }>::new(id), metrics.clone());
+                let state = StatsState::new(Stateless::<{ ApplicationData::PAYLOAD_SIZE }>::new(id), metrics.clone());
                 Box::new(SessionSocket::new(transport, state, socket_cfg)?)
             }
         } else {
@@ -465,7 +465,7 @@ impl HoprSession {
         &self.cfg
     }
 
-    pub fn metrics(&self) -> &Arc<SessionMetrics> {
+    pub fn metrics(&self) -> &Arc<SessionStats> {
         &self.metrics
     }
 }
@@ -519,7 +519,7 @@ impl futures::AsyncWrite for HoprSession {
         futures::ready!(this.inner.poll_close(cx))?;
         tracing::trace!("hopr session closed");
 
-        this.metrics.set_state(crate::metrics::SessionLifecycleState::Closing);
+        this.metrics.set_state(crate::stats::SessionLifecycleState::Closing);
 
         if let Some(notifier) = this.on_close.take() {
             tracing::trace!("notifying write half closure of session");
@@ -569,7 +569,7 @@ mod tests {
     use hopr_primitive_types::prelude::*;
 
     use super::*;
-    use crate::{SESSION_MTU, metrics::SessionMetrics};
+    use crate::{SESSION_MTU, stats::SessionStats};
 
     #[test]
     fn test_session_id_to_str_from_str() -> anyhow::Result<()> {
@@ -618,14 +618,14 @@ mod tests {
         let id = SessionId::new(1234_u64, HoprPseudonym::random());
         const DATA_LEN: usize = 5000;
 
-        let alice_metrics = Arc::new(SessionMetrics::new(
+        let alice_metrics = Arc::new(SessionStats::new(
             id,
             None,
             SESSION_MTU,
             Duration::from_millis(800),
             0,
         ));
-        let bob_metrics = Arc::new(SessionMetrics::new(
+        let bob_metrics = Arc::new(SessionStats::new(
             id,
             None,
             SESSION_MTU,
@@ -710,14 +710,14 @@ mod tests {
         let id = SessionId::new(1234_u64, HoprPseudonym::random());
         const DATA_LEN: usize = 5000;
 
-        let alice_metrics = Arc::new(SessionMetrics::new(
+        let alice_metrics = Arc::new(SessionStats::new(
             id,
             None,
             SESSION_MTU,
             Duration::from_millis(800),
             16384,
         ));
-        let bob_metrics = Arc::new(SessionMetrics::new(
+        let bob_metrics = Arc::new(SessionStats::new(
             id,
             None,
             SESSION_MTU,

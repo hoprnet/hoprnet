@@ -1,8 +1,8 @@
-//! Session metrics tracking and snapshotting.
+//! Session stats tracking and snapshotting.
 //!
-//! This module provides functionality to track various metrics of a HOPR session,
+//! This module provides functionality to track various stats of a HOPR session,
 //! including data throughput, packet counts, frame events, and session lifecycle.
-//! It allows creating immutable snapshots of the metrics state for monitoring and reporting.
+//! It allows creating immutable snapshots of the stats state for monitoring and reporting.
 
 use std::{
     sync::{
@@ -18,6 +18,7 @@ use hopr_protocol_session::{
 };
 
 use crate::SessionId;
+use crate::balancer::AtomicSurbFlowEstimator;
 
 /// The lifecycle state of a session from the perspective of metrics.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
@@ -153,7 +154,7 @@ pub struct TransportSnapshot {
 
 /// Complete snapshot of all session metrics at a point in time.
 #[derive(Debug, Clone, serde::Serialize)]
-pub struct SessionMetricsSnapshot {
+pub struct SessionStatsSnapshot {
     /// The ID of the session.
     pub session_id: SessionId,
     /// Time when this snapshot was taken.
@@ -174,7 +175,7 @@ pub struct SessionMetricsSnapshot {
 ///
 /// This struct uses atomic counters to allow lock-free updates from multiple threads/tasks.
 #[derive(Debug)]
-pub struct SessionMetrics {
+pub struct SessionStats {
     session_id: SessionId,
     created_at_us: AtomicU64,
     last_activity_us: AtomicU64,
@@ -199,9 +200,11 @@ pub struct SessionMetrics {
     last_rate_total: AtomicU64,
     last_rate_us: AtomicU64,
     inspector: OnceLock<FrameInspector>,
+    surb_estimator: OnceLock<AtomicSurbFlowEstimator>,
+    surb_target_buffer: OnceLock<u64>,
 }
 
-impl SessionMetrics {
+impl SessionStats {
     pub fn new(
         session_id: SessionId,
         ack_mode: Option<AcknowledgementMode>,
@@ -235,6 +238,8 @@ impl SessionMetrics {
             last_rate_total: AtomicU64::new(0),
             last_rate_us: AtomicU64::new(now),
             inspector: OnceLock::new(),
+            surb_estimator: OnceLock::new(),
+            surb_target_buffer: OnceLock::new(),
         }
     }
 
@@ -296,6 +301,14 @@ impl SessionMetrics {
         let _ = self.inspector.set(inspector);
     }
 
+    /// Sets the SURB flow estimator for tracking produced/consumed SURBs.
+    ///
+    /// The estimator and target buffer are initialized only once via `OnceLock`.
+    pub fn set_surb_estimator(&self, estimator: AtomicSurbFlowEstimator, target_buffer: u64) {
+        let _ = self.surb_estimator.set(estimator);
+        let _ = self.surb_target_buffer.set(target_buffer);
+    }
+
     /// Updates the count of incomplete frames from the frame inspector.
     fn record_incomplete_frames(&self) {
         if let Some(inspector) = self.inspector.get() {
@@ -342,13 +355,9 @@ impl SessionMetrics {
     ///
     /// This method atomically reads all metric counters and creates an immutable snapshot
     /// that includes lifetime, frame buffer, acknowledgement, SURB, and transport metrics.
-    ///
-    /// # Arguments
-    ///
-    /// * `produced` - Total number of SURBs produced/minted
-    /// * `consumed` - Total number of SURBs consumed/used
-    /// * `target` - Target SURB buffer size (if configured)
-    pub fn snapshot(&self, produced: u64, consumed: u64, target: Option<u64>) -> SessionMetricsSnapshot {
+    /// SURB metrics are loaded automatically from the stored estimator if one was set via
+    /// [`set_surb_estimator`].
+    pub fn snapshot(&self) -> SessionStatsSnapshot {
         self.record_incomplete_frames();
 
         let snapshot_at_us = now_us();
@@ -358,10 +367,21 @@ impl SessionMetrics {
         let uptime_us = snapshot_at_us.saturating_sub(created_at_us);
         let idle_us = snapshot_at_us.saturating_sub(last_activity_us);
 
+        let (produced, consumed) = self
+            .surb_estimator
+            .get()
+            .map(|e| (
+                e.produced.load(Ordering::Relaxed),
+                e.consumed.load(Ordering::Relaxed),
+            ))
+            .unwrap_or((0, 0));
+
+        let target = self.surb_target_buffer.get().copied();
+
         let buffer_estimate = produced.saturating_sub(consumed);
         let rate_per_sec = self.compute_rate_per_sec(produced, consumed, snapshot_at_us);
 
-        SessionMetricsSnapshot {
+        SessionStatsSnapshot {
             session_id: self.session_id,
             snapshot_at: UNIX_EPOCH + Duration::from_micros(snapshot_at_us),
             lifetime: SessionLifetimeSnapshot {
@@ -424,27 +444,27 @@ impl SessionMetrics {
 /// A wrapper that adds metrics tracking to a socket state implementation.
 ///
 /// This struct wraps any `SocketState` implementation and intercepts lifecycle and data events
-/// to record them in the associated `SessionMetrics`. It maintains a transparent interface
+/// to record them in the associated `SessionStats`. It maintains a transparent interface
 /// to the wrapped state while collecting comprehensive metrics.
 #[derive(Clone)]
-pub struct MetricsState<S> {
+pub struct StatsState<S> {
     inner: S,
-    metrics: Arc<SessionMetrics>,
+    metrics: Arc<SessionStats>,
 }
 
-impl<S> MetricsState<S> {
+impl<S> StatsState<S> {
     /// Creates a new metrics-tracking state wrapper.
     ///
     /// # Arguments
     ///
     /// * `inner` - The underlying socket state implementation
     /// * `metrics` - The metrics tracker shared across clones
-    pub fn new(inner: S, metrics: Arc<SessionMetrics>) -> Self {
+    pub fn new(inner: S, metrics: Arc<SessionStats>) -> Self {
         Self { inner, metrics }
     }
 }
 
-impl<const C: usize, S: SocketState<C> + Clone> SocketState<C> for MetricsState<S> {
+impl<const C: usize, S: SocketState<C> + Clone> SocketState<C> for StatsState<S> {
     /// Delegates to the inner state's session ID.
     fn session_id(&self) -> &str {
         self.inner.session_id()
@@ -536,13 +556,13 @@ mod tests {
     #[test]
     fn metrics_snapshot_tracks_bytes_and_packets() {
         let id = SessionId::new(1_u64, HoprPseudonym::random());
-        let metrics = SessionMetrics::new(id, None, 1500, Duration::from_millis(800), 1024);
+        let metrics = SessionStats::new(id, None, 1500, Duration::from_millis(800), 1024);
 
         metrics.record_read(10);
         metrics.record_read(0);
         metrics.record_write(20);
 
-        let snapshot = metrics.snapshot(0, 0, None);
+        let snapshot = metrics.snapshot();
 
         assert_eq!(snapshot.transport.bytes_in, 10);
         assert_eq!(snapshot.transport.bytes_out, 20);
@@ -553,13 +573,13 @@ mod tests {
     #[test]
     fn metrics_snapshot_tracks_frame_events() {
         let id = SessionId::new(2_u64, HoprPseudonym::random());
-        let metrics = SessionMetrics::new(id, None, 1500, Duration::from_millis(800), 1024);
+        let metrics = SessionStats::new(id, None, 1500, Duration::from_millis(800), 1024);
 
         metrics.record_frame_complete();
         metrics.record_frame_emitted();
         metrics.record_frame_discarded();
 
-        let snapshot = metrics.snapshot(0, 0, None);
+        let snapshot = metrics.snapshot();
 
         assert_eq!(snapshot.frame_buffer.frames_completed, 1);
         assert_eq!(snapshot.frame_buffer.frames_emitted, 1);

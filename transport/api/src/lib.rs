@@ -73,9 +73,9 @@ pub use hopr_transport_session as session;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::transfer_session;
 pub use hopr_transport_session::{
-    Capabilities as SessionCapabilities, Capability as SessionCapability, HoprSession, IncomingSession, SESSION_MTU,
-    SURB_SIZE, ServiceId, SessionAckMode, SessionClientConfig, SessionId, SessionLifecycleState,
-    SessionMetricsSnapshot, SessionTarget, SurbBalancerConfig,
+    AtomicSurbFlowEstimator, Capabilities as SessionCapabilities, Capability as SessionCapability, HoprSession,
+    IncomingSession, SESSION_MTU, SURB_SIZE, ServiceId, SessionAckMode, SessionClientConfig, SessionId,
+    SessionLifecycleState, SessionStatsSnapshot, SessionTarget, SurbBalancerConfig,
     errors::{SessionManagerError, TransportSessionError},
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
@@ -570,7 +570,7 @@ where
         Ok(self.smgr.get_surb_balancer_config(id).await?)
     }
 
-    pub async fn session_stats(&self, id: &SessionId) -> errors::Result<SessionMetricsSnapshot> {
+    pub async fn session_stats(&self, id: &SessionId) -> errors::Result<SessionStatsSnapshot> {
         Ok(self.smgr.get_session_stats(id).await?)
     }
 
