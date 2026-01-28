@@ -77,8 +77,8 @@ where
                     .await
                 {
                     Ok(Ok(value)) => Ok(value.map(|account| account.public_key)),
-                    Ok(Err(e)) => Err(ConnectorError::BackendError(e.into())),
-                    Err(e) => Err(ConnectorError::BackendError(e.into())),
+                    Ok(Err(e)) => Err(ConnectorError::backend(e)),
+                    Err(e) => Err(ConnectorError::backend(e)),
                 }
             })
             .await?)
@@ -92,12 +92,15 @@ where
         Ok(self
             .packet_to_chain
             .try_get_with_by_ref(&packet_key, async move {
-                tracing::warn!(%packet_key, "cache miss on packet_key_to_chain_key");
+                tracing::warn!(
+                    peer_id = packet.to_peerid_str(),
+                    "cache miss on packet_key_to_chain_key"
+                );
                 match hopr_async_runtime::prelude::spawn_blocking(move || backend.get_account_by_key(&packet_key)).await
                 {
                     Ok(Ok(value)) => Ok(value.map(|account| account.chain_addr)),
-                    Ok(Err(e)) => Err(ConnectorError::BackendError(e.into())),
-                    Err(e) => Err(ConnectorError::BackendError(e.into())),
+                    Ok(Err(e)) => Err(ConnectorError::backend(e)),
+                    Err(e) => Err(ConnectorError::backend(e)),
                 }
             })
             .await?)

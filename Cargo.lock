@@ -4402,7 +4402,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.13.0"
+version = "0.13.1"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4708,7 +4708,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-internal-types"
-version = "0.17.0"
+version = "0.17.1"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -5147,7 +5147,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-probe"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5182,7 +5182,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "0.13.0"
+version = "0.13.1"
 dependencies = [
  "ahash",
  "anyhow",

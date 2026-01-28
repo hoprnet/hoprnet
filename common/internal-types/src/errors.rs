@@ -46,7 +46,7 @@ pub enum PathError {
     #[error("path is not valid")]
     PathNotValid,
 
-    #[error("path contains an invalid peer id: {0}")]
+    #[error("path contains a missing peer id or address: {0}")]
     InvalidPeer(String),
 
     #[error("path contains a unknown peer that cannot be resolved: {0}")]
