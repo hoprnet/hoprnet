@@ -1,7 +1,6 @@
-use std::sync::atomic::Ordering;
 use std::{
     ops::Range,
-    sync::{Arc, OnceLock},
+    sync::{Arc, OnceLock, atomic::Ordering},
     time::Duration,
 };
 

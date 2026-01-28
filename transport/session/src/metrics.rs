@@ -4,11 +4,13 @@
 //! including data throughput, packet counts, frame events, and session lifecycle.
 //! It allows creating immutable snapshots of the metrics state for monitoring and reporting.
 
-use std::sync::{
-    Arc, OnceLock,
-    atomic::{AtomicBool, AtomicU8, AtomicU64, AtomicUsize, Ordering},
+use std::{
+    sync::{
+        Arc, OnceLock,
+        atomic::{AtomicBool, AtomicU8, AtomicU64, AtomicUsize, Ordering},
+    },
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use hopr_protocol_session::{
     AcknowledgementMode, FrameAcknowledgements, FrameId, FrameInspector, Segment, SegmentId, SegmentRequest,

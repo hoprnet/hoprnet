@@ -569,8 +569,7 @@ mod tests {
     use hopr_primitive_types::prelude::*;
 
     use super::*;
-    use crate::SESSION_MTU;
-    use crate::metrics::SessionMetrics;
+    use crate::{SESSION_MTU, metrics::SessionMetrics};
 
     #[test]
     fn test_session_id_to_str_from_str() -> anyhow::Result<()> {
