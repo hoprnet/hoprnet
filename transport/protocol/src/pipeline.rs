@@ -152,25 +152,25 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
             let mut ack_outgoing_failure = ack_outgoing_failure.clone();
             let mut ticket_events_reject = ticket_events.clone();
 
-            tracing::trace!("protocol message in");
+            tracing::trace!(%peer, "protocol message in");
 
             async move {
                 match decoder.decode(peer, data)
                     .timeout(futures_time::time::Duration::from(PACKET_DECODING_TIMEOUT))
                     .await {
                     Ok(Ok(packet)) => {
-                        tracing::trace!(?packet, "successfully decoded incoming packet");
+                        tracing::trace!(%peer, ?packet, "successfully decoded incoming packet");
                         Some(packet)
                     },
                     Ok(Err(IncomingPacketError::Undecodable(error))) => {
                         // Do not send an ack back if the packet could not be decoded at all
                         //
                         // Potentially adversarial behavior
-                        tracing::trace!(%error, "not sending ack back on undecodable packet - possible adversarial behavior");
+                        tracing::trace!(%peer, %error, "not sending ack back on undecodable packet - possible adversarial behavior");
                         None
                     },
                     Ok(Err(IncomingPacketError::ProcessingError(sender, error))) => {
-                        tracing::error!(%error, "failed to process the decoded packet");
+                        tracing::error!(%peer, %error, "failed to process the decoded packet");
                         // On this failure, we send back a random acknowledgement
                         ack_outgoing_failure
                             .send((sender, None))
@@ -198,7 +198,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                     }
                     Err(_) => {
                         // If we cannot decode the packet within the time limit, just drop it
-                        tracing::error!("dropped incoming packet: failed to decode packet within {:?}", PACKET_DECODING_TIMEOUT);
+                        tracing::error!(%peer, "dropped incoming packet: failed to decode packet within {:?}", PACKET_DECODING_TIMEOUT);
                         None
                     }
                 }
