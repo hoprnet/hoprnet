@@ -36,7 +36,7 @@ surb:
   rate_per_sec: 0
   refill_in_flight: false
 transport:
-  bytes_in: 4096
-  bytes_out: 4096
-  packets_in: 3
-  packets_out: 3
+  bytes_in: 4156
+  bytes_out: 4156
+  packets_in: 6
+  packets_out: 6

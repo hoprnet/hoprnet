@@ -374,9 +374,12 @@ impl HoprSession {
         let routing_clone = routing.clone();
 
         // Wrap the HOPR transport so that it appears as regular transport to the SessionSocket
+        let metrics_write = metrics.clone();
+        let metrics_read = metrics.clone();
         let transport = DuplexIO(
             AsyncWriteSink::<{ ApplicationData::PAYLOAD_SIZE }, _>(hopr.0.sink_map_err(std::io::Error::other).with(
                 move |buf: Box<[u8]>| {
+                    metrics_write.record_write(buf.len());
                     // The Session protocol does not set any packet info on outgoing packets.
                     // However, the SessionManager on top usually overrides this.
                     futures::future::ready(
@@ -389,7 +392,10 @@ impl HoprSession {
             // The Session protocol ignores the packet info on incoming packets.
             // It is typically SessionManager's job to interpret those.
             hopr.1
-                .map(|data| Ok::<_, std::io::Error>(data.data.plain_text))
+                .map(move |data| {
+                    metrics_read.record_read(data.data.plain_text.len());
+                    Ok::<_, std::io::Error>(data.data.plain_text)
+                })
                 .into_async_read(),
         );
 
@@ -484,7 +490,6 @@ impl futures::AsyncRead for HoprSession {
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
         let this = self.project();
         let read = futures::ready!(this.inner.poll_read(cx, buf))?;
-        this.metrics.record_read(read);
         if read == 0 {
             tracing::trace!("hopr session empty read");
             // Empty read signals end of the socket, notify if needed
@@ -501,11 +506,7 @@ impl futures::AsyncWrite for HoprSession {
     #[instrument(name = "Session::poll_write", level = "trace", skip(self, cx, buf), fields(session_id = %self.id), ret)]
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
         let this = self.project();
-        let res = this.inner.poll_write(cx, buf);
-        if let Poll::Ready(Ok(written)) = &res {
-            this.metrics.record_write(*written);
-        }
-        res
+        this.inner.poll_write(cx, buf)
     }
 
     #[instrument(name = "Session::poll_flush", level = "trace", skip(self, cx), fields(session_id = %self.id), ret)]

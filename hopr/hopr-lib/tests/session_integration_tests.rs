@@ -199,8 +199,7 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
         ".session_id.pseudonym" => "[pseudonym]",
     });
 
-    // Dropping the handle cancels the spawned transfer task
-    drop(transfer_handle);
+    transfer_handle.abort();
 
     Ok(())
 }
@@ -390,8 +389,7 @@ async fn tcp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
         ".session_id.pseudonym" => "[pseudonym]",
     });
 
-    // Dropping the handle cancels the spawned transfer task
-    drop(transfer_handle);
+    transfer_handle.abort();
 
     Ok(())
 }

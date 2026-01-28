@@ -6,7 +6,7 @@
 
 use std::{
     sync::{
-        Arc, OnceLock,
+        Arc, Mutex, OnceLock,
         atomic::{AtomicBool, AtomicU8, AtomicU64, AtomicUsize, Ordering},
     },
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -196,8 +196,9 @@ pub struct SessionStats {
     packets_in: AtomicU64,
     packets_out: AtomicU64,
     surb_refill_in_flight: AtomicBool,
-    last_rate_total: AtomicU64,
-    last_rate_us: AtomicU64,
+    /// Previous (buffer_estimate, timestamp_us) for rate calculation, protected by mutex
+    /// to ensure atomic read/update of the pair.
+    last_rate_snapshot: Mutex<(u64, u64)>,
     inspector: OnceLock<FrameInspector>,
     surb_estimator: OnceLock<AtomicSurbFlowEstimator>,
     surb_target_buffer: OnceLock<u64>,
@@ -234,8 +235,7 @@ impl SessionStats {
             packets_in: AtomicU64::new(0),
             packets_out: AtomicU64::new(0),
             surb_refill_in_flight: AtomicBool::new(false),
-            last_rate_total: AtomicU64::new(0),
-            last_rate_us: AtomicU64::new(now),
+            last_rate_snapshot: Mutex::new((0, now)),
             inspector: OnceLock::new(),
             surb_estimator: OnceLock::new(),
             surb_target_buffer: OnceLock::new(),
@@ -420,19 +420,33 @@ impl SessionStats {
         }
     }
 
-    /// Computes the SURB consumption/production rate in items per second.
+    /// Computes the SURB buffer change rate in items per second.
     ///
     /// This uses a sliding window approach, tracking the delta since the last computation
-    /// and the elapsed time to calculate the current rate. Returns 0.0 if no time has elapsed.
+    /// and the elapsed time to calculate the current rate.
+    ///
+    /// Returns:
+    /// - Positive value: buffer is growing (production > consumption)
+    /// - Negative value: buffer is depleting (consumption > production)
+    /// - Zero: no change or no time has elapsed
     fn compute_rate_per_sec(&self, produced: u64, consumed: u64, now_us: u64) -> f64 {
         let total = produced.saturating_sub(consumed);
-        let last_total = self.last_rate_total.swap(total, Ordering::Relaxed);
-        let last_us = self.last_rate_us.swap(now_us, Ordering::Relaxed);
-        let delta = total.saturating_sub(last_total);
+
+        // Atomically read and update the previous snapshot
+        let (last_total, last_us) = {
+            let mut snapshot = self.last_rate_snapshot.lock().unwrap_or_else(|e| e.into_inner());
+            let prev = *snapshot;
+            *snapshot = (total, now_us);
+            prev
+        };
+
         let elapsed_us = now_us.saturating_sub(last_us);
         if elapsed_us == 0 {
             return 0.0;
         }
+
+        // Use signed arithmetic to capture buffer depletion as negative rates
+        let delta = total as i64 - last_total as i64;
         (delta as f64) / (elapsed_us as f64 / 1_000_000.0)
     }
 }

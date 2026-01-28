@@ -37,6 +37,6 @@ surb:
   refill_in_flight: false
 transport:
   bytes_in: 0
-  bytes_out: 9183
+  bytes_out: 9313
   packets_in: 0
-  packets_out: 7
+  packets_out: 13

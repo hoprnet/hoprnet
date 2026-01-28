@@ -1,6 +1,6 @@
 [package]
 name = "hoprd-api"
-version = "4.5.0"
+version = "4.6.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "API enabling developers to interact with a hoprd node programatically through HTTP REST API."
