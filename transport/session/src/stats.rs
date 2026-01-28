@@ -17,8 +17,7 @@ use hopr_protocol_session::{
     SeqIndicator, SocketComponents, SocketState,
 };
 
-use crate::SessionId;
-use crate::balancer::AtomicSurbFlowEstimator;
+use crate::{SessionId, balancer::AtomicSurbFlowEstimator};
 
 /// The lifecycle state of a session from the perspective of metrics.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
@@ -370,10 +369,7 @@ impl SessionStats {
         let (produced, consumed) = self
             .surb_estimator
             .get()
-            .map(|e| (
-                e.produced.load(Ordering::Relaxed),
-                e.consumed.load(Ordering::Relaxed),
-            ))
+            .map(|e| (e.produced.load(Ordering::Relaxed), e.consumed.load(Ordering::Relaxed)))
             .unwrap_or((0, 0));
 
         let target = self.surb_target_buffer.get().copied();

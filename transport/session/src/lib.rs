@@ -19,8 +19,8 @@ pub use hopr_network_types::types::*;
 pub use hopr_protocol_session::AcknowledgementMode;
 pub use manager::{DispatchResult, MIN_SURB_BUFFER_DURATION, SessionManager, SessionManagerConfig};
 pub use stats::{
-    AckSnapshot, FrameBufferSnapshot, SessionAckMode, SessionLifecycleState, SessionLifetimeSnapshot,
-    SessionStats, SessionStatsSnapshot, StatsState, SurbSnapshot, TransportSnapshot,
+    AckSnapshot, FrameBufferSnapshot, SessionAckMode, SessionLifecycleState, SessionLifetimeSnapshot, SessionStats,
+    SessionStatsSnapshot, StatsState, SurbSnapshot, TransportSnapshot,
 };
 pub use types::{
     ByteCapabilities, HoprSession, HoprSessionConfig, IncomingSession, ServiceId, SessionId, SessionTarget,

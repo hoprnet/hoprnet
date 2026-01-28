@@ -29,7 +29,7 @@ use tracing::{debug, instrument};
 use crate::{
     Capabilities, Capability,
     errors::TransportSessionError,
-    stats::{StatsState, SessionStats},
+    stats::{SessionStats, StatsState},
 };
 
 /// Wrapper for [`Capabilities`] that makes conversion to/from `u8` possible.
@@ -618,20 +618,8 @@ mod tests {
         let id = SessionId::new(1234_u64, HoprPseudonym::random());
         const DATA_LEN: usize = 5000;
 
-        let alice_metrics = Arc::new(SessionStats::new(
-            id,
-            None,
-            SESSION_MTU,
-            Duration::from_millis(800),
-            0,
-        ));
-        let bob_metrics = Arc::new(SessionStats::new(
-            id,
-            None,
-            SESSION_MTU,
-            Duration::from_millis(800),
-            0,
-        ));
+        let alice_metrics = Arc::new(SessionStats::new(id, None, SESSION_MTU, Duration::from_millis(800), 0));
+        let bob_metrics = Arc::new(SessionStats::new(id, None, SESSION_MTU, Duration::from_millis(800), 0));
 
         let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
         let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();

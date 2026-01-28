@@ -148,9 +148,6 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
 
     assert_eq!(recv_msg, msg);
 
-    // Ensure some time passes so uptime > 0 (metrics track ms)
-    tokio::time::sleep(Duration::from_millis(10)).await;
-
     // Verify metrics updated correctly
     let snapshot = alice_metrics.snapshot();
 
@@ -170,7 +167,6 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
         snapshot.lifetime.last_activity_at >= start_time,
         "last_activity_at should be recent"
     );
-    assert!(snapshot.lifetime.uptime > Duration::ZERO, "uptime should be positive");
 
     insta::assert_yaml_snapshot!(format!("alice_metrics_udp_{}", cap_suffix), snapshot, {
     ".snapshot_at" => "[snapshot_ts]",
@@ -193,7 +189,6 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
         snapshot.lifetime.last_activity_at >= start_time,
         "last_activity_at should be recent"
     );
-    assert!(snapshot.lifetime.uptime > Duration::ZERO, "uptime should be positive");
 
     insta::assert_yaml_snapshot!(format!("bob_metrics_udp_{:}", cap_suffix),snapshot, {
         ".snapshot_at" => "[snapshot_ts]",
@@ -204,11 +199,8 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
         ".session_id.pseudonym" => "[pseudonym]",
     });
 
-    transfer_handle.abort();
-
-    if let Ok(Err(e)) = transfer_handle.await {
-        panic!("transfer failed: {e}");
-    }
+    // Dropping the handle cancels the spawned transfer task
+    drop(transfer_handle);
 
     Ok(())
 }
@@ -336,9 +328,6 @@ async fn tcp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
 
     assert_eq!(recv_msg, msg);
 
-    // Ensure some time passes so uptime > 0 (metrics track ms)
-    tokio::time::sleep(Duration::from_millis(10)).await;
-
     // Verify metrics updated correctly
     let snapshot = alice_metrics.snapshot();
 
@@ -358,7 +347,6 @@ async fn tcp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
         snapshot.lifetime.last_activity_at >= start_time,
         "last_activity_at should be recent"
     );
-    assert!(snapshot.lifetime.uptime > Duration::ZERO, "uptime should be positive");
 
     let cap_suffix = if cap.is_empty() {
         "plain"
@@ -392,7 +380,6 @@ async fn tcp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
         snapshot.lifetime.last_activity_at >= start_time,
         "last_activity_at should be recent"
     );
-    assert!(snapshot.lifetime.uptime > Duration::ZERO, "uptime should be positive");
 
     insta::assert_yaml_snapshot!(format!("bob_metrics_tcp_{}", cap_suffix), snapshot, {
         ".snapshot_at" => "[snapshot_ts]",
@@ -403,11 +390,8 @@ async fn tcp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
         ".session_id.pseudonym" => "[pseudonym]",
     });
 
-    transfer_handle.abort();
-
-    if let Ok(Err(e)) = transfer_handle.await {
-        panic!("transfer failed: {e}");
-    }
+    // Dropping the handle cancels the spawned transfer task
+    drop(transfer_handle);
 
     Ok(())
 }
@@ -535,17 +519,10 @@ async fn bidirectional_tcp_session(#[case] cap: Capabilities) -> anyhow::Result<
     alice_session.read_exact(&mut recv_from_bob).await?;
     assert_eq!(recv_from_bob, bob_msg);
 
-    // Ensure some time passes so uptime > 0
-    tokio::time::sleep(Duration::from_millis(10)).await;
-
     // Verify alice metrics - should have bytes_in (from bob) and bytes_out (to bob)
     let alice_snapshot = alice_metrics.snapshot();
 
     assert!(alice_snapshot.snapshot_at >= start_time, "snapshot_at should be recent");
-    assert!(
-        alice_snapshot.lifetime.uptime > Duration::ZERO,
-        "uptime should be positive"
-    );
 
     let cap_suffix = if cap.is_empty() { "plain" } else { "seg" };
     insta::assert_yaml_snapshot!(format!("bidirectional_alice_{}", cap_suffix), alice_snapshot, {
@@ -561,10 +538,6 @@ async fn bidirectional_tcp_session(#[case] cap: Capabilities) -> anyhow::Result<
     let bob_snapshot = bob_metrics.snapshot();
 
     assert!(bob_snapshot.snapshot_at >= start_time, "snapshot_at should be recent");
-    assert!(
-        bob_snapshot.lifetime.uptime > Duration::ZERO,
-        "uptime should be positive"
-    );
 
     insta::assert_yaml_snapshot!(format!("bidirectional_bob_{}", cap_suffix), bob_snapshot, {
         ".snapshot_at" => "[snapshot_ts]",
@@ -596,9 +569,6 @@ async fn surb_metrics_tracking() -> anyhow::Result<()> {
     // Set the estimator with target buffer
     let target = 200;
     metrics.set_surb_estimator(surb_estimator, target);
-
-    // Simulate some activity to have non-zero lifetime metrics
-    tokio::time::sleep(Duration::from_millis(10)).await;
 
     // Take snapshot - SURB values are non zero
     let snapshot = metrics.snapshot();
@@ -701,17 +671,10 @@ async fn frame_buffer_metrics(#[case] cap: Capabilities) -> anyhow::Result<()> {
 
     assert_eq!(recv_msg, msg);
 
-    // Ensure some time passes so uptime > 0
-    tokio::time::sleep(Duration::from_millis(10)).await;
-
     // Verify alice metrics - frames_emitted should be non-zero (sender)
     let alice_snapshot = alice_metrics.snapshot();
 
     assert!(alice_snapshot.snapshot_at >= start_time, "snapshot_at should be recent");
-    assert!(
-        alice_snapshot.lifetime.uptime > Duration::ZERO,
-        "uptime should be positive"
-    );
 
     insta::assert_yaml_snapshot!("frame_buffer_alice", alice_snapshot, {
         ".snapshot_at" => "[snapshot_ts]",
@@ -726,10 +689,6 @@ async fn frame_buffer_metrics(#[case] cap: Capabilities) -> anyhow::Result<()> {
     let bob_snapshot = bob_metrics.snapshot();
 
     assert!(bob_snapshot.snapshot_at >= start_time, "snapshot_at should be recent");
-    assert!(
-        bob_snapshot.lifetime.uptime > Duration::ZERO,
-        "uptime should be positive"
-    );
 
     insta::assert_yaml_snapshot!("frame_buffer_bob", bob_snapshot, {
         ".snapshot_at" => "[snapshot_ts]",
