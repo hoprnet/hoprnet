@@ -10,7 +10,7 @@ use hopr_internal_types::prelude::*;
 use hopr_lib::{
     ApplicationDataIn, ApplicationDataOut,
     exports::transport::session::{
-        AcknowledgementMode, Capabilities, Capability, HoprSession, HoprSessionConfig, SessionId, SessionMetrics,
+        AcknowledgementMode, Capabilities, Capability, HoprSession, HoprSessionConfig, SessionId, SessionStats,
         transfer_session,
     },
 };
@@ -63,7 +63,7 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
         None
     };
 
-    let alice_metrics = Arc::new(SessionMetrics::new(
+    let alice_metrics = Arc::new(SessionStats::new(
         id,
         alice_ack_mode,
         alice_cfg.frame_mtu,
@@ -84,7 +84,7 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
         None
     };
 
-    let bob_metrics = Arc::new(SessionMetrics::new(
+    let bob_metrics = Arc::new(SessionStats::new(
         id,
         bob_ack_mode,
         bob_cfg.frame_mtu,
@@ -256,7 +256,7 @@ async fn tcp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
         None
     };
 
-    let alice_metrics = Arc::new(SessionMetrics::new(
+    let alice_metrics = Arc::new(SessionStats::new(
         id,
         alice_ack_mode,
         alice_cfg.frame_mtu,
@@ -277,7 +277,7 @@ async fn tcp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
         None
     };
 
-    let bob_metrics = Arc::new(SessionMetrics::new(
+    let bob_metrics = Arc::new(SessionStats::new(
         id,
         bob_ack_mode,
         bob_cfg.frame_mtu,

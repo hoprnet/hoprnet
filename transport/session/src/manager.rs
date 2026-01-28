@@ -1002,7 +1002,7 @@ where
         }
     }
 
-    pub async fn get_session_metrics(&self, id: &SessionId) -> crate::errors::Result<SessionMetricsSnapshot> {
+    pub async fn get_session_stats(&self, id: &SessionId) -> crate::errors::Result<SessionMetricsSnapshot> {
         match self.sessions.get(id).await {
             Some(session) => {
                 let metrics = session

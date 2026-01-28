@@ -950,7 +950,7 @@ pub(crate) async fn session_config(
 /// Session lifecycle state for metrics.
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "lowercase")]
-pub(crate) enum SessionMetricsState {
+pub(crate) enum SessionStatsState {
     /// Session is active and running.
     Active,
     /// Session is in the process of closing.
@@ -959,13 +959,13 @@ pub(crate) enum SessionMetricsState {
     Closed,
 }
 
-impl From<SessionLifecycleState> for SessionMetricsState {
+impl From<SessionLifecycleState> for SessionStatsState {
     /// Converts protocol-level lifecycle state into the API metrics state format.
     fn from(value: SessionLifecycleState) -> Self {
         match value {
-            SessionLifecycleState::Active => SessionMetricsState::Active,
-            SessionLifecycleState::Closing => SessionMetricsState::Closing,
-            SessionLifecycleState::Closed => SessionMetricsState::Closed,
+            SessionLifecycleState::Active => SessionStatsState::Active,
+            SessionLifecycleState::Closing => SessionStatsState::Closing,
+            SessionLifecycleState::Closed => SessionStatsState::Closed,
         }
     }
 }
@@ -973,7 +973,7 @@ impl From<SessionLifecycleState> for SessionMetricsState {
 /// Session acknowledgement mode for metrics.
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "lowercase")]
-pub(crate) enum SessionMetricsAckMode {
+pub(crate) enum SessionStatsAckMode {
     /// No acknowledgements.
     None,
     /// Partial acknowledgements.
@@ -984,14 +984,14 @@ pub(crate) enum SessionMetricsAckMode {
     Both,
 }
 
-impl From<SessionAckMode> for SessionMetricsAckMode {
+impl From<SessionAckMode> for SessionStatsAckMode {
     /// Converts protocol-level acknowledgement mode into the API metrics mode format.
     fn from(value: SessionAckMode) -> Self {
         match value {
-            SessionAckMode::None => SessionMetricsAckMode::None,
-            SessionAckMode::Partial => SessionMetricsAckMode::Partial,
-            SessionAckMode::Full => SessionMetricsAckMode::Full,
-            SessionAckMode::Both => SessionMetricsAckMode::Both,
+            SessionAckMode::None => SessionStatsAckMode::None,
+            SessionAckMode::Partial => SessionStatsAckMode::Partial,
+            SessionAckMode::Full => SessionStatsAckMode::Full,
+            SessionAckMode::Both => SessionStatsAckMode::Both,
         }
     }
 }
@@ -999,7 +999,7 @@ impl From<SessionAckMode> for SessionMetricsAckMode {
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 /// Session lifetime metrics.
-pub(crate) struct SessionMetricsLifetime {
+pub(crate) struct SessionStatsLifetime {
     /// Time when the session was created (in milliseconds since UNIX epoch).
     pub created_at_ms: u64,
     /// Time of the last read or write activity (in milliseconds since UNIX epoch).
@@ -1009,13 +1009,13 @@ pub(crate) struct SessionMetricsLifetime {
     /// Duration since the last activity (in milliseconds).
     pub idle_ms: u64,
     /// Current lifecycle state of the session.
-    pub state: SessionMetricsState,
+    pub state: SessionStatsState,
 }
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 /// Session frame buffer metrics.
-pub(crate) struct SessionMetricsFrameBuffer {
+pub(crate) struct SessionStatsFrameBuffer {
     /// Maximum Transmission Unit for frames.
     pub frame_mtu: usize,
     /// Configured timeout for frame reassembly/acknowledgement (in milliseconds).
@@ -1035,9 +1035,9 @@ pub(crate) struct SessionMetricsFrameBuffer {
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 /// Session acknowledgement metrics.
-pub(crate) struct SessionMetricsAck {
+pub(crate) struct SessionStatsAck {
     /// Configured acknowledgement mode.
-    pub mode: SessionMetricsAckMode,
+    pub mode: SessionStatsAckMode,
     /// Total incoming segments received.
     pub incoming_segments: u64,
     /// Total outgoing segments sent.
@@ -1051,7 +1051,7 @@ pub(crate) struct SessionMetricsAck {
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 /// Session SURB (Single Use Reply Block) metrics.
-pub(crate) struct SessionMetricsSurb {
+pub(crate) struct SessionStatsSurb {
     /// Total SURBs produced/minted.
     pub produced_total: u64,
     /// Total SURBs consumed/used.
@@ -1069,7 +1069,7 @@ pub(crate) struct SessionMetricsSurb {
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 /// Session transport-level metrics.
-pub(crate) struct SessionMetricsTransport {
+pub(crate) struct SessionStatsTransport {
     /// Total bytes received.
     pub bytes_in: u64,
     /// Total bytes sent.
@@ -1083,24 +1083,24 @@ pub(crate) struct SessionMetricsTransport {
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 /// Complete snapshot of session metrics.
-pub(crate) struct SessionMetricsResponse {
+pub(crate) struct SessionStatsResponse {
     /// The session ID.
     pub session_id: String,
     /// Time when this snapshot was taken (in milliseconds since UNIX epoch).
     pub snapshot_at_ms: u64,
     /// Lifetime metrics.
-    pub lifetime: SessionMetricsLifetime,
+    pub lifetime: SessionStatsLifetime,
     /// Frame buffer metrics.
-    pub frame_buffer: SessionMetricsFrameBuffer,
+    pub frame_buffer: SessionStatsFrameBuffer,
     /// Acknowledgement metrics.
-    pub ack: SessionMetricsAck,
+    pub ack: SessionStatsAck,
     /// SURB metrics.
-    pub surb: SessionMetricsSurb,
+    pub surb: SessionStatsSurb,
     /// Transport metrics.
-    pub transport: SessionMetricsTransport,
+    pub transport: SessionStatsTransport,
 }
 
-impl From<SessionMetricsSnapshot> for SessionMetricsResponse {
+impl From<SessionMetricsSnapshot> for SessionStatsResponse {
     /// Converts protocol-level metrics snapshot into the API response format.
     fn from(value: SessionMetricsSnapshot) -> Self {
         Self {
@@ -1110,7 +1110,7 @@ impl From<SessionMetricsSnapshot> for SessionMetricsResponse {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_millis() as u64,
-            lifetime: SessionMetricsLifetime {
+            lifetime: SessionStatsLifetime {
                 created_at_ms: value
                     .lifetime
                     .created_at
@@ -1127,7 +1127,7 @@ impl From<SessionMetricsSnapshot> for SessionMetricsResponse {
                 idle_ms: value.lifetime.idle.as_millis() as u64,
                 state: value.lifetime.state.into(),
             },
-            frame_buffer: SessionMetricsFrameBuffer {
+            frame_buffer: SessionStatsFrameBuffer {
                 frame_mtu: value.frame_buffer.frame_mtu,
                 frame_timeout_ms: value.frame_buffer.frame_timeout.as_millis() as u64,
                 frame_capacity: value.frame_buffer.frame_capacity,
@@ -1136,14 +1136,14 @@ impl From<SessionMetricsSnapshot> for SessionMetricsResponse {
                 frames_emitted: value.frame_buffer.frames_emitted,
                 frames_discarded: value.frame_buffer.frames_discarded,
             },
-            ack: SessionMetricsAck {
+            ack: SessionStatsAck {
                 mode: value.ack.mode.into(),
                 incoming_segments: value.ack.incoming_segments,
                 outgoing_segments: value.ack.outgoing_segments,
                 retransmission_requests: value.ack.retransmission_requests,
                 acknowledged_frames: value.ack.acknowledged_frames,
             },
-            surb: SessionMetricsSurb {
+            surb: SessionStatsSurb {
                 produced_total: value.surb.produced_total,
                 consumed_total: value.surb.consumed_total,
                 buffer_estimate: value.surb.buffer_estimate,
@@ -1151,7 +1151,7 @@ impl From<SessionMetricsSnapshot> for SessionMetricsResponse {
                 rate_per_sec: value.surb.rate_per_sec,
                 refill_in_flight: value.surb.refill_in_flight,
             },
-            transport: SessionMetricsTransport {
+            transport: SessionStatsTransport {
                 bytes_in: value.transport.bytes_in,
                 bytes_out: value.transport.bytes_out,
                 packets_in: value.transport.packets_in,
@@ -1163,13 +1163,13 @@ impl From<SessionMetricsSnapshot> for SessionMetricsResponse {
 
 #[utoipa::path(
     get,
-    path = const_format::formatcp!("{BASE_PATH}/session/metrics/{{id}}"),
-    description = "Gets metrics for an existing active session.",
+    path = const_format::formatcp!("{BASE_PATH}/session/stats/{{id}}"),
+    description = "Gets stats for an existing active session.",
     params(
         ("id" = String, Path, description = "Session ID", example = "0x5112D584a1C72Fc25017:487"),
     ),
     responses(
-            (status = 200, description = "Retrieved session metrics.", body = SessionMetricsResponse),
+            (status = 200, description = "Retrieved session stats.", body = SessionStatsResponse),
             (status = 400, description = "Invalid session ID.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Given session ID does not refer to an existing Session", body = ApiError),
@@ -1181,16 +1181,16 @@ impl From<SessionMetricsSnapshot> for SessionMetricsResponse {
     ),
     tag = "Session"
 )]
-pub(crate) async fn session_metrics(
+pub(crate) async fn session_stats(
     State(state): State<Arc<InternalState>>,
     Path(session_id): Path<String>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let session_id =
         SessionId::from_str(&session_id).map_err(|_| (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidSessionId))?;
 
-    match state.hopr.get_session_metrics(&session_id).await {
+    match state.hopr.get_session_stats(&session_id).await {
         Ok(metrics) => Ok::<_, (StatusCode, ApiErrorStatus)>(
-            (StatusCode::OK, Json(SessionMetricsResponse::from(metrics))).into_response(),
+            (StatusCode::OK, Json(SessionStatsResponse::from(metrics))).into_response(),
         ),
         Err(HoprLibError::TransportError(HoprTransportError::Session(TransportSessionError::Manager(
             SessionManagerError::NonExistingSession,

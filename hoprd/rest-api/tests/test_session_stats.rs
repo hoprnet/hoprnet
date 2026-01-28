@@ -1,7 +1,7 @@
-//! Integration tests for the session metrics REST API endpoint.
+//! Integration tests for the session stats REST API endpoint.
 //!
-//! These tests verify the behavior of the `/api/v4/session/metrics/{session_id}` endpoint,
-//! including successful metric retrieval, error handling, and response structure validation.
+//! These tests verify the behavior of the `/api/v4/session/stats/{session_id}` endpoint,
+//! including successful stat retrieval, error handling, and response structure validation.
 //! Tests use insta snapshots with redactions for non-deterministic fields (timestamps, durations).
 
 #![cfg(feature = "test-fixtures")]
@@ -21,7 +21,7 @@ use serde_json::Value;
 use tokio::net::TcpListener;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn session_metrics_endpoint_returns_snapshot() -> anyhow::Result<()> {
+async fn session_stats_endpoint_returns_snapshot() -> anyhow::Result<()> {
     let cluster = cluster_fixture(2);
     let entry = &cluster[0];
     let exit = &cluster[1];
@@ -52,7 +52,7 @@ async fn session_metrics_endpoint_returns_snapshot() -> anyhow::Result<()> {
     tokio::time::sleep(Duration::from_millis(200)).await;
 
     let client = reqwest::Client::new();
-    let url = format!("{base_url}/api/v4/session/metrics/{session_id}");
+    let url = format!("{base_url}/api/v4/session/stats/{session_id}");
     let response = client.get(url).send().await?;
     assert_eq!(response.status(), StatusCode::OK);
 
@@ -72,7 +72,7 @@ async fn session_metrics_endpoint_returns_snapshot() -> anyhow::Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn session_metrics_invalid_id_returns_400() -> anyhow::Result<()> {
+async fn session_stats_invalid_id_returns_400() -> anyhow::Result<()> {
     let cluster = cluster_fixture(1);
     let entry = &cluster[0];
 
@@ -97,7 +97,7 @@ async fn session_metrics_invalid_id_returns_400() -> anyhow::Result<()> {
     tokio::time::sleep(Duration::from_millis(200)).await;
 
     let client = reqwest::Client::new();
-    let url = format!("{base_url}/api/v4/session/metrics/not-a-session-id");
+    let url = format!("{base_url}/api/v4/session/stats/not-a-session-id");
     let response = client.get(url).send().await?;
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 
@@ -106,7 +106,7 @@ async fn session_metrics_invalid_id_returns_400() -> anyhow::Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn session_metrics_invalid_session_id_format() -> anyhow::Result<()> {
+async fn session_stats_invalid_session_id_format() -> anyhow::Result<()> {
     let cluster = cluster_fixture(1);
     let entry = &cluster[0];
 
@@ -134,7 +134,7 @@ async fn session_metrics_invalid_session_id_format() -> anyhow::Result<()> {
     let nonexistent_session_id = "0x0000000000000000000000000000000000000000:65535";
 
     let client = reqwest::Client::new();
-    let url = format!("{base_url}/api/v4/session/metrics/{nonexistent_session_id}");
+    let url = format!("{base_url}/api/v4/session/stats/{nonexistent_session_id}");
     let response = client.get(url).send().await?;
     // API returns 400 for both invalid format and nonexistent sessions
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);

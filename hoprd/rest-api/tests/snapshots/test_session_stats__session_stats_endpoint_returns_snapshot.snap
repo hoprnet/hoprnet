@@ -1,5 +1,5 @@
 ---
-source: hoprd/rest-api/tests/test_session_metrics.rs
+source: hoprd/rest-api/tests/test_session_stats.rs
 expression: body
 ---
 ack:

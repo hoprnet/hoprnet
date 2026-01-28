@@ -570,8 +570,8 @@ where
         Ok(self.smgr.get_surb_balancer_config(id).await?)
     }
 
-    pub async fn session_metrics(&self, id: &SessionId) -> errors::Result<SessionMetricsSnapshot> {
-        Ok(self.smgr.get_session_metrics(id).await?)
+    pub async fn session_stats(&self, id: &SessionId) -> errors::Result<SessionMetricsSnapshot> {
+        Ok(self.smgr.get_session_stats(id).await?)
     }
 
     pub async fn update_session_surb_balancing_cfg(
