@@ -44,8 +44,8 @@ const MIN_TX_CONFIRM_TIMEOUT: Duration = Duration::from_secs(1);
 pub struct BlockchainConnectorConfig {
     /// Default time to wait until a transaction is confirmed.
     ///
-    /// Default is 30 seconds, minimum is 1 second.
-    #[default(Duration::from_secs(30))]
+    /// Default is 90 seconds, minimum is 1 second.
+    #[default(Duration::from_secs(90))]
     pub tx_confirm_timeout: Duration,
     /// Time to wait for [connection](HoprBlockchainConnector::connect) to complete.
     ///
