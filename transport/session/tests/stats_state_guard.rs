@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use futures::channel::mpsc;
 use hopr_crypto_random::Randomizable;
 use hopr_internal_types::prelude::HoprPseudonym;
-use hopr_protocol_session::{FrameInspector, SocketComponents, Stateless};
+use hopr_protocol_session::{FrameInspector, SocketComponents, SocketState, Stateless};
 use hopr_transport_session::{SessionId, SessionStats, StatsState};
 
 #[test]
