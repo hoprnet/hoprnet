@@ -238,22 +238,21 @@ where
                         graph.write().add_node(account.key_id);
                         mapper.backend.insert_account(account.clone()).map(|old| (account, old))
                     })
-                    .map_err(|e| ConnectorError::BackendError(e.into()))
+                    .map_err(ConnectorError::backend)
                     .and_then(move |res| {
                         let chain_to_packet = chain_to_packet.clone();
                         let packet_to_chain = packet_to_chain.clone();
                         async move {
-                            if let Ok((account, _)) = &res {
+                            if let Ok((upserted_account, _)) = &res {
                                 // Rather update the cached entry than invalidating it
                                 chain_to_packet
-                                    .insert(account.chain_addr, Some(account.public_key))
+                                    .insert(upserted_account.chain_addr, Some(upserted_account.public_key))
                                     .await;
                                 packet_to_chain
-                                    .insert(account.public_key, Some(account.chain_addr))
+                                    .insert(upserted_account.public_key, Some(upserted_account.chain_addr))
                                     .await;
                             }
-                            res.map(SubscribedEventType::Account)
-                                .map_err(|e| ConnectorError::BackendError(e.into()))
+                            res.map(SubscribedEventType::Account).map_err(ConnectorError::backend)
                         }
                     })
                 })
@@ -275,20 +274,21 @@ where
                             .insert_channel(channel)
                             .map(|old| (channel, old.map(|old| old.diff(&channel))))
                     })
-                    .map_err(|e| ConnectorError::BackendError(e.into()))
+                    .map_err(ConnectorError::backend)
                     .and_then(move |res| {
                         let channel_by_id = channel_by_id.clone();
                         let channel_by_parties = channel_by_parties.clone();
                         async move {
-                            if let Ok((channel, _)) = &res {
+                            if let Ok((upserted_channel, _)) = &res {
                                 // Rather update the cached entry than invalidating it
-                                channel_by_id.insert(*channel.get_id(), Some(*channel)).await;
+                                channel_by_id
+                                    .insert(*upserted_channel.get_id(), Some(*upserted_channel))
+                                    .await;
                                 channel_by_parties
-                                    .insert(ChannelParties::from(channel), Some(*channel))
+                                    .insert(ChannelParties::from(upserted_channel), Some(*upserted_channel))
                                     .await;
                             }
-                            res.map(SubscribedEventType::Channel)
-                                .map_err(|e| ConnectorError::BackendError(e.into()))
+                            res.map(SubscribedEventType::Channel).map_err(ConnectorError::backend)
                         }
                     })
                 })

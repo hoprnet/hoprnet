@@ -107,13 +107,13 @@ jobs:
     runs-on: self-hosted-hoprnet-small
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
+        uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 # v2.14.1
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
 
       - name: Checkout hoprd-test repository
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
           repository: hoprnet/hoprd-test
@@ -121,12 +121,12 @@ jobs:
 
       - name: Setup GCP
         id: gcp
-        uses: hoprnet/hopr-workflows/actions/setup-gcp@12c56020e16036982e6cc529848edeedfc705865 # master
+        uses: hoprnet/hopr-workflows/actions/setup-gcp@644d936de4e1c8f5c50ba50f8526209455c28b4a # master
         with:
-          google-credentials: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
-          login-artifact-registry: 'false'
-          install-sdk: 'true'
-          login-gke: 'true'
+          google_credentials: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
+          login_artifact_registry: 'false'
+          install_sdk: 'true'
+          login_gke: 'true'
           project: hopr-staging
       - name: Set environment variables
         run: |

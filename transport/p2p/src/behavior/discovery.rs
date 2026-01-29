@@ -104,7 +104,7 @@ impl Behaviour {
 
     fn schedule_dial_with(&mut self, peer: PeerId, mut backoff: backon::ExponentialBackoff) {
         let duration = backoff.next().unwrap_or_else(|| {
-            tracing::warn!(%peer, "failed to get next backoff duration, using 10s");
+            tracing::debug!(%peer, "failed to get next backoff duration, using 10s");
             std::time::Duration::from_secs(10)
         });
         self.not_connected_peers.insert(peer, backoff);

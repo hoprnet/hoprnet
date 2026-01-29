@@ -78,6 +78,10 @@ impl ConnectorError {
         Self::OtherError(e.into())
     }
 
+    pub fn backend(e: impl Into<anyhow::Error>) -> Self {
+        Self::BackendError(e.into())
+    }
+
     pub fn io(e: impl Into<std::io::Error>) -> Self {
         Self::IoError(e.into())
     }

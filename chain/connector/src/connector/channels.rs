@@ -87,8 +87,8 @@ where
                 .await
                 {
                     Ok(Ok(value)) => Ok(value),
-                    Ok(Err(e)) => Err(ConnectorError::BackendError(e.into())),
-                    Err(e) => Err(ConnectorError::BackendError(e.into())),
+                    Ok(Err(e)) => Err(ConnectorError::backend(e)),
+                    Err(e) => Err(ConnectorError::backend(e)),
                 }
             })
             .await?)
@@ -106,8 +106,8 @@ where
                 match hopr_async_runtime::prelude::spawn_blocking(move || backend.get_channel_by_id(&channel_id)).await
                 {
                     Ok(Ok(value)) => Ok(value),
-                    Ok(Err(e)) => Err(ConnectorError::BackendError(e.into())),
-                    Err(e) => Err(ConnectorError::BackendError(e.into())),
+                    Ok(Err(e)) => Err(ConnectorError::backend(e)),
+                    Err(e) => Err(ConnectorError::backend(e)),
                 }
             })
             .await?)
