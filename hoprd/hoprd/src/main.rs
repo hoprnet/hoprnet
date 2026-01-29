@@ -38,7 +38,7 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 #[cfg(all(target_os = "linux", feature = "allocator-jemalloc-stats"))]
 mod jemalloc_stats;
 
-const DEFAULT_BLOKLI_URL: &str = "https://blokli.prod.hoprnet.link";
+const DEFAULT_BLOKLI_URL: &str = "https://blokli.dufour.hoprnet.link";
 
 fn init_logger() -> anyhow::Result<()> {
     let env_filter = match tracing_subscriber::EnvFilter::try_from_default_env() {
