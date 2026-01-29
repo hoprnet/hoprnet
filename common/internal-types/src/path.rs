@@ -246,7 +246,7 @@ impl ValidatedPath {
             PathAddress::Offchain(key) => resolver
                 .resolve_chain_address(&key)
                 .await?
-                .ok_or(InvalidPeer(key.to_string()))?,
+                .ok_or(InvalidPeer(key.to_peerid_str()))?,
         };
 
         let mut keys = Vec::with_capacity(path.num_hops());
@@ -261,7 +261,7 @@ impl ValidatedPath {
                     let key = resolver
                         .resolve_transport_address(addr)
                         .await?
-                        .ok_or(InvalidPeer(addr.to_string()))?;
+                        .ok_or(InvalidPeer(addr.to_hex()))?;
                     keys.push(key);
                     addrs.push(*addr);
                     *addr
@@ -270,7 +270,7 @@ impl ValidatedPath {
                     let addr = resolver
                         .resolve_chain_address(key)
                         .await?
-                        .ok_or(InvalidPeer(key.to_string()))?;
+                        .ok_or(InvalidPeer(key.to_peerid_str()))?;
                     addrs.push(addr);
                     keys.push(*key);
                     addr

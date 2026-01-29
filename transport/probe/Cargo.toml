@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-probe"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Probing mechanism of the discovered network topology"
