@@ -161,7 +161,7 @@ serde_bytes = "0.11.19"
 serde_cbor_2 = "0.13.0"
 serde_json = "1.0.149"
 serde_repr = "0.1.20"
-serde_with = { version = "3.15.1", features = ["base64"] }
+serde_with = { version = "3.16.1", features = ["base64"] }
 serde_yaml = { version = "0.9.33" } # using last version before the library was deprecated
 serial_test = "3.3.1"
 sha3 = "0.10.8"
