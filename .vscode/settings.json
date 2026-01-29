@@ -16,5 +16,6 @@
     "editor.defaultFormatter": "JuanBlanco.solidity"
   },
   "makefile.configureOnOpen": false,
-  "rust-analyzer.testExplorer": true
+  "rust-analyzer.testExplorer": true,
+  "chat.promptFiles": true
 }
