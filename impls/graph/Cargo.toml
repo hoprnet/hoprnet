@@ -1,0 +1,21 @@
+[package]
+name = "hopr-network-graph"
+version = "0.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+description = "Implementation of the HOPR network graph."
+edition = "2021"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+default = []
+
+[dependencies]
+anyhow = { workspace = true }
+
+
+[dev-dependencies]
