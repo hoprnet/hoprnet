@@ -4763,6 +4763,7 @@ dependencies = [
  "hopr-api",
  "hopr-async-runtime",
  "hopr-chain-connector",
+ "hopr-chain-types",
  "hopr-crypto-keypair",
  "hopr-crypto-random 0.3.0",
  "hopr-crypto-types 0.9.0",

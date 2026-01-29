@@ -41,6 +41,7 @@ pub use hopr_api as api;
 #[doc(hidden)]
 pub mod exports {
     pub mod types {
+        pub use hopr_chain_types as chain;
         pub use hopr_internal_types as internal;
         pub use hopr_primitive_types as primitive;
     }
@@ -77,7 +78,6 @@ pub mod prelude {
 use std::{
     convert::identity,
     future::Future,
-    num::NonZeroUsize,
     sync::{Arc, OnceLock, atomic::Ordering},
     time::Duration,
 };
@@ -138,8 +138,8 @@ lazy_static::lazy_static! {
 /// to be used for IO-bound and half for CPU-bound tasks.
 #[cfg(feature = "runtime-tokio")]
 pub fn prepare_tokio_runtime(
-    num_cpu_threads: Option<NonZeroUsize>,
-    num_io_threads: Option<NonZeroUsize>,
+    num_cpu_threads: Option<std::num::NonZeroUsize>,
+    num_io_threads: Option<std::num::NonZeroUsize>,
 ) -> anyhow::Result<tokio::runtime::Runtime> {
     use std::str::FromStr;
     let avail_parallelism = std::thread::available_parallelism().ok().map(|v| v.get() / 2);

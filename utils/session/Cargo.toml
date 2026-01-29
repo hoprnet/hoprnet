@@ -42,7 +42,7 @@ tokio-stream = { workspace = true }
 tracing = { workspace = true }
 
 hopr-api = { workspace = true }
-hopr-lib = { workspace = true }
+hopr-lib = { workspace = true, features = ["session-client"] }
 hopr-async-runtime = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
