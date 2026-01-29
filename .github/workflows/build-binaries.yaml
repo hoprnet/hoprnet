@@ -66,7 +66,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
+        uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 # v2.14.1
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -111,7 +111,7 @@ jobs:
           echo "runner=${{ inputs.runner || github.event.inputs.runner }}"
 
       - name: Checkout hoprnet repository
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
           repository: ${{ steps.vars.outputs.source_repo }}
@@ -119,12 +119,12 @@ jobs:
 
       - name: Install Nix
         if: steps.vars.outputs.runner_needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@0b0e072294b088b73964f1d72dfdac0951439dbd # v31
+        uses: cachix/install-nix-action@4e002c8ec80594ecd40e759629461e26c8abed15 # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
           nix_path: nixpkgs=channel:nixos-24.05
 
-      - uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # v16
+      - uses: cachix/cachix-action@3ba601ff5bbb07c7220846facfa2cd81eeee15a1 # v16
         if: steps.vars.outputs.runner_needs_nix_setup == 'true'
         with:
           name: hoprnet
@@ -144,19 +144,19 @@ jobs:
           GPG_HOPRNET_PRIVATE_KEY: ${{ secrets.GPG_HOPRNET_PRIVATE_KEY }}
 
       - name: Publish ${{ steps.vars.outputs.binary }} binary
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: ${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}
           path: ${{ github.workspace }}/dist/bin/${{ steps.vars.outputs.binary }}
 
       - name: Publish Github Workflow artifact hash
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: ${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}.sha256
           path: ${{ github.workspace }}/dist/bin/${{ steps.vars.outputs.binary }}.sha256
 
       - name: Publish Github Workflow artifact signature
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: ${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}.asc
           path: ${{ github.workspace }}/dist/bin/${{ steps.vars.outputs.binary }}.asc
