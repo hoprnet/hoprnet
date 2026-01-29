@@ -30,7 +30,7 @@ pub use pipeline::{AcknowledgementPipelineConfig, PacketPipelineProcesses, Ticke
 const HOPR_PACKET_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::SIZE;
 
 pub type HoprBinaryCodec = codec::FixedLengthCodec<HOPR_PACKET_SIZE>;
-pub const CURRENT_HOPR_MSG_PROTOCOL: &str = "/hopr/mix/1.0.0";
+pub const CURRENT_HOPR_MSG_PROTOCOL: &str = "/hopr/mix/1.1.0";
 
 /// Processed indexer generated events.
 #[derive(Debug, Clone)]
