@@ -199,9 +199,7 @@ async fn p2p_peer_packet_stats_quic() -> anyhow::Result<()> {
     // guarantees that get_packet_stats() will return Some when the stream opens.
     timeout(std::time::Duration::from_secs(30), async {
         loop {
-            if swarm1.packet_stats_snapshot(&api2.me).is_some()
-                && swarm2.packet_stats_snapshot(&api1.me).is_some()
-            {
+            if swarm1.packet_stats_snapshot(&api2.me).is_some() && swarm2.packet_stats_snapshot(&api1.me).is_some() {
                 break;
             }
             sleep(std::time::Duration::from_millis(100)).await;
@@ -221,10 +219,7 @@ async fn p2p_peer_packet_stats_quic() -> anyhow::Result<()> {
 
     timeout(
         std::time::Duration::from_secs(10),
-        api2.recv_msg
-            .by_ref()
-            .take(phase1_count)
-            .collect::<Vec<_>>(),
+        api2.recv_msg.by_ref().take(phase1_count).collect::<Vec<_>>(),
     )
     .await
     .context("timed out waiting for peer2 to receive phase 1 packets")?;
@@ -268,10 +263,7 @@ async fn p2p_peer_packet_stats_quic() -> anyhow::Result<()> {
 
     timeout(
         std::time::Duration::from_secs(10),
-        api1.recv_msg
-            .by_ref()
-            .take(phase2_count)
-            .collect::<Vec<_>>(),
+        api1.recv_msg.by_ref().take(phase2_count).collect::<Vec<_>>(),
     )
     .await
     .context("timed out waiting for peer1 to receive phase 2 packets")?;
@@ -308,12 +300,18 @@ async fn p2p_peer_packet_stats_quic() -> anyhow::Result<()> {
     let all_stats1 = swarm1.all_packet_stats();
     assert_eq!(all_stats1.len(), 1, "swarm1 should track exactly 1 remote peer");
     assert_eq!(all_stats1[0].0, api2.me, "swarm1 should track peer2");
-    assert_eq!(all_stats1[0].1, stats1_for_peer2, "swarm1 bulk stats should match per-peer snapshot");
+    assert_eq!(
+        all_stats1[0].1, stats1_for_peer2,
+        "swarm1 bulk stats should match per-peer snapshot"
+    );
 
     let all_stats2 = swarm2.all_packet_stats();
     assert_eq!(all_stats2.len(), 1, "swarm2 should track exactly 1 remote peer");
     assert_eq!(all_stats2[0].0, api1.me, "swarm2 should track peer1");
-    assert_eq!(all_stats2[0].1, stats2_for_peer1, "swarm2 bulk stats should match per-peer snapshot");
+    assert_eq!(
+        all_stats2[0].1, stats2_for_peer1,
+        "swarm2 bulk stats should match per-peer snapshot"
+    );
 
     Ok(())
 }

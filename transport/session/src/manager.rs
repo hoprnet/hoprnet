@@ -22,8 +22,7 @@ use hopr_protocol_start::{
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
-    Capabilities, Capability, HoprSession, IncomingSession, SESSION_MTU, SessionClientConfig, SessionId,
-    SessionTarget,
+    Capabilities, Capability, HoprSession, IncomingSession, SESSION_MTU, SessionClientConfig, SessionId, SessionTarget,
     SurbBalancerConfig,
     balancer::{
         AtomicSurbFlowEstimator, BalancerConfigFeedback, RateController, RateLimitSinkExt, SurbBalancer,
