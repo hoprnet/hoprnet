@@ -78,7 +78,6 @@ pub mod prelude {
 use std::{
     convert::identity,
     future::Future,
-    num::NonZeroUsize,
     sync::{Arc, OnceLock, atomic::Ordering},
     time::Duration,
 };
