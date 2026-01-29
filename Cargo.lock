@@ -4747,7 +4747,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-lib"
-version = "4.0.4"
+version = "4.1.0"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -5193,7 +5193,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "0.13.1"
+version = "1.0.0"
 dependencies = [
  "ahash",
  "anyhow",
