@@ -933,6 +933,16 @@ where
         Ok(self.transport_api.network_peer_observations(peer).await?)
     }
 
+    /// Get packet stats for a specific peer.
+    pub async fn network_peer_packet_stats(&self, peer: &PeerId) -> errors::Result<Option<PeerPacketStatsSnapshot>> {
+        Ok(self.transport_api.network_peer_packet_stats(peer).await?)
+    }
+
+    /// Get packet stats for all connected peers.
+    pub async fn network_all_packet_stats(&self) -> errors::Result<Vec<(PeerId, PeerPacketStatsSnapshot)>> {
+        Ok(self.transport_api.network_all_packet_stats().await?)
+    }
+
     /// Get peers connected peers with quality higher than some value
     pub async fn all_network_peers(
         &self,

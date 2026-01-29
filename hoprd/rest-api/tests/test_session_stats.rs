@@ -72,6 +72,57 @@ async fn session_stats_endpoint_returns_snapshot() -> anyhow::Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn session_stats_endpoint_populates_incomplete_frames() -> anyhow::Result<()> {
+    let cluster = cluster_fixture(2);
+    let entry = &cluster[0];
+    let exit = &cluster[1];
+
+    let (session, _fw_channels, _bw_channels) =
+        cluster.create_session(&[entry, exit], HoprBalance::new_base(1)).await?;
+
+    let session_id = session.id().to_string();
+
+    let listener = TcpListener::bind("127.0.0.1:0").await?;
+    let addr = listener.local_addr()?;
+    let base_url = format!("http://{addr}");
+
+    let params = RestApiParameters {
+        listener,
+        hoprd_cfg: serde_json::json!({}),
+        cfg: Api {
+            enable: true,
+            auth: Auth::None,
+            host: HostConfig::from_str("127.0.0.1:0").map_err(|e| anyhow::anyhow!("{}", e))?,
+        },
+        hopr: entry.instance.clone(),
+        session_listener_sockets: Arc::new(ListenerJoinHandles::default()),
+        default_session_listen_host: "127.0.0.1:0".parse()?,
+    };
+
+    let server_handle = tokio::spawn(async move { serve_api(params).await });
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    let client = reqwest::Client::new();
+    let url = format!("{base_url}/api/v4/session/stats/{session_id}");
+    let response = client.get(url).send().await?;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body: Value = response.json().await?;
+    let incomplete_frames = body
+        .pointer("/frameBuffer/incompleteFrames")
+        .and_then(Value::as_u64)
+        .expect("incompleteFrames should be present and numeric");
+    let frame_capacity = body
+        .pointer("/frameBuffer/frameCapacity")
+        .and_then(Value::as_u64)
+        .expect("frameCapacity should be present and numeric");
+    assert!(incomplete_frames <= frame_capacity);
+
+    server_handle.abort();
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn session_stats_invalid_id_returns_400() -> anyhow::Result<()> {
     let cluster = cluster_fixture(1);
     let entry = &cluster[0];

@@ -482,6 +482,11 @@ impl<const C: usize, S: SocketState<C> + Clone> SocketState<C> for StatsState<S>
 
     /// Initializes the socket with components, recording the frame inspector for metrics.
     fn run(&mut self, components: SocketComponents<C>) -> Result<(), hopr_protocol_session::errors::SessionError> {
+        if components.inspector.is_none() {
+            return Err(hopr_protocol_session::errors::SessionError::InvalidState(
+                "inspector is not available".into(),
+            ));
+        }
         if let Some(inspector) = components.inspector.clone() {
             self.metrics.set_inspector(inspector);
         }
@@ -557,8 +562,10 @@ fn now_us() -> u64 {
 
 #[cfg(test)]
 mod tests {
+    use futures::channel::mpsc;
     use hopr_crypto_random::Randomizable;
     use hopr_internal_types::prelude::HoprPseudonym;
+    use hopr_protocol_session::Stateless;
 
     use super::*;
     use crate::SessionId;
@@ -594,5 +601,22 @@ mod tests {
         assert_eq!(snapshot.frame_buffer.frames_completed, 1);
         assert_eq!(snapshot.frame_buffer.frames_emitted, 1);
         assert_eq!(snapshot.frame_buffer.frames_discarded, 1);
+    }
+
+    #[test]
+    fn stats_state_requires_inspector() {
+        const MTU: usize = 1000;
+
+        let id = SessionId::new(3_u64, HoprPseudonym::random());
+        let metrics = Arc::new(SessionStats::new(id, None, 1500, Duration::from_millis(800), 1024));
+        let inner = Stateless::<MTU>::new(id.to_string());
+        let mut state = StatsState::new(inner, metrics);
+        let (ctl_tx, _ctl_rx) = mpsc::channel(1);
+        let components = SocketComponents {
+            inspector: None,
+            ctl_tx,
+        };
+
+        assert!(state.run(components).is_err());
     }
 }

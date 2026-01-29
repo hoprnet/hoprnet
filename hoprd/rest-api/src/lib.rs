@@ -104,6 +104,7 @@ pub(crate) struct InternalState {
         node::info,
         node::peers,
         node::version,
+        peers::peer_stats,
         peers::ping_peer,
         peers::show_peer_info,
         root::metrics,
@@ -129,8 +130,8 @@ pub(crate) struct InternalState {
             network::TicketPriceResponse,
             network::TicketProbabilityResponse,
             node::EntryNode, node::NodeInfoResponse, node::NodePeersQueryRequest,
-            node::HeartbeatInfo, node::PeerObservations, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse,
-            peers::NodePeerInfoResponse, peers::PingResponse,
+            node::HeartbeatInfo, node::PeerObservations, node::PeerPacketStatsResponse, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse,
+            peers::NodePeerInfoResponse, peers::PeerPacketStatsResponse, peers::PingResponse,
             session::SessionClientRequest, session::SessionCapability, session::RoutingOptions, session::SessionTargetSpec, session::SessionClientResponse, session::IpProtocol, session::SessionConfig,
             session::SessionStatsResponse, session::SessionStatsLifetime, session::SessionStatsFrameBuffer, session::SessionStatsAck, session::SessionStatsSurb, session::SessionStatsTransport, session::SessionStatsState, session::SessionStatsAckMode,
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
@@ -310,6 +311,7 @@ async fn build_api(
                 .route("/node/peers", get(node::peers))
                 .route("/node/entry-nodes", get(node::entry_nodes))
                 .route("/peers/{destination}/ping", post(peers::ping_peer))
+                .route("/peers/{destination}/stats", get(peers::peer_stats))
                 .route("/session/config/{id}", get(session::session_config))
                 .route("/session/config/{id}", post(session::adjust_session))
                 .route("/session/stats/{id}", get(session::session_stats))

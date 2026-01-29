@@ -62,8 +62,12 @@ async fn build_p2p_swarm(
         swarm.into_network_with_stream_protocol_process(hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL, true);
 
     let msg_codec = hopr_transport_protocol::HoprBinaryCodec {};
+    let network_for_stats = network.clone();
     let (wire_msg_tx, wire_msg_rx) =
-        hopr_transport_protocol::stream::process_stream_protocol(msg_codec, network.clone()).await?;
+        hopr_transport_protocol::stream::process_stream_protocol(msg_codec, network.clone(), move |peer| {
+            network_for_stats.get_packet_stats(peer)
+        })
+        .await?;
 
     let api = Interface {
         me: peer_id,

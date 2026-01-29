@@ -7,7 +7,7 @@ use axum::{
 };
 use futures::FutureExt;
 use hopr_lib::{
-    Address, Multiaddr,
+    Address, Multiaddr, PeerPacketStatsSnapshot,
     errors::{HoprLibError, HoprStatusError, HoprTransportError},
 };
 use serde::{Deserialize, Serialize};
@@ -158,5 +158,78 @@ pub(super) async fn ping_peer(
         },
         Ok(None) => Ok((StatusCode::NOT_FOUND, ApiErrorStatus::PeerNotFound).into_response()),
         Err(_) => Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::PeerNotFound).into_response()),
+    }
+}
+
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
+    "packetsOut": 100,
+    "packetsIn": 50,
+    "bytesOut": 102400,
+    "bytesIn": 51200
+}))]
+#[serde(rename_all = "camelCase")]
+/// Packet statistics for a peer.
+pub(crate) struct PeerPacketStatsResponse {
+    #[schema(example = 100)]
+    pub packets_out: u64,
+    #[schema(example = 50)]
+    pub packets_in: u64,
+    #[schema(example = 102400)]
+    pub bytes_out: u64,
+    #[schema(example = 51200)]
+    pub bytes_in: u64,
+}
+
+impl From<PeerPacketStatsSnapshot> for PeerPacketStatsResponse {
+    fn from(snapshot: PeerPacketStatsSnapshot) -> Self {
+        Self {
+            packets_out: snapshot.packets_out,
+            packets_in: snapshot.packets_in,
+            bytes_out: snapshot.bytes_out,
+            bytes_in: snapshot.bytes_in,
+        }
+    }
+}
+
+/// Get packet statistics for a specific connected peer.
+///
+/// Returns the number of packets and bytes sent/received to/from the peer
+/// since the connection was established.
+#[utoipa::path(
+    get,
+    path = const_format::formatcp!("{BASE_PATH}/peers/{{destination}}/stats"),
+    description = "Get packet statistics for a specific connected peer",
+    params(
+        ("destination" = String, Path, description = "Address of the requested peer", example = "0x07eaf07d6624f741e04f4092a755a9027aaab7f6"),
+    ),
+    responses(
+        (status = 200, description = "Peer packet statistics", body = PeerPacketStatsResponse),
+        (status = 404, description = "Peer not found or not connected", body = ApiError),
+        (status = 401, description = "Invalid authorization token.", body = ApiError),
+    ),
+    security(
+        ("api_token" = []),
+        ("bearer_token" = [])
+    ),
+    tag = "Peers",
+)]
+pub(super) async fn peer_stats(
+    Path(DestinationParams { destination }): Path<DestinationParams>,
+    State(state): State<Arc<InternalState>>,
+) -> impl IntoResponse {
+    let hopr = state.hopr.clone();
+
+    match hopr.chain_key_to_peerid(&destination).await {
+        Ok(Some(peer)) => match hopr.network_peer_packet_stats(&peer).await {
+            Ok(Some(stats)) => {
+                let resp = Json(PeerPacketStatsResponse::from(stats));
+                Ok((StatusCode::OK, resp))
+            }
+            Ok(None) => Err(ApiErrorStatus::PeerNotFound),
+            Err(_) => Err(ApiErrorStatus::PeerNotFound),
+        },
+        Ok(None) => Err(ApiErrorStatus::PeerNotFound),
+        Err(_) => Err(ApiErrorStatus::PeerNotFound),
     }
 }

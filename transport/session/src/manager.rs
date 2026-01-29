@@ -66,9 +66,9 @@ lazy_static::lazy_static! {
 fn close_session(session_id: SessionId, session_data: SessionSlot, reason: ClosureReason) {
     debug!(?session_id, ?reason, "closing session");
 
-    if let Some(metrics) = session_data.metrics.as_ref() {
-        metrics.set_state(SessionLifecycleState::Closed);
-        metrics.touch_activity();
+    if let Some(stats) = session_data.stats.as_ref() {
+        stats.set_state(SessionLifecycleState::Closed);
+        stats.touch_activity();
     }
 
     if reason != ClosureReason::EmptyRead {
@@ -113,7 +113,7 @@ struct SessionSlot {
     session_tx: Arc<UnboundedSender<ApplicationDataIn>>,
     routing_opts: DestinationRouting,
     abort_handles: Vec<AbortHandle>,
-    metrics: Option<Arc<SessionStats>>,
+    stats: Option<Arc<SessionStats>>,
     // Allows reconfiguring of the SURB balancer on-the-fly
     // Set on both Entry and Exit sides.
     surb_mgmt: Option<SurbBalancerConfig>,
@@ -803,7 +803,7 @@ where
                             session_tx: Arc::new(tx),
                             routing_opts: forward_routing.clone(),
                             abort_handles,
-                            metrics: Some(metrics.clone()),
+                            stats: Some(metrics.clone()),
                             surb_mgmt: Some(balancer_config),
                             surb_estimator: Some(surb_estimator.clone()),
                         },
@@ -863,7 +863,7 @@ where
                             session_tx: Arc::new(tx),
                             routing_opts: forward_routing.clone(),
                             abort_handles: vec![],
-                            metrics: Some(metrics.clone()),
+                            stats: Some(metrics.clone()),
                             surb_mgmt: None,
                             surb_estimator: None,
                         },
@@ -1007,7 +1007,7 @@ where
         match self.sessions.get(id).await {
             Some(session) => {
                 let metrics = session
-                    .metrics
+                    .stats
                     .as_ref()
                     .ok_or_else(|| SessionManagerError::Other("missing session metrics".into()))?;
                 Ok(metrics.snapshot())
@@ -1105,7 +1105,7 @@ where
                     session_tx: Arc::new(tx_session_data),
                     routing_opts: reply_routing.clone(),
                     abort_handles: vec![],
-                    metrics: None,
+                    stats: None,
                     surb_mgmt: None,
                     surb_estimator: None,
                 },
@@ -1148,7 +1148,7 @@ where
                     futures::future::ready(match entry.map(|e| e.into_value()) {
                         None => moka::ops::compute::Op::Nop,
                         Some(mut slot) => {
-                            slot.metrics = Some(metrics.clone());
+                            slot.stats = Some(metrics.clone());
                             moka::ops::compute::Op::Put(slot)
                         }
                     })
@@ -1248,7 +1248,7 @@ where
                             cached_session.abort_handles.push(balancer_abort_handle);
                             cached_session.surb_mgmt = Some(balancer_config);
                             cached_session.surb_estimator = Some(surb_estimator.clone());
-                            cached_session.metrics = Some(metrics.clone());
+                            cached_session.stats = Some(metrics.clone());
                             futures::future::ready(moka::ops::compute::Op::Put(cached_session))
                         } else {
                             futures::future::ready(moka::ops::compute::Op::Nop)
@@ -1855,7 +1855,7 @@ mod tests {
                     session_tx: Arc::new(dummy_tx),
                     routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
                     abort_handles: Vec::new(),
-                    metrics: Some(Arc::new(SessionStats::new(
+                    stats: Some(Arc::new(SessionStats::new(
                         session_id,
                         None,
                         SESSION_MTU,
@@ -1913,7 +1913,7 @@ mod tests {
                     session_tx: Arc::new(dummy_tx),
                     routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
                     abort_handles: Vec::new(),
-                    metrics: Some(Arc::new(SessionStats::new(
+                    stats: Some(Arc::new(SessionStats::new(
                         SessionId::new(16u64, alice_pseudonym),
                         None,
                         SESSION_MTU,
@@ -2036,7 +2036,7 @@ mod tests {
                     session_tx: Arc::new(dummy_tx),
                     routing_opts: DestinationRouting::Return(alice_pseudonym.into()),
                     abort_handles: Vec::new(),
-                    metrics: Some(Arc::new(SessionStats::new(
+                    stats: Some(Arc::new(SessionStats::new(
                         SessionId::new(16u64, alice_pseudonym),
                         None,
                         SESSION_MTU,

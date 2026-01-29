@@ -6,7 +6,7 @@ use axum::{
     response::IntoResponse,
 };
 use futures::{StreamExt, stream::FuturesUnordered};
-use hopr_lib::{Address, Health, Multiaddr, api::network::Observable};
+use hopr_lib::{Address, Health, Multiaddr, PeerPacketStatsSnapshot, api::network::Observable};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
@@ -97,6 +97,37 @@ pub(crate) struct HeartbeatInfo {
     success: u64,
 }
 
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
+    "packetsOut": 100,
+    "packetsIn": 50,
+    "bytesOut": 102400,
+    "bytesIn": 51200
+}))]
+#[serde(rename_all = "camelCase")]
+/// Packet statistics for a peer.
+pub(crate) struct PeerPacketStatsResponse {
+    #[schema(example = 100)]
+    pub packets_out: u64,
+    #[schema(example = 50)]
+    pub packets_in: u64,
+    #[schema(example = 102400)]
+    pub bytes_out: u64,
+    #[schema(example = 51200)]
+    pub bytes_in: u64,
+}
+
+impl From<PeerPacketStatsSnapshot> for PeerPacketStatsResponse {
+    fn from(snapshot: PeerPacketStatsSnapshot) -> Self {
+        Self {
+            packets_out: snapshot.packets_out,
+            packets_in: snapshot.packets_in,
+            bytes_out: snapshot.bytes_out,
+            bytes_in: snapshot.bytes_in,
+        }
+    }
+}
+
 #[serde_as]
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -107,6 +138,12 @@ pub(crate) struct HeartbeatInfo {
     "lastSeen": 1690000000,
     "averageLatency": 100,
     "score": 0.7,
+    "packetStats": {
+        "packetsOut": 100,
+        "packetsIn": 50,
+        "bytesOut": 102400,
+        "bytesIn": 51200
+    }
 }))]
 /// All information about a known peer.
 pub(crate) struct PeerObservations {
@@ -124,6 +161,9 @@ pub(crate) struct PeerObservations {
     average_latency: u128,
     #[schema(example = 0.7)]
     score: f64,
+    /// Packet statistics for this peer (if available).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    packet_stats: Option<PeerPacketStatsResponse>,
 }
 
 #[serde_as]
@@ -245,16 +285,25 @@ pub(super) async fn peers(
                 // WARNING: Only in Providence and Saint-Louis are all peers public
                 let multiaddresses = hopr.network_observed_multiaddresses(&peer_id).await;
 
-                Some((address, multiaddresses, info))
+                // Get packet stats for the peer
+                let packet_stats = hopr
+                    .network_peer_packet_stats(&peer_id)
+                    .await
+                    .ok()
+                    .flatten()
+                    .map(PeerPacketStatsResponse::from);
+
+                Some((address, multiaddresses, info, packet_stats))
             }
         })
-        .map(|(address, mas, info)| PeerObservations {
+        .map(|(address, mas, info, packet_stats)| PeerObservations {
             address,
             multiaddr: mas.first().cloned(),
             last_update: info.last_update().as_millis(),
             average_latency: info.average_latency().map_or(0, |d| d.as_millis()),
             probe_rate: info.average_probe_rate(),
             score: info.score(),
+            packet_stats,
         })
         .collect::<Vec<_>>()
         .await;

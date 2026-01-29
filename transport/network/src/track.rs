@@ -2,18 +2,26 @@ use std::sync::Arc;
 
 use hopr_api::PeerId;
 
-use super::observation::Observations;
+use super::observation::{Observations, PeerPacketStats, PeerPacketStatsSnapshot};
 
-/// Tracker of [`Observations`] for network peers.
+/// Entry containing both observations and packet stats for a peer.
+#[derive(Debug, Default)]
+pub struct PeerEntry {
+    pub observations: Observations,
+    pub packet_stats: Arc<PeerPacketStats>,
+}
+
+/// Tracker of [`Observations`] and packet statistics for network peers.
 ///
 /// This structure maintains a mapping between [`PeerId`] and their associated
-/// [`Observations`], allowing for efficient tracking and updating of peer telemetry data.
+/// [`PeerEntry`] (containing [`Observations`] and [`PeerPacketStats`]),
+/// allowing for efficient tracking and updating of peer telemetry data.
 ///
 /// It can be combined with other objects to offer a complete view of the network state in regards
 /// to immediate peer probing.
 #[derive(Debug, Default, Clone)]
 pub struct NetworkPeerTracker {
-    peers: Arc<dashmap::DashMap<PeerId, Observations>>,
+    peers: Arc<dashmap::DashMap<PeerId, PeerEntry>>,
 }
 
 impl NetworkPeerTracker {
@@ -33,12 +41,15 @@ impl NetworkPeerTracker {
     where
         F: FnOnce(&PeerId, Observations) -> Observations,
     {
-        self.peers.alter(peer, f);
+        self.peers.alter(peer, |peer_id: &PeerId, mut entry: PeerEntry| {
+            entry.observations = f(peer_id, entry.observations);
+            entry
+        });
     }
 
     #[inline]
     pub fn get(&self, peer: &PeerId) -> Option<Observations> {
-        self.peers.get(peer).map(|o| *o.value())
+        self.peers.get(peer).map(|entry| entry.value().observations)
     }
 
     #[inline]
@@ -61,6 +72,26 @@ impl NetworkPeerTracker {
     #[inline]
     pub fn iter_keys(&self) -> impl Iterator<Item = PeerId> + '_ {
         self.peers.iter().map(|entry| *entry.key())
+    }
+
+    /// Get the packet stats handle for a peer, for use in instrumenting streams.
+    #[inline]
+    pub fn get_packet_stats(&self, peer: &PeerId) -> Option<Arc<PeerPacketStats>> {
+        self.peers.get(peer).map(|entry| entry.value().packet_stats.clone())
+    }
+
+    /// Get a snapshot of packet stats for a specific peer.
+    #[inline]
+    pub fn packet_stats_snapshot(&self, peer: &PeerId) -> Option<PeerPacketStatsSnapshot> {
+        self.peers.get(peer).map(|entry| entry.value().packet_stats.snapshot())
+    }
+
+    /// Get packet stats snapshots for all tracked peers.
+    pub fn all_packet_stats(&self) -> Vec<(PeerId, PeerPacketStatsSnapshot)> {
+        self.peers
+            .iter()
+            .map(|entry| (*entry.key(), entry.value().packet_stats.snapshot()))
+            .collect()
     }
 }
 
@@ -134,5 +165,88 @@ mod tests {
         assert!(tracker.get(&peer).is_none());
 
         Ok(())
+    }
+
+    #[test]
+    fn peer_tracker_should_provide_packet_stats_for_tracked_peer() -> anyhow::Result<()> {
+        let tracker = NetworkPeerTracker::new();
+        let peer = PeerId::random();
+
+        tracker.add(peer);
+
+        let stats = tracker.get_packet_stats(&peer).context("should contain packet stats")?;
+        stats.record_packet_out(100);
+        stats.record_packet_in(50);
+
+        let snapshot = tracker
+            .packet_stats_snapshot(&peer)
+            .context("should contain snapshot")?;
+        assert_eq!(snapshot.packets_out, 1);
+        assert_eq!(snapshot.packets_in, 1);
+        assert_eq!(snapshot.bytes_out, 100);
+        assert_eq!(snapshot.bytes_in, 50);
+
+        Ok(())
+    }
+
+    #[test]
+    fn peer_tracker_should_return_none_for_packet_stats_of_untracked_peer() {
+        let tracker = NetworkPeerTracker::new();
+        let peer = PeerId::random();
+
+        assert!(tracker.get_packet_stats(&peer).is_none());
+        assert!(tracker.packet_stats_snapshot(&peer).is_none());
+    }
+
+    #[test]
+    fn peer_tracker_should_reset_packet_stats_on_remove_and_readd() -> anyhow::Result<()> {
+        let tracker = NetworkPeerTracker::new();
+        let peer = PeerId::random();
+
+        tracker.add(peer);
+        let stats = tracker.get_packet_stats(&peer).context("should contain stats")?;
+        stats.record_packet_out(1000);
+
+        let snapshot = tracker.packet_stats_snapshot(&peer).context("should have snapshot")?;
+        assert_eq!(snapshot.bytes_out, 1000);
+
+        tracker.remove(&peer);
+        tracker.add(peer);
+
+        let new_snapshot = tracker
+            .packet_stats_snapshot(&peer)
+            .context("should have new snapshot")?;
+        assert_eq!(new_snapshot.bytes_out, 0);
+        assert_eq!(new_snapshot.packets_out, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn peer_tracker_all_packet_stats_should_return_all_peers() {
+        let tracker = NetworkPeerTracker::new();
+        let peer1 = PeerId::random();
+        let peer2 = PeerId::random();
+
+        tracker.add(peer1);
+        tracker.add(peer2);
+
+        if let Some(stats) = tracker.get_packet_stats(&peer1) {
+            stats.record_packet_out(100);
+        }
+        if let Some(stats) = tracker.get_packet_stats(&peer2) {
+            stats.record_packet_in(200);
+        }
+
+        let all_stats = tracker.all_packet_stats();
+        assert_eq!(all_stats.len(), 2);
+
+        let peer1_stats = all_stats.iter().find(|(p, _)| *p == peer1).map(|(_, s)| s);
+        let peer2_stats = all_stats.iter().find(|(p, _)| *p == peer2).map(|(_, s)| s);
+
+        assert!(peer1_stats.is_some());
+        assert!(peer2_stats.is_some());
+        assert_eq!(peer1_stats.unwrap().bytes_out, 100);
+        assert_eq!(peer2_stats.unwrap().bytes_in, 200);
     }
 }
