@@ -45,7 +45,7 @@ where
     <C as Decoder>::Item: AsRef<[u8]> + Clone + Send + 'static,
 {
     let (stream_rx, stream_tx) = stream.split();
-    let (send, recv) = channel::<<C as Decoder>::Item>(1000);
+    let (send, mut recv) = channel::<<C as Decoder>::Item>(1000);
     let cache_internal = cache.clone();
 
     let mut frame_writer = FramedWrite::new(stream_tx.compat_write(), codec.clone());
@@ -57,20 +57,21 @@ where
     let packet_stats_out = packet_stats.clone();
     let packet_stats_in = packet_stats;
 
-    // Send all outgoing data to the peer
-    hopr_async_runtime::prelude::spawn(
-        recv.inspect(move |data| {
+    // Send all outgoing data to the peer, recording stats only after a successful write
+    hopr_async_runtime::prelude::spawn(async move {
+        while let Some(data) = recv.next().await {
+            let byte_len = data.as_ref().len();
             tracing::trace!(%peer, "writing message to peer stream");
-            if let Some(ref stats) = packet_stats_out {
-                stats.record_packet_out(data.as_ref().len());
+            if let Err(error) = frame_writer.send(data).await {
+                tracing::debug!(%peer, ?error, component = "stream", "writing stream with peer finished");
+                return;
             }
-        })
-        .map(Ok)
-        .forward(frame_writer)
-        .inspect(move |res| {
-            tracing::debug!(%peer, ?res, component = "stream", "writing stream with peer finished");
-        }),
-    );
+            if let Some(ref stats) = packet_stats_out {
+                stats.record_packet_out(byte_len);
+            }
+        }
+        tracing::debug!(%peer, component = "stream", "writing stream with peer finished");
+    });
 
     // Read all incoming data from that peer and pass it to the general ingress stream
     hopr_async_runtime::prelude::spawn(

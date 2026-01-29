@@ -22,7 +22,8 @@ use hopr_protocol_start::{
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
-    Capability, HoprSession, IncomingSession, SESSION_MTU, SessionClientConfig, SessionId, SessionTarget,
+    Capabilities, Capability, HoprSession, IncomingSession, SESSION_MTU, SessionClientConfig, SessionId,
+    SessionTarget,
     SurbBalancerConfig,
     balancer::{
         AtomicSurbFlowEstimator, BalancerConfigFeedback, RateController, RateLimitSinkExt, SurbBalancer,
@@ -568,6 +569,28 @@ where
         self.session_notifiers.get().is_some()
     }
 
+    fn create_session_stats(&self, session_id: SessionId, capabilities: Capabilities) -> Arc<SessionStats> {
+        let ack_mode = if capabilities.contains(Capability::RetransmissionAck)
+            || capabilities.contains(Capability::RetransmissionNack)
+        {
+            Some(crate::types::caps_to_ack_mode(capabilities))
+        } else {
+            None
+        };
+        let frame_capacity = if capabilities.contains(Capability::Segmentation) {
+            16384
+        } else {
+            0
+        };
+        Arc::new(SessionStats::new(
+            session_id,
+            ack_mode,
+            self.cfg.frame_mtu,
+            self.cfg.max_frame_timeout,
+            frame_capacity,
+        ))
+    }
+
     async fn insert_session_slot(&self, session_id: SessionId, slot: SessionSlot) -> crate::errors::Result<()> {
         // We currently do not support loopback Sessions on ourselves.
         let abort_handles_clone = slot.abort_handles.clone();
@@ -710,25 +733,7 @@ where
                     })
                     .ok_or(SessionManagerError::NotStarted)?;
 
-                let ack_mode = if cfg.capabilities.contains(Capability::RetransmissionAck)
-                    || cfg.capabilities.contains(Capability::RetransmissionNack)
-                {
-                    Some(crate::types::caps_to_ack_mode(cfg.capabilities))
-                } else {
-                    None
-                };
-                let frame_capacity = if cfg.capabilities.contains(Capability::Segmentation) {
-                    16384
-                } else {
-                    0
-                };
-                let metrics = Arc::new(SessionStats::new(
-                    session_id,
-                    ack_mode,
-                    self.cfg.frame_mtu,
-                    self.cfg.max_frame_timeout,
-                    frame_capacity,
-                ));
+                let metrics = self.create_session_stats(session_id, cfg.capabilities);
 
                 // NOTE: the Exit node can have different `max_surb_buffer_size`
                 // setting on the Session manager, so it does not make sense to cap it here
@@ -809,6 +814,7 @@ where
                         },
                     )
                     .await?;
+                    metrics.set_state(SessionLifecycleState::Active);
 
                     // Wait for enough SURBs to be sent to the counterparty
                     // TODO: consider making this interactive = other party reports the exact level periodically
@@ -869,6 +875,7 @@ where
                         },
                     )
                     .await?;
+                    metrics.set_state(SessionLifecycleState::Active);
 
                     // For standard Session data we first reduce the number of SURBs we want to produce,
                     // unless requested to always max them out
@@ -1121,25 +1128,7 @@ where
         if let Some(session_id) = allocated_slot {
             debug!(%session_id, ?session_req, "assigned a new session");
 
-            let ack_mode = if session_req.capabilities.0.contains(Capability::RetransmissionAck)
-                || session_req.capabilities.0.contains(Capability::RetransmissionNack)
-            {
-                Some(crate::types::caps_to_ack_mode(session_req.capabilities.into()))
-            } else {
-                None
-            };
-            let frame_capacity = if session_req.capabilities.0.contains(Capability::Segmentation) {
-                16384
-            } else {
-                0
-            };
-            let metrics = Arc::new(SessionStats::new(
-                session_id,
-                ack_mode,
-                self.cfg.frame_mtu,
-                self.cfg.max_frame_timeout,
-                frame_capacity,
-            ));
+            let metrics = self.create_session_stats(session_id, session_req.capabilities.0);
 
             if let moka::ops::compute::CompResult::ReplacedWith(_) = self
                 .sessions
