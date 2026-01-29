@@ -126,7 +126,7 @@ jobs:
           google_credentials: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
           login_artifact_registry: 'false'
           install_sdk: 'true'
-          login-gke: 'true'
+          login_gke: 'true'
           project: hopr-staging
       - name: Set environment variables
         run: |
