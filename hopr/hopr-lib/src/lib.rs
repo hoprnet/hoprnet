@@ -584,7 +584,7 @@ where
         }
 
         info!("starting ticket events processor");
-        let (tickets_tx, tickets_rx) = channel(1024);
+        let (tickets_tx, tickets_rx) = channel(8192);
         let (tickets_rx, tickets_handle) = futures::stream::abortable(tickets_rx);
         processes.insert(HoprLibProcess::TicketEvents, tickets_handle);
         let node_db = self.node_db.clone();

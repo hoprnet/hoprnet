@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-connector"
-version = "0.13.1"
+version = "0.13.2"
 edition = "2024"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implementation of HOPR Chain APIs using Blokli client"
