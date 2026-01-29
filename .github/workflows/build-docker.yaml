@@ -60,9 +60,9 @@ jobs:
         id: gcp
         uses: hoprnet/hopr-workflows/actions/setup-gcp@644d936de4e1c8f5c50ba50f8526209455c28b4a # master
         with:
-          google-credentials: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
-          login-artifact-registry: 'true'
-          install-sdk: 'false'
+          google_credentials: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+          login_artifact_registry: 'true'
+          install_sdk: 'false'
 
       - name: Install Nix
         if: env.needs_nix_setup == true
