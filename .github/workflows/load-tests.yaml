@@ -123,9 +123,9 @@ jobs:
         id: gcp
         uses: hoprnet/hopr-workflows/actions/setup-gcp@12c56020e16036982e6cc529848edeedfc705865 # master
         with:
-          google-credentials: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
-          login-artifact-registry: 'false'
-          install-sdk: 'true'
+          google_credentials: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
+          login_artifact_registry: 'false'
+          install_sdk: 'true'
           login-gke: 'true'
           project: hopr-staging
       - name: Set environment variables
