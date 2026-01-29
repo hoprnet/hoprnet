@@ -176,10 +176,7 @@ mod tests {
         let stats = PeerPacketStats::default();
         let snapshot = stats.snapshot();
 
-        assert_eq!(snapshot.packets_out, 0);
-        assert_eq!(snapshot.packets_in, 0);
-        assert_eq!(snapshot.bytes_out, 0);
-        assert_eq!(snapshot.bytes_in, 0);
+        insta::assert_yaml_snapshot!(snapshot);
     }
 
     #[test]
@@ -190,10 +187,7 @@ mod tests {
         stats.record_packet_out(200);
 
         let snapshot = stats.snapshot();
-        assert_eq!(snapshot.packets_out, 2);
-        assert_eq!(snapshot.bytes_out, 300);
-        assert_eq!(snapshot.packets_in, 0);
-        assert_eq!(snapshot.bytes_in, 0);
+        insta::assert_yaml_snapshot!(snapshot);
     }
 
     #[test]
@@ -205,10 +199,7 @@ mod tests {
         stats.record_packet_in(100);
 
         let snapshot = stats.snapshot();
-        assert_eq!(snapshot.packets_in, 3);
-        assert_eq!(snapshot.bytes_in, 300);
-        assert_eq!(snapshot.packets_out, 0);
-        assert_eq!(snapshot.bytes_out, 0);
+        insta::assert_yaml_snapshot!(snapshot);
     }
 
     #[test]
@@ -221,9 +212,6 @@ mod tests {
         stats.record_packet_in(1500);
 
         let snapshot = stats.snapshot();
-        assert_eq!(snapshot.packets_out, 2);
-        assert_eq!(snapshot.packets_in, 2);
-        assert_eq!(snapshot.bytes_out, 3000);
-        assert_eq!(snapshot.bytes_in, 2000);
+        insta::assert_yaml_snapshot!(snapshot);
     }
 }

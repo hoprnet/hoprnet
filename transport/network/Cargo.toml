@@ -29,6 +29,7 @@ hopr-statistics = { workspace = true, features = ["moving"] }
 [dev-dependencies]
 assertables = { workspace = true }
 anyhow = { workspace = true }
+insta = { workspace = true }
 
 [package.metadata.cargo-machete]
 ignored = ["humantime-serde"]

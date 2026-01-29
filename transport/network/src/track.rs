@@ -181,10 +181,7 @@ mod tests {
         let snapshot = tracker
             .packet_stats_snapshot(&peer)
             .context("should contain snapshot")?;
-        assert_eq!(snapshot.packets_out, 1);
-        assert_eq!(snapshot.packets_in, 1);
-        assert_eq!(snapshot.bytes_out, 100);
-        assert_eq!(snapshot.bytes_in, 50);
+        insta::assert_yaml_snapshot!(snapshot);
 
         Ok(())
     }
@@ -207,17 +204,16 @@ mod tests {
         let stats = tracker.get_packet_stats(&peer).context("should contain stats")?;
         stats.record_packet_out(1000);
 
-        let snapshot = tracker.packet_stats_snapshot(&peer).context("should have snapshot")?;
-        assert_eq!(snapshot.bytes_out, 1000);
+        let before_snapshot = tracker.packet_stats_snapshot(&peer).context("should have snapshot")?;
+        insta::assert_yaml_snapshot!("before_remove", before_snapshot);
 
         tracker.remove(&peer);
         tracker.add(peer);
 
-        let new_snapshot = tracker
+        let after_snapshot = tracker
             .packet_stats_snapshot(&peer)
             .context("should have new snapshot")?;
-        assert_eq!(new_snapshot.bytes_out, 0);
-        assert_eq!(new_snapshot.packets_out, 0);
+        insta::assert_yaml_snapshot!("after_readd", after_snapshot);
 
         Ok(())
     }
@@ -238,15 +234,14 @@ mod tests {
             stats.record_packet_in(200);
         }
 
-        let all_stats = tracker.all_packet_stats();
+        let mut all_stats = tracker.all_packet_stats();
         assert_eq!(all_stats.len(), 2);
 
-        let peer1_stats = all_stats.iter().find(|(p, _)| *p == peer1).map(|(_, s)| s);
-        let peer2_stats = all_stats.iter().find(|(p, _)| *p == peer2).map(|(_, s)| s);
+        // Sort by bytes_out descending so peer1 (100 bytes out) comes first,
+        // giving us a deterministic order regardless of DashMap iteration.
+        all_stats.sort_by(|(_, a), (_, b)| b.bytes_out.cmp(&a.bytes_out));
 
-        assert!(peer1_stats.is_some());
-        assert!(peer2_stats.is_some());
-        assert_eq!(peer1_stats.unwrap().bytes_out, 100);
-        assert_eq!(peer2_stats.unwrap().bytes_in, 200);
+        let snapshots: Vec<_> = all_stats.iter().map(|(_, s)| s).collect();
+        insta::assert_yaml_snapshot!(snapshots);
     }
 }

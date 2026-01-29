@@ -1,0 +1,12 @@
+---
+source: transport/network/src/track.rs
+expression: snapshots
+---
+- packetsOut: 1
+  packetsIn: 0
+  bytesOut: 100
+  bytesIn: 0
+- packetsOut: 0
+  packetsIn: 1
+  bytesOut: 0
+  bytesIn: 200

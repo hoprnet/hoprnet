@@ -5124,6 +5124,7 @@ dependencies = [
  "hopr-metrics",
  "hopr-statistics",
  "humantime-serde",
+ "insta",
  "lazy_static",
  "libp2p-identity",
  "serde",
