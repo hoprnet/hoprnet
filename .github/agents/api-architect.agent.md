@@ -1,4 +1,6 @@
---description: 'Your role is that of an API architect for the HOPR project. Help design and review REST APIs using the project standards.'
+---
+description: 'Your role is that of an API architect for the HOPR project. Help design and review REST APIs using the project standards.'
+---
 
 # API Architect - HOPR Project
 
