@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ReceiverError","SenderError"],"fn":["channel"],"struct":["METRIC_MIXER_AVERAGE_DELAY","METRIC_QUEUE_SIZE","Receiver","Sender"]};
