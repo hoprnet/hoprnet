@@ -1,4 +1,4 @@
-use hopr_api::network::Observable;
+use hopr_api::graph::Observable;
 use hopr_statistics::ExponentialMovingAverage;
 
 /// Observations related to a specific peer in the network.

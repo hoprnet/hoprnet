@@ -98,6 +98,7 @@ mod tests {
     use hopr_platform::time::native::current_time;
     use hopr_primitive_types::traits::AsUnixTimestamp;
     use more_asserts::assert_lt;
+    use rand::Rng;
 
     use super::*;
 
@@ -110,6 +111,7 @@ mod tests {
 
         let m1 = Message::Telemetry(PathTelemetry {
             id: hopr_crypto_random::random_bytes(),
+            seq_id: hopr_crypto_random::rng().r#gen(),
             path: hopr_crypto_random::random_bytes(),
             timestamp: 1234567890,
         });
@@ -166,6 +168,7 @@ mod tests {
         let telemetry = PathTelemetry {
             id: [1; 10],
             path: [1; 10],
+            seq_id: 2,
             timestamp: current_time().as_unix_timestamp().as_millis(),
         };
         let as_data: ApplicationData = Message::Telemetry(telemetry).try_into()?;

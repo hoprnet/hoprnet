@@ -41,6 +41,7 @@ members = [
   "utils/session",
   # implementations
   "impls/ct/telemetry",
+  "impls/graph",
 ]
 
 [workspace.dependencies]
@@ -264,6 +265,7 @@ hopr-statistics = { path = "common/statistics" }
 
 # referential implementations
 hopr-ct-telemetry = { path = "impls/ct/telemetry" }
+hopr-network-graph = { path = "impls/graph" }
 
 [profile.dev]
 panic = "abort"

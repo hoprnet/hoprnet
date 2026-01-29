@@ -1,5 +1,7 @@
 use std::num::NonZeroU8;
+use std::sync::Arc;
 
+use dashmap::DashSet;
 use futures::{Stream, StreamExt};
 use hopr_network_types::prelude::is_public_address;
 use hopr_transport_identity::{
@@ -197,17 +199,17 @@ impl HoprLibp2pNetworkBuilder {
         protocol: &'static str,
         allow_private_addresses: bool,
     ) -> (HoprNetwork, impl std::future::Future<Output = ()>) {
-        let tracker = hopr_transport_network::track::NetworkPeerTracker::new();
         let store =
             hopr_transport_network::store::NetworkPeerStore::new(self.me, self.my_addresses.into_iter().collect());
 
         let network = HoprNetwork {
-            tracker: tracker.clone(),
+            tracker: Arc::new(DashSet::new()),
             store: store.clone(),
             control: self.swarm.behaviour().streams.new_control(),
             protocol: libp2p::StreamProtocol::new(protocol),
         };
 
+        let tracker = network.tracker.clone();
         #[cfg(all(feature = "prometheus", not(test)))]
         let network_inner = network.clone();
         let mut swarm = self.swarm;
@@ -257,7 +259,7 @@ impl HoprLibp2pNetworkBuilder {
                                     } else {
                                         debug!(transport="libp2p", peer = %peer_id, multiaddress = %address, "Private/local peer address encountered")
                                     }
-                                    tracker.add(peer_id);
+                                    tracker.insert(peer_id);
                                 },
                                 libp2p::core::ConnectedPoint::Listener { send_back_addr, .. } => {
                                     if allow_private_addresses || is_public_address(&send_back_addr) {
@@ -267,7 +269,7 @@ impl HoprLibp2pNetworkBuilder {
                                     } else {
                                         debug!(transport="libp2p", peer = %peer_id, multiaddress = %send_back_addr, "Private/local peer address ignored")
                                     }
-                                    tracker.add(peer_id);
+                                    tracker.insert(peer_id);
                                 }
                             }
                         } else {

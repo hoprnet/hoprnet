@@ -4370,6 +4370,7 @@ version = "0.9.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "atomic_enum",
  "auto_impl",
  "chrono",
  "futures",
@@ -4804,6 +4805,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-network-graph"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "assertables",
+ "async-stream",
+ "async-trait",
+ "dashmap",
+ "futures",
+ "hex-literal",
+ "hopr-api",
+ "hopr-crypto-random 0.3.0",
+ "hopr-crypto-types 0.9.0",
+ "hopr-internal-types",
+ "hopr-primitive-types 0.10.0",
+ "hopr-statistics",
+ "lazy_static",
+ "petgraph",
+ "rand 0.8.5",
+ "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
 name = "hopr-network-types"
 version = "1.1.2"
 dependencies = [
@@ -5137,6 +5162,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "backon",
+ "dashmap",
  "futures",
  "hopr-api",
  "hopr-crypto-packet",

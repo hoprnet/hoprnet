@@ -32,8 +32,8 @@ use axum::{
     routing::{delete, get, post},
 };
 use hopr_chain_connector::HoprBlockchainSafeConnector;
-use hopr_db_node::HoprNodeDb;
-use hopr_lib::{Address, Hopr, errors::HoprLibError};
+use hopr_db_node::{HoprNodeDb, HoprNodeDbApi};
+use hopr_lib::{Address, Hopr, errors::HoprLibError, traits::chain::HoprChainApi};
 use hopr_utils_session::ListenerJoinHandles;
 use serde::Serialize;
 pub use session::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
@@ -61,7 +61,7 @@ type HoprBlokliConnector = HoprBlockchainSafeConnector<hopr_chain_connector::blo
 
 #[derive(Clone)]
 pub(crate) struct AppState {
-    pub hopr: Arc<Hopr<Arc<HoprBlokliConnector>, HoprNodeDb>>, // checks
+    pub hopr: Arc<Hopr<Arc<Chain>, Db, Graph>>,
 }
 
 pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
@@ -70,7 +70,7 @@ pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
 pub(crate) struct InternalState {
     pub hoprd_cfg: serde_json::Value,
     pub auth: Arc<Auth>,
-    pub hopr: Arc<Hopr<Arc<HoprBlokliConnector>, HoprNodeDb>>,
+    pub hopr: Arc<Hopr<Arc<Chain>, Db, Graph>>,
     pub websocket_active_count: Arc<AtomicU16>,
     pub open_listeners: Arc<ListenerJoinHandles>,
     pub default_listen_host: std::net::SocketAddr,
@@ -209,7 +209,7 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
 async fn build_api(
     hoprd_cfg: serde_json::Value,
     cfg: crate::config::Api,
-    hopr: Arc<Hopr<Arc<HoprBlokliConnector>, HoprNodeDb>>,
+    hopr: Arc<Hopr>,
     open_listeners: Arc<ListenerJoinHandles>,
     default_listen_host: std::net::SocketAddr,
 ) -> Router {

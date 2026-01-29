@@ -1,16 +1,12 @@
-use std::sync::Arc;
-
 use futures::StreamExt;
 use hopr_api::{
     PeerId,
     ct::{DestinationRouting, NetworkGraphView, TrafficGeneration},
-    network::{NetworkObservations, NetworkView},
 };
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::protocol::HoprPseudonym;
 use hopr_network_types::types::RoutingOptions;
-use rand::seq::SliceRandom;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use validator::Validate;
@@ -105,90 +101,6 @@ impl TrafficGeneration for ImmediateNeighborProber {
     }
 }
 
-#[derive(Clone)]
-pub struct ImmediateNeighborChannelGraph<T> {
-    network: Arc<T>,
-    recheck_threshold: std::time::Duration,
-}
-
-impl<T> ImmediateNeighborChannelGraph<T> {
-    pub fn new(network: T, recheck_threshold: std::time::Duration) -> Self {
-        Self {
-            network: Arc::new(network),
-            recheck_threshold,
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl<T> hopr_api::ct::NetworkGraphUpdate for ImmediateNeighborChannelGraph<T>
-where
-    T: NetworkObservations + Send + Sync,
-{
-    async fn record<N, P>(
-        &self,
-        telemetry: std::result::Result<hopr_api::ct::Telemetry<N, P>, hopr_api::ct::TrafficGenerationError<P>>,
-    ) where
-        N: hopr_api::ct::MeasurableNeighbor + Send + Clone,
-        P: hopr_api::ct::MeasurablePath + Send + Clone,
-    {
-        match telemetry {
-            Ok(hopr_api::ct::Telemetry::Neighbor(telemetry)) => {
-                tracing::trace!(
-                    peer = %telemetry.peer(),
-                    latency_ms = telemetry.rtt().as_millis(),
-                    "neighbor probe successful"
-                );
-                hopr_api::network::NetworkObservations::update(
-                    self.network.as_ref(),
-                    telemetry.peer(),
-                    Ok(telemetry.rtt() / 2),
-                );
-            }
-            Ok(hopr_api::ct::Telemetry::Loopback(_)) => {
-                tracing::warn!(
-                    reason = "feature not implemented",
-                    "loopback path telemetry not supported yet"
-                );
-            }
-            Err(hopr_api::ct::TrafficGenerationError::ProbeNeighborTimeout(peer)) => {
-                hopr_api::network::NetworkObservations::update(self.network.as_ref(), &peer, Err(()));
-            }
-            Err(hopr_api::ct::TrafficGenerationError::ProbeLoopbackTimeout(_)) => {
-                tracing::warn!(
-                    reason = "feature not implemented",
-                    "loopback path telemetry not supported yet"
-                );
-            }
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl<T> hopr_api::ct::NetworkGraphView for ImmediateNeighborChannelGraph<T>
-where
-    T: NetworkView + Send + Sync + Clone + 'static,
-{
-    fn nodes(&self) -> futures::stream::BoxStream<'static, PeerId> {
-        let fetcher = self.network.clone();
-        let _recheck_threshold = self.recheck_threshold; // TODO: currently being ignored
-        let mut rng = hopr_crypto_random::rng();
-
-        Box::pin(async_stream::stream! {
-            let mut peers: Vec<PeerId> = fetcher.discovered_peers().into_iter().collect();
-            peers.shuffle(&mut rng);    // shuffle peers to randomize order between rounds
-
-            for peer in peers {
-                yield peer;
-            }
-        })
-    }
-
-    async fn find_routes(&self, _destination: &PeerId, _length: usize) -> Vec<DestinationRouting> {
-        vec![]
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
@@ -239,9 +151,6 @@ mod tests {
 
             fn connected_peers(&self) -> HashSet<PeerId>;
 
-            #[allow(refining_impl_trait)]
-            fn observations_for(&self, peer: &PeerId) -> Option<MockObserved>;
-
             fn health(&self) -> Health;
         }
 
@@ -256,7 +165,7 @@ mod tests {
         fetcher.expect_discovered_peers().returning(|| HashSet::new());
 
         let channel_graph = ImmediateNeighborChannelGraph {
-            network: Arc::new(fetcher),
+            tracker: Arc::new(fetcher),
             recheck_threshold: ProberConfig::default().recheck_threshold,
         };
 
@@ -282,7 +191,7 @@ mod tests {
         fetcher.expect_discovered_peers().returning(|| RANDOM_PEERS.clone());
 
         let channel_graph = ImmediateNeighborChannelGraph {
-            network: Arc::new(fetcher),
+            tracker: Arc::new(fetcher),
             recheck_threshold: ProberConfig::default().recheck_threshold,
         };
 
@@ -335,7 +244,44 @@ mod tests {
         fetcher.expect_discovered_peers().returning(|| HashSet::new());
 
         let channel_graph = ImmediateNeighborChannelGraph {
-            network: Arc::new(fetcher),
+            tracker: Arc::new(fetcher),
+            recheck_threshold: cfg.recheck_threshold,
+        };
+
+        let prober = ImmediateNeighborProber::new(cfg);
+        let stream = prober.build(channel_graph);
+        pin_mut!(stream);
+
+        assert!(timeout(TINY_TIMEOUT, stream.next()).await?.is_some());
+        assert!(timeout(TINY_TIMEOUT, stream.next()).await?.is_some());
+        assert!(
+            timeout(TINY_TIMEOUT, stream.next()).await.is_errual.len(),
+            RANDOM_PEERS.len()
+        );
+        assert!(!actual.iter().zip(RANDOM_PEERS.iter()).all(|(a, b)| a == b));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn peers_should_be_generated_in_multiple_rounds_as_long_as_they_are_available() -> anyhow::Result<()> {
+        let cfg = ProberConfig {
+            interval: std::time::Duration::from_millis(1),
+            recheck_threshold: std::time::Duration::from_millis(1000),
+            ..Default::default()
+        };
+
+        let mut fetcher = MockScanInteraction::new();
+        fetcher.expect_discovered_peers().times(2).returning(|| {
+            let peer: PeerId = OffchainPublicKey::from_privkey(&hopr_crypto_random::random_bytes::<32>())
+                .unwrap()
+                .into();
+            HashSet::from([peer])
+        });
+        fetcher.expect_discovered_peers().returning(|| HashSet::new());
+
+        let channel_graph = ImmediateNeighborChannelGraph {
+            tracker: Arc::new(fetcher),
             recheck_threshold: cfg.recheck_threshold,
         };
 

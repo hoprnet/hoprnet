@@ -11,14 +11,17 @@ license = "GPL-3.0-only"
 
 [features]
 default = []
-ct = ["dep:hopr-network-types"]
+ct = ["graph", "dep:hopr-network-types"]
 db = []
 chain = ["db"]
 network = []
+graph = []
+node = ["chain", "db", "graph", "network", "dep:atomic_enum"]
 serde = ["hopr-primitive-types/serde"]
 
 [dependencies]
 async-trait = { workspace = true }
+atomic_enum = { workspace = true, optional = true }
 auto_impl = { workspace = true }
 chrono = { workspace = true }
 futures = { workspace = true }

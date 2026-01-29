@@ -39,10 +39,11 @@ use helpers::PathPlanner;
 use hopr_api::{
     chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
     db::HoprDbTicketOperations,
+    graph::{NetworkGraphUpdate, NetworkGraphView, Observable},
 };
 pub use hopr_api::{
     db::ChannelTicketStatistics,
-    network::{Health, Observable, traits::NetworkView},
+    network::{Health, traits::NetworkView},
 };
 use hopr_async_runtime::{AbortableList, prelude::spawn, spawn_as_abortable};
 use hopr_crypto_packet::prelude::PacketSignal;
@@ -50,7 +51,6 @@ pub use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     types::{HalfKeyChallenge, Hash, OffchainPublicKey},
 };
-use hopr_ct_telemetry::ImmediateNeighborChannelGraph;
 pub use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_internal_types::prelude::*;
 pub use hopr_network_types::prelude::RoutingOptions;
@@ -61,7 +61,6 @@ use hopr_protocol_hopr::MemorySurbStore;
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId, Protocol};
 use hopr_transport_mixer::MixerConfig;
-pub use hopr_transport_network::observation::Observations;
 use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork};
 use hopr_transport_probe::{
     Probe, TrafficGeneration,
@@ -118,20 +117,24 @@ type CurrentPathSelector = NoPathSelector;
 
 /// Interface into the physical transport mechanism allowing all off-chain HOPR-related tasks on
 /// the transport.
-pub struct HoprTransport<Chain, Db> {
+pub struct HoprTransport<Chain, Db, Graph>
+where
+    Graph: NetworkGraphView + NetworkGraphUpdate + Clone + Send + Sync + 'static,
+{
     packet_key: OffchainKeypair,
     chain_key: ChainKeypair,
     db: Db,
     chain_api: Chain,
     ping: Arc<OnceLock<Pinger>>,
     network: Arc<OnceLock<HoprNetwork>>,
+    graph: Graph,
     path_planner: PathPlanner<MemorySurbStore, Chain, CurrentPathSelector>,
     my_multiaddresses: Vec<Multiaddr>,
     smgr: SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>, Sender<IncomingSession>>,
     cfg: HoprProtocolConfig,
 }
 
-impl<Chain, Db> HoprTransport<Chain, Db>
+impl<Chain, Db, Graph> HoprTransport<Chain, Db, Graph>
 where
     Db: HoprDbTicketOperations + Clone + Send + Sync + 'static,
     Chain: ChainReadChannelOperations
@@ -142,11 +145,13 @@ where
         + Send
         + Sync
         + 'static,
+    Graph: NetworkGraphView + NetworkGraphUpdate + Clone + Send + Sync + 'static,
 {
     pub fn new(
         identity: (&ChainKeypair, &OffchainKeypair),
         resolver: Chain,
         db: Db,
+        graph: Graph,
         my_multiaddresses: Vec<Multiaddr>,
         cfg: HoprProtocolConfig,
     ) -> Self {
@@ -155,6 +160,7 @@ where
             chain_key: identity.0.clone(),
             ping: Arc::new(OnceLock::new()),
             network: Arc::new(OnceLock::new()),
+            graph,
             path_planner: PathPlanner::new(
                 *identity.0.as_ref(),
                 MemorySurbStore::new(cfg.packet.surb_store),
@@ -453,7 +459,7 @@ where
                 manual_ping_rx,
                 tx_from_probing,
                 cover_traffic,
-                ImmediateNeighborChannelGraph::new(transport_network.clone(), self.cfg.probe.recheck_threshold),
+                self.graph.clone(),
             )
             .await;
 
@@ -518,7 +524,7 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn ping(&self, peer: &PeerId) -> errors::Result<(std::time::Duration, Observations)> {
+    pub async fn ping(&self, peer: &PeerId) -> errors::Result<(std::time::Duration, Graph::Observed)> {
         if peer == &self.packet_key.public().into() {
             return Err(HoprTransportError::Api("ping to self does not make sense".into()));
         }
@@ -528,26 +534,20 @@ where
             .get()
             .ok_or_else(|| HoprTransportError::Api("ping processing is not yet initialized".into()))?;
 
-        let network = self
+        let _network = self
             .network
             .get()
             .ok_or_else(|| HoprTransportError::Api("transport network is not yet initialized".into()))?;
 
         let latency = (*pinger).ping(*peer).await?;
 
-        let observations = match network.observations_for(peer) {
-            Some(observations) => observations,
-            None => {
-                // artificial delay to allow the observations to be recorded, the 50ms is random value
-                futures_time::task::sleep(futures_time::time::Duration::from_millis(50)).await;
-
-                network
-                    .observations_for(peer)
-                    .ok_or(HoprTransportError::Probe(ProbeError::NonExistingPeer))?
-            }
-        };
-
-        Ok((latency, observations))
+        if let Some(observations) = self.graph.observations_for(peer) {
+            Ok((latency, observations))
+        } else {
+            Err(HoprTransportError::Api(format!(
+                "no observations available for peer {peer}",
+            )))
+        }
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
@@ -650,7 +650,7 @@ where
             .unwrap_or(Health::Red)
     }
 
-    pub async fn network_connected_peers(&self) -> errors::Result<Vec<PeerId>> {
+    pub fn network_connected_peers(&self) -> errors::Result<Vec<PeerId>> {
         Ok(self
             .network
             .get()
@@ -664,12 +664,29 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn network_peer_observations(&self, peer: &PeerId) -> errors::Result<Option<Observations>> {
+    pub fn network_peer_observations(&self, peer: &PeerId) -> Option<Graph::Observed> {
+        self.graph.observations_for(peer)
+    }
+
+    /// Get peers connected peers with quality higher than some value
+    #[tracing::instrument(level = "debug", skip(self))]
+    pub fn all_network_peers(&self, minimum_score: f64) -> errors::Result<Vec<(PeerId, Graph::Observed)>> {
         Ok(self
-            .network
-            .get()
-            .ok_or_else(|| HoprTransportError::Api("transport network is not yet initialized".into()))?
-            .observations_for(peer))
+            .network_connected_peers()?
+            .into_iter()
+            .filter_map(|peer| {
+                let observation = self.graph.observations_for(&peer);
+                if let Some(info) = observation {
+                    if info.score() >= minimum_score {
+                        Some((peer, info))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>())
     }
 }
 

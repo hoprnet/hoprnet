@@ -29,9 +29,6 @@ pub mod utils;
 /// Public traits for interactions with this library.
 pub mod traits;
 
-/// Functionality related to the HOPR node state.
-pub mod state;
-
 #[cfg(any(feature = "testing", test))]
 pub mod testing;
 
@@ -88,8 +85,13 @@ use hopr_api::{
     chain::{AccountSelector, AnnouncementError, ChannelSelector, *},
     ct::TrafficGeneration,
     db::{HoprNodeDbApi, TicketMarker, TicketSelector},
+    node::{
+        ChainInfo, CloseChannelResult, HoprNodeChainOperations, HoprNodeNetworkOperations, HoprNodeOperations,
+        OpenChannelResult, SafeModuleConfig,
+        state::{AtomicHoprState, HoprState},
+    },
 };
-pub use hopr_api::{db::ChannelTicketStatistics, network::Observable};
+pub use hopr_api::{db::ChannelTicketStatistics, graph::Observable};
 use hopr_async_runtime::prelude::spawn;
 pub use hopr_async_runtime::{Abortable, AbortableList};
 pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
@@ -110,9 +112,24 @@ pub use crate::{
     config::SafeModule,
     constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE},
     errors::{HoprLibError, HoprStatusError},
-    state::{HoprLibProcess, HoprState},
-    traits::chain::{CloseChannelResult, OpenChannelResult},
 };
+
+/// Long-running tasks that are spawned by the HOPR node.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, strum::Display, strum::EnumCount)]
+pub enum HoprLibProcess {
+    #[strum(to_string = "transport: {0}")]
+    Transport(HoprTransportProcess),
+    #[strum(to_string = "session server providing the exit node session stream functionality")]
+    SessionServer,
+    #[strum(to_string = "ticket redemption queue driver")]
+    TicketRedemptions,
+    #[strum(to_string = "subscription for on-chain account announcements")]
+    AccountAnnouncements,
+    #[strum(to_string = "subscription for on-chain channel updates")]
+    ChannelEvents,
+    #[strum(to_string = "on received ticket event (winning or rejected)")]
+    TicketEvents,
+}
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -207,11 +224,14 @@ const ON_CHAIN_RESOLUTION_EVENT_TIMEOUT: Duration = Duration::from_secs(90);
 /// that manual interaction is unnecessary.
 ///
 /// As such, the `hopr_lib` serves mainly as an integration point into Rust programs.
-pub struct Hopr<Chain, Db> {
+pub struct Hopr<Chain, Db, Graph>
+where
+    Graph: hopr_api::graph::NetworkGraphView + hopr_api::graph::NetworkGraphUpdate + Clone + Send + Sync + 'static,
+{
     me: OffchainKeypair,
     cfg: config::HoprLibConfig,
-    state: Arc<state::AtomicHoprState>,
-    transport_api: HoprTransport<Chain, Db>,
+    state: Arc<api::node::state::AtomicHoprState>,
+    transport_api: HoprTransport<Chain, Db, Graph>,
     redeem_requests: OnceLock<futures::channel::mpsc::Sender<TicketSelector>>,
     node_db: Db,
     chain_api: Chain,
@@ -219,15 +239,17 @@ pub struct Hopr<Chain, Db> {
     processes: OnceLock<AbortableList<HoprLibProcess>>,
 }
 
-impl<Chain, Db> Hopr<Chain, Db>
+impl<Chain, Db, Graph> Hopr<Chain, Db, Graph>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
+    Graph: hopr_api::graph::NetworkGraphView + hopr_api::graph::NetworkGraphUpdate + Clone + Send + Sync + 'static,
 {
     pub async fn new(
         identity: (&ChainKeypair, &OffchainKeypair),
         hopr_chain_api: Chain,
         hopr_node_db: Db,
+        graph: Graph,
         cfg: config::HoprLibConfig,
     ) -> errors::Result<Self> {
         if hopr_crypto_random::is_rng_fixed() {
@@ -240,6 +262,7 @@ where
             identity,
             hopr_chain_api.clone(),
             hopr_node_db.clone(),
+            graph,
             vec![(&cfg.host).try_into().map_err(HoprLibError::TransportError)?],
             cfg.protocol,
         );
@@ -271,7 +294,7 @@ where
         Ok(Self {
             me: identity.1.clone(),
             cfg,
-            state: Arc::new(state::AtomicHoprState::new(HoprState::Uninitialized)),
+            state: Arc::new(AtomicHoprState::new(HoprState::Uninitialized)),
             transport_api: hopr_transport_api,
             chain_api: hopr_chain_api,
             node_db: hopr_node_db,
@@ -282,37 +305,11 @@ where
     }
 
     fn error_if_not_in_state(&self, state: HoprState, error: String) -> errors::Result<()> {
-        if self.status() == state {
+        if HoprNodeOperations::status(self) == state {
             Ok(())
         } else {
             Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(state, error)))
         }
-    }
-
-    pub fn status(&self) -> HoprState {
-        self.state.load(Ordering::Relaxed)
-    }
-
-    pub async fn get_balance<C: Currency + Send>(&self) -> errors::Result<Balance<C>> {
-        self.chain_api
-            .balance(self.me_onchain())
-            .await
-            .map_err(HoprLibError::chain)
-    }
-
-    pub async fn get_safe_balance<C: Currency + Send>(&self) -> errors::Result<Balance<C>> {
-        self.chain_api
-            .balance(self.cfg.safe_module.safe_address)
-            .await
-            .map_err(HoprLibError::chain)
-    }
-
-    pub async fn chain_info(&self) -> errors::Result<ChainInfo> {
-        self.chain_api.chain_info().await.map_err(HoprLibError::chain)
-    }
-
-    pub fn get_safe_config(&self) -> SafeModule {
-        self.cfg.safe_module.clone()
     }
 
     pub fn config(&self) -> &config::HoprLibConfig {
@@ -324,10 +321,7 @@ where
         self.cfg.publish
     }
 
-    pub async fn run<
-        Ct,
-        #[cfg(feature = "session-server")] T: traits::session::HoprSessionServer + Clone + Send + 'static,
-    >(
+    pub async fn run<Ct, #[cfg(feature = "session-server")] T: traits::HoprSessionServer + Clone + Send + 'static>(
         &self,
         cover_traffic: Ct,
         #[cfg(feature = "session-server")] serve_handler: T,
@@ -343,8 +337,9 @@ where
         #[cfg(feature = "testing")]
         warn!("!! FOR TESTING ONLY !! Node is running with some safety checks disabled!");
 
+        let me_onchain = *self.chain_api.me();
         info!(
-            address = %self.me_onchain(), minimum_balance = %*SUGGESTED_NATIVE_BALANCE,
+            address = %me_onchain, minimum_balance = %*SUGGESTED_NATIVE_BALANCE,
             "node is not started, please fund this node",
         );
 
@@ -353,7 +348,7 @@ where
             *MIN_NATIVE_BALANCE,
             *SUGGESTED_NATIVE_BALANCE,
             Duration::from_secs(200),
-            self.me_onchain(),
+            me_onchain,
             &self.chain_api,
         )
         .await?;
@@ -363,11 +358,11 @@ where
         info!("starting HOPR node...");
         self.state.store(HoprState::CheckingBalance, Ordering::Relaxed);
 
-        let balance: XDaiBalance = self.get_balance().await?;
+        let balance: XDaiBalance = self.chain_api.balance(me_onchain).await.map_err(HoprLibError::chain)?;
         let minimum_balance = *constants::MIN_NATIVE_BALANCE;
 
         info!(
-            address = %self.me_onchain(),
+            address = %me_onchain,
             %balance,
             %minimum_balance,
             "node information"
@@ -765,7 +760,7 @@ where
         METRIC_HOPR_NODE_INFO.set(
             &[
                 &self.me.public().to_peerid_str(),
-                &self.me_onchain().to_string(),
+                &me_onchain.to_string(),
                 &self.cfg.safe_module.safe_address.to_string(),
                 &self.cfg.safe_module.module_address.to_string(),
             ],
@@ -791,47 +786,6 @@ where
         self.state.store(HoprState::Terminated, Ordering::Relaxed);
         info!("NODE SHUTDOWN COMPLETE");
         Ok(())
-    }
-
-    /// Allows external users to receive notifications about new winning tickets.
-    pub fn subscribe_winning_tickets(&self) -> impl Stream<Item = VerifiedTicket> + Send {
-        self.winning_ticket_subscribers.1.activate_cloned()
-    }
-
-    // p2p transport =========
-    /// Own PeerId used in the libp2p transport layer
-    pub fn me_peer_id(&self) -> PeerId {
-        (*self.me.public()).into()
-    }
-
-    /// Get the list of all announced public nodes in the network
-    pub async fn get_public_nodes(&self) -> errors::Result<Vec<(PeerId, Address, Vec<Multiaddr>)>> {
-        Ok(self
-            .chain_api
-            .stream_accounts(AccountSelector {
-                public_only: true,
-                ..Default::default()
-            })
-            .map_err(HoprLibError::chain)
-            .await?
-            .map(|entry| {
-                (
-                    PeerId::from(entry.public_key),
-                    entry.chain_addr,
-                    entry.get_multiaddrs().to_vec(),
-                )
-            })
-            .collect()
-            .await)
-    }
-
-    /// Ping another node in the network based on the PeerId
-    ///
-    /// Returns the RTT (round trip time), i.e. how long it took for the ping to return.
-    pub async fn ping(&self, peer: &PeerId) -> errors::Result<(std::time::Duration, Observations)> {
-        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
-
-        Ok(self.transport_api.ping(peer).await?)
     }
 
     /// Create a client session connection returning a session object that implements
@@ -886,277 +840,6 @@ where
         Ok(self.transport_api.update_session_surb_balancing_cfg(id, cfg).await?)
     }
 
-    /// List all multiaddresses announced by this node
-    pub fn local_multiaddresses(&self) -> Vec<Multiaddr> {
-        self.transport_api.local_multiaddresses()
-    }
-
-    /// List all multiaddresses on which the node is listening
-    pub async fn listening_multiaddresses(&self) -> Vec<Multiaddr> {
-        self.transport_api.listening_multiaddresses().await
-    }
-
-    /// List all multiaddresses observed for a PeerId
-    pub async fn network_observed_multiaddresses(&self, peer: &PeerId) -> Vec<Multiaddr> {
-        self.transport_api.network_observed_multiaddresses(peer).await
-    }
-
-    /// List all multiaddresses announced on-chain for the given node.
-    pub async fn multiaddresses_announced_on_chain(&self, peer: &PeerId) -> errors::Result<Vec<Multiaddr>> {
-        let peer = *peer;
-        // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
-        let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer)).await?;
-
-        match self
-            .chain_api
-            .stream_accounts(AccountSelector {
-                public_only: false,
-                offchain_key: Some(pubkey),
-                ..Default::default()
-            })
-            .map_err(HoprLibError::chain)
-            .await?
-            .next()
-            .await
-        {
-            Some(entry) => Ok(entry.get_multiaddrs().to_vec()),
-            None => {
-                error!(%peer, "no information");
-                Ok(vec![])
-            }
-        }
-    }
-
-    // Network =========
-
-    /// Get measured network health
-    pub async fn network_health(&self) -> Health {
-        self.transport_api.network_health().await
-    }
-
-    /// List all peers connected to this
-    pub async fn network_connected_peers(&self) -> errors::Result<Vec<PeerId>> {
-        Ok(self.transport_api.network_connected_peers().await?)
-    }
-
-    /// Get all data collected from the network relevant for a PeerId
-    pub async fn network_peer_info(&self, peer: &PeerId) -> errors::Result<Option<Observations>> {
-        Ok(self.transport_api.network_peer_observations(peer).await?)
-    }
-
-    /// Get peers connected peers with quality higher than some value
-    pub async fn all_network_peers(
-        &self,
-        minimum_score: f64,
-    ) -> errors::Result<Vec<(Option<Address>, PeerId, Observations)>> {
-        Ok(
-            futures::stream::iter(self.transport_api.network_connected_peers().await?)
-                .filter_map(|peer| async move {
-                    if let Ok(Some(info)) = self.transport_api.network_peer_observations(&peer).await {
-                        if info.score() >= minimum_score {
-                            Some((peer, info))
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                })
-                .filter_map(|(peer_id, info)| async move {
-                    let address = self.peerid_to_chain_key(&peer_id).await.ok().flatten();
-                    Some((address, peer_id, info))
-                })
-                .collect::<Vec<_>>()
-                .await,
-        )
-    }
-
-    // Ticket ========
-    /// Get all tickets in a channel specified by [`channel_id`](ChannelId).
-    pub async fn tickets_in_channel(&self, channel_id: &ChannelId) -> errors::Result<Option<Vec<RedeemableTicket>>> {
-        if let Some(channel) = self
-            .chain_api
-            .channel_by_id(channel_id)
-            .await
-            .map_err(|e| HoprTransportError::Other(e.into()))?
-        {
-            if &channel.destination == self.chain_api.me() {
-                Ok(Some(
-                    self.node_db
-                        .stream_tickets([&channel])
-                        .await
-                        .map_err(HoprLibError::db)?
-                        .collect()
-                        .await,
-                ))
-            } else {
-                Ok(None)
-            }
-        } else {
-            Ok(None)
-        }
-    }
-
-    /// Get all tickets
-    pub async fn all_tickets(&self) -> errors::Result<Vec<VerifiedTicket>> {
-        Ok(self
-            .node_db
-            .stream_tickets(None::<TicketSelector>)
-            .await
-            .map_err(HoprLibError::db)?
-            .map(|v| v.ticket)
-            .collect()
-            .await)
-    }
-
-    /// Get statistics for all tickets
-    pub async fn ticket_statistics(&self) -> errors::Result<ChannelTicketStatistics> {
-        self.node_db.get_ticket_statistics(None).await.map_err(HoprLibError::db)
-    }
-
-    /// Reset the ticket metrics to zero
-    pub async fn reset_ticket_statistics(&self) -> errors::Result<()> {
-        self.node_db
-            .reset_ticket_statistics()
-            .await
-            .map_err(HoprLibError::chain)
-    }
-
-    // Chain =========
-    pub fn me_onchain(&self) -> Address {
-        *self.chain_api.me()
-    }
-
-    /// Get ticket price
-    pub async fn get_ticket_price(&self) -> errors::Result<HoprBalance> {
-        self.chain_api.minimum_ticket_price().await.map_err(HoprLibError::chain)
-    }
-
-    /// Get minimum incoming ticket winning probability
-    pub async fn get_minimum_incoming_ticket_win_probability(&self) -> errors::Result<WinningProbability> {
-        self.chain_api
-            .minimum_incoming_ticket_win_prob()
-            .await
-            .map_err(HoprLibError::chain)
-    }
-
-    /// List of all accounts announced on the chain
-    pub async fn accounts_announced_on_chain(&self) -> errors::Result<Vec<AccountEntry>> {
-        Ok(self
-            .chain_api
-            .stream_accounts(AccountSelector {
-                public_only: true,
-                ..Default::default()
-            })
-            .map_err(HoprLibError::chain)
-            .await?
-            .collect()
-            .await)
-    }
-
-    /// Get the channel entry from Hash.
-    /// @returns the channel entry of those two nodes
-    pub async fn channel_from_hash(&self, channel_id: &Hash) -> errors::Result<Option<ChannelEntry>> {
-        self.chain_api
-            .channel_by_id(channel_id)
-            .await
-            .map_err(HoprLibError::chain)
-    }
-
-    /// Get the channel entry between source and destination node.
-    /// @param src Address
-    /// @param dest Address
-    /// @returns the channel entry of those two nodes
-    pub async fn channel(&self, src: &Address, dest: &Address) -> errors::Result<Option<ChannelEntry>> {
-        self.chain_api
-            .channel_by_parties(src, dest)
-            .await
-            .map_err(HoprLibError::chain)
-    }
-
-    /// List all channels open from a specified Address
-    pub async fn channels_from(&self, src: &Address) -> errors::Result<Vec<ChannelEntry>> {
-        Ok(self
-            .chain_api
-            .stream_channels(ChannelSelector::default().with_source(*src).with_allowed_states(&[
-                ChannelStatusDiscriminants::Closed,
-                ChannelStatusDiscriminants::Open,
-                ChannelStatusDiscriminants::PendingToClose,
-            ]))
-            .map_err(HoprLibError::chain)
-            .await?
-            .collect()
-            .await)
-    }
-
-    /// List all channels open to a specified address
-    pub async fn channels_to(&self, dest: &Address) -> errors::Result<Vec<ChannelEntry>> {
-        Ok(self
-            .chain_api
-            .stream_channels(
-                ChannelSelector::default()
-                    .with_destination(*dest)
-                    .with_allowed_states(&[
-                        ChannelStatusDiscriminants::Closed,
-                        ChannelStatusDiscriminants::Open,
-                        ChannelStatusDiscriminants::PendingToClose,
-                    ]),
-            )
-            .map_err(HoprLibError::chain)
-            .await?
-            .collect()
-            .await)
-    }
-
-    /// List all channels
-    pub async fn all_channels(&self) -> errors::Result<Vec<ChannelEntry>> {
-        Ok(self
-            .chain_api
-            .stream_channels(ChannelSelector::default().with_allowed_states(&[
-                ChannelStatusDiscriminants::Closed,
-                ChannelStatusDiscriminants::Open,
-                ChannelStatusDiscriminants::PendingToClose,
-            ]))
-            .map_err(HoprLibError::chain)
-            .await?
-            .collect()
-            .await)
-    }
-
-    /// Current safe allowance balance
-    pub async fn safe_allowance(&self) -> errors::Result<HoprBalance> {
-        self.chain_api
-            .safe_allowance(self.cfg.safe_module.safe_address)
-            .await
-            .map_err(HoprLibError::chain)
-    }
-
-    /// Withdraw on-chain assets to a given address
-    /// @param recipient the account where the assets should be transferred to
-    /// @param amount how many tokens to be transferred
-    pub async fn withdraw_tokens(&self, recipient: Address, amount: HoprBalance) -> errors::Result<prelude::Hash> {
-        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
-
-        self.chain_api
-            .withdraw(amount, &recipient)
-            .and_then(identity)
-            .map_err(HoprLibError::chain)
-            .await
-    }
-
-    /// Withdraw on-chain native assets to a given address
-    /// @param recipient the account where the assets should be transferred to
-    /// @param amount how many tokens to be transferred
-    pub async fn withdraw_native(&self, recipient: Address, amount: XDaiBalance) -> errors::Result<prelude::Hash> {
-        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
-
-        self.chain_api
-            .withdraw(amount, &recipient)
-            .and_then(identity)
-            .map_err(HoprLibError::chain)
-            .await
-    }
-
     /// Spawns a one-shot awaiter that hooks up to the [`ChainEvent`] bus and either matching the given `predicate`
     /// successfully or timing out after `timeout`.
     fn spawn_wait_for_on_chain_event(
@@ -1197,11 +880,348 @@ where
             handle,
         ))
     }
+}
 
-    pub async fn open_channel(&self, destination: &Address, amount: HoprBalance) -> errors::Result<OpenChannelResult> {
+impl<Chain, Db, Graph> Hopr<Chain, Db, Graph>
+where
+    Graph: hopr_api::graph::NetworkGraphView + hopr_api::graph::NetworkGraphUpdate + Clone + Send + Sync + 'static,
+{
+    // === telemetry
+    /// Prometheus formatted metrics collected by the hopr-lib components.
+    pub fn collect_hopr_metrics() -> errors::Result<String> {
+        cfg_if::cfg_if! {
+            if #[cfg(all(feature = "prometheus", not(test)))] {
+                hopr_metrics::gather_all_metrics().map_err(HoprLibError::other)
+            } else {
+                Err(HoprLibError::GeneralError("BUILT WITHOUT METRICS SUPPORT".into()))
+            }
+        }
+    }
+}
+
+// === Trait implementations for the high-level node API ===
+
+impl<Chain, Db, Graph> HoprNodeOperations for Hopr<Chain, Db, Graph>
+where
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+    Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
+    Graph: hopr_api::graph::NetworkGraphView + hopr_api::graph::NetworkGraphUpdate + Clone + Send + Sync + 'static,
+{
+    fn status(&self) -> HoprState {
+        self.state.load(Ordering::Relaxed)
+    }
+}
+
+#[async_trait::async_trait]
+impl<Chain, Db, Graph> HoprNodeNetworkOperations for Hopr<Chain, Db, Graph>
+where
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+    Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
+    Graph: hopr_api::graph::NetworkGraphView + hopr_api::graph::NetworkGraphUpdate + Clone + Send + Sync + 'static,
+{
+    type Error = HoprLibError;
+    type PeerObservable = Graph::Observed;
+
+    fn me_peer_id(&self) -> PeerId {
+        (*self.me.public()).into()
+    }
+
+    async fn get_public_nodes(&self) -> Result<Vec<(PeerId, Address, Vec<Multiaddr>)>, Self::Error> {
+        Ok(self
+            .chain_api
+            .stream_accounts(AccountSelector {
+                public_only: true,
+                ..Default::default()
+            })
+            .map_err(HoprLibError::chain)
+            .await?
+            .map(|entry| {
+                (
+                    PeerId::from(entry.public_key),
+                    entry.chain_addr,
+                    entry.get_multiaddrs().to_vec(),
+                )
+            })
+            .collect()
+            .await)
+    }
+
+    async fn network_health(&self) -> hopr_api::network::Health {
+        self.transport_api.network_health().await
+    }
+
+    async fn network_connected_peers(&self) -> Result<Vec<PeerId>, Self::Error> {
+        Ok(self.transport_api.network_connected_peers()?)
+    }
+
+    fn network_peer_info(&self, peer: &PeerId) -> Option<Self::PeerObservable> {
+        self.transport_api.network_peer_observations(peer)
+    }
+
+    async fn all_network_peers(
+        &self,
+        minimum_score: f64,
+    ) -> Result<Vec<(Option<Address>, PeerId, Self::PeerObservable)>, Self::Error> {
+        Ok(
+            futures::stream::iter(self.transport_api.all_network_peers(minimum_score)?)
+                .filter_map(|(peer_id, info)| async move {
+                    let address = HoprNodeChainOperations::peerid_to_chain_key(self, &peer_id)
+                        .await
+                        .ok()
+                        .flatten();
+                    Some((address, peer_id, info))
+                })
+                .collect::<Vec<_>>()
+                .await,
+        )
+    }
+
+    fn local_multiaddresses(&self) -> Vec<Multiaddr> {
+        self.transport_api.local_multiaddresses()
+    }
+
+    async fn listening_multiaddresses(&self) -> Vec<Multiaddr> {
+        self.transport_api.listening_multiaddresses().await
+    }
+
+    async fn network_observed_multiaddresses(&self, peer: &PeerId) -> Vec<Multiaddr> {
+        self.transport_api.network_observed_multiaddresses(peer).await
+    }
+
+    async fn multiaddresses_announced_on_chain(&self, peer: &PeerId) -> Result<Vec<Multiaddr>, Self::Error> {
+        let peer = *peer;
+        // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
+        let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer)).await?;
+
+        match self
+            .chain_api
+            .stream_accounts(AccountSelector {
+                public_only: false,
+                offchain_key: Some(pubkey),
+                ..Default::default()
+            })
+            .map_err(HoprLibError::chain)
+            .await?
+            .next()
+            .await
+        {
+            Some(entry) => Ok(entry.get_multiaddrs().to_vec()),
+            None => {
+                error!(%peer, "no information");
+                Ok(vec![])
+            }
+        }
+    }
+
+    async fn ping(&self, peer: &PeerId) -> Result<(Duration, Self::PeerObservable), Self::Error> {
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
+        Ok(self.transport_api.ping(peer).await?)
+    }
+}
+
+/// Wrapper around mpsc sender to implement Sink with HoprLibError.
+#[derive(Clone)]
+pub struct RedemptionRequestSink(futures::channel::mpsc::Sender<TicketSelector>);
+
+impl futures::Sink<TicketSelector> for RedemptionRequestSink {
+    type Error = HoprLibError;
+
+    fn poll_ready(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
+        std::pin::Pin::new(&mut self.0)
+            .poll_ready(cx)
+            .map_err(|e| HoprLibError::GeneralError(e.to_string()))
+    }
+
+    fn start_send(mut self: std::pin::Pin<&mut Self>, item: TicketSelector) -> Result<(), Self::Error> {
+        std::pin::Pin::new(&mut self.0)
+            .start_send(item)
+            .map_err(|e| HoprLibError::GeneralError(e.to_string()))
+    }
+
+    fn poll_flush(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
+        std::pin::Pin::new(&mut self.0)
+            .poll_flush(cx)
+            .map_err(|e| HoprLibError::GeneralError(e.to_string()))
+    }
+
+    fn poll_close(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
+        std::pin::Pin::new(&mut self.0)
+            .poll_close(cx)
+            .map_err(|e| HoprLibError::GeneralError(e.to_string()))
+    }
+}
+
+#[async_trait::async_trait]
+impl<Chain, Db, Graph> HoprNodeChainOperations for Hopr<Chain, Db, Graph>
+where
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+    Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
+    Graph: hopr_api::graph::NetworkGraphView + hopr_api::graph::NetworkGraphUpdate + Clone + Send + Sync + 'static,
+{
+    type Error = HoprLibError;
+    type RedemptionSink = RedemptionRequestSink;
+
+    fn me_onchain(&self) -> Address {
+        *self.chain_api.me()
+    }
+
+    fn get_safe_config(&self) -> SafeModuleConfig {
+        SafeModuleConfig {
+            safe_address: self.cfg.safe_module.safe_address,
+            module_address: self.cfg.safe_module.module_address,
+        }
+    }
+
+    async fn get_balance<C: Currency + Send>(&self) -> Result<Balance<C>, Self::Error> {
+        self.chain_api
+            .balance(HoprNodeChainOperations::me_onchain(self))
+            .await
+            .map_err(HoprLibError::chain)
+    }
+
+    async fn get_safe_balance<C: Currency + Send>(&self) -> Result<Balance<C>, Self::Error> {
+        self.chain_api
+            .balance(self.cfg.safe_module.safe_address)
+            .await
+            .map_err(HoprLibError::chain)
+    }
+
+    async fn safe_allowance(&self) -> Result<HoprBalance, Self::Error> {
+        self.chain_api
+            .safe_allowance(self.cfg.safe_module.safe_address)
+            .await
+            .map_err(HoprLibError::chain)
+    }
+
+    async fn chain_info(&self) -> Result<ChainInfo, Self::Error> {
+        self.chain_api.chain_info().await.map_err(HoprLibError::chain)
+    }
+
+    async fn get_ticket_price(&self) -> Result<HoprBalance, Self::Error> {
+        self.chain_api.minimum_ticket_price().await.map_err(HoprLibError::chain)
+    }
+
+    async fn get_minimum_incoming_ticket_win_probability(&self) -> Result<WinningProbability, Self::Error> {
+        self.chain_api
+            .minimum_incoming_ticket_win_prob()
+            .await
+            .map_err(HoprLibError::chain)
+    }
+
+    async fn get_channel_closure_notice_period(&self) -> Result<Duration, Self::Error> {
+        self.chain_api
+            .channel_closure_notice_period()
+            .await
+            .map_err(HoprLibError::chain)
+    }
+
+    async fn accounts_announced_on_chain(&self) -> Result<Vec<AccountEntry>, Self::Error> {
+        Ok(self
+            .chain_api
+            .stream_accounts(AccountSelector {
+                public_only: true,
+                ..Default::default()
+            })
+            .map_err(HoprLibError::chain)
+            .await?
+            .collect()
+            .await)
+    }
+
+    async fn peerid_to_chain_key(&self, peer_id: &PeerId) -> Result<Option<Address>, Self::Error> {
+        let peer_id = *peer_id;
+        // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
+        let pubkey = hopr_parallelize::cpu::spawn_blocking(move || prelude::OffchainPublicKey::from_peerid(&peer_id))
+            .await
+            .map_err(|e| HoprLibError::GeneralError(format!("failed to convert peer id to off-chain key: {}", e)))?;
+
+        self.chain_api
+            .packet_key_to_chain_key(&pubkey)
+            .await
+            .map_err(HoprLibError::chain)
+    }
+
+    async fn chain_key_to_peerid(&self, address: &Address) -> Result<Option<PeerId>, Self::Error> {
+        self.chain_api
+            .chain_key_to_packet_key(address)
+            .await
+            .map(|pk| pk.map(|v| v.into()))
+            .map_err(HoprLibError::chain)
+    }
+
+    async fn channel_from_hash(&self, channel_id: &Hash) -> Result<Option<ChannelEntry>, Self::Error> {
+        self.chain_api
+            .channel_by_id(channel_id)
+            .await
+            .map_err(HoprLibError::chain)
+    }
+
+    async fn channel(&self, src: &Address, dest: &Address) -> Result<Option<ChannelEntry>, Self::Error> {
+        self.chain_api
+            .channel_by_parties(src, dest)
+            .await
+            .map_err(HoprLibError::chain)
+    }
+
+    async fn channels_from(&self, src: &Address) -> Result<Vec<ChannelEntry>, Self::Error> {
+        Ok(self
+            .chain_api
+            .stream_channels(ChannelSelector::default().with_source(*src).with_allowed_states(&[
+                ChannelStatusDiscriminants::Closed,
+                ChannelStatusDiscriminants::Open,
+                ChannelStatusDiscriminants::PendingToClose,
+            ]))
+            .map_err(HoprLibError::chain)
+            .await?
+            .collect()
+            .await)
+    }
+
+    async fn channels_to(&self, dest: &Address) -> Result<Vec<ChannelEntry>, Self::Error> {
+        Ok(self
+            .chain_api
+            .stream_channels(
+                ChannelSelector::default()
+                    .with_destination(*dest)
+                    .with_allowed_states(&[
+                        ChannelStatusDiscriminants::Closed,
+                        ChannelStatusDiscriminants::Open,
+                        ChannelStatusDiscriminants::PendingToClose,
+                    ]),
+            )
+            .map_err(HoprLibError::chain)
+            .await?
+            .collect()
+            .await)
+    }
+
+    async fn all_channels(&self) -> Result<Vec<ChannelEntry>, Self::Error> {
+        Ok(self
+            .chain_api
+            .stream_channels(ChannelSelector::default().with_allowed_states(&[
+                ChannelStatusDiscriminants::Closed,
+                ChannelStatusDiscriminants::Open,
+                ChannelStatusDiscriminants::PendingToClose,
+            ]))
+            .map_err(HoprLibError::chain)
+            .await?
+            .collect()
+            .await)
+    }
+
+    async fn open_channel(&self, destination: &Address, amount: HoprBalance) -> Result<OpenChannelResult, Self::Error> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        let channel_id = generate_channel_id(&self.me_onchain(), destination);
+        let channel_id = generate_channel_id(&HoprNodeChainOperations::me_onchain(self), destination);
 
         let confirm_awaiter = self
             .chain_api
@@ -1226,7 +1246,7 @@ where
         Ok(OpenChannelResult { tx_hash, channel_id })
     }
 
-    pub async fn fund_channel(&self, channel_id: &ChannelId, amount: HoprBalance) -> errors::Result<Hash> {
+    async fn fund_channel(&self, channel_id: &ChannelId, amount: HoprBalance) -> Result<Hash, Self::Error> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         let channel_id = *channel_id;
@@ -1254,7 +1274,7 @@ where
         Ok(res)
     }
 
-    pub async fn close_channel_by_id(&self, channel_id: &ChannelId) -> errors::Result<CloseChannelResult> {
+    async fn close_channel_by_id(&self, channel_id: &ChannelId) -> Result<CloseChannelResult, Self::Error> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         let channel_id = *channel_id;
@@ -1285,28 +1305,53 @@ where
         Ok(CloseChannelResult { tx_hash })
     }
 
-    pub async fn get_channel_closure_notice_period(&self) -> errors::Result<Duration> {
-        self.chain_api
-            .channel_closure_notice_period()
+    async fn tickets_in_channel(&self, channel_id: &ChannelId) -> Result<Option<Vec<RedeemableTicket>>, Self::Error> {
+        if let Some(channel) = self
+            .chain_api
+            .channel_by_id(channel_id)
+            .await
+            .map_err(|e| HoprTransportError::Other(e.into()))?
+        {
+            if &channel.destination == self.chain_api.me() {
+                Ok(Some(
+                    self.node_db
+                        .stream_tickets([&channel])
+                        .await
+                        .map_err(HoprLibError::db)?
+                        .collect()
+                        .await,
+                ))
+            } else {
+                Ok(None)
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
+    async fn all_tickets(&self) -> Result<Vec<VerifiedTicket>, Self::Error> {
+        Ok(self
+            .node_db
+            .stream_tickets(None::<TicketSelector>)
+            .await
+            .map_err(HoprLibError::db)?
+            .map(|v| v.ticket)
+            .collect()
+            .await)
+    }
+
+    async fn ticket_statistics(&self) -> Result<ChannelTicketStatistics, Self::Error> {
+        self.node_db.get_ticket_statistics(None).await.map_err(HoprLibError::db)
+    }
+
+    async fn reset_ticket_statistics(&self) -> Result<(), Self::Error> {
+        self.node_db
+            .reset_ticket_statistics()
             .await
             .map_err(HoprLibError::chain)
     }
 
-    pub fn redemption_requests(
-        &self,
-    ) -> errors::Result<impl futures::Sink<TicketSelector, Error = HoprLibError> + Clone> {
-        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
-
-        // TODO: add universal timeout sink here
-        Ok(self
-            .redeem_requests
-            .get()
-            .cloned()
-            .expect("redeem_requests is not initialized")
-            .sink_map_err(HoprLibError::other))
-    }
-
-    pub async fn redeem_all_tickets<B: Into<HoprBalance>>(&self, min_value: B) -> errors::Result<()> {
+    async fn redeem_all_tickets<B: Into<HoprBalance> + Send>(&self, min_value: B) -> Result<(), Self::Error> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         let min_value = min_value.into();
@@ -1314,7 +1359,7 @@ where
         self.chain_api
             .stream_channels(
                 ChannelSelector::default()
-                    .with_destination(self.me_onchain())
+                    .with_destination(HoprNodeChainOperations::me_onchain(self))
                     .with_allowed_states(&[
                         ChannelStatusDiscriminants::Open,
                         ChannelStatusDiscriminants::PendingToClose,
@@ -1328,26 +1373,30 @@ where
                     .with_index_range(channel.ticket_index..)
                     .with_state(AcknowledgedTicketStatus::Untouched))
             })
-            .forward(self.redemption_requests()?)
+            .forward(HoprNodeChainOperations::redemption_requests(self)?)
             .await?;
 
         Ok(())
     }
 
-    pub async fn redeem_tickets_with_counterparty<B: Into<HoprBalance>>(
+    async fn redeem_tickets_with_counterparty<B: Into<HoprBalance> + Send>(
         &self,
         counterparty: &Address,
         min_value: B,
-    ) -> errors::Result<()> {
-        self.redeem_tickets_in_channel(&generate_channel_id(counterparty, &self.me_onchain()), min_value)
-            .await
+    ) -> Result<(), Self::Error> {
+        HoprNodeChainOperations::redeem_tickets_in_channel(
+            self,
+            &generate_channel_id(counterparty, &HoprNodeChainOperations::me_onchain(self)),
+            min_value,
+        )
+        .await
     }
 
-    pub async fn redeem_tickets_in_channel<B: Into<HoprBalance>>(
+    async fn redeem_tickets_in_channel<B: Into<HoprBalance> + Send>(
         &self,
         channel_id: &Hash,
         min_value: B,
-    ) -> errors::Result<()> {
+    ) -> Result<(), Self::Error> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         let channel = self
@@ -1357,7 +1406,7 @@ where
             .map_err(HoprLibError::chain)?
             .ok_or(HoprLibError::GeneralError("Channel not found".into()))?;
 
-        self.redemption_requests()?
+        HoprNodeChainOperations::redemption_requests(self)?
             .send(
                 TicketSelector::from(channel)
                     .with_amount(min_value.into()..)
@@ -1369,48 +1418,48 @@ where
         Ok(())
     }
 
-    pub async fn redeem_ticket(&self, ack_ticket: AcknowledgedTicket) -> errors::Result<()> {
+    async fn redeem_ticket(&self, ack_ticket: AcknowledgedTicket) -> Result<(), Self::Error> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        self.redemption_requests()?
+        HoprNodeChainOperations::redemption_requests(self)?
             .send(TicketSelector::from(&ack_ticket).with_state(AcknowledgedTicketStatus::Untouched))
             .await?;
 
         Ok(())
     }
 
-    pub async fn peerid_to_chain_key(&self, peer_id: &PeerId) -> errors::Result<Option<Address>> {
-        let peer_id = *peer_id;
-        // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
-        let pubkey = hopr_parallelize::cpu::spawn_blocking(move || prelude::OffchainPublicKey::from_peerid(&peer_id))
-            .await
-            .map_err(|e| HoprLibError::GeneralError(format!("failed to convert peer id to off-chain key: {}", e)))?;
-
-        self.chain_api
-            .packet_key_to_chain_key(&pubkey)
-            .await
-            .map_err(HoprLibError::chain)
+    fn subscribe_winning_tickets(&self) -> impl Stream<Item = VerifiedTicket> + Send {
+        self.winning_ticket_subscribers.1.activate_cloned()
     }
 
-    pub async fn chain_key_to_peerid(&self, address: &Address) -> errors::Result<Option<PeerId>> {
-        self.chain_api
-            .chain_key_to_packet_key(address)
-            .await
-            .map(|pk| pk.map(|v| v.into()))
-            .map_err(HoprLibError::chain)
-    }
-}
+    fn redemption_requests(&self) -> Result<Self::RedemptionSink, Self::Error> {
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-impl<Chain, Db> Hopr<Chain, Db> {
-    // === telemetry
-    /// Prometheus formatted metrics collected by the hopr-lib components.
-    pub fn collect_hopr_metrics() -> errors::Result<String> {
-        cfg_if::cfg_if! {
-            if #[cfg(all(feature = "prometheus", not(test)))] {
-                hopr_metrics::gather_all_metrics().map_err(HoprLibError::other)
-            } else {
-                Err(HoprLibError::GeneralError("BUILT WITHOUT METRICS SUPPORT".into()))
-            }
-        }
+        Ok(RedemptionRequestSink(
+            self.redeem_requests
+                .get()
+                .cloned()
+                .expect("redeem_requests is not initialized"),
+        ))
+    }
+
+    async fn withdraw_tokens(&self, recipient: Address, amount: HoprBalance) -> Result<Hash, Self::Error> {
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
+
+        self.chain_api
+            .withdraw(amount, &recipient)
+            .and_then(identity)
+            .map_err(HoprLibError::chain)
+            .await
+    }
+
+    async fn withdraw_native(&self, recipient: Address, amount: XDaiBalance) -> Result<Hash, Self::Error> {
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
+
+        self.chain_api
+            .withdraw(amount, &recipient)
+            .and_then(identity)
+            .map_err(HoprLibError::chain)
+            .await
     }
 }
