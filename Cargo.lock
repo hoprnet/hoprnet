@@ -4808,6 +4808,14 @@ name = "hopr-network-graph"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "hex-literal",
+ "hopr-crypto-types 0.9.0",
+ "hopr-internal-types",
+ "hopr-primitive-types 0.10.0",
+ "lazy_static",
+ "petgraph",
+ "thiserror 2.0.18",
+ "tracing",
 ]
 
 [[package]]
