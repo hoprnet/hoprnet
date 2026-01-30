@@ -254,6 +254,7 @@ impl ChannelGraph {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::Context;
     use hex_literal::hex;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::prelude::HoprBalance;
@@ -322,42 +323,49 @@ mod tests {
     }
 
     #[test]
-    fn adding_channel_creates_nodes_automatically() {
+    fn adding_channel_creates_nodes_automatically() -> anyhow::Result<()> {
         let mut graph = ChannelGraph::new();
         let channel = make_open_channel(*ALICE, *BOB, 100);
 
-        graph.add_channel(channel).expect("should add channel");
+        graph.add_channel(channel).context("failed to add channel")?;
 
         assert_eq!(graph.node_count(), 2);
         assert_eq!(graph.channel_count(), 1);
         assert!(graph.contains_node(&ALICE));
         assert!(graph.contains_node(&BOB));
+        Ok(())
     }
 
     #[test]
-    fn channels_are_directional() {
+    fn channels_are_directional() -> anyhow::Result<()> {
         let mut graph = ChannelGraph::new();
         let channel = make_open_channel(*ALICE, *BOB, 100);
 
-        graph.add_channel(channel).expect("should add channel");
+        graph.add_channel(channel).context("failed to add channel")?;
 
         assert!(graph.has_channel(&ALICE, &BOB));
         assert!(!graph.has_channel(&BOB, &ALICE));
+        Ok(())
     }
 
     #[test]
-    fn bidirectional_channels_are_supported() {
+    fn bidirectional_channels_are_supported() -> anyhow::Result<()> {
         let mut graph = ChannelGraph::new();
         let ab_channel = make_open_channel(*ALICE, *BOB, 100);
         let ba_channel = make_open_channel(*BOB, *ALICE, 50);
 
-        graph.add_channel(ab_channel).expect("should add channel");
-        graph.add_channel(ba_channel).expect("should add channel");
+        graph
+            .add_channel(ab_channel)
+            .context("failed to add ALICE->BOB channel")?;
+        graph
+            .add_channel(ba_channel)
+            .context("failed to add BOB->ALICE channel")?;
 
         assert_eq!(graph.node_count(), 2);
         assert_eq!(graph.channel_count(), 2);
         assert!(graph.has_channel(&ALICE, &BOB));
         assert!(graph.has_channel(&BOB, &ALICE));
+        Ok(())
     }
 
     #[test]
@@ -371,38 +379,40 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_channels_are_rejected() {
+    fn duplicate_channels_are_rejected() -> anyhow::Result<()> {
         let mut graph = ChannelGraph::new();
         let channel1 = make_open_channel(*ALICE, *BOB, 100);
         let channel2 = make_open_channel(*ALICE, *BOB, 200);
 
-        graph.add_channel(channel1).expect("should add channel");
+        graph.add_channel(channel1).context("failed to add first channel")?;
         let result = graph.add_channel(channel2);
 
         assert_eq!(result, Err(ChannelGraphError::ChannelAlreadyExists(*ALICE, *BOB)));
+        Ok(())
     }
 
     #[test]
-    fn closed_channels_are_not_added() {
+    fn closed_channels_are_not_added() -> anyhow::Result<()> {
         let mut graph = ChannelGraph::new();
         let channel = make_closed_channel(*ALICE, *BOB);
 
-        graph.add_channel(channel).expect("should not fail");
+        graph.add_channel(channel).context("failed to process closed channel")?;
 
         assert_eq!(graph.channel_count(), 0);
         assert_eq!(graph.node_count(), 0);
+        Ok(())
     }
 
     #[test]
-    fn get_channel_returns_existing_channel() {
+    fn get_channel_returns_existing_channel() -> anyhow::Result<()> {
         let mut graph = ChannelGraph::new();
         let channel = make_open_channel(*ALICE, *BOB, 100);
 
-        graph.add_channel(channel).expect("should add channel");
+        graph.add_channel(channel).context("failed to add channel")?;
 
-        let retrieved = graph.get_channel(&ALICE, &BOB);
-        assert!(retrieved.is_some());
-        assert_eq!(retrieved.unwrap().balance, HoprBalance::from(100u64));
+        let retrieved = graph.get_channel(&ALICE, &BOB).context("channel not found")?;
+        assert_eq!(retrieved.balance, HoprBalance::from(100u64));
+        Ok(())
     }
 
     #[test]
@@ -415,17 +425,18 @@ mod tests {
     }
 
     #[test]
-    fn remove_channel_returns_removed_entry() {
+    fn remove_channel_returns_removed_entry() -> anyhow::Result<()> {
         let mut graph = ChannelGraph::new();
         let channel = make_open_channel(*ALICE, *BOB, 100);
 
-        graph.add_channel(channel).expect("should add channel");
-        let removed = graph.remove_channel(&ALICE, &BOB).expect("should remove channel");
+        graph.add_channel(channel).context("failed to add channel")?;
+        let removed = graph.remove_channel(&ALICE, &BOB).context("failed to remove channel")?;
 
         assert_eq!(removed.balance, HoprBalance::from(100u64));
         assert_eq!(graph.channel_count(), 0);
         // Nodes should still exist
         assert_eq!(graph.node_count(), 2);
+        Ok(())
     }
 
     #[test]
@@ -440,11 +451,11 @@ mod tests {
     }
 
     #[test]
-    fn removing_node_removes_associated_channels() {
+    fn removing_node_removes_associated_channels() -> anyhow::Result<()> {
         let mut graph = ChannelGraph::new();
         let channel = make_open_channel(*ALICE, *BOB, 100);
 
-        graph.add_channel(channel).expect("should add channel");
+        graph.add_channel(channel).context("failed to add channel")?;
         let removed = graph.remove_node(&ALICE);
 
         assert!(removed);
@@ -452,6 +463,7 @@ mod tests {
         assert!(graph.contains_node(&BOB));
         assert_eq!(graph.node_count(), 1);
         assert_eq!(graph.channel_count(), 0);
+        Ok(())
     }
 
     #[test]
@@ -464,29 +476,35 @@ mod tests {
     }
 
     #[test]
-    fn updating_channel_changes_balance() {
+    fn updating_channel_changes_balance() -> anyhow::Result<()> {
         let mut graph = ChannelGraph::new();
         let channel = make_open_channel(*ALICE, *BOB, 100);
         let updated = make_open_channel(*ALICE, *BOB, 50);
 
-        graph.add_channel(channel).expect("should add channel");
-        graph.update_channel(updated).expect("should update channel");
+        graph.add_channel(channel).context("failed to add channel")?;
+        graph.update_channel(updated).context("failed to update channel")?;
 
-        let retrieved = graph.get_channel(&ALICE, &BOB).expect("should have channel");
+        let retrieved = graph
+            .get_channel(&ALICE, &BOB)
+            .context("channel not found after update")?;
         assert_eq!(retrieved.balance, HoprBalance::from(50u64));
+        Ok(())
     }
 
     #[test]
-    fn updating_channel_to_closed_removes_it() {
+    fn updating_channel_to_closed_removes_it() -> anyhow::Result<()> {
         let mut graph = ChannelGraph::new();
         let channel = make_open_channel(*ALICE, *BOB, 100);
         let closed = make_closed_channel(*ALICE, *BOB);
 
-        graph.add_channel(channel).expect("should add channel");
-        graph.update_channel(closed).expect("should update channel");
+        graph.add_channel(channel).context("failed to add channel")?;
+        graph
+            .update_channel(closed)
+            .context("failed to update channel to closed")?;
 
         assert_eq!(graph.channel_count(), 0);
         assert!(!graph.has_channel(&ALICE, &BOB));
+        Ok(())
     }
 
     #[test]
@@ -502,39 +520,41 @@ mod tests {
     }
 
     #[test]
-    fn outgoing_channels_returns_correct_edges() {
+    fn outgoing_channels_returns_correct_edges() -> anyhow::Result<()> {
         let mut graph = ChannelGraph::new();
         let ab = make_open_channel(*ALICE, *BOB, 100);
         let ac = make_open_channel(*ALICE, *CHARLIE, 200);
         let ba = make_open_channel(*BOB, *ALICE, 50);
 
-        graph.add_channel(ab).expect("should add channel");
-        graph.add_channel(ac).expect("should add channel");
-        graph.add_channel(ba).expect("should add channel");
+        graph.add_channel(ab).context("failed to add ALICE->BOB channel")?;
+        graph.add_channel(ac).context("failed to add ALICE->CHARLIE channel")?;
+        graph.add_channel(ba).context("failed to add BOB->ALICE channel")?;
 
         let alice_outgoing = graph.outgoing_channels(&ALICE);
         assert_eq!(alice_outgoing.len(), 2);
 
         let bob_outgoing = graph.outgoing_channels(&BOB);
         assert_eq!(bob_outgoing.len(), 1);
+        Ok(())
     }
 
     #[test]
-    fn incoming_channels_returns_correct_edges() {
+    fn incoming_channels_returns_correct_edges() -> anyhow::Result<()> {
         let mut graph = ChannelGraph::new();
         let ab = make_open_channel(*ALICE, *BOB, 100);
         let cb = make_open_channel(*CHARLIE, *BOB, 200);
         let ba = make_open_channel(*BOB, *ALICE, 50);
 
-        graph.add_channel(ab).expect("should add channel");
-        graph.add_channel(cb).expect("should add channel");
-        graph.add_channel(ba).expect("should add channel");
+        graph.add_channel(ab).context("failed to add ALICE->BOB channel")?;
+        graph.add_channel(cb).context("failed to add CHARLIE->BOB channel")?;
+        graph.add_channel(ba).context("failed to add BOB->ALICE channel")?;
 
         let bob_incoming = graph.incoming_channels(&BOB);
         assert_eq!(bob_incoming.len(), 2);
 
         let alice_incoming = graph.incoming_channels(&ALICE);
         assert_eq!(alice_incoming.len(), 1);
+        Ok(())
     }
 
     #[test]
@@ -547,44 +567,46 @@ mod tests {
     }
 
     #[test]
-    fn all_channels_iterates_over_edges() {
+    fn all_channels_iterates_over_edges() -> anyhow::Result<()> {
         let mut graph = ChannelGraph::new();
         let ab = make_open_channel(*ALICE, *BOB, 100);
         let bc = make_open_channel(*BOB, *CHARLIE, 200);
 
-        graph.add_channel(ab).expect("should add channel");
-        graph.add_channel(bc).expect("should add channel");
+        graph.add_channel(ab).context("failed to add ALICE->BOB channel")?;
+        graph.add_channel(bc).context("failed to add BOB->CHARLIE channel")?;
 
         let channels: Vec<_> = graph.all_channels().collect();
         assert_eq!(channels.len(), 2);
+        Ok(())
     }
 
     #[test]
-    fn all_nodes_iterates_over_vertices() {
+    fn all_nodes_iterates_over_vertices() -> anyhow::Result<()> {
         let mut graph = ChannelGraph::new();
         let ab = make_open_channel(*ALICE, *BOB, 100);
 
-        graph.add_channel(ab).expect("should add channel");
+        graph.add_channel(ab).context("failed to add channel")?;
         graph.add_node(*CHARLIE);
 
         let nodes: Vec<_> = graph.all_nodes().collect();
         assert_eq!(nodes.len(), 3);
+        Ok(())
     }
 
     #[test]
-    fn triangle_topology_forms_cycle() {
+    fn triangle_topology_forms_cycle() -> anyhow::Result<()> {
         // Create a triangle: ALICE -> BOB -> CHARLIE -> ALICE
         let mut graph = ChannelGraph::new();
 
         graph
             .add_channel(make_open_channel(*ALICE, *BOB, 100))
-            .expect("should add");
+            .context("failed to add ALICE->BOB channel")?;
         graph
             .add_channel(make_open_channel(*BOB, *CHARLIE, 100))
-            .expect("should add");
+            .context("failed to add BOB->CHARLIE channel")?;
         graph
             .add_channel(make_open_channel(*CHARLIE, *ALICE, 100))
-            .expect("should add");
+            .context("failed to add CHARLIE->ALICE channel")?;
 
         assert_eq!(graph.node_count(), 3);
         assert_eq!(graph.channel_count(), 3);
@@ -593,5 +615,6 @@ mod tests {
         assert!(graph.has_channel(&ALICE, &BOB));
         assert!(graph.has_channel(&BOB, &CHARLIE));
         assert!(graph.has_channel(&CHARLIE, &ALICE));
+        Ok(())
     }
 }
