@@ -1384,31 +1384,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "axum-extra"
-version = "0.12.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fef252edff26ddba56bbcdf2ee3307b8129acb86f5749b68990c168a6fcc9c76"
-dependencies = [
- "axum",
- "axum-core",
- "bytes",
- "form_urlencoded",
- "futures-core",
- "futures-util",
- "http 1.4.0",
- "http-body 1.0.1",
- "http-body-util",
- "mime",
- "pin-project-lite",
- "serde_core",
- "serde_html_form",
- "serde_path_to_error",
- "tower-layer",
- "tower-service",
- "tracing",
-]
-
-[[package]]
 name = "backon"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5362,16 +5337,14 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "4.5.0"
+version = "4.6.0"
 dependencies = [
  "anyhow",
  "axum",
- "axum-extra",
  "base64 0.22.1",
  "bytesize",
  "const_format",
  "futures",
- "futures-concurrency",
  "hopr-chain-connector",
  "hopr-db-node",
  "hopr-lib",
@@ -9066,19 +9039,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.114",
-]
-
-[[package]]
-name = "serde_html_form"
-version = "0.2.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2f2d7ff8a2140333718bb329f5c40fc5f0865b84c426183ce14c97d2ab8154f"
-dependencies = [
- "form_urlencoded",
- "indexmap 2.13.0",
- "itoa",
- "ryu",
- "serde_core",
 ]
 
 [[package]]
