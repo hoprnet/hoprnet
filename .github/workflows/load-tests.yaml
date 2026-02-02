@@ -121,7 +121,7 @@ jobs:
 
       - name: Setup GCP
         id: gcp
-        uses: hoprnet/hopr-workflows/actions/setup-gcp@644d936de4e1c8f5c50ba50f8526209455c28b4a # master
+        uses: hoprnet/hopr-workflows/actions/setup-gcp@dc45f200b11bbc192a8a0766f22d1e6ba680e8b1 # master
         with:
           google_credentials: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
           login_artifact_registry: 'false'
