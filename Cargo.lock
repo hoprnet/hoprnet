@@ -1587,8 +1587,8 @@ dependencies = [
 
 [[package]]
 name = "blokli-client"
-version = "0.17.0"
-source = "git+https://github.com/hoprnet/blokli#fe812af2d0d6ec27c2699ad97c86ec26575848f5"
+version = "0.18.0"
+source = "git+https://github.com/hoprnet/blokli#8797aff2fbcff2c1a0ce1149438237902cf56979"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -2491,7 +2491,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ab67060fc6b8ef687992d439ca0fa36e7ed17e9a0b16b25b601e8757df720de"
 dependencies = [
  "data-encoding",
- "syn 2.0.114",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -2855,7 +2855,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -4535,7 +4535,7 @@ dependencies = [
 [[package]]
 name = "hopr-crypto-random"
 version = "0.3.0"
-source = "git+https://github.com/hoprnet/hoprnet?branch=master#ccfc6449fbda124868ded471765d908717f8c1cb"
+source = "git+https://github.com/hoprnet/hoprnet?branch=master#3580b6996ad122c8ba0d38a444fba210e40f6e7f"
 dependencies = [
  "generic-array 1.3.5",
  "rand 0.8.5",
@@ -4605,7 +4605,7 @@ dependencies = [
 [[package]]
 name = "hopr-crypto-types"
 version = "0.9.0"
-source = "git+https://github.com/hoprnet/hoprnet?branch=master#ccfc6449fbda124868ded471765d908717f8c1cb"
+source = "git+https://github.com/hoprnet/hoprnet?branch=master#3580b6996ad122c8ba0d38a444fba210e40f6e7f"
 dependencies = [
  "aes",
  "blake3",
@@ -4875,7 +4875,7 @@ dependencies = [
 [[package]]
 name = "hopr-primitive-types"
 version = "0.10.0"
-source = "git+https://github.com/hoprnet/hoprnet?branch=master#ccfc6449fbda124868ded471765d908717f8c1cb"
+source = "git+https://github.com/hoprnet/hoprnet?branch=master#3580b6996ad122c8ba0d38a444fba210e40f6e7f"
 dependencies = [
  "bigdecimal",
  "chrono",
@@ -6033,7 +6033,7 @@ dependencies = [
  "portable-atomic",
  "portable-atomic-util",
  "serde_core",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -6990,7 +6990,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -7993,7 +7993,7 @@ dependencies = [
  "once_cell",
  "socket2 0.6.2",
  "tracing",
- "windows-sys 0.60.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -8509,7 +8509,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -9791,7 +9791,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -10841,7 +10841,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
