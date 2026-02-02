@@ -10,7 +10,7 @@ pub trait NetworkGraphView {
     fn nodes(&self) -> futures::stream::BoxStream<'static, PeerId>;
 
     /// Returns a list of all routes to the given destination of the specified length.
-    async fn find_routes(&self, destination: &PeerId, length: usize) -> Vec<DestinationRouting>;
+    async fn routes(&self, destination: &PeerId, length: usize) -> Vec<DestinationRouting>;
 }
 
 /// A trait specifying the graph update functionality

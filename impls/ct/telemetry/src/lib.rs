@@ -148,7 +148,7 @@ where
             Ok(hopr_api::ct::Telemetry::Loopback(_)) => {
                 tracing::warn!(
                     reason = "feature not implemented",
-                    "loopback path telemetry not supported yet"
+                    "loopback path telemetry not supported"
                 );
             }
             Err(hopr_api::ct::TrafficGenerationError::ProbeNeighborTimeout(peer)) => {
@@ -157,7 +157,7 @@ where
             Err(hopr_api::ct::TrafficGenerationError::ProbeLoopbackTimeout(_)) => {
                 tracing::warn!(
                     reason = "feature not implemented",
-                    "loopback path telemetry not supported yet"
+                    "loopback path telemetry not supported"
                 );
             }
         }
@@ -184,7 +184,7 @@ where
         })
     }
 
-    async fn find_routes(&self, _destination: &PeerId, _length: usize) -> Vec<DestinationRouting> {
+    async fn routes(&self, _destination: &PeerId, _length: usize) -> Vec<DestinationRouting> {
         vec![]
     }
 }

@@ -20,9 +20,18 @@
 use std::collections::HashMap;
 
 use hopr_internal_types::channels::{ChannelEntry, ChannelStatus};
-use hopr_primitive_types::primitives::Address;
+use hopr_primitive_types::{
+    prelude::{Balance, WxHOPR},
+    primitives::Address,
+};
 use petgraph::graph::{DiGraph, NodeIndex};
 use thiserror::Error;
+
+// pub struct Weight {
+//     channel_balance: Option<Balance<WxHOPR>>,
+//     immediate_qos: Option<f32>,
+//     intermediate_qos: Option<f32>,
+// }
 
 /// Errors that can occur when manipulating the channel graph.
 #[derive(Error, Debug, PartialEq, Eq)]

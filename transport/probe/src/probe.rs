@@ -349,7 +349,7 @@ mod tests {
         }
 
         /// Returns a list of all routes to the given destination of the specified length.
-        async fn find_routes(&self, destination: &PeerId, length: usize) -> Vec<DestinationRouting> {
+        async fn routes(&self, destination: &PeerId, length: usize) -> Vec<DestinationRouting> {
             tracing::debug!(%destination, %length, "finding routes in test peer store");
             vec![]
         }
