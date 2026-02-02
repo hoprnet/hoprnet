@@ -135,21 +135,22 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                         // Filter old frame ids to save space in the Reassembler
                         let last_emitted_id = last_emitted_frame.load(std::sync::atomic::Ordering::Relaxed);
                         if s.frame_id <= last_emitted_id {
-                            tracing::warn!(frame_id = s.frame_id, last_emitted_id, "frame already seen");
+                            tracing::warn!(
+                                session_id = session_id_1,
+                                frame_id = s.frame_id,
+                                last_emitted_id,
+                                "frame already seen"
+                            );
                             false
                         } else {
                             true
                         }
                     }),
                     Err(error) => {
-                        tracing::error!(%error, "unparseable packet");
+                        tracing::error!(session_id = session_id_1, %error, "unparseable packet");
                         None
                     }
                 })
-                .instrument(tracing::debug_span!(
-                    "SessionSocket::packets_in::pre_reassembly",
-                    session_id = session_id_1
-                ))
             })
             // Reassemble the segments into frames
             .reassembler(cfg.frame_timeout, cfg.capacity)
@@ -158,14 +159,10 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                 futures::future::ready(match maybe_frame {
                     Ok(frame) => Some(OrderedFrame(frame)),
                     Err(error) => {
-                        tracing::error!(%error, "failed to reassemble frame");
+                        tracing::error!(session_id = session_id_2, %error, "failed to reassemble frame");
                         None
                     }
                 })
-                .instrument(tracing::debug_span!(
-                    "SessionSocket::packets_in::pre_sequencing",
-                    session_id = session_id_2
-                ))
             })
             // Put the frames into the correct sequence by Frame Ids
             .sequencer(cfg.frame_timeout, cfg.capacity)
@@ -175,22 +172,18 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                     Ok(frame) => {
                         last_emitted_frame_clone.store(frame.0.frame_id, std::sync::atomic::Ordering::Relaxed);
                         if frame.0.is_terminating {
-                            tracing::warn!("terminating frame received");
+                            tracing::warn!(session_id = session_id_3, "terminating frame received");
                             packets_in_abort_handle.abort();
                         }
                         Some(Ok(frame.0))
                     }
                     // Downstream skips discarded frames
                     Err(SessionError::FrameDiscarded(frame_id)) | Err(SessionError::IncompleteFrame(frame_id)) => {
-                        tracing::error!(frame_id, "frame discarded");
+                        tracing::error!(session_id = session_id_3, frame_id, "frame discarded");
                         None
                     }
                     Err(err) => Some(Err(std::io::Error::other(err))),
                 })
-                .instrument(tracing::debug_span!(
-                    "SessionSocket::packets_in::post_sequencing",
-                    session_id = session_id_3
-                ))
             })
             .into_async_read();
 
