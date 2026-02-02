@@ -202,7 +202,7 @@ impl HoprLibp2pNetworkBuilder {
             hopr_transport_network::store::NetworkPeerStore::new(self.me, self.my_addresses.into_iter().collect());
 
         let network = HoprNetwork {
-            tracker: tracker.clone(),
+            tracker: tracker.clone(), // TODO, make this a Sink
             store: store.clone(),
             control: self.swarm.behaviour().streams.new_control(),
             protocol: libp2p::StreamProtocol::new(protocol),

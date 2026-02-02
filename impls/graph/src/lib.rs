@@ -21,7 +21,7 @@ use std::collections::HashMap;
 
 use hopr_internal_types::channels::{ChannelEntry, ChannelStatus};
 use hopr_primitive_types::{
-    prelude::{Balance, WxHOPR},
+    // prelude::{Balance, WxHOPR},
     primitives::Address,
 };
 use petgraph::graph::{DiGraph, NodeIndex};

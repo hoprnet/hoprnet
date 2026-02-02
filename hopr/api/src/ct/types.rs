@@ -21,6 +21,7 @@ pub trait MeasurableNeighbor {
 /// Measurable path telemetry.
 pub trait MeasurablePath {
     fn id(&self) -> &[u8];
+    fn seq_id(&self) -> u16;
     fn path(&self) -> &[u8];
     fn timestamp(&self) -> u128;
 }

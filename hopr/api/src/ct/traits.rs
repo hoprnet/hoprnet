@@ -11,6 +11,11 @@ pub trait NetworkGraphView {
 
     /// Returns a list of all routes to the given destination of the specified length.
     async fn routes(&self, destination: &PeerId, length: usize) -> Vec<DestinationRouting>;
+
+    /// Returns a list of batches of loopback routes. Each batch contains a set of routes
+    /// that start and end at the same node, while also belonging to the same path discovery
+    /// batch.
+    async fn loopback_routes(&self) -> Vec<Vec<DestinationRouting>>;
 }
 
 /// A trait specifying the graph update functionality

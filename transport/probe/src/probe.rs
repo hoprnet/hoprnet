@@ -353,6 +353,12 @@ mod tests {
             tracing::debug!(%destination, %length, "finding routes in test peer store");
             vec![]
         }
+
+        /// Returns a list of all loopback routes of the specified length.
+        async fn loopback_routes(&self) -> Vec<Vec<DestinationRouting>> {
+            tracing::debug!("finding loopback routes in test peer store");
+            vec![]
+        }
     }
 
     struct TestInterface {

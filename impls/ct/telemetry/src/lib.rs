@@ -187,6 +187,10 @@ where
     async fn routes(&self, _destination: &PeerId, _length: usize) -> Vec<DestinationRouting> {
         vec![]
     }
+
+    async fn loopback_routes(&self) -> Vec<Vec<DestinationRouting>> {
+        vec![]
+    }
 }
 
 #[cfg(test)]
