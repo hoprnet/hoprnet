@@ -97,7 +97,7 @@ hickory-resolver = "0.25.2"
 human-bandwidth = { version = "0.1.4", features = ["serde"] }
 humansize = "2.1.3"
 humantime-serde = "1.1.1"
-insta = { version = "1.46.2", features = ["json", "yaml"] }
+insta = { version = "1.46.3", features = ["json", "yaml"] }
 indexmap = { version = "2.13.0", features = ["serde", "rayon"] }
 k256 = { version = "0.13.4", features = [
   "arithmetic",
