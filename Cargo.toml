@@ -41,7 +41,7 @@ members = [
   "utils/session",
   # implementations
   "impls/ct/telemetry",
-  "impls/graph"
+  "impls/graph",
 ]
 
 [workspace.dependencies]

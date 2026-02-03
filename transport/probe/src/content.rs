@@ -111,7 +111,7 @@ mod tests {
 
         let m1 = Message::Telemetry(PathTelemetry {
             id: hopr_crypto_random::random_bytes(),
-            seq_id: hopr_crypto_random::rng().gen(),
+            seq_id: hopr_crypto_random::rng().r#gen(),
             path: hopr_crypto_random::random_bytes(),
             timestamp: 1234567890,
         });

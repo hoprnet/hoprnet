@@ -1,18 +1,20 @@
-//! The library code containing the graph data structure for transport and incentivization layer (through the "channel graph").
+//! The library code containing the graph data structure for transport and incentivization layer (through the "channel
+//! graph").
 //!
 //! [`NetworkGraph`] is the main data structure representing the network of nodes and channels. It combines 2 layers:
-//! 1. The **channel graph** layer, which represents the network topology with nodes and channels as loaded from the chain.
+//! 1. The **channel graph** layer, which represents the network topology with nodes and channels as loaded from the
+//!    chain.
 //! 2. The **network layer**, which represents the nodes based on their physical connectability and QoS attributes.
 //!
 //! What does the graph look like:
 //! - Nodes are represented as vertices in the graph.
-//! - Possible connections, a combination of channel availability and or network usability
-//!   are represented as edges between nodes.
+//! - Possible connections, a combination of channel availability and or network usability are represented as edges
+//!   between nodes.
 //!
 //! ## Weights
-//! The weights accumulate different properties of the edges to represent the cost of using that edge for routing or whether the edge can be used at all.
-//! Weights are represented as a struct containing different fields, each representing a different property of the edge. The
-//! used properties are:
+//! The weights accumulate different properties of the edges to represent the cost of using that edge for routing or
+//! whether the edge can be used at all. Weights are represented as a struct containing different fields, each
+//! representing a different property of the edge. The used properties are:
 //! - presence of incentivization channel with remaining balance (Option<Balance>)
 //! - presence of peer for immediate direct network connection and its quality (Option<ImmediateQoS>)
 //! - presence of intermediate connection through other nodes (Option<IntermediateQoS>)
@@ -262,11 +264,12 @@ impl ChannelGraph {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use anyhow::Context;
     use hex_literal::hex;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::prelude::HoprBalance;
+
+    use super::*;
 
     lazy_static::lazy_static! {
         static ref ALICE_KP: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("keypair should be valid");

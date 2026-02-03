@@ -17,7 +17,7 @@ default = []
 [dependencies]
 anyhow = { workspace = true }
 petgraph = { workspace = true }
-hopr-internal-types = {workspace = true }
+hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
