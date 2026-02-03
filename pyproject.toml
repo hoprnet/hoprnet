@@ -12,13 +12,12 @@ dependencies = ["sdk-localcluster", "sdk-api"]
 [tool.uv.sources]
 sdk-localcluster = { workspace = true }
 sdk-api = { workspace = true }
-tests = { workspace = true }
 
 [tool.uv.workspace]
-members = ["sdk/python/localcluster", "sdk/python/api", "tests"]
+members = ["sdk/python/localcluster", "sdk/python/api"]
 
 [dependency-groups]
-dev = ["ruff>=0.14.14", "tests"]
+dev = ["ruff>=0.14.14"]
 lint = ["black==26.1.0"]
 
 [tool.black]
