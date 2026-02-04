@@ -1,7 +1,7 @@
 use multiaddr::PeerId;
 
 #[derive(thiserror::Error, Debug)]
-pub enum TrafficGenerationError<P>
+pub enum NetworkGraphError<P>
 where
     P: MeasurablePath,
 {

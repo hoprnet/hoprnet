@@ -121,19 +121,19 @@ impl<T> ImmediateNeighborChannelGraph<T> {
 }
 
 #[async_trait::async_trait]
-impl<T> hopr_api::ct::NetworkGraphUpdate for ImmediateNeighborChannelGraph<T>
+impl<T> hopr_api::graph::NetworkGraphUpdate for ImmediateNeighborChannelGraph<T>
 where
     T: NetworkObservations + Send + Sync,
 {
     async fn record<N, P>(
         &self,
-        telemetry: std::result::Result<hopr_api::ct::Telemetry<N, P>, hopr_api::ct::TrafficGenerationError<P>>,
+        telemetry: std::result::Result<hopr_api::graph::Telemetry<N, P>, hopr_api::graph::NetworkGraphError<P>>,
     ) where
-        N: hopr_api::ct::MeasurableNeighbor + Send + Clone,
-        P: hopr_api::ct::MeasurablePath + Send + Clone,
+        N: hopr_api::graph::MeasurableNeighbor + Send + Clone,
+        P: hopr_api::graph::MeasurablePath + Send + Clone,
     {
         match telemetry {
-            Ok(hopr_api::ct::Telemetry::Neighbor(telemetry)) => {
+            Ok(hopr_api::graph::Telemetry::Neighbor(telemetry)) => {
                 tracing::trace!(
                     peer = %telemetry.peer(),
                     latency_ms = telemetry.rtt().as_millis(),
@@ -145,16 +145,16 @@ where
                     Ok(telemetry.rtt() / 2),
                 );
             }
-            Ok(hopr_api::ct::Telemetry::Loopback(_)) => {
+            Ok(hopr_api::graph::Telemetry::Loopback(_)) => {
                 tracing::warn!(
                     reason = "feature not implemented",
                     "loopback path telemetry not supported"
                 );
             }
-            Err(hopr_api::ct::TrafficGenerationError::ProbeNeighborTimeout(peer)) => {
+            Err(hopr_api::graph::NetworkGraphError::ProbeNeighborTimeout(peer)) => {
                 hopr_api::network::NetworkObservations::update(self.network.as_ref(), &peer, Err(()));
             }
-            Err(hopr_api::ct::TrafficGenerationError::ProbeLoopbackTimeout(_)) => {
+            Err(hopr_api::graph::NetworkGraphError::ProbeLoopbackTimeout(_)) => {
                 tracing::warn!(
                     reason = "feature not implemented",
                     "loopback path telemetry not supported"
@@ -165,7 +165,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<T> hopr_api::ct::NetworkGraphView for ImmediateNeighborChannelGraph<T>
+impl<T> hopr_api::graph::NetworkGraphView for ImmediateNeighborChannelGraph<T>
 where
     T: NetworkView + Send + Sync + Clone + 'static,
 {

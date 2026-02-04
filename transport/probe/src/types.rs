@@ -155,7 +155,7 @@ impl PathTelemetry {
     }
 }
 
-impl hopr_api::ct::MeasurablePath for PathTelemetry {
+impl hopr_api::graph::MeasurablePath for PathTelemetry {
     fn id(&self) -> &[u8] {
         &self.id
     }
@@ -225,7 +225,7 @@ pub struct NeighborTelemetry {
     pub rtt: std::time::Duration,
 }
 
-impl hopr_api::ct::MeasurableNeighbor for NeighborTelemetry {
+impl hopr_api::graph::MeasurableNeighbor for NeighborTelemetry {
     fn peer(&self) -> &PeerId {
         &self.peer
     }

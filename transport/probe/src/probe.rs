@@ -2,9 +2,8 @@ use std::sync::Arc;
 
 use futures::{FutureExt, SinkExt, StreamExt, pin_mut};
 use futures_concurrency::stream::StreamExt as _;
-use hopr_api::ct::{
-    NetworkGraphView, Telemetry, TrafficGeneration, traits::NetworkGraphUpdate, types::TrafficGenerationError,
-};
+use hopr_api::ct::TrafficGeneration;
+use hopr_api::graph::{NetworkGraphError, NetworkGraphUpdate, NetworkGraphView, Telemetry};
 use hopr_async_runtime::AbortableList;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::types::OffchainPublicKey;
@@ -82,9 +81,9 @@ impl Probe {
                         tracing::debug!(%peer, pseudonym = %k.0, probe = %k.1, reason = "timeout", "probe failed");
                         if let Some(replier) = notifier {
                             if let NodeId::Offchain(opk) = peer.as_ref() {
-                                replier.notify(Err(ProbeError::TrafficError(
-                                    TrafficGenerationError::ProbeNeighborTimeout(opk.into()),
-                                )));
+                                replier.notify(Err(ProbeError::TrafficError(NetworkGraphError::ProbeNeighborTimeout(
+                                    opk.into(),
+                                ))));
                             } else {
                                 tracing::warn!(
                                     reason = "non-offchain peer",
@@ -98,7 +97,7 @@ impl Probe {
                             futures::FutureExt::boxed(async move {
                                 store
                                     .record::<NeighborTelemetry, PathTelemetry>(Err(
-                                        TrafficGenerationError::ProbeNeighborTimeout(peer),
+                                        NetworkGraphError::ProbeNeighborTimeout(peer),
                                     ))
                                     .await
                             })
@@ -287,7 +286,7 @@ mod tests {
 
     use async_trait::async_trait;
     use futures::future::BoxFuture;
-    use hopr_api::ct::types::TrafficGenerationError;
+    use hopr_api::graph::NetworkGraphError;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use hopr_ct_telemetry::{ImmediateNeighborProber, ProberConfig};
     use hopr_protocol_app::prelude::{ApplicationData, Tag};
@@ -314,10 +313,10 @@ mod tests {
 
     #[async_trait]
     impl NetworkGraphUpdate for PeerStore {
-        async fn record<N, P>(&self, telemetry: std::result::Result<Telemetry<N, P>, TrafficGenerationError<P>>)
+        async fn record<N, P>(&self, telemetry: std::result::Result<Telemetry<N, P>, NetworkGraphError<P>>)
         where
-            N: hopr_api::ct::MeasurableNeighbor + Send + Clone,
-            P: hopr_api::ct::MeasurablePath + Send + Clone,
+            N: hopr_api::graph::MeasurableNeighbor + Send + Clone,
+            P: hopr_api::graph::MeasurablePath + Send + Clone,
         {
             let mut on_finished = self.on_finished.write().unwrap();
 
@@ -327,12 +326,10 @@ mod tests {
                     let duration = neighbor_telemetry.rtt();
                     on_finished.push((peer, Ok(duration)));
                 }
-                Err(TrafficGenerationError::ProbeNeighborTimeout(peer)) => {
+                Err(NetworkGraphError::ProbeNeighborTimeout(peer)) => {
                     on_finished.push((
                         peer.clone(),
-                        Err(ProbeError::TrafficError(TrafficGenerationError::ProbeNeighborTimeout(
-                            peer,
-                        ))),
+                        Err(ProbeError::TrafficError(NetworkGraphError::ProbeNeighborTimeout(peer))),
                     ));
                 }
                 _ => panic!("unexpected telemetry type, unimplemented"),

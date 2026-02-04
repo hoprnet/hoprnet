@@ -11,10 +11,11 @@ license = "GPL-3.0-only"
 
 [features]
 default = []
-ct = ["dep:hopr-network-types"]
+ct = ["graph", "dep:hopr-network-types"]
 db = []
 chain = ["db"]
 network = []
+graph = []
 serde = ["hopr-primitive-types/serde"]
 
 [dependencies]
