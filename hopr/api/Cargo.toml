@@ -16,6 +16,7 @@ db = []
 chain = ["db"]
 network = []
 graph = []
+node = ["chain", "db", "graph", "network"]
 serde = ["hopr-primitive-types/serde"]
 
 [dependencies]
