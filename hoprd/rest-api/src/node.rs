@@ -248,8 +248,12 @@ pub(super) async fn peers(
                 Some((address, multiaddresses, info))
             }
         })
+        // Filter out peers without a known chain address
+        .filter_map(|(address, mas, info)| async move {
+            address.map(|addr| (addr, mas, info))
+        })
         .map(|(address, mas, info)| PeerObservations {
-            address,
+            address: Some(address),
             multiaddr: mas.first().cloned(),
             last_update: info.last_update().as_millis(),
             average_latency: info.average_latency().map_or(0, |d| d.as_millis()),
