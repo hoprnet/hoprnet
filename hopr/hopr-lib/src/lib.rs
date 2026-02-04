@@ -89,7 +89,7 @@ use hopr_api::{
     ct::TrafficGeneration,
     db::{HoprNodeDbApi, TicketMarker, TicketSelector},
 };
-pub use hopr_api::{db::ChannelTicketStatistics, network::Observable};
+pub use hopr_api::{db::ChannelTicketStatistics, graph::Observable};
 use hopr_async_runtime::prelude::spawn;
 pub use hopr_async_runtime::{Abortable, AbortableList};
 pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
@@ -207,11 +207,14 @@ const ON_CHAIN_RESOLUTION_EVENT_TIMEOUT: Duration = Duration::from_secs(90);
 /// that manual interaction is unnecessary.
 ///
 /// As such, the `hopr_lib` serves mainly as an integration point into Rust programs.
-pub struct Hopr<Chain, Db> {
+pub struct Hopr<Chain, Db, Graph>
+where
+    Graph: hopr_api::graph::NetworkGraphView + hopr_api::graph::NetworkGraphUpdate + Clone + Send + Sync + 'static,
+{
     me: OffchainKeypair,
     cfg: config::HoprLibConfig,
     state: Arc<state::AtomicHoprState>,
-    transport_api: HoprTransport<Chain, Db>,
+    transport_api: HoprTransport<Chain, Db, Graph>,
     redeem_requests: OnceLock<futures::channel::mpsc::Sender<TicketSelector>>,
     node_db: Db,
     chain_api: Chain,
@@ -219,15 +222,17 @@ pub struct Hopr<Chain, Db> {
     processes: OnceLock<AbortableList<HoprLibProcess>>,
 }
 
-impl<Chain, Db> Hopr<Chain, Db>
+impl<Chain, Db, Graph> Hopr<Chain, Db, Graph>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
+    Graph: hopr_api::graph::NetworkGraphView + hopr_api::graph::NetworkGraphUpdate + Clone + Send + Sync + 'static,
 {
     pub async fn new(
         identity: (&ChainKeypair, &OffchainKeypair),
         hopr_chain_api: Chain,
         hopr_node_db: Db,
+        graph: Graph,
         cfg: config::HoprLibConfig,
     ) -> errors::Result<Self> {
         if hopr_crypto_random::is_rng_fixed() {
@@ -240,6 +245,7 @@ where
             identity,
             hopr_chain_api.clone(),
             hopr_node_db.clone(),
+            graph,
             vec![(&cfg.host).try_into().map_err(HoprLibError::TransportError)?],
             cfg.protocol,
         );
@@ -828,7 +834,10 @@ where
     /// Ping another node in the network based on the PeerId
     ///
     /// Returns the RTT (round trip time), i.e. how long it took for the ping to return.
-    pub async fn ping(&self, peer: &PeerId) -> errors::Result<(std::time::Duration, Observations)> {
+    pub async fn ping<'a, 'b>(
+        &'a self,
+        peer: &'b PeerId,
+    ) -> errors::Result<(std::time::Duration, impl Observable + use<'a, 'b, Chain, Db, Graph>)> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         Ok(self.transport_api.ping(peer).await?)
@@ -936,32 +945,24 @@ where
 
     /// List all peers connected to this
     pub async fn network_connected_peers(&self) -> errors::Result<Vec<PeerId>> {
-        Ok(self.transport_api.network_connected_peers().await?)
+        Ok(self.transport_api.network_connected_peers()?)
     }
 
     /// Get all data collected from the network relevant for a PeerId
-    pub async fn network_peer_info(&self, peer: &PeerId) -> errors::Result<Option<Observations>> {
-        Ok(self.transport_api.network_peer_observations(peer).await?)
+    pub fn network_peer_info<'a, 'b>(
+        &'a self,
+        peer: &'b PeerId,
+    ) -> Option<impl Observable + use<'a, 'b, Chain, Db, Graph>> {
+        self.transport_api.network_peer_observations(peer)
     }
 
     /// Get peers connected peers with quality higher than some value
-    pub async fn all_network_peers(
-        &self,
+    pub async fn all_network_peers<'a>(
+        &'a self,
         minimum_score: f64,
-    ) -> errors::Result<Vec<(Option<Address>, PeerId, Observations)>> {
+    ) -> errors::Result<Vec<(Option<Address>, PeerId, impl Observable + use<'a, Chain, Db, Graph>)>> {
         Ok(
-            futures::stream::iter(self.transport_api.network_connected_peers().await?)
-                .filter_map(|peer| async move {
-                    if let Ok(Some(info)) = self.transport_api.network_peer_observations(&peer).await {
-                        if info.score() >= minimum_score {
-                            Some((peer, info))
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                })
+            futures::stream::iter(self.transport_api.all_network_peers(minimum_score)?)
                 .filter_map(|(peer_id, info)| async move {
                     let address = self.peerid_to_chain_key(&peer_id).await.ok().flatten();
                     Some((address, peer_id, info))
@@ -1401,7 +1402,10 @@ where
     }
 }
 
-impl<Chain, Db> Hopr<Chain, Db> {
+impl<Chain, Db, Graph> Hopr<Chain, Db, Graph>
+where
+    Graph: hopr_api::graph::NetworkGraphView + hopr_api::graph::NetworkGraphUpdate + Clone + Send + Sync + 'static,
+{
     // === telemetry
     /// Prometheus formatted metrics collected by the hopr-lib components.
     pub fn collect_hopr_metrics() -> errors::Result<String> {

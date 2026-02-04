@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use hopr_api::PeerId;
 
-use super::observation::Observations;
+use crate::observation::Observations;
 
 /// Tracker of [`Observations`] for network peers.
 ///

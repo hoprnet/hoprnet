@@ -2,8 +2,10 @@ use std::sync::Arc;
 
 use futures::{FutureExt, SinkExt, StreamExt, pin_mut};
 use futures_concurrency::stream::StreamExt as _;
-use hopr_api::ct::TrafficGeneration;
-use hopr_api::graph::{NetworkGraphError, NetworkGraphUpdate, NetworkGraphView, Telemetry};
+use hopr_api::{
+    ct::TrafficGeneration,
+    graph::{NetworkGraphError, NetworkGraphUpdate, NetworkGraphView, Telemetry},
+};
 use hopr_async_runtime::AbortableList;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::types::OffchainPublicKey;

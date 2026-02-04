@@ -14,27 +14,6 @@ pub enum Health {
     Green = 4,
 }
 
-pub trait Observable {
-    /// Record a new result of the probe towards the measured peer.
-    fn record_probe(&mut self, latency: std::result::Result<std::time::Duration, ()>);
-
-    /// The timestamp of the last update.
-    fn last_update(&self) -> std::time::Duration;
-
-    /// Return average latency observed for the measured peer.
-    fn average_latency(&self) -> Option<std::time::Duration>;
-
-    /// A value representing the average success rate of probes.
-    ///
-    /// It is from the range [0.0, 1.0]. The higher the value, the better the score.
-    fn average_probe_rate(&self) -> f64;
-
-    /// A value scoring the observed peer.
-    ///
-    /// It is from the range [0.0, 1.0]. The higher the value, the better the score.
-    fn score(&self) -> f64;
-}
-
 #[cfg(test)]
 mod tests {
     use super::Health;

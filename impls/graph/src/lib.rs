@@ -19,6 +19,9 @@
 //! - presence of peer for immediate direct network connection and its quality (Option<ImmediateQoS>)
 //! - presence of intermediate connection through other nodes (Option<IntermediateQoS>)
 
+pub mod immediate;
+pub mod observation;
+
 use std::collections::HashMap;
 
 use hopr_internal_types::channels::{ChannelEntry, ChannelStatus};

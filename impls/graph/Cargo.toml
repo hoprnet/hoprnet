@@ -15,14 +15,25 @@ crate-type = ["rlib"]
 default = []
 
 [dependencies]
+async-trait = { workspace = true }
+async-stream = { workspace = true }
 anyhow = { workspace = true }
+dashmap = { workspace = true }
+futures = { workspace = true }
 petgraph = { workspace = true }
-hopr-internal-types = { workspace = true }
-hopr-primitive-types = { workspace = true }
+rand = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
+hopr-api = { workspace = true}
+hopr-crypto-random = { workspace = true }
+hopr-internal-types = { workspace = true }
+hopr-primitive-types = { workspace = true }
+hopr-statistics = { workspace = true }
+
 [dev-dependencies]
-hopr-crypto-types = { workspace = true }
+assertables = { workspace = true }
 hex-literal = { workspace = true }
 lazy_static = { workspace = true }
+
+hopr-crypto-types = { workspace = true }

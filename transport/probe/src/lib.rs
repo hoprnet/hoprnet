@@ -25,8 +25,10 @@ pub mod ping;
 pub mod probe;
 pub mod types;
 
-pub use hopr_api::ct::TrafficGeneration;
-pub use hopr_api::graph::{NetworkGraphError, Telemetry};
+pub use hopr_api::{
+    ct::TrafficGeneration,
+    graph::{NetworkGraphError, Telemetry},
+};
 
 pub use crate::{
     config::ProbeConfig, content::Message as TrafficReturnedObservation, probe::Probe, types::NeighborTelemetry,
