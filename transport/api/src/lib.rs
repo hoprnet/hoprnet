@@ -524,10 +524,7 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn ping<'a, 'b>(
-        &'a self,
-        peer: &'b PeerId,
-    ) -> errors::Result<(std::time::Duration, impl Observable + use<'a, 'b, Chain, Db, Graph>)> {
+    pub async fn ping(&self, peer: &PeerId) -> errors::Result<(std::time::Duration, Graph::Observed)> {
         if peer == &self.packet_key.public().into() {
             return Err(HoprTransportError::Api("ping to self does not make sense".into()));
         }
@@ -667,19 +664,13 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    pub fn network_peer_observations<'a, 'b>(
-        &'a self,
-        peer: &'b PeerId,
-    ) -> Option<impl Observable + use<'a, 'b, Chain, Db, Graph>> {
+    pub fn network_peer_observations(&self, peer: &PeerId) -> Option<Graph::Observed> {
         self.graph.observations_for(peer)
     }
 
     /// Get peers connected peers with quality higher than some value
     #[tracing::instrument(level = "debug", skip(self))]
-    pub fn all_network_peers(
-        &self,
-        minimum_score: f64,
-    ) -> errors::Result<Vec<(PeerId, impl Observable + use<Chain, Db, Graph>)>> {
+    pub fn all_network_peers(&self, minimum_score: f64) -> errors::Result<Vec<(PeerId, Graph::Observed)>> {
         Ok(self
             .network_connected_peers()?
             .into_iter()

@@ -288,7 +288,7 @@ mod tests {
 
     use async_trait::async_trait;
     use futures::future::BoxFuture;
-    use hopr_api::graph::NetworkGraphError;
+    use hopr_api::graph::{NetworkGraphError, Observable};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use hopr_ct_telemetry::{ImmediateNeighborProber, ProberConfig};
     use hopr_protocol_app::prelude::{ApplicationData, Tag};
@@ -305,6 +305,26 @@ mod tests {
             OffchainKeypair::random().public().into(),
         ];
     );
+
+    /// Test stub implementation of Observable.
+    #[derive(Debug, Clone, Copy, Default)]
+    pub struct TestObservations;
+
+    impl Observable for TestObservations {
+        fn record_probe(&mut self, _latency: std::result::Result<Duration, ()>) {}
+        fn last_update(&self) -> Duration {
+            Duration::default()
+        }
+        fn average_latency(&self) -> Option<Duration> {
+            None
+        }
+        fn average_probe_rate(&self) -> f64 {
+            1.0
+        }
+        fn score(&self) -> f64 {
+            1.0
+        }
+    }
 
     #[derive(Debug, Clone)]
     pub struct PeerStore {
@@ -341,6 +361,8 @@ mod tests {
 
     #[async_trait]
     impl NetworkGraphView for PeerStore {
+        type Observed = TestObservations;
+
         /// Returns a stream of all known nodes in the network graph.
         fn nodes(&self) -> futures::stream::BoxStream<'static, PeerId> {
             let mut get_peers = self.get_peers.write().unwrap();
@@ -357,6 +379,10 @@ mod tests {
         async fn loopback_routes(&self) -> Vec<Vec<DestinationRouting>> {
             tracing::debug!("finding loopback routes in test peer store");
             vec![]
+        }
+
+        fn observations_for(&self, _peer: &PeerId) -> Option<TestObservations> {
+            Some(TestObservations)
         }
     }
 

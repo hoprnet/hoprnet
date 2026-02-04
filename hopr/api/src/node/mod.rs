@@ -16,6 +16,7 @@ use hopr_primitive_types::prelude::{Address, Balance, Currency, HoprBalance, XDa
 use multiaddr::Multiaddr;
 pub use multiaddr::PeerId;
 
+pub use crate::chain::ChainInfo;
 use crate::{
     chain::ChannelId,
     db::{ChannelTicketStatistics, TicketSelector},
@@ -37,17 +38,6 @@ pub struct OpenChannelResult {
 pub struct CloseChannelResult {
     /// Transaction hash of the channel close operation.
     pub tx_hash: Hash,
-}
-
-/// Information about the chain environment for the node API.
-#[derive(Debug, Clone)]
-pub struct ChainInfo {
-    /// The chain ID.
-    pub chain_id: u64,
-    /// The block number at which the HOPR contracts were deployed.
-    pub genesis_block: u64,
-    /// The current block number.
-    pub current_block: u64,
 }
 
 /// Configuration for the Safe module.
@@ -107,11 +97,8 @@ pub trait HoprNodeNetworkOperations {
 
     // === Peers ===
 
-    /// Observable type returned by ping operations.
-    type PingObservable: Observable + Send;
-
     /// Pings a peer and returns the round-trip time along with observable data.
-    async fn ping(&self, peer: &PeerId) -> Result<(Duration, Self::PingObservable), Self::Error>;
+    async fn ping(&self, peer: &PeerId) -> Result<(Duration, Self::PeerObservable), Self::Error>;
 }
 
 /// High-level chain operations.
@@ -119,9 +106,6 @@ pub trait HoprNodeNetworkOperations {
 pub trait HoprNodeChainOperations {
     /// Error type for node operations.
     type Error: std::error::Error + Send + Sync + 'static;
-
-    /// Observable type returned by peer information queries.
-    type PeerObservable: Observable + Send;
 
     // === Identity ===
 
@@ -247,22 +231,4 @@ pub trait HoprNodeChainOperations {
     async fn withdraw_native(&self, recipient: Address, amount: XDaiBalance) -> Result<Hash, Self::Error>;
 
     // === Tickets ===
-}
-
-/// Combined trait representing the complete HOPR node external API.
-///
-/// This trait is automatically implemented for types that implement all constituent traits.
-pub trait HoprNodeApi:
-    HoprNodeChainOperations<Error = Self::ApiError> + HoprNodeNetworkOperations<Error = Self::ApiError>
-{
-    /// The unified error type for all API operations.
-    type ApiError: std::error::Error + Send + Sync + 'static;
-}
-
-impl<T, E> HoprNodeApi for T
-where
-    T: HoprNodeChainOperations<Error = E> + HoprNodeNetworkOperations<Error = E>,
-    E: std::error::Error + Send + Sync + 'static,
-{
-    type ApiError = E;
 }

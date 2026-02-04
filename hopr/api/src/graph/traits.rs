@@ -35,6 +35,9 @@ pub trait Observable {
 /// A trait specifying the graph traversal functionality
 #[async_trait::async_trait]
 pub trait NetworkGraphView {
+    /// The concrete type of observations for peers.
+    type Observed: Observable + Send;
+
     /// Returns a stream of all known nodes in the network graph.
     fn nodes(&self) -> futures::stream::BoxStream<'static, PeerId>;
 
@@ -51,7 +54,7 @@ pub trait NetworkGraphView {
 
     /// Returns observations for a given peer, if available.
     /// The returned type is owned and does not borrow from inputs.
-    fn observations_for(&self, peer: &PeerId) -> Option<impl Observable + use<Self>>;
+    fn observations_for(&self, peer: &PeerId) -> Option<Self::Observed>;
 }
 
 /// A trait specifying the graph update functionality

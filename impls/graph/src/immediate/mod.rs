@@ -77,6 +77,8 @@ impl<T> hopr_api::graph::NetworkGraphView for ImmediateNeighborChannelGraph<T>
 where
     T: NetworkView + Send + Sync + Clone + 'static,
 {
+    type Observed = Observations;
+
     fn nodes(&self) -> futures::stream::BoxStream<'static, PeerId> {
         let fetcher = self.network.clone();
         let _recheck_threshold = self.recheck_threshold; // TODO: currently being ignored
@@ -100,7 +102,6 @@ where
         vec![]
     }
 
-    #[allow(refining_impl_trait_reachable)]
     fn observations_for(&self, peer: &PeerId) -> Option<Observations> {
         if self.network.is_connected(peer) {
             self.tracker.get(peer)
