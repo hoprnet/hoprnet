@@ -10,9 +10,7 @@ use hopr_lib::{Address, Health, Multiaddr, api::network::Observable};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
-use crate::{
-    ApiError, ApiErrorStatus, BASE_PATH, InternalState, checksum_address_serializer,
-};
+use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState, checksum_address_serializer};
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
@@ -249,9 +247,7 @@ pub(super) async fn peers(
             }
         })
         // Filter out peers without a known chain address
-        .filter_map(|(address, mas, info)| async move {
-            address.map(|addr| (addr, mas, info))
-        })
+        .filter_map(|(address, mas, info)| async move { address.map(|addr| (addr, mas, info)) })
         .map(|(address, mas, info)| PeerObservations {
             address,
             multiaddr: mas.first().cloned(),
