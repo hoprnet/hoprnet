@@ -39,7 +39,7 @@ pub struct CloseChannelResult {
     pub tx_hash: Hash,
 }
 
-/// Information about the chain environment.
+/// Information about the chain environment for the node API.
 #[derive(Debug, Clone)]
 pub struct ChainInfo {
     /// The chain ID.

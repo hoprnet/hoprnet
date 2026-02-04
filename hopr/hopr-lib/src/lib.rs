@@ -88,6 +88,7 @@ use hopr_api::{
     chain::{AccountSelector, AnnouncementError, ChannelSelector, *},
     ct::TrafficGeneration,
     db::{HoprNodeDbApi, TicketMarker, TicketSelector},
+    node::{CloseChannelResult, OpenChannelResult},
 };
 pub use hopr_api::{db::ChannelTicketStatistics, graph::Observable};
 use hopr_async_runtime::prelude::spawn;
@@ -111,7 +112,6 @@ pub use crate::{
     constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE},
     errors::{HoprLibError, HoprStatusError},
     state::{HoprLibProcess, HoprState},
-    traits::chain::{CloseChannelResult, OpenChannelResult},
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -330,10 +330,7 @@ where
         self.cfg.publish
     }
 
-    pub async fn run<
-        Ct,
-        #[cfg(feature = "session-server")] T: traits::session::HoprSessionServer + Clone + Send + 'static,
-    >(
+    pub async fn run<Ct, #[cfg(feature = "session-server")] T: traits::HoprSessionServer + Clone + Send + 'static>(
         &self,
         cover_traffic: Ct,
         #[cfg(feature = "session-server")] serve_handler: T,
