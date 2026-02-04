@@ -15,11 +15,19 @@ crate-type = ["rlib"]
 default = ["rayon"]
 rayon = ["dep:rayon"]
 runtime-tokio = ["dep:tokio"]
+prometheus = ["dep:hopr-metrics", "dep:lazy_static"]
 
 [dependencies]
 futures = { workspace = true }
+lazy_static = { workspace = true, optional = true }
 rayon = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
+tracing = { workspace = true }
+
+hopr-metrics = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt", "macros", "time"] }
 
 [package.metadata.cargo-machete]
 ignored = ["tokio"]

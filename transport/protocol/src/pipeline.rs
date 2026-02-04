@@ -30,6 +30,14 @@ lazy_static::lazy_static! {
         "Number of processed packets of different types (sent, received, forwarded)",
         &["type"]
     ).unwrap();
+    // Tracks how often the Rayon-backed packet decode path exceeds PACKET_DECODING_TIMEOUT.
+    // A sustained non-zero rate here indicates the Rayon pool is saturated—correlate with
+    // hopr_rayon_tasks_cancelled_total and hopr_rayon_queue_wait_seconds to diagnose whether
+    // the bottleneck is queue depth, individual task duration, or both.
+    static ref METRIC_PACKET_DECODE_TIMEOUTS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+        "hopr_packet_decode_timeouts_total",
+        "Number of incoming packets dropped due to decode timeout"
+    ).unwrap();
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
@@ -199,6 +207,8 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                     Err(_) => {
                         // If we cannot decode the packet within the time limit, just drop it
                         tracing::error!(%peer, "dropped incoming packet: failed to decode packet within {:?}", PACKET_DECODING_TIMEOUT);
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        METRIC_PACKET_DECODE_TIMEOUTS.increment();
                         None
                     }
                 }
@@ -555,6 +565,7 @@ where
     {
         // Initialize the lazy statics here
         lazy_static::initialize(&METRIC_PACKET_COUNT);
+        lazy_static::initialize(&METRIC_PACKET_DECODE_TIMEOUTS);
     }
 
     let (outgoing_ack_tx, outgoing_ack_rx) =
