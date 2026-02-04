@@ -61,66 +61,92 @@ pub mod cpu {
     pub use rayon;
 
     #[cfg(all(feature = "prometheus", not(test)))]
-    lazy_static::lazy_static! {
-        static ref METRIC_RAYON_TASKS_SUBMITTED: hopr_metrics::SimpleCounter =
+    static METRIC_RAYON_TASKS_SUBMITTED: std::sync::LazyLock<hopr_metrics::SimpleCounter> =
+        std::sync::LazyLock::new(|| {
             hopr_metrics::SimpleCounter::new(
                 "hopr_rayon_tasks_submitted_total",
-                "Total number of tasks submitted to the Rayon thread pool"
-            ).unwrap();
-        static ref METRIC_RAYON_TASKS_COMPLETED: hopr_metrics::SimpleCounter =
+                "Total number of tasks submitted to the Rayon thread pool",
+            )
+            .unwrap()
+        });
+
+    #[cfg(all(feature = "prometheus", not(test)))]
+    static METRIC_RAYON_TASKS_COMPLETED: std::sync::LazyLock<hopr_metrics::SimpleCounter> =
+        std::sync::LazyLock::new(|| {
             hopr_metrics::SimpleCounter::new(
                 "hopr_rayon_tasks_completed_total",
-                "Total number of Rayon tasks that completed and delivered results"
-            ).unwrap();
-        static ref METRIC_RAYON_TASKS_CANCELLED: hopr_metrics::SimpleCounter =
+                "Total number of Rayon tasks that completed and delivered results",
+            )
+            .unwrap()
+        });
+
+    #[cfg(all(feature = "prometheus", not(test)))]
+    static METRIC_RAYON_TASKS_CANCELLED: std::sync::LazyLock<hopr_metrics::SimpleCounter> =
+        std::sync::LazyLock::new(|| {
             hopr_metrics::SimpleCounter::new(
                 "hopr_rayon_tasks_cancelled_total",
-                "Total number of Rayon tasks skipped because receiver was already dropped"
-            ).unwrap();
-        static ref METRIC_RAYON_TASKS_ORPHANED: hopr_metrics::SimpleCounter =
+                "Total number of Rayon tasks skipped because receiver was already dropped",
+            )
+            .unwrap()
+        });
+
+    #[cfg(all(feature = "prometheus", not(test)))]
+    static METRIC_RAYON_TASKS_ORPHANED: std::sync::LazyLock<hopr_metrics::SimpleCounter> =
+        std::sync::LazyLock::new(|| {
             hopr_metrics::SimpleCounter::new(
                 "hopr_rayon_tasks_orphaned_total",
-                "Total number of Rayon tasks whose results were discarded after completion"
-            ).unwrap();
-        static ref METRIC_RAYON_QUEUE_WAIT: hopr_metrics::SimpleHistogram =
+                "Total number of Rayon tasks whose results were discarded after completion",
+            )
+            .unwrap()
+        });
+
+    #[cfg(all(feature = "prometheus", not(test)))]
+    static METRIC_RAYON_QUEUE_WAIT: std::sync::LazyLock<hopr_metrics::SimpleHistogram> =
+        std::sync::LazyLock::new(|| {
             hopr_metrics::SimpleHistogram::new(
                 "hopr_rayon_queue_wait_seconds",
                 "Time tasks spend waiting in the Rayon queue before execution starts",
-                vec![0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.15, 0.25, 0.5, 1.0]
-            ).unwrap();
-    }
+                vec![0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.15, 0.25, 0.5, 1.0],
+            )
+            .unwrap()
+        });
 
     /// Initialize a `rayon` CPU thread pool with the given number of threads.
     pub fn init_thread_pool(num_threads: usize) -> Result<(), rayon::ThreadPoolBuildError> {
         rayon::ThreadPoolBuilder::new().num_threads(num_threads).build_global()
     }
 
-    /// Spawn an awaitable non-blocking execution of the given blocking function on a `rayon` CPU thread pool.
+    /// Builds a cancellable task closure and its corresponding oneshot receiver.
     ///
-    /// The current thread pool uses a LIFO (Last In First Out) scheduling policy for the thread's queue, but
-    /// FIFO (First In First Out) for stealing tasks from other threads.
+    /// The returned closure wraps `f` with cooperative cancellation, panic catching,
+    /// queue-wait timing, and Prometheus metric updates. It is suitable for passing
+    /// directly to [`rayon::spawn`] or [`rayon::spawn_fifo`].
     ///
-    /// Includes cooperative cancellation: if the async receiver is dropped (e.g., due to timeout)
-    /// before the Rayon task starts executing, the task is skipped without performing any work.
-    /// See the [module-level documentation](cpu) for details on why this is necessary.
+    /// See the [module-level documentation](cpu) for why cooperative cancellation
+    /// is necessary.
     #[cfg(feature = "rayon")]
-    pub async fn spawn_blocking<R: Send + 'static>(f: impl FnOnce() -> R + Send + 'static) -> R {
+    fn cancellable_task<R: Send + 'static>(
+        f: impl FnOnce() -> R + Send + 'static,
+    ) -> (
+        impl FnOnce() + Send + 'static,
+        futures::channel::oneshot::Receiver<std::thread::Result<R>>,
+    ) {
         let (tx, rx) = futures::channel::oneshot::channel();
         let submitted_at = std::time::Instant::now();
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_RAYON_TASKS_SUBMITTED.increment();
 
-        rayon::spawn(move || {
+        let task = move || {
             // Cooperative cancellation: if the caller already timed out and dropped
             // the receiver, skip the (potentially expensive) closure entirely.
             // This is a best-effort check—there's an inherent race between this check
             // and the timeout firing, but it catches the common case where a task sat
             // in the queue past its deadline, preventing zombie accumulation.
             if tx.is_canceled() {
-                tracing::warn!(
+                tracing::debug!(
                     queue_wait_ms = submitted_at.elapsed().as_millis() as u64,
-                    "spawn_blocking: skipping cancelled task (receiver dropped)"
+                    "skipping cancelled task (receiver dropped before execution)"
                 );
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_RAYON_TASKS_CANCELLED.increment();
@@ -141,18 +167,33 @@ pub mod cpu {
                 // task completion (the timeout fired while the closure was running).
                 // The work is wasted but unavoidable without mid-closure cancellation.
                 Err(_) => {
-                    tracing::warn!(
+                    tracing::debug!(
                         queue_wait_ms = wait_duration.as_millis() as u64,
-                        "spawn_blocking: receiver dropped during execution, result discarded"
+                        "receiver dropped during execution, result discarded"
                     );
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_RAYON_TASKS_ORPHANED.increment();
                 }
             }
-        });
+        };
 
+        (task, rx)
+    }
+
+    /// Spawn an awaitable non-blocking execution of the given blocking function on a `rayon` CPU thread pool.
+    ///
+    /// The current thread pool uses a LIFO (Last In First Out) scheduling policy for the thread's queue, but
+    /// FIFO (First In First Out) for stealing tasks from other threads.
+    ///
+    /// Includes cooperative cancellation: if the async receiver is dropped (e.g., due to timeout)
+    /// before the Rayon task starts executing, the task is skipped without performing any work.
+    /// See the [module-level documentation](cpu) for details on why this is necessary.
+    #[cfg(feature = "rayon")]
+    pub async fn spawn_blocking<R: Send + 'static>(f: impl FnOnce() -> R + Send + 'static) -> R {
+        let (task, rx) = cancellable_task(f);
+        rayon::spawn(task);
         rx.await
-            .expect("spawned blocking process should be awaitable")
+            .expect("rayon task channel closed unexpectedly")
             .unwrap_or_else(|caught_panic| std::panic::resume_unwind(caught_panic))
     }
 
@@ -167,59 +208,23 @@ pub mod cpu {
     /// See the [module-level documentation](cpu) for details on why this is necessary.
     #[cfg(feature = "rayon")]
     pub async fn spawn_fifo_blocking<R: Send + 'static>(f: impl FnOnce() -> R + Send + 'static) -> R {
-        let (tx, rx) = futures::channel::oneshot::channel();
-        let submitted_at = std::time::Instant::now();
-
-        #[cfg(all(feature = "prometheus", not(test)))]
-        METRIC_RAYON_TASKS_SUBMITTED.increment();
-
-        rayon::spawn_fifo(move || {
-            // Cooperative cancellation: see spawn_blocking for detailed rationale.
-            if tx.is_canceled() {
-                tracing::warn!(
-                    queue_wait_ms = submitted_at.elapsed().as_millis() as u64,
-                    "spawn_fifo_blocking: skipping cancelled task (receiver dropped)"
-                );
-                #[cfg(all(feature = "prometheus", not(test)))]
-                METRIC_RAYON_TASKS_CANCELLED.increment();
-                return;
-            }
-
-            let wait_duration = submitted_at.elapsed();
-            #[cfg(all(feature = "prometheus", not(test)))]
-            METRIC_RAYON_QUEUE_WAIT.observe(wait_duration.as_secs_f64());
-
-            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f));
-            match tx.send(result) {
-                Ok(()) => {
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_RAYON_TASKS_COMPLETED.increment();
-                }
-                // See spawn_blocking Err arm for explanation.
-                Err(_) => {
-                    tracing::warn!(
-                        queue_wait_ms = wait_duration.as_millis() as u64,
-                        "spawn_fifo_blocking: receiver dropped during execution, result discarded"
-                    );
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_RAYON_TASKS_ORPHANED.increment();
-                }
-            }
-        });
-
+        let (task, rx) = cancellable_task(f);
+        rayon::spawn_fifo(task);
         rx.await
-            .expect("spawned fifo blocking process should be awaitable")
+            .expect("rayon task channel closed unexpectedly")
             .unwrap_or_else(|caught_panic| std::panic::resume_unwind(caught_panic))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{
-        Arc,
-        atomic::{AtomicU32, Ordering},
+    use std::{
+        sync::{
+            Arc,
+            atomic::{AtomicU32, Ordering},
+        },
+        time::Duration,
     };
-    use std::time::Duration;
 
     use futures::FutureExt;
 

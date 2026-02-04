@@ -204,10 +204,7 @@ where
         tracing::trace!(data_len = data.len(), "decoding packet");
 
         // Try to retrieve the peer's public key from the cache or compute it if it does not exist yet.
-        // The async block ensures the Rayon task is only submitted on cache miss—without it, the
-        // spawn_fifo_blocking future would be constructed (and its Rayon closure captured) for every
-        // incoming packet even when the PeerId is already cached. Under high packet volume, this
-        // avoids unnecessary Rayon queue pressure on a pool that is already small (CPU_cores / 2).
+        // The async block ensures the Rayon task is only submitted on cache miss.
         let previous_hop = match self
             .peer_id_cache
             .try_get_with_by_ref(&sender, async {

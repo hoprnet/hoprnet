@@ -21,11 +21,8 @@ impl<B> Clone for HoprKeyMapper<B> {
 }
 
 // These lookups run synchronously on Rayon threads (called from `HoprPacket::from_incoming`
-// inside `spawn_fifo_blocking`). The moka::sync::Cache uses per-key locks, so different keys
-// don't block each other, but the init closure performs synchronous redb I/O on cache miss.
-// If redb is slow (disk contention, large file, swap pressure), a cache miss on a Rayon thread
-// can block for tens of milliseconds, contributing to PACKET_DECODING_TIMEOUT breaches.
-// The elapsed_ms timing in each init closure makes this visible in structured logs.
+// inside `spawn_fifo_blocking`). The elapsed_ms timing in each init closure makes the rayon
+// execution time visible in structured logs.
 impl<B> hopr_api::chain::KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec> for HoprKeyMapper<B>
 where
     B: Backend + Send + Sync + 'static,
