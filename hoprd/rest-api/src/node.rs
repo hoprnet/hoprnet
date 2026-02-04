@@ -110,9 +110,9 @@ pub(crate) struct HeartbeatInfo {
 }))]
 /// All information about a known peer.
 pub(crate) struct PeerObservations {
-    #[serde(serialize_with = "option_checksum_address_serializer")]
-    #[schema(value_type = Option<String>, example = "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe")]
-    address: Option<Address>,
+    #[serde(serialize_with = "checksum_address_serializer")]
+    #[schema(value_type = String, example = "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe")]
+    address: Address,
     #[serde_as(as = "Option<DisplayFromStr>")]
     #[schema(value_type = Option<String>, example = "/ip4/178.12.1.9/tcp/19092")]
     multiaddr: Option<Multiaddr>,
@@ -253,7 +253,7 @@ pub(super) async fn peers(
             address.map(|addr| (addr, mas, info))
         })
         .map(|(address, mas, info)| PeerObservations {
-            address: Some(address),
+            address,
             multiaddr: mas.first().cloned(),
             last_update: info.last_update().as_millis(),
             average_latency: info.average_latency().map_or(0, |d| d.as_millis()),
