@@ -14,6 +14,8 @@ pub enum TempDbError {
     Database(#[from] redb::Error),
     #[error("serialization error: {0}")]
     Serialization(#[from] postcard::Error),
+    #[error("I/O error: {0}")]
+    Io(#[from] std::io::Error),
 }
 
 impl From<redb::TransactionError> for TempDbError {
@@ -59,8 +61,7 @@ pub struct TempDbBackend {
 
 impl TempDbBackend {
     pub fn new() -> Result<Self, TempDbError> {
-        let file = tempfile::NamedTempFile::new()
-            .map_err(|e| TempDbError::Database(redb::StorageError::Io(e).into()))?;
+        let file = tempfile::NamedTempFile::new()?;
 
         tracing::info!(path = %file.path().display(), "opened temporary redb database");
 
@@ -183,15 +184,15 @@ impl super::Backend for TempDbBackend {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::Backend;
-    use crate::backend::tests::test_backend;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use hopr_internal_types::{
         account::AccountType,
         channels::{ChannelStatus, generate_channel_id},
     };
     use hopr_primitive_types::balance::HoprBalance;
+
+    use super::*;
+    use crate::{Backend, backend::tests::test_backend};
 
     #[test]
     fn test_tempdb() -> anyhow::Result<()> {
