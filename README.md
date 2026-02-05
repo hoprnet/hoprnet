@@ -196,7 +196,6 @@ On top of the default configuration options generated for the command line, the 
 - `HOPR_INTERNAL_LIBP2P_MAX_NEGOTIATING_INBOUND_STREAM_COUNT` - the maximum number of negotiating inbound streams
 - `HOPR_INTERNAL_LIBP2P_SWARM_IDLE_TIMEOUT` - timeout for all idle libp2p swarm connections in seconds
 - `HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS` - cutoff duration from now to not retain the peers with older records in the peers database (e.g. after a restart)
-- `HOPR_INTERNAL_REST_API_MAX_CONCURRENT_WEBSOCKET_COUNT` - the maximum number of concurrent websocket opened through the REST API
 - `HOPR_INTERNAL_MANUAL_PING_CHANNEL_CAPACITY` - the maximum capacity of awaiting manual ping queue
 - `HOPR_INTERNAL_MIXER_CAPACITY` - capacity of the mixer buffer
 - `HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS` - the minimum mixer delay in milliseconds
