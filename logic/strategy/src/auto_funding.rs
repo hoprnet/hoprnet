@@ -88,9 +88,9 @@ impl<A: ChainWriteChannelOperations + Send + Sync> SingularStrategy for AutoFund
         }
 
         if let ChannelChange::Balance { right: new, .. } = change {
-            if new.lt(&self.cfg.min_stake_threshold) && channel.status == ChannelStatus::Open {
+            if new.le(&self.cfg.min_stake_threshold) && channel.status == ChannelStatus::Open {
                 info!(%channel, balance = %channel.balance, threshold = %self.cfg.min_stake_threshold,
-                    "stake on channel is below threshold",
+                    "stake on channel at or below threshold",
                 );
 
                 #[cfg(all(feature = "prometheus", not(test)))]
