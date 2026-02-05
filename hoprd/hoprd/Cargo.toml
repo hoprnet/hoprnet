@@ -107,12 +107,14 @@ hopr-lib = { workspace = true, features = [
   "session-server",
   "utils_parallel",
 ] }
-hopr-ct-telemetry = { workspace = true }
 hopr-db-node = { workspace = true }
 hopr-chain-connector = { workspace = true }
 hopr-utils-session = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hoprd-api = { workspace = true }
+# impls
+hopr-ct-telemetry = { workspace = true }
+hopr-network-graph = { workspace = true }
 
 # Target-specific dependencies for memory allocators
 [target.'cfg(target_os = "linux")'.dependencies]

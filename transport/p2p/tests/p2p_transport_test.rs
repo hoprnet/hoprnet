@@ -8,11 +8,11 @@ use futures::{
     SinkExt, StreamExt,
     channel::mpsc::{Receiver, Sender},
 };
+use hopr_api::network::PeerDiscovery;
 use hopr_crypto_types::{keypairs::Keypair, prelude::OffchainKeypair};
 use hopr_platform::time::native::current_time;
 use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork};
 use hopr_transport_probe::ping::PingQueryReplier;
-use hopr_transport_protocol::PeerDiscovery;
 use lazy_static::lazy_static;
 
 pub fn random_free_local_ipv4_port() -> Option<u16> {

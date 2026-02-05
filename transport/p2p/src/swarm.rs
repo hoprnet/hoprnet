@@ -3,12 +3,8 @@ use std::sync::Arc;
 
 use dashmap::DashSet;
 use futures::{Stream, StreamExt};
+use hopr_api::{Multiaddr, network::PeerDiscovery};
 use hopr_network_types::prelude::is_public_address;
-use hopr_transport_identity::{
-    Multiaddr,
-    multiaddrs::{replace_transport_with_unspecified, resolve_dns_if_any},
-};
-use hopr_transport_protocol::PeerDiscovery;
 use libp2p::{
     PeerId, autonat,
     identity::PublicKey,
@@ -16,7 +12,11 @@ use libp2p::{
 };
 use tracing::{debug, error, info, trace, warn};
 
-use crate::{HoprNetwork, HoprNetworkBehavior, HoprNetworkBehaviorEvent, constants, errors::Result};
+use crate::{
+    HoprNetwork, HoprNetworkBehavior, HoprNetworkBehaviorEvent, constants,
+    errors::Result,
+    utils::{replace_transport_with_unspecified, resolve_dns_if_any},
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {

@@ -1,3 +1,5 @@
+use multiaddr::{Multiaddr, PeerId};
+
 /// Network health represented with colors, where green is the best and red
 /// is the worst possible observed network quality.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, strum::Display, strum::EnumString)]
@@ -12,6 +14,12 @@ pub enum Health {
     Yellow = 3,
     /// High-quality connection to at least 1 public relay and 1 NAT node
     Green = 4,
+}
+
+/// Processed indexer generated events.
+#[derive(Debug, Clone)]
+pub enum PeerDiscovery {
+    Announce(PeerId, Vec<Multiaddr>),
 }
 
 #[cfg(test)]

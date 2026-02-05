@@ -39,8 +39,10 @@ use std::sync::Arc;
 use dashmap::DashSet;
 use futures::{AsyncRead, AsyncWrite};
 pub use hopr_api::network::Health;
-use hopr_api::network::NetworkView;
+use hopr_api::network::{NetworkView, traits::NetworkStreamControl};
 use libp2p::{Multiaddr, PeerId};
+
+mod utils;
 
 pub use crate::{
     behavior::{HoprNetworkBehavior, HoprNetworkBehaviorEvent},
@@ -103,7 +105,7 @@ impl NetworkView for HoprNetwork {
 }
 
 #[async_trait::async_trait]
-impl hopr_transport_protocol::stream::BidirectionalStreamControl for HoprNetwork {
+impl NetworkStreamControl for HoprNetwork {
     fn accept(
         mut self,
     ) -> Result<impl futures::Stream<Item = (PeerId, impl AsyncRead + AsyncWrite + Send)> + Send, impl std::error::Error>

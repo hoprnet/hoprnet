@@ -14,12 +14,10 @@ default = []
 prometheus = [
   "dep:lazy_static",
   "dep:hopr-metrics",
-  "hopr-transport-protocol/prometheus",
   "hopr-transport-network/prometheus",
 ]
 runtime-tokio = [
   "libp2p/tokio",
-  "hopr-transport-protocol/runtime-tokio",
   "hopr-transport-probe/runtime-tokio",
 ]
 transport-quic = ["libp2p/quic"]
@@ -39,6 +37,7 @@ libp2p = { workspace = true, features = [
   "yamux",
 ] }
 libp2p-stream = { workspace = true }
+multiaddr = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
@@ -48,7 +47,6 @@ hopr-api = { workspace = true, features = ["ct"] }
 hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true }
 hopr-transport-identity = { workspace = true }
-hopr-transport-protocol = { workspace = true }
 hopr-transport-network = { workspace = true }
 
 [dev-dependencies]
