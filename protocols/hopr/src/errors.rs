@@ -72,4 +72,7 @@ pub enum HoprProtocolError {
 
     #[error(transparent)]
     GeneralError(#[from] hopr_primitive_types::errors::GeneralError),
+
+    #[error("rayon thread pool queue full: {0}")]
+    SpawnError(#[from] hopr_parallelize::cpu::SpawnError),
 }

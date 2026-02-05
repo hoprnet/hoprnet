@@ -71,7 +71,10 @@ where
             .await
             .map_err(|e| HoprProtocolError::ResolverError(e.into()))?
             .ok_or(HoprProtocolError::KeyNotFound)?;
-        tracing::trace!(elapsed_ms = lookup_start.elapsed().as_millis() as u64, "previous_hop_addr lookup");
+        tracing::trace!(
+            elapsed_ms = lookup_start.elapsed().as_millis() as u64,
+            "previous_hop_addr lookup"
+        );
 
         let lookup_start = std::time::Instant::now();
         let next_hop_addr = self
@@ -80,7 +83,10 @@ where
             .await
             .map_err(|e| HoprProtocolError::ResolverError(e.into()))?
             .ok_or(HoprProtocolError::KeyNotFound)?;
-        tracing::trace!(elapsed_ms = lookup_start.elapsed().as_millis() as u64, "next_hop_addr lookup");
+        tracing::trace!(
+            elapsed_ms = lookup_start.elapsed().as_millis() as u64,
+            "next_hop_addr lookup"
+        );
 
         let lookup_start = std::time::Instant::now();
         let incoming_channel = self
@@ -89,7 +95,10 @@ where
             .await
             .map_err(|e| HoprProtocolError::ResolverError(e.into()))?
             .ok_or_else(|| HoprProtocolError::ChannelNotFound(previous_hop_addr, *self.chain_key.as_ref()))?;
-        tracing::trace!(elapsed_ms = lookup_start.elapsed().as_millis() as u64, "incoming_channel lookup");
+        tracing::trace!(
+            elapsed_ms = lookup_start.elapsed().as_millis() as u64,
+            "incoming_channel lookup"
+        );
 
         // The ticket price from the oracle times my node's position on the
         // path is the acceptable minimum
@@ -100,7 +109,10 @@ where
             .await
             .map_err(|e| HoprProtocolError::ResolverError(e.into()))?
             .mul(U256::from(fwd.path_pos));
-        tracing::trace!(elapsed_ms = lookup_start.elapsed().as_millis() as u64, "minimum_ticket_price lookup");
+        tracing::trace!(
+            elapsed_ms = lookup_start.elapsed().as_millis() as u64,
+            "minimum_ticket_price lookup"
+        );
 
         let lookup_start = std::time::Instant::now();
         let remaining_balance = incoming_channel.balance.sub(
@@ -109,7 +121,10 @@ where
                 .await
                 .map_err(|e| HoprProtocolError::TicketTrackerError(e.into()))?,
         );
-        tracing::trace!(elapsed_ms = lookup_start.elapsed().as_millis() as u64, "remaining_balance lookup");
+        tracing::trace!(
+            elapsed_ms = lookup_start.elapsed().as_millis() as u64,
+            "remaining_balance lookup"
+        );
 
         // Here also the signature on the ticket gets validated,
         // so afterward we are sure the source of the `channel`
@@ -121,7 +136,10 @@ where
             .minimum_incoming_ticket_win_prob()
             .await
             .map_err(|e| HoprProtocolError::ResolverError(e.into()))?;
-        tracing::trace!(elapsed_ms = lookup_start.elapsed().as_millis() as u64, "win_prob lookup");
+        tracing::trace!(
+            elapsed_ms = lookup_start.elapsed().as_millis() as u64,
+            "win_prob lookup"
+        );
 
         let domain_separator = self.channels_dst;
 
@@ -136,8 +154,11 @@ where
                 &domain_separator,
             )
         })
-        .await?;
-        tracing::debug!(elapsed_ms = verify_start.elapsed().as_millis() as u64, "ticket_signature_verification");
+        .await??;
+        tracing::debug!(
+            elapsed_ms = verify_start.elapsed().as_millis() as u64,
+            "ticket_signature_verification"
+        );
 
         // The ticket is now validated:
         tracing::trace!(%verified_incoming_ticket, "successfully verified incoming ticket");
@@ -195,7 +216,7 @@ where
         fwd.outgoing.ticket = hopr_parallelize::cpu::spawn_fifo_blocking(move || {
             ticket_builder.build_signed(&me_on_chain, &domain_separator)
         })
-        .await?
+        .await??
         .leak();
         tracing::debug!(elapsed_ms = sign_start.elapsed().as_millis() as u64, "ticket_signing");
 
@@ -230,7 +251,9 @@ where
         let previous_hop = match self
             .peer_id_cache
             .try_get_with_by_ref(&sender, async {
-                hopr_parallelize::cpu::spawn_fifo_blocking(move || OffchainPublicKey::from_peerid(&sender)).await
+                hopr_parallelize::cpu::spawn_fifo_blocking(move || OffchainPublicKey::from_peerid(&sender))
+                    .await
+                    .map_err(|e| hopr_primitive_types::errors::GeneralError::NonSpecificError(e.to_string()))?
             })
             .await
         {
@@ -261,6 +284,7 @@ where
             })
         })
         .await
+        .map_err(|e| IncomingPacketError::Undecodable(e.into()))?
         .map_err(|e| IncomingPacketError::Undecodable(e.into()))?;
         let packet_type = match &packet {
             HoprPacket::Final(_) => "final",

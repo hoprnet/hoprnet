@@ -363,15 +363,21 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
             let packet_key = packet_key.clone();
             async move {
                  // Sign acknowledgement with the given half-key or generate a signed random one
-                 let ack = hopr_parallelize::cpu::spawn_blocking(move || {
+                 match hopr_parallelize::cpu::spawn_blocking(move || {
                      maybe_ack_key
                          .map(|ack_key| VerifiedAcknowledgement::new(ack_key, &packet_key))
                          .unwrap_or_else(|| VerifiedAcknowledgement::random(&packet_key))
                  })
-                 .await;
-                (destination, ack)
+                 .await {
+                    Ok(ack) => Some((destination, ack)),
+                    Err(error) => {
+                        tracing::error!(%error, "failed to spawn acknowledgement signing task");
+                        None
+                    }
+                 }
             }
         })
+        .filter_map(futures::future::ready)
         .buffer(futures_time::time::Duration::from(cfg.ack_buffer_interval))
         .filter(|acks| futures::future::ready(!acks.is_empty()))
         .flat_map(|buffered_acks| {

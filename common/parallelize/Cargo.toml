@@ -26,6 +26,7 @@ tracing = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]
+serial_test = { workspace = true }
 tokio = { workspace = true, features = ["rt", "macros", "time"] }
 
 [package.metadata.cargo-machete]
