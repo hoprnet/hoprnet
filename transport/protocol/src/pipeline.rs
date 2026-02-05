@@ -206,7 +206,11 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                     }
                     Err(_) => {
                         // If we cannot decode the packet within the time limit, just drop it
-                        tracing::error!(%peer, "dropped incoming packet: failed to decode packet within {:?}", PACKET_DECODING_TIMEOUT);
+                        tracing::error!(
+                            %peer,
+                            timeout_ms = PACKET_DECODING_TIMEOUT.as_millis() as u64,
+                            "dropped incoming packet: decode timeout - check hopr_rayon_queue_wait_seconds metric for pool saturation"
+                        );
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_PACKET_DECODE_TIMEOUTS.increment();
                         None
