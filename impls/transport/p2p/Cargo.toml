@@ -52,7 +52,6 @@ more-asserts = { workspace = true }
 tokio = { workspace = true }
 
 hopr-api = { workspace = true, features = ["network"] }
-hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }

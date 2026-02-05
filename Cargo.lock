@@ -4656,7 +4656,6 @@ dependencies = [
  "serde",
  "smart-default",
  "tokio",
- "tracing",
  "validator",
 ]
 
@@ -5090,7 +5089,6 @@ dependencies = [
  "hopr-transport-identity",
  "hopr-transport-mixer",
  "hopr-transport-network",
- "hopr-transport-p2p",
  "hopr-transport-probe",
  "hopr-transport-protocol",
  "hopr-transport-session",
@@ -5162,7 +5160,6 @@ dependencies = [
  "dashmap",
  "futures",
  "hopr-api",
- "hopr-async-runtime",
  "hopr-crypto-packet",
  "hopr-crypto-random 0.3.0",
  "hopr-crypto-types 0.9.0",

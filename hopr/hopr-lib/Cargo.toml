@@ -41,8 +41,6 @@ serde = [
 session-client = []
 session-server = []
 transport-announce-quic = ["hopr-transport/p2p-announce-quic"]
-transport-use-quic = ["hopr-transport/p2p-transport-quic"]
-
 
 # === utility features ===
 utils_futures = []  # utility futures for async adapters

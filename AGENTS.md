@@ -14,4 +14,3 @@ For detailed development guidelines, coding standards, and project-specific conv
 Custom agent configurations are available in:
 
 - [.github/agents/](.github/agents/) - Specialized agent definitions
-

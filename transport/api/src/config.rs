@@ -162,7 +162,7 @@ impl Display for HostConfig {
 
 fn default_multiaddr_transport(port: u16) -> String {
     cfg_if::cfg_if! {
-        if #[cfg(all(feature = "p2p-announce-quic", feature = "p2p-transport-quic"))] {
+        if #[cfg(feature = "p2p-announce-quic")] {
             // In case we run on a Dappnode-like device, presumably behind NAT, we fall back to TCP
             // to circumvent issues with QUIC in such environments. To make this work reliably,
             // we would need proper NAT traversal support.

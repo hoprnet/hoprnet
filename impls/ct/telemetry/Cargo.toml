@@ -19,7 +19,6 @@ serde = ["dep:serde", "hopr-api/serde"]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }
-tracing = { workspace = true }
 smart-default = { workspace = true }
 serde = { workspace = true, optional = true, features = ["derive"] }
 validator = { workspace = true }

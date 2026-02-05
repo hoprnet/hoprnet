@@ -21,6 +21,7 @@
   "chat.tools.terminal.autoApprove": {
     "nix": true,
     "cargo build": true,
-    "cargo test": true
+    "cargo test": true,
+    "cargo shear": true
   }
 }

@@ -12,20 +12,17 @@ crate-type = ["rlib"]
 [features]
 capture = ["dep:pcap-file"]
 p2p-announce-quic = []
-p2p-transport-quic = ["hopr-transport-p2p/transport-quic"]
 prometheus = [
   "dep:hopr-metrics",
   "hopr-network-types/prometheus",
   "hopr-transport-mixer/prometheus",
   "hopr-transport-network/prometheus",
-  "hopr-transport-p2p/prometheus",
   "hopr-transport-protocol/prometheus",
   "hopr-transport-session/prometheus",
 ]
 runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hopr-network-types/runtime-tokio",
-  "hopr-transport-p2p/runtime-tokio",
   "hopr-transport-protocol/runtime-tokio",
   "hopr-transport-session/runtime-tokio",
 ]
@@ -86,7 +83,6 @@ hopr-protocol-session = { workspace = true, features = [
 hopr-transport-network = { workspace = true }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-protocol = { workspace = true, features = ["runtime-tokio"] }
-hopr-transport-p2p = { workspace = true, features = ["runtime-tokio"] }
 temp-env = { workspace = true }
 tokio = { workspace = true }
 
@@ -94,4 +90,4 @@ tokio = { workspace = true }
 ignored = ["humantime-serde"]
 
 [package.metadata.cargo-shear]
-ignored = ["humantime-serde"]
+ignored = ["humantime-serde", "hopr-transport-probe"]
