@@ -55,6 +55,11 @@ where
                 );
             }
             Err(hopr_api::graph::NetworkGraphError::ProbeNeighborTimeout(peer)) => {
+                tracing::trace!(
+                    peer = %peer,
+                    reason = "probe timeout",
+                    "neighbor probe failed"
+                );
                 self.tracker.alter(&peer, |_peer, mut observation| {
                     observation.record_probe(Err(()));
                     observation

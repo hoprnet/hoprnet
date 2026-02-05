@@ -33,9 +33,10 @@ impl NetworkPeerTracker {
     where
         F: FnOnce(&PeerId, Observations) -> Observations,
     {
-        self.peers.alter(peer, f);
+        let mut entry = self.peers.entry(*peer).or_default();
+        let new_value = f(peer, *entry.value());
+        *entry.value_mut() = new_value;
     }
-
     #[inline]
     pub fn get(&self, peer: &PeerId) -> Option<Observations> {
         self.peers.get(peer).map(|o| *o.value())

@@ -192,15 +192,19 @@ impl NetworkView for UninitializedPeerStore {
     }
 
     fn connected_peers(&self) -> std::collections::HashSet<libp2p::PeerId> {
-        std::collections::HashSet::new()
+        self.tracker.iter().map(|r| *r.key()).collect()
     }
 
-    fn is_connected(&self, _peer: &libp2p::PeerId) -> bool {
-        false
+    fn is_connected(&self, peer: &libp2p::PeerId) -> bool {
+        self.tracker.contains(peer)
     }
 
-    fn multiaddress_of(&self, _peer: &libp2p::PeerId) -> Option<std::collections::HashSet<Multiaddr>> {
-        None
+    fn multiaddress_of(&self, peer: &libp2p::PeerId) -> Option<std::collections::HashSet<Multiaddr>> {
+        if let Some(store) = self.store.get() {
+            store.get(peer)
+        } else {
+            None
+        }
     }
 
     fn health(&self) -> Health {
@@ -265,7 +269,7 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
         self.store
             .store
             .set(store.clone())
-            .expect("peer store must be settable form the p2p chain");
+            .expect("peer store must be settable from the p2p chain");
 
         let tracker = self.store.tracker.clone();
 

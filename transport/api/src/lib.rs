@@ -539,11 +539,6 @@ where
             .get()
             .ok_or_else(|| HoprTransportError::Api("ping processing is not yet initialized".into()))?;
 
-        let _network = self
-            .network
-            .get()
-            .ok_or_else(|| HoprTransportError::Api("transport network is not yet initialized".into()))?;
-
         let latency = (*pinger).ping(*peer).await?;
 
         if let Some(observations) = self.graph.observations_for(peer) {
