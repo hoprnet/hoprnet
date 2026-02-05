@@ -1,28 +1,19 @@
 use std::{fmt::Formatter, hash::Hash, net::IpAddr, str::FromStr, sync::Arc};
 
 use axum::{
-    Error,
-    extract::{
-        Json, Path, State,
-        ws::{Message, WebSocket, WebSocketUpgrade},
-    },
+    extract::{Json, Path, State},
     http::status::StatusCode,
     response::IntoResponse,
 };
-use axum_extra::extract::Query;
 use base64::Engine;
-use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt};
-use futures_concurrency::stream::Merge;
 use hopr_lib::{
-    Address, HoprSession, NodeId, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities, SessionClientConfig,
-    SessionId, SessionManagerError, SessionTarget, SurbBalancerConfig, TransportSessionError,
+    Address, NodeId, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities, SessionClientConfig, SessionId,
+    SessionManagerError, SessionTarget, SurbBalancerConfig, TransportSessionError,
     errors::{HoprLibError, HoprTransportError},
-    utils::futures::AsyncReadStreamer,
 };
 use hopr_utils_session::{ListenerId, build_binding_host, create_tcp_client_binding, create_udp_client_binding};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
-use tracing::{debug, error, info, trace};
 
 use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState};
 
@@ -135,202 +126,6 @@ impl From<SessionCapability> for hopr_lib::SessionCapabilities {
             SessionCapability::NoRateControl => hopr_lib::SessionCapability::NoRateControl.into(),
         }
     }
-}
-
-#[serde_as]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, utoipa::ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct SessionWebsocketClientQueryRequest {
-    #[serde_as(as = "DisplayFromStr")]
-    #[schema(required = true, value_type = String)]
-    pub destination: Address,
-    #[schema(required = true)]
-    pub hops: u8,
-    #[cfg(feature = "explicit-path")]
-    #[schema(required = false, value_type = String)]
-    pub path: Option<Vec<Address>>,
-    #[schema(required = true)]
-    #[serde_as(as = "Vec<DisplayFromStr>")]
-    pub capabilities: Vec<SessionCapability>,
-    #[schema(required = true)]
-    #[serde_as(as = "DisplayFromStr")]
-    pub target: SessionTargetSpec,
-    #[schema(required = false)]
-    #[serde(default = "default_protocol")]
-    pub protocol: IpProtocol,
-}
-
-#[inline]
-fn default_protocol() -> IpProtocol {
-    IpProtocol::TCP
-}
-
-impl SessionWebsocketClientQueryRequest {
-    pub(crate) async fn into_protocol_session_config(
-        self,
-    ) -> Result<(Address, SessionTarget, SessionClientConfig), ApiErrorStatus> {
-        #[cfg(not(feature = "explicit-path"))]
-        let path_options = hopr_lib::RoutingOptions::Hops((self.hops as u32).try_into()?);
-
-        #[cfg(feature = "explicit-path")]
-        let path_options = if let Some(path) = self.path {
-            // Explicit `path` will override `hops`
-            let path = path.into_iter().map(NodeId::from).collect::<Vec<_>>();
-            hopr_lib::RoutingOptions::IntermediatePath(path.try_into()?)
-        } else {
-            hopr_lib::RoutingOptions::Hops((self.hops as u32).try_into()?)
-        };
-
-        let mut capabilities = SessionCapabilities::empty();
-        capabilities.extend(self.capabilities.into_iter().flat_map(SessionCapabilities::from));
-
-        let target_spec: hopr_utils_session::SessionTargetSpec = self.target.into();
-
-        Ok((
-            self.destination,
-            target_spec.into_target(self.protocol.into())?,
-            SessionClientConfig {
-                forward_path_options: path_options.clone(),
-                return_path_options: path_options.clone(), // TODO: allow using separate return options
-                capabilities,
-                ..Default::default()
-            },
-        ))
-    }
-}
-
-#[derive(Debug, Default, Clone, Deserialize, utoipa::ToSchema)]
-#[schema(value_type = String, format = Binary)]
-#[allow(dead_code)] // not dead code, just for codegen
-struct WssData(Vec<u8>);
-
-/// Websocket endpoint exposing a binary socket-like connection to a peer through websockets using underlying HOPR
-/// sessions.
-///
-/// Once configured, the session represents and automatically managed connection to a target peer through a network
-/// routing configuration. The session can be used to send and receive binary data over the network.
-///
-/// Authentication (if enabled) is done by cookie `X-Auth-Token`.
-///
-/// Connect to the endpoint by using a WS client. No preview is available. Example:
-/// `ws://127.0.0.1:3001/api/v4/session/websocket`
-#[allow(dead_code)] // not dead code, just for documentation
-#[utoipa::path(
-        get,
-        path = const_format::formatcp!("{BASE_PATH}/session/websocket"),
-        description = "Websocket endpoint exposing a binary socket-like connection to a peer through websockets using underlying HOPR sessions.",
-        request_body(
-            content = SessionWebsocketClientQueryRequest,
-            content_type = "application/json",
-            description = "Websocket endpoint exposing a binary socket-like connection to a peer through websockets using underlying HOPR sessions.",
-        ),
-        responses(
-            (status = 200, description = "Successfully created a new client websocket session."),
-            (status = 401, description = "Invalid authorization token.", body = ApiError),
-            (status = 422, description = "Unknown failure", body = ApiError),
-            (status = 429, description = "Too many open websocket connections.", body = ApiError),
-        ),
-        security(
-            ("api_token" = []),
-            ("bearer_token" = [])
-        ),
-        tag = "Session",
-    )]
-
-pub(crate) async fn websocket(
-    ws: WebSocketUpgrade,
-    Query(query): Query<SessionWebsocketClientQueryRequest>,
-    State(state): State<Arc<InternalState>>,
-) -> Result<impl IntoResponse, impl IntoResponse> {
-    let (dst, target, data) = query
-        .into_protocol_session_config()
-        .await
-        .map_err(|e| (StatusCode::UNPROCESSABLE_ENTITY, e))?;
-
-    let hopr = state.hopr.clone();
-    let session: HoprSession = hopr.connect_to(dst, target, data).await.map_err(|e| {
-        error!(error = %e, "Failed to establish session");
-        (
-            StatusCode::UNPROCESSABLE_ENTITY,
-            ApiErrorStatus::UnknownFailure(e.to_string()),
-        )
-    })?;
-
-    Ok::<_, (StatusCode, ApiErrorStatus)>(ws.on_upgrade(move |socket| websocket_connection(socket, session)))
-}
-
-enum WebSocketInput {
-    Network(Result<Box<[u8]>, std::io::Error>),
-    WsInput(Result<Message, Error>),
-}
-
-/// The maximum number of bytes read from a Session that WS can transfer within a single message.
-const WS_MAX_SESSION_READ_SIZE: usize = 4096;
-
-#[tracing::instrument(level = "debug", skip(socket, session))]
-async fn websocket_connection(socket: WebSocket, session: HoprSession) {
-    let session_id = *session.id();
-
-    let (rx, mut tx) = session.split();
-    let (mut sender, receiver) = socket.split();
-
-    let mut queue = (
-        receiver.map(WebSocketInput::WsInput),
-        AsyncReadStreamer::<WS_MAX_SESSION_READ_SIZE, _>(rx).map(WebSocketInput::Network),
-    )
-        .merge();
-
-    let (mut bytes_to_session, mut bytes_from_session) = (0, 0);
-
-    while let Some(v) = queue.next().await {
-        match v {
-            WebSocketInput::Network(bytes) => match bytes {
-                Ok(bytes) => {
-                    let len = bytes.len();
-                    if let Err(e) = sender.send(Message::Binary(bytes.into())).await {
-                        error!(
-                            error = %e,
-                            "Failed to emit read data onto the websocket, closing connection"
-                        );
-                        break;
-                    };
-                    bytes_from_session += len;
-                }
-                Err(e) => {
-                    error!(
-                        error = %e,
-                        "Failed to push data from network to socket, closing connection"
-                    );
-                    break;
-                }
-            },
-            WebSocketInput::WsInput(ws_in) => match ws_in {
-                Ok(Message::Binary(data)) => {
-                    let len = data.len();
-                    if let Err(e) = tx.write(data.as_ref()).await {
-                        error!(error = %e, "Failed to write data to the session, closing connection");
-                        break;
-                    }
-                    bytes_to_session += len;
-                }
-                Ok(Message::Text(_)) => {
-                    error!("Received string instead of binary data, closing connection");
-                    break;
-                }
-                Ok(Message::Close(_)) => {
-                    debug!("Received close frame, closing connection");
-                    break;
-                }
-                Ok(m) => trace!(message = ?m, "skipping an unsupported websocket message"),
-                Err(e) => {
-                    error!(error = %e, "Failed to get a valid websocket message, closing connection");
-                    break;
-                }
-            },
-        }
-    }
-
-    info!(%session_id, bytes_from_session, bytes_to_session, "WS session connection ended");
 }
 
 #[serde_as]
@@ -610,7 +405,7 @@ pub(crate) async fn create_client(
     }
 
     let port_range = std::env::var(crate::env::HOPRD_SESSION_PORT_RANGE).ok();
-    debug!("binding {protocol} session listening socket to {bind_host} (port range limitations: {port_range:?})");
+    tracing::debug!(%protocol, %bind_host, ?port_range, "binding session listening socket");
 
     let (bound_host, udp_session_id, max_clients) = match protocol {
         IpProtocol::TCP => {
