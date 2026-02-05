@@ -905,7 +905,7 @@ where
     pub async fn multiaddresses_announced_on_chain(&self, peer: &PeerId) -> errors::Result<Vec<Multiaddr>> {
         let peer = *peer;
         // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
-        let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer)).await?;
+        let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer)).await??;
 
         match self
             .chain_api
@@ -1383,8 +1383,7 @@ where
         let peer_id = *peer_id;
         // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
         let pubkey = hopr_parallelize::cpu::spawn_blocking(move || prelude::OffchainPublicKey::from_peerid(&peer_id))
-            .await
-            .map_err(|e| HoprLibError::GeneralError(format!("failed to convert peer id to off-chain key: {}", e)))?;
+            .await??;
 
         self.chain_api
             .packet_key_to_chain_key(&pubkey)

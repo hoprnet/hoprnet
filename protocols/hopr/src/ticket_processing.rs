@@ -277,7 +277,8 @@ where
                 .collect::<Vec<_>>()
             }
         })
-        .await;
+        .await
+        .map_err(|e| TicketAcknowledgementError::Inner(HoprProtocolError::from(e)))?;
 
         // Find all the tickets that we're awaiting acknowledgement for
         let mut unack_tickets = Vec::with_capacity(half_keys_challenges.len());
@@ -351,7 +352,8 @@ where
             })
             .collect::<Vec<_>>()
         })
-        .await)
+        .await
+        .map_err(|e| TicketAcknowledgementError::Inner(HoprProtocolError::from(e)))?)
     }
 }
 

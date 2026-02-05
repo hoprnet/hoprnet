@@ -4817,6 +4817,7 @@ dependencies = [
  "futures",
  "hopr-metrics",
  "rayon",
+ "serial_test",
  "tokio",
  "tracing",
 ]

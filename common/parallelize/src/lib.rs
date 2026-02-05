@@ -165,8 +165,10 @@ pub mod cpu {
             .unwrap()
         });
 
-    use std::sync::OnceLock;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{
+        OnceLock,
+        atomic::{AtomicUsize, Ordering},
+    };
 
     /// Current number of tasks in the queue (submitted but not yet completed/cancelled/orphaned).
     static QUEUE_DEPTH: AtomicUsize = AtomicUsize::new(0);
@@ -220,18 +222,6 @@ pub mod cpu {
         })
     }
 
-    /// Acquires a queue slot unconditionally, incrementing the depth counter.
-    /// Used by `spawn_blocking` and `spawn_fifo_blocking` which always accept tasks.
-    fn acquire_queue_slot() {
-        #[cfg(all(feature = "prometheus", not(test)))]
-        let new_depth = QUEUE_DEPTH.fetch_add(1, Ordering::AcqRel) + 1;
-        #[cfg(not(all(feature = "prometheus", not(test))))]
-        QUEUE_DEPTH.fetch_add(1, Ordering::AcqRel);
-
-        #[cfg(all(feature = "prometheus", not(test)))]
-        METRIC_RAYON_QUEUE_DEPTH.set(new_depth as f64);
-    }
-
     /// Attempts to acquire a queue slot using compare-and-swap.
     /// Returns the new queue depth on success, or `SpawnError::QueueFull` if the limit is reached.
     fn try_acquire_queue_slot() -> Result<usize, SpawnError> {
@@ -274,8 +264,14 @@ pub mod cpu {
     }
 
     /// Initialize a `rayon` CPU thread pool with the given number of threads.
+    ///
+    /// This also initializes the queue limit metric so it's available immediately
+    /// after thread pool initialization.
     pub fn init_thread_pool(num_threads: usize) -> Result<(), rayon::ThreadPoolBuildError> {
-        rayon::ThreadPoolBuilder::new().num_threads(num_threads).build_global()
+        let result = rayon::ThreadPoolBuilder::new().num_threads(num_threads).build_global();
+        // Initialize queue limit (and its metric) now that the thread pool is ready
+        let _ = get_queue_limit();
+        result
     }
 
     /// Builds a cancellable task closure and its corresponding oneshot receiver.
@@ -364,17 +360,25 @@ pub mod cpu {
     /// The current thread pool uses a LIFO (Last In First Out) scheduling policy for the thread's queue, but
     /// FIFO (First In First Out) for stealing tasks from other threads.
     ///
+    /// The queue limit defaults to `10 * rayon::current_num_threads()` but can be overridden
+    /// via the `HOPR_CPU_TASK_QUEUE_LIMIT` environment variable.
+    ///
     /// Includes cooperative cancellation: if the async receiver is dropped (e.g., due to timeout)
     /// before the Rayon task starts executing, the task is skipped without performing any work.
     /// See the [module-level documentation](cpu) for details on why this is necessary.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SpawnError::QueueFull`] if the queue depth has reached the configured limit.
     #[cfg(feature = "rayon")]
-    pub async fn spawn_blocking<R: Send + 'static>(f: impl FnOnce() -> R + Send + 'static) -> R {
-        acquire_queue_slot();
+    pub async fn spawn_blocking<R: Send + 'static>(f: impl FnOnce() -> R + Send + 'static) -> Result<R, SpawnError> {
+        try_acquire_queue_slot()?;
         let (task, rx) = cancellable_task(f, true);
         rayon::spawn(task);
-        rx.await
+        Ok(rx
+            .await
             .expect("rayon task channel closed unexpectedly")
-            .unwrap_or_else(|caught_panic| std::panic::resume_unwind(caught_panic))
+            .unwrap_or_else(|caught_panic| std::panic::resume_unwind(caught_panic)))
     }
 
     /// Spawn an awaitable non-blocking execution of the given blocking function on a `rayon` CPU thread pool.
@@ -383,67 +387,45 @@ pub mod cpu {
     /// This is the primary variant used by packet decoding, where FIFO ordering prevents
     /// starvation of older tasks by newer arrivals.
     ///
+    /// The queue limit defaults to `10 * rayon::current_num_threads()` but can be overridden
+    /// via the `HOPR_CPU_TASK_QUEUE_LIMIT` environment variable.
+    ///
     /// Includes cooperative cancellation: if the async receiver is dropped (e.g., due to timeout)
     /// before the Rayon task starts executing, the task is skipped without performing any work.
     /// See the [module-level documentation](cpu) for details on why this is necessary.
-    #[cfg(feature = "rayon")]
-    pub async fn spawn_fifo_blocking<R: Send + 'static>(f: impl FnOnce() -> R + Send + 'static) -> R {
-        acquire_queue_slot();
-        let (task, rx) = cancellable_task(f, true);
-        rayon::spawn_fifo(task);
-        rx.await
-            .expect("rayon task channel closed unexpectedly")
-            .unwrap_or_else(|caught_panic| std::panic::resume_unwind(caught_panic))
-    }
-
-    /// Fallible version of [`spawn_blocking`] that returns an error when the queue is full.
-    ///
-    /// This allows callers to implement backpressure by rejecting work when the Rayon
-    /// thread pool is saturated, rather than accumulating unbounded work in the queue.
-    ///
-    /// The queue limit defaults to `10 * rayon::current_num_threads()` but can be overridden
-    /// via the `HOPR_CPU_TASK_QUEUE_LIMIT` environment variable.
     ///
     /// # Errors
     ///
     /// Returns [`SpawnError::QueueFull`] if the queue depth has reached the configured limit.
     #[cfg(feature = "rayon")]
+    pub async fn spawn_fifo_blocking<R: Send + 'static>(
+        f: impl FnOnce() -> R + Send + 'static,
+    ) -> Result<R, SpawnError> {
+        try_acquire_queue_slot()?;
+        let (task, rx) = cancellable_task(f, true);
+        rayon::spawn_fifo(task);
+        Ok(rx
+            .await
+            .expect("rayon task channel closed unexpectedly")
+            .unwrap_or_else(|caught_panic| std::panic::resume_unwind(caught_panic)))
+    }
+
+    /// Alias for [`spawn_blocking`] for backwards compatibility.
+    #[cfg(feature = "rayon")]
+    #[inline]
     pub async fn try_spawn_blocking<R: Send + 'static>(
         f: impl FnOnce() -> R + Send + 'static,
     ) -> Result<R, SpawnError> {
-        try_acquire_queue_slot()?;
-        let (task, rx) = cancellable_task(f, true);
-        rayon::spawn(task);
-        Ok(rx
-            .await
-            .expect("rayon task channel closed unexpectedly")
-            .unwrap_or_else(|caught_panic| std::panic::resume_unwind(caught_panic)))
+        spawn_blocking(f).await
     }
 
-    /// Fallible version of [`spawn_fifo_blocking`] that returns an error when the queue is full.
-    ///
-    /// This allows callers to implement backpressure by rejecting work when the Rayon
-    /// thread pool is saturated, rather than accumulating unbounded work in the queue.
-    /// This is the FIFO variant, which is preferred for packet decoding where older
-    /// tasks should be processed before newer ones.
-    ///
-    /// The queue limit defaults to `10 * rayon::current_num_threads()` but can be overridden
-    /// via the `HOPR_CPU_TASK_QUEUE_LIMIT` environment variable.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`SpawnError::QueueFull`] if the queue depth has reached the configured limit.
+    /// Alias for [`spawn_fifo_blocking`] for backwards compatibility.
     #[cfg(feature = "rayon")]
+    #[inline]
     pub async fn try_spawn_fifo_blocking<R: Send + 'static>(
         f: impl FnOnce() -> R + Send + 'static,
     ) -> Result<R, SpawnError> {
-        try_acquire_queue_slot()?;
-        let (task, rx) = cancellable_task(f, true);
-        rayon::spawn_fifo(task);
-        Ok(rx
-            .await
-            .expect("rayon task channel closed unexpectedly")
-            .unwrap_or_else(|caught_panic| std::panic::resume_unwind(caught_panic)))
+        spawn_fifo_blocking(f).await
     }
 }
 
@@ -458,26 +440,34 @@ mod tests {
     };
 
     use futures::FutureExt;
+    use serial_test::serial;
 
     use super::cpu;
 
     #[tokio::test]
+    #[serial]
     async fn spawn_blocking_returns_result() {
-        let result = cpu::spawn_blocking(|| 42).await;
+        let result = cpu::spawn_blocking(|| 42).await.unwrap();
         assert_eq!(result, 42);
     }
 
     #[tokio::test]
+    #[serial]
     async fn spawn_fifo_blocking_returns_result() {
-        let result = cpu::spawn_fifo_blocking(|| "hello").await;
+        let result = cpu::spawn_fifo_blocking(|| "hello").await.unwrap();
         assert_eq!(result, "hello");
     }
 
     #[tokio::test]
+    #[serial]
     async fn spawn_blocking_propagates_panic() {
-        let result = std::panic::AssertUnwindSafe(cpu::spawn_blocking(|| {
-            panic!("test panic");
-        }))
+        let result = std::panic::AssertUnwindSafe(async {
+            cpu::spawn_blocking(|| {
+                panic!("test panic");
+            })
+            .await
+            .unwrap()
+        })
         .catch_unwind()
         .await;
         assert!(result.is_err(), "should propagate panic from Rayon task");
@@ -488,6 +478,7 @@ mod tests {
     /// full 50ms sleep, causing massive delays. With cancellation, skipped tasks complete
     /// in nanoseconds, so the final task should return promptly.
     #[tokio::test]
+    #[serial]
     async fn cancelled_tasks_are_skipped_via_cooperative_cancellation() {
         let initial_depth = cpu::current_queue_depth();
         let executed_count = Arc::new(AtomicU32::new(0));
@@ -508,7 +499,7 @@ mod tests {
 
         // Submit a task that should complete promptly because cancelled tasks are skipped
         let start = std::time::Instant::now();
-        let result = cpu::spawn_fifo_blocking(|| 42).await;
+        let result = cpu::spawn_fifo_blocking(|| 42).await.unwrap();
         let elapsed = start.elapsed();
 
         assert_eq!(result, 42);
@@ -541,6 +532,7 @@ mod tests {
     /// Verifies that after a burst of timed-out tasks, the pool recovers and new tasks
     /// complete normally without lingering starvation.
     #[tokio::test]
+    #[serial]
     async fn pool_recovers_after_cancelled_burst() {
         let initial_depth = cpu::current_queue_depth();
 
@@ -558,7 +550,7 @@ mod tests {
         // Now verify the pool is healthy: multiple sequential tasks should all complete promptly
         for i in 0..10 {
             let start = std::time::Instant::now();
-            let result = cpu::spawn_fifo_blocking(move || i * 2).await;
+            let result = cpu::spawn_fifo_blocking(move || i * 2).await.unwrap();
             let elapsed = start.elapsed();
 
             assert_eq!(result, i * 2);
@@ -578,26 +570,27 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn try_spawn_blocking_returns_result() {
         let result = cpu::try_spawn_blocking(|| 42).await;
         assert_eq!(result.unwrap(), 42);
     }
 
     #[tokio::test]
+    #[serial]
     async fn try_spawn_fifo_blocking_returns_result() {
         let result = cpu::try_spawn_fifo_blocking(|| "hello").await;
         assert_eq!(result.unwrap(), "hello");
     }
 
     #[tokio::test]
+    #[serial]
     async fn queue_depth_tracking() {
-        // Queue should start at 0 (or return to 0 after previous tests)
-        // Note: This test may be flaky if run in parallel with other tests
-        // that use the queue. In practice, tests run serially in the same process.
-
+        // This test verifies that queue depth increases when a task is submitted
+        // and decreases when it completes.
         let initial_depth = cpu::current_queue_depth();
 
-        // Submit a slow task via try_spawn
+        // Submit a slow task via try_spawn using a barrier to control execution
         let barrier = Arc::new(std::sync::Barrier::new(2));
         let barrier_clone = barrier.clone();
 
@@ -613,16 +606,16 @@ mod tests {
         tokio::time::sleep(Duration::from_millis(50)).await;
 
         // Queue depth should have increased by 1
-        let during_depth = cpu::current_queue_depth();
+        let depth_during = cpu::current_queue_depth();
         assert!(
-            during_depth > initial_depth,
-            "Queue depth should increase after submitting task: initial={initial_depth}, during={during_depth}"
+            depth_during > initial_depth,
+            "Queue depth should increase after submitting task: initial={initial_depth}, during={depth_during}"
         );
 
         // Release the barrier to let the task complete
         barrier.wait();
 
-        // Wait for the task to complete
+        // Wait for the task to complete and verify it returned correctly
         let result = task_handle.await.unwrap();
         assert_eq!(result.unwrap(), 42);
 
@@ -637,6 +630,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn queue_full_returns_error() {
         // Temporarily set a very low queue limit by saturating the queue
         // We need to submit more tasks than the limit allows
@@ -695,7 +689,9 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn queue_depth_decrements_on_cancellation() {
+        // This test verifies that cancelled tasks properly release their queue slots.
         let initial_depth = cpu::current_queue_depth();
 
         // Submit tasks that will be cancelled via cooperative cancellation

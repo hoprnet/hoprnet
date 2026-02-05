@@ -118,7 +118,7 @@ where
                 signals,
             )
         })
-        .await?;
+        .await??;
 
         // Store the reply openers under the given SenderId
         // This is a no-op for reply packets
