@@ -346,7 +346,7 @@ where
 
         processes.insert(
             HoprTransportProcess::Medium,
-            spawn_as_abortable!(transport_layer_process.inspect(|_| tracing::warn!(
+            spawn_as_abortable!(transport_layer_process().inspect(|_| tracing::warn!(
                 task = %HoprTransportProcess::Medium,
                 "long-running background task finished"
             ))),

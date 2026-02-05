@@ -15,13 +15,17 @@ crate-type = ["rlib"]
 default = ["prometheus"]
 prometheus = [
   "hopr-lib/prometheus",
+  "hopr-transport-p2p/prometheus",
   "dep:hopr-metrics",
   "dep:lazy_static",
   "dep:regex",
 ]
 explicit-path = []
 # placeholder feature so we can enable it globally during tests
-runtime-tokio = []
+runtime-tokio = [
+  "hopr-transport-p2p/runtime-tokio",
+  "hopr-lib/runtime-tokio",
+]
 
 [dependencies]
 axum = { workspace = true, features = ["ws", "http2"] }
@@ -58,6 +62,8 @@ hopr-lib = { workspace = true, features = [
 
 hopr-db-node = { workspace = true }
 hopr-chain-connector = { workspace = true }
+hopr-network-graph = { workspace = true }
+hopr-transport-p2p = { workspace = true}
 hopr-metrics = { workspace = true, optional = true }
 hopr-utils-session = { workspace = true }
 

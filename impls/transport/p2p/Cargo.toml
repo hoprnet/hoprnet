@@ -46,7 +46,6 @@ dashmap = { workspace = true }
 hopr-api = { workspace = true, features = ["ct"] }
 hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true }
-hopr-transport-identity = { workspace = true }
 hopr-transport-network = { workspace = true }
 
 [dev-dependencies]

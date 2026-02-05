@@ -64,7 +64,6 @@ testing = [
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 async-broadcast = { workspace = true }
-atomic_enum = { workspace = true }
 backon = { workspace = true, features = ["futures-timer-sleep"] }
 cfg_eval = { workspace = true, optional = true }
 cfg-if = { workspace = true }

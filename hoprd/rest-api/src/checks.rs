@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::{extract::State, http::status::StatusCode, response::IntoResponse};
-use hopr_lib::{Health, state::HoprState};
+use hopr_lib::{Health, HoprState};
 
 use crate::AppState;
 

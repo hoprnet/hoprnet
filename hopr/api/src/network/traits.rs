@@ -1,10 +1,13 @@
 use std::collections::HashSet;
 
-use futures::{AsyncRead, AsyncWrite, Stream};
+use futures::{AsyncRead, AsyncWrite, Stream, future::BoxFuture};
 use hopr_crypto_types::keypairs::OffchainKeypair;
 
 use super::Health;
 use crate::{Multiaddr, PeerId, network::PeerDiscovery};
+
+/// Type alias for a boxed function returning a boxed future.
+pub type BoxedProcessFn = Box<dyn FnOnce() -> BoxFuture<'static, ()> + Send>;
 
 /// Trait representing a read-only view of the network state.
 pub trait NetworkView {
@@ -47,13 +50,7 @@ pub trait NetworkBuilder {
         protocol: &'static str,
         allow_private_addresses: bool,
         network_discovery_events: T,
-    ) -> Result<
-        (
-            Self::Network,
-            impl std::future::Future<Output = ()> + Send + Sync + 'static,
-        ),
-        impl std::error::Error,
-    >
+    ) -> Result<(Self::Network, BoxedProcessFn), impl std::error::Error>
     where
         T: Stream<Item = PeerDiscovery> + Send + 'static;
 }

@@ -21,8 +21,7 @@ use tokio::time::sleep;
 use tracing::info;
 
 use crate::{
-    Address,
-    state::HoprState,
+    Address, HoprState,
     testing::{
         dummies::EchoServer,
         hopr::{ChannelGuard, NodeSafeConfig, TestedHopr, create_hopr_instance},

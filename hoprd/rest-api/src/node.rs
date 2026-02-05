@@ -6,7 +6,7 @@ use axum::{
     response::IntoResponse,
 };
 use futures::{StreamExt, stream::FuturesUnordered};
-use hopr_lib::{Address, Health, Multiaddr, api::network::Observable};
+use hopr_lib::{Address, Health, Multiaddr, api::graph::Observable};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 

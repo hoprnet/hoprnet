@@ -22,6 +22,7 @@ prometheus = [
   "hoprd-api/prometheus",
   "hopr-db-node/prometheus",
   "hopr-strategy/prometheus",
+  "hopr-transport-p2p/prometheus",
   "dep:hopr-metrics",
 ]
 runtime-tokio = [
@@ -31,6 +32,7 @@ runtime-tokio = [
   "hopr-db-node/runtime-tokio",
   "opentelemetry_sdk?/rt-tokio",
   "hopr-strategy/runtime-tokio",
+  "hopr-transport-p2p/runtime-tokio",
 ]
 telemetry = [
   "dep:opentelemetry",
@@ -115,6 +117,7 @@ hoprd-api = { workspace = true }
 # impls
 hopr-ct-telemetry = { workspace = true }
 hopr-network-graph = { workspace = true }
+hopr-transport-p2p = { workspace = true }
 
 # Target-specific dependencies for memory allocators
 [target.'cfg(target_os = "linux")'.dependencies]

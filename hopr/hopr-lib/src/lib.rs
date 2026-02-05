@@ -85,14 +85,17 @@ use hopr_api::{
     chain::{AccountSelector, AnnouncementError, ChannelSelector, *},
     ct::TrafficGeneration,
     db::{HoprNodeDbApi, TicketMarker, TicketSelector},
-    network::{NetworkBuilder, NetworkStreamControl},
     node::{
         ChainInfo, CloseChannelResult, HoprNodeChainOperations, HoprNodeNetworkOperations, HoprNodeOperations,
         OpenChannelResult, SafeModuleConfig,
         state::{AtomicHoprState, HoprState},
     },
 };
-pub use hopr_api::{db::ChannelTicketStatistics, graph::Observable};
+pub use hopr_api::{
+    db::ChannelTicketStatistics,
+    graph::Observable,
+    network::{NetworkBuilder, NetworkStreamControl},
+};
 use hopr_async_runtime::prelude::spawn;
 pub use hopr_async_runtime::{Abortable, AbortableList};
 pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};

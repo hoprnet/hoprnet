@@ -46,13 +46,13 @@ mod utils;
 
 pub use crate::{
     behavior::{HoprNetworkBehavior, HoprNetworkBehaviorEvent},
-    swarm::HoprLibp2pNetworkBuilder,
+    swarm::{HoprLibp2pNetworkBuilder, UninitializedPeerStore},
 };
 
 #[derive(Clone)]
 pub struct HoprNetwork {
     tracker: Arc<DashSet<PeerId>>,
-    store: hopr_transport_network::store::NetworkPeerStore,
+    store: Arc<hopr_transport_network::store::NetworkPeerStore>,
     control: libp2p_stream::Control,
     protocol: libp2p::StreamProtocol,
 }

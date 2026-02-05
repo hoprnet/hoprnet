@@ -33,7 +33,9 @@ use axum::{
 };
 use hopr_chain_connector::HoprBlockchainSafeConnector;
 use hopr_db_node::{HoprNodeDb, HoprNodeDbApi};
-use hopr_lib::{Address, Hopr, errors::HoprLibError, traits::chain::HoprChainApi};
+use hopr_lib::{Address, Hopr, NetworkBuilder, errors::HoprLibError, traits::chain::HoprChainApi};
+use hopr_network_graph::immediate::ImmediateNeighborChannelGraph;
+use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork, UninitializedPeerStore};
 use hopr_utils_session::ListenerJoinHandles;
 use serde::Serialize;
 pub use session::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
@@ -61,7 +63,14 @@ type HoprBlokliConnector = HoprBlockchainSafeConnector<hopr_chain_connector::blo
 
 #[derive(Clone)]
 pub(crate) struct AppState {
-    pub hopr: Arc<Hopr<Arc<Chain>, Db, Graph>>,
+    pub hopr: Arc<
+        Hopr<
+            Arc<HoprBlokliConnector>,
+            HoprNodeDb,
+            ImmediateNeighborChannelGraph<UninitializedPeerStore>,
+            HoprLibp2pNetworkBuilder<HoprNetwork>,
+        >,
+    >,
 }
 
 pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
@@ -70,7 +79,14 @@ pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
 pub(crate) struct InternalState {
     pub hoprd_cfg: serde_json::Value,
     pub auth: Arc<Auth>,
-    pub hopr: Arc<Hopr<Arc<Chain>, Db, Graph>>,
+    pub hopr: Arc<
+        Hopr<
+            Arc<HoprBlokliConnector>,
+            HoprNodeDb,
+            ImmediateNeighborChannelGraph<UninitializedPeerStore>,
+            HoprLibp2pNetworkBuilder<Network = HoprNetwork>,
+        >,
+    >,
     pub websocket_active_count: Arc<AtomicU16>,
     pub open_listeners: Arc<ListenerJoinHandles>,
     pub default_listen_host: std::net::SocketAddr,

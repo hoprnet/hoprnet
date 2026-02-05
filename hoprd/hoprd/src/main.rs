@@ -303,8 +303,26 @@ async fn main_inner() -> anyhow::Result<()> {
 
     // Create the node instance
     info!("creating the HOPRd node instance from hopr-lib");
-    let node =
-        Arc::new(hopr_lib::Hopr::new((&hopr_keys).into(), chain_connector.clone(), node_db, hopr_lib_cfg).await?);
+
+    // create network
+    let peer_store = hopr_transport_p2p::UninitializedPeerStore::default();
+    let network_builder = hopr_transport_p2p::HoprLibp2pNetworkBuilder::new(peer_store.clone());
+    // create graph
+    let graph = hopr_network_graph::immediate::ImmediateNeighborChannelGraph::new(
+        peer_store,
+        std::time::Duration::from_mins(2),
+    );
+    // create the node
+    let node = Arc::new(
+        hopr_lib::Hopr::new(
+            (&hopr_keys).into(),
+            chain_connector.clone(),
+            node_db,
+            graph,
+            hopr_lib_cfg,
+        )
+        .await?,
+    );
 
     let mut processes = AbortableList::<HoprdProcess>::default();
 
@@ -316,6 +334,7 @@ async fn main_inner() -> anyhow::Result<()> {
     let _hopr_socket = node
         .run(
             hopr_ct_telemetry::ImmediateNeighborProber::new(Default::default()),
+            network_builder,
             HoprServerIpForwardingReactor::new(hopr_keys.packet_key.clone(), cfg.session_ip_forwarding),
         )
         .await?;
