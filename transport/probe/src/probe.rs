@@ -312,15 +312,19 @@ mod tests {
 
     impl Observable for TestObservations {
         fn record_probe(&mut self, _latency: std::result::Result<Duration, ()>) {}
+
         fn last_update(&self) -> Duration {
             Duration::default()
         }
+
         fn average_latency(&self) -> Option<Duration> {
             None
         }
+
         fn average_probe_rate(&self) -> f64 {
             1.0
         }
+
         fn score(&self) -> f64 {
             1.0
         }

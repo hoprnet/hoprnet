@@ -9,8 +9,7 @@ use hopr_chain_connector::{
 use hopr_db_node::{HoprNodeDb, init_hopr_node_db};
 use hopr_lib::{
     AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex,
-    api::chain::ChainEvents,
-    api::node::HoprNodeChainOperations,
+    api::{chain::ChainEvents, node::HoprNodeChainOperations},
     config::HoprLibConfig,
 };
 use hopr_network_graph::immediate::ImmediateNeighborChannelGraph;
@@ -156,10 +155,7 @@ enum HoprdProcess {
 #[cfg(not(feature = "runtime-tokio"))]
 compile_error!("The 'runtime-tokio' feature must be enabled");
 
-async fn init_rest_api(
-    cfg: &HoprdConfig,
-    hopr: Arc<HoprNode>,
-) -> anyhow::Result<AbortableList<HoprdProcess>> {
+async fn init_rest_api(cfg: &HoprdConfig, hopr: Arc<HoprNode>) -> anyhow::Result<AbortableList<HoprdProcess>> {
     let node_cfg_value = serde_json::to_value(cfg.as_redacted()).map_err(|e| HoprdError::ConfigError(e.to_string()))?;
 
     let api_cfg = cfg.api.clone();

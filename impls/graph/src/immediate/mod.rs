@@ -1,7 +1,7 @@
-use rand::seq::SliceRandom;
 use std::sync::Arc;
 
 use hopr_api::{PeerId, ct::DestinationRouting, graph::Observable, network::NetworkView};
+use rand::seq::SliceRandom;
 
 use crate::{immediate::tracker::NetworkPeerTracker, observation::Observations};
 

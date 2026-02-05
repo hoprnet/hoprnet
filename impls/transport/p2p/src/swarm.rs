@@ -1,17 +1,17 @@
-use std::num::NonZeroU8;
-use std::sync::{Arc, OnceLock};
+use std::{
+    num::NonZeroU8,
+    sync::{Arc, OnceLock},
+};
 
 use dashmap::DashSet;
 use futures::{FutureExt, Stream, StreamExt};
-use hopr_api::OffchainKeypair;
-use hopr_api::network::{Health, NetworkView};
 use hopr_api::{
-    Multiaddr,
-    network::{NetworkBuilder, PeerDiscovery},
+    Multiaddr, OffchainKeypair,
+    network::{Health, NetworkBuilder, NetworkView, PeerDiscovery},
 };
 use hopr_network_types::prelude::is_public_address;
-use libp2p::autonat;
 use libp2p::{
+    autonat,
     identity::PublicKey,
     swarm::{NetworkInfo, SwarmEvent},
 };

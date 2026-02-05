@@ -106,11 +106,7 @@ mod tests {
     use std::collections::HashSet;
 
     use futures::{StreamExt, pin_mut};
-    use hopr_api::{
-        Multiaddr,
-        graph::Observable,
-        network::Health,
-    };
+    use hopr_api::{Multiaddr, graph::Observable, network::Health};
     use hopr_internal_types::NodeId;
     use hopr_network_graph::immediate::ImmediateNeighborChannelGraph;
     use tokio::time::timeout;
@@ -163,10 +159,7 @@ mod tests {
         let mut fetcher = MockScanInteraction::new();
         fetcher.expect_discovered_peers().returning(|| HashSet::new());
 
-        let channel_graph = ImmediateNeighborChannelGraph::new(
-            fetcher,
-            ProberConfig::default().recheck_threshold,
-        );
+        let channel_graph = ImmediateNeighborChannelGraph::new(fetcher, ProberConfig::default().recheck_threshold);
 
         let prober = ImmediateNeighborProber::new(Default::default());
         let stream = prober.build(channel_graph);
@@ -189,10 +182,7 @@ mod tests {
         let mut fetcher = MockScanInteraction::new();
         fetcher.expect_discovered_peers().returning(|| RANDOM_PEERS.clone());
 
-        let channel_graph = ImmediateNeighborChannelGraph::new(
-            fetcher,
-            ProberConfig::default().recheck_threshold,
-        );
+        let channel_graph = ImmediateNeighborChannelGraph::new(fetcher, ProberConfig::default().recheck_threshold);
 
         let prober = ImmediateNeighborProber::new(ProberConfig {
             interval: std::time::Duration::from_millis(1),
@@ -242,10 +232,7 @@ mod tests {
         });
         fetcher.expect_discovered_peers().returning(|| HashSet::new());
 
-        let channel_graph = ImmediateNeighborChannelGraph::new(
-            fetcher,
-            cfg.recheck_threshold,
-        );
+        let channel_graph = ImmediateNeighborChannelGraph::new(fetcher, cfg.recheck_threshold);
 
         let prober = ImmediateNeighborProber::new(cfg);
         let stream = prober.build(channel_graph);

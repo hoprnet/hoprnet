@@ -8,9 +8,11 @@ use axum::{
 use futures::{StreamExt, stream::FuturesUnordered};
 use hopr_lib::{
     Address, Multiaddr,
-    api::graph::Observable,
-    api::network::Health,
-    api::node::{HoprNodeChainOperations, HoprNodeNetworkOperations},
+    api::{
+        graph::Observable,
+        network::Health,
+        node::{HoprNodeChainOperations, HoprNodeNetworkOperations},
+    },
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};

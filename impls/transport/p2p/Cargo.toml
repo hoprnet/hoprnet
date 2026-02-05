@@ -16,10 +16,7 @@ prometheus = [
   "dep:hopr-metrics",
   "hopr-transport-network/prometheus",
 ]
-runtime-tokio = [
-  "libp2p/tokio",
-  "hopr-transport-probe/runtime-tokio",
-]
+runtime-tokio = ["libp2p/tokio", "hopr-transport-probe/runtime-tokio"]
 transport-quic = ["libp2p/quic"]
 
 [dependencies]
