@@ -536,10 +536,12 @@ impl Validate for AcknowledgementPipelineConfig {
 )]
 pub struct PacketPipelineConfig {
     /// Maximum concurrency when processing outgoing packets
-    #[validate(range(min = 1))]
+    ///
+    /// Use 0 for no limit.
     pub output_concurrency: Option<usize>,
     /// Maximum concurrency when processing incoming packets.
-    #[validate(range(min = 1))]
+    ///
+    /// Use 0 for no limit.
     pub input_concurrency: Option<usize>,
     /// Configuration of the packet acknowledgement processing
     pub ack_config: AcknowledgementPipelineConfig,
