@@ -100,6 +100,16 @@ impl InactiveNetwork {
         })
     }
 
+    #[cfg(not(feature = "runtime-tokio"))]
+    pub async fn build<T>(_me: libp2p::identity::Keypair, _external_discovery_events: T) -> Result<Self>
+    where
+        T: Stream<Item = PeerDiscovery> + Send + 'static,
+    {
+        Err(crate::errors::P2PError::Libp2p(
+            "InactiveNetwork::build requires the runtime-tokio feature".to_string(),
+        ))
+    }
+
     pub fn with_listen_on(mut self, multiaddresses: Vec<Multiaddr>) -> Result<InactiveConfiguredNetwork> {
         for multiaddress in multiaddresses.iter() {
             match resolve_dns_if_any(multiaddress) {

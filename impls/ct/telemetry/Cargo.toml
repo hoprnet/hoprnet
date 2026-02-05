@@ -36,3 +36,4 @@ hopr-network-types = { workspace = true }
 tokio = { workspace = true }
 mockall = { workspace = true }
 lazy_static = { workspace = true }
+hopr-network-graph = { workspace = true }

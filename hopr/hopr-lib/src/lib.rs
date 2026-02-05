@@ -86,8 +86,7 @@ use hopr_api::{
     ct::TrafficGeneration,
     db::{HoprNodeDbApi, TicketMarker, TicketSelector},
     node::{
-        ChainInfo, CloseChannelResult, HoprNodeChainOperations, HoprNodeNetworkOperations, HoprNodeOperations,
-        OpenChannelResult, SafeModuleConfig,
+        ChainInfo, CloseChannelResult, OpenChannelResult, SafeModuleConfig,
         state::{AtomicHoprState, HoprState},
     },
 };
@@ -95,6 +94,7 @@ pub use hopr_api::{
     db::ChannelTicketStatistics,
     graph::Observable,
     network::{NetworkBuilder, NetworkStreamControl},
+    node::{HoprNodeChainOperations, HoprNodeNetworkOperations, HoprNodeOperations},
 };
 use hopr_async_runtime::prelude::spawn;
 pub use hopr_async_runtime::{Abortable, AbortableList};
