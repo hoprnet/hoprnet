@@ -23,10 +23,8 @@ tracing = { workspace = true }
 
 hopr-api = { workspace = true, features = ["network"] }
 hopr-metrics = { workspace = true, optional = true }
-hopr-statistics = { workspace = true }
 
 [dev-dependencies]
-assertables = { workspace = true }
 anyhow = { workspace = true }
 
 [package.metadata.cargo-machete]

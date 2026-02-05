@@ -9,7 +9,7 @@ use std::{
 
 use backon::BackoffBuilder;
 use futures::stream::{BoxStream, Stream, StreamExt};
-use hopr_transport_protocol::PeerDiscovery;
+use hopr_api::network::PeerDiscovery;
 use libp2p::{
     Multiaddr, PeerId,
     core::Endpoint,

@@ -5,7 +5,7 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
-use hopr_lib::HoprBalance;
+use hopr_lib::{HoprBalance, api::node::HoprNodeChainOperations};
 use serde_with::{DisplayFromStr, serde_as};
 
 use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState};

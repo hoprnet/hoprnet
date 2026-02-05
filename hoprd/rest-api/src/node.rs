@@ -6,7 +6,14 @@ use axum::{
     response::IntoResponse,
 };
 use futures::{StreamExt, stream::FuturesUnordered};
-use hopr_lib::{Address, Health, Multiaddr, api::network::Observable};
+use hopr_lib::{
+    Address, Multiaddr,
+    api::{
+        graph::Observable,
+        network::Health,
+        node::{HoprNodeChainOperations, HoprNodeNetworkOperations},
+    },
+};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
@@ -225,7 +232,7 @@ pub(super) async fn peers(
             let hopr = hopr.clone();
 
             async move {
-                if let Ok(Some(info)) = hopr.network_peer_info(&peer).await {
+                if let Some(info) = hopr.network_peer_info(&peer) {
                     if info.score() >= score {
                         Some((peer, info))
                     } else {

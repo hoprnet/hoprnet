@@ -18,10 +18,7 @@ serde = ["dep:serde", "hopr-api/serde"]
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
-async-stream = { workspace = true }
 futures = { workspace = true }
-tracing = { workspace = true }
-rand = { workspace = true }
 smart-default = { workspace = true }
 serde = { workspace = true, optional = true, features = ["derive"] }
 validator = { workspace = true }
@@ -38,3 +35,4 @@ hopr-network-types = { workspace = true }
 tokio = { workspace = true }
 mockall = { workspace = true }
 lazy_static = { workspace = true }
+hopr-network-graph = { workspace = true }

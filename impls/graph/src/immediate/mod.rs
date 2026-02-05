@@ -1,11 +1,7 @@
-use rand::seq::SliceRandom;
 use std::sync::Arc;
 
-use hopr_api::{
-    PeerId,
-    ct::DestinationRouting,
-    network::{NetworkObservations, NetworkView},
-};
+use hopr_api::{PeerId, ct::DestinationRouting, graph::Observable, network::NetworkView};
+use rand::seq::SliceRandom;
 
 use crate::{immediate::tracker::NetworkPeerTracker, observation::Observations};
 
@@ -31,7 +27,7 @@ impl<T> ImmediateNeighborChannelGraph<T> {
 #[async_trait::async_trait]
 impl<T> hopr_api::graph::NetworkGraphUpdate for ImmediateNeighborChannelGraph<T>
 where
-    T: NetworkObservations + Send + Sync,
+    T: NetworkView + Send + Sync,
 {
     async fn record<N, P>(
         &self,
@@ -47,11 +43,10 @@ where
                     latency_ms = telemetry.rtt().as_millis(),
                     "neighbor probe successful"
                 );
-                hopr_api::network::NetworkObservations::update(
-                    self.network.as_ref(),
-                    telemetry.peer(),
-                    Ok(telemetry.rtt() / 2),
-                );
+                self.tracker.alter(telemetry.peer(), |_peer, mut observation| {
+                    observation.record_probe(Ok(telemetry.rtt() / 2));
+                    observation
+                });
             }
             Ok(hopr_api::graph::Telemetry::Loopback(_)) => {
                 tracing::warn!(
@@ -60,7 +55,15 @@ where
                 );
             }
             Err(hopr_api::graph::NetworkGraphError::ProbeNeighborTimeout(peer)) => {
-                hopr_api::network::NetworkObservations::update(self.network.as_ref(), &peer, Err(()));
+                tracing::trace!(
+                    peer = %peer,
+                    reason = "probe timeout",
+                    "neighbor probe failed"
+                );
+                self.tracker.alter(&peer, |_peer, mut observation| {
+                    observation.record_probe(Err(()));
+                    observation
+                });
             }
             Err(hopr_api::graph::NetworkGraphError::ProbeLoopbackTimeout(_)) => {
                 tracing::warn!(

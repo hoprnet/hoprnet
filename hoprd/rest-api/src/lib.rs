@@ -32,8 +32,10 @@ use axum::{
     routing::{delete, get, post},
 };
 use hopr_chain_connector::HoprBlockchainSafeConnector;
-use hopr_db_node::{HoprNodeDb, HoprNodeDbApi};
-use hopr_lib::{Address, Hopr, errors::HoprLibError, traits::chain::HoprChainApi};
+use hopr_db_node::HoprNodeDb;
+use hopr_lib::{Address, Hopr, errors::HoprLibError};
+use hopr_network_graph::immediate::ImmediateNeighborChannelGraph;
+use hopr_transport_p2p::{HoprNetwork, UninitializedPeerStore};
 use hopr_utils_session::ListenerJoinHandles;
 use serde::Serialize;
 pub use session::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
@@ -59,9 +61,12 @@ pub(crate) const BASE_PATH: &str = const_format::formatcp!("/api/v{}", env!("CAR
 
 type HoprBlokliConnector = HoprBlockchainSafeConnector<hopr_chain_connector::blokli_client::BlokliClient>;
 
+pub(crate) type HoprNode =
+    Hopr<Arc<HoprBlokliConnector>, HoprNodeDb, ImmediateNeighborChannelGraph<UninitializedPeerStore>, HoprNetwork>;
+
 #[derive(Clone)]
 pub(crate) struct AppState {
-    pub hopr: Arc<Hopr<Arc<Chain>, Db, Graph>>,
+    pub hopr: Arc<HoprNode>,
 }
 
 pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
@@ -70,7 +75,7 @@ pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
 pub(crate) struct InternalState {
     pub hoprd_cfg: serde_json::Value,
     pub auth: Arc<Auth>,
-    pub hopr: Arc<Hopr<Arc<Chain>, Db, Graph>>,
+    pub hopr: Arc<HoprNode>,
     pub websocket_active_count: Arc<AtomicU16>,
     pub open_listeners: Arc<ListenerJoinHandles>,
     pub default_listen_host: std::net::SocketAddr,
@@ -178,7 +183,7 @@ pub struct RestApiParameters {
     pub listener: TcpListener,
     pub hoprd_cfg: serde_json::Value,
     pub cfg: crate::config::Api,
-    pub hopr: Arc<Hopr<Arc<HoprBlokliConnector>, HoprNodeDb>>,
+    pub hopr: Arc<HoprNode>,
     pub session_listener_sockets: Arc<ListenerJoinHandles>,
     pub default_session_listen_host: std::net::SocketAddr,
 }
@@ -209,7 +214,7 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
 async fn build_api(
     hoprd_cfg: serde_json::Value,
     cfg: crate::config::Api,
-    hopr: Arc<Hopr>,
+    hopr: Arc<HoprNode>,
     open_listeners: Arc<ListenerJoinHandles>,
     default_listen_host: std::net::SocketAddr,
 ) -> Router {

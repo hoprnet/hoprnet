@@ -86,12 +86,16 @@ use hopr_api::{
     ct::TrafficGeneration,
     db::{HoprNodeDbApi, TicketMarker, TicketSelector},
     node::{
-        ChainInfo, CloseChannelResult, HoprNodeChainOperations, HoprNodeNetworkOperations, HoprNodeOperations,
-        OpenChannelResult, SafeModuleConfig,
+        ChainInfo, CloseChannelResult, OpenChannelResult, SafeModuleConfig,
         state::{AtomicHoprState, HoprState},
     },
 };
-pub use hopr_api::{db::ChannelTicketStatistics, graph::Observable};
+pub use hopr_api::{
+    db::ChannelTicketStatistics,
+    graph::Observable,
+    network::{NetworkBuilder, NetworkStreamControl},
+    node::{HoprNodeChainOperations, HoprNodeNetworkOperations, HoprNodeOperations},
+};
 use hopr_async_runtime::prelude::spawn;
 pub use hopr_async_runtime::{Abortable, AbortableList};
 pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
@@ -224,14 +228,15 @@ const ON_CHAIN_RESOLUTION_EVENT_TIMEOUT: Duration = Duration::from_secs(90);
 /// that manual interaction is unnecessary.
 ///
 /// As such, the `hopr_lib` serves mainly as an integration point into Rust programs.
-pub struct Hopr<Chain, Db, Graph>
+pub struct Hopr<Chain, Db, Graph, Net>
 where
     Graph: hopr_api::graph::NetworkGraphView + hopr_api::graph::NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     me: OffchainKeypair,
     cfg: config::HoprLibConfig,
     state: Arc<api::node::state::AtomicHoprState>,
-    transport_api: HoprTransport<Chain, Db, Graph>,
+    transport_api: HoprTransport<Chain, Db, Graph, Net>,
     redeem_requests: OnceLock<futures::channel::mpsc::Sender<TicketSelector>>,
     node_db: Db,
     chain_api: Chain,
@@ -239,11 +244,12 @@ where
     processes: OnceLock<AbortableList<HoprLibProcess>>,
 }
 
-impl<Chain, Db, Graph> Hopr<Chain, Db, Graph>
+impl<Chain, Db, Graph, Net> Hopr<Chain, Db, Graph, Net>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
     Graph: hopr_api::graph::NetworkGraphView + hopr_api::graph::NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     pub async fn new(
         identity: (&ChainKeypair, &OffchainKeypair),
@@ -321,13 +327,19 @@ where
         self.cfg.publish
     }
 
-    pub async fn run<Ct, #[cfg(feature = "session-server")] T: traits::HoprSessionServer + Clone + Send + 'static>(
+    pub async fn run<
+        Ct,
+        NetBuilder,
+        #[cfg(feature = "session-server")] T: traits::HoprSessionServer + Clone + Send + 'static,
+    >(
         &self,
         cover_traffic: Ct,
+        network_builder: NetBuilder,
         #[cfg(feature = "session-server")] serve_handler: T,
     ) -> errors::Result<HoprTransportIO>
     where
         Ct: TrafficGeneration + Send + Sync + 'static,
+        NetBuilder: NetworkBuilder<Network = Net> + Send + Sync + 'static,
     {
         self.error_if_not_in_state(
             HoprState::Uninitialized,
@@ -645,7 +657,13 @@ where
         info!("starting transport");
         let (hopr_socket, transport_processes) = self
             .transport_api
-            .run(cover_traffic, indexer_peer_update_rx, tickets_tx, session_tx)
+            .run(
+                cover_traffic,
+                network_builder,
+                indexer_peer_update_rx,
+                tickets_tx,
+                session_tx,
+            )
             .await?;
         processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
 
@@ -882,9 +900,10 @@ where
     }
 }
 
-impl<Chain, Db, Graph> Hopr<Chain, Db, Graph>
+impl<Chain, Db, Graph, Net> Hopr<Chain, Db, Graph, Net>
 where
     Graph: hopr_api::graph::NetworkGraphView + hopr_api::graph::NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     // === telemetry
     /// Prometheus formatted metrics collected by the hopr-lib components.
@@ -901,11 +920,12 @@ where
 
 // === Trait implementations for the high-level node API ===
 
-impl<Chain, Db, Graph> HoprNodeOperations for Hopr<Chain, Db, Graph>
+impl<Chain, Db, Graph, Net> HoprNodeOperations for Hopr<Chain, Db, Graph, Net>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
     Graph: hopr_api::graph::NetworkGraphView + hopr_api::graph::NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     fn status(&self) -> HoprState {
         self.state.load(Ordering::Relaxed)
@@ -913,11 +933,12 @@ where
 }
 
 #[async_trait::async_trait]
-impl<Chain, Db, Graph> HoprNodeNetworkOperations for Hopr<Chain, Db, Graph>
+impl<Chain, Db, Graph, Net> HoprNodeNetworkOperations for Hopr<Chain, Db, Graph, Net>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
     Graph: hopr_api::graph::NetworkGraphView + hopr_api::graph::NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     type Error = HoprLibError;
     type PeerObservable = Graph::Observed;
@@ -1061,11 +1082,12 @@ impl futures::Sink<TicketSelector> for RedemptionRequestSink {
 }
 
 #[async_trait::async_trait]
-impl<Chain, Db, Graph> HoprNodeChainOperations for Hopr<Chain, Db, Graph>
+impl<Chain, Db, Graph, Net> HoprNodeChainOperations for Hopr<Chain, Db, Graph, Net>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
     Graph: hopr_api::graph::NetworkGraphView + hopr_api::graph::NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     type Error = HoprLibError;
     type RedemptionSink = RedemptionRequestSink;
@@ -1428,7 +1450,7 @@ where
         Ok(())
     }
 
-    fn subscribe_winning_tickets(&self) -> impl Stream<Item = VerifiedTicket> + Send {
+    fn subscribe_winning_tickets(&self) -> impl Stream<Item = VerifiedTicket> + Send + 'static {
         self.winning_ticket_subscribers.1.activate_cloned()
     }
 

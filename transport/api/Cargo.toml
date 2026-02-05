@@ -12,20 +12,17 @@ crate-type = ["rlib"]
 [features]
 capture = ["dep:pcap-file"]
 p2p-announce-quic = []
-p2p-transport-quic = ["hopr-transport-p2p/transport-quic"]
 prometheus = [
   "dep:hopr-metrics",
   "hopr-network-types/prometheus",
   "hopr-transport-mixer/prometheus",
   "hopr-transport-network/prometheus",
-  "hopr-transport-p2p/prometheus",
   "hopr-transport-protocol/prometheus",
   "hopr-transport-session/prometheus",
 ]
 runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hopr-network-types/runtime-tokio",
-  "hopr-transport-p2p/runtime-tokio",
   "hopr-transport-protocol/runtime-tokio",
   "hopr-transport-session/runtime-tokio",
 ]
@@ -47,7 +44,6 @@ async-trait = { workspace = true }
 cfg-if = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
-futures-time = { workspace = true }
 humantime-serde = { workspace = true, optional = true }
 lazy_static = { workspace = true }
 proc-macro-regex = { workspace = true }
@@ -72,11 +68,9 @@ hopr-protocol-hopr = { workspace = true }
 hopr-transport-identity = { workspace = true }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-network = { workspace = true }
-hopr-transport-p2p = { workspace = true }
 hopr-transport-probe = { workspace = true }
 hopr-transport-protocol = { workspace = true }
 hopr-transport-session = { workspace = true }
-hopr-ct-telemetry = { workspace = true }
 
 [dev-dependencies]
 hex-literal = { workspace = true }
@@ -89,7 +83,6 @@ hopr-protocol-session = { workspace = true, features = [
 hopr-transport-network = { workspace = true }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-protocol = { workspace = true, features = ["runtime-tokio"] }
-hopr-transport-p2p = { workspace = true, features = ["runtime-tokio"] }
 temp-env = { workspace = true }
 tokio = { workspace = true }
 
@@ -97,4 +90,4 @@ tokio = { workspace = true }
 ignored = ["humantime-serde"]
 
 [package.metadata.cargo-shear]
-ignored = ["humantime-serde"]
+ignored = ["humantime-serde", "hopr-transport-probe"]

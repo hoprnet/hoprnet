@@ -14,6 +14,9 @@ pub enum P2PError {
 
     #[error("libp2p failed with: {0}")]
     Libp2p(String),
+
+    #[error("Failed to process a multiaddress: {0}")]
+    Multiaddress(String),
 }
 
 /// Result utilizing the [P2PError] as the error type.

@@ -6,8 +6,8 @@ use std::{
     time::Duration,
 };
 
+use hopr_api::Multiaddr;
 pub use hopr_protocol_hopr::{HoprCodecConfig, HoprTicketProcessorConfig, SurbStoreConfig};
-use hopr_transport_identity::Multiaddr;
 pub use hopr_transport_probe::config::ProbeConfig;
 use hopr_transport_protocol::AcknowledgementPipelineConfig;
 use hopr_transport_session::{MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION};
@@ -162,7 +162,7 @@ impl Display for HostConfig {
 
 fn default_multiaddr_transport(port: u16) -> String {
     cfg_if::cfg_if! {
-        if #[cfg(all(feature = "p2p-announce-quic", feature = "p2p-transport-quic"))] {
+        if #[cfg(feature = "p2p-announce-quic")] {
             // In case we run on a Dappnode-like device, presumably behind NAT, we fall back to TCP
             // to circumvent issues with QUIC in such environments. To make this work reliably,
             // we would need proper NAT traversal support.

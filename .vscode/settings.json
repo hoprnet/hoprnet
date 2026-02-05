@@ -20,6 +20,8 @@
   "chat.promptFiles": true,
   "chat.tools.terminal.autoApprove": {
     "nix": true,
-    "cargo build": true
+    "cargo build": true,
+    "cargo test": true,
+    "cargo shear": true
   }
 }

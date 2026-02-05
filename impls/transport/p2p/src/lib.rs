@@ -33,24 +33,25 @@ pub mod swarm;
 /// P2P behavior definitions for the transport level interactions not related to the HOPR protocol
 mod behavior;
 
-use std::collections::HashSet;
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use dashmap::DashSet;
 use futures::{AsyncRead, AsyncWrite};
 pub use hopr_api::network::Health;
-use hopr_api::network::NetworkView;
+use hopr_api::network::{NetworkView, traits::NetworkStreamControl};
 use libp2p::{Multiaddr, PeerId};
+
+mod utils;
 
 pub use crate::{
     behavior::{HoprNetworkBehavior, HoprNetworkBehaviorEvent},
-    swarm::HoprLibp2pNetworkBuilder,
+    swarm::{HoprLibp2pNetworkBuilder, UninitializedPeerStore},
 };
 
 #[derive(Clone)]
 pub struct HoprNetwork {
     tracker: Arc<DashSet<PeerId>>,
-    store: hopr_transport_network::store::NetworkPeerStore,
+    store: Arc<hopr_transport_network::store::NetworkPeerStore>,
     control: libp2p_stream::Control,
     protocol: libp2p::StreamProtocol,
 }
@@ -103,7 +104,7 @@ impl NetworkView for HoprNetwork {
 }
 
 #[async_trait::async_trait]
-impl hopr_transport_protocol::stream::BidirectionalStreamControl for HoprNetwork {
+impl NetworkStreamControl for HoprNetwork {
     fn accept(
         mut self,
     ) -> Result<impl futures::Stream<Item = (PeerId, impl AsyncRead + AsyncWrite + Send)> + Send, impl std::error::Error>

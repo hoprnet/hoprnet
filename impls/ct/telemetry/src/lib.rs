@@ -106,11 +106,9 @@ mod tests {
     use std::collections::HashSet;
 
     use futures::{StreamExt, pin_mut};
-    use hopr_api::{
-        Multiaddr,
-        network::{Health, Observable},
-    };
+    use hopr_api::{Multiaddr, graph::Observable, network::Health};
     use hopr_internal_types::NodeId;
+    use hopr_network_graph::immediate::ImmediateNeighborChannelGraph;
     use tokio::time::timeout;
 
     use super::*;
@@ -137,19 +135,16 @@ mod tests {
         ScanInteraction {}
 
         #[async_trait::async_trait]
-        impl hopr_api::network::NetworkObservations for ScanInteraction {
-            fn update(&self, peer: &PeerId, result: std::result::Result<std::time::Duration, ()>);
-        }
-
-        #[async_trait::async_trait]
         impl hopr_api::network::NetworkView for ScanInteraction {
             fn listening_as(&self) -> HashSet<Multiaddr>;
 
             fn multiaddress_of(&self, peer: &PeerId) -> Option<HashSet<Multiaddr>>;
 
-            fn discovered_peers(&self) -> std::collections::HashSet<PeerId> ;
+            fn discovered_peers(&self) -> std::collections::HashSet<PeerId>;
 
             fn connected_peers(&self) -> HashSet<PeerId>;
+
+            fn is_connected(&self, peer: &PeerId) -> bool;
 
             fn health(&self) -> Health;
         }
@@ -164,10 +159,7 @@ mod tests {
         let mut fetcher = MockScanInteraction::new();
         fetcher.expect_discovered_peers().returning(|| HashSet::new());
 
-        let channel_graph = ImmediateNeighborChannelGraph {
-            tracker: Arc::new(fetcher),
-            recheck_threshold: ProberConfig::default().recheck_threshold,
-        };
+        let channel_graph = ImmediateNeighborChannelGraph::new(fetcher, ProberConfig::default().recheck_threshold);
 
         let prober = ImmediateNeighborProber::new(Default::default());
         let stream = prober.build(channel_graph);
@@ -190,10 +182,7 @@ mod tests {
         let mut fetcher = MockScanInteraction::new();
         fetcher.expect_discovered_peers().returning(|| RANDOM_PEERS.clone());
 
-        let channel_graph = ImmediateNeighborChannelGraph {
-            tracker: Arc::new(fetcher),
-            recheck_threshold: ProberConfig::default().recheck_threshold,
-        };
+        let channel_graph = ImmediateNeighborChannelGraph::new(fetcher, ProberConfig::default().recheck_threshold);
 
         let prober = ImmediateNeighborProber::new(ProberConfig {
             interval: std::time::Duration::from_millis(1),
@@ -243,47 +232,7 @@ mod tests {
         });
         fetcher.expect_discovered_peers().returning(|| HashSet::new());
 
-        let channel_graph = ImmediateNeighborChannelGraph {
-            tracker: Arc::new(fetcher),
-            recheck_threshold: cfg.recheck_threshold,
-        };
-
-        let prober = ImmediateNeighborProber::new(cfg);
-        let stream = prober.build(channel_graph);
-        pin_mut!(stream);
-
-        assert!(timeout(TINY_TIMEOUT, stream.next()).await?.is_some());
-        assert!(timeout(TINY_TIMEOUT, stream.next()).await?.is_some());
-        assert!(
-            timeout(TINY_TIMEOUT, stream.next()).await.is_errual.len(),
-            RANDOM_PEERS.len()
-        );
-        assert!(!actual.iter().zip(RANDOM_PEERS.iter()).all(|(a, b)| a == b));
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn peers_should_be_generated_in_multiple_rounds_as_long_as_they_are_available() -> anyhow::Result<()> {
-        let cfg = ProberConfig {
-            interval: std::time::Duration::from_millis(1),
-            recheck_threshold: std::time::Duration::from_millis(1000),
-            ..Default::default()
-        };
-
-        let mut fetcher = MockScanInteraction::new();
-        fetcher.expect_discovered_peers().times(2).returning(|| {
-            let peer: PeerId = OffchainPublicKey::from_privkey(&hopr_crypto_random::random_bytes::<32>())
-                .unwrap()
-                .into();
-            HashSet::from([peer])
-        });
-        fetcher.expect_discovered_peers().returning(|| HashSet::new());
-
-        let channel_graph = ImmediateNeighborChannelGraph {
-            tracker: Arc::new(fetcher),
-            recheck_threshold: cfg.recheck_threshold,
-        };
+        let channel_graph = ImmediateNeighborChannelGraph::new(fetcher, cfg.recheck_threshold);
 
         let prober = ImmediateNeighborProber::new(cfg);
         let stream = prober.build(channel_graph);

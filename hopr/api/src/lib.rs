@@ -17,6 +17,7 @@ pub mod network;
 #[cfg(feature = "node")]
 pub mod node;
 
-pub use hopr_crypto_types::prelude::{OffchainPublicKey, PeerId};
+pub use hopr_crypto_types::prelude::{OffchainKeypair, OffchainPublicKey};
 pub use hopr_primitive_types::prelude::Address;
+pub use libp2p_identity::PeerId;
 pub use multiaddr::Multiaddr;

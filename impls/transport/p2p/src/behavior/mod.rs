@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use futures::Stream;
-use hopr_transport_protocol::PeerDiscovery;
+use hopr_api::network::PeerDiscovery;
 use libp2p::{identity::PublicKey, swarm::NetworkBehaviour};
 
 /// Definition of the HOPR discovery mechanism for the network.

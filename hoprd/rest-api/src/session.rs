@@ -361,6 +361,11 @@ impl From<hopr_lib::RoutingOptions> for RoutingOptions {
             hopr_lib::RoutingOptions::IntermediatePath(path) => {
                 RoutingOptions::IntermediatePath(path.into_iter().collect())
             }
+            #[cfg(not(feature = "explicit-path"))]
+            hopr_lib::RoutingOptions::IntermediatePath(path) => {
+                // Convert path length to hops when explicit-path feature is disabled
+                RoutingOptions::Hops(path.into_iter().count())
+            }
             hopr_lib::RoutingOptions::Hops(hops) => RoutingOptions::Hops(usize::from(hops)),
         }
     }

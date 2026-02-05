@@ -8,6 +8,7 @@ use axum::{
 use futures::FutureExt;
 use hopr_lib::{
     Address, Multiaddr,
+    api::node::{HoprNodeChainOperations, HoprNodeNetworkOperations},
     errors::{HoprLibError, HoprStatusError, HoprTransportError},
 };
 use serde::{Deserialize, Serialize};

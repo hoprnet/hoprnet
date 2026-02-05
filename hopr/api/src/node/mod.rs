@@ -219,7 +219,7 @@ pub trait HoprNodeChainOperations {
     type RedemptionSink: Sink<TicketSelector, Error = Self::Error> + Clone + Send;
 
     /// Returns a stream of newly received winning tickets.
-    fn subscribe_winning_tickets(&self) -> impl Stream<Item = VerifiedTicket> + Send;
+    fn subscribe_winning_tickets(&self) -> impl Stream<Item = VerifiedTicket> + Send + 'static;
 
     /// Returns a sink for submitting ticket redemption requests.
     fn redemption_requests(&self) -> Result<Self::RedemptionSink, Self::Error>;

@@ -9,8 +9,11 @@ use hopr_transport::{Hash, config::HoprCodecConfig};
 use tokio::time::sleep;
 
 use crate::{
-    Address, ChannelEntry, ChannelStatus, Hopr, HoprState, HoprTransportIO, PeerId, config::HoprLibConfig, prelude,
-    testing::TestingConnector,
+    Address, ChannelEntry, ChannelStatus, HoprNodeChainOperations, HoprNodeNetworkOperations, HoprNodeOperations,
+    HoprState, HoprTransportIO, PeerId,
+    config::HoprLibConfig,
+    prelude,
+    testing::{TestingConnector, TestingGraph, TestingHopr},
 };
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -24,13 +27,15 @@ pub async fn create_hopr_instance(
     host_port: u16,
     node_db: HoprNodeDb,
     connector: TestingConnector,
+    graph: TestingGraph,
     safe: NodeSafeConfig,
     winn_prob: f64,
-) -> Hopr<TestingConnector, HoprNodeDb> {
-    Hopr::new(
+) -> TestingHopr {
+    crate::Hopr::new(
         identity,
         connector,
         node_db,
+        graph,
         HoprLibConfig {
             host: crate::config::HostConfig {
                 address: crate::config::HostType::default(),
@@ -78,7 +83,7 @@ pub struct TestedHopr {
     // Tokio runtime in which all long-running tasks of the HOPR node are spawned.
     runtime: Option<tokio::runtime::Runtime>,
     /// HOPR instance that is used for testing.
-    pub instance: Arc<Hopr<TestingConnector, HoprNodeDb>>,
+    pub instance: Arc<TestingHopr>,
     /// Transport socket that can be used to send and receive data via the HOPR node.
     pub socket: HoprTransportIO,
 }
@@ -92,11 +97,7 @@ impl std::fmt::Debug for TestedHopr {
 }
 
 impl TestedHopr {
-    pub fn new(
-        runtime: tokio::runtime::Runtime,
-        instance: Hopr<TestingConnector, HoprNodeDb>,
-        socket: HoprTransportIO,
-    ) -> Self {
+    pub fn new(runtime: tokio::runtime::Runtime, instance: TestingHopr, socket: HoprTransportIO) -> Self {
         assert_eq!(HoprState::Running, instance.status(), "hopr instance must be running");
         Self {
             runtime: Some(runtime),
@@ -118,7 +119,7 @@ impl Drop for TestedHopr {
 }
 
 impl TestedHopr {
-    pub fn inner(&self) -> &Hopr<TestingConnector, HoprNodeDb> {
+    pub fn inner(&self) -> &TestingHopr {
         &self.instance
     }
 
@@ -157,7 +158,7 @@ impl TestedHopr {
 ///
 /// Cleans up the opened channels on drop.
 pub struct ChannelGuard {
-    pub channels: Vec<(Arc<Hopr<TestingConnector, HoprNodeDb>>, Hash)>,
+    pub channels: Vec<(Arc<TestingHopr>, Hash)>,
 }
 
 impl ChannelGuard {
@@ -168,11 +169,11 @@ impl ChannelGuard {
     pub async fn try_open_channels_for_path<I, T>(path: I, funding: HoprBalance) -> anyhow::Result<Self>
     where
         I: IntoIterator<Item = T>,
-        T: Into<Arc<Hopr<TestingConnector, HoprNodeDb>>>,
+        T: Into<Arc<TestingHopr>>,
     {
         let mut channels = vec![];
 
-        let path: Vec<Arc<Hopr<TestingConnector, HoprNodeDb>>> = path.into_iter().map(|item| item.into()).collect();
+        let path: Vec<Arc<TestingHopr>> = path.into_iter().map(|item| item.into()).collect();
         let path_len = path.len();
 
         // no need for a channel to the last node from penultimate
@@ -205,8 +206,8 @@ impl ChannelGuard {
     }
 
     pub async fn open_channel_between_nodes(
-        src: Arc<Hopr<TestingConnector, HoprNodeDb>>,
-        dst: Arc<Hopr<TestingConnector, HoprNodeDb>>,
+        src: Arc<TestingHopr>,
+        dst: Arc<TestingHopr>,
         funding: HoprBalance,
     ) -> anyhow::Result<Self> {
         let channel = src

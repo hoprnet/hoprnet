@@ -33,7 +33,9 @@ impl NetworkPeerTracker {
     where
         F: FnOnce(&PeerId, Observations) -> Observations,
     {
-        self.peers.alter(peer, f);
+        let mut entry = self.peers.entry(*peer).or_default();
+        let new_value = f(peer, *entry.value());
+        *entry.value_mut() = new_value;
     }
 
     #[inline]
@@ -121,7 +123,7 @@ mod tests {
     }
 
     #[test]
-    fn peer_tracker_should_not_reflect_alterations_on_non_existent_peers() -> anyhow::Result<()> {
+    fn peer_tracker_should_create_entry_on_alter_of_non_existent_peers() -> anyhow::Result<()> {
         let tracker = NetworkPeerTracker::new();
 
         let peer = PeerId::random();
@@ -131,7 +133,8 @@ mod tests {
             o
         });
 
-        assert!(tracker.get(&peer).is_none());
+        let observation = tracker.get(&peer).context("Expected peer to be created")?;
+        assert_eq!(observation.msg_sent, 1);
 
         Ok(())
     }

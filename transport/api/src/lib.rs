@@ -40,6 +40,7 @@ use hopr_api::{
     chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
     db::HoprDbTicketOperations,
     graph::{NetworkGraphUpdate, NetworkGraphView, Observable},
+    network::{NetworkBuilder, NetworkStreamControl},
 };
 pub use hopr_api::{
     db::ChannelTicketStatistics,
@@ -61,7 +62,6 @@ use hopr_protocol_hopr::MemorySurbStore;
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId, Protocol};
 use hopr_transport_mixer::MixerConfig;
-use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork};
 use hopr_transport_probe::{
     Probe, TrafficGeneration,
     ping::{PingConfig, Pinger},
@@ -117,16 +117,17 @@ type CurrentPathSelector = NoPathSelector;
 
 /// Interface into the physical transport mechanism allowing all off-chain HOPR-related tasks on
 /// the transport.
-pub struct HoprTransport<Chain, Db, Graph>
+pub struct HoprTransport<Chain, Db, Graph, Net>
 where
     Graph: NetworkGraphView + NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Net: NetworkView + NetworkStreamControl + Clone + Send + Sync + 'static,
 {
     packet_key: OffchainKeypair,
     chain_key: ChainKeypair,
     db: Db,
     chain_api: Chain,
     ping: Arc<OnceLock<Pinger>>,
-    network: Arc<OnceLock<HoprNetwork>>,
+    network: Arc<OnceLock<Net>>,
     graph: Graph,
     path_planner: PathPlanner<MemorySurbStore, Chain, CurrentPathSelector>,
     my_multiaddresses: Vec<Multiaddr>,
@@ -134,7 +135,7 @@ where
     cfg: HoprProtocolConfig,
 }
 
-impl<Chain, Db, Graph> HoprTransport<Chain, Db, Graph>
+impl<Chain, Db, Graph, Net> HoprTransport<Chain, Db, Graph, Net>
 where
     Db: HoprDbTicketOperations + Clone + Send + Sync + 'static,
     Chain: ChainReadChannelOperations
@@ -146,6 +147,7 @@ where
         + Sync
         + 'static,
     Graph: NetworkGraphView + NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Net: NetworkView + NetworkStreamControl + Clone + Send + Sync + 'static,
 {
     pub fn new(
         identity: (&ChainKeypair, &OffchainKeypair),
@@ -204,9 +206,10 @@ where
     /// [`crate::HoprTransportProcess::BloomFilterSave`], [`crate::HoprTransportProcess::Swarm`] and session-related
     /// processes and return join handles to the calling function. These processes are not started immediately but
     /// are waiting for a trigger from this piece of code.
-    pub async fn run<S, T, Ct>(
+    pub async fn run<S, T, Ct, NetBuilder>(
         &self,
         cover_traffic: Ct,
+        network_builder: NetBuilder,
         discovery_updates: S,
         ticket_events: T,
         on_incoming_session: Sender<IncomingSession>,
@@ -222,6 +225,7 @@ where
         T: futures::Sink<TicketEvent> + Clone + Send + Unpin + 'static,
         T::Error: std::error::Error,
         Ct: TrafficGeneration + Send + Sync + 'static,
+        NetBuilder: NetworkBuilder<Network = Net> + Send + Sync + 'static,
     {
         info!("loading initial peers from the chain");
         let public_nodes = self
@@ -286,33 +290,34 @@ where
         // 1. Discovery events are filtered before they reach the transport component
         // 2. SwarmEvent::NewExternalAddrOfPeer events are filtered using is_public_address()
         let allow_private_addresses = self.cfg.transport.prefer_local_addresses;
-        let (transport_network, transport_layer_process) = HoprLibp2pNetworkBuilder::new(
-            (&self.packet_key).into(),
-            discovery_updates.filter_map(move |event| async move {
-                match event {
-                    PeerDiscovery::Announce(peer, multiaddrs) => {
-                        let multiaddrs = multiaddrs
-                            .into_iter()
-                            .filter(|ma| {
-                                hopr_transport_identity::multiaddrs::is_supported(ma)
-                                    && (allow_private_addresses || is_public_address(ma))
-                            })
-                            .collect::<Vec<_>>();
-                        if multiaddrs.is_empty() {
-                            None
-                        } else {
-                            Some(PeerDiscovery::Announce(peer, multiaddrs))
+        let (transport_network, transport_layer_process) = network_builder
+            .build(
+                &self.packet_key,
+                self.my_multiaddresses.clone(),
+                hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL,
+                allow_private_addresses,
+                discovery_updates.filter_map(move |event| async move {
+                    match event {
+                        PeerDiscovery::Announce(peer, multiaddrs) => {
+                            let multiaddrs = multiaddrs
+                                .into_iter()
+                                .filter(|ma| {
+                                    hopr_transport_identity::multiaddrs::is_supported(ma)
+                                        && (allow_private_addresses || is_public_address(ma))
+                                })
+                                .collect::<Vec<_>>();
+                            if multiaddrs.is_empty() {
+                                None
+                            } else {
+                                Some(PeerDiscovery::Announce(peer, multiaddrs))
+                            }
                         }
                     }
-                }
-            }),
-            self.my_multiaddresses.clone(),
-        )
-        .await
-        .into_network_with_stream_protocol_process(
-            hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL,
-            allow_private_addresses,
-        );
+                }),
+            )
+            .await
+            .map_err(|e| HoprTransportError::Api(e.to_string()))?;
+
         self.network
             .clone()
             .set(transport_network.clone())
@@ -341,7 +346,7 @@ where
 
         processes.insert(
             HoprTransportProcess::Medium,
-            spawn_as_abortable!(transport_layer_process.inspect(|_| tracing::warn!(
+            spawn_as_abortable!(transport_layer_process().inspect(|_| tracing::warn!(
                 task = %HoprTransportProcess::Medium,
                 "long-running background task finished"
             ))),
@@ -533,11 +538,6 @@ where
             .ping
             .get()
             .ok_or_else(|| HoprTransportError::Api("ping processing is not yet initialized".into()))?;
-
-        let _network = self
-            .network
-            .get()
-            .ok_or_else(|| HoprTransportError::Api("transport network is not yet initialized".into()))?;
 
         let latency = (*pinger).ping(*peer).await?;
 

@@ -31,7 +31,6 @@ members = [
   "transport/identity",
   "transport/mixer",
   "transport/network",
-  "transport/p2p",
   "transport/probe",
   "transport/protocol",
   "transport/session",
@@ -42,6 +41,7 @@ members = [
   # implementations
   "impls/ct/telemetry",
   "impls/graph",
+  "impls/transport/p2p",
 ]
 
 [workspace.dependencies]
@@ -253,7 +253,6 @@ hopr-transport-network = { path = "transport/network" }
 hopr-transport-mixer = { path = "transport/mixer" }
 hopr-transport-probe = { path = "transport/probe" }
 hopr-transport-protocol = { path = "transport/protocol" }
-hopr-transport-p2p = { path = "transport/p2p" }
 hopr-transport-session = { path = "transport/session" }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
 hopr-db-entity = { path = "db/entity" }
@@ -264,6 +263,7 @@ hopr-chain-connector = { path = "chain/connector" }
 hopr-statistics = { path = "common/statistics" }
 
 # referential implementations
+hopr-transport-p2p = { path = "impls/transport/p2p" }
 hopr-ct-telemetry = { path = "impls/ct/telemetry" }
 hopr-network-graph = { path = "impls/graph" }
 
