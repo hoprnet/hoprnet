@@ -14,10 +14,6 @@ pub enum Health {
     Green = 4,
 }
 
-pub enum Measurement {
-    Probe(std::result::Result<std::time::Duration, ()>),
-}
-
 pub trait Observable {
     /// Record a new result of the probe towards the measured peer.
     fn record_probe(&mut self, latency: std::result::Result<std::time::Duration, ()>);
