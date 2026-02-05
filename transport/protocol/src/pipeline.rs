@@ -60,6 +60,7 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
     app_outgoing: AppOut,
     encoder: std::sync::Arc<E>,
     wire_outgoing: WOut,
+    concurrency: usize,
 ) where
     AppOut: futures::Stream<Item = (ResolvedTransportRouting, ApplicationDataOut)> + Send + 'static,
     E: PacketEncoder + Send + 'static,
@@ -67,33 +68,36 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
     WOutErr: std::error::Error,
 {
     let res = app_outgoing
-        .then_concurrent(|(routing, data)| {
-            let encoder = encoder.clone();
-            async move {
-                match encoder
-                    .encode_packet(
-                        data.data.to_bytes(),
-                        routing,
-                        data.packet_info
-                            .map(|data| data.signals_to_destination)
-                            .unwrap_or_default(),
-                    )
-                    .await
-                {
-                    Ok(packet) => {
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_PACKET_COUNT.increment(&["sent"]);
+        .then_concurrent(
+            |(routing, data)| {
+                let encoder = encoder.clone();
+                async move {
+                    match encoder
+                        .encode_packet(
+                            data.data.to_bytes(),
+                            routing,
+                            data.packet_info
+                                .map(|data| data.signals_to_destination)
+                                .unwrap_or_default(),
+                        )
+                        .await
+                    {
+                        Ok(packet) => {
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            METRIC_PACKET_COUNT.increment(&["sent"]);
 
-                        tracing::trace!(peer = packet.next_hop.to_peerid_str(), "protocol message out");
-                        Some((packet.next_hop.into(), packet.data))
-                    }
-                    Err(error) => {
-                        tracing::error!(%error, "packet could not be wrapped for sending");
-                        None
+                            tracing::trace!(peer = packet.next_hop.to_peerid_str(), "protocol message out");
+                            Some((packet.next_hop.into(), packet.data))
+                        }
+                        Err(error) => {
+                            tracing::error!(%error, "packet could not be wrapped for sending");
+                            None
+                        }
                     }
                 }
-            }
-        })
+            },
+            concurrency,
+        )
         .filter_map(futures::future::ready)
         .map(Ok)
         .forward_to_timeout(wire_outgoing)
@@ -127,6 +131,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
     ticket_events: TEvt,
     (ack_outgoing, ack_incoming): (AckOut, AckIn),
     app_incoming: AppIn,
+    concurrency: usize,
 ) where
     WIn: futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + 'static,
     WOut: futures::Sink<(PeerId, Box<[u8]>)> + Clone + Unpin + Send + 'static,
@@ -203,7 +208,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                     }
                 }
             }.instrument(tracing::debug_span!("incoming_packet_decode", %peer))
-        })
+        }, concurrency)
         .filter_map(futures::future::ready)
         .then_concurrent(move |packet| {
             let ticket_proc = ticket_proc_success.clone();
@@ -298,7 +303,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                         None
                     }
                 }
-            }})
+            }}, None) // No concurrency limit here, already limited before
         .filter_map(|maybe_data| futures::future::ready(
             // Create the ApplicationDataIn data structure for incoming data
             maybe_data
@@ -522,6 +527,24 @@ impl Validate for AcknowledgementPipelineConfig {
     }
 }
 
+/// Overall configuration of the input/output packet processing pipeline.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Validate)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(deny_unknown_fields)
+)]
+pub struct PacketPipelineConfig {
+    /// Maximum concurrency when processing outgoing packets
+    #[validate(range(min = 1))]
+    pub output_concurrency: Option<usize>,
+    /// Maximum concurrency when processing incoming packets.
+    #[validate(range(min = 1))]
+    pub input_concurrency: Option<usize>,
+    /// Configuration of the packet acknowledgement processing
+    pub ack_config: AcknowledgementPipelineConfig,
+}
+
 /// Run all processes responsible for handling the msg and acknowledgment protocols.
 ///
 /// The pipeline does not handle the mixing itself, that needs to be injected as a separate process
@@ -533,7 +556,7 @@ pub fn run_packet_pipeline<WIn, WOut, C, D, T, TEvt, AppOut, AppIn>(
     codec: (C, D),
     ticket_proc: T,
     ticket_events: TEvt,
-    ack_config: AcknowledgementPipelineConfig,
+    cfg: PacketPipelineConfig,
     api: (AppOut, AppIn),
 ) -> AbortableList<PacketPipelineProcesses>
 where
@@ -575,10 +598,24 @@ where
     let decoder = std::sync::Arc::new(codec.1);
     let ticket_proc = std::sync::Arc::new(ticket_proc);
 
+    // Default maximum concurrency (if not set) is 8 times the number of available cores
+    let avail_concurrency = std::thread::available_parallelism()
+        .ok()
+        .map(|n| n.get())
+        .unwrap_or(1)
+        .max(1)
+        * 8;
+
     processes.insert(
         PacketPipelineProcesses::MsgOut,
         spawn_as_abortable!(
-            start_outgoing_packet_pipeline(app_in, encoder.clone(), wire_out.clone(),).in_current_span()
+            start_outgoing_packet_pipeline(
+                app_in,
+                encoder.clone(),
+                wire_out.clone(),
+                cfg.output_concurrency.unwrap_or(avail_concurrency)
+            )
+            .in_current_span()
         ),
     );
 
@@ -592,6 +629,7 @@ where
                 ticket_events.clone(),
                 (outgoing_ack_tx, incoming_ack_tx),
                 app_out,
+                cfg.input_concurrency.unwrap_or(avail_concurrency),
             )
             .in_current_span()
         ),
@@ -600,7 +638,7 @@ where
     processes.insert(
         PacketPipelineProcesses::AckOut,
         spawn_as_abortable!(
-            start_outgoing_ack_pipeline(outgoing_ack_rx, encoder, ack_config, packet_key.clone(), wire_out,)
+            start_outgoing_ack_pipeline(outgoing_ack_rx, encoder, cfg.ack_config, packet_key.clone(), wire_out,)
                 .in_current_span()
         ),
     );

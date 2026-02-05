@@ -194,7 +194,7 @@ pub async fn peer_setup_for(
             (encoder, decoder),
             ticket_proc,
             received_ack_tickets_tx,
-            AcknowledgementPipelineConfig::default(),
+            Default::default(),
             (api_recv_tx, api_send_rx),
         );
 

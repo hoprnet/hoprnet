@@ -137,7 +137,7 @@ rand = "0.8.5" # ignored in renovate, cannot be updated, dependencies reference 
 rayon = "1.11.0"
 regex = "1.12.2"
 ringbuffer = "0.16.0"
-rust-stream-ext-concurrent = "1.0.0"
+rust-stream-ext-concurrent = "2.0.0"
 rstest = { version = "0.26.1" }
 scrypt = { version = "0.11.0", default-features = false }
 sea-orm = { version = "1.1.19", default-features = false, features = [
