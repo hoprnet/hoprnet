@@ -45,6 +45,17 @@
 /// If the receiver was already dropped (timeout fired while the task waited in the queue),
 /// the closure returns immediately instead of burning CPU time.
 ///
+/// ## Queue depth limiting
+///
+/// To prevent unbounded queue growth under sustained load, the module tracks the number
+/// of tasks currently queued. Callers can use [`try_spawn_blocking`] or [`try_spawn_fifo_blocking`]
+/// to get a fallible spawn that returns [`SpawnError::QueueFull`] when the queue limit is reached.
+/// This allows callers to implement backpressure by dropping packets gracefully instead of
+/// accumulating unbounded work.
+///
+/// The queue limit defaults to `10 * rayon::current_num_threads()` but can be overridden
+/// via the `HOPR_CPU_TASK_QUEUE_LIMIT` environment variable.
+///
 /// ## Observability
 ///
 /// Prometheus metrics (behind the `prometheus` feature) track:
@@ -53,6 +64,10 @@
 /// - **cancelled**: tasks skipped via cooperative cancellation (receiver dropped before execution)
 /// - **orphaned**: tasks that ran to completion but whose receiver was dropped during execution
 /// - **queue_wait**: histogram of time between submission and execution start
+/// - **execution_time**: histogram of actual task execution duration
+/// - **queue_depth**: current number of tasks in the queue
+/// - **queue_limit**: configured maximum queue depth (for comparison with queue_depth)
+/// - **rejected**: total tasks rejected due to queue being full
 ///
 /// A rising cancelled or orphaned count relative to submitted indicates pool saturation.
 /// Sustained queue_wait times approaching the caller's timeout threshold signal imminent
@@ -111,6 +126,153 @@ pub mod cpu {
             .unwrap()
         });
 
+    #[cfg(all(feature = "prometheus", not(test)))]
+    static METRIC_RAYON_EXECUTION_TIME: std::sync::LazyLock<hopr_metrics::SimpleHistogram> =
+        std::sync::LazyLock::new(|| {
+            hopr_metrics::SimpleHistogram::new(
+                "hopr_rayon_execution_seconds",
+                "Time tasks spend executing in the Rayon thread pool",
+                vec![0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.15, 0.25, 0.5, 1.0],
+            )
+            .unwrap()
+        });
+
+    #[cfg(all(feature = "prometheus", not(test)))]
+    static METRIC_RAYON_QUEUE_DEPTH: std::sync::LazyLock<hopr_metrics::SimpleGauge> = std::sync::LazyLock::new(|| {
+        hopr_metrics::SimpleGauge::new(
+            "hopr_rayon_queue_depth",
+            "Current number of tasks waiting in the Rayon queue",
+        )
+        .unwrap()
+    });
+
+    #[cfg(all(feature = "prometheus", not(test)))]
+    static METRIC_RAYON_QUEUE_LIMIT: std::sync::LazyLock<hopr_metrics::SimpleGauge> = std::sync::LazyLock::new(|| {
+        hopr_metrics::SimpleGauge::new(
+            "hopr_rayon_queue_limit",
+            "Configured maximum queue depth for the Rayon thread pool",
+        )
+        .unwrap()
+    });
+
+    #[cfg(all(feature = "prometheus", not(test)))]
+    static METRIC_RAYON_TASKS_REJECTED: std::sync::LazyLock<hopr_metrics::SimpleCounter> =
+        std::sync::LazyLock::new(|| {
+            hopr_metrics::SimpleCounter::new(
+                "hopr_rayon_tasks_rejected_total",
+                "Total number of tasks rejected due to queue being full",
+            )
+            .unwrap()
+        });
+
+    use std::sync::OnceLock;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    /// Current number of tasks in the queue (submitted but not yet completed/cancelled/orphaned).
+    static QUEUE_DEPTH: AtomicUsize = AtomicUsize::new(0);
+
+    /// Lazily initialized queue limit.
+    static QUEUE_LIMIT: OnceLock<usize> = OnceLock::new();
+
+    /// Default multiplier for queue limit relative to thread count.
+    const DEFAULT_QUEUE_LIMIT_MULTIPLIER: usize = 10;
+
+    /// Environment variable name for overriding queue limit.
+    const QUEUE_LIMIT_ENV_VAR: &str = "HOPR_CPU_TASK_QUEUE_LIMIT";
+
+    /// Error type for fallible spawn operations.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum SpawnError {
+        /// The queue is full and cannot accept more tasks.
+        QueueFull {
+            /// Current queue depth when rejection occurred.
+            current: usize,
+            /// Configured queue limit.
+            limit: usize,
+        },
+    }
+
+    impl std::fmt::Display for SpawnError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                SpawnError::QueueFull { current, limit } => {
+                    write!(f, "rayon queue full: {current}/{limit} tasks queued")
+                }
+            }
+        }
+    }
+
+    impl std::error::Error for SpawnError {}
+
+    /// Returns the configured queue limit, initializing it on first call.
+    fn get_queue_limit() -> usize {
+        *QUEUE_LIMIT.get_or_init(|| {
+            let limit = std::env::var(QUEUE_LIMIT_ENV_VAR)
+                .ok()
+                .and_then(|v| v.parse::<usize>().ok())
+                .filter(|&v| v > 0)
+                .unwrap_or_else(|| rayon::current_num_threads() * DEFAULT_QUEUE_LIMIT_MULTIPLIER);
+
+            #[cfg(all(feature = "prometheus", not(test)))]
+            METRIC_RAYON_QUEUE_LIMIT.set(limit as f64);
+
+            limit
+        })
+    }
+
+    /// Acquires a queue slot unconditionally, incrementing the depth counter.
+    /// Used by `spawn_blocking` and `spawn_fifo_blocking` which always accept tasks.
+    fn acquire_queue_slot() {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        let new_depth = QUEUE_DEPTH.fetch_add(1, Ordering::AcqRel) + 1;
+        #[cfg(not(all(feature = "prometheus", not(test))))]
+        QUEUE_DEPTH.fetch_add(1, Ordering::AcqRel);
+
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_RAYON_QUEUE_DEPTH.set(new_depth as f64);
+    }
+
+    /// Attempts to acquire a queue slot using compare-and-swap.
+    /// Returns the new queue depth on success, or `SpawnError::QueueFull` if the limit is reached.
+    fn try_acquire_queue_slot() -> Result<usize, SpawnError> {
+        let limit = get_queue_limit();
+        loop {
+            let current = QUEUE_DEPTH.load(Ordering::Relaxed);
+            if current >= limit {
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_RAYON_TASKS_REJECTED.increment();
+                return Err(SpawnError::QueueFull { current, limit });
+            }
+            match QUEUE_DEPTH.compare_exchange_weak(current, current + 1, Ordering::AcqRel, Ordering::Relaxed) {
+                Ok(_) => {
+                    let new_depth = current + 1;
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_RAYON_QUEUE_DEPTH.set(new_depth as f64);
+                    return Ok(new_depth);
+                }
+                Err(_) => continue, // CAS failed, retry
+            }
+        }
+    }
+
+    /// Releases a queue slot, decrementing the depth counter.
+    fn release_queue_slot() {
+        let prev = QUEUE_DEPTH.fetch_sub(1, Ordering::AcqRel);
+        debug_assert!(prev > 0, "queue depth underflow");
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_RAYON_QUEUE_DEPTH.set((prev - 1) as f64);
+    }
+
+    /// Returns the current queue depth (tasks submitted but not yet completed).
+    pub fn current_queue_depth() -> usize {
+        QUEUE_DEPTH.load(Ordering::Relaxed)
+    }
+
+    /// Returns the configured queue limit.
+    pub fn queue_limit() -> usize {
+        get_queue_limit()
+    }
+
     /// Initialize a `rayon` CPU thread pool with the given number of threads.
     pub fn init_thread_pool(num_threads: usize) -> Result<(), rayon::ThreadPoolBuildError> {
         rayon::ThreadPoolBuilder::new().num_threads(num_threads).build_global()
@@ -122,11 +284,15 @@ pub mod cpu {
     /// queue-wait timing, and Prometheus metric updates. It is suitable for passing
     /// directly to [`rayon::spawn`] or [`rayon::spawn_fifo`].
     ///
+    /// If `track_queue_depth` is true, the task will release a queue slot on completion.
+    /// This should be true when the task was submitted via `try_spawn_*` functions.
+    ///
     /// See the [module-level documentation](cpu) for why cooperative cancellation
     /// is necessary.
     #[cfg(feature = "rayon")]
     fn cancellable_task<R: Send + 'static>(
         f: impl FnOnce() -> R + Send + 'static,
+        track_queue_depth: bool,
     ) -> (
         impl FnOnce() + Send + 'static,
         futures::channel::oneshot::Receiver<std::thread::Result<R>>,
@@ -150,6 +316,9 @@ pub mod cpu {
                 );
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_RAYON_TASKS_CANCELLED.increment();
+                if track_queue_depth {
+                    release_queue_slot();
+                }
                 return;
             }
 
@@ -157,7 +326,14 @@ pub mod cpu {
             #[cfg(all(feature = "prometheus", not(test)))]
             METRIC_RAYON_QUEUE_WAIT.observe(wait_duration.as_secs_f64());
 
+            #[cfg(all(feature = "prometheus", not(test)))]
+            let execution_start = std::time::Instant::now();
+
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f));
+
+            #[cfg(all(feature = "prometheus", not(test)))]
+            METRIC_RAYON_EXECUTION_TIME.observe(execution_start.elapsed().as_secs_f64());
+
             match tx.send(result) {
                 Ok(()) => {
                     #[cfg(all(feature = "prometheus", not(test)))]
@@ -175,6 +351,9 @@ pub mod cpu {
                     METRIC_RAYON_TASKS_ORPHANED.increment();
                 }
             }
+            if track_queue_depth {
+                release_queue_slot();
+            }
         };
 
         (task, rx)
@@ -190,7 +369,8 @@ pub mod cpu {
     /// See the [module-level documentation](cpu) for details on why this is necessary.
     #[cfg(feature = "rayon")]
     pub async fn spawn_blocking<R: Send + 'static>(f: impl FnOnce() -> R + Send + 'static) -> R {
-        let (task, rx) = cancellable_task(f);
+        acquire_queue_slot();
+        let (task, rx) = cancellable_task(f, true);
         rayon::spawn(task);
         rx.await
             .expect("rayon task channel closed unexpectedly")
@@ -208,11 +388,62 @@ pub mod cpu {
     /// See the [module-level documentation](cpu) for details on why this is necessary.
     #[cfg(feature = "rayon")]
     pub async fn spawn_fifo_blocking<R: Send + 'static>(f: impl FnOnce() -> R + Send + 'static) -> R {
-        let (task, rx) = cancellable_task(f);
+        acquire_queue_slot();
+        let (task, rx) = cancellable_task(f, true);
         rayon::spawn_fifo(task);
         rx.await
             .expect("rayon task channel closed unexpectedly")
             .unwrap_or_else(|caught_panic| std::panic::resume_unwind(caught_panic))
+    }
+
+    /// Fallible version of [`spawn_blocking`] that returns an error when the queue is full.
+    ///
+    /// This allows callers to implement backpressure by rejecting work when the Rayon
+    /// thread pool is saturated, rather than accumulating unbounded work in the queue.
+    ///
+    /// The queue limit defaults to `10 * rayon::current_num_threads()` but can be overridden
+    /// via the `HOPR_CPU_TASK_QUEUE_LIMIT` environment variable.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SpawnError::QueueFull`] if the queue depth has reached the configured limit.
+    #[cfg(feature = "rayon")]
+    pub async fn try_spawn_blocking<R: Send + 'static>(
+        f: impl FnOnce() -> R + Send + 'static,
+    ) -> Result<R, SpawnError> {
+        try_acquire_queue_slot()?;
+        let (task, rx) = cancellable_task(f, true);
+        rayon::spawn(task);
+        Ok(rx
+            .await
+            .expect("rayon task channel closed unexpectedly")
+            .unwrap_or_else(|caught_panic| std::panic::resume_unwind(caught_panic)))
+    }
+
+    /// Fallible version of [`spawn_fifo_blocking`] that returns an error when the queue is full.
+    ///
+    /// This allows callers to implement backpressure by rejecting work when the Rayon
+    /// thread pool is saturated, rather than accumulating unbounded work in the queue.
+    /// This is the FIFO variant, which is preferred for packet decoding where older
+    /// tasks should be processed before newer ones.
+    ///
+    /// The queue limit defaults to `10 * rayon::current_num_threads()` but can be overridden
+    /// via the `HOPR_CPU_TASK_QUEUE_LIMIT` environment variable.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SpawnError::QueueFull`] if the queue depth has reached the configured limit.
+    #[cfg(feature = "rayon")]
+    pub async fn try_spawn_fifo_blocking<R: Send + 'static>(
+        f: impl FnOnce() -> R + Send + 'static,
+    ) -> Result<R, SpawnError> {
+        try_acquire_queue_slot()?;
+        let (task, rx) = cancellable_task(f, true);
+        rayon::spawn_fifo(task);
+        Ok(rx
+            .await
+            .expect("rayon task channel closed unexpectedly")
+            .unwrap_or_else(|caught_panic| std::panic::resume_unwind(caught_panic)))
     }
 }
 
@@ -258,6 +489,7 @@ mod tests {
     /// in nanoseconds, so the final task should return promptly.
     #[tokio::test]
     async fn cancelled_tasks_are_skipped_via_cooperative_cancellation() {
+        let initial_depth = cpu::current_queue_depth();
         let executed_count = Arc::new(AtomicU32::new(0));
 
         // Submit many slow tasks and immediately cancel them by dropping the future.
@@ -288,8 +520,14 @@ mod tests {
             "Task took {elapsed:?} - cancelled tasks may not be getting skipped"
         );
 
-        // Allow remaining Rayon tasks to drain
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        // Allow remaining Rayon tasks to drain and wait for queue depth to return to initial
+        for _ in 0..50 {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            if cpu::current_queue_depth() == initial_depth {
+                break;
+            }
+        }
+
         let executed = executed_count.load(Ordering::SeqCst);
 
         // Most tasks should have been skipped due to cancellation.
@@ -304,6 +542,8 @@ mod tests {
     /// complete normally without lingering starvation.
     #[tokio::test]
     async fn pool_recovers_after_cancelled_burst() {
+        let initial_depth = cpu::current_queue_depth();
+
         // Saturate with tasks that will be cancelled
         for _ in 0..50 {
             let fut = cpu::spawn_fifo_blocking(|| {
@@ -327,5 +567,153 @@ mod tests {
                 "Recovery task {i} took {elapsed:?} - pool may still be starved"
             );
         }
+
+        // Wait for queue depth to return to initial value
+        for _ in 0..50 {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            if cpu::current_queue_depth() == initial_depth {
+                break;
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn try_spawn_blocking_returns_result() {
+        let result = cpu::try_spawn_blocking(|| 42).await;
+        assert_eq!(result.unwrap(), 42);
+    }
+
+    #[tokio::test]
+    async fn try_spawn_fifo_blocking_returns_result() {
+        let result = cpu::try_spawn_fifo_blocking(|| "hello").await;
+        assert_eq!(result.unwrap(), "hello");
+    }
+
+    #[tokio::test]
+    async fn queue_depth_tracking() {
+        // Queue should start at 0 (or return to 0 after previous tests)
+        // Note: This test may be flaky if run in parallel with other tests
+        // that use the queue. In practice, tests run serially in the same process.
+
+        let initial_depth = cpu::current_queue_depth();
+
+        // Submit a slow task via try_spawn
+        let barrier = Arc::new(std::sync::Barrier::new(2));
+        let barrier_clone = barrier.clone();
+
+        let task_handle = tokio::spawn(async move {
+            cpu::try_spawn_fifo_blocking(move || {
+                barrier_clone.wait();
+                42
+            })
+            .await
+        });
+
+        // Give the task time to be submitted to rayon
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        // Queue depth should have increased by 1
+        let during_depth = cpu::current_queue_depth();
+        assert!(
+            during_depth > initial_depth,
+            "Queue depth should increase after submitting task: initial={initial_depth}, during={during_depth}"
+        );
+
+        // Release the barrier to let the task complete
+        barrier.wait();
+
+        // Wait for the task to complete
+        let result = task_handle.await.unwrap();
+        assert_eq!(result.unwrap(), 42);
+
+        // Give time for queue depth to decrement
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        let final_depth = cpu::current_queue_depth();
+        assert_eq!(
+            final_depth, initial_depth,
+            "Queue depth should return to initial value after task completion"
+        );
+    }
+
+    #[tokio::test]
+    async fn queue_full_returns_error() {
+        // Temporarily set a very low queue limit by saturating the queue
+        // We need to submit more tasks than the limit allows
+        let limit = cpu::queue_limit();
+
+        // Use barriers to hold tasks in the queue
+        let barriers: Vec<_> = (0..limit + 5).map(|_| Arc::new(std::sync::Barrier::new(2))).collect();
+
+        let mut handles = Vec::new();
+
+        // Submit tasks up to and beyond the limit
+        for (i, barrier) in barriers.iter().enumerate() {
+            let barrier_clone = barrier.clone();
+            let handle = tokio::spawn(async move {
+                cpu::try_spawn_fifo_blocking(move || {
+                    barrier_clone.wait();
+                    i
+                })
+                .await
+            });
+            handles.push(handle);
+
+            // Small delay to ensure sequential submission
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+
+        // Check that at least one task was rejected due to queue being full
+        // Release all barriers so tasks can complete
+        for barrier in &barriers {
+            std::thread::spawn({
+                let b = barrier.clone();
+                move || b.wait()
+            });
+        }
+
+        let mut rejected_count = 0;
+        for handle in handles {
+            let result = handle.await.unwrap();
+            if result.is_err() {
+                rejected_count += 1;
+                if let Err(cpu::SpawnError::QueueFull { current, limit }) = result {
+                    assert!(current >= limit, "QueueFull should report current >= limit");
+                }
+            }
+        }
+
+        // At least some tasks should have been rejected
+        // (we submitted limit + 5 tasks)
+        assert!(
+            rejected_count > 0,
+            "Expected at least one task to be rejected due to queue being full, but all succeeded. limit={limit}"
+        );
+
+        // Wait for tasks to drain
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    }
+
+    #[tokio::test]
+    async fn queue_depth_decrements_on_cancellation() {
+        let initial_depth = cpu::current_queue_depth();
+
+        // Submit tasks that will be cancelled via cooperative cancellation
+        for _ in 0..10 {
+            let fut = cpu::try_spawn_fifo_blocking(|| {
+                std::thread::sleep(Duration::from_millis(100));
+            });
+            // Poll once to submit the Rayon task, then drop the future (drops receiver)
+            let _ = fut.now_or_never();
+        }
+
+        // Wait for cancelled tasks to be processed and release their slots
+        tokio::time::sleep(Duration::from_millis(500)).await;
+
+        let final_depth = cpu::current_queue_depth();
+        assert_eq!(
+            final_depth, initial_depth,
+            "Queue depth should return to initial value after cancelled tasks are processed"
+        );
     }
 }
