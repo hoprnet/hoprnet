@@ -4,6 +4,8 @@
 //! The [`HoprNodeApi`] trait provides the complete set of operations available to external
 //! consumers, abstracting over the underlying implementation details.
 
+pub mod state;
+
 use std::time::Duration;
 
 use futures::{Sink, Stream};
@@ -231,4 +233,8 @@ pub trait HoprNodeChainOperations {
     async fn withdraw_native(&self, recipient: Address, amount: XDaiBalance) -> Result<Hash, Self::Error>;
 
     // === Tickets ===
+}
+
+pub trait HoprNodeOperations {
+    fn status(&self) -> state::HoprState;
 }

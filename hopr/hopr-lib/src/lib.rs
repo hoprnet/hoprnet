@@ -29,9 +29,6 @@ pub mod utils;
 /// Public traits for interactions with this library.
 pub mod traits;
 
-/// Functionality related to the HOPR node state.
-pub mod state;
-
 #[cfg(any(feature = "testing", test))]
 pub mod testing;
 
@@ -89,8 +86,9 @@ use hopr_api::{
     ct::TrafficGeneration,
     db::{HoprNodeDbApi, TicketMarker, TicketSelector},
     node::{
-        ChainInfo, CloseChannelResult, HoprNodeChainOperations, HoprNodeNetworkOperations, OpenChannelResult,
-        SafeModuleConfig,
+        ChainInfo, CloseChannelResult, HoprNodeChainOperations, HoprNodeNetworkOperations, HoprNodeOperations,
+        OpenChannelResult, SafeModuleConfig,
+        state::{AtomicHoprState, HoprState},
     },
 };
 pub use hopr_api::{db::ChannelTicketStatistics, graph::Observable};
@@ -114,8 +112,24 @@ pub use crate::{
     config::SafeModule,
     constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE},
     errors::{HoprLibError, HoprStatusError},
-    state::{HoprLibProcess, HoprState},
 };
+
+/// Long-running tasks that are spawned by the HOPR node.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, strum::Display, strum::EnumCount)]
+pub enum HoprLibProcess {
+    #[strum(to_string = "transport: {0}")]
+    Transport(HoprTransportProcess),
+    #[strum(to_string = "session server providing the exit node session stream functionality")]
+    SessionServer,
+    #[strum(to_string = "ticket redemption queue driver")]
+    TicketRedemptions,
+    #[strum(to_string = "subscription for on-chain account announcements")]
+    AccountAnnouncements,
+    #[strum(to_string = "subscription for on-chain channel updates")]
+    ChannelEvents,
+    #[strum(to_string = "on received ticket event (winning or rejected)")]
+    TicketEvents,
+}
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -216,7 +230,7 @@ where
 {
     me: OffchainKeypair,
     cfg: config::HoprLibConfig,
-    state: Arc<state::AtomicHoprState>,
+    state: Arc<api::node::state::AtomicHoprState>,
     transport_api: HoprTransport<Chain, Db, Graph>,
     redeem_requests: OnceLock<futures::channel::mpsc::Sender<TicketSelector>>,
     node_db: Db,
@@ -280,7 +294,7 @@ where
         Ok(Self {
             me: identity.1.clone(),
             cfg,
-            state: Arc::new(state::AtomicHoprState::new(HoprState::Uninitialized)),
+            state: Arc::new(AtomicHoprState::new(HoprState::Uninitialized)),
             transport_api: hopr_transport_api,
             chain_api: hopr_chain_api,
             node_db: hopr_node_db,
@@ -291,37 +305,11 @@ where
     }
 
     fn error_if_not_in_state(&self, state: HoprState, error: String) -> errors::Result<()> {
-        if self.status() == state {
+        if HoprNodeOperations::status(self) == state {
             Ok(())
         } else {
             Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(state, error)))
         }
-    }
-
-    pub fn status(&self) -> HoprState {
-        self.state.load(Ordering::Relaxed)
-    }
-
-    pub async fn get_balance<C: Currency + Send>(&self) -> errors::Result<Balance<C>> {
-        self.chain_api
-            .balance(self.me_onchain())
-            .await
-            .map_err(HoprLibError::chain)
-    }
-
-    pub async fn get_safe_balance<C: Currency + Send>(&self) -> errors::Result<Balance<C>> {
-        self.chain_api
-            .balance(self.cfg.safe_module.safe_address)
-            .await
-            .map_err(HoprLibError::chain)
-    }
-
-    pub async fn chain_info(&self) -> errors::Result<ChainInfo> {
-        self.chain_api.chain_info().await.map_err(HoprLibError::chain)
-    }
-
-    pub fn get_safe_config(&self) -> SafeModule {
-        self.cfg.safe_module.clone()
     }
 
     pub fn config(&self) -> &config::HoprLibConfig {
@@ -912,6 +900,17 @@ where
 }
 
 // === Trait implementations for the high-level node API ===
+
+impl<Chain, Db, Graph> HoprNodeOperations for Hopr<Chain, Db, Graph>
+where
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+    Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
+    Graph: hopr_api::graph::NetworkGraphView + hopr_api::graph::NetworkGraphUpdate + Clone + Send + Sync + 'static,
+{
+    fn status(&self) -> HoprState {
+        self.state.load(Ordering::Relaxed)
+    }
+}
 
 #[async_trait::async_trait]
 impl<Chain, Db, Graph> HoprNodeNetworkOperations for Hopr<Chain, Db, Graph>
