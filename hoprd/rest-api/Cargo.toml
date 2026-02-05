@@ -12,7 +12,7 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = ["prometheus"]
+default = ["prometheus", "runtime-tokio"]
 prometheus = [
   "hopr-lib/prometheus",
   "hopr-transport-p2p/prometheus",
@@ -54,7 +54,6 @@ utoipa-swagger-ui = { workspace = true }
 validator = { workspace = true }
 
 hopr-lib = { workspace = true, features = [
-  "runtime-tokio",
   "serde",
   "session-client",
   "utils_futures",

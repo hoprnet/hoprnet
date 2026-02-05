@@ -14,7 +14,7 @@ use base64::Engine;
 use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt};
 use futures_concurrency::stream::Merge;
 use hopr_lib::{
-    Address, HoprSession, NodeId, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities, SessionClientConfig,
+    Address, HoprSession, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities, SessionClientConfig,
     SessionId, SessionManagerError, SessionTarget, SurbBalancerConfig, TransportSessionError,
     errors::{HoprLibError, HoprTransportError},
     utils::futures::AsyncReadStreamer,
@@ -360,6 +360,11 @@ impl From<hopr_lib::RoutingOptions> for RoutingOptions {
             #[cfg(feature = "explicit-path")]
             hopr_lib::RoutingOptions::IntermediatePath(path) => {
                 RoutingOptions::IntermediatePath(path.into_iter().collect())
+            }
+            #[cfg(not(feature = "explicit-path"))]
+            hopr_lib::RoutingOptions::IntermediatePath(path) => {
+                // Convert path length to hops when explicit-path feature is disabled
+                RoutingOptions::Hops(path.into_iter().count())
             }
             hopr_lib::RoutingOptions::Hops(hops) => RoutingOptions::Hops(usize::from(hops)),
         }

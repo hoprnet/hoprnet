@@ -17,3 +17,4 @@ description: "Rust-specific guidelines"
 - Tests containing `expect` or `unwrap` in the test body should be returning an instance of `anyhow::Result<()>` with proper `.context()` on errors.
 - Upon editing tests or code, always rerun the closest package test suite to ensure no unintended failures.
 - Use TDD to drive the design of new modules and features, when unsure, request guidance for the user.
+- Once a cycle is finished, `cargo shear --fix` should be run followed by a `cargo check` to ensure dependency hygiene and code correctness.
