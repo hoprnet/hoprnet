@@ -127,12 +127,13 @@ pub mod cpu {
         });
 
     #[cfg(all(feature = "prometheus", not(test)))]
-    static METRIC_RAYON_EXECUTION_TIME: std::sync::LazyLock<hopr_metrics::SimpleHistogram> =
+    static METRIC_RAYON_EXECUTION_TIME: std::sync::LazyLock<hopr_metrics::MultiHistogram> =
         std::sync::LazyLock::new(|| {
-            hopr_metrics::SimpleHistogram::new(
+            hopr_metrics::MultiHistogram::new(
                 "hopr_rayon_execution_seconds",
                 "Time tasks spend executing in the Rayon thread pool",
                 vec![0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.15, 0.25, 0.5, 1.0],
+                &["operation"],
             )
             .unwrap()
         });
@@ -289,6 +290,7 @@ pub mod cpu {
     fn cancellable_task<R: Send + 'static>(
         f: impl FnOnce() -> R + Send + 'static,
         track_queue_depth: bool,
+        operation: &'static str,
     ) -> (
         impl FnOnce() + Send + 'static,
         futures::channel::oneshot::Receiver<std::thread::Result<R>>,
@@ -328,7 +330,7 @@ pub mod cpu {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f));
 
             #[cfg(all(feature = "prometheus", not(test)))]
-            METRIC_RAYON_EXECUTION_TIME.observe(execution_start.elapsed().as_secs_f64());
+            METRIC_RAYON_EXECUTION_TIME.observe(&[operation], execution_start.elapsed().as_secs_f64());
 
             match tx.send(result) {
                 Ok(()) => {
@@ -371,9 +373,12 @@ pub mod cpu {
     ///
     /// Returns [`SpawnError::QueueFull`] if the queue depth has reached the configured limit.
     #[cfg(feature = "rayon")]
-    pub async fn spawn_blocking<R: Send + 'static>(f: impl FnOnce() -> R + Send + 'static) -> Result<R, SpawnError> {
+    pub async fn spawn_blocking<R: Send + 'static>(
+        f: impl FnOnce() -> R + Send + 'static,
+        operation: &'static str,
+    ) -> Result<R, SpawnError> {
         try_acquire_queue_slot()?;
-        let (task, rx) = cancellable_task(f, true);
+        let (task, rx) = cancellable_task(f, true, operation);
         rayon::spawn(task);
         Ok(rx
             .await
@@ -400,9 +405,10 @@ pub mod cpu {
     #[cfg(feature = "rayon")]
     pub async fn spawn_fifo_blocking<R: Send + 'static>(
         f: impl FnOnce() -> R + Send + 'static,
+        operation: &'static str,
     ) -> Result<R, SpawnError> {
         try_acquire_queue_slot()?;
-        let (task, rx) = cancellable_task(f, true);
+        let (task, rx) = cancellable_task(f, true, operation);
         rayon::spawn_fifo(task);
         Ok(rx
             .await
@@ -415,8 +421,9 @@ pub mod cpu {
     #[inline]
     pub async fn try_spawn_blocking<R: Send + 'static>(
         f: impl FnOnce() -> R + Send + 'static,
+        operation: &'static str,
     ) -> Result<R, SpawnError> {
-        spawn_blocking(f).await
+        spawn_blocking(f, operation).await
     }
 
     /// Alias for [`spawn_fifo_blocking`] for backwards compatibility.
@@ -424,8 +431,9 @@ pub mod cpu {
     #[inline]
     pub async fn try_spawn_fifo_blocking<R: Send + 'static>(
         f: impl FnOnce() -> R + Send + 'static,
+        operation: &'static str,
     ) -> Result<R, SpawnError> {
-        spawn_fifo_blocking(f).await
+        spawn_fifo_blocking(f, operation).await
     }
 }
 
@@ -447,14 +455,14 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn spawn_blocking_returns_result() {
-        let result = cpu::spawn_blocking(|| 42).await.unwrap();
+        let result = cpu::spawn_blocking(|| 42, "test").await.unwrap();
         assert_eq!(result, 42);
     }
 
     #[tokio::test]
     #[serial]
     async fn spawn_fifo_blocking_returns_result() {
-        let result = cpu::spawn_fifo_blocking(|| "hello").await.unwrap();
+        let result = cpu::spawn_fifo_blocking(|| "hello", "test").await.unwrap();
         assert_eq!(result, "hello");
     }
 
@@ -462,9 +470,12 @@ mod tests {
     #[serial]
     async fn spawn_blocking_propagates_panic() {
         let result = std::panic::AssertUnwindSafe(async {
-            cpu::spawn_blocking(|| {
-                panic!("test panic");
-            })
+            cpu::spawn_blocking(
+                || {
+                    panic!("test panic");
+                },
+                "test",
+            )
             .await
             .unwrap()
         })
@@ -489,17 +500,20 @@ mod tests {
         // as cancelled.
         for _ in 0..100 {
             let count = executed_count.clone();
-            let fut = cpu::spawn_fifo_blocking(move || {
-                count.fetch_add(1, Ordering::SeqCst);
-                std::thread::sleep(Duration::from_millis(50));
-            });
+            let fut = cpu::spawn_fifo_blocking(
+                move || {
+                    count.fetch_add(1, Ordering::SeqCst);
+                    std::thread::sleep(Duration::from_millis(50));
+                },
+                "test",
+            );
             // Poll once to submit the Rayon task, then drop the future (drops receiver)
             let _ = fut.now_or_never();
         }
 
         // Submit a task that should complete promptly because cancelled tasks are skipped
         let start = std::time::Instant::now();
-        let result = cpu::spawn_fifo_blocking(|| 42).await.unwrap();
+        let result = cpu::spawn_fifo_blocking(|| 42, "test").await.unwrap();
         let elapsed = start.elapsed();
 
         assert_eq!(result, 42);
@@ -538,9 +552,12 @@ mod tests {
 
         // Saturate with tasks that will be cancelled
         for _ in 0..50 {
-            let fut = cpu::spawn_fifo_blocking(|| {
-                std::thread::sleep(Duration::from_millis(100));
-            });
+            let fut = cpu::spawn_fifo_blocking(
+                || {
+                    std::thread::sleep(Duration::from_millis(100));
+                },
+                "test",
+            );
             let _ = fut.now_or_never();
         }
 
@@ -550,7 +567,7 @@ mod tests {
         // Now verify the pool is healthy: multiple sequential tasks should all complete promptly
         for i in 0..10 {
             let start = std::time::Instant::now();
-            let result = cpu::spawn_fifo_blocking(move || i * 2).await.unwrap();
+            let result = cpu::spawn_fifo_blocking(move || i * 2, "test").await.unwrap();
             let elapsed = start.elapsed();
 
             assert_eq!(result, i * 2);
@@ -572,14 +589,14 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn try_spawn_blocking_returns_result() {
-        let result = cpu::try_spawn_blocking(|| 42).await;
+        let result = cpu::try_spawn_blocking(|| 42, "test").await;
         assert_eq!(result.unwrap(), 42);
     }
 
     #[tokio::test]
     #[serial]
     async fn try_spawn_fifo_blocking_returns_result() {
-        let result = cpu::try_spawn_fifo_blocking(|| "hello").await;
+        let result = cpu::try_spawn_fifo_blocking(|| "hello", "test").await;
         assert_eq!(result.unwrap(), "hello");
     }
 
@@ -595,10 +612,13 @@ mod tests {
         let barrier_clone = barrier.clone();
 
         let task_handle = tokio::spawn(async move {
-            cpu::try_spawn_fifo_blocking(move || {
-                barrier_clone.wait();
-                42
-            })
+            cpu::try_spawn_fifo_blocking(
+                move || {
+                    barrier_clone.wait();
+                    42
+                },
+                "test",
+            )
             .await
         });
 
@@ -645,10 +665,13 @@ mod tests {
         for (i, barrier) in barriers.iter().enumerate() {
             let barrier_clone = barrier.clone();
             let handle = tokio::spawn(async move {
-                cpu::try_spawn_fifo_blocking(move || {
-                    barrier_clone.wait();
-                    i
-                })
+                cpu::try_spawn_fifo_blocking(
+                    move || {
+                        barrier_clone.wait();
+                        i
+                    },
+                    "test",
+                )
                 .await
             });
             handles.push(handle);
@@ -696,9 +719,12 @@ mod tests {
 
         // Submit tasks that will be cancelled via cooperative cancellation
         for _ in 0..10 {
-            let fut = cpu::try_spawn_fifo_blocking(|| {
-                std::thread::sleep(Duration::from_millis(100));
-            });
+            let fut = cpu::try_spawn_fifo_blocking(
+                || {
+                    std::thread::sleep(Duration::from_millis(100));
+                },
+                "test",
+            );
             // Poll once to submit the Rayon task, then drop the future (drops receiver)
             let _ = fut.now_or_never();
         }

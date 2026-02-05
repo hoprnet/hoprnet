@@ -144,16 +144,19 @@ where
         let domain_separator = self.channels_dst;
 
         let verify_start = std::time::Instant::now();
-        let verified_incoming_ticket = hopr_parallelize::cpu::spawn_fifo_blocking(move || {
-            validate_unacknowledged_ticket(
-                fwd.outgoing.ticket,
-                &incoming_channel,
-                minimum_ticket_price,
-                win_prob,
-                remaining_balance,
-                &domain_separator,
-            )
-        })
+        let verified_incoming_ticket = hopr_parallelize::cpu::spawn_fifo_blocking(
+            move || {
+                validate_unacknowledged_ticket(
+                    fwd.outgoing.ticket,
+                    &incoming_channel,
+                    minimum_ticket_price,
+                    win_prob,
+                    remaining_balance,
+                    &domain_separator,
+                )
+            },
+            "ticket_validate",
+        )
         .await??;
         tracing::debug!(
             elapsed_ms = verify_start.elapsed().as_millis() as u64,
@@ -213,9 +216,10 @@ where
         let ticket_builder = ticket_builder.eth_challenge(fwd.next_challenge);
         let me_on_chain = self.chain_key.clone();
         let sign_start = std::time::Instant::now();
-        fwd.outgoing.ticket = hopr_parallelize::cpu::spawn_fifo_blocking(move || {
-            ticket_builder.build_signed(&me_on_chain, &domain_separator)
-        })
+        fwd.outgoing.ticket = hopr_parallelize::cpu::spawn_fifo_blocking(
+            move || ticket_builder.build_signed(&me_on_chain, &domain_separator),
+            "ticket_sign",
+        )
         .await??
         .leak();
         tracing::debug!(elapsed_ms = sign_start.elapsed().as_millis() as u64, "ticket_signing");
@@ -251,9 +255,12 @@ where
         let previous_hop = match self
             .peer_id_cache
             .try_get_with_by_ref(&sender, async {
-                hopr_parallelize::cpu::spawn_fifo_blocking(move || OffchainPublicKey::from_peerid(&sender))
-                    .await
-                    .map_err(|e| hopr_primitive_types::errors::GeneralError::NonSpecificError(e.to_string()))?
+                hopr_parallelize::cpu::spawn_fifo_blocking(
+                    move || OffchainPublicKey::from_peerid(&sender),
+                    "peerid_lookup",
+                )
+                .await
+                .map_err(|e| hopr_primitive_types::errors::GeneralError::NonSpecificError(e.to_string()))?
             })
             .await
         {
@@ -278,11 +285,14 @@ where
 
         // If the following operation fails, it means that the packet is not a valid Hopr packet,
         // and as such should not be acknowledged later.
-        let packet = hopr_parallelize::cpu::spawn_fifo_blocking(move || {
-            HoprPacket::from_incoming(&data, &offchain_keypair, previous_hop, &mapper, |p| {
-                surb_store.find_reply_opener(p)
-            })
-        })
+        let packet = hopr_parallelize::cpu::spawn_fifo_blocking(
+            move || {
+                HoprPacket::from_incoming(&data, &offchain_keypair, previous_hop, &mapper, |p| {
+                    surb_store.find_reply_opener(p)
+                })
+            },
+            "packet_decode",
+        )
         .await
         .map_err(|e| IncomingPacketError::Undecodable(e.into()))?
         .map_err(|e| IncomingPacketError::Undecodable(e.into()))?;

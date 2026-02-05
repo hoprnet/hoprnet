@@ -238,45 +238,50 @@ where
 
         // Verify all the acknowledgements and compute challenges from half-keys
         let use_batch_verify = self.cfg.use_batch_verification;
-        let half_keys_challenges = hopr_parallelize::cpu::spawn_fifo_blocking(move || {
-            if use_batch_verify {
-                // Uses regular verifications for small batches but switches to a more effective
-                // batch verification algorithm for larger ones.
-                let acks = Acknowledgement::verify_batch(acks.into_iter().map(|ack| (peer, ack)));
+        let half_keys_challenges = hopr_parallelize::cpu::spawn_fifo_blocking(
+            move || {
+                if use_batch_verify {
+                    // Uses regular verifications for small batches but switches to a more effective
+                    // batch verification algorithm for larger ones.
+                    let acks = Acknowledgement::verify_batch(acks.into_iter().map(|ack| (peer, ack)));
 
-                #[cfg(feature = "rayon")]
-                let iter = acks.into_par_iter();
+                    #[cfg(feature = "rayon")]
+                    let iter = acks.into_par_iter();
 
-                #[cfg(not(feature = "rayon"))]
-                let iter = acks.into_iter();
+                    #[cfg(not(feature = "rayon"))]
+                    let iter = acks.into_iter();
 
-                iter.map(|verified| {
-                    verified
-                        .and_then(|verified| Ok((*verified.ack_key_share(), verified.ack_key_share().to_challenge()?)))
-                })
-                .filter_map(|res| {
-                    res.inspect_err(|error| tracing::error!(%error, "failed to process acknowledgement"))
-                        .ok()
-                })
-                .collect::<Vec<_>>()
-            } else {
-                #[cfg(feature = "rayon")]
-                let iter = acks.into_par_iter();
+                    iter.map(|verified| {
+                        verified.and_then(|verified| {
+                            Ok((*verified.ack_key_share(), verified.ack_key_share().to_challenge()?))
+                        })
+                    })
+                    .filter_map(|res| {
+                        res.inspect_err(|error| tracing::error!(%error, "failed to process acknowledgement"))
+                            .ok()
+                    })
+                    .collect::<Vec<_>>()
+                } else {
+                    #[cfg(feature = "rayon")]
+                    let iter = acks.into_par_iter();
 
-                #[cfg(not(feature = "rayon"))]
-                let iter = acks.into_iter();
+                    #[cfg(not(feature = "rayon"))]
+                    let iter = acks.into_iter();
 
-                iter.map(|ack| {
-                    ack.verify(&peer)
-                        .and_then(|verified| Ok((*verified.ack_key_share(), verified.ack_key_share().to_challenge()?)))
-                })
-                .filter_map(|res| {
-                    res.inspect_err(|error| tracing::error!(%error, "failed to process acknowledgement"))
-                        .ok()
-                })
-                .collect::<Vec<_>>()
-            }
-        })
+                    iter.map(|ack| {
+                        ack.verify(&peer).and_then(|verified| {
+                            Ok((*verified.ack_key_share(), verified.ack_key_share().to_challenge()?))
+                        })
+                    })
+                    .filter_map(|res| {
+                        res.inspect_err(|error| tracing::error!(%error, "failed to process acknowledgement"))
+                            .ok()
+                    })
+                    .collect::<Vec<_>>()
+                }
+            },
+            "ack_verify",
+        )
         .await
         .map_err(|e| TicketAcknowledgementError::Inner(HoprProtocolError::from(e)))?;
 
@@ -315,43 +320,46 @@ where
 
         let domain_separator = self.channels_dst;
         let chain_key = self.chain_key.clone();
-        Ok(hopr_parallelize::cpu::spawn_fifo_blocking(move || {
-            #[cfg(feature = "rayon")]
-            let iter = unack_tickets.into_par_iter();
+        Ok(hopr_parallelize::cpu::spawn_fifo_blocking(
+            move || {
+                #[cfg(feature = "rayon")]
+                let iter = unack_tickets.into_par_iter();
 
-            #[cfg(not(feature = "rayon"))]
-            let iter = unack_tickets.into_iter();
+                #[cfg(not(feature = "rayon"))]
+                let iter = unack_tickets.into_iter();
 
-            iter.filter_map(|(channel, half_key, unack_ticket)| {
-                // This explicitly checks whether the acknowledgement
-                // solves the challenge on the ticket.
-                // It must be done before we check that the ticket is winning,
-                // which is a lengthy operation and should not be done for
-                // bogus unacknowledged tickets
-                let Ok(ack_ticket) = unack_ticket.acknowledge(&half_key) else {
-                    tracing::error!(%unack_ticket, "failed to acknowledge ticket");
-                    return None;
-                };
+                iter.filter_map(|(channel, half_key, unack_ticket)| {
+                    // This explicitly checks whether the acknowledgement
+                    // solves the challenge on the ticket.
+                    // It must be done before we check that the ticket is winning,
+                    // which is a lengthy operation and should not be done for
+                    // bogus unacknowledged tickets
+                    let Ok(ack_ticket) = unack_ticket.acknowledge(&half_key) else {
+                        tracing::error!(%unack_ticket, "failed to acknowledge ticket");
+                        return None;
+                    };
 
-                // This operation checks if the ticket is winning, and if it is, it
-                // turns it into a redeemable ticket.
-                match ack_ticket.into_redeemable(&chain_key, &domain_separator) {
-                    Ok(redeemable) => {
-                        tracing::debug!(%channel, "found winning ticket");
-                        Some(ResolvedAcknowledgement::RelayingWin(Box::new(redeemable)))
+                    // This operation checks if the ticket is winning, and if it is, it
+                    // turns it into a redeemable ticket.
+                    match ack_ticket.into_redeemable(&chain_key, &domain_separator) {
+                        Ok(redeemable) => {
+                            tracing::debug!(%channel, "found winning ticket");
+                            Some(ResolvedAcknowledgement::RelayingWin(Box::new(redeemable)))
+                        }
+                        Err(CoreTypesError::TicketNotWinning) => {
+                            tracing::trace!(%channel, "found losing ticket");
+                            Some(ResolvedAcknowledgement::RelayingLoss(*channel.get_id()))
+                        }
+                        Err(error) => {
+                            tracing::error!(%error, %channel, "error when acknowledging ticket");
+                            Some(ResolvedAcknowledgement::RelayingLoss(*channel.get_id()))
+                        }
                     }
-                    Err(CoreTypesError::TicketNotWinning) => {
-                        tracing::trace!(%channel, "found losing ticket");
-                        Some(ResolvedAcknowledgement::RelayingLoss(*channel.get_id()))
-                    }
-                    Err(error) => {
-                        tracing::error!(%error, %channel, "error when acknowledging ticket");
-                        Some(ResolvedAcknowledgement::RelayingLoss(*channel.get_id()))
-                    }
-                }
-            })
-            .collect::<Vec<_>>()
-        })
+                })
+                .collect::<Vec<_>>()
+            },
+            "ticket_redeem",
+        )
         .await
         .map_err(|e| TicketAcknowledgementError::Inner(HoprProtocolError::from(e)))?)
     }
