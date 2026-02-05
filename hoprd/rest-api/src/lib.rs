@@ -18,11 +18,7 @@ pub(crate) mod env {
     pub const HOPRD_SESSION_PORT_RANGE: &str = "HOPRD_SESSION_PORT_RANGE";
 }
 
-use std::{
-    error::Error,
-    iter::once,
-    sync::{Arc, atomic::AtomicU16},
-};
+use std::{error::Error, iter::once, sync::Arc};
 
 use axum::{
     Router,
@@ -76,7 +72,6 @@ pub(crate) struct InternalState {
     pub hoprd_cfg: serde_json::Value,
     pub auth: Arc<Auth>,
     pub hopr: Arc<HoprNode>,
-    pub websocket_active_count: Arc<AtomicU16>,
     pub open_listeners: Arc<ListenerJoinHandles>,
     pub default_listen_host: std::net::SocketAddr,
 }
@@ -225,7 +220,6 @@ async fn build_api(
         hopr: state.hopr.clone(),
         open_listeners,
         default_listen_host,
-        websocket_active_count: Arc::new(AtomicU16::new(0)),
     };
 
     Router::new()
@@ -257,10 +251,6 @@ async fn build_api(
                 .layer(axum::middleware::from_fn_with_state(
                     inner_state.clone(),
                     middleware::preconditions::authenticate,
-                ))
-                .layer(axum::middleware::from_fn_with_state(
-                    inner_state.clone(),
-                    middleware::preconditions::cap_websockets,
                 ))
                 .layer(
                     ServiceBuilder::new()
@@ -309,7 +299,6 @@ async fn build_api(
                 .route("/peers/{destination}/ping", post(peers::ping_peer))
                 .route("/session/config/{id}", get(session::session_config))
                 .route("/session/config/{id}", post(session::adjust_session))
-                .route("/session/websocket", get(session::websocket))
                 .route("/session/{protocol}", post(session::create_client))
                 .route("/session/{protocol}", get(session::list_clients))
                 .route("/session/{protocol}/{ip}/{port}", delete(session::close_client))
@@ -317,10 +306,6 @@ async fn build_api(
                 .layer(axum::middleware::from_fn_with_state(
                     inner_state.clone(),
                     middleware::preconditions::authenticate,
-                ))
-                .layer(axum::middleware::from_fn_with_state(
-                    inner_state.clone(),
-                    middleware::preconditions::cap_websockets,
                 ))
                 .layer(
                     ServiceBuilder::new()
@@ -380,7 +365,6 @@ enum ApiErrorStatus {
     Timeout,
     PingError(String),
     Unauthorized,
-    TooManyOpenWebsocketConnections,
     InvalidQuality,
     NotReady,
     ListenHostAlreadyUsed,
