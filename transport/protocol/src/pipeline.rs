@@ -364,29 +364,14 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
     WOut::Error: std::error::Error,
 {
     ack_outgoing
-        .then(move |(destination, maybe_ack_key)|{
+        .map(move |(destination, maybe_ack_key)| {
             let packet_key = packet_key.clone();
-            async move {
-                 // Sign acknowledgement with the given half-key or generate a signed random one
-                 match hopr_parallelize::cpu::spawn_blocking(
-                     move || {
-                         maybe_ack_key
-                             .map(|ack_key| VerifiedAcknowledgement::new(ack_key, &packet_key))
-                             .unwrap_or_else(|| VerifiedAcknowledgement::random(&packet_key))
-                     },
-                     "ack_sign",
-                 )
-                 .await
-                 {
-                    Ok(ack) => Some((destination, ack)),
-                    Err(error) => {
-                        tracing::error!(%error, "failed to spawn acknowledgement signing task");
-                        None
-                    }
-                 }
-            }
+            // Sign acknowledgement with the given half-key or generate a signed random one
+            let ack = maybe_ack_key
+                .map(|ack_key| VerifiedAcknowledgement::new(ack_key, &packet_key))
+                .unwrap_or_else(|| VerifiedAcknowledgement::random(&packet_key));
+            (destination, ack)
         })
-        .filter_map(futures::future::ready)
         .buffer(futures_time::time::Duration::from(cfg.ack_buffer_interval))
         .filter(|acks| futures::future::ready(!acks.is_empty()))
         .flat_map(|buffered_acks| {
