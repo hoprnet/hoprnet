@@ -42,7 +42,7 @@ pub mod cpu {
         let (tx, rx) = futures::channel::oneshot::channel();
         rayon::spawn(|| {
             tx.send(std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)))
-                .unwrap_or_else(|_| eprintln!("blocking task panicked"))
+                .unwrap_or_else(|r| eprintln!("spawned task receiver is gone, ok = {}", r.is_ok()))
         });
         rx.await
             .expect("spawned blocking process should be awaitable")
@@ -57,7 +57,7 @@ pub mod cpu {
         let (tx, rx) = futures::channel::oneshot::channel();
         rayon::spawn_fifo(|| {
             tx.send(std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)))
-                .unwrap_or_else(|_| eprintln!("blocking task panicked"))
+                .unwrap_or_else(|r| eprintln!("spawned fifo task receiver is gone, ok = {}", r.is_ok()))
         });
         rx.await
             .expect("spawned fifo blocking process should be awaitable")
