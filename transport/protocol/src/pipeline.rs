@@ -544,6 +544,7 @@ pub struct PacketPipelineConfig {
     /// Use 0 for no limit.
     pub input_concurrency: Option<usize>,
     /// Configuration of the packet acknowledgement processing
+    #[validate(nested)]
     pub ack_config: AcknowledgementPipelineConfig,
 }
 
