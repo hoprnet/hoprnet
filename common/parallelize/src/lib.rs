@@ -236,10 +236,9 @@ pub mod cpu {
             }
             match QUEUE_DEPTH.compare_exchange_weak(current, current + 1, Ordering::AcqRel, Ordering::Relaxed) {
                 Ok(_) => {
-                    let new_depth = current + 1;
                     #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_RAYON_QUEUE_DEPTH.set(new_depth as f64);
-                    return Ok(new_depth);
+                    METRIC_RAYON_QUEUE_DEPTH.increment(1.0);
+                    return Ok(current + 1);
                 }
                 Err(_) => continue, // CAS failed, retry
             }
@@ -251,7 +250,7 @@ pub mod cpu {
         let prev = QUEUE_DEPTH.fetch_sub(1, Ordering::AcqRel);
         debug_assert!(prev > 0, "queue depth underflow");
         #[cfg(all(feature = "prometheus", not(test)))]
-        METRIC_RAYON_QUEUE_DEPTH.set((prev - 1) as f64);
+        METRIC_RAYON_QUEUE_DEPTH.decrement(1.0);
     }
 
     /// Returns the current queue depth (tasks submitted but not yet completed).
