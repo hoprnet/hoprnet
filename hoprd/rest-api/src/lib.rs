@@ -324,14 +324,6 @@ fn checksum_address_serializer<S: serde::Serializer>(a: &Address, s: S) -> Resul
     s.serialize_str(&a.to_checksum())
 }
 
-fn option_checksum_address_serializer<S: serde::Serializer>(a: &Option<Address>, s: S) -> Result<S::Ok, S::Error> {
-    if let Some(addr) = a {
-        s.serialize_some(&addr.to_checksum())
-    } else {
-        s.serialize_none()
-    }
-}
-
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
     "status": "INVALID_INPUT",
