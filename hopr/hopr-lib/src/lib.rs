@@ -1450,7 +1450,7 @@ where
         Ok(())
     }
 
-    fn subscribe_winning_tickets(&self) -> impl Stream<Item = VerifiedTicket> + Send {
+    fn subscribe_winning_tickets(&self) -> impl Stream<Item = VerifiedTicket> + Send + 'static {
         self.winning_ticket_subscribers.1.activate_cloned()
     }
 

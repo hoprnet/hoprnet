@@ -8,8 +8,13 @@ use hopr_chain_connector::{
 };
 use hopr_db_node::{HoprNodeDb, init_hopr_node_db};
 use hopr_lib::{
-    AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, api::chain::ChainEvents, config::HoprLibConfig,
+    AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex,
+    api::chain::ChainEvents,
+    api::node::HoprNodeChainOperations,
+    config::HoprLibConfig,
 };
+use hopr_network_graph::immediate::ImmediateNeighborChannelGraph;
+use hopr_transport_p2p::{HoprNetwork, UninitializedPeerStore};
 use hoprd::{cli::CliArgs, config::HoprdConfig, errors::HoprdError, exit::HoprServerIpForwardingReactor};
 use hoprd_api::{RestApiParameters, serve_api};
 use signal_hook::low_level;
@@ -39,6 +44,14 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 mod jemalloc_stats;
 
 const DEFAULT_BLOKLI_URL: &str = "https://blokli.dufour.hoprnet.link";
+
+type HoprBlokliConnector = HoprBlockchainSafeConnector<BlokliClient>;
+type HoprNode = hopr_lib::Hopr<
+    Arc<HoprBlokliConnector>,
+    HoprNodeDb,
+    ImmediateNeighborChannelGraph<UninitializedPeerStore>,
+    HoprNetwork,
+>;
 
 fn init_logger() -> anyhow::Result<()> {
     let env_filter = match tracing_subscriber::EnvFilter::try_from_default_env() {
@@ -145,7 +158,7 @@ compile_error!("The 'runtime-tokio' feature must be enabled");
 
 async fn init_rest_api(
     cfg: &HoprdConfig,
-    hopr: Arc<hopr_lib::Hopr<Arc<HoprBlockchainSafeConnector<BlokliClient>>, HoprNodeDb>>,
+    hopr: Arc<HoprNode>,
 ) -> anyhow::Result<AbortableList<HoprdProcess>> {
     let node_cfg_value = serde_json::to_value(cfg.as_redacted()).map_err(|e| HoprdError::ConfigError(e.to_string()))?;
 

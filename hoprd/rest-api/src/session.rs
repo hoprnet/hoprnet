@@ -14,7 +14,7 @@ use base64::Engine;
 use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt};
 use futures_concurrency::stream::Merge;
 use hopr_lib::{
-    Address, HoprSession, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities, SessionClientConfig,
+    Address, HoprSession, NodeId, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities, SessionClientConfig,
     SessionId, SessionManagerError, SessionTarget, SurbBalancerConfig, TransportSessionError,
     errors::{HoprLibError, HoprTransportError},
     utils::futures::AsyncReadStreamer,
