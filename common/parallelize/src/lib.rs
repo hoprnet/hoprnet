@@ -53,8 +53,8 @@
 /// This allows callers to implement backpressure by dropping packets gracefully instead of
 /// accumulating unbounded work.
 ///
-/// The queue limit defaults to `10 * rayon::current_num_threads()` but can be overridden
-/// via the `HOPR_CPU_TASK_QUEUE_LIMIT` environment variable.
+/// The queue limit is disabled by default. Set the `HOPR_CPU_TASK_QUEUE_LIMIT` environment
+/// variable to enable queue limiting with a specific value.
 ///
 /// ## Observability
 ///
@@ -174,13 +174,10 @@ pub mod cpu {
     /// Current number of tasks in the queue (submitted but not yet completed/cancelled/orphaned).
     static QUEUE_DEPTH: AtomicUsize = AtomicUsize::new(0);
 
-    /// Lazily initialized queue limit.
-    static QUEUE_LIMIT: OnceLock<usize> = OnceLock::new();
+    /// Lazily initialized queue limit. `None` means no limit is enforced.
+    static QUEUE_LIMIT: OnceLock<Option<usize>> = OnceLock::new();
 
-    /// Default multiplier for queue limit relative to thread count.
-    const DEFAULT_QUEUE_LIMIT_MULTIPLIER: usize = 10;
-
-    /// Environment variable name for overriding queue limit.
+    /// Environment variable name for setting the queue limit.
     const QUEUE_LIMIT_ENV_VAR: &str = "HOPR_CPU_TASK_QUEUE_LIMIT";
 
     /// Error type for fallible spawn operations.
@@ -208,25 +205,31 @@ pub mod cpu {
     impl std::error::Error for SpawnError {}
 
     /// Returns the configured queue limit, initializing it on first call.
-    fn get_queue_limit() -> usize {
+    /// Returns `None` if no limit is configured (the default).
+    fn get_queue_limit() -> Option<usize> {
         *QUEUE_LIMIT.get_or_init(|| {
             let limit = std::env::var(QUEUE_LIMIT_ENV_VAR)
                 .ok()
                 .and_then(|v| v.parse::<usize>().ok())
-                .filter(|&v| v > 0)
-                .unwrap_or_else(|| rayon::current_num_threads() * DEFAULT_QUEUE_LIMIT_MULTIPLIER);
+                .filter(|&v| v > 0);
 
             #[cfg(all(feature = "prometheus", not(test)))]
-            METRIC_RAYON_QUEUE_LIMIT.set(limit as f64);
+            if let Some(l) = limit {
+                METRIC_RAYON_QUEUE_LIMIT.set(l as f64);
+            }
 
             limit
         })
     }
 
     /// Attempts to acquire a queue slot using compare-and-swap.
-    /// Returns the new queue depth on success, or `SpawnError::QueueFull` if the limit is reached.
-    fn try_acquire_queue_slot() -> Result<usize, SpawnError> {
-        let limit = get_queue_limit();
+    /// Returns `Ok(())` if no limit is configured or if a slot is acquired successfully.
+    /// Returns `Err(SpawnError::QueueFull)` if the limit is reached.
+    fn try_acquire_queue_slot() -> Result<(), SpawnError> {
+        let Some(limit) = get_queue_limit() else {
+            // No limit configured, always allow
+            return Ok(());
+        };
         loop {
             let current = QUEUE_DEPTH.load(Ordering::Relaxed);
             if current >= limit {
@@ -238,7 +241,7 @@ pub mod cpu {
                 Ok(_) => {
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_RAYON_QUEUE_DEPTH.increment(1.0);
-                    return Ok(current + 1);
+                    return Ok(());
                 }
                 Err(_) => continue, // CAS failed, retry
             }
@@ -246,11 +249,14 @@ pub mod cpu {
     }
 
     /// Releases a queue slot, decrementing the depth counter.
+    /// Only decrements when queue limiting is enabled.
     fn release_queue_slot() {
-        let prev = QUEUE_DEPTH.fetch_sub(1, Ordering::AcqRel);
-        debug_assert!(prev > 0, "queue depth underflow");
-        #[cfg(all(feature = "prometheus", not(test)))]
-        METRIC_RAYON_QUEUE_DEPTH.decrement(1.0);
+        if get_queue_limit().is_some() {
+            let prev = QUEUE_DEPTH.fetch_sub(1, Ordering::AcqRel);
+            debug_assert!(prev > 0, "queue depth underflow");
+            #[cfg(all(feature = "prometheus", not(test)))]
+            METRIC_RAYON_QUEUE_DEPTH.decrement(1.0);
+        }
     }
 
     /// Returns the current queue depth (tasks submitted but not yet completed).
@@ -258,8 +264,8 @@ pub mod cpu {
         QUEUE_DEPTH.load(Ordering::Relaxed)
     }
 
-    /// Returns the configured queue limit.
-    pub fn queue_limit() -> usize {
+    /// Returns the configured queue limit, or `None` if no limit is configured.
+    pub fn queue_limit() -> Option<usize> {
         get_queue_limit()
     }
 
@@ -361,8 +367,8 @@ pub mod cpu {
     /// The current thread pool uses a LIFO (Last In First Out) scheduling policy for the thread's queue, but
     /// FIFO (First In First Out) for stealing tasks from other threads.
     ///
-    /// The queue limit defaults to `10 * rayon::current_num_threads()` but can be overridden
-    /// via the `HOPR_CPU_TASK_QUEUE_LIMIT` environment variable.
+    /// The queue limit is disabled by default. Set the `HOPR_CPU_TASK_QUEUE_LIMIT` environment
+    /// variable to enable queue limiting with a specific value.
     ///
     /// Includes cooperative cancellation: if the async receiver is dropped (e.g., due to timeout)
     /// before the Rayon task starts executing, the task is skipped without performing any work.
@@ -391,8 +397,8 @@ pub mod cpu {
     /// This is the primary variant used by packet decoding, where FIFO ordering prevents
     /// starvation of older tasks by newer arrivals.
     ///
-    /// The queue limit defaults to `10 * rayon::current_num_threads()` but can be overridden
-    /// via the `HOPR_CPU_TASK_QUEUE_LIMIT` environment variable.
+    /// The queue limit is disabled by default. Set the `HOPR_CPU_TASK_QUEUE_LIMIT` environment
+    /// variable to enable queue limiting with a specific value.
     ///
     /// Includes cooperative cancellation: if the async receiver is dropped (e.g., due to timeout)
     /// before the Rayon task starts executing, the task is skipped without performing any work.
@@ -603,7 +609,17 @@ mod tests {
     #[serial]
     async fn queue_depth_tracking() {
         // This test verifies that queue depth increases when a task is submitted
-        // and decreases when it completes.
+        // and decreases when it completes. Queue depth tracking only happens when
+        // a limit is configured.
+        // To exercise this test, run with: HOPR_CPU_TASK_QUEUE_LIMIT=10 cargo test
+        if cpu::queue_limit().is_none() {
+            eprintln!(
+                "Skipping queue_depth_tracking: no queue limit configured. \
+                 Set HOPR_CPU_TASK_QUEUE_LIMIT=10 to run this test."
+            );
+            return;
+        }
+
         let initial_depth = cpu::current_queue_depth();
 
         // Submit a slow task via try_spawn using a barrier to control execution
@@ -651,9 +667,16 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn queue_full_returns_error() {
-        // Temporarily set a very low queue limit by saturating the queue
-        // We need to submit more tasks than the limit allows
-        let limit = cpu::queue_limit();
+        // This test validates queue-full behavior which requires a limit to be set.
+        // Skip if no limit is configured (the default).
+        // To exercise this test, run with: HOPR_CPU_TASK_QUEUE_LIMIT=10 cargo test
+        let Some(limit) = cpu::queue_limit() else {
+            eprintln!(
+                "Skipping queue_full_returns_error: no queue limit configured. \
+                 Set HOPR_CPU_TASK_QUEUE_LIMIT=10 to run this test."
+            );
+            return;
+        };
 
         // Use barriers to hold tasks in the queue
         let barriers: Vec<_> = (0..limit + 5).map(|_| Arc::new(std::sync::Barrier::new(2))).collect();
@@ -714,6 +737,16 @@ mod tests {
     #[serial]
     async fn queue_depth_decrements_on_cancellation() {
         // This test verifies that cancelled tasks properly release their queue slots.
+        // Queue depth tracking only happens when a limit is configured.
+        // To exercise this test, run with: HOPR_CPU_TASK_QUEUE_LIMIT=10 cargo test
+        if cpu::queue_limit().is_none() {
+            eprintln!(
+                "Skipping queue_depth_decrements_on_cancellation: no queue limit configured. \
+                 Set HOPR_CPU_TASK_QUEUE_LIMIT=10 to run this test."
+            );
+            return;
+        }
+
         let initial_depth = cpu::current_queue_depth();
 
         // Submit tasks that will be cancelled via cooperative cancellation
