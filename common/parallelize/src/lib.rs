@@ -211,9 +211,10 @@ pub mod cpu {
     }
 
     /// Error type for spawn operations.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
     pub enum SpawnError {
         /// The queue is full and cannot accept more tasks.
+        #[error("rayon queue full: {current}/{limit} tasks outstanding")]
         QueueFull {
             /// Current outstanding task count when rejection occurred.
             current: usize,
@@ -221,18 +222,6 @@ pub mod cpu {
             limit: usize,
         },
     }
-
-    impl std::fmt::Display for SpawnError {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            match self {
-                SpawnError::QueueFull { current, limit } => {
-                    write!(f, "rayon queue full: {current}/{limit} tasks outstanding")
-                }
-            }
-        }
-    }
-
-    impl std::error::Error for SpawnError {}
 
     /// Returns the current outstanding task count (queued + running).
     #[inline]
@@ -272,32 +261,13 @@ pub mod cpu {
         metrics::outstanding_dec();
     }
 
-    /// Guard that ensures `release_slot()` is called exactly once,
+    /// Guard that calls `release_slot()` on drop,
     /// even if the task panics or returns early.
-    struct SlotGuard {
-        released: bool,
-    }
-
-    impl SlotGuard {
-        fn new() -> Self {
-            Self { released: false }
-        }
-
-        /// Manually release the slot (prevents double-release in Drop).
-        fn release(mut self) {
-            if !self.released {
-                self.released = true;
-                release_slot();
-            }
-        }
-    }
+    struct SlotGuard;
 
     impl Drop for SlotGuard {
         fn drop(&mut self) {
-            if !self.released {
-                self.released = true;
-                release_slot();
-            }
+            release_slot();
         }
     }
 
@@ -332,7 +302,7 @@ pub mod cpu {
 
         let task = move || {
             // guard ensures slot is released even on panic
-            let guard = SlotGuard::new();
+            let _guard = SlotGuard;
 
             if tx.is_canceled() {
                 tracing::debug!(
@@ -340,7 +310,6 @@ pub mod cpu {
                     "skipping cancelled task (receiver dropped before execution)"
                 );
                 metrics::cancelled();
-                guard.release();
                 return;
             }
 
@@ -361,7 +330,6 @@ pub mod cpu {
                     metrics::orphaned();
                 }
             }
-            guard.release();
         };
 
         (task, rx)

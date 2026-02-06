@@ -62,7 +62,7 @@ impl hopr_lib::traits::session::HoprSessionServer for HoprServerIpForwardingReac
                 let udp_target =
                     hopr_lib::utils::parallelize::cpu::spawn_blocking(move || udp_target.unseal(&kp), "udp_unseal")
                         .await
-                        .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?
+                        .map_err(|e| HoprLibError::GeneralError(format!("failed to spawn unseal task: {e}")))?
                         .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?;
 
                 tracing::debug!(
@@ -151,7 +151,7 @@ impl hopr_lib::traits::session::HoprSessionServer for HoprServerIpForwardingReac
                 let tcp_target =
                     hopr_lib::utils::parallelize::cpu::spawn_blocking(move || tcp_target.unseal(&kp), "tcp_unseal")
                         .await
-                        .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?
+                        .map_err(|e| HoprLibError::GeneralError(format!("failed to spawn unseal task: {e}")))?
                         .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?;
 
                 tracing::debug!(?session_id, %tcp_target, "creating a connection to the TCP server");

@@ -23,7 +23,7 @@ serde = [
   "hopr-internal-types/serde",
   "hopr-crypto-types/serde",
 ]
-prometheus = ["dep:hopr-metrics"]
+prometheus = ["dep:hopr-metrics", "hopr-parallelize/prometheus"]
 
 [dependencies]
 anyhow = { workspace = true }

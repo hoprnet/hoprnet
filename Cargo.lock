@@ -4386,7 +4386,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.13.2"
+version = "0.14.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4819,6 +4819,7 @@ dependencies = [
  "lazy_static",
  "rayon",
  "serial_test",
+ "thiserror 2.0.18",
  "tokio",
  "tracing",
 ]

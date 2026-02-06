@@ -18,33 +18,33 @@ pub enum TempDbError {
     Io(#[from] std::io::Error),
 }
 
+impl From<redb::DatabaseError> for TempDbError {
+    fn from(error: redb::DatabaseError) -> Self {
+        Self::Database(error.into())
+    }
+}
+
 impl From<redb::TransactionError> for TempDbError {
-    fn from(e: redb::TransactionError) -> Self {
-        Self::Database(e.into())
+    fn from(error: redb::TransactionError) -> Self {
+        Self::Database(error.into())
     }
 }
 
 impl From<redb::TableError> for TempDbError {
-    fn from(e: redb::TableError) -> Self {
-        Self::Database(e.into())
+    fn from(error: redb::TableError) -> Self {
+        Self::Database(error.into())
     }
 }
 
 impl From<redb::StorageError> for TempDbError {
-    fn from(e: redb::StorageError) -> Self {
-        Self::Database(e.into())
+    fn from(error: redb::StorageError) -> Self {
+        Self::Database(error.into())
     }
 }
 
 impl From<redb::CommitError> for TempDbError {
-    fn from(e: redb::CommitError) -> Self {
-        Self::Database(e.into())
-    }
-}
-
-impl From<redb::DatabaseError> for TempDbError {
-    fn from(e: redb::DatabaseError) -> Self {
-        Self::Database(e.into())
+    fn from(error: redb::CommitError) -> Self {
+        Self::Database(error.into())
     }
 }
 

@@ -15,6 +15,8 @@ use crate::{
     errors::HoprProtocolError, tbf::TagBloomFilter,
 };
 
+const QUEUE_FULL_ERROR_MARKER: &str = "local CPU queue full";
+
 /// Default [decoder](PacketDecoder) implementation for HOPR packets.
 pub struct HoprDecoder<Chain, S, T> {
     chain_api: Chain,
@@ -271,7 +273,7 @@ where
                 .map_err(|e| match e {
                     hopr_parallelize::cpu::SpawnError::QueueFull { current, limit } => {
                         hopr_primitive_types::errors::GeneralError::NonSpecificError(format!(
-                            "local CPU queue full ({current}/{limit})"
+                            "{QUEUE_FULL_ERROR_MARKER} ({current}/{limit})"
                         ))
                     }
                 })?
@@ -281,7 +283,7 @@ where
             Ok(peer) => peer,
             Err(error) => {
                 let error_str = error.to_string();
-                if error_str.contains("local CPU queue full") {
+                if error_str.contains(QUEUE_FULL_ERROR_MARKER) {
                     tracing::warn!(%sender, "dropping packet due to local CPU overload (not sender's fault)");
                 } else {
                     tracing::error!(%sender, %error, "dropping packet - cannot convert peer id");
@@ -316,12 +318,14 @@ where
         .await
         .map_err(|e| IncomingPacketError::Undecodable(e.into()))?
         .map_err(|e| IncomingPacketError::Undecodable(e.into()))?;
+
+        let packet_type = match &packet {
+            HoprPacket::Final(_) => "final",
+            HoprPacket::Forwarded(_) => "forwarded",
+            HoprPacket::Outgoing(_) => "outgoing",
+        };
+
         if let Some(start) = phase_start {
-            let packet_type = match &packet {
-                HoprPacket::Final(_) => "final",
-                HoprPacket::Forwarded(_) => "forwarded",
-                HoprPacket::Outgoing(_) => "outgoing",
-            };
             tracing::trace!(
                 elapsed_ms = start.elapsed().as_millis() as u64,
                 packet_type,
@@ -341,12 +345,6 @@ where
                 ));
             }
         }
-
-        let packet_type = match &packet {
-            HoprPacket::Final(_) => "final",
-            HoprPacket::Forwarded(_) => "forwarded",
-            HoprPacket::Outgoing(_) => "outgoing",
-        };
 
         match packet {
             HoprPacket::Final(incoming) => {
@@ -412,7 +410,11 @@ where
                     ),
                 };
                 if trace_timing {
-                    tracing::trace!(total_ms = decode_start.elapsed().as_millis() as u64, packet_type, "decode complete");
+                    tracing::trace!(
+                        total_ms = decode_start.elapsed().as_millis() as u64,
+                        packet_type,
+                        "decode complete"
+                    );
                 }
                 Ok(result)
             }
@@ -443,7 +445,11 @@ where
                 payload.extend_from_slice(&fwd.outgoing.ticket.into_encoded());
 
                 if trace_timing {
-                    tracing::trace!(total_ms = decode_start.elapsed().as_millis() as u64, packet_type, "decode complete");
+                    tracing::trace!(
+                        total_ms = decode_start.elapsed().as_millis() as u64,
+                        packet_type,
+                        "decode complete"
+                    );
                 }
                 Ok(IncomingPacket::Forwarded(
                     IncomingForwardedPacket {
@@ -460,7 +466,11 @@ where
             }
             HoprPacket::Outgoing(_) => {
                 if trace_timing {
-                    tracing::trace!(total_ms = decode_start.elapsed().as_millis() as u64, packet_type, "decode complete");
+                    tracing::trace!(
+                        total_ms = decode_start.elapsed().as_millis() as u64,
+                        packet_type,
+                        "decode complete"
+                    );
                 }
                 Err(IncomingPacketError::ProcessingError(
                     previous_hop,

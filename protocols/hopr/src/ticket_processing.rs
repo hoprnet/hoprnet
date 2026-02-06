@@ -553,7 +553,7 @@ where
                 })
                 .collect::<Vec<_>>()
             },
-            "ticket_redeem",
+            "ticket_into_redeemable",
         )
         .await
         .map_err(|e| TicketAcknowledgementError::Inner(HoprProtocolError::from(e)))?)

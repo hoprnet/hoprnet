@@ -107,6 +107,7 @@ These metrics track the Rayon thread pool used for CPU-intensive cryptographic o
    - Consider setting `HOPR_CPU_TASK_QUEUE_LIMIT` for backpressure
 
 **Mitigation**:
+
 - Set `HOPR_CPU_TASK_QUEUE_LIMIT` (e.g., 1000) to apply backpressure upstream
 - Reduce `HOPR_TRANSPORT_MAX_CONCURRENT_PACKETS` to limit incoming load
 - Increase CPU allocation to the hoprd process
@@ -155,6 +156,7 @@ These metrics help diagnose "unknown ticket" acknowledgement failures by trackin
    - **Remember to disable** after debugging to avoid cardinality issues
 
 **Mitigation**:
+
 - Review cache TTL and capacity settings in ticket processing code
 - Investigate network latency to specific peers (acknowledgements arriving late)
 - Check if peer is malicious (not sending acknowledgements intentionally)

@@ -205,8 +205,8 @@ On top of the default configuration options generated for the command line, the 
 - `HOPR_INTERNAL_SESSION_INCOMING_CAPACITY` - the maximum capacity of the queue storing unprocessed incoming and outgoing messages inside a session
 - `HOPR_INTERNAL_SESSION_BALANCER_LEVEL_CAPACITY` - the maximum capacity of the session balancer
 - `HOPR_INTERNAL_RAW_SOCKET_LIKE_CHANNEL_CAPACITY` - the maximum capacity of the raw socket-like bidirectional API interface
-- `HOPR_INTERNAL_IN_PACKET_PIPELINE_CONCURRENCY` - the maximum number of incoming packets to process concurrently (default: set by CPU, 0 = no limit)
-- `HOPR_INTERNAL_OUT_PACKET_PIPELINE_CONCURRENCY` - the maximum number of outgoing packets to process concurrently (default: set by CPU, 0 = no limit)
+- `HOPR_INTERNAL_IN_PACKET_PIPELINE_CONCURRENCY` - the maximum number of incoming packets to process concurrently (default: 8 × CPU cores, 0 = no limit)
+- `HOPR_INTERNAL_OUT_PACKET_PIPELINE_CONCURRENCY` - the maximum number of outgoing packets to process concurrently (default: 8 × CPU cores, 0 = no limit)
 - `HOPR_CPU_TASK_QUEUE_LIMIT` - maximum number of CPU-bound tasks (queued + running) in the Rayon thread pool. If not set, the queue is unbounded. Set this to prevent unbounded queue growth under sustained load (e.g., `1000`). When the limit is reached, new tasks are rejected and packet decode operations may fail with "local CPU queue full" errors.
 - `HOPR_BALANCER_PID_P_GAIN` - proportional (P) gain for the PID controller in outgoing SURB balancer (default: `0.6`)
 - `HOPR_BALANCER_PID_I_GAIN` - integral (I) gain for the PID controller in outgoing SURB balancer (default: `0.7`)
