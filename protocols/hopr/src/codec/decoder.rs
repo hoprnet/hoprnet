@@ -75,7 +75,7 @@ where
             .map_err(|e| HoprProtocolError::ResolverError(e.into()))?
             .ok_or(HoprProtocolError::KeyNotFound)?;
         if let Some(start) = lookup_start {
-            tracing::trace!(
+            tracing::debug!(
                 elapsed_ms = start.elapsed().as_millis() as u64,
                 "previous_hop_addr lookup"
             );
@@ -89,7 +89,7 @@ where
             .map_err(|e| HoprProtocolError::ResolverError(e.into()))?
             .ok_or(HoprProtocolError::KeyNotFound)?;
         if let Some(start) = lookup_start {
-            tracing::trace!(elapsed_ms = start.elapsed().as_millis() as u64, "next_hop_addr lookup");
+            tracing::debug!(elapsed_ms = start.elapsed().as_millis() as u64, "next_hop_addr lookup");
         }
 
         let lookup_start = trace_timing.then(std::time::Instant::now);
@@ -100,7 +100,7 @@ where
             .map_err(|e| HoprProtocolError::ResolverError(e.into()))?
             .ok_or_else(|| HoprProtocolError::ChannelNotFound(previous_hop_addr, *self.chain_key.as_ref()))?;
         if let Some(start) = lookup_start {
-            tracing::trace!(
+            tracing::debug!(
                 elapsed_ms = start.elapsed().as_millis() as u64,
                 "incoming_channel lookup"
             );
@@ -116,7 +116,7 @@ where
             .map_err(|e| HoprProtocolError::ResolverError(e.into()))?
             .mul(U256::from(fwd.path_pos));
         if let Some(start) = lookup_start {
-            tracing::trace!(
+            tracing::debug!(
                 elapsed_ms = start.elapsed().as_millis() as u64,
                 "minimum_ticket_price lookup"
             );
@@ -130,7 +130,7 @@ where
                 .map_err(|e| HoprProtocolError::TicketTrackerError(e.into()))?,
         );
         if let Some(start) = lookup_start {
-            tracing::trace!(
+            tracing::debug!(
                 elapsed_ms = start.elapsed().as_millis() as u64,
                 "remaining_balance lookup"
             );
@@ -147,7 +147,7 @@ where
             .await
             .map_err(|e| HoprProtocolError::ResolverError(e.into()))?;
         if let Some(start) = lookup_start {
-            tracing::trace!(elapsed_ms = start.elapsed().as_millis() as u64, "win_prob lookup");
+            tracing::debug!(elapsed_ms = start.elapsed().as_millis() as u64, "win_prob lookup");
         }
 
         let domain_separator = self.channels_dst;
@@ -332,16 +332,15 @@ where
 
         // This is checked on both Final and Forwarded packets,
         // Outgoing packets are not allowed to pass and are later reported as invalid state.
-        if let Some(tag) = packet.packet_tag() {
-            // This operation has run-time of ~10 nanoseconds,
-            // and therefore does not need to be invoked via spawn_blocking
-            if self.tbf.lock().check_and_set(tag) {
-                return Err(IncomingPacketError::ProcessingError(
-                    previous_hop,
-                    HoprProtocolError::Replay,
-                ));
-            }
-        }
+        // if let Some(tag) = packet.packet_tag() {
+        // This operation has run-time of ~10 nanoseconds,
+        // and therefore does not need to be invoked via spawn_blocking
+        //   if self.tbf.lock().check_and_set(tag) {
+        //     return Err(IncomingPacketError::ProcessingError(
+        //       previous_hop,
+        //     HoprProtocolError::Replay,
+        //));
+        //}
 
         match packet {
             HoprPacket::Final(incoming) => {
