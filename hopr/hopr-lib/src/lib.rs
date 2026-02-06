@@ -79,7 +79,12 @@ use std::{
     time::Duration,
 };
 
-use futures::{FutureExt, SinkExt, Stream, StreamExt, TryFutureExt, channel::mpsc::channel, pin_mut};
+use futures::{
+    FutureExt, SinkExt, Stream, StreamExt, TryFutureExt,
+    channel::mpsc::{SendError, channel},
+    pin_mut,
+    sink::SinkMapErr,
+};
 use futures_time::future::FutureExt as FuturesTimeFutureExt;
 use hopr_api::{
     chain::{AccountSelector, AnnouncementError, ChannelSelector, *},
@@ -1040,47 +1045,6 @@ where
     }
 }
 
-/// Wrapper around mpsc sender to implement Sink with HoprLibError.
-#[derive(Clone)]
-pub struct RedemptionRequestSink(futures::channel::mpsc::Sender<TicketSelector>);
-
-impl futures::Sink<TicketSelector> for RedemptionRequestSink {
-    type Error = HoprLibError;
-
-    fn poll_ready(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), Self::Error>> {
-        std::pin::Pin::new(&mut self.0)
-            .poll_ready(cx)
-            .map_err(|e| HoprLibError::GeneralError(e.to_string()))
-    }
-
-    fn start_send(mut self: std::pin::Pin<&mut Self>, item: TicketSelector) -> Result<(), Self::Error> {
-        std::pin::Pin::new(&mut self.0)
-            .start_send(item)
-            .map_err(|e| HoprLibError::GeneralError(e.to_string()))
-    }
-
-    fn poll_flush(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), Self::Error>> {
-        std::pin::Pin::new(&mut self.0)
-            .poll_flush(cx)
-            .map_err(|e| HoprLibError::GeneralError(e.to_string()))
-    }
-
-    fn poll_close(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), Self::Error>> {
-        std::pin::Pin::new(&mut self.0)
-            .poll_close(cx)
-            .map_err(|e| HoprLibError::GeneralError(e.to_string()))
-    }
-}
-
 #[async_trait::async_trait]
 impl<Chain, Db, Graph, Net> HoprNodeChainOperations for Hopr<Chain, Db, Graph, Net>
 where
@@ -1090,7 +1054,7 @@ where
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     type Error = HoprLibError;
-    type RedemptionSink = RedemptionRequestSink;
+    type RedemptionSink = SinkMapErr<futures::channel::mpsc::Sender<TicketSelector>, fn(SendError) -> HoprLibError>;
 
     fn me_onchain(&self) -> Address {
         *self.chain_api.me()
@@ -1457,12 +1421,12 @@ where
     fn redemption_requests(&self) -> Result<Self::RedemptionSink, Self::Error> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        Ok(RedemptionRequestSink(
-            self.redeem_requests
-                .get()
-                .cloned()
-                .expect("redeem_requests is not initialized"),
-        ))
+        Ok(self
+            .redeem_requests
+            .get()
+            .cloned()
+            .expect("redeem_requests is not initialized")
+            .sink_map_err(|e| HoprLibError::GeneralError(format!("failed to send redemption request: {e}"))))
     }
 
     async fn withdraw_tokens(&self, recipient: Address, amount: HoprBalance) -> Result<Hash, Self::Error> {
