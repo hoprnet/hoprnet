@@ -59,9 +59,11 @@ impl ImmediateNeighborProber {
 }
 
 impl TrafficGeneration for ImmediateNeighborProber {
+    type NodeId = PeerId;
+
     fn build<U>(self, network_graph: U) -> impl futures::Stream<Item = DestinationRouting> + Send
     where
-        U: NetworkGraphView + Send + Sync + 'static,
+        U: NetworkGraphView<NodeId = PeerId> + Send + Sync + 'static,
     {
         // For each probe target a cached version of transport routing is stored
         let cache_peer_routing: moka::future::Cache<PeerId, DestinationRouting> = moka::future::Cache::builder()

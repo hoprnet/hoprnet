@@ -1,6 +1,11 @@
 use std::sync::Arc;
 
-use hopr_api::{PeerId, ct::DestinationRouting, graph::Observable, network::NetworkView};
+use hopr_api::{
+    PeerId,
+    ct::DestinationRouting,
+    graph::Observable,
+    network::NetworkView,
+};
 use rand::seq::SliceRandom;
 
 use crate::{immediate::tracker::NetworkPeerTracker, observation::Observations};
@@ -81,8 +86,9 @@ where
     T: NetworkView + Send + Sync + Clone + 'static,
 {
     type Observed = Observations;
+    type NodeId = PeerId;
 
-    fn nodes(&self) -> futures::stream::BoxStream<'static, PeerId> {
+    fn nodes(&self) -> futures::stream::BoxStream<'static, Self::NodeId> {
         let fetcher = self.network.clone();
         let _recheck_threshold = self.recheck_threshold; // TODO: currently being ignored
         let mut rng = hopr_crypto_random::rng();
@@ -97,7 +103,7 @@ where
         })
     }
 
-    async fn routes(&self, _destination: &PeerId, _length: usize) -> Vec<DestinationRouting> {
+    async fn routes(&self, _destination: &Self::NodeId, _length: usize) -> Vec<DestinationRouting> {
         vec![]
     }
 
@@ -105,7 +111,7 @@ where
         vec![]
     }
 
-    fn observations_for(&self, peer: &PeerId) -> Option<Observations> {
+    fn observations_for(&self, peer: &Self::NodeId) -> Option<Self::Observed> {
         if self.network.is_connected(peer) {
             self.tracker.get(peer)
         } else {

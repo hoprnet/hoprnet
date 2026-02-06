@@ -22,6 +22,7 @@
     "nix": true,
     "cargo build": true,
     "cargo test": true,
-    "cargo shear": true
+    "cargo shear": true,
+    "cargo check": true
   }
 }

@@ -119,7 +119,7 @@ type CurrentPathSelector = NoPathSelector;
 /// the transport.
 pub struct HoprTransport<Chain, Db, Graph, Net>
 where
-    Graph: NetworkGraphView + NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Graph: NetworkGraphView<NodeId = PeerId> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
     Net: NetworkView + NetworkStreamControl + Clone + Send + Sync + 'static,
 {
     packet_key: OffchainKeypair,
@@ -146,7 +146,7 @@ where
         + Send
         + Sync
         + 'static,
-    Graph: NetworkGraphView + NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Graph: NetworkGraphView<NodeId = PeerId> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
     Net: NetworkView + NetworkStreamControl + Clone + Send + Sync + 'static,
 {
     pub fn new(
@@ -224,7 +224,7 @@ where
         S: futures::Stream<Item = PeerDiscovery> + Send + 'static,
         T: futures::Sink<TicketEvent> + Clone + Send + Unpin + 'static,
         T::Error: std::error::Error,
-        Ct: TrafficGeneration + Send + Sync + 'static,
+        Ct: TrafficGeneration<NodeId = PeerId> + Send + Sync + 'static,
         NetBuilder: NetworkBuilder<Network = Net> + Send + Sync + 'static,
     {
         info!("loading initial peers from the chain");

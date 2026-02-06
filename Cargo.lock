@@ -4622,6 +4622,7 @@ dependencies = [
  "hopr-internal-types",
  "hopr-network-graph",
  "hopr-network-types",
+ "humantime-serde",
  "lazy_static",
  "mockall",
  "moka",

@@ -18,6 +18,7 @@ use futures::{
     future::{AbortHandle, AbortRegistration},
 };
 use hopr_api::{
+    PeerId,
     chain::HoprChainApi,
     db::HoprNodeDbApi,
     graph::{NetworkGraphUpdate, NetworkGraphView},
@@ -221,7 +222,7 @@ impl SessionPool {
     where
         Chain: HoprChainApi + Clone + Send + Sync + 'static,
         Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
-        Graph: NetworkGraphView + NetworkGraphUpdate + Clone + Send + Sync + 'static,
+        Graph: NetworkGraphView<NodeId = PeerId> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
         Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
     {
         let pool = Arc::new(parking_lot::Mutex::new(VecDeque::with_capacity(size)));
@@ -316,7 +317,7 @@ pub async fn create_tcp_client_binding<Chain, Db, Graph, Net>(
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
-    Graph: NetworkGraphView + NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Graph: NetworkGraphView<NodeId = PeerId> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     // Bind the TCP socket first
@@ -489,7 +490,7 @@ pub async fn create_udp_client_binding<Chain, Db, Graph, Net>(
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
-    Graph: NetworkGraphView + NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Graph: NetworkGraphView<NodeId = PeerId> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     // Bind the UDP socket first

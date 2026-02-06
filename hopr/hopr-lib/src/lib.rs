@@ -235,7 +235,12 @@ const ON_CHAIN_RESOLUTION_EVENT_TIMEOUT: Duration = Duration::from_secs(90);
 /// As such, the `hopr_lib` serves mainly as an integration point into Rust programs.
 pub struct Hopr<Chain, Db, Graph, Net>
 where
-    Graph: hopr_api::graph::NetworkGraphView + hopr_api::graph::NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Graph: hopr_api::graph::NetworkGraphView<NodeId = PeerId>
+        + hopr_api::graph::NetworkGraphUpdate
+        + Clone
+        + Send
+        + Sync
+        + 'static,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     me: OffchainKeypair,
@@ -253,7 +258,12 @@ impl<Chain, Db, Graph, Net> Hopr<Chain, Db, Graph, Net>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
-    Graph: hopr_api::graph::NetworkGraphView + hopr_api::graph::NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Graph: hopr_api::graph::NetworkGraphView<NodeId = PeerId>
+        + hopr_api::graph::NetworkGraphUpdate
+        + Clone
+        + Send
+        + Sync
+        + 'static,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     pub async fn new(
@@ -343,7 +353,7 @@ where
         #[cfg(feature = "session-server")] serve_handler: T,
     ) -> errors::Result<HoprTransportIO>
     where
-        Ct: TrafficGeneration + Send + Sync + 'static,
+        Ct: TrafficGeneration<NodeId = PeerId> + Send + Sync + 'static,
         NetBuilder: NetworkBuilder<Network = Net> + Send + Sync + 'static,
     {
         self.error_if_not_in_state(
@@ -907,7 +917,12 @@ where
 
 impl<Chain, Db, Graph, Net> Hopr<Chain, Db, Graph, Net>
 where
-    Graph: hopr_api::graph::NetworkGraphView + hopr_api::graph::NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Graph: hopr_api::graph::NetworkGraphView<NodeId = PeerId>
+        + hopr_api::graph::NetworkGraphUpdate
+        + Clone
+        + Send
+        + Sync
+        + 'static,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     // === telemetry
@@ -929,7 +944,12 @@ impl<Chain, Db, Graph, Net> HoprNodeOperations for Hopr<Chain, Db, Graph, Net>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
-    Graph: hopr_api::graph::NetworkGraphView + hopr_api::graph::NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Graph: hopr_api::graph::NetworkGraphView<NodeId = PeerId>
+        + hopr_api::graph::NetworkGraphUpdate
+        + Clone
+        + Send
+        + Sync
+        + 'static,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     fn status(&self) -> HoprState {
@@ -942,7 +962,12 @@ impl<Chain, Db, Graph, Net> HoprNodeNetworkOperations for Hopr<Chain, Db, Graph,
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
-    Graph: hopr_api::graph::NetworkGraphView + hopr_api::graph::NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Graph: hopr_api::graph::NetworkGraphView<NodeId = PeerId>
+        + hopr_api::graph::NetworkGraphUpdate
+        + Clone
+        + Send
+        + Sync
+        + 'static,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     type Error = HoprLibError;
@@ -1050,7 +1075,12 @@ impl<Chain, Db, Graph, Net> HoprNodeChainOperations for Hopr<Chain, Db, Graph, N
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
-    Graph: hopr_api::graph::NetworkGraphView + hopr_api::graph::NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Graph: hopr_api::graph::NetworkGraphView<NodeId = PeerId>
+        + hopr_api::graph::NetworkGraphUpdate
+        + Clone
+        + Send
+        + Sync
+        + 'static,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     type Error = HoprLibError;
