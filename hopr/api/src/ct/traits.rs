@@ -12,7 +12,10 @@ pub use crate::graph::traits::NetworkGraphView;
 /// since the exhaustion of the stream might result in termination of the
 /// cover traffic generation.
 pub trait TrafficGeneration {
+    /// The type of node identifier used by this traffic generator.
+    type NodeId: Send;
+
     fn build<T>(self, network_graph: T) -> impl futures::Stream<Item = DestinationRouting> + Send
     where
-        T: NetworkGraphView + Send + Sync + 'static;
+        T: NetworkGraphView<NodeId = Self::NodeId> + Send + Sync + 'static;
 }

@@ -80,7 +80,7 @@ pub fn packet_sending_bench(c: &mut Criterion) {
                         hopr_crypto_random::random_fill(&mut payload);
                         (addrs, forward_path, return_paths, payload)
                     },
-                    |((sender_addr, destination_addr), forward_path, return_paths, payload)| {
+                    |((_sender_addr, destination_addr), forward_path, return_paths, payload)| {
                         // The number of hops for ticket creation does not matter for benchmark purposes
                         let tb = TicketBuilder::zero_hop().counterparty(destination_addr);
                         HoprPacket::into_outgoing(
@@ -174,7 +174,7 @@ pub fn packet_precompute_bench(c: &mut Criterion) {
                         );
                         (addrs, forward_path, return_paths)
                     },
-                    |((sender_addr, destination_addr), forward_path, return_paths)| {
+                    |((_sender_addr, destination_addr), forward_path, return_paths)| {
                         // The number of hops for ticket creation does not matter for benchmark purposes
                         let tb = TicketBuilder::zero_hop().counterparty(destination_addr);
                         PartialHoprPacket::new(

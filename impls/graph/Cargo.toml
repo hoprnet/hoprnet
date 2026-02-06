@@ -12,7 +12,8 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = []
+default = ["graph_immediate"]
+graph_immediate = []
 
 [dependencies]
 async-trait = { workspace = true }

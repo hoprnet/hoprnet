@@ -1,5 +1,4 @@
 use hopr_network_types::types::DestinationRouting;
-use multiaddr::PeerId;
 
 use super::{MeasurableNeighbor, MeasurablePath, NetworkGraphError, Telemetry};
 
@@ -37,24 +36,25 @@ pub trait Observable {
 pub trait NetworkGraphView {
     /// The concrete type of observations for peers.
     type Observed: Observable + Send;
+    type NodeId: Send;
 
     /// Returns a stream of all known nodes in the network graph.
-    fn nodes(&self) -> futures::stream::BoxStream<'static, PeerId>;
+    fn nodes(&self) -> futures::stream::BoxStream<'static, Self::NodeId>;
+
+    /// Returns the weight represented by the observations for the edge between the
+    /// given source and destination, if available.
+    fn edge(&self, src: &Self::NodeId, dest: &Self::NodeId) -> Option<Self::Observed>;
 
     /// Returns a list of all routes to the given destination of the specified length.
     ///
     /// NOTE(20260204): for future usage in path planning this should contain a referencable
     /// object that can be updated whenever the graph changes instead of a static snapshot.
-    async fn routes(&self, destination: &PeerId, length: usize) -> Vec<DestinationRouting>;
+    async fn routes(&self, destination: &Self::NodeId, length: usize) -> Vec<DestinationRouting>;
 
     /// Returns a list of batches of loopback routes. Each batch contains a set of routes
     /// that start and end at the same node, while also belonging to the same path discovery
     /// batch.
     async fn loopback_routes(&self) -> Vec<Vec<DestinationRouting>>;
-
-    /// Returns observations for a given peer, if available.
-    /// The returned type is owned and does not borrow from inputs.
-    fn observations_for(&self, peer: &PeerId) -> Option<Self::Observed>;
 }
 
 /// A trait specifying the graph update functionality

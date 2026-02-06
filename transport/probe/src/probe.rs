@@ -57,7 +57,7 @@ impl Probe {
         U: futures::Stream<Item = (HoprPseudonym, ApplicationDataIn)> + Send + Sync + 'static,
         V: futures::Stream<Item = (PeerId, PingQueryReplier)> + Send + Sync + 'static,
         Up: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Clone + Send + Sync + 'static,
-        Tr: TrafficGeneration + Send + Sync + 'static,
+        Tr: TrafficGeneration<NodeId = G::NodeId> + Send + Sync + 'static,
         G: NetworkGraphView + NetworkGraphUpdate + Clone + Send + Sync + 'static,
     {
         let max_parallel_probes = self.cfg.max_parallel_probes;
@@ -365,6 +365,7 @@ mod tests {
 
     #[async_trait]
     impl NetworkGraphView for PeerStore {
+        type NodeId = PeerId;
         type Observed = TestObservations;
 
         /// Returns a stream of all known nodes in the network graph.
@@ -385,7 +386,7 @@ mod tests {
             vec![]
         }
 
-        fn observations_for(&self, _peer: &PeerId) -> Option<TestObservations> {
+        fn edge(&self, _src: &PeerId, _dest: &PeerId) -> Option<TestObservations> {
             Some(TestObservations)
         }
     }
@@ -401,7 +402,7 @@ mod tests {
     where
         Fut: std::future::Future<Output = anyhow::Result<()>>,
         F: Fn(TestInterface) -> Fut + Send + Sync + 'static,
-        St: NetworkGraphUpdate + NetworkGraphView + Clone + Send + Sync + 'static,
+        St: NetworkGraphUpdate + NetworkGraphView<NodeId = PeerId> + Clone + Send + Sync + 'static,
     {
         let probe = Probe::new(cfg.clone());
 

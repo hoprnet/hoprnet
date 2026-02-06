@@ -13,7 +13,7 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-serde = ["dep:serde", "hopr-api/serde"]
+serde = ["dep:serde", "dep:humantime-serde", "hopr-api/serde"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -21,6 +21,7 @@ async-trait = { workspace = true }
 futures = { workspace = true }
 smart-default = { workspace = true }
 serde = { workspace = true, optional = true, features = ["derive"] }
+humantime-serde = { workspace = true, optional = true }
 validator = { workspace = true }
 moka = { workspace = true }
 
@@ -36,3 +37,6 @@ tokio = { workspace = true }
 mockall = { workspace = true }
 lazy_static = { workspace = true }
 hopr-network-graph = { workspace = true }
+
+[package.metadata.cargo-machete]
+ignored = ["humantime-serde"]

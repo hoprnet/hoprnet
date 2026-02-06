@@ -453,7 +453,7 @@ mod tests {
     use hopr_protocol_app::prelude::ApplicationData;
     use hopr_protocol_session::types::*;
     use hopr_protocol_start::{KeepAliveMessage, StartErrorReason, StartErrorType, StartEstablished, StartInitiation};
-    use hopr_transport_probe::content::{NeighborProbe, PathTelemetry};
+    use hopr_transport_probe::types::{NeighborProbe, PathTelemetry};
     use hopr_transport_session::{ByteCapabilities, Capability, SessionId, SessionTarget};
 
     use super::*;
@@ -622,6 +622,7 @@ mod tests {
             data: ApplicationData::try_from(hopr_transport_probe::content::Message::Telemetry(PathTelemetry {
                 id: hopr_crypto_random::random_bytes(),
                 path: hopr_crypto_random::random_bytes(),
+                seq_id: 0,
                 timestamp: 123456789_u128,
             }))?
             .to_bytes()

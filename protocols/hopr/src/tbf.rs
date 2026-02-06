@@ -93,6 +93,7 @@ impl Default for TagBloomFilter {
 }
 
 #[cfg(test)]
+#[allow(unused)]
 mod tests {
     use hopr_crypto_types::types::PACKET_TAG_LENGTH;
 
