@@ -19,6 +19,7 @@ prometheus = ["dep:hopr-metrics"]
 
 [dependencies]
 futures = { workspace = true }
+lazy_static = { workspace = true }
 rayon = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
