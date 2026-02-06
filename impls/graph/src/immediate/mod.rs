@@ -1,11 +1,6 @@
 use std::sync::Arc;
 
-use hopr_api::{
-    PeerId,
-    ct::DestinationRouting,
-    graph::Observable,
-    network::NetworkView,
-};
+use hopr_api::{PeerId, ct::DestinationRouting, graph::Observable, network::NetworkView};
 use rand::seq::SliceRandom;
 
 use crate::{immediate::tracker::NetworkPeerTracker, observation::Observations};
@@ -85,8 +80,8 @@ impl<T> hopr_api::graph::NetworkGraphView for ImmediateNeighborChannelGraph<T>
 where
     T: NetworkView + Send + Sync + Clone + 'static,
 {
-    type Observed = Observations;
     type NodeId = PeerId;
+    type Observed = Observations;
 
     fn nodes(&self) -> futures::stream::BoxStream<'static, Self::NodeId> {
         let fetcher = self.network.clone();
@@ -103,19 +98,19 @@ where
         })
     }
 
+    fn edge(&self, _src: &Self::NodeId, dest: &Self::NodeId) -> Option<Self::Observed> {
+        if self.network.is_connected(dest) {
+            self.tracker.get(dest)
+        } else {
+            None
+        }
+    }
+
     async fn routes(&self, _destination: &Self::NodeId, _length: usize) -> Vec<DestinationRouting> {
         vec![]
     }
 
     async fn loopback_routes(&self) -> Vec<Vec<DestinationRouting>> {
         vec![]
-    }
-
-    fn observations_for(&self, peer: &Self::NodeId) -> Option<Self::Observed> {
-        if self.network.is_connected(peer) {
-            self.tracker.get(peer)
-        } else {
-            None
-        }
     }
 }

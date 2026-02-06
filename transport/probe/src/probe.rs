@@ -365,8 +365,8 @@ mod tests {
 
     #[async_trait]
     impl NetworkGraphView for PeerStore {
-        type Observed = TestObservations;
         type NodeId = PeerId;
+        type Observed = TestObservations;
 
         /// Returns a stream of all known nodes in the network graph.
         fn nodes(&self) -> futures::stream::BoxStream<'static, PeerId> {
@@ -386,7 +386,7 @@ mod tests {
             vec![]
         }
 
-        fn observations_for(&self, _peer: &PeerId) -> Option<TestObservations> {
+        fn edge(&self, _src: &PeerId, _dest: &PeerId) -> Option<TestObservations> {
             Some(TestObservations)
         }
     }

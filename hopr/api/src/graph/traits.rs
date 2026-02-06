@@ -41,6 +41,10 @@ pub trait NetworkGraphView {
     /// Returns a stream of all known nodes in the network graph.
     fn nodes(&self) -> futures::stream::BoxStream<'static, Self::NodeId>;
 
+    /// Returns the weight represented by the observations for the edge between the
+    /// given source and destination, if available.
+    fn edge(&self, src: &Self::NodeId, dest: &Self::NodeId) -> Option<Self::Observed>;
+
     /// Returns a list of all routes to the given destination of the specified length.
     ///
     /// NOTE(20260204): for future usage in path planning this should contain a referencable
@@ -51,10 +55,6 @@ pub trait NetworkGraphView {
     /// that start and end at the same node, while also belonging to the same path discovery
     /// batch.
     async fn loopback_routes(&self) -> Vec<Vec<DestinationRouting>>;
-
-    /// Returns observations for a given peer, if available.
-    /// The returned type is owned and does not borrow from inputs.
-    fn observations_for(&self, peer: &Self::NodeId) -> Option<Self::Observed>;
 }
 
 /// A trait specifying the graph update functionality
