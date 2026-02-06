@@ -258,10 +258,7 @@ pub mod cpu {
             if new > limit {
                 release_slot();
                 metrics::rejected();
-                return Err(SpawnError::QueueFull {
-                    current: prev,
-                    limit,
-                });
+                return Err(SpawnError::QueueFull { current: prev, limit });
             }
         }
         Ok(())
@@ -273,6 +270,35 @@ pub mod cpu {
         let prev = OUTSTANDING.fetch_sub(1, Ordering::AcqRel);
         debug_assert!(prev > 0, "outstanding task count underflow");
         metrics::outstanding_dec();
+    }
+
+    /// Guard that ensures `release_slot()` is called exactly once,
+    /// even if the task panics or returns early.
+    struct SlotGuard {
+        released: bool,
+    }
+
+    impl SlotGuard {
+        fn new() -> Self {
+            Self { released: false }
+        }
+
+        /// Manually release the slot (prevents double-release in Drop).
+        fn release(mut self) {
+            if !self.released {
+                self.released = true;
+                release_slot();
+            }
+        }
+    }
+
+    impl Drop for SlotGuard {
+        fn drop(&mut self) {
+            if !self.released {
+                self.released = true;
+                release_slot();
+            }
+        }
     }
 
     /// Initialize the Rayon thread pool with the given number of threads.
@@ -287,7 +313,11 @@ pub mod cpu {
     /// Builds a cancellable task closure and its receiver.
     ///
     /// The closure wraps `f` with cooperative cancellation, panic catching,
-    /// timing metrics, and slot tracking.
+    /// timing metrics, and slot tracking via guard.
+    ///
+    /// Note: Cooperative cancellation only prevents "queued zombies" - tasks whose
+    /// receiver was dropped before execution started. If the timeout fires *after*
+    /// execution begins, the task will still run to completion (counted as "orphaned").
     fn cancellable_task<R: Send + 'static>(
         f: impl FnOnce() -> R + Send + 'static,
         operation: &'static str,
@@ -301,13 +331,16 @@ pub mod cpu {
         metrics::submitted();
 
         let task = move || {
+            // guard ensures slot is released even on panic
+            let guard = SlotGuard::new();
+
             if tx.is_canceled() {
                 tracing::debug!(
                     queue_wait_ms = submitted_at.elapsed().as_millis() as u64,
                     "skipping cancelled task (receiver dropped before execution)"
                 );
                 metrics::cancelled();
-                release_slot();
+                guard.release();
                 return;
             }
 
@@ -328,7 +361,7 @@ pub mod cpu {
                     metrics::orphaned();
                 }
             }
-            release_slot();
+            guard.release();
         };
 
         (task, rx)

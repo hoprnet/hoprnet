@@ -611,7 +611,8 @@ where
     let decoder = std::sync::Arc::new(codec.1);
     let ticket_proc = std::sync::Arc::new(ticket_proc);
 
-    // Default maximum concurrency (if not set) is 8 times the number of available cores
+    // Default maximum concurrency (if not set or zero) is 8 times the number of available cores.
+    // Zero is normalized to the default to prevent deadlock (0 concurrent tasks = no work).
     let avail_concurrency = std::thread::available_parallelism()
         .ok()
         .map(|n| n.get())
@@ -619,16 +620,14 @@ where
         .max(1)
         * 8;
 
+    let output_concurrency = cfg.output_concurrency.filter(|&n| n > 0).unwrap_or(avail_concurrency);
+    let input_concurrency = cfg.input_concurrency.filter(|&n| n > 0).unwrap_or(avail_concurrency);
+
     processes.insert(
         PacketPipelineProcesses::MsgOut,
         spawn_as_abortable!(
-            start_outgoing_packet_pipeline(
-                app_in,
-                encoder.clone(),
-                wire_out.clone(),
-                cfg.output_concurrency.unwrap_or(avail_concurrency)
-            )
-            .in_current_span()
+            start_outgoing_packet_pipeline(app_in, encoder.clone(), wire_out.clone(), output_concurrency)
+                .in_current_span()
         ),
     );
 
@@ -642,7 +641,7 @@ where
                 ticket_events.clone(),
                 (outgoing_ack_tx, incoming_ack_tx),
                 app_out,
-                cfg.input_concurrency.unwrap_or(avail_concurrency),
+                input_concurrency,
             )
             .in_current_span()
         ),

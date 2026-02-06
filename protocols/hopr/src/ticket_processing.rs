@@ -18,6 +18,9 @@ use crate::{
 ///
 /// These help investigate "unknown ticket" acknowledgement failures by tracking
 /// cache insertions, lookups, misses, and evictions.
+///
+/// Per-peer metrics are disabled by default due to Prometheus cardinality concerns.
+/// Set `HOPR_METRICS_UNACK_PER_PEER=1` to enable them for debugging.
 mod metrics {
     #[cfg(any(not(feature = "prometheus"), test))]
     pub use noop::*;
@@ -27,6 +30,11 @@ mod metrics {
     #[cfg(all(feature = "prometheus", not(test)))]
     mod real {
         lazy_static::lazy_static! {
+            /// Whether per-peer metrics are enabled (disabled by default to avoid cardinality explosion).
+            static ref PER_PEER_ENABLED: bool = std::env::var("HOPR_METRICS_UNACK_PER_PEER")
+                .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+                .unwrap_or(false);
+
             static ref UNACK_PEERS: hopr_metrics::SimpleGauge = hopr_metrics::SimpleGauge::new(
                 "hopr_tickets_unack_peers_total",
                 "Number of peers with unacknowledged tickets in cache",
@@ -59,20 +67,29 @@ mod metrics {
             .unwrap();
             static ref UNACK_TICKETS_PER_PEER: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
                 "hopr_tickets_unack_tickets_per_peer",
-                "Number of unacknowledged tickets per peer in cache",
+                "Number of unacknowledged tickets per peer in cache (enable with HOPR_METRICS_UNACK_PER_PEER=1)",
                 &["peer"],
             )
             .unwrap();
         }
 
         pub fn initialize() {
+            lazy_static::initialize(&PER_PEER_ENABLED);
             lazy_static::initialize(&UNACK_PEERS);
             lazy_static::initialize(&UNACK_TICKETS);
             lazy_static::initialize(&UNACK_INSERTIONS);
             lazy_static::initialize(&UNACK_LOOKUPS);
             lazy_static::initialize(&UNACK_LOOKUP_MISSES);
             lazy_static::initialize(&UNACK_EVICTIONS);
-            lazy_static::initialize(&UNACK_TICKETS_PER_PEER);
+            if *PER_PEER_ENABLED {
+                lazy_static::initialize(&UNACK_TICKETS_PER_PEER);
+            }
+        }
+
+        #[inline]
+        #[allow(dead_code)]
+        pub fn per_peer_enabled() -> bool {
+            *PER_PEER_ENABLED
         }
 
         #[inline]
@@ -112,17 +129,24 @@ mod metrics {
 
         #[inline]
         pub fn inc_unack_tickets_for_peer(peer: &str) {
-            UNACK_TICKETS_PER_PEER.increment(&[peer], 1.0);
+            if *PER_PEER_ENABLED {
+                UNACK_TICKETS_PER_PEER.increment(&[peer], 1.0);
+            }
         }
 
         #[inline]
         pub fn dec_unack_tickets_for_peer(peer: &str) {
-            UNACK_TICKETS_PER_PEER.decrement(&[peer], 1.0);
+            if *PER_PEER_ENABLED {
+                UNACK_TICKETS_PER_PEER.decrement(&[peer], 1.0);
+            }
         }
 
         #[inline]
+        #[allow(dead_code)]
         pub fn reset_unack_tickets_for_peer(peer: &str) {
-            UNACK_TICKETS_PER_PEER.set(&[peer], 0.0);
+            if *PER_PEER_ENABLED {
+                UNACK_TICKETS_PER_PEER.set(&[peer], 0.0);
+            }
         }
     }
 
@@ -130,6 +154,11 @@ mod metrics {
     mod noop {
         #[inline]
         pub fn initialize() {}
+        #[inline]
+        #[allow(dead_code)]
+        pub fn per_peer_enabled() -> bool {
+            false
+        }
         #[inline]
         pub fn set_unack_peers(_: u64) {}
         #[inline]
@@ -149,6 +178,7 @@ mod metrics {
         #[inline]
         pub fn dec_unack_tickets_for_peer(_: &str) {}
         #[inline]
+        #[allow(dead_code)]
         pub fn reset_unack_tickets_for_peer(_: &str) {}
     }
 }

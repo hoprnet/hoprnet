@@ -64,86 +64,95 @@ where
         &self,
         mut fwd: HoprForwardedPacket,
     ) -> Result<(HoprForwardedPacket, UnacknowledgedTicket), HoprProtocolError> {
-        let lookup_start = std::time::Instant::now();
+        let trace_timing = tracing::enabled!(tracing::Level::TRACE);
+        let debug_timing = tracing::enabled!(tracing::Level::DEBUG);
+
+        let lookup_start = trace_timing.then(std::time::Instant::now);
         let previous_hop_addr = self
             .chain_api
             .packet_key_to_chain_key(&fwd.previous_hop)
             .await
             .map_err(|e| HoprProtocolError::ResolverError(e.into()))?
             .ok_or(HoprProtocolError::KeyNotFound)?;
-        tracing::trace!(
-            elapsed_ms = lookup_start.elapsed().as_millis() as u64,
-            "previous_hop_addr lookup"
-        );
+        if let Some(start) = lookup_start {
+            tracing::trace!(
+                elapsed_ms = start.elapsed().as_millis() as u64,
+                "previous_hop_addr lookup"
+            );
+        }
 
-        let lookup_start = std::time::Instant::now();
+        let lookup_start = trace_timing.then(std::time::Instant::now);
         let next_hop_addr = self
             .chain_api
             .packet_key_to_chain_key(&fwd.outgoing.next_hop)
             .await
             .map_err(|e| HoprProtocolError::ResolverError(e.into()))?
             .ok_or(HoprProtocolError::KeyNotFound)?;
-        tracing::trace!(
-            elapsed_ms = lookup_start.elapsed().as_millis() as u64,
-            "next_hop_addr lookup"
-        );
+        if let Some(start) = lookup_start {
+            tracing::trace!(elapsed_ms = start.elapsed().as_millis() as u64, "next_hop_addr lookup");
+        }
 
-        let lookup_start = std::time::Instant::now();
+        let lookup_start = trace_timing.then(std::time::Instant::now);
         let incoming_channel = self
             .chain_api
             .channel_by_parties(&previous_hop_addr, self.chain_key.as_ref())
             .await
             .map_err(|e| HoprProtocolError::ResolverError(e.into()))?
             .ok_or_else(|| HoprProtocolError::ChannelNotFound(previous_hop_addr, *self.chain_key.as_ref()))?;
-        tracing::trace!(
-            elapsed_ms = lookup_start.elapsed().as_millis() as u64,
-            "incoming_channel lookup"
-        );
+        if let Some(start) = lookup_start {
+            tracing::trace!(
+                elapsed_ms = start.elapsed().as_millis() as u64,
+                "incoming_channel lookup"
+            );
+        }
 
         // The ticket price from the oracle times my node's position on the
         // path is the acceptable minimum
-        let lookup_start = std::time::Instant::now();
+        let lookup_start = trace_timing.then(std::time::Instant::now);
         let minimum_ticket_price = self
             .chain_api
             .minimum_ticket_price()
             .await
             .map_err(|e| HoprProtocolError::ResolverError(e.into()))?
             .mul(U256::from(fwd.path_pos));
-        tracing::trace!(
-            elapsed_ms = lookup_start.elapsed().as_millis() as u64,
-            "minimum_ticket_price lookup"
-        );
+        if let Some(start) = lookup_start {
+            tracing::trace!(
+                elapsed_ms = start.elapsed().as_millis() as u64,
+                "minimum_ticket_price lookup"
+            );
+        }
 
-        let lookup_start = std::time::Instant::now();
+        let lookup_start = trace_timing.then(std::time::Instant::now);
         let remaining_balance = incoming_channel.balance.sub(
             self.tracker
                 .incoming_channel_unrealized_balance(incoming_channel.get_id(), incoming_channel.channel_epoch)
                 .await
                 .map_err(|e| HoprProtocolError::TicketTrackerError(e.into()))?,
         );
-        tracing::trace!(
-            elapsed_ms = lookup_start.elapsed().as_millis() as u64,
-            "remaining_balance lookup"
-        );
+        if let Some(start) = lookup_start {
+            tracing::trace!(
+                elapsed_ms = start.elapsed().as_millis() as u64,
+                "remaining_balance lookup"
+            );
+        }
 
         // Here also the signature on the ticket gets validated,
         // so afterward we are sure the source of the `channel`
         // (which is equal to `previous_hop_addr`) has issued this
         // ticket.
-        let lookup_start = std::time::Instant::now();
+        let lookup_start = trace_timing.then(std::time::Instant::now);
         let win_prob = self
             .chain_api
             .minimum_incoming_ticket_win_prob()
             .await
             .map_err(|e| HoprProtocolError::ResolverError(e.into()))?;
-        tracing::trace!(
-            elapsed_ms = lookup_start.elapsed().as_millis() as u64,
-            "win_prob lookup"
-        );
+        if let Some(start) = lookup_start {
+            tracing::trace!(elapsed_ms = start.elapsed().as_millis() as u64, "win_prob lookup");
+        }
 
         let domain_separator = self.channels_dst;
 
-        let verify_start = std::time::Instant::now();
+        let verify_start = debug_timing.then(std::time::Instant::now);
         let verified_incoming_ticket = hopr_parallelize::cpu::spawn_fifo_blocking(
             move || {
                 validate_unacknowledged_ticket(
@@ -159,10 +168,12 @@ where
         )
         .await??;
 
-        tracing::debug!(
-            elapsed_ms = verify_start.elapsed().as_millis() as u64,
-            "ticket_signature_verification"
-        );
+        if let Some(start) = verify_start {
+            tracing::debug!(
+                elapsed_ms = start.elapsed().as_millis() as u64,
+                "ticket_signature_verification"
+            );
+        }
 
         // The ticket is now validated:
         tracing::trace!(%verified_incoming_ticket, "successfully verified incoming ticket");
@@ -245,8 +256,11 @@ where
         // Phase 1: Peer ID conversion
         // Try to retrieve the peer's public key from the cache or compute it if it does not exist yet.
         // The async block ensures the Rayon task is only submitted on cache miss.
-        let phase_start = std::time::Instant::now();
-        let cache_hit = self.peer_id_cache.contains_key(&sender);
+        let phase_start = if tracing::enabled!(tracing::Level::DEBUG) {
+            Some(std::time::Instant::now())
+        } else {
+            None
+        };
         let previous_hop = match self
             .peer_id_cache
             .try_get_with_by_ref(&sender, async {
@@ -255,25 +269,37 @@ where
                     "peerid_lookup",
                 )
                 .await
-                .map_err(|e| hopr_primitive_types::errors::GeneralError::NonSpecificError(e.to_string()))?
+                .map_err(|e| match e {
+                    hopr_parallelize::cpu::SpawnError::QueueFull { current, limit } => {
+                        hopr_primitive_types::errors::GeneralError::NonSpecificError(format!(
+                            "local CPU queue full ({current}/{limit})"
+                        ))
+                    }
+                })?
             })
             .await
         {
             Ok(peer) => peer,
             Err(error) => {
-                // There absolutely nothing we can do when the peer id is unparseable (e.g., non-ed25519 based)
-                tracing::error!(%sender, %error, "dropping packet - cannot convert peer id");
+                let error_str = error.to_string();
+                if error_str.contains("local CPU queue full") {
+                    tracing::warn!(%sender, "dropping packet due to local CPU overload (not sender's fault)");
+                } else {
+                    tracing::error!(%sender, %error, "dropping packet - cannot convert peer id");
+                }
                 return Err(IncomingPacketError::Undecodable(HoprProtocolError::InvalidSender));
             }
         };
-        tracing::debug!(
-            elapsed_ms = phase_start.elapsed().as_millis() as u64,
-            cache_hit,
-            "peer_id_conversion complete"
-        );
+        if let Some(start) = phase_start {
+            tracing::debug!(
+                elapsed_ms = start.elapsed().as_millis() as u64,
+                "peer_id_conversion complete"
+            );
+        }
 
         // Phase 2: Sphinx packet decoding
-        let phase_start = std::time::Instant::now();
+        let debug_timing = tracing::enabled!(tracing::Level::DEBUG);
+        let phase_start = debug_timing.then(std::time::Instant::now);
         let offchain_keypair = self.packet_key.clone();
         let surb_store = self.surb_store.clone();
         let mapper = self.chain_api.key_id_mapper_ref().clone();
@@ -291,16 +317,18 @@ where
         .await
         .map_err(|e| IncomingPacketError::Undecodable(e.into()))?
         .map_err(|e| IncomingPacketError::Undecodable(e.into()))?;
-        let packet_type = match &packet {
-            HoprPacket::Final(_) => "final",
-            HoprPacket::Forwarded(_) => "forwarded",
-            HoprPacket::Outgoing(_) => "outgoing",
-        };
-        tracing::debug!(
-            elapsed_ms = phase_start.elapsed().as_millis() as u64,
-            packet_type,
-            "sphinx_decode complete"
-        );
+        if let Some(start) = phase_start {
+            let packet_type = match &packet {
+                HoprPacket::Final(_) => "final",
+                HoprPacket::Forwarded(_) => "forwarded",
+                HoprPacket::Outgoing(_) => "outgoing",
+            };
+            tracing::debug!(
+                elapsed_ms = start.elapsed().as_millis() as u64,
+                packet_type,
+                "sphinx_decode complete"
+            );
+        }
 
         // This is checked on both Final and Forwarded packets,
         // Outgoing packets are not allowed to pass and are later reported as invalid state.
@@ -378,12 +406,14 @@ where
                         .into(),
                     ),
                 };
-                tracing::debug!(total_ms = decode_start.elapsed().as_millis() as u64, "decode complete");
+                if debug_timing {
+                    tracing::debug!(total_ms = decode_start.elapsed().as_millis() as u64, "decode complete");
+                }
                 Ok(result)
             }
             HoprPacket::Forwarded(fwd) => {
                 // Phase 3: Ticket validation and replacement for forwarded packets
-                let phase_start = std::time::Instant::now();
+                let phase_start = debug_timing.then(std::time::Instant::now);
                 // Transform the ticket so it can be sent to the next hop
                 let (fwd, verified_unack_ticket) =
                     self.validate_and_replace_ticket(*fwd)
@@ -395,16 +425,20 @@ where
                             }
                             e => IncomingPacketError::ProcessingError(previous_hop, e),
                         })?;
-                tracing::debug!(
-                    elapsed_ms = phase_start.elapsed().as_millis() as u64,
-                    "ticket_validation complete"
-                );
+                if let Some(start) = phase_start {
+                    tracing::debug!(
+                        elapsed_ms = start.elapsed().as_millis() as u64,
+                        "ticket_validation complete"
+                    );
+                }
 
                 let mut payload = Vec::with_capacity(HoprPacket::SIZE);
                 payload.extend_from_slice(fwd.outgoing.packet.as_ref());
                 payload.extend_from_slice(&fwd.outgoing.ticket.into_encoded());
 
-                tracing::debug!(total_ms = decode_start.elapsed().as_millis() as u64, "decode complete");
+                if debug_timing {
+                    tracing::debug!(total_ms = decode_start.elapsed().as_millis() as u64, "decode complete");
+                }
                 Ok(IncomingPacket::Forwarded(
                     IncomingForwardedPacket {
                         packet_tag: fwd.packet_tag,
@@ -419,7 +453,9 @@ where
                 ))
             }
             HoprPacket::Outgoing(_) => {
-                tracing::debug!(total_ms = decode_start.elapsed().as_millis() as u64, "decode complete");
+                if debug_timing {
+                    tracing::debug!(total_ms = decode_start.elapsed().as_millis() as u64, "decode complete");
+                }
                 Err(IncomingPacketError::ProcessingError(
                     previous_hop,
                     HoprProtocolError::InvalidState("cannot be outgoing packet"),
