@@ -250,16 +250,16 @@ pub mod cpu {
     ///
     /// Returns `Ok(())` if no limit or slot acquired, `Err(QueueFull)` if at limit.
     fn try_acquire_slot() -> Result<(), SpawnError> {
-        OUTSTANDING.fetch_add(1, Ordering::AcqRel);
+        let prev = OUTSTANDING.fetch_add(1, Ordering::AcqRel);
         metrics::outstanding_inc();
 
         if let Some(limit) = *QUEUE_LIMIT {
-            let current = OUTSTANDING.load(Ordering::Relaxed);
-            if current > limit {
+            let new = prev + 1;
+            if new > limit {
                 release_slot();
                 metrics::rejected();
                 return Err(SpawnError::QueueFull {
-                    current: current - 1,
+                    current: prev,
                     limit,
                 });
             }
