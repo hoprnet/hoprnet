@@ -4816,6 +4816,7 @@ version = "0.1.1"
 dependencies = [
  "futures",
  "hopr-metrics",
+ "lazy_static",
  "rayon",
  "serial_test",
  "tokio",
@@ -4898,6 +4899,7 @@ dependencies = [
  "hopr-crypto-types 0.9.0",
  "hopr-db-node",
  "hopr-internal-types",
+ "hopr-metrics",
  "hopr-network-types",
  "hopr-parallelize",
  "hopr-primitive-types 0.10.0",
