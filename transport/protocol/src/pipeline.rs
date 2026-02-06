@@ -104,7 +104,7 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
                     }
                 }
             },
-            concurrency,
+            Some(concurrency),
         )
         .filter_map(futures::future::ready)
         .map(Ok)
@@ -222,7 +222,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                     }
                 }
             }.instrument(tracing::debug_span!("incoming_packet_decode", %peer))
-        }, concurrency)
+        }, Some(concurrency))
         .filter_map(futures::future::ready)
         .then_concurrent(move |packet| {
             let ticket_proc = ticket_proc_success.clone();
@@ -544,13 +544,13 @@ impl Validate for AcknowledgementPipelineConfig {
     serde(deny_unknown_fields)
 )]
 pub struct PacketPipelineConfig {
-    /// Maximum concurrency when processing outgoing packets
+    /// Maximum concurrency when processing outgoing packets.
     ///
-    /// Use 0 for no limit.
+    /// `None` or `Some(0)` both fall back to the default (available parallelism * 8).
     pub output_concurrency: Option<usize>,
     /// Maximum concurrency when processing incoming packets.
     ///
-    /// Use 0 for no limit.
+    /// `None` or `Some(0)` both fall back to the default (available parallelism * 8).
     pub input_concurrency: Option<usize>,
     /// Configuration of the packet acknowledgement processing
     #[validate(nested)]
