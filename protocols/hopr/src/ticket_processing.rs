@@ -14,63 +14,117 @@ use crate::{
     UnacknowledgedTicketProcessor,
 };
 
-// -------------------- Prometheus Metrics --------------------
-// These metrics help diagnose unacknowledged ticket cache behavior,
-// particularly for investigating "unknown ticket" acknowledgement failures.
+/// Metrics for unacknowledged ticket cache diagnostics.
+///
+/// These help investigate "unknown ticket" acknowledgement failures by tracking
+/// cache insertions, lookups, misses, and evictions.
+mod metrics {
+    #[cfg(all(feature = "prometheus", not(test)))]
+    pub use real::*;
 
-#[cfg(all(feature = "prometheus", not(test)))]
-static METRIC_UNACK_PEERS: std::sync::LazyLock<hopr_metrics::SimpleGauge> = std::sync::LazyLock::new(|| {
-    hopr_metrics::SimpleGauge::new(
-        "hopr_tickets_unack_peers_total",
-        "Number of peers with unacknowledged tickets in cache",
-    )
-    .unwrap()
-});
+    #[cfg(any(not(feature = "prometheus"), test))]
+    pub use noop::*;
 
-#[cfg(all(feature = "prometheus", not(test)))]
-static METRIC_UNACK_TICKETS: std::sync::LazyLock<hopr_metrics::SimpleGauge> = std::sync::LazyLock::new(|| {
-    hopr_metrics::SimpleGauge::new(
-        "hopr_tickets_unack_tickets_total",
-        "Total number of unacknowledged tickets across all peer caches",
-    )
-    .unwrap()
-});
+    #[cfg(all(feature = "prometheus", not(test)))]
+    mod real {
+        lazy_static::lazy_static! {
+            static ref UNACK_PEERS: hopr_metrics::SimpleGauge = hopr_metrics::SimpleGauge::new(
+                "hopr_tickets_unack_peers_total",
+                "Number of peers with unacknowledged tickets in cache",
+            )
+            .unwrap();
+            static ref UNACK_TICKETS: hopr_metrics::SimpleGauge = hopr_metrics::SimpleGauge::new(
+                "hopr_tickets_unack_tickets_total",
+                "Total number of unacknowledged tickets across all peer caches",
+            )
+            .unwrap();
+            static ref UNACK_INSERTIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+                "hopr_tickets_unack_insertions_total",
+                "Total number of unacknowledged tickets inserted into cache",
+            )
+            .unwrap();
+            static ref UNACK_LOOKUPS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+                "hopr_tickets_unack_lookups_total",
+                "Total number of ticket acknowledgement lookups",
+            )
+            .unwrap();
+            static ref UNACK_LOOKUP_MISSES: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+                "hopr_tickets_unack_lookup_misses_total",
+                "Total number of ticket lookup failures (unknown ticket)",
+            )
+            .unwrap();
+            static ref UNACK_EVICTIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+                "hopr_tickets_unack_evictions_total",
+                "Total number of unacknowledged tickets evicted from cache",
+            )
+            .unwrap();
+        }
 
-#[cfg(all(feature = "prometheus", not(test)))]
-static METRIC_UNACK_INSERTIONS: std::sync::LazyLock<hopr_metrics::SimpleCounter> = std::sync::LazyLock::new(|| {
-    hopr_metrics::SimpleCounter::new(
-        "hopr_tickets_unack_insertions_total",
-        "Total number of unacknowledged tickets inserted into cache",
-    )
-    .unwrap()
-});
+        pub fn initialize() {
+            lazy_static::initialize(&UNACK_PEERS);
+            lazy_static::initialize(&UNACK_TICKETS);
+            lazy_static::initialize(&UNACK_INSERTIONS);
+            lazy_static::initialize(&UNACK_LOOKUPS);
+            lazy_static::initialize(&UNACK_LOOKUP_MISSES);
+            lazy_static::initialize(&UNACK_EVICTIONS);
+        }
 
-#[cfg(all(feature = "prometheus", not(test)))]
-static METRIC_UNACK_LOOKUPS: std::sync::LazyLock<hopr_metrics::SimpleCounter> = std::sync::LazyLock::new(|| {
-    hopr_metrics::SimpleCounter::new(
-        "hopr_tickets_unack_lookups_total",
-        "Total number of ticket acknowledgement lookups",
-    )
-    .unwrap()
-});
+        #[inline]
+        pub fn set_unack_peers(count: u64) {
+            UNACK_PEERS.set(count as f64);
+        }
 
-#[cfg(all(feature = "prometheus", not(test)))]
-static METRIC_UNACK_LOOKUP_MISSES: std::sync::LazyLock<hopr_metrics::SimpleCounter> = std::sync::LazyLock::new(|| {
-    hopr_metrics::SimpleCounter::new(
-        "hopr_tickets_unack_lookup_misses_total",
-        "Total number of ticket lookup failures (unknown ticket)",
-    )
-    .unwrap()
-});
+        #[inline]
+        pub fn inc_unack_tickets() {
+            UNACK_TICKETS.increment(1.0);
+        }
 
-#[cfg(all(feature = "prometheus", not(test)))]
-static METRIC_UNACK_EVICTIONS: std::sync::LazyLock<hopr_metrics::SimpleCounter> = std::sync::LazyLock::new(|| {
-    hopr_metrics::SimpleCounter::new(
-        "hopr_tickets_unack_evictions_total",
-        "Total number of unacknowledged tickets evicted from cache",
-    )
-    .unwrap()
-});
+        #[inline]
+        pub fn dec_unack_tickets() {
+            UNACK_TICKETS.decrement(1.0);
+        }
+
+        #[inline]
+        pub fn inc_insertions() {
+            UNACK_INSERTIONS.increment();
+        }
+
+        #[inline]
+        pub fn inc_lookups() {
+            UNACK_LOOKUPS.increment();
+        }
+
+        #[inline]
+        pub fn inc_lookup_misses() {
+            UNACK_LOOKUP_MISSES.increment();
+        }
+
+        #[inline]
+        pub fn inc_evictions() {
+            UNACK_EVICTIONS.increment();
+        }
+    }
+
+    #[cfg(any(not(feature = "prometheus"), test))]
+    mod noop {
+        #[inline]
+        pub fn initialize() {}
+        #[inline]
+        pub fn set_unack_peers(_: u64) {}
+        #[inline]
+        pub fn inc_unack_tickets() {}
+        #[inline]
+        pub fn dec_unack_tickets() {}
+        #[inline]
+        pub fn inc_insertions() {}
+        #[inline]
+        pub fn inc_lookups() {}
+        #[inline]
+        pub fn inc_lookup_misses() {}
+        #[inline]
+        pub fn inc_evictions() {}
+    }
+}
 
 const MIN_UNACK_TICKET_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 fn validate_unack_ticket_timeout(timeout: &std::time::Duration) -> Result<(), ValidationError> {
@@ -179,6 +233,8 @@ impl<Chain, Db> HoprTicketProcessor<Chain, Db> {
         channels_dst: Hash,
         cfg: HoprTicketProcessorConfig,
     ) -> Self {
+        metrics::initialize();
+
         Self {
             out_ticket_index: moka::future::Cache::builder()
                 .time_to_idle(cfg.outgoing_index_cache_retention)
@@ -262,7 +318,6 @@ where
     ) -> Result<(), Self::Error> {
         tracing::trace!(%ticket, "received unacknowledged ticket");
 
-        #[cfg(all(feature = "prometheus", not(test)))]
         let inner_cache = self
             .unacknowledged_tickets
             .get_with_by_ref(next_hop, async {
@@ -273,33 +328,19 @@ where
                         // Only count non-explicit removals as evictions.
                         // Explicit removals happen during successful acknowledgement lookups.
                         if cause != moka::notification::RemovalCause::Explicit {
-                            METRIC_UNACK_EVICTIONS.increment();
-                            METRIC_UNACK_TICKETS.decrement(1.0);
+                            metrics::inc_evictions();
+                            metrics::dec_unack_tickets();
                         }
                     })
                     .build()
             })
             .await;
 
-        #[cfg(not(all(feature = "prometheus", not(test))))]
-        let inner_cache = self
-            .unacknowledged_tickets
-            .get_with_by_ref(next_hop, async {
-                moka::future::Cache::builder()
-                    .time_to_live(self.cfg.unack_ticket_timeout)
-                    .max_capacity(self.cfg.max_unack_tickets as u64)
-                    .build()
-            })
-            .await;
-
         inner_cache.insert(challenge, ticket).await;
 
-        #[cfg(all(feature = "prometheus", not(test)))]
-        {
-            METRIC_UNACK_INSERTIONS.increment();
-            METRIC_UNACK_TICKETS.increment(1.0);
-            METRIC_UNACK_PEERS.set(self.unacknowledged_tickets.entry_count() as f64);
-        }
+        metrics::inc_insertions();
+        metrics::inc_unack_tickets();
+        metrics::set_unack_peers(self.unacknowledged_tickets.entry_count());
 
         Ok(())
     }
@@ -375,21 +416,16 @@ where
         // Find all the tickets that we're awaiting acknowledgement for
         let mut unack_tickets = Vec::with_capacity(half_keys_challenges.len());
         for (half_key, challenge) in half_keys_challenges {
-            #[cfg(all(feature = "prometheus", not(test)))]
-            METRIC_UNACK_LOOKUPS.increment();
+            metrics::inc_lookups();
 
             let Some(unack_ticket) = awaiting_ack_from_peer.remove(&challenge).await else {
                 tracing::debug!(%challenge, "received acknowledgement for unknown ticket");
-
-                #[cfg(all(feature = "prometheus", not(test)))]
-                METRIC_UNACK_LOOKUP_MISSES.increment();
-
+                metrics::inc_lookup_misses();
                 continue;
             };
 
             // Decrement ticket count for successful removal (explicit removals don't trigger eviction listener)
-            #[cfg(all(feature = "prometheus", not(test)))]
-            METRIC_UNACK_TICKETS.decrement(1.0);
+            metrics::dec_unack_tickets();
 
             let issuer_channel = match self
                 .chain_api
