@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-protocol"
-version = "1.1.0"
+version = "1.2.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"
@@ -12,7 +12,6 @@ crate-type = ["rlib"]
 default = []
 prometheus = [
   "dep:hopr-metrics",
-  "hopr-parallelize/prometheus",
   "hopr-protocol-hopr/prometheus",
 ]
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
@@ -55,7 +54,6 @@ hopr-crypto-types = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-network-types = { workspace = true }
 hopr-metrics = { optional = true, workspace = true }
-hopr-parallelize = { workspace = true, features = ["rayon"] }
 hopr-primitive-types = { workspace = true }
 hopr-protocol-hopr = { workspace = true }
 hopr-protocol-app = { workspace = true }

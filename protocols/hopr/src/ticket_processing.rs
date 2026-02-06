@@ -483,7 +483,7 @@ where
             metrics::inc_lookups();
 
             let Some(unack_ticket) = awaiting_ack_from_peer.remove(&challenge).await else {
-                tracing::debug!(%challenge, "received acknowledgement for unknown ticket");
+                tracing::trace!(%challenge, "received acknowledgement for unknown ticket");
                 metrics::inc_lookup_misses();
                 continue;
             };
@@ -538,7 +538,7 @@ where
                     // turns it into a redeemable ticket.
                     match ack_ticket.into_redeemable(&chain_key, &domain_separator) {
                         Ok(redeemable) => {
-                            tracing::debug!(%channel, "found winning ticket");
+                            tracing::trace!(%channel, "found winning ticket");
                             Some(ResolvedAcknowledgement::RelayingWin(Box::new(redeemable)))
                         }
                         Err(CoreTypesError::TicketNotWinning) => {
