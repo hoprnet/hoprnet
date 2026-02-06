@@ -19,11 +19,10 @@ use crate::{
 /// These help investigate "unknown ticket" acknowledgement failures by tracking
 /// cache insertions, lookups, misses, and evictions.
 mod metrics {
-    #[cfg(all(feature = "prometheus", not(test)))]
-    pub use real::*;
-
     #[cfg(any(not(feature = "prometheus"), test))]
     pub use noop::*;
+    #[cfg(all(feature = "prometheus", not(test)))]
+    pub use real::*;
 
     #[cfg(all(feature = "prometheus", not(test)))]
     mod real {
@@ -58,6 +57,12 @@ mod metrics {
                 "Total number of unacknowledged tickets evicted from cache",
             )
             .unwrap();
+            static ref UNACK_TICKETS_PER_PEER: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+                "hopr_tickets_unack_tickets_per_peer",
+                "Number of unacknowledged tickets per peer in cache",
+                &["peer"],
+            )
+            .unwrap();
         }
 
         pub fn initialize() {
@@ -67,6 +72,7 @@ mod metrics {
             lazy_static::initialize(&UNACK_LOOKUPS);
             lazy_static::initialize(&UNACK_LOOKUP_MISSES);
             lazy_static::initialize(&UNACK_EVICTIONS);
+            lazy_static::initialize(&UNACK_TICKETS_PER_PEER);
         }
 
         #[inline]
@@ -103,6 +109,21 @@ mod metrics {
         pub fn inc_evictions() {
             UNACK_EVICTIONS.increment();
         }
+
+        #[inline]
+        pub fn inc_unack_tickets_for_peer(peer: &str) {
+            UNACK_TICKETS_PER_PEER.increment(&[peer], 1.0);
+        }
+
+        #[inline]
+        pub fn dec_unack_tickets_for_peer(peer: &str) {
+            UNACK_TICKETS_PER_PEER.decrement(&[peer], 1.0);
+        }
+
+        #[inline]
+        pub fn reset_unack_tickets_for_peer(peer: &str) {
+            UNACK_TICKETS_PER_PEER.set(&[peer], 0.0);
+        }
     }
 
     #[cfg(any(not(feature = "prometheus"), test))]
@@ -123,6 +144,12 @@ mod metrics {
         pub fn inc_lookup_misses() {}
         #[inline]
         pub fn inc_evictions() {}
+        #[inline]
+        pub fn inc_unack_tickets_for_peer(_: &str) {}
+        #[inline]
+        pub fn dec_unack_tickets_for_peer(_: &str) {}
+        #[inline]
+        pub fn reset_unack_tickets_for_peer(_: &str) {}
     }
 }
 
@@ -318,18 +345,24 @@ where
     ) -> Result<(), Self::Error> {
         tracing::trace!(%ticket, "received unacknowledged ticket");
 
+        let peer_id = next_hop.to_peerid_str();
         let inner_cache = self
             .unacknowledged_tickets
             .get_with_by_ref(next_hop, async {
+                let peer_id_for_eviction = peer_id.clone();
                 moka::future::Cache::builder()
                     .time_to_live(self.cfg.unack_ticket_timeout)
                     .max_capacity(self.cfg.max_unack_tickets as u64)
-                    .eviction_listener(|_key, _value, cause| {
-                        // Only count non-explicit removals as evictions.
-                        // Explicit removals happen during successful acknowledgement lookups.
-                        if cause != moka::notification::RemovalCause::Explicit {
+                    .eviction_listener(move |_key, _value, cause| {
+                        metrics::dec_unack_tickets();
+                        metrics::dec_unack_tickets_for_peer(&peer_id_for_eviction);
+
+                        // Only count Expired/Size removals as evictions (not Explicit or Replaced)
+                        if matches!(
+                            cause,
+                            moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size
+                        ) {
                             metrics::inc_evictions();
-                            metrics::dec_unack_tickets();
                         }
                     })
                     .build()
@@ -340,6 +373,7 @@ where
 
         metrics::inc_insertions();
         metrics::inc_unack_tickets();
+        metrics::inc_unack_tickets_for_peer(&peer_id);
         metrics::set_unack_peers(self.unacknowledged_tickets.entry_count());
 
         Ok(())
@@ -423,9 +457,6 @@ where
                 metrics::inc_lookup_misses();
                 continue;
             };
-
-            // Decrement ticket count for successful removal (explicit removals don't trigger eviction listener)
-            metrics::dec_unack_tickets();
 
             let issuer_channel = match self
                 .chain_api

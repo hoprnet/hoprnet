@@ -144,14 +144,21 @@ where
         let domain_separator = self.channels_dst;
 
         let verify_start = std::time::Instant::now();
-        let verified_incoming_ticket = validate_unacknowledged_ticket(
-            fwd.outgoing.ticket,
-            &incoming_channel,
-            minimum_ticket_price,
-            win_prob,
-            remaining_balance,
-            &domain_separator,
-        )?;
+        let verified_incoming_ticket = hopr_parallelize::cpu::spawn_fifo_blocking(
+            move || {
+                validate_unacknowledged_ticket(
+                    fwd.outgoing.ticket,
+                    &incoming_channel,
+                    minimum_ticket_price,
+                    win_prob,
+                    remaining_balance,
+                    &domain_separator,
+                )
+            },
+            "ticket_verify",
+        )
+        .await??;
+
         tracing::debug!(
             elapsed_ms = verify_start.elapsed().as_millis() as u64,
             "ticket_signature_verification"
@@ -209,9 +216,7 @@ where
         // Finally, replace the ticket in the outgoing packet with a new one
         let ticket_builder = ticket_builder.eth_challenge(fwd.next_challenge);
         let sign_start = std::time::Instant::now();
-        fwd.outgoing.ticket = ticket_builder
-            .build_signed(&self.chain_key, &domain_separator)?
-            .leak();
+        fwd.outgoing.ticket = ticket_builder.build_signed(&self.chain_key, &domain_separator)?.leak();
         tracing::debug!(elapsed_ms = sign_start.elapsed().as_millis() as u64, "ticket_signing");
 
         let unack_ticket = verified_incoming_ticket.into_unacknowledged(fwd.own_key);
@@ -275,9 +280,16 @@ where
 
         // If the following operation fails, it means that the packet is not a valid Hopr packet,
         // and as such should not be acknowledged later.
-        let packet = HoprPacket::from_incoming(&data, &offchain_keypair, previous_hop, &mapper, |p| {
-            surb_store.find_reply_opener(p)
-        })
+        let packet = hopr_parallelize::cpu::spawn_fifo_blocking(
+            move || {
+                HoprPacket::from_incoming(&data, &offchain_keypair, previous_hop, &mapper, |p| {
+                    surb_store.find_reply_opener(p)
+                })
+            },
+            "packet_decode",
+        )
+        .await
+        .map_err(|e| IncomingPacketError::Undecodable(e.into()))?
         .map_err(|e| IncomingPacketError::Undecodable(e.into()))?;
         let packet_type = match &packet {
             HoprPacket::Final(_) => "final",

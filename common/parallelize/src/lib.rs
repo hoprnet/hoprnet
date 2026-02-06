@@ -45,22 +45,20 @@
 /// - **queue_limit**: configured maximum (for comparison)
 #[cfg(feature = "rayon")]
 pub mod cpu {
-    pub use rayon;
-
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use futures::channel::oneshot;
+    pub use rayon;
 
     /// Histogram buckets for timing metrics (seconds).
     #[cfg(all(feature = "prometheus", not(test)))]
     const TIMING_BUCKETS: &[f64] = &[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.15, 0.25, 0.5, 1.0];
 
     mod metrics {
-        #[cfg(all(feature = "prometheus", not(test)))]
-        pub use real::*;
-
         #[cfg(any(not(feature = "prometheus"), test))]
         pub use noop::*;
+        #[cfg(all(feature = "prometheus", not(test)))]
+        pub use real::*;
 
         #[cfg(all(feature = "prometheus", not(test)))]
         mod real {
@@ -260,7 +258,10 @@ pub mod cpu {
             if current > limit {
                 release_slot();
                 metrics::rejected();
-                return Err(SpawnError::QueueFull { current: current - 1, limit });
+                return Err(SpawnError::QueueFull {
+                    current: current - 1,
+                    limit,
+                });
             }
         }
         Ok(())
@@ -290,7 +291,10 @@ pub mod cpu {
     fn cancellable_task<R: Send + 'static>(
         f: impl FnOnce() -> R + Send + 'static,
         operation: &'static str,
-    ) -> (impl FnOnce() + Send + 'static, oneshot::Receiver<std::thread::Result<R>>) {
+    ) -> (
+        impl FnOnce() + Send + 'static,
+        oneshot::Receiver<std::thread::Result<R>>,
+    ) {
         let (tx, rx) = oneshot::channel();
         let submitted_at = std::time::Instant::now();
 
@@ -560,6 +564,9 @@ mod tests {
         tokio::time::sleep(Duration::from_millis(500)).await;
 
         let after = cpu::outstanding_tasks();
-        assert_eq!(after, initial, "Outstanding should return to initial after cancelled tasks drain");
+        assert_eq!(
+            after, initial,
+            "Outstanding should return to initial after cancelled tasks drain"
+        );
     }
 }
