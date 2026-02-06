@@ -342,6 +342,12 @@ where
             }
         }
 
+        let packet_type = match &packet {
+            HoprPacket::Final(_) => "final",
+            HoprPacket::Forwarded(_) => "forwarded",
+            HoprPacket::Outgoing(_) => "outgoing",
+        };
+
         match packet {
             HoprPacket::Final(incoming) => {
                 // Extract additional information from the packet that will be passed upwards
@@ -353,7 +359,7 @@ where
                 // Store all incoming SURBs if any
                 if !incoming.surbs.is_empty() {
                     self.surb_store.insert_surbs(incoming.sender, incoming.surbs).await;
-                    tracing::trace!(pseudonym = %incoming.sender, num_surbs = info.num_surbs, "stored incoming surbs for pseudonym");
+                    tracing::trace!(pseudonym = %incoming.sender, num_surbs = info.num_surbs, packet_type, "stored incoming surbs for pseudonym");
                 }
 
                 let result = match incoming.ack_key {
@@ -376,7 +382,7 @@ where
                                 GeneralError::ParseError("invalid number of acknowledgements in packet".into()).into(),
                             ));
                         }
-                        tracing::trace!(num_acks, "received acknowledgement packet");
+                        tracing::trace!(num_acks, packet_type, "received acknowledgement packet");
 
                         // The contained payload represents an Acknowledgement
                         IncomingPacket::Acknowledgement(
@@ -406,7 +412,7 @@ where
                     ),
                 };
                 if trace_timing {
-                    tracing::trace!(total_ms = decode_start.elapsed().as_millis() as u64, "decode complete");
+                    tracing::trace!(total_ms = decode_start.elapsed().as_millis() as u64, packet_type, "decode complete");
                 }
                 Ok(result)
             }
@@ -427,6 +433,7 @@ where
                 if let Some(start) = phase_start {
                     tracing::trace!(
                         elapsed_ms = start.elapsed().as_millis() as u64,
+                        packet_type,
                         "ticket_validation complete"
                     );
                 }
@@ -436,7 +443,7 @@ where
                 payload.extend_from_slice(&fwd.outgoing.ticket.into_encoded());
 
                 if trace_timing {
-                    tracing::trace!(total_ms = decode_start.elapsed().as_millis() as u64, "decode complete");
+                    tracing::trace!(total_ms = decode_start.elapsed().as_millis() as u64, packet_type, "decode complete");
                 }
                 Ok(IncomingPacket::Forwarded(
                     IncomingForwardedPacket {
@@ -453,7 +460,7 @@ where
             }
             HoprPacket::Outgoing(_) => {
                 if trace_timing {
-                    tracing::trace!(total_ms = decode_start.elapsed().as_millis() as u64, "decode complete");
+                    tracing::trace!(total_ms = decode_start.elapsed().as_millis() as u64, packet_type, "decode complete");
                 }
                 Err(IncomingPacketError::ProcessingError(
                     previous_hop,
