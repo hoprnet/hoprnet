@@ -208,7 +208,9 @@ where
             .peer_id_cache
             .try_get_with_by_ref(
                 &sender,
-                hopr_parallelize::cpu::spawn_fifo_blocking(move || OffchainPublicKey::from_peerid(&sender)),
+                async {
+                    hopr_parallelize::cpu::spawn_fifo_blocking(move || OffchainPublicKey::from_peerid(&sender)).await
+                }
             )
             .await
         {
