@@ -175,6 +175,10 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                         tracing::trace!(%peer, ?packet, "successfully decoded incoming packet");
                         Some(packet)
                     },
+                    Ok(Err(IncomingPacketError::Overloaded(error))) => {
+                        tracing::warn!(%peer, %error, "dropping packet due to local CPU overload");
+                        None
+                    },
                     Ok(Err(IncomingPacketError::Undecodable(error))) => {
                         // Do not send an ack back if the packet could not be decoded at all
                         //

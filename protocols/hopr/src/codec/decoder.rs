@@ -15,8 +15,6 @@ use crate::{
     errors::HoprProtocolError, tbf::TagBloomFilter,
 };
 
-const QUEUE_FULL_ERROR_MARKER: &str = "local CPU queue full";
-
 /// Default [decoder](PacketDecoder) implementation for HOPR packets.
 pub struct HoprDecoder<Chain, S, T> {
     chain_api: Chain,
@@ -270,25 +268,23 @@ where
                     "peerid_lookup",
                 )
                 .await
-                .map_err(|e| match e {
-                    hopr_parallelize::cpu::SpawnError::QueueFull { current, limit } => {
-                        hopr_primitive_types::errors::GeneralError::NonSpecificError(format!(
-                            "{QUEUE_FULL_ERROR_MARKER} ({current}/{limit})"
-                        ))
-                    }
-                })?
+                .map_err(HoprProtocolError::from)?
+                .map_err(HoprProtocolError::from)
             })
             .await
         {
             Ok(peer) => peer,
             Err(error) => {
-                let error_str = error.to_string();
-                if error_str.contains(QUEUE_FULL_ERROR_MARKER) {
-                    tracing::warn!(%sender, "dropping packet due to local CPU overload (not sender's fault)");
-                } else {
-                    tracing::error!(%sender, %error, "dropping packet - cannot convert peer id");
-                }
-                return Err(IncomingPacketError::Undecodable(HoprProtocolError::InvalidSender));
+                return match error.as_ref() {
+                    HoprProtocolError::SpawnError(spawn_err) => {
+                        tracing::warn!(%sender, %error, "dropping packet due to local CPU overload (not sender's fault)");
+                        Err(IncomingPacketError::Overloaded(HoprProtocolError::SpawnError(*spawn_err)))
+                    }
+                    _ => {
+                        tracing::error!(%sender, %error, "dropping packet - cannot convert peer id");
+                        Err(IncomingPacketError::Undecodable(HoprProtocolError::InvalidSender))
+                    }
+                };
             }
         };
         if let Some(start) = phase_start {
@@ -316,7 +312,7 @@ where
             "packet_decode",
         )
         .await
-        .map_err(|e| IncomingPacketError::Undecodable(e.into()))?
+        .map_err(|e| IncomingPacketError::Overloaded(e.into()))?
         .map_err(|e| IncomingPacketError::Undecodable(e.into()))?;
 
         let packet_type = match &packet {

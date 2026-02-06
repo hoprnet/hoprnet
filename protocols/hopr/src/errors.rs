@@ -13,6 +13,9 @@ pub enum IncomingPacketError<E: std::error::Error> {
     /// Such errors are fatal and therefore the packet cannot be acknowledged.
     #[error("packet is not decodable: {0}")]
     Undecodable(E),
+    /// Packet dropped due to local resource exhaustion (not sender's fault).
+    #[error("local overload: {0}")]
+    Overloaded(E),
     /// Packet is decodable but cannot be processed due to other reasons.
     ///
     /// Such errors are protocol-related and packets must be acknowledged.

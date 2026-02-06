@@ -93,8 +93,13 @@ mod metrics {
         }
 
         #[inline]
-        pub fn set_unack_peers(count: u64) {
-            UNACK_PEERS.set(count as f64);
+        pub fn inc_unack_peers() {
+            UNACK_PEERS.increment(1.0);
+        }
+
+        #[inline]
+        pub fn dec_unack_peers() {
+            UNACK_PEERS.decrement(1.0);
         }
 
         #[inline]
@@ -160,7 +165,9 @@ mod metrics {
             false
         }
         #[inline]
-        pub fn set_unack_peers(_: u64) {}
+        pub fn inc_unack_peers() {}
+        #[inline]
+        pub fn dec_unack_peers() {}
         #[inline]
         pub fn inc_unack_tickets() {}
         #[inline]
@@ -300,6 +307,11 @@ impl<Chain, Db> HoprTicketProcessor<Chain, Db> {
             unacknowledged_tickets: moka::future::Cache::builder()
                 .time_to_idle(cfg.unack_ticket_timeout)
                 .max_capacity(100_000)
+                .eviction_listener(|_key, _value, cause| {
+                    if !matches!(cause, moka::notification::RemovalCause::Replaced) {
+                        metrics::dec_unack_peers();
+                    }
+                })
                 .build(),
             chain_api,
             db,
@@ -380,6 +392,7 @@ where
             .unacknowledged_tickets
             .get_with_by_ref(next_hop, async {
                 let peer_id_for_eviction = peer_id.clone();
+                metrics::inc_unack_peers();
                 moka::future::Cache::builder()
                     .time_to_live(self.cfg.unack_ticket_timeout)
                     .max_capacity(self.cfg.max_unack_tickets as u64)
@@ -404,7 +417,6 @@ where
         metrics::inc_insertions();
         metrics::inc_unack_tickets();
         metrics::inc_unack_tickets_for_peer(&peer_id);
-        metrics::set_unack_peers(self.unacknowledged_tickets.entry_count());
 
         Ok(())
     }
