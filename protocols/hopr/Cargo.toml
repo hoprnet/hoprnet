@@ -23,6 +23,7 @@ serde = [
   "hopr-internal-types/serde",
   "hopr-crypto-types/serde",
 ]
+prometheus = ["dep:hopr-metrics"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -50,6 +51,7 @@ hopr-crypto-packet = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-internal-types = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true }
 hopr-parallelize = { workspace = true }
 hopr-primitive-types = { workspace = true }
