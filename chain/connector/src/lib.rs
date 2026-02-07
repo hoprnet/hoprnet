@@ -9,7 +9,7 @@ pub(crate) mod utils;
 
 #[cfg(feature = "testing")]
 pub use backend::InMemoryBackend;
-pub use backend::{Backend, TempDbBackend};
+pub use backend::{Backend, TempDbBackend, TempDbError};
 pub use connector::{BlockchainConnectorConfig, HoprBlockchainConnector};
 pub use hopr_api::chain as api;
 pub use hopr_chain_types::payload::{BasicPayloadGenerator, SafePayloadGenerator};
@@ -73,7 +73,7 @@ where
         chain_key.clone(),
         cfg,
         client,
-        TempDbBackend::new()?,
+        TempDbBackend::new().map_err(errors::ConnectorError::backend)?,
         payload_gen,
     ))
 }
@@ -103,7 +103,7 @@ where
         chain_key.clone(),
         cfg,
         client,
-        TempDbBackend::new()?,
+        TempDbBackend::new().map_err(errors::ConnectorError::backend)?,
         payload_gen,
     ))
 }
@@ -140,7 +140,7 @@ where
         chain_key.clone(),
         cfg,
         client,
-        TempDbBackend::new()?,
+        TempDbBackend::new().map_err(errors::ConnectorError::backend)?,
         payload_gen,
     ))
 }
@@ -179,7 +179,7 @@ where
         chain_key.clone(),
         cfg,
         client,
-        TempDbBackend::new()?,
+        TempDbBackend::new().map_err(errors::ConnectorError::backend)?,
         payload_gen,
     ))
 }

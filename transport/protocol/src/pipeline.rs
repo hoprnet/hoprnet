@@ -30,6 +30,14 @@ lazy_static::lazy_static! {
         "Number of processed packets of different types (sent, received, forwarded)",
         &["type"]
     ).unwrap();
+    // Tracks how often the Rayon-backed packet decode path exceeds PACKET_DECODING_TIMEOUT.
+    // A sustained non-zero rate here indicates the Rayon pool is saturated—correlate with
+    // hopr_rayon_tasks_cancelled_total and hopr_rayon_queue_wait_seconds to diagnose whether
+    // the bottleneck is queue depth, individual task duration, or both.
+    static ref METRIC_PACKET_DECODE_TIMEOUTS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+        "hopr_packet_decode_timeouts_total",
+        "Number of incoming packets dropped due to decode timeout"
+    ).unwrap();
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
@@ -96,7 +104,7 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
                     }
                 }
             },
-            concurrency,
+            Some(concurrency),
         )
         .filter_map(futures::future::ready)
         .map(Ok)
@@ -167,6 +175,10 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                         tracing::trace!(%peer, ?packet, "successfully decoded incoming packet");
                         Some(packet)
                     },
+                    Ok(Err(IncomingPacketError::Overloaded(error))) => {
+                        tracing::warn!(%peer, %error, "dropping packet due to local CPU overload");
+                        None
+                    },
                     Ok(Err(IncomingPacketError::Undecodable(error))) => {
                         // Do not send an ack back if the packet could not be decoded at all
                         //
@@ -203,12 +215,18 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                     }
                     Err(_) => {
                         // If we cannot decode the packet within the time limit, just drop it
-                        tracing::error!(%peer, "dropped incoming packet: failed to decode packet within {:?}", PACKET_DECODING_TIMEOUT);
+                        tracing::error!(
+                            %peer,
+                            timeout_ms = PACKET_DECODING_TIMEOUT.as_millis() as u64,
+                            "dropped incoming packet: decode timeout - check hopr_rayon_queue_wait_seconds metric for pool saturation"
+                        );
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        METRIC_PACKET_DECODE_TIMEOUTS.increment();
                         None
                     }
                 }
             }.instrument(tracing::debug_span!("incoming_packet_decode", %peer))
-        }, concurrency)
+        }, Some(concurrency))
         .filter_map(futures::future::ready)
         .then_concurrent(move |packet| {
             let ticket_proc = ticket_proc_success.clone();
@@ -350,18 +368,13 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
     WOut::Error: std::error::Error,
 {
     ack_outgoing
-        .then(move |(destination, maybe_ack_key)|{
+        .map(move |(destination, maybe_ack_key)| {
             let packet_key = packet_key.clone();
-            async move {
-                 // Sign acknowledgement with the given half-key or generate a signed random one
-                 let ack = hopr_parallelize::cpu::spawn_blocking(move || {
-                     maybe_ack_key
-                         .map(|ack_key| VerifiedAcknowledgement::new(ack_key, &packet_key))
-                         .unwrap_or_else(|| VerifiedAcknowledgement::random(&packet_key))
-                 })
-                 .await;
-                (destination, ack)
-            }
+            // Sign acknowledgement with the given half-key or generate a signed random one
+            let ack = maybe_ack_key
+                .map(|ack_key| VerifiedAcknowledgement::new(ack_key, &packet_key))
+                .unwrap_or_else(|| VerifiedAcknowledgement::random(&packet_key));
+            (destination, ack)
         })
         .buffer(futures_time::time::Duration::from(cfg.ack_buffer_interval))
         .filter(|acks| futures::future::ready(!acks.is_empty()))
@@ -535,13 +548,13 @@ impl Validate for AcknowledgementPipelineConfig {
     serde(deny_unknown_fields)
 )]
 pub struct PacketPipelineConfig {
-    /// Maximum concurrency when processing outgoing packets
+    /// Maximum concurrency when processing outgoing packets.
     ///
-    /// Use 0 for no limit.
+    /// `None` or `Some(0)` both fall back to the default (available parallelism * 8).
     pub output_concurrency: Option<usize>,
     /// Maximum concurrency when processing incoming packets.
     ///
-    /// Use 0 for no limit.
+    /// `None` or `Some(0)` both fall back to the default (available parallelism * 8).
     pub input_concurrency: Option<usize>,
     /// Configuration of the packet acknowledgement processing
     #[validate(nested)]
@@ -581,6 +594,7 @@ where
     {
         // Initialize the lazy statics here
         lazy_static::initialize(&METRIC_PACKET_COUNT);
+        lazy_static::initialize(&METRIC_PACKET_DECODE_TIMEOUTS);
     }
 
     let (outgoing_ack_tx, outgoing_ack_rx) =
@@ -601,7 +615,8 @@ where
     let decoder = std::sync::Arc::new(codec.1);
     let ticket_proc = std::sync::Arc::new(ticket_proc);
 
-    // Default maximum concurrency (if not set) is 8 times the number of available cores
+    // Default maximum concurrency (if not set or zero) is 8 times the number of available cores.
+    // Zero is normalized to the default to prevent deadlock (0 concurrent tasks = no work).
     let avail_concurrency = std::thread::available_parallelism()
         .ok()
         .map(|n| n.get())
@@ -609,16 +624,14 @@ where
         .max(1)
         * 8;
 
+    let output_concurrency = cfg.output_concurrency.filter(|&n| n > 0).unwrap_or(avail_concurrency);
+    let input_concurrency = cfg.input_concurrency.filter(|&n| n > 0).unwrap_or(avail_concurrency);
+
     processes.insert(
         PacketPipelineProcesses::MsgOut,
         spawn_as_abortable!(
-            start_outgoing_packet_pipeline(
-                app_in,
-                encoder.clone(),
-                wire_out.clone(),
-                cfg.output_concurrency.unwrap_or(avail_concurrency)
-            )
-            .in_current_span()
+            start_outgoing_packet_pipeline(app_in, encoder.clone(), wire_out.clone(), output_concurrency)
+                .in_current_span()
         ),
     );
 
@@ -632,7 +645,7 @@ where
                 ticket_events.clone(),
                 (outgoing_ack_tx, incoming_ack_tx),
                 app_out,
-                cfg.input_concurrency.unwrap_or(avail_concurrency),
+                input_concurrency,
             )
             .in_current_span()
         ),
