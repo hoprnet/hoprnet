@@ -320,24 +320,29 @@ impl<Chain, Db> HoprTicketProcessor<Chain, Db> {
             unacknowledged_tickets: moka::future::Cache::builder()
                 .time_to_idle(cfg.unack_ticket_timeout)
                 .max_capacity(100_000)
-                .async_eviction_listener(|_key, value: moka::future::Cache<HalfKeyChallenge, UnacknowledgedTicket>, cause| -> moka::notification::ListenerFuture {
-                    Box::pin(async move {
-                        if !matches!(cause, moka::notification::RemovalCause::Replaced) {
-                            metrics::dec_unack_peers();
-                            if matches!(
-                                cause,
-                                moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size
-                            ) {
-                                metrics::inc_peer_evictions();
+                .async_eviction_listener(
+                    |_key,
+                     value: moka::future::Cache<HalfKeyChallenge, UnacknowledgedTicket>,
+                     cause|
+                     -> moka::notification::ListenerFuture {
+                        Box::pin(async move {
+                            if !matches!(cause, moka::notification::RemovalCause::Replaced) {
+                                metrics::dec_unack_peers();
+                                if matches!(
+                                    cause,
+                                    moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size
+                                ) {
+                                    metrics::inc_peer_evictions();
+                                }
                             }
-                        }
-                        // Explicitly invalidate all inner cache entries so their eviction
-                        // listeners fire (decrementing UNACK_TICKETS and per-peer metrics).
-                        // Without this, dropping the inner cache silently leaks those metrics.
-                        value.invalidate_all();
-                        value.run_pending_tasks().await;
-                    })
-                })
+                            // Explicitly invalidate all inner cache entries so their eviction
+                            // listeners fire (decrementing UNACK_TICKETS and per-peer metrics).
+                            // Without this, dropping the inner cache silently leaks those metrics.
+                            value.invalidate_all();
+                            value.run_pending_tasks().await;
+                        })
+                    },
+                )
                 .build(),
             chain_api,
             db,
