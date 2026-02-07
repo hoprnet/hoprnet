@@ -65,8 +65,21 @@ impl TempDbBackend {
 
         tracing::info!(path = %file.path().display(), "opened temporary redb database");
 
+        let db = redb::Database::create(file.path())?;
+
+        // Create all tables eagerly so that read-only lookups on a fresh
+        // database return Ok(None) instead of a TableError.
+        {
+            let write_tx = db.begin_write()?;
+            write_tx.open_table(ACCOUNTS_TABLE_DEF)?;
+            write_tx.open_table(CHANNELS_TABLE_DEF)?;
+            write_tx.open_table(ADDRESS_TO_ID)?;
+            write_tx.open_table(KEY_TO_ID)?;
+            write_tx.commit()?;
+        }
+
         Ok(Self {
-            db: std::sync::Arc::new(redb::Database::create(file.path())?),
+            db: std::sync::Arc::new(db),
             _tmp: std::sync::Arc::new(file),
         })
     }
@@ -311,26 +324,6 @@ mod tests {
     fn lookup_nonexistent_returns_none() -> anyhow::Result<()> {
         let backend = TempDbBackend::new()?;
 
-        // Insert one account and one channel so the tables are created
-        let seed_kp = OffchainKeypair::random();
-        let seed_cp = ChainKeypair::random();
-        backend.insert_account(AccountEntry {
-            public_key: (*seed_kp.public()).into(),
-            chain_addr: seed_cp.public().to_address(),
-            entry_type: AccountType::NotAnnounced,
-            safe_address: None,
-            key_id: 1.into(),
-        })?;
-        backend.insert_channel(ChannelEntry::new(
-            Address::new(&[10u8; 20]),
-            Address::new(&[11u8; 20]),
-            HoprBalance::new_base(1),
-            1u32.into(),
-            ChannelStatus::Open,
-            1u32.into(),
-        ))?;
-
-        // Now look up keys that were never inserted
         let kp = OffchainKeypair::random();
         let cp = ChainKeypair::random();
         let channel_id = generate_channel_id(&Address::new(&[1u8; 20]), &Address::new(&[2u8; 20]));
