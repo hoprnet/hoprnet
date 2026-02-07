@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["public_key_to_address","recover_signer","recover_signer_unchecked","sign_message","verify_and_compute_signer","verify_and_compute_signer_unchecked"]};
