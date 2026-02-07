@@ -65,6 +65,11 @@ mod metrics {
                 "Total number of unacknowledged tickets evicted from cache",
             )
             .unwrap();
+            static ref UNACK_PEER_EVICTIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+                "hopr_tickets_unack_peer_evictions_total",
+                "Total number of peer caches evicted from the outer unacknowledged ticket cache",
+            )
+            .unwrap();
             static ref UNACK_TICKETS_PER_PEER: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
                 "hopr_tickets_unack_tickets_per_peer",
                 "Number of unacknowledged tickets per peer in cache (enable with HOPR_METRICS_UNACK_PER_PEER=1)",
@@ -81,6 +86,7 @@ mod metrics {
             lazy_static::initialize(&UNACK_LOOKUPS);
             lazy_static::initialize(&UNACK_LOOKUP_MISSES);
             lazy_static::initialize(&UNACK_EVICTIONS);
+            lazy_static::initialize(&UNACK_PEER_EVICTIONS);
             if *PER_PEER_ENABLED {
                 lazy_static::initialize(&UNACK_TICKETS_PER_PEER);
             }
@@ -133,6 +139,11 @@ mod metrics {
         }
 
         #[inline]
+        pub fn inc_peer_evictions() {
+            UNACK_PEER_EVICTIONS.increment();
+        }
+
+        #[inline]
         pub fn inc_unack_tickets_for_peer(peer: &str) {
             if *PER_PEER_ENABLED {
                 UNACK_TICKETS_PER_PEER.increment(&[peer], 1.0);
@@ -180,6 +191,8 @@ mod metrics {
         pub fn inc_lookup_misses() {}
         #[inline]
         pub fn inc_evictions() {}
+        #[inline]
+        pub fn inc_peer_evictions() {}
         #[inline]
         pub fn inc_unack_tickets_for_peer(_: &str) {}
         #[inline]
@@ -307,10 +320,23 @@ impl<Chain, Db> HoprTicketProcessor<Chain, Db> {
             unacknowledged_tickets: moka::future::Cache::builder()
                 .time_to_idle(cfg.unack_ticket_timeout)
                 .max_capacity(100_000)
-                .eviction_listener(|_key, _value, cause| {
-                    if !matches!(cause, moka::notification::RemovalCause::Replaced) {
-                        metrics::dec_unack_peers();
-                    }
+                .async_eviction_listener(|_key, value: moka::future::Cache<HalfKeyChallenge, UnacknowledgedTicket>, cause| -> moka::notification::ListenerFuture {
+                    Box::pin(async move {
+                        if !matches!(cause, moka::notification::RemovalCause::Replaced) {
+                            metrics::dec_unack_peers();
+                            if matches!(
+                                cause,
+                                moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size
+                            ) {
+                                metrics::inc_peer_evictions();
+                            }
+                        }
+                        // Explicitly invalidate all inner cache entries so their eviction
+                        // listeners fire (decrementing UNACK_TICKETS and per-peer metrics).
+                        // Without this, dropping the inner cache silently leaks those metrics.
+                        value.invalidate_all();
+                        value.run_pending_tasks().await;
+                    })
                 })
                 .build(),
             chain_api,

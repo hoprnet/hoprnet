@@ -127,6 +127,7 @@ These metrics help diagnose "unknown ticket" acknowledgement failures by trackin
 - `hopr_tickets_unack_lookups_total`: Total number of acknowledgement lookups attempted (counter)
 - `hopr_tickets_unack_lookup_misses_total`: Total number of lookup failures - "unknown ticket" errors (counter)
 - `hopr_tickets_unack_evictions_total`: Total number of tickets evicted from cache due to TTL or capacity limits (counter)
+- `hopr_tickets_unack_peer_evictions_total`: Total number of peer caches evicted from the outer unacknowledged ticket cache (counter)
 
 ### Optional Per-Peer Metrics
 
@@ -145,6 +146,7 @@ These metrics help diagnose "unknown ticket" acknowledgement failures by trackin
 1. **Check eviction rate**: Compare `hopr_tickets_unack_evictions_total` vs `hopr_tickets_unack_insertions_total`
    - High eviction rate suggests TTL too short or cache capacity too small
    - Tickets may be evicted before acknowledgements arrive
+   - Also check `hopr_tickets_unack_peer_evictions_total` to see if entire peer caches are being evicted (idle timeout or size pressure on the outer cache)
 
 2. **Check cache size**: Monitor `hopr_tickets_unack_tickets_total` and `hopr_tickets_unack_peers_total`
    - Low values during high traffic suggest aggressive eviction
