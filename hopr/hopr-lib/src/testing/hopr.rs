@@ -66,9 +66,7 @@ pub async fn create_hopr_instance(
                         outgoing_win_prob: Some(winn_prob.try_into().expect("invalid winning probability")),
                         ..Default::default()
                     },
-                    ticket_processing: Default::default(),
-                    surb_store: Default::default(),
-                    ack_processing: Default::default(),
+                    ..Default::default()
                 },
             },
             publish: true,

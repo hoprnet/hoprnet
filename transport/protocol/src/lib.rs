@@ -26,7 +26,9 @@ pub mod stream;
 
 use hopr_api::PeerId;
 pub use hopr_api::network::PeerDiscovery;
-pub use pipeline::{AcknowledgementPipelineConfig, PacketPipelineProcesses, TicketEvent, run_packet_pipeline};
+pub use pipeline::{
+    AcknowledgementPipelineConfig, PacketPipelineConfig, PacketPipelineProcesses, TicketEvent, run_packet_pipeline,
+};
 
 const HOPR_PACKET_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::SIZE;
 

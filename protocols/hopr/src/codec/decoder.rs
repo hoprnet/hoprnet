@@ -206,10 +206,9 @@ where
         // Try to retrieve the peer's public key from the cache or compute it if it does not exist yet
         let previous_hop = match self
             .peer_id_cache
-            .try_get_with_by_ref(
-                &sender,
-                hopr_parallelize::cpu::spawn_fifo_blocking(move || OffchainPublicKey::from_peerid(&sender)),
-            )
+            .try_get_with_by_ref(&sender, async {
+                hopr_parallelize::cpu::spawn_fifo_blocking(move || OffchainPublicKey::from_peerid(&sender)).await
+            })
             .await
         {
             Ok(peer) => peer,
