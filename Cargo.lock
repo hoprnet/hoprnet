@@ -4826,9 +4826,10 @@ dependencies = [
 
 [[package]]
 name = "hopr-platform"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "thiserror 2.0.18",
+ "tracing",
 ]
 
 [[package]]
@@ -4903,6 +4904,7 @@ dependencies = [
  "hopr-metrics",
  "hopr-network-types",
  "hopr-parallelize",
+ "hopr-platform",
  "hopr-primitive-types 0.10.0",
  "humantime-serde",
  "lazy_static",

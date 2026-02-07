@@ -24,6 +24,7 @@ serde = [
   "hopr-crypto-types/serde",
 ]
 prometheus = ["dep:hopr-metrics", "hopr-parallelize/prometheus"]
+trace-timing = ["hopr-platform/trace-timing"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -55,6 +56,7 @@ hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true }
 hopr-parallelize = { workspace = true }
+hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
