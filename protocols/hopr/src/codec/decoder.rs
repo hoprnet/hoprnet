@@ -4,10 +4,10 @@ use std::{
 };
 
 use hopr_api::chain::*;
-use hopr_platform::trace_timed;
 use hopr_crypto_packet::prelude::*;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
+use hopr_platform::trace_timed;
 use hopr_primitive_types::prelude::*;
 
 use crate::{
@@ -239,7 +239,9 @@ where
                     return match error.as_ref() {
                         HoprProtocolError::SpawnError(spawn_err) => {
                             tracing::warn!(%sender, %error, "dropping packet due to local CPU overload (not sender's fault)");
-                            Err(IncomingPacketError::Overloaded(HoprProtocolError::SpawnError(*spawn_err)))
+                            Err(IncomingPacketError::Overloaded(HoprProtocolError::SpawnError(
+                                *spawn_err,
+                            )))
                         }
                         _ => {
                             tracing::error!(%sender, %error, "dropping packet - cannot convert peer id");

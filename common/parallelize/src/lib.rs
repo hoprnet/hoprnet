@@ -412,6 +412,7 @@ mod tests {
         assert_eq!(result, "hello");
     }
 
+    #[cfg(panic = "unwind")]
     #[tokio::test]
     #[serial]
     async fn spawn_blocking_propagates_panic() {
