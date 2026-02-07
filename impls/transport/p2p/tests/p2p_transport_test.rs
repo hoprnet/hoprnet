@@ -8,11 +8,11 @@ use futures::{
     SinkExt, StreamExt,
     channel::mpsc::{Receiver, Sender},
 };
+use hopr_api::network::{NetworkBuilder, PeerDiscovery};
 use hopr_crypto_types::{keypairs::Keypair, prelude::OffchainKeypair};
 use hopr_platform::time::native::current_time;
-use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork};
+use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork, UninitializedPeerStore};
 use hopr_transport_probe::ping::PingQueryReplier;
-use hopr_transport_protocol::PeerDiscovery;
 use lazy_static::lazy_static;
 
 pub fn random_free_local_ipv4_port() -> Option<u16> {
@@ -42,11 +42,10 @@ pub(crate) type TestSwarm = HoprNetwork;
 
 async fn build_p2p_swarm(
     announcement: Announcement,
-) -> anyhow::Result<(Interface, (TestSwarm, impl std::future::Future<Output = ()>))> {
+) -> anyhow::Result<(Interface, (TestSwarm, hopr_api::network::BoxedProcessFn))> {
     let random_port = random_free_local_ipv4_port().context("could not find a free port")?;
     let random_keypair = OffchainKeypair::random();
-    let identity: libp2p::identity::Keypair = (&random_keypair).into();
-    let peer_id: PeerId = identity.public().into();
+    let peer_id: PeerId = libp2p::identity::Keypair::from(&random_keypair).public().into();
 
     let (transport_updates_tx, transport_updates_rx) = futures::channel::mpsc::unbounded::<PeerDiscovery>();
     let (heartbeat_requests_tx, _heartbeat_requests_rx) =
@@ -57,9 +56,18 @@ async fn build_p2p_swarm(
     };
     let multiaddress = Multiaddr::from_str(&multiaddress).context("failed to create a valid multiaddress")?;
 
-    let swarm = HoprLibp2pNetworkBuilder::new(identity, transport_updates_rx, vec![multiaddress.clone()]).await;
-    let (network, process) =
-        swarm.into_network_with_stream_protocol_process(hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL, true);
+    let peer_store = UninitializedPeerStore::default();
+    let network_builder = HoprLibp2pNetworkBuilder::new(peer_store);
+    let (network, process) = network_builder
+        .build(
+            &random_keypair,
+            vec![multiaddress.clone()],
+            hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL,
+            true,
+            transport_updates_rx,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to build network: {e}"))?;
 
     let msg_codec = hopr_transport_protocol::HoprBinaryCodec {};
     let (wire_msg_tx, wire_msg_rx) =
@@ -121,14 +129,14 @@ use tokio::{
     time::{sleep, timeout},
 };
 
-#[ignore]
+// #[ignore]    // TODO return back once compiling
 #[tokio::test]
 async fn p2p_only_communication_quic() -> anyhow::Result<()> {
     let (mut api1, (_swarm1, process1)) = build_p2p_swarm(Announcement::QUIC).await?;
     let (api2, (_swarm2, process2)) = build_p2p_swarm(Announcement::QUIC).await?;
 
-    let _sjh1 = SelfClosingJoinHandle::new(process1);
-    let _sjh2 = SelfClosingJoinHandle::new(process2);
+    let _sjh1 = SelfClosingJoinHandle::new(process1());
+    let _sjh2 = SelfClosingJoinHandle::new(process2());
 
     // Announce nodes to each other
     api1.update_from_announcements

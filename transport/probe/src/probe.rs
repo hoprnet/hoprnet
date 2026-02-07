@@ -2,8 +2,9 @@ use std::sync::Arc;
 
 use futures::{FutureExt, SinkExt, StreamExt, pin_mut};
 use futures_concurrency::stream::StreamExt as _;
-use hopr_api::ct::{
-    NetworkGraphView, Telemetry, TrafficGeneration, traits::NetworkGraphUpdate, types::TrafficGenerationError,
+use hopr_api::{
+    ct::TrafficGeneration,
+    graph::{NetworkGraphError, NetworkGraphUpdate, NetworkGraphView, Telemetry},
 };
 use hopr_async_runtime::AbortableList;
 use hopr_crypto_random::Randomizable;
@@ -56,7 +57,7 @@ impl Probe {
         U: futures::Stream<Item = (HoprPseudonym, ApplicationDataIn)> + Send + Sync + 'static,
         V: futures::Stream<Item = (PeerId, PingQueryReplier)> + Send + Sync + 'static,
         Up: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Clone + Send + Sync + 'static,
-        Tr: TrafficGeneration + Send + Sync + 'static,
+        Tr: TrafficGeneration<NodeId = G::NodeId> + Send + Sync + 'static,
         G: NetworkGraphView + NetworkGraphUpdate + Clone + Send + Sync + 'static,
     {
         let max_parallel_probes = self.cfg.max_parallel_probes;
@@ -82,9 +83,9 @@ impl Probe {
                         tracing::debug!(%peer, pseudonym = %k.0, probe = %k.1, reason = "timeout", "probe failed");
                         if let Some(replier) = notifier {
                             if let NodeId::Offchain(opk) = peer.as_ref() {
-                                replier.notify(Err(ProbeError::TrafficError(
-                                    TrafficGenerationError::ProbeNeighborTimeout(opk.into()),
-                                )));
+                                replier.notify(Err(ProbeError::TrafficError(NetworkGraphError::ProbeNeighborTimeout(
+                                    opk.into(),
+                                ))));
                             } else {
                                 tracing::warn!(
                                     reason = "non-offchain peer",
@@ -98,7 +99,7 @@ impl Probe {
                             futures::FutureExt::boxed(async move {
                                 store
                                     .record::<NeighborTelemetry, PathTelemetry>(Err(
-                                        TrafficGenerationError::ProbeNeighborTimeout(peer),
+                                        NetworkGraphError::ProbeNeighborTimeout(peer),
                                     ))
                                     .await
                             })
@@ -287,7 +288,7 @@ mod tests {
 
     use async_trait::async_trait;
     use futures::future::BoxFuture;
-    use hopr_api::ct::types::TrafficGenerationError;
+    use hopr_api::graph::{NetworkGraphError, Observable};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use hopr_ct_telemetry::{ImmediateNeighborProber, ProberConfig};
     use hopr_protocol_app::prelude::{ApplicationData, Tag};
@@ -305,6 +306,30 @@ mod tests {
         ];
     );
 
+    /// Test stub implementation of Observable.
+    #[derive(Debug, Clone, Copy, Default)]
+    pub struct TestObservations;
+
+    impl Observable for TestObservations {
+        fn record_probe(&mut self, _latency: std::result::Result<Duration, ()>) {}
+
+        fn last_update(&self) -> Duration {
+            Duration::default()
+        }
+
+        fn average_latency(&self) -> Option<Duration> {
+            None
+        }
+
+        fn average_probe_rate(&self) -> f64 {
+            1.0
+        }
+
+        fn score(&self) -> f64 {
+            1.0
+        }
+    }
+
     #[derive(Debug, Clone)]
     pub struct PeerStore {
         get_peers: Arc<RwLock<VecDeque<Vec<PeerId>>>>,
@@ -314,10 +339,10 @@ mod tests {
 
     #[async_trait]
     impl NetworkGraphUpdate for PeerStore {
-        async fn record<N, P>(&self, telemetry: std::result::Result<Telemetry<N, P>, TrafficGenerationError<P>>)
+        async fn record<N, P>(&self, telemetry: std::result::Result<Telemetry<N, P>, NetworkGraphError<P>>)
         where
-            N: hopr_api::ct::MeasurableNeighbor + Send + Clone,
-            P: hopr_api::ct::MeasurablePath + Send + Clone,
+            N: hopr_api::graph::MeasurableNeighbor + Send + Clone,
+            P: hopr_api::graph::MeasurablePath + Send + Clone,
         {
             let mut on_finished = self.on_finished.write().unwrap();
 
@@ -327,12 +352,10 @@ mod tests {
                     let duration = neighbor_telemetry.rtt();
                     on_finished.push((peer, Ok(duration)));
                 }
-                Err(TrafficGenerationError::ProbeNeighborTimeout(peer)) => {
+                Err(NetworkGraphError::ProbeNeighborTimeout(peer)) => {
                     on_finished.push((
                         peer.clone(),
-                        Err(ProbeError::TrafficError(TrafficGenerationError::ProbeNeighborTimeout(
-                            peer,
-                        ))),
+                        Err(ProbeError::TrafficError(NetworkGraphError::ProbeNeighborTimeout(peer))),
                     ));
                 }
                 _ => panic!("unexpected telemetry type, unimplemented"),
@@ -342,6 +365,9 @@ mod tests {
 
     #[async_trait]
     impl NetworkGraphView for PeerStore {
+        type NodeId = PeerId;
+        type Observed = TestObservations;
+
         /// Returns a stream of all known nodes in the network graph.
         fn nodes(&self) -> futures::stream::BoxStream<'static, PeerId> {
             let mut get_peers = self.get_peers.write().unwrap();
@@ -349,9 +375,19 @@ mod tests {
         }
 
         /// Returns a list of all routes to the given destination of the specified length.
-        async fn find_routes(&self, destination: &PeerId, length: usize) -> Vec<DestinationRouting> {
+        async fn routes(&self, destination: &PeerId, length: usize) -> Vec<DestinationRouting> {
             tracing::debug!(%destination, %length, "finding routes in test peer store");
             vec![]
+        }
+
+        /// Returns a list of all loopback routes of the specified length.
+        async fn loopback_routes(&self) -> Vec<Vec<DestinationRouting>> {
+            tracing::debug!("finding loopback routes in test peer store");
+            vec![]
+        }
+
+        fn edge(&self, _src: &PeerId, _dest: &PeerId) -> Option<TestObservations> {
+            Some(TestObservations)
         }
     }
 
@@ -366,7 +402,7 @@ mod tests {
     where
         Fut: std::future::Future<Output = anyhow::Result<()>>,
         F: Fn(TestInterface) -> Fut + Send + Sync + 'static,
-        St: NetworkGraphUpdate + NetworkGraphView + Clone + Send + Sync + 'static,
+        St: NetworkGraphUpdate + NetworkGraphView<NodeId = PeerId> + Clone + Send + Sync + 'static,
     {
         let probe = Probe::new(cfg.clone());
 

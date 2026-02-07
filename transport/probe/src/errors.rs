@@ -1,4 +1,4 @@
-use hopr_api::ct::types::TrafficGenerationError;
+use hopr_api::graph::NetworkGraphError;
 use libp2p_identity::PeerId;
 use thiserror::Error;
 
@@ -7,7 +7,7 @@ use crate::types::PathTelemetry;
 #[derive(Error, Debug)]
 pub enum ProbeError {
     #[error("probing traffic error: {0}")]
-    TrafficError(TrafficGenerationError<PathTelemetry>),
+    TrafficError(NetworkGraphError<PathTelemetry>),
 
     #[error("error while decoding message data")]
     DecodingError,

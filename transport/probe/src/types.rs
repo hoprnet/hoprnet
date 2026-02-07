@@ -133,6 +133,9 @@ pub struct PathTelemetry {
     pub id: [u8; Self::ID_SIZE],
     /// Path information encoded as bytes
     pub path: [u8; Self::PATH_SIZE],
+    /// Sequence identifier representing the order of the telemetry measurement
+    /// inside the existing id
+    pub seq_id: u16,
     /// Timestamp when the telemetry was created
     pub timestamp: u128,
 }
@@ -140,24 +143,29 @@ pub struct PathTelemetry {
 impl PathTelemetry {
     pub const ID_SIZE: usize = 10;
     pub const PATH_SIZE: usize = 10;
-    pub const SIZE: usize = Self::ID_SIZE + Self::PATH_SIZE + size_of::<u128>();
+    pub const SIZE: usize = Self::ID_SIZE + Self::PATH_SIZE + size_of::<u16>() + size_of::<u128>();
 
     pub fn to_bytes(self) -> Box<[u8]> {
         let mut out = Vec::with_capacity(Self::SIZE);
         out.extend_from_slice(&self.id);
         out.extend_from_slice(&self.path);
+        out.extend_from_slice(&self.seq_id.to_be_bytes());
         out.extend_from_slice(&self.timestamp.to_be_bytes());
         out.into_boxed_slice()
     }
 }
 
-impl hopr_api::ct::MeasurablePath for PathTelemetry {
+impl hopr_api::graph::MeasurablePath for PathTelemetry {
     fn id(&self) -> &[u8] {
         &self.id
     }
 
     fn path(&self) -> &[u8] {
         &self.path
+    }
+
+    fn seq_id(&self) -> u16 {
+        self.seq_id
     }
 
     fn timestamp(&self) -> u128 {
@@ -191,8 +199,13 @@ impl<'a> TryFrom<&'a [u8]> for PathTelemetry {
                 path: (&value[10..20])
                     .try_into()
                     .map_err(|_| GeneralError::ParseError("PathTelemetry.path".into()))?,
+                seq_id: u16::from_be_bytes(
+                    (&value[20..22])
+                        .try_into()
+                        .map_err(|_| GeneralError::ParseError("PathTelemetry.seq_id".into()))?,
+                ),
                 timestamp: u128::from_be_bytes(
-                    (&value[20..36])
+                    (&value[22..38])
                         .try_into()
                         .map_err(|_| GeneralError::ParseError("PathTelemetry.timestamp".into()))?,
                 ),
@@ -212,7 +225,7 @@ pub struct NeighborTelemetry {
     pub rtt: std::time::Duration,
 }
 
-impl hopr_api::ct::MeasurableNeighbor for NeighborTelemetry {
+impl hopr_api::graph::MeasurableNeighbor for NeighborTelemetry {
     fn peer(&self) -> &PeerId {
         &self.peer
     }

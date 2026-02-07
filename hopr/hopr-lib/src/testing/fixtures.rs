@@ -12,17 +12,18 @@ use hopr_chain_connector::{
 use hopr_crypto_types::prelude::*;
 use hopr_db_node::HoprNodeDb;
 use hopr_internal_types::prelude::WinningProbability;
+use hopr_network_graph::immediate::ImmediateNeighborChannelGraph;
 use hopr_network_types::prelude::{IpOrHost, RoutingOptions, SealedHost};
 use hopr_primitive_types::prelude::*;
 use hopr_transport::{HoprSession, SessionClientConfig, SessionTarget};
+use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, UninitializedPeerStore};
 use rand::prelude::{IteratorRandom, SliceRandom};
 use rstest::fixture;
 use tokio::time::sleep;
 use tracing::info;
 
 use crate::{
-    Address,
-    state::HoprState,
+    Address, HoprNodeChainOperations, HoprNodeNetworkOperations, HoprNodeOperations, HoprState,
     testing::{
         dummies::EchoServer,
         hopr::{ChannelGuard, NodeSafeConfig, TestedHopr, create_hopr_instance},
@@ -387,11 +388,17 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
                         .await
                         .expect("failed to connect to HoprBlockchainSafeConnector");
 
+                    // Create peer store, network builder, and graph
+                    let peer_store = UninitializedPeerStore::default();
+                    let network_builder = HoprLibp2pNetworkBuilder::new(peer_store.clone());
+                    let graph = ImmediateNeighborChannelGraph::new(peer_store, Duration::from_mins(2));
+
                     let instance = create_hopr_instance(
                         (&onchain_keys[i], &offchain_keys[i]),
                         3001 + i as u16,
                         node_db,
                         std::sync::Arc::new(connector),
+                        graph,
                         safes[i],
                         if i % 2 != 0 { MINIMUM_INCOMING_WIN_PROB } else { 1.0 },
                     )
@@ -400,6 +407,7 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
                     let socket = instance
                         .run(
                             hopr_ct_telemetry::ImmediateNeighborProber::new(Default::default()),
+                            network_builder,
                             EchoServer::new(),
                         )
                         .await?;
