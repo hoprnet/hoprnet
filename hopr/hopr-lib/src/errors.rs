@@ -39,6 +39,9 @@ pub enum HoprLibError {
     #[error(transparent)]
     NetworkTypeError(#[from] hopr_network_types::errors::NetworkTypeError),
 
+    #[error("rayon thread pool queue full: {0}")]
+    SpawnError(#[from] hopr_parallelize::cpu::SpawnError),
+
     #[error("unspecified error: {0}")]
     Other(#[source] anyhow::Error),
 }

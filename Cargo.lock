@@ -2464,7 +2464,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ab67060fc6b8ef687992d439ca0fa36e7ed17e9a0b16b25b601e8757df720de"
 dependencies = [
  "data-encoding",
- "syn 2.0.114",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -4388,7 +4388,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.13.2"
+version = "0.14.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4836,18 +4836,24 @@ dependencies = [
 
 [[package]]
 name = "hopr-parallelize"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "futures",
+ "hopr-metrics",
+ "lazy_static",
  "rayon",
+ "serial_test",
+ "thiserror 2.0.18",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
 name = "hopr-platform"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "thiserror 2.0.18",
+ "tracing",
 ]
 
 [[package]]
@@ -4900,7 +4906,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-hopr"
-version = "4.0.3"
+version = "4.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4919,8 +4925,10 @@ dependencies = [
  "hopr-crypto-types 0.9.0",
  "hopr-db-node",
  "hopr-internal-types",
+ "hopr-metrics",
  "hopr-network-types",
  "hopr-parallelize",
+ "hopr-platform",
  "hopr-primitive-types 0.10.0",
  "humantime-serde",
  "lazy_static",
@@ -5036,7 +5044,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5187,7 +5195,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -5210,7 +5218,6 @@ dependencies = [
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-network-types",
- "hopr-parallelize",
  "hopr-primitive-types 0.10.0",
  "hopr-protocol-app",
  "hopr-protocol-hopr",
