@@ -79,7 +79,7 @@ pub struct HoprBlockchainConnector<C, B, P, R> {
     channel_by_id: moka::future::Cache<ChannelId, Option<ChannelEntry>, ahash::RandomState>,
     // Fast retrieval of channel entries by parties
     channel_by_parties: moka::future::Cache<ChannelParties, Option<ChannelEntry>, ahash::RandomState>,
-    // Contains only the chain info structure
+    // Contains chain info (no TTL - kept fresh by subscription handler)
     values: moka::future::Cache<u32, ParsedChainInfo>,
 }
 
@@ -144,9 +144,8 @@ where
             channel_by_parties: moka::future::CacheBuilder::new(EXPECTED_NUM_CHANNELS as u64)
                 .time_to_idle(DEFAULT_CACHE_TIMEOUT)
                 .build_with_hasher(ahash::RandomState::default()),
-            values: moka::future::CacheBuilder::new(1)
-                .time_to_live(DEFAULT_CACHE_TIMEOUT)
-                .build(),
+            // No TTL: kept fresh by the Blokli subscription handler
+            values: moka::future::CacheBuilder::new(1).build(),
         }
     }
 

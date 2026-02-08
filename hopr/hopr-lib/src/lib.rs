@@ -348,6 +348,7 @@ where
             "node is not started, please fund this node",
         );
 
+        self.state.store(HoprState::WaitingForFunds, Ordering::Relaxed);
         helpers::wait_for_funds(
             *MIN_NATIVE_BALANCE,
             *SUGGESTED_NATIVE_BALANCE,
@@ -360,7 +361,7 @@ where
         let mut processes = AbortableList::<HoprLibProcess>::default();
 
         info!("starting HOPR node...");
-        self.state.store(HoprState::Initializing, Ordering::Relaxed);
+        self.state.store(HoprState::CheckingBalance, Ordering::Relaxed);
 
         let balance: XDaiBalance = self.get_balance().await?;
         let minimum_balance = *constants::MIN_NATIVE_BALANCE;
@@ -377,6 +378,8 @@ where
                 "cannot start the node without a sufficiently funded wallet".into(),
             ));
         }
+
+        self.state.store(HoprState::ValidatingNetworkConfig, Ordering::Relaxed);
 
         // Once we are able to query the chain,
         // check if the ticket price is configured correctly.
@@ -437,6 +440,9 @@ where
         let (indexer_peer_update_tx, indexer_peer_update_rx) =
             channel::<PeerDiscovery>(chain_discovery_events_capacity);
 
+        self.state
+            .store(HoprState::SubscribingToAnnouncements, Ordering::Relaxed);
+
         // Stream all the existing announcements and also subscribe to all future on-chain
         // announcements
         let (announcements_stream, announcements_handle) = futures::stream::abortable(
@@ -468,6 +474,7 @@ where
             return Err(HoprLibError::GeneralError("cannot self as staking safe address".into()));
         }
 
+        self.state.store(HoprState::RegisteringSafe, Ordering::Relaxed);
         info!(%safe_addr, "registering safe with this node");
         match self.chain_api.register_safe(&safe_addr).await {
             Ok(awaiter) => {
@@ -507,6 +514,8 @@ where
             .filter(|a| !is_public_address(a))
             .for_each(|multi_addr| warn!(?multi_addr, "announcing private multiaddress"));
 
+        self.state.store(HoprState::AnnouncingNode, Ordering::Relaxed);
+
         let chain_api = self.chain_api.clone();
         let me_offchain = *self.me.public();
         let node_ready = spawn(async move { chain_api.await_key_binding(&me_offchain, NODE_READY_TIMEOUT).await });
@@ -532,6 +541,8 @@ where
             }
         }
 
+        self.state.store(HoprState::AwaitingKeyBinding, Ordering::Relaxed);
+
         // Wait for the node key-binding readiness to return
         let this_node_account = node_ready
             .await
@@ -546,6 +557,9 @@ where
 
         info!(%this_node_account, "node account is ready");
 
+        self.state.store(HoprState::InitializingServices, Ordering::Relaxed);
+
+        info!("initializing session infrastructure");
         let incoming_session_channel_capacity = std::env::var("HOPR_INTERNAL_SESSION_INCOMING_CAPACITY")
             .ok()
             .and_then(|s| s.trim().parse::<usize>().ok())
@@ -640,6 +654,7 @@ where
             .await?;
         processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
 
+        info!("starting ticket redemption service");
         // Start a queue that takes care of redeeming tickets via given TicketSelectors
         let (redemption_req_tx, redemption_req_rx) = channel::<TicketSelector>(1024);
         let _ = self.redeem_requests.set(redemption_req_tx);
@@ -661,6 +676,7 @@ where
             .inspect(|_| tracing::warn!(task = %HoprLibProcess::TicketRedemptions, "long-running background task finished"))
         );
 
+        info!("subscribing to channel events");
         let (chain_events_sub_handle, chain_events_sub_reg) = hopr_async_runtime::AbortHandle::new_pair();
         processes.insert(HoprLibProcess::ChannelEvents, chain_events_sub_handle);
         let chain = self.chain_api.clone();
@@ -706,6 +722,7 @@ where
             .inspect(|_| tracing::warn!(task = %HoprLibProcess::ChannelEvents, "long-running background task finished"))
         );
 
+        info!("synchronizing ticket states");
         // NOTE: after the chain is synced, we can reset tickets which are considered
         // redeemed but on-chain state does not align with that. This implies there was a problem
         // right when the transaction was sent on-chain. In such cases, we simply let it retry and
@@ -894,7 +911,9 @@ where
     pub async fn multiaddresses_announced_on_chain(&self, peer: &PeerId) -> errors::Result<Vec<Multiaddr>> {
         let peer = *peer;
         // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
-        let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer)).await?;
+        let pubkey =
+            hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer), "multiaddr_lookup")
+                .await??;
 
         match self
             .chain_api
@@ -1381,9 +1400,11 @@ where
     pub async fn peerid_to_chain_key(&self, peer_id: &PeerId) -> errors::Result<Option<Address>> {
         let peer_id = *peer_id;
         // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
-        let pubkey = hopr_parallelize::cpu::spawn_blocking(move || prelude::OffchainPublicKey::from_peerid(&peer_id))
-            .await
-            .map_err(|e| HoprLibError::GeneralError(format!("failed to convert peer id to off-chain key: {}", e)))?;
+        let pubkey = hopr_parallelize::cpu::spawn_blocking(
+            move || prelude::OffchainPublicKey::from_peerid(&peer_id),
+            "chainkey_lookup",
+        )
+        .await??;
 
         self.chain_api
             .packet_key_to_chain_key(&pubkey)

@@ -9,7 +9,7 @@ use std::{
 pub use hopr_protocol_hopr::{HoprCodecConfig, HoprTicketProcessorConfig, SurbStoreConfig};
 use hopr_transport_identity::Multiaddr;
 pub use hopr_transport_probe::config::ProbeConfig;
-use hopr_transport_protocol::AcknowledgementPipelineConfig;
+use hopr_transport_protocol::PacketPipelineConfig;
 use hopr_transport_session::{MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION};
 use proc_macro_regex::regex;
 use validator::{Validate, ValidationError, ValidationErrors};
@@ -55,9 +55,9 @@ pub struct HoprPacketPipelineConfig {
     /// Single Use Reply Block (SURB) handling configuration
     #[validate(nested)]
     pub surb_store: SurbStoreConfig,
-    /// Additional configuration affecting the acknowledgement processing
+    /// Packet pipeline configuration controlling output/input concurrency and acknowledgement processing
     #[validate(nested)]
-    pub ack_processing: AcknowledgementPipelineConfig,
+    pub pipeline: PacketPipelineConfig,
 }
 
 regex!(is_dns_address_regex "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$");

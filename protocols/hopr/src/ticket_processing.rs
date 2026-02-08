@@ -14,6 +14,195 @@ use crate::{
     UnacknowledgedTicketProcessor,
 };
 
+/// Metrics for unacknowledged ticket cache diagnostics.
+///
+/// These help investigate "unknown ticket" acknowledgement failures by tracking
+/// cache insertions, lookups, misses, and evictions.
+///
+/// Per-peer metrics are disabled by default due to Prometheus cardinality concerns.
+/// Set `HOPR_METRICS_UNACK_PER_PEER=1` to enable them for debugging.
+mod metrics {
+    #[cfg(any(not(feature = "prometheus"), test))]
+    pub use noop::*;
+    #[cfg(all(feature = "prometheus", not(test)))]
+    pub use real::*;
+
+    #[cfg(all(feature = "prometheus", not(test)))]
+    mod real {
+        lazy_static::lazy_static! {
+            /// Whether per-peer metrics are enabled (disabled by default to avoid cardinality explosion).
+            static ref PER_PEER_ENABLED: bool = std::env::var("HOPR_METRICS_UNACK_PER_PEER")
+                .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+                .unwrap_or(false);
+
+            static ref UNACK_PEERS: hopr_metrics::SimpleGauge = hopr_metrics::SimpleGauge::new(
+                "hopr_tickets_unack_peers_total",
+                "Number of peers with unacknowledged tickets in cache",
+            )
+            .unwrap();
+            static ref UNACK_TICKETS: hopr_metrics::SimpleGauge = hopr_metrics::SimpleGauge::new(
+                "hopr_tickets_unack_tickets_total",
+                "Total number of unacknowledged tickets across all peer caches",
+            )
+            .unwrap();
+            static ref UNACK_INSERTIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+                "hopr_tickets_unack_insertions_total",
+                "Total number of unacknowledged tickets inserted into cache",
+            )
+            .unwrap();
+            static ref UNACK_LOOKUPS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+                "hopr_tickets_unack_lookups_total",
+                "Total number of ticket acknowledgement lookups",
+            )
+            .unwrap();
+            static ref UNACK_LOOKUP_MISSES: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+                "hopr_tickets_unack_lookup_misses_total",
+                "Total number of ticket lookup failures (unknown ticket)",
+            )
+            .unwrap();
+            static ref UNACK_EVICTIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+                "hopr_tickets_unack_evictions_total",
+                "Total number of unacknowledged tickets evicted from cache",
+            )
+            .unwrap();
+            static ref UNACK_PEER_EVICTIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+                "hopr_tickets_unack_peer_evictions_total",
+                "Total number of peer caches evicted from the outer unacknowledged ticket cache",
+            )
+            .unwrap();
+            static ref UNACK_TICKETS_PER_PEER: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+                "hopr_tickets_unack_tickets_per_peer",
+                "Number of unacknowledged tickets per peer in cache (enable with HOPR_METRICS_UNACK_PER_PEER=1)",
+                &["peer"],
+            )
+            .unwrap();
+        }
+
+        pub fn initialize() {
+            lazy_static::initialize(&PER_PEER_ENABLED);
+            lazy_static::initialize(&UNACK_PEERS);
+            lazy_static::initialize(&UNACK_TICKETS);
+            lazy_static::initialize(&UNACK_INSERTIONS);
+            lazy_static::initialize(&UNACK_LOOKUPS);
+            lazy_static::initialize(&UNACK_LOOKUP_MISSES);
+            lazy_static::initialize(&UNACK_EVICTIONS);
+            lazy_static::initialize(&UNACK_PEER_EVICTIONS);
+            if *PER_PEER_ENABLED {
+                lazy_static::initialize(&UNACK_TICKETS_PER_PEER);
+            }
+        }
+
+        #[inline]
+        #[allow(dead_code)]
+        pub fn per_peer_enabled() -> bool {
+            *PER_PEER_ENABLED
+        }
+
+        #[inline]
+        pub fn inc_unack_peers() {
+            UNACK_PEERS.increment(1.0);
+        }
+
+        #[inline]
+        pub fn dec_unack_peers() {
+            UNACK_PEERS.decrement(1.0);
+        }
+
+        #[inline]
+        pub fn inc_unack_tickets() {
+            UNACK_TICKETS.increment(1.0);
+        }
+
+        #[inline]
+        pub fn dec_unack_tickets() {
+            UNACK_TICKETS.decrement(1.0);
+        }
+
+        #[inline]
+        pub fn inc_insertions() {
+            UNACK_INSERTIONS.increment();
+        }
+
+        #[inline]
+        pub fn inc_lookups() {
+            UNACK_LOOKUPS.increment();
+        }
+
+        #[inline]
+        pub fn inc_lookup_misses() {
+            UNACK_LOOKUP_MISSES.increment();
+        }
+
+        #[inline]
+        pub fn inc_evictions() {
+            UNACK_EVICTIONS.increment();
+        }
+
+        #[inline]
+        pub fn inc_peer_evictions() {
+            UNACK_PEER_EVICTIONS.increment();
+        }
+
+        #[inline]
+        pub fn inc_unack_tickets_for_peer(peer: &str) {
+            if *PER_PEER_ENABLED {
+                UNACK_TICKETS_PER_PEER.increment(&[peer], 1.0);
+            }
+        }
+
+        #[inline]
+        pub fn dec_unack_tickets_for_peer(peer: &str) {
+            if *PER_PEER_ENABLED {
+                UNACK_TICKETS_PER_PEER.decrement(&[peer], 1.0);
+            }
+        }
+
+        #[inline]
+        #[allow(dead_code)]
+        pub fn reset_unack_tickets_for_peer(peer: &str) {
+            if *PER_PEER_ENABLED {
+                UNACK_TICKETS_PER_PEER.set(&[peer], 0.0);
+            }
+        }
+    }
+
+    #[cfg(any(not(feature = "prometheus"), test))]
+    mod noop {
+        #[inline]
+        pub fn initialize() {}
+        #[inline]
+        #[allow(dead_code)]
+        pub fn per_peer_enabled() -> bool {
+            false
+        }
+        #[inline]
+        pub fn inc_unack_peers() {}
+        #[inline]
+        pub fn dec_unack_peers() {}
+        #[inline]
+        pub fn inc_unack_tickets() {}
+        #[inline]
+        pub fn dec_unack_tickets() {}
+        #[inline]
+        pub fn inc_insertions() {}
+        #[inline]
+        pub fn inc_lookups() {}
+        #[inline]
+        pub fn inc_lookup_misses() {}
+        #[inline]
+        pub fn inc_evictions() {}
+        #[inline]
+        pub fn inc_peer_evictions() {}
+        #[inline]
+        pub fn inc_unack_tickets_for_peer(_: &str) {}
+        #[inline]
+        pub fn dec_unack_tickets_for_peer(_: &str) {}
+        #[inline]
+        #[allow(dead_code)]
+        pub fn reset_unack_tickets_for_peer(_: &str) {}
+    }
+}
+
 const MIN_UNACK_TICKET_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 fn validate_unack_ticket_timeout(timeout: &std::time::Duration) -> Result<(), ValidationError> {
     if timeout < &MIN_UNACK_TICKET_TIMEOUT {
@@ -121,6 +310,8 @@ impl<Chain, Db> HoprTicketProcessor<Chain, Db> {
         channels_dst: Hash,
         cfg: HoprTicketProcessorConfig,
     ) -> Self {
+        metrics::initialize();
+
         Self {
             out_ticket_index: moka::future::Cache::builder()
                 .time_to_idle(cfg.outgoing_index_cache_retention)
@@ -129,6 +320,29 @@ impl<Chain, Db> HoprTicketProcessor<Chain, Db> {
             unacknowledged_tickets: moka::future::Cache::builder()
                 .time_to_idle(cfg.unack_ticket_timeout)
                 .max_capacity(100_000)
+                .async_eviction_listener(
+                    |_key,
+                     value: moka::future::Cache<HalfKeyChallenge, UnacknowledgedTicket>,
+                     cause|
+                     -> moka::notification::ListenerFuture {
+                        Box::pin(async move {
+                            if !matches!(cause, moka::notification::RemovalCause::Replaced) {
+                                metrics::dec_unack_peers();
+                                if matches!(
+                                    cause,
+                                    moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size
+                                ) {
+                                    metrics::inc_peer_evictions();
+                                }
+                            }
+                            // Explicitly invalidate all inner cache entries so their eviction
+                            // listeners fire (decrementing UNACK_TICKETS and per-peer metrics).
+                            // Without this, dropping the inner cache silently leaks those metrics.
+                            value.invalidate_all();
+                            value.run_pending_tasks().await;
+                        })
+                    },
+                )
                 .build(),
             chain_api,
             db,
@@ -203,16 +417,37 @@ where
         ticket: UnacknowledgedTicket,
     ) -> Result<(), Self::Error> {
         tracing::trace!(%ticket, "received unacknowledged ticket");
-        self.unacknowledged_tickets
+
+        let peer_id = next_hop.to_peerid_str();
+        let inner_cache = self
+            .unacknowledged_tickets
             .get_with_by_ref(next_hop, async {
+                let peer_id_for_eviction = peer_id.clone();
+                metrics::inc_unack_peers();
                 moka::future::Cache::builder()
                     .time_to_live(self.cfg.unack_ticket_timeout)
                     .max_capacity(self.cfg.max_unack_tickets as u64)
+                    .eviction_listener(move |_key, _value, cause| {
+                        metrics::dec_unack_tickets();
+                        metrics::dec_unack_tickets_for_peer(&peer_id_for_eviction);
+
+                        // Only count Expired/Size removals as evictions (not Explicit or Replaced)
+                        if matches!(
+                            cause,
+                            moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size
+                        ) {
+                            metrics::inc_evictions();
+                        }
+                    })
                     .build()
             })
-            .await
-            .insert(challenge, ticket)
             .await;
+
+        inner_cache.insert(challenge, ticket).await;
+
+        metrics::inc_insertions();
+        metrics::inc_unack_tickets();
+        metrics::inc_unack_tickets_for_peer(&peer_id);
 
         Ok(())
     }
@@ -238,52 +473,61 @@ where
 
         // Verify all the acknowledgements and compute challenges from half-keys
         let use_batch_verify = self.cfg.use_batch_verification;
-        let half_keys_challenges = hopr_parallelize::cpu::spawn_fifo_blocking(move || {
-            if use_batch_verify {
-                // Uses regular verifications for small batches but switches to a more effective
-                // batch verification algorithm for larger ones.
-                let acks = Acknowledgement::verify_batch(acks.into_iter().map(|ack| (peer, ack)));
+        let half_keys_challenges = hopr_parallelize::cpu::spawn_fifo_blocking(
+            move || {
+                if use_batch_verify {
+                    // Uses regular verifications for small batches but switches to a more effective
+                    // batch verification algorithm for larger ones.
+                    let acks = Acknowledgement::verify_batch(acks.into_iter().map(|ack| (peer, ack)));
 
-                #[cfg(feature = "rayon")]
-                let iter = acks.into_par_iter();
+                    #[cfg(feature = "rayon")]
+                    let iter = acks.into_par_iter();
 
-                #[cfg(not(feature = "rayon"))]
-                let iter = acks.into_iter();
+                    #[cfg(not(feature = "rayon"))]
+                    let iter = acks.into_iter();
 
-                iter.map(|verified| {
-                    verified
-                        .and_then(|verified| Ok((*verified.ack_key_share(), verified.ack_key_share().to_challenge()?)))
-                })
-                .filter_map(|res| {
-                    res.inspect_err(|error| tracing::error!(%error, "failed to process acknowledgement"))
-                        .ok()
-                })
-                .collect::<Vec<_>>()
-            } else {
-                #[cfg(feature = "rayon")]
-                let iter = acks.into_par_iter();
+                    iter.map(|verified| {
+                        verified.and_then(|verified| {
+                            Ok((*verified.ack_key_share(), verified.ack_key_share().to_challenge()?))
+                        })
+                    })
+                    .filter_map(|res| {
+                        res.inspect_err(|error| tracing::error!(%error, "failed to process acknowledgement"))
+                            .ok()
+                    })
+                    .collect::<Vec<_>>()
+                } else {
+                    #[cfg(feature = "rayon")]
+                    let iter = acks.into_par_iter();
 
-                #[cfg(not(feature = "rayon"))]
-                let iter = acks.into_iter();
+                    #[cfg(not(feature = "rayon"))]
+                    let iter = acks.into_iter();
 
-                iter.map(|ack| {
-                    ack.verify(&peer)
-                        .and_then(|verified| Ok((*verified.ack_key_share(), verified.ack_key_share().to_challenge()?)))
-                })
-                .filter_map(|res| {
-                    res.inspect_err(|error| tracing::error!(%error, "failed to process acknowledgement"))
-                        .ok()
-                })
-                .collect::<Vec<_>>()
-            }
-        })
-        .await;
+                    iter.map(|ack| {
+                        ack.verify(&peer).and_then(|verified| {
+                            Ok((*verified.ack_key_share(), verified.ack_key_share().to_challenge()?))
+                        })
+                    })
+                    .filter_map(|res| {
+                        res.inspect_err(|error| tracing::error!(%error, "failed to process acknowledgement"))
+                            .ok()
+                    })
+                    .collect::<Vec<_>>()
+                }
+            },
+            "ack_verify",
+        )
+        .await
+        .map_err(|e| TicketAcknowledgementError::Inner(HoprProtocolError::from(e)))?;
 
         // Find all the tickets that we're awaiting acknowledgement for
         let mut unack_tickets = Vec::with_capacity(half_keys_challenges.len());
         for (half_key, challenge) in half_keys_challenges {
+            metrics::inc_lookups();
+
             let Some(unack_ticket) = awaiting_ack_from_peer.remove(&challenge).await else {
-                tracing::debug!(%challenge, "received acknowledgement for unknown ticket");
+                tracing::trace!(%challenge, "received acknowledgement for unknown ticket");
+                metrics::inc_lookup_misses();
                 continue;
             };
 
@@ -314,44 +558,48 @@ where
 
         let domain_separator = self.channels_dst;
         let chain_key = self.chain_key.clone();
-        Ok(hopr_parallelize::cpu::spawn_fifo_blocking(move || {
-            #[cfg(feature = "rayon")]
-            let iter = unack_tickets.into_par_iter();
+        Ok(hopr_parallelize::cpu::spawn_fifo_blocking(
+            move || {
+                #[cfg(feature = "rayon")]
+                let iter = unack_tickets.into_par_iter();
 
-            #[cfg(not(feature = "rayon"))]
-            let iter = unack_tickets.into_iter();
+                #[cfg(not(feature = "rayon"))]
+                let iter = unack_tickets.into_iter();
 
-            iter.filter_map(|(channel, half_key, unack_ticket)| {
-                // This explicitly checks whether the acknowledgement
-                // solves the challenge on the ticket.
-                // It must be done before we check that the ticket is winning,
-                // which is a lengthy operation and should not be done for
-                // bogus unacknowledged tickets
-                let Ok(ack_ticket) = unack_ticket.acknowledge(&half_key) else {
-                    tracing::error!(%unack_ticket, "failed to acknowledge ticket");
-                    return None;
-                };
+                iter.filter_map(|(channel, half_key, unack_ticket)| {
+                    // This explicitly checks whether the acknowledgement
+                    // solves the challenge on the ticket.
+                    // It must be done before we check that the ticket is winning,
+                    // which is a lengthy operation and should not be done for
+                    // bogus unacknowledged tickets
+                    let Ok(ack_ticket) = unack_ticket.acknowledge(&half_key) else {
+                        tracing::error!(%unack_ticket, "failed to acknowledge ticket");
+                        return None;
+                    };
 
-                // This operation checks if the ticket is winning, and if it is, it
-                // turns it into a redeemable ticket.
-                match ack_ticket.into_redeemable(&chain_key, &domain_separator) {
-                    Ok(redeemable) => {
-                        tracing::debug!(%channel, "found winning ticket");
-                        Some(ResolvedAcknowledgement::RelayingWin(Box::new(redeemable)))
+                    // This operation checks if the ticket is winning, and if it is, it
+                    // turns it into a redeemable ticket.
+                    match ack_ticket.into_redeemable(&chain_key, &domain_separator) {
+                        Ok(redeemable) => {
+                            tracing::trace!(%channel, "found winning ticket");
+                            Some(ResolvedAcknowledgement::RelayingWin(Box::new(redeemable)))
+                        }
+                        Err(CoreTypesError::TicketNotWinning) => {
+                            tracing::trace!(%channel, "found losing ticket");
+                            Some(ResolvedAcknowledgement::RelayingLoss(*channel.get_id()))
+                        }
+                        Err(error) => {
+                            tracing::error!(%error, %channel, "error when acknowledging ticket");
+                            Some(ResolvedAcknowledgement::RelayingLoss(*channel.get_id()))
+                        }
                     }
-                    Err(CoreTypesError::TicketNotWinning) => {
-                        tracing::trace!(%channel, "found losing ticket");
-                        Some(ResolvedAcknowledgement::RelayingLoss(*channel.get_id()))
-                    }
-                    Err(error) => {
-                        tracing::error!(%error, %channel, "error when acknowledging ticket");
-                        Some(ResolvedAcknowledgement::RelayingLoss(*channel.get_id()))
-                    }
-                }
-            })
-            .collect::<Vec<_>>()
-        })
-        .await)
+                })
+                .collect::<Vec<_>>()
+            },
+            "ticket_into_redeemable",
+        )
+        .await
+        .map_err(|e| TicketAcknowledgementError::Inner(HoprProtocolError::from(e)))?)
     }
 }
 

@@ -10,9 +10,7 @@ use hopr_lib::{Address, Health, Multiaddr, PeerPacketStatsSnapshot, api::network
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
-use crate::{
-    ApiError, ApiErrorStatus, BASE_PATH, InternalState, checksum_address_serializer, option_checksum_address_serializer,
-};
+use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState, checksum_address_serializer};
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
@@ -147,9 +145,9 @@ impl From<PeerPacketStatsSnapshot> for PeerPacketStatsResponse {
 }))]
 /// All information about a known peer.
 pub(crate) struct PeerObservations {
-    #[serde(serialize_with = "option_checksum_address_serializer")]
-    #[schema(value_type = Option<String>, example = "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe")]
-    address: Option<Address>,
+    #[serde(serialize_with = "checksum_address_serializer")]
+    #[schema(value_type = String, example = "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe")]
+    address: Address,
     #[serde_as(as = "Option<DisplayFromStr>")]
     #[schema(value_type = Option<String>, example = "/ip4/178.12.1.9/tcp/19092")]
     multiaddr: Option<Multiaddr>,
@@ -296,6 +294,8 @@ pub(super) async fn peers(
                 Some((address, multiaddresses, info, packet_stats))
             }
         })
+        // Filter out peers without a known chain address
+        .filter_map(|(address, mas, info, packet_stats)| async move { address.map(|addr| (addr, mas, info, packet_stats)) })
         .map(|(address, mas, info, packet_stats)| PeerObservations {
             address,
             multiaddr: mas.first().cloned(),

@@ -106,19 +106,22 @@ where
         let chain_key = self.chain_key.clone();
         let mapper = self.chain_api.key_id_mapper_ref().clone();
         let domain_separator = self.channels_dst;
-        let (packet, openers) = hopr_parallelize::cpu::spawn_fifo_blocking(move || {
-            HoprPacket::into_outgoing(
-                data.as_ref(),
-                &pseudonym,
-                routing,
-                &chain_key,
-                next_ticket,
-                &mapper,
-                &domain_separator,
-                signals,
-            )
-        })
-        .await?;
+        let (packet, openers) = hopr_parallelize::cpu::spawn_fifo_blocking(
+            move || {
+                HoprPacket::into_outgoing(
+                    data.as_ref(),
+                    &pseudonym,
+                    routing,
+                    &chain_key,
+                    next_ticket,
+                    &mapper,
+                    &domain_separator,
+                    signals,
+                )
+            },
+            "packet_encode",
+        )
+        .await??;
 
         // Store the reply openers under the given SenderId
         // This is a no-op for reply packets
