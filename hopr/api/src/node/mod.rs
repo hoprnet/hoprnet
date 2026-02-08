@@ -22,7 +22,7 @@ pub use crate::chain::ChainInfo;
 use crate::{
     chain::ChannelId,
     db::{ChannelTicketStatistics, TicketSelector},
-    graph::Observable,
+    graph::traits::EdgeObservable,
     network::Health,
 };
 
@@ -58,7 +58,7 @@ pub trait HoprNodeNetworkOperations {
     type Error: std::error::Error + Send + Sync + 'static;
 
     /// Observable type returned by peer information queries.
-    type PeerObservable: Observable + Send;
+    type TransportObservable: EdgeObservable + Send;
 
     // === Identity ===
 
@@ -75,13 +75,13 @@ pub trait HoprNodeNetworkOperations {
     async fn network_connected_peers(&self) -> Result<Vec<PeerId>, Self::Error>;
 
     /// Returns observations for a specific peer.
-    fn network_peer_info(&self, peer: &PeerId) -> Option<Self::PeerObservable>;
+    fn network_peer_info(&self, peer: &PeerId) -> Option<Self::TransportObservable>;
 
     /// Returns all network peers with quality above the minimum score.
     async fn all_network_peers(
         &self,
         minimum_score: f64,
-    ) -> Result<Vec<(Option<Address>, PeerId, Self::PeerObservable)>, Self::Error>;
+    ) -> Result<Vec<(Option<Address>, PeerId, Self::TransportObservable)>, Self::Error>;
 
     // === Transport ===
 
@@ -100,7 +100,7 @@ pub trait HoprNodeNetworkOperations {
     // === Peers ===
 
     /// Pings a peer and returns the round-trip time along with observable data.
-    async fn ping(&self, peer: &PeerId) -> Result<(Duration, Self::PeerObservable), Self::Error>;
+    async fn ping(&self, peer: &PeerId) -> Result<(Duration, Self::TransportObservable), Self::Error>;
 }
 
 /// High-level chain operations.

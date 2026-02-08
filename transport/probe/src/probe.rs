@@ -98,7 +98,7 @@ impl Probe {
                             let peer: PeerId = opk.into();
                             futures::FutureExt::boxed(async move {
                                 store
-                                    .record::<NeighborTelemetry, PathTelemetry>(Err(
+                                    .record_edge::<NeighborTelemetry, PathTelemetry>(Err(
                                         NetworkGraphError::ProbeNeighborTimeout(peer),
                                     ))
                                     .await
@@ -220,7 +220,7 @@ impl Probe {
                             Ok(message) => {
                                 match message {
                                     Message::Telemetry(path_telemetry) => {
-                                        store.record::<NeighborTelemetry, PathTelemetry>(Ok(Telemetry::Loopback(path_telemetry))).await
+                                        store.record_edge::<NeighborTelemetry, PathTelemetry>(Ok(Telemetry::Loopback(path_telemetry))).await
                                     },
                                     Message::Probe(NeighborProbe::Ping(ping)) => {
                                         tracing::debug!(%pseudonym, nonce = hex::encode(ping), "received ping");
@@ -248,7 +248,7 @@ impl Probe {
 
                                             if let NodeId::Offchain(opk) = peer.as_ref() {
                                                 tracing::debug!(%pseudonym, nonce = hex::encode(pong), latency_ms = latency.as_millis(), "probe successful");
-                                                store.record::<NeighborTelemetry, PathTelemetry>(Ok(Telemetry::Neighbor(NeighborTelemetry {
+                                                store.record_edge::<NeighborTelemetry, PathTelemetry>(Ok(Telemetry::Neighbor(NeighborTelemetry {
                                                     peer: opk.into(),
                                                     rtt: latency,
                                                 }))).await
@@ -288,7 +288,7 @@ mod tests {
 
     use async_trait::async_trait;
     use futures::future::BoxFuture;
-    use hopr_api::graph::{NetworkGraphError, Observable};
+    use hopr_api::graph::{EdgeTransportObservable, NetworkGraphError, traits::EdgeObservable};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use hopr_ct_telemetry::{ImmediateNeighborProber, ProberConfig};
     use hopr_protocol_app::prelude::{ApplicationData, Tag};
@@ -308,14 +308,10 @@ mod tests {
 
     /// Test stub implementation of Observable.
     #[derive(Debug, Clone, Copy, Default)]
-    pub struct TestObservations;
+    pub struct TestEdgeTransportObservations;
 
-    impl Observable for TestObservations {
-        fn record_probe(&mut self, _latency: std::result::Result<Duration, ()>) {}
-
-        fn last_update(&self) -> Duration {
-            Duration::default()
-        }
+    impl EdgeTransportObservable for TestEdgeTransportObservations {
+        fn record(&mut self, _latency: std::result::Result<Duration, ()>) {}
 
         fn average_latency(&self) -> Option<Duration> {
             None
@@ -323,6 +319,38 @@ mod tests {
 
         fn average_probe_rate(&self) -> f64 {
             1.0
+        }
+
+        fn score(&self) -> f64 {
+            1.0
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, Default)]
+    pub struct TestEdgeObservations;
+
+    impl EdgeObservable for TestEdgeObservations {
+        type ImmediateMeasurement = TestEdgeTransportObservations;
+        type IntermediateMeasurement = TestEdgeTransportObservations;
+
+        fn record(&mut self, _measurement: hopr_api::graph::traits::EdgeWeightType) {}
+
+        fn last_update(&self) -> std::time::Duration {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+        }
+
+        fn balance(&self) -> Option<&hopr_primitive_types::prelude::Balance<hopr_primitive_types::prelude::WxHOPR>> {
+            None
+        }
+
+        fn immediate_qos(&self) -> Option<&Self::ImmediateMeasurement> {
+            None
+        }
+
+        fn intermediate_qos(&self) -> Option<&Self::IntermediateMeasurement> {
+            None
         }
 
         fn score(&self) -> f64 {
@@ -339,7 +367,7 @@ mod tests {
 
     #[async_trait]
     impl NetworkGraphUpdate for PeerStore {
-        async fn record<N, P>(&self, telemetry: std::result::Result<Telemetry<N, P>, NetworkGraphError<P>>)
+        async fn record_edge<N, P>(&self, telemetry: std::result::Result<Telemetry<N, P>, NetworkGraphError<P>>)
         where
             N: hopr_api::graph::MeasurableNeighbor + Send + Clone,
             P: hopr_api::graph::MeasurablePath + Send + Clone,
@@ -366,7 +394,7 @@ mod tests {
     #[async_trait]
     impl NetworkGraphView for PeerStore {
         type NodeId = PeerId;
-        type Observed = TestObservations;
+        type Observed = TestEdgeObservations;
 
         /// Returns a stream of all known nodes in the network graph.
         fn nodes(&self) -> futures::stream::BoxStream<'static, PeerId> {
@@ -374,20 +402,8 @@ mod tests {
             Box::pin(futures::stream::iter(get_peers.pop_front().unwrap_or_default()))
         }
 
-        /// Returns a list of all routes to the given destination of the specified length.
-        async fn routes(&self, destination: &PeerId, length: usize) -> Vec<DestinationRouting> {
-            tracing::debug!(%destination, %length, "finding routes in test peer store");
-            vec![]
-        }
-
-        /// Returns a list of all loopback routes of the specified length.
-        async fn loopback_routes(&self) -> Vec<Vec<DestinationRouting>> {
-            tracing::debug!("finding loopback routes in test peer store");
-            vec![]
-        }
-
-        fn edge(&self, _src: &PeerId, _dest: &PeerId) -> Option<TestObservations> {
-            Some(TestObservations)
+        fn edge(&self, _src: &PeerId, _dest: &PeerId) -> Option<TestEdgeObservations> {
+            Some(TestEdgeObservations)
         }
     }
 

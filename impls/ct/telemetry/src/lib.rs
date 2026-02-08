@@ -108,7 +108,7 @@ mod tests {
     use std::collections::HashSet;
 
     use futures::{StreamExt, pin_mut};
-    use hopr_api::{Multiaddr, graph::Observable, network::Health};
+    use hopr_api::{Multiaddr, graph::EdgeTransportObservable, network::Health};
     use hopr_internal_types::NodeId;
     use hopr_network_graph::immediate::ImmediateNeighborChannelGraph;
     use tokio::time::timeout;
@@ -120,10 +120,8 @@ mod tests {
     mockall::mock! {
         Observed {}
 
-        impl Observable for Observed {
-            fn record_probe(&mut self, latency: std::result::Result<std::time::Duration, ()>);
-
-            fn last_update(&self) -> std::time::Duration;
+        impl EdgeTransportObservable for Observed {
+            fn record(&mut self, latency: std::result::Result<std::time::Duration, ()>);
 
             fn average_latency(&self) -> Option<std::time::Duration>;
 

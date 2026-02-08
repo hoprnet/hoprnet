@@ -338,6 +338,7 @@ async fn main_inner() -> anyhow::Result<()> {
     let peer_store = hopr_transport_p2p::UninitializedPeerStore::default();
     let network_builder = hopr_transport_p2p::HoprLibp2pNetworkBuilder::new(peer_store.clone());
     // create graph
+    // TODO: subscribe to existing state + state sync from connector
     let graph = hopr_network_graph::immediate::ImmediateNeighborChannelGraph::new(
         peer_store,
         std::time::Duration::from_mins(2),

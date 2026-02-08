@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use hopr_api::{PeerId, ct::DestinationRouting, graph::Observable, network::NetworkView};
+use hopr_api::{PeerId, ct::DestinationRouting, graph::traits::EdgeObservable, network::NetworkView};
 use rand::seq::SliceRandom;
 
-use crate::{immediate::tracker::NetworkPeerTracker, observation::Observations};
+use crate::{immediate::tracker::NetworkPeerTracker, weight::Observations};
 
 pub mod tracker;
 
@@ -29,7 +29,7 @@ impl<T> hopr_api::graph::NetworkGraphUpdate for ImmediateNeighborChannelGraph<T>
 where
     T: NetworkView + Send + Sync,
 {
-    async fn record<N, P>(
+    async fn record_edge<N, P>(
         &self,
         telemetry: std::result::Result<hopr_api::graph::Telemetry<N, P>, hopr_api::graph::NetworkGraphError<P>>,
     ) where
@@ -44,7 +44,9 @@ where
                     "neighbor probe successful"
                 );
                 self.tracker.alter(telemetry.peer(), |_peer, mut observation| {
-                    observation.record_probe(Ok(telemetry.rtt() / 2));
+                    observation.record(hopr_api::graph::traits::EdgeWeightType::Immediate(Ok(
+                        telemetry.rtt() / 2
+                    )));
                     observation
                 });
             }
@@ -61,7 +63,7 @@ where
                     "neighbor probe failed"
                 );
                 self.tracker.alter(&peer, |_peer, mut observation| {
-                    observation.record_probe(Err(()));
+                    observation.record(hopr_api::graph::traits::EdgeWeightType::Immediate(Err(())));
                     observation
                 });
             }
@@ -105,6 +107,14 @@ where
             None
         }
     }
+}
+
+#[async_trait::async_trait]
+impl<T> hopr_api::graph::NetworkGraphTraverse for ImmediateNeighborChannelGraph<T>
+where
+    T: NetworkView + Send + Sync + Clone + 'static,
+{
+    type NodeId = PeerId;
 
     async fn routes(&self, _destination: &Self::NodeId, _length: usize) -> Vec<DestinationRouting> {
         vec![]

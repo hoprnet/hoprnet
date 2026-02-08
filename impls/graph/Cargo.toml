@@ -12,8 +12,9 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = ["graph_immediate"]
+default = ["graph_immediate", "graph_full"]
 graph_immediate = []
+graph_full = ["dep:petgraph"]
 
 [dependencies]
 async-trait = { workspace = true }
@@ -21,7 +22,7 @@ async-stream = { workspace = true }
 anyhow = { workspace = true }
 dashmap = { workspace = true }
 futures = { workspace = true }
-petgraph = { workspace = true }
+petgraph = { workspace = true, optional = true }
 rand = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
