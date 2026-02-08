@@ -58,7 +58,7 @@ pub struct BlockchainConnectorConfig {
     /// be received during a [connection attempt](HoprBlockchainConnector::connect)
     /// to be successful.
     ///
-    /// Default is 90%, minimum is 1, maximum is 100/
+    /// Default is 90%, minimum is 1, maximum is 100.
     #[default(DEFAULT_SYNC_TOLERANCE_PCT)]
     pub sync_tolerance: usize,
 }
@@ -159,7 +159,7 @@ where
     }
 
     async fn do_connect(&self, timeout: Duration) -> Result<AbortHandle, ConnectorError> {
-        let sync_quota = 1.0 - (self.cfg.sync_tolerance.clamp(1, 100) as f64 / 100.0);
+        let sync_quota = self.cfg.sync_tolerance.clamp(1, 100) as f64 / 100.0;
         let min_accounts = (self
             .client
             .count_accounts(blokli_client::api::AccountSelector::Any)
