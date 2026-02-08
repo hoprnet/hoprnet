@@ -61,7 +61,7 @@ use hopr_protocol_hopr::MemorySurbStore;
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId, Protocol};
 use hopr_transport_mixer::MixerConfig;
-pub use hopr_transport_network::observation::Observations;
+pub use hopr_transport_network::observation::{Observations, PeerPacketStatsSnapshot};
 use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork};
 use hopr_transport_probe::{
     Probe, TrafficGeneration,
@@ -73,8 +73,9 @@ pub use hopr_transport_session as session;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::transfer_session;
 pub use hopr_transport_session::{
-    Capabilities as SessionCapabilities, Capability as SessionCapability, HoprSession, IncomingSession, SESSION_MTU,
-    SURB_SIZE, ServiceId, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
+    AtomicSurbFlowEstimator, Capabilities as SessionCapabilities, Capability as SessionCapability, HoprSession,
+    IncomingSession, SESSION_MTU, SURB_SIZE, ServiceId, SessionAckMode, SessionClientConfig, SessionId,
+    SessionLifecycleState, SessionStatsSnapshot, SessionTarget, SurbBalancerConfig,
     errors::{SessionManagerError, TransportSessionError},
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
@@ -313,8 +314,13 @@ where
             .map_err(|_| HoprTransportError::Api("transport network viewer already set".into()))?;
 
         let msg_codec = hopr_transport_protocol::HoprBinaryCodec {};
-        let (wire_msg_tx, wire_msg_rx) =
-            hopr_transport_protocol::stream::process_stream_protocol(msg_codec, transport_network.clone()).await?;
+        let transport_network_for_stats = transport_network.clone();
+        let (wire_msg_tx, wire_msg_rx) = hopr_transport_protocol::stream::process_stream_protocol(
+            msg_codec,
+            transport_network.clone(),
+            move |peer| transport_network_for_stats.get_packet_stats(peer),
+        )
+        .await?;
 
         let (mixing_channel_tx, mixing_channel_rx) =
             hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(build_mixer_cfg_from_env());
@@ -569,6 +575,10 @@ where
         Ok(self.smgr.get_surb_balancer_config(id).await?)
     }
 
+    pub async fn session_stats(&self, id: &SessionId) -> errors::Result<SessionStatsSnapshot> {
+        Ok(self.smgr.get_session_stats(id).await?)
+    }
+
     pub async fn update_session_surb_balancing_cfg(
         &self,
         id: &SessionId,
@@ -670,6 +680,26 @@ where
             .get()
             .ok_or_else(|| HoprTransportError::Api("transport network is not yet initialized".into()))?
             .observations_for(peer))
+    }
+
+    /// Get packet stats snapshot for a specific peer.
+    #[tracing::instrument(level = "debug", skip(self))]
+    pub async fn network_peer_packet_stats(&self, peer: &PeerId) -> errors::Result<Option<PeerPacketStatsSnapshot>> {
+        Ok(self
+            .network
+            .get()
+            .ok_or_else(|| HoprTransportError::Api("transport network is not yet initialized".into()))?
+            .packet_stats_snapshot(peer))
+    }
+
+    /// Get packet stats for all connected peers.
+    #[tracing::instrument(level = "debug", skip(self))]
+    pub async fn network_all_packet_stats(&self) -> errors::Result<Vec<(PeerId, PeerPacketStatsSnapshot)>> {
+        Ok(self
+            .network
+            .get()
+            .ok_or_else(|| HoprTransportError::Api("transport network is not yet initialized".into()))?
+            .all_packet_stats())
     }
 }
 

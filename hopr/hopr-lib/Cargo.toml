@@ -55,6 +55,7 @@ testing = [
   "dep:tokio-util",
   "dep:hex-literal",
   "dep:hopr-db-node",
+  "hopr-db-node/runtime-tokio",
   "dep:hopr-chain-connector",
   "hopr-chain-connector/testing",
   "dep:hopr-ct-telemetry",
@@ -112,6 +113,7 @@ tokio = { workspace = true }
 test-log = { workspace = true }
 
 hopr-db-node = { workspace = true, features = ["runtime-tokio"] }
+insta = { workspace = true, features = ["yaml"] }
 hopr-lib = { workspace = true, features = [
   "runtime-tokio",
   "session-server",

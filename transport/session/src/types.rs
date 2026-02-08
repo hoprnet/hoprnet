@@ -3,6 +3,7 @@ use std::{
     hash::{Hash, Hasher},
     pin::Pin,
     str::FromStr,
+    sync::Arc,
     task::{Context, Poll},
     time::Duration,
 };
@@ -19,13 +20,17 @@ use hopr_primitive_types::{
 };
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 use hopr_protocol_session::{
-    AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, ReliableSocket, SessionSocketConfig,
-    UnreliableSocket,
+    AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, SessionSocket, SessionSocketConfig,
+    Stateless,
 };
 use hopr_protocol_start::StartProtocol;
 use tracing::{debug, instrument};
 
-use crate::{Capabilities, Capability, errors::TransportSessionError};
+use crate::{
+    Capabilities, Capability,
+    errors::TransportSessionError,
+    stats::{SessionStats, StatsState},
+};
 
 /// Wrapper for [`Capabilities`] that makes conversion to/from `u8` possible.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -255,7 +260,7 @@ impl Hash for SessionId {
     }
 }
 
-fn caps_to_ack_mode(caps: Capabilities) -> AcknowledgementMode {
+pub(crate) fn caps_to_ack_mode(caps: Capabilities) -> AcknowledgementMode {
     if caps.contains(Capability::RetransmissionAck | Capability::RetransmissionNack) {
         AcknowledgementMode::Both
     } else if caps.contains(Capability::RetransmissionAck) {
@@ -341,6 +346,7 @@ pub struct HoprSession {
     routing: DestinationRouting,
     cfg: HoprSessionConfig,
     on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
+    metrics: Arc<SessionStats>,
 }
 
 impl HoprSession {
@@ -357,6 +363,7 @@ impl HoprSession {
         routing: DestinationRouting,
         cfg: HoprSessionConfig,
         hopr: (Tx, Rx),
+        metrics: Arc<SessionStats>,
         on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
     ) -> Result<Self, TransportSessionError>
     where
@@ -367,9 +374,12 @@ impl HoprSession {
         let routing_clone = routing.clone();
 
         // Wrap the HOPR transport so that it appears as regular transport to the SessionSocket
+        let metrics_write = metrics.clone();
+        let metrics_read = metrics.clone();
         let transport = DuplexIO(
             AsyncWriteSink::<{ ApplicationData::PAYLOAD_SIZE }, _>(hopr.0.sink_map_err(std::io::Error::other).with(
                 move |buf: Box<[u8]>| {
+                    metrics_write.record_write(buf.len());
                     // The Session protocol does not set any packet info on outgoing packets.
                     // However, the SessionManager on top usually overrides this.
                     futures::future::ready(
@@ -382,7 +392,10 @@ impl HoprSession {
             // The Session protocol ignores the packet info on incoming packets.
             // It is typically SessionManager's job to interpret those.
             hopr.1
-                .map(|data| Ok::<_, std::io::Error>(data.data.plain_text))
+                .map(move |data| {
+                    metrics_read.record_read(data.data.plain_text.len());
+                    Ok::<_, std::io::Error>(data.data.plain_text)
+                })
                 .into_async_read(),
         );
 
@@ -417,17 +430,16 @@ impl HoprSession {
 
                 debug!(?socket_cfg, ?ack_cfg, "opening new stateful session socket");
 
-                Box::new(ReliableSocket::new(
-                    transport,
+                let state = StatsState::new(
                     AcknowledgementState::<{ ApplicationData::PAYLOAD_SIZE }>::new(id, ack_cfg),
-                    socket_cfg,
-                )?)
+                    metrics.clone(),
+                );
+                Box::new(SessionSocket::new(transport, state, socket_cfg)?)
             } else {
                 debug!(?socket_cfg, "opening new stateless session socket");
 
-                Box::new(UnreliableSocket::<{ ApplicationData::PAYLOAD_SIZE }>::new_stateless(
-                    id, transport, socket_cfg,
-                )?)
+                let state = StatsState::new(Stateless::<{ ApplicationData::PAYLOAD_SIZE }>::new(id), metrics.clone());
+                Box::new(SessionSocket::new(transport, state, socket_cfg)?)
             }
         } else {
             debug!("opening raw session socket");
@@ -440,6 +452,7 @@ impl HoprSession {
             routing,
             cfg,
             on_close,
+            metrics,
         })
     }
 
@@ -456,6 +469,10 @@ impl HoprSession {
     /// Configuration of this Session.
     pub fn config(&self) -> &HoprSessionConfig {
         &self.cfg
+    }
+
+    pub fn metrics(&self) -> &Arc<SessionStats> {
+        &self.metrics
     }
 }
 
@@ -488,7 +505,8 @@ impl futures::AsyncRead for HoprSession {
 impl futures::AsyncWrite for HoprSession {
     #[instrument(name = "Session::poll_write", level = "trace", skip(self, cx, buf), fields(session_id = %self.id), ret)]
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
-        self.project().inner.poll_write(cx, buf)
+        let this = self.project();
+        this.inner.poll_write(cx, buf)
     }
 
     #[instrument(name = "Session::poll_flush", level = "trace", skip(self, cx), fields(session_id = %self.id), ret)]
@@ -501,6 +519,8 @@ impl futures::AsyncWrite for HoprSession {
         let this = self.project();
         futures::ready!(this.inner.poll_close(cx))?;
         tracing::trace!("hopr session closed");
+
+        this.metrics.set_state(crate::stats::SessionLifecycleState::Closing);
 
         if let Some(notifier) = this.on_close.take() {
             tracing::trace!("notifying write half closure of session");
@@ -550,6 +570,7 @@ mod tests {
     use hopr_primitive_types::prelude::*;
 
     use super::*;
+    use crate::{SESSION_MTU, stats::SessionStats};
 
     #[test]
     fn test_session_id_to_str_from_str() -> anyhow::Result<()> {
@@ -598,6 +619,9 @@ mod tests {
         let id = SessionId::new(1234_u64, HoprPseudonym::random());
         const DATA_LEN: usize = 5000;
 
+        let alice_metrics = Arc::new(SessionStats::new(id, None, SESSION_MTU, Duration::from_millis(800), 0));
+        let bob_metrics = Arc::new(SessionStats::new(id, None, SESSION_MTU, Duration::from_millis(800), 0));
+
         let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
         let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
 
@@ -614,6 +638,7 @@ mod tests {
                     })
                     .inspect(|d| debug!("alice rcvd: {}", d.data.total_len())),
             ),
+            alice_metrics,
             None,
         )?;
 
@@ -630,6 +655,7 @@ mod tests {
                     })
                     .inspect(|d| debug!("bob rcvd: {}", d.data.total_len())),
             ),
+            bob_metrics,
             None,
         )?;
 
@@ -673,6 +699,21 @@ mod tests {
         let id = SessionId::new(1234_u64, HoprPseudonym::random());
         const DATA_LEN: usize = 5000;
 
+        let alice_metrics = Arc::new(SessionStats::new(
+            id,
+            None,
+            SESSION_MTU,
+            Duration::from_millis(800),
+            16384,
+        ));
+        let bob_metrics = Arc::new(SessionStats::new(
+            id,
+            None,
+            SESSION_MTU,
+            Duration::from_millis(800),
+            16384,
+        ));
+
         let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
         let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
 
@@ -692,6 +733,7 @@ mod tests {
                     })
                     .inspect(|d| debug!("alice rcvd: {}", d.data.total_len())),
             ),
+            alice_metrics,
             None,
         )?;
 
@@ -711,6 +753,7 @@ mod tests {
                     })
                     .inspect(|d| debug!("bob rcvd: {}", d.data.total_len())),
             ),
+            bob_metrics,
             None,
         )?;
 

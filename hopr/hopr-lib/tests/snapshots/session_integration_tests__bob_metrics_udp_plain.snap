@@ -1,0 +1,42 @@
+---
+source: hopr/hopr-lib/tests/session_integration_tests.rs
+expression: snapshot
+---
+session_id:
+  tag: 1
+  pseudonym: "[pseudonym]"
+snapshot_at: "[snapshot_ts]"
+lifetime:
+  created_at: "[created_at]"
+  last_activity_at: "[last_activity_at]"
+  uptime: "[uptime]"
+  idle: "[idle]"
+  state: Active
+frame_buffer:
+  frame_mtu: 1500
+  frame_timeout:
+    secs: 0
+    nanos: 800000000
+  frame_capacity: 16384
+  incomplete_frames: 0
+  frames_completed: 0
+  frames_emitted: 0
+  frames_discarded: 0
+ack:
+  mode: None
+  incoming_segments: 0
+  outgoing_segments: 0
+  retransmission_requests: 0
+  acknowledged_frames: 0
+surb:
+  produced_total: 0
+  consumed_total: 0
+  buffer_estimate: 0
+  target_buffer: ~
+  rate_per_sec: 0
+  refill_in_flight: false
+transport:
+  bytes_in: 9183
+  bytes_out: 0
+  packets_in: 9
+  packets_out: 0

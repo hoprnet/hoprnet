@@ -33,12 +33,12 @@ pub mod swarm;
 /// P2P behavior definitions for the transport level interactions not related to the HOPR protocol
 mod behavior;
 
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Arc};
 
 use futures::{AsyncRead, AsyncWrite};
 pub use hopr_api::network::{Health, Observable};
 use hopr_api::network::{NetworkObservations, NetworkView};
-use hopr_transport_network::observation::Observations;
+use hopr_transport_network::observation::{Observations, PeerPacketStats, PeerPacketStatsSnapshot};
 use libp2p::{Multiaddr, PeerId};
 
 pub use crate::{
@@ -123,5 +123,22 @@ impl NetworkObservations for HoprNetwork {
             o.record_probe(result.map_err(|_| ()));
             o
         });
+    }
+}
+
+impl HoprNetwork {
+    /// Get the packet stats handle for a peer, for use in instrumenting streams.
+    pub fn get_packet_stats(&self, peer: &PeerId) -> Option<Arc<PeerPacketStats>> {
+        self.tracker.get_packet_stats(peer)
+    }
+
+    /// Get a snapshot of packet stats for a specific peer.
+    pub fn packet_stats_snapshot(&self, peer: &PeerId) -> Option<PeerPacketStatsSnapshot> {
+        self.tracker.packet_stats_snapshot(peer)
+    }
+
+    /// Get packet stats snapshots for all tracked peers.
+    pub fn all_packet_stats(&self) -> Vec<(PeerId, PeerPacketStatsSnapshot)> {
+        self.tracker.all_packet_stats()
     }
 }

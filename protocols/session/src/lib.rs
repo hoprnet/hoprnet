@@ -39,10 +39,12 @@ mod protocol;
 mod socket;
 pub(crate) mod utils;
 
+pub use processing::types::FrameInspector;
+pub use protocol::{FrameAcknowledgements, FrameId, Segment, SegmentId, SegmentRequest, SeqIndicator};
 pub use socket::{
     SessionSocket, SessionSocketConfig,
     ack_state::{AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig},
-    state::{SocketState, Stateless},
+    state::{SocketComponents, SocketState, Stateless},
 };
 
 // Enable exports of additional Session protocol types
