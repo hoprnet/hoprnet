@@ -261,8 +261,7 @@ pub(super) async fn peers(
             last_update: info.last_update().as_millis(),
             average_latency: info
                 .immediate_qos()
-                .map(|qos| qos.average_latency())
-                .flatten()
+                .and_then(|qos| qos.average_latency())
                 .map_or(0, |latency| latency.as_millis()),
             probe_rate: info.immediate_qos().map_or(0.0, |qos| qos.average_probe_rate()),
             score: info.score(),

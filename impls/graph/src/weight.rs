@@ -63,7 +63,7 @@ impl EdgeObservable for Observations {
                     self.immediate_probe = Some(TransportLinkMeasurement::default());
                 }
 
-                self.immediate_probe.as_mut().map(|probe| probe.record(result));
+                if let Some(probe) = self.immediate_probe.as_mut() { probe.record(result) }
             }
 
             EdgeWeightType::Intermediate(result) => {
@@ -71,7 +71,7 @@ impl EdgeObservable for Observations {
                     self.intermediate_probe = Some(TransportLinkMeasurement::default());
                 }
 
-                self.intermediate_probe.as_mut().map(|probe| probe.record(result));
+                if let Some(probe) = self.intermediate_probe.as_mut() { probe.record(result) }
             }
         }
     }
