@@ -47,6 +47,8 @@ utils_futures = []  # utility futures for async adapters
 utils_parallel = [] # utility parallelization functionality
 
 testing = [
+  "session-server",
+  "session-client",
   "dep:rand",
   "dep:rstest",
   "dep:tokio",
@@ -114,9 +116,3 @@ tokio = { workspace = true }
 test-log = { workspace = true }
 
 hopr-db-node = { workspace = true, features = ["runtime-tokio"] }
-hopr-lib = { workspace = true, features = [
-  "runtime-tokio",
-  "session-server",
-  "session-client",
-  "testing",
-] }

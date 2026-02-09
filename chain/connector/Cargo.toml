@@ -10,7 +10,11 @@ license = "GPL-3.0-only"
 
 [features]
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
-testing = ["dep:hex", "blokli-client/testing", "hopr-chain-types/use-bindings"]
+testing = [
+  "dep:hex",
+  "blokli-client/testing",
+  "hopr-chain-types/use-bindings"
+]
 
 [dependencies]
 ahash = { workspace = true }
@@ -45,10 +49,6 @@ hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 hex-literal = { workspace = true }
-hopr-chain-connector = { workspace = true, features = [
-  "testing",
-  "runtime-tokio",
-] }
 insta = { workspace = true }
 lazy_static = { workspace = true }
 test-log = { workspace = true }
