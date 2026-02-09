@@ -1,4 +1,4 @@
-use hopr_api::PeerId;
+use hopr_api::OffchainPublicKey;
 use hopr_crypto_random::Randomizable;
 use hopr_internal_types::{NodeId, protocol::HoprPseudonym};
 use hopr_network_types::types::{DestinationRouting, RoutingOptions};
@@ -134,8 +134,8 @@ pub struct PathTelemetry {
     /// Path information encoded as bytes
     pub path: [u8; Self::PATH_SIZE],
     /// Sequence identifier representing the order of the telemetry measurement
-    /// inside the existing id
-    pub seq_id: u16,
+    /// inside the existing id corresponding to an internal designation
+    pub seq_id: u128,
     /// Timestamp when the telemetry was created
     pub timestamp: u128,
 }
@@ -143,7 +143,7 @@ pub struct PathTelemetry {
 impl PathTelemetry {
     pub const ID_SIZE: usize = 10;
     pub const PATH_SIZE: usize = 10;
-    pub const SIZE: usize = Self::ID_SIZE + Self::PATH_SIZE + size_of::<u16>() + size_of::<u128>();
+    pub const SIZE: usize = Self::ID_SIZE + Self::PATH_SIZE + size_of::<u128>() + size_of::<u128>();
 
     pub fn to_bytes(self) -> Box<[u8]> {
         let mut out = Vec::with_capacity(Self::SIZE);
@@ -164,7 +164,7 @@ impl hopr_api::graph::MeasurablePath for PathTelemetry {
         &self.path
     }
 
-    fn seq_id(&self) -> u16 {
+    fn seq_id(&self) -> u128 {
         self.seq_id
     }
 
@@ -199,13 +199,13 @@ impl<'a> TryFrom<&'a [u8]> for PathTelemetry {
                 path: (&value[10..20])
                     .try_into()
                     .map_err(|_| GeneralError::ParseError("PathTelemetry.path".into()))?,
-                seq_id: u16::from_be_bytes(
-                    (&value[20..22])
+                seq_id: u128::from_be_bytes(
+                    (&value[20..36])
                         .try_into()
                         .map_err(|_| GeneralError::ParseError("PathTelemetry.seq_id".into()))?,
                 ),
                 timestamp: u128::from_be_bytes(
-                    (&value[22..38])
+                    (&value[36..52])
                         .try_into()
                         .map_err(|_| GeneralError::ParseError("PathTelemetry.timestamp".into()))?,
                 ),
@@ -221,12 +221,12 @@ impl<'a> TryFrom<&'a [u8]> for PathTelemetry {
 /// Represents the finding of an intermediate peer probing operation.
 #[derive(Debug, Clone)]
 pub struct NeighborTelemetry {
-    pub peer: PeerId,
+    pub peer: OffchainPublicKey,
     pub rtt: std::time::Duration,
 }
 
-impl hopr_api::graph::MeasurableNeighbor for NeighborTelemetry {
-    fn peer(&self) -> &PeerId {
+impl hopr_api::graph::MeasurablePeer for NeighborTelemetry {
+    fn peer(&self) -> &OffchainPublicKey {
         &self.peer
     }
 

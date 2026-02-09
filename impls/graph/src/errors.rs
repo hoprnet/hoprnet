@@ -1,4 +1,4 @@
-use hopr_api::Address;
+use hopr_api::{Address, OffchainPublicKey};
 use thiserror::Error;
 
 /// Errors that can occur when manipulating the channel graph.
@@ -16,4 +16,7 @@ pub enum ChannelGraphError {
     /// Node not found in the graph.
     #[error("node not found: {0}")]
     NodeNotFound(Address),
+    /// Node identified by its public key not found in the graph.
+    #[error("node with public key not found: {0}")]
+    PublicKeyNodeNotFound(OffchainPublicKey),
 }

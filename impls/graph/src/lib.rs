@@ -19,11 +19,20 @@
 //! - presence of peer for immediate direct network connection and its quality (Option<ImmediateQoS>)
 //! - presence of intermediate connection through other nodes (Option<IntermediateQoS>)
 
-#[cfg(feature = "graph_immediate")]
-pub mod immediate;
-
-#[cfg(feature = "graph_full")]
-pub mod full;
+#[cfg(feature = "petgraph")]
+pub mod petgraph;
 
 pub mod errors;
 pub mod weight;
+
+#[cfg(feature = "petgraph")]
+pub use petgraph::*;
+pub use weight::Observations;
+
+/// A thread-safe, shareable handle to a [`ChannelGraph`].
+///
+/// This is a convenience alias. Since [`ChannelGraph`] uses interior mutability,
+/// wrapping it in `Arc` is sufficient for concurrent sharing without an
+/// external `RwLock`.
+#[cfg(feature = "petgraph")]
+pub type SharedChannelGraph = std::sync::Arc<ChannelGraph>;

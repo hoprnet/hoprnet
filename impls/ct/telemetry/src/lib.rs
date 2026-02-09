@@ -1,8 +1,5 @@
 use futures::StreamExt;
-use hopr_api::{
-    PeerId,
-    ct::{DestinationRouting, NetworkGraphView, TrafficGeneration},
-};
+use hopr_api::ct::{DestinationRouting, NetworkGraphView, TrafficGeneration};
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::protocol::HoprPseudonym;
@@ -59,17 +56,18 @@ impl ImmediateNeighborProber {
 }
 
 impl TrafficGeneration for ImmediateNeighborProber {
-    type NodeId = PeerId;
+    type NodeId = OffchainPublicKey;
 
     fn build<U>(self, network_graph: U) -> impl futures::Stream<Item = DestinationRouting> + Send
     where
-        U: NetworkGraphView<NodeId = PeerId> + Send + Sync + 'static,
+        U: NetworkGraphView<NodeId = OffchainPublicKey> + Send + Sync + 'static,
     {
         // For each probe target a cached version of transport routing is stored
-        let cache_peer_routing: moka::future::Cache<PeerId, DestinationRouting> = moka::future::Cache::builder()
-            .time_to_live(std::time::Duration::from_secs(600))
-            .max_capacity(100_000)
-            .build();
+        let cache_peer_routing: moka::future::Cache<OffchainPublicKey, DestinationRouting> =
+            moka::future::Cache::builder()
+                .time_to_live(std::time::Duration::from_secs(600))
+                .max_capacity(100_000)
+                .build();
 
         let cfg = self.cfg;
 
@@ -90,7 +88,7 @@ impl TrafficGeneration for ImmediateNeighborProber {
                     cache_peer_routing
                         .try_get_with(peer, async move {
                             Ok::<DestinationRouting, anyhow::Error>(DestinationRouting::Forward {
-                                destination: Box::new(OffchainPublicKey::from_peerid(&peer)?.into()),
+                                destination: Box::new(peer.into()),
                                 pseudonym: Some(HoprPseudonym::random()),
                                 forward_options: RoutingOptions::Hops(0.try_into().expect("0 is a valid u8")),
                                 return_options: Some(RoutingOptions::Hops(0.try_into().expect("0 is a valid u8"))),
@@ -108,58 +106,47 @@ mod tests {
     use std::collections::HashSet;
 
     use futures::{StreamExt, pin_mut};
-    use hopr_api::{Multiaddr, graph::EdgeTransportObservable, network::Health};
+    use hopr_api::{
+        OffchainKeypair,
+        graph::{MeasurableNode, NetworkGraphUpdate},
+    };
+    use hopr_crypto_types::keypairs::Keypair;
     use hopr_internal_types::NodeId;
-    use hopr_network_graph::immediate::ImmediateNeighborChannelGraph;
+    use hopr_network_graph::ChannelGraph;
     use tokio::time::timeout;
 
     use super::*;
 
     const TINY_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(20);
 
-    mockall::mock! {
-        Observed {}
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+    pub struct Node {
+        pub id: OffchainPublicKey,
+        pub is_connected: bool,
+    }
 
-        impl EdgeTransportObservable for Observed {
-            fn record(&mut self, latency: std::result::Result<std::time::Duration, ()>);
+    impl MeasurableNode for Node {
+        fn id(&self) -> &OffchainPublicKey {
+            &self.id
+        }
 
-            fn average_latency(&self) -> Option<std::time::Duration>;
-
-            fn average_probe_rate(&self) -> f64;
-
-            fn score(&self) -> f64;
+        fn is_connected(&self) -> bool {
+            self.is_connected
         }
     }
 
-    mockall::mock! {
-        ScanInteraction {}
-
-        #[async_trait::async_trait]
-        impl hopr_api::network::NetworkView for ScanInteraction {
-            fn listening_as(&self) -> HashSet<Multiaddr>;
-
-            fn multiaddress_of(&self, peer: &PeerId) -> Option<HashSet<Multiaddr>>;
-
-            fn discovered_peers(&self) -> std::collections::HashSet<PeerId>;
-
-            fn connected_peers(&self) -> HashSet<PeerId>;
-
-            fn is_connected(&self, peer: &PeerId) -> bool;
-
-            fn health(&self) -> Health;
-        }
-
-        impl Clone for ScanInteraction {
-            fn clone(&self) -> Self;
-        }
+    lazy_static::lazy_static! {
+        static ref RANDOM_PEERS: HashSet<Node> = (1..10).map(|_| {
+            Node {
+                id: OffchainPublicKey::from_privkey(&hopr_crypto_random::random_bytes::<32>()).unwrap(),
+                is_connected: false
+            }
+        }).collect::<HashSet<_>>();
     }
 
     #[tokio::test]
     async fn peers_should_not_be_passed_if_none_are_present() -> anyhow::Result<()> {
-        let mut fetcher = MockScanInteraction::new();
-        fetcher.expect_discovered_peers().returning(|| HashSet::new());
-
-        let channel_graph = ImmediateNeighborChannelGraph::new(fetcher, ProberConfig::default().recheck_threshold);
+        let channel_graph = ChannelGraph::new(OffchainKeypair::random().public().clone());
 
         let prober = ImmediateNeighborProber::new(Default::default());
         let stream = prober.build(channel_graph);
@@ -170,24 +157,19 @@ mod tests {
         Ok(())
     }
 
-    lazy_static::lazy_static! {
-        static ref RANDOM_PEERS: HashSet<PeerId> = (1..10).map(|_| {
-            let peer: PeerId = OffchainPublicKey::from_privkey(&hopr_crypto_random::random_bytes::<32>()).unwrap().into();
-            peer
-        }).collect::<HashSet<_>>();
-    }
-
     #[tokio::test]
     async fn peers_should_have_randomized_order() -> anyhow::Result<()> {
-        let mut fetcher = MockScanInteraction::new();
-        fetcher.expect_discovered_peers().returning(|| RANDOM_PEERS.clone());
+        let channel_graph = ChannelGraph::new(OffchainKeypair::random().public().clone());
 
-        let channel_graph = ImmediateNeighborChannelGraph::new(fetcher, ProberConfig::default().recheck_threshold);
+        for node in RANDOM_PEERS.iter() {
+            channel_graph.record_node(node.clone()).await;
+        }
 
         let prober = ImmediateNeighborProber::new(ProberConfig {
             interval: std::time::Duration::from_millis(1),
             ..Default::default()
         });
+
         let stream = prober.build(channel_graph);
         pin_mut!(stream);
 
@@ -198,7 +180,7 @@ mod tests {
                 .map(|routing| match routing {
                     DestinationRouting::Forward { destination, .. } => {
                         if let NodeId::Offchain(peer_key) = destination.as_ref() {
-                            PeerId::from(peer_key)
+                            *peer_key
                         } else {
                             panic!("expected offchain destination, got chain address");
                         }
@@ -210,7 +192,7 @@ mod tests {
         .await?;
 
         assert_eq!(actual.len(), RANDOM_PEERS.len());
-        assert!(!actual.iter().zip(RANDOM_PEERS.iter()).all(|(a, b)| a == b));
+        assert!(!actual.iter().zip(RANDOM_PEERS.iter()).all(|(a, b)| a == b.id()));
 
         Ok(())
     }
@@ -223,16 +205,10 @@ mod tests {
             ..Default::default()
         };
 
-        let mut fetcher = MockScanInteraction::new();
-        fetcher.expect_discovered_peers().times(2).returning(|| {
-            let peer: PeerId = OffchainPublicKey::from_privkey(&hopr_crypto_random::random_bytes::<32>())
-                .unwrap()
-                .into();
-            HashSet::from([peer])
-        });
-        fetcher.expect_discovered_peers().returning(|| HashSet::new());
-
-        let channel_graph = ImmediateNeighborChannelGraph::new(fetcher, cfg.recheck_threshold);
+        let channel_graph = ChannelGraph::new(OffchainKeypair::random().public().clone());
+        channel_graph
+            .record_node(RANDOM_PEERS.iter().next().unwrap().clone())
+            .await;
 
         let prober = ImmediateNeighborProber::new(cfg);
         let stream = prober.build(channel_graph);
@@ -240,7 +216,6 @@ mod tests {
 
         assert!(timeout(TINY_TIMEOUT, stream.next()).await?.is_some());
         assert!(timeout(TINY_TIMEOUT, stream.next()).await?.is_some());
-        assert!(timeout(TINY_TIMEOUT, stream.next()).await.is_err());
 
         Ok(())
     }

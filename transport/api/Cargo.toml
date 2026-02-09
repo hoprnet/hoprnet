@@ -46,6 +46,7 @@ futures = { workspace = true }
 futures-concurrency = { workspace = true }
 humantime-serde = { workspace = true, optional = true }
 lazy_static = { workspace = true }
+moka = { workspace = true }
 proc-macro-regex = { workspace = true }
 pcap-file = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }

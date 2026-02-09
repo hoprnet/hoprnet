@@ -2,7 +2,6 @@ use hopr_api::graph::{
     EdgeTransportObservable,
     traits::{EdgeObservable, EdgeTransportMeasurement, EdgeWeightType},
 };
-use hopr_primitive_types::prelude::{Balance, WxHOPR};
 use hopr_statistics::ExponentialMovingAverage;
 
 /// A representation of a individual edge measurement
@@ -43,7 +42,7 @@ impl EdgeTransportObservable for TransportLinkMeasurement {
 #[derive(Debug, Copy, Clone, Default, PartialEq)]
 pub struct Observations {
     last_update: std::time::Duration,
-    balance: Option<Balance<WxHOPR>>,
+    capacity: Option<u128>,
     immediate_probe: Option<TransportLinkMeasurement>,
     intermediate_probe: Option<TransportLinkMeasurement>,
 }
@@ -63,15 +62,21 @@ impl EdgeObservable for Observations {
                     self.immediate_probe = Some(TransportLinkMeasurement::default());
                 }
 
-                if let Some(probe) = self.immediate_probe.as_mut() { probe.record(result) }
+                if let Some(probe) = self.immediate_probe.as_mut() {
+                    probe.record(result)
+                }
             }
-
             EdgeWeightType::Intermediate(result) => {
                 if self.intermediate_probe.is_none() {
                     self.intermediate_probe = Some(TransportLinkMeasurement::default());
                 }
 
-                if let Some(probe) = self.intermediate_probe.as_mut() { probe.record(result) }
+                if let Some(probe) = self.intermediate_probe.as_mut() {
+                    probe.record(result)
+                }
+            }
+            EdgeWeightType::Capacity(capacity) => {
+                self.capacity = capacity;
             }
         }
     }
@@ -81,8 +86,8 @@ impl EdgeObservable for Observations {
         self.last_update
     }
 
-    fn balance(&self) -> Option<&Balance<WxHOPR>> {
-        self.balance.as_ref()
+    fn capacity(&self) -> Option<u128> {
+        self.capacity
     }
 
     fn immediate_qos(&self) -> Option<&Self::ImmediateMeasurement> {

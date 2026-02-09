@@ -30,8 +30,8 @@ use axum::{
 use hopr_chain_connector::HoprBlockchainSafeConnector;
 use hopr_db_node::HoprNodeDb;
 use hopr_lib::{Address, Hopr, errors::HoprLibError};
-use hopr_network_graph::immediate::ImmediateNeighborChannelGraph;
-use hopr_transport_p2p::{HoprNetwork, UninitializedPeerStore};
+use hopr_network_graph::SharedChannelGraph;
+use hopr_transport_p2p::HoprNetwork;
 use hopr_utils_session::ListenerJoinHandles;
 use serde::Serialize;
 pub use session::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
@@ -57,8 +57,7 @@ pub(crate) const BASE_PATH: &str = const_format::formatcp!("/api/v{}", env!("CAR
 
 type HoprBlokliConnector = HoprBlockchainSafeConnector<hopr_chain_connector::blokli_client::BlokliClient>;
 
-pub(crate) type HoprNode =
-    Hopr<Arc<HoprBlokliConnector>, HoprNodeDb, ImmediateNeighborChannelGraph<UninitializedPeerStore>, HoprNetwork>;
+pub(crate) type HoprNode = Hopr<Arc<HoprBlokliConnector>, HoprNodeDb, SharedChannelGraph, HoprNetwork>;
 
 #[derive(Clone)]
 pub(crate) struct AppState {

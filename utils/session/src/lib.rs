@@ -18,7 +18,6 @@ use futures::{
     future::{AbortHandle, AbortRegistration},
 };
 use hopr_api::{
-    PeerId,
     chain::HoprChainApi,
     db::HoprNodeDbApi,
     graph::{NetworkGraphUpdate, NetworkGraphView},
@@ -26,8 +25,8 @@ use hopr_api::{
 };
 use hopr_async_runtime::Abortable;
 use hopr_lib::{
-    Address, Hopr, HoprSession, NetworkView, SURB_SIZE, ServiceId, SessionClientConfig, SessionId, SessionTarget,
-    errors::HoprLibError, transfer_session,
+    Address, Hopr, HoprSession, NetworkView, OffchainPublicKey, SURB_SIZE, ServiceId, SessionClientConfig, SessionId,
+    SessionTarget, errors::HoprLibError, transfer_session,
 };
 use hopr_network_types::{
     prelude::{ConnectedUdpStream, IpOrHost, IpProtocol, SealedHost, UdpStreamParallelism},
@@ -222,7 +221,7 @@ impl SessionPool {
     where
         Chain: HoprChainApi + Clone + Send + Sync + 'static,
         Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
-        Graph: NetworkGraphView<NodeId = PeerId> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
+        Graph: NetworkGraphView<NodeId = OffchainPublicKey> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
         Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
     {
         let pool = Arc::new(parking_lot::Mutex::new(VecDeque::with_capacity(size)));
@@ -317,7 +316,7 @@ pub async fn create_tcp_client_binding<Chain, Db, Graph, Net>(
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
-    Graph: NetworkGraphView<NodeId = PeerId> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Graph: NetworkGraphView<NodeId = OffchainPublicKey> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     // Bind the TCP socket first
@@ -490,7 +489,7 @@ pub async fn create_udp_client_binding<Chain, Db, Graph, Net>(
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
-    Graph: NetworkGraphView<NodeId = PeerId> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Graph: NetworkGraphView<NodeId = OffchainPublicKey> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     // Bind the UDP socket first

@@ -235,7 +235,7 @@ const ON_CHAIN_RESOLUTION_EVENT_TIMEOUT: Duration = Duration::from_secs(90);
 /// As such, the `hopr_lib` serves mainly as an integration point into Rust programs.
 pub struct Hopr<Chain, Db, Graph, Net>
 where
-    Graph: hopr_api::graph::NetworkGraphView<NodeId = PeerId>
+    Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
         + Clone
         + Send
@@ -258,7 +258,7 @@ impl<Chain, Db, Graph, Net> Hopr<Chain, Db, Graph, Net>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
-    Graph: hopr_api::graph::NetworkGraphView<NodeId = PeerId>
+    Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
         + Clone
         + Send
@@ -353,7 +353,7 @@ where
         #[cfg(feature = "session-server")] serve_handler: T,
     ) -> errors::Result<HoprTransportIO>
     where
-        Ct: TrafficGeneration<NodeId = PeerId> + Send + Sync + 'static,
+        Ct: TrafficGeneration<NodeId = OffchainPublicKey> + Send + Sync + 'static,
         NetBuilder: NetworkBuilder<Network = Net> + Send + Sync + 'static,
     {
         self.error_if_not_in_state(
@@ -917,7 +917,7 @@ where
 
 impl<Chain, Db, Graph, Net> Hopr<Chain, Db, Graph, Net>
 where
-    Graph: hopr_api::graph::NetworkGraphView<NodeId = PeerId>
+    Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
         + Clone
         + Send
@@ -944,7 +944,7 @@ impl<Chain, Db, Graph, Net> HoprNodeOperations for Hopr<Chain, Db, Graph, Net>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
-    Graph: hopr_api::graph::NetworkGraphView<NodeId = PeerId>
+    Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
         + Clone
         + Send
@@ -962,7 +962,7 @@ impl<Chain, Db, Graph, Net> HoprNodeNetworkOperations for Hopr<Chain, Db, Graph,
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
-    Graph: hopr_api::graph::NetworkGraphView<NodeId = PeerId>
+    Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
         + Clone
         + Send
@@ -1002,11 +1002,18 @@ where
     }
 
     async fn network_connected_peers(&self) -> Result<Vec<PeerId>, Self::Error> {
-        Ok(self.transport_api.network_connected_peers()?)
+        Ok(self
+            .transport_api
+            .network_connected_peers()
+            .await?
+            .into_iter()
+            .map(PeerId::from)
+            .collect())
     }
 
     fn network_peer_info(&self, peer: &PeerId) -> Option<Self::TransportObservable> {
-        self.transport_api.network_peer_observations(peer)
+        let pubkey = OffchainPublicKey::from_peerid(peer).ok()?;
+        self.transport_api.network_peer_observations(&pubkey)
     }
 
     async fn all_network_peers(
@@ -1014,8 +1021,9 @@ where
         minimum_score: f64,
     ) -> Result<Vec<(Option<Address>, PeerId, Self::TransportObservable)>, Self::Error> {
         Ok(
-            futures::stream::iter(self.transport_api.all_network_peers(minimum_score)?)
-                .filter_map(|(peer_id, info)| async move {
+            futures::stream::iter(self.transport_api.all_network_peers(minimum_score).await?)
+                .filter_map(|(pubkey, info)| async move {
+                    let peer_id = PeerId::from(pubkey);
                     let address = HoprNodeChainOperations::peerid_to_chain_key(self, &peer_id)
                         .await
                         .ok()
@@ -1036,17 +1044,16 @@ where
     }
 
     async fn network_observed_multiaddresses(&self, peer: &PeerId) -> Vec<Multiaddr> {
-        self.transport_api.network_observed_multiaddresses(peer).await
+        let Ok(pubkey) = hopr_transport::peer_id_to_public_key(peer).await else {
+            return vec![];
+        };
+        self.transport_api.network_observed_multiaddresses(&pubkey).await
     }
 
     async fn multiaddresses_announced_on_chain(&self, peer: &PeerId) -> Result<Vec<Multiaddr>, Self::Error> {
-        let peer = *peer;
-        // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
-        let pubkey = hopr_parallelize::cpu::spawn_blocking(
-            move || OffchainPublicKey::from_peerid(&peer),
-            "peerid -> offchain public key",
-        )
-        .await??;
+        let pubkey = hopr_transport::peer_id_to_public_key(peer)
+            .await
+            .map_err(HoprLibError::TransportError)?;
 
         match self
             .chain_api
@@ -1070,7 +1077,10 @@ where
 
     async fn ping(&self, peer: &PeerId) -> Result<(Duration, Self::TransportObservable), Self::Error> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
-        Ok(self.transport_api.ping(peer).await?)
+        let pubkey = hopr_transport::peer_id_to_public_key(peer)
+            .await
+            .map_err(HoprLibError::TransportError)?;
+        Ok(self.transport_api.ping(&pubkey).await?)
     }
 }
 
@@ -1079,7 +1089,7 @@ impl<Chain, Db, Graph, Net> HoprNodeChainOperations for Hopr<Chain, Db, Graph, N
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
-    Graph: hopr_api::graph::NetworkGraphView<NodeId = PeerId>
+    Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
         + Clone
         + Send
@@ -1158,14 +1168,9 @@ where
     }
 
     async fn peerid_to_chain_key(&self, peer_id: &PeerId) -> Result<Option<Address>, Self::Error> {
-        let peer_id = *peer_id;
-        // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
-        let pubkey = hopr_parallelize::cpu::spawn_blocking(
-            move || prelude::OffchainPublicKey::from_peerid(&peer_id),
-            "peerid -> offchain public key",
-        )
-        .await
-        .map_err(|e| HoprLibError::GeneralError(format!("failed to convert peer id to off-chain key: {}", e)))??;
+        let pubkey = hopr_transport::peer_id_to_public_key(peer_id)
+            .await
+            .map_err(HoprLibError::TransportError)?;
 
         self.chain_api
             .packet_key_to_chain_key(&pubkey)
