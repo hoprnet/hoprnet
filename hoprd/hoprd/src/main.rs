@@ -311,6 +311,7 @@ async fn main_inner() -> anyhow::Result<()> {
         BlockchainConnectorConfig {
             tx_confirm_timeout: std::time::Duration::from_secs(90),
             connection_timeout: std::time::Duration::from_mins(1),
+            sync_tolerance: 90,
         },
         BlokliClient::new(
             cfg.blokli_url
