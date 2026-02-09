@@ -205,8 +205,9 @@ On top of the default configuration options generated for the command line, the 
 - `HOPR_INTERNAL_SESSION_INCOMING_CAPACITY` - the maximum capacity of the queue storing unprocessed incoming and outgoing messages inside a session
 - `HOPR_INTERNAL_SESSION_BALANCER_LEVEL_CAPACITY` - the maximum capacity of the session balancer
 - `HOPR_INTERNAL_RAW_SOCKET_LIKE_CHANNEL_CAPACITY` - the maximum capacity of the raw socket-like bidirectional API interface
-- `HOPR_INTERNAL_IN_PACKET_PIPELINE_CONCURRENCY` - the maximum number of incoming packets to process concurrently (default: set by CPU, 0 = no limit)
-- `HOPR_INTERNAL_OUT_PACKET_PIPELINE_CONCURRENCY` - the maximum number of outgoing packets to process concurrently (default: set by CPU, 0 = no limit)
+- `HOPR_INTERNAL_IN_PACKET_PIPELINE_CONCURRENCY` - the maximum number of incoming packets to process concurrently (default: 8 × CPU cores, 0 = no limit)
+- `HOPR_INTERNAL_OUT_PACKET_PIPELINE_CONCURRENCY` - the maximum number of outgoing packets to process concurrently (default: 8 × CPU cores, 0 = no limit)
+- `HOPR_CPU_TASK_QUEUE_LIMIT` - maximum number of CPU-bound tasks (queued + running) in the Rayon thread pool. If not set, the queue is unbounded. Set this to prevent unbounded queue growth under sustained load (e.g., `1000`). When the limit is reached, new tasks are rejected and packet decode operations may fail with "local CPU queue full" errors.
 - `HOPR_BALANCER_PID_P_GAIN` - proportional (P) gain for the PID controller in outgoing SURB balancer (default: `0.6`)
 - `HOPR_BALANCER_PID_I_GAIN` - integral (I) gain for the PID controller in outgoing SURB balancer (default: `0.7`)
 - `HOPR_BALANCER_PID_D_GAIN` - derivative (D) gain for the PID controller in outgoing SURB balancer (default: `0.2`)
@@ -226,6 +227,7 @@ On top of the default configuration options generated for the command line, the 
 - `HOPRD_NUM_CPU_THREADS` - sets the number of threads for CPU-bound tasks (default: number of CPU cores / 2)
 - `HOPRD_NUM_IO_THREADS` - sets the number of threads for IO-bound tasks (default: number of CPU cores / 2)
 - `HOPRD_THREAD_STACK_SIZE` - sets the thread stack size (default: 10 MB)
+- `HOPR_METRICS_UNACK_PER_PEER` - enable per-peer unacknowledged ticket cache metrics (disabled by default to reduce Prometheus cardinality). Set to `1` or `true` for debugging specific peer acknowledgement issues. **Warning**: Do not enable in production with many peers.
 
 ### Example execution
 

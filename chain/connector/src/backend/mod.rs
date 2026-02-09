@@ -29,7 +29,7 @@ pub trait Backend {
     fn get_channel_by_id(&self, id: &ChannelId) -> Result<Option<ChannelEntry>, Self::Error>;
 }
 
-pub use tempdb::TempDbBackend;
+pub use tempdb::{TempDbBackend, TempDbError};
 
 /// Represents a backend that stores all data in-memory.
 ///

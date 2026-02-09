@@ -20,35 +20,54 @@ impl<B> Clone for HoprKeyMapper<B> {
     }
 }
 
+// These lookups run synchronously on Rayon threads (called from `HoprPacket::from_incoming`
+// inside `spawn_fifo_blocking`). The elapsed_ms timing in each init closure makes the rayon
+// execution time visible in structured logs.
 impl<B> hopr_api::chain::KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec> for HoprKeyMapper<B>
 where
     B: Backend + Send + Sync + 'static,
 {
     fn map_key_to_id(&self, key: &OffchainPublicKey) -> Option<HoprKeyIdent> {
         self.key_to_id.get_with_by_ref(key, || {
+            let start = std::time::Instant::now();
             tracing::warn!(%key, "cache miss on map_key_to_id");
-            match self.backend.get_account_by_key(key) {
+            let result = match self.backend.get_account_by_key(key) {
                 Ok(Some(account)) => Some(account.key_id),
                 Ok(None) => None,
                 Err(error) => {
                     tracing::error!(%error, %key, "failed to get account by key");
                     None
                 }
-            }
+            };
+            tracing::trace!(
+                %key,
+                elapsed_ms = start.elapsed().as_millis() as u64,
+                found = result.is_some(),
+                "map_key_to_id backend lookup"
+            );
+            result
         })
     }
 
     fn map_id_to_public(&self, id: &HoprKeyIdent) -> Option<OffchainPublicKey> {
         self.id_to_key.get_with_by_ref(id, || {
+            let start = std::time::Instant::now();
             tracing::warn!(%id, "cache miss on map_id_to_public");
-            match self.backend.get_account_by_id(id) {
+            let result = match self.backend.get_account_by_id(id) {
                 Ok(Some(account)) => Some(account.public_key),
                 Ok(None) => None,
                 Err(error) => {
                     tracing::error!(%error, %id, "failed to get account by id");
                     None
                 }
-            }
+            };
+            tracing::trace!(
+                %id,
+                elapsed_ms = start.elapsed().as_millis() as u64,
+                found = result.is_some(),
+                "map_id_to_public backend lookup"
+            );
+            result
         })
     }
 }

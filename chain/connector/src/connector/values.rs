@@ -19,6 +19,12 @@ impl<B, C, P, R> HoprBlockchainConnector<C, R, B, P>
 where
     C: BlokliQueryClient + Send + Sync + 'static,
 {
+    /// Queries chain info from cache, fetching from Blokli on cold start.
+    ///
+    /// The cache has no TTL - it's kept fresh by the Blokli subscription handler
+    /// which updates it whenever ticket parameters change. This prevents the
+    /// cascading timeout issue where cache expiration during packet processing
+    /// would trigger blocking Blokli queries.
     pub(crate) async fn query_cached_chain_info(&self) -> Result<ParsedChainInfo, ConnectorError> {
         Ok(self
             .values

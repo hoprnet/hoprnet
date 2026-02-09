@@ -434,6 +434,27 @@
             '';
           };
 
+          # Development shells with Rust nightly using nix-lib
+          devShellNightly = nixLib.mkDevShell {
+            rustToolchainFile = ./rust-toolchain-nightly.toml;
+            shellName = "HOPR Development";
+            treefmtWrapper = config.treefmt.build.wrapper;
+            treefmtPrograms = pkgs.lib.attrValues config.treefmt.build.programs;
+            extraPackages = with pkgs; [
+              sqlite
+              pkgs-unstable.cargo-audit
+              cargo-machete
+              cargo-shear
+              cargo-insta
+              foundry-bin
+              nfpm
+              envsubst
+            ];
+            shellHook = ''
+              ${pre-commit-check.shellHook}
+            '';
+          };
+
           ciShell = nixLib.mkDevShell {
             rustToolchainFile = ./rust-toolchain.toml;
             shellName = "HOPR CI";
@@ -668,6 +689,7 @@
           };
 
           devShells.default = devShell;
+          devShells.nightly = devShellNightly;
           devShells.ci = ciShell;
           devShells.test = testShell;
           devShells.citest = ciTestShell;

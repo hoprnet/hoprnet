@@ -55,7 +55,7 @@ pub struct HoprPacketPipelineConfig {
     /// Single Use Reply Block (SURB) handling configuration
     #[validate(nested)]
     pub surb_store: SurbStoreConfig,
-    /// Additional configuration affecting the acknowledgement processing
+    /// Packet pipeline configuration controlling output/input concurrency and acknowledgement processing
     #[validate(nested)]
     pub pipeline: PacketPipelineConfig,
 }

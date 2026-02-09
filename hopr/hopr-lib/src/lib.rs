@@ -1042,7 +1042,9 @@ where
     async fn multiaddresses_announced_on_chain(&self, peer: &PeerId) -> Result<Vec<Multiaddr>, Self::Error> {
         let peer = *peer;
         // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
-        let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer)).await?;
+        let pubkey =
+            hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer), "multiaddr_lookup")
+                .await??;
 
         match self
             .chain_api
@@ -1156,9 +1158,11 @@ where
     async fn peerid_to_chain_key(&self, peer_id: &PeerId) -> Result<Option<Address>, Self::Error> {
         let peer_id = *peer_id;
         // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
-        let pubkey = hopr_parallelize::cpu::spawn_blocking(move || prelude::OffchainPublicKey::from_peerid(&peer_id))
-            .await
-            .map_err(|e| HoprLibError::GeneralError(format!("failed to convert peer id to off-chain key: {}", e)))?;
+        let pubkey = hopr_parallelize::cpu::spawn_blocking(
+            move || prelude::OffchainPublicKey::from_peerid(&peer_id),
+            "chainkey_lookup",
+        )
+        .await??;
 
         self.chain_api
             .packet_key_to_chain_key(&pubkey)
@@ -1447,7 +1451,7 @@ where
     fn subscribe_winning_tickets(&self) -> impl Stream<Item = VerifiedTicket> + Send + 'static {
         self.winning_ticket_subscribers.1.activate_cloned()
     }
-
+    
     fn redemption_requests(&self) -> Result<Self::RedemptionSink, Self::Error> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 

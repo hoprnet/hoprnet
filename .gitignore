@@ -218,3 +218,5 @@ deploy/nfpm/*.1.gz
 
 # pcap packet capture files
 **/*.pcap
+~/.cargo/advisory-db
+~/.cargo/advisory-db..lock

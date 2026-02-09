@@ -39,6 +39,8 @@ type EventsChannel = (
 const MIN_CONNECTION_TIMEOUT: Duration = Duration::from_millis(100);
 const MIN_TX_CONFIRM_TIMEOUT: Duration = Duration::from_secs(1);
 
+const DEFAULT_SYNC_TOLERANCE_PCT: usize = 90;
+
 /// Configuration of the [`HoprBlockchainConnector`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, smart_default::SmartDefault)]
 pub struct BlockchainConnectorConfig {
@@ -52,6 +54,13 @@ pub struct BlockchainConnectorConfig {
     /// Default is 30 seconds, minimum is 100 milliseconds.
     #[default(Duration::from_secs(30))]
     pub connection_timeout: Duration,
+    /// Percentage of the total number of accounts and opened channels that must
+    /// be received during a [connection attempt](HoprBlockchainConnector::connect)
+    /// to be successful.
+    ///
+    /// Default is 90%, minimum is 1, maximum is 100.
+    #[default(DEFAULT_SYNC_TOLERANCE_PCT)]
+    pub sync_tolerance: usize,
 }
 
 /// A connector acting as middleware between the HOPR APIs (see the [`hopr_api`] crate) and the Blokli Client API (see
@@ -79,7 +88,7 @@ pub struct HoprBlockchainConnector<C, B, P, R> {
     channel_by_id: moka::future::Cache<ChannelId, Option<ChannelEntry>, ahash::RandomState>,
     // Fast retrieval of channel entries by parties
     channel_by_parties: moka::future::Cache<ChannelParties, Option<ChannelEntry>, ahash::RandomState>,
-    // Contains only the chain info structure
+    // Contains chain info (no TTL - kept fresh by subscription handler)
     values: moka::future::Cache<u32, ParsedChainInfo>,
 }
 
@@ -144,28 +153,27 @@ where
             channel_by_parties: moka::future::CacheBuilder::new(EXPECTED_NUM_CHANNELS as u64)
                 .time_to_idle(DEFAULT_CACHE_TIMEOUT)
                 .build_with_hasher(ahash::RandomState::default()),
-            values: moka::future::CacheBuilder::new(1)
-                .time_to_live(DEFAULT_CACHE_TIMEOUT)
-                .build(),
+            // No TTL: kept fresh by the Blokli subscription handler
+            values: moka::future::CacheBuilder::new(1).build(),
         }
     }
 
     async fn do_connect(&self, timeout: Duration) -> Result<AbortHandle, ConnectorError> {
-        const TOLERANCE: f64 = 0.01;
+        let sync_quota = self.cfg.sync_tolerance.clamp(1, 100) as f64 / 100.0;
         let min_accounts = (self
             .client
             .count_accounts(blokli_client::api::AccountSelector::Any)
             .await? as f64
-            * (1.0 - TOLERANCE))
+            * sync_quota)
             .round() as u32;
         let min_channels = (self
             .client
             .count_channels(blokli_client::api::ChannelSelector {
                 filter: None,
-                status: None,
+                status: Some(blokli_client::api::types::ChannelStatus::Open),
             })
             .await? as f64
-            * (1.0 - TOLERANCE))
+            * sync_quota)
             .round() as u32;
         tracing::debug!(min_accounts, min_channels, "connection thresholds");
 
@@ -207,6 +215,8 @@ where
         }
 
         hopr_async_runtime::prelude::spawn(async move {
+            let sync_started = std::time::Instant::now();
+
             let connections = client
                 .subscribe_accounts(blokli_client::api::AccountSelector::Any)
                 .and_then(|accounts| Ok((accounts, client.subscribe_graph()?)))
@@ -352,7 +362,7 @@ where
             let mut account_counter = 0;
             let mut channel_counter = 0;
             if min_accounts == 0 && min_channels == 0 {
-                tracing::debug!(account_counter, channel_counter, "on-chain graph has been synced");
+                tracing::info!(account_counter, channel_counter, time = ?sync_started.elapsed(), "on-chain graph has been synced");
                 let _ = connection_ready_tx.take().unwrap().send(Ok(()));
             }
 
@@ -368,11 +378,21 @@ where
                         _ => {}
                     }
 
+                    let pct_synced =
+                        ((account_counter + channel_counter) * 100 / (min_accounts + min_channels)).clamp(0, 100);
+                    tracing::debug!(
+                        pct_synced,
+                        sync_quota,
+                        account_counter,
+                        channel_counter,
+                        "percentage of connection quota synced"
+                    );
+
                     // Send the completion notification
                     // once we reach the expected number of accounts and channels with
                     // the given tolerance
                     if account_counter >= min_accounts && channel_counter >= min_channels {
-                        tracing::debug!(account_counter, channel_counter, "on-chain graph has been synced");
+                        tracing::info!(account_counter, channel_counter, time = ?sync_started.elapsed(), "on-chain graph has been synced");
                         let _ = connection_ready_tx.take().unwrap().send(Ok(()));
                     }
                 }

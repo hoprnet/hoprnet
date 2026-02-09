@@ -1,6 +1,6 @@
 [package]
 name = "hopr-platform"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Rust implementation of wrappers for different hopr-platforms, including WASM"
@@ -13,6 +13,8 @@ crate-type = ["rlib"]
 
 [features]
 default = []
+trace-timing = ["dep:tracing"]
 
 [dependencies]
 thiserror = { workspace = true }
+tracing = { workspace = true, optional = true }
