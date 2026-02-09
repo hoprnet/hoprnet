@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, DurationMilliSeconds, serde_as};
 use tracing::debug;
 
-use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState};
+use crate::{ApiError, ApiErrorStatus, BASE_PATH, BlokliClientLike, InternalState};
 
 #[serde_as]
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -67,9 +67,9 @@ pub(crate) struct DestinationParams {
     ),
     tag = "Peers",
 )]
-pub(super) async fn show_peer_info(
+pub(super) async fn show_peer_info<C: BlokliClientLike>(
     Path(DestinationParams { destination }): Path<DestinationParams>,
-    State(state): State<Arc<InternalState>>,
+    State(state): State<Arc<InternalState<C>>>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
@@ -125,9 +125,9 @@ pub(crate) struct PingResponse {
     ),
     tag = "Peers",
 )]
-pub(super) async fn ping_peer(
+pub(super) async fn ping_peer<C: BlokliClientLike>(
     Path(DestinationParams { destination }): Path<DestinationParams>,
-    State(state): State<Arc<InternalState>>,
+    State(state): State<Arc<InternalState<C>>>,
 ) -> Result<impl IntoResponse, ApiError> {
     debug!(%destination, "Manually ping peer");
 

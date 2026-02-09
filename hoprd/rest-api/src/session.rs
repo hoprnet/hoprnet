@@ -7,7 +7,7 @@ use axum::{
 };
 use base64::Engine;
 use hopr_lib::{
-    Address, NodeId, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities, SessionClientConfig, SessionId,
+    Address, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities, SessionClientConfig, SessionId,
     SessionManagerError, SessionTarget, SurbBalancerConfig, TransportSessionError,
     errors::{HoprLibError, HoprTransportError},
 };
@@ -15,7 +15,7 @@ use hopr_utils_session::{ListenerId, build_binding_host, create_tcp_client_bindi
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
-use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState};
+use crate::{ApiError, ApiErrorStatus, BASE_PATH, BlokliClientLike, InternalState};
 
 /// Size of the buffer for forwarding data to/from a TCP stream.
 pub const HOPR_TCP_BUFFER_SIZE: usize = 4096;
@@ -135,7 +135,7 @@ impl From<SessionCapability> for hopr_lib::SessionCapabilities {
 pub enum RoutingOptions {
     #[cfg(feature = "explicit-path")]
     #[schema(value_type = Vec<String>)]
-    IntermediatePath(#[serde_as(as = "Vec<DisplayFromStr>")] Vec<NodeId>),
+    IntermediatePath(#[serde_as(as = "Vec<DisplayFromStr>")] Vec<hopr_lib::NodeId>),
     Hops(usize),
 }
 
@@ -157,6 +157,8 @@ impl From<hopr_lib::RoutingOptions> for RoutingOptions {
                 RoutingOptions::IntermediatePath(path.into_iter().collect())
             }
             hopr_lib::RoutingOptions::Hops(hops) => RoutingOptions::Hops(usize::from(hops)),
+            #[cfg(not(feature = "explicit-path"))]
+            hopr_lib::RoutingOptions::IntermediatePath(path) => RoutingOptions::Hops(path.into_iter().count()),
         }
     }
 }
@@ -392,8 +394,8 @@ pub(crate) struct SessionClientResponse {
         ),
         tag = "Session"
     )]
-pub(crate) async fn create_client(
-    State(state): State<Arc<InternalState>>,
+pub(crate) async fn create_client<C: BlokliClientLike>(
+    State(state): State<Arc<InternalState<C>>>,
     Path(protocol): Path<IpProtocol>,
     Json(args): Json<SessionClientRequest>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
@@ -531,8 +533,8 @@ pub(crate) async fn create_client(
     ),
     tag = "Session",
 )]
-pub(crate) async fn list_clients(
-    State(state): State<Arc<InternalState>>,
+pub(crate) async fn list_clients<C: BlokliClientLike>(
+    State(state): State<Arc<InternalState<C>>>,
     Path(protocol): Path<IpProtocol>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let response = state
@@ -657,8 +659,8 @@ impl From<SurbBalancerConfig> for SessionConfig {
     ),
     tag = "Session"
 )]
-pub(crate) async fn adjust_session(
-    State(state): State<Arc<InternalState>>,
+pub(crate) async fn adjust_session<C: BlokliClientLike>(
+    State(state): State<Arc<InternalState<C>>>,
     Path(session_id): Path<String>,
     Json(args): Json<SessionConfig>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
@@ -701,8 +703,8 @@ pub(crate) async fn adjust_session(
     ),
     tag = "Session"
 )]
-pub(crate) async fn session_config(
-    State(state): State<Arc<InternalState>>,
+pub(crate) async fn session_config<C: BlokliClientLike>(
+    State(state): State<Arc<InternalState<C>>>,
     Path(session_id): Path<String>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let session_id =
@@ -783,8 +785,8 @@ pub struct SessionCloseClientQuery {
     ),
     tag = "Session",
 )]
-pub(crate) async fn close_client(
-    State(state): State<Arc<InternalState>>,
+pub(crate) async fn close_client<C: BlokliClientLike>(
+    State(state): State<Arc<InternalState<C>>>,
     Path(SessionCloseClientQuery { protocol, ip, port }): Path<SessionCloseClientQuery>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let listening_ip: IpAddr = ip

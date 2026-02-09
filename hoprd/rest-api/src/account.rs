@@ -12,7 +12,7 @@ use hopr_lib::{
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
-use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState};
+use crate::{ApiError, ApiErrorStatus, BASE_PATH, BlokliClientLike, InternalState};
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
@@ -40,7 +40,7 @@ pub(crate) struct AccountAddressesResponse {
         ),
         tag = "Account",
     )]
-pub(super) async fn addresses(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+pub(super) async fn addresses<C: BlokliClientLike>(State(state): State<Arc<InternalState<C>>>) -> impl IntoResponse {
     let addresses = AccountAddressesResponse {
         native: state.hopr.me_onchain().to_checksum(),
     };
@@ -97,7 +97,7 @@ pub(crate) struct AccountBalancesResponse {
         ),
         tag = "Account",
     )]
-pub(super) async fn balances(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+pub(super) async fn balances<C: BlokliClientLike>(State(state): State<Arc<InternalState<C>>>) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
     let mut account_balances = AccountBalancesResponse::default();
@@ -181,8 +181,8 @@ pub(crate) struct WithdrawResponse {
         ),
         tag = "Account",
     )]
-pub(super) async fn withdraw(
-    State(state): State<Arc<InternalState>>,
+pub(super) async fn withdraw<C: BlokliClientLike>(
+    State(state): State<Arc<InternalState<C>>>,
     Json(req_data): Json<WithdrawBodyRequest>,
 ) -> impl IntoResponse {
     let res = if let Ok(native) = XDaiBalance::from_str(&req_data.amount) {

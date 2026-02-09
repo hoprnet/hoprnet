@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::{extract::State, http::status::StatusCode, response::IntoResponse};
 use hopr_lib::{Health, state::HoprState};
 
-use crate::AppState;
+use crate::{AppState, BlokliClientLike};
 
 /// Check whether the node is started.
 ///
@@ -24,7 +24,7 @@ use crate::AppState;
         ),
         tag = "Checks"
     )]
-pub(super) async fn startedz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub(super) async fn startedz<C: BlokliClientLike>(State(state): State<Arc<AppState<C>>>) -> impl IntoResponse {
     eval_precondition(is_running(state)) // FIXME: improve this once node state granularity is improved
 }
 
@@ -53,7 +53,7 @@ pub(super) async fn startedz(State(state): State<Arc<AppState>>) -> impl IntoRes
         ),
         tag = "Checks"
     )]
-pub(super) async fn readyz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub(super) async fn readyz<C: BlokliClientLike>(State(state): State<Arc<AppState<C>>>) -> impl IntoResponse {
     eval_precondition(is_running(state.clone()) && is_minimally_connected(state).await)
 }
 
@@ -84,7 +84,7 @@ pub(super) async fn readyz(State(state): State<Arc<AppState>>) -> impl IntoRespo
         ),
         tag = "Checks"
     )]
-pub(super) async fn healthyz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub(super) async fn healthyz<C: BlokliClientLike>(State(state): State<Arc<AppState<C>>>) -> impl IntoResponse {
     eval_precondition(is_running(state.clone()) && is_minimally_connected(state).await)
 }
 
@@ -93,7 +93,7 @@ pub(super) async fn healthyz(State(state): State<Arc<AppState>>) -> impl IntoRes
 /// Returns `true` if the network health is `Orange`, `Yellow`, or `Green`.
 /// Returns `false` if the network health is `Unknown` or `Red`.
 #[inline]
-async fn is_minimally_connected(state: Arc<AppState>) -> bool {
+async fn is_minimally_connected<C: BlokliClientLike>(state: Arc<AppState<C>>) -> bool {
     matches!(
         state.hopr.network_health().await,
         Health::Orange | Health::Yellow | Health::Green
@@ -105,7 +105,7 @@ async fn is_minimally_connected(state: Arc<AppState>) -> bool {
 /// Returns `true` only when `HoprState::Running`.
 /// Returns `false` for all other states (Uninitialized, Initializing, Indexing, Starting).
 #[inline]
-fn is_running(state: Arc<AppState>) -> bool {
+fn is_running<C: BlokliClientLike>(state: Arc<AppState<C>>) -> bool {
     matches!(state.hopr.status(), HoprState::Running)
 }
 
@@ -134,7 +134,7 @@ fn eval_precondition(precondition: bool) -> impl IntoResponse {
         ),
         tag = "Checks"
     )]
-pub(super) async fn eligiblez(State(_state): State<Arc<AppState>>) -> impl IntoResponse {
+pub(super) async fn eligiblez<C: BlokliClientLike>(State(_state): State<Arc<AppState<C>>>) -> impl IntoResponse {
     (StatusCode::OK, "").into_response()
 }
 
