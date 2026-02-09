@@ -39,7 +39,7 @@ use helpers::PathPlanner;
 use hopr_api::{
     chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
     db::HoprDbTicketOperations,
-    graph::{NetworkGraphUpdate, NetworkGraphView, Observable},
+    graph::{NetworkGraphUpdate, NetworkGraphView, traits::EdgeObservable},
     network::{NetworkBuilder, NetworkStreamControl},
 };
 pub use hopr_api::{

@@ -1,5 +1,5 @@
 pub mod traits;
 pub mod types;
 
-pub use traits::{NetworkGraphUpdate, NetworkGraphView, Observable};
+pub use traits::{EdgeTransportObservable, NetworkGraphTraverse, NetworkGraphUpdate, NetworkGraphView};
 pub use types::*;

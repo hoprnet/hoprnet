@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use hopr_api::PeerId;
 
-use crate::observation::Observations;
+use crate::weight::Observations;
 
 /// Tracker of [`Observations`] for network peers.
 ///
@@ -69,6 +69,7 @@ impl NetworkPeerTracker {
 #[cfg(test)]
 mod tests {
     use anyhow::Context;
+    use hopr_api::graph::{EdgeTransportObservable, traits::EdgeObservable};
 
     use super::*;
 
@@ -105,36 +106,51 @@ mod tests {
 
     #[test]
     fn peer_tracker_should_reflect_the_alteration_changes() -> anyhow::Result<()> {
+        let expected_latency = std::time::Duration::from_millis(50);
+
         let tracker = NetworkPeerTracker::new();
 
         let peer = PeerId::random();
 
         tracker.add(peer.clone());
         tracker.alter(&peer, |_, mut o| {
-            o.msg_sent += 1;
+            o.record(hopr_api::graph::traits::EdgeWeightType::Immediate(Ok(expected_latency)));
             o
         });
 
-        let obs = tracker.get(&peer).context("should contain a value")?;
-        assert_eq!(obs.msg_sent, 1);
-        assert_eq!(obs.ack_received, 0);
+        let observation = tracker.get(&peer).context("should contain a value")?;
+        assert_eq!(
+            observation
+                .immediate_qos()
+                .ok_or_else(|| anyhow::anyhow!("the value should be present"))?
+                .average_latency(),
+            Some(expected_latency)
+        );
 
         Ok(())
     }
 
     #[test]
     fn peer_tracker_should_create_entry_on_alter_of_non_existent_peers() -> anyhow::Result<()> {
+        let expected_latency = std::time::Duration::from_millis(50);
+
         let tracker = NetworkPeerTracker::new();
 
         let peer = PeerId::random();
 
         tracker.alter(&peer, |_, mut o| {
-            o.msg_sent += 1;
+            o.record(hopr_api::graph::traits::EdgeWeightType::Immediate(Ok(expected_latency)));
             o
         });
 
         let observation = tracker.get(&peer).context("Expected peer to be created")?;
-        assert_eq!(observation.msg_sent, 1);
+        assert_eq!(
+            observation
+                .immediate_qos()
+                .ok_or_else(|| anyhow::anyhow!("the value should be present"))?
+                .average_latency(),
+            Some(expected_latency)
+        );
 
         Ok(())
     }

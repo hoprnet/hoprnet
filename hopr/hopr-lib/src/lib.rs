@@ -97,7 +97,7 @@ use hopr_api::{
 };
 pub use hopr_api::{
     db::ChannelTicketStatistics,
-    graph::Observable,
+    graph::EdgeTransportObservable,
     network::{NetworkBuilder, NetworkStreamControl},
     node::{HoprNodeChainOperations, HoprNodeNetworkOperations, HoprNodeOperations},
 };
@@ -971,7 +971,7 @@ where
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     type Error = HoprLibError;
-    type PeerObservable = Graph::Observed;
+    type TransportObservable = Graph::Observed;
 
     fn me_peer_id(&self) -> PeerId {
         (*self.me.public()).into()
@@ -1005,14 +1005,14 @@ where
         Ok(self.transport_api.network_connected_peers()?)
     }
 
-    fn network_peer_info(&self, peer: &PeerId) -> Option<Self::PeerObservable> {
+    fn network_peer_info(&self, peer: &PeerId) -> Option<Self::TransportObservable> {
         self.transport_api.network_peer_observations(peer)
     }
 
     async fn all_network_peers(
         &self,
         minimum_score: f64,
-    ) -> Result<Vec<(Option<Address>, PeerId, Self::PeerObservable)>, Self::Error> {
+    ) -> Result<Vec<(Option<Address>, PeerId, Self::TransportObservable)>, Self::Error> {
         Ok(
             futures::stream::iter(self.transport_api.all_network_peers(minimum_score)?)
                 .filter_map(|(peer_id, info)| async move {
@@ -1064,7 +1064,7 @@ where
         }
     }
 
-    async fn ping(&self, peer: &PeerId) -> Result<(Duration, Self::PeerObservable), Self::Error> {
+    async fn ping(&self, peer: &PeerId) -> Result<(Duration, Self::TransportObservable), Self::Error> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
         Ok(self.transport_api.ping(peer).await?)
     }
