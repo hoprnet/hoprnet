@@ -50,7 +50,7 @@ impl BlokliTestStateBuilder {
                         .values()
                         .find(|a| a.chain_key == hex::encode(channel.source))
                         .map(|a| a.keyid)
-                        .expect(&format!("missing dst account {}", channel.source)),
+                        .unwrap_or_else(|| panic!("missing dst account {}", channel.source)),
                     epoch: channel.channel_epoch as i32,
                     destination: self
                         .0
@@ -58,7 +58,7 @@ impl BlokliTestStateBuilder {
                         .values()
                         .find(|a| a.chain_key == hex::encode(channel.destination))
                         .map(|a| a.keyid)
-                        .expect(&format!("missing dst account {}", channel.destination)),
+                        .unwrap_or_else(|| panic!("missing dst account {}", channel.destination)),
                     status: match channel.status {
                         ChannelStatus::Closed => blokli_client::api::types::ChannelStatus::Closed,
                         ChannelStatus::Open => blokli_client::api::types::ChannelStatus::Open,
@@ -86,9 +86,9 @@ impl BlokliTestStateBuilder {
                         keyid: u32::from(account.key_id) as i32,
                         multi_addresses: account.get_multiaddrs().iter().map(|a| a.to_string()).collect(),
                         packet_key: hex::encode(account.public_key),
-                        safe_address: account.safe_address.map(|a| hex::encode(a)),
+                        safe_address: account.safe_address.map(hex::encode),
                     });
-                    if let Some(safe_addr) = account.safe_address.as_ref().map(|a| hex::encode(a)) {
+                    if let Some(safe_addr) = account.safe_address.as_ref().map(hex::encode) {
                         self.0.deployed_safes.insert(
                             safe_addr.clone(),
                             blokli_client::api::types::Safe {
@@ -102,20 +102,20 @@ impl BlokliTestStateBuilder {
                         );
                     }
                     self.0.token_balances.insert(
-                        hex::encode(account.chain_addr.clone()),
+                        hex::encode(account.chain_addr),
                         blokli_client::api::types::HoprBalance {
                             __typename: "HoprBalance".to_string(),
                             balance: blokli_client::api::types::TokenValueString(HoprBalance::zero().to_string()),
                         },
                     );
                     self.0.native_balances.insert(
-                        hex::encode(account.chain_addr.clone()),
+                        hex::encode(account.chain_addr),
                         blokli_client::api::types::NativeBalance {
                             __typename: "NativeBalance".to_string(),
                             balance: blokli_client::api::types::TokenValueString(native_balance.to_string()),
                         },
                     );
-                    if let Some(addr) = account.safe_address.as_ref().map(|a| hex::encode(a)) {
+                    if let Some(addr) = account.safe_address.as_ref().map(hex::encode) {
                         self.0.token_balances.insert(
                             addr.clone(),
                             blokli_client::api::types::HoprBalance {
@@ -150,16 +150,12 @@ impl BlokliTestStateBuilder {
     pub fn with_deployed_safes<I: IntoIterator<Item = DeployedSafe>>(mut self, safes: I) -> Self {
         self.0.deployed_safes.extend(safes.into_iter().map(|safe| {
             (
-                hex::encode(&safe.address),
+                hex::encode(safe.address),
                 blokli_client::api::types::Safe {
-                    address: hex::encode(&safe.address),
-                    chain_key: hex::encode(&safe.owner),
-                    module_address: hex::encode(&safe.module),
-                    registered_nodes: safe
-                        .registered_nodes
-                        .into_iter()
-                        .map(|addr| hex::encode(&addr))
-                        .collect(),
+                    address: hex::encode(safe.address),
+                    chain_key: hex::encode(safe.owner),
+                    module_address: hex::encode(safe.module),
+                    registered_nodes: safe.registered_nodes.into_iter().map(hex::encode).collect(),
                 },
             )
         }));
@@ -332,7 +328,6 @@ impl BlokliTestStateBuilder {
     /// Similar to [`BlokliTestStateBuilder::build_dynamic_client`], but also creates
     /// a stream of [`ParsedHoprChainAction`] to allow interception of all on-chain actions
     /// sent by the client.
-    #[must_use]
     pub fn build_dynamic_client_with_tx_interceptor(
         self,
         module_address: Address,

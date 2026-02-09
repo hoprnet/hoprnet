@@ -95,7 +95,7 @@ impl Backend for InMemoryBackend {
     }
 
     fn get_channel_by_id(&self, id: &ChannelId) -> Result<Option<ChannelEntry>, Self::Error> {
-        Ok(self.channels.get(id).map(|e| e.value().clone()))
+        Ok(self.channels.get(id).map(|e| *e.value()))
     }
 }
 
