@@ -1,5 +1,4 @@
 use hopr_network_types::types::DestinationRouting;
-use hopr_primitive_types::prelude::{Balance, WxHOPR};
 
 use super::{MeasurableNeighbor, MeasurablePath, NetworkGraphError, Telemetry};
 
@@ -20,8 +19,8 @@ pub trait EdgeObservable {
     /// The timestamp of the last update.
     fn last_update(&self) -> std::time::Duration;
 
-    /// Balance present in the virtual channel
-    fn balance(&self) -> Option<&Balance<WxHOPR>>;
+    /// Capacity present in the channel to send through this path segment using PoR of HOPR protocol.
+    fn capacity(&self) -> Option<u128>;
 
     /// Transport level measurements performed over the path segment exposed.
     fn immediate_qos(&self) -> Option<&Self::ImmediateMeasurement>;

@@ -341,7 +341,7 @@ mod tests {
                 .unwrap_or_default()
         }
 
-        fn balance(&self) -> Option<&hopr_primitive_types::prelude::Balance<hopr_primitive_types::prelude::WxHOPR>> {
+        fn capacity(&self) -> Option<u128> {
             None
         }
 
