@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use bimap::BiHashMap;
 use parking_lot::RwLock;
 use petgraph::graph::{DiGraph, NodeIndex};
@@ -8,6 +6,13 @@ use hopr_api::OffchainPublicKey;
 
 use crate::{errors::ChannelGraphError, weight::Observations};
 
+/// Internal mutable state of a [`ChannelGraph`], protected by a lock.
+#[derive(Debug, Clone)]
+struct InnerGraph {
+    graph: DiGraph<OffchainPublicKey, Observations>,
+    indices: BiHashMap<OffchainPublicKey, NodeIndex>,
+}
+
 /// A directed graph representing logical channels between nodes.
 ///
 /// The graph is directed, with nodes representing the physical nodes in the network using
@@ -15,11 +20,14 @@ use crate::{errors::ChannelGraphError, weight::Observations};
 /// between them. Each logical channel aggregates different weighted properties, like
 /// channel capacity (calculated from the on-chain channel balance, ticket price and ticket probability)
 /// and evaluated transport network properties between the nodes.
-#[derive(Debug, Clone)]
+///
+/// Interior mutability is provided via an internal [`RwLock`] so that all trait
+/// methods (which take `&self`) can safely read and write the graph. In production
+/// code, the graph is expected to be shared behind an `Arc<ChannelGraph>`.
+#[derive(Debug)]
 pub struct ChannelGraph {
     me: OffchainPublicKey,
-    graph: DiGraph<OffchainPublicKey, Observations>,
-    indices: BiHashMap<OffchainPublicKey, NodeIndex>,
+    inner: RwLock<InnerGraph>,
 }
 
 impl ChannelGraph {
@@ -34,37 +42,47 @@ impl ChannelGraph {
         let idx = graph.add_node(me);
         indices.insert(me, idx);
 
-        Self { me, graph, indices }
+        Self {
+            me,
+            inner: RwLock::new(InnerGraph { graph, indices }),
+        }
+    }
+
+    /// Returns the self-identity key of this graph.
+    pub fn me(&self) -> &OffchainPublicKey {
+        &self.me
     }
 
     /// Returns the number of nodes in the graph.
     pub fn node_count(&self) -> usize {
-        self.graph.node_count()
+        self.inner.read().graph.node_count()
     }
 
     /// Checks whether the graph contains the given node.
     pub fn contains_node(&self, key: &OffchainPublicKey) -> bool {
-        self.indices.contains_left(key)
+        self.inner.read().indices.contains_left(key)
     }
 
     /// Adds a node to the graph if it does not already exist.
-    pub fn add_node(&mut self, key: OffchainPublicKey) {
-        if !self.contains_node(&key) {
-            let idx = self.graph.add_node(key);
-            self.indices.insert(key, idx);
+    pub fn add_node(&self, key: OffchainPublicKey) {
+        let mut inner = self.inner.write();
+        if !inner.indices.contains_left(&key) {
+            let idx = inner.graph.add_node(key);
+            inner.indices.insert(key, idx);
         }
     }
 
     /// Removes a node and all its associated edges from the graph.
-    pub fn remove_node(&mut self, key: &OffchainPublicKey) {
-        if let Some((_, idx)) = self.indices.remove_by_left(key) {
-            self.graph.remove_node(idx);
+    pub fn remove_node(&self, key: &OffchainPublicKey) {
+        let mut inner = self.inner.write();
+        if let Some((_, idx)) = inner.indices.remove_by_left(key) {
+            inner.graph.remove_node(idx);
 
             // petgraph swaps the last node into the removed slot,
             // so we need to update the index mapping for the swapped node.
-            if let Some(swapped_key) = self.graph.node_weight(idx) {
+            if let Some(swapped_key) = inner.graph.node_weight(idx) {
                 let swapped_key = *swapped_key;
-                self.indices.insert(swapped_key, idx);
+                inner.indices.insert(swapped_key, idx);
             }
         }
     }
@@ -72,55 +90,59 @@ impl ChannelGraph {
     /// Adds a directed edge between two existing nodes with default observations.
     ///
     /// Returns an error if either node is not present in the graph.
-    pub fn add_edge(&mut self, src: &OffchainPublicKey, dest: &OffchainPublicKey) -> Result<(), ChannelGraphError> {
-        let src_idx = self
+    pub fn add_edge(&self, src: &OffchainPublicKey, dest: &OffchainPublicKey) -> Result<(), ChannelGraphError> {
+        let mut inner = self.inner.write();
+        let src_idx = inner
             .indices
             .get_by_left(src)
+            .copied()
             .ok_or(ChannelGraphError::PublicKeyNodeNotFound(*src))?;
-        let dest_idx = self
+        let dest_idx = inner
             .indices
             .get_by_left(dest)
+            .copied()
             .ok_or(ChannelGraphError::PublicKeyNodeNotFound(*dest))?;
 
-        self.graph.add_edge(*src_idx, *dest_idx, Observations::default());
+        inner.graph.add_edge(src_idx, dest_idx, Observations::default());
         Ok(())
     }
 
     /// Checks whether a directed edge exists between two nodes.
     pub fn has_edge(&self, src: &OffchainPublicKey, dest: &OffchainPublicKey) -> bool {
-        let (Some(src_idx), Some(dest_idx)) = (self.indices.get_by_left(src), self.indices.get_by_left(dest)) else {
+        let inner = self.inner.read();
+        let (Some(src_idx), Some(dest_idx)) = (inner.indices.get_by_left(src), inner.indices.get_by_left(dest)) else {
             return false;
         };
-        self.graph.contains_edge(*src_idx, *dest_idx)
+        inner.graph.contains_edge(*src_idx, *dest_idx)
     }
 
     /// Returns a copy of the edge observations between two nodes, if the edge exists.
-    pub fn get_edge_observation(&self, src: &OffchainPublicKey, dest: &OffchainPublicKey) -> Option<Observations> {
-        let src_idx = self.indices.get_by_left(src)?;
-        let dest_idx = self.indices.get_by_left(dest)?;
-        let edge_idx = self.graph.find_edge(*src_idx, *dest_idx)?;
-        self.graph.edge_weight(edge_idx).copied()
+    pub fn get_edge(&self, src: &OffchainPublicKey, dest: &OffchainPublicKey) -> Option<Observations> {
+        let inner = self.inner.read();
+        let src_idx = inner.indices.get_by_left(src)?;
+        let dest_idx = inner.indices.get_by_left(dest)?;
+        let edge_idx = inner.graph.find_edge(*src_idx, *dest_idx)?;
+        inner.graph.edge_weight(edge_idx).copied()
     }
 
     /// Mutably updates the edge observations between two nodes.
     ///
     /// If the edge exists, applies the given function to its observations.
-    fn update_edge<F>(&mut self, src: &OffchainPublicKey, dest: &OffchainPublicKey, f: F)
+    fn update_edge<F>(&self, src: &OffchainPublicKey, dest: &OffchainPublicKey, f: F)
     where
         F: FnOnce(&mut Observations),
     {
-        if let (Some(src_idx), Some(dest_idx)) = (self.indices.get_by_left(src), self.indices.get_by_left(dest)) {
-            if let Some(edge_idx) = self.graph.find_edge(*src_idx, *dest_idx) {
-                if let Some(weight) = self.graph.edge_weight_mut(edge_idx) {
+        let mut inner = self.inner.write();
+        if let (Some(src_idx), Some(dest_idx)) = (
+            inner.indices.get_by_left(src).copied(),
+            inner.indices.get_by_left(dest).copied(),
+        ) {
+            if let Some(edge_idx) = inner.graph.find_edge(src_idx, dest_idx) {
+                if let Some(weight) = inner.graph.edge_weight_mut(edge_idx) {
                     f(weight);
                 }
             }
         }
-    }
-
-    /// Returns the self-identity key of this graph.
-    pub fn me(&self) -> &OffchainPublicKey {
-        &self.me
     }
 
     /// Finds all simple paths of exactly `length` hops from `src` to `dest`.
@@ -133,19 +155,22 @@ impl ChannelGraph {
         dest: &OffchainPublicKey,
         length: usize,
     ) -> Vec<Vec<OffchainPublicKey>> {
-        let Some(src_idx) = self.indices.get_by_left(src) else {
+        // TOOD: use simple_path from `petgraph`
+        let inner = self.inner.read();
+        let Some(src_idx) = inner.indices.get_by_left(src) else {
             return vec![];
         };
-        let Some(dest_idx) = self.indices.get_by_left(dest) else {
+        let Some(dest_idx) = inner.indices.get_by_left(dest) else {
             return vec![];
         };
 
         let mut results = Vec::new();
-        let mut visited = vec![false; self.graph.node_count()];
+        let mut visited = vec![false; inner.graph.node_count()];
         let mut current_path = Vec::new();
 
         visited[src_idx.index()] = true;
-        self.dfs_paths(
+        Self::dfs_paths(
+            &inner,
             *src_idx,
             *dest_idx,
             length,
@@ -159,7 +184,7 @@ impl ChannelGraph {
 
     /// DFS helper to enumerate simple paths of a specific length.
     fn dfs_paths(
-        &self,
+        inner: &InnerGraph,
         current: NodeIndex,
         target: NodeIndex,
         remaining_hops: usize,
@@ -174,7 +199,7 @@ impl ChannelGraph {
             return;
         }
 
-        for neighbor in self.graph.neighbors(current) {
+        for neighbor in inner.graph.neighbors(current) {
             if neighbor == target && remaining_hops == 1 {
                 // Reached target at exactly the right depth
                 results.push(current_path.clone());
@@ -183,9 +208,17 @@ impl ChannelGraph {
 
             if !visited[neighbor.index()] && remaining_hops > 1 {
                 visited[neighbor.index()] = true;
-                if let Some(key) = self.indices.get_by_right(&neighbor) {
+                if let Some(key) = inner.indices.get_by_right(&neighbor) {
                     current_path.push(*key);
-                    self.dfs_paths(neighbor, target, remaining_hops - 1, visited, current_path, results);
+                    Self::dfs_paths(
+                        inner,
+                        neighbor,
+                        target,
+                        remaining_hops - 1,
+                        visited,
+                        current_path,
+                        results,
+                    );
                     current_path.pop();
                 }
                 visited[neighbor.index()] = false;
@@ -196,7 +229,8 @@ impl ChannelGraph {
     /// Finds all simple cycles that start and end at `me` with length between 2 and
     /// `MAX_INTERMEDIATE_HOPS + 1`.
     fn find_loopback_paths(&self) -> Vec<Vec<OffchainPublicKey>> {
-        let Some(me_idx) = self.indices.get_by_left(&self.me) else {
+        let inner = self.inner.read();
+        let Some(me_idx) = inner.indices.get_by_left(&self.me) else {
             return vec![];
         };
 
@@ -204,11 +238,12 @@ impl ChannelGraph {
 
         // Try cycle lengths from 2 (me -> A -> me) to MAX_INTERMEDIATE_HOPS + 1
         for cycle_len in 2..=4 {
-            let mut visited = vec![false; self.graph.node_count()];
+            let mut visited = vec![false; inner.graph.node_count()];
             let mut current_path = Vec::new();
             visited[me_idx.index()] = true;
 
-            self.dfs_loopback(
+            Self::dfs_loopback(
+                &inner,
                 *me_idx,
                 *me_idx,
                 cycle_len,
@@ -223,7 +258,7 @@ impl ChannelGraph {
 
     /// DFS helper for finding loopback (cycle) paths.
     fn dfs_loopback(
-        &self,
+        inner: &InnerGraph,
         current: NodeIndex,
         home: NodeIndex,
         remaining_hops: usize,
@@ -235,7 +270,7 @@ impl ChannelGraph {
             return;
         }
 
-        for neighbor in self.graph.neighbors(current) {
+        for neighbor in inner.graph.neighbors(current) {
             if neighbor == home && remaining_hops == 1 {
                 // Completed a cycle back to home
                 results.push(current_path.clone());
@@ -244,9 +279,17 @@ impl ChannelGraph {
 
             if !visited[neighbor.index()] && remaining_hops > 1 {
                 visited[neighbor.index()] = true;
-                if let Some(key) = self.indices.get_by_right(&neighbor) {
+                if let Some(key) = inner.indices.get_by_right(&neighbor) {
                     current_path.push(*key);
-                    self.dfs_loopback(neighbor, home, remaining_hops - 1, visited, current_path, results);
+                    Self::dfs_loopback(
+                        inner,
+                        neighbor,
+                        home,
+                        remaining_hops - 1,
+                        visited,
+                        current_path,
+                        results,
+                    );
                     current_path.pop();
                 }
                 visited[neighbor.index()] = false;
@@ -257,35 +300,13 @@ impl ChannelGraph {
 
 /// A thread-safe, shareable handle to a [`ChannelGraph`].
 ///
-/// This wrapper enables concurrent access to the underlying graph and
-/// implements the [`NetworkGraphView`](hopr_api::graph::NetworkGraphView) and
-/// [`NetworkGraphUpdate`](hopr_api::graph::NetworkGraphUpdate) traits.
-#[derive(Debug, Clone)]
-pub struct SharedChannelGraph {
-    inner: Arc<RwLock<ChannelGraph>>,
-}
-
-impl SharedChannelGraph {
-    /// Creates a new shared channel graph from the given inner graph.
-    pub fn new(graph: ChannelGraph) -> Self {
-        Self {
-            inner: Arc::new(RwLock::new(graph)),
-        }
-    }
-
-    /// Acquires a read lock on the underlying graph.
-    pub fn read(&self) -> parking_lot::RwLockReadGuard<'_, ChannelGraph> {
-        self.inner.read()
-    }
-
-    /// Acquires a write lock on the underlying graph.
-    pub fn write(&self) -> parking_lot::RwLockWriteGuard<'_, ChannelGraph> {
-        self.inner.write()
-    }
-}
+/// This is a convenience alias. Since [`ChannelGraph`] uses interior mutability,
+/// wrapping it in `Arc` is sufficient for concurrent sharing without an
+/// external `RwLock`.
+pub type SharedChannelGraph = std::sync::Arc<ChannelGraph>;
 
 #[async_trait::async_trait]
-impl hopr_api::graph::NetworkGraphUpdate for SharedChannelGraph {
+impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
     async fn record_edge<N, P>(
         &self,
         telemetry: std::result::Result<hopr_api::graph::Telemetry<N, P>, hopr_api::graph::NetworkGraphError<P>>,
@@ -304,9 +325,7 @@ impl hopr_api::graph::NetworkGraphUpdate for SharedChannelGraph {
                 );
 
                 if let Ok(key) = OffchainPublicKey::from_peerid(telemetry.peer()) {
-                    let mut g = self.inner.write();
-                    let me = g.me;
-                    g.update_edge(&me, &key, |obs| {
+                    self.update_edge(&self.me, &key, |obs| {
                         obs.record(EdgeWeightType::Immediate(Ok(telemetry.rtt() / 2)));
                     });
                 } else {
@@ -330,9 +349,7 @@ impl hopr_api::graph::NetworkGraphUpdate for SharedChannelGraph {
                 );
 
                 if let Ok(key) = OffchainPublicKey::from_peerid(peer) {
-                    let mut g = self.inner.write();
-                    let me = g.me;
-                    g.update_edge(&me, &key, |obs| {
+                    self.update_edge(&self.me, &key, |obs| {
                         obs.record(EdgeWeightType::Immediate(Err(())));
                     });
                 }
@@ -348,35 +365,33 @@ impl hopr_api::graph::NetworkGraphUpdate for SharedChannelGraph {
 }
 
 #[async_trait::async_trait]
-impl hopr_api::graph::NetworkGraphView for SharedChannelGraph {
+impl hopr_api::graph::NetworkGraphView for ChannelGraph {
     type NodeId = OffchainPublicKey;
     type Observed = Observations;
 
     fn nodes(&self) -> futures::stream::BoxStream<'static, Self::NodeId> {
         let keys: Vec<OffchainPublicKey> = {
-            let g = self.inner.read();
-            g.indices.left_values().copied().collect()
+            let inner = self.inner.read();
+            inner.indices.left_values().copied().collect()
         };
 
         Box::pin(futures::stream::iter(keys))
     }
 
     fn edge(&self, src: &Self::NodeId, dest: &Self::NodeId) -> Option<Self::Observed> {
-        let g = self.inner.read();
-        g.get_edge_observation(src, dest)
+        self.get_edge(src, dest)
     }
 }
 
 #[async_trait::async_trait]
-impl hopr_api::graph::NetworkGraphTraverse for SharedChannelGraph {
+impl hopr_api::graph::NetworkGraphTraverse for ChannelGraph {
     type NodeId = OffchainPublicKey;
 
     async fn routes(&self, destination: &Self::NodeId, length: usize) -> Vec<hopr_api::ct::DestinationRouting> {
         use hopr_internal_types::prelude::NodeId;
         use hopr_network_types::types::{DestinationRouting, RoutingOptions};
 
-        let g = self.inner.read();
-        let paths = g.find_paths(&g.me, destination, length);
+        let paths = self.find_paths(&self.me, destination, length);
 
         paths
             .into_iter()
@@ -399,8 +414,7 @@ impl hopr_api::graph::NetworkGraphTraverse for SharedChannelGraph {
         use hopr_internal_types::prelude::NodeId;
         use hopr_network_types::types::{DestinationRouting, RoutingOptions};
 
-        let g = self.inner.read();
-        let paths = g.find_loopback_paths();
+        let paths = self.find_loopback_paths();
 
         // Group all loopback routes into a single batch
         let routes: Vec<DestinationRouting> = paths
@@ -413,7 +427,7 @@ impl hopr_api::graph::NetworkGraphTraverse for SharedChannelGraph {
                 > = node_ids.try_into().ok()?;
 
                 Some(DestinationRouting::forward_only(
-                    g.me,
+                    self.me,
                     RoutingOptions::IntermediatePath(bounded),
                 ))
             })
@@ -496,7 +510,7 @@ mod tests {
     #[test]
     fn adding_a_node_increases_count() -> anyhow::Result<()> {
         let me = pubkey_from(&SECRET_0);
-        let mut graph = ChannelGraph::new(me);
+        let graph = ChannelGraph::new(me);
         let peer = pubkey_from(&SECRET_1);
         graph.add_node(peer);
         assert!(graph.contains_node(&peer));
@@ -507,7 +521,7 @@ mod tests {
     #[test]
     fn adding_duplicate_node_is_idempotent() -> anyhow::Result<()> {
         let me = pubkey_from(&SECRET_0);
-        let mut graph = ChannelGraph::new(me);
+        let graph = ChannelGraph::new(me);
         let peer = pubkey_from(&SECRET_1);
         graph.add_node(peer);
         graph.add_node(peer);
@@ -518,7 +532,7 @@ mod tests {
     #[test]
     fn removing_a_node_decreases_count() -> anyhow::Result<()> {
         let me = pubkey_from(&SECRET_0);
-        let mut graph = ChannelGraph::new(me);
+        let graph = ChannelGraph::new(me);
         let peer = pubkey_from(&SECRET_1);
         graph.add_node(peer);
         assert_eq!(graph.node_count(), 2);
@@ -531,7 +545,7 @@ mod tests {
     #[test]
     fn removing_nonexistent_node_is_noop() -> anyhow::Result<()> {
         let me = pubkey_from(&SECRET_0);
-        let mut graph = ChannelGraph::new(me);
+        let graph = ChannelGraph::new(me);
         graph.remove_node(&pubkey_from(&SECRET_7));
         assert_eq!(graph.node_count(), 1);
         Ok(())
@@ -540,7 +554,7 @@ mod tests {
     #[test]
     fn adding_an_edge_between_nodes() -> anyhow::Result<()> {
         let me = pubkey_from(&SECRET_0);
-        let mut graph = ChannelGraph::new(me);
+        let graph = ChannelGraph::new(me);
         let peer = pubkey_from(&SECRET_1);
         graph.add_node(peer);
         graph.add_edge(&me, &peer)?;
@@ -552,7 +566,7 @@ mod tests {
     #[test]
     fn adding_edge_to_missing_node_errors() -> anyhow::Result<()> {
         let me = pubkey_from(&SECRET_0);
-        let mut graph = ChannelGraph::new(me);
+        let graph = ChannelGraph::new(me);
         assert!(graph.add_edge(&me, &pubkey_from(&SECRET_7)).is_err());
         Ok(())
     }
@@ -560,7 +574,7 @@ mod tests {
     #[test]
     fn removing_a_node_also_removes_its_edges() -> anyhow::Result<()> {
         let me = pubkey_from(&SECRET_0);
-        let mut graph = ChannelGraph::new(me);
+        let graph = ChannelGraph::new(me);
         let peer = pubkey_from(&SECRET_1);
         graph.add_node(peer);
         graph.add_edge(&me, &peer)?;
@@ -578,19 +592,17 @@ mod tests {
         let peer_key = *peer_kp.public();
         let peer_id: PeerId = peer_kp.public().into();
 
-        let mut inner = ChannelGraph::new(me);
-        inner.add_node(peer_key);
-        inner.add_edge(&me, &peer_key)?;
-        let graph = SharedChannelGraph::new(inner);
+        let graph = ChannelGraph::new(me);
+        graph.add_node(peer_key);
+        graph.add_edge(&me, &peer_key)?;
 
         let rtt = std::time::Duration::from_millis(100);
         let telemetry: Result<Telemetry<TestNeighbor, TestPath>, NetworkGraphError<TestPath>> =
             Ok(Telemetry::Neighbor(TestNeighbor { peer: peer_id, rtt }));
         graph.record_edge(telemetry).await;
 
-        let g = graph.read();
-        let obs = g
-            .get_edge_observation(&me, &peer_key)
+        let obs = graph
+            .get_edge(&me, &peer_key)
             .context("edge observation should exist")?;
         let immediate = obs
             .immediate_qos()
@@ -607,18 +619,16 @@ mod tests {
         let peer_key = *peer_kp.public();
         let peer_id: PeerId = peer_kp.public().into();
 
-        let mut inner = ChannelGraph::new(me);
-        inner.add_node(peer_key);
-        inner.add_edge(&me, &peer_key)?;
-        let graph = SharedChannelGraph::new(inner);
+        let graph = ChannelGraph::new(me);
+        graph.add_node(peer_key);
+        graph.add_edge(&me, &peer_key)?;
 
         let telemetry: Result<Telemetry<TestNeighbor, TestPath>, NetworkGraphError<TestPath>> =
             Err(NetworkGraphError::ProbeNeighborTimeout(peer_id));
         graph.record_edge(telemetry).await;
 
-        let g = graph.read();
-        let obs = g
-            .get_edge_observation(&me, &peer_key)
+        let obs = graph
+            .get_edge(&me, &peer_key)
             .context("edge observation should exist")?;
         let immediate = obs
             .immediate_qos()
@@ -633,15 +643,14 @@ mod tests {
         use futures::StreamExt;
 
         let me = pubkey_from(&SECRET_0);
-        let mut inner = ChannelGraph::new(me);
+        let graph = ChannelGraph::new(me);
         let peers: Vec<_> = [SECRET_1, SECRET_2, SECRET_3, SECRET_4, SECRET_5]
             .iter()
             .map(|s| pubkey_from(s))
             .collect();
         for &peer in &peers {
-            inner.add_node(peer);
+            graph.add_node(peer);
         }
-        let graph = SharedChannelGraph::new(inner);
         let nodes: Vec<_> = graph.nodes().collect().await;
         assert_eq!(nodes.len(), 6);
         assert!(nodes.contains(&me));
@@ -654,11 +663,10 @@ mod tests {
     #[tokio::test]
     async fn view_edge_returns_observations_for_existing_edge() -> anyhow::Result<()> {
         let me = pubkey_from(&SECRET_0);
-        let mut inner = ChannelGraph::new(me);
+        let graph = ChannelGraph::new(me);
         let peer = pubkey_from(&SECRET_1);
-        inner.add_node(peer);
-        inner.add_edge(&me, &peer)?;
-        let graph = SharedChannelGraph::new(inner);
+        graph.add_node(peer);
+        graph.add_edge(&me, &peer)?;
         assert!(graph.edge(&me, &peer).is_some());
         Ok(())
     }
@@ -666,9 +674,8 @@ mod tests {
     #[tokio::test]
     async fn view_edge_returns_none_for_missing_edge() -> anyhow::Result<()> {
         let me = pubkey_from(&SECRET_0);
-        let inner = ChannelGraph::new(me);
+        let graph = ChannelGraph::new(me);
         let peer = pubkey_from(&SECRET_1);
-        let graph = SharedChannelGraph::new(inner);
         assert!(graph.edge(&me, &peer).is_none());
         Ok(())
     }
@@ -682,11 +689,10 @@ mod tests {
         let me = pubkey_from(&SECRET_0);
         let dest = pubkey_from(&SECRET_1);
 
-        let mut inner = ChannelGraph::new(me);
-        inner.add_node(dest);
-        inner.add_edge(&me, &dest)?;
+        let graph = ChannelGraph::new(me);
+        graph.add_node(dest);
+        graph.add_edge(&me, &dest)?;
 
-        let graph = SharedChannelGraph::new(inner);
         let routes = graph.routes(&dest, 1).await;
 
         assert_eq!(routes.len(), 1, "should find exactly one 1-hop route");
@@ -703,13 +709,12 @@ mod tests {
         let hop = pubkey_from(&SECRET_1);
         let dest = pubkey_from(&SECRET_2);
 
-        let mut inner = ChannelGraph::new(me);
-        inner.add_node(hop);
-        inner.add_node(dest);
-        inner.add_edge(&me, &hop)?;
-        inner.add_edge(&hop, &dest)?;
+        let graph = ChannelGraph::new(me);
+        graph.add_node(hop);
+        graph.add_node(dest);
+        graph.add_edge(&me, &hop)?;
+        graph.add_edge(&hop, &dest)?;
 
-        let graph = SharedChannelGraph::new(inner);
         let routes = graph.routes(&dest, 2).await;
 
         assert!(!routes.is_empty(), "should find at least one 2-hop route");
@@ -724,11 +729,10 @@ mod tests {
         let me = pubkey_from(&SECRET_0);
         let dest = pubkey_from(&SECRET_1);
 
-        let mut inner = ChannelGraph::new(me);
-        inner.add_node(dest);
+        let graph = ChannelGraph::new(me);
+        graph.add_node(dest);
         // No edge between me and dest
 
-        let graph = SharedChannelGraph::new(inner);
         let routes = graph.routes(&dest, 1).await;
 
         assert!(routes.is_empty(), "should return no routes when unreachable");
@@ -743,8 +747,7 @@ mod tests {
         let me = pubkey_from(&SECRET_0);
         let unknown = pubkey_from(&SECRET_1);
 
-        let inner = ChannelGraph::new(me);
-        let graph = SharedChannelGraph::new(inner);
+        let graph = ChannelGraph::new(me);
         let routes = graph.routes(&unknown, 1).await;
 
         assert!(routes.is_empty());
@@ -760,15 +763,14 @@ mod tests {
         let a = pubkey_from(&SECRET_1);
         let b = pubkey_from(&SECRET_2);
 
-        let mut inner = ChannelGraph::new(me);
-        inner.add_node(a);
-        inner.add_node(b);
+        let graph = ChannelGraph::new(me);
+        graph.add_node(a);
+        graph.add_node(b);
         // Create a cycle: me -> a -> b -> me
-        inner.add_edge(&me, &a)?;
-        inner.add_edge(&a, &b)?;
-        inner.add_edge(&b, &me)?;
+        graph.add_edge(&me, &a)?;
+        graph.add_edge(&a, &b)?;
+        graph.add_edge(&b, &me)?;
 
-        let graph = SharedChannelGraph::new(inner);
         let routes = graph.loopback_routes().await;
 
         assert!(!routes.is_empty(), "should find at least one loopback route batch");
@@ -783,12 +785,11 @@ mod tests {
         let me = pubkey_from(&SECRET_0);
         let a = pubkey_from(&SECRET_1);
 
-        let mut inner = ChannelGraph::new(me);
-        inner.add_node(a);
-        inner.add_edge(&me, &a)?;
+        let graph = ChannelGraph::new(me);
+        graph.add_node(a);
+        graph.add_edge(&me, &a)?;
         // a has no outgoing edge back, so no cycle
 
-        let graph = SharedChannelGraph::new(inner);
         let routes = graph.loopback_routes().await;
 
         assert!(routes.is_empty(), "should return empty when no cycle exists");
