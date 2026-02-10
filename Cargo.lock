@@ -5395,6 +5395,7 @@ dependencies = [
  "anyhow",
  "clap",
  "futures",
+ "hopr-primitive-types 0.10.0",
  "hoprd",
  "hoprd-rest-api-client",
  "reqwest 0.13.2",

@@ -1,4 +1,7 @@
+use std::{path::PathBuf, str::FromStr};
+
 use clap::Parser;
+use hopr_primitive_types::prelude::HoprBalance;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -11,8 +14,8 @@ pub struct Args {
     pub size: usize,
 
     /// Channel funding amount in base units (per channel)
-    #[arg(long, default_value = "1 wxHOPR")]
-    pub funding_amount: String,
+    #[arg(long, default_value = "1 wxHOPR", value_parser = HoprBalance::from_str)]
+    pub funding_amount: HoprBalance,
 
     /// Skip channel creation
     #[arg(long, default_value_t = false)]
@@ -36,7 +39,7 @@ pub struct Args {
 
     /// Base directory for generated configs, identities, DBs, and logs
     #[arg(long, default_value = "/tmp/hoprd-localcluster")]
-    pub data_dir: String,
+    pub data_dir: PathBuf,
 
     /// Docker image containing both Anvil and Blokli
     #[arg(long)]
@@ -44,7 +47,7 @@ pub struct Args {
 
     /// Path to the hoprd binary
     #[arg(long, default_value = "hoprd")]
-    pub hoprd_bin: String,
+    pub hoprd_bin: PathBuf,
 
     /// Password used to encrypt identities
     #[arg(long, default_value = "password")]

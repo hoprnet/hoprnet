@@ -1,6 +1,6 @@
 use std::{
     fs::{self, File},
-    path::{Path, PathBuf},
+    path::Path,
     process::{Child, Command, Stdio},
     time::Duration,
 };
@@ -16,6 +16,7 @@ mod helper;
 
 use cli::Args;
 use helper::HoprdApiClient;
+use hopr_primitive_types::prelude::HoprBalance;
 
 const DEFAULT_WAIT_TIMEOUT: Duration = Duration::from_secs(60);
 const INDEXING_WAIT_TIME: Duration = Duration::from_secs(10);
@@ -91,7 +92,7 @@ async fn main() -> Result<()> {
     let args = Args::parse();
     validate_args(&args)?;
 
-    let data_dir = PathBuf::from(&args.data_dir);
+    let data_dir = args.data_dir.clone();
     fs::create_dir_all(&data_dir).context("failed to create data directory")?;
     let log_dir = data_dir.join("logs");
     fs::create_dir_all(&log_dir).context("failed to create log directory")?;
@@ -247,7 +248,8 @@ async fn start_hoprd_nodes(args: &Args, data_dir: &Path, log_dir: &Path) -> Resu
     Ok(nodes)
 }
 
-async fn open_full_mesh_channels(nodes: &[NodeProcess], amount: &str) -> Result<()> {
+async fn open_full_mesh_channels(nodes: &[NodeProcess], amount: &HoprBalance) -> Result<()> {
+    let amount = amount.to_string();
     let mut tasks = Vec::new();
     for src in nodes {
         let Some(src_addr) = src.address.clone() else {
@@ -261,7 +263,7 @@ async fn open_full_mesh_channels(nodes: &[NodeProcess], amount: &str) -> Result<
                 continue;
             }
             let api = src.api.clone();
-            let amount = amount.to_string();
+            let amount = amount.clone();
             tasks.push(async move { api.open_channel(&dst_addr, &amount).await });
         }
     }

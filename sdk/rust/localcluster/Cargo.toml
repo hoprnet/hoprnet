@@ -13,6 +13,7 @@ clap = { workspace = true, features = ["derive"] }
 futures = { workspace = true }
 hoprd = { workspace = true }
 hoprd-rest-api-client = { workspace = true }
+hopr-primitive-types = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
 tokio = { workspace = true, features = [
   "macros",
