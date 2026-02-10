@@ -1,62 +1,73 @@
-use anyhow::Result;
-use futures::future::try_join_all;
-use hopr_lib::{
-    HoprBalance,
-    testing::{fixtures::ClusterGuard, hopr::ChannelGuard},
-};
-use tokio::task::JoinHandle;
+use anyhow::{Context, Result};
+use hoprd_rest_api_client as hoprd_api_client;
+use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 
-pub struct ApiHandle {
-    pub host: String,
-    pub port: u16,
-    pub token: String,
-    pub join: JoinHandle<()>,
+#[derive(Debug, Clone)]
+pub struct HoprdApiClient {
+    inner: hoprd_api_client::Client,
 }
 
-impl ApiHandle {
-    pub fn host_with_port(&self) -> String {
-        format!("{}:{}", self.host, self.port)
+impl HoprdApiClient {
+    pub fn new(base_url: String, token: Option<String>) -> Result<Self> {
+        let mut headers = HeaderMap::new();
+        if let Some(token) = token {
+            let value = format!("Bearer {token}");
+            headers.insert(
+                AUTHORIZATION,
+                HeaderValue::from_str(&value).context("invalid api token")?,
+            );
+        }
+
+        let http_client = reqwest::ClientBuilder::new()
+            .timeout(std::time::Duration::from_secs(10))
+            .default_headers(headers)
+            .build()
+            .context("failed to build http client")?;
+
+        Ok(Self {
+            inner: hoprd_api_client::Client::new_with_client(base_url.as_ref(), http_client),
+        })
     }
-}
 
-pub async fn open_full_mesh_channels(cluster: &ClusterGuard, funding: HoprBalance) -> Result<Vec<ChannelGuard>> {
-    let mut futures = Vec::new();
+    pub async fn wait_started(&self, timeout: std::time::Duration) -> Result<()> {
+        self.wait_status("/startedz", timeout).await
+    }
 
-    for (src_idx, src) in cluster.iter().enumerate() {
-        for (dst_idx, dst) in cluster.iter().enumerate() {
-            if src_idx == dst_idx {
-                continue;
+    pub async fn wait_ready(&self, timeout: std::time::Duration) -> Result<()> {
+        self.wait_status("/readyz", timeout).await
+    }
+
+    async fn wait_status(&self, path: &str, timeout: std::time::Duration) -> Result<()> {
+        let start = std::time::Instant::now();
+        loop {
+            let ready = match path {
+                "/startedz" => self.inner.startedz().await,
+                "/readyz" => self.inner.readyz().await,
+                _ => anyhow::bail!("unknown status path: {path}"),
+            };
+            if ready.is_ok() {
+                return Ok(());
             }
 
-            let src = src.instance.clone();
-            let dst = dst.instance.clone();
-            futures.push(async move { ChannelGuard::open_channel_between_nodes(src, dst, funding).await });
+            if start.elapsed() > timeout {
+                anyhow::bail!("timeout while waiting for {}", path);
+            }
+
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         }
     }
 
-    try_join_all(futures).await
-}
+    pub async fn addresses(&self) -> Result<String> {
+        let response = self.inner.addresses().await?;
+        Ok(response.into_inner().native)
+    }
 
-pub fn print_node_summary(cluster: &ClusterGuard, api_handles: &[ApiHandle]) {
-    println!("\n\n");
-
-    for (idx, node) in cluster.iter().enumerate() {
-        let api = api_handles.get(idx);
-        let api_host = api.map(|h| h.host_with_port()).unwrap_or_else(|| "N/A".to_string());
-        let api_key = api.map(|h| h.token.clone()).unwrap_or_else(|| "N/A".to_string());
-        let node_admin = format!(
-            "http://localhost:4677/node/info?apiToken={}&apiEndpoint=http://{}",
-            api_key, api_host
-        );
-
-        println!(
-            "Node {}:\n\tAddress: {}\n\tPeer ID: {}\n\tAPI Host: {}\n\tAPI Key: {}\n\tNode admin: {}\n\n",
-            idx,
-            node.address(),
-            node.peer_id(),
-            api_host,
-            api_key,
-            node_admin
-        );
+    pub async fn open_channel(&self, destination: &str, amount: &str) -> Result<()> {
+        let req = hoprd_api_client::types::OpenChannelBodyRequest {
+            amount: amount.to_string(),
+            destination: destination.to_string(),
+        };
+        let _ = self.inner.open_channel(&req).await?;
+        Ok(())
     }
 }
