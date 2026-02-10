@@ -235,39 +235,36 @@ pub mod cpu {
         *QUEUE_LIMIT
     }
 
-    /// Attempts to acquire a slot for a new task.
-    ///
-    /// Returns `Ok(())` if no limit or slot acquired, `Err(QueueFull)` if at limit.
-    fn try_acquire_slot() -> Result<(), SpawnError> {
-        let prev = OUTSTANDING.fetch_add(1, Ordering::AcqRel);
-        metrics::outstanding_inc();
-
-        if let Some(limit) = *QUEUE_LIMIT {
-            let new = prev + 1;
-            if new > limit {
-                release_slot();
-                metrics::rejected();
-                return Err(SpawnError::QueueFull { current: prev, limit });
-            }
-        }
-        Ok(())
-    }
-
-    /// Releases a slot when a task completes, is cancelled, or orphaned.
-    #[inline]
-    fn release_slot() {
-        let prev = OUTSTANDING.fetch_sub(1, Ordering::AcqRel);
-        debug_assert!(prev > 0, "outstanding task count underflow");
-        metrics::outstanding_dec();
-    }
-
-    /// Guard that calls `release_slot()` on drop,
+    /// Guard that acquires a slot on construction and calls releases slot on drop,
     /// even if the task panics or returns early.
     struct SlotGuard;
 
+    impl SlotGuard {
+        /// Attempts to acquire a slot for a new task.
+        ///
+        /// Returns `Ok(())` if no limit or slot acquired, `Err(QueueFull)` if at limit.
+        pub fn try_acquire_slot() -> Result<Self, SpawnError> {
+            let prev = OUTSTANDING.fetch_add(1, Ordering::AcqRel);
+            metrics::outstanding_inc();
+            let guard = Self;
+
+            if let Some(limit) = *QUEUE_LIMIT {
+                let new = prev + 1;
+                if new > limit {
+                    metrics::rejected();
+                    return Err(SpawnError::QueueFull { current: prev, limit });
+                }
+            }
+            Ok(guard)
+        }
+    }
+
     impl Drop for SlotGuard {
+        #[inline]
         fn drop(&mut self) {
-            release_slot();
+            let prev = OUTSTANDING.fetch_sub(1, Ordering::AcqRel);
+            debug_assert!(prev > 0, "outstanding task count underflow");
+            metrics::outstanding_dec();
         }
     }
 
@@ -291,18 +288,24 @@ pub mod cpu {
     fn cancellable_task<R: Send + 'static>(
         f: impl FnOnce() -> R + Send + 'static,
         operation: &'static str,
-    ) -> (
-        impl FnOnce() + Send + 'static,
-        oneshot::Receiver<std::thread::Result<R>>,
-    ) {
+    ) -> Result<
+        (
+            impl FnOnce() + Send + 'static,
+            oneshot::Receiver<std::thread::Result<R>>,
+        ),
+        SpawnError,
+    > {
+        let guard = SlotGuard::try_acquire_slot()?;
+
         let (tx, rx) = oneshot::channel();
         let submitted_at = std::time::Instant::now();
 
         metrics::submitted();
 
         let task = move || {
-            // guard ensures slot is released even on panic
-            let _guard = SlotGuard;
+            // ensures guard is moved inside the closure, and
+            // that the slot is released even on panic
+            let _g = guard;
 
             if tx.is_canceled() {
                 tracing::debug!(
@@ -332,7 +335,7 @@ pub mod cpu {
             }
         };
 
-        (task, rx)
+        Ok((task, rx))
     }
 
     /// Spawn a blocking function on the Rayon thread pool (LIFO scheduling).
@@ -349,8 +352,7 @@ pub mod cpu {
         f: impl FnOnce() -> R + Send + 'static,
         operation: &'static str,
     ) -> Result<R, SpawnError> {
-        try_acquire_slot()?;
-        let (task, rx) = cancellable_task(f, operation);
+        let (task, rx) = cancellable_task(f, operation)?;
         rayon::spawn(task);
         Ok(rx
             .await
@@ -373,8 +375,7 @@ pub mod cpu {
         f: impl FnOnce() -> R + Send + 'static,
         operation: &'static str,
     ) -> Result<R, SpawnError> {
-        try_acquire_slot()?;
-        let (task, rx) = cancellable_task(f, operation);
+        let (task, rx) = cancellable_task(f, operation)?;
         rayon::spawn_fifo(task);
         Ok(rx
             .await
