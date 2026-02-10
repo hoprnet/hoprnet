@@ -193,6 +193,27 @@ async fn init_rest_api(
     Ok(processes)
 }
 
+// TODO: load all the environment variables here and use them to configure the hopr-lib config (#7660)
+fn update_hopr_lib_config_from_env_vars(cfg: &mut HoprLibConfig) -> anyhow::Result<()> {
+    cfg.protocol.packet.pipeline.output_concurrency = std::env::var("HOPR_INTERNAL_OUT_PACKET_PIPELINE_CONCURRENCY")
+        .ok()
+        .and_then(|p| {
+            p.parse()
+                .inspect_err(|error| error!(%error, "failed to parse HOPR_INTERNAL_OUT_PACKET_PIPELINE_CONCURRENCY"))
+                .ok()
+        });
+
+    cfg.protocol.packet.pipeline.input_concurrency = std::env::var("HOPR_INTERNAL_IN_PACKET_PIPELINE_CONCURRENCY")
+        .ok()
+        .and_then(|p| {
+            p.parse()
+                .inspect_err(|error| error!(%error, "failed to parse HOPR_INTERNAL_IN_PACKET_PIPELINE_CONCURRENCY"))
+                .ok()
+        });
+
+    Ok(())
+}
+
 #[cfg(feature = "runtime-tokio")]
 fn main() -> ExitCode {
     if let Err(error) = init_logger() {
@@ -281,6 +302,7 @@ async fn main_inner() -> anyhow::Result<()> {
         BlockchainConnectorConfig {
             tx_confirm_timeout: std::time::Duration::from_secs(90),
             connection_timeout: std::time::Duration::from_mins(1),
+            sync_tolerance: 90,
         },
         BlokliClient::new(
             cfg.blokli_url
@@ -298,8 +320,8 @@ async fn main_inner() -> anyhow::Result<()> {
     chain_connector.connect().await?;
     let chain_connector = Arc::new(chain_connector);
 
-    // TODO: load all the environment variables here and use them to configure the hopr-lib config (#7660)
-    let hopr_lib_cfg: HoprLibConfig = cfg.hopr.clone().into();
+    let mut hopr_lib_cfg: HoprLibConfig = cfg.hopr.clone().into();
+    update_hopr_lib_config_from_env_vars(&mut hopr_lib_cfg)?;
 
     // Create the node instance
     info!("creating the HOPRd node instance from hopr-lib");

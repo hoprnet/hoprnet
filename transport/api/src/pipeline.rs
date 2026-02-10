@@ -116,7 +116,7 @@ where
             (encoder, decoder),
             ticket_proc,
             ticket_events,
-            cfg.ack_processing,
+            cfg.pipeline,
             api,
         ),
         HoprTransportProcess::Pipeline,

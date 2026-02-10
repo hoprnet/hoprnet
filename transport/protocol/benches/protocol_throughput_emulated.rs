@@ -1,7 +1,7 @@
 #[path = "../tests/common/mod.rs"]
 mod common;
 
-use std::{str::FromStr, sync::Arc, time::Duration};
+use std::{str::FromStr, sync::Arc};
 
 use common::{CHAIN_DATA, PEERS, PEERS_CHAIN, random_packets_of_count, resolve_mock_path};
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
@@ -20,7 +20,7 @@ use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, HoprTicketProcessor, HoprTicketProcessorConfig, MemorySurbStore,
     SurbStoreConfig,
 };
-use hopr_transport_protocol::{AcknowledgementPipelineConfig, TicketEvent};
+use hopr_transport_protocol::TicketEvent;
 use libp2p::PeerId;
 
 const SAMPLE_SIZE: usize = 50;
@@ -129,7 +129,7 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                             (encoder, decoder),
                             ticket_proc,
                             received_ack_tickets_tx,
-                            AcknowledgementPipelineConfig::default(),
+                            Default::default(),
                             (api_recv_tx, api_send_rx),
                         );
 
