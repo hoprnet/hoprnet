@@ -32,3 +32,6 @@ tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 [package.metadata.cargo-machete]
 ignored = ["hopr-db-node"]
+
+[package.metadata.cargo-shear]
+ignored = ["hopr-db-node"]
