@@ -1,5 +1,4 @@
-use hopr_api::graph::NetworkGraphError;
-use libp2p_identity::PeerId;
+use hopr_api::{OffchainPublicKey, graph::NetworkGraphError};
 use thiserror::Error;
 
 use crate::types::PathTelemetry;
@@ -16,7 +15,7 @@ pub enum ProbeError {
     NonExistingPeer,
 
     #[error("error while pinging peer {0}: {1}")]
-    PingerError(PeerId, String),
+    PingerError(OffchainPublicKey, String),
 
     #[error("error sending probe: {0}")]
     SendError(String),

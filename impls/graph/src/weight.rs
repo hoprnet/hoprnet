@@ -66,7 +66,6 @@ impl EdgeObservable for Observations {
                     probe.record(result)
                 }
             }
-
             EdgeWeightType::Intermediate(result) => {
                 if self.intermediate_probe.is_none() {
                     self.intermediate_probe = Some(TransportLinkMeasurement::default());
@@ -75,6 +74,9 @@ impl EdgeObservable for Observations {
                 if let Some(probe) = self.intermediate_probe.as_mut() {
                     probe.record(result)
                 }
+            }
+            EdgeWeightType::Capacity(capacity) => {
+                self.capacity = capacity;
             }
         }
     }

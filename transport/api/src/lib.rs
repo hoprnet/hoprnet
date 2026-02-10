@@ -92,6 +92,29 @@ pub use hopr_api as api;
 // Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
 lazy_static::lazy_static! {
     static ref SESSION_INITIATION_TIMEOUT_MAX: std::time::Duration = 2 * constants::SESSION_INITIATION_TIMEOUT_BASE * RoutingOptions::MAX_INTERMEDIATE_HOPS as u32;
+
+    static ref PEER_ID_CACHE: moka::future::Cache<PeerId, OffchainPublicKey> = moka::future::Cache::builder()
+        .time_to_idle(Duration::from_mins(15))
+        .max_capacity(10_000)
+        .build();
+}
+
+/// PeerId -> OffchainPublicKey is a CPU-intensive blocking operation.
+///
+/// This helper uses a cached static object to speed up the lookup and avoid blocking the async
+/// runtime on repeated conversions for the same [`PeerId`]s.
+pub async fn peer_id_to_public_key(peer_id: &PeerId) -> crate::errors::Result<OffchainPublicKey> {
+    PEER_ID_CACHE
+        .try_get_with_by_ref(peer_id, async {
+            OffchainPublicKey::from_peerid(peer_id).map_err(|e| e.into())
+        })
+        .await
+        .map_err(|e: Arc<HoprTransportError>| {
+            crate::errors::HoprTransportError::Other(anyhow::anyhow!(
+                "failed to convert peer_id ({:?}) to an offchain public key: {e}",
+                peer_id
+            ))
+        })
 }
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, strum::Display)]
@@ -119,7 +142,7 @@ type CurrentPathSelector = NoPathSelector;
 /// the transport.
 pub struct HoprTransport<Chain, Db, Graph, Net>
 where
-    Graph: NetworkGraphView<NodeId = PeerId> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Graph: NetworkGraphView<NodeId = OffchainPublicKey> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
     Net: NetworkView + NetworkStreamControl + Clone + Send + Sync + 'static,
 {
     packet_key: OffchainKeypair,
@@ -146,7 +169,7 @@ where
         + Send
         + Sync
         + 'static,
-    Graph: NetworkGraphView<NodeId = PeerId> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Graph: NetworkGraphView<NodeId = OffchainPublicKey> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
     Net: NetworkView + NetworkStreamControl + Clone + Send + Sync + 'static,
 {
     pub fn new(
@@ -224,7 +247,7 @@ where
         S: futures::Stream<Item = PeerDiscovery> + Send + 'static,
         T: futures::Sink<TicketEvent> + Clone + Send + Unpin + 'static,
         T::Error: std::error::Error,
-        Ct: TrafficGeneration<NodeId = PeerId> + Send + Sync + 'static,
+        Ct: TrafficGeneration<NodeId = OffchainPublicKey> + Send + Sync + 'static,
         NetBuilder: NetworkBuilder<Network = Net> + Send + Sync + 'static,
     {
         info!("loading initial peers from the chain");
@@ -454,7 +477,8 @@ where
             .filter(|&c| c > 0)
             .unwrap_or(128);
         debug!(capacity = manual_ping_channel_capacity, "Creating manual ping channel");
-        let (manual_ping_tx, manual_ping_rx) = channel::<(PeerId, PingQueryReplier)>(manual_ping_channel_capacity);
+        let (manual_ping_tx, manual_ping_rx) =
+            channel::<(OffchainPublicKey, PingQueryReplier)>(manual_ping_channel_capacity);
 
         let probe = Probe::new(self.cfg.probe);
 
@@ -529,8 +553,9 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn ping(&self, peer: &PeerId) -> errors::Result<(std::time::Duration, Graph::Observed)> {
-        if peer == &self.packet_key.public().into() {
+    pub async fn ping(&self, peer: &OffchainPublicKey) -> errors::Result<(std::time::Duration, Graph::Observed)> {
+        let me: &OffchainPublicKey = self.packet_key.public();
+        if peer == me {
             return Err(HoprTransportError::Api("ping to self does not make sense".into()));
         }
 
@@ -539,10 +564,9 @@ where
             .get()
             .ok_or_else(|| HoprTransportError::Api("ping processing is not yet initialized".into()))?;
 
-        let latency = (*pinger).ping(*peer).await?;
+        let latency = (*pinger).ping(peer).await?;
 
-        let me: PeerId = self.packet_key.public().into();
-        if let Some(observations) = self.graph.edge(&me, peer) {
+        if let Some(observations) = self.graph.edge(me, peer) {
             Ok((latency, observations))
         } else {
             Err(HoprTransportError::Api(format!(
@@ -628,13 +652,17 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn network_observed_multiaddresses(&self, peer: &PeerId) -> Vec<Multiaddr> {
+    pub async fn network_observed_multiaddresses(&self, peer: &OffchainPublicKey) -> Vec<Multiaddr> {
         match self
             .network
             .get()
             .ok_or_else(|| HoprTransportError::Api("transport network is not yet initialized".into()))
         {
-            Ok(network) => network.multiaddress_of(peer).unwrap_or_default().into_iter().collect(),
+            Ok(network) => network
+                .multiaddress_of(&peer.into())
+                .unwrap_or_default()
+                .into_iter()
+                .collect(),
             Err(error) => {
                 tracing::error!(%error, "failed to get observed multiaddresses");
                 return vec![];
@@ -651,34 +679,47 @@ where
             .unwrap_or(Health::Red)
     }
 
-    pub fn network_connected_peers(&self) -> errors::Result<Vec<PeerId>> {
-        Ok(self
-            .network
-            .get()
-            .ok_or_else(|| {
-                tracing::error!("transport network is not yet initialized");
-                HoprTransportError::Api("transport network is not yet initialized".into())
-            })?
-            .connected_peers()
-            .into_iter()
-            .collect())
+    pub async fn network_connected_peers(&self) -> errors::Result<Vec<OffchainPublicKey>> {
+        Ok(futures::stream::iter(
+            self.network
+                .get()
+                .ok_or_else(|| {
+                    tracing::error!("transport network is not yet initialized");
+                    HoprTransportError::Api("transport network is not yet initialized".into())
+                })?
+                .connected_peers(),
+        )
+        .filter_map(|peer_id| async move {
+            match peer_id_to_public_key(&peer_id).await {
+                Ok(key) => Some(key),
+                Err(error) => {
+                    tracing::warn!(%peer_id, %error, "failed to convert PeerId to OffchainPublicKey");
+                    None
+                }
+            }
+        })
+        .collect()
+        .await)
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    pub fn network_peer_observations(&self, peer: &PeerId) -> Option<Graph::Observed> {
-        let me: PeerId = self.packet_key.public().into();
-        self.graph.edge(&me, peer)
+    pub fn network_peer_observations(&self, peer: &OffchainPublicKey) -> Option<Graph::Observed> {
+        self.graph.edge(self.packet_key.public(), peer)
     }
 
-    /// Get peers connected peers with quality higher than some value
+    /// Get connected peers with quality higher than some value.
     #[tracing::instrument(level = "debug", skip(self))]
-    pub fn all_network_peers(&self, minimum_score: f64) -> errors::Result<Vec<(PeerId, Graph::Observed)>> {
-        let me: PeerId = self.packet_key.public().into();
+    pub async fn all_network_peers(
+        &self,
+        minimum_score: f64,
+    ) -> errors::Result<Vec<(OffchainPublicKey, Graph::Observed)>> {
+        let me = self.packet_key.public();
         Ok(self
-            .network_connected_peers()?
+            .network_connected_peers()
+            .await?
             .into_iter()
             .filter_map(|peer| {
-                let observation = self.graph.edge(&me, &peer);
+                let observation = self.graph.edge(me, &peer);
                 if let Some(info) = observation {
                     if info.score() >= minimum_score {
                         Some((peer, info))

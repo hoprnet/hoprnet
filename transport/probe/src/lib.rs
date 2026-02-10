@@ -27,7 +27,7 @@ pub mod types;
 
 pub use hopr_api::{
     ct::TrafficGeneration,
-    graph::{NetworkGraphError, Telemetry},
+    graph::{EdgeTransportTelemetry, NetworkGraphError},
 };
 
 pub use crate::{

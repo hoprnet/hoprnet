@@ -1,16 +1,21 @@
+use std::collections::HashSet;
+
 use bimap::BiHashMap;
+use hopr_api::{
+    OffchainPublicKey,
+    graph::{MeasurableEdge, MeasurableNode},
+};
 use parking_lot::RwLock;
 use petgraph::graph::{DiGraph, NodeIndex};
-
-use hopr_api::OffchainPublicKey;
 
 use crate::{errors::ChannelGraphError, weight::Observations};
 
 /// Internal mutable state of a [`ChannelGraph`], protected by a lock.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 struct InnerGraph {
     graph: DiGraph<OffchainPublicKey, Observations>,
     indices: BiHashMap<OffchainPublicKey, NodeIndex>,
+    connected: HashSet<OffchainPublicKey>,
 }
 
 /// A directed graph representing logical channels between nodes.
@@ -44,7 +49,11 @@ impl ChannelGraph {
 
         Self {
             me,
-            inner: RwLock::new(InnerGraph { graph, indices }),
+            inner: RwLock::new(InnerGraph {
+                graph,
+                indices,
+                ..Default::default()
+            }),
         }
     }
 
@@ -226,68 +235,67 @@ impl ChannelGraph {
     }
 }
 
-/// A thread-safe, shareable handle to a [`ChannelGraph`].
-///
-/// This is a convenience alias. Since [`ChannelGraph`] uses interior mutability,
-/// wrapping it in `Arc` is sufficient for concurrent sharing without an
-/// external `RwLock`.
-pub type SharedChannelGraph = std::sync::Arc<ChannelGraph>;
-
 #[async_trait::async_trait]
 impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
-    async fn record_edge<N, P>(
-        &self,
-        telemetry: std::result::Result<hopr_api::graph::Telemetry<N, P>, hopr_api::graph::NetworkGraphError<P>>,
-    ) where
-        N: hopr_api::graph::MeasurableNeighbor + Send + Clone,
+    async fn record_edge<N, P>(&self, update: MeasurableEdge<N, P>)
+    where
+        N: hopr_api::graph::MeasurablePeer + Send + Clone,
         P: hopr_api::graph::MeasurablePath + Send + Clone,
     {
         use hopr_api::graph::traits::{EdgeObservable, EdgeWeightType};
 
-        match telemetry {
-            Ok(hopr_api::graph::Telemetry::Neighbor(ref telemetry)) => {
+        match update {
+            MeasurableEdge::Probe(Ok(hopr_api::graph::EdgeTransportTelemetry::Neighbor(ref telemetry))) => {
                 tracing::trace!(
                     peer = %telemetry.peer(),
                     latency_ms = telemetry.rtt().as_millis(),
                     "neighbor probe successful"
                 );
 
-                if let Ok(key) = OffchainPublicKey::from_peerid(telemetry.peer()) {
-                    self.update_edge(&self.me, &key, |obs| {
-                        obs.record(EdgeWeightType::Immediate(Ok(telemetry.rtt() / 2)));
-                    });
-                } else {
-                    tracing::warn!(
-                        peer = %telemetry.peer(),
-                        "failed to convert PeerId to OffchainPublicKey"
-                    );
-                }
+                self.update_edge(&self.me, telemetry.peer(), |obs| {
+                    obs.record(EdgeWeightType::Immediate(Ok(telemetry.rtt() / 2)));
+                });
             }
-            Ok(hopr_api::graph::Telemetry::Loopback(_)) => {
+            MeasurableEdge::Probe(Ok(hopr_api::graph::EdgeTransportTelemetry::Loopback(_))) => {
                 tracing::warn!(
                     reason = "feature not implemented",
                     "loopback path telemetry not supported"
                 );
             }
-            Err(hopr_api::graph::NetworkGraphError::ProbeNeighborTimeout(ref peer)) => {
+            MeasurableEdge::Probe(Err(hopr_api::graph::NetworkGraphError::ProbeNeighborTimeout(ref peer))) => {
                 tracing::trace!(
                     peer = %peer,
                     reason = "probe timeout",
                     "neighbor probe failed"
                 );
 
-                if let Ok(key) = OffchainPublicKey::from_peerid(peer) {
-                    self.update_edge(&self.me, &key, |obs| {
-                        obs.record(EdgeWeightType::Immediate(Err(())));
-                    });
-                }
+                self.update_edge(&self.me, peer, |obs| {
+                    obs.record(EdgeWeightType::Immediate(Err(())));
+                });
             }
-            Err(hopr_api::graph::NetworkGraphError::ProbeLoopbackTimeout(_)) => {
+            MeasurableEdge::Probe(Err(hopr_api::graph::NetworkGraphError::ProbeLoopbackTimeout(_))) => {
                 tracing::warn!(
                     reason = "feature not implemented",
                     "loopback path telemetry not supported"
                 );
             }
+            MeasurableEdge::Capacity(update) => {
+                self.update_edge(&update.src, &update.dest, |obs: &mut Observations| {
+                    obs.record(EdgeWeightType::Capacity(update.capacity));
+                });
+            }
+        }
+    }
+
+    async fn record_node<N>(&self, update: N)
+    where
+        N: MeasurableNode + Clone + Send + Sync + 'static,
+    {
+        hopr_api::graph::NetworkGraphWrite::add_node(self, update.id().clone());
+        if update.is_connected() {
+            self.inner.write().connected.insert(*update.id());
+        } else {
+            self.inner.write().connected.remove(update.id());
         }
     }
 }
@@ -432,11 +440,9 @@ impl hopr_api::graph::NetworkGraphTraverse for ChannelGraph {
 mod tests {
     use anyhow::Context;
     use hex_literal::hex;
-    use hopr_api::PeerId;
-    use hopr_api::graph::traits::EdgeObservable;
     use hopr_api::graph::{
-        EdgeTransportObservable, MeasurableNeighbor, MeasurablePath, NetworkGraphError, NetworkGraphUpdate,
-        NetworkGraphView, NetworkGraphWrite, Telemetry,
+        EdgeTransportObservable, EdgeTransportTelemetry, MeasurablePath, MeasurablePeer, NetworkGraphError,
+        NetworkGraphUpdate, NetworkGraphView, NetworkGraphWrite, traits::EdgeObservable,
     };
     use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
 
@@ -458,14 +464,15 @@ mod tests {
 
     #[derive(Debug, Clone)]
     struct TestNeighbor {
-        peer: PeerId,
+        peer: OffchainPublicKey,
         rtt: std::time::Duration,
     }
 
-    impl MeasurableNeighbor for TestNeighbor {
-        fn peer(&self) -> &PeerId {
+    impl MeasurablePeer for TestNeighbor {
+        fn peer(&self) -> &OffchainPublicKey {
             &self.peer
         }
+
         fn rtt(&self) -> std::time::Duration {
             self.rtt
         }
@@ -478,12 +485,15 @@ mod tests {
         fn id(&self) -> &[u8] {
             &[]
         }
-        fn seq_id(&self) -> u16 {
+
+        fn seq_id(&self) -> u128 {
             0
         }
+
         fn path(&self) -> &[u8] {
             &[]
         }
+
         fn timestamp(&self) -> u128 {
             0
         }
@@ -581,16 +591,17 @@ mod tests {
         let me = *me_kp.public();
         let peer_kp = OffchainKeypair::from_secret(&SECRET_1)?;
         let peer_key = *peer_kp.public();
-        let peer_id: PeerId = peer_kp.public().into();
 
         let graph = ChannelGraph::new(me);
         graph.add_node(peer_key);
         graph.add_edge(&me, &peer_key)?;
 
         let rtt = std::time::Duration::from_millis(100);
-        let telemetry: Result<Telemetry<TestNeighbor, TestPath>, NetworkGraphError<TestPath>> =
-            Ok(Telemetry::Neighbor(TestNeighbor { peer: peer_id, rtt }));
-        graph.record_edge(telemetry).await;
+        let telemetry: Result<EdgeTransportTelemetry<TestNeighbor, TestPath>, NetworkGraphError<TestPath>> =
+            Ok(EdgeTransportTelemetry::Neighbor(TestNeighbor { peer: peer_key, rtt }));
+        graph
+            .record_edge(hopr_api::graph::MeasurableEdge::Probe(telemetry))
+            .await;
 
         let obs = graph.edge(&me, &peer_key).context("edge observation should exist")?;
         let immediate = obs
@@ -606,15 +617,16 @@ mod tests {
         let me = *me_kp.public();
         let peer_kp = OffchainKeypair::from_secret(&SECRET_1)?;
         let peer_key = *peer_kp.public();
-        let peer_id: PeerId = peer_kp.public().into();
 
         let graph = ChannelGraph::new(me);
         graph.add_node(peer_key);
         graph.add_edge(&me, &peer_key)?;
 
-        let telemetry: Result<Telemetry<TestNeighbor, TestPath>, NetworkGraphError<TestPath>> =
-            Err(NetworkGraphError::ProbeNeighborTimeout(peer_id));
-        graph.record_edge(telemetry).await;
+        let telemetry: Result<EdgeTransportTelemetry<TestNeighbor, TestPath>, NetworkGraphError<TestPath>> =
+            Err(NetworkGraphError::ProbeNeighborTimeout(peer_key));
+        graph
+            .record_edge(hopr_api::graph::MeasurableEdge::Probe(telemetry))
+            .await;
 
         let obs = graph.edge(&me, &peer_key).context("edge observation should exist")?;
         let immediate = obs

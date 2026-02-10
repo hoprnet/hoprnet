@@ -12,25 +12,20 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = ["graph_immediate", "graph_full"]
-graph_immediate = []
-graph_full = ["dep:petgraph"]
+default = ["petgraph"]
+petgraph = ["dep:petgraph"]
 
 [dependencies]
 async-trait = { workspace = true }
-async-stream = { workspace = true }
 anyhow = { workspace = true }
-bimap = { workspace = true}
-dashmap = { workspace = true }
+bimap = { workspace = true }
 futures = { workspace = true }
 parking_lot = { workspace = true }
 petgraph = { workspace = true, optional = true }
-rand = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
 hopr-api = { workspace = true, features = ["ct", "graph", "network"] }
-hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-network-types = { workspace = true }

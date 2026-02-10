@@ -12,7 +12,7 @@ use hopr_chain_connector::{
 use hopr_crypto_types::prelude::*;
 use hopr_db_node::HoprNodeDb;
 use hopr_internal_types::prelude::WinningProbability;
-use hopr_network_graph::immediate::ImmediateNeighborChannelGraph;
+use hopr_network_graph::SharedChannelGraph;
 use hopr_network_types::prelude::{IpOrHost, RoutingOptions, SealedHost};
 use hopr_primitive_types::prelude::*;
 use hopr_transport::{HoprSession, SessionClientConfig, SessionTarget};
@@ -391,7 +391,9 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
                     // Create peer store, network builder, and graph
                     let peer_store = UninitializedPeerStore::default();
                     let network_builder = HoprLibp2pNetworkBuilder::new(peer_store.clone());
-                    let graph = ImmediateNeighborChannelGraph::new(peer_store, Duration::from_mins(2));
+                    let me_offchain = *offchain_keys[i].public();
+                    let graph: SharedChannelGraph =
+                        std::sync::Arc::new(hopr_network_graph::ChannelGraph::new(me_offchain));
 
                     let instance = create_hopr_instance(
                         (&onchain_keys[i], &offchain_keys[i]),

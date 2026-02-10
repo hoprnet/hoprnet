@@ -1,12 +1,22 @@
 use hopr_network_types::types::DestinationRouting;
 
-use super::{MeasurableNeighbor, MeasurablePath, NetworkGraphError, Telemetry};
+use super::{MeasurablePath, MeasurablePeer};
+use crate::graph::{MeasurableEdge, MeasurableNode};
 
 pub type EdgeTransportMeasurement = std::result::Result<std::time::Duration, ()>;
+
+pub type Capacity = u128;
+
+pub enum EdgeObservation {
+    Update(EdgeWeightType),
+    Remove,
+    Add(Capacity),
+}
 
 pub enum EdgeWeightType {
     Immediate(EdgeTransportMeasurement),
     Intermediate(EdgeTransportMeasurement),
+    Capacity(Option<Capacity>),
 }
 
 pub trait EdgeObservable {
@@ -59,10 +69,10 @@ pub enum NodeObservation<T> {
 }
 
 pub trait NodeObservable {
-    type Node: MeasurableNeighbor + Send;
+    type Node: MeasurablePeer + Send;
 
     /// Record a new observation for the given node.
-    fn record(&mut self, observation: NodeObservation<Self::Node>);
+    fn record_node(&mut self, observation: NodeObservation<Self::Node>);
 }
 
 // TODO: with final implementation the return objects should be back-linked
@@ -127,16 +137,21 @@ pub trait NetworkGraphWrite: NetworkGraphView {
 #[async_trait::async_trait]
 pub trait NetworkGraphUpdate {
     /// Update the observation for the telemetry.
-    async fn record_edge<N, P>(&self, telemetry: std::result::Result<Telemetry<N, P>, NetworkGraphError<P>>)
+    async fn record_edge<N, P>(&self, update: MeasurableEdge<N, P>)
     where
-        N: MeasurableNeighbor + Clone + Send + Sync + 'static,
+        N: MeasurablePeer + Clone + Send + Sync + 'static,
         P: MeasurablePath + Clone + Send + Sync + 'static;
+
+    /// Update the observation for the telemetry.
+    async fn record_node<N>(&self, update: N)
+    where
+        N: MeasurableNode + Clone + Send + Sync + 'static;
 }
 
 /// A trait specifying the graph traversal functionality
 #[async_trait::async_trait]
 pub trait NetworkGraphTraverse {
-    type NodeId: Send;
+    type NodeId: Send + Sync;
 
     /// Returns a list of all routes to the given destination of the specified length.
     ///
@@ -148,4 +163,94 @@ pub trait NetworkGraphTraverse {
     /// that start and end at the same node, while also belonging to the same path discovery
     /// batch.
     async fn loopback_routes(&self) -> Vec<Vec<DestinationRouting>>;
+}
+
+// --- Blanket `Arc<T>` implementations ---
+//
+// These allow any graph implementation wrapped in `Arc` to satisfy the trait
+// bounds required by `Hopr` and `HoprTransport` (which need `Clone + Send + Sync`).
+
+#[async_trait::async_trait]
+impl<T> NetworkGraphView for std::sync::Arc<T>
+where
+    T: NetworkGraphView + Send + Sync,
+{
+    type NodeId = T::NodeId;
+    type Observed = T::Observed;
+
+    fn node_count(&self) -> usize {
+        (**self).node_count()
+    }
+
+    fn contains_node(&self, key: &Self::NodeId) -> bool {
+        (**self).contains_node(key)
+    }
+
+    fn nodes(&self) -> futures::stream::BoxStream<'static, Self::NodeId> {
+        (**self).nodes()
+    }
+
+    fn has_edge(&self, src: &Self::NodeId, dest: &Self::NodeId) -> bool {
+        (**self).has_edge(src, dest)
+    }
+
+    fn edge(&self, src: &Self::NodeId, dest: &Self::NodeId) -> Option<Self::Observed> {
+        (**self).edge(src, dest)
+    }
+}
+
+impl<T> NetworkGraphWrite for std::sync::Arc<T>
+where
+    T: NetworkGraphWrite + Send + Sync,
+{
+    type Error = T::Error;
+
+    fn add_node(&self, key: Self::NodeId) {
+        (**self).add_node(key)
+    }
+
+    fn remove_node(&self, key: &Self::NodeId) {
+        (**self).remove_node(key)
+    }
+
+    fn add_edge(&self, src: &Self::NodeId, dest: &Self::NodeId) -> Result<(), Self::Error> {
+        (**self).add_edge(src, dest)
+    }
+}
+
+#[async_trait::async_trait]
+impl<T> NetworkGraphUpdate for std::sync::Arc<T>
+where
+    T: NetworkGraphUpdate + Send + Sync,
+{
+    async fn record_edge<N, P>(&self, update: MeasurableEdge<N, P>)
+    where
+        N: MeasurablePeer + Clone + Send + Sync + 'static,
+        P: MeasurablePath + Clone + Send + Sync + 'static,
+    {
+        (**self).record_edge(update).await
+    }
+
+    async fn record_node<N>(&self, update: N)
+    where
+        N: MeasurableNode + Clone + Send + Sync + 'static,
+    {
+        (**self).record_node(update).await
+    }
+}
+
+#[async_trait::async_trait]
+impl<T> NetworkGraphTraverse for std::sync::Arc<T>
+where
+    T: NetworkGraphTraverse + Send + Sync,
+{
+    type NodeId = T::NodeId;
+
+    async fn routes(&self, destination: &Self::NodeId, length: usize) -> Vec<DestinationRouting> {
+        (**self).routes(destination, length).await
+    }
+
+    async fn loopback_routes(&self) -> Vec<Vec<DestinationRouting>> {
+        (**self).loopback_routes().await
+    }
 }

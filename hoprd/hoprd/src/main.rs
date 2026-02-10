@@ -12,8 +12,8 @@ use hopr_lib::{
     api::{chain::ChainEvents, node::HoprNodeChainOperations},
     config::HoprLibConfig,
 };
-use hopr_network_graph::immediate::ImmediateNeighborChannelGraph;
-use hopr_transport_p2p::{HoprNetwork, UninitializedPeerStore};
+use hopr_network_graph::SharedChannelGraph;
+use hopr_transport_p2p::HoprNetwork;
 use hoprd::{cli::CliArgs, config::HoprdConfig, errors::HoprdError, exit::HoprServerIpForwardingReactor};
 use hoprd_api::{RestApiParameters, serve_api};
 use signal_hook::low_level;
@@ -45,12 +45,7 @@ mod jemalloc_stats;
 const DEFAULT_BLOKLI_URL: &str = "https://blokli.dufour.hoprnet.link";
 
 type HoprBlokliConnector = HoprBlockchainSafeConnector<BlokliClient>;
-type HoprNode = hopr_lib::Hopr<
-    Arc<HoprBlokliConnector>,
-    HoprNodeDb,
-    ImmediateNeighborChannelGraph<UninitializedPeerStore>,
-    HoprNetwork,
->;
+type HoprNode = hopr_lib::Hopr<Arc<HoprBlokliConnector>, HoprNodeDb, SharedChannelGraph, HoprNetwork>;
 
 fn init_logger() -> anyhow::Result<()> {
     let env_filter = match tracing_subscriber::EnvFilter::try_from_default_env() {
@@ -340,10 +335,8 @@ async fn main_inner() -> anyhow::Result<()> {
     let network_builder = hopr_transport_p2p::HoprLibp2pNetworkBuilder::new(peer_store.clone());
     // create graph
     // TODO: subscribe to existing state + state sync from connector
-    let graph = hopr_network_graph::immediate::ImmediateNeighborChannelGraph::new(
-        peer_store,
-        std::time::Duration::from_mins(2),
-    );
+    let me_offchain = *hopr_lib::Keypair::public(&hopr_keys.packet_key);
+    let graph = std::sync::Arc::new(hopr_network_graph::ChannelGraph::new(me_offchain));
     // create the node
     let node = Arc::new(
         hopr_lib::Hopr::new(
