@@ -85,6 +85,14 @@ where
     type NodeId = PeerId;
     type Observed = Observations;
 
+    fn node_count(&self) -> usize {
+        self.network.discovered_peers().len()
+    }
+
+    fn contains_node(&self, key: &PeerId) -> bool {
+        self.network.discovered_peers().contains(key)
+    }
+
     fn nodes(&self) -> futures::stream::BoxStream<'static, Self::NodeId> {
         let fetcher = self.network.clone();
         let _recheck_threshold = self.recheck_threshold; // TODO: currently being ignored

@@ -53,78 +53,6 @@ impl ChannelGraph {
         &self.me
     }
 
-    /// Returns the number of nodes in the graph.
-    pub fn node_count(&self) -> usize {
-        self.inner.read().graph.node_count()
-    }
-
-    /// Checks whether the graph contains the given node.
-    pub fn contains_node(&self, key: &OffchainPublicKey) -> bool {
-        self.inner.read().indices.contains_left(key)
-    }
-
-    /// Adds a node to the graph if it does not already exist.
-    pub fn add_node(&self, key: OffchainPublicKey) {
-        let mut inner = self.inner.write();
-        if !inner.indices.contains_left(&key) {
-            let idx = inner.graph.add_node(key);
-            inner.indices.insert(key, idx);
-        }
-    }
-
-    /// Removes a node and all its associated edges from the graph.
-    pub fn remove_node(&self, key: &OffchainPublicKey) {
-        let mut inner = self.inner.write();
-        if let Some((_, idx)) = inner.indices.remove_by_left(key) {
-            inner.graph.remove_node(idx);
-
-            // petgraph swaps the last node into the removed slot,
-            // so we need to update the index mapping for the swapped node.
-            if let Some(swapped_key) = inner.graph.node_weight(idx) {
-                let swapped_key = *swapped_key;
-                inner.indices.insert(swapped_key, idx);
-            }
-        }
-    }
-
-    /// Adds a directed edge between two existing nodes with default observations.
-    ///
-    /// Returns an error if either node is not present in the graph.
-    pub fn add_edge(&self, src: &OffchainPublicKey, dest: &OffchainPublicKey) -> Result<(), ChannelGraphError> {
-        let mut inner = self.inner.write();
-        let src_idx = inner
-            .indices
-            .get_by_left(src)
-            .copied()
-            .ok_or(ChannelGraphError::PublicKeyNodeNotFound(*src))?;
-        let dest_idx = inner
-            .indices
-            .get_by_left(dest)
-            .copied()
-            .ok_or(ChannelGraphError::PublicKeyNodeNotFound(*dest))?;
-
-        inner.graph.add_edge(src_idx, dest_idx, Observations::default());
-        Ok(())
-    }
-
-    /// Checks whether a directed edge exists between two nodes.
-    pub fn has_edge(&self, src: &OffchainPublicKey, dest: &OffchainPublicKey) -> bool {
-        let inner = self.inner.read();
-        let (Some(src_idx), Some(dest_idx)) = (inner.indices.get_by_left(src), inner.indices.get_by_left(dest)) else {
-            return false;
-        };
-        inner.graph.contains_edge(*src_idx, *dest_idx)
-    }
-
-    /// Returns a copy of the edge observations between two nodes, if the edge exists.
-    pub fn get_edge(&self, src: &OffchainPublicKey, dest: &OffchainPublicKey) -> Option<Observations> {
-        let inner = self.inner.read();
-        let src_idx = inner.indices.get_by_left(src)?;
-        let dest_idx = inner.indices.get_by_left(dest)?;
-        let edge_idx = inner.graph.find_edge(*src_idx, *dest_idx)?;
-        inner.graph.edge_weight(edge_idx).copied()
-    }
-
     /// Mutably updates the edge observations between two nodes.
     ///
     /// If the edge exists, applies the given function to its observations.
@@ -369,6 +297,14 @@ impl hopr_api::graph::NetworkGraphView for ChannelGraph {
     type NodeId = OffchainPublicKey;
     type Observed = Observations;
 
+    fn node_count(&self) -> usize {
+        self.inner.read().graph.node_count()
+    }
+
+    fn contains_node(&self, key: &OffchainPublicKey) -> bool {
+        self.inner.read().indices.contains_left(key)
+    }
+
     fn nodes(&self) -> futures::stream::BoxStream<'static, Self::NodeId> {
         let keys: Vec<OffchainPublicKey> = {
             let inner = self.inner.read();
@@ -378,8 +314,63 @@ impl hopr_api::graph::NetworkGraphView for ChannelGraph {
         Box::pin(futures::stream::iter(keys))
     }
 
+    fn has_edge(&self, src: &OffchainPublicKey, dest: &OffchainPublicKey) -> bool {
+        let inner = self.inner.read();
+        let (Some(src_idx), Some(dest_idx)) = (inner.indices.get_by_left(src), inner.indices.get_by_left(dest)) else {
+            return false;
+        };
+        inner.graph.contains_edge(*src_idx, *dest_idx)
+    }
+
     fn edge(&self, src: &Self::NodeId, dest: &Self::NodeId) -> Option<Self::Observed> {
-        self.get_edge(src, dest)
+        let inner = self.inner.read();
+        let src_idx = inner.indices.get_by_left(src)?;
+        let dest_idx = inner.indices.get_by_left(dest)?;
+        let edge_idx = inner.graph.find_edge(*src_idx, *dest_idx)?;
+        inner.graph.edge_weight(edge_idx).copied()
+    }
+}
+
+impl hopr_api::graph::NetworkGraphWrite for ChannelGraph {
+    type Error = ChannelGraphError;
+
+    fn add_node(&self, key: OffchainPublicKey) {
+        let mut inner = self.inner.write();
+        if !inner.indices.contains_left(&key) {
+            let idx = inner.graph.add_node(key);
+            inner.indices.insert(key, idx);
+        }
+    }
+
+    fn remove_node(&self, key: &OffchainPublicKey) {
+        let mut inner = self.inner.write();
+        if let Some((_, idx)) = inner.indices.remove_by_left(key) {
+            inner.graph.remove_node(idx);
+
+            // petgraph swaps the last node into the removed slot,
+            // so we need to update the index mapping for the swapped node.
+            if let Some(swapped_key) = inner.graph.node_weight(idx) {
+                let swapped_key = *swapped_key;
+                inner.indices.insert(swapped_key, idx);
+            }
+        }
+    }
+
+    fn add_edge(&self, src: &OffchainPublicKey, dest: &OffchainPublicKey) -> Result<(), ChannelGraphError> {
+        let mut inner = self.inner.write();
+        let src_idx = inner
+            .indices
+            .get_by_left(src)
+            .copied()
+            .ok_or(ChannelGraphError::PublicKeyNodeNotFound(*src))?;
+        let dest_idx = inner
+            .indices
+            .get_by_left(dest)
+            .copied()
+            .ok_or(ChannelGraphError::PublicKeyNodeNotFound(*dest))?;
+
+        inner.graph.add_edge(src_idx, dest_idx, Observations::default());
+        Ok(())
     }
 }
 
@@ -445,7 +436,7 @@ mod tests {
     use hopr_api::graph::traits::EdgeObservable;
     use hopr_api::graph::{
         EdgeTransportObservable, MeasurableNeighbor, MeasurablePath, NetworkGraphError, NetworkGraphUpdate,
-        NetworkGraphView, Telemetry,
+        NetworkGraphView, NetworkGraphWrite, Telemetry,
     };
     use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
 
@@ -601,9 +592,7 @@ mod tests {
             Ok(Telemetry::Neighbor(TestNeighbor { peer: peer_id, rtt }));
         graph.record_edge(telemetry).await;
 
-        let obs = graph
-            .get_edge(&me, &peer_key)
-            .context("edge observation should exist")?;
+        let obs = graph.edge(&me, &peer_key).context("edge observation should exist")?;
         let immediate = obs
             .immediate_qos()
             .context("immediate QoS should be present after probe")?;
@@ -627,9 +616,7 @@ mod tests {
             Err(NetworkGraphError::ProbeNeighborTimeout(peer_id));
         graph.record_edge(telemetry).await;
 
-        let obs = graph
-            .get_edge(&me, &peer_key)
-            .context("edge observation should exist")?;
+        let obs = graph.edge(&me, &peer_key).context("edge observation should exist")?;
         let immediate = obs
             .immediate_qos()
             .context("immediate QoS should be present after failed probe")?;

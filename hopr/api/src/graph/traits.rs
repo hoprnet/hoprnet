@@ -73,19 +73,54 @@ pub trait NodeObservable {
 // instead of Vecs, i.e. it should return a generator that could be efficiently
 // and fast polled.
 
-/// A trait specifying the graph traversal functionality
+/// A trait specifying read-only graph view functionality.
+///
+/// Provides methods to inspect the graph topology: node membership, node count,
+/// edge existence, and edge observation retrieval.
 #[async_trait::async_trait]
 pub trait NetworkGraphView {
     /// The concrete type of observations for peers.
     type Observed: EdgeObservable + Send;
     type NodeId: Send;
 
+    /// Returns the number of nodes in the graph.
+    fn node_count(&self) -> usize;
+
+    /// Checks whether the graph contains the given node.
+    fn contains_node(&self, key: &Self::NodeId) -> bool;
+
     /// Returns a stream of all known nodes in the network graph.
     fn nodes(&self) -> futures::stream::BoxStream<'static, Self::NodeId>;
+
+    /// Checks whether a directed edge exists between two nodes.
+    ///
+    /// The default implementation delegates to [`edge`](Self::edge).
+    fn has_edge(&self, src: &Self::NodeId, dest: &Self::NodeId) -> bool {
+        self.edge(src, dest).is_some()
+    }
 
     /// Returns the weight represented by the observations for the edge between the
     /// given source and destination, if available.
     fn edge(&self, src: &Self::NodeId, dest: &Self::NodeId) -> Option<Self::Observed>;
+}
+
+/// A trait for mutating the graph topology.
+///
+/// Provides methods to add/remove nodes and add edges.
+pub trait NetworkGraphWrite: NetworkGraphView {
+    /// The error type returned by fallible write operations.
+    type Error;
+
+    /// Adds a node to the graph if it does not already exist.
+    fn add_node(&self, key: Self::NodeId);
+
+    /// Removes a node and all its associated edges from the graph.
+    fn remove_node(&self, key: &Self::NodeId);
+
+    /// Adds a directed edge between two existing nodes with default observations.
+    ///
+    /// Returns an error if either node is not present in the graph.
+    fn add_edge(&self, src: &Self::NodeId, dest: &Self::NodeId) -> Result<(), Self::Error>;
 }
 
 /// A trait specifying the graph update functionality

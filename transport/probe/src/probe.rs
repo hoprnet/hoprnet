@@ -396,6 +396,14 @@ mod tests {
         type NodeId = PeerId;
         type Observed = TestEdgeObservations;
 
+        fn node_count(&self) -> usize {
+            self.get_peers.read().unwrap().front().map_or(0, |v| v.len())
+        }
+
+        fn contains_node(&self, _key: &PeerId) -> bool {
+            false
+        }
+
         /// Returns a stream of all known nodes in the network graph.
         fn nodes(&self) -> futures::stream::BoxStream<'static, PeerId> {
             let mut get_peers = self.get_peers.write().unwrap();
