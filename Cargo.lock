@@ -4386,7 +4386,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.14.0"
+version = "0.14.1"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4813,7 +4813,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-parallelize"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "futures",
  "hopr-metrics",
@@ -4924,7 +4924,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-session"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "anyhow",
  "aquamarine",
