@@ -143,16 +143,16 @@
           };
           localclusterBuildArgs = {
             inherit src depsSrc rev;
-            cargoExtraArgs = "-p hopr-localcluster";
+            cargoExtraArgs = "-p hoprd-localcluster";
             cargoToml = ./sdk/rust/localcluster/Cargo.toml;
           };
 
           hoprd = rust-builder-local.callPackage nixLib.mkRustPackage hoprdBuildArgs;
-          hopr-localcluster = rust-builder-local.callPackage nixLib.mkRustPackage localclusterBuildArgs;
+          hoprd-localcluster = rust-builder-local.callPackage nixLib.mkRustPackage localclusterBuildArgs;
           # also used for Docker image
           hoprd-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage hoprdBuildArgs;
           # also used for Docker image
-          hopr-localcluster-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage localclusterBuildArgs;
+          hoprd-localcluster-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage localclusterBuildArgs;
           # also used for Docker image
           hoprd-x86_64-linux-profile = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage (
             hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
@@ -352,14 +352,14 @@
             Cmd = [ "hoprd" ];
             env = [ "TMPDIR=/app/.tmp" ];
           };
-          hopr-localcluster-docker = nixLib.mkDockerImage {
-            name = "hopr-localcluster";
+          hoprd-localcluster-docker = nixLib.mkDockerImage {
+            name = "hoprd-localcluster";
             extraContents = [
-              hopr-localcluster-x86_64-linux
+              hoprd-localcluster-x86_64-linux
               pkgs.cacert
               pkgs.curl
             ];
-            Entrypoint = [ "/bin/hopr-localcluster" ];
+            Entrypoint = [ "/bin/hoprd-localcluster" ];
             Cmd = [ ];
             env = [ "TMPDIR=/app/.tmp" ];
           };
@@ -404,8 +404,8 @@
           hoprd-profile-docker-build-and-upload = flake-utils.lib.mkApp {
             drv = dockerImageUploadScript hoprd-profile-docker;
           };
-          hopr-localcluster-docker-build-and-upload = flake-utils.lib.mkApp {
-            drv = dockerImageUploadScript hopr-localcluster-docker;
+          hoprd-localcluster-docker-build-and-upload = flake-utils.lib.mkApp {
+            drv = dockerImageUploadScript hoprd-localcluster-docker;
           };
           docs = rust-builder-local-nightly.callPackage nixLib.mkRustPackage (
             hoprdBuildArgs // { buildDocs = true; }
@@ -677,7 +677,7 @@
             inherit hoprd-docker-build-and-upload;
             inherit hoprd-dev-docker-build-and-upload;
             inherit hoprd-profile-docker-build-and-upload;
-            inherit hopr-localcluster-docker-build-and-upload;
+            inherit hoprd-localcluster-docker-build-and-upload;
             inherit update-github-labels find-port-ci;
             check = run-check;
             audit = run-audit;
@@ -690,8 +690,8 @@
               hoprd-docker
               hoprd-dev-docker
               hoprd-profile-docker
-              hopr-localcluster
-              hopr-localcluster-docker
+              hoprd-localcluster
+              hoprd-localcluster-docker
               ;
             inherit hopr-test-unit hopr-test-nightly;
             inherit docs;

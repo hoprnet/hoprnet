@@ -10,7 +10,7 @@ use hopr_lib::{Address, Health, Multiaddr, api::network::Observable};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
-use crate::{ApiError, ApiErrorStatus, BASE_PATH, BlokliClientLike, InternalState, checksum_address_serializer};
+use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState, checksum_address_serializer};
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
@@ -64,9 +64,7 @@ pub(super) async fn version() -> impl IntoResponse {
     ),
     tag = "Configuration"
     )]
-pub(super) async fn configuration<C: BlokliClientLike>(
-    State(state): State<Arc<InternalState<C>>>,
-) -> impl IntoResponse {
+pub(super) async fn configuration(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
     (StatusCode::OK, Json(state.hoprd_cfg.clone())).into_response()
 }
 
@@ -210,9 +208,9 @@ pub(crate) struct NodePeersResponse {
         ),
         tag = "Node"
     )]
-pub(super) async fn peers<C: BlokliClientLike>(
+pub(super) async fn peers(
     Query(NodePeersQueryRequest { score }): Query<NodePeersQueryRequest>,
-    State(state): State<Arc<InternalState<C>>>,
+    State(state): State<Arc<InternalState>>,
 ) -> Result<impl IntoResponse, ApiError> {
     if !(0.0f64..=1.0f64).contains(&score) {
         return Ok((StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidQuality).into_response());
@@ -338,9 +336,7 @@ pub(crate) struct NodeInfoResponse {
         ),
         tag = "Node"
     )]
-pub(super) async fn info<C: BlokliClientLike>(
-    State(state): State<Arc<InternalState<C>>>,
-) -> Result<impl IntoResponse, ApiError> {
+pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl IntoResponse, ApiError> {
     let hopr = state.hopr.clone();
 
     let safe_config = hopr.get_safe_config();
@@ -406,9 +402,7 @@ pub(crate) struct EntryNode {
         ),
         tag = "Node"
     )]
-pub(super) async fn entry_nodes<C: BlokliClientLike>(
-    State(state): State<Arc<InternalState<C>>>,
-) -> Result<impl IntoResponse, ApiError> {
+pub(super) async fn entry_nodes(State(state): State<Arc<InternalState>>) -> Result<impl IntoResponse, ApiError> {
     let hopr = state.hopr.clone();
 
     match hopr.get_public_nodes().await {

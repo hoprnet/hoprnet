@@ -13,7 +13,7 @@ use hopr_lib::{
 use serde::Deserialize;
 use serde_with::{DisplayFromStr, serde_as};
 
-use crate::{ApiError, ApiErrorStatus, BASE_PATH, BlokliClientLike, InternalState};
+use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState};
 
 #[serde_as]
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -84,9 +84,9 @@ pub(crate) struct ChannelIdParams {
         ),
         tag = "Channels"
     )]
-pub(super) async fn show_channel_tickets<C: BlokliClientLike>(
+pub(super) async fn show_channel_tickets(
     Path(ChannelIdParams { channel_id }): Path<ChannelIdParams>,
-    State(state): State<Arc<InternalState<C>>>,
+    State(state): State<Arc<InternalState>>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
@@ -190,9 +190,7 @@ impl From<ChannelTicketStatistics> for NodeTicketStatisticsResponse {
         ),
         tag = "Tickets"
     )]
-pub(super) async fn show_ticket_statistics<C: BlokliClientLike>(
-    State(state): State<Arc<InternalState<C>>>,
-) -> impl IntoResponse {
+pub(super) async fn show_ticket_statistics(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
     let hopr = state.hopr.clone();
     match hopr.ticket_statistics().await.map(NodeTicketStatisticsResponse::from) {
         Ok(stats) => (StatusCode::OK, Json(stats)).into_response(),
@@ -216,9 +214,7 @@ pub(super) async fn show_ticket_statistics<C: BlokliClientLike>(
         ),
         tag = "Tickets"
     )]
-pub(super) async fn reset_ticket_statistics<C: BlokliClientLike>(
-    State(state): State<Arc<InternalState<C>>>,
-) -> impl IntoResponse {
+pub(super) async fn reset_ticket_statistics(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
     let hopr = state.hopr.clone();
     match hopr.reset_ticket_statistics().await {
         Ok(()) => (StatusCode::NO_CONTENT, "").into_response(),
@@ -246,9 +242,7 @@ pub(super) async fn reset_ticket_statistics<C: BlokliClientLike>(
         ),
         tag = "Tickets"
     )]
-pub(super) async fn redeem_all_tickets<C: BlokliClientLike>(
-    State(state): State<Arc<InternalState<C>>>,
-) -> impl IntoResponse {
+pub(super) async fn redeem_all_tickets(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
     let hopr = state.hopr.clone();
     match hopr.redeem_all_tickets(0).await {
         Ok(()) => (StatusCode::NO_CONTENT, "").into_response(),
@@ -284,9 +278,9 @@ pub(super) async fn redeem_all_tickets<C: BlokliClientLike>(
         ),
         tag = "Channels"
     )]
-pub(super) async fn redeem_tickets_in_channel<C: BlokliClientLike>(
+pub(super) async fn redeem_tickets_in_channel(
     Path(ChannelIdParams { channel_id }): Path<ChannelIdParams>,
-    State(state): State<Arc<InternalState<C>>>,
+    State(state): State<Arc<InternalState>>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 

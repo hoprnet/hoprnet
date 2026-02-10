@@ -27,10 +27,7 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{delete, get, post},
 };
-use hopr_chain_connector::{
-    HoprBlockchainSafeConnector,
-    blokli_client::{BlokliQueryClient, BlokliSubscriptionClient, BlokliTransactionClient},
-};
+use hopr_chain_connector::HoprBlockchainSafeConnector;
 use hopr_db_node::HoprNodeDb;
 use hopr_lib::{Address, Hopr, errors::HoprLibError};
 use hopr_utils_session::ListenerJoinHandles;
@@ -56,50 +53,22 @@ use crate::config::Auth;
 
 pub(crate) const BASE_PATH: &str = const_format::formatcp!("/api/v{}", env!("CARGO_PKG_VERSION_MAJOR"));
 
-pub trait BlokliClientLike:
-    BlokliSubscriptionClient + BlokliQueryClient + BlokliTransactionClient + Send + Sync + 'static
-{
-}
+type HoprBlokliConnector = HoprBlockchainSafeConnector<hopr_chain_connector::blokli_client::BlokliClient>;
 
-impl<T> BlokliClientLike for T where
-    T: BlokliSubscriptionClient + BlokliQueryClient + BlokliTransactionClient + Send + Sync + 'static
-{
-}
-
-pub(crate) type HoprNode<C> = Hopr<Arc<HoprBlockchainSafeConnector<C>>, HoprNodeDb>;
-
-pub(crate) struct AppState<C: BlokliClientLike> {
-    pub hopr: Arc<HoprNode<C>>, // checks
+#[derive(Clone)]
+pub(crate) struct AppState {
+    pub hopr: Arc<Hopr<Arc<HoprBlokliConnector>, HoprNodeDb>>, // checks
 }
 
 pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
 
-pub(crate) struct InternalState<C: BlokliClientLike> {
+#[derive(Clone)]
+pub(crate) struct InternalState {
     pub hoprd_cfg: serde_json::Value,
     pub auth: Arc<Auth>,
-    pub hopr: Arc<HoprNode<C>>,
+    pub hopr: Arc<Hopr<Arc<HoprBlokliConnector>, HoprNodeDb>>,
     pub open_listeners: Arc<ListenerJoinHandles>,
     pub default_listen_host: std::net::SocketAddr,
-}
-
-impl<C: BlokliClientLike> Clone for AppState<C> {
-    fn clone(&self) -> Self {
-        Self {
-            hopr: self.hopr.clone(),
-        }
-    }
-}
-
-impl<C: BlokliClientLike> Clone for InternalState<C> {
-    fn clone(&self) -> Self {
-        Self {
-            hoprd_cfg: self.hoprd_cfg.clone(),
-            auth: self.auth.clone(),
-            hopr: self.hopr.clone(),
-            open_listeners: self.open_listeners.clone(),
-            default_listen_host: self.default_listen_host,
-        }
-    }
 }
 
 #[derive(OpenApi)]
@@ -200,17 +169,17 @@ impl Modify for SecurityAddon {
 }
 
 /// Parameters needed to construct the Rest API via [`serve_api`].
-pub struct RestApiParameters<C: BlokliClientLike> {
+pub struct RestApiParameters {
     pub listener: TcpListener,
     pub hoprd_cfg: serde_json::Value,
     pub cfg: crate::config::Api,
-    pub hopr: Arc<HoprNode<C>>,
+    pub hopr: Arc<Hopr<Arc<HoprBlokliConnector>, HoprNodeDb>>,
     pub session_listener_sockets: Arc<ListenerJoinHandles>,
     pub default_session_listen_host: std::net::SocketAddr,
 }
 
 /// Starts the Rest API listener and router.
-pub async fn serve_api<C: BlokliClientLike>(params: RestApiParameters<C>) -> Result<(), std::io::Error> {
+pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> {
     let RestApiParameters {
         listener,
         hoprd_cfg,
@@ -232,10 +201,10 @@ pub async fn serve_api<C: BlokliClientLike>(params: RestApiParameters<C>) -> Res
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn build_api<C: BlokliClientLike>(
+async fn build_api(
     hoprd_cfg: serde_json::Value,
     cfg: crate::config::Api,
-    hopr: Arc<HoprNode<C>>,
+    hopr: Arc<Hopr<Arc<HoprBlokliConnector>, HoprNodeDb>>,
     open_listeners: Arc<ListenerJoinHandles>,
     default_listen_host: std::net::SocketAddr,
 ) -> Router {
@@ -256,10 +225,10 @@ async fn build_api<C: BlokliClientLike>(
         )
         .merge(
             Router::new()
-                .route("/startedz", get(checks::startedz::<C>))
-                .route("/readyz", get(checks::readyz::<C>))
-                .route("/healthyz", get(checks::healthyz::<C>))
-                .route("/eligiblez", get(checks::eligiblez::<C>))
+                .route("/startedz", get(checks::startedz))
+                .route("/readyz", get(checks::readyz))
+                .route("/healthyz", get(checks::healthyz))
+                .route("/eligiblez", get(checks::eligiblez))
                 .layer(
                     ServiceBuilder::new().layer(
                         CorsLayer::new()
@@ -276,7 +245,7 @@ async fn build_api<C: BlokliClientLike>(
                 .route("/metrics", get(root::metrics))
                 .layer(axum::middleware::from_fn_with_state(
                     inner_state.clone(),
-                    middleware::preconditions::authenticate::<C>,
+                    middleware::preconditions::authenticate,
                 ))
                 .layer(
                     ServiceBuilder::new()
@@ -297,41 +266,41 @@ async fn build_api<C: BlokliClientLike>(
         .nest(
             BASE_PATH,
             Router::new()
-                .route("/account/addresses", get(account::addresses::<C>))
-                .route("/account/balances", get(account::balances::<C>))
-                .route("/account/withdraw", post(account::withdraw::<C>))
-                .route("/peers/{destination}", get(peers::show_peer_info::<C>))
-                .route("/channels", get(channels::list_channels::<C>))
-                .route("/channels", post(channels::open_channel::<C>))
-                .route("/channels/{channelId}", get(channels::show_channel::<C>))
-                .route("/channels/{channelId}/tickets", get(tickets::show_channel_tickets::<C>))
-                .route("/channels/{channelId}", delete(channels::close_channel::<C>))
-                .route("/channels/{channelId}/fund", post(channels::fund_channel::<C>))
+                .route("/account/addresses", get(account::addresses))
+                .route("/account/balances", get(account::balances))
+                .route("/account/withdraw", post(account::withdraw))
+                .route("/peers/{destination}", get(peers::show_peer_info))
+                .route("/channels", get(channels::list_channels))
+                .route("/channels", post(channels::open_channel))
+                .route("/channels/{channelId}", get(channels::show_channel))
+                .route("/channels/{channelId}/tickets", get(tickets::show_channel_tickets))
+                .route("/channels/{channelId}", delete(channels::close_channel))
+                .route("/channels/{channelId}/fund", post(channels::fund_channel))
                 .route(
                     "/channels/{channelId}/tickets/redeem",
-                    post(tickets::redeem_tickets_in_channel::<C>),
+                    post(tickets::redeem_tickets_in_channel),
                 )
                 .route("/tickets", get(tickets::show_all_tickets))
-                .route("/tickets/redeem", post(tickets::redeem_all_tickets::<C>))
-                .route("/tickets/statistics", get(tickets::show_ticket_statistics::<C>))
-                .route("/tickets/statistics", delete(tickets::reset_ticket_statistics::<C>))
-                .route("/network/price", get(network::price::<C>))
-                .route("/network/probability", get(network::probability::<C>))
+                .route("/tickets/redeem", post(tickets::redeem_all_tickets))
+                .route("/tickets/statistics", get(tickets::show_ticket_statistics))
+                .route("/tickets/statistics", delete(tickets::reset_ticket_statistics))
+                .route("/network/price", get(network::price))
+                .route("/network/probability", get(network::probability))
                 .route("/node/version", get(node::version))
-                .route("/node/configuration", get(node::configuration::<C>))
-                .route("/node/info", get(node::info::<C>))
-                .route("/node/peers", get(node::peers::<C>))
-                .route("/node/entry-nodes", get(node::entry_nodes::<C>))
-                .route("/peers/{destination}/ping", post(peers::ping_peer::<C>))
-                .route("/session/config/{id}", get(session::session_config::<C>))
-                .route("/session/config/{id}", post(session::adjust_session::<C>))
-                .route("/session/{protocol}", post(session::create_client::<C>))
-                .route("/session/{protocol}", get(session::list_clients::<C>))
-                .route("/session/{protocol}/{ip}/{port}", delete(session::close_client::<C>))
+                .route("/node/configuration", get(node::configuration))
+                .route("/node/info", get(node::info))
+                .route("/node/peers", get(node::peers))
+                .route("/node/entry-nodes", get(node::entry_nodes))
+                .route("/peers/{destination}/ping", post(peers::ping_peer))
+                .route("/session/config/{id}", get(session::session_config))
+                .route("/session/config/{id}", post(session::adjust_session))
+                .route("/session/{protocol}", post(session::create_client))
+                .route("/session/{protocol}", get(session::list_clients))
+                .route("/session/{protocol}/{ip}/{port}", delete(session::close_client))
                 .with_state(inner_state.clone().into())
                 .layer(axum::middleware::from_fn_with_state(
                     inner_state.clone(),
-                    middleware::preconditions::authenticate::<C>,
+                    middleware::preconditions::authenticate,
                 ))
                 .layer(
                     ServiceBuilder::new()

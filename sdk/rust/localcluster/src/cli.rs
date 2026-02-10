@@ -2,7 +2,7 @@ use clap::Parser;
 
 #[derive(Parser, Debug)]
 #[command(
-    name = "hopr-localcluster",
+    name = "hoprd-localcluster",
     about = "Run a local HOPR cluster using external processes"
 )]
 pub struct Args {
@@ -35,7 +35,7 @@ pub struct Args {
     pub p2p_port_base: u16,
 
     /// Base directory for generated configs, identities, DBs, and logs
-    #[arg(long, default_value = "/tmp/hopr-localcluster")]
+    #[arg(long, default_value = "/tmp/hoprd-localcluster")]
     pub data_dir: String,
 
     /// Docker image containing both Anvil and Blokli

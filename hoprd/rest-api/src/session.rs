@@ -15,7 +15,7 @@ use hopr_utils_session::{ListenerId, build_binding_host, create_tcp_client_bindi
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
-use crate::{ApiError, ApiErrorStatus, BASE_PATH, BlokliClientLike, InternalState};
+use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState};
 
 /// Size of the buffer for forwarding data to/from a TCP stream.
 pub const HOPR_TCP_BUFFER_SIZE: usize = 4096;
@@ -394,8 +394,8 @@ pub(crate) struct SessionClientResponse {
         ),
         tag = "Session"
     )]
-pub(crate) async fn create_client<C: BlokliClientLike>(
-    State(state): State<Arc<InternalState<C>>>,
+pub(crate) async fn create_client(
+    State(state): State<Arc<InternalState>>,
     Path(protocol): Path<IpProtocol>,
     Json(args): Json<SessionClientRequest>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
@@ -533,8 +533,8 @@ pub(crate) async fn create_client<C: BlokliClientLike>(
     ),
     tag = "Session",
 )]
-pub(crate) async fn list_clients<C: BlokliClientLike>(
-    State(state): State<Arc<InternalState<C>>>,
+pub(crate) async fn list_clients(
+    State(state): State<Arc<InternalState>>,
     Path(protocol): Path<IpProtocol>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let response = state
@@ -659,8 +659,8 @@ impl From<SurbBalancerConfig> for SessionConfig {
     ),
     tag = "Session"
 )]
-pub(crate) async fn adjust_session<C: BlokliClientLike>(
-    State(state): State<Arc<InternalState<C>>>,
+pub(crate) async fn adjust_session(
+    State(state): State<Arc<InternalState>>,
     Path(session_id): Path<String>,
     Json(args): Json<SessionConfig>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
@@ -703,8 +703,8 @@ pub(crate) async fn adjust_session<C: BlokliClientLike>(
     ),
     tag = "Session"
 )]
-pub(crate) async fn session_config<C: BlokliClientLike>(
-    State(state): State<Arc<InternalState<C>>>,
+pub(crate) async fn session_config(
+    State(state): State<Arc<InternalState>>,
     Path(session_id): Path<String>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let session_id =
@@ -785,8 +785,8 @@ pub struct SessionCloseClientQuery {
     ),
     tag = "Session",
 )]
-pub(crate) async fn close_client<C: BlokliClientLike>(
-    State(state): State<Arc<InternalState<C>>>,
+pub(crate) async fn close_client(
+    State(state): State<Arc<InternalState>>,
     Path(SessionCloseClientQuery { protocol, ip, port }): Path<SessionCloseClientQuery>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let listening_ip: IpAddr = ip

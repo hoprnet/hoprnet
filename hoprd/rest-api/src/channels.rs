@@ -14,7 +14,7 @@ use hopr_lib::{
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
-use crate::{ApiError, ApiErrorStatus, BASE_PATH, BlokliClientLike, InternalState, checksum_address_serializer};
+use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState, checksum_address_serializer};
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -163,9 +163,9 @@ pub(crate) struct ChannelsQueryRequest {
         ),
         tag = "Channels",
     )]
-pub(super) async fn list_channels<C: BlokliClientLike>(
+pub(super) async fn list_channels(
     Query(query): Query<ChannelsQueryRequest>,
-    State(state): State<Arc<InternalState<C>>>,
+    State(state): State<Arc<InternalState>>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
@@ -293,8 +293,8 @@ pub(crate) struct OpenChannelResponse {
         ),
         tag = "Channels",
     )]
-pub(super) async fn open_channel<C: BlokliClientLike>(
-    State(state): State<Arc<InternalState<C>>>,
+pub(super) async fn open_channel(
+    State(state): State<Arc<InternalState>>,
     Json(open_req): Json<OpenChannelBodyRequest>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
@@ -354,9 +354,9 @@ pub(crate) struct ChannelIdParams {
         ),
         tag = "Channels",
     )]
-pub(super) async fn show_channel<C: BlokliClientLike>(
+pub(super) async fn show_channel(
     Path(ChannelIdParams { channel_id }): Path<ChannelIdParams>,
-    State(state): State<Arc<InternalState<C>>>,
+    State(state): State<Arc<InternalState>>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
@@ -421,9 +421,9 @@ pub(crate) struct CloseChannelResponse {
         ),
         tag = "Channels",
     )]
-pub(super) async fn close_channel<C: BlokliClientLike>(
+pub(super) async fn close_channel(
     Path(ChannelIdParams { channel_id }): Path<ChannelIdParams>,
-    State(state): State<Arc<InternalState<C>>>,
+    State(state): State<Arc<InternalState>>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
@@ -506,9 +506,9 @@ pub(crate) struct FundBodyRequest {
         ),
         tag = "Channels",
     )]
-pub(super) async fn fund_channel<C: BlokliClientLike>(
+pub(super) async fn fund_channel(
     Path(ChannelIdParams { channel_id }): Path<ChannelIdParams>,
-    State(state): State<Arc<InternalState<C>>>,
+    State(state): State<Arc<InternalState>>,
     Json(fund_req): Json<FundBodyRequest>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();

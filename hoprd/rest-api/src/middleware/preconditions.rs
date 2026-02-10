@@ -11,10 +11,10 @@ use axum::{
     response::IntoResponse,
 };
 
-use crate::{ApiErrorStatus, Auth, BlokliClientLike, InternalState};
+use crate::{ApiErrorStatus, Auth, InternalState};
 
-pub(crate) async fn authenticate<C: BlokliClientLike>(
-    State(state): State<InternalState<C>>,
+pub(crate) async fn authenticate(
+    State(state): State<InternalState>,
     _uri: OriginalUri,
     headers: HeaderMap,
     request: Request,

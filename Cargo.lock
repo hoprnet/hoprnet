@@ -1562,7 +1562,7 @@ dependencies = [
 [[package]]
 name = "blokli-client"
 version = "0.18.0"
-source = "git+https://github.com/hoprnet/blokli#1c1f948bd06b7184ac10ae0902788a689db3f7e8"
+source = "git+https://github.com/hoprnet/blokli#d3a36841edcd9d636d1f46527bb0b7eadb65c41d"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -4782,20 +4782,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-localcluster"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "futures",
- "hoprd-rest-api-client",
- "reqwest 0.13.2",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "hopr-metrics"
 version = "1.3.0"
 dependencies = [
@@ -5400,6 +5386,20 @@ dependencies = [
  "utoipa-scalar",
  "utoipa-swagger-ui",
  "validator",
+]
+
+[[package]]
+name = "hoprd-localcluster"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "futures",
+ "hoprd-rest-api-client",
+ "reqwest 0.13.2",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -10330,9 +10330,9 @@ dependencies = [
 
 [[package]]
 name = "toml_parser"
-version = "1.0.6+spec-1.1.0"
+version = "1.0.7+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3198b4b0a8e11f09dd03e133c0280504d0801269e9afa46362ffde1cbeebf44"
+checksum = "247eaa3197818b831697600aadf81514e577e0cba5eab10f7e064e78ae154df1"
 dependencies = [
  "winnow",
 ]

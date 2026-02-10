@@ -67,7 +67,7 @@ jobs:
       matrix:
         package:
           - hoprd
-          - hopr-localcluster
+          - hoprd-localcluster
     name: Build ${{ matrix.package }}
     # only run build and tag if the PR is merged, not if its closed
     if: github.event.pull_request.merged == true
