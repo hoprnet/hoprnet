@@ -8,6 +8,7 @@ use std::{
 use anyhow::{Context, Result};
 use clap::Parser;
 use futures::future::try_join_all;
+use hoprd::gen_test::{GenTestConfig, generate};
 use tracing::{debug, error, info, warn};
 
 mod cli;
@@ -110,8 +111,8 @@ async fn main() -> Result<()> {
         );
         tokio::time::sleep(INDEXING_WAIT_TIME).await;
 
-        info!("generating identities and configs via hoprd-gen-test");
-        run_hoprd_gen_test(&args, &data_dir, &blokli_url)?;
+        info!("generating identities and configs via hoprd-gen-test library");
+        run_hoprd_gen_test(&args, &data_dir, &blokli_url).await?;
 
         info!("starting hoprd nodes");
         cleanup.nodes = start_hoprd_nodes(&args, &data_dir, &log_dir).await?;
@@ -172,24 +173,19 @@ fn init_tracing() {
         .init();
 }
 
-fn run_hoprd_gen_test(args: &Args, data_dir: &Path, blokli_url: &str) -> Result<()> {
-    let mut cmd = Command::new(&args.hoprd_gen_test_bin);
-    cmd.arg("--blokli-url")
-        .arg(blokli_url)
-        .arg("--num-nodes")
-        .arg(args.size.to_string())
-        .arg("--config-home")
-        .arg(data_dir)
-        .arg("--identity-password")
-        .arg(&args.identity_password)
-        .arg("--random-identities");
+async fn run_hoprd_gen_test(args: &Args, data_dir: &Path, blokli_url: &str) -> Result<()> {
+    let config = GenTestConfig {
+        blokli_url: blokli_url.to_string(),
+        num_nodes: args.size,
+        config_home: data_dir.to_path_buf(),
+        identity_password: args.identity_password.clone(),
+        random_identities: true,
+        ..GenTestConfig::default()
+    };
 
-    let status = cmd.status().context("failed to run hoprd-gen-test")?;
-    if !status.success() {
-        anyhow::bail!("hoprd-gen-test failed with status {status}");
-    }
-
-    Ok(())
+    generate(&config)
+        .await
+        .context("failed to generate test identities and configs")
 }
 
 async fn start_hoprd_nodes(args: &Args, data_dir: &Path, log_dir: &Path) -> Result<Vec<NodeProcess>> {

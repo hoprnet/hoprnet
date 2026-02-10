@@ -269,6 +269,7 @@ hopr-transport-protocol = { path = "transport/protocol" }
 hopr-transport-p2p = { path = "transport/p2p" }
 hopr-transport-session = { path = "transport/session" }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
+hoprd = { path = "hoprd/hoprd" }
 hopr-db-entity = { path = "db/entity" }
 hopr-db-migration = { path = "db/migration" }
 hopr-utils-session = { path = "utils/session" }

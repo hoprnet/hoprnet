@@ -11,6 +11,7 @@ description = "Local HOPR cluster runner using external hoprd processes"
 anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 futures = { workspace = true }
+hoprd = { workspace = true }
 hoprd-rest-api-client = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
 tokio = { workspace = true, features = [

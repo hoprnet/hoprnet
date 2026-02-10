@@ -5395,6 +5395,7 @@ dependencies = [
  "anyhow",
  "clap",
  "futures",
+ "hoprd",
  "hoprd-rest-api-client",
  "reqwest 0.13.2",
  "tokio",

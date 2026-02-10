@@ -46,10 +46,6 @@ pub struct Args {
     #[arg(long, default_value = "hoprd")]
     pub hoprd_bin: String,
 
-    /// Path to the hoprd-gen-test binary
-    #[arg(long, default_value = "hoprd-gen-test")]
-    pub hoprd_gen_test_bin: String,
-
     /// Password used to encrypt identities
     #[arg(long, default_value = "password")]
     pub identity_password: String,
