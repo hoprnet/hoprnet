@@ -1,5 +1,5 @@
 use futures::{StreamExt, stream::BoxStream};
-use hopr_api::ct::{DestinationRouting, NetworkGraphView, ProbingTrafficGeneration};
+use hopr_api::ct::{DestinationRouting, NetworkGraphView, ProbeRouting, ProbingTrafficGeneration};
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::protocol::HoprPseudonym;
@@ -60,13 +60,12 @@ impl<U> ProbingTrafficGeneration for ImmediateNeighborProber<U>
 where
     U: NetworkGraphView<NodeId = OffchainPublicKey> + Clone + Send + Sync + 'static,
 {
-    fn build(&self) -> BoxStream<'static, DestinationRouting> {
+    fn build(&self) -> BoxStream<'static, ProbeRouting> {
         // For each probe target a cached version of transport routing is stored
-        let cache_peer_routing: moka::future::Cache<OffchainPublicKey, DestinationRouting> =
-            moka::future::Cache::builder()
-                .time_to_live(std::time::Duration::from_secs(600))
-                .max_capacity(100_000)
-                .build();
+        let cache_peer_routing: moka::future::Cache<OffchainPublicKey, ProbeRouting> = moka::future::Cache::builder()
+            .time_to_live(std::time::Duration::from_secs(600))
+            .max_capacity(100_000)
+            .build();
 
         let cfg = self.cfg;
         let graph = self.graph.clone();
@@ -87,12 +86,12 @@ where
                 async move {
                     cache_peer_routing
                         .try_get_with(peer, async move {
-                            Ok::<DestinationRouting, anyhow::Error>(DestinationRouting::Forward {
+                            Ok::<ProbeRouting, anyhow::Error>(ProbeRouting::Neighbor(DestinationRouting::Forward {
                                 destination: Box::new(peer.into()),
                                 pseudonym: Some(HoprPseudonym::random()),
                                 forward_options: RoutingOptions::Hops(0.try_into().expect("0 is a valid u8")),
                                 return_options: Some(RoutingOptions::Hops(0.try_into().expect("0 is a valid u8"))),
-                            })
+                            }))
                         })
                         .await
                         .ok()
@@ -182,14 +181,14 @@ mod tests {
             stream
                 .take(RANDOM_PEERS.len())
                 .map(|routing| match routing {
-                    DestinationRouting::Forward { destination, .. } => {
+                    ProbeRouting::Neighbor(DestinationRouting::Forward { destination, .. }) => {
                         if let NodeId::Offchain(peer_key) = destination.as_ref() {
                             *peer_key
                         } else {
                             panic!("expected offchain destination, got chain address");
                         }
                     }
-                    _ => panic!("expected Forward routing"),
+                    _ => panic!("expected Neighbor Forward routing"),
                 })
                 .collect::<Vec<_>>(),
         )

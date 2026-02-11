@@ -3,7 +3,7 @@ use std::sync::Arc;
 use futures::{FutureExt, SinkExt, StreamExt, pin_mut};
 use futures_concurrency::stream::StreamExt as _;
 use hopr_api::{
-    ct::ProbingTrafficGeneration,
+    ct::{ProbeRouting, ProbingTrafficGeneration},
     graph::{EdgeTransportTelemetry, NetworkGraphError, NetworkGraphUpdate, NetworkGraphView},
 };
 use hopr_async_runtime::AbortableList;
@@ -128,7 +128,7 @@ impl Probe {
                         forward_options: RoutingOptions::Hops(0.try_into().expect("0 is a valid u8")),
                         return_options: Some(RoutingOptions::Hops(0.try_into().expect("0 is a valid u8"))),
                     };
-                    Some((routing, Some(notifier)))
+                    Some((ProbeRouting::Neighbor(routing), Some(notifier)))
                 }));
 
         processes.insert(
@@ -141,12 +141,12 @@ impl Probe {
 
                         async move {
                             match peer {
-                                DestinationRouting::Forward {
+                                ProbeRouting::Neighbor(DestinationRouting::Forward {
                                     destination,
                                     pseudonym,
                                     forward_options,
                                     return_options,
-                                } => {
+                                }) => {
                                     let nonce = NeighborProbe::random_nonce();
 
                                     let message = Message::Probe(nonce);
@@ -179,9 +179,13 @@ impl Probe {
                                         tracing::error!("failed to convert ping message into data");
                                     }
                                 }
-                                DestinationRouting::Return(_surb_matcher) => tracing::error!(
+                                ProbeRouting::Neighbor(DestinationRouting::Return(_surb_matcher)) => tracing::error!(
                                     error = "logical error",
                                     "resolved transport routing is not forward"
+                                ),
+                                ProbeRouting::Looping(_) => tracing::error!(
+                                    error = "logical error",
+                                    "probing component does not support the looping probes yet"
                                 ),
                             }
                         }
