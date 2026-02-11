@@ -23,7 +23,7 @@ pub struct PingConfig {
 
 /// Ping query result type holding data about the ping duration and the string
 /// containg an optional version information of the pinged peer, if provided.
-pub type PingQueryResult = Result<std::time::Duration>;
+pub type PingQueryResult = std::result::Result<std::time::Duration, ()>;
 
 /// Helper object allowing to send a ping query as a wrapped channel combination
 /// that can be filled up on the transport part and awaited locally by the `Pinger`.
@@ -78,22 +78,16 @@ impl Pinger {
                 debug!(latency = latency.as_millis(), %peer, "Ping succeeded",);
                 Ok(latency)
             }
-            Ok(Some(Err(e))) => {
-                let error = if let ProbeError::DecodingError = e {
-                    ProbeError::PingerError(*peer, "incorrect pong response".into())
-                } else {
-                    e
-                };
-
-                debug!(%peer, %error, "Ping failed internally",);
-                Err(error)
+            Ok(Some(Err(_))) => {
+                debug!(%peer, "Ping failed internally",);
+                Err(ProbeError::PingerError(format!("could not successfully ping: {peer}")))
             }
             Ok(None) => {
                 debug!(%peer, "Ping canceled");
-                Err(ProbeError::PingerError(*peer, "canceled".into()))
+                Err(ProbeError::PingerError("canceled".into()))
             }
             Err(_) => {
-                debug!(%peer, "Ping failed due to timeout");
+                debug!(%peer, "ping failed due to timeout");
                 Err(ProbeError::TrafficError(NetworkGraphError::ProbeNeighborTimeout(*peer)))
             }
         }
@@ -118,9 +112,7 @@ mod tests {
 
         let replier = PingQueryReplier::new(tx);
 
-        replier.notify(Err(ProbeError::TrafficError(NetworkGraphError::ProbeNeighborTimeout(
-            OffchainPublicKey::from_privkey(&SECRET_0)?,
-        ))));
+        replier.notify(Err(()));
 
         assert!(rx.next().await.is_some_and(|r| r.is_err()));
 
@@ -140,7 +132,7 @@ mod tests {
         let result = rx.next().await.ok_or(anyhow!("should contain a value"))?;
 
         assert!(result.is_ok());
-        let result = result?;
+        let result = result.map_err(|_| anyhow!("should succeed"))?;
         assert_eq!(result, RTT.div(2));
 
         Ok(())

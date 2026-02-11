@@ -19,7 +19,6 @@ use crate::{
     HoprProbeProcess,
     config::ProbeConfig,
     content::Message,
-    errors::ProbeError,
     ping::PingQueryReplier,
     types::{NeighborProbe, NeighborTelemetry, PathTelemetry},
 };
@@ -81,10 +80,8 @@ impl Probe {
 
                         tracing::debug!(%peer, pseudonym = %k.0, probe = %k.1, reason = "timeout", "probe failed");
                         if let Some(replier) = notifier {
-                            if let NodeId::Offchain(opk) = peer.as_ref() {
-                                replier.notify(Err(ProbeError::TrafficError(NetworkGraphError::ProbeNeighborTimeout(
-                                    *opk,
-                                ))));
+                            if matches!(peer.as_ref(), NodeId::Offchain(_)) {
+                                replier.notify(Err(()));
                             } else {
                                 tracing::warn!(
                                     reason = "non-offchain peer",
@@ -289,6 +286,8 @@ mod tests {
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use hopr_ct_telemetry::{ImmediateNeighborProber, ProberConfig};
     use hopr_protocol_app::prelude::{ApplicationData, Tag};
+
+    use crate::errors::ProbeError;
 
     use super::*;
 
@@ -541,7 +540,7 @@ mod tests {
             let from_probing_to_network_rx = iface.from_probing_to_network_rx;
             let from_network_to_probing_tx = iface.from_network_to_probing_tx;
 
-            let (tx, mut rx) = futures::channel::mpsc::channel::<std::result::Result<Duration, ProbeError>>(128);
+            let (tx, mut rx) = futures::channel::mpsc::channel::<std::result::Result<Duration, ()>>(128);
             manual_probe_tx.send((NEIGHBOURS[0], PingQueryReplier::new(tx))).await?;
 
             let _jh: hopr_async_runtime::prelude::JoinHandle<()> = tokio::spawn(async move {
@@ -555,7 +554,8 @@ mod tests {
 
             let _duration = tokio::time::timeout(std::time::Duration::from_secs(1), rx.next())
                 .await?
-                .ok_or_else(|| anyhow::anyhow!("Probe did not return a result in time"))??;
+                .ok_or_else(|| anyhow::anyhow!("Probe did not return a result in time"))?
+                .map_err(|_| anyhow::anyhow!("Probe failed"))?;
 
             Ok(())
         })
@@ -581,7 +581,7 @@ mod tests {
             let from_probing_to_network_rx = iface.from_probing_to_network_rx;
             let from_network_to_probing_tx = iface.from_network_to_probing_tx;
 
-            let (tx, mut rx) = futures::channel::mpsc::channel::<std::result::Result<Duration, ProbeError>>(128);
+            let (tx, mut rx) = futures::channel::mpsc::channel::<std::result::Result<Duration, ()>>(128);
             manual_probe_tx.send((NEIGHBOURS[0], PingQueryReplier::new(tx))).await?;
 
             let _jh: hopr_async_runtime::prelude::JoinHandle<()> = tokio::spawn(async move {
