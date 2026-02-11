@@ -118,9 +118,10 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         let last_emitted_frame = Arc::new(AtomicU32::new(0));
         let last_emitted_frame_clone = last_emitted_frame.clone();
 
-        let session_id_1 = id.to_string();
-        let session_id_2 = id.to_string();
-        let session_id_3 = id.to_string();
+        // Debug tracing spans for individual pipeline stages
+        let preassembly_span = tracing::debug_span!("SessionSocket::packets_in::pre_reassembly", session_id = %id);
+        let presequence_span = tracing::debug_span!("SessionSocket::packets_in::pre_sequencing", session_id = %id);
+        let postsequence_span = tracing::debug_span!("SessionSocket::packets_in::post_sequencing", session_id = %id);
 
         let (packets_in_abort_handle, packets_in_abort_reg) = AbortHandle::new_pair();
 
@@ -130,6 +131,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         let downstream_frames_out = futures::stream::Abortable::new(packets_in, packets_in_abort_reg)
             // Filter-out segments that we've seen already
             .filter_map(move |packet| {
+                let _span = preassembly_span.enter();
                 futures::future::ready(match packet {
                     Ok(packet) => packet.try_as_segment().filter(|s| {
                         // Filter old frame ids to save space in the Reassembler
@@ -146,15 +148,12 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                         None
                     }
                 })
-                .instrument(tracing::debug_span!(
-                    "SessionSocket::packets_in::pre_reassembly",
-                    session_id = session_id_1
-                ))
             })
             // Reassemble the segments into frames
             .reassembler(cfg.frame_timeout, cfg.capacity)
             // Discard frames that we could not reassemble
             .filter_map(move |maybe_frame| {
+                let _span = presequence_span.enter();
                 futures::future::ready(match maybe_frame {
                     Ok(frame) => Some(OrderedFrame(frame)),
                     Err(error) => {
@@ -162,15 +161,12 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                         None
                     }
                 })
-                .instrument(tracing::debug_span!(
-                    "SessionSocket::packets_in::pre_sequencing",
-                    session_id = session_id_2
-                ))
             })
             // Put the frames into the correct sequence by Frame Ids
             .sequencer(cfg.frame_timeout, cfg.capacity)
             // Discard frames missing from the sequence
             .filter_map(move |maybe_frame| {
+                let _span = postsequence_span.enter();
                 future::ready(match maybe_frame {
                     Ok(frame) => {
                         last_emitted_frame_clone.store(frame.0.frame_id, std::sync::atomic::Ordering::Relaxed);
@@ -187,10 +183,6 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                     }
                     Err(err) => Some(Err(std::io::Error::other(err))),
                 })
-                .instrument(tracing::debug_span!(
-                    "SessionSocket::packets_in::post_sequencing",
-                    session_id = session_id_3
-                ))
             })
             .into_async_read();
 
@@ -254,7 +246,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 // The segment_sent event is raised only for segments coming from Upstream,
                 // not for the segments from the Control stream (= segment resends).
                 if let Err(error) = st_1.segment_sent(&segment) {
-                    tracing::debug!(%error, "outgoing segment state update failed");
+                    tracing::debug!(session_id = st_1.session_id(), %error, "outgoing segment state update failed");
                 }
                 future::ok::<_, futures::channel::mpsc::SendError>(SessionMessage::<C>::Segment(segment))
             })
@@ -294,6 +286,11 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         let downstream_frames_out = futures::stream::Abortable::new(packets_in, packets_in_abort_reg)
             // Filter out Session control messages and update the State, pass only Segments onwards
             .filter_map(move |packet| {
+                let _span = tracing::debug_span!(
+                    "SessionSocket::packets_in::pre_reassembly",
+                    session_id = st_1.session_id()
+                )
+                .entered();
                 futures::future::ready(match packet {
                     Ok(packet) => {
                         if let Err(error) = match &packet {
@@ -319,15 +316,16 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                         None
                     }
                 })
-                .instrument(tracing::debug_span!(
-                    "SessionSocket::packets_in::pre_reassembly",
-                    session_id = st_1.session_id()
-                ))
             })
             // Reassemble segments into frames
             .reassembler_with_inspector(cfg.frame_timeout, cfg.capacity, inspector)
             // Notify State once a frame has been reassembled, discard frames that we could not reassemble
             .filter_map(move |maybe_frame| {
+                let _span = tracing::debug_span!(
+                    "SessionSocket::packets_in::pre_sequencing",
+                    session_id = st_2.session_id()
+                )
+                .entered();
                 futures::future::ready(match maybe_frame {
                     Ok(frame) => {
                         if let Err(error) = st_2.frame_complete(frame.frame_id) {
@@ -340,16 +338,17 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                         None
                     }
                 })
-                .instrument(tracing::debug_span!(
-                    "SessionSocket::packets_in::pre_sequencing",
-                    session_id = st_2.session_id()
-                ))
             })
             // Put the frames into the correct sequence by Frame Ids
             .sequencer(cfg.frame_timeout, cfg.frame_size)
             // Discard frames missing from the sequence and
             // notify the State about emitted or discarded frames
             .filter_map(move |maybe_frame| {
+                let _span = tracing::debug_span!(
+                    "SessionSocket::packets_in::post_sequencing",
+                    session_id = st_3.session_id()
+                )
+                .entered();
                 // Filter out discarded Frames and dispatch events to the State if needed
                 future::ready(match maybe_frame {
                     Ok(frame) => {
@@ -371,10 +370,6 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                     }
                     Err(err) => Some(Err(std::io::Error::other(err))),
                 })
-                .instrument(tracing::debug_span!(
-                    "SessionSocket::packets_in::post_sequencing",
-                    session_id = st_3.session_id()
-                ))
             })
             .into_async_read();
 

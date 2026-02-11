@@ -3,7 +3,7 @@ name = "hoprnet"
 version = "3.0.0"
 description = "HOPR network"
 readme = "README.md"
-requires-python = ">=3.14.2,<3.15"
+requires-python = ">=3.14.3,<3.15"
 dependencies = ["sdk-localcluster", "sdk-api"]
 
 [tool.uv]
@@ -17,7 +17,7 @@ sdk-api = { workspace = true }
 members = ["sdk/python/localcluster", "sdk/python/api"]
 
 [dependency-groups]
-dev = ["ruff>=0.14.14"]
+dev = ["ruff>=0.15.0"]
 lint = ["black==26.1.0"]
 
 [tool.black]
