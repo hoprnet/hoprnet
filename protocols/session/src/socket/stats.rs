@@ -1,21 +1,63 @@
 use std::sync::atomic::{AtomicU64, Ordering};
-use crate::{FrameAcknowledgements, FrameId, Segment, SegmentId, SegmentRequest, SeqIndicator, SocketComponents, SocketState};
-use crate::errors::SessionError;
+use crate::protocol::SessionMessage;
 
 /// Various statistics for a [`SessionSocket`](crate::SessionSocket).
 #[derive(Debug, Default)]
 pub struct SessionSocketStats {
+    errors: AtomicU64,
     incomplete_frames: AtomicU64,
     frames_completed: AtomicU64,
     frames_emitted: AtomicU64,
     frames_discarded: AtomicU64,
     incoming_segments: AtomicU64,
+    incoming_retransmission_requests: AtomicU64,
+    incoming_acknowledged_frames: AtomicU64,
     outgoing_segments: AtomicU64,
-    retransmission_requests: AtomicU64,
-    acknowledged_frames: AtomicU64,
+    outgoing_retransmission_requests: AtomicU64,
+    outgoing_acknowledged_frames: AtomicU64,
 }
 
 impl SessionSocketStats {
+    pub(crate) fn inc_errors(&self) {
+        self.errors.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub(crate) fn inc_incomplete_frames(&self) {
+        self.incomplete_frames.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub(crate) fn inc_frames_completed(&self) {
+        self.frames_completed.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub(crate) fn inc_frames_emitted(&self) {
+        self.frames_emitted.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub(crate) fn inc_frames_discarded(&self) {
+        self.frames_discarded.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub(crate) fn inc_outgoing_segments(&self) {
+        self.outgoing_segments.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub(crate) fn inc_incoming_session_message<const C: usize>(&self, msg: &SessionMessage<C>) {
+        match msg {
+            SessionMessage::Segment(_) => self.incoming_segments.fetch_add(1, Ordering::Relaxed),
+            SessionMessage::Request(_) => self.incoming_retransmission_requests.fetch_add(1, Ordering::Relaxed),
+            SessionMessage::Acknowledge(f) => self.incoming_acknowledged_frames.fetch_add(f.len() as u64, Ordering::Relaxed),
+        };
+    }
+
+    pub(crate) fn inc_outgoing_session_message<const C: usize>(&self, msg: &SessionMessage<C>) {
+        match msg {
+            SessionMessage::Segment(_) => self.outgoing_segments.fetch_add(1, Ordering::Relaxed),
+            SessionMessage::Request(_) => self.outgoing_retransmission_requests.fetch_add(1, Ordering::Relaxed),
+            SessionMessage::Acknowledge(f) => self.outgoing_acknowledged_frames.fetch_add(f.len() as u64, Ordering::Relaxed),
+        };
+    }
+
     pub fn incomplete_frames(&self) -> u64 {
         self.incomplete_frames.load(Ordering::Relaxed)
     }
@@ -40,75 +82,18 @@ impl SessionSocketStats {
         self.outgoing_segments.load(Ordering::Relaxed)
     }
 
-    pub fn retransmission_requests(&self) -> u64 {
-        self.retransmission_requests.load(Ordering::Relaxed)
+    pub fn incoming_retransmission_requests(&self) -> u64 {
+        self.incoming_retransmission_requests.load(Ordering::Relaxed)
+    }
+    pub fn incoming_acknowledged_frames(&self) -> u64 {
+        self.incoming_acknowledged_frames.load(Ordering::Relaxed)
     }
 
-    pub fn acknowledged_frames(&self) -> u64 {
-        self.acknowledged_frames.load(Ordering::Relaxed)
-    }
-}
-
-pub(crate) struct StatsStateWrapper<S>(pub(crate) S, pub(crate) std::sync::Arc<SessionSocketStats>);
-
-impl<S: Clone> Clone for StatsStateWrapper<S> {
-    fn clone(&self) -> Self {
-        Self(self.0.clone(), self.1.clone())
-    }
-}
-
-impl<const C: usize, S: SocketState<C>> SocketState<C> for StatsStateWrapper<S> {
-    fn session_id(&self) -> &str {
-        self.0.session_id()
+    pub fn outgoing_retransmission_requests(&self) -> u64 {
+        self.outgoing_retransmission_requests.load(Ordering::Relaxed)
     }
 
-    fn run(&mut self, components: SocketComponents<C>) -> Result<(), SessionError> {
-        self.0.run(components)
-    }
-
-    fn stop(&mut self) -> Result<(), SessionError> {
-        self.0.stop()
-    }
-
-    fn incoming_segment(&mut self, id: &SegmentId, ind: SeqIndicator) -> Result<(), SessionError> {
-        let r = self.0.incoming_segment(id, ind);
-        self.1.incoming_segments.fetch_add(1, Ordering::Relaxed);
-        r
-    }
-
-    fn incoming_retransmission_request(&mut self, request: SegmentRequest<C>) -> Result<(), SessionError> {
-        let r = self.0.incoming_retransmission_request(request);
-        self.1.retransmission_requests.fetch_add(1, Ordering::Relaxed);
-        r
-    }
-
-    fn incoming_acknowledged_frames(&mut self, ack: FrameAcknowledgements<C>) -> Result<(), SessionError> {
-        let r = self.0.incoming_acknowledged_frames(ack);
-        self.1.acknowledged_frames.fetch_add(1, Ordering::Relaxed);
-        r
-    }
-
-    fn frame_complete(&mut self, id: FrameId) -> Result<(), SessionError> {
-        let r = self.0.frame_complete(id);
-        self.1.frames_completed.fetch_add(1, Ordering::Relaxed);
-        r
-    }
-
-    fn frame_emitted(&mut self, id: FrameId) -> Result<(), SessionError> {
-        let r =  self.0.frame_emitted(id);
-        self.1.frames_emitted.fetch_add(1, Ordering::Relaxed);
-        r
-    }
-
-    fn frame_discarded(&mut self, id: FrameId) -> Result<(), SessionError> {
-        let r = self.0.frame_discarded(id);
-        self.1.frames_discarded.fetch_add(1, Ordering::Relaxed);
-        r
-    }
-
-    fn segment_sent(&mut self, segment: &Segment) -> Result<(), SessionError> {
-        let r = self.0.segment_sent(segment);
-        self.1.outgoing_segments.fetch_add(1, Ordering::Relaxed);
-        r
+    pub fn outgoing_acknowledged_frames(&self) -> u64 {
+        self.outgoing_acknowledged_frames.load(Ordering::Relaxed)
     }
 }

@@ -79,11 +79,11 @@ enum WriteState {
 /// The constant argument `C` specifies the MTU in bytes of the underlying transport.
 #[pin_project::pin_project]
 pub struct SessionSocket<const C: usize, S> {
+    state: S,
     // This is where upstream writes the to-be-segmented frame data to
     upstream_frames_in: Pin<Box<dyn futures::io::AsyncWrite + Send>>,
     // This is where upstream reads the reconstructed frame data from
     downstream_frames_out: Pin<Box<dyn futures::io::AsyncRead + Send>>,
-    state: S,
     write_state: WriteState,
     #[cfg(feature = "stats")]
     stats: Arc<stats::SessionSocketStats>,
@@ -115,21 +115,31 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         // Downstream transport
         let (packets_out, packets_in) = framed.split();
 
+        // If needed, add also stats to individual stages.
+        // This socket does not have a state, so the stats cannot be hooked up there.
+        #[cfg(feature = "stats")]
+        let (s0, s1, s2, s3, stats) = {
+            let s = Arc::new(stats::SessionSocketStats::default());
+            (s.clone(), s.clone(), s.clone(), s.clone(), s)
+        };
+
         // Pipeline IN: Data incoming from Upstream
         let upstream_frames_in = packets_out
-            .with(|segment| future::ok::<_, SessionError>(SessionMessage::<C>::Segment(segment)))
+            .with(move |segment| {
+                #[cfg(feature = "stats")]
+                s0.inc_outgoing_segments();
+
+                future::ok::<_, SessionError>(SessionMessage::<C>::Segment(segment))
+            })
             .segmenter_with_terminating_segment::<C>(frame_size);
 
         let last_emitted_frame = Arc::new(AtomicU32::new(0));
         let last_emitted_frame_clone = last_emitted_frame.clone();
 
         // Debug tracing spans for individual pipeline stages
-        let preassembly_span = tracing::debug_span!("SessionSocket::packets_in::pre_reassembly", session_id = %id);
-        let presequence_span = tracing::debug_span!("SessionSocket::packets_in::pre_sequencing", session_id = %id);
-        let postsequence_span = tracing::debug_span!("SessionSocket::packets_in::post_sequencing", session_id = %id);
-
-        #[cfg(feature = "stats")]
-        let stats = Arc::new(stats::SessionSocketStats::default());
+        let stage1_span = tracing::debug_span!("SessionSocket::packets_in::pre_reassembly", session_id = %id);
+        let stage2_span = tracing::debug_span!("SessionSocket::packets_in::pre_sequencing", session_id = %id);
+        let stage3_span = tracing::debug_span!("SessionSocket::packets_in::post_sequencing", session_id = %id);
 
         let (packets_in_abort_handle, packets_in_abort_reg) = AbortHandle::new_pair();
 
@@ -139,20 +149,27 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         let downstream_frames_out = futures::stream::Abortable::new(packets_in, packets_in_abort_reg)
             // Filter-out segments that we've seen already
             .filter_map(move |packet| {
-                let _span = preassembly_span.enter();
+                let _span = stage1_span.enter();
                 futures::future::ready(match packet {
-                    Ok(packet) => packet.try_as_segment().filter(|s| {
-                        // Filter old frame ids to save space in the Reassembler
-                        let last_emitted_id = last_emitted_frame.load(std::sync::atomic::Ordering::Relaxed);
-                        if s.frame_id <= last_emitted_id {
-                            tracing::warn!(frame_id = s.frame_id, last_emitted_id, "frame already seen");
-                            false
-                        } else {
-                            true
-                        }
-                    }),
+                    Ok(packet) => {
+                        #[cfg(feature = "stats")]
+                        s1.inc_incoming_session_message(&packet);
+
+                        packet.try_as_segment().filter(|s| {
+                            // Filter old frame ids to save space in the Reassembler
+                            let last_emitted_id = last_emitted_frame.load(std::sync::atomic::Ordering::Relaxed);
+                            if s.frame_id <= last_emitted_id {
+                                tracing::warn!(frame_id = s.frame_id, last_emitted_id, "frame already seen");
+                                false
+                            } else {
+                                true
+                            }
+                        })
+                    },
                     Err(error) => {
                         tracing::error!(%error, "unparseable packet");
+                        #[cfg(feature = "stats")]
+                        s1.inc_errors();
                         None
                     }
                 })
@@ -161,10 +178,16 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
             .reassembler(cfg.frame_timeout, cfg.capacity)
             // Discard frames that we could not reassemble
             .filter_map(move |maybe_frame| {
-                let _span = presequence_span.enter();
+                let _span = stage2_span.enter();
                 futures::future::ready(match maybe_frame {
-                    Ok(frame) => Some(OrderedFrame(frame)),
+                    Ok(frame) => {
+                        #[cfg(feature = "stats")]
+                        s2.inc_frames_completed();
+                        Some(OrderedFrame(frame))
+                    },
                     Err(error) => {
+                        #[cfg(feature = "stats")]
+                        s2.inc_incomplete_frames();
                         tracing::error!(%error, "failed to reassemble frame");
                         None
                     }
@@ -174,7 +197,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
             .sequencer(cfg.frame_timeout, cfg.capacity)
             // Discard frames missing from the sequence
             .filter_map(move |maybe_frame| {
-                let _span = postsequence_span.enter();
+                let _span = stage3_span.enter();
                 future::ready(match maybe_frame {
                     Ok(frame) => {
                         last_emitted_frame_clone.store(frame.0.frame_id, std::sync::atomic::Ordering::Relaxed);
@@ -182,14 +205,22 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                             tracing::warn!("terminating frame received");
                             packets_in_abort_handle.abort();
                         }
+                        #[cfg(feature = "stats")]
+                        s3.inc_frames_emitted();
                         Some(Ok(frame.0))
                     }
                     // Downstream skips discarded frames
                     Err(SessionError::FrameDiscarded(frame_id)) | Err(SessionError::IncompleteFrame(frame_id)) => {
                         tracing::error!(frame_id, "frame discarded");
+                        #[cfg(feature = "stats")]
+                        s3.inc_frames_discarded();
                         None
                     }
-                    Err(err) => Some(Err(std::io::Error::other(err))),
+                    Err(err) => {
+                        #[cfg(feature = "stats")]
+                        s3.inc_errors();
+                        Some(Err(std::io::Error::other(err)))
+                    },
                 })
             })
             .into_async_read();
@@ -204,7 +235,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                 WriteState::WriteOnly
             },
             #[cfg(feature = "stats")]
-            stats,
+            stats
         })
     }
 }
@@ -230,11 +261,12 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         // The HWM cannot be 0 bytes
         framed.set_send_high_water_mark(1.max(cfg.max_buffered_segments * C));
 
+        // If needed, add also stats to individual stages.
         #[cfg(feature = "stats")]
-        let stats = Arc::new(stats::SessionSocketStats::default());
-
-        #[cfg(feature = "stats")]
-        let mut state = stats::StatsStateWrapper(state, stats.clone());
+        let (s0, s1, s2, s3, stats) = {
+            let s = Arc::new(stats::SessionSocketStats::default());
+            (s.clone(), s.clone(), s.clone(), s.clone(), s)
+        };
 
         // Downstream transport
         let (packets_out, packets_in) = framed.split();
@@ -259,10 +291,15 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         let mut st_1 = state.clone();
         let upstream_frames_in = segments_tx
             .with(move |segment| {
+                let _span = tracing::debug_span!(
+                    "SessionSocket::packets_out::segmenter",
+                    session_id = st_1.session_id()
+                ).entered();
+
                 // The segment_sent event is raised only for segments coming from Upstream,
                 // not for the segments from the Control stream (= segment resends).
                 if let Err(error) = st_1.segment_sent(&segment) {
-                    tracing::debug!(session_id = st_1.session_id(), %error, "outgoing segment state update failed");
+                    tracing::debug!(%error, "outgoing segment state update failed");
                 }
                 future::ok::<_, futures::channel::mpsc::SendError>(SessionMessage::<C>::Segment(segment))
             })
@@ -273,7 +310,11 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         hopr_async_runtime::prelude::spawn(
             (ctl_rx, segments_rx)
                 .merge()
-                .map(Ok)
+                .map(move |msg| {
+                    #[cfg(feature = "stats")]
+                    s0.inc_outgoing_session_message(&msg);
+                    Ok(msg)
+                })
                 .forward(packets_out)
                 .map(move |result| match result {
                     Ok(_) => tracing::debug!("outgoing packet processing done"),
@@ -316,6 +357,9 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                         } {
                             tracing::debug!(%error, "incoming message state update failed");
                         }
+                        #[cfg(feature = "stats")]
+                        s1.inc_outgoing_session_message(&packet);
+
                         // Filter old frame ids to save space in the Reassembler
                         packet.try_as_segment().filter(|s| {
                             let last_emitted_id = last_emitted_frame.load(std::sync::atomic::Ordering::Relaxed);
@@ -329,6 +373,8 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                     }
                     Err(error) => {
                         tracing::error!(%error, "unparseable packet");
+                        #[cfg(feature = "stats")]
+                        s1.inc_errors();
                         None
                     }
                 })
@@ -347,10 +393,14 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                         if let Err(error) = st_2.frame_complete(frame.frame_id) {
                             tracing::error!(%error, "frame complete state update failed");
                         }
+                        #[cfg(feature = "stats")]
+                        s2.inc_frames_completed();
                         Some(OrderedFrame(frame))
                     }
                     Err(error) => {
                         tracing::error!(%error, "failed to reassemble frame");
+                        #[cfg(feature = "stats")]
+                        s2.inc_incomplete_frames();
                         None
                     }
                 })
@@ -376,20 +426,29 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                             tracing::warn!("terminating frame received");
                             packets_in_abort_handle.abort();
                         }
+                        #[cfg(feature = "stats")]
+                        s3.inc_frames_emitted();
                         Some(Ok(frame.0))
                     }
                     Err(SessionError::FrameDiscarded(frame_id)) | Err(SessionError::IncompleteFrame(frame_id)) => {
                         if let Err(error) = st_3.frame_discarded(frame_id) {
                             tracing::error!(%error, "frame discarded state update failed");
                         }
+                        #[cfg(feature = "stats")]
+                        s3.inc_frames_discarded();
                         None // Downstream skips discarded frames
                     }
-                    Err(err) => Some(Err(std::io::Error::other(err))),
+                    Err(err) => {
+                        #[cfg(feature = "stats")]
+                        s3.inc_errors();
+                        Some(Err(std::io::Error::other(err)))
+                    },
                 })
             })
             .into_async_read();
 
         Ok(Self {
+            state,
             upstream_frames_in: Box::pin(upstream_frames_in),
             downstream_frames_out: Box::pin(downstream_frames_out),
             write_state: if cfg.flush_immediately {
@@ -398,11 +457,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 WriteState::WriteOnly
             },
             #[cfg(feature = "stats")]
-            state: state.0.clone(),
-            #[cfg(not(feature = "stats"))]
-            state,
-            #[cfg(feature = "stats")]
-            stats,
+            stats
         })
     }
 }
