@@ -9,7 +9,7 @@ use futures::{StreamExt, stream::FuturesUnordered};
 use hopr_lib::{
     Address, Multiaddr,
     api::{
-        graph::{EdgeTransportObservable, traits::EdgeObservable},
+        graph::{EdgeTransportObservable, traits::EdgeObservableRead},
         network::Health,
         node::{HoprNodeChainOperations, HoprNodeNetworkOperations},
     },

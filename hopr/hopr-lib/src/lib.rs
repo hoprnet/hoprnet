@@ -88,7 +88,7 @@ use futures::{
 use futures_time::future::FutureExt as FuturesTimeFutureExt;
 use hopr_api::{
     chain::{AccountSelector, AnnouncementError, ChannelSelector, *},
-    ct::TrafficGeneration,
+    ct::ProbingTrafficGeneration,
     db::{HoprNodeDbApi, TicketMarker, TicketSelector},
     node::{
         ChainInfo, CloseChannelResult, OpenChannelResult, SafeModuleConfig,
@@ -353,7 +353,7 @@ where
         #[cfg(feature = "session-server")] serve_handler: T,
     ) -> errors::Result<HoprTransportIO>
     where
-        Ct: TrafficGeneration<NodeId = OffchainPublicKey> + Send + Sync + 'static,
+        Ct: ProbingTrafficGeneration + Send + Sync + 'static,
         NetBuilder: NetworkBuilder<Network = Net> + Send + Sync + 'static,
     {
         self.error_if_not_in_state(

@@ -622,7 +622,6 @@ mod tests {
             data: ApplicationData::try_from(hopr_transport_probe::content::Message::Telemetry(PathTelemetry {
                 id: hopr_crypto_random::random_bytes(),
                 path: hopr_crypto_random::random_bytes(),
-                seq_id: 0,
                 timestamp: 123456789_u128,
             }))?
             .to_bytes()

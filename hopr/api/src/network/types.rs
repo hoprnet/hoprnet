@@ -22,6 +22,15 @@ pub enum PeerDiscovery {
     Announce(PeerId, Vec<Multiaddr>),
 }
 
+/// Generated network events
+#[derive(Debug, Copy, Clone)]
+pub enum NetworkEvent {
+    /// A peer has been connected to.
+    PeerConnected(PeerId),
+    /// A peer has been disconnected from.
+    PeerDisconnected(PeerId),
+}
+
 #[cfg(test)]
 mod tests {
     use super::Health;

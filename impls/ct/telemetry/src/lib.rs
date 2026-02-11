@@ -1,5 +1,5 @@
-use futures::StreamExt;
-use hopr_api::ct::{DestinationRouting, NetworkGraphView, TrafficGeneration};
+use futures::{StreamExt, stream::BoxStream};
+use hopr_api::ct::{DestinationRouting, NetworkGraphView, ProbeRouting, ProbingTrafficGeneration};
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::protocol::HoprPseudonym;
@@ -45,35 +45,34 @@ const fn default_recheck_threshold() -> std::time::Duration {
     DEFAULT_PROBE_RECHECK_THRESHOLD
 }
 
-pub struct ImmediateNeighborProber {
+pub struct ImmediateNeighborProber<U> {
     cfg: ProberConfig,
+    graph: U,
 }
 
-impl ImmediateNeighborProber {
-    pub fn new(cfg: ProberConfig) -> Self {
-        Self { cfg }
+impl<U> ImmediateNeighborProber<U> {
+    pub fn new(cfg: ProberConfig, graph: U) -> Self {
+        Self { cfg, graph }
     }
 }
 
-impl TrafficGeneration for ImmediateNeighborProber {
-    type NodeId = OffchainPublicKey;
-
-    fn build<U>(self, network_graph: U) -> impl futures::Stream<Item = DestinationRouting> + Send
-    where
-        U: NetworkGraphView<NodeId = OffchainPublicKey> + Send + Sync + 'static,
-    {
+impl<U> ProbingTrafficGeneration for ImmediateNeighborProber<U>
+where
+    U: NetworkGraphView<NodeId = OffchainPublicKey> + Clone + Send + Sync + 'static,
+{
+    fn build(&self) -> BoxStream<'static, ProbeRouting> {
         // For each probe target a cached version of transport routing is stored
-        let cache_peer_routing: moka::future::Cache<OffchainPublicKey, DestinationRouting> =
-            moka::future::Cache::builder()
-                .time_to_live(std::time::Duration::from_secs(600))
-                .max_capacity(100_000)
-                .build();
+        let cache_peer_routing: moka::future::Cache<OffchainPublicKey, ProbeRouting> = moka::future::Cache::builder()
+            .time_to_live(std::time::Duration::from_secs(600))
+            .max_capacity(100_000)
+            .build();
 
         let cfg = self.cfg;
+        let graph = self.graph.clone();
 
         futures::stream::repeat(())
             .filter_map(move |_| {
-                let nodes = network_graph.nodes();
+                let nodes = graph.nodes();
 
                 async move {
                     hopr_async_runtime::prelude::sleep(cfg.interval).await;
@@ -87,23 +86,24 @@ impl TrafficGeneration for ImmediateNeighborProber {
                 async move {
                     cache_peer_routing
                         .try_get_with(peer, async move {
-                            Ok::<DestinationRouting, anyhow::Error>(DestinationRouting::Forward {
+                            Ok::<ProbeRouting, anyhow::Error>(ProbeRouting::Neighbor(DestinationRouting::Forward {
                                 destination: Box::new(peer.into()),
                                 pseudonym: Some(HoprPseudonym::random()),
                                 forward_options: RoutingOptions::Hops(0.try_into().expect("0 is a valid u8")),
                                 return_options: Some(RoutingOptions::Hops(0.try_into().expect("0 is a valid u8"))),
-                            })
+                            }))
                         })
                         .await
                         .ok()
                 }
             })
+            .boxed()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
+    use std::{collections::HashSet, sync::Arc};
 
     use futures::{StreamExt, pin_mut};
     use hopr_api::{
@@ -146,10 +146,10 @@ mod tests {
 
     #[tokio::test]
     async fn peers_should_not_be_passed_if_none_are_present() -> anyhow::Result<()> {
-        let channel_graph = ChannelGraph::new(OffchainKeypair::random().public().clone());
+        let channel_graph = Arc::new(ChannelGraph::new(OffchainKeypair::random().public().clone()));
 
-        let prober = ImmediateNeighborProber::new(Default::default());
-        let stream = prober.build(channel_graph);
+        let prober = ImmediateNeighborProber::new(Default::default(), channel_graph);
+        let stream = prober.build();
         pin_mut!(stream);
 
         assert!(timeout(TINY_TIMEOUT, stream.next()).await.is_err());
@@ -159,18 +159,21 @@ mod tests {
 
     #[tokio::test]
     async fn peers_should_have_randomized_order() -> anyhow::Result<()> {
-        let channel_graph = ChannelGraph::new(OffchainKeypair::random().public().clone());
+        let channel_graph = Arc::new(ChannelGraph::new(OffchainKeypair::random().public().clone()));
 
         for node in RANDOM_PEERS.iter() {
             channel_graph.record_node(node.clone()).await;
         }
 
-        let prober = ImmediateNeighborProber::new(ProberConfig {
-            interval: std::time::Duration::from_millis(1),
-            ..Default::default()
-        });
+        let prober = ImmediateNeighborProber::new(
+            ProberConfig {
+                interval: std::time::Duration::from_millis(1),
+                ..Default::default()
+            },
+            channel_graph,
+        );
 
-        let stream = prober.build(channel_graph);
+        let stream = prober.build();
         pin_mut!(stream);
 
         let actual = timeout(
@@ -178,14 +181,14 @@ mod tests {
             stream
                 .take(RANDOM_PEERS.len())
                 .map(|routing| match routing {
-                    DestinationRouting::Forward { destination, .. } => {
+                    ProbeRouting::Neighbor(DestinationRouting::Forward { destination, .. }) => {
                         if let NodeId::Offchain(peer_key) = destination.as_ref() {
                             *peer_key
                         } else {
                             panic!("expected offchain destination, got chain address");
                         }
                     }
-                    _ => panic!("expected Forward routing"),
+                    _ => panic!("expected Neighbor Forward routing"),
                 })
                 .collect::<Vec<_>>(),
         )
@@ -205,13 +208,13 @@ mod tests {
             ..Default::default()
         };
 
-        let channel_graph = ChannelGraph::new(OffchainKeypair::random().public().clone());
+        let channel_graph = Arc::new(ChannelGraph::new(OffchainKeypair::random().public().clone()));
         channel_graph
             .record_node(RANDOM_PEERS.iter().next().unwrap().clone())
             .await;
 
-        let prober = ImmediateNeighborProber::new(cfg);
-        let stream = prober.build(channel_graph);
+        let prober = ImmediateNeighborProber::new(cfg, channel_graph);
+        let stream = prober.build();
         pin_mut!(stream);
 
         assert!(timeout(TINY_TIMEOUT, stream.next()).await?.is_some());

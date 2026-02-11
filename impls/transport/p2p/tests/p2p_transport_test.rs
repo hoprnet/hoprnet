@@ -11,7 +11,7 @@ use futures::{
 use hopr_api::network::{NetworkBuilder, PeerDiscovery};
 use hopr_crypto_types::{keypairs::Keypair, prelude::OffchainKeypair};
 use hopr_platform::time::native::current_time;
-use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork, UninitializedPeerStore};
+use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork};
 use hopr_transport_probe::ping::PingQueryReplier;
 use lazy_static::lazy_static;
 
@@ -56,8 +56,7 @@ async fn build_p2p_swarm(
     };
     let multiaddress = Multiaddr::from_str(&multiaddress).context("failed to create a valid multiaddress")?;
 
-    let peer_store = UninitializedPeerStore::default();
-    let network_builder = HoprLibp2pNetworkBuilder::new(peer_store);
+    let network_builder = HoprLibp2pNetworkBuilder::new();
     let (network, process) = network_builder
         .build(
             &random_keypair,

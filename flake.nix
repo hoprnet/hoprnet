@@ -645,7 +645,7 @@
             programs.ruff-format.enable = true;
 
             settings.formatter.rustfmt = {
-              command = "${pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default)}/bin/rustfmt";
+              command = "${pkgs.rust-bin.nightly."2026-01-08".default}/bin/rustfmt";
             };
           };
 

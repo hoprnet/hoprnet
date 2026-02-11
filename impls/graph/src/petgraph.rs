@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use bimap::BiHashMap;
 use hopr_api::{
     OffchainPublicKey,
-    graph::{MeasurableEdge, MeasurableNode},
+    graph::{MeasurableEdge, MeasurableNode, traits::EdgeObservableWrite},
 };
 use parking_lot::RwLock;
 use petgraph::graph::{DiGraph, NodeIndex};
@@ -65,24 +65,33 @@ impl ChannelGraph {
     /// Mutably updates the edge observations between two nodes.
     ///
     /// If the edge exists, applies the given function to its observations.
+    #[tracing::instrument(level = "debug", skip(self, f))]
     fn update_edge<F>(&self, src: &OffchainPublicKey, dest: &OffchainPublicKey, f: F)
     where
         F: FnOnce(&mut Observations),
     {
+        tracing::trace!(%src, %dest, "attempting to update edge observations");
         let mut inner = self.inner.write();
+
         if let (Some(src_idx), Some(dest_idx)) = (
             inner.indices.get_by_left(src).copied(),
             inner.indices.get_by_left(dest).copied(),
         ) {
-            if let Some(edge_idx) = inner.graph.find_edge(src_idx, dest_idx) {
-                if let Some(weight) = inner.graph.edge_weight_mut(edge_idx) {
-                    f(weight);
-                }
+            let edge_idx = inner
+                .graph
+                .find_edge(src_idx, dest_idx)
+                .unwrap_or_else(|| inner.graph.add_edge(src_idx, dest_idx, Observations::default()));
+
+            if let Some(weight) = inner.graph.edge_weight_mut(edge_idx) {
+                tracing::trace!(%src, %dest, "updating edge observations");
+                f(weight);
             }
+        } else {
+            tracing::warn!(%src, %dest, reason = "one or both of the nodes do not exist", "edge update failed" );
         }
     }
 
-    /// Finds all simple paths of exactly `length` hops from `src` to `dest`.
+    /// Finds all simple paths of exactly `length` hops from `src` to `dest`. (naive implementation)
     ///
     /// Returns a list of paths, where each path is a vector of intermediate
     /// [`OffchainPublicKey`]s (excluding `src` and `dest`).
@@ -162,87 +171,17 @@ impl ChannelGraph {
             }
         }
     }
-
-    /// Finds all simple cycles that start and end at `me` with length between 2 and
-    /// `MAX_INTERMEDIATE_HOPS + 1`.
-    fn find_loopback_paths(&self) -> Vec<Vec<OffchainPublicKey>> {
-        let inner = self.inner.read();
-        let Some(me_idx) = inner.indices.get_by_left(&self.me) else {
-            return vec![];
-        };
-
-        let mut results = Vec::new();
-
-        // Try cycle lengths from 2 (me -> A -> me) to MAX_INTERMEDIATE_HOPS + 1
-        for cycle_len in 2..=4 {
-            let mut visited = vec![false; inner.graph.node_count()];
-            let mut current_path = Vec::new();
-            visited[me_idx.index()] = true;
-
-            Self::dfs_loopback(
-                &inner,
-                *me_idx,
-                *me_idx,
-                cycle_len,
-                &mut visited,
-                &mut current_path,
-                &mut results,
-            );
-        }
-
-        results
-    }
-
-    /// DFS helper for finding loopback (cycle) paths.
-    fn dfs_loopback(
-        inner: &InnerGraph,
-        current: NodeIndex,
-        home: NodeIndex,
-        remaining_hops: usize,
-        visited: &mut Vec<bool>,
-        current_path: &mut Vec<OffchainPublicKey>,
-        results: &mut Vec<Vec<OffchainPublicKey>>,
-    ) {
-        if remaining_hops == 0 {
-            return;
-        }
-
-        for neighbor in inner.graph.neighbors(current) {
-            if neighbor == home && remaining_hops == 1 {
-                // Completed a cycle back to home
-                results.push(current_path.clone());
-                continue;
-            }
-
-            if !visited[neighbor.index()] && remaining_hops > 1 {
-                visited[neighbor.index()] = true;
-                if let Some(key) = inner.indices.get_by_right(&neighbor) {
-                    current_path.push(*key);
-                    Self::dfs_loopback(
-                        inner,
-                        neighbor,
-                        home,
-                        remaining_hops - 1,
-                        visited,
-                        current_path,
-                        results,
-                    );
-                    current_path.pop();
-                }
-                visited[neighbor.index()] = false;
-            }
-        }
-    }
 }
 
 #[async_trait::async_trait]
 impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn record_edge<N, P>(&self, update: MeasurableEdge<N, P>)
     where
-        N: hopr_api::graph::MeasurablePeer + Send + Clone,
-        P: hopr_api::graph::MeasurablePath + Send + Clone,
+        N: hopr_api::graph::MeasurablePeer + std::fmt::Debug + Send + Clone,
+        P: hopr_api::graph::MeasurablePath + std::fmt::Debug + Send + Clone,
     {
-        use hopr_api::graph::traits::{EdgeObservable, EdgeWeightType};
+        use hopr_api::graph::traits::EdgeWeightType;
 
         match update {
             MeasurableEdge::Probe(Ok(hopr_api::graph::EdgeTransportTelemetry::Neighbor(ref telemetry))) => {
@@ -287,10 +226,12 @@ impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
         }
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn record_node<N>(&self, update: N)
     where
-        N: MeasurableNode + Clone + Send + Sync + 'static,
+        N: MeasurableNode + std::fmt::Debug + Clone + Send + Sync + 'static,
     {
+        tracing::trace!(?update, "recording node update");
         hopr_api::graph::NetworkGraphWrite::add_node(self, *update.id());
         if update.is_connected() {
             self.inner.write().connected.insert(*update.id());
@@ -341,6 +282,8 @@ impl hopr_api::graph::NetworkGraphView for ChannelGraph {
 
 impl hopr_api::graph::NetworkGraphWrite for ChannelGraph {
     type Error = ChannelGraphError;
+    type NodeId = OffchainPublicKey;
+    type Observed = Observations;
 
     fn add_node(&self, key: OffchainPublicKey) {
         let mut inner = self.inner.write();
@@ -386,7 +329,7 @@ impl hopr_api::graph::NetworkGraphWrite for ChannelGraph {
 impl hopr_api::graph::NetworkGraphTraverse for ChannelGraph {
     type NodeId = OffchainPublicKey;
 
-    async fn routes(&self, destination: &Self::NodeId, length: usize) -> Vec<hopr_api::ct::DestinationRouting> {
+    async fn simple_route(&self, destination: &Self::NodeId, length: usize) -> Vec<hopr_api::ct::DestinationRouting> {
         use hopr_internal_types::prelude::NodeId;
         use hopr_network_types::types::{DestinationRouting, RoutingOptions};
 
@@ -408,32 +351,6 @@ impl hopr_api::graph::NetworkGraphTraverse for ChannelGraph {
             })
             .collect()
     }
-
-    async fn loopback_routes(&self) -> Vec<Vec<hopr_api::ct::DestinationRouting>> {
-        use hopr_internal_types::prelude::NodeId;
-        use hopr_network_types::types::{DestinationRouting, RoutingOptions};
-
-        let paths = self.find_loopback_paths();
-
-        // Group all loopback routes into a single batch
-        let routes: Vec<DestinationRouting> = paths
-            .into_iter()
-            .filter_map(|intermediates| {
-                let node_ids: Vec<NodeId> = intermediates.into_iter().map(NodeId::from).collect();
-                let bounded: hopr_primitive_types::bounded::BoundedVec<
-                    NodeId,
-                    { RoutingOptions::MAX_INTERMEDIATE_HOPS },
-                > = node_ids.try_into().ok()?;
-
-                Some(DestinationRouting::forward_only(
-                    self.me,
-                    RoutingOptions::IntermediatePath(bounded),
-                ))
-            })
-            .collect();
-
-        if routes.is_empty() { vec![] } else { vec![routes] }
-    }
 }
 
 #[cfg(test)]
@@ -442,7 +359,7 @@ mod tests {
     use hex_literal::hex;
     use hopr_api::graph::{
         EdgeTransportObservable, EdgeTransportTelemetry, MeasurablePath, MeasurablePeer, NetworkGraphError,
-        NetworkGraphUpdate, NetworkGraphView, NetworkGraphWrite, traits::EdgeObservable,
+        NetworkGraphTraverse, NetworkGraphUpdate, NetworkGraphView, NetworkGraphWrite, traits::EdgeObservableRead,
     };
     use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
 
@@ -484,10 +401,6 @@ mod tests {
     impl MeasurablePath for TestPath {
         fn id(&self) -> &[u8] {
             &[]
-        }
-
-        fn seq_id(&self) -> u128 {
-            0
         }
 
         fn path(&self) -> &[u8] {
@@ -683,8 +596,6 @@ mod tests {
 
     #[tokio::test]
     async fn routes_returns_direct_route_for_length_one() -> anyhow::Result<()> {
-        use hopr_api::graph::NetworkGraphTraverse;
-
         let me = pubkey_from(&SECRET_0);
         let dest = pubkey_from(&SECRET_1);
 
@@ -692,7 +603,7 @@ mod tests {
         graph.add_node(dest);
         graph.add_edge(&me, &dest)?;
 
-        let routes = graph.routes(&dest, 1).await;
+        let routes = graph.simple_route(&dest, 1).await;
 
         assert_eq!(routes.len(), 1, "should find exactly one 1-hop route");
         assert!(routes[0].is_forward(), "route should be a forward route");
@@ -702,8 +613,6 @@ mod tests {
 
     #[tokio::test]
     async fn routes_returns_two_hop_route_through_intermediate() -> anyhow::Result<()> {
-        use hopr_api::graph::NetworkGraphTraverse;
-
         let me = pubkey_from(&SECRET_0);
         let hop = pubkey_from(&SECRET_1);
         let dest = pubkey_from(&SECRET_2);
@@ -714,7 +623,7 @@ mod tests {
         graph.add_edge(&me, &hop)?;
         graph.add_edge(&hop, &dest)?;
 
-        let routes = graph.routes(&dest, 2).await;
+        let routes = graph.simple_route(&dest, 2).await;
 
         assert!(!routes.is_empty(), "should find at least one 2-hop route");
 
@@ -723,8 +632,6 @@ mod tests {
 
     #[tokio::test]
     async fn routes_returns_empty_when_no_path_exists() -> anyhow::Result<()> {
-        use hopr_api::graph::NetworkGraphTraverse;
-
         let me = pubkey_from(&SECRET_0);
         let dest = pubkey_from(&SECRET_1);
 
@@ -732,7 +639,7 @@ mod tests {
         graph.add_node(dest);
         // No edge between me and dest
 
-        let routes = graph.routes(&dest, 1).await;
+        let routes = graph.simple_route(&dest, 1).await;
 
         assert!(routes.is_empty(), "should return no routes when unreachable");
 
@@ -741,57 +648,13 @@ mod tests {
 
     #[tokio::test]
     async fn routes_returns_empty_for_unknown_destination() -> anyhow::Result<()> {
-        use hopr_api::graph::NetworkGraphTraverse;
-
         let me = pubkey_from(&SECRET_0);
         let unknown = pubkey_from(&SECRET_1);
 
         let graph = ChannelGraph::new(me);
-        let routes = graph.routes(&unknown, 1).await;
+        let routes = graph.simple_route(&unknown, 1).await;
 
         assert!(routes.is_empty());
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn loopback_routes_finds_cycle_through_peers() -> anyhow::Result<()> {
-        use hopr_api::graph::NetworkGraphTraverse;
-
-        let me = pubkey_from(&SECRET_0);
-        let a = pubkey_from(&SECRET_1);
-        let b = pubkey_from(&SECRET_2);
-
-        let graph = ChannelGraph::new(me);
-        graph.add_node(a);
-        graph.add_node(b);
-        // Create a cycle: me -> a -> b -> me
-        graph.add_edge(&me, &a)?;
-        graph.add_edge(&a, &b)?;
-        graph.add_edge(&b, &me)?;
-
-        let routes = graph.loopback_routes().await;
-
-        assert!(!routes.is_empty(), "should find at least one loopback route batch");
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn loopback_routes_returns_empty_when_no_cycle() -> anyhow::Result<()> {
-        use hopr_api::graph::NetworkGraphTraverse;
-
-        let me = pubkey_from(&SECRET_0);
-        let a = pubkey_from(&SECRET_1);
-
-        let graph = ChannelGraph::new(me);
-        graph.add_node(a);
-        graph.add_edge(&me, &a)?;
-        // a has no outgoing edge back, so no cycle
-
-        let routes = graph.loopback_routes().await;
-
-        assert!(routes.is_empty(), "should return empty when no cycle exists");
 
         Ok(())
     }

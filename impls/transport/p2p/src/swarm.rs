@@ -1,13 +1,10 @@
-use std::{
-    num::NonZeroU8,
-    sync::{Arc, OnceLock},
-};
+use std::{num::NonZeroU8, sync::Arc};
 
 use dashmap::DashSet;
 use futures::{FutureExt, Stream, StreamExt};
 use hopr_api::{
     Multiaddr, OffchainKeypair,
-    network::{Health, NetworkBuilder, NetworkView, PeerDiscovery},
+    network::{NetworkBuilder, PeerDiscovery},
 };
 use hopr_network_types::prelude::is_public_address;
 use libp2p::{
@@ -155,68 +152,6 @@ pub struct InactiveConfiguredNetwork {
     swarm: libp2p::Swarm<HoprNetworkBehavior>,
 }
 
-#[derive(Debug, Default, Clone)]
-pub struct UninitializedPeerStore {
-    store: Arc<OnceLock<hopr_transport_network::store::NetworkPeerStore>>,
-    tracker: Arc<DashSet<libp2p::PeerId>>,
-}
-
-impl UninitializedPeerStore {
-    pub fn new() -> Self {
-        Self {
-            store: Arc::new(OnceLock::new()),
-            tracker: Arc::new(DashSet::new()),
-        }
-    }
-
-    pub fn get_store(&self) -> Arc<OnceLock<hopr_transport_network::store::NetworkPeerStore>> {
-        self.store.clone()
-    }
-}
-
-impl NetworkView for UninitializedPeerStore {
-    fn listening_as(&self) -> std::collections::HashSet<Multiaddr> {
-        if let Some(store) = self.store.get() {
-            store.get(store.me()).unwrap_or_default()
-        } else {
-            std::collections::HashSet::new()
-        }
-    }
-
-    fn discovered_peers(&self) -> std::collections::HashSet<libp2p::PeerId> {
-        if let Some(store) = self.store.get() {
-            store.iter_keys().collect()
-        } else {
-            std::collections::HashSet::new()
-        }
-    }
-
-    fn connected_peers(&self) -> std::collections::HashSet<libp2p::PeerId> {
-        self.tracker.iter().map(|r| *r.key()).collect()
-    }
-
-    fn is_connected(&self, peer: &libp2p::PeerId) -> bool {
-        self.tracker.contains(peer)
-    }
-
-    fn multiaddress_of(&self, peer: &libp2p::PeerId) -> Option<std::collections::HashSet<Multiaddr>> {
-        if let Some(store) = self.store.get() {
-            store.get(peer)
-        } else {
-            None
-        }
-    }
-
-    fn health(&self) -> Health {
-        match self.tracker.len() {
-            0 => Health::Red,
-            1 => Health::Orange,
-            2..4 => Health::Yellow,
-            _ => Health::Green,
-        }
-    }
-}
-
 /// Builder of the network view and an actual background process running the libp2p core
 /// event processing loop.
 ///
@@ -224,7 +159,10 @@ impl NetworkView for UninitializedPeerStore {
 /// as well as setup all the interconnections with the underlying network views to allow complex
 /// functionality and signalling.
 pub struct HoprLibp2pNetworkBuilder {
-    store: UninitializedPeerStore,
+    subscribtions: (
+        async_broadcast::Sender<hopr_api::network::NetworkEvent>,
+        async_broadcast::InactiveReceiver<hopr_api::network::NetworkEvent>,
+    ),
 }
 
 impl std::fmt::Debug for HoprLibp2pNetworkBuilder {
@@ -265,13 +203,7 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
 
         let swarm = swarm.swarm;
         let store = hopr_transport_network::store::NetworkPeerStore::new(me, my_multiaddresses.into_iter().collect());
-
-        self.store
-            .store
-            .set(store.clone())
-            .expect("peer store must be settable from the p2p chain");
-
-        let tracker = self.store.tracker.clone();
+        let tracker: Arc<DashSet<libp2p::PeerId>> = Default::default();
 
         let network = HoprNetwork {
             tracker: tracker.clone(),
@@ -473,8 +405,24 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
 }
 
 impl HoprLibp2pNetworkBuilder {
-    pub fn new(store: UninitializedPeerStore) -> Self {
-        Self { store }
+    pub fn new() -> Self {
+        let (tx, rx) = async_broadcast::broadcast(1000);
+        Self {
+            subscribtions: (tx, rx.deactivate()),
+        }
+    }
+
+    pub fn subscribe_network_events(
+        &self,
+    ) -> impl futures::Stream<Item = hopr_api::network::NetworkEvent> + Send + Sync + 'static {
+        let rx = self.subscribtions.1.clone();
+        rx.activate()
+    }
+}
+
+impl Default for HoprLibp2pNetworkBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

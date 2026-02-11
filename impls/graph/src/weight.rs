@@ -1,10 +1,10 @@
 use hopr_api::graph::{
     EdgeTransportObservable,
-    traits::{EdgeObservable, EdgeTransportMeasurement, EdgeWeightType},
+    traits::{EdgeObservableRead, EdgeObservableWrite, EdgeTransportMeasurement, EdgeWeightType},
 };
 use hopr_statistics::ExponentialMovingAverage;
 
-/// A representation of a individual edge measurement
+/// A representation of a individual neighbor link measurement
 #[derive(Debug, Copy, Clone, Default, PartialEq)]
 pub struct TransportLinkMeasurement {
     latency_average: ExponentialMovingAverage<3>,
@@ -34,7 +34,24 @@ impl EdgeTransportObservable for TransportLinkMeasurement {
     }
 
     fn score(&self) -> f64 {
-        self.probe_success_rate.get()
+        self.average_probe_rate() * latency_score(self.average_latency())
+    }
+}
+
+/// Aid in calculation of the overall transport link score.
+///
+/// The smaller the latency over the channel, the more useful the link might
+/// be for routing complext traffic.
+fn latency_score(latency: Option<std::time::Duration>) -> f64 {
+    if let Some(latency) = latency {
+        match latency.as_millis() {
+            0..=75 => 1.0,
+            76..=125 => 0.7,
+            126..=200 => 0.3,
+            _ => 0.15,
+        }
+    } else {
+        0.05
     }
 }
 
@@ -47,10 +64,7 @@ pub struct Observations {
     intermediate_probe: Option<TransportLinkMeasurement>,
 }
 
-impl EdgeObservable for Observations {
-    type ImmediateMeasurement = TransportLinkMeasurement;
-    type IntermediateMeasurement = TransportLinkMeasurement;
-
+impl EdgeObservableWrite for Observations {
     fn record(&mut self, measurement: EdgeWeightType) {
         self.last_update = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -80,6 +94,11 @@ impl EdgeObservable for Observations {
             }
         }
     }
+}
+
+impl EdgeObservableRead for Observations {
+    type ImmediateMeasurement = TransportLinkMeasurement;
+    type IntermediateMeasurement = TransportLinkMeasurement;
 
     #[inline]
     fn last_update(&self) -> std::time::Duration {

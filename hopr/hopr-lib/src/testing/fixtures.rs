@@ -1,8 +1,12 @@
 use std::{convert::identity, ops::Div, str::FromStr, time::Duration};
 
-use futures_time::future::FutureExt;
+use futures::{FutureExt, StreamExt};
+use futures_time::future::FutureExt as _;
 use hex_literal::hex;
-use hopr_api::chain::DeployedSafe;
+use hopr_api::{
+    chain::{ChainEvent, ChainEvents, ChainKeyOperations, DeployedSafe, StateSyncOptions},
+    graph::NetworkGraphUpdate,
+};
 use hopr_chain_connector::{
     BlockchainConnectorConfig,
     blokli_client::BlokliQueryClient,
@@ -12,11 +16,11 @@ use hopr_chain_connector::{
 use hopr_crypto_types::prelude::*;
 use hopr_db_node::HoprNodeDb;
 use hopr_internal_types::prelude::WinningProbability;
-use hopr_network_graph::SharedChannelGraph;
+use hopr_network_graph::{GraphNode, SharedChannelGraph};
 use hopr_network_types::prelude::{IpOrHost, RoutingOptions, SealedHost};
 use hopr_primitive_types::prelude::*;
 use hopr_transport::{HoprSession, SessionClientConfig, SessionTarget};
-use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, UninitializedPeerStore};
+use hopr_transport_p2p::HoprLibp2pNetworkBuilder;
 use rand::prelude::{IteratorRandom, SliceRandom};
 use rstest::fixture;
 use tokio::time::sleep;
@@ -388,19 +392,109 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
                         .await
                         .expect("failed to connect to HoprBlockchainSafeConnector");
 
+                    let connector = std::sync::Arc::new(connector);
+
                     // Create peer store, network builder, and graph
-                    let peer_store = UninitializedPeerStore::default();
-                    let network_builder = HoprLibp2pNetworkBuilder::new(peer_store.clone());
+                    let network_builder = HoprLibp2pNetworkBuilder::new();
                     let me_offchain = *offchain_keys[i].public();
                     let graph: SharedChannelGraph =
                         std::sync::Arc::new(hopr_network_graph::ChannelGraph::new(me_offchain));
+
+                    // START = process chain and network events into graph updates
+                    let chain_events = connector.subscribe_with_state_sync([
+                        StateSyncOptions::AllAccounts,
+                        StateSyncOptions::OpenedChannels,
+                    ])?;
+                    let network_events = network_builder.subscribe_network_events();
+                    let graph_updater = graph.clone();
+                    let chain_reader = connector.clone();
+
+                    let _jh = tokio::spawn(
+                        async move {
+                            use futures_concurrency::stream::StreamExt;
+
+                            enum Event {
+                                Chain(ChainEvent),
+                                Network(crate::api::network::NetworkEvent),
+                            }
+
+                            network_events
+                                .map(Event::Network)
+                                .merge(chain_events.map(Event::Chain))
+                                .for_each(|event| async {
+                                    match event {
+                                        Event::Chain(chain_event) => {
+
+                                            match chain_event {
+                                                ChainEvent::Announcement(account) =>{
+                                                    graph_updater.record_node(GraphNode {
+                                                        id: account.public_key,
+                                                        is_connected: false,
+                                                    }).await;
+                                                },
+                                                ChainEvent::ChannelOpened(channel) => {
+                                                    let from = chain_reader.chain_key_to_packet_key(&channel.source).await;
+                                                    let to = chain_reader.chain_key_to_packet_key(&channel.destination).await;
+
+                                                    match (from, to) {
+                                                        (Ok(Some(_from)), Ok(Some(_to))) => {
+                                                            // graph_updater.record_edge(from, to).await;
+                                                            // TODO: update here
+                                                        },
+                                                        (Ok(_), Ok(_)) => {
+                                                            tracing::error!(%channel, "could not find packet keys for the channel endpoints");
+                                                        },
+                                                        (Err(e), _) | (_, Err(e)) => {
+                                                            tracing::error!(%e, %channel, "failed to convert chain keys to packet keys for graph update");
+                                                        }
+                                                    }
+                                                },
+                                                ChainEvent::ChannelClosureInitiated(_channel) => {},
+                                                ChainEvent::ChannelClosed(_channel) => {},
+                                                ChainEvent::ChannelBalanceIncreased(_channel, _balance) => {},
+                                                ChainEvent::ChannelBalanceDecreased(_channel, _balance) => {},
+                                                ChainEvent::WinningProbabilityIncreased(_probability) => {},
+                                                ChainEvent::WinningProbabilityDecreased(_probability) => {},
+                                                ChainEvent::TicketPriceChanged(_price) => {},
+                                                ChainEvent::TicketRedeemed(_channel_entry, _verified_ticket) => {},
+                                            }
+                                        }
+                                        Event::Network(network_event) => {
+                                            match network_event {
+                                                hopr_api::network::NetworkEvent::PeerConnected(peer_id) =>
+                                                    if let Ok(opk) = crate::peer_id_to_public_key(&peer_id).await {
+                                                        graph_updater.record_node(GraphNode {
+                                                            id: opk,
+                                                            is_connected: true,
+                                                        }).await;
+                                                    } else {
+                                                        tracing::error!(%peer_id, "failed to convert peer ID to public key for graph update");
+                                                    },
+                                                hopr_api::network::NetworkEvent::PeerDisconnected(peer_id) =>
+                                                    if let Ok(opk) = crate::peer_id_to_public_key(&peer_id).await {
+                                                        graph_updater.record_node(GraphNode {
+                                                            id: opk,
+                                                            is_connected: false,
+                                                        }).await;
+                                                    } else {
+                                                        tracing::error!(%peer_id, "failed to convert peer ID to public key for graph update");
+                                                    },
+                                            };
+                                        }
+                                    }
+                                })
+                                .await;
+                        }
+                        .inspect(|_| tracing::warn!(task = "hoprd - Graph", "long-running background task finished")),
+                    );
+                    // END = process chain and network events into graph updates
 
                     let instance = create_hopr_instance(
                         (&onchain_keys[i], &offchain_keys[i]),
                         3001 + i as u16,
                         node_db,
-                        std::sync::Arc::new(connector),
-                        graph,
+                        connector,
+                        graph.clone(),
                         safes[i],
                         if i % 2 != 0 { MINIMUM_INCOMING_WIN_PROB } else { 1.0 },
                     )
@@ -408,7 +502,7 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
 
                     let socket = instance
                         .run(
-                            hopr_ct_telemetry::ImmediateNeighborProber::new(Default::default()),
+                            hopr_ct_telemetry::ImmediateNeighborProber::new(Default::default(), graph),
                             network_builder,
                             EchoServer::new(),
                         )

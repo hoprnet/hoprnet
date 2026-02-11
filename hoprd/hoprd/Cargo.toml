@@ -69,6 +69,7 @@ async-trait = { workspace = true }
 clap = { workspace = true }
 console-subscriber = { workspace = true, optional = true }
 futures = { workspace = true }
+futures-concurrency = { workspace = true }
 hex = { workspace = true }
 home = "0.5.12"
 humansize = { workspace = true, optional = true, features = ["no_alloc"] }
@@ -100,6 +101,7 @@ opentelemetry_sdk = { workspace = true, optional = true }
 tracing-opentelemetry = { workspace = true, optional = true }
 
 hopr-strategy = { workspace = true }
+hopr-api = { workspace = true, features = ["network"] }
 hopr-lib = { workspace = true, features = [
   "runtime-tokio",
   "session-client",

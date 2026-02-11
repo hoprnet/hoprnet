@@ -133,23 +133,19 @@ pub struct PathTelemetry {
     pub id: [u8; Self::ID_SIZE],
     /// Path information encoded as bytes
     pub path: [u8; Self::PATH_SIZE],
-    /// Sequence identifier representing the order of the telemetry measurement
-    /// inside the existing id corresponding to an internal designation
-    pub seq_id: u128,
     /// Timestamp when the telemetry was created
     pub timestamp: u128,
 }
 
 impl PathTelemetry {
     pub const ID_SIZE: usize = 10;
-    pub const PATH_SIZE: usize = 10;
-    pub const SIZE: usize = Self::ID_SIZE + Self::PATH_SIZE + size_of::<u128>() + size_of::<u128>();
+    pub const PATH_SIZE: usize = 10 * size_of::<u128>();
+    pub const SIZE: usize = Self::ID_SIZE + Self::PATH_SIZE + size_of::<u128>();
 
     pub fn to_bytes(self) -> Box<[u8]> {
         let mut out = Vec::with_capacity(Self::SIZE);
         out.extend_from_slice(&self.id);
         out.extend_from_slice(&self.path);
-        out.extend_from_slice(&self.seq_id.to_be_bytes());
         out.extend_from_slice(&self.timestamp.to_be_bytes());
         out.into_boxed_slice()
     }
@@ -162,10 +158,6 @@ impl hopr_api::graph::MeasurablePath for PathTelemetry {
 
     fn path(&self) -> &[u8] {
         &self.path
-    }
-
-    fn seq_id(&self) -> u128 {
-        self.seq_id
     }
 
     fn timestamp(&self) -> u128 {
@@ -193,19 +185,14 @@ impl<'a> TryFrom<&'a [u8]> for PathTelemetry {
     fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
         if value.len() == Self::SIZE {
             Ok(Self {
-                id: (&value[0..10])
+                id: (&value[0..Self::ID_SIZE])
                     .try_into()
                     .map_err(|_| GeneralError::ParseError("PathTelemetry.id".into()))?,
-                path: (&value[10..20])
+                path: (&value[Self::ID_SIZE..(Self::ID_SIZE + Self::PATH_SIZE)])
                     .try_into()
                     .map_err(|_| GeneralError::ParseError("PathTelemetry.path".into()))?,
-                seq_id: u128::from_be_bytes(
-                    (&value[20..36])
-                        .try_into()
-                        .map_err(|_| GeneralError::ParseError("PathTelemetry.seq_id".into()))?,
-                ),
                 timestamp: u128::from_be_bytes(
-                    (&value[36..52])
+                    (&value[(Self::ID_SIZE + Self::PATH_SIZE)..Self::SIZE])
                         .try_into()
                         .map_err(|_| GeneralError::ParseError("PathTelemetry.timestamp".into()))?,
                 ),

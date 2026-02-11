@@ -26,17 +26,18 @@ pub trait MeasurablePeer {
 /// Measurable path telemetry.
 pub trait MeasurablePath {
     fn id(&self) -> &[u8];
-    fn seq_id(&self) -> u128;
     fn path(&self) -> &[u8];
     fn timestamp(&self) -> u128;
 }
 
+#[derive(Debug, Copy, Clone)]
 pub struct EdgeCapacityUpdate {
     pub capacity: Option<u128>,
     pub src: OffchainPublicKey,
     pub dest: OffchainPublicKey,
 }
 
+#[derive(Debug)]
 pub enum MeasurableEdge<N, P>
 where
     N: MeasurablePeer + Clone,

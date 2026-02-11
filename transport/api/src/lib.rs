@@ -39,7 +39,7 @@ use helpers::PathPlanner;
 use hopr_api::{
     chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
     db::HoprDbTicketOperations,
-    graph::{NetworkGraphUpdate, NetworkGraphView, traits::EdgeObservable},
+    graph::{NetworkGraphUpdate, NetworkGraphView, traits::EdgeObservableRead},
     network::{NetworkBuilder, NetworkStreamControl},
 };
 pub use hopr_api::{
@@ -63,7 +63,7 @@ use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId, Protocol};
 use hopr_transport_mixer::MixerConfig;
 use hopr_transport_probe::{
-    Probe, TrafficGeneration,
+    Probe, ProbingTrafficGeneration,
     ping::{PingConfig, Pinger},
 };
 pub use hopr_transport_probe::{errors::ProbeError, ping::PingQueryReplier};
@@ -247,7 +247,7 @@ where
         S: futures::Stream<Item = PeerDiscovery> + Send + 'static,
         T: futures::Sink<TicketEvent> + Clone + Send + Unpin + 'static,
         T::Error: std::error::Error,
-        Ct: TrafficGeneration<NodeId = OffchainPublicKey> + Send + Sync + 'static,
+        Ct: ProbingTrafficGeneration + Send + Sync + 'static,
         NetBuilder: NetworkBuilder<Network = Net> + Send + Sync + 'static,
     {
         info!("loading initial peers from the chain");

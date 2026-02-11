@@ -20,6 +20,7 @@ runtime-tokio = ["libp2p/tokio", "hopr-transport-probe/runtime-tokio"]
 transport-quic = ["libp2p/quic"]
 
 [dependencies]
+async-broadcast = { workspace = true }
 async-trait = { workspace = true }
 backon = { workspace = true }
 futures = { workspace = true }
