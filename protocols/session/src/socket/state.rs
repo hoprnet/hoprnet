@@ -63,7 +63,7 @@ pub trait SocketState<const C: usize>: Send {
 pub struct Stateless<const C: usize>(String);
 
 impl<const C: usize> Stateless<C> {
-    pub fn new<I: std::fmt::Display>(session_id: I) -> Self {
+    pub(crate) fn new<I: std::fmt::Display>(session_id: I) -> Self {
         Self(session_id.to_string())
     }
 }

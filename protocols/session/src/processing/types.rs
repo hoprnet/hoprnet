@@ -113,6 +113,7 @@ impl TryFrom<FrameBuilder> for Frame {
 #[derive(Clone, Debug)]
 pub struct FrameInspector(pub(crate) FrameDashMap);
 
+#[allow(clippy::len_without_is_empty)]
 impl FrameInspector {
     /// Indicates how many incomplete frames there could be per one complete/discarded frame.
     pub const INCOMPLETE_FRAME_RATIO: usize = 2;

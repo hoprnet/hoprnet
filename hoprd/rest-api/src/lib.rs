@@ -304,6 +304,7 @@ async fn build_api(
                 .route("/peers/{destination}/stats", get(peers::peer_stats))
                 .route("/session/config/{id}", get(session::session_config))
                 .route("/session/config/{id}", post(session::adjust_session))
+                .route("/session/stats/{id}", get(session::session_stats))
                 .route("/session/{protocol}", post(session::create_client))
                 .route("/session/{protocol}", get(session::list_clients))
                 .route("/session/{protocol}/{ip}/{port}", delete(session::close_client))

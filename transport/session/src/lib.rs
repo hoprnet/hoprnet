@@ -10,6 +10,7 @@
 pub(crate) mod balancer;
 pub mod errors;
 mod manager;
+#[cfg(feature = "stats")]
 mod stats;
 mod types;
 mod utils;
@@ -18,6 +19,7 @@ pub use balancer::{AtomicSurbFlowEstimator, MIN_BALANCER_SAMPLING_INTERVAL, Surb
 pub use hopr_network_types::types::*;
 pub use hopr_protocol_session::AcknowledgementMode;
 pub use manager::{DispatchResult, MIN_SURB_BUFFER_DURATION, SessionManager, SessionManagerConfig};
+#[cfg(feature = "stats")]
 pub use stats::{
     AckSnapshot, FrameBufferSnapshot, SessionAckMode, SessionLifecycleState, SessionLifetimeSnapshot, SessionStats,
     SessionStatsSnapshot, StatsState, SurbSnapshot, TransportSnapshot,

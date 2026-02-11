@@ -3,6 +3,9 @@
 pub mod ack_state;
 pub mod state;
 
+#[cfg(feature = "stats")]
+pub mod stats;
+
 use std::{
     pin::Pin,
     sync::{Arc, atomic::AtomicU32},
@@ -82,6 +85,8 @@ pub struct SessionSocket<const C: usize, S> {
     downstream_frames_out: Pin<Box<dyn futures::io::AsyncRead + Send>>,
     state: S,
     write_state: WriteState,
+    #[cfg(feature = "stats")]
+    stats: Arc<stats::SessionSocketStats>,
 }
 
 impl<const C: usize> SessionSocket<C, Stateless<C>> {
@@ -122,6 +127,9 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         let preassembly_span = tracing::debug_span!("SessionSocket::packets_in::pre_reassembly", session_id = %id);
         let presequence_span = tracing::debug_span!("SessionSocket::packets_in::pre_sequencing", session_id = %id);
         let postsequence_span = tracing::debug_span!("SessionSocket::packets_in::post_sequencing", session_id = %id);
+
+        #[cfg(feature = "stats")]
+        let stats = Arc::new(stats::SessionSocketStats::default());
 
         let (packets_in_abort_handle, packets_in_abort_reg) = AbortHandle::new_pair();
 
@@ -195,6 +203,8 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
             } else {
                 WriteState::WriteOnly
             },
+            #[cfg(feature = "stats")]
+            stats,
         })
     }
 }
@@ -219,6 +229,12 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         // Check if we allow sending multiple segments to downstream in a single write
         // The HWM cannot be 0 bytes
         framed.set_send_high_water_mark(1.max(cfg.max_buffered_segments * C));
+
+        #[cfg(feature = "stats")]
+        let stats = Arc::new(stats::SessionSocketStats::default());
+
+        #[cfg(feature = "stats")]
+        let mut state = stats::StatsStateWrapper(state, stats.clone());
 
         // Downstream transport
         let (packets_out, packets_in) = framed.split();
@@ -374,7 +390,6 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
             .into_async_read();
 
         Ok(Self {
-            state,
             upstream_frames_in: Box::pin(upstream_frames_in),
             downstream_frames_out: Box::pin(downstream_frames_out),
             write_state: if cfg.flush_immediately {
@@ -382,6 +397,12 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
             } else {
                 WriteState::WriteOnly
             },
+            #[cfg(feature = "stats")]
+            state: state.0.clone(),
+            #[cfg(not(feature = "stats"))]
+            state,
+            #[cfg(feature = "stats")]
+            stats,
         })
     }
 }

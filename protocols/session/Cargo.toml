@@ -1,6 +1,6 @@
 [package]
 name = "hopr-protocol-session"
-version = "1.0.3"
+version = "1.1.0"
 edition = "2024"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains implementation of Session protocol according to HOPR RFC-0007"
@@ -11,6 +11,7 @@ license = "GPL-3.0-only"
 [features]
 default = ["hashbrown"]
 serde = ["dep:serde", "dep:serde_bytes", "hopr-crypto-packet/serde"]
+stats = []
 runtime-tokio = ["dep:tokio", "hopr-async-runtime/runtime-tokio"]
 hashbrown = ["dep:hashbrown"]
 prometheus = ["dep:hopr-metrics", "dep:lazy_static"]

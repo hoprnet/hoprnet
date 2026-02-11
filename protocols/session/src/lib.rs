@@ -47,6 +47,9 @@ pub use socket::{
     state::{SocketComponents, SocketState, Stateless},
 };
 
+#[cfg(feature = "stats")]
+pub use socket::stats::SessionSocketStats;
+
 // Enable exports of additional Session protocol types
 #[cfg(feature = "session-types")]
 pub mod types {

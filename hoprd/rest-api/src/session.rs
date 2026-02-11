@@ -7,8 +7,9 @@ use axum::{
 };
 use base64::Engine;
 use hopr_lib::{
-    Address, NodeId, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities, SessionClientConfig, SessionId,
-    SessionManagerError, SessionTarget, SessionLifecycleState, SessionAckMode, SessionStatsSnapshot, SurbBalancerConfig, TransportSessionError,
+    Address, NodeId, SESSION_MTU, SURB_SIZE, ServiceId, SessionAckMode, SessionCapabilities, SessionClientConfig,
+    SessionId, SessionLifecycleState, SessionManagerError, SessionStatsSnapshot, SessionTarget, SurbBalancerConfig,
+    TransportSessionError,
     errors::{HoprLibError, HoprTransportError},
 };
 use hopr_utils_session::{ListenerId, build_binding_host, create_tcp_client_binding, create_udp_client_binding};

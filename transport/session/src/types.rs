@@ -19,17 +19,13 @@ use hopr_primitive_types::{
     prelude::{BytesRepresentable, ToHex},
 };
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
-use hopr_protocol_session::{
-    AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, SessionSocket, SessionSocketConfig,
-    Stateless,
-};
+use hopr_protocol_session::{AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, ReliableSocket, SessionSocket, SessionSocketConfig, Stateless, UnreliableSocket};
 use hopr_protocol_start::StartProtocol;
 use tracing::{debug, instrument};
 
 use crate::{
     Capabilities, Capability,
     errors::TransportSessionError,
-    stats::{SessionStats, StatsState},
 };
 
 /// Wrapper for [`Capabilities`] that makes conversion to/from `u8` possible.
@@ -346,8 +342,11 @@ pub struct HoprSession {
     routing: DestinationRouting,
     cfg: HoprSessionConfig,
     on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
-    metrics: Arc<SessionStats>,
+    #[cfg(feature = "stats")]
+    metrics: Arc<crate::stats::SessionStats>,
 }
+
+pub(crate) const SESSION_SOCKET_CAPACITY: usize = 16384;
 
 impl HoprSession {
     /// Creates a new HOPR Session.
@@ -363,8 +362,8 @@ impl HoprSession {
         routing: DestinationRouting,
         cfg: HoprSessionConfig,
         hopr: (Tx, Rx),
-        metrics: Arc<SessionStats>,
         on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
+        #[cfg(feature = "stats")] metrics: Arc<crate::stats::SessionStats>,
     ) -> Result<Self, TransportSessionError>
     where
         Tx: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Send + Sync + Unpin + 'static,
@@ -404,7 +403,7 @@ impl HoprSession {
             let socket_cfg = SessionSocketConfig {
                 frame_size: cfg.frame_mtu,
                 frame_timeout: cfg.frame_timeout,
-                capacity: 16384,
+                capacity: SESSION_SOCKET_CAPACITY,
                 flush_immediately: cfg.capabilities.contains(Capability::NoDelay),
                 ..Default::default()
             };
@@ -430,16 +429,17 @@ impl HoprSession {
 
                 debug!(?socket_cfg, ?ack_cfg, "opening new stateful session socket");
 
-                let state = StatsState::new(
+                Box::new(ReliableSocket::new(
+                    transport,
                     AcknowledgementState::<{ ApplicationData::PAYLOAD_SIZE }>::new(id, ack_cfg),
-                    metrics.clone(),
-                );
-                Box::new(SessionSocket::new(transport, state, socket_cfg)?)
+                    socket_cfg,
+                )?)
             } else {
                 debug!(?socket_cfg, "opening new stateless session socket");
 
-                let state = StatsState::new(Stateless::<{ ApplicationData::PAYLOAD_SIZE }>::new(id), metrics.clone());
-                Box::new(SessionSocket::new(transport, state, socket_cfg)?)
+                Box::new(UnreliableSocket::<{ ApplicationData::PAYLOAD_SIZE }>::new_stateless(
+                    id, transport, socket_cfg,
+                )?)
             }
         } else {
             debug!("opening raw session socket");
@@ -471,7 +471,8 @@ impl HoprSession {
         &self.cfg
     }
 
-    pub fn metrics(&self) -> &Arc<SessionStats> {
+    #[cfg(feature = "stats")]
+    pub fn metrics(&self) -> &Arc<crate::stats::SessionStats> {
         &self.metrics
     }
 }
@@ -486,7 +487,7 @@ impl std::fmt::Debug for HoprSession {
 }
 
 impl futures::AsyncRead for HoprSession {
-    #[instrument(name = "Session::poll_read", level = "trace", skip(self, cx, buf), fields(session_id = %self.id), ret)]
+    #[instrument(name = "Session::poll_read", level = "trace", skip_all, fields(session_id = %self.id), ret)]
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
         let this = self.project();
         let read = futures::ready!(this.inner.poll_read(cx, buf))?;
@@ -503,18 +504,17 @@ impl futures::AsyncRead for HoprSession {
 }
 
 impl futures::AsyncWrite for HoprSession {
-    #[instrument(name = "Session::poll_write", level = "trace", skip(self, cx, buf), fields(session_id = %self.id), ret)]
+    #[instrument(name = "Session::poll_write", level = "trace", skip_all, fields(session_id = %self.id), ret)]
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
-        let this = self.project();
-        this.inner.poll_write(cx, buf)
+        self.project().inner.poll_write(cx, buf)
     }
 
-    #[instrument(name = "Session::poll_flush", level = "trace", skip(self, cx), fields(session_id = %self.id), ret)]
+    #[instrument(name = "Session::poll_flush", level = "trace", skip_all, fields(session_id = %self.id), ret)]
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         self.project().inner.poll_flush(cx)
     }
 
-    #[instrument(name = "Session::poll_close", level = "trace", skip(self, cx), fields(session_id = %self.id), ret)]
+    #[instrument(name = "Session::poll_close", level = "trace", skip_all, fields(session_id = %self.id), ret)]
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         let this = self.project();
         futures::ready!(this.inner.poll_close(cx))?;
@@ -638,8 +638,9 @@ mod tests {
                     })
                     .inspect(|d| debug!("alice rcvd: {}", d.data.total_len())),
             ),
-            alice_metrics,
             None,
+            #[cfg(feature = "stats")]
+            alice_metrics,
         )?;
 
         let mut bob_session = HoprSession::new(
@@ -655,8 +656,9 @@ mod tests {
                     })
                     .inspect(|d| debug!("bob rcvd: {}", d.data.total_len())),
             ),
-            bob_metrics,
             None,
+            #[cfg(feature = "stats")]
+            bob_metrics,
         )?;
 
         let alice_sent = hopr_crypto_random::random_bytes::<DATA_LEN>();
@@ -733,8 +735,9 @@ mod tests {
                     })
                     .inspect(|d| debug!("alice rcvd: {}", d.data.total_len())),
             ),
-            alice_metrics,
             None,
+            #[cfg(feature = "stats")]
+            alice_metrics
         )?;
 
         let mut bob_session = HoprSession::new(
@@ -753,8 +756,9 @@ mod tests {
                     })
                     .inspect(|d| debug!("bob rcvd: {}", d.data.total_len())),
             ),
-            bob_metrics,
             None,
+            #[cfg(feature = "stats")]
+            bob_metrics,
         )?;
 
         let alice_sent = hopr_crypto_random::random_bytes::<DATA_LEN>();
