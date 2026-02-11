@@ -486,10 +486,6 @@ mod tests {
             &[]
         }
 
-        fn seq_id(&self) -> u128 {
-            0
-        }
-
         fn path(&self) -> &[u8] {
             &[]
         }

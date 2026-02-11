@@ -1,5 +1,5 @@
-use futures::StreamExt;
-use hopr_api::ct::{DestinationRouting, NetworkGraphView, TrafficGeneration};
+use futures::{StreamExt, stream::BoxStream};
+use hopr_api::ct::{DestinationRouting, NetworkGraphView, ProbingTrafficGeneration};
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::protocol::HoprPseudonym;
@@ -55,10 +55,10 @@ impl ImmediateNeighborProber {
     }
 }
 
-impl TrafficGeneration for ImmediateNeighborProber {
+impl ProbingTrafficGeneration for ImmediateNeighborProber {
     type NodeId = OffchainPublicKey;
 
-    fn build<U>(self, network_graph: U) -> impl futures::Stream<Item = DestinationRouting> + Send
+    fn build<U>(&self, network_graph: U) -> BoxStream<'static, DestinationRouting>
     where
         U: NetworkGraphView<NodeId = OffchainPublicKey> + Send + Sync + 'static,
     {
@@ -98,6 +98,7 @@ impl TrafficGeneration for ImmediateNeighborProber {
                         .ok()
                 }
             })
+            .boxed()
     }
 }
 

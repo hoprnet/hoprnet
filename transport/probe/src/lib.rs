@@ -26,7 +26,7 @@ pub mod probe;
 pub mod types;
 
 pub use hopr_api::{
-    ct::TrafficGeneration,
+    ct::ProbingTrafficGeneration,
     graph::{EdgeTransportTelemetry, NetworkGraphError},
 };
 

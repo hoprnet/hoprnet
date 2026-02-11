@@ -3,7 +3,7 @@ use std::sync::Arc;
 use futures::{FutureExt, SinkExt, StreamExt, pin_mut};
 use futures_concurrency::stream::StreamExt as _;
 use hopr_api::{
-    ct::TrafficGeneration,
+    ct::ProbingTrafficGeneration,
     graph::{EdgeTransportTelemetry, NetworkGraphError, NetworkGraphUpdate, NetworkGraphView},
 };
 use hopr_async_runtime::AbortableList;
@@ -46,7 +46,7 @@ impl Probe {
         api: (T, U),      // lower (tx, rx) channels for sending and receiving messages
         manual_events: V, // explicit requests from the API
         move_up: Up,      // forward up non-probing messages from the network
-        traffic_generator: Tr,
+        probing_traffic_generator: Tr,
         network_graph: G,
     ) -> AbortableList<HoprProbeProcess>
     where
@@ -55,12 +55,12 @@ impl Probe {
         U: futures::Stream<Item = (HoprPseudonym, ApplicationDataIn)> + Send + Sync + 'static,
         V: futures::Stream<Item = (OffchainPublicKey, PingQueryReplier)> + Send + Sync + 'static,
         Up: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Clone + Send + Sync + 'static,
-        Tr: TrafficGeneration<NodeId = G::NodeId> + Send + Sync + 'static,
+        Tr: ProbingTrafficGeneration<NodeId = G::NodeId> + Send + Sync + 'static,
         G: NetworkGraphView + NetworkGraphUpdate + Clone + Send + Sync + 'static,
     {
         let max_parallel_probes = self.cfg.max_parallel_probes;
 
-        let probing_routes = traffic_generator.build(network_graph.clone());
+        let probing_routes = probing_traffic_generator.build(network_graph.clone());
 
         // Currently active probes
         let network_graph_internal = network_graph.clone();

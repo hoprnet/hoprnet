@@ -1,3 +1,4 @@
+use futures::stream::BoxStream;
 pub use hopr_network_types::types::DestinationRouting;
 
 pub use crate::graph::traits::NetworkGraphView;
@@ -11,11 +12,11 @@ pub use crate::graph::traits::NetworkGraphView;
 /// The implementor should ensure that the produced routes are indefinite,
 /// since the exhaustion of the stream might result in termination of the
 /// cover traffic generation.
-pub trait TrafficGeneration {
+pub trait ProbingTrafficGeneration {
     /// The type of node identifier used by this traffic generator.
     type NodeId: Send;
 
-    fn build<T>(self, network_graph: T) -> impl futures::Stream<Item = DestinationRouting> + Send
+    fn build<T>(&self, network_graph: T) -> BoxStream<'static, DestinationRouting>
     where
         T: NetworkGraphView<NodeId = Self::NodeId> + Send + Sync + 'static;
 }
