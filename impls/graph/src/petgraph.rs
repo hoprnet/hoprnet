@@ -291,7 +291,7 @@ impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
     where
         N: MeasurableNode + Clone + Send + Sync + 'static,
     {
-        hopr_api::graph::NetworkGraphWrite::add_node(self, update.id().clone());
+        hopr_api::graph::NetworkGraphWrite::add_node(self, *update.id());
         if update.is_connected() {
             self.inner.write().connected.insert(*update.id());
         } else {

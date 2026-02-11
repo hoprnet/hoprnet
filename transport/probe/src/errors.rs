@@ -1,4 +1,4 @@
-use hopr_api::{OffchainPublicKey, graph::NetworkGraphError};
+use hopr_api::graph::NetworkGraphError;
 use thiserror::Error;
 
 use crate::types::PathTelemetry;
@@ -8,14 +8,11 @@ pub enum ProbeError {
     #[error("probing traffic error: {0}")]
     TrafficError(NetworkGraphError<PathTelemetry>),
 
-    #[error("error while decoding message data")]
-    DecodingError,
-
     #[error("peer does not exist")]
     NonExistingPeer,
 
-    #[error("error while pinging peer {0}: {1}")]
-    PingerError(OffchainPublicKey, String),
+    #[error("error while pinging peer: {0}")]
+    PingerError(String),
 
     #[error("error sending probe: {0}")]
     SendError(String),
