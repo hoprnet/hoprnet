@@ -217,7 +217,7 @@ where
                             }
                         }
                         Err(error) => {
-                            tracing::error!(%peer, %error, "failed to open a stream to peer");
+                            tracing::debug!(%peer, %error, "failed to open a stream to peer");
                         }
                     }
                 }
