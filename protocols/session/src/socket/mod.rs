@@ -15,14 +15,16 @@ use std::{
 
 use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt, future, future::AbortHandle};
 use futures_concurrency::stream::Merge;
-use state::SocketState;
+use state::{SocketComponents, SocketState, Stateless};
+#[cfg(feature = "stats")]
+use stats::SessionStatisticsTracker;
+use strum::IntoDiscriminant;
 use tracing::{Instrument, instrument};
 
 use crate::{
     errors::SessionError,
     processing::{ReassemblerExt, SegmenterExt, SequencerExt, types::FrameInspector},
-    protocol::{OrderedFrame, SegmentRequest, SeqIndicator, SessionCodec, SessionMessage},
-    socket::state::{SocketComponents, Stateless},
+    protocol::{OrderedFrame, SegmentRequest, SeqIndicator, SessionCodec, SessionMessage, SessionMessageDiscriminants},
 };
 
 /// Configuration object for [`SessionSocket`].
@@ -56,12 +58,18 @@ pub struct SessionSocketConfig {
     /// Default is 8192.
     #[default(8192)]
     pub capacity: usize,
-
     /// Flushes data written to the socket immediately to the underlying transport.
     ///
     /// Default is false.
     #[default(false)]
     pub flush_immediately: bool,
+    /// Capacity of the control channel, the maximum number of outstanding control messages.
+    ///
+    /// This option affects stateful sockets.
+    ///
+    /// Default is 2048.
+    #[default(2048)]
+    pub control_channel_capacity: usize,
 }
 
 enum WriteState {
@@ -85,8 +93,6 @@ pub struct SessionSocket<const C: usize, S> {
     // This is where upstream reads the reconstructed frame data from
     downstream_frames_out: Pin<Box<dyn futures::io::AsyncRead + Send>>,
     write_state: WriteState,
-    #[cfg(feature = "stats")]
-    stats: Arc<stats::SessionSocketStats>,
 }
 
 impl<const C: usize> SessionSocket<C, Stateless<C>> {
@@ -94,7 +100,12 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
     ///
     /// Note that this results in a faster socket than if created via [`SessionSocket::new`] with
     /// [`Stateless`]. This is because the frame inspector does not need to be instantiated.
-    pub fn new_stateless<T, I>(id: I, transport: T, cfg: SessionSocketConfig) -> Result<Self, SessionError>
+    pub fn new_stateless<T, I>(
+        id: I,
+        transport: T,
+        cfg: SessionSocketConfig,
+        #[cfg(feature = "stats")] stats: impl SessionStatisticsTracker + Clone + Send + 'static,
+    ) -> Result<Self, SessionError>
     where
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
         I: std::fmt::Display + Clone,
@@ -116,18 +127,14 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         let (packets_out, packets_in) = framed.split();
 
         // If needed, add also stats to individual stages.
-        // This socket does not have a state, so the stats cannot be hooked up there.
         #[cfg(feature = "stats")]
-        let (s0, s1, s2, s3, stats) = {
-            let s = Arc::new(stats::SessionSocketStats::default());
-            (s.clone(), s.clone(), s.clone(), s.clone(), s)
-        };
+        let (s0, s1, s2, s3) = { (stats.clone(), stats.clone(), stats.clone(), stats.clone()) };
 
         // Pipeline IN: Data incoming from Upstream
         let upstream_frames_in = packets_out
             .with(move |segment| {
                 #[cfg(feature = "stats")]
-                s0.inc_outgoing_segments();
+                s0.outgoing_message(SessionMessageDiscriminants::Segment);
 
                 future::ok::<_, SessionError>(SessionMessage::<C>::Segment(segment))
             })
@@ -152,10 +159,10 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                 let _span = stage1_span.enter();
                 futures::future::ready(match packet {
                     Ok(packet) => {
-                        #[cfg(feature = "stats")]
-                        s1.inc_incoming_session_message(&packet);
-
                         packet.try_as_segment().filter(|s| {
+                            #[cfg(feature = "stats")]
+                            s1.incoming_message(SessionMessageDiscriminants::Segment);
+
                             // Filter old frame ids to save space in the Reassembler
                             let last_emitted_id = last_emitted_frame.load(std::sync::atomic::Ordering::Relaxed);
                             if s.frame_id <= last_emitted_id {
@@ -165,11 +172,11 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                                 true
                             }
                         })
-                    },
+                    }
                     Err(error) => {
                         tracing::error!(%error, "unparseable packet");
                         #[cfg(feature = "stats")]
-                        s1.inc_errors();
+                        s1.error();
                         None
                     }
                 })
@@ -182,13 +189,13 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                 futures::future::ready(match maybe_frame {
                     Ok(frame) => {
                         #[cfg(feature = "stats")]
-                        s2.inc_frames_completed();
+                        s2.frame_completed();
                         Some(OrderedFrame(frame))
-                    },
+                    }
                     Err(error) => {
-                        #[cfg(feature = "stats")]
-                        s2.inc_incomplete_frames();
                         tracing::error!(%error, "failed to reassemble frame");
+                        #[cfg(feature = "stats")]
+                        s2.incomplete_frame();
                         None
                     }
                 })
@@ -206,21 +213,21 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                             packets_in_abort_handle.abort();
                         }
                         #[cfg(feature = "stats")]
-                        s3.inc_frames_emitted();
+                        s3.frame_emitted();
                         Some(Ok(frame.0))
                     }
                     // Downstream skips discarded frames
                     Err(SessionError::FrameDiscarded(frame_id)) | Err(SessionError::IncompleteFrame(frame_id)) => {
                         tracing::error!(frame_id, "frame discarded");
                         #[cfg(feature = "stats")]
-                        s3.inc_frames_discarded();
+                        s3.frame_discarded();
                         None
                     }
                     Err(err) => {
                         #[cfg(feature = "stats")]
-                        s3.inc_errors();
+                        s3.error();
                         Some(Err(std::io::Error::other(err)))
-                    },
+                    }
                 })
             })
             .into_async_read();
@@ -234,8 +241,6 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
             } else {
                 WriteState::WriteOnly
             },
-            #[cfg(feature = "stats")]
-            stats
         })
     }
 }
@@ -243,7 +248,12 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
 impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
     /// Creates a stateful socket with frame inspection capabilities - suitable for communication
     /// requiring TCP-like delivery guarantees.
-    pub fn new<T>(transport: T, mut state: S, cfg: SessionSocketConfig) -> Result<Self, SessionError>
+    pub fn new<T>(
+        transport: T,
+        mut state: S,
+        cfg: SessionSocketConfig,
+        #[cfg(feature = "stats")] stats: impl SessionStatisticsTracker + Clone + Send + 'static,
+    ) -> Result<Self, SessionError>
     where
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
     {
@@ -263,24 +273,18 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
 
         // If needed, add also stats to individual stages.
         #[cfg(feature = "stats")]
-        let (s0, s1, s2, s3, stats) = {
-            let s = Arc::new(stats::SessionSocketStats::default());
-            (s.clone(), s.clone(), s.clone(), s.clone(), s)
-        };
+        let (s0, s1, s2, s3) = { (stats.clone(), stats.clone(), stats.clone(), stats.clone()) };
 
         // Downstream transport
         let (packets_out, packets_in) = framed.split();
 
         let inspector = FrameInspector::new(cfg.capacity);
 
-        let ctl_channel_capacity = std::env::var("HOPR_INTERNAL_SESSION_CTL_CHANNEL_CAPACITY")
-            .ok()
-            .and_then(|s| s.trim().parse::<usize>().ok())
-            .filter(|&c| c > 0)
-            .unwrap_or(2048);
-
-        tracing::debug!(capacity = ctl_channel_capacity, "Creating session control channel");
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(ctl_channel_capacity);
+        tracing::debug!(
+            capacity = cfg.control_channel_capacity,
+            "creating session control channel"
+        );
+        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(cfg.control_channel_capacity.max(128));
         state.run(SocketComponents {
             inspector: Some(inspector.clone()),
             ctl_tx,
@@ -291,11 +295,9 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         let mut st_1 = state.clone();
         let upstream_frames_in = segments_tx
             .with(move |segment| {
-                let _span = tracing::debug_span!(
-                    "SessionSocket::packets_out::segmenter",
-                    session_id = st_1.session_id()
-                ).entered();
-
+                let _span =
+                    tracing::debug_span!("SessionSocket::packets_out::segmenter", session_id = st_1.session_id())
+                        .entered();
                 // The segment_sent event is raised only for segments coming from Upstream,
                 // not for the segments from the Control stream (= segment resends).
                 if let Err(error) = st_1.segment_sent(&segment) {
@@ -312,7 +314,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 .merge()
                 .map(move |msg| {
                     #[cfg(feature = "stats")]
-                    s0.inc_outgoing_session_message(&msg);
+                    s0.outgoing_message(msg.discriminant());
                     Ok(msg)
                 })
                 .forward(packets_out)
@@ -350,15 +352,11 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 .entered();
                 futures::future::ready(match packet {
                     Ok(packet) => {
-                        if let Err(error) = match &packet {
-                            SessionMessage::Segment(s) => st_1.incoming_segment(&s.id(), s.seq_flags),
-                            SessionMessage::Request(r) => st_1.incoming_retransmission_request(r.clone()),
-                            SessionMessage::Acknowledge(a) => st_1.incoming_acknowledged_frames(a.clone()),
-                        } {
+                        if let Err(error) = st_1.incoming_message(&packet) {
                             tracing::debug!(%error, "incoming message state update failed");
                         }
                         #[cfg(feature = "stats")]
-                        s1.inc_outgoing_session_message(&packet);
+                        s1.incoming_message(packet.discriminant());
 
                         // Filter old frame ids to save space in the Reassembler
                         packet.try_as_segment().filter(|s| {
@@ -374,7 +372,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                     Err(error) => {
                         tracing::error!(%error, "unparseable packet");
                         #[cfg(feature = "stats")]
-                        s1.inc_errors();
+                        s1.error();
                         None
                     }
                 })
@@ -394,13 +392,13 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                             tracing::error!(%error, "frame complete state update failed");
                         }
                         #[cfg(feature = "stats")]
-                        s2.inc_frames_completed();
+                        s2.frame_completed();
                         Some(OrderedFrame(frame))
                     }
                     Err(error) => {
                         tracing::error!(%error, "failed to reassemble frame");
                         #[cfg(feature = "stats")]
-                        s2.inc_incomplete_frames();
+                        s2.incomplete_frame();
                         None
                     }
                 })
@@ -427,7 +425,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                             packets_in_abort_handle.abort();
                         }
                         #[cfg(feature = "stats")]
-                        s3.inc_frames_emitted();
+                        s3.frame_emitted();
                         Some(Ok(frame.0))
                     }
                     Err(SessionError::FrameDiscarded(frame_id)) | Err(SessionError::IncompleteFrame(frame_id)) => {
@@ -435,14 +433,14 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                             tracing::error!(%error, "frame discarded state update failed");
                         }
                         #[cfg(feature = "stats")]
-                        s3.inc_frames_discarded();
+                        s3.frame_discarded();
                         None // Downstream skips discarded frames
                     }
                     Err(err) => {
                         #[cfg(feature = "stats")]
-                        s3.inc_errors();
+                        s3.error();
                         Some(Err(std::io::Error::other(err)))
-                    },
+                    }
                 })
             })
             .into_async_read();
@@ -456,8 +454,6 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
             } else {
                 WriteState::WriteOnly
             },
-            #[cfg(feature = "stats")]
-            stats
         })
     }
 }
@@ -546,6 +542,8 @@ mod tests {
     use hopr_crypto_packet::prelude::HoprPacket;
 
     use super::*;
+    #[cfg(feature = "stats")]
+    use crate::socket::stats::NoopTracker;
     use crate::{AcknowledgementState, AcknowledgementStateConfig, utils::test::*};
 
     const MTU: usize = HoprPacket::PAYLOAD_SIZE;
@@ -563,8 +561,20 @@ mod tests {
             ..Default::default()
         };
 
-        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless("alice", alice, sock_cfg)?;
-        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless("bob", bob, sock_cfg)?;
+        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
+            "alice",
+            alice,
+            sock_cfg,
+            #[cfg(feature = "stats")]
+            NoopTracker,
+        )?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
+            "bob",
+            bob,
+            sock_cfg,
+            #[cfg(feature = "stats")]
+            NoopTracker,
+        )?;
 
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
 
@@ -602,9 +612,20 @@ mod tests {
             ..Default::default()
         };
 
-        let mut alice_socket =
-            SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), sock_cfg)?;
-        let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), sock_cfg)?;
+        let mut alice_socket = SessionSocket::<MTU, _>::new(
+            alice,
+            AcknowledgementState::new("alice", ack_cfg),
+            sock_cfg,
+            #[cfg(feature = "stats")]
+            NoopTracker,
+        )?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new(
+            bob,
+            AcknowledgementState::new("bob", ack_cfg),
+            sock_cfg,
+            #[cfg(feature = "stats")]
+            NoopTracker,
+        )?;
 
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
 
@@ -636,8 +657,20 @@ mod tests {
             ..Default::default()
         };
 
-        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless("alice", alice, sock_cfg)?;
-        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless("bob", bob, sock_cfg)?;
+        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
+            "alice",
+            alice,
+            sock_cfg,
+            #[cfg(feature = "stats")]
+            NoopTracker,
+        )?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
+            "bob",
+            bob,
+            sock_cfg,
+            #[cfg(feature = "stats")]
+            NoopTracker,
+        )?;
 
         let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket
@@ -688,9 +721,20 @@ mod tests {
             ..Default::default()
         };
 
-        let mut alice_socket =
-            SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), sock_cfg)?;
-        let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), sock_cfg)?;
+        let mut alice_socket = SessionSocket::<MTU, _>::new(
+            alice,
+            AcknowledgementState::new("alice", ack_cfg),
+            sock_cfg,
+            #[cfg(feature = "stats")]
+            NoopTracker,
+        )?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new(
+            bob,
+            AcknowledgementState::new("bob", ack_cfg),
+            sock_cfg,
+            #[cfg(feature = "stats")]
+            NoopTracker,
+        )?;
 
         let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket
@@ -737,8 +781,20 @@ mod tests {
             ..Default::default()
         };
 
-        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless("alice", alice, sock_cfg)?;
-        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless("bob", bob, sock_cfg)?;
+        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
+            "alice",
+            alice,
+            sock_cfg,
+            #[cfg(feature = "stats")]
+            NoopTracker,
+        )?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
+            "bob",
+            bob,
+            sock_cfg,
+            #[cfg(feature = "stats")]
+            NoopTracker,
+        )?;
 
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket
@@ -780,9 +836,20 @@ mod tests {
             ..Default::default()
         };
 
-        let mut alice_socket =
-            SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), sock_cfg)?;
-        let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), sock_cfg)?;
+        let mut alice_socket = SessionSocket::<MTU, _>::new(
+            alice,
+            AcknowledgementState::new("alice", ack_cfg),
+            sock_cfg,
+            #[cfg(feature = "stats")]
+            NoopTracker,
+        )?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new(
+            bob,
+            AcknowledgementState::new("bob", ack_cfg),
+            sock_cfg,
+            #[cfg(feature = "stats")]
+            NoopTracker,
+        )?;
 
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket
@@ -818,8 +885,20 @@ mod tests {
             ..Default::default()
         };
 
-        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless("alice", alice, sock_cfg)?;
-        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless("bob", bob, sock_cfg)?;
+        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
+            "alice",
+            alice,
+            sock_cfg,
+            #[cfg(feature = "stats")]
+            NoopTracker,
+        )?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
+            "bob",
+            bob,
+            sock_cfg,
+            #[cfg(feature = "stats")]
+            NoopTracker,
+        )?;
 
         let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket
@@ -875,9 +954,20 @@ mod tests {
             ..Default::default()
         };
 
-        let mut alice_socket =
-            SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), sock_cfg)?;
-        let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), sock_cfg)?;
+        let mut alice_socket = SessionSocket::<MTU, _>::new(
+            alice,
+            AcknowledgementState::new("alice", ack_cfg),
+            sock_cfg,
+            #[cfg(feature = "stats")]
+            NoopTracker,
+        )?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new(
+            bob,
+            AcknowledgementState::new("bob", ack_cfg),
+            sock_cfg,
+            #[cfg(feature = "stats")]
+            NoopTracker,
+        )?;
 
         let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket
@@ -936,8 +1026,20 @@ mod tests {
             ..Default::default()
         };
 
-        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless("alice", alice, alice_cfg)?;
-        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless("bob", bob, bob_cfg)?;
+        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
+            "alice",
+            alice,
+            alice_cfg,
+            #[cfg(feature = "stats")]
+            NoopTracker,
+        )?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
+            "bob",
+            bob,
+            bob_cfg,
+            #[cfg(feature = "stats")]
+            NoopTracker,
+        )?;
 
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket
@@ -991,9 +1093,20 @@ mod tests {
             ..Default::default()
         };
 
-        let mut alice_socket =
-            SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), alice_cfg)?;
-        let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), bob_cfg)?;
+        let mut alice_socket = SessionSocket::<MTU, _>::new(
+            alice,
+            AcknowledgementState::new("alice", ack_cfg),
+            alice_cfg,
+            #[cfg(feature = "stats")]
+            NoopTracker,
+        )?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new(
+            bob,
+            AcknowledgementState::new("bob", ack_cfg),
+            bob_cfg,
+            #[cfg(feature = "stats")]
+            NoopTracker,
+        )?;
 
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
 
@@ -1052,8 +1165,20 @@ mod tests {
             ..Default::default()
         };
 
-        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless("alice", alice, alice_cfg)?;
-        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless("bob", bob, bob_cfg)?;
+        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
+            "alice",
+            alice,
+            alice_cfg,
+            #[cfg(feature = "stats")]
+            NoopTracker,
+        )?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
+            "bob",
+            bob,
+            bob_cfg,
+            #[cfg(feature = "stats")]
+            NoopTracker,
+        )?;
 
         let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket
@@ -1128,11 +1253,23 @@ mod tests {
             ..Default::default()
         };
 
-        let (mut alice_rx, mut alice_tx) =
-            SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), alice_cfg)?.split();
+        let (mut alice_rx, mut alice_tx) = SessionSocket::<MTU, _>::new(
+            alice,
+            AcknowledgementState::new("alice", ack_cfg),
+            alice_cfg,
+            #[cfg(feature = "stats")]
+            NoopTracker,
+        )?
+        .split();
 
-        let (mut bob_rx, mut bob_tx) =
-            SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), bob_cfg)?.split();
+        let (mut bob_rx, mut bob_tx) = SessionSocket::<MTU, _>::new(
+            bob,
+            AcknowledgementState::new("bob", ack_cfg),
+            bob_cfg,
+            #[cfg(feature = "stats")]
+            NoopTracker,
+        )?
+        .split();
 
         let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
         let (alice_data_tx, alice_recv_data) = futures::channel::oneshot::channel();

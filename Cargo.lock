@@ -4929,6 +4929,7 @@ dependencies = [
  "anyhow",
  "aquamarine",
  "asynchronous-codec",
+ "auto_impl",
  "bitvec",
  "bytes",
  "clap",

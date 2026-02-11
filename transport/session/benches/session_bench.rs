@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use futures::{AsyncReadExt, AsyncWriteExt, FutureExt, StreamExt};
 use hopr_crypto_random::Randomizable;
@@ -6,7 +8,7 @@ use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::prelude::{DestinationRouting, RoutingOptions};
 use hopr_primitive_types::prelude::Address;
 use hopr_protocol_app::{prelude::ApplicationDataOut, v1::ApplicationDataIn};
-use hopr_transport_session::{Capabilities, Capability, HoprSession, HoprSessionConfig, SessionId};
+use hopr_transport_session::{Capabilities, Capability, HoprSession, HoprSessionConfig, SessionId, SessionStats};
 use rand::{Rng, thread_rng};
 
 // Avoid musl's default allocator due to degraded performance
@@ -46,6 +48,8 @@ pub async fn alice_send_data(
             }),
         ),
         None,
+        #[cfg(feature = "stats")]
+        SessionStats::new(id, None, 1500, Duration::from_millis(800), 8192).into(),
     )
     .unwrap();
 
@@ -75,6 +79,8 @@ pub async fn bob_receive_data(
         },
         (bob_tx, futures::stream::iter(data).map(|data| data)),
         None,
+        #[cfg(feature = "stats")]
+        SessionStats::new(id, None, 1500, Duration::from_millis(800), 8192).into(),
     )
     .unwrap();
 

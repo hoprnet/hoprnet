@@ -9,9 +9,9 @@ repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
 [features]
-default = ["hashbrown"]
+default = ["hashbrown", "stats"]
 serde = ["dep:serde", "dep:serde_bytes", "hopr-crypto-packet/serde"]
-stats = []
+stats = ["dep:auto_impl"]
 runtime-tokio = ["dep:tokio", "hopr-async-runtime/runtime-tokio"]
 hashbrown = ["dep:hashbrown"]
 prometheus = ["dep:hopr-metrics", "dep:lazy_static"]
@@ -27,6 +27,7 @@ allocator-jemalloc = [
 [dependencies]
 aquamarine = { workspace = true }
 asynchronous-codec = { workspace = true }
+auto_impl = { workspace = true, optional = true }
 bitvec = { workspace = true }
 bytes = { workspace = true }
 dashmap = { workspace = true }

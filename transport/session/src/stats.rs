@@ -6,16 +6,13 @@
 
 use std::{
     sync::{
-        Arc, OnceLock,
+        OnceLock,
         atomic::{AtomicBool, AtomicU8, AtomicU64, AtomicUsize, Ordering},
     },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use hopr_protocol_session::{
-    AcknowledgementMode, FrameAcknowledgements, FrameId, FrameInspector, Segment, SegmentId, SegmentRequest,
-    SeqIndicator, SocketComponents, SocketState,
-};
+use hopr_protocol_session::{AcknowledgementMode, FrameInspector, SessionMessageDiscriminants};
 
 use crate::{SessionId, balancer::AtomicSurbFlowEstimator};
 
@@ -85,6 +82,8 @@ pub struct SessionLifetimeSnapshot {
     pub idle: Duration,
     /// Current lifecycle state of the session.
     pub state: SessionLifecycleState,
+    /// Errors during pipeline processing.
+    pub pipeline_errors: u64,
 }
 
 /// Snapshot of frame buffer metrics.
@@ -97,7 +96,7 @@ pub struct FrameBufferSnapshot {
     /// Configured capacity of the frame buffer.
     pub frame_capacity: usize,
     /// Number of frames currently being assembled (incomplete).
-    pub incomplete_frames: usize,
+    pub frames_being_assembled: usize,
     /// Total number of frames successfully completed/assembled.
     pub frames_completed: u64,
     /// Total number of frames emitted to the application.
@@ -113,12 +112,16 @@ pub struct AckSnapshot {
     pub mode: SessionAckMode,
     /// Total incoming segments received.
     pub incoming_segments: u64,
+    /// Total retransmission requests received.
+    pub incoming_retransmission_requests: u64,
+    /// Total frames acknowledged by the peer.
+    pub incoming_acknowledged_frames: u64,
     /// Total outgoing segments sent.
     pub outgoing_segments: u64,
     /// Total retransmission requests received.
-    pub retransmission_requests: u64,
+    pub outgoing_retransmission_requests: u64,
     /// Total frames acknowledged by the peer.
-    pub acknowledged_frames: u64,
+    pub outgoing_acknowledged_frames: u64,
 }
 
 /// Snapshot of SURB (Single Use Reply Block) metrics.
@@ -183,14 +186,18 @@ pub struct SessionStats {
     frame_mtu: usize,
     frame_timeout: Duration,
     frame_capacity: usize,
-    incomplete_frames: AtomicUsize,
+    frames_being_reassembled: AtomicUsize,
+    frames_incomplete: AtomicU64,
     frames_completed: AtomicU64,
     frames_emitted: AtomicU64,
     frames_discarded: AtomicU64,
     incoming_segments: AtomicU64,
     outgoing_segments: AtomicU64,
-    retransmission_requests: AtomicU64,
-    acknowledged_frames: AtomicU64,
+    incoming_retransmission_requests: AtomicU64,
+    incoming_acknowledged_frames: AtomicU64,
+    outgoing_retransmission_requests: AtomicU64,
+    outgoing_acknowledged_frames: AtomicU64,
+    session_pipeline_errors: AtomicU64,
     bytes_in: AtomicU64,
     bytes_out: AtomicU64,
     packets_in: AtomicU64,
@@ -222,14 +229,18 @@ impl SessionStats {
             frame_mtu,
             frame_timeout,
             frame_capacity,
-            incomplete_frames: AtomicUsize::new(0),
+            frames_being_reassembled: AtomicUsize::new(0),
+            frames_incomplete: AtomicU64::new(0),
             frames_completed: AtomicU64::new(0),
             frames_emitted: AtomicU64::new(0),
             frames_discarded: AtomicU64::new(0),
             incoming_segments: AtomicU64::new(0),
+            incoming_retransmission_requests: AtomicU64::new(0),
+            incoming_acknowledged_frames: AtomicU64::new(0),
             outgoing_segments: AtomicU64::new(0),
-            retransmission_requests: AtomicU64::new(0),
-            acknowledged_frames: AtomicU64::new(0),
+            outgoing_retransmission_requests: AtomicU64::new(0),
+            outgoing_acknowledged_frames: AtomicU64::new(0),
+            session_pipeline_errors: AtomicU64::new(0),
             bytes_in: AtomicU64::new(0),
             bytes_out: AtomicU64::new(0),
             packets_in: AtomicU64::new(0),
@@ -311,43 +322,8 @@ impl SessionStats {
     /// Updates the count of incomplete frames from the frame inspector.
     fn record_incomplete_frames(&self) {
         if let Some(inspector) = self.inspector.get() {
-            self.incomplete_frames.store(inspector.len(), Ordering::Relaxed);
+            self.frames_being_reassembled.store(inspector.len(), Ordering::Relaxed);
         }
-    }
-
-    /// Records the receipt of an incoming segment.
-    fn record_incoming_segment(&self) {
-        self.incoming_segments.fetch_add(1, Ordering::Relaxed);
-    }
-
-    /// Records the transmission of an outgoing segment.
-    fn record_outgoing_segment(&self) {
-        self.outgoing_segments.fetch_add(1, Ordering::Relaxed);
-    }
-
-    /// Records retransmission requests with the specified count.
-    fn record_retransmission_request(&self, count: usize) {
-        self.retransmission_requests.fetch_add(count as u64, Ordering::Relaxed);
-    }
-
-    /// Records acknowledged frames with the specified count.
-    fn record_acknowledged_frames(&self, count: usize) {
-        self.acknowledged_frames.fetch_add(count as u64, Ordering::Relaxed);
-    }
-
-    /// Records a frame completion event.
-    fn record_frame_complete(&self) {
-        self.frames_completed.fetch_add(1, Ordering::Relaxed);
-    }
-
-    /// Records a frame emission event.
-    fn record_frame_emitted(&self) {
-        self.frames_emitted.fetch_add(1, Ordering::Relaxed);
-    }
-
-    /// Records a frame discard event.
-    fn record_frame_discarded(&self) {
-        self.frames_discarded.fetch_add(1, Ordering::Relaxed);
     }
 
     /// Creates a snapshot of all current metrics.
@@ -386,12 +362,13 @@ impl SessionStats {
                 uptime: Duration::from_micros(uptime_us),
                 idle: Duration::from_micros(idle_us),
                 state,
+                pipeline_errors: self.session_pipeline_errors.load(Ordering::Relaxed),
             },
             frame_buffer: FrameBufferSnapshot {
                 frame_mtu: self.frame_mtu,
                 frame_timeout: self.frame_timeout,
                 frame_capacity: self.frame_capacity,
-                incomplete_frames: self.incomplete_frames.load(Ordering::Relaxed),
+                frames_being_assembled: self.frames_being_reassembled.load(Ordering::Relaxed),
                 frames_completed: self.frames_completed.load(Ordering::Relaxed),
                 frames_emitted: self.frames_emitted.load(Ordering::Relaxed),
                 frames_discarded: self.frames_discarded.load(Ordering::Relaxed),
@@ -400,8 +377,10 @@ impl SessionStats {
                 mode: self.ack_mode,
                 incoming_segments: self.incoming_segments.load(Ordering::Relaxed),
                 outgoing_segments: self.outgoing_segments.load(Ordering::Relaxed),
-                retransmission_requests: self.retransmission_requests.load(Ordering::Relaxed),
-                acknowledged_frames: self.acknowledged_frames.load(Ordering::Relaxed),
+                incoming_retransmission_requests: self.incoming_retransmission_requests.load(Ordering::Relaxed),
+                incoming_acknowledged_frames: self.incoming_acknowledged_frames.load(Ordering::Relaxed),
+                outgoing_retransmission_requests: self.outgoing_retransmission_requests.load(Ordering::Relaxed),
+                outgoing_acknowledged_frames: self.outgoing_acknowledged_frames.load(Ordering::Relaxed),
             },
             surb: SurbSnapshot {
                 produced_total: produced,
@@ -451,7 +430,6 @@ impl SessionStats {
     }
 }
 
-
 /// Returns the current time as microseconds since the Unix epoch.
 fn now_us() -> u64 {
     SystemTime::now()
@@ -460,12 +438,62 @@ fn now_us() -> u64 {
         .as_micros() as u64
 }
 
+impl hopr_protocol_session::SessionStatisticsTracker for SessionStats {
+    fn frame_emitted(&self) {
+        self.frames_emitted.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn frame_completed(&self) {
+        self.frames_completed.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn frame_discarded(&self) {
+        self.frames_discarded.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn incomplete_frame(&self) {
+        self.frames_incomplete.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn incoming_message(&self, msg: SessionMessageDiscriminants) {
+        match msg {
+            SessionMessageDiscriminants::Segment => {
+                self.incoming_segments.fetch_add(1, Ordering::Relaxed);
+            }
+            SessionMessageDiscriminants::Request => {
+                self.incoming_retransmission_requests.fetch_add(1, Ordering::Relaxed);
+            }
+            SessionMessageDiscriminants::Acknowledge => {
+                self.incoming_acknowledged_frames.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+    }
+
+    fn outgoing_message(&self, msg: SessionMessageDiscriminants) {
+        match msg {
+            SessionMessageDiscriminants::Segment => {
+                self.outgoing_segments.fetch_add(1, Ordering::Relaxed);
+            }
+            SessionMessageDiscriminants::Request => {
+                self.outgoing_retransmission_requests.fetch_add(1, Ordering::Relaxed);
+            }
+            SessionMessageDiscriminants::Acknowledge => {
+                self.outgoing_acknowledged_frames.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+    }
+
+    fn error(&self) {
+        self.session_pipeline_errors.fetch_add(1, Ordering::Relaxed);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use futures::channel::mpsc;
     use hopr_crypto_random::Randomizable;
     use hopr_internal_types::prelude::HoprPseudonym;
-    use hopr_protocol_session::Stateless;
+    use hopr_protocol_session::{SessionStatisticsTracker, Stateless};
 
     use super::*;
     use crate::SessionId;
@@ -492,9 +520,9 @@ mod tests {
         let id = SessionId::new(2_u64, HoprPseudonym::random());
         let metrics = SessionStats::new(id, None, 1500, Duration::from_millis(800), 1024);
 
-        metrics.record_frame_complete();
-        metrics.record_frame_emitted();
-        metrics.record_frame_discarded();
+        metrics.frame_completed();
+        metrics.frame_emitted();
+        metrics.frame_discarded();
 
         let snapshot = metrics.snapshot();
 

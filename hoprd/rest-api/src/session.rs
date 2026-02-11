@@ -824,12 +824,16 @@ pub(crate) struct SessionStatsAck {
     pub mode: SessionStatsAckMode,
     /// Total incoming segments received.
     pub incoming_segments: u64,
+    /// Total incoming retransmission requests received.
+    pub incoming_retransmission_requests: u64,
+    /// Total incoming frame acknowledgements.
+    pub incoming_acknowledged_frames: u64,
     /// Total outgoing segments sent.
     pub outgoing_segments: u64,
-    /// Total retransmission requests received.
-    pub retransmission_requests: u64,
-    /// Total frames acknowledged by the peer.
-    pub acknowledged_frames: u64,
+    /// Total outgoing retransmission requests received.
+    pub outgoing_retransmission_requests: u64,
+    /// Total outgoing frames acknowledgements
+    pub outgoing_acknowledged_frames: u64,
 }
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -915,7 +919,7 @@ impl From<SessionStatsSnapshot> for SessionStatsResponse {
                 frame_mtu: value.frame_buffer.frame_mtu,
                 frame_timeout_ms: value.frame_buffer.frame_timeout.as_millis() as u64,
                 frame_capacity: value.frame_buffer.frame_capacity,
-                incomplete_frames: value.frame_buffer.incomplete_frames,
+                incomplete_frames: value.frame_buffer.frames_being_assembled,
                 frames_completed: value.frame_buffer.frames_completed,
                 frames_emitted: value.frame_buffer.frames_emitted,
                 frames_discarded: value.frame_buffer.frames_discarded,
@@ -923,9 +927,11 @@ impl From<SessionStatsSnapshot> for SessionStatsResponse {
             ack: SessionStatsAck {
                 mode: value.ack.mode.into(),
                 incoming_segments: value.ack.incoming_segments,
+                incoming_retransmission_requests: value.ack.incoming_retransmission_requests,
+                incoming_acknowledged_frames: value.ack.incoming_acknowledged_frames,
                 outgoing_segments: value.ack.outgoing_segments,
-                retransmission_requests: value.ack.retransmission_requests,
-                acknowledged_frames: value.ack.acknowledged_frames,
+                outgoing_acknowledged_frames: value.ack.outgoing_acknowledged_frames,
+                outgoing_retransmission_requests: value.ack.outgoing_retransmission_requests,
             },
             surb: SessionStatsSurb {
                 produced_total: value.surb.produced_total,

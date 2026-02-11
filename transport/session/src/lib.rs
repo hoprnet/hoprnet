@@ -22,7 +22,7 @@ pub use manager::{DispatchResult, MIN_SURB_BUFFER_DURATION, SessionManager, Sess
 #[cfg(feature = "stats")]
 pub use stats::{
     AckSnapshot, FrameBufferSnapshot, SessionAckMode, SessionLifecycleState, SessionLifetimeSnapshot, SessionStats,
-    SessionStatsSnapshot, StatsState, SurbSnapshot, TransportSnapshot,
+    SessionStatsSnapshot, SurbSnapshot, TransportSnapshot,
 };
 pub use types::{
     ByteCapabilities, HoprSession, HoprSessionConfig, IncomingSession, ServiceId, SessionId, SessionTarget,

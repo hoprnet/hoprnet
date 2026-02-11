@@ -19,14 +19,14 @@ use hopr_primitive_types::{
     prelude::{BytesRepresentable, ToHex},
 };
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
-use hopr_protocol_session::{AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, ReliableSocket, SessionSocket, SessionSocketConfig, Stateless, UnreliableSocket};
+use hopr_protocol_session::{
+    AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, ReliableSocket, SessionSocketConfig,
+    UnreliableSocket,
+};
 use hopr_protocol_start::StartProtocol;
 use tracing::{debug, instrument};
 
-use crate::{
-    Capabilities, Capability,
-    errors::TransportSessionError,
-};
+use crate::{Capabilities, Capability, errors::TransportSessionError};
 
 /// Wrapper for [`Capabilities`] that makes conversion to/from `u8` possible.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -372,12 +372,14 @@ impl HoprSession {
     {
         let routing_clone = routing.clone();
 
+        #[cfg(feature = "stats")]
+        let (metrics_write, metrics_read) = (metrics.clone(), metrics.clone());
+
         // Wrap the HOPR transport so that it appears as regular transport to the SessionSocket
-        let metrics_write = metrics.clone();
-        let metrics_read = metrics.clone();
         let transport = DuplexIO(
             AsyncWriteSink::<{ ApplicationData::PAYLOAD_SIZE }, _>(hopr.0.sink_map_err(std::io::Error::other).with(
                 move |buf: Box<[u8]>| {
+                    #[cfg(feature = "stats")]
                     metrics_write.record_write(buf.len());
                     // The Session protocol does not set any packet info on outgoing packets.
                     // However, the SessionManager on top usually overrides this.
@@ -392,6 +394,7 @@ impl HoprSession {
             // It is typically SessionManager's job to interpret those.
             hopr.1
                 .map(move |data| {
+                    #[cfg(feature = "stats")]
                     metrics_read.record_read(data.data.plain_text.len());
                     Ok::<_, std::io::Error>(data.data.plain_text)
                 })
@@ -433,12 +436,18 @@ impl HoprSession {
                     transport,
                     AcknowledgementState::<{ ApplicationData::PAYLOAD_SIZE }>::new(id, ack_cfg),
                     socket_cfg,
+                    #[cfg(feature = "stats")]
+                    metrics.clone(),
                 )?)
             } else {
                 debug!(?socket_cfg, "opening new stateless session socket");
 
                 Box::new(UnreliableSocket::<{ ApplicationData::PAYLOAD_SIZE }>::new_stateless(
-                    id, transport, socket_cfg,
+                    id,
+                    transport,
+                    socket_cfg,
+                    #[cfg(feature = "stats")]
+                    metrics.clone(),
                 )?)
             }
         } else {
@@ -737,7 +746,7 @@ mod tests {
             ),
             None,
             #[cfg(feature = "stats")]
-            alice_metrics
+            alice_metrics,
         )?;
 
         let mut bob_session = HoprSession::new(

@@ -1,99 +1,40 @@
-use std::sync::atomic::{AtomicU64, Ordering};
-use crate::protocol::SessionMessage;
+pub use crate::protocol::SessionMessageDiscriminants;
 
-/// Various statistics for a [`SessionSocket`](crate::SessionSocket).
-#[derive(Debug, Default)]
-pub struct SessionSocketStats {
-    errors: AtomicU64,
-    incomplete_frames: AtomicU64,
-    frames_completed: AtomicU64,
-    frames_emitted: AtomicU64,
-    frames_discarded: AtomicU64,
-    incoming_segments: AtomicU64,
-    incoming_retransmission_requests: AtomicU64,
-    incoming_acknowledged_frames: AtomicU64,
-    outgoing_segments: AtomicU64,
-    outgoing_retransmission_requests: AtomicU64,
-    outgoing_acknowledged_frames: AtomicU64,
+/// Used to track various statistics of a [`SessionSocket`](crate::SessionSocket).
+#[auto_impl::auto_impl(&, Arc)]
+pub trait SessionStatisticsTracker {
+    /// Records a frame that has been emitted from the Sequencer.
+    fn frame_emitted(&self);
+    /// Records a frame that has successfully reassembled by the Reassembler.
+    fn frame_completed(&self);
+    /// Records a frame that has been discarded due to timeout or other errors.
+    fn frame_discarded(&self);
+    /// Records an incomplete frame that could not be reassembled.
+    fn incomplete_frame(&self);
+    /// Records an incoming Session message.
+    fn incoming_message(&self, msg: SessionMessageDiscriminants);
+    /// Records an outgoing Session message.
+    fn outgoing_message(&self, msg: SessionMessageDiscriminants);
+    /// Records an error that occurred during processing of a Session packet.
+    fn error(&self);
 }
 
-impl SessionSocketStats {
-    pub(crate) fn inc_errors(&self) {
-        self.errors.fetch_add(1, Ordering::Relaxed);
-    }
+/// Session socket statistics tracker that does nothing.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
+pub struct NoopTracker;
 
-    pub(crate) fn inc_incomplete_frames(&self) {
-        self.incomplete_frames.fetch_add(1, Ordering::Relaxed);
-    }
+impl SessionStatisticsTracker for NoopTracker {
+    fn frame_emitted(&self) {}
 
-    pub(crate) fn inc_frames_completed(&self) {
-        self.frames_completed.fetch_add(1, Ordering::Relaxed);
-    }
+    fn frame_completed(&self) {}
 
-    pub(crate) fn inc_frames_emitted(&self) {
-        self.frames_emitted.fetch_add(1, Ordering::Relaxed);
-    }
+    fn frame_discarded(&self) {}
 
-    pub(crate) fn inc_frames_discarded(&self) {
-        self.frames_discarded.fetch_add(1, Ordering::Relaxed);
-    }
+    fn incomplete_frame(&self) {}
 
-    pub(crate) fn inc_outgoing_segments(&self) {
-        self.outgoing_segments.fetch_add(1, Ordering::Relaxed);
-    }
+    fn incoming_message(&self, _: SessionMessageDiscriminants) {}
 
-    pub(crate) fn inc_incoming_session_message<const C: usize>(&self, msg: &SessionMessage<C>) {
-        match msg {
-            SessionMessage::Segment(_) => self.incoming_segments.fetch_add(1, Ordering::Relaxed),
-            SessionMessage::Request(_) => self.incoming_retransmission_requests.fetch_add(1, Ordering::Relaxed),
-            SessionMessage::Acknowledge(f) => self.incoming_acknowledged_frames.fetch_add(f.len() as u64, Ordering::Relaxed),
-        };
-    }
+    fn outgoing_message(&self, _: SessionMessageDiscriminants) {}
 
-    pub(crate) fn inc_outgoing_session_message<const C: usize>(&self, msg: &SessionMessage<C>) {
-        match msg {
-            SessionMessage::Segment(_) => self.outgoing_segments.fetch_add(1, Ordering::Relaxed),
-            SessionMessage::Request(_) => self.outgoing_retransmission_requests.fetch_add(1, Ordering::Relaxed),
-            SessionMessage::Acknowledge(f) => self.outgoing_acknowledged_frames.fetch_add(f.len() as u64, Ordering::Relaxed),
-        };
-    }
-
-    pub fn incomplete_frames(&self) -> u64 {
-        self.incomplete_frames.load(Ordering::Relaxed)
-    }
-
-    pub fn frames_completed(&self) -> u64 {
-        self.frames_completed.load(Ordering::Relaxed)
-    }
-
-    pub fn frames_emitted(&self) -> u64 {
-        self.frames_emitted.load(Ordering::Relaxed)
-    }
-
-    pub fn frames_discarded(&self) -> u64 {
-        self.frames_discarded.load(Ordering::Relaxed)
-    }
-
-    pub fn incoming_segments(&self) -> u64 {
-        self.incoming_segments.load(Ordering::Relaxed)
-    }
-
-    pub fn outgoing_segments(&self) -> u64 {
-        self.outgoing_segments.load(Ordering::Relaxed)
-    }
-
-    pub fn incoming_retransmission_requests(&self) -> u64 {
-        self.incoming_retransmission_requests.load(Ordering::Relaxed)
-    }
-    pub fn incoming_acknowledged_frames(&self) -> u64 {
-        self.incoming_acknowledged_frames.load(Ordering::Relaxed)
-    }
-
-    pub fn outgoing_retransmission_requests(&self) -> u64 {
-        self.outgoing_retransmission_requests.load(Ordering::Relaxed)
-    }
-
-    pub fn outgoing_acknowledged_frames(&self) -> u64 {
-        self.outgoing_acknowledged_frames.load(Ordering::Relaxed)
-    }
+    fn error(&self) {}
 }

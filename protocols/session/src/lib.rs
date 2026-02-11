@@ -41,14 +41,13 @@ pub(crate) mod utils;
 
 pub use processing::types::FrameInspector;
 pub use protocol::{FrameAcknowledgements, FrameId, Segment, SegmentId, SegmentRequest, SeqIndicator};
+#[cfg(feature = "stats")]
+pub use socket::stats::{NoopTracker, SessionMessageDiscriminants, SessionStatisticsTracker};
 pub use socket::{
     SessionSocket, SessionSocketConfig,
     ack_state::{AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig},
     state::{SocketComponents, SocketState, Stateless},
 };
-
-#[cfg(feature = "stats")]
-pub use socket::stats::SessionSocketStats;
 
 // Enable exports of additional Session protocol types
 #[cfg(feature = "session-types")]
@@ -80,7 +79,14 @@ pub trait SessionSocketExt: futures::io::AsyncRead + futures::io::AsyncWrite + S
     where
         Self: Sized + 'static,
     {
-        SessionSocket::new(self, ack, cfg)
+        #[cfg(feature = "stats")]
+        {
+            SessionSocket::new(self, ack, cfg, NoopTracker)
+        }
+        #[cfg(not(feature = "stats"))]
+        {
+            SessionSocket::new(self, ack, cfg)
+        }
     }
 
     /// Runs [unreliable](UnreliableSocket) Session protocol on self.
@@ -92,7 +98,14 @@ pub trait SessionSocketExt: futures::io::AsyncRead + futures::io::AsyncWrite + S
     where
         Self: Sized + 'static,
     {
-        SessionSocket::new_stateless(id, self, cfg)
+        #[cfg(feature = "stats")]
+        {
+            SessionSocket::new_stateless(id, self, cfg, NoopTracker)
+        }
+        #[cfg(not(feature = "stats"))]
+        {
+            SessionSocket::new_stateless(id, self, cfg)
+        }
     }
 }
 

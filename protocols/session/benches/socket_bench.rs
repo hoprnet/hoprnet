@@ -2,7 +2,7 @@ use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_m
 use futures::{AsyncRead, AsyncWrite, io::Cursor};
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_network_types::utils::DuplexIO;
-use hopr_protocol_session::{SessionSocketConfig, UnreliableSocket};
+use hopr_protocol_session::{NoopTracker, SessionSocketConfig, UnreliableSocket};
 use tokio_util::compat::TokioAsyncReadCompatExt;
 
 // Avoid musl's default allocator due to degraded performance
@@ -22,8 +22,14 @@ const MTU: usize = HoprPacket::PAYLOAD_SIZE;
 pub async fn alice_send_data<S: AsyncRead + AsyncWrite + Send + Unpin + 'static>(data: &[u8], alice: S) {
     use futures::AsyncWriteExt;
 
-    let mut alice_socket =
-        UnreliableSocket::<MTU>::new_stateless("alice", alice, SessionSocketConfig::default()).unwrap();
+    let mut alice_socket = UnreliableSocket::<MTU>::new_stateless(
+        "alice",
+        alice,
+        SessionSocketConfig::default(),
+        #[cfg(feature = "stats")]
+        NoopTracker,
+    )
+    .unwrap();
 
     alice_socket.write_all(data).await.unwrap();
     alice_socket.flush().await.unwrap();
@@ -37,6 +43,8 @@ pub async fn bob_receive_data(data: Vec<u8>, mut recv_data: Vec<u8>) -> Vec<u8> 
         "bob",
         DuplexIO::from((futures::io::sink(), Cursor::new(data))),
         SessionSocketConfig::default(),
+        #[cfg(feature = "stats")]
+        NoopTracker,
     )
     .unwrap();
     bob_socket.read_to_end(&mut recv_data).await.unwrap();
