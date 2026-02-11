@@ -16,15 +16,17 @@ use std::{
 use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt, future, future::AbortHandle};
 use futures_concurrency::stream::Merge;
 use state::{SocketComponents, SocketState, Stateless};
-#[cfg(feature = "stats")]
-use stats::SessionStatisticsTracker;
-use strum::IntoDiscriminant;
 use tracing::{Instrument, instrument};
+#[cfg(feature = "stats")]
+use {
+    stats::{SessionMessageDiscriminants, SessionStatisticsTracker},
+    strum::IntoDiscriminant,
+};
 
 use crate::{
     errors::SessionError,
     processing::{ReassemblerExt, SegmenterExt, SequencerExt, types::FrameInspector},
-    protocol::{OrderedFrame, SegmentRequest, SeqIndicator, SessionCodec, SessionMessage, SessionMessageDiscriminants},
+    protocol::{OrderedFrame, SegmentRequest, SeqIndicator, SessionCodec, SessionMessage},
 };
 
 /// Configuration object for [`SessionSocket`].

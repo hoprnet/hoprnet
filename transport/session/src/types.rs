@@ -3,7 +3,6 @@ use std::{
     hash::{Hash, Hasher},
     pin::Pin,
     str::FromStr,
-    sync::Arc,
     task::{Context, Poll},
     time::Duration,
 };
@@ -343,7 +342,7 @@ pub struct HoprSession {
     cfg: HoprSessionConfig,
     on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
     #[cfg(feature = "stats")]
-    metrics: Arc<crate::stats::SessionStats>,
+    metrics: std::sync::Arc<crate::stats::SessionStats>,
 }
 
 pub(crate) const SESSION_SOCKET_CAPACITY: usize = 16384;
@@ -356,14 +355,14 @@ impl HoprSession {
     /// based on the given `capabilities`.
     ///
     /// The `on_close` closure can be optionally called when the Session has been closed via `poll_close`.
-    #[tracing::instrument(skip(hopr, on_close), fields(session_id = %id))]
+    #[tracing::instrument(skip_all, fields(id, routing, cfg, session_id = %id))]
     pub fn new<Tx, Rx>(
         id: SessionId,
         routing: DestinationRouting,
         cfg: HoprSessionConfig,
         hopr: (Tx, Rx),
         on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
-        #[cfg(feature = "stats")] metrics: Arc<crate::stats::SessionStats>,
+        #[cfg(feature = "stats")] metrics: std::sync::Arc<crate::stats::SessionStats>,
     ) -> Result<Self, TransportSessionError>
     where
         Tx: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Send + Sync + Unpin + 'static,
@@ -461,6 +460,7 @@ impl HoprSession {
             routing,
             cfg,
             on_close,
+            #[cfg(feature = "stats")]
             metrics,
         })
     }
@@ -481,7 +481,7 @@ impl HoprSession {
     }
 
     #[cfg(feature = "stats")]
-    pub fn metrics(&self) -> &Arc<crate::stats::SessionStats> {
+    pub fn metrics(&self) -> &std::sync::Arc<crate::stats::SessionStats> {
         &self.metrics
     }
 }
@@ -529,6 +529,7 @@ impl futures::AsyncWrite for HoprSession {
         futures::ready!(this.inner.poll_close(cx))?;
         tracing::trace!("hopr session closed");
 
+        #[cfg(feature = "stats")]
         this.metrics.set_state(crate::stats::SessionLifecycleState::Closing);
 
         if let Some(notifier) = this.on_close.take() {
@@ -571,6 +572,8 @@ impl tokio::io::AsyncWrite for HoprSession {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use anyhow::Context;
     use futures::{AsyncReadExt, AsyncWriteExt};
     use hopr_crypto_random::Randomizable;
@@ -579,7 +582,7 @@ mod tests {
     use hopr_primitive_types::prelude::*;
 
     use super::*;
-    use crate::{SESSION_MTU, stats::SessionStats};
+    use crate::stats::SessionStats;
 
     #[test]
     fn test_session_id_to_str_from_str() -> anyhow::Result<()> {
@@ -628,8 +631,8 @@ mod tests {
         let id = SessionId::new(1234_u64, HoprPseudonym::random());
         const DATA_LEN: usize = 5000;
 
-        let alice_metrics = Arc::new(SessionStats::new(id, None, SESSION_MTU, Duration::from_millis(800), 0));
-        let bob_metrics = Arc::new(SessionStats::new(id, None, SESSION_MTU, Duration::from_millis(800), 0));
+        let alice_metrics = Arc::new(SessionStats::new(id, Default::default()));
+        let bob_metrics = Arc::new(SessionStats::new(id, Default::default()));
 
         let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
         let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
@@ -710,20 +713,8 @@ mod tests {
         let id = SessionId::new(1234_u64, HoprPseudonym::random());
         const DATA_LEN: usize = 5000;
 
-        let alice_metrics = Arc::new(SessionStats::new(
-            id,
-            None,
-            SESSION_MTU,
-            Duration::from_millis(800),
-            16384,
-        ));
-        let bob_metrics = Arc::new(SessionStats::new(
-            id,
-            None,
-            SESSION_MTU,
-            Duration::from_millis(800),
-            16384,
-        ));
+        let alice_metrics = Arc::new(SessionStats::new(id, Default::default()));
+        let bob_metrics = Arc::new(SessionStats::new(id, Default::default()));
 
         let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
         let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();

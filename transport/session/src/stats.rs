@@ -12,9 +12,11 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use hopr_protocol_session::{AcknowledgementMode, FrameInspector, SessionMessageDiscriminants};
+use hopr_protocol_session::{FrameInspector, SessionMessageDiscriminants};
 
-use crate::{SessionId, balancer::AtomicSurbFlowEstimator};
+use crate::{
+    Capability, HoprSessionConfig, SessionId, balancer::AtomicSurbFlowEstimator, types::SESSION_SOCKET_CAPACITY,
+};
 
 /// The lifecycle state of a session from the perspective of metrics.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
@@ -38,17 +40,6 @@ pub enum SessionAckMode {
     Full,
     /// Both (if applicable, though typically maps to Full in some contexts).
     Both,
-}
-
-impl SessionAckMode {
-    fn from_ack_mode(mode: Option<AcknowledgementMode>) -> Self {
-        match mode {
-            None => SessionAckMode::None,
-            Some(AcknowledgementMode::Partial) => SessionAckMode::Partial,
-            Some(AcknowledgementMode::Full) => SessionAckMode::Full,
-            Some(AcknowledgementMode::Both) => SessionAckMode::Both,
-        }
-    }
 }
 
 impl SessionLifecycleState {
@@ -212,23 +203,30 @@ pub struct SessionStats {
 }
 
 impl SessionStats {
-    pub fn new(
-        session_id: SessionId,
-        ack_mode: Option<AcknowledgementMode>,
-        frame_mtu: usize,
-        frame_timeout: Duration,
-        frame_capacity: usize,
-    ) -> Self {
+    pub fn new(session_id: SessionId, cfg: HoprSessionConfig) -> Self {
         let now = now_us();
+        let ack_mode = if cfg
+            .capabilities
+            .contains(Capability::RetransmissionAck | Capability::RetransmissionNack)
+        {
+            SessionAckMode::Both
+        } else if cfg.capabilities.contains(Capability::RetransmissionAck) {
+            SessionAckMode::Full
+        } else if cfg.capabilities.contains(Capability::RetransmissionNack) {
+            SessionAckMode::Partial
+        } else {
+            SessionAckMode::None
+        };
+
         Self {
             session_id,
             created_at_us: AtomicU64::new(now),
             last_activity_us: AtomicU64::new(now),
             state: AtomicU8::new(SessionLifecycleState::Active.as_u8()),
-            ack_mode: SessionAckMode::from_ack_mode(ack_mode),
-            frame_mtu,
-            frame_timeout,
-            frame_capacity,
+            ack_mode,
+            frame_mtu: cfg.frame_mtu,
+            frame_timeout: cfg.frame_timeout,
+            frame_capacity: SESSION_SOCKET_CAPACITY,
             frames_being_reassembled: AtomicUsize::new(0),
             frames_incomplete: AtomicU64::new(0),
             frames_completed: AtomicU64::new(0),
@@ -490,10 +488,9 @@ impl hopr_protocol_session::SessionStatisticsTracker for SessionStats {
 
 #[cfg(test)]
 mod tests {
-    use futures::channel::mpsc;
     use hopr_crypto_random::Randomizable;
     use hopr_internal_types::prelude::HoprPseudonym;
-    use hopr_protocol_session::{SessionStatisticsTracker, Stateless};
+    use hopr_protocol_session::SessionStatisticsTracker;
 
     use super::*;
     use crate::SessionId;
@@ -501,7 +498,7 @@ mod tests {
     #[test]
     fn metrics_snapshot_tracks_bytes_and_packets() {
         let id = SessionId::new(1_u64, HoprPseudonym::random());
-        let metrics = SessionStats::new(id, None, 1500, Duration::from_millis(800), 1024);
+        let metrics = SessionStats::new(id, HoprSessionConfig::default());
 
         metrics.record_read(10);
         metrics.record_read(0);
@@ -518,7 +515,7 @@ mod tests {
     #[test]
     fn metrics_snapshot_tracks_frame_events() {
         let id = SessionId::new(2_u64, HoprPseudonym::random());
-        let metrics = SessionStats::new(id, None, 1500, Duration::from_millis(800), 1024);
+        let metrics = SessionStats::new(id, HoprSessionConfig::default());
 
         metrics.frame_completed();
         metrics.frame_emitted();

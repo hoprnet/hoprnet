@@ -24,7 +24,7 @@ use tracing::{debug, error, info, trace, warn};
 #[cfg(feature = "stats")]
 use crate::stats::{SessionLifecycleState, SessionStats, SessionStatsSnapshot};
 use crate::{
-    Capabilities, Capability, HoprSession, IncomingSession, SESSION_MTU, SessionClientConfig, SessionId, SessionTarget,
+    Capability, HoprSession, IncomingSession, SESSION_MTU, SessionClientConfig, SessionId, SessionTarget,
     SurbBalancerConfig,
     balancer::{
         AtomicSurbFlowEstimator, BalancerConfigFeedback, RateController, RateLimitSinkExt, SurbBalancer,
@@ -571,29 +571,6 @@ where
         self.session_notifiers.get().is_some()
     }
 
-    #[cfg(feature = "stats")]
-    fn create_session_stats(&self, session_id: SessionId, capabilities: Capabilities) -> Arc<SessionStats> {
-        let ack_mode = if capabilities.contains(Capability::RetransmissionAck)
-            || capabilities.contains(Capability::RetransmissionNack)
-        {
-            Some(crate::types::caps_to_ack_mode(capabilities))
-        } else {
-            None
-        };
-        let frame_capacity = if capabilities.contains(Capability::Segmentation) {
-            crate::types::SESSION_SOCKET_CAPACITY
-        } else {
-            0
-        };
-        Arc::new(SessionStats::new(
-            session_id,
-            ack_mode,
-            self.cfg.frame_mtu,
-            self.cfg.max_frame_timeout,
-            frame_capacity,
-        ))
-    }
-
     async fn insert_session_slot(&self, session_id: SessionId, slot: SessionSlot) -> crate::errors::Result<()> {
         // We currently do not support loopback Sessions on ourselves.
         let abort_handles_clone = slot.abort_handles.clone();
@@ -737,7 +714,14 @@ where
                     .ok_or(SessionManagerError::NotStarted)?;
 
                 #[cfg(feature = "stats")]
-                let metrics = self.create_session_stats(session_id, cfg.capabilities);
+                let metrics = Arc::new(SessionStats::new(
+                    session_id,
+                    HoprSessionConfig {
+                        capabilities: cfg.capabilities,
+                        frame_mtu: self.cfg.frame_mtu,
+                        frame_timeout: self.cfg.max_frame_timeout,
+                    },
+                ));
 
                 // NOTE: the Exit node can have different `max_surb_buffer_size`
                 // setting on the Session manager, so it does not make sense to cap it here
@@ -1121,14 +1105,22 @@ where
                     };
                     SessionId::new(next_tag, pseudonym)
                 },
-                |sid| SessionSlot {
+                |_sid| SessionSlot {
                     session_tx: Arc::new(tx_session_data),
                     routing_opts: reply_routing.clone(),
                     abort_handles: vec![],
                     surb_mgmt: None,
                     surb_estimator: None,
                     #[cfg(feature = "stats")]
-                    stats: self.create_session_stats(sid, session_req.capabilities.0),
+                    stats: SessionStats::new(
+                        _sid,
+                        HoprSessionConfig {
+                            capabilities: session_req.capabilities.0,
+                            frame_mtu: self.cfg.frame_mtu,
+                            frame_timeout: self.cfg.max_frame_timeout,
+                        },
+                    )
+                    .into(),
                 },
             )
             .await
@@ -1170,6 +1162,7 @@ where
                             .max(MIN_SURB_BUFFER_DURATION)
                             .as_secs()
                 };
+                #[cfg(feature = "stats")]
                 stats.set_surb_estimator(surb_estimator.clone(), target_surb_buffer_size);
 
                 let surb_estimator_clone = surb_estimator.clone();
@@ -1234,7 +1227,10 @@ where
                             cached_session.abort_handles.push(balancer_abort_handle);
                             cached_session.surb_mgmt = Some(balancer_config);
                             cached_session.surb_estimator = Some(surb_estimator.clone());
-                            cached_session.stats = stats.clone();
+                            #[cfg(feature = "stats")]
+                            {
+                                cached_session.stats = stats.clone();
+                            }
                             futures::future::ready(moka::ops::compute::Op::Put(cached_session))
                         } else {
                             futures::future::ready(moka::ops::compute::Op::Nop)
@@ -1845,13 +1841,7 @@ mod tests {
                     surb_mgmt: Some(balancer_cfg.clone()),
                     surb_estimator: None,
                     #[cfg(feature = "stats")]
-                    stats: Arc::new(SessionStats::new(
-                        session_id,
-                        None,
-                        SESSION_MTU,
-                        Duration::from_millis(800),
-                        0,
-                    )),
+                    stats: Arc::new(SessionStats::new(session_id, Default::default())),
                 },
             )
             .await;
@@ -1903,10 +1893,7 @@ mod tests {
                     abort_handles: Vec::new(),
                     stats: Arc::new(SessionStats::new(
                         SessionId::new(16u64, alice_pseudonym),
-                        None,
-                        SESSION_MTU,
-                        Duration::from_millis(800),
-                        0,
+                        Default::default(),
                     )),
                     surb_mgmt: None,
                     surb_estimator: None,
@@ -2029,10 +2016,7 @@ mod tests {
                     #[cfg(feature = "stats")]
                     stats: Arc::new(SessionStats::new(
                         SessionId::new(16u64, alice_pseudonym),
-                        None,
-                        SESSION_MTU,
-                        Duration::from_millis(800),
-                        0,
+                        Default::default(),
                     )),
                 },
             )

@@ -1,7 +1,4 @@
-use std::{
-    sync::Arc,
-    time::{Duration, SystemTime},
-};
+use std::{sync::Arc, time::SystemTime};
 
 use futures::StreamExt;
 use hopr_crypto_random::Randomizable;
@@ -10,8 +7,8 @@ use hopr_internal_types::prelude::*;
 use hopr_lib::{
     ApplicationDataIn, ApplicationDataOut,
     exports::transport::session::{
-        AcknowledgementMode, AtomicSurbFlowEstimator, Capabilities, Capability, HoprSession, HoprSessionConfig,
-        SessionId, SessionStats, transfer_session,
+        AtomicSurbFlowEstimator, Capabilities, Capability, HoprSession, HoprSessionConfig, SessionId, SessionStats,
+        transfer_session,
     },
 };
 use hopr_network_types::prelude::*;
@@ -50,47 +47,9 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
         ..Default::default()
     };
 
-    let alice_ack_mode = if alice_cfg
-        .capabilities
-        .contains(Capability::RetransmissionAck | Capability::RetransmissionNack)
-    {
-        Some(AcknowledgementMode::Both)
-    } else if alice_cfg.capabilities.contains(Capability::RetransmissionAck) {
-        Some(AcknowledgementMode::Full)
-    } else if alice_cfg.capabilities.contains(Capability::RetransmissionNack) {
-        Some(AcknowledgementMode::Partial)
-    } else {
-        None
-    };
+    let alice_metrics = Arc::new(SessionStats::new(id, alice_cfg));
 
-    let alice_metrics = Arc::new(SessionStats::new(
-        id,
-        alice_ack_mode,
-        alice_cfg.frame_mtu,
-        alice_cfg.frame_timeout,
-        BUF_LEN,
-    ));
-
-    let bob_ack_mode = if bob_cfg
-        .capabilities
-        .contains(Capability::RetransmissionAck | Capability::RetransmissionNack)
-    {
-        Some(AcknowledgementMode::Both)
-    } else if bob_cfg.capabilities.contains(Capability::RetransmissionAck) {
-        Some(AcknowledgementMode::Full)
-    } else if bob_cfg.capabilities.contains(Capability::RetransmissionNack) {
-        Some(AcknowledgementMode::Partial)
-    } else {
-        None
-    };
-
-    let bob_metrics = Arc::new(SessionStats::new(
-        id,
-        bob_ack_mode,
-        bob_cfg.frame_mtu,
-        bob_cfg.frame_timeout,
-        BUF_LEN,
-    ));
+    let bob_metrics = Arc::new(SessionStats::new(id, bob_cfg));
 
     let mut alice_session = HoprSession::new(
         id,
@@ -103,8 +62,8 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
                 packet_info: Default::default(),
             }),
         ),
-        alice_metrics.clone(),
         None,
+        alice_metrics.clone(),
     )?;
 
     let mut bob_session = HoprSession::new(
@@ -118,8 +77,8 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
                 packet_info: Default::default(),
             }),
         ),
-        bob_metrics.clone(),
         None,
+        bob_metrics.clone(),
     )?;
 
     let mut listener = ConnectedUdpStream::builder()
@@ -233,47 +192,9 @@ async fn tcp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
         ..Default::default()
     };
 
-    let alice_ack_mode = if alice_cfg
-        .capabilities
-        .contains(Capability::RetransmissionAck | Capability::RetransmissionNack)
-    {
-        Some(AcknowledgementMode::Both)
-    } else if alice_cfg.capabilities.contains(Capability::RetransmissionAck) {
-        Some(AcknowledgementMode::Full)
-    } else if alice_cfg.capabilities.contains(Capability::RetransmissionNack) {
-        Some(AcknowledgementMode::Partial)
-    } else {
-        None
-    };
+    let alice_metrics = Arc::new(SessionStats::new(id, alice_cfg));
 
-    let alice_metrics = Arc::new(SessionStats::new(
-        id,
-        alice_ack_mode,
-        alice_cfg.frame_mtu,
-        alice_cfg.frame_timeout,
-        BUF_LEN,
-    ));
-
-    let bob_ack_mode = if bob_cfg
-        .capabilities
-        .contains(Capability::RetransmissionAck | Capability::RetransmissionNack)
-    {
-        Some(AcknowledgementMode::Both)
-    } else if bob_cfg.capabilities.contains(Capability::RetransmissionAck) {
-        Some(AcknowledgementMode::Full)
-    } else if bob_cfg.capabilities.contains(Capability::RetransmissionNack) {
-        Some(AcknowledgementMode::Partial)
-    } else {
-        None
-    };
-
-    let bob_metrics = Arc::new(SessionStats::new(
-        id,
-        bob_ack_mode,
-        bob_cfg.frame_mtu,
-        bob_cfg.frame_timeout,
-        BUF_LEN,
-    ));
+    let bob_metrics = Arc::new(SessionStats::new(id, bob_cfg));
 
     let mut alice_session = HoprSession::new(
         id,
@@ -286,8 +207,8 @@ async fn tcp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
                 packet_info: Default::default(),
             }),
         ),
-        alice_metrics.clone(),
         None,
+        alice_metrics.clone(),
     )?;
 
     let mut bob_session = HoprSession::new(
@@ -301,8 +222,8 @@ async fn tcp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
                 packet_info: Default::default(),
             }),
         ),
-        bob_metrics.clone(),
         None,
+        bob_metrics.clone(),
     )?;
 
     let listener = TcpListener::bind("127.0.0.1:0").await?;
@@ -401,7 +322,6 @@ async fn tcp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
 /// Creates paired Hopr sessions with bidirectional communication to prove that
 /// data can flow both alice → bob and bob → alice using SURB-enabled routing.
 async fn bidirectional_tcp_session(#[case] cap: Capabilities) -> anyhow::Result<()> {
-    const BUF_LEN: usize = 16384;
     const MSG_LEN: usize = 4096;
 
     let start_time = SystemTime::now();
@@ -421,47 +341,9 @@ async fn bidirectional_tcp_session(#[case] cap: Capabilities) -> anyhow::Result<
         ..Default::default()
     };
 
-    let alice_ack_mode = if alice_cfg
-        .capabilities
-        .contains(Capability::RetransmissionAck | Capability::RetransmissionNack)
-    {
-        Some(AcknowledgementMode::Both)
-    } else if alice_cfg.capabilities.contains(Capability::RetransmissionAck) {
-        Some(AcknowledgementMode::Full)
-    } else if alice_cfg.capabilities.contains(Capability::RetransmissionNack) {
-        Some(AcknowledgementMode::Partial)
-    } else {
-        None
-    };
+    let alice_metrics = Arc::new(SessionStats::new(id, alice_cfg));
 
-    let alice_metrics = Arc::new(SessionStats::new(
-        id,
-        alice_ack_mode,
-        alice_cfg.frame_mtu,
-        alice_cfg.frame_timeout,
-        BUF_LEN,
-    ));
-
-    let bob_ack_mode = if bob_cfg
-        .capabilities
-        .contains(Capability::RetransmissionAck | Capability::RetransmissionNack)
-    {
-        Some(AcknowledgementMode::Both)
-    } else if bob_cfg.capabilities.contains(Capability::RetransmissionAck) {
-        Some(AcknowledgementMode::Full)
-    } else if bob_cfg.capabilities.contains(Capability::RetransmissionNack) {
-        Some(AcknowledgementMode::Partial)
-    } else {
-        None
-    };
-
-    let bob_metrics = Arc::new(SessionStats::new(
-        id,
-        bob_ack_mode,
-        bob_cfg.frame_mtu,
-        bob_cfg.frame_timeout,
-        BUF_LEN,
-    ));
+    let bob_metrics = Arc::new(SessionStats::new(id, bob_cfg));
 
     // Alice uses Forward with return_options to enable SURB production
     let mut alice_session = HoprSession::new(
@@ -480,8 +362,8 @@ async fn bidirectional_tcp_session(#[case] cap: Capabilities) -> anyhow::Result<
                 packet_info: Default::default(),
             }),
         ),
-        alice_metrics.clone(),
         None,
+        alice_metrics.clone(),
     )?;
 
     let mut bob_session = HoprSession::new(
@@ -495,8 +377,8 @@ async fn bidirectional_tcp_session(#[case] cap: Capabilities) -> anyhow::Result<
                 packet_info: Default::default(),
             }),
         ),
-        bob_metrics.clone(),
         None,
+        bob_metrics.clone(),
     )?;
 
     // Alice sends to Bob
@@ -554,10 +436,8 @@ async fn bidirectional_tcp_session(#[case] cap: Capabilities) -> anyhow::Result<
 async fn surb_metrics_tracking() -> anyhow::Result<()> {
     use std::sync::atomic::Ordering;
 
-    const BUF_LEN: usize = 16384;
-
     let id = SessionId::new(1u64, HoprPseudonym::random());
-    let metrics = Arc::new(SessionStats::new(id, None, 1500, Duration::from_millis(800), BUF_LEN));
+    let metrics = Arc::new(SessionStats::new(id, Default::default()));
 
     // Create a SURB estimator and set non-zero values
     let surb_estimator = AtomicSurbFlowEstimator::default();
@@ -590,7 +470,6 @@ async fn surb_metrics_tracking() -> anyhow::Result<()> {
 /// Tests that frame buffer metrics are correctly captured when segmentation is enabled
 /// and enough data is sent to create multiple frames.
 async fn frame_buffer_metrics(#[case] cap: Capabilities) -> anyhow::Result<()> {
-    const BUF_LEN: usize = 16384;
     const FRAME_MTU: usize = 1500;
     const NUM_FRAMES: usize = 5;
     const MSG_LEN: usize = FRAME_MTU * NUM_FRAMES;
@@ -613,21 +492,9 @@ async fn frame_buffer_metrics(#[case] cap: Capabilities) -> anyhow::Result<()> {
         ..Default::default()
     };
 
-    let alice_metrics = Arc::new(SessionStats::new(
-        id,
-        None,
-        alice_cfg.frame_mtu,
-        alice_cfg.frame_timeout,
-        BUF_LEN,
-    ));
+    let alice_metrics = Arc::new(SessionStats::new(id, alice_cfg));
 
-    let bob_metrics = Arc::new(SessionStats::new(
-        id,
-        None,
-        bob_cfg.frame_mtu,
-        bob_cfg.frame_timeout,
-        BUF_LEN,
-    ));
+    let bob_metrics = Arc::new(SessionStats::new(id, bob_cfg));
 
     let mut alice_session = HoprSession::new(
         id,
@@ -640,8 +507,8 @@ async fn frame_buffer_metrics(#[case] cap: Capabilities) -> anyhow::Result<()> {
                 packet_info: Default::default(),
             }),
         ),
-        alice_metrics.clone(),
         None,
+        alice_metrics.clone(),
     )?;
 
     let mut bob_session = HoprSession::new(
@@ -655,8 +522,8 @@ async fn frame_buffer_metrics(#[case] cap: Capabilities) -> anyhow::Result<()> {
                 packet_info: Default::default(),
             }),
         ),
-        bob_metrics.clone(),
         None,
+        bob_metrics.clone(),
     )?;
 
     // Send enough data to create multiple frames

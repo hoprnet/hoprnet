@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use futures::{AsyncReadExt, AsyncWriteExt, FutureExt, StreamExt};
 use hopr_crypto_random::Randomizable;
@@ -32,14 +30,15 @@ pub async fn alice_send_data(
 
     let dst: Address = (&ChainKeypair::random()).into();
     let id = SessionId::new(1234_u64, HoprPseudonym::random());
+    let cfg = HoprSessionConfig {
+        capabilities: caps.into(),
+        ..Default::default()
+    };
 
     let mut alice_session = HoprSession::new(
         id,
         DestinationRouting::forward_only(dst, RoutingOptions::Hops(0.try_into().unwrap())),
-        HoprSessionConfig {
-            capabilities: caps.into(),
-            ..Default::default()
-        },
+        cfg,
         (
             alice_tx,
             alice_rx.map(|(_, data)| ApplicationDataIn {
@@ -49,7 +48,7 @@ pub async fn alice_send_data(
         ),
         None,
         #[cfg(feature = "stats")]
-        SessionStats::new(id, None, 1500, Duration::from_millis(800), 8192).into(),
+        SessionStats::new(id, cfg).into(),
     )
     .unwrap();
 
@@ -69,18 +68,19 @@ pub async fn bob_receive_data(
 ) -> Vec<u8> {
     let (bob_tx, _alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
     let id = SessionId::new(1234_u64, HoprPseudonym::random());
+    let cfg = HoprSessionConfig {
+        capabilities: caps.into(),
+        ..Default::default()
+    };
 
     let mut bob_session = HoprSession::new(
         id,
         DestinationRouting::Return(id.pseudonym().into()),
-        HoprSessionConfig {
-            capabilities: caps.into(),
-            ..Default::default()
-        },
+        cfg,
         (bob_tx, futures::stream::iter(data).map(|data| data)),
         None,
         #[cfg(feature = "stats")]
-        SessionStats::new(id, None, 1500, Duration::from_millis(800), 8192).into(),
+        SessionStats::new(id, cfg).into(),
     )
     .unwrap();
 

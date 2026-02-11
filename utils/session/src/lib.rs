@@ -727,20 +727,14 @@ mod tests {
         let session_id = SessionId::new(4567u64, HoprPseudonym::random());
         let peer: Address = "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F".parse()?;
         let cfg = HoprSessionConfig::default();
-        let metrics = Arc::new(SessionStats::new(
-            session_id,
-            None,
-            cfg.frame_mtu,
-            cfg.frame_timeout,
-            16384,
-        ));
+        let metrics = Arc::new(SessionStats::new(session_id, cfg));
         let session = HoprSession::new(
             session_id,
             DestinationRouting::forward_only(peer, RoutingOptions::IntermediatePath(Default::default())),
             cfg,
             loopback_transport(),
-            metrics,
             None,
+            metrics,
         )?;
 
         let (bound_addr, tcp_listener) = tcp_listen_on(("127.0.0.1", 0), None)
@@ -778,20 +772,14 @@ mod tests {
         let session_id = SessionId::new(4567u64, HoprPseudonym::random());
         let peer: Address = "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F".parse()?;
         let cfg = HoprSessionConfig::default();
-        let metrics = Arc::new(SessionStats::new(
-            session_id,
-            None,
-            cfg.frame_mtu,
-            cfg.frame_timeout,
-            16384,
-        ));
+        let metrics = Arc::new(SessionStats::new(session_id, cfg));
         let session = HoprSession::new(
             session_id,
             DestinationRouting::forward_only(peer, RoutingOptions::IntermediatePath(Default::default())),
             cfg,
             loopback_transport(),
-            metrics,
             None,
+            metrics,
         )?;
 
         let (listen_addr, udp_listener) = udp_bind_to(("127.0.0.1", 0), None)

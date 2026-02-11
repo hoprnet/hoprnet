@@ -9,7 +9,7 @@ repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
 [features]
-default = ["hashbrown", "stats"]
+default = ["hashbrown"]
 serde = ["dep:serde", "dep:serde_bytes", "hopr-crypto-packet/serde"]
 stats = ["dep:auto_impl"]
 runtime-tokio = ["dep:tokio", "hopr-async-runtime/runtime-tokio"]
