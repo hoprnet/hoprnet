@@ -247,7 +247,7 @@ where
         S: futures::Stream<Item = PeerDiscovery> + Send + 'static,
         T: futures::Sink<TicketEvent> + Clone + Send + Unpin + 'static,
         T::Error: std::error::Error,
-        Ct: ProbingTrafficGeneration<NodeId = OffchainPublicKey> + Send + Sync + 'static,
+        Ct: ProbingTrafficGeneration + Send + Sync + 'static,
         NetBuilder: NetworkBuilder<Network = Net> + Send + Sync + 'static,
     {
         info!("loading initial peers from the chain");

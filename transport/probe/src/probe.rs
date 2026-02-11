@@ -55,12 +55,12 @@ impl Probe {
         U: futures::Stream<Item = (HoprPseudonym, ApplicationDataIn)> + Send + Sync + 'static,
         V: futures::Stream<Item = (OffchainPublicKey, PingQueryReplier)> + Send + Sync + 'static,
         Up: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Clone + Send + Sync + 'static,
-        Tr: ProbingTrafficGeneration<NodeId = G::NodeId> + Send + Sync + 'static,
+        Tr: ProbingTrafficGeneration + Send + Sync + 'static,
         G: NetworkGraphView + NetworkGraphUpdate + Clone + Send + Sync + 'static,
     {
         let max_parallel_probes = self.cfg.max_parallel_probes;
 
-        let probing_routes = probing_traffic_generator.build(network_graph.clone());
+        let probing_routes = probing_traffic_generator.build();
 
         // Currently active probes
         let network_graph_internal = network_graph.clone();
@@ -457,10 +457,13 @@ mod tests {
                 (from_probing_to_network_tx, from_network_to_probing_rx),
                 manual_probe_rx,
                 from_probing_up_tx,
-                ImmediateNeighborProber::new(ProberConfig {
-                    interval: cfg.interval,
-                    recheck_threshold: cfg.recheck_threshold,
-                }),
+                ImmediateNeighborProber::new(
+                    ProberConfig {
+                        interval: cfg.interval,
+                        recheck_threshold: cfg.recheck_threshold,
+                    },
+                    store.clone(),
+                ),
                 store,
             )
             .await;

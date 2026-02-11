@@ -13,10 +13,6 @@ pub use crate::graph::traits::NetworkGraphView;
 /// since the exhaustion of the stream might result in termination of the
 /// cover traffic generation.
 pub trait ProbingTrafficGeneration {
-    /// The type of node identifier used by this traffic generator.
-    type NodeId: Send;
-
-    fn build<T>(&self, network_graph: T) -> BoxStream<'static, DestinationRouting>
-    where
-        T: NetworkGraphView<NodeId = Self::NodeId> + Send + Sync + 'static;
+    /// Builds a stream of routes to be used for cover traffic.
+    fn build(&self) -> BoxStream<'static, DestinationRouting>;
 }

@@ -400,7 +400,7 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
                         3001 + i as u16,
                         node_db,
                         std::sync::Arc::new(connector),
-                        graph,
+                        graph.clone(),
                         safes[i],
                         if i % 2 != 0 { MINIMUM_INCOMING_WIN_PROB } else { 1.0 },
                     )
@@ -408,7 +408,7 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
 
                     let socket = instance
                         .run(
-                            hopr_ct_telemetry::ImmediateNeighborProber::new(Default::default()),
+                            hopr_ct_telemetry::ImmediateNeighborProber::new(Default::default(), graph),
                             network_builder,
                             EchoServer::new(),
                         )

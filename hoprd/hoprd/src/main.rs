@@ -343,7 +343,7 @@ async fn main_inner() -> anyhow::Result<()> {
             (&hopr_keys).into(),
             chain_connector.clone(),
             node_db,
-            graph,
+            graph.clone(),
             hopr_lib_cfg,
         )
         .await?,
@@ -358,7 +358,7 @@ async fn main_inner() -> anyhow::Result<()> {
 
     let _hopr_socket = node
         .run(
-            hopr_ct_telemetry::ImmediateNeighborProber::new(Default::default()),
+            hopr_ct_telemetry::ImmediateNeighborProber::new(Default::default(), graph.clone()),
             network_builder,
             HoprServerIpForwardingReactor::new(hopr_keys.packet_key.clone(), cfg.session_ip_forwarding),
         )
