@@ -3,6 +3,7 @@
 pub mod ack_state;
 pub mod state;
 
+/// Contains socket statistics types.
 #[cfg(feature = "stats")]
 pub mod stats;
 

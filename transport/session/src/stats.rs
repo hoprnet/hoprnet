@@ -105,13 +105,13 @@ pub struct AckSnapshot {
     pub incoming_segments: u64,
     /// Total retransmission requests received.
     pub incoming_retransmission_requests: u64,
-    /// Total frames acknowledged by the peer.
+    /// Total frame acknowledgements received.
     pub incoming_acknowledged_frames: u64,
     /// Total outgoing segments sent.
     pub outgoing_segments: u64,
-    /// Total retransmission requests received.
+    /// Total retransmission requests sent.
     pub outgoing_retransmission_requests: u64,
-    /// Total frames acknowledged by the peer.
+    /// Total frame acknowledgements sent.
     pub outgoing_acknowledged_frames: u64,
 }
 

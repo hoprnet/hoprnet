@@ -6,7 +6,9 @@ use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::prelude::{DestinationRouting, RoutingOptions};
 use hopr_primitive_types::prelude::Address;
 use hopr_protocol_app::{prelude::ApplicationDataOut, v1::ApplicationDataIn};
-use hopr_transport_session::{Capabilities, Capability, HoprSession, HoprSessionConfig, SessionId, SessionStats};
+#[cfg(feature = "stats")]
+use hopr_transport_session::SessionStats;
+use hopr_transport_session::{Capabilities, Capability, HoprSession, HoprSessionConfig, SessionId};
 use rand::{Rng, thread_rng};
 
 // Avoid musl's default allocator due to degraded performance

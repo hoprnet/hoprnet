@@ -2,7 +2,9 @@ use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_m
 use futures::{AsyncRead, AsyncWrite, io::Cursor};
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_network_types::utils::DuplexIO;
-use hopr_protocol_session::{NoopTracker, SessionSocketConfig, UnreliableSocket};
+#[cfg(feature = "stats")]
+use hopr_protocol_session::NoopTracker;
+use hopr_protocol_session::{SessionSocketConfig, UnreliableSocket};
 use tokio_util::compat::TokioAsyncReadCompatExt;
 
 // Avoid musl's default allocator due to degraded performance

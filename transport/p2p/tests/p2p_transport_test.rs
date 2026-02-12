@@ -121,6 +121,7 @@ impl Drop for SelfClosingJoinHandle {
 }
 
 use hopr_crypto_packet::prelude::HoprPacket;
+#[cfg(feature = "stats")]
 use hopr_transport_network::observation::PeerPacketStatsSnapshot;
 use libp2p::{Multiaddr, PeerId};
 use more_asserts::assert_gt;

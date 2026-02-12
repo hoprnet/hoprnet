@@ -46,6 +46,7 @@ pub mod tests {
 
     use super::*;
 
+    /// Statistics tracker that records all events in a map and is possible to serialize (e.g.: for snapshot testing)
     #[derive(Debug, Clone)]
     pub struct TestStatsTracker(std::sync::Arc<Mutex<indexmap::IndexMap<String, usize>>>);
 
