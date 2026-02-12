@@ -45,7 +45,7 @@ mod utils;
 
 pub use crate::{
     behavior::{HoprNetworkBehavior, HoprNetworkBehaviorEvent},
-    swarm::{HoprLibp2pNetworkBuilder, UninitializedPeerStore},
+    swarm::HoprLibp2pNetworkBuilder,
 };
 
 #[derive(Clone)]

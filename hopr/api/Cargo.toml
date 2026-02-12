@@ -15,14 +15,14 @@ ct = ["graph"]
 db = []
 chain = ["db"]
 network = []
-graph = ["dep:hopr-network-types"]
+graph = ["dep:auto_impl", "dep:hopr-network-types"]
 node = ["chain", "db", "graph", "network", "dep:atomic_enum"]
 serde = ["hopr-primitive-types/serde"]
 
 [dependencies]
 async-trait = { workspace = true }
+auto_impl = { workspace = true, optional = true }
 atomic_enum = { workspace = true, optional = true }
-auto_impl = { workspace = true }
 chrono = { workspace = true }
 futures = { workspace = true }
 libp2p-identity = { workspace = true }

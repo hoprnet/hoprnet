@@ -49,6 +49,7 @@ utils_parallel = [] # utility parallelization functionality
 testing = [
   "session-server",
   "session-client",
+  "dep:futures-concurrency",
   "dep:rand",
   "dep:rstest",
   "dep:tokio",
@@ -72,6 +73,7 @@ cfg_eval = { workspace = true, optional = true }
 cfg-if = { workspace = true }
 const_format = { workspace = true }
 futures = { workspace = true }
+futures-concurrency = { workspace = true, optional = true }
 futures-time = { workspace = true }
 hex-literal = { workspace = true, optional = true }
 lazy_static = { workspace = true }

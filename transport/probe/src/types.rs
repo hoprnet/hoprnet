@@ -185,14 +185,14 @@ impl<'a> TryFrom<&'a [u8]> for PathTelemetry {
     fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
         if value.len() == Self::SIZE {
             Ok(Self {
-                id: (&value[0..10])
+                id: (&value[0..Self::ID_SIZE])
                     .try_into()
                     .map_err(|_| GeneralError::ParseError("PathTelemetry.id".into()))?,
-                path: (&value[10..10 * size_of::<u128>()])
+                path: (&value[Self::ID_SIZE..(Self::ID_SIZE + Self::PATH_SIZE)])
                     .try_into()
                     .map_err(|_| GeneralError::ParseError("PathTelemetry.path".into()))?,
                 timestamp: u128::from_be_bytes(
-                    (&value[10 * size_of::<u128>()..Self::SIZE])
+                    (&value[(Self::ID_SIZE + Self::PATH_SIZE)..Self::SIZE])
                         .try_into()
                         .map_err(|_| GeneralError::ParseError("PathTelemetry.timestamp".into()))?,
                 ),

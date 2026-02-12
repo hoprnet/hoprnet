@@ -102,15 +102,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn probe_message_should_serialize_and_deserialize() -> anyhow::Result<()> {
+    fn probe_message_variant_probe_should_serialize_and_deserialize() -> anyhow::Result<()> {
         let m1 = Message::Probe(NeighborProbe::random_nonce());
         let m2 = Message::try_from(m1.to_bytes().as_ref())?;
 
         assert_eq!(m1, m2);
 
+        Ok(())
+    }
+
+    #[test]
+    fn probe_message_variant_telemetry_should_serialize_and_deserialize() -> anyhow::Result<()> {
         let m1 = Message::Telemetry(PathTelemetry {
-            id: hopr_crypto_random::random_bytes(),
-            path: hopr_crypto_random::random_bytes(),
+            id: hopr_crypto_random::random_bytes::<10>(),
+            path: hopr_crypto_random::random_bytes::<{ 10 * std::mem::size_of::<u128>() }>(),
             timestamp: 1234567890,
         });
         let m2 = Message::try_from(m1.to_bytes().as_ref())?;
