@@ -546,7 +546,9 @@ mod tests {
     use super::*;
     #[cfg(feature = "stats")]
     use crate::socket::stats::NoopTracker;
-    use crate::{AcknowledgementState, AcknowledgementStateConfig, utils::test::*};
+    use crate::{
+        AcknowledgementState, AcknowledgementStateConfig, socket::stats::tests::TestStatsTracker, utils::test::*,
+    };
 
     const MTU: usize = HoprPacket::PAYLOAD_SIZE;
 
@@ -563,19 +565,22 @@ mod tests {
             ..Default::default()
         };
 
+        #[cfg(feature = "stats")]
+        let (alice_tracker, bob_tracker) = (TestStatsTracker::default(), TestStatsTracker::default());
+
         let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
             "alice",
             alice,
             sock_cfg,
             #[cfg(feature = "stats")]
-            NoopTracker,
+            alice_tracker.clone(),
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
             "bob",
             bob,
             sock_cfg,
             #[cfg(feature = "stats")]
-            NoopTracker,
+            bob_tracker.clone(),
         )?;
 
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
@@ -595,6 +600,12 @@ mod tests {
 
         alice_socket.close().await?;
         bob_socket.close().await?;
+
+        #[cfg(feature = "stats")]
+        {
+            insta::assert_yaml_snapshot!(alice_tracker);
+            insta::assert_yaml_snapshot!(bob_tracker);
+        }
 
         Ok(())
     }
@@ -659,19 +670,22 @@ mod tests {
             ..Default::default()
         };
 
+        #[cfg(feature = "stats")]
+        let (alice_tracker, bob_tracker) = (TestStatsTracker::default(), TestStatsTracker::default());
+
         let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
             "alice",
             alice,
             sock_cfg,
             #[cfg(feature = "stats")]
-            NoopTracker,
+            alice_tracker.clone(),
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
             "bob",
             bob,
             sock_cfg,
             #[cfg(feature = "stats")]
-            NoopTracker,
+            bob_tracker.clone(),
         )?;
 
         let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
@@ -701,6 +715,12 @@ mod tests {
             .timeout(futures_time::time::Duration::from_secs(2))
             .await??;
         assert_eq!(bob_sent_data, alice_recv_data);
+
+        #[cfg(feature = "stats")]
+        {
+            insta::assert_yaml_snapshot!(alice_tracker);
+            insta::assert_yaml_snapshot!(bob_tracker);
+        }
 
         Ok(())
     }
@@ -1028,19 +1048,22 @@ mod tests {
             ..Default::default()
         };
 
+        #[cfg(feature = "stats")]
+        let (alice_tracker, bob_tracker) = (TestStatsTracker::default(), TestStatsTracker::default());
+
         let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
             "alice",
             alice,
             alice_cfg,
             #[cfg(feature = "stats")]
-            NoopTracker,
+            alice_tracker.clone(),
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
             "bob",
             bob,
             bob_cfg,
             #[cfg(feature = "stats")]
-            NoopTracker,
+            bob_tracker.clone(),
         )?;
 
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
@@ -1062,6 +1085,12 @@ mod tests {
         assert_eq!(&data[1500..], &bob_data);
 
         bob_socket.close().await?;
+
+        #[cfg(feature = "stats")]
+        {
+            insta::assert_yaml_snapshot!(alice_tracker);
+            insta::assert_yaml_snapshot!(bob_tracker);
+        }
 
         Ok(())
     }
@@ -1167,19 +1196,22 @@ mod tests {
             ..Default::default()
         };
 
+        #[cfg(feature = "stats")]
+        let (alice_tracker, bob_tracker) = (TestStatsTracker::default(), TestStatsTracker::default());
+
         let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
             "alice",
             alice,
             alice_cfg,
             #[cfg(feature = "stats")]
-            NoopTracker,
+            alice_tracker.clone(),
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
             "bob",
             bob,
             bob_cfg,
             #[cfg(feature = "stats")]
-            NoopTracker,
+            bob_tracker.clone(),
         )?;
 
         let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
@@ -1217,6 +1249,12 @@ mod tests {
 
         assert_eq!(alice_sent_data.len() - 1500, bob_recv_data.len());
         assert_eq!(&alice_sent_data[1500..], &bob_recv_data);
+
+        #[cfg(feature = "stats")]
+        {
+            insta::assert_yaml_snapshot!(alice_tracker);
+            insta::assert_yaml_snapshot!(bob_tracker);
+        }
 
         Ok(())
     }

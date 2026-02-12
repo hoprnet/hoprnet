@@ -58,8 +58,11 @@ anyhow = { workspace = true }
 clap = { workspace = true }
 criterion = { workspace = true }
 hex-literal = { workspace = true }
+insta = { workspace = true }
+indexmap = { workspace = true }
 mockall = { workspace = true }
 parameterized = { workspace = true }
+serde = { workspace = true }
 rand = { workspace = true }
 test-log = { workspace = true, features = ["trace"] }
 tokio = { workspace = true, features = ["io-util", "io-std", "net", "signal"] }
