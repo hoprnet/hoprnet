@@ -43,7 +43,7 @@ where
     P: MeasurablePath + Clone,
 {
     Probe(std::result::Result<EdgeTransportTelemetry<N, P>, NetworkGraphError<P>>),
-    Capacity(EdgeCapacityUpdate),
+    Capacity(Box<EdgeCapacityUpdate>),
 }
 
 /// Enum representing different types of telemetry data used by the CT mechanism.

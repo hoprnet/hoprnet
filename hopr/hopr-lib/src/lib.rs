@@ -97,7 +97,7 @@ use hopr_api::{
 };
 pub use hopr_api::{
     db::ChannelTicketStatistics,
-    graph::EdgeTransportObservable,
+    graph::EdgeLinkObservable,
     network::{NetworkBuilder, NetworkStreamControl},
     node::{HoprNodeChainOperations, HoprNodeNetworkOperations, HoprNodeOperations},
 };
