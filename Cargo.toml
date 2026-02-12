@@ -40,7 +40,7 @@ members = [
   "db/migration",
   "db/node",
   "utils/session",
-  "sdk/rust/localcluster",
+  "localcluster",
   # implementations
   "impls/ct/telemetry",
 ]

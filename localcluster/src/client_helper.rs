@@ -1,4 +1,8 @@
+use std::process::Child;
+
 use anyhow::{Context, Result};
+use futures::future::try_join_all;
+use hopr_lib::HoprBalance;
 use hoprd_rest_api_client as hoprd_api_client;
 use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 
@@ -70,4 +74,37 @@ impl HoprdApiClient {
         let _ = self.inner.open_channel(&req).await?;
         Ok(())
     }
+}
+
+pub struct NodeProcess {
+    pub id: usize,
+    pub api_port: u16,
+    pub p2p_port: u16,
+    pub api: HoprdApiClient,
+    pub child: Child,
+    pub address: Option<String>,
+}
+
+pub async fn open_full_mesh_channels(nodes: &[NodeProcess], amount: &HoprBalance) -> Result<()> {
+    let amount = amount.to_string();
+    let mut tasks = Vec::new();
+    for src in nodes {
+        let Some(src_addr) = src.address.clone() else {
+            anyhow::bail!("node {} address missing", src.id);
+        };
+        for dst in nodes {
+            let Some(dst_addr) = dst.address.clone() else {
+                anyhow::bail!("node {} address missing", dst.id);
+            };
+            if src_addr == dst_addr {
+                continue;
+            }
+            let api = src.api.clone();
+            let amount = amount.clone();
+            tasks.push(async move { api.open_channel(&dst_addr, &amount).await });
+        }
+    }
+
+    try_join_all(tasks).await.context("failed to open channels")?;
+    Ok(())
 }

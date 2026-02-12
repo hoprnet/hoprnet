@@ -1,77 +1,22 @@
 use std::{
     fs::{self, File},
     path::Path,
-    process::{Child, Command, Stdio},
+    process::{Command, Stdio},
     time::Duration,
 };
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use futures::future::try_join_all;
-use hoprd::gen_test::{GenTestConfig, generate};
+use hoprd_localcluster::{blokli_helper, cli, client_helper, identity};
 use tracing::{debug, error, info, warn};
-
-mod cli;
-mod helper;
-
-use cli::Args;
-use helper::HoprdApiClient;
-use hopr_primitive_types::prelude::HoprBalance;
 
 const DEFAULT_WAIT_TIMEOUT: Duration = Duration::from_secs(60);
 const INDEXING_WAIT_TIME: Duration = Duration::from_secs(10);
 
-struct ChainHandle {
-    name: String,
-    child: Child,
-}
-
-impl ChainHandle {
-    fn start(args: &Args, log_dir: &Path) -> Result<Self> {
-        fs::create_dir_all(log_dir).context("failed to create log directory")?;
-        let log_file = log_dir.join("chain.log");
-        let log_file = File::create(&log_file).context("failed to create blokli log file")?;
-        let log_err = log_file.try_clone().context("failed to clone blokli log file handle")?;
-        let name = "hopr-chain";
-
-        let mut cmd = Command::new("docker");
-        cmd.arg("run")
-            .arg("--rm")
-            .arg("--name")
-            .arg(name)
-            .arg("-p")
-            .arg("8081:8080")
-            .arg(&args.chain_image)
-            .stdout(Stdio::from(log_file))
-            .stderr(Stdio::from(log_err));
-
-        let child = cmd.spawn().context("failed to start blokli container")?;
-
-        Ok(Self {
-            name: name.to_string(),
-            child,
-        })
-    }
-
-    fn stop(&mut self) {
-        let _ = self.child.kill();
-        let _ = Command::new("docker").arg("rm").arg("-f").arg(&self.name).status();
-    }
-}
-
-struct NodeProcess {
-    id: usize,
-    api_port: u16,
-    p2p_port: u16,
-    api: HoprdApiClient,
-    child: Child,
-    address: Option<String>,
-}
-
 #[derive(Default)]
 struct Cleanup {
-    nodes: Vec<NodeProcess>,
-    chain: Option<ChainHandle>,
+    nodes: Vec<client_helper::NodeProcess>,
+    chain: Option<blokli_helper::ChainHandle>,
 }
 
 impl Cleanup {
@@ -87,33 +32,59 @@ impl Cleanup {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    init_tracing();
+    let filter = std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string());
+    tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_target(false)
+        .init();
 
-    let args = Args::parse();
-    validate_args(&args)?;
+    let args = cli::Args::parse();
 
     let data_dir = args.data_dir.clone();
     fs::create_dir_all(&data_dir).context("failed to create data directory")?;
     let log_dir = data_dir.join("logs");
     fs::create_dir_all(&log_dir).context("failed to create log directory")?;
 
+    let blokli_url = args
+        .chain_url
+        .clone()
+        .unwrap_or_else(|| "http://127.0.0.1:8081".to_string());
+    let blokli_url = blokli_url.trim_end_matches('/').to_string();
+    let config = identity::GenerationConfig {
+        blokli_url: blokli_url.to_string(),
+        num_nodes: args.size,
+        config_home: data_dir.to_path_buf(),
+        identity_password: args.identity_password.clone(),
+        random_identities: true,
+        ..Default::default()
+    };
+
     let mut cleanup = Cleanup::default();
 
     let result: Result<()> = async {
-        info!("starting chain services (anvil + blokli)");
-        cleanup.chain = Some(ChainHandle::start(&args, &log_dir)?);
-        let blokli_url = "http://127.0.0.1:8081".to_string();
+        if args.chain_url.is_some() {
+            info!("using external chain services at {blokli_url}");
+        } else {
+            let chain_image = args
+                .chain_image
+                .as_deref()
+                .context("missing chain image (set --chain-image or HOPRD_CHAIN_IMAGE)")?;
+            info!("starting chain services (anvil + blokli)");
+            cleanup.chain = Some(blokli_helper::ChainHandle::start(chain_image, &log_dir)?);
+        }
 
-        wait_for_http_response(&format!("{blokli_url}/graphql"), DEFAULT_WAIT_TIMEOUT).await?;
-
-        info!(
-            "chain services are up. Waiting {} seconds for the indexer to catch up",
-            INDEXING_WAIT_TIME.as_secs()
-        );
-        tokio::time::sleep(INDEXING_WAIT_TIME).await;
+        // TODO: replace with a proper healthcheck call to blokli once available
+        {
+            wait_for_http_response(&format!("{blokli_url}/graphql"), DEFAULT_WAIT_TIMEOUT).await?;
+            info!(
+                "chain services are up. Waiting {} seconds for the indexer to catch up",
+                INDEXING_WAIT_TIME.as_secs()
+            );
+            tokio::time::sleep(INDEXING_WAIT_TIME).await;
+        }
 
         info!("generating identities and configs via hoprd-gen-test library");
-        run_hoprd_gen_test(&args, &data_dir, &blokli_url).await?;
+        identity::generate(&config).await?;
 
         info!("starting hoprd nodes");
         cleanup.nodes = start_hoprd_nodes(&args, &data_dir, &log_dir).await?;
@@ -135,11 +106,11 @@ async fn main() -> Result<()> {
         if args.skip_channels {
             warn!("skipping channel creation");
         } else {
-            info!("opening full-mesh channels");
-            open_full_mesh_channels(&cleanup.nodes, &args.funding_amount).await?;
+            info!("opening channels to every other node");
+            client_helper::open_full_mesh_channels(&cleanup.nodes, &args.funding_amount).await?;
         }
 
-        print_node_summary(&cleanup.nodes, &args);
+        node_summary(&cleanup.nodes, &args);
 
         info!("localcluster running; press Ctrl+C to stop");
         tokio::signal::ctrl_c().await.context("failed to await Ctrl+C")?;
@@ -149,47 +120,21 @@ async fn main() -> Result<()> {
     }
     .await;
 
+    cleanup.shutdown();
+
     if let Err(err) = result {
         error!(error = %err, "localcluster failed");
-        cleanup.shutdown();
         return Err(err);
     }
 
-    cleanup.shutdown();
     Ok(())
 }
 
-fn validate_args(args: &Args) -> Result<()> {
-    if args.size == 0 {
-        anyhow::bail!("size must be at least 1");
-    }
-    Ok(())
-}
-
-fn init_tracing() {
-    let filter = std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string());
-    tracing_subscriber::fmt()
-        .with_env_filter(filter)
-        .with_target(false)
-        .init();
-}
-
-async fn run_hoprd_gen_test(args: &Args, data_dir: &Path, blokli_url: &str) -> Result<()> {
-    let config = GenTestConfig {
-        blokli_url: blokli_url.to_string(),
-        num_nodes: args.size,
-        config_home: data_dir.to_path_buf(),
-        identity_password: args.identity_password.clone(),
-        random_identities: true,
-        ..GenTestConfig::default()
-    };
-
-    generate(&config)
-        .await
-        .context("failed to generate test identities and configs")
-}
-
-async fn start_hoprd_nodes(args: &Args, data_dir: &Path, log_dir: &Path) -> Result<Vec<NodeProcess>> {
+async fn start_hoprd_nodes(
+    args: &cli::Args,
+    data_dir: &Path,
+    log_dir: &Path,
+) -> Result<Vec<client_helper::NodeProcess>> {
     let mut nodes = Vec::new();
     let api_host = &args.api_host;
     let api_client_host = if api_host == "0.0.0.0" { "127.0.0.1" } else { api_host };
@@ -218,7 +163,7 @@ async fn start_hoprd_nodes(args: &Args, data_dir: &Path, log_dir: &Path) -> Resu
             .arg("--apiPort")
             .arg(api_port.to_string())
             .arg("--host")
-            .arg(format!("{}:{}", args.p2p_host, p2p_port))
+            .arg(format!("{}:{}", &args.p2p_host, p2p_port))
             .arg("--password")
             .arg(&args.identity_password)
             .stdout(Stdio::from(log_file))
@@ -230,12 +175,12 @@ async fn start_hoprd_nodes(args: &Args, data_dir: &Path, log_dir: &Path) -> Resu
 
         debug!("starting hoprd node {} with command: {:?}", id, cmd);
         let child = cmd.spawn().context("failed to start hoprd")?;
-        let api = HoprdApiClient::new(
+        let api = client_helper::HoprdApiClient::new(
             format!("http://{}:{}", api_client_host, api_port),
             args.api_token.clone(),
         )?;
 
-        nodes.push(NodeProcess {
+        nodes.push(client_helper::NodeProcess {
             id,
             api_port,
             p2p_port,
@@ -248,32 +193,8 @@ async fn start_hoprd_nodes(args: &Args, data_dir: &Path, log_dir: &Path) -> Resu
     Ok(nodes)
 }
 
-async fn open_full_mesh_channels(nodes: &[NodeProcess], amount: &HoprBalance) -> Result<()> {
-    let amount = amount.to_string();
-    let mut tasks = Vec::new();
-    for src in nodes {
-        let Some(src_addr) = src.address.clone() else {
-            anyhow::bail!("node {} address missing", src.id);
-        };
-        for dst in nodes {
-            let Some(dst_addr) = dst.address.clone() else {
-                anyhow::bail!("node {} address missing", dst.id);
-            };
-            if src_addr == dst_addr {
-                continue;
-            }
-            let api = src.api.clone();
-            let amount = amount.clone();
-            tasks.push(async move { api.open_channel(&dst_addr, &amount).await });
-        }
-    }
-
-    try_join_all(tasks).await.context("failed to open channels")?;
-    Ok(())
-}
-
-fn print_node_summary(nodes: &[NodeProcess], args: &Args) {
-    println!("\n\n");
+fn node_summary(nodes: &[client_helper::NodeProcess], args: &cli::Args) {
+    println!();
 
     for node in nodes {
         let addr = node.address.clone().unwrap_or_else(|| "N/A".to_string());
@@ -289,17 +210,21 @@ fn print_node_summary(nodes: &[NodeProcess], args: &Args) {
             node_admin.push_str(&format!("&apiToken={token}"));
         }
 
-        println!(
-            "Node {}:\n\tAddress: {}\n\tP2P: {}:{}\n\tAPI host {}\n\tAPI token: {}\n\tNode admin: {}\n\tPID: {}\n\n",
-            node.id,
-            addr,
-            args.p2p_host,
-            node.p2p_port,
-            api,
-            token,
-            node_admin,
-            node.child.id()
-        );
+        let rows = [
+            ("Address", addr),
+            ("P2P", format!("{}:{}", &args.p2p_host, node.p2p_port)),
+            ("API host", api),
+            ("API token", token),
+            ("Node admin", node_admin),
+            ("PID", node.child.id().to_string()),
+        ];
+        let label_width = rows.iter().map(|(label, _)| label.len()).max().unwrap_or(0);
+
+        println!("Node {}", node.id);
+        for (label, value) in rows {
+            println!("\t{label:<width$}: {value}", width = label_width);
+        }
+        println!();
     }
 }
 

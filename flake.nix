@@ -303,7 +303,6 @@
               exec /bin/hoprd "$@"
             fi
           '';
-
           # Man pages using nix-lib
           hoprd-man = nixLib.mkManPage {
             pname = "hoprd";
@@ -352,17 +351,6 @@
             Cmd = [ "hoprd" ];
             env = [ "TMPDIR=/app/.tmp" ];
           };
-          hoprd-localcluster-docker = nixLib.mkDockerImage {
-            name = "hoprd-localcluster";
-            extraContents = [
-              hoprd-localcluster-x86_64-linux
-              pkgs.cacert
-              pkgs.curl
-            ];
-            Entrypoint = [ "/bin/hoprd-localcluster" ];
-            Cmd = [ ];
-            env = [ "TMPDIR=/app/.tmp" ];
-          };
 
           # Docker security scanning and SBOM generation using nix-lib
           hoprd-docker-trivy = nixLib.mkTrivyScan {
@@ -403,9 +391,6 @@
           };
           hoprd-profile-docker-build-and-upload = flake-utils.lib.mkApp {
             drv = dockerImageUploadScript hoprd-profile-docker;
-          };
-          hoprd-localcluster-docker-build-and-upload = flake-utils.lib.mkApp {
-            drv = dockerImageUploadScript hoprd-localcluster-docker;
           };
           docs = rust-builder-local-nightly.callPackage nixLib.mkRustPackage (
             hoprdBuildArgs // { buildDocs = true; }
@@ -677,7 +662,6 @@
             inherit hoprd-docker-build-and-upload;
             inherit hoprd-dev-docker-build-and-upload;
             inherit hoprd-profile-docker-build-and-upload;
-            inherit hoprd-localcluster-docker-build-and-upload;
             inherit update-github-labels find-port-ci;
             check = run-check;
             audit = run-audit;
@@ -691,7 +675,6 @@
               hoprd-dev-docker
               hoprd-profile-docker
               hoprd-localcluster
-              hoprd-localcluster-docker
               ;
             inherit hopr-test-unit hopr-test-nightly;
             inherit docs;

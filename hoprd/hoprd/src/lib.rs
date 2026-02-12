@@ -13,4 +13,3 @@ pub mod cli;
 pub mod config;
 pub mod errors;
 pub mod exit;
-pub mod gen_test;

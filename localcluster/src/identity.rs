@@ -9,9 +9,8 @@ use hopr_chain_connector::{
     reexports::hopr_chain_types::exports::alloy::hex,
 };
 use hopr_lib::{ChainKeypair, HoprKeys, Keypair, SafeModule, XDaiBalance, crypto_traits::Randomizable};
+use hoprd::config::{Db, HoprdConfig, Identity, SessionIpForwardingConfig, UserHoprLibConfig, UserHoprNetworkConfig};
 use hoprd_api::config::{Api, Auth};
-
-use crate::config::{Db, HoprdConfig, Identity, SessionIpForwardingConfig, UserHoprLibConfig};
 
 pub const DEFAULT_BLOKLI_URL: &str = "http://localhost:8080";
 pub const DEFAULT_PRIVATE_KEY: &str = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
@@ -20,7 +19,7 @@ pub const DEFAULT_IDENTITY_PASSWORD: &str = "password";
 pub const DEFAULT_NUM_NODES: usize = 3;
 
 #[derive(Clone, Debug)]
-pub struct GenTestConfig {
+pub struct GenerationConfig {
     pub blokli_url: String,
     pub private_key: String,
     pub num_nodes: usize,
@@ -29,7 +28,7 @@ pub struct GenTestConfig {
     pub random_identities: bool,
 }
 
-impl Default for GenTestConfig {
+impl Default for GenerationConfig {
     fn default() -> Self {
         Self {
             blokli_url: DEFAULT_BLOKLI_URL.to_string(),
@@ -70,7 +69,7 @@ lazy_static::lazy_static! {
 /// Generate test node Safes and hoprd configuration files.
 ///
 /// This generates node identities, deploys/funds Safes, and writes hoprd config files.
-pub async fn generate(config: &GenTestConfig) -> anyhow::Result<()> {
+pub async fn generate(config: &GenerationConfig) -> anyhow::Result<()> {
     std::fs::create_dir_all(&config.config_home)?;
     let home_path = &config.config_home;
     let private_key = hex::decode(&config.private_key).context("invalid private key")?;
@@ -172,6 +171,11 @@ pub async fn generate(config: &GenTestConfig) -> anyhow::Result<()> {
         let node_cfg = HoprdConfig {
             hopr: UserHoprLibConfig {
                 announce: true,
+                network: UserHoprNetworkConfig {
+                    announce_local_addresses: true,
+                    prefer_local_addresses: true,
+                    ..Default::default()
+                },
                 safe_module: SafeModule {
                     safe_address: safe.address,
                     module_address: safe.module,

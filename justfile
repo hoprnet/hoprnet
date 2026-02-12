@@ -63,3 +63,9 @@ sign-file source_file:
 # list all available docker image targets which can be built
 list-docker-images:
     nix flake show --json | jq '.packages | to_entries | .[0].value | to_entries[] | select(.key | endswith("docker")) | .key'
+
+
+localcluster clustersize:
+    docker rm -f anvil_blokli || true 
+    docker run --rm --name anvil_blokli --platform linux/amd64 -p 8080:8080 -d europe-west3-docker.pkg.dev/hoprassociation/docker-images/bloklid-anvil:latest
+    cargo run -p hoprd-localcluster -- --chain-url http://localhost:8080  --hoprd-bin ./result/bin/hoprd --size {{clustersize}}
