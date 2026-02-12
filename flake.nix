@@ -144,7 +144,7 @@
           localclusterBuildArgs = {
             inherit src depsSrc rev;
             cargoExtraArgs = "-p hoprd-localcluster";
-            cargoToml = ./sdk/rust/localcluster/Cargo.toml;
+            cargoToml = ./localcluster/Cargo.toml;
           };
 
           hoprd = rust-builder-local.callPackage nixLib.mkRustPackage hoprdBuildArgs;

@@ -7,7 +7,10 @@ use std::{
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use hoprd_localcluster::{blokli_helper, cli, client_helper, identity};
+use hoprd_localcluster::{
+    blokli_helper, cli, client_helper,
+    identity::{self, DEFAULT_BLOKLI_URL},
+};
 use tracing::{debug, error, info, warn};
 
 const DEFAULT_WAIT_TIMEOUT: Duration = Duration::from_secs(60);
@@ -45,10 +48,7 @@ async fn main() -> Result<()> {
     let log_dir = data_dir.join("logs");
     fs::create_dir_all(&log_dir).context("failed to create log directory")?;
 
-    let blokli_url = args
-        .chain_url
-        .clone()
-        .unwrap_or_else(|| "http://127.0.0.1:8081".to_string());
+    let blokli_url = args.chain_url.clone().unwrap_or_else(|| DEFAULT_BLOKLI_URL.to_string());
     let blokli_url = blokli_url.trim_end_matches('/').to_string();
     let config = identity::GenerationConfig {
         blokli_url: blokli_url.to_string(),
