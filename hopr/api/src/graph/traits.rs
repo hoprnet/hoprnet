@@ -17,6 +17,7 @@ pub enum EdgeWeightType {
     Immediate(EdgeTransportMeasurement),
     Intermediate(EdgeTransportMeasurement),
     Capacity(Option<Capacity>),
+    Connected(bool),
 }
 
 pub trait EdgeObservableWrite {
@@ -31,6 +32,9 @@ pub trait EdgeObservableRead {
 
     /// Capacity present in the channel to send through this path segment using PoR of HOPR protocol.
     fn capacity(&self) -> Option<u128>;
+
+    /// Whether this edge represents also an existing physical connection between the peers.
+    fn is_connected(&self) -> bool;
 
     /// Transport level measurements performed over the path segment exposed.
     fn immediate_qos(&self) -> Option<&Self::ImmediateMeasurement>;

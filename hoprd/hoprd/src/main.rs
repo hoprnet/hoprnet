@@ -15,7 +15,7 @@ use hopr_lib::{
     api::{chain::ChainEvents, graph::NetworkGraphUpdate, node::HoprNodeChainOperations},
     config::HoprLibConfig,
 };
-use hopr_network_graph::{GraphNode, SharedChannelGraph};
+use hopr_network_graph::SharedChannelGraph;
 use hopr_transport_p2p::HoprNetwork;
 use hoprd::{cli::CliArgs, config::HoprdConfig, errors::HoprdError, exit::HoprServerIpForwardingReactor};
 use hoprd_api::{RestApiParameters, serve_api};
@@ -379,10 +379,7 @@ async fn main_inner() -> anyhow::Result<()> {
                         Event::Chain(chain_event) => {
                             match chain_event {
                                 ChainEvent::Announcement(account) =>{
-                                    graph_updater.record_node(GraphNode {
-                                        id: account.public_key,
-                                        is_connected: false,
-                                    }).await;
+                                    graph_updater.record_node(account.public_key).await;
                                 },
                                 ChainEvent::ChannelOpened(channel) => {
                                     let from = chain_reader.chain_key_to_packet_key(&channel.source).await;
@@ -439,19 +436,13 @@ async fn main_inner() -> anyhow::Result<()> {
                             match network_event {
                                 hopr_api::network::NetworkEvent::PeerConnected(peer_id) =>
                                     if let Ok(opk) = hopr_lib::peer_id_to_public_key(&peer_id).await {
-                                        graph_updater.record_node(GraphNode {
-                                            id: opk,
-                                            is_connected: true,
-                                        }).await;
+                                        graph_updater.record_node(opk).await;
                                     } else {
                                         tracing::error!(%peer_id, "failed to convert peer ID to public key for graph update");
                                     },
                                 hopr_api::network::NetworkEvent::PeerDisconnected(peer_id) =>
                                     if let Ok(opk) = hopr_lib::peer_id_to_public_key(&peer_id).await {
-                                        graph_updater.record_node(GraphNode {
-                                            id: opk,
-                                            is_connected: false,
-                                        }).await;
+                                        graph_updater.record_node(opk).await;
                                     } else {
                                         tracing::error!(%peer_id, "failed to convert peer ID to public key for graph update");
                                     },

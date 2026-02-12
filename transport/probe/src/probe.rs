@@ -349,6 +349,10 @@ mod tests {
             None
         }
 
+        fn is_connected(&self) -> bool {
+            true
+        }
+
         fn immediate_qos(&self) -> Option<&Self::ImmediateMeasurement> {
             None
         }

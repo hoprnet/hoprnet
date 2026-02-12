@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use bimap::BiHashMap;
 use hopr_api::{
     OffchainPublicKey,
@@ -15,7 +13,6 @@ use crate::{errors::ChannelGraphError, weight::Observations};
 struct InnerGraph {
     graph: DiGraph<OffchainPublicKey, Observations>,
     indices: BiHashMap<OffchainPublicKey, NodeIndex>,
-    connected: HashSet<OffchainPublicKey>,
 }
 
 /// A directed graph representing logical channels between nodes.
@@ -232,12 +229,7 @@ impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
         N: MeasurableNode + std::fmt::Debug + Clone + Send + Sync + 'static,
     {
         tracing::trace!(?update, "recording node update");
-        hopr_api::graph::NetworkGraphWrite::add_node(self, *update.id());
-        if update.is_connected() {
-            self.inner.write().connected.insert(*update.id());
-        } else {
-            self.inner.write().connected.remove(update.id());
-        }
+        hopr_api::graph::NetworkGraphWrite::add_node(self, update.into());
     }
 }
 

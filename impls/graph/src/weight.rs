@@ -60,6 +60,7 @@ fn latency_score(latency: Option<std::time::Duration>) -> f64 {
 pub struct Observations {
     last_update: std::time::Duration,
     capacity: Option<u128>,
+    is_connected: bool,
     immediate_probe: Option<TransportLinkMeasurement>,
     intermediate_probe: Option<TransportLinkMeasurement>,
 }
@@ -92,6 +93,9 @@ impl EdgeObservableWrite for Observations {
             EdgeWeightType::Capacity(capacity) => {
                 self.capacity = capacity;
             }
+            EdgeWeightType::Connected(is_connected) => {
+                self.is_connected = is_connected;
+            }
         }
     }
 }
@@ -109,6 +113,10 @@ impl EdgeObservableRead for Observations {
         self.capacity
     }
 
+    fn is_connected(&self) -> bool {
+        self.is_connected
+    }
+
     fn immediate_qos(&self) -> Option<&Self::ImmediateMeasurement> {
         self.immediate_probe.as_ref()
     }
@@ -120,6 +128,9 @@ impl EdgeObservableRead for Observations {
     /// The score is calculated based on the available observations, with priority order:
     /// 1. intermediate probe
     /// 2. immediate ones
+    ///
+    /// TODO: find a better way to do this or completely remove this score function,
+    /// as it is not clear how to combine the different observations in a meaningful way.
     fn score(&self) -> f64 {
         if let Some(qos) = &self.intermediate_probe {
             qos.score()

@@ -12,10 +12,9 @@ where
     ProbeLoopbackTimeout(P),
 }
 
-pub trait MeasurableNode {
-    fn id(&self) -> &OffchainPublicKey;
-    fn is_connected(&self) -> bool;
-}
+pub trait MeasurableNode: Into<OffchainPublicKey> {}
+
+impl<T: Into<OffchainPublicKey>> MeasurableNode for T {}
 
 /// Measurable peer attributes.
 pub trait MeasurablePeer {
