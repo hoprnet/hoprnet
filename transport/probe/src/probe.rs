@@ -286,7 +286,10 @@ mod tests {
 
     use async_trait::async_trait;
     use futures::future::BoxFuture;
-    use hopr_api::graph::{EdgeTransportObservable, MeasurableEdge, NetworkGraphError, traits::EdgeObservable};
+    use hopr_api::graph::{
+        EdgeTransportObservable, MeasurableEdge, NetworkGraphError,
+        traits::{EdgeObservableRead, EdgeObservableWrite},
+    };
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use hopr_ct_telemetry::{ImmediateNeighborProber, ProberConfig};
     use hopr_protocol_app::prelude::{ApplicationData, Tag};
@@ -329,11 +332,13 @@ mod tests {
     #[derive(Debug, Clone, Copy, Default)]
     pub struct TestEdgeObservations;
 
-    impl EdgeObservable for TestEdgeObservations {
+    impl EdgeObservableWrite for TestEdgeObservations {
+        fn record(&mut self, _measurement: hopr_api::graph::traits::EdgeWeightType) {}
+    }
+
+    impl EdgeObservableRead for TestEdgeObservations {
         type ImmediateMeasurement = TestEdgeTransportObservations;
         type IntermediateMeasurement = TestEdgeTransportObservations;
-
-        fn record(&mut self, _measurement: hopr_api::graph::traits::EdgeWeightType) {}
 
         fn last_update(&self) -> std::time::Duration {
             std::time::SystemTime::now()

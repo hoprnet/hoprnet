@@ -347,7 +347,7 @@ mod tests {
     use hex_literal::hex;
     use hopr_api::graph::{
         EdgeTransportObservable, EdgeTransportTelemetry, MeasurablePath, MeasurablePeer, NetworkGraphError,
-        NetworkGraphTraverse, NetworkGraphUpdate, NetworkGraphView, NetworkGraphWrite,
+        NetworkGraphTraverse, NetworkGraphUpdate, NetworkGraphView, NetworkGraphWrite, traits::EdgeObservableRead,
     };
     use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
 
