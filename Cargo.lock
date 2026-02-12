@@ -5355,6 +5355,7 @@ dependencies = [
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry_sdk",
+ "parking_lot",
  "proc-macro-regex",
  "serde",
  "serde_json",

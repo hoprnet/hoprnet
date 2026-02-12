@@ -4,33 +4,35 @@ use super::{MeasurablePath, MeasurablePeer};
 use crate::graph::{MeasurableEdge, MeasurableNode};
 
 pub type EdgeTransportMeasurement = std::result::Result<std::time::Duration, ()>;
-
 pub type Capacity = u128;
-
-pub enum EdgeObservation {
-    Update(EdgeWeightType),
-    Remove,
-    Add(Capacity),
-}
 
 pub enum EdgeWeightType {
     Immediate(EdgeTransportMeasurement),
     Intermediate(EdgeTransportMeasurement),
     Capacity(Option<Capacity>),
+    Connected(bool),
 }
 
 pub trait EdgeObservableWrite {
     fn record(&mut self, measurement: EdgeWeightType);
 }
+
+pub trait EdgeNetworkObservableRead {
+    /// Whether this edge represents also an existing physical connection between the peers.
+    fn is_connected(&self) -> bool;
+}
+
+pub trait EdgeProtocolObservable {
+    /// Capacity present in the channel to send through this path segment using PoR of HOPR protocol.
+    fn capacity(&self) -> Option<u128>;
+}
+
 pub trait EdgeObservableRead {
-    type ImmediateMeasurement: EdgeTransportObservable + Send;
-    type IntermediateMeasurement: EdgeTransportObservable + Send;
+    type ImmediateMeasurement: EdgeLinkObservable + EdgeNetworkObservableRead + Send;
+    type IntermediateMeasurement: EdgeLinkObservable + EdgeProtocolObservable + Send;
 
     /// The timestamp of the last update.
     fn last_update(&self) -> std::time::Duration;
-
-    /// Capacity present in the channel to send through this path segment using PoR of HOPR protocol.
-    fn capacity(&self) -> Option<u128>;
 
     /// Transport level measurements performed over the path segment exposed.
     fn immediate_qos(&self) -> Option<&Self::ImmediateMeasurement>;
@@ -48,11 +50,11 @@ pub trait EdgeObservable: EdgeObservableRead + EdgeObservableWrite {}
 
 impl<T: EdgeObservableWrite + EdgeObservableRead> EdgeObservable for T {}
 
-pub trait EdgeTransportObservable {
-    /// Record a new result of the probe over this path segment.
+pub trait EdgeLinkObservable {
+    /// Records a new result of the probe over this path segment.
     fn record(&mut self, measurement: EdgeTransportMeasurement);
 
-    /// Return average latency observed for the measured peer.
+    /// Returns average latency observed for the measured peer.
     fn average_latency(&self) -> Option<std::time::Duration>;
 
     /// A value representing the average success rate of probes.
@@ -141,6 +143,22 @@ pub trait NetworkGraphWrite {
     ///
     /// Returns an error if either node is not present in the graph.
     fn add_edge(&self, src: &Self::NodeId, dest: &Self::NodeId) -> Result<(), Self::Error>;
+
+    /// Removes a directed edge between two nodes.
+    ///
+    /// If the edge does not exist, this operation has no effect.
+    fn remove_edge(&self, src: &Self::NodeId, dest: &Self::NodeId);
+
+    /// Updates an existing edge or inserts a new edge between two nodes.
+    ///
+    /// If the nodes do not exist, they are inserted into the graph.
+    /// 
+    /// The provided closure `f` is applied to modify the edge's observations.
+    /// If the edge already exists, its observations are updated.
+    /// If the edge does not exist, it is created and the closure is applied.
+    fn upsert_edge<F>(&self, src: &Self::NodeId, dest: &Self::NodeId, f: F)
+    where
+        F: FnOnce(&mut Self::Observed);
 }
 
 /// A trait specifying the graph update functionality

@@ -25,7 +25,7 @@ pub mod petgraph;
 pub mod errors;
 pub mod weight;
 
-use hopr_api::{OffchainPublicKey, graph::MeasurableNode};
+use hopr_api::OffchainPublicKey;
 #[cfg(feature = "petgraph")]
 pub use petgraph::*;
 pub use weight::Observations;
@@ -39,17 +39,10 @@ pub use weight::Observations;
 pub type SharedChannelGraph = std::sync::Arc<ChannelGraph>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct GraphNode {
-    pub id: OffchainPublicKey,
-    pub is_connected: bool,
-}
+pub struct GraphNode(OffchainPublicKey);
 
-impl MeasurableNode for GraphNode {
-    fn id(&self) -> &OffchainPublicKey {
-        &self.id
-    }
-
-    fn is_connected(&self) -> bool {
-        self.is_connected
+impl Into<OffchainPublicKey> for GraphNode {
+    fn into(self) -> OffchainPublicKey {
+        self.0
     }
 }

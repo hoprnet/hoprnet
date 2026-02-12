@@ -15,7 +15,7 @@ use hopr_lib::{
     api::{chain::ChainEvents, graph::NetworkGraphUpdate, node::HoprNodeChainOperations},
     config::HoprLibConfig,
 };
-use hopr_network_graph::{GraphNode, SharedChannelGraph};
+use hopr_network_graph::SharedChannelGraph;
 use hopr_transport_p2p::HoprNetwork;
 use hoprd::{cli::CliArgs, config::HoprdConfig, errors::HoprdError, exit::HoprServerIpForwardingReactor};
 use hoprd_api::{RestApiParameters, serve_api};
@@ -370,17 +370,16 @@ async fn main_inner() -> anyhow::Result<()> {
                 .map(Event::Network)
                 .merge(chain_events.map(Event::Chain))
                 .for_each(|event| async {
-                    // let ticket_price = .;
-                    // let win_probability = ..;
+                    use hopr_api::chain::ChainValues;
+
+                    let ticket_price = std::sync::Arc::new(parking_lot::RwLock::new(chain_reader.minimum_ticket_price().await.unwrap_or_default()));
+                    let win_probability = std::sync::Arc::new(parking_lot::RwLock::new(chain_reader.minimum_incoming_ticket_win_prob().await.unwrap_or_default()));
+                    
                     match event {
                         Event::Chain(chain_event) => {
-
                             match chain_event {
                                 ChainEvent::Announcement(account) =>{
-                                    graph_updater.record_node(GraphNode {
-                                        id: account.public_key,
-                                        is_connected: false,
-                                    }).await;
+                                    graph_updater.record_node(account.public_key).await;
                                 },
                                 ChainEvent::ChannelOpened(channel) => {
                                     let from = chain_reader.chain_key_to_packet_key(&channel.source).await;
@@ -388,8 +387,9 @@ async fn main_inner() -> anyhow::Result<()> {
 
                                     match (from, to) {
                                         (Ok(Some(_from)), Ok(Some(_to))) => {
-                                            // graph_updater.record_edge(from, to).await;
+                                            let capacity = Some(channel.balance.amount().low_u128().saturating_div(ticket_price.read().amount().low_u128()).saturating_mul(win_probability.read().as_luck() as u128));
                                             // TODO: update here
+                                            // graph_updater.record_edge(from, to).await;
                                         },
                                         (Ok(_), Ok(_)) => {
                                             tracing::error!(%channel, "could not find packet keys for the channel endpoints");
@@ -400,32 +400,49 @@ async fn main_inner() -> anyhow::Result<()> {
                                     }
                                 },
                                 ChainEvent::ChannelClosureInitiated(_channel) => {},
-                                ChainEvent::ChannelClosed(_channel) => {},
-                                ChainEvent::ChannelBalanceIncreased(_channel, _balance) => {},
-                                ChainEvent::ChannelBalanceDecreased(_channel, _balance) => {},
-                                ChainEvent::WinningProbabilityIncreased(_probability) => {},
-                                ChainEvent::WinningProbabilityDecreased(_probability) => {},
-                                ChainEvent::TicketPriceChanged(_price) => {},
-                                ChainEvent::TicketRedeemed(_channel_entry, _verified_ticket) => {},
+                                ChainEvent::ChannelClosed(_channel) => {
+                                    // let capacity = None;
+                                },
+                                ChainEvent::ChannelBalanceIncreased(channel, _) |
+                                ChainEvent::ChannelBalanceDecreased(channel, _) => {
+                                    let from = chain_reader.chain_key_to_packet_key(&channel.source).await;
+                                    let to = chain_reader.chain_key_to_packet_key(&channel.destination).await;
+
+                                    match (from, to) {
+                                        (Ok(Some(_from)), Ok(Some(_to))) => {
+                                            let capacity = Some(channel.balance.amount().low_u128().saturating_div(ticket_price.read().amount().low_u128()).saturating_mul(win_probability.read().as_luck() as u128));
+                                            // TODO: update here
+                                            // graph_updater.record_edge(from, to).await;
+                                        },
+                                        (Ok(_), Ok(_)) => {
+                                            tracing::error!(%channel, "could not find packet keys for the channel endpoints");
+                                        },
+                                        (Err(e), _) | (_, Err(e)) => {
+                                            tracing::error!(%e, %channel, "failed to convert chain keys to packet keys for graph update");
+                                        }
+                                    }
+                                },
+                                ChainEvent::WinningProbabilityIncreased(probability) |
+                                ChainEvent::WinningProbabilityDecreased(probability) => {
+                                    *win_probability.write() = probability;
+                                }
+                                ChainEvent::TicketPriceChanged(price) => {
+                                    *ticket_price.write() = price;
+                                },
+                                _ => {}
                             }
                         }
                         Event::Network(network_event) => {
                             match network_event {
                                 hopr_api::network::NetworkEvent::PeerConnected(peer_id) =>
                                     if let Ok(opk) = hopr_lib::peer_id_to_public_key(&peer_id).await {
-                                        graph_updater.record_node(GraphNode {
-                                            id: opk,
-                                            is_connected: true,
-                                        }).await;
+                                        graph_updater.record_node(opk).await;
                                     } else {
                                         tracing::error!(%peer_id, "failed to convert peer ID to public key for graph update");
                                     },
                                 hopr_api::network::NetworkEvent::PeerDisconnected(peer_id) =>
                                     if let Ok(opk) = hopr_lib::peer_id_to_public_key(&peer_id).await {
-                                        graph_updater.record_node(GraphNode {
-                                            id: opk,
-                                            is_connected: false,
-                                        }).await;
+                                        graph_updater.record_node(opk).await;
                                     } else {
                                         tracing::error!(%peer_id, "failed to convert peer ID to public key for graph update");
                                     },

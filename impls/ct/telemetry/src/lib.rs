@@ -106,10 +106,7 @@ mod tests {
     use std::{collections::HashSet, sync::Arc};
 
     use futures::{StreamExt, pin_mut};
-    use hopr_api::{
-        OffchainKeypair,
-        graph::{MeasurableNode, NetworkGraphUpdate},
-    };
+    use hopr_api::{OffchainKeypair, graph::NetworkGraphUpdate};
     use hopr_crypto_types::keypairs::Keypair;
     use hopr_internal_types::NodeId;
     use hopr_network_graph::ChannelGraph;
@@ -122,16 +119,11 @@ mod tests {
     #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub struct Node {
         pub id: OffchainPublicKey,
-        pub is_connected: bool,
     }
 
-    impl MeasurableNode for Node {
-        fn id(&self) -> &OffchainPublicKey {
-            &self.id
-        }
-
-        fn is_connected(&self) -> bool {
-            self.is_connected
+    impl Into<OffchainPublicKey> for Node {
+        fn into(self) -> OffchainPublicKey {
+            self.id
         }
     }
 
@@ -139,7 +131,6 @@ mod tests {
         static ref RANDOM_PEERS: HashSet<Node> = (1..10).map(|_| {
             Node {
                 id: OffchainPublicKey::from_privkey(&hopr_crypto_random::random_bytes::<32>()).unwrap(),
-                is_connected: false
             }
         }).collect::<HashSet<_>>();
     }
@@ -195,7 +186,7 @@ mod tests {
         .await?;
 
         assert_eq!(actual.len(), RANDOM_PEERS.len());
-        assert!(!actual.iter().zip(RANDOM_PEERS.iter()).all(|(a, b)| a == b.id()));
+        assert!(!actual.iter().zip(RANDOM_PEERS.iter()).all(|(a, b)| a == &b.id));
 
         Ok(())
     }

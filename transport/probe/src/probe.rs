@@ -287,8 +287,8 @@ mod tests {
     use async_trait::async_trait;
     use futures::future::BoxFuture;
     use hopr_api::graph::{
-        EdgeTransportObservable, MeasurableEdge, NetworkGraphError,
-        traits::{EdgeObservableRead, EdgeObservableWrite},
+        EdgeLinkObservable, MeasurableEdge, NetworkGraphError,
+        traits::{EdgeNetworkObservableRead, EdgeObservableRead, EdgeObservableWrite, EdgeProtocolObservable},
     };
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use hopr_ct_telemetry::{ImmediateNeighborProber, ProberConfig};
@@ -312,7 +312,7 @@ mod tests {
     #[derive(Debug, Clone, Copy, Default)]
     pub struct TestEdgeTransportObservations;
 
-    impl EdgeTransportObservable for TestEdgeTransportObservations {
+    impl EdgeLinkObservable for TestEdgeTransportObservations {
         fn record(&mut self, _latency: std::result::Result<Duration, ()>) {}
 
         fn average_latency(&self) -> Option<Duration> {
@@ -325,6 +325,18 @@ mod tests {
 
         fn score(&self) -> f64 {
             1.0
+        }
+    }
+
+    impl EdgeNetworkObservableRead for TestEdgeTransportObservations {
+        fn is_connected(&self) -> bool {
+            true
+        }
+    }
+
+    impl EdgeProtocolObservable for TestEdgeTransportObservations {
+        fn capacity(&self) -> Option<u128> {
+            None
         }
     }
 
@@ -343,10 +355,6 @@ mod tests {
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
-        }
-
-        fn capacity(&self) -> Option<u128> {
-            None
         }
 
         fn immediate_qos(&self) -> Option<&Self::ImmediateMeasurement> {

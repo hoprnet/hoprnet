@@ -16,7 +16,7 @@ use hopr_chain_connector::{
 use hopr_crypto_types::prelude::*;
 use hopr_db_node::HoprNodeDb;
 use hopr_internal_types::prelude::WinningProbability;
-use hopr_network_graph::{GraphNode, SharedChannelGraph};
+use hopr_network_graph::SharedChannelGraph;
 use hopr_network_types::prelude::{IpOrHost, RoutingOptions, SealedHost};
 use hopr_primitive_types::prelude::*;
 use hopr_transport::{HoprSession, SessionClientConfig, SessionTarget};
@@ -427,10 +427,7 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
 
                                             match chain_event {
                                                 ChainEvent::Announcement(account) =>{
-                                                    graph_updater.record_node(GraphNode {
-                                                        id: account.public_key,
-                                                        is_connected: false,
-                                                    }).await;
+                                                    graph_updater.record_node(account.public_key).await;
                                                 },
                                                 ChainEvent::ChannelOpened(channel) => {
                                                     let from = chain_reader.chain_key_to_packet_key(&channel.source).await;
@@ -463,19 +460,13 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
                                             match network_event {
                                                 hopr_api::network::NetworkEvent::PeerConnected(peer_id) =>
                                                     if let Ok(opk) = crate::peer_id_to_public_key(&peer_id).await {
-                                                        graph_updater.record_node(GraphNode {
-                                                            id: opk,
-                                                            is_connected: true,
-                                                        }).await;
+                                                        graph_updater.record_node(opk).await;
                                                     } else {
                                                         tracing::error!(%peer_id, "failed to convert peer ID to public key for graph update");
                                                     },
                                                 hopr_api::network::NetworkEvent::PeerDisconnected(peer_id) =>
                                                     if let Ok(opk) = crate::peer_id_to_public_key(&peer_id).await {
-                                                        graph_updater.record_node(GraphNode {
-                                                            id: opk,
-                                                            is_connected: false,
-                                                        }).await;
+                                                        graph_updater.record_node(opk).await;
                                                     } else {
                                                         tracing::error!(%peer_id, "failed to convert peer ID to public key for graph update");
                                                     },

@@ -1,9 +1,7 @@
-use std::collections::HashSet;
-
 use bimap::BiHashMap;
 use hopr_api::{
     OffchainPublicKey,
-    graph::{MeasurableEdge, MeasurableNode, traits::EdgeObservableWrite},
+    graph::{MeasurableEdge, MeasurableNode, NetworkGraphWrite, traits::EdgeObservableWrite},
 };
 use parking_lot::RwLock;
 use petgraph::graph::{DiGraph, NodeIndex};
@@ -15,7 +13,6 @@ use crate::{errors::ChannelGraphError, weight::Observations};
 struct InnerGraph {
     graph: DiGraph<OffchainPublicKey, Observations>,
     indices: BiHashMap<OffchainPublicKey, NodeIndex>,
-    connected: HashSet<OffchainPublicKey>,
 }
 
 /// A directed graph representing logical channels between nodes.
@@ -60,35 +57,6 @@ impl ChannelGraph {
     /// Returns the self-identity key of this graph.
     pub fn me(&self) -> &OffchainPublicKey {
         &self.me
-    }
-
-    /// Mutably updates the edge observations between two nodes.
-    ///
-    /// If the edge exists, applies the given function to its observations.
-    #[tracing::instrument(level = "debug", skip(self, f))]
-    fn update_edge<F>(&self, src: &OffchainPublicKey, dest: &OffchainPublicKey, f: F)
-    where
-        F: FnOnce(&mut Observations),
-    {
-        tracing::trace!(%src, %dest, "attempting to update edge observations");
-        let mut inner = self.inner.write();
-
-        if let (Some(src_idx), Some(dest_idx)) = (
-            inner.indices.get_by_left(src).copied(),
-            inner.indices.get_by_left(dest).copied(),
-        ) {
-            let edge_idx = inner
-                .graph
-                .find_edge(src_idx, dest_idx)
-                .unwrap_or_else(|| inner.graph.add_edge(src_idx, dest_idx, Observations::default()));
-
-            if let Some(weight) = inner.graph.edge_weight_mut(edge_idx) {
-                tracing::trace!(%src, %dest, "updating edge observations");
-                f(weight);
-            }
-        } else {
-            tracing::warn!(%src, %dest, reason = "one or both of the nodes do not exist", "edge update failed" );
-        }
     }
 
     /// Finds all simple paths of exactly `length` hops from `src` to `dest`. (naive implementation)
@@ -191,7 +159,7 @@ impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
                     "neighbor probe successful"
                 );
 
-                self.update_edge(&self.me, telemetry.peer(), |obs| {
+                self.upsert_edge(&self.me, telemetry.peer(), |obs| {
                     obs.record(EdgeWeightType::Immediate(Ok(telemetry.rtt() / 2)));
                 });
             }
@@ -208,7 +176,7 @@ impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
                     "neighbor probe failed"
                 );
 
-                self.update_edge(&self.me, peer, |obs| {
+                self.upsert_edge(&self.me, peer, |obs| {
                     obs.record(EdgeWeightType::Immediate(Err(())));
                 });
             }
@@ -219,7 +187,7 @@ impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
                 );
             }
             MeasurableEdge::Capacity(update) => {
-                self.update_edge(&update.src, &update.dest, |obs: &mut Observations| {
+                self.upsert_edge(&update.src, &update.dest, |obs: &mut Observations| {
                     obs.record(EdgeWeightType::Capacity(update.capacity));
                 });
             }
@@ -232,12 +200,7 @@ impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
         N: MeasurableNode + std::fmt::Debug + Clone + Send + Sync + 'static,
     {
         tracing::trace!(?update, "recording node update");
-        hopr_api::graph::NetworkGraphWrite::add_node(self, *update.id());
-        if update.is_connected() {
-            self.inner.write().connected.insert(*update.id());
-        } else {
-            self.inner.write().connected.remove(update.id());
-        }
+        hopr_api::graph::NetworkGraphWrite::add_node(self, update.into());
     }
 }
 
@@ -323,6 +286,46 @@ impl hopr_api::graph::NetworkGraphWrite for ChannelGraph {
         inner.graph.add_edge(src_idx, dest_idx, Observations::default());
         Ok(())
     }
+
+    fn remove_edge(&self, src: &OffchainPublicKey, dest: &OffchainPublicKey) {
+        let mut inner = self.inner.write();
+        if let (Some(src_idx), Some(dest_idx)) = (
+            inner.indices.get_by_left(src).copied(),
+            inner.indices.get_by_left(dest).copied(),
+        ) {
+            if let Some(edge_idx) = inner.graph.find_edge(src_idx, dest_idx) {
+                inner.graph.remove_edge(edge_idx);
+            }
+        }
+    }
+
+    /// Mutably updates the edge observations between two nodes.
+    ///
+    /// If the edge does not exist, it gets created first.
+    #[tracing::instrument(level = "debug", skip(self, f))]
+    fn upsert_edge<F>(&self, src: &OffchainPublicKey, dest: &OffchainPublicKey, f: F)
+    where
+        F: FnOnce(&mut Observations),
+    {
+        let mut inner = self.inner.write();
+
+        if let (Some(src_idx), Some(dest_idx)) = (
+            inner.indices.get_by_left(src).copied(),
+            inner.indices.get_by_left(dest).copied(),
+        ) {
+            let edge_idx = inner
+                .graph
+                .find_edge(src_idx, dest_idx)
+                .unwrap_or_else(|| inner.graph.add_edge(src_idx, dest_idx, Observations::default()));
+
+            if let Some(weight) = inner.graph.edge_weight_mut(edge_idx) {
+                f(weight);
+                tracing::debug!(%src, %dest, ?weight, "updated edge weight with an observation");
+            }
+        } else {
+            tracing::warn!(%src, %dest, reason = "one or both of the nodes do not exist", "edge update failed" );
+        }
+    }
 }
 
 #[async_trait::async_trait]
@@ -358,8 +361,9 @@ mod tests {
     use anyhow::Context;
     use hex_literal::hex;
     use hopr_api::graph::{
-        EdgeTransportObservable, EdgeTransportTelemetry, MeasurablePath, MeasurablePeer, NetworkGraphError,
-        NetworkGraphTraverse, NetworkGraphUpdate, NetworkGraphView, NetworkGraphWrite, traits::EdgeObservableRead,
+        EdgeLinkObservable, EdgeTransportTelemetry, MeasurablePath, MeasurablePeer, NetworkGraphError,
+        NetworkGraphTraverse, NetworkGraphUpdate, NetworkGraphView, NetworkGraphWrite,
+        traits::{EdgeObservableRead, EdgeObservableWrite, EdgeProtocolObservable, EdgeWeightType},
     };
     use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
 
@@ -656,6 +660,440 @@ mod tests {
 
         assert!(routes.is_empty());
 
+        Ok(())
+    }
+
+    #[test]
+    fn me_returns_self_identity() {
+        let me = pubkey_from(&SECRET_0);
+        let graph = ChannelGraph::new(me);
+        assert_eq!(*graph.me(), me);
+    }
+
+    #[test]
+    fn removing_an_edge_disconnects_nodes() -> anyhow::Result<()> {
+        let me = pubkey_from(&SECRET_0);
+        let peer = pubkey_from(&SECRET_1);
+        let graph = ChannelGraph::new(me);
+        graph.add_node(peer);
+        graph.add_edge(&me, &peer)?;
+        assert!(graph.has_edge(&me, &peer));
+
+        graph.remove_edge(&me, &peer);
+        assert!(!graph.has_edge(&me, &peer));
+        // Nodes should still exist
+        assert!(graph.contains_node(&me));
+        assert!(graph.contains_node(&peer));
+        Ok(())
+    }
+
+    #[test]
+    fn removing_nonexistent_edge_is_noop() {
+        let me = pubkey_from(&SECRET_0);
+        let peer = pubkey_from(&SECRET_1);
+        let graph = ChannelGraph::new(me);
+        graph.add_node(peer);
+        // No edge exists — should not panic
+        graph.remove_edge(&me, &peer);
+        assert!(!graph.has_edge(&me, &peer));
+    }
+
+    #[test]
+    fn removing_edge_for_unknown_nodes_is_noop() {
+        let me = pubkey_from(&SECRET_0);
+        let graph = ChannelGraph::new(me);
+        let unknown = pubkey_from(&SECRET_7);
+        // Neither node known — should not panic
+        graph.remove_edge(&me, &unknown);
+    }
+
+    #[test]
+    fn has_edge_returns_false_when_nodes_not_in_graph() {
+        let me = pubkey_from(&SECRET_0);
+        let graph = ChannelGraph::new(me);
+        let unknown = pubkey_from(&SECRET_7);
+        assert!(!graph.has_edge(&me, &unknown));
+        assert!(!graph.has_edge(&unknown, &me));
+    }
+
+    #[test]
+    fn edge_returns_none_when_nodes_not_in_graph() {
+        let me = pubkey_from(&SECRET_0);
+        let graph = ChannelGraph::new(me);
+        let unknown = pubkey_from(&SECRET_7);
+        assert!(graph.edge(&me, &unknown).is_none());
+        assert!(graph.edge(&unknown, &me).is_none());
+    }
+
+    #[test]
+    fn upsert_edge_creates_edge_when_absent() {
+        let me = pubkey_from(&SECRET_0);
+        let peer = pubkey_from(&SECRET_1);
+        let graph = ChannelGraph::new(me);
+        graph.add_node(peer);
+
+        assert!(!graph.has_edge(&me, &peer));
+        graph.upsert_edge(&me, &peer, |obs| {
+            obs.record(EdgeWeightType::Immediate(Ok(std::time::Duration::from_millis(50))));
+        });
+        assert!(graph.has_edge(&me, &peer));
+
+        let obs = graph.edge(&me, &peer).expect("edge should exist after upsert");
+        assert!(obs.immediate_qos().is_some());
+    }
+
+    #[test]
+    fn upsert_edge_updates_existing_edge() -> anyhow::Result<()> {
+        let me = pubkey_from(&SECRET_0);
+        let peer = pubkey_from(&SECRET_1);
+        let graph = ChannelGraph::new(me);
+        graph.add_node(peer);
+        graph.add_edge(&me, &peer)?;
+
+        graph.upsert_edge(&me, &peer, |obs| {
+            obs.record(EdgeWeightType::Immediate(Ok(std::time::Duration::from_millis(100))));
+        });
+        graph.upsert_edge(&me, &peer, |obs| {
+            obs.record(EdgeWeightType::Immediate(Ok(std::time::Duration::from_millis(200))));
+        });
+
+        let obs = graph.edge(&me, &peer).expect("edge should exist");
+        let latency = obs
+            .immediate_qos()
+            .expect("should have immediate QoS")
+            .average_latency()
+            .expect("should have latency");
+        // After two updates (100ms and 200ms), average should be between 100 and 200
+        assert!(latency > std::time::Duration::from_millis(100));
+        assert!(latency < std::time::Duration::from_millis(200));
+        Ok(())
+    }
+
+    #[test]
+    fn upsert_edge_with_unknown_nodes_is_noop() {
+        let me = pubkey_from(&SECRET_0);
+        let unknown = pubkey_from(&SECRET_7);
+        let graph = ChannelGraph::new(me);
+
+        // One or both nodes unknown — should not panic, no edge created
+        graph.upsert_edge(&me, &unknown, |_obs| {
+            panic!("closure should not be called when nodes are missing");
+        });
+        assert!(!graph.has_edge(&me, &unknown));
+    }
+
+    #[tokio::test]
+    async fn record_edge_capacity_updates_observations() -> anyhow::Result<()> {
+        let me = pubkey_from(&SECRET_0);
+        let peer = pubkey_from(&SECRET_1);
+        let graph = ChannelGraph::new(me);
+        graph.add_node(peer);
+        graph.add_edge(&me, &peer)?;
+
+        let capacity_update = hopr_api::graph::EdgeCapacityUpdate {
+            src: me,
+            dest: peer,
+            capacity: Some(1000),
+        };
+        graph
+            .record_edge::<TestNeighbor, TestPath>(hopr_api::graph::MeasurableEdge::Capacity(Box::new(capacity_update)))
+            .await;
+
+        let obs = graph.edge(&me, &peer).context("edge should exist")?;
+        let intermediate = obs
+            .intermediate_qos()
+            .context("intermediate QoS should be present after capacity update")?;
+        assert_eq!(intermediate.capacity(), Some(1000));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn record_edge_capacity_with_none_value() -> anyhow::Result<()> {
+        let me = pubkey_from(&SECRET_0);
+        let peer = pubkey_from(&SECRET_1);
+        let graph = ChannelGraph::new(me);
+        graph.add_node(peer);
+        graph.add_edge(&me, &peer)?;
+
+        let capacity_update = hopr_api::graph::EdgeCapacityUpdate {
+            src: me,
+            dest: peer,
+            capacity: None,
+        };
+        graph
+            .record_edge::<TestNeighbor, TestPath>(hopr_api::graph::MeasurableEdge::Capacity(Box::new(capacity_update)))
+            .await;
+
+        let obs = graph.edge(&me, &peer).context("edge should exist")?;
+        let intermediate = obs.intermediate_qos().context("intermediate QoS should be present")?;
+        assert_eq!(intermediate.capacity(), None);
+        Ok(())
+    }
+
+    // --- record_node ---
+
+    #[tokio::test]
+    async fn record_node_adds_node_to_graph() {
+        let me = pubkey_from(&SECRET_0);
+        let peer = pubkey_from(&SECRET_1);
+        let graph = ChannelGraph::new(me);
+
+        assert!(!graph.contains_node(&peer));
+        graph.record_node(peer).await;
+        assert!(graph.contains_node(&peer));
+    }
+
+    #[test]
+    fn removing_non_last_node_preserves_other_nodes() -> anyhow::Result<()> {
+        let me = pubkey_from(&SECRET_0);
+        let a = pubkey_from(&SECRET_1);
+        let b = pubkey_from(&SECRET_2);
+        let c = pubkey_from(&SECRET_3);
+
+        let graph = ChannelGraph::new(me);
+        graph.add_node(a);
+        graph.add_node(b);
+        graph.add_node(c);
+        assert_eq!(graph.node_count(), 4);
+
+        // Remove a node that is not the last one (triggers index swap in petgraph)
+        graph.remove_node(&a);
+        assert_eq!(graph.node_count(), 3);
+        assert!(!graph.contains_node(&a));
+        assert!(graph.contains_node(&me));
+        assert!(graph.contains_node(&b));
+        assert!(graph.contains_node(&c));
+
+        // Verify edges can still be added to remaining nodes
+        graph.add_edge(&me, &b)?;
+        graph.add_edge(&me, &c)?;
+        assert!(graph.has_edge(&me, &b));
+        assert!(graph.has_edge(&me, &c));
+        Ok(())
+    }
+
+    #[test]
+    fn removing_multiple_nodes_preserves_consistency() -> anyhow::Result<()> {
+        let me = pubkey_from(&SECRET_0);
+        let a = pubkey_from(&SECRET_1);
+        let b = pubkey_from(&SECRET_2);
+        let c = pubkey_from(&SECRET_3);
+        let d = pubkey_from(&SECRET_4);
+
+        let graph = ChannelGraph::new(me);
+        graph.add_node(a);
+        graph.add_node(b);
+        graph.add_node(c);
+        graph.add_node(d);
+
+        graph.add_edge(&me, &a)?;
+        graph.add_edge(&a, &b)?;
+        graph.add_edge(&b, &c)?;
+        graph.add_edge(&c, &d)?;
+
+        // Remove middle nodes
+        graph.remove_node(&b);
+        graph.remove_node(&c);
+
+        assert_eq!(graph.node_count(), 3);
+        assert!(graph.contains_node(&me));
+        assert!(graph.contains_node(&a));
+        assert!(graph.contains_node(&d));
+
+        // Edges through removed nodes should be gone
+        assert!(!graph.has_edge(&a, &b));
+        assert!(!graph.has_edge(&b, &c));
+        assert!(!graph.has_edge(&c, &d));
+
+        // Edge not involving removed nodes should survive
+        assert!(graph.has_edge(&me, &a));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn routes_finds_multiple_paths_in_diamond_topology() -> anyhow::Result<()> {
+        //   me -> a -> dest
+        //   me -> b -> dest
+        let me = pubkey_from(&SECRET_0);
+        let a = pubkey_from(&SECRET_1);
+        let b = pubkey_from(&SECRET_2);
+        let dest = pubkey_from(&SECRET_3);
+
+        let graph = ChannelGraph::new(me);
+        graph.add_node(a);
+        graph.add_node(b);
+        graph.add_node(dest);
+        graph.add_edge(&me, &a)?;
+        graph.add_edge(&me, &b)?;
+        graph.add_edge(&a, &dest)?;
+        graph.add_edge(&b, &dest)?;
+
+        let routes = graph.simple_route(&dest, 2).await;
+        assert_eq!(routes.len(), 2, "diamond topology should yield two 2-hop routes");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn routes_finds_three_hop_path() -> anyhow::Result<()> {
+        // me -> a -> b -> dest
+        let me = pubkey_from(&SECRET_0);
+        let a = pubkey_from(&SECRET_1);
+        let b = pubkey_from(&SECRET_2);
+        let dest = pubkey_from(&SECRET_3);
+
+        let graph = ChannelGraph::new(me);
+        graph.add_node(a);
+        graph.add_node(b);
+        graph.add_node(dest);
+        graph.add_edge(&me, &a)?;
+        graph.add_edge(&a, &b)?;
+        graph.add_edge(&b, &dest)?;
+
+        let routes = graph.simple_route(&dest, 3).await;
+        assert_eq!(routes.len(), 1, "should find exactly one 3-hop route");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn routes_avoids_cycles() -> anyhow::Result<()> {
+        // me -> a -> b -> dest, plus a -> me (back-edge creating cycle)
+        let me = pubkey_from(&SECRET_0);
+        let a = pubkey_from(&SECRET_1);
+        let b = pubkey_from(&SECRET_2);
+        let dest = pubkey_from(&SECRET_3);
+
+        let graph = ChannelGraph::new(me);
+        graph.add_node(a);
+        graph.add_node(b);
+        graph.add_node(dest);
+        graph.add_edge(&me, &a)?;
+        graph.add_edge(&a, &b)?;
+        graph.add_edge(&b, &dest)?;
+        graph.add_edge(&a, &me)?; // back-edge
+
+        let routes = graph.simple_route(&dest, 3).await;
+        assert_eq!(routes.len(), 1, "cycle should not produce extra paths");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn routes_wrong_length_returns_empty() -> anyhow::Result<()> {
+        // me -> dest (1 hop), but ask for 2 hops
+        let me = pubkey_from(&SECRET_0);
+        let dest = pubkey_from(&SECRET_1);
+        let graph = ChannelGraph::new(me);
+        graph.add_node(dest);
+        graph.add_edge(&me, &dest)?;
+
+        let routes = graph.simple_route(&dest, 2).await;
+        assert!(routes.is_empty(), "no 2-hop route should exist for a direct edge");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn routes_length_zero_to_self_returns_one_route() -> anyhow::Result<()> {
+        let me = pubkey_from(&SECRET_0);
+        let graph = ChannelGraph::new(me);
+
+        let routes = graph.simple_route(&me, 0).await;
+        assert_eq!(routes.len(), 1, "zero-hop route to self should find exactly one route");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn routes_length_zero_to_other_returns_empty() -> anyhow::Result<()> {
+        let me = pubkey_from(&SECRET_0);
+        let dest = pubkey_from(&SECRET_1);
+        let graph = ChannelGraph::new(me);
+        graph.add_node(dest);
+
+        let routes = graph.simple_route(&dest, 0).await;
+        assert!(routes.is_empty(), "zero-hop route to different node should be empty");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn routes_respects_edge_direction() -> anyhow::Result<()> {
+        // me -> a, but no a -> dest, only dest -> a
+        let me = pubkey_from(&SECRET_0);
+        let a = pubkey_from(&SECRET_1);
+        let dest = pubkey_from(&SECRET_2);
+
+        let graph = ChannelGraph::new(me);
+        graph.add_node(a);
+        graph.add_node(dest);
+        graph.add_edge(&me, &a)?;
+        graph.add_edge(&dest, &a)?; // wrong direction
+
+        let routes = graph.simple_route(&dest, 2).await;
+        assert!(routes.is_empty(), "should not traverse edge in wrong direction");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn record_edge_probe_creates_edge_if_absent() -> anyhow::Result<()> {
+        let me = pubkey_from(&SECRET_0);
+        let peer = pubkey_from(&SECRET_1);
+        let graph = ChannelGraph::new(me);
+        graph.add_node(peer);
+        // No explicit add_edge — record_edge should upsert
+
+        let rtt = std::time::Duration::from_millis(80);
+        let telemetry: Result<EdgeTransportTelemetry<TestNeighbor, TestPath>, NetworkGraphError<TestPath>> =
+            Ok(EdgeTransportTelemetry::Neighbor(TestNeighbor { peer: peer, rtt }));
+        graph
+            .record_edge(hopr_api::graph::MeasurableEdge::Probe(telemetry))
+            .await;
+
+        assert!(graph.has_edge(&me, &peer), "probe should create edge via upsert");
+        let obs = graph.edge(&me, &peer).context("edge should exist")?;
+        assert!(obs.immediate_qos().is_some());
+        Ok(())
+    }
+
+    #[test]
+    fn edges_are_directed() -> anyhow::Result<()> {
+        let me = pubkey_from(&SECRET_0);
+        let peer = pubkey_from(&SECRET_1);
+        let graph = ChannelGraph::new(me);
+        graph.add_node(peer);
+        graph.add_edge(&me, &peer)?;
+
+        assert!(graph.has_edge(&me, &peer));
+        assert!(!graph.has_edge(&peer, &me));
+
+        assert!(graph.edge(&me, &peer).is_some());
+        assert!(graph.edge(&peer, &me).is_none());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn multiple_probes_accumulate_in_observations() -> anyhow::Result<()> {
+        let me = pubkey_from(&SECRET_0);
+        let peer = pubkey_from(&SECRET_1);
+        let graph = ChannelGraph::new(me);
+        graph.add_node(peer);
+        graph.add_edge(&me, &peer)?;
+
+        // Send several successful probes
+        for _ in 0..5 {
+            let telemetry: Result<EdgeTransportTelemetry<TestNeighbor, TestPath>, NetworkGraphError<TestPath>> =
+                Ok(EdgeTransportTelemetry::Neighbor(TestNeighbor {
+                    peer: peer,
+                    rtt: std::time::Duration::from_millis(60),
+                }));
+            graph
+                .record_edge(hopr_api::graph::MeasurableEdge::Probe(telemetry))
+                .await;
+        }
+
+        let obs = graph.edge(&me, &peer).context("edge should exist")?;
+        let qos = obs.immediate_qos().context("immediate QoS should exist")?;
+        assert_eq!(
+            qos.average_latency().context("latency should be set")?,
+            std::time::Duration::from_millis(30), // rtt / 2 = 30ms
+        );
+        assert!(qos.average_probe_rate() > 0.9, "all probes succeeded");
         Ok(())
     }
 }

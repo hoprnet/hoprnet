@@ -1,6 +1,9 @@
 use hopr_api::graph::{
-    EdgeTransportObservable,
-    traits::{EdgeObservableRead, EdgeObservableWrite, EdgeTransportMeasurement, EdgeWeightType},
+    EdgeLinkObservable,
+    traits::{
+        EdgeNetworkObservableRead, EdgeObservableRead, EdgeObservableWrite, EdgeProtocolObservable,
+        EdgeTransportMeasurement, EdgeWeightType,
+    },
 };
 use hopr_statistics::ExponentialMovingAverage;
 
@@ -11,7 +14,7 @@ pub struct TransportLinkMeasurement {
     probe_success_rate: ExponentialMovingAverage<5>,
 }
 
-impl EdgeTransportObservable for TransportLinkMeasurement {
+impl EdgeLinkObservable for TransportLinkMeasurement {
     fn record(&mut self, measurement: EdgeTransportMeasurement) {
         if let Ok(latency) = measurement {
             self.latency_average.update(latency.as_millis() as f64);
@@ -59,9 +62,8 @@ fn latency_score(latency: Option<std::time::Duration>) -> f64 {
 #[derive(Debug, Copy, Clone, Default, PartialEq)]
 pub struct Observations {
     last_update: std::time::Duration,
-    capacity: Option<u128>,
-    immediate_probe: Option<TransportLinkMeasurement>,
-    intermediate_probe: Option<TransportLinkMeasurement>,
+    immediate_probe: Option<TransportImmediates>,
+    intermediate_probe: Option<TransportIntermediates>,
 }
 
 impl EdgeObservableWrite for Observations {
@@ -71,42 +73,83 @@ impl EdgeObservableWrite for Observations {
             .unwrap_or_default();
 
         match measurement {
-            EdgeWeightType::Immediate(result) => {
-                if self.immediate_probe.is_none() {
-                    self.immediate_probe = Some(TransportLinkMeasurement::default());
-                }
-
-                if let Some(probe) = self.immediate_probe.as_mut() {
-                    probe.record(result)
-                }
-            }
-            EdgeWeightType::Intermediate(result) => {
-                if self.intermediate_probe.is_none() {
-                    self.intermediate_probe = Some(TransportLinkMeasurement::default());
-                }
-
-                if let Some(probe) = self.intermediate_probe.as_mut() {
-                    probe.record(result)
-                }
-            }
-            EdgeWeightType::Capacity(capacity) => {
-                self.capacity = capacity;
+            EdgeWeightType::Immediate(result) => self.immediate_probe.get_or_insert_default().record(result),
+            EdgeWeightType::Intermediate(result) => self.intermediate_probe.get_or_insert_default().record(result),
+            EdgeWeightType::Capacity(capacity) => self.intermediate_probe.get_or_insert_default().capacity = capacity,
+            EdgeWeightType::Connected(is_connected) => {
+                self.immediate_probe.get_or_insert_default().is_connected = is_connected
             }
         }
     }
 }
 
+#[derive(Debug, Copy, Clone, Default, PartialEq)]
+pub struct TransportImmediates {
+    link: TransportLinkMeasurement,
+    is_connected: bool,
+}
+
+impl EdgeNetworkObservableRead for TransportImmediates {
+    fn is_connected(&self) -> bool {
+        self.is_connected
+    }
+}
+
+impl EdgeLinkObservable for TransportImmediates {
+    fn record(&mut self, measurement: EdgeTransportMeasurement) {
+        self.link.record(measurement)
+    }
+
+    fn average_latency(&self) -> Option<std::time::Duration> {
+        self.link.average_latency()
+    }
+
+    fn average_probe_rate(&self) -> f64 {
+        self.link.average_probe_rate()
+    }
+
+    fn score(&self) -> f64 {
+        self.link.score()
+    }
+}
+
+#[derive(Debug, Copy, Clone, Default, PartialEq)]
+pub struct TransportIntermediates {
+    link: TransportLinkMeasurement,
+    capacity: Option<u128>,
+}
+
+impl EdgeProtocolObservable for TransportIntermediates {
+    fn capacity(&self) -> Option<u128> {
+        self.capacity
+    }
+}
+
+impl EdgeLinkObservable for TransportIntermediates {
+    fn record(&mut self, measurement: EdgeTransportMeasurement) {
+        self.link.record(measurement);
+    }
+
+    fn average_latency(&self) -> Option<std::time::Duration> {
+        self.link.average_latency()
+    }
+
+    fn average_probe_rate(&self) -> f64 {
+        self.link.average_probe_rate()
+    }
+
+    fn score(&self) -> f64 {
+        self.link.score()
+    }
+}
+
 impl EdgeObservableRead for Observations {
-    type ImmediateMeasurement = TransportLinkMeasurement;
-    type IntermediateMeasurement = TransportLinkMeasurement;
+    type ImmediateMeasurement = TransportImmediates;
+    type IntermediateMeasurement = TransportIntermediates;
 
     #[inline]
     fn last_update(&self) -> std::time::Duration {
         self.last_update
-    }
-
-    fn capacity(&self) -> Option<u128> {
-        self.capacity
     }
 
     fn immediate_qos(&self) -> Option<&Self::ImmediateMeasurement> {
@@ -120,6 +163,9 @@ impl EdgeObservableRead for Observations {
     /// The score is calculated based on the available observations, with priority order:
     /// 1. intermediate probe
     /// 2. immediate ones
+    ///
+    /// TODO: find a better way to do this or completely remove this score function,
+    /// as it is not clear how to combine the different observations in a meaningful way.
     fn score(&self) -> f64 {
         if let Some(qos) = &self.intermediate_probe {
             qos.score()
