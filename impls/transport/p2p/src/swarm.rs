@@ -420,6 +420,12 @@ impl HoprLibp2pNetworkBuilder {
     }
 }
 
+impl Default for HoprLibp2pNetworkBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn print_network_info(network_info: NetworkInfo, event: &str) {
     let num_peers = network_info.num_peers();
     let connection_counters = network_info.connection_counters();
