@@ -65,20 +65,30 @@ impl ChannelGraph {
     /// Mutably updates the edge observations between two nodes.
     ///
     /// If the edge exists, applies the given function to its observations.
+    ///
+    #[tracing::instrument(level = "debug", skip(self, f))]
     fn update_edge<F>(&self, src: &OffchainPublicKey, dest: &OffchainPublicKey, f: F)
     where
         F: FnOnce(&mut Observations),
     {
+        tracing::trace!(%src, %dest, "attempting to update edge observations");
         let mut inner = self.inner.write();
+
         if let (Some(src_idx), Some(dest_idx)) = (
             inner.indices.get_by_left(src).copied(),
             inner.indices.get_by_left(dest).copied(),
         ) {
-            if let Some(edge_idx) = inner.graph.find_edge(src_idx, dest_idx) {
-                if let Some(weight) = inner.graph.edge_weight_mut(edge_idx) {
-                    f(weight);
-                }
+            let edge_idx = inner
+                .graph
+                .find_edge(src_idx, dest_idx)
+                .unwrap_or_else(|| inner.graph.add_edge(src_idx, dest_idx, Observations::default()));
+
+            if let Some(weight) = inner.graph.edge_weight_mut(edge_idx) {
+                tracing::trace!(%src, %dest, "updating edge observations");
+                f(weight);
             }
+        } else {
+            tracing::warn!(%src, %dest, reason = "one or both of the nodes do not exist", "edge update failed" );
         }
     }
 
@@ -166,10 +176,11 @@ impl ChannelGraph {
 
 #[async_trait::async_trait]
 impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn record_edge<N, P>(&self, update: MeasurableEdge<N, P>)
     where
-        N: hopr_api::graph::MeasurablePeer + Send + Clone,
-        P: hopr_api::graph::MeasurablePath + Send + Clone,
+        N: hopr_api::graph::MeasurablePeer + std::fmt::Debug + Send + Clone,
+        P: hopr_api::graph::MeasurablePath + std::fmt::Debug + Send + Clone,
     {
         use hopr_api::graph::traits::EdgeWeightType;
 
@@ -216,10 +227,12 @@ impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
         }
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn record_node<N>(&self, update: N)
     where
-        N: MeasurableNode + Clone + Send + Sync + 'static,
+        N: MeasurableNode + std::fmt::Debug + Clone + Send + Sync + 'static,
     {
+        tracing::trace!(?update, "recording node update");
         hopr_api::graph::NetworkGraphWrite::add_node(self, *update.id());
         if update.is_connected() {
             self.inner.write().connected.insert(*update.id());

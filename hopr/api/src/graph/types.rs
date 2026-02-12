@@ -30,12 +30,14 @@ pub trait MeasurablePath {
     fn timestamp(&self) -> u128;
 }
 
+#[derive(Debug, Copy, Clone)]
 pub struct EdgeCapacityUpdate {
     pub capacity: Option<u128>,
     pub src: OffchainPublicKey,
     pub dest: OffchainPublicKey,
 }
 
+#[derive(Debug)]
 pub enum MeasurableEdge<N, P>
 where
     N: MeasurablePeer + Clone,

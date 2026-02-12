@@ -150,13 +150,13 @@ pub trait NetworkGraphUpdate {
     /// Update the observation for the telemetry.
     async fn record_edge<N, P>(&self, update: MeasurableEdge<N, P>)
     where
-        N: MeasurablePeer + Clone + Send + Sync + 'static,
-        P: MeasurablePath + Clone + Send + Sync + 'static;
+        N: MeasurablePeer + std::fmt::Debug + Clone + Send + Sync + 'static,
+        P: MeasurablePath + std::fmt::Debug + Clone + Send + Sync + 'static;
 
     /// Update the observation for the telemetry.
     async fn record_node<N>(&self, update: N)
     where
-        N: MeasurableNode + Clone + Send + Sync + 'static;
+        N: MeasurableNode + std::fmt::Debug + Clone + Send + Sync + 'static;
 }
 
 /// A trait specifying the graph traversal functionality

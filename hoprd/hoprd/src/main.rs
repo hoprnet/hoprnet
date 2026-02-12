@@ -373,6 +373,8 @@ async fn main_inner() -> anyhow::Result<()> {
                 .map(Event::Network)
                 .merge(chain_events.map(Event::Chain))
                 .for_each(|event| async {
+                    // let ticket_price = .;
+                    // let win_probability = ..;
                     match event {
                         Event::Chain(chain_event) => {
 
