@@ -736,7 +736,7 @@ dependencies = [
  "alloy-json-rpc",
  "alloy-transport",
  "itertools 0.14.0",
- "reqwest 0.12.28",
+ "reqwest",
  "serde_json",
  "tower",
  "tracing",
@@ -1562,7 +1562,7 @@ dependencies = [
 [[package]]
 name = "blokli-client"
 version = "0.18.0"
-source = "git+https://github.com/hoprnet/blokli#d3a36841edcd9d636d1f46527bb0b7eadb65c41d"
+source = "git+https://github.com/hoprnet/blokli#8dcf413739fe55068d99cbfdd5afc998bf94df55"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -2495,9 +2495,9 @@ dependencies = [
 
 [[package]]
 name = "deranged"
-version = "0.5.5"
+version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ececcb659e7ba858fb4f10388c250a7252eb0a27373f1a72b8748afdd248e587"
+checksum = "cc3dc5ad92c2e2d1c193bbbbdf2ea477cb81331de4f3103f267ca18368b988c4"
 dependencies = [
  "powerfmt",
  "serde_core",
@@ -11033,19 +11033,6 @@ dependencies = [
  "indexmap 2.13.0",
  "wasm-encoder",
  "wasmparser",
-]
-
-[[package]]
-name = "wasm-streams"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d1ec4f6517c9e11ae630e200b2b65d193279042e28edd4a2cda233e46670bbb"
-dependencies = [
- "futures-util",
- "js-sys",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
 ]
 
 [[package]]
