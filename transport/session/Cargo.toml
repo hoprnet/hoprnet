@@ -12,7 +12,7 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = ["stats"]
+default = []
 runtime-tokio = [
   "hopr-network-types/runtime-tokio",
   "hopr-protocol-session/runtime-tokio",

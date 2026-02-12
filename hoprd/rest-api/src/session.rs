@@ -7,11 +7,12 @@ use axum::{
 };
 use base64::Engine;
 use hopr_lib::{
-    Address, NodeId, SESSION_MTU, SURB_SIZE, ServiceId, SessionAckMode, SessionCapabilities, SessionClientConfig,
-    SessionId, SessionLifecycleState, SessionManagerError, SessionStatsSnapshot, SessionTarget, SurbBalancerConfig,
-    TransportSessionError,
+    Address, NodeId, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities, SessionClientConfig, SessionId,
+    SessionManagerError, SessionTarget, SurbBalancerConfig, TransportSessionError,
     errors::{HoprLibError, HoprTransportError},
 };
+#[cfg(feature = "stats")]
+use hopr_lib::{SessionAckMode, SessionLifecycleState, SessionStatsSnapshot};
 use hopr_utils_session::{ListenerId, build_binding_host, create_tcp_client_binding, create_udp_client_binding};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
@@ -743,6 +744,7 @@ pub(crate) enum SessionStatsState {
     Closed,
 }
 
+#[cfg(feature = "stats")]
 impl From<SessionLifecycleState> for SessionStatsState {
     /// Converts protocol-level lifecycle state into the API metrics state format.
     fn from(value: SessionLifecycleState) -> Self {
@@ -768,6 +770,7 @@ pub(crate) enum SessionStatsAckMode {
     Both,
 }
 
+#[cfg(feature = "stats")]
 impl From<SessionAckMode> for SessionStatsAckMode {
     /// Converts protocol-level acknowledgement mode into the API metrics mode format.
     fn from(value: SessionAckMode) -> Self {
@@ -888,6 +891,7 @@ pub(crate) struct SessionStatsResponse {
     pub transport: SessionStatsTransport,
 }
 
+#[cfg(feature = "stats")]
 impl From<SessionStatsSnapshot> for SessionStatsResponse {
     /// Converts protocol-level metrics snapshot into the API response format.
     fn from(value: SessionStatsSnapshot) -> Self {
@@ -972,23 +976,30 @@ impl From<SessionStatsSnapshot> for SessionStatsResponse {
     tag = "Session"
 )]
 pub(crate) async fn session_stats(
-    State(state): State<Arc<InternalState>>,
-    Path(session_id): Path<String>,
+    State(_state): State<Arc<InternalState>>,
+    Path(_session_id): Path<String>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
-    let session_id =
-        SessionId::from_str(&session_id).map_err(|_| (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidSessionId))?;
+    #[cfg(feature = "stats")]
+    {
+        let session_id = SessionId::from_str(&_session_id)
+            .map_err(|_| (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidSessionId))?;
 
-    match state.hopr.get_session_stats(&session_id).await {
-        Ok(metrics) => Ok::<_, (StatusCode, ApiErrorStatus)>(
-            (StatusCode::OK, Json(SessionStatsResponse::from(metrics))).into_response(),
-        ),
-        Err(HoprLibError::TransportError(HoprTransportError::Session(TransportSessionError::Manager(
-            SessionManagerError::NonExistingSession,
-        )))) => Err((StatusCode::NOT_FOUND, ApiErrorStatus::SessionNotFound)),
-        Err(e) => Err((
-            StatusCode::UNPROCESSABLE_ENTITY,
-            ApiErrorStatus::UnknownFailure(e.to_string()),
-        )),
+        match _state.hopr.get_session_stats(&session_id).await {
+            Ok(metrics) => Ok::<_, (StatusCode, ApiErrorStatus)>(
+                (StatusCode::OK, Json(SessionStatsResponse::from(metrics))).into_response(),
+            ),
+            Err(HoprLibError::TransportError(HoprTransportError::Session(TransportSessionError::Manager(
+                SessionManagerError::NonExistingSession,
+            )))) => Err((StatusCode::NOT_FOUND, ApiErrorStatus::SessionNotFound)),
+            Err(e) => Err((
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ApiErrorStatus::UnknownFailure(e.to_string()),
+            )),
+        }
+    }
+    #[cfg(not(feature = "stats"))]
+    {
+        Err::<(StatusCode, Json<SessionStatsResponse>), _>((StatusCode::NOT_FOUND, ApiErrorStatus::SessionNotFound))
     }
 }
 

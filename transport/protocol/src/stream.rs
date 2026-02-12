@@ -7,6 +7,7 @@ use futures::{
     AsyncRead, AsyncReadExt, AsyncWrite, FutureExt, SinkExt as _, Stream, StreamExt,
     channel::mpsc::{Receiver, Sender, channel},
 };
+#[cfg(feature = "stats")]
 use hopr_transport_network::PeerPacketStats;
 use libp2p::PeerId;
 use tokio_util::{
@@ -35,7 +36,7 @@ fn build_peer_stream_io<S, C>(
     cache: moka::future::Cache<PeerId, Sender<<C as Decoder>::Item>>,
     codec: C,
     ingress_from_peers: Sender<(PeerId, <C as Decoder>::Item)>,
-    packet_stats: Option<Arc<PeerPacketStats>>,
+    #[cfg(feature = "stats")] packet_stats: Option<Arc<PeerPacketStats>>,
 ) -> Sender<<C as Decoder>::Item>
 where
     S: AsyncRead + AsyncWrite + Send + 'static,
@@ -45,7 +46,7 @@ where
     <C as Decoder>::Item: AsRef<[u8]> + Clone + Send + 'static,
 {
     let (stream_rx, stream_tx) = stream.split();
-    let (send, mut recv) = channel::<<C as Decoder>::Item>(1000);
+    let (send, recv) = channel::<<C as Decoder>::Item>(1000);
     let cache_internal = cache.clone();
 
     let mut frame_writer = FramedWrite::new(stream_tx.compat_write(), codec.clone());
@@ -53,46 +54,45 @@ where
     // Lower the backpressure boundary to make sure each message is flushed after writing to buffer
     frame_writer.set_backpressure_boundary(1);
 
-    // Clone stats for the egress and ingress spawns
-    let packet_stats_out = packet_stats.clone();
-    let packet_stats_in = packet_stats;
+    #[cfg(feature = "stats")]
+    let frame_writer = {
+        let packet_stats_out = packet_stats.clone();
+        frame_writer.with(move |item: <C as Decoder>::Item| {
+            if let Some(stats) = &packet_stats_out {
+                stats.record_packet_out(item.as_ref().len());
+            }
+            futures::future::ok::<_, <C as Encoder<<C as Decoder>::Item>>::Error>(item)
+        })
+    };
 
-    // Send all outgoing data to the peer, recording stats only after a successful write
-    hopr_async_runtime::prelude::spawn(async move {
-        while let Some(data) = recv.next().await {
-            let byte_len = data.as_ref().len();
-            tracing::trace!(%peer, "writing message to peer stream");
-            if let Err(error) = frame_writer.send(data).await {
-                tracing::debug!(%peer, ?error, component = "stream", "writing stream with peer finished");
-                return;
-            }
-            if let Some(ref stats) = packet_stats_out {
-                stats.record_packet_out(byte_len);
-            }
-        }
-        tracing::debug!(%peer, component = "stream", "writing stream with peer finished");
-    });
+    // Send all outgoing data to the peer
+    hopr_async_runtime::prelude::spawn(
+        recv.inspect(move |_| tracing::trace!(%peer, "writing message to peer stream"))
+            .map(Ok)
+            .forward(frame_writer)
+            .inspect(move |res| {
+                tracing::debug!(%peer, ?res, component = "stream", "writing stream with peer finished");
+            }),
+    );
 
     // Read all incoming data from that peer and pass it to the general ingress stream
     hopr_async_runtime::prelude::spawn(
         FramedRead::new(stream_rx.compat(), codec)
             .filter_map(move |v| {
-                let stats_in = packet_stats_in.clone();
-                async move {
-                    match v {
-                        Ok(v) => {
-                            tracing::trace!(%peer, "read message from peer stream");
-                            if let Some(ref stats) = stats_in {
-                                stats.record_packet_in(v.as_ref().len());
-                            }
-                            Some((peer, v))
+                futures::future::ready(match v {
+                    Ok(v) => {
+                        tracing::trace!(%peer, "read message from peer stream");
+                        #[cfg(feature = "stats")]
+                        if let Some(stats) = &packet_stats {
+                            stats.record_packet_in(v.as_ref().len());
                         }
-                        Err(error) => {
-                            tracing::error!(%error, "Error decoding object from the underlying stream");
-                            None
-                        }
+                        Some((peer, v))
                     }
-                }
+                    Err(error) => {
+                        tracing::error!(%error, "Error decoding object from the underlying stream");
+                        None
+                    }
+                })
             })
             .map(Ok)
             .forward(ingress_from_peers)
@@ -115,10 +115,14 @@ where
     send
 }
 
-pub async fn process_stream_protocol<C, V, F>(
+pub async fn process_stream_protocol<C, V>(
     codec: C,
     control: V,
-    get_packet_stats: F,
+    #[cfg(feature = "stats")] get_packet_stats: impl Fn(&PeerId) -> Option<Arc<PeerPacketStats>>
+    + Clone
+    + Send
+    + Sync
+    + 'static,
 ) -> crate::errors::Result<(
     Sender<(PeerId, <C as Decoder>::Item)>, // impl Sink<(PeerId, <C as Decoder>::Item)>,
     Receiver<(PeerId, <C as Decoder>::Item)>, // impl Stream<Item = (PeerId, <C as Decoder>::Item)>,
@@ -129,7 +133,6 @@ where
     <C as Decoder>::Error: std::fmt::Debug + std::fmt::Display + Send + Sync + 'static,
     <C as Decoder>::Item: AsRef<[u8]> + Clone + Send + 'static,
     V: BidirectionalStreamControl + Clone + Send + Sync + 'static,
-    F: Fn(&PeerId) -> Option<Arc<PeerPacketStats>> + Clone + Send + Sync + 'static,
 {
     let (tx_out, rx_out) = channel::<(PeerId, <C as Decoder>::Item)>(100_000);
     let (tx_in, rx_in) = channel::<(PeerId, <C as Decoder>::Item)>(100_000);
@@ -149,6 +152,8 @@ where
     let cache_ingress = cache_out.clone();
     let codec_ingress = codec.clone();
     let tx_in_ingress = tx_in.clone();
+
+    #[cfg(feature = "stats")]
     let get_stats_ingress = get_packet_stats.clone();
 
     // terminated when the incoming is dropped
@@ -158,13 +163,17 @@ where
                 let codec = codec_ingress.clone();
                 let cache = cache_ingress.clone();
                 let tx_in = tx_in_ingress.clone();
-                let get_stats = get_stats_ingress.clone();
 
                 tracing::debug!(%peer, "received incoming peer-to-peer stream");
-
-                let packet_stats = get_stats(&peer);
-                let send =
-                    build_peer_stream_io(peer, stream, cache.clone(), codec.clone(), tx_in.clone(), packet_stats);
+                let send = build_peer_stream_io(
+                    peer,
+                    stream,
+                    cache.clone(),
+                    codec.clone(),
+                    tx_in.clone(),
+                    #[cfg(feature = "stats")]
+                    get_stats_ingress.clone()(&peer),
+                );
 
                 async move {
                     cache.insert(peer, send).await;
@@ -198,13 +207,13 @@ where
                 let control = control.clone();
                 let codec = codec.clone();
                 let tx_in = tx_in.clone();
-                let get_stats = get_packet_stats.clone();
+                #[cfg(feature = "stats")]
+                let packet_stats = get_packet_stats.clone()(&peer);
 
                 async move {
                     let cache_clone = cache.clone();
                     tracing::trace!(%peer, "trying to deliver message to peer");
 
-                    let packet_stats = get_stats(&peer);
                     let cached: Result<Sender<<C as Decoder>::Item>, Arc<anyhow::Error>> = cache
                         .try_get_with(peer, async move {
                             tracing::trace!(%peer, "peer is not in cache, opening new stream");
@@ -229,6 +238,7 @@ where
                                 cache_clone.clone(),
                                 codec.clone(),
                                 tx_in.clone(),
+                                #[cfg(feature = "stats")]
                                 packet_stats,
                             ))
                         })

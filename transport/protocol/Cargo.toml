@@ -12,6 +12,7 @@ crate-type = ["rlib"]
 default = []
 prometheus = ["dep:hopr-metrics", "hopr-protocol-hopr/prometheus"]
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
+stats = ["hopr-transport-network/stats"]
 serde = [
   "dep:serde",
   "dep:humantime-serde",

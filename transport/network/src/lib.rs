@@ -29,5 +29,7 @@ pub mod track;
 pub mod observation;
 
 pub use libp2p_identity::PeerId;
-pub use observation::{Observations, PeerPacketStats, PeerPacketStatsSnapshot};
+pub use observation::Observations;
+#[cfg(feature = "stats")]
+pub use observation::{PeerPacketStats, PeerPacketStatsSnapshot};
 pub use track::{NetworkPeerTracker, PeerEntry};

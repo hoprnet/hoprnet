@@ -10,7 +10,14 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
+default = []
 capture = ["dep:pcap-file"]
+stats = [
+  "hopr-transport-protocol/stats",
+  "hopr-transport-session/stats",
+  "hopr-transport-network/stats",
+  "hopr-transport-p2p/stats",
+]
 p2p-announce-quic = []
 p2p-transport-quic = ["hopr-transport-p2p/transport-quic"]
 prometheus = [

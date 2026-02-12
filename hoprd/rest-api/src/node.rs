@@ -6,7 +6,9 @@ use axum::{
     response::IntoResponse,
 };
 use futures::{StreamExt, stream::FuturesUnordered};
-use hopr_lib::{Address, Health, Multiaddr, PeerPacketStatsSnapshot, api::network::Observable};
+#[cfg(feature = "stats")]
+use hopr_lib::PeerPacketStatsSnapshot;
+use hopr_lib::{Address, Health, Multiaddr, api::network::Observable};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
@@ -115,6 +117,7 @@ pub(crate) struct PeerPacketStatsResponse {
     pub bytes_in: u64,
 }
 
+#[cfg(feature = "stats")]
 impl From<PeerPacketStatsSnapshot> for PeerPacketStatsResponse {
     fn from(snapshot: PeerPacketStatsSnapshot) -> Self {
         Self {
@@ -160,6 +163,7 @@ pub(crate) struct PeerObservations {
     #[schema(example = 0.7)]
     score: f64,
     /// Packet statistics for this peer (if available).
+    #[cfg(feature = "stats")]
     #[serde(skip_serializing_if = "Option::is_none")]
     packet_stats: Option<PeerPacketStatsResponse>,
 }
@@ -278,34 +282,30 @@ pub(super) async fn peers(
             let hopr = hopr.clone();
 
             async move {
-                let address = hopr.peerid_to_chain_key(&peer_id).await.ok().flatten();
+                let Some(address) = hopr.peerid_to_chain_key(&peer_id).await.ok().flatten() else {
+                    // Filter out peers without a known chain address
+                    return None;
+                };
 
                 // WARNING: Only in Providence and Saint-Louis are all peers public
                 let multiaddresses = hopr.network_observed_multiaddresses(&peer_id).await;
 
-                // Get packet stats for the peer
-                let packet_stats = hopr
-                    .network_peer_packet_stats(&peer_id)
-                    .await
-                    .ok()
-                    .flatten()
-                    .map(PeerPacketStatsResponse::from);
-
-                Some((address, multiaddresses, info, packet_stats))
+                Some(PeerObservations {
+                    address,
+                    multiaddr: multiaddresses.first().cloned(),
+                    last_update: info.last_update().as_millis(),
+                    average_latency: info.average_latency().map_or(0, |d| d.as_millis()),
+                    probe_rate: info.average_probe_rate(),
+                    score: info.score(),
+                    #[cfg(feature = "stats")]
+                    packet_stats: hopr
+                        .network_peer_packet_stats(&peer_id)
+                        .await
+                        .ok()
+                        .flatten()
+                        .map(PeerPacketStatsResponse::from),
+                })
             }
-        })
-        // Filter out peers without a known chain address
-        .filter_map(
-            |(address, mas, info, packet_stats)| async move { address.map(|addr| (addr, mas, info, packet_stats)) },
-        )
-        .map(|(address, mas, info, packet_stats)| PeerObservations {
-            address,
-            multiaddr: mas.first().cloned(),
-            last_update: info.last_update().as_millis(),
-            average_latency: info.average_latency().map_or(0, |d| d.as_millis()),
-            probe_rate: info.average_probe_rate(),
-            score: info.score(),
-            packet_stats,
         })
         .collect::<Vec<_>>()
         .await;

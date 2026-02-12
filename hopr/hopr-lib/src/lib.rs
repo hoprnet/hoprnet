@@ -876,7 +876,7 @@ where
         Ok(self.transport_api.session_surb_balancing_cfg(id).await?)
     }
 
-    #[cfg(feature = "session-client")]
+    #[cfg(all(feature = "session-client", feature = "stats"))]
     pub async fn get_session_stats(&self, id: &SessionId) -> errors::Result<SessionStatsSnapshot> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for session operations".into())?;
         Ok(self.transport_api.session_stats(id).await?)
@@ -953,11 +953,13 @@ where
     }
 
     /// Get packet stats for a specific peer.
+    #[cfg(feature = "stats")]
     pub async fn network_peer_packet_stats(&self, peer: &PeerId) -> errors::Result<Option<PeerPacketStatsSnapshot>> {
         Ok(self.transport_api.network_peer_packet_stats(peer).await?)
     }
 
     /// Get packet stats for all connected peers.
+    #[cfg(feature = "stats")]
     pub async fn network_all_packet_stats(&self) -> errors::Result<Vec<(PeerId, PeerPacketStatsSnapshot)>> {
         Ok(self.transport_api.network_all_packet_stats().await?)
     }

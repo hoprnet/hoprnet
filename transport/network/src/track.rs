@@ -2,12 +2,15 @@ use std::sync::Arc;
 
 use hopr_api::PeerId;
 
-use super::observation::{Observations, PeerPacketStats, PeerPacketStatsSnapshot};
+use super::observation::Observations;
+#[cfg(feature = "stats")]
+use super::{PeerPacketStats, PeerPacketStatsSnapshot};
 
 /// Entry containing both observations and packet stats for a peer.
 #[derive(Debug, Default)]
 pub struct PeerEntry {
     pub observations: Observations,
+    #[cfg(feature = "stats")]
     pub packet_stats: Arc<PeerPacketStats>,
 }
 
@@ -75,18 +78,21 @@ impl NetworkPeerTracker {
     }
 
     /// Get the packet stats handle for a peer, for use in instrumenting streams.
+    #[cfg(feature = "stats")]
     #[inline]
     pub fn get_packet_stats(&self, peer: &PeerId) -> Option<Arc<PeerPacketStats>> {
         self.peers.get(peer).map(|entry| entry.value().packet_stats.clone())
     }
 
     /// Get a snapshot of packet stats for a specific peer.
+    #[cfg(feature = "stats")]
     #[inline]
     pub fn packet_stats_snapshot(&self, peer: &PeerId) -> Option<PeerPacketStatsSnapshot> {
         self.peers.get(peer).map(|entry| entry.value().packet_stats.snapshot())
     }
 
     /// Get packet stats snapshots for all tracked peers.
+    #[cfg(feature = "stats")]
     pub fn all_packet_stats(&self) -> Vec<(PeerId, PeerPacketStatsSnapshot)> {
         self.peers
             .iter()
@@ -167,6 +173,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "stats")]
     #[test]
     fn peer_tracker_should_provide_packet_stats_for_tracked_peer() -> anyhow::Result<()> {
         let tracker = NetworkPeerTracker::new();
@@ -186,6 +193,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "stats")]
     #[test]
     fn peer_tracker_should_return_none_for_packet_stats_of_untracked_peer() {
         let tracker = NetworkPeerTracker::new();
@@ -195,6 +203,7 @@ mod tests {
         assert!(tracker.packet_stats_snapshot(&peer).is_none());
     }
 
+    #[cfg(feature = "stats")]
     #[test]
     fn peer_tracker_should_reset_packet_stats_on_remove_and_readd() -> anyhow::Result<()> {
         let tracker = NetworkPeerTracker::new();
@@ -218,6 +227,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "stats")]
     #[test]
     fn peer_tracker_all_packet_stats_should_return_all_peers() {
         let tracker = NetworkPeerTracker::new();

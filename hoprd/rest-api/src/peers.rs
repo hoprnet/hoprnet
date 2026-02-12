@@ -6,8 +6,10 @@ use axum::{
     response::IntoResponse,
 };
 use futures::FutureExt;
+#[cfg(feature = "stats")]
+use hopr_lib::PeerPacketStatsSnapshot;
 use hopr_lib::{
-    Address, Multiaddr, PeerPacketStatsSnapshot,
+    Address, Multiaddr,
     errors::{HoprLibError, HoprStatusError, HoprTransportError},
 };
 use serde::{Deserialize, Serialize};
@@ -181,6 +183,7 @@ pub(crate) struct PeerPacketStatsResponse {
     pub bytes_in: u64,
 }
 
+#[cfg(feature = "stats")]
 impl From<PeerPacketStatsSnapshot> for PeerPacketStatsResponse {
     fn from(snapshot: PeerPacketStatsSnapshot) -> Self {
         Self {
@@ -215,21 +218,33 @@ impl From<PeerPacketStatsSnapshot> for PeerPacketStatsResponse {
     tag = "Peers",
 )]
 pub(super) async fn peer_stats(
-    Path(DestinationParams { destination }): Path<DestinationParams>,
-    State(state): State<Arc<InternalState>>,
+    Path(DestinationParams {
+        destination: _destination,
+    }): Path<DestinationParams>,
+    State(_state): State<Arc<InternalState>>,
 ) -> impl IntoResponse {
-    let hopr = state.hopr.clone();
+    #[cfg(not(feature = "stats"))]
+    {
+        return Err::<(StatusCode, Json<PeerPacketStatsResponse>), _>(ApiErrorStatus::UnknownFailure(
+            "BUILT WITHOUT STATS SUPPORT".into(),
+        ));
+    }
 
-    match hopr.chain_key_to_peerid(&destination).await {
-        Ok(Some(peer)) => match hopr.network_peer_packet_stats(&peer).await {
-            Ok(Some(stats)) => {
-                let resp = Json(PeerPacketStatsResponse::from(stats));
-                Ok((StatusCode::OK, resp))
-            }
+    #[cfg(feature = "stats")]
+    {
+        let hopr = _state.hopr.clone();
+
+        match hopr.chain_key_to_peerid(&_destination).await {
+            Ok(Some(peer)) => match hopr.network_peer_packet_stats(&peer).await {
+                Ok(Some(stats)) => {
+                    let resp = Json(PeerPacketStatsResponse::from(stats));
+                    Ok((StatusCode::OK, resp))
+                }
+                Ok(None) => Err(ApiErrorStatus::PeerNotFound),
+                Err(_) => Err(ApiErrorStatus::PeerNotFound),
+            },
             Ok(None) => Err(ApiErrorStatus::PeerNotFound),
             Err(_) => Err(ApiErrorStatus::PeerNotFound),
-        },
-        Ok(None) => Err(ApiErrorStatus::PeerNotFound),
-        Err(_) => Err(ApiErrorStatus::PeerNotFound),
+        }
     }
 }

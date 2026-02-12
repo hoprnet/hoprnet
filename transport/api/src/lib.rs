@@ -61,7 +61,9 @@ use hopr_protocol_hopr::MemorySurbStore;
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId, Protocol};
 use hopr_transport_mixer::MixerConfig;
-pub use hopr_transport_network::observation::{Observations, PeerPacketStatsSnapshot};
+pub use hopr_transport_network::observation::Observations;
+#[cfg(feature = "stats")]
+pub use hopr_transport_network::observation::PeerPacketStatsSnapshot;
 use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork};
 use hopr_transport_probe::{
     Probe, TrafficGeneration,
@@ -73,12 +75,15 @@ pub use hopr_transport_session as session;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::transfer_session;
 pub use hopr_transport_session::{
-    AtomicSurbFlowEstimator, Capabilities as SessionCapabilities, Capability as SessionCapability, HoprSession,
-    IncomingSession, SESSION_MTU, SURB_SIZE, ServiceId, SessionAckMode, SessionClientConfig, SessionId,
-    SessionLifecycleState, SessionStatsSnapshot, SessionTarget, SurbBalancerConfig,
+    Capabilities as SessionCapabilities, Capability as SessionCapability, HoprSession, IncomingSession, SESSION_MTU,
+    SURB_SIZE, ServiceId, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
     errors::{SessionManagerError, TransportSessionError},
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
+#[cfg(feature = "stats")]
+pub use hopr_transport_session::{
+    SessionAckMode, SessionLifecycleState, SessionLifetimeSnapshot, SessionStatsSnapshot,
+};
 use tracing::{Instrument, debug, error, info, trace, warn};
 
 pub use crate::config::HoprProtocolConfig;
@@ -93,7 +98,7 @@ pub use hopr_api as api;
 
 // Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
 lazy_static::lazy_static! {
-    static ref SESSION_INITIATION_TIMEOUT_MAX: std::time::Duration = 2 * constants::SESSION_INITIATION_TIMEOUT_BASE * RoutingOptions::MAX_INTERMEDIATE_HOPS as u32;
+    static ref SESSION_INITIATION_TIMEOUT_MAX: Duration = 2 * constants::SESSION_INITIATION_TIMEOUT_BASE * RoutingOptions::MAX_INTERMEDIATE_HOPS as u32;
 }
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, strum::Display)]
@@ -313,11 +318,14 @@ where
             .set(transport_network.clone())
             .map_err(|_| HoprTransportError::Api("transport network viewer already set".into()))?;
 
-        let msg_codec = hopr_transport_protocol::HoprBinaryCodec {};
+        #[cfg(feature = "stats")]
         let transport_network_for_stats = transport_network.clone();
+
+        let msg_codec = hopr_transport_protocol::HoprBinaryCodec {};
         let (wire_msg_tx, wire_msg_rx) = hopr_transport_protocol::stream::process_stream_protocol(
             msg_codec,
             transport_network.clone(),
+            #[cfg(feature = "stats")]
             move |peer| transport_network_for_stats.get_packet_stats(peer),
         )
         .await?;
@@ -575,6 +583,7 @@ where
         Ok(self.smgr.get_surb_balancer_config(id).await?)
     }
 
+    #[cfg(feature = "stats")]
     pub async fn session_stats(&self, id: &SessionId) -> errors::Result<SessionStatsSnapshot> {
         Ok(self.smgr.get_session_stats(id).await?)
     }
@@ -683,6 +692,7 @@ where
     }
 
     /// Get packet stats snapshot for a specific peer.
+    #[cfg(feature = "stats")]
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_peer_packet_stats(&self, peer: &PeerId) -> errors::Result<Option<PeerPacketStatsSnapshot>> {
         Ok(self
@@ -693,6 +703,7 @@ where
     }
 
     /// Get packet stats for all connected peers.
+    #[cfg(feature = "stats")]
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_all_packet_stats(&self) -> errors::Result<Vec<(PeerId, PeerPacketStatsSnapshot)>> {
         Ok(self
