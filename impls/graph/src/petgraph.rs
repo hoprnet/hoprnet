@@ -65,7 +65,6 @@ impl ChannelGraph {
     /// Mutably updates the edge observations between two nodes.
     ///
     /// If the edge exists, applies the given function to its observations.
-    ///
     #[tracing::instrument(level = "debug", skip(self, f))]
     fn update_edge<F>(&self, src: &OffchainPublicKey, dest: &OffchainPublicKey, f: F)
     where

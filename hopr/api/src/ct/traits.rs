@@ -33,8 +33,8 @@ pub trait ProbingTrafficGeneration {
 /// traffic and maintain plausible deniability for network participants.
 ///
 /// # Requirements
-/// - The stream produced by `build` should not terminate under normal operation, as the termination will lead
-///   to the cessation of cover traffic generation.
+/// - The stream produced by `build` should not terminate under normal operation, as the termination will lead to the
+///   cessation of cover traffic generation.
 /// - Route selection should be randomized or follow a strategy that maximizes privacy and/or network utility.
 pub trait CoverTrafficGeneration {
     /// Builds a stream of routes to be used for cover traffic.

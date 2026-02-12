@@ -461,7 +461,7 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
                                         }
                                         Event::Network(network_event) => {
                                             match network_event {
-                                                hopr_api::network::NetworkEvent::PeerConnected(peer_id) => 
+                                                hopr_api::network::NetworkEvent::PeerConnected(peer_id) =>
                                                     if let Ok(opk) = crate::peer_id_to_public_key(&peer_id).await {
                                                         graph_updater.record_node(GraphNode {
                                                             id: opk,

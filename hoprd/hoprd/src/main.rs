@@ -2,22 +2,20 @@ use std::{num::NonZeroUsize, process::ExitCode, str::FromStr, sync::Arc};
 
 use async_signal::{Signal, Signals};
 use futures::{FutureExt, StreamExt, future::abortable};
-use hopr_chain_connector::api::ChainEvent;
-use hopr_chain_connector::api::ChainKeyOperations;
-use hopr_chain_connector::api::StateSyncOptions;
 use hopr_chain_connector::{
-    BlockchainConnectorConfig, HoprBlockchainSafeConnector, blokli_client, blokli_client::BlokliClient,
+    BlockchainConnectorConfig, HoprBlockchainSafeConnector,
+    api::{ChainEvent, ChainKeyOperations, StateSyncOptions},
+    blokli_client,
+    blokli_client::BlokliClient,
     create_trustful_hopr_blokli_connector,
 };
 use hopr_db_node::{HoprNodeDb, init_hopr_node_db};
-use hopr_lib::api::graph::NetworkGraphUpdate;
 use hopr_lib::{
     AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex,
-    api::{chain::ChainEvents, node::HoprNodeChainOperations},
+    api::{chain::ChainEvents, graph::NetworkGraphUpdate, node::HoprNodeChainOperations},
     config::HoprLibConfig,
 };
-use hopr_network_graph::GraphNode;
-use hopr_network_graph::SharedChannelGraph;
+use hopr_network_graph::{GraphNode, SharedChannelGraph};
 use hopr_transport_p2p::HoprNetwork;
 use hoprd::{cli::CliArgs, config::HoprdConfig, errors::HoprdError, exit::HoprServerIpForwardingReactor};
 use hoprd_api::{RestApiParameters, serve_api};
@@ -25,7 +23,6 @@ use signal_hook::low_level;
 use tracing::{debug, error, info, warn};
 use tracing_subscriber::prelude::*;
 use validator::Validate;
-
 #[cfg(feature = "telemetry")]
 use {
     opentelemetry::trace::TracerProvider,
@@ -414,7 +411,7 @@ async fn main_inner() -> anyhow::Result<()> {
                         }
                         Event::Network(network_event) => {
                             match network_event {
-                                hopr_api::network::NetworkEvent::PeerConnected(peer_id) => 
+                                hopr_api::network::NetworkEvent::PeerConnected(peer_id) =>
                                     if let Ok(opk) = hopr_lib::peer_id_to_public_key(&peer_id).await {
                                         graph_updater.record_node(GraphNode {
                                             id: opk,

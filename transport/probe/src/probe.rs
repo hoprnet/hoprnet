@@ -294,9 +294,8 @@ mod tests {
     use hopr_ct_telemetry::{ImmediateNeighborProber, ProberConfig};
     use hopr_protocol_app::prelude::{ApplicationData, Tag};
 
-    use crate::errors::ProbeError;
-
     use super::*;
+    use crate::errors::ProbeError;
 
     lazy_static::lazy_static!(
         static ref OFFCHAIN_KEYPAIR: OffchainKeypair = OffchainKeypair::random();
