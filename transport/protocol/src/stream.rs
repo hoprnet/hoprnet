@@ -7,7 +7,7 @@ use futures::{
     AsyncRead, AsyncReadExt, AsyncWrite, FutureExt, SinkExt as _, Stream, StreamExt,
     channel::mpsc::{Receiver, Sender, channel},
 };
-#[cfg(feature = "stats")]
+#[cfg(feature = "telemetry")]
 use hopr_transport_network::PeerPacketStats;
 use libp2p::PeerId;
 use tokio_util::{
@@ -36,7 +36,7 @@ fn build_peer_stream_io<S, C>(
     cache: moka::future::Cache<PeerId, Sender<<C as Decoder>::Item>>,
     codec: C,
     ingress_from_peers: Sender<(PeerId, <C as Decoder>::Item)>,
-    #[cfg(feature = "stats")] packet_stats: Option<Arc<PeerPacketStats>>,
+    #[cfg(feature = "telemetry")] packet_stats: Option<Arc<PeerPacketStats>>,
 ) -> Sender<<C as Decoder>::Item>
 where
     S: AsyncRead + AsyncWrite + Send + 'static,
@@ -54,7 +54,7 @@ where
     // Lower the backpressure boundary to make sure each message is flushed after writing to buffer
     frame_writer.set_backpressure_boundary(1);
 
-    #[cfg(feature = "stats")]
+    #[cfg(feature = "telemetry")]
     let frame_writer = {
         let packet_stats_out = packet_stats.clone();
         frame_writer.with(move |item: <C as Decoder>::Item| {
@@ -82,7 +82,7 @@ where
                 futures::future::ready(match v {
                     Ok(v) => {
                         tracing::trace!(%peer, "read message from peer stream");
-                        #[cfg(feature = "stats")]
+                        #[cfg(feature = "telemetry")]
                         if let Some(stats) = &packet_stats {
                             stats.record_packet_in(v.as_ref().len());
                         }
@@ -118,7 +118,7 @@ where
 pub async fn process_stream_protocol<C, V>(
     codec: C,
     control: V,
-    #[cfg(feature = "stats")] get_packet_stats: impl Fn(&PeerId) -> Option<Arc<PeerPacketStats>>
+    #[cfg(feature = "telemetry")] get_packet_stats: impl Fn(&PeerId) -> Option<Arc<PeerPacketStats>>
     + Clone
     + Send
     + Sync
@@ -153,7 +153,7 @@ where
     let codec_ingress = codec.clone();
     let tx_in_ingress = tx_in.clone();
 
-    #[cfg(feature = "stats")]
+    #[cfg(feature = "telemetry")]
     let get_stats_ingress = get_packet_stats.clone();
 
     // terminated when the incoming is dropped
@@ -171,7 +171,7 @@ where
                     cache.clone(),
                     codec.clone(),
                     tx_in.clone(),
-                    #[cfg(feature = "stats")]
+                    #[cfg(feature = "telemetry")]
                     get_stats_ingress.clone()(&peer),
                 );
 
@@ -207,7 +207,7 @@ where
                 let control = control.clone();
                 let codec = codec.clone();
                 let tx_in = tx_in.clone();
-                #[cfg(feature = "stats")]
+                #[cfg(feature = "telemetry")]
                 let packet_stats = get_packet_stats.clone()(&peer);
 
                 async move {
@@ -238,7 +238,7 @@ where
                                 cache_clone.clone(),
                                 codec.clone(),
                                 tx_in.clone(),
-                                #[cfg(feature = "stats")]
+                                #[cfg(feature = "telemetry")]
                                 packet_stats,
                             ))
                         })

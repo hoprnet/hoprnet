@@ -2,7 +2,7 @@ pub use crate::protocol::SessionMessageDiscriminants;
 
 /// Used to track various statistics of a [`SessionSocket`](crate::SessionSocket).
 #[auto_impl::auto_impl(&, Arc)]
-pub trait SessionStatisticsTracker {
+pub trait SessionTelemetryTracker {
     /// Records a frame that has been emitted from the Sequencer.
     fn frame_emitted(&self);
     /// Records a frame that has successfully reassembled by the Reassembler.
@@ -23,7 +23,7 @@ pub trait SessionStatisticsTracker {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 pub struct NoopTracker;
 
-impl SessionStatisticsTracker for NoopTracker {
+impl SessionTelemetryTracker for NoopTracker {
     fn frame_emitted(&self) {}
 
     fn frame_completed(&self) {}
@@ -48,9 +48,9 @@ pub mod tests {
 
     /// Statistics tracker that records all events in a map and is possible to serialize (e.g.: for snapshot testing)
     #[derive(Debug, Clone)]
-    pub struct TestStatsTracker(std::sync::Arc<Mutex<indexmap::IndexMap<String, usize>>>);
+    pub struct TestTelemetryTracker(std::sync::Arc<Mutex<indexmap::IndexMap<String, usize>>>);
 
-    impl Serialize for TestStatsTracker {
+    impl Serialize for TestTelemetryTracker {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer,
@@ -59,7 +59,7 @@ pub mod tests {
         }
     }
 
-    impl<'de> Deserialize<'de> for TestStatsTracker {
+    impl<'de> Deserialize<'de> for TestTelemetryTracker {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
             D: serde::Deserializer<'de>,
@@ -69,7 +69,7 @@ pub mod tests {
         }
     }
 
-    impl Default for TestStatsTracker {
+    impl Default for TestTelemetryTracker {
         fn default() -> Self {
             let mut map = indexmap::IndexMap::new();
             map.insert("frames_emitted".into(), 0);
@@ -88,14 +88,14 @@ pub mod tests {
         }
     }
 
-    impl TestStatsTracker {
+    impl TestTelemetryTracker {
         fn increment(&self, key: &str) {
             let mut map = self.0.lock();
             *map.entry(key.to_string()).or_insert(0) += 1;
         }
     }
 
-    impl SessionStatisticsTracker for TestStatsTracker {
+    impl SessionTelemetryTracker for TestTelemetryTracker {
         fn frame_emitted(&self) {
             self.increment("frames_emitted");
         }

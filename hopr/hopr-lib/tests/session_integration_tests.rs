@@ -7,7 +7,7 @@ use hopr_internal_types::prelude::*;
 use hopr_lib::{
     ApplicationDataIn, ApplicationDataOut,
     exports::transport::session::{
-        AtomicSurbFlowEstimator, Capabilities, Capability, HoprSession, HoprSessionConfig, SessionId, SessionStats,
+        AtomicSurbFlowEstimator, Capabilities, Capability, HoprSession, HoprSessionConfig, SessionId, SessionTelemetry,
         transfer_session,
     },
 };
@@ -47,9 +47,9 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
         ..Default::default()
     };
 
-    let alice_metrics = Arc::new(SessionStats::new(id, alice_cfg));
+    let alice_metrics = Arc::new(SessionTelemetry::new(id, alice_cfg));
 
-    let bob_metrics = Arc::new(SessionStats::new(id, bob_cfg));
+    let bob_metrics = Arc::new(SessionTelemetry::new(id, bob_cfg));
 
     let mut alice_session = HoprSession::new(
         id,
@@ -192,9 +192,9 @@ async fn tcp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
         ..Default::default()
     };
 
-    let alice_metrics = Arc::new(SessionStats::new(id, alice_cfg));
+    let alice_metrics = Arc::new(SessionTelemetry::new(id, alice_cfg));
 
-    let bob_metrics = Arc::new(SessionStats::new(id, bob_cfg));
+    let bob_metrics = Arc::new(SessionTelemetry::new(id, bob_cfg));
 
     let mut alice_session = HoprSession::new(
         id,
@@ -341,9 +341,9 @@ async fn bidirectional_tcp_session(#[case] cap: Capabilities) -> anyhow::Result<
         ..Default::default()
     };
 
-    let alice_metrics = Arc::new(SessionStats::new(id, alice_cfg));
+    let alice_metrics = Arc::new(SessionTelemetry::new(id, alice_cfg));
 
-    let bob_metrics = Arc::new(SessionStats::new(id, bob_cfg));
+    let bob_metrics = Arc::new(SessionTelemetry::new(id, bob_cfg));
 
     // Alice uses Forward with return_options to enable SURB production
     let mut alice_session = HoprSession::new(
@@ -437,7 +437,7 @@ async fn surb_metrics_tracking() -> anyhow::Result<()> {
     use std::sync::atomic::Ordering;
 
     let id = SessionId::new(1u64, HoprPseudonym::random());
-    let metrics = Arc::new(SessionStats::new(id, Default::default()));
+    let metrics = Arc::new(SessionTelemetry::new(id, Default::default()));
 
     // Create a SURB estimator and set non-zero values
     let surb_estimator = AtomicSurbFlowEstimator::default();
@@ -492,9 +492,9 @@ async fn frame_buffer_metrics(#[case] cap: Capabilities) -> anyhow::Result<()> {
         ..Default::default()
     };
 
-    let alice_metrics = Arc::new(SessionStats::new(id, alice_cfg));
+    let alice_metrics = Arc::new(SessionTelemetry::new(id, alice_cfg));
 
-    let bob_metrics = Arc::new(SessionStats::new(id, bob_cfg));
+    let bob_metrics = Arc::new(SessionTelemetry::new(id, bob_cfg));
 
     let mut alice_session = HoprSession::new(
         id,

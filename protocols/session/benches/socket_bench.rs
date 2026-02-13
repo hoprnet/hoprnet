@@ -2,7 +2,7 @@ use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_m
 use futures::{AsyncRead, AsyncWrite, io::Cursor};
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_network_types::utils::DuplexIO;
-#[cfg(feature = "stats")]
+#[cfg(feature = "telemetry")]
 use hopr_protocol_session::NoopTracker;
 use hopr_protocol_session::{SessionSocketConfig, UnreliableSocket};
 use tokio_util::compat::TokioAsyncReadCompatExt;
@@ -28,7 +28,7 @@ pub async fn alice_send_data<S: AsyncRead + AsyncWrite + Send + Unpin + 'static>
         "alice",
         alice,
         SessionSocketConfig::default(),
-        #[cfg(feature = "stats")]
+        #[cfg(feature = "telemetry")]
         NoopTracker,
     )
     .unwrap();
@@ -45,7 +45,7 @@ pub async fn bob_receive_data(data: Vec<u8>, mut recv_data: Vec<u8>) -> Vec<u8> 
         "bob",
         DuplexIO::from((futures::io::sink(), Cursor::new(data))),
         SessionSocketConfig::default(),
-        #[cfg(feature = "stats")]
+        #[cfg(feature = "telemetry")]
         NoopTracker,
     )
     .unwrap();

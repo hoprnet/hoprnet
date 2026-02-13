@@ -4,8 +4,8 @@ pub mod ack_state;
 pub mod state;
 
 /// Contains socket statistics types.
-#[cfg(feature = "stats")]
-pub mod stats;
+#[cfg(feature = "telemetry")]
+pub mod telemetry;
 
 use std::{
     pin::Pin,
@@ -18,10 +18,10 @@ use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt, future, future::Abort
 use futures_concurrency::stream::Merge;
 use state::{SocketComponents, SocketState, Stateless};
 use tracing::{Instrument, instrument};
-#[cfg(feature = "stats")]
+#[cfg(feature = "telemetry")]
 use {
-    stats::{SessionMessageDiscriminants, SessionStatisticsTracker},
     strum::IntoDiscriminant,
+    telemetry::{SessionMessageDiscriminants, SessionTelemetryTracker},
 };
 
 use crate::{
@@ -107,7 +107,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         id: I,
         transport: T,
         cfg: SessionSocketConfig,
-        #[cfg(feature = "stats")] stats: impl SessionStatisticsTracker + Clone + Send + 'static,
+        #[cfg(feature = "telemetry")] stats: impl SessionTelemetryTracker + Clone + Send + 'static,
     ) -> Result<Self, SessionError>
     where
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
@@ -130,13 +130,13 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         let (packets_out, packets_in) = framed.split();
 
         // If needed, add also stats to individual stages.
-        #[cfg(feature = "stats")]
+        #[cfg(feature = "telemetry")]
         let (s0, s1, s2, s3) = { (stats.clone(), stats.clone(), stats.clone(), stats.clone()) };
 
         // Pipeline IN: Data incoming from Upstream
         let upstream_frames_in = packets_out
             .with(move |segment| {
-                #[cfg(feature = "stats")]
+                #[cfg(feature = "telemetry")]
                 s0.outgoing_message(SessionMessageDiscriminants::Segment);
 
                 future::ok::<_, SessionError>(SessionMessage::<C>::Segment(segment))
@@ -163,7 +163,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                 futures::future::ready(match packet {
                     Ok(packet) => {
                         packet.try_as_segment().filter(|s| {
-                            #[cfg(feature = "stats")]
+                            #[cfg(feature = "telemetry")]
                             s1.incoming_message(SessionMessageDiscriminants::Segment);
 
                             // Filter old frame ids to save space in the Reassembler
@@ -178,7 +178,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                     }
                     Err(error) => {
                         tracing::error!(%error, "unparseable packet");
-                        #[cfg(feature = "stats")]
+                        #[cfg(feature = "telemetry")]
                         s1.error();
                         None
                     }
@@ -191,13 +191,13 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                 let _span = stage2_span.enter();
                 futures::future::ready(match maybe_frame {
                     Ok(frame) => {
-                        #[cfg(feature = "stats")]
+                        #[cfg(feature = "telemetry")]
                         s2.frame_completed();
                         Some(OrderedFrame(frame))
                     }
                     Err(error) => {
                         tracing::error!(%error, "failed to reassemble frame");
-                        #[cfg(feature = "stats")]
+                        #[cfg(feature = "telemetry")]
                         s2.incomplete_frame();
                         None
                     }
@@ -215,19 +215,19 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                             tracing::warn!("terminating frame received");
                             packets_in_abort_handle.abort();
                         }
-                        #[cfg(feature = "stats")]
+                        #[cfg(feature = "telemetry")]
                         s3.frame_emitted();
                         Some(Ok(frame.0))
                     }
                     // Downstream skips discarded frames
                     Err(SessionError::FrameDiscarded(frame_id)) | Err(SessionError::IncompleteFrame(frame_id)) => {
                         tracing::error!(frame_id, "frame discarded");
-                        #[cfg(feature = "stats")]
+                        #[cfg(feature = "telemetry")]
                         s3.frame_discarded();
                         None
                     }
                     Err(err) => {
-                        #[cfg(feature = "stats")]
+                        #[cfg(feature = "telemetry")]
                         s3.error();
                         Some(Err(std::io::Error::other(err)))
                     }
@@ -255,7 +255,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         transport: T,
         mut state: S,
         cfg: SessionSocketConfig,
-        #[cfg(feature = "stats")] stats: impl SessionStatisticsTracker + Clone + Send + 'static,
+        #[cfg(feature = "telemetry")] stats: impl SessionTelemetryTracker + Clone + Send + 'static,
     ) -> Result<Self, SessionError>
     where
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
@@ -275,7 +275,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         framed.set_send_high_water_mark(1.max(cfg.max_buffered_segments * C));
 
         // If needed, add also stats to individual stages.
-        #[cfg(feature = "stats")]
+        #[cfg(feature = "telemetry")]
         let (s0, s1, s2, s3) = { (stats.clone(), stats.clone(), stats.clone(), stats.clone()) };
 
         // Downstream transport
@@ -316,7 +316,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
             (ctl_rx, segments_rx)
                 .merge()
                 .map(move |msg| {
-                    #[cfg(feature = "stats")]
+                    #[cfg(feature = "telemetry")]
                     s0.outgoing_message(msg.discriminant());
                     Ok(msg)
                 })
@@ -358,7 +358,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                         if let Err(error) = st_1.incoming_message(&packet) {
                             tracing::debug!(%error, "incoming message state update failed");
                         }
-                        #[cfg(feature = "stats")]
+                        #[cfg(feature = "telemetry")]
                         s1.incoming_message(packet.discriminant());
 
                         // Filter old frame ids to save space in the Reassembler
@@ -374,7 +374,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                     }
                     Err(error) => {
                         tracing::error!(%error, "unparseable packet");
-                        #[cfg(feature = "stats")]
+                        #[cfg(feature = "telemetry")]
                         s1.error();
                         None
                     }
@@ -394,13 +394,13 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                         if let Err(error) = st_2.frame_complete(frame.frame_id) {
                             tracing::error!(%error, "frame complete state update failed");
                         }
-                        #[cfg(feature = "stats")]
+                        #[cfg(feature = "telemetry")]
                         s2.frame_completed();
                         Some(OrderedFrame(frame))
                     }
                     Err(error) => {
                         tracing::error!(%error, "failed to reassemble frame");
-                        #[cfg(feature = "stats")]
+                        #[cfg(feature = "telemetry")]
                         s2.incomplete_frame();
                         None
                     }
@@ -427,7 +427,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                             tracing::warn!("terminating frame received");
                             packets_in_abort_handle.abort();
                         }
-                        #[cfg(feature = "stats")]
+                        #[cfg(feature = "telemetry")]
                         s3.frame_emitted();
                         Some(Ok(frame.0))
                     }
@@ -435,12 +435,12 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                         if let Err(error) = st_3.frame_discarded(frame_id) {
                             tracing::error!(%error, "frame discarded state update failed");
                         }
-                        #[cfg(feature = "stats")]
+                        #[cfg(feature = "telemetry")]
                         s3.frame_discarded();
                         None // Downstream skips discarded frames
                     }
                     Err(err) => {
-                        #[cfg(feature = "stats")]
+                        #[cfg(feature = "telemetry")]
                         s3.error();
                         Some(Err(std::io::Error::other(err)))
                     }
@@ -545,10 +545,11 @@ mod tests {
     use hopr_crypto_packet::prelude::HoprPacket;
 
     use super::*;
-    #[cfg(feature = "stats")]
-    use crate::socket::stats::NoopTracker;
+    #[cfg(feature = "telemetry")]
+    use crate::socket::telemetry::NoopTracker;
     use crate::{
-        AcknowledgementState, AcknowledgementStateConfig, socket::stats::tests::TestStatsTracker, utils::test::*,
+        AcknowledgementState, AcknowledgementStateConfig, socket::telemetry::tests::TestTelemetryTracker,
+        utils::test::*,
     };
 
     const MTU: usize = HoprPacket::PAYLOAD_SIZE;
@@ -566,21 +567,21 @@ mod tests {
             ..Default::default()
         };
 
-        #[cfg(feature = "stats")]
-        let (alice_tracker, bob_tracker) = (TestStatsTracker::default(), TestStatsTracker::default());
+        #[cfg(feature = "telemetry")]
+        let (alice_tracker, bob_tracker) = (TestTelemetryTracker::default(), TestTelemetryTracker::default());
 
         let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
             "alice",
             alice,
             sock_cfg,
-            #[cfg(feature = "stats")]
+            #[cfg(feature = "telemetry")]
             alice_tracker.clone(),
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
             "bob",
             bob,
             sock_cfg,
-            #[cfg(feature = "stats")]
+            #[cfg(feature = "telemetry")]
             bob_tracker.clone(),
         )?;
 
@@ -602,7 +603,7 @@ mod tests {
         alice_socket.close().await?;
         bob_socket.close().await?;
 
-        #[cfg(feature = "stats")]
+        #[cfg(feature = "telemetry")]
         {
             insta::assert_yaml_snapshot!(alice_tracker);
             insta::assert_yaml_snapshot!(bob_tracker);
@@ -630,14 +631,14 @@ mod tests {
             alice,
             AcknowledgementState::new("alice", ack_cfg),
             sock_cfg,
-            #[cfg(feature = "stats")]
+            #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new(
             bob,
             AcknowledgementState::new("bob", ack_cfg),
             sock_cfg,
-            #[cfg(feature = "stats")]
+            #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
 
@@ -671,21 +672,21 @@ mod tests {
             ..Default::default()
         };
 
-        #[cfg(feature = "stats")]
-        let (alice_tracker, bob_tracker) = (TestStatsTracker::default(), TestStatsTracker::default());
+        #[cfg(feature = "telemetry")]
+        let (alice_tracker, bob_tracker) = (TestTelemetryTracker::default(), TestTelemetryTracker::default());
 
         let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
             "alice",
             alice,
             sock_cfg,
-            #[cfg(feature = "stats")]
+            #[cfg(feature = "telemetry")]
             alice_tracker.clone(),
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
             "bob",
             bob,
             sock_cfg,
-            #[cfg(feature = "stats")]
+            #[cfg(feature = "telemetry")]
             bob_tracker.clone(),
         )?;
 
@@ -717,7 +718,7 @@ mod tests {
             .await??;
         assert_eq!(bob_sent_data, alice_recv_data);
 
-        #[cfg(feature = "stats")]
+        #[cfg(feature = "telemetry")]
         {
             insta::assert_yaml_snapshot!(alice_tracker);
             insta::assert_yaml_snapshot!(bob_tracker);
@@ -748,14 +749,14 @@ mod tests {
             alice,
             AcknowledgementState::new("alice", ack_cfg),
             sock_cfg,
-            #[cfg(feature = "stats")]
+            #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new(
             bob,
             AcknowledgementState::new("bob", ack_cfg),
             sock_cfg,
-            #[cfg(feature = "stats")]
+            #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
 
@@ -808,14 +809,14 @@ mod tests {
             "alice",
             alice,
             sock_cfg,
-            #[cfg(feature = "stats")]
+            #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
             "bob",
             bob,
             sock_cfg,
-            #[cfg(feature = "stats")]
+            #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
 
@@ -863,14 +864,14 @@ mod tests {
             alice,
             AcknowledgementState::new("alice", ack_cfg),
             sock_cfg,
-            #[cfg(feature = "stats")]
+            #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new(
             bob,
             AcknowledgementState::new("bob", ack_cfg),
             sock_cfg,
-            #[cfg(feature = "stats")]
+            #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
 
@@ -912,14 +913,14 @@ mod tests {
             "alice",
             alice,
             sock_cfg,
-            #[cfg(feature = "stats")]
+            #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
             "bob",
             bob,
             sock_cfg,
-            #[cfg(feature = "stats")]
+            #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
 
@@ -981,14 +982,14 @@ mod tests {
             alice,
             AcknowledgementState::new("alice", ack_cfg),
             sock_cfg,
-            #[cfg(feature = "stats")]
+            #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new(
             bob,
             AcknowledgementState::new("bob", ack_cfg),
             sock_cfg,
-            #[cfg(feature = "stats")]
+            #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
 
@@ -1049,21 +1050,21 @@ mod tests {
             ..Default::default()
         };
 
-        #[cfg(feature = "stats")]
-        let (alice_tracker, bob_tracker) = (TestStatsTracker::default(), TestStatsTracker::default());
+        #[cfg(feature = "telemetry")]
+        let (alice_tracker, bob_tracker) = (TestTelemetryTracker::default(), TestTelemetryTracker::default());
 
         let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
             "alice",
             alice,
             alice_cfg,
-            #[cfg(feature = "stats")]
+            #[cfg(feature = "telemetry")]
             alice_tracker.clone(),
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
             "bob",
             bob,
             bob_cfg,
-            #[cfg(feature = "stats")]
+            #[cfg(feature = "telemetry")]
             bob_tracker.clone(),
         )?;
 
@@ -1087,7 +1088,7 @@ mod tests {
 
         bob_socket.close().await?;
 
-        #[cfg(feature = "stats")]
+        #[cfg(feature = "telemetry")]
         {
             insta::assert_yaml_snapshot!(alice_tracker);
             insta::assert_yaml_snapshot!(bob_tracker);
@@ -1129,14 +1130,14 @@ mod tests {
             alice,
             AcknowledgementState::new("alice", ack_cfg),
             alice_cfg,
-            #[cfg(feature = "stats")]
+            #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new(
             bob,
             AcknowledgementState::new("bob", ack_cfg),
             bob_cfg,
-            #[cfg(feature = "stats")]
+            #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
 
@@ -1197,21 +1198,21 @@ mod tests {
             ..Default::default()
         };
 
-        #[cfg(feature = "stats")]
-        let (alice_tracker, bob_tracker) = (TestStatsTracker::default(), TestStatsTracker::default());
+        #[cfg(feature = "telemetry")]
+        let (alice_tracker, bob_tracker) = (TestTelemetryTracker::default(), TestTelemetryTracker::default());
 
         let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
             "alice",
             alice,
             alice_cfg,
-            #[cfg(feature = "stats")]
+            #[cfg(feature = "telemetry")]
             alice_tracker.clone(),
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
             "bob",
             bob,
             bob_cfg,
-            #[cfg(feature = "stats")]
+            #[cfg(feature = "telemetry")]
             bob_tracker.clone(),
         )?;
 
@@ -1251,7 +1252,7 @@ mod tests {
         assert_eq!(alice_sent_data.len() - 1500, bob_recv_data.len());
         assert_eq!(&alice_sent_data[1500..], &bob_recv_data);
 
-        #[cfg(feature = "stats")]
+        #[cfg(feature = "telemetry")]
         {
             insta::assert_yaml_snapshot!(alice_tracker);
             insta::assert_yaml_snapshot!(bob_tracker);
@@ -1298,7 +1299,7 @@ mod tests {
             alice,
             AcknowledgementState::new("alice", ack_cfg),
             alice_cfg,
-            #[cfg(feature = "stats")]
+            #[cfg(feature = "telemetry")]
             NoopTracker,
         )?
         .split();
@@ -1307,7 +1308,7 @@ mod tests {
             bob,
             AcknowledgementState::new("bob", ack_cfg),
             bob_cfg,
-            #[cfg(feature = "stats")]
+            #[cfg(feature = "telemetry")]
             NoopTracker,
         )?
         .split();

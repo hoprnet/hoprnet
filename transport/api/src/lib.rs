@@ -62,7 +62,7 @@ use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId, Protocol};
 use hopr_transport_mixer::MixerConfig;
 pub use hopr_transport_network::observation::Observations;
-#[cfg(feature = "stats")]
+#[cfg(feature = "telemetry")]
 pub use hopr_transport_network::observation::PeerPacketStatsSnapshot;
 use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork};
 use hopr_transport_probe::{
@@ -80,7 +80,7 @@ pub use hopr_transport_session::{
     errors::{SessionManagerError, TransportSessionError},
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
-#[cfg(feature = "stats")]
+#[cfg(feature = "telemetry")]
 pub use hopr_transport_session::{
     SessionAckMode, SessionLifecycleState, SessionLifetimeSnapshot, SessionStatsSnapshot,
 };
@@ -318,14 +318,14 @@ where
             .set(transport_network.clone())
             .map_err(|_| HoprTransportError::Api("transport network viewer already set".into()))?;
 
-        #[cfg(feature = "stats")]
+        #[cfg(feature = "telemetry")]
         let transport_network_for_stats = transport_network.clone();
 
         let msg_codec = hopr_transport_protocol::HoprBinaryCodec {};
         let (wire_msg_tx, wire_msg_rx) = hopr_transport_protocol::stream::process_stream_protocol(
             msg_codec,
             transport_network.clone(),
-            #[cfg(feature = "stats")]
+            #[cfg(feature = "telemetry")]
             move |peer| transport_network_for_stats.get_packet_stats(peer),
         )
         .await?;
@@ -583,7 +583,7 @@ where
         Ok(self.smgr.get_surb_balancer_config(id).await?)
     }
 
-    #[cfg(feature = "stats")]
+    #[cfg(feature = "telemetry")]
     pub async fn session_stats(&self, id: &SessionId) -> errors::Result<SessionStatsSnapshot> {
         Ok(self.smgr.get_session_stats(id).await?)
     }
@@ -692,7 +692,7 @@ where
     }
 
     /// Get packet stats snapshot for a specific peer.
-    #[cfg(feature = "stats")]
+    #[cfg(feature = "telemetry")]
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_peer_packet_stats(&self, peer: &PeerId) -> errors::Result<Option<PeerPacketStatsSnapshot>> {
         Ok(self
@@ -703,7 +703,7 @@ where
     }
 
     /// Get packet stats for all connected peers.
-    #[cfg(feature = "stats")]
+    #[cfg(feature = "telemetry")]
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_all_packet_stats(&self) -> errors::Result<Vec<(PeerId, PeerPacketStatsSnapshot)>> {
         Ok(self

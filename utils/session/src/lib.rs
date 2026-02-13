@@ -695,7 +695,7 @@ mod tests {
         Address, ApplicationData, ApplicationDataIn, ApplicationDataOut, DestinationRouting, HoprPseudonym,
         HoprSession, RoutingOptions, SessionId,
     };
-    use hopr_transport::session::{HoprSessionConfig, SessionStats};
+    use hopr_transport::session::{HoprSessionConfig, SessionTelemetry};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     use super::*;
@@ -727,7 +727,7 @@ mod tests {
         let session_id = SessionId::new(4567u64, HoprPseudonym::random());
         let peer: Address = "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F".parse()?;
         let cfg = HoprSessionConfig::default();
-        let metrics = Arc::new(SessionStats::new(session_id, cfg));
+        let metrics = Arc::new(SessionTelemetry::new(session_id, cfg));
         let session = HoprSession::new(
             session_id,
             DestinationRouting::forward_only(peer, RoutingOptions::IntermediatePath(Default::default())),
@@ -772,7 +772,7 @@ mod tests {
         let session_id = SessionId::new(4567u64, HoprPseudonym::random());
         let peer: Address = "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F".parse()?;
         let cfg = HoprSessionConfig::default();
-        let metrics = Arc::new(SessionStats::new(session_id, cfg));
+        let metrics = Arc::new(SessionTelemetry::new(session_id, cfg));
         let session = HoprSession::new(
             session_id,
             DestinationRouting::forward_only(peer, RoutingOptions::IntermediatePath(Default::default())),

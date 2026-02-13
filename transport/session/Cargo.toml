@@ -18,7 +18,7 @@ runtime-tokio = [
   "hopr-protocol-session/runtime-tokio",
   "dep:tokio",
 ]
-stats = ["hopr-protocol-session/stats"]
+telemetry = ["hopr-protocol-session/telemetry"]
 prometheus = [
   "hopr-network-types/prometheus",
   "hopr-protocol-session/prometheus",

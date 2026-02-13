@@ -41,8 +41,8 @@ pub(crate) mod utils;
 
 pub use processing::types::FrameInspector;
 pub use protocol::{FrameAcknowledgements, FrameId, Segment, SegmentId, SegmentRequest, SeqIndicator};
-#[cfg(feature = "stats")]
-pub use socket::stats::{NoopTracker, SessionMessageDiscriminants, SessionStatisticsTracker};
+#[cfg(feature = "telemetry")]
+pub use socket::telemetry::{NoopTracker, SessionMessageDiscriminants, SessionTelemetryTracker};
 pub use socket::{
     SessionSocket, SessionSocketConfig,
     ack_state::{AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig},
@@ -79,11 +79,11 @@ pub trait SessionSocketExt: futures::io::AsyncRead + futures::io::AsyncWrite + S
     where
         Self: Sized + 'static,
     {
-        #[cfg(feature = "stats")]
+        #[cfg(feature = "telemetry")]
         {
             SessionSocket::new(self, ack, cfg, NoopTracker)
         }
-        #[cfg(not(feature = "stats"))]
+        #[cfg(not(feature = "telemetry"))]
         {
             SessionSocket::new(self, ack, cfg)
         }
@@ -98,11 +98,11 @@ pub trait SessionSocketExt: futures::io::AsyncRead + futures::io::AsyncWrite + S
     where
         Self: Sized + 'static,
     {
-        #[cfg(feature = "stats")]
+        #[cfg(feature = "telemetry")]
         {
             SessionSocket::new_stateless(id, self, cfg, NoopTracker)
         }
-        #[cfg(not(feature = "stats"))]
+        #[cfg(not(feature = "telemetry"))]
         {
             SessionSocket::new_stateless(id, self, cfg)
         }

@@ -14,7 +14,7 @@ crate-type = ["rlib"]
 [features]
 capture = ["hopr-transport/capture"]
 default = []
-stats = ["hopr-transport/stats"]
+telemetry = ["hopr-transport/telemetry"]
 fixed-rng = ["hopr-crypto-random/fixed-rng", "hopr-internal-types/fixed-rng"]
 prometheus = [
   "dep:hopr-metrics",

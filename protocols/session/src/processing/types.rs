@@ -113,7 +113,6 @@ impl TryFrom<FrameBuilder> for Frame {
 #[derive(Clone, Debug)]
 pub struct FrameInspector(pub(crate) FrameDashMap);
 
-#[allow(clippy::len_without_is_empty)]
 impl FrameInspector {
     /// Indicates how many incomplete frames there could be per one complete/discarded frame.
     pub const INCOMPLETE_FRAME_RATIO: usize = 2;
@@ -127,8 +126,14 @@ impl FrameInspector {
         self.0.0.get(frame_id).map(|f| f.as_missing())
     }
 
+    /// Number of incomplete frames.
     pub fn len(&self) -> usize {
         self.0.len()
+    }
+
+    /// Checks if there are no incomplete frames.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 }
 
@@ -179,6 +184,13 @@ pub trait FrameMap {
     /// Number of elements in the map.
     fn len(&self) -> usize;
 
+    /// Indicates whether the map is empty.
+    ///
+    /// Defaults to check if the [`FrameMap::len`] is 0.
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// Removes all elements from the map, for which the given predicate evaluates to `false`.
     fn retain(&mut self, f: impl FnMut(&FrameId, &mut FrameBuilder) -> bool);
 }
@@ -224,6 +236,10 @@ impl FrameMap for FrameDashMap {
 
     fn len(&self) -> usize {
         self.0.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 
     fn retain(&mut self, f: impl FnMut(&FrameId, &mut FrameBuilder) -> bool) {
@@ -277,6 +293,10 @@ impl FrameMap for FrameHashMap {
         self.0.len()
     }
 
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     fn retain(&mut self, f: impl FnMut(&FrameId, &mut FrameBuilder) -> bool) {
         self.0.retain(f)
     }
@@ -326,6 +346,10 @@ impl FrameMap for FrameHashMap {
 
     fn len(&self) -> usize {
         self.0.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 
     fn retain(&mut self, f: impl FnMut(&FrameId, &mut FrameBuilder) -> bool) {

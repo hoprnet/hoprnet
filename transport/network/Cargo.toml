@@ -9,7 +9,7 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-stats = []
+telemetry = []
 default = ["compat-ping"]
 compat-ping = []
 prometheus = ["dep:hopr-metrics"]

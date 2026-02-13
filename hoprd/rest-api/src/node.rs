@@ -6,7 +6,7 @@ use axum::{
     response::IntoResponse,
 };
 use futures::{StreamExt, stream::FuturesUnordered};
-#[cfg(feature = "stats")]
+#[cfg(feature = "telemetry")]
 use hopr_lib::PeerPacketStatsSnapshot;
 use hopr_lib::{Address, Health, Multiaddr, api::network::Observable};
 use serde::{Deserialize, Serialize};
@@ -117,7 +117,7 @@ pub(crate) struct PeerPacketStatsResponse {
     pub bytes_in: u64,
 }
 
-#[cfg(feature = "stats")]
+#[cfg(feature = "telemetry")]
 impl From<PeerPacketStatsSnapshot> for PeerPacketStatsResponse {
     fn from(snapshot: PeerPacketStatsSnapshot) -> Self {
         Self {
@@ -163,7 +163,7 @@ pub(crate) struct PeerObservations {
     #[schema(example = 0.7)]
     score: f64,
     /// Packet statistics for this peer (if available).
-    #[cfg(feature = "stats")]
+    #[cfg(feature = "telemetry")]
     #[serde(skip_serializing_if = "Option::is_none")]
     packet_stats: Option<PeerPacketStatsResponse>,
 }
@@ -297,7 +297,7 @@ pub(super) async fn peers(
                     average_latency: info.average_latency().map_or(0, |d| d.as_millis()),
                     probe_rate: info.average_probe_rate(),
                     score: info.score(),
-                    #[cfg(feature = "stats")]
+                    #[cfg(feature = "telemetry")]
                     packet_stats: hopr
                         .network_peer_packet_stats(&peer_id)
                         .await

@@ -168,7 +168,7 @@ pub struct SessionStatsSnapshot {
 ///
 /// This struct uses atomic counters to allow lock-free updates from multiple threads/tasks.
 #[derive(Debug)]
-pub struct SessionStats {
+pub struct SessionTelemetry {
     session_id: SessionId,
     created_at_us: AtomicU64,
     last_activity_us: AtomicU64,
@@ -202,7 +202,7 @@ pub struct SessionStats {
     surb_target_buffer: OnceLock<u64>,
 }
 
-impl SessionStats {
+impl SessionTelemetry {
     pub fn new(session_id: SessionId, cfg: HoprSessionConfig) -> Self {
         let now = now_us();
         let ack_mode = if cfg
@@ -436,7 +436,7 @@ fn now_us() -> u64 {
         .as_micros() as u64
 }
 
-impl hopr_protocol_session::SessionStatisticsTracker for SessionStats {
+impl hopr_protocol_session::SessionTelemetryTracker for SessionTelemetry {
     fn frame_emitted(&self) {
         self.frames_emitted.fetch_add(1, Ordering::Relaxed);
     }
@@ -490,7 +490,7 @@ impl hopr_protocol_session::SessionStatisticsTracker for SessionStats {
 mod tests {
     use hopr_crypto_random::Randomizable;
     use hopr_internal_types::prelude::HoprPseudonym;
-    use hopr_protocol_session::SessionStatisticsTracker;
+    use hopr_protocol_session::SessionTelemetryTracker;
 
     use super::*;
     use crate::SessionId;
@@ -498,7 +498,7 @@ mod tests {
     #[test]
     fn metrics_snapshot_tracks_bytes_and_packets() {
         let id = SessionId::new(1_u64, HoprPseudonym::random());
-        let metrics = SessionStats::new(id, HoprSessionConfig::default());
+        let metrics = SessionTelemetry::new(id, HoprSessionConfig::default());
 
         metrics.record_read(10);
         metrics.record_read(0);
@@ -515,7 +515,7 @@ mod tests {
     #[test]
     fn metrics_snapshot_tracks_frame_events() {
         let id = SessionId::new(2_u64, HoprPseudonym::random());
-        let metrics = SessionStats::new(id, HoprSessionConfig::default());
+        let metrics = SessionTelemetry::new(id, HoprSessionConfig::default());
 
         metrics.frame_completed();
         metrics.frame_emitted();

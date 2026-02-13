@@ -61,13 +61,13 @@ async fn build_p2p_swarm(
     let (network, process) =
         swarm.into_network_with_stream_protocol_process(hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL, true);
 
-    #[cfg(feature = "stats")]
+    #[cfg(feature = "telemetry")]
     let network_for_stats = network.clone();
     let msg_codec = hopr_transport_protocol::HoprBinaryCodec {};
     let (wire_msg_tx, wire_msg_rx) = hopr_transport_protocol::stream::process_stream_protocol(
         msg_codec,
         network.clone(),
-        #[cfg(feature = "stats")]
+        #[cfg(feature = "telemetry")]
         move |peer| network_for_stats.get_packet_stats(peer),
     )
     .await?;
@@ -121,7 +121,7 @@ impl Drop for SelfClosingJoinHandle {
 }
 
 use hopr_crypto_packet::prelude::HoprPacket;
-#[cfg(feature = "stats")]
+#[cfg(feature = "telemetry")]
 use hopr_transport_network::observation::PeerPacketStatsSnapshot;
 use libp2p::{Multiaddr, PeerId};
 use more_asserts::assert_gt;
@@ -180,7 +180,7 @@ async fn p2p_only_communication_quic() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[cfg(feature = "stats")]
+#[cfg(feature = "telemetry")]
 #[ignore]
 #[tokio::test]
 async fn p2p_peer_packet_stats_quic() -> anyhow::Result<()> {

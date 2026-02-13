@@ -11,7 +11,7 @@ use hopr_lib::{
     SessionManagerError, SessionTarget, SurbBalancerConfig, TransportSessionError,
     errors::{HoprLibError, HoprTransportError},
 };
-#[cfg(feature = "stats")]
+#[cfg(feature = "telemetry")]
 use hopr_lib::{SessionAckMode, SessionLifecycleState, SessionStatsSnapshot};
 use hopr_utils_session::{ListenerId, build_binding_host, create_tcp_client_binding, create_udp_client_binding};
 use serde::{Deserialize, Serialize};
@@ -744,7 +744,7 @@ pub(crate) enum SessionStatsState {
     Closed,
 }
 
-#[cfg(feature = "stats")]
+#[cfg(feature = "telemetry")]
 impl From<SessionLifecycleState> for SessionStatsState {
     /// Converts protocol-level lifecycle state into the API metrics state format.
     fn from(value: SessionLifecycleState) -> Self {
@@ -770,7 +770,7 @@ pub(crate) enum SessionStatsAckMode {
     Both,
 }
 
-#[cfg(feature = "stats")]
+#[cfg(feature = "telemetry")]
 impl From<SessionAckMode> for SessionStatsAckMode {
     /// Converts protocol-level acknowledgement mode into the API metrics mode format.
     fn from(value: SessionAckMode) -> Self {
@@ -891,7 +891,7 @@ pub(crate) struct SessionStatsResponse {
     pub transport: SessionStatsTransport,
 }
 
-#[cfg(feature = "stats")]
+#[cfg(feature = "telemetry")]
 impl From<SessionStatsSnapshot> for SessionStatsResponse {
     /// Converts protocol-level metrics snapshot into the API response format.
     fn from(value: SessionStatsSnapshot) -> Self {
@@ -979,7 +979,7 @@ pub(crate) async fn session_stats(
     State(_state): State<Arc<InternalState>>,
     Path(_session_id): Path<String>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
-    #[cfg(feature = "stats")]
+    #[cfg(feature = "telemetry")]
     {
         let session_id = SessionId::from_str(&_session_id)
             .map_err(|_| (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidSessionId))?;
@@ -997,7 +997,7 @@ pub(crate) async fn session_stats(
             )),
         }
     }
-    #[cfg(not(feature = "stats"))]
+    #[cfg(not(feature = "telemetry"))]
     {
         Err::<(StatusCode, Json<SessionStatsResponse>), _>((StatusCode::NOT_FOUND, ApiErrorStatus::SessionNotFound))
     }

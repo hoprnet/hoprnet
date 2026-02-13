@@ -128,8 +128,8 @@ mod tests {
     use futures_time::future::FutureExt;
 
     use super::*;
-    #[cfg(feature = "stats")]
-    use crate::socket::stats::NoopTracker;
+    #[cfg(feature = "telemetry")]
+    use crate::socket::telemetry::NoopTracker;
     use crate::{
         SessionSocket, SessionSocketConfig,
         utils::test::{FaultyNetworkConfig, setup_alice_bob},
@@ -310,14 +310,14 @@ mod tests {
             alice,
             CloneableMockState::new(alice_state, "alice"),
             cfg,
-            #[cfg(feature = "stats")]
+            #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
         let mut bob_socket = SessionSocket::new(
             bob,
             CloneableMockState::new(bob_state, "bob"),
             cfg,
-            #[cfg(feature = "stats")]
+            #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
 

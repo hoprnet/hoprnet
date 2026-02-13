@@ -6,7 +6,7 @@ use axum::{
     response::IntoResponse,
 };
 use futures::FutureExt;
-#[cfg(feature = "stats")]
+#[cfg(feature = "telemetry")]
 use hopr_lib::PeerPacketStatsSnapshot;
 use hopr_lib::{
     Address, Multiaddr,
@@ -183,7 +183,7 @@ pub(crate) struct PeerPacketStatsResponse {
     pub bytes_in: u64,
 }
 
-#[cfg(feature = "stats")]
+#[cfg(feature = "telemetry")]
 impl From<PeerPacketStatsSnapshot> for PeerPacketStatsResponse {
     fn from(snapshot: PeerPacketStatsSnapshot) -> Self {
         Self {
@@ -223,14 +223,14 @@ pub(super) async fn peer_stats(
     }): Path<DestinationParams>,
     State(_state): State<Arc<InternalState>>,
 ) -> impl IntoResponse {
-    #[cfg(not(feature = "stats"))]
+    #[cfg(not(feature = "telemetry"))]
     {
         return Err::<(StatusCode, Json<PeerPacketStatsResponse>), _>(ApiErrorStatus::UnknownFailure(
             "BUILT WITHOUT STATS SUPPORT".into(),
         ));
     }
 
-    #[cfg(feature = "stats")]
+    #[cfg(feature = "telemetry")]
     {
         let hopr = _state.hopr.clone();
 
