@@ -2,6 +2,8 @@ use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_m
 use futures::{AsyncRead, AsyncWrite, io::Cursor};
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_network_types::utils::DuplexIO;
+#[cfg(feature = "telemetry")]
+use hopr_protocol_session::NoopTracker;
 use hopr_protocol_session::{SessionSocketConfig, UnreliableSocket};
 use tokio_util::compat::TokioAsyncReadCompatExt;
 
@@ -22,8 +24,14 @@ const MTU: usize = HoprPacket::PAYLOAD_SIZE;
 pub async fn alice_send_data<S: AsyncRead + AsyncWrite + Send + Unpin + 'static>(data: &[u8], alice: S) {
     use futures::AsyncWriteExt;
 
-    let mut alice_socket =
-        UnreliableSocket::<MTU>::new_stateless("alice", alice, SessionSocketConfig::default()).unwrap();
+    let mut alice_socket = UnreliableSocket::<MTU>::new_stateless(
+        "alice",
+        alice,
+        SessionSocketConfig::default(),
+        #[cfg(feature = "telemetry")]
+        NoopTracker,
+    )
+    .unwrap();
 
     alice_socket.write_all(data).await.unwrap();
     alice_socket.flush().await.unwrap();
@@ -37,6 +45,8 @@ pub async fn bob_receive_data(data: Vec<u8>, mut recv_data: Vec<u8>) -> Vec<u8> 
         "bob",
         DuplexIO::from((futures::io::sink(), Cursor::new(data))),
         SessionSocketConfig::default(),
+        #[cfg(feature = "telemetry")]
+        NoopTracker,
     )
     .unwrap();
     bob_socket.read_to_end(&mut recv_data).await.unwrap();
@@ -78,7 +88,7 @@ pub fn stateless_socket_benchmark(c: &mut Criterion) {
         group.throughput(Throughput::Bytes(*size as u64));
         group.bench_with_input(BenchmarkId::new("alice_tx", size), &alice_data, |b, data| {
             b.to_async(&runtime)
-                .iter(|| alice_send_data(&data, DuplexIO::from((futures::io::sink(), futures::io::empty()))));
+                .iter(|| alice_send_data(data, DuplexIO::from((futures::io::sink(), futures::io::empty()))));
         });
         group.bench_with_input(BenchmarkId::new("bob_rx", size), &wire_data, |b, data| {
             b.to_async(&runtime)

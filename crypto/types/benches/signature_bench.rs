@@ -89,7 +89,7 @@ pub fn offchain_signature_bench(c: &mut Criterion) {
 
         b.iter_batched(
             || tuples.clone(),
-            |tuples| OffchainSignature::verify_batch(tuples),
+            OffchainSignature::verify_batch,
             BatchSize::SmallInput,
         );
     });

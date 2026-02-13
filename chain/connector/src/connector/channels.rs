@@ -423,7 +423,7 @@ mod tests {
         let mut connector = create_connector(blokli_client)?;
         connector.connect().await?;
 
-        connector.fund_channel(&channel_1.get_id(), 5.into()).await?.await?;
+        connector.fund_channel(channel_1.get_id(), 5.into()).await?.await?;
 
         insta::assert_yaml_snapshot!(*connector.client().snapshot());
 
@@ -474,7 +474,7 @@ mod tests {
         let mut connector = create_connector(blokli_client)?;
         connector.connect().await?;
 
-        connector.close_channel(&channel_1.get_id()).await?.await?;
+        connector.close_channel(channel_1.get_id()).await?.await?;
 
         let mut snapshot = (*connector.client().snapshot()).clone();
 
@@ -483,7 +483,7 @@ mod tests {
             .channels
             .get_mut(&hex::encode(channel_1.get_id()))
             .unwrap()
-            .closure_time = Some(blokli_client::api::types::DateTime { 0: "dummy".into() });
+            .closure_time = Some(blokli_client::api::types::DateTime("dummy".into()));
 
         insta::assert_yaml_snapshot!(snapshot);
 
@@ -534,7 +534,7 @@ mod tests {
         let mut connector = create_connector(blokli_client)?;
         connector.connect().await?;
 
-        connector.close_channel(&channel_1.get_id()).await?.await?;
+        connector.close_channel(channel_1.get_id()).await?.await?;
 
         insta::assert_yaml_snapshot!(*connector.client().snapshot());
 
@@ -585,7 +585,7 @@ mod tests {
         let mut connector = create_connector(blokli_client)?;
         connector.connect().await?;
 
-        connector.close_channel(&channel_1.get_id()).await?.await?;
+        connector.close_channel(channel_1.get_id()).await?.await?;
 
         insta::assert_yaml_snapshot!(*connector.client().snapshot());
 

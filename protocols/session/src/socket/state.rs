@@ -54,6 +54,15 @@ pub trait SocketState<const C: usize>: Send {
 
     /// Called when a segment of a Frame was sent to the Downstream.
     fn segment_sent(&mut self, segment: &Segment) -> Result<(), SessionError>;
+
+    /// Convenience method to dispatch a [`message`](SessionMessage) to one of the available handlers.
+    fn incoming_message(&mut self, message: &SessionMessage<C>) -> Result<(), SessionError> {
+        match &message {
+            SessionMessage::Segment(s) => self.incoming_segment(&s.id(), s.seq_flags),
+            SessionMessage::Request(r) => self.incoming_retransmission_request(r.clone()),
+            SessionMessage::Acknowledge(a) => self.incoming_acknowledged_frames(a.clone()),
+        }
+    }
 }
 
 /// Represents a stateless Session socket.
@@ -119,6 +128,8 @@ mod tests {
     use futures_time::future::FutureExt;
 
     use super::*;
+    #[cfg(feature = "telemetry")]
+    use crate::socket::telemetry::NoopTracker;
     use crate::{
         SessionSocket, SessionSocketConfig,
         utils::test::{FaultyNetworkConfig, setup_alice_bob},
@@ -295,8 +306,20 @@ mod tests {
             ..Default::default()
         };
 
-        let mut alice_socket = SessionSocket::new(alice, CloneableMockState::new(alice_state, "alice"), cfg)?;
-        let mut bob_socket = SessionSocket::new(bob, CloneableMockState::new(bob_state, "bob"), cfg)?;
+        let mut alice_socket = SessionSocket::new(
+            alice,
+            CloneableMockState::new(alice_state, "alice"),
+            cfg,
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        )?;
+        let mut bob_socket = SessionSocket::new(
+            bob,
+            CloneableMockState::new(bob_state, "bob"),
+            cfg,
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        )?;
 
         let alice_sent_data = hopr_crypto_random::random_bytes::<{ NUM_FRAMES * FRAME_SIZE }>();
         alice_socket

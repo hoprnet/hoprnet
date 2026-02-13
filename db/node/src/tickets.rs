@@ -841,7 +841,7 @@ mod tests {
             .collect::<anyhow::Result<Vec<RedeemableTicket>>>()?;
 
         for t in &tickets {
-            db.upsert_ticket(t.clone()).await?;
+            db.upsert_ticket(*t).await?;
         }
 
         Ok(tickets)

@@ -292,7 +292,7 @@ mod tests {
         );
 
         // PartialEq is intentionally not implemented for VrfParameters
-        let vrf: [u8; VrfParameters::SIZE] = vrf_values.clone().into();
+        let vrf: [u8; VrfParameters::SIZE] = vrf_values.into();
         let other = VrfParameters::try_from(vrf.as_ref())?;
         assert!(vrf_values.s == other.s && vrf_values.V == other.V && vrf_values.h == other.h);
 

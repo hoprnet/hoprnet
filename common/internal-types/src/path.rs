@@ -428,7 +428,7 @@ mod tests {
     }
 
     pub fn dummy_channel(src: Address, dst: Address, status: ChannelStatus) -> ChannelEntry {
-        ChannelEntry::new(src, dst, 1.into(), 1u32.into(), status, 1u32.into())
+        ChannelEntry::new(src, dst, 1.into(), 1, status, 1)
     }
 
     struct DummyResolver(Vec<ChannelEntry>);

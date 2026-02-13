@@ -96,9 +96,12 @@ impl Default for TagBloomFilter {
 mod tests {
     use hopr_crypto_types::types::PACKET_TAG_LENGTH;
 
+    #[allow(unused_imports)]
     use super::*;
 
+    #[allow(dead_code)]
     const ZEROS_TAG: [u8; PACKET_TAG_LENGTH] = [0; PACKET_TAG_LENGTH];
+    #[allow(dead_code)]
     const ONES_TAG: [u8; PACKET_TAG_LENGTH] = [1; PACKET_TAG_LENGTH];
 
     #[test]
