@@ -9,11 +9,11 @@
 //!
 //! ### In-flight tracking
 //! To prevent duplicate funding when multiple balance-decrease events arrive in quick succession,
-//! the strategy maintains a set of channel IDs
-//! with in-flight funding transactions. A channel is added to the set when a funding tx is
-//! successfully enqueued, and removed when:
-//! - A balance increase event is observed for that channel (indicating the funding confirmed), or
-//! - An `on_tick` scan finds the channel's balance has risen above the threshold.
+//! the strategy maintains a map of channel IDs to the time they were marked in-flight.
+//! A channel is added to the map when a funding tx is successfully enqueued, and removed when:
+//! - A balance increase event is observed for that channel (indicating the funding confirmed),
+//! - An `on_tick` scan finds the channel's balance has risen above the threshold, or
+//! - The entry has exceeded [`IN_FLIGHT_TTL`] (guarding against lost/dropped transactions).
 //!
 //! ### Metrics
 //! - `hopr_strategy_auto_funding_funding_count` — incremented when a funding tx is successfully enqueued
@@ -21,9 +21,8 @@
 //!
 //! For details on default parameters see [AutoFundingStrategyConfig].
 use std::{
-    collections::HashSet,
     fmt::{Debug, Display, Formatter},
-    sync::Mutex,
+    time::Duration,
 };
 
 use async_trait::async_trait;
@@ -79,6 +78,10 @@ pub struct AutoFundingStrategyConfig {
     pub funding_amount: HoprBalance,
 }
 
+/// How long an in-flight entry is considered valid before it expires.
+/// Guards against funding transactions that are lost or dropped from the mempool.
+const IN_FLIGHT_TTL: Duration = Duration::from_secs(300);
+
 /// The `AutoFundingStrategy` automatically funds a channel that
 /// dropped its staked balance below the configured threshold.
 ///
@@ -87,11 +90,11 @@ pub struct AutoFundingStrategyConfig {
 pub struct AutoFundingStrategy<A> {
     hopr_chain_actions: A,
     cfg: AutoFundingStrategyConfig,
-    /// Channels with in-flight funding transactions.
-    /// Entries are added when a funding tx is enqueued and removed when a
-    /// balance increase is observed for the channel or when `on_tick` finds
-    /// the channel's balance is above the threshold.
-    in_flight: Mutex<HashSet<ChannelId>>,
+    /// Channels with in-flight funding transactions. Entries expire after
+    /// [`IN_FLIGHT_TTL`] to guard against lost transactions. They are also
+    /// explicitly removed when a balance increase is observed or when
+    /// `on_tick` finds the balance above threshold.
+    in_flight: moka::future::Cache<ChannelId, ()>,
 }
 
 impl<A: ChainReadChannelOperations + ChainWriteChannelOperations> AutoFundingStrategy<A> {
@@ -107,7 +110,62 @@ impl<A: ChainReadChannelOperations + ChainWriteChannelOperations> AutoFundingStr
         Self {
             cfg,
             hopr_chain_actions,
-            in_flight: Mutex::new(HashSet::new()),
+            in_flight: moka::future::Cache::builder()
+                .time_to_live(IN_FLIGHT_TTL)
+                .max_capacity(10_000)
+                .build(),
+        }
+    }
+
+    /// Attempt to fund a channel if it is not already in-flight.
+    /// Returns `Ok(())` if the channel was skipped (already in-flight)
+    /// or if funding was successfully enqueued. Returns `Err` if `fund_channel` fails.
+    async fn try_fund_channel(&self, channel: &ChannelEntry) -> crate::errors::Result<()> {
+        let channel_id = *channel.get_id();
+
+        // Skip channels with a valid (non-expired) in-flight entry.
+        if self.in_flight.get(&channel_id).await.is_some() {
+            debug!(%channel, "skipping channel with in-flight funding");
+            return Ok(());
+        }
+
+        // Mark as in-flight before the async funding call to prevent
+        // concurrent duplicate funding.
+        self.in_flight.insert(channel_id, ()).await;
+
+        info!(
+            %channel,
+            balance = %channel.balance,
+            threshold = %self.cfg.min_stake_threshold,
+            "stake on channel at or below threshold"
+        );
+
+        let fund_result = self
+            .hopr_chain_actions
+            .fund_channel(&channel_id, self.cfg.funding_amount)
+            .await
+            .map_err(|e| StrategyError::Other(e.into()));
+
+        // Drop the confirmation future (BoxFuture) before channel_id goes out of scope.
+        let funded = fund_result.map(|_rx| ());
+
+        match funded {
+            Ok(()) => {
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_COUNT_AUTO_FUNDINGS.increment();
+
+                info!(%channel, amount = %self.cfg.funding_amount, "issued re-staking of channel");
+                Ok(())
+            }
+            Err(e) => {
+                // Funding failed; remove from in-flight so it can be retried.
+                self.in_flight.remove(&channel_id).await;
+
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_COUNT_AUTO_FUNDING_FAILURES.increment();
+
+                Err(e)
+            }
         }
     }
 }
@@ -149,51 +207,12 @@ impl<A: ChainReadChannelOperations + ChainWriteChannelOperations + Send + Sync> 
 
         while let Some(channel) = channels.next().await {
             if channel.balance.le(&self.cfg.min_stake_threshold) {
-                let channel_id = *channel.get_id();
-
-                // Skip channels with in-flight funding
-                {
-                    let in_flight = self.in_flight.lock().unwrap_or_else(|e| e.into_inner());
-                    if in_flight.contains(&channel_id) {
-                        debug!(%channel, "skipping channel with in-flight funding");
-                        continue;
-                    }
-                }
-
-                info!(
-                    %channel,
-                    balance = %channel.balance,
-                    threshold = %self.cfg.min_stake_threshold,
-                    "on_tick: stake on channel at or below threshold"
-                );
-
-                let fund_result = self
-                    .hopr_chain_actions
-                    .fund_channel(&channel_id, self.cfg.funding_amount)
-                    .await;
-                // Drop the confirmation future (BoxFuture) before channel_id goes out of scope.
-                let funded = fund_result.map(|_rx| ()).map_err(|e| e.to_string());
-                match funded {
-                    Ok(()) => {
-                        let mut in_flight = self.in_flight.lock().unwrap_or_else(|e| e.into_inner());
-                        in_flight.insert(channel_id);
-
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_COUNT_AUTO_FUNDINGS.increment();
-
-                        info!(%channel, amount = %self.cfg.funding_amount, "on_tick: issued re-staking of channel");
-                    }
-                    Err(e) => {
-                        warn!(%channel, error = %e, "on_tick: failed to enqueue funding tx");
-
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_COUNT_AUTO_FUNDING_FAILURES.increment();
-                    }
+                if let Err(e) = self.try_fund_channel(&channel).await {
+                    warn!(%channel, error = %e, "on_tick: failed to fund channel");
                 }
             } else {
                 // Channel is above threshold; clear any stale in-flight entry
-                let mut in_flight = self.in_flight.lock().unwrap_or_else(|e| e.into_inner());
-                in_flight.remove(channel.get_id());
+                self.in_flight.remove(channel.get_id()).await;
             }
         }
 
@@ -215,54 +234,13 @@ impl<A: ChainReadChannelOperations + ChainWriteChannelOperations + Send + Sync> 
         if let ChannelChange::Balance { left: old, right: new } = change {
             // If balance increased, clear in-flight state for this channel
             if new > old {
-                let mut in_flight = self.in_flight.lock().unwrap_or_else(|e| e.into_inner());
-                if in_flight.remove(channel.get_id()) {
+                if self.in_flight.remove(channel.get_id()).await.is_some() {
                     debug!(%channel, "cleared in-flight funding state after balance increase");
                 }
             }
 
             if new.le(&self.cfg.min_stake_threshold) && channel.status == ChannelStatus::Open {
-                let channel_id = *channel.get_id();
-
-                // Skip channels with in-flight funding
-                {
-                    let in_flight = self.in_flight.lock().unwrap_or_else(|e| e.into_inner());
-                    if in_flight.contains(&channel_id) {
-                        debug!(%channel, "skipping channel with in-flight funding");
-                        return Ok(());
-                    }
-                }
-
-                info!(
-                    %channel,
-                    balance = %channel.balance,
-                    threshold = %self.cfg.min_stake_threshold,
-                    "stake on channel at or below threshold"
-                );
-
-                let fund_result = self
-                    .hopr_chain_actions
-                    .fund_channel(&channel_id, self.cfg.funding_amount)
-                    .await;
-                // Drop the confirmation future (BoxFuture) before channel_id goes out of scope.
-                let funded = fund_result.map(|_rx| ()).map_err(|e| e.to_string());
-                match funded {
-                    Ok(()) => {
-                        let mut in_flight = self.in_flight.lock().unwrap_or_else(|e| e.into_inner());
-                        in_flight.insert(channel_id);
-
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_COUNT_AUTO_FUNDINGS.increment();
-
-                        info!(%channel, amount = %self.cfg.funding_amount, "issued re-staking of channel");
-                    }
-                    Err(e) => {
-                        warn!(%channel, error = %e, "failed to enqueue funding tx");
-
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_COUNT_AUTO_FUNDING_FAILURES.increment();
-                    }
-                }
+                self.try_fund_channel(channel).await?;
             }
             Ok(())
         } else {
@@ -529,14 +507,11 @@ mod tests {
         )
         .await?;
 
-        // Verify the channel is in the in-flight set
-        {
-            let in_flight = afs.in_flight.lock().unwrap();
-            assert!(
-                in_flight.contains(c1.get_id()),
-                "channel should be in the in-flight set after funding"
-            );
-        }
+        // Verify the channel is in the in-flight cache
+        assert!(
+            afs.in_flight.get(c1.get_id()).await.is_some(),
+            "channel should be in the in-flight cache after funding"
+        );
 
         // Second call with same balance should be skipped due to in-flight tracking.
         // This returns Ok(()) rather than triggering another funding tx.
@@ -550,15 +525,13 @@ mod tests {
         )
         .await?;
 
-        // The in-flight set should still contain exactly one entry (unchanged)
-        {
-            let in_flight = afs.in_flight.lock().unwrap();
-            assert_eq!(in_flight.len(), 1, "in-flight set should still have exactly one entry");
-            assert!(
-                in_flight.contains(c1.get_id()),
-                "channel should still be in the in-flight set"
-            );
-        }
+        // The in-flight cache should still contain exactly one entry (unchanged)
+        afs.in_flight.run_pending_tasks().await;
+        assert_eq!(afs.in_flight.entry_count(), 1, "in-flight cache should still have exactly one entry");
+        assert!(
+            afs.in_flight.get(c1.get_id()).await.is_some(),
+            "channel should still be in the in-flight cache"
+        );
 
         Ok(())
     }
@@ -612,10 +585,7 @@ mod tests {
         .await?;
 
         // Verify channel is in-flight
-        {
-            let in_flight = afs.in_flight.lock().unwrap();
-            assert!(in_flight.contains(c1.get_id()));
-        }
+        assert!(afs.in_flight.get(c1.get_id()).await.is_some());
 
         // Simulate balance increase event (funding confirmed)
         let funded_channel = ChannelEntry::new(
@@ -638,13 +608,79 @@ mod tests {
         .await?;
 
         // Verify channel is no longer in-flight
-        {
-            let in_flight = afs.in_flight.lock().unwrap();
-            assert!(
-                !in_flight.contains(c1.get_id()),
-                "channel should be cleared from in-flight after balance increase"
-            );
-        }
+        assert!(
+            afs.in_flight.get(c1.get_id()).await.is_none(),
+            "channel should be cleared from in-flight after balance increase"
+        );
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn test_on_tick_skips_in_flight_channels() -> anyhow::Result<()> {
+        let stake_limit = HoprBalance::from(7_u32);
+        let fund_amount = HoprBalance::from(5_u32);
+
+        // BOB -> CHRIS channel with balance below threshold
+        let c1 = ChannelEntry::new(
+            *BOB,
+            *CHRIS,
+            3_u32.into(),
+            0_u32.into(),
+            ChannelStatus::Open,
+            0_u32.into(),
+        );
+
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_generated_accounts(
+                &[&*ALICE, &*BOB, &*CHRIS, &*DAVE],
+                false,
+                XDaiBalance::new_base(1),
+                HoprBalance::new_base(1000),
+            )
+            .with_channels([c1])
+            .build_dynamic_client([1; Address::SIZE].into());
+
+        let mut chain_connector =
+            create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
+        chain_connector.connect().await?;
+        let _events = chain_connector.subscribe()?;
+
+        let cfg = AutoFundingStrategyConfig {
+            min_stake_threshold: stake_limit,
+            funding_amount: fund_amount,
+        };
+
+        let afs = AutoFundingStrategy::new(cfg, chain_connector);
+
+        // Fund via on_own_channel_changed to populate in-flight set
+        afs.on_own_channel_changed(
+            &c1,
+            ChannelDirection::Outgoing,
+            ChannelChange::Balance {
+                left: HoprBalance::from(10_u32),
+                right: c1.balance,
+            },
+        )
+        .await?;
+
+        // Verify the channel is in-flight
+        assert!(
+            afs.in_flight.get(c1.get_id()).await.is_some(),
+            "channel should be in the in-flight cache after funding"
+        );
+
+        // on_tick should skip c1 because it is already in-flight
+        afs.on_tick().await?;
+
+        // Verify the in-flight cache still has exactly one entry (channel was not re-funded)
+        afs.in_flight.run_pending_tasks().await;
+        assert_eq!(afs.in_flight.entry_count(), 1, "in-flight cache should still have exactly one entry");
+        assert!(
+            afs.in_flight.get(c1.get_id()).await.is_some(),
+            "channel should still be in the in-flight cache"
+        );
 
         Ok(())
     }
