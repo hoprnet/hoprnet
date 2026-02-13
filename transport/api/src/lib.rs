@@ -693,7 +693,7 @@ where
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_peer_packet_stats(&self, peer: &PeerId) -> errors::Result<Option<PeerPacketStatsSnapshot>> {
         // TODO (@TeeborChoka): please fill this in
-        Err(HoprTransportError::Api("not implemented yet".into()).into())
+        Err(HoprTransportError::Api("not implemented yet".into()))
     }
 
     /// Get packet stats for all connected peers.
@@ -701,7 +701,7 @@ where
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_all_packet_stats(&self) -> errors::Result<Vec<(PeerId, PeerPacketStatsSnapshot)>> {
         // TODO (@TeeborChoka): please fill this in
-        Err(HoprTransportError::Api("not implemented yet".into()).into())
+        Err(HoprTransportError::Api("not implemented yet".into()))
     }
 }
 
