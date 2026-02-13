@@ -85,7 +85,7 @@ pub struct AutoFundingStrategyConfig {
 /// Tracks channels with in-flight funding transactions to prevent duplicate
 /// funding when multiple balance-decrease events arrive in quick succession.
 pub struct AutoFundingStrategy<A> {
-    hopr_chain_actions: A,
+    hopr_chain_actions: Arc<A>,
     cfg: AutoFundingStrategyConfig,
     /// Channels with in-flight funding transactions. Entries are removed when:
     /// - The spawned confirmation task observes a tx failure,
@@ -94,7 +94,7 @@ pub struct AutoFundingStrategy<A> {
     in_flight: Arc<DashSet<ChannelId>>,
 }
 
-impl<A: ChainReadChannelOperations + ChainWriteChannelOperations> AutoFundingStrategy<A> {
+impl<A: ChainReadChannelOperations + ChainWriteChannelOperations + Send + Sync + 'static> AutoFundingStrategy<A> {
     pub fn new(cfg: AutoFundingStrategyConfig, hopr_chain_actions: A) -> Self {
         if cfg.funding_amount.le(&cfg.min_stake_threshold) {
             warn!(
@@ -106,14 +106,15 @@ impl<A: ChainReadChannelOperations + ChainWriteChannelOperations> AutoFundingStr
         }
         Self {
             cfg,
-            hopr_chain_actions,
+            hopr_chain_actions: Arc::new(hopr_chain_actions),
             in_flight: Arc::new(DashSet::new()),
         }
     }
 
     /// Attempt to fund a channel if it is not already in-flight.
     /// Returns `Ok(())` if the channel was skipped (already in-flight)
-    /// or if funding was successfully enqueued. Returns `Err` if `fund_channel` fails.
+    /// or if a funding task was spawned. The actual `fund_channel` call
+    /// happens inside the spawned task so the confirmation future is `'static`.
     async fn try_fund_channel(&self, channel: &ChannelEntry) -> crate::errors::Result<()> {
         let channel_id = *channel.get_id();
 
@@ -130,23 +131,18 @@ impl<A: ChainReadChannelOperations + ChainWriteChannelOperations> AutoFundingStr
             "stake on channel at or below threshold"
         );
 
-        let fund_result = self
-            .hopr_chain_actions
-            .fund_channel(&channel_id, self.cfg.funding_amount)
-            .await
-            .map_err(|e| StrategyError::Other(e.into()));
+        let chain_actions = Arc::clone(&self.hopr_chain_actions);
+        let funding_amount = self.cfg.funding_amount;
+        let in_flight = Arc::clone(&self.in_flight);
 
-        match fund_result {
-            Ok(confirmation) => {
-                #[cfg(all(feature = "prometheus", not(test)))]
-                METRIC_COUNT_AUTO_FUNDINGS.increment();
+        hopr_async_runtime::prelude::spawn(async move {
+            match chain_actions.fund_channel(&channel_id, funding_amount).await {
+                Ok(confirmation) => {
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_COUNT_AUTO_FUNDINGS.increment();
 
-                info!(%channel, amount = %self.cfg.funding_amount, "issued re-staking of channel");
+                    info!(%channel_id, %funding_amount, "issued re-staking of channel");
 
-                // Spawn a background task to track the confirmation outcome.
-                // On failure, clear the in-flight entry so the channel can be retried.
-                let in_flight = self.in_flight.clone();
-                hopr_async_runtime::prelude::spawn(async move {
                     if let Err(e) = confirmation.await {
                         warn!(%channel_id, error = %e, "funding transaction failed");
                         in_flight.remove(&channel_id);
@@ -156,20 +152,18 @@ impl<A: ChainReadChannelOperations + ChainWriteChannelOperations> AutoFundingStr
                     }
                     // On success: the ChannelBalanceIncreased event will clear the
                     // in-flight entry via on_own_channel_changed.
-                });
+                }
+                Err(e) => {
+                    warn!(%channel_id, error = %e, "failed to enqueue funding transaction");
+                    in_flight.remove(&channel_id);
 
-                Ok(())
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_COUNT_AUTO_FUNDING_FAILURES.increment();
+                }
             }
-            Err(e) => {
-                // Enqueuing failed; remove from in-flight so it can be retried.
-                self.in_flight.remove(&channel_id);
+        });
 
-                #[cfg(all(feature = "prometheus", not(test)))]
-                METRIC_COUNT_AUTO_FUNDING_FAILURES.increment();
-
-                Err(e)
-            }
-        }
+        Ok(())
     }
 }
 
@@ -186,7 +180,7 @@ impl<A> Display for AutoFundingStrategy<A> {
 }
 
 #[async_trait]
-impl<A: ChainReadChannelOperations + ChainWriteChannelOperations + Send + Sync> SingularStrategy
+impl<A: ChainReadChannelOperations + ChainWriteChannelOperations + Send + Sync + 'static> SingularStrategy
     for AutoFundingStrategy<A>
 {
     /// Periodically scans all outgoing open channels and funds any with balance at or below

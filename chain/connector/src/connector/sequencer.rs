@@ -135,8 +135,7 @@ where
         &self,
         transaction: R,
         timeout_until_finalized: std::time::Duration,
-    ) -> errors::Result<impl Future<Output = errors::Result<blokli_client::api::types::Transaction>> + Send + 'static>
-    {
+    ) -> errors::Result<impl Future<Output = errors::Result<blokli_client::api::types::Transaction>> + Send> {
         let (notifier_tx, notifier_rx) = futures::channel::oneshot::channel();
 
         self.sender
