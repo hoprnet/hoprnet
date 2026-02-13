@@ -80,7 +80,9 @@ mod tests {
 
     #[test]
     fn unseal_fixed_test() -> anyhow::Result<()> {
-        let data = hex!("d7538951e728a28c6381a481f9f33111b6d78211bd1d6a286bdf1b16ee1ad35837b5b0ffcd3b308a4fa9939af0a208150418629c7af31ad457d3fe51602dc9b5f0da253fb44ec0fb75cac9e0bcb9a3ef");
+        let data = hex!(
+            "d7538951e728a28c6381a481f9f33111b6d78211bd1d6a286bdf1b16ee1ad35837b5b0ffcd3b308a4fa9939af0a208150418629c7af31ad457d3fe51602dc9b5f0da253fb44ec0fb75cac9e0bcb9a3ef"
+        );
         let peer_id: PeerId = "12D3KooWHcCWDKzMkypyLWvri5ioSVivCazU8jgbWzyerM5aMuf8".parse()?;
 
         let keypair = OffchainKeypair::from_secret(&hex!(

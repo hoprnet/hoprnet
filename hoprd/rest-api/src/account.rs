@@ -7,6 +7,7 @@ use axum::{
 };
 use hopr_lib::{
     Address, HoprBalance, WxHOPR, XDai, XDaiBalance,
+    api::node::HoprNodeChainOperations,
     errors::{HoprLibError, HoprStatusError},
 };
 use serde::{Deserialize, Serialize};

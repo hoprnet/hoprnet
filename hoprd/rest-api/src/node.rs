@@ -6,7 +6,14 @@ use axum::{
     response::IntoResponse,
 };
 use futures::{StreamExt, stream::FuturesUnordered};
-use hopr_lib::{Address, Health, Multiaddr, api::network::Observable};
+use hopr_lib::{
+    Address, Multiaddr,
+    api::{
+        graph::{EdgeLinkObservable, traits::EdgeObservableRead},
+        network::Health,
+        node::{HoprNodeChainOperations, HoprNodeNetworkOperations},
+    },
+};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
@@ -223,7 +230,7 @@ pub(super) async fn peers(
             let hopr = hopr.clone();
 
             async move {
-                if let Ok(Some(info)) = hopr.network_peer_info(&peer).await {
+                if let Some(info) = hopr.network_peer_info(&peer) {
                     if info.score() >= score {
                         Some((peer, info))
                     } else {
@@ -252,8 +259,11 @@ pub(super) async fn peers(
             address,
             multiaddr: mas.first().cloned(),
             last_update: info.last_update().as_millis(),
-            average_latency: info.average_latency().map_or(0, |d| d.as_millis()),
-            probe_rate: info.average_probe_rate(),
+            average_latency: info
+                .immediate_qos()
+                .and_then(|qos| qos.average_latency())
+                .map_or(0, |latency| latency.as_millis()),
+            probe_rate: info.immediate_qos().map_or(0.0, |qos| qos.average_probe_rate()),
             score: info.score(),
         })
         .collect::<Vec<_>>()

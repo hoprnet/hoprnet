@@ -345,7 +345,7 @@ mod tests {
         writer.close().await?;
 
         // Segmenter already takes into account the SessionMessage overhead
-        let expected = segment(&data, SMTU, 1)?;
+        let expected = segment(data, SMTU, 1)?;
         let actual = segments.collect::<Vec<_>>().await;
 
         assert_eq!(expected, actual);
@@ -365,7 +365,7 @@ mod tests {
         writer.close().await?;
 
         // Segmenter already takes into account the SessionMessage overhead
-        let mut expected = segment(&data, SMTU, 1)?;
+        let mut expected = segment(data, SMTU, 1)?;
         expected.push(Segment::terminating(2));
         let actual = segments.collect::<Vec<_>>().await;
 

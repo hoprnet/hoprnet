@@ -1,7 +1,3 @@
-use std::hash::Hash;
-
-use crate::exports::transport::HoprTransportProcess;
-
 /// An enum representing the current state of the HOPR node.
 ///
 /// The states represent granular steps in the node initialization and lifecycle,
@@ -52,22 +48,4 @@ pub enum HoprState {
     /// Node has been shut down
     #[strum(to_string = "Node has been terminated")]
     Terminated = 10,
-}
-
-/// Long-running tasks that are spawned by the HOPR node.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, strum::Display, strum::EnumCount)]
-pub enum HoprLibProcess {
-    #[strum(to_string = "transport: {0}")]
-    Transport(HoprTransportProcess),
-    #[cfg(feature = "session-server")]
-    #[strum(to_string = "session server providing the exit node session stream functionality")]
-    SessionServer,
-    #[strum(to_string = "ticket redemption queue driver")]
-    TicketRedemptions,
-    #[strum(to_string = "subscription for on-chain account announcements")]
-    AccountAnnouncements,
-    #[strum(to_string = "subscription for on-chain channel updates")]
-    ChannelEvents,
-    #[strum(to_string = "on received ticket event (winning or rejected)")]
-    TicketEvents,
 }

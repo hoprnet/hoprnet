@@ -1,26 +1,14 @@
+use futures::stream::BoxStream;
 pub use hopr_network_types::types::DestinationRouting;
-use multiaddr::PeerId;
 
-use super::{MeasurableNeighbor, MeasurablePath, Telemetry, TrafficGenerationError};
+pub use crate::graph::traits::NetworkGraphView;
 
-/// A trait specifying the graph traversal functionality
-#[async_trait::async_trait]
-pub trait NetworkGraphView {
-    /// Returns a stream of all known nodes in the network graph.
-    fn nodes(&self) -> futures::stream::BoxStream<'static, PeerId>;
+pub type PathId = [u128; 10];
 
-    /// Returns a list of all routes to the given destination of the specified length.
-    async fn find_routes(&self, destination: &PeerId, length: usize) -> Vec<DestinationRouting>;
-}
-
-/// A trait specifying the graph update functionality
-#[async_trait::async_trait]
-pub trait NetworkGraphUpdate {
-    /// Update the observation for the telemetry.
-    async fn record<N, P>(&self, telemetry: std::result::Result<Telemetry<N, P>, TrafficGenerationError<P>>)
-    where
-        N: MeasurableNeighbor + Clone + Send + Sync + 'static,
-        P: MeasurablePath + Clone + Send + Sync + 'static;
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProbeRouting {
+    Neighbor(DestinationRouting),
+    Looping((DestinationRouting, PathId)),
 }
 
 /// A trait for types that can produce a stream of cover traffic routes.
@@ -32,8 +20,23 @@ pub trait NetworkGraphUpdate {
 /// The implementor should ensure that the produced routes are indefinite,
 /// since the exhaustion of the stream might result in termination of the
 /// cover traffic generation.
-pub trait TrafficGeneration {
-    fn build<T>(self, network_graph: T) -> impl futures::Stream<Item = DestinationRouting> + Send
-    where
-        T: NetworkGraphView + Send + Sync + 'static;
+pub trait ProbingTrafficGeneration {
+    /// Builds a stream of routes to be used for cover traffic.
+    fn build(&self) -> BoxStream<'static, ProbeRouting>;
+}
+
+/// A trait for types that can generate cover traffic routes for the HOPR network.
+///
+/// Implementors of this trait are responsible for producing an infinite stream
+/// of `DestinationRouting` values, each representing a route for a cover (non-user) traffic.
+/// Cover traffic is essential for privacy and network health, as it helps to obscure real user
+/// traffic and maintain plausible deniability for network participants.
+///
+/// # Requirements
+/// - The stream produced by `build` should not terminate under normal operation, as the termination will lead to the
+///   cessation of cover traffic generation.
+/// - Route selection should be randomized or follow a strategy that maximizes privacy and/or network utility.
+pub trait CoverTrafficGeneration {
+    /// Builds a stream of routes to be used for cover traffic.
+    fn build(&self) -> BoxStream<'static, DestinationRouting>;
 }

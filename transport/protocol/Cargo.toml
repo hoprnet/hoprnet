@@ -44,6 +44,7 @@ tokio-util = { workspace = true, default-features = false, features = [
 tracing = { workspace = true }
 validator = { workspace = true }
 
+hopr-api = { workspace = true, features = ["network"] }
 hopr-async-runtime = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-random = { workspace = true }
@@ -54,7 +55,6 @@ hopr-metrics = { optional = true, workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-protocol-hopr = { workspace = true }
 hopr-protocol-app = { workspace = true }
-hopr-transport-identity = { workspace = true }
 
 
 [dev-dependencies]

@@ -31,7 +31,6 @@ members = [
   "transport/identity",
   "transport/mixer",
   "transport/network",
-  "transport/p2p",
   "transport/probe",
   "transport/protocol",
   "transport/session",
@@ -41,6 +40,8 @@ members = [
   "utils/session",
   # implementations
   "impls/ct/telemetry",
+  "impls/graph",
+  "impls/transport/p2p",
 ]
 
 [workspace.dependencies]
@@ -49,12 +50,12 @@ anyhow = "1.0.101"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
 assertables = "9.8.4"
+async-broadcast = "0.7.2"
 async-lock = "3.4.2"
 async-signal = "0.2.13"
 async-stream = "0.3.6"
 async-trait = "0.1.89"
 asynchronous-codec = { version = "0.7.0" }
-async-broadcast = "0.7.2"
 atomic_enum = "0.3.0"
 auto_impl = "1.3.0"
 axum = { version = "0.8.8", features = ["http2"] }
@@ -73,7 +74,7 @@ chrono = { version = "0.4.43", default-features = false, features = [
   "std",
   "clock",
 ] }
-clap = { version = "4.5.57", features = ["derive", "env", "string"] }
+clap = { version = "4.5.58", features = ["derive", "env", "string"] }
 const_format = "0.2.35"
 console-subscriber = "0.5.0"
 criterion = { version = "0.8.2", features = ["async_tokio", "html_reports"] }
@@ -250,7 +251,6 @@ hopr-transport-network = { path = "transport/network" }
 hopr-transport-mixer = { path = "transport/mixer" }
 hopr-transport-probe = { path = "transport/probe" }
 hopr-transport-protocol = { path = "transport/protocol" }
-hopr-transport-p2p = { path = "transport/p2p" }
 hopr-transport-session = { path = "transport/session" }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
 hopr-db-entity = { path = "db/entity" }
@@ -261,7 +261,9 @@ hopr-chain-connector = { path = "chain/connector" }
 hopr-statistics = { path = "common/statistics" }
 
 # referential implementations
+hopr-transport-p2p = { path = "impls/transport/p2p" }
 hopr-ct-telemetry = { path = "impls/ct/telemetry" }
+hopr-network-graph = { path = "impls/graph" }
 
 [profile.dev]
 panic = "abort"

@@ -13,7 +13,6 @@ pub struct TagBloomFilter {
     capacity: usize,
 }
 
-#[allow(unused)]
 impl TagBloomFilter {
     // The default maximum number of packet tags this Bloom filter can hold.
     // After these many packets, the Bloom filter resets and packet replays are possible.

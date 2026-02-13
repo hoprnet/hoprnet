@@ -2,8 +2,9 @@ use std::sync::Arc;
 
 use futures::{FutureExt, SinkExt, StreamExt, pin_mut};
 use futures_concurrency::stream::StreamExt as _;
-use hopr_api::ct::{
-    NetworkGraphView, Telemetry, TrafficGeneration, traits::NetworkGraphUpdate, types::TrafficGenerationError,
+use hopr_api::{
+    ct::{ProbeRouting, ProbingTrafficGeneration},
+    graph::{EdgeTransportTelemetry, NetworkGraphError, NetworkGraphUpdate, NetworkGraphView},
 };
 use hopr_async_runtime::AbortableList;
 use hopr_crypto_random::Randomizable;
@@ -13,13 +14,11 @@ use hopr_network_types::prelude::*;
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::traits::AsUnixTimestamp;
 use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut, ReservedTag};
-use libp2p_identity::PeerId;
 
 use crate::{
     HoprProbeProcess,
     config::ProbeConfig,
     content::Message,
-    errors::ProbeError,
     ping::PingQueryReplier,
     types::{NeighborProbe, NeighborTelemetry, PathTelemetry},
 };
@@ -47,21 +46,21 @@ impl Probe {
         api: (T, U),      // lower (tx, rx) channels for sending and receiving messages
         manual_events: V, // explicit requests from the API
         move_up: Up,      // forward up non-probing messages from the network
-        traffic_generator: Tr,
+        probing_traffic_generator: Tr,
         network_graph: G,
     ) -> AbortableList<HoprProbeProcess>
     where
         T: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + 'static,
         T::Error: Send,
         U: futures::Stream<Item = (HoprPseudonym, ApplicationDataIn)> + Send + Sync + 'static,
-        V: futures::Stream<Item = (PeerId, PingQueryReplier)> + Send + Sync + 'static,
+        V: futures::Stream<Item = (OffchainPublicKey, PingQueryReplier)> + Send + Sync + 'static,
         Up: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Clone + Send + Sync + 'static,
-        Tr: TrafficGeneration + Send + Sync + 'static,
+        Tr: ProbingTrafficGeneration + Send + Sync + 'static,
         G: NetworkGraphView + NetworkGraphUpdate + Clone + Send + Sync + 'static,
     {
         let max_parallel_probes = self.cfg.max_parallel_probes;
 
-        let probing_routes = traffic_generator.build(network_graph.clone());
+        let probing_routes = probing_traffic_generator.build();
 
         // Currently active probes
         let network_graph_internal = network_graph.clone();
@@ -81,10 +80,8 @@ impl Probe {
 
                         tracing::debug!(%peer, pseudonym = %k.0, probe = %k.1, reason = "timeout", "probe failed");
                         if let Some(replier) = notifier {
-                            if let NodeId::Offchain(opk) = peer.as_ref() {
-                                replier.notify(Err(ProbeError::TrafficError(
-                                    TrafficGenerationError::ProbeNeighborTimeout(opk.into()),
-                                )));
+                            if matches!(peer.as_ref(), NodeId::Offchain(_)) {
+                                replier.notify(Err(()));
                             } else {
                                 tracing::warn!(
                                     reason = "non-offchain peer",
@@ -94,12 +91,14 @@ impl Probe {
                         };
 
                         if let NodeId::Offchain(opk) = peer.as_ref() {
-                            let peer: PeerId = opk.into();
+                            let opk: OffchainPublicKey = *opk;
                             futures::FutureExt::boxed(async move {
                                 store
-                                    .record::<NeighborTelemetry, PathTelemetry>(Err(
-                                        TrafficGenerationError::ProbeNeighborTimeout(peer),
-                                    ))
+                                    .record_edge::<NeighborTelemetry, PathTelemetry>(
+                                        hopr_api::graph::MeasurableEdge::Probe(Err(
+                                            NetworkGraphError::ProbeNeighborTimeout(Box::new(opk)),
+                                        )),
+                                    )
                                     .await
                             })
                         } else {
@@ -123,17 +122,13 @@ impl Probe {
             probing_routes
                 .map(|peer| (peer, None))
                 .merge(manual_events.filter_map(|(peer, notifier)| async move {
-                    if let Ok(peer) = OffchainPublicKey::from_peerid(&peer) {
-                        let routing = DestinationRouting::Forward {
-                            destination: Box::new(peer.into()),
-                            pseudonym: Some(HoprPseudonym::random()),
-                            forward_options: RoutingOptions::Hops(0.try_into().expect("0 is a valid u8")),
-                            return_options: Some(RoutingOptions::Hops(0.try_into().expect("0 is a valid u8"))),
-                        };
-                        Some((routing, Some(notifier)))
-                    } else {
-                        None
-                    }
+                    let routing = DestinationRouting::Forward {
+                        destination: Box::new(peer.into()),
+                        pseudonym: Some(HoprPseudonym::random()),
+                        forward_options: RoutingOptions::Hops(0.try_into().expect("0 is a valid u8")),
+                        return_options: Some(RoutingOptions::Hops(0.try_into().expect("0 is a valid u8"))),
+                    };
+                    Some((ProbeRouting::Neighbor(routing), Some(notifier)))
                 }));
 
         processes.insert(
@@ -146,12 +141,12 @@ impl Probe {
 
                         async move {
                             match peer {
-                                DestinationRouting::Forward {
+                                ProbeRouting::Neighbor(DestinationRouting::Forward {
                                     destination,
                                     pseudonym,
                                     forward_options,
                                     return_options,
-                                } => {
+                                }) => {
                                     let nonce = NeighborProbe::random_nonce();
 
                                     let message = Message::Probe(nonce);
@@ -184,9 +179,13 @@ impl Probe {
                                         tracing::error!("failed to convert ping message into data");
                                     }
                                 }
-                                DestinationRouting::Return(_surb_matcher) => tracing::error!(
+                                ProbeRouting::Neighbor(DestinationRouting::Return(_surb_matcher)) => tracing::error!(
                                     error = "logical error",
                                     "resolved transport routing is not forward"
+                                ),
+                                ProbeRouting::Looping(_) => tracing::error!(
+                                    error = "logical error",
+                                    "probing component does not support the looping probes yet"
                                 ),
                             }
                         }
@@ -219,7 +218,7 @@ impl Probe {
                             Ok(message) => {
                                 match message {
                                     Message::Telemetry(path_telemetry) => {
-                                        store.record::<NeighborTelemetry, PathTelemetry>(Ok(Telemetry::Loopback(path_telemetry))).await
+                                        store.record_edge::<NeighborTelemetry, PathTelemetry>(hopr_api::graph::MeasurableEdge::Probe(Ok(EdgeTransportTelemetry::Loopback(path_telemetry)))).await
                                     },
                                     Message::Probe(NeighborProbe::Ping(ping)) => {
                                         tracing::debug!(%pseudonym, nonce = hex::encode(ping), "received ping");
@@ -247,10 +246,10 @@ impl Probe {
 
                                             if let NodeId::Offchain(opk) = peer.as_ref() {
                                                 tracing::debug!(%pseudonym, nonce = hex::encode(pong), latency_ms = latency.as_millis(), "probe successful");
-                                                store.record::<NeighborTelemetry, PathTelemetry>(Ok(Telemetry::Neighbor(NeighborTelemetry {
-                                                    peer: opk.into(),
+                                                store.record_edge::<NeighborTelemetry, PathTelemetry>(hopr_api::graph::MeasurableEdge::Probe(Ok(EdgeTransportTelemetry::Neighbor(NeighborTelemetry {
+                                                    peer: *opk,
                                                     rtt: latency,
-                                                }))).await
+                                                })))).await
                                             } else {
                                                 tracing::warn!(%pseudonym, nonce = hex::encode(pong), latency_ms = latency.as_millis(), "probe successful to non-offchain peer");
                                             }
@@ -287,71 +286,151 @@ mod tests {
 
     use async_trait::async_trait;
     use futures::future::BoxFuture;
-    use hopr_api::ct::types::TrafficGenerationError;
+    use hopr_api::graph::{
+        EdgeLinkObservable, MeasurableEdge, NetworkGraphError,
+        traits::{EdgeNetworkObservableRead, EdgeObservableRead, EdgeObservableWrite, EdgeProtocolObservable},
+    };
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use hopr_ct_telemetry::{ImmediateNeighborProber, ProberConfig};
     use hopr_protocol_app::prelude::{ApplicationData, Tag};
 
     use super::*;
+    use crate::errors::ProbeError;
 
     lazy_static::lazy_static!(
         static ref OFFCHAIN_KEYPAIR: OffchainKeypair = OffchainKeypair::random();
         static ref ONCHAIN_KEYPAIR: ChainKeypair = ChainKeypair::random();
-        static ref NEIGHBOURS: Vec<PeerId> = vec![
-            OffchainKeypair::random().public().into(),
-            OffchainKeypair::random().public().into(),
-            OffchainKeypair::random().public().into(),
-            OffchainKeypair::random().public().into(),
+        static ref NEIGHBOURS: Vec<OffchainPublicKey> = vec![
+            *OffchainKeypair::random().public(),
+            *OffchainKeypair::random().public(),
+            *OffchainKeypair::random().public(),
+            *OffchainKeypair::random().public(),
         ];
     );
 
+    /// Test stub implementation of Observable.
+    #[derive(Debug, Clone, Copy, Default)]
+    pub struct TestEdgeTransportObservations;
+
+    impl EdgeLinkObservable for TestEdgeTransportObservations {
+        fn record(&mut self, _latency: std::result::Result<Duration, ()>) {}
+
+        fn average_latency(&self) -> Option<Duration> {
+            None
+        }
+
+        fn average_probe_rate(&self) -> f64 {
+            1.0
+        }
+
+        fn score(&self) -> f64 {
+            1.0
+        }
+    }
+
+    impl EdgeNetworkObservableRead for TestEdgeTransportObservations {
+        fn is_connected(&self) -> bool {
+            true
+        }
+    }
+
+    impl EdgeProtocolObservable for TestEdgeTransportObservations {
+        fn capacity(&self) -> Option<u128> {
+            None
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, Default)]
+    pub struct TestEdgeObservations;
+
+    impl EdgeObservableWrite for TestEdgeObservations {
+        fn record(&mut self, _measurement: hopr_api::graph::traits::EdgeWeightType) {}
+    }
+
+    impl EdgeObservableRead for TestEdgeObservations {
+        type ImmediateMeasurement = TestEdgeTransportObservations;
+        type IntermediateMeasurement = TestEdgeTransportObservations;
+
+        fn last_update(&self) -> std::time::Duration {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+        }
+
+        fn immediate_qos(&self) -> Option<&Self::ImmediateMeasurement> {
+            None
+        }
+
+        fn intermediate_qos(&self) -> Option<&Self::IntermediateMeasurement> {
+            None
+        }
+
+        fn score(&self) -> f64 {
+            1.0
+        }
+    }
+
     #[derive(Debug, Clone)]
     pub struct PeerStore {
-        get_peers: Arc<RwLock<VecDeque<Vec<PeerId>>>>,
+        get_peers: Arc<RwLock<VecDeque<Vec<OffchainPublicKey>>>>,
         #[allow(clippy::type_complexity)]
-        on_finished: Arc<RwLock<Vec<(PeerId, crate::errors::Result<Duration>)>>>,
+        on_finished: Arc<RwLock<Vec<(OffchainPublicKey, crate::errors::Result<Duration>)>>>,
     }
 
     #[async_trait]
     impl NetworkGraphUpdate for PeerStore {
-        async fn record<N, P>(&self, telemetry: std::result::Result<Telemetry<N, P>, TrafficGenerationError<P>>)
+        async fn record_edge<N, P>(&self, telemetry: MeasurableEdge<N, P>)
         where
-            N: hopr_api::ct::MeasurableNeighbor + Send + Clone,
-            P: hopr_api::ct::MeasurablePath + Send + Clone,
+            N: hopr_api::graph::MeasurablePeer + Send + Clone,
+            P: hopr_api::graph::MeasurablePath + Send + Clone,
         {
             let mut on_finished = self.on_finished.write().unwrap();
 
             match telemetry {
-                Ok(Telemetry::Neighbor(neighbor_telemetry)) => {
-                    let peer: PeerId = neighbor_telemetry.peer().clone();
+                hopr_api::graph::MeasurableEdge::Probe(Ok(EdgeTransportTelemetry::Neighbor(neighbor_telemetry))) => {
+                    let peer: OffchainPublicKey = neighbor_telemetry.peer().clone();
                     let duration = neighbor_telemetry.rtt();
                     on_finished.push((peer, Ok(duration)));
                 }
-                Err(TrafficGenerationError::ProbeNeighborTimeout(peer)) => {
+                hopr_api::graph::MeasurableEdge::Probe(Err(NetworkGraphError::ProbeNeighborTimeout(peer))) => {
                     on_finished.push((
-                        peer.clone(),
-                        Err(ProbeError::TrafficError(TrafficGenerationError::ProbeNeighborTimeout(
-                            peer,
-                        ))),
+                        peer.as_ref().clone(),
+                        Err(ProbeError::TrafficError(NetworkGraphError::ProbeNeighborTimeout(peer))),
                     ));
                 }
                 _ => panic!("unexpected telemetry type, unimplemented"),
             }
         }
+
+        async fn record_node<N>(&self, _node: N)
+        where
+            N: hopr_api::graph::MeasurableNode + Send + Clone,
+        {
+            unimplemented!()
+        }
     }
 
     #[async_trait]
     impl NetworkGraphView for PeerStore {
+        type NodeId = OffchainPublicKey;
+        type Observed = TestEdgeObservations;
+
+        fn node_count(&self) -> usize {
+            self.get_peers.read().unwrap().front().map_or(0, |v| v.len())
+        }
+
+        fn contains_node(&self, _key: &OffchainPublicKey) -> bool {
+            false
+        }
+
         /// Returns a stream of all known nodes in the network graph.
-        fn nodes(&self) -> futures::stream::BoxStream<'static, PeerId> {
+        fn nodes(&self) -> futures::stream::BoxStream<'static, OffchainPublicKey> {
             let mut get_peers = self.get_peers.write().unwrap();
             Box::pin(futures::stream::iter(get_peers.pop_front().unwrap_or_default()))
         }
 
-        /// Returns a list of all routes to the given destination of the specified length.
-        async fn find_routes(&self, destination: &PeerId, length: usize) -> Vec<DestinationRouting> {
-            tracing::debug!(%destination, %length, "finding routes in test peer store");
-            vec![]
+        fn edge(&self, _src: &OffchainPublicKey, _dest: &OffchainPublicKey) -> Option<TestEdgeObservations> {
+            Some(TestEdgeObservations)
         }
     }
 
@@ -359,14 +438,14 @@ mod tests {
         from_probing_up_rx: futures::channel::mpsc::Receiver<(HoprPseudonym, ApplicationDataIn)>,
         from_probing_to_network_rx: futures::channel::mpsc::Receiver<(DestinationRouting, ApplicationDataOut)>,
         from_network_to_probing_tx: futures::channel::mpsc::Sender<(HoprPseudonym, ApplicationDataIn)>,
-        manual_probe_tx: futures::channel::mpsc::Sender<(PeerId, PingQueryReplier)>,
+        manual_probe_tx: futures::channel::mpsc::Sender<(OffchainPublicKey, PingQueryReplier)>,
     }
 
     async fn test_with_probing<F, St, Fut>(cfg: ProbeConfig, store: St, test: F) -> anyhow::Result<()>
     where
         Fut: std::future::Future<Output = anyhow::Result<()>>,
         F: Fn(TestInterface) -> Fut + Send + Sync + 'static,
-        St: NetworkGraphUpdate + NetworkGraphView + Clone + Send + Sync + 'static,
+        St: NetworkGraphUpdate + NetworkGraphView<NodeId = OffchainPublicKey> + Clone + Send + Sync + 'static,
     {
         let probe = Probe::new(cfg.clone());
 
@@ -379,7 +458,8 @@ mod tests {
         let (from_network_to_probing_tx, from_network_to_probing_rx) =
             futures::channel::mpsc::channel::<(HoprPseudonym, ApplicationDataIn)>(100);
 
-        let (manual_probe_tx, manual_probe_rx) = futures::channel::mpsc::channel::<(PeerId, PingQueryReplier)>(100);
+        let (manual_probe_tx, manual_probe_rx) =
+            futures::channel::mpsc::channel::<(OffchainPublicKey, PingQueryReplier)>(100);
 
         let interface = TestInterface {
             from_probing_up_rx,
@@ -393,10 +473,13 @@ mod tests {
                 (from_probing_to_network_tx, from_network_to_probing_rx),
                 manual_probe_rx,
                 from_probing_up_tx,
-                ImmediateNeighborProber::new(ProberConfig {
-                    interval: cfg.interval,
-                    recheck_threshold: cfg.recheck_threshold,
-                }),
+                ImmediateNeighborProber::new(
+                    ProberConfig {
+                        interval: cfg.interval,
+                        recheck_threshold: cfg.recheck_threshold,
+                    },
+                    store.clone(),
+                ),
                 store,
             )
             .await;
@@ -476,7 +559,7 @@ mod tests {
             let from_probing_to_network_rx = iface.from_probing_to_network_rx;
             let from_network_to_probing_tx = iface.from_network_to_probing_tx;
 
-            let (tx, mut rx) = futures::channel::mpsc::channel::<std::result::Result<Duration, ProbeError>>(128);
+            let (tx, mut rx) = futures::channel::mpsc::channel::<std::result::Result<Duration, ()>>(128);
             manual_probe_tx.send((NEIGHBOURS[0], PingQueryReplier::new(tx))).await?;
 
             let _jh: hopr_async_runtime::prelude::JoinHandle<()> = tokio::spawn(async move {
@@ -490,7 +573,8 @@ mod tests {
 
             let _duration = tokio::time::timeout(std::time::Duration::from_secs(1), rx.next())
                 .await?
-                .ok_or_else(|| anyhow::anyhow!("Probe did not return a result in time"))??;
+                .ok_or_else(|| anyhow::anyhow!("Probe did not return a result in time"))?
+                .map_err(|_| anyhow::anyhow!("Probe failed"))?;
 
             Ok(())
         })
@@ -516,7 +600,7 @@ mod tests {
             let from_probing_to_network_rx = iface.from_probing_to_network_rx;
             let from_network_to_probing_tx = iface.from_network_to_probing_tx;
 
-            let (tx, mut rx) = futures::channel::mpsc::channel::<std::result::Result<Duration, ProbeError>>(128);
+            let (tx, mut rx) = futures::channel::mpsc::channel::<std::result::Result<Duration, ()>>(128);
             manual_probe_tx.send((NEIGHBOURS[0], PingQueryReplier::new(tx))).await?;
 
             let _jh: hopr_async_runtime::prelude::JoinHandle<()> = tokio::spawn(async move {

@@ -33,13 +33,15 @@ pub mod swarm;
 /// P2P behavior definitions for the transport level interactions not related to the HOPR protocol
 mod behavior;
 
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Arc};
 
+use dashmap::DashSet;
 use futures::{AsyncRead, AsyncWrite};
-pub use hopr_api::network::{Health, Observable};
-use hopr_api::network::{NetworkObservations, NetworkView};
-use hopr_transport_network::observation::Observations;
+pub use hopr_api::network::Health;
+use hopr_api::network::{NetworkView, traits::NetworkStreamControl};
 use libp2p::{Multiaddr, PeerId};
+
+mod utils;
 
 pub use crate::{
     behavior::{HoprNetworkBehavior, HoprNetworkBehaviorEvent},
@@ -48,8 +50,8 @@ pub use crate::{
 
 #[derive(Clone)]
 pub struct HoprNetwork {
-    tracker: hopr_transport_network::track::NetworkPeerTracker,
-    store: hopr_transport_network::store::NetworkPeerStore,
+    tracker: Arc<DashSet<PeerId>>,
+    store: Arc<hopr_transport_network::store::NetworkPeerStore>,
     control: libp2p_stream::Control,
     protocol: libp2p::StreamProtocol,
 }
@@ -79,18 +81,16 @@ impl NetworkView for HoprNetwork {
 
     #[inline]
     fn connected_peers(&self) -> HashSet<PeerId> {
-        self.tracker.iter_keys().collect()
+        self.tracker.iter().map(|r| *r).collect()
+    }
+
+    fn is_connected(&self, peer: &PeerId) -> bool {
+        self.tracker.contains(peer)
     }
 
     #[inline]
     fn multiaddress_of(&self, peer: &PeerId) -> Option<HashSet<Multiaddr>> {
         self.store.get(peer)
-    }
-
-    #[allow(refining_impl_trait_reachable)]
-    #[inline]
-    fn observations_for(&self, peer: &PeerId) -> Option<Observations> {
-        self.tracker.get(peer)
     }
 
     fn health(&self) -> Health {
@@ -104,7 +104,7 @@ impl NetworkView for HoprNetwork {
 }
 
 #[async_trait::async_trait]
-impl hopr_transport_protocol::stream::BidirectionalStreamControl for HoprNetwork {
+impl NetworkStreamControl for HoprNetwork {
     fn accept(
         mut self,
     ) -> Result<impl futures::Stream<Item = (PeerId, impl AsyncRead + AsyncWrite + Send)> + Send, impl std::error::Error>
@@ -114,14 +114,5 @@ impl hopr_transport_protocol::stream::BidirectionalStreamControl for HoprNetwork
 
     async fn open(mut self, peer: PeerId) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error> {
         self.control.open_stream(peer, self.protocol).await
-    }
-}
-
-impl NetworkObservations for HoprNetwork {
-    fn update(&self, peer: &PeerId, result: std::result::Result<std::time::Duration, ()>) {
-        self.tracker.alter(peer, |_, mut o| {
-            o.record_probe(result.map_err(|_| ()));
-            o
-        });
     }
 }

@@ -1852,9 +1852,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.5.57"
+version = "4.5.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6899ea499e3fb9305a65d5ebf6e3d2248c5fab291f300ad0a704fbe142eae31a"
+checksum = "63be97961acde393029492ce0be7a1af7e323e6bae9511ebfac33751be5e6806"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -1862,9 +1862,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.5.57"
+version = "4.5.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b12c8b680195a62a8364d16b8447b01b6c2c8f9aaf68bee653be34d4245e238"
+checksum = "7f13174bda5dfd69d7e947827e5af4b0f2f94a4a3ee92912fba07a66150f21e2"
 dependencies = [
  "anstream",
  "anstyle",
@@ -1886,9 +1886,9 @@ dependencies = [
 
 [[package]]
 name = "clap_lex"
-version = "0.7.7"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3e64b0cc0439b12df2fa678eae89a1c56a529fd067a9115f7827f1fffd22b32"
+checksum = "3a822ea5bc7590f9d40f1ba12c0dc3c2760f3482c6984db1573ad11031420831"
 
 [[package]]
 name = "clru"
@@ -4356,6 +4356,7 @@ version = "0.9.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "atomic_enum",
  "auto_impl",
  "chrono",
  "futures",
@@ -4365,6 +4366,7 @@ dependencies = [
  "hopr-internal-types",
  "hopr-network-types",
  "hopr-primitive-types 0.10.0",
+ "libp2p-identity",
  "multiaddr",
  "strum 0.27.2",
  "thiserror 2.0.18",
@@ -4416,7 +4418,6 @@ dependencies = [
  "hex-literal",
  "hopr-api",
  "hopr-async-runtime",
- "hopr-chain-connector",
  "hopr-chain-types",
  "hopr-crypto-random 0.3.0",
  "hopr-crypto-types 0.9.0",
@@ -4625,23 +4626,20 @@ name = "hopr-ct-telemetry"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "async-stream",
- "async-trait",
  "futures",
  "hopr-api",
  "hopr-async-runtime",
  "hopr-crypto-random 0.3.0",
  "hopr-crypto-types 0.9.0",
  "hopr-internal-types",
+ "hopr-network-graph",
  "hopr-network-types",
+ "humantime-serde",
  "lazy_static",
- "mockall",
  "moka",
- "rand 0.8.5",
  "serde",
  "smart-default",
  "tokio",
- "tracing",
  "validator",
 ]
 
@@ -4739,12 +4737,12 @@ dependencies = [
  "anyhow",
  "async-broadcast",
  "async-trait",
- "atomic_enum",
  "backon",
  "cfg-if",
  "cfg_eval",
  "const_format",
  "futures",
+ "futures-concurrency",
  "futures-time",
  "hex-literal",
  "hopr-api",
@@ -4757,14 +4755,16 @@ dependencies = [
  "hopr-ct-telemetry",
  "hopr-db-node",
  "hopr-internal-types",
- "hopr-lib",
  "hopr-metrics",
+ "hopr-network-graph",
  "hopr-network-types",
  "hopr-parallelize",
  "hopr-platform",
  "hopr-primitive-types 0.10.0",
  "hopr-transport",
+ "hopr-transport-p2p",
  "lazy_static",
+ "parking_lot",
  "rand 0.8.5",
  "rstest",
  "serde",
@@ -4787,6 +4787,29 @@ version = "1.3.0"
 dependencies = [
  "anyhow",
  "prometheus",
+]
+
+[[package]]
+name = "hopr-network-graph"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "assertables",
+ "async-trait",
+ "bimap",
+ "futures",
+ "hex-literal",
+ "hopr-api",
+ "hopr-crypto-types 0.9.0",
+ "hopr-internal-types",
+ "hopr-network-types",
+ "hopr-primitive-types 0.10.0",
+ "hopr-statistics",
+ "parking_lot",
+ "petgraph",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -5041,14 +5064,12 @@ dependencies = [
  "cfg-if",
  "futures",
  "futures-concurrency",
- "futures-time",
  "hex-literal",
  "hopr-api",
  "hopr-async-runtime",
  "hopr-crypto-packet",
  "hopr-crypto-random 0.3.0",
  "hopr-crypto-types 0.9.0",
- "hopr-ct-telemetry",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-network-types",
@@ -5060,12 +5081,12 @@ dependencies = [
  "hopr-transport-identity",
  "hopr-transport-mixer",
  "hopr-transport-network",
- "hopr-transport-p2p",
  "hopr-transport-probe",
  "hopr-transport-protocol",
  "hopr-transport-session",
  "humantime-serde",
  "lazy_static",
+ "moka",
  "pcap-file",
  "proc-macro-regex",
  "serde",
@@ -5112,11 +5133,9 @@ name = "hopr-transport-network"
 version = "0.8.1"
 dependencies = [
  "anyhow",
- "assertables",
  "dashmap",
  "hopr-api",
  "hopr-metrics",
- "hopr-statistics",
  "humantime-serde",
  "lazy_static",
  "libp2p-identity",
@@ -5129,8 +5148,10 @@ name = "hopr-transport-p2p"
 version = "0.8.2"
 dependencies = [
  "anyhow",
+ "async-broadcast",
  "async-trait",
  "backon",
+ "dashmap",
  "futures",
  "hopr-api",
  "hopr-crypto-packet",
@@ -5139,7 +5160,6 @@ dependencies = [
  "hopr-metrics",
  "hopr-network-types",
  "hopr-platform",
- "hopr-transport-identity",
  "hopr-transport-network",
  "hopr-transport-probe",
  "hopr-transport-protocol",
@@ -5147,6 +5167,7 @@ dependencies = [
  "libp2p",
  "libp2p-stream",
  "more-asserts",
+ "multiaddr",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -5161,6 +5182,7 @@ dependencies = [
  "futures",
  "futures-concurrency",
  "hex",
+ "hex-literal",
  "hopr-api",
  "hopr-async-runtime",
  "hopr-crypto-packet",
@@ -5174,7 +5196,6 @@ dependencies = [
  "hopr-protocol-app",
  "humantime-serde",
  "lazy_static",
- "libp2p-identity",
  "moka",
  "more-asserts",
  "rand 0.8.5",
@@ -5215,7 +5236,6 @@ dependencies = [
  "hopr-primitive-types 0.10.0",
  "hopr-protocol-app",
  "hopr-protocol-hopr",
- "hopr-transport-identity",
  "hopr-transport-mixer",
  "humantime-serde",
  "lazy_static",
@@ -5315,14 +5335,18 @@ dependencies = [
  "clap",
  "console-subscriber",
  "futures",
+ "futures-concurrency",
  "hex",
  "home",
+ "hopr-api",
  "hopr-chain-connector",
  "hopr-ct-telemetry",
  "hopr-db-node",
  "hopr-lib",
  "hopr-metrics",
+ "hopr-network-graph",
  "hopr-strategy",
+ "hopr-transport-p2p",
  "hopr-utils-session",
  "hoprd-api",
  "humansize",
@@ -5332,6 +5356,7 @@ dependencies = [
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry_sdk",
+ "parking_lot",
  "proc-macro-regex",
  "serde",
  "serde_json",
@@ -5368,6 +5393,8 @@ dependencies = [
  "hopr-db-node",
  "hopr-lib",
  "hopr-metrics",
+ "hopr-network-graph",
+ "hopr-transport-p2p",
  "hopr-utils-session",
  "human-bandwidth",
  "lazy_static",

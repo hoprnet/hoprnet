@@ -1,20 +1,24 @@
-use multiaddr::PeerId;
+use hopr_crypto_types::types::OffchainPublicKey;
 
 #[derive(thiserror::Error, Debug)]
-pub enum TrafficGenerationError<P>
+pub enum NetworkGraphError<P>
 where
     P: MeasurablePath,
 {
     #[error("timed out for near neighbor probe '{0:?}'")]
-    ProbeNeighborTimeout(PeerId),
+    ProbeNeighborTimeout(Box<OffchainPublicKey>),
 
     #[error("timed out for loopback probe")]
     ProbeLoopbackTimeout(P),
 }
 
-/// Measurable neighbor telemetry.
-pub trait MeasurableNeighbor {
-    fn peer(&self) -> &PeerId;
+pub trait MeasurableNode: Into<OffchainPublicKey> {}
+
+impl<T: Into<OffchainPublicKey>> MeasurableNode for T {}
+
+/// Measurable peer attributes.
+pub trait MeasurablePeer {
+    fn peer(&self) -> &OffchainPublicKey;
     fn rtt(&self) -> std::time::Duration;
 }
 
@@ -25,11 +29,28 @@ pub trait MeasurablePath {
     fn timestamp(&self) -> u128;
 }
 
+#[derive(Debug, Copy, Clone)]
+pub struct EdgeCapacityUpdate {
+    pub capacity: Option<u128>,
+    pub src: OffchainPublicKey,
+    pub dest: OffchainPublicKey,
+}
+
+#[derive(Debug)]
+pub enum MeasurableEdge<N, P>
+where
+    N: MeasurablePeer + Clone,
+    P: MeasurablePath + Clone,
+{
+    Probe(std::result::Result<EdgeTransportTelemetry<N, P>, NetworkGraphError<P>>),
+    Capacity(Box<EdgeCapacityUpdate>),
+}
+
 /// Enum representing different types of telemetry data used by the CT mechanism.
 #[derive(Debug, Clone)]
-pub enum Telemetry<N, P>
+pub enum EdgeTransportTelemetry<N, P>
 where
-    N: MeasurableNeighbor + Clone,
+    N: MeasurablePeer + Clone,
     P: MeasurablePath + Clone,
 {
     /// Telemetry data looping the traffic through multiple peers back to self.

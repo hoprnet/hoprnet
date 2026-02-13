@@ -45,10 +45,6 @@ hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 hex-literal = { workspace = true }
-hopr-chain-connector = { workspace = true, features = [
-  "testing",
-  "runtime-tokio",
-] }
 insta = { workspace = true }
 lazy_static = { workspace = true }
 test-log = { workspace = true }

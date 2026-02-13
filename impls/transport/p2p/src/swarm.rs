@@ -1,20 +1,24 @@
-use std::num::NonZeroU8;
+use std::{num::NonZeroU8, sync::Arc};
 
-use futures::{Stream, StreamExt};
-use hopr_network_types::prelude::is_public_address;
-use hopr_transport_identity::{
-    Multiaddr,
-    multiaddrs::{replace_transport_with_unspecified, resolve_dns_if_any},
+use dashmap::DashSet;
+use futures::{FutureExt, Stream, StreamExt};
+use hopr_api::{
+    Multiaddr, OffchainKeypair,
+    network::{NetworkBuilder, PeerDiscovery},
 };
-use hopr_transport_protocol::PeerDiscovery;
+use hopr_network_types::prelude::is_public_address;
 use libp2p::{
-    PeerId, autonat,
+    autonat,
     identity::PublicKey,
     swarm::{NetworkInfo, SwarmEvent},
 };
 use tracing::{debug, error, info, trace, warn};
 
-use crate::{HoprNetwork, HoprNetworkBehavior, HoprNetworkBehaviorEvent, constants, errors::Result};
+use crate::{
+    HoprNetwork, HoprNetworkBehavior, HoprNetworkBehaviorEvent, constants,
+    errors::Result,
+    utils::{replace_transport_with_unspecified, resolve_dns_if_any},
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -93,6 +97,16 @@ impl InactiveNetwork {
         })
     }
 
+    #[cfg(not(feature = "runtime-tokio"))]
+    pub async fn build<T>(_me: libp2p::identity::Keypair, _external_discovery_events: T) -> Result<Self>
+    where
+        T: Stream<Item = PeerDiscovery> + Send + 'static,
+    {
+        Err(crate::errors::P2PError::Libp2p(
+            "InactiveNetwork::build requires the runtime-tokio feature".to_string(),
+        ))
+    }
+
     pub fn with_listen_on(mut self, multiaddresses: Vec<Multiaddr>) -> Result<InactiveConfiguredNetwork> {
         for multiaddress in multiaddresses.iter() {
             match resolve_dns_if_any(multiaddress) {
@@ -145,29 +159,30 @@ pub struct InactiveConfiguredNetwork {
 /// as well as setup all the interconnections with the underlying network views to allow complex
 /// functionality and signalling.
 pub struct HoprLibp2pNetworkBuilder {
-    pub(crate) swarm: libp2p::Swarm<HoprNetworkBehavior>,
-    me: PeerId,
-    my_addresses: Vec<Multiaddr>,
+    subscribtions: (
+        async_broadcast::Sender<hopr_api::network::NetworkEvent>,
+        async_broadcast::InactiveReceiver<hopr_api::network::NetworkEvent>,
+    ),
 }
 
 impl std::fmt::Debug for HoprLibp2pNetworkBuilder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("HoprSwarm").finish()
+        f.debug_struct("HoprSwarmBuilder").finish()
     }
 }
 
-impl From<HoprLibp2pNetworkBuilder> for libp2p::Swarm<HoprNetworkBehavior> {
-    fn from(value: HoprLibp2pNetworkBuilder) -> Self {
-        value.swarm
-    }
-}
+#[async_trait::async_trait]
+impl NetworkBuilder for HoprLibp2pNetworkBuilder {
+    type Network = HoprNetwork;
 
-impl HoprLibp2pNetworkBuilder {
-    pub async fn new<T>(
-        identity: libp2p::identity::Keypair,
-        external_discovery_events: T,
+    async fn build<T>(
+        self,
+        identity: &OffchainKeypair,
         my_multiaddresses: Vec<Multiaddr>,
-    ) -> Self
+        protocol: &'static str,
+        allow_private_addresses: bool,
+        network_discovery_events: T,
+    ) -> std::result::Result<(Self::Network, hopr_api::network::BoxedProcessFn), impl std::error::Error>
     where
         T: Stream<Item = PeerDiscovery> + Send + 'static,
     {
@@ -176,8 +191,9 @@ impl HoprLibp2pNetworkBuilder {
             METRIC_NETWORK_HEALTH.set(0.0);
         }
 
-        let me = identity.public().to_peer_id();
-        let swarm = InactiveNetwork::build(identity, external_discovery_events)
+        let identity_p2p: libp2p::identity::Keypair = identity.into();
+        let me = identity_p2p.public().to_peer_id();
+        let swarm = InactiveNetwork::build(identity_p2p, network_discovery_events)
             .await
             .expect("swarm must be constructible");
 
@@ -185,32 +201,20 @@ impl HoprLibp2pNetworkBuilder {
             .with_listen_on(my_multiaddresses.clone())
             .expect("swarm must be configurable");
 
-        Self {
-            swarm: swarm.swarm,
-            me,
-            my_addresses: my_multiaddresses,
-        }
-    }
-
-    pub fn into_network_with_stream_protocol_process(
-        self,
-        protocol: &'static str,
-        allow_private_addresses: bool,
-    ) -> (HoprNetwork, impl std::future::Future<Output = ()>) {
-        let tracker = hopr_transport_network::track::NetworkPeerTracker::new();
-        let store =
-            hopr_transport_network::store::NetworkPeerStore::new(self.me, self.my_addresses.into_iter().collect());
+        let swarm = swarm.swarm;
+        let store = hopr_transport_network::store::NetworkPeerStore::new(me, my_multiaddresses.into_iter().collect());
+        let tracker: Arc<DashSet<libp2p::PeerId>> = Default::default();
 
         let network = HoprNetwork {
             tracker: tracker.clone(),
-            store: store.clone(),
-            control: self.swarm.behaviour().streams.new_control(),
+            store: Arc::new(store.clone()),
+            control: swarm.behaviour().streams.new_control(),
             protocol: libp2p::StreamProtocol::new(protocol),
         };
 
         #[cfg(all(feature = "prometheus", not(test)))]
         let network_inner = network.clone();
-        let mut swarm = self.swarm;
+        let mut swarm = swarm;
         let process = async move {
             while let Some(event) = swarm.next().await {
                 match event {
@@ -257,7 +261,7 @@ impl HoprLibp2pNetworkBuilder {
                                     } else {
                                         debug!(transport="libp2p", peer = %peer_id, multiaddress = %address, "Private/local peer address encountered")
                                     }
-                                    tracker.add(peer_id);
+                                    tracker.insert(peer_id);
                                 },
                                 libp2p::core::ConnectedPoint::Listener { send_back_addr, .. } => {
                                     if allow_private_addresses || is_public_address(&send_back_addr) {
@@ -267,7 +271,7 @@ impl HoprLibp2pNetworkBuilder {
                                     } else {
                                         debug!(transport="libp2p", peer = %peer_id, multiaddress = %send_back_addr, "Private/local peer address ignored")
                                     }
-                                    tracker.add(peer_id);
+                                    tracker.insert(peer_id);
                                 }
                             }
                         } else {
@@ -394,9 +398,31 @@ impl HoprLibp2pNetworkBuilder {
                     _ => trace!(transport="libp2p", "Unsupported enum option detected")
                 }
             }
-        };
+        }.boxed();
 
-        (network, process)
+        Ok::<_, std::io::Error>((network, Box::new(move || process)))
+    }
+}
+
+impl HoprLibp2pNetworkBuilder {
+    pub fn new() -> Self {
+        let (tx, rx) = async_broadcast::broadcast(1000);
+        Self {
+            subscribtions: (tx, rx.deactivate()),
+        }
+    }
+
+    pub fn subscribe_network_events(
+        &self,
+    ) -> impl futures::Stream<Item = hopr_api::network::NetworkEvent> + Send + Sync + 'static {
+        let rx = self.subscribtions.1.clone();
+        rx.activate()
+    }
+}
+
+impl Default for HoprLibp2pNetworkBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
