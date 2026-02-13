@@ -127,23 +127,3 @@ impl NetworkObservations for HoprNetwork {
         });
     }
 }
-
-impl HoprNetwork {
-    /// Get the packet stats handle for a peer, for use in instrumenting streams.
-    #[cfg(feature = "telemetry")]
-    pub fn get_packet_stats(&self, peer: &PeerId) -> Option<std::sync::Arc<PeerPacketStats>> {
-        self.tracker.get_packet_stats(peer)
-    }
-
-    /// Get a snapshot of packet stats for a specific peer.
-    #[cfg(feature = "telemetry")]
-    pub fn packet_stats_snapshot(&self, peer: &PeerId) -> Option<PeerPacketStatsSnapshot> {
-        self.tracker.packet_stats_snapshot(peer)
-    }
-
-    /// Get packet stats snapshots for all tracked peers.
-    #[cfg(feature = "telemetry")]
-    pub fn all_packet_stats(&self) -> Vec<(PeerId, PeerPacketStatsSnapshot)> {
-        self.tracker.all_packet_stats()
-    }
-}

@@ -318,15 +318,12 @@ where
             .set(transport_network.clone())
             .map_err(|_| HoprTransportError::Api("transport network viewer already set".into()))?;
 
-        #[cfg(feature = "telemetry")]
-        let transport_network_for_stats = transport_network.clone();
-
         let msg_codec = hopr_transport_protocol::HoprBinaryCodec {};
         let (wire_msg_tx, wire_msg_rx) = hopr_transport_protocol::stream::process_stream_protocol(
             msg_codec,
             transport_network.clone(),
             #[cfg(feature = "telemetry")]
-            move |peer| transport_network_for_stats.get_packet_stats(peer),
+            move |_| None, // TODO (@TeeborChoka): please fill this in
         )
         .await?;
 
@@ -695,22 +692,16 @@ where
     #[cfg(feature = "telemetry")]
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_peer_packet_stats(&self, peer: &PeerId) -> errors::Result<Option<PeerPacketStatsSnapshot>> {
-        Ok(self
-            .network
-            .get()
-            .ok_or_else(|| HoprTransportError::Api("transport network is not yet initialized".into()))?
-            .packet_stats_snapshot(peer))
+        // TODO (@TeeborChoka): please fill this in
+        Err(HoprTransportError::Api("not implemented yet".into()).into())
     }
 
     /// Get packet stats for all connected peers.
     #[cfg(feature = "telemetry")]
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_all_packet_stats(&self) -> errors::Result<Vec<(PeerId, PeerPacketStatsSnapshot)>> {
-        Ok(self
-            .network
-            .get()
-            .ok_or_else(|| HoprTransportError::Api("transport network is not yet initialized".into()))?
-            .all_packet_stats())
+        // TODO (@TeeborChoka): please fill this in
+        Err(HoprTransportError::Api("not implemented yet".into()).into())
     }
 }
 

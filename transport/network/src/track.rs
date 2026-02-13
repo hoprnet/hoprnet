@@ -3,15 +3,11 @@ use std::sync::Arc;
 use hopr_api::PeerId;
 
 use super::observation::Observations;
-#[cfg(feature = "telemetry")]
-use super::{PeerPacketStats, PeerPacketStatsSnapshot};
 
 /// Entry containing both observations and packet stats for a peer.
 #[derive(Debug, Default)]
 pub struct PeerEntry {
     pub observations: Observations,
-    #[cfg(feature = "telemetry")]
-    pub packet_stats: Arc<PeerPacketStats>,
 }
 
 /// Tracker of [`Observations`] and packet statistics for network peers.
@@ -75,29 +71,6 @@ impl NetworkPeerTracker {
     #[inline]
     pub fn iter_keys(&self) -> impl Iterator<Item = PeerId> + '_ {
         self.peers.iter().map(|entry| *entry.key())
-    }
-
-    /// Get the packet stats handle for a peer, for use in instrumenting streams.
-    #[cfg(feature = "telemetry")]
-    #[inline]
-    pub fn get_packet_stats(&self, peer: &PeerId) -> Option<Arc<PeerPacketStats>> {
-        self.peers.get(peer).map(|entry| entry.value().packet_stats.clone())
-    }
-
-    /// Get a snapshot of packet stats for a specific peer.
-    #[cfg(feature = "telemetry")]
-    #[inline]
-    pub fn packet_stats_snapshot(&self, peer: &PeerId) -> Option<PeerPacketStatsSnapshot> {
-        self.peers.get(peer).map(|entry| entry.value().packet_stats.snapshot())
-    }
-
-    /// Get packet stats snapshots for all tracked peers.
-    #[cfg(feature = "telemetry")]
-    pub fn all_packet_stats(&self) -> Vec<(PeerId, PeerPacketStatsSnapshot)> {
-        self.peers
-            .iter()
-            .map(|entry| (*entry.key(), entry.value().packet_stats.snapshot()))
-            .collect()
     }
 }
 
@@ -171,87 +144,5 @@ mod tests {
         assert!(tracker.get(&peer).is_none());
 
         Ok(())
-    }
-
-    #[cfg(feature = "telemetry")]
-    #[test]
-    fn peer_tracker_should_provide_packet_stats_for_tracked_peer() -> anyhow::Result<()> {
-        let tracker = NetworkPeerTracker::new();
-        let peer = PeerId::random();
-
-        tracker.add(peer);
-
-        let stats = tracker.get_packet_stats(&peer).context("should contain packet stats")?;
-        stats.record_packet_out(100);
-        stats.record_packet_in(50);
-
-        let snapshot = tracker
-            .packet_stats_snapshot(&peer)
-            .context("should contain snapshot")?;
-        insta::assert_yaml_snapshot!(snapshot);
-
-        Ok(())
-    }
-
-    #[cfg(feature = "telemetry")]
-    #[test]
-    fn peer_tracker_should_return_none_for_packet_stats_of_untracked_peer() {
-        let tracker = NetworkPeerTracker::new();
-        let peer = PeerId::random();
-
-        assert!(tracker.get_packet_stats(&peer).is_none());
-        assert!(tracker.packet_stats_snapshot(&peer).is_none());
-    }
-
-    #[cfg(feature = "telemetry")]
-    #[test]
-    fn peer_tracker_should_reset_packet_stats_on_remove_and_readd() -> anyhow::Result<()> {
-        let tracker = NetworkPeerTracker::new();
-        let peer = PeerId::random();
-
-        tracker.add(peer);
-        let stats = tracker.get_packet_stats(&peer).context("should contain stats")?;
-        stats.record_packet_out(1000);
-
-        let before_snapshot = tracker.packet_stats_snapshot(&peer).context("should have snapshot")?;
-        insta::assert_yaml_snapshot!("before_remove", before_snapshot);
-
-        tracker.remove(&peer);
-        tracker.add(peer);
-
-        let after_snapshot = tracker
-            .packet_stats_snapshot(&peer)
-            .context("should have new snapshot")?;
-        insta::assert_yaml_snapshot!("after_readd", after_snapshot);
-
-        Ok(())
-    }
-
-    #[cfg(feature = "telemetry")]
-    #[test]
-    fn peer_tracker_all_packet_stats_should_return_all_peers() {
-        let tracker = NetworkPeerTracker::new();
-        let peer1 = PeerId::random();
-        let peer2 = PeerId::random();
-
-        tracker.add(peer1);
-        tracker.add(peer2);
-
-        if let Some(stats) = tracker.get_packet_stats(&peer1) {
-            stats.record_packet_out(100);
-        }
-        if let Some(stats) = tracker.get_packet_stats(&peer2) {
-            stats.record_packet_in(200);
-        }
-
-        let mut all_stats = tracker.all_packet_stats();
-        assert_eq!(all_stats.len(), 2);
-
-        // Sort by bytes_out descending so peer1 (100 bytes out) comes first,
-        // giving us a deterministic order regardless of DashMap iteration.
-        all_stats.sort_by(|(_, a), (_, b)| b.bytes_out.cmp(&a.bytes_out));
-
-        let snapshots: Vec<_> = all_stats.iter().map(|(_, s)| s).collect();
-        insta::assert_yaml_snapshot!(snapshots);
     }
 }
