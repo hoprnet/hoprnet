@@ -5,12 +5,11 @@ use hopr_lib::{
     HoprBalance, RoutingOptions, SessionCapabilities, SessionClientConfig, SessionTarget, SurbBalancerConfig,
     errors::{HoprLibError, HoprTransportError},
     exports::transport::session::{IpOrHost, SealedHost},
-    testing::{
-        fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster},
-        hopr::ChannelGuard,
-    },
 };
-use hopr_primitive_types::bounded::BoundedVec;
+use hopr_reference::testing::{
+    fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster},
+    hopr::ChannelGuard,
+};
 use rstest::*;
 use serial_test::serial;
 use tokio::time::sleep;
@@ -99,7 +98,9 @@ async fn test_session_surb_balancer_config(cluster: &ClusterGuard) -> anyhow::Re
     };
 
     let ip = IpOrHost::from_str(":0")?;
-    let routing = RoutingOptions::IntermediatePath(BoundedVec::from_iter(std::iter::once(mid.address().into())));
+    let routing = RoutingOptions::IntermediatePath(
+        hopr_lib::exports::types::primitive::bounded::BoundedVec::from_iter(std::iter::once(mid.address().into())),
+    );
 
     let session = src
         .inner()

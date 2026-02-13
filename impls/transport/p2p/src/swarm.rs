@@ -1,11 +1,8 @@
 use std::{num::NonZeroU8, sync::Arc};
 
 use dashmap::DashSet;
-use futures::{FutureExt, Stream, StreamExt};
-use hopr_api::{
-    Multiaddr, OffchainKeypair,
-    network::{NetworkBuilder, PeerDiscovery},
-};
+use futures::{FutureExt, Stream, StreamExt, stream::BoxStream};
+use hopr_api::{Multiaddr, OffchainKeypair, network::NetworkBuilder};
 use hopr_network_types::prelude::is_public_address;
 use libp2p::{
     autonat,
@@ -14,6 +11,8 @@ use libp2p::{
 };
 use tracing::{debug, error, info, trace, warn};
 
+#[cfg(feature = "runtime-tokio")]
+use crate::PeerDiscovery;
 use crate::{
     HoprNetwork, HoprNetworkBehavior, HoprNetworkBehaviorEvent, constants,
     errors::Result,
@@ -43,10 +42,10 @@ pub struct InactiveNetwork {
 /// Returns a built [libp2p::Swarm] object implementing the HoprNetworkBehavior functionality.
 impl InactiveNetwork {
     #[cfg(feature = "runtime-tokio")]
-    pub async fn build<T>(me: libp2p::identity::Keypair, external_discovery_events: T) -> Result<Self>
-    where
-        T: Stream<Item = PeerDiscovery> + Send + 'static,
-    {
+    pub async fn build(
+        me: libp2p::identity::Keypair,
+        external_discovery_events: BoxStream<'static, PeerDiscovery>,
+    ) -> Result<Self> {
         let me_public: PublicKey = me.public();
 
         let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
@@ -163,11 +162,32 @@ pub struct HoprLibp2pNetworkBuilder {
         async_broadcast::Sender<hopr_api::network::NetworkEvent>,
         async_broadcast::InactiveReceiver<hopr_api::network::NetworkEvent>,
     ),
+    bootstrap: std::pin::Pin<Box<dyn Stream<Item = PeerDiscovery> + Send + Sync>>,
+}
+
+impl HoprLibp2pNetworkBuilder {
+    pub fn new<T>(bootstrap: T) -> Self
+    where
+        T: Stream<Item = PeerDiscovery> + Send + Sync + 'static,
+    {
+        let (tx, rx) = async_broadcast::broadcast(1000);
+        Self {
+            subscribtions: (tx, rx.deactivate()),
+            bootstrap: Box::pin(bootstrap),
+        }
+    }
+
+    pub fn subscribe_network_events(
+        &self,
+    ) -> impl futures::Stream<Item = hopr_api::network::NetworkEvent> + Send + Sync + 'static {
+        let rx = self.subscribtions.1.clone();
+        rx.activate()
+    }
 }
 
 impl std::fmt::Debug for HoprLibp2pNetworkBuilder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("HoprSwarmBuilder").finish()
+        f.debug_struct("HoprSwarmBuilder").finish_non_exhaustive()
     }
 }
 
@@ -175,17 +195,13 @@ impl std::fmt::Debug for HoprLibp2pNetworkBuilder {
 impl NetworkBuilder for HoprLibp2pNetworkBuilder {
     type Network = HoprNetwork;
 
-    async fn build<T>(
+    async fn build(
         self,
         identity: &OffchainKeypair,
         my_multiaddresses: Vec<Multiaddr>,
         protocol: &'static str,
         allow_private_addresses: bool,
-        network_discovery_events: T,
-    ) -> std::result::Result<(Self::Network, hopr_api::network::BoxedProcessFn), impl std::error::Error>
-    where
-        T: Stream<Item = PeerDiscovery> + Send + 'static,
-    {
+    ) -> std::result::Result<(Self::Network, hopr_api::network::BoxedProcessFn), impl std::error::Error> {
         #[cfg(all(feature = "prometheus", not(test)))]
         {
             METRIC_NETWORK_HEALTH.set(0.0);
@@ -193,7 +209,7 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
 
         let identity_p2p: libp2p::identity::Keypair = identity.into();
         let me = identity_p2p.public().to_peer_id();
-        let swarm = InactiveNetwork::build(identity_p2p, network_discovery_events)
+        let swarm = InactiveNetwork::build(identity_p2p, self.bootstrap)
             .await
             .expect("swarm must be constructible");
 
@@ -401,28 +417,6 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
         }.boxed();
 
         Ok::<_, std::io::Error>((network, Box::new(move || process)))
-    }
-}
-
-impl HoprLibp2pNetworkBuilder {
-    pub fn new() -> Self {
-        let (tx, rx) = async_broadcast::broadcast(1000);
-        Self {
-            subscribtions: (tx, rx.deactivate()),
-        }
-    }
-
-    pub fn subscribe_network_events(
-        &self,
-    ) -> impl futures::Stream<Item = hopr_api::network::NetworkEvent> + Send + Sync + 'static {
-        let rx = self.subscribtions.1.clone();
-        rx.activate()
-    }
-}
-
-impl Default for HoprLibp2pNetworkBuilder {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

@@ -2,7 +2,7 @@
 name = "hopr-lib"
 version = "4.1.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-edition = "2021"
+edition = "2024"
 description = "HOPR library containing the entire functionality importable without the HOPRd daemon"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
@@ -19,14 +19,12 @@ prometheus = [
   "dep:hopr-metrics",
   "hopr-transport/prometheus",
   "hopr-network-types/prometheus",
-  "hopr-db-node/prometheus",
 ]
 runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hopr-network-types/runtime-tokio",
   "hopr-transport/runtime-tokio",
   "dep:tokio",
-  "hopr-chain-connector?/runtime-tokio",
 ]
 serde = [
   "dep:cfg_eval",
@@ -49,20 +47,7 @@ utils_parallel = [] # utility parallelization functionality
 testing = [
   "session-server",
   "session-client",
-  "dep:futures-concurrency",
-  "dep:parking_lot",
-  "dep:rand",
-  "dep:rstest",
   "dep:tokio",
-  "dep:tokio-util",
-  "dep:hex-literal",
-  "dep:hopr-db-node",
-  "dep:hopr-chain-connector",
-  "hopr-chain-connector/testing",
-  "dep:hopr-ct-telemetry",
-  "dep:hopr-network-graph",
-  "dep:hopr-transport-p2p",
-  "hopr-transport-p2p/runtime-tokio",
 ] # testing related functionality
 
 [dependencies]
@@ -74,30 +59,23 @@ cfg_eval = { workspace = true, optional = true }
 cfg-if = { workspace = true }
 const_format = { workspace = true }
 futures = { workspace = true }
-futures-concurrency = { workspace = true, optional = true }
 futures-time = { workspace = true }
-hex-literal = { workspace = true, optional = true }
 lazy_static = { workspace = true }
-parking_lot = { workspace = true, optional = true }
-rand = { workspace = true, optional = true }
-rstest = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_with = { workspace = true, optional = true }
 strum = { workspace = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
-tokio-util = { workspace = true, features = ["compat"], optional = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
-hopr-api = { workspace = true, features = ["ct", "node"] }
+hopr-api = { workspace = true, features = ["full"] }
 hopr-async-runtime = { workspace = true }
 hopr-chain-types = { workspace = true }
 hopr-crypto-keypair = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-db-node = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true }
@@ -105,18 +83,7 @@ hopr-parallelize = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-transport = { workspace = true }
-hopr-chain-connector = { workspace = true, optional = true }
-hopr-ct-telemetry = { workspace = true, optional = true }
-hopr-network-graph = { workspace = true, optional = true }
-hopr-transport-p2p = { workspace = true, optional = true }
 
 [dev-dependencies]
-hex-literal = { workspace = true }
-rand = { workspace = true }
-rstest = { workspace = true }
-serial_test = { workspace = true }
 serde_yaml = { workspace = true }
 tokio = { workspace = true }
-test-log = { workspace = true }
-
-hopr-db-node = { workspace = true, features = ["runtime-tokio"] }

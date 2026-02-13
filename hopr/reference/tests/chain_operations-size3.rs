@@ -2,14 +2,11 @@ use std::{ops::Mul, time::Duration};
 
 use anyhow::Context;
 use hopr_chain_connector::blokli_client::BlokliQueryClient;
-use hopr_lib::{
-    ChannelId, ChannelStatus, HoprBalance, HoprNodeChainOperations,
-    testing::{
-        fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster},
-        hopr::ChannelGuard,
-    },
+use hopr_lib::{Address, BytesRepresentable, ChannelId, ChannelStatus, HoprBalance, HoprNodeChainOperations};
+use hopr_reference::testing::{
+    fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster},
+    hopr::ChannelGuard,
 };
-use hopr_primitive_types::prelude::{Address, BytesRepresentable};
 use rstest::*;
 use serial_test::serial;
 use tokio::time::sleep;

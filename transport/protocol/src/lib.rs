@@ -25,7 +25,6 @@ mod pipeline;
 pub mod stream;
 
 use hopr_api::PeerId;
-pub use hopr_api::network::PeerDiscovery;
 pub use pipeline::{
     AcknowledgementPipelineConfig, PacketPipelineConfig, PacketPipelineProcesses, TicketEvent, run_packet_pipeline,
 };

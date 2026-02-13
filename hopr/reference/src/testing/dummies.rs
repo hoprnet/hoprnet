@@ -1,7 +1,6 @@
 use futures::AsyncReadExt;
+use hopr_lib::{IncomingSession, errors::HoprLibError, traits::session::HoprSessionServer};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, FuturesAsyncWriteCompatExt};
-
-use crate::{IncomingSession, errors::HoprLibError, traits::session::HoprSessionServer};
 
 #[derive(Debug, Clone)]
 pub struct EchoServer {}

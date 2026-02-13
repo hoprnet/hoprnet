@@ -4,12 +4,11 @@ use std::str::FromStr;
 use hopr_lib::{
     HoprBalance, RoutingOptions, SessionCapabilities, SessionClientConfig, SessionTarget,
     exports::transport::session::{IpOrHost, SealedHost},
-    testing::{
-        fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster},
-        hopr::ChannelGuard,
-    },
 };
-use hopr_primitive_types::bounded::BoundedVec;
+use hopr_reference::testing::{
+    fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster},
+    hopr::ChannelGuard,
+};
 use rstest::*;
 use serial_test::serial;
 
@@ -49,7 +48,9 @@ async fn test_create_n_hop_session(cluster: &ClusterGuard, #[case] hops: usize) 
         (RoutingOptions::Hops(0_u32.try_into()?), SessionCapabilities::empty())
     } else {
         (
-            RoutingOptions::IntermediatePath(BoundedVec::from_iter(mid.iter().map(|node| node.address().into()))),
+            RoutingOptions::IntermediatePath(hopr_lib::exports::types::primitive::bounded::BoundedVec::from_iter(
+                mid.iter().map(|node| node.address().into()),
+            )),
             SessionCapabilities::default(),
         )
     };

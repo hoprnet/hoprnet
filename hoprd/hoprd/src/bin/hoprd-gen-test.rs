@@ -8,7 +8,8 @@ use hopr_chain_connector::{
     reexports::hopr_chain_types::exports::alloy::hex,
 };
 use hopr_lib::{ChainKeypair, HoprKeys, Keypair, SafeModule, XDaiBalance, crypto_traits::Randomizable};
-use hoprd::config::{Db, HoprdConfig, Identity, SessionIpForwardingConfig, UserHoprLibConfig};
+use hopr_reference::config::SessionIpForwardingConfig;
+use hoprd::config::{Db, HoprdConfig, Identity, UserHoprLibConfig};
 use hoprd_api::config::{Api, Auth};
 
 /// Tool used to generate test node Safes and hoprd configuration files.

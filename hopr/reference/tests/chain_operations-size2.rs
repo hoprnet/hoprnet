@@ -1,11 +1,8 @@
 use anyhow::Context;
-use hopr_internal_types::prelude::WinningProbability;
-use hopr_lib::{
-    HoprBalance, HoprNodeChainOperations, WxHOPR, XDai, XDaiBalance,
-    testing::fixtures::{
-        ClusterGuard, DEFAULT_SAFE_ALLOWANCE, INITIAL_NODE_NATIVE, INITIAL_NODE_TOKEN, INITIAL_SAFE_NATIVE,
-        INITIAL_SAFE_TOKEN, MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, size_2_cluster_fixture as cluster,
-    },
+use hopr_lib::{HoprBalance, HoprNodeChainOperations, WinningProbability, WxHOPR, XDai, XDaiBalance};
+use hopr_reference::testing::fixtures::{
+    ClusterGuard, DEFAULT_SAFE_ALLOWANCE, INITIAL_NODE_NATIVE, INITIAL_NODE_TOKEN, INITIAL_SAFE_NATIVE,
+    INITIAL_SAFE_TOKEN, MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, size_2_cluster_fixture as cluster,
 };
 use rstest::*;
 

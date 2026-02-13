@@ -1,9 +1,5 @@
 {
   "permissions": {
-    "allow": [
-      "Bash(cargo check:*)",
-      "Bash(cargo test:*)",
-      "Bash(find:*)"
-    ]
+    "allow": ["Bash(cargo check:*)", "Bash(cargo test:*)", "Bash(find:*)"]
   }
 }

@@ -29,9 +29,6 @@ pub mod utils;
 /// Public traits for interactions with this library.
 pub mod traits;
 
-#[cfg(any(feature = "testing", test))]
-pub mod testing;
-
 pub use hopr_api as api;
 
 /// Exports of libraries necessary for API and interface operations.
@@ -90,16 +87,13 @@ use hopr_api::{
     chain::{AccountSelector, AnnouncementError, ChannelSelector, *},
     ct::ProbingTrafficGeneration,
     db::{HoprNodeDbApi, TicketMarker, TicketSelector},
-    node::{
-        ChainInfo, CloseChannelResult, OpenChannelResult, SafeModuleConfig,
-        state::{AtomicHoprState, HoprState},
-    },
+    node::{ChainInfo, CloseChannelResult, OpenChannelResult, SafeModuleConfig, state::AtomicHoprState},
 };
 pub use hopr_api::{
     db::ChannelTicketStatistics,
     graph::EdgeLinkObservable,
     network::{NetworkBuilder, NetworkStreamControl},
-    node::{HoprNodeChainOperations, HoprNodeNetworkOperations, HoprNodeOperations},
+    node::{HoprNodeChainOperations, HoprNodeNetworkOperations, HoprNodeOperations, state::HoprState},
 };
 use hopr_async_runtime::prelude::spawn;
 pub use hopr_async_runtime::{Abortable, AbortableList};
@@ -132,8 +126,6 @@ pub enum HoprLibProcess {
     SessionServer,
     #[strum(to_string = "ticket redemption queue driver")]
     TicketRedemptions,
-    #[strum(to_string = "subscription for on-chain account announcements")]
-    AccountAnnouncements,
     #[strum(to_string = "subscription for on-chain channel updates")]
     ChannelEvents,
     #[strum(to_string = "on received ticket event (winning or rejected)")]
@@ -434,66 +426,16 @@ where
             )));
         }
 
-        // Calculate the minimum capacity based on accounts (each account can generate 2 messages),
-        // plus 100 as an additional buffer
-        let minimum_capacity = self
-            .chain_api
-            .count_accounts(AccountSelector {
-                public_only: true,
-                ..Default::default()
-            })
-            .await
-            .map_err(HoprLibError::chain)?
-            .saturating_mul(2)
-            .saturating_add(100);
-
-        let chain_discovery_events_capacity = std::env::var("HOPR_INTERNAL_CHAIN_DISCOVERY_CHANNEL_CAPACITY")
-            .ok()
-            .and_then(|s| s.trim().parse::<usize>().ok())
-            .filter(|&c| c > 0)
-            .unwrap_or(2048)
-            .max(minimum_capacity);
-
-        debug!(
-            capacity = chain_discovery_events_capacity,
-            minimum_required = minimum_capacity,
-            "creating chain discovery events channel"
-        );
-        let (indexer_peer_update_tx, indexer_peer_update_rx) =
-            channel::<PeerDiscovery>(chain_discovery_events_capacity);
-
-        self.state
-            .store(HoprState::SubscribingToAnnouncements, Ordering::Relaxed);
-
-        // Stream all the existing announcements and also subscribe to all future on-chain
-        // announcements
-        let (announcements_stream, announcements_handle) = futures::stream::abortable(
-            self.chain_api
-                .subscribe_with_state_sync([StateSyncOptions::PublicAccounts])
-                .map_err(HoprLibError::chain)?,
-        );
-        processes.insert(HoprLibProcess::AccountAnnouncements, announcements_handle);
-
-        spawn(
-            announcements_stream
-                .filter_map(|event| {
-                    futures::future::ready(event.try_as_announcement().map(|account| {
-                        PeerDiscovery::Announce(account.public_key.into(), account.get_multiaddrs().to_vec())
-                    }))
-                })
-                .map(Ok)
-                .forward(indexer_peer_update_tx)
-                .inspect(
-                    |_| warn!(task = %HoprLibProcess::AccountAnnouncements,"long-running background task finished"),
-                ),
-        );
+        self.state.store(HoprState::CheckingOnchainAddress, Ordering::Relaxed);
 
         info!(peer_id = %self.me_peer_id(), address = %self.me_onchain(), version = constants::APP_VERSION, "Node information");
 
         let safe_addr = self.cfg.safe_module.safe_address;
 
         if self.me_onchain() == safe_addr {
-            return Err(HoprLibError::GeneralError("cannot self as staking safe address".into()));
+            return Err(HoprLibError::GeneralError(
+                "cannot use self as staking safe address".into(),
+            ));
         }
 
         self.state.store(HoprState::RegisteringSafe, Ordering::Relaxed);
@@ -672,13 +614,7 @@ where
         info!("starting transport");
         let (hopr_socket, transport_processes) = self
             .transport_api
-            .run(
-                cover_traffic,
-                network_builder,
-                indexer_peer_update_rx,
-                tickets_tx,
-                session_tx,
-            )
+            .run(cover_traffic, network_builder, tickets_tx, session_tx)
             .await?;
         processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
 

@@ -8,10 +8,10 @@ use futures::{
     SinkExt, StreamExt,
     channel::mpsc::{Receiver, Sender},
 };
-use hopr_api::network::{NetworkBuilder, PeerDiscovery};
+use hopr_api::network::NetworkBuilder;
 use hopr_crypto_types::{keypairs::Keypair, prelude::OffchainKeypair};
 use hopr_platform::time::native::current_time;
-use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork};
+use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork, PeerDiscovery};
 use hopr_transport_probe::ping::PingQueryReplier;
 use lazy_static::lazy_static;
 
@@ -56,14 +56,13 @@ async fn build_p2p_swarm(
     };
     let multiaddress = Multiaddr::from_str(&multiaddress).context("failed to create a valid multiaddress")?;
 
-    let network_builder = HoprLibp2pNetworkBuilder::new();
+    let network_builder = HoprLibp2pNetworkBuilder::new(transport_updates_rx);
     let (network, process) = network_builder
         .build(
             &random_keypair,
             vec![multiaddress.clone()],
             hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL,
             true,
-            transport_updates_rx,
         )
         .await
         .map_err(|e| anyhow::anyhow!("failed to build network: {e}"))?;
