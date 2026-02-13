@@ -62,8 +62,13 @@ async fn build_p2p_swarm(
         swarm.into_network_with_stream_protocol_process(hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL, true);
 
     let msg_codec = hopr_transport_protocol::HoprBinaryCodec {};
-    let (wire_msg_tx, wire_msg_rx) =
-        hopr_transport_protocol::stream::process_stream_protocol(msg_codec, network.clone()).await?;
+    let (wire_msg_tx, wire_msg_rx) = hopr_transport_protocol::stream::process_stream_protocol(
+        msg_codec,
+        network.clone(),
+        #[cfg(feature = "telemetry")]
+        move |_| None,
+    )
+    .await?;
 
     let api = Interface {
         me: peer_id,

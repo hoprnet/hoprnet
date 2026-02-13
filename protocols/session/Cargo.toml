@@ -1,6 +1,6 @@
 [package]
 name = "hopr-protocol-session"
-version = "1.0.3"
+version = "1.1.0"
 edition = "2024"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains implementation of Session protocol according to HOPR RFC-0007"
@@ -11,6 +11,7 @@ license = "GPL-3.0-only"
 [features]
 default = ["hashbrown"]
 serde = ["dep:serde", "dep:serde_bytes", "hopr-crypto-packet/serde"]
+telemetry = ["dep:auto_impl"]
 runtime-tokio = ["dep:tokio", "hopr-async-runtime/runtime-tokio"]
 hashbrown = ["dep:hashbrown"]
 prometheus = ["dep:hopr-metrics", "dep:lazy_static"]
@@ -26,6 +27,7 @@ allocator-jemalloc = [
 [dependencies]
 aquamarine = { workspace = true }
 asynchronous-codec = { workspace = true }
+auto_impl = { workspace = true, optional = true }
 bitvec = { workspace = true }
 bytes = { workspace = true }
 dashmap = { workspace = true }
@@ -56,8 +58,11 @@ anyhow = { workspace = true }
 clap = { workspace = true }
 criterion = { workspace = true }
 hex-literal = { workspace = true }
+insta = { workspace = true }
+indexmap = { workspace = true }
 mockall = { workspace = true }
 parameterized = { workspace = true }
+serde = { workspace = true }
 rand = { workspace = true }
 test-log = { workspace = true, features = ["trace"] }
 tokio = { workspace = true, features = ["io-util", "io-std", "net", "signal"] }

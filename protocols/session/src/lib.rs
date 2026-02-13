@@ -39,10 +39,14 @@ mod protocol;
 mod socket;
 pub(crate) mod utils;
 
+pub use processing::types::FrameInspector;
+pub use protocol::{FrameAcknowledgements, FrameId, Segment, SegmentId, SegmentRequest, SeqIndicator};
+#[cfg(feature = "telemetry")]
+pub use socket::telemetry::{NoopTracker, SessionMessageDiscriminants, SessionTelemetryTracker};
 pub use socket::{
     SessionSocket, SessionSocketConfig,
     ack_state::{AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig},
-    state::{SocketState, Stateless},
+    state::{SocketComponents, SocketState, Stateless},
 };
 
 // Enable exports of additional Session protocol types
@@ -75,7 +79,14 @@ pub trait SessionSocketExt: futures::io::AsyncRead + futures::io::AsyncWrite + S
     where
         Self: Sized + 'static,
     {
-        SessionSocket::new(self, ack, cfg)
+        #[cfg(feature = "telemetry")]
+        {
+            SessionSocket::new(self, ack, cfg, NoopTracker)
+        }
+        #[cfg(not(feature = "telemetry"))]
+        {
+            SessionSocket::new(self, ack, cfg)
+        }
     }
 
     /// Runs [unreliable](UnreliableSocket) Session protocol on self.
@@ -87,7 +98,14 @@ pub trait SessionSocketExt: futures::io::AsyncRead + futures::io::AsyncWrite + S
     where
         Self: Sized + 'static,
     {
-        SessionSocket::new_stateless(id, self, cfg)
+        #[cfg(feature = "telemetry")]
+        {
+            SessionSocket::new_stateless(id, self, cfg, NoopTracker)
+        }
+        #[cfg(not(feature = "telemetry"))]
+        {
+            SessionSocket::new_stateless(id, self, cfg)
+        }
     }
 }
 
