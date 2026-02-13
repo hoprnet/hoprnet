@@ -22,10 +22,11 @@
 //! For details on default parameters see [AutoFundingStrategyConfig].
 use std::{
     fmt::{Debug, Display, Formatter},
-    time::Duration,
+    sync::Arc,
 };
 
 use async_trait::async_trait;
+use dashmap::DashSet;
 use futures::StreamExt;
 use hopr_lib::{
     ChannelChange, ChannelDirection, ChannelEntry, ChannelId, ChannelStatus, ChannelStatusDiscriminants, HoprBalance,
@@ -78,10 +79,6 @@ pub struct AutoFundingStrategyConfig {
     pub funding_amount: HoprBalance,
 }
 
-/// How long an in-flight entry is considered valid before it expires.
-/// Guards against funding transactions that are lost or dropped from the mempool.
-const IN_FLIGHT_TTL: Duration = Duration::from_secs(300);
-
 /// The `AutoFundingStrategy` automatically funds a channel that
 /// dropped its staked balance below the configured threshold.
 ///
@@ -90,11 +87,11 @@ const IN_FLIGHT_TTL: Duration = Duration::from_secs(300);
 pub struct AutoFundingStrategy<A> {
     hopr_chain_actions: A,
     cfg: AutoFundingStrategyConfig,
-    /// Channels with in-flight funding transactions. Entries expire after
-    /// [`IN_FLIGHT_TTL`] to guard against lost transactions. They are also
-    /// explicitly removed when a balance increase is observed or when
-    /// `on_tick` finds the balance above threshold.
-    in_flight: moka::future::Cache<ChannelId, ()>,
+    /// Channels with in-flight funding transactions. Entries are removed when:
+    /// - The spawned confirmation task observes a tx failure,
+    /// - A balance increase is observed via `on_own_channel_changed`, or
+    /// - `on_tick` finds the balance above threshold.
+    in_flight: Arc<DashSet<ChannelId>>,
 }
 
 impl<A: ChainReadChannelOperations + ChainWriteChannelOperations> AutoFundingStrategy<A> {
@@ -110,10 +107,7 @@ impl<A: ChainReadChannelOperations + ChainWriteChannelOperations> AutoFundingStr
         Self {
             cfg,
             hopr_chain_actions,
-            in_flight: moka::future::Cache::builder()
-                .time_to_live(IN_FLIGHT_TTL)
-                .max_capacity(10_000)
-                .build(),
+            in_flight: Arc::new(DashSet::new()),
         }
     }
 
@@ -123,15 +117,11 @@ impl<A: ChainReadChannelOperations + ChainWriteChannelOperations> AutoFundingStr
     async fn try_fund_channel(&self, channel: &ChannelEntry) -> crate::errors::Result<()> {
         let channel_id = *channel.get_id();
 
-        // Skip channels with a valid (non-expired) in-flight entry.
-        if self.in_flight.get(&channel_id).await.is_some() {
+        // Atomically check and mark as in-flight
+        if !self.in_flight.insert(channel_id) {
             debug!(%channel, "skipping channel with in-flight funding");
             return Ok(());
         }
-
-        // Mark as in-flight before the async funding call to prevent
-        // concurrent duplicate funding.
-        self.in_flight.insert(channel_id, ()).await;
 
         info!(
             %channel,
@@ -146,20 +136,33 @@ impl<A: ChainReadChannelOperations + ChainWriteChannelOperations> AutoFundingStr
             .await
             .map_err(|e| StrategyError::Other(e.into()));
 
-        // Drop the confirmation future (BoxFuture) before channel_id goes out of scope.
-        let funded = fund_result.map(|_rx| ());
-
-        match funded {
-            Ok(()) => {
+        match fund_result {
+            Ok(confirmation) => {
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_COUNT_AUTO_FUNDINGS.increment();
 
                 info!(%channel, amount = %self.cfg.funding_amount, "issued re-staking of channel");
+
+                // Spawn a background task to track the confirmation outcome.
+                // On failure, clear the in-flight entry so the channel can be retried.
+                let in_flight = self.in_flight.clone();
+                hopr_async_runtime::prelude::spawn(async move {
+                    if let Err(e) = confirmation.await {
+                        warn!(%channel_id, error = %e, "funding transaction failed");
+                        in_flight.remove(&channel_id);
+
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        METRIC_COUNT_AUTO_FUNDING_FAILURES.increment();
+                    }
+                    // On success: the ChannelBalanceIncreased event will clear the
+                    // in-flight entry via on_own_channel_changed.
+                });
+
                 Ok(())
             }
             Err(e) => {
-                // Funding failed; remove from in-flight so it can be retried.
-                self.in_flight.remove(&channel_id).await;
+                // Enqueuing failed; remove from in-flight so it can be retried.
+                self.in_flight.remove(&channel_id);
 
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_COUNT_AUTO_FUNDING_FAILURES.increment();
@@ -212,7 +215,7 @@ impl<A: ChainReadChannelOperations + ChainWriteChannelOperations + Send + Sync> 
                 }
             } else {
                 // Channel is above threshold; clear any stale in-flight entry
-                self.in_flight.remove(channel.get_id()).await;
+                self.in_flight.remove(channel.get_id());
             }
         }
 
@@ -234,7 +237,7 @@ impl<A: ChainReadChannelOperations + ChainWriteChannelOperations + Send + Sync> 
         if let ChannelChange::Balance { left: old, right: new } = change {
             // If balance increased, clear in-flight state for this channel
             if new > old {
-                if self.in_flight.remove(channel.get_id()).await.is_some() {
+                if self.in_flight.remove(channel.get_id()).is_some() {
                     debug!(%channel, "cleared in-flight funding state after balance increase");
                 }
             }
@@ -507,10 +510,10 @@ mod tests {
         )
         .await?;
 
-        // Verify the channel is in the in-flight cache
+        // Verify the channel is in the in-flight set
         assert!(
-            afs.in_flight.get(c1.get_id()).await.is_some(),
-            "channel should be in the in-flight cache after funding"
+            afs.in_flight.contains(c1.get_id()),
+            "channel should be in the in-flight set after funding"
         );
 
         // Second call with same balance should be skipped due to in-flight tracking.
@@ -525,12 +528,11 @@ mod tests {
         )
         .await?;
 
-        // The in-flight cache should still contain exactly one entry (unchanged)
-        afs.in_flight.run_pending_tasks().await;
-        assert_eq!(afs.in_flight.entry_count(), 1, "in-flight cache should still have exactly one entry");
+        // The in-flight set should still contain exactly one entry (unchanged)
+        assert_eq!(afs.in_flight.len(), 1, "in-flight set should still have exactly one entry");
         assert!(
-            afs.in_flight.get(c1.get_id()).await.is_some(),
-            "channel should still be in the in-flight cache"
+            afs.in_flight.contains(c1.get_id()),
+            "channel should still be in the in-flight set"
         );
 
         Ok(())
@@ -585,7 +587,7 @@ mod tests {
         .await?;
 
         // Verify channel is in-flight
-        assert!(afs.in_flight.get(c1.get_id()).await.is_some());
+        assert!(afs.in_flight.contains(c1.get_id()));
 
         // Simulate balance increase event (funding confirmed)
         let funded_channel = ChannelEntry::new(
@@ -609,7 +611,7 @@ mod tests {
 
         // Verify channel is no longer in-flight
         assert!(
-            afs.in_flight.get(c1.get_id()).await.is_none(),
+            !afs.in_flight.contains(c1.get_id()),
             "channel should be cleared from in-flight after balance increase"
         );
 
@@ -667,19 +669,18 @@ mod tests {
 
         // Verify the channel is in-flight
         assert!(
-            afs.in_flight.get(c1.get_id()).await.is_some(),
-            "channel should be in the in-flight cache after funding"
+            afs.in_flight.contains(c1.get_id()),
+            "channel should be in the in-flight set after funding"
         );
 
         // on_tick should skip c1 because it is already in-flight
         afs.on_tick().await?;
 
-        // Verify the in-flight cache still has exactly one entry (channel was not re-funded)
-        afs.in_flight.run_pending_tasks().await;
-        assert_eq!(afs.in_flight.entry_count(), 1, "in-flight cache should still have exactly one entry");
+        // Verify the in-flight set still has exactly one entry (channel was not re-funded)
+        assert_eq!(afs.in_flight.len(), 1, "in-flight set should still have exactly one entry");
         assert!(
-            afs.in_flight.get(c1.get_id()).await.is_some(),
-            "channel should still be in the in-flight cache"
+            afs.in_flight.contains(c1.get_id()),
+            "channel should still be in the in-flight set"
         );
 
         Ok(())

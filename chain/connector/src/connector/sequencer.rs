@@ -135,7 +135,7 @@ where
         &self,
         transaction: R,
         timeout_until_finalized: std::time::Duration,
-    ) -> errors::Result<impl Future<Output = errors::Result<blokli_client::api::types::Transaction>>> {
+    ) -> errors::Result<impl Future<Output = errors::Result<blokli_client::api::types::Transaction>> + Send + 'static> {
         let (notifier_tx, notifier_rx) = futures::channel::oneshot::channel();
 
         self.sender
@@ -144,19 +144,21 @@ where
             .await
             .map_err(|_| ConnectorError::InvalidState("transaction queue dropped"))?;
 
-        Ok(notifier_rx
-            .inspect_ok(|res| tracing::debug!(?res, "transaction tracking id received"))
-            .map(move |result| {
-                result
-                    .map_err(|_| ConnectorError::InvalidState("transaction notifier dropped"))
-                    .and_then(|tx_res| tx_res.map(|id| (id, timeout_until_finalized)))
-            })
-            .and_then(|(tx_id, timeout)| {
-                self.client
-                    .track_transaction(tx_id, timeout)
-                    .map_err(ConnectorError::from)
-                    .inspect(|res| tracing::debug!(?res, "transaction tracking done"))
-            }))
+        let client = self.client.clone();
+
+        Ok(async move {
+            let tx_id = notifier_rx
+                .inspect_ok(|res| tracing::debug!(?res, "transaction tracking id received"))
+                .await
+                .map_err(|_| ConnectorError::InvalidState("transaction notifier dropped"))
+                .and_then(|tx_res| tx_res)?;
+
+            client
+                .track_transaction(tx_id, timeout_until_finalized)
+                .map_err(ConnectorError::from)
+                .inspect(|res| tracing::debug!(?res, "transaction tracking done"))
+                .await
+        })
     }
 }
 

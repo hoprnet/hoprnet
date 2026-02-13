@@ -537,10 +537,10 @@ where
     P: PayloadGenerator + Send + Sync,
     P::TxRequest: Send + Sync,
 {
-    async fn send_tx<'a>(
-        &'a self,
+    async fn send_tx(
+        &self,
         tx_req: P::TxRequest,
-    ) -> Result<impl Future<Output = Result<ChainReceipt, ConnectorError>> + Send + 'a, ConnectorError> {
+    ) -> Result<impl Future<Output = Result<ChainReceipt, ConnectorError>> + Send + 'static, ConnectorError> {
         Ok(self
             .sequencer
             .enqueue_transaction(tx_req, self.cfg.tx_confirm_timeout.max(MIN_TX_CONFIRM_TIMEOUT))

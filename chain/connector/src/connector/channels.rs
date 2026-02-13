@@ -146,11 +146,11 @@ where
         Ok(self.send_tx(tx_req).await?.boxed())
     }
 
-    async fn fund_channel<'a>(
-        &'a self,
-        channel_id: &'a ChannelId,
+    async fn fund_channel(
+        &self,
+        channel_id: &ChannelId,
         amount: HoprBalance,
-    ) -> Result<BoxFuture<'a, Result<ChainReceipt, Self::Error>>, Self::Error> {
+    ) -> Result<BoxFuture<'static, Result<ChainReceipt, Self::Error>>, Self::Error> {
         self.check_connection_state()?;
 
         use hopr_api::chain::ChainReadChannelOperations;
