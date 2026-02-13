@@ -96,7 +96,7 @@ impl Probe {
                                 store
                                     .record_edge::<NeighborTelemetry, PathTelemetry>(
                                         hopr_api::graph::MeasurableEdge::Probe(Err(
-                                            NetworkGraphError::ProbeNeighborTimeout(opk),
+                                            NetworkGraphError::ProbeNeighborTimeout(Box::new(opk)),
                                         )),
                                     )
                                     .await
@@ -394,7 +394,7 @@ mod tests {
                 }
                 hopr_api::graph::MeasurableEdge::Probe(Err(NetworkGraphError::ProbeNeighborTimeout(peer))) => {
                     on_finished.push((
-                        peer.clone(),
+                        peer.as_ref().clone(),
                         Err(ProbeError::TrafficError(NetworkGraphError::ProbeNeighborTimeout(peer))),
                     ));
                 }

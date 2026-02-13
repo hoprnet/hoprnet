@@ -152,7 +152,7 @@ pub trait NetworkGraphWrite {
     /// Updates an existing edge or inserts a new edge between two nodes.
     ///
     /// If the nodes do not exist, they are inserted into the graph.
-    /// 
+    ///
     /// The provided closure `f` is applied to modify the edge's observations.
     /// If the edge already exists, its observations are updated.
     /// If the edge does not exist, it is created and the closure is applied.

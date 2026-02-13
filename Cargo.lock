@@ -4764,6 +4764,7 @@ dependencies = [
  "hopr-transport",
  "hopr-transport-p2p",
  "lazy_static",
+ "parking_lot",
  "rand 0.8.5",
  "rstest",
  "serde",

@@ -374,22 +374,36 @@ async fn main_inner() -> anyhow::Result<()> {
 
                     let ticket_price = std::sync::Arc::new(parking_lot::RwLock::new(chain_reader.minimum_ticket_price().await.unwrap_or_default()));
                     let win_probability = std::sync::Arc::new(parking_lot::RwLock::new(chain_reader.minimum_incoming_ticket_win_prob().await.unwrap_or_default()));
-                    
+
                     match event {
                         Event::Chain(chain_event) => {
                             match chain_event {
                                 ChainEvent::Announcement(account) =>{
                                     graph_updater.record_node(account.public_key).await;
                                 },
-                                ChainEvent::ChannelOpened(channel) => {
+                                ChainEvent::ChannelOpened(channel) |
+                                ChainEvent::ChannelClosed(channel) |
+                                ChainEvent::ChannelBalanceIncreased(channel, _) |
+                                ChainEvent::ChannelBalanceDecreased(channel, _) => {
                                     let from = chain_reader.chain_key_to_packet_key(&channel.source).await;
                                     let to = chain_reader.chain_key_to_packet_key(&channel.destination).await;
 
                                     match (from, to) {
-                                        (Ok(Some(_from)), Ok(Some(_to))) => {
-                                            let capacity = Some(channel.balance.amount().low_u128().saturating_div(ticket_price.read().amount().low_u128()).saturating_mul(win_probability.read().as_luck() as u128));
-                                            // TODO: update here
-                                            // graph_updater.record_edge(from, to).await;
+                                        (Ok(Some(from)), Ok(Some(to))) => {
+                                            use hopr_api::graph::EdgeCapacityUpdate;
+                                            use hopr_lib::{ChannelStatus, NeighborTelemetry, PathTelemetry};
+
+                                            let capacity =  if matches!(channel.status, ChannelStatus::Closed) {
+                                                None
+                                            } else {
+                                                Some(channel.balance.amount().low_u128().saturating_div(ticket_price.read().amount().low_u128()).saturating_mul(win_probability.read().as_luck() as u128))
+                                            };
+
+                                            graph_updater.record_edge(hopr_api::graph::MeasurableEdge::<NeighborTelemetry, PathTelemetry>::Capacity(Box::new(EdgeCapacityUpdate{
+                                                capacity,
+                                                src: from,
+                                                dest: to
+                                        }))).await;
                                         },
                                         (Ok(_), Ok(_)) => {
                                             tracing::error!(%channel, "could not find packet keys for the channel endpoints");
@@ -400,28 +414,6 @@ async fn main_inner() -> anyhow::Result<()> {
                                     }
                                 },
                                 ChainEvent::ChannelClosureInitiated(_channel) => {},
-                                ChainEvent::ChannelClosed(_channel) => {
-                                    // let capacity = None;
-                                },
-                                ChainEvent::ChannelBalanceIncreased(channel, _) |
-                                ChainEvent::ChannelBalanceDecreased(channel, _) => {
-                                    let from = chain_reader.chain_key_to_packet_key(&channel.source).await;
-                                    let to = chain_reader.chain_key_to_packet_key(&channel.destination).await;
-
-                                    match (from, to) {
-                                        (Ok(Some(_from)), Ok(Some(_to))) => {
-                                            let capacity = Some(channel.balance.amount().low_u128().saturating_div(ticket_price.read().amount().low_u128()).saturating_mul(win_probability.read().as_luck() as u128));
-                                            // TODO: update here
-                                            // graph_updater.record_edge(from, to).await;
-                                        },
-                                        (Ok(_), Ok(_)) => {
-                                            tracing::error!(%channel, "could not find packet keys for the channel endpoints");
-                                        },
-                                        (Err(e), _) | (_, Err(e)) => {
-                                            tracing::error!(%e, %channel, "failed to convert chain keys to packet keys for graph update");
-                                        }
-                                    }
-                                },
                                 ChainEvent::WinningProbabilityIncreased(probability) |
                                 ChainEvent::WinningProbabilityDecreased(probability) => {
                                     *win_probability.write() = probability;

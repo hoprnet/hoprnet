@@ -114,8 +114,8 @@ mod tests {
     #[test]
     fn probe_message_variant_telemetry_should_serialize_and_deserialize() -> anyhow::Result<()> {
         let m1 = Message::Telemetry(PathTelemetry {
-            id: hopr_crypto_random::random_bytes::<10>(),
-            path: hopr_crypto_random::random_bytes::<{ 10 * std::mem::size_of::<u128>() }>(),
+            id: hopr_crypto_random::random_bytes(),
+            path: hopr_crypto_random::random_bytes(),
             timestamp: 1234567890,
         });
         let m2 = Message::try_from(m1.to_bytes().as_ref())?;
@@ -169,8 +169,8 @@ mod tests {
     #[test]
     fn check_that_at_least_one_surb_can_fit_into_the_payload_for_path_telemetry() -> anyhow::Result<()> {
         let telemetry = PathTelemetry {
-            id: [1; 10],
-            path: [1; 10 * size_of::<u128>()],
+            id: [1; 8],
+            path: [1; 5 * size_of::<u64>()],
             timestamp: current_time().as_unix_timestamp().as_millis(),
         };
         let as_data: ApplicationData = Message::Telemetry(telemetry).try_into()?;

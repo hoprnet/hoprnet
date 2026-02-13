@@ -62,11 +62,11 @@ use hopr_protocol_hopr::MemorySurbStore;
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId, Protocol};
 use hopr_transport_mixer::MixerConfig;
+pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
 use hopr_transport_probe::{
     Probe, ProbingTrafficGeneration,
     ping::{PingConfig, Pinger},
 };
-pub use hopr_transport_probe::{errors::ProbeError, ping::PingQueryReplier};
 pub use hopr_transport_protocol::{PeerDiscovery, TicketEvent};
 pub use hopr_transport_session as session;
 #[cfg(feature = "runtime-tokio")]

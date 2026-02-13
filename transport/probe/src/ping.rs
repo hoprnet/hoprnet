@@ -88,7 +88,9 @@ impl Pinger {
             }
             Err(_) => {
                 debug!(%peer, "ping failed due to timeout");
-                Err(ProbeError::TrafficError(NetworkGraphError::ProbeNeighborTimeout(*peer)))
+                Err(ProbeError::TrafficError(NetworkGraphError::ProbeNeighborTimeout(
+                    Box::new(*peer),
+                )))
             }
         }
     }
