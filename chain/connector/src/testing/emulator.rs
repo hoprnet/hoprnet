@@ -293,7 +293,7 @@ impl BlokliTestStateMutator for FullStateEmulator {
 
                     tracing::debug!(%sender, %dst_addr, %stake, "channel funded");
                 } else {
-                    let new_id = generate_channel_id(&sender, &dst_addr);
+                    let new_id = generate_channel_id(&sender, dst_addr);
                     state.channels.insert(
                         hex::encode(new_id),
                         blokli_client::api::types::Channel {

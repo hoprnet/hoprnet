@@ -293,7 +293,7 @@ mod tests {
         let lioness = LionessBlake3ChaCha20::<U1024>::new(&Default::default(), &Default::default());
 
         let mut data = GenericArray::<u8, U1024>::default();
-        let data_clone = data.clone();
+        let data_clone = data;
         assert_eq!(data, data_clone);
 
         lioness.encrypt_block((&mut data).into());
@@ -332,7 +332,7 @@ mod tests {
 
         let mut data = GenericArray::<u8, U1024>::default();
         hopr_crypto_random::random_fill(&mut data);
-        let data_clone = data.clone();
+        let data_clone = data;
         assert_eq!(data, data_clone);
 
         lioness.encrypt_block((&mut data).into());
@@ -350,7 +350,7 @@ mod tests {
         let mut data_in = GenericArray::<u8, U1024>::default();
         let mut data_out = GenericArray::<u8, U1024>::default();
         hopr_crypto_random::random_fill(&mut data_in);
-        let data_orig = data_in.clone();
+        let data_orig = data_in;
         assert_eq!(data_in, data_orig);
 
         lioness.encrypt_block((&data_in, &mut data_out).into());

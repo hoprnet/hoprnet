@@ -88,7 +88,7 @@ pub fn stateless_socket_benchmark(c: &mut Criterion) {
         group.throughput(Throughput::Bytes(*size as u64));
         group.bench_with_input(BenchmarkId::new("alice_tx", size), &alice_data, |b, data| {
             b.to_async(&runtime)
-                .iter(|| alice_send_data(&data, DuplexIO::from((futures::io::sink(), futures::io::empty()))));
+                .iter(|| alice_send_data(data, DuplexIO::from((futures::io::sink(), futures::io::empty()))));
         });
         group.bench_with_input(BenchmarkId::new("bob_rx", size), &wire_data, |b, data| {
             b.to_async(&runtime)

@@ -480,7 +480,7 @@ mod tests {
 
         let basic_gen = BasicPayloadGenerator::new(cp_2.public().to_address(), *CONTRACT_ADDRS);
         let signed_tx = basic_gen
-            .redeem_ticket(ticket.clone())?
+            .redeem_ticket(ticket)?
             .sign_and_encode_to_eip2718(1, 1, None, &cp_2)
             .await?;
 
@@ -498,7 +498,7 @@ mod tests {
 
         let safe_gen = SafePayloadGenerator::new(&cp_2, *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
         let signed_tx = safe_gen
-            .redeem_ticket(ticket.clone())?
+            .redeem_ticket(ticket)?
             .sign_and_encode_to_eip2718(1, 1, None, &cp_2)
             .await?;
 

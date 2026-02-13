@@ -86,7 +86,7 @@ mod tests {
 
         let peer = PeerId::random();
 
-        tracker.add(peer.clone());
+        tracker.add(peer);
 
         assert_eq!(
             tracker.get(&peer).context("should contain a value")?,
@@ -117,7 +117,7 @@ mod tests {
 
         let peer = PeerId::random();
 
-        tracker.add(peer.clone());
+        tracker.add(peer);
         tracker.alter(&peer, |_, mut o| {
             o.msg_sent += 1;
             o

@@ -163,7 +163,7 @@ mod tests {
 
         assert_eq!(
             Some(chain_addr),
-            connector.packet_key_to_chain_key(&offchain_key.public()).await?
+            connector.packet_key_to_chain_key(offchain_key.public()).await?
         );
         assert_eq!(
             Some(*offchain_key.public()),
@@ -172,7 +172,7 @@ mod tests {
 
         let mapper = connector.key_id_mapper_ref();
 
-        assert_eq!(Some(account.key_id), mapper.map_key_to_id(&offchain_key.public()));
+        assert_eq!(Some(account.key_id), mapper.map_key_to_id(offchain_key.public()));
         assert_eq!(Some(*offchain_key.public()), mapper.map_id_to_public(&account.key_id));
 
         Ok(())

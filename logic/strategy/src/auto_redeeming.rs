@@ -266,7 +266,7 @@ mod tests {
 
         static ref CHAIN_CLIENT: BlokliTestClient<StaticState> = BlokliTestStateBuilder::default()
             .with_generated_accounts(&[ALICE.public().as_ref(), BOB.public().as_ref(), CHARLIE.public().as_ref()], false, XDaiBalance::new_base(1), HoprBalance::new_base(1000))
-            .with_channels([CHANNEL_1.clone(), CHANNEL_2.clone()])
+            .with_channels([*CHANNEL_1, *CHANNEL_2])
             .build_static_client();
     }
 
@@ -285,7 +285,7 @@ mod tests {
             .challenge(challenge)
             .build_signed(&ALICE, &Hash::default())?
             .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?)
-            .into_redeemable(&*BOB, &Hash::default())?)
+            .into_redeemable(&BOB, &Hash::default())?)
     }
 
     #[tokio::test]
@@ -294,7 +294,7 @@ mod tests {
         let (tx, rx) = futures::channel::mpsc::channel(10);
 
         let mut connector = create_trustful_hopr_blokli_connector(
-            &*BOB,
+            &BOB,
             Default::default(),
             CHAIN_CLIENT.clone(),
             [1u8; Address::SIZE].into(),
@@ -323,7 +323,7 @@ mod tests {
         assert_eq!(
             redeem_requests,
             vec![
-                TicketSelector::from(CHANNEL_1.clone())
+                TicketSelector::from(*CHANNEL_1)
                     .with_amount(HoprBalance::zero()..)
                     .with_index_range(
                         ack_ticket.ticket.verified_ticket().index..=ack_ticket.ticket.verified_ticket().index,
@@ -340,7 +340,7 @@ mod tests {
         let (tx, rx) = futures::channel::mpsc::channel(10);
 
         let mut connector = create_trustful_hopr_blokli_connector(
-            &*BOB,
+            &BOB,
             Default::default(),
             CHAIN_CLIENT.clone(),
             [1u8; Address::SIZE].into(),
@@ -367,11 +367,11 @@ mod tests {
         assert_eq!(
             redeem_requests,
             vec![
-                TicketSelector::from(CHANNEL_2.clone())
+                TicketSelector::from(*CHANNEL_2)
                     .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
                     .with_index_range(CHANNEL_2.ticket_index..)
                     .with_state(AcknowledgedTicketStatus::Untouched),
-                TicketSelector::from(CHANNEL_1.clone())
+                TicketSelector::from(*CHANNEL_1)
                     .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
                     .with_index_range(CHANNEL_1.ticket_index..)
                     .with_state(AcknowledgedTicketStatus::Untouched),
@@ -388,7 +388,7 @@ mod tests {
 
         let (tx, rx) = futures::channel::mpsc::channel(10);
         let mut connector = create_trustful_hopr_blokli_connector(
-            &*BOB,
+            &BOB,
             Default::default(),
             CHAIN_CLIENT.clone(),
             [1u8; Address::SIZE].into(),
@@ -418,7 +418,7 @@ mod tests {
         assert_eq!(
             redeem_requests,
             vec![
-                TicketSelector::from(CHANNEL_1.clone())
+                TicketSelector::from(*CHANNEL_1)
                     .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
                     .with_index_range(CHANNEL_1.ticket_index..=ack_ticket_at.ticket.verified_ticket().index)
                     .with_state(AcknowledgedTicketStatus::Untouched)
@@ -430,12 +430,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_auto_redeeming_strategy_should_redeem_singular_ticket_on_close() -> anyhow::Result<()> {
-        let mut channel = CHANNEL_1.clone();
+        let mut channel = *CHANNEL_1;
         channel.status = ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100)));
 
         let (tx, rx) = futures::channel::mpsc::channel(10);
         let mut connector = create_trustful_hopr_blokli_connector(
-            &*BOB,
+            &BOB,
             Default::default(),
             CHAIN_CLIENT.clone(),
             [1u8; Address::SIZE].into(),
@@ -470,7 +470,7 @@ mod tests {
         assert_eq!(
             redeem_requests,
             vec![
-                TicketSelector::from(CHANNEL_1.clone())
+                TicketSelector::from(*CHANNEL_1)
                     .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
                     .with_index_range(CHANNEL_1.ticket_index..)
                     .with_state(AcknowledgedTicketStatus::Untouched)
@@ -486,7 +486,7 @@ mod tests {
 
         let (tx, rx) = futures::channel::mpsc::channel(10);
         let mut connector = create_trustful_hopr_blokli_connector(
-            &*BOB,
+            &BOB,
             Default::default(),
             CHAIN_CLIENT.clone(),
             [1u8; Address::SIZE].into(),
@@ -514,7 +514,7 @@ mod tests {
         assert_eq!(
             redeem_requests,
             vec![
-                TicketSelector::from(CHANNEL_1.clone())
+                TicketSelector::from(*CHANNEL_1)
                     .with_amount(HoprBalance::zero()..)
                     .with_index_range(CHANNEL_1.ticket_index..=ack_ticket_1.ticket.verified_ticket().index)
                     .with_state(AcknowledgedTicketStatus::Untouched),

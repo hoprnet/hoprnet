@@ -1,9 +1,14 @@
+# list all available recipes
+default:
+    @just --list
+
+# start a local cluster using the python SDK
 run-local-cluster:
     #!/usr/bin/env bash
     uv sync --no-dev
     uv run --no-sync -m sdk.python.localcluster --config ./sdk/python/localcluster.params.yml --fully_connected --exposed
 
-
+# build a distribution package (deb, rpm, etc.) for a given architecture
 package packager arch:
     #!/usr/bin/env bash
     set -o errexit -o nounset -o pipefail
@@ -26,6 +31,7 @@ package packager arch:
     mkdir -p dist/packages
     nfpm package --config deploy/nfpm/nfpm.generated.yaml --packager "{{packager}}" --target "dist/packages/hoprd-{{arch}}.{{packager}}"
 
+# test a built package by deploying it to a VM
 test-package packager arch:
     #!/usr/bin/env bash
     set -o errexit -o nounset -o pipefail
@@ -38,6 +44,7 @@ test-package packager arch:
     deploy/nfpm/test-package-tool.sh copy {{packager}} {{arch}} 2>&1 | tee -a deploy/nfpm/test-package-{{packager}}-{{arch}}.log
     deploy/nfpm/test-package-tool.sh install {{packager}} {{arch}} 2>&1 | tee -a deploy/nfpm/test-package-{{packager}}-{{arch}}.log
 
+# sign a release file with GPG and generate a SHA256 hash
 sign-file source_file:
     #!/usr/bin/env bash
     set -o errexit -o nounset -o pipefail
@@ -63,3 +70,16 @@ sign-file source_file:
 # list all available docker image targets which can be built
 list-docker-images:
     nix flake show --json | jq '.packages | to_entries | .[0].value | to_entries[] | select(.key | endswith("docker")) | .key'
+
+# run the full test suite (unit tests, integration tests, clippy, formatting)
+test:
+    #!/usr/bin/env bash
+    set -o errexit -o nounset -o pipefail
+    echo "==> Running clippy..."
+    cargo clippy --workspace --all-targets -- -D warnings
+    echo ""
+    echo "==> Running unit tests..."
+    cargo test --lib
+    echo ""
+    echo "==> Running integration tests..."
+    cargo test --test '*' -- --test-threads=1

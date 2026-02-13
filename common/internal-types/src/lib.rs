@@ -103,7 +103,7 @@ mod tests {
 
     #[test]
     fn test_node_id_display_from_str() -> anyhow::Result<()> {
-        let offchain = OffchainKeypair::random().public().clone();
+        let offchain = *OffchainKeypair::random().public();
         let onchain = ChainKeypair::random().public().to_address();
 
         let n1 = NodeId::from_str(&offchain.to_string())?;

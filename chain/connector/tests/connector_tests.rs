@@ -42,25 +42,25 @@ lazy_static::lazy_static! {
             CHAIN_KEYS[0].public().to_address(),
             CHAIN_KEYS[1].public().to_address(),
             100_u32.into(),
-            1_u64.into(),
+            1_u64,
             ChannelStatus::Open,
-            1_u32.into(),
+            1_u32,
         ),
         ChannelEntry::new(
             CHAIN_KEYS[2].public().to_address(),
             CHAIN_KEYS[0].public().to_address(),
             200_u32.into(),
-            1_u64.into(),
+            1_u64,
             ChannelStatus::Open,
-            2_u32.into(),
+            2_u32,
         ),
         ChannelEntry::new(
             CHAIN_KEYS[1].public().to_address(),
             CHAIN_KEYS[0].public().to_address(),
             10_u32.into(),
-            3_u64.into(),
+            3_u64,
             ChannelStatus::Open,
-            1_u32.into(),
+            1_u32,
         )
     ];
 }

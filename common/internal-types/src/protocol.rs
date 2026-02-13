@@ -136,7 +136,7 @@ impl Acknowledgement {
             let iter = (keys, optimistic_result).into_par_iter();
 
             #[cfg(not(feature = "rayon"))]
-            let iter = keys.into_iter().zip(optimistic_result.into_iter());
+            let iter = keys.into_iter().zip(optimistic_result);
 
             iter.filter_map(|(key, res)| key.zip(res.ok().map(VerifiedAcknowledgement::leak)))
                 .map(|(key, ack)| ack.verify(&key))
