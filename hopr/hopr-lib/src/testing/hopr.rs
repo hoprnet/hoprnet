@@ -135,10 +135,7 @@ impl TestedHopr {
     }
 
     pub async fn channel_from_hash(&self, channel_hash: &prelude::Hash) -> Option<ChannelEntry> {
-        self.instance
-            .channel_from_hash(channel_hash)
-            .await
-            .unwrap_or(None)
+        self.instance.channel_from_hash(channel_hash).await.unwrap_or(None)
     }
 
     pub async fn outgoing_channels_by_status(&self, status: ChannelStatus) -> Option<Vec<ChannelEntry>> {

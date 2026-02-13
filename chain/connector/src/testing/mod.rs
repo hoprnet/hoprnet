@@ -155,11 +155,7 @@ impl BlokliTestStateBuilder {
                     address: hex::encode(safe.address),
                     chain_key: hex::encode(safe.owner),
                     module_address: hex::encode(safe.module),
-                    registered_nodes: safe
-                        .registered_nodes
-                        .into_iter()
-                        .map(hex::encode)
-                        .collect(),
+                    registered_nodes: safe.registered_nodes.into_iter().map(hex::encode).collect(),
                 },
             )
         }));
