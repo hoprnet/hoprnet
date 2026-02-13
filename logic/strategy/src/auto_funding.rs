@@ -149,23 +149,9 @@ mod tests {
         let stake_limit = HoprBalance::from(7_u32);
         let fund_amount = HoprBalance::from(5_u32);
 
-        let c1 = ChannelEntry::new(
-            *ALICE,
-            *BOB,
-            10_u32.into(),
-            0_u32.into(),
-            ChannelStatus::Open,
-            0_u32.into(),
-        );
+        let c1 = ChannelEntry::new(*ALICE, *BOB, 10_u32.into(), 0_u32.into(), ChannelStatus::Open, 0);
 
-        let c2 = ChannelEntry::new(
-            *BOB,
-            *CHRIS,
-            5_u32.into(),
-            0_u32.into(),
-            ChannelStatus::Open,
-            0_u32.into(),
-        );
+        let c2 = ChannelEntry::new(*BOB, *CHRIS, 5_u32.into(), 0_u32.into(), ChannelStatus::Open, 0);
 
         let c3 = ChannelEntry::new(
             *CHRIS,
@@ -175,7 +161,7 @@ mod tests {
             ChannelStatus::PendingToClose(
                 chrono::DateTime::<chrono::Utc>::from_str("2025-11-10T00:00:00+00:00")?.into(),
             ),
-            0_u32.into(),
+            0,
         );
 
         let blokli_sim = BlokliTestStateBuilder::default()

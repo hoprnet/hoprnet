@@ -64,8 +64,8 @@ async fn ticket_statistics_should_reset_when_cleaned(#[with(5)] cluster_fixture:
         .map(|t| *t.channel_id())
         .collect::<Vec<ChannelId>>();
 
-    assert!(channels_with_pending_tickets.contains(&fw_channels.channel_id(0)));
-    assert!(channels_with_pending_tickets.contains(&bw_channels.channel_id(0)));
+    assert!(channels_with_pending_tickets.contains(fw_channels.channel_id(0)));
+    assert!(channels_with_pending_tickets.contains(bw_channels.channel_id(0)));
 
     let stats_before = mid
         .inner()

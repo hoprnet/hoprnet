@@ -95,7 +95,7 @@ impl Backend for InMemoryBackend {
     }
 
     fn get_channel_by_id(&self, id: &ChannelId) -> Result<Option<ChannelEntry>, Self::Error> {
-        Ok(self.channels.get(id).map(|e| e.value().clone()))
+        Ok(self.channels.get(id).map(|e| *e.value()))
     }
 }
 
@@ -115,7 +115,7 @@ pub(crate) mod tests {
         let cp = ChainKeypair::random();
 
         let account = AccountEntry {
-            public_key: (*kp.public()).into(),
+            public_key: (*kp.public()),
             chain_addr: cp.public().to_address(),
             entry_type: AccountType::Announced(vec!["/ip4/1.2.3.4/tcp/1234".parse()?]),
             safe_address: Some(Address::new(&[3u8; 20])),
@@ -131,17 +131,17 @@ pub(crate) mod tests {
             HoprBalance::new_base(1000),
             10u32.into(),
             ChannelStatus::PendingToClose(std::time::SystemTime::now()),
-            10u32.into(),
+            10u32,
         );
 
         backend.insert_account(account.clone())?;
-        backend.insert_channel(channel.clone())?;
+        backend.insert_channel(channel)?;
 
         let a1 = backend
             .get_account_by_id(&account.key_id)?
             .ok_or(anyhow::anyhow!("account not found"))?;
         let a2 = backend
-            .get_account_by_key(&kp.public())?
+            .get_account_by_key(kp.public())?
             .ok_or(anyhow::anyhow!("account not found"))?;
         let a3 = backend
             .get_account_by_address(cp.public().as_ref())?

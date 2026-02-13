@@ -428,7 +428,7 @@ mod tests {
         const LAST_ID: FrameId = FrameId::MAX - 1;
         assert!(matches!(rx.next().await, Some(Ok(LAST_ID))));
         assert!(matches!(rx.next().await, Some(Ok(FrameId::MAX))));
-        assert!(matches!(rx.next().await, None));
+        assert!(rx.next().await.is_none());
 
         Ok(())
     }

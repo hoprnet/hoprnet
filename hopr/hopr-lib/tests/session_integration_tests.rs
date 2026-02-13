@@ -91,9 +91,8 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
     assert_eq!(recv_msg, msg);
 
     transfer_handle.abort();
-    match transfer_handle.await {
-        Ok(Err(e)) => panic!("transfer failed: {e}"),
-        _ => {} // Task was aborted (expected)
+    if let Ok(Err(e)) = transfer_handle.await {
+        panic!("transfer failed: {e}")
     }
 
     Ok(())

@@ -194,10 +194,9 @@ mod tests {
     async fn test_ticket_validation_should_fail_if_ticket_chance_is_low() -> anyhow::Result<()> {
         let mut ticket = create_valid_ticket()?;
         ticket.encoded_win_prob = WinningProbability::try_from(0.5f64)?.into();
-        let ticket = ticket
+        let ticket = *ticket
             .sign(&SENDER_PRIV_KEY, &Hash::default())
-            .verified_ticket()
-            .clone();
+            .verified_ticket();
 
         let channel = create_channel_entry();
 
@@ -227,10 +226,9 @@ mod tests {
     async fn test_ticket_validation_should_fail_if_ticket_epoch_does_not_match_2() -> anyhow::Result<()> {
         let mut ticket = create_valid_ticket()?;
         ticket.channel_epoch = 2u32;
-        let ticket = ticket
+        let ticket = *ticket
             .sign(&SENDER_PRIV_KEY, &Hash::default())
-            .verified_ticket()
-            .clone();
+            .verified_ticket();
 
         let channel = create_channel_entry();
 

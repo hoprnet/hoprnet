@@ -186,6 +186,7 @@ pub(crate) mod tests {
 
     use super::*;
 
+    #[allow(clippy::type_complexity)]
     pub fn generic_sphinx_suite_test<S: SphinxSuite>(node_count: usize) {
         let (pub_keys, priv_keys): (Vec<(S::G, Alpha<<S::G as GroupElement<S::E>>::AlphaLen>)>, Vec<S::E>) = (0
             ..node_count)

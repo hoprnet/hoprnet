@@ -450,7 +450,6 @@ mod tests {
             target_surb_buffer_size: 5_000,
             max_surbs_per_sec: 2500,
             surb_decay: Some((Duration::from_millis(200), 0.05)),
-            ..Default::default()
         };
 
         let mut mock_balancer_feedback = MockBalancerConfigFeedback::new();
@@ -521,14 +520,12 @@ mod tests {
             target_surb_buffer_size: 4500,
             max_surbs_per_sec: 2500,
             surb_decay: None,
-            ..Default::default()
         };
 
         let cfg_2 = SurbBalancerConfig {
             target_surb_buffer_size: 5500,
             max_surbs_per_sec: 3055,
             surb_decay: None,
-            ..Default::default()
         };
 
         let mut seq = mockall::Sequence::new();

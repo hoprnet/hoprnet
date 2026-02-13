@@ -718,11 +718,11 @@ pub(crate) mod tests {
     async fn redeem_ticket_basic() -> anyhow::Result<()> {
         let chain_key_bob = ChainKeypair::from_secret(&PRIVATE_KEY_2)?;
 
-        let acked_ticket = REDEEMABLE_TICKET.clone();
+        let acked_ticket = *REDEEMABLE_TICKET;
 
         // Bob redeems the ticket
         let generator = BasicPayloadGenerator::new((&chain_key_bob).into(), *CONTRACT_ADDRS);
-        let redeem_ticket_tx = generator.redeem_ticket(acked_ticket.clone())?;
+        let redeem_ticket_tx = generator.redeem_ticket(acked_ticket)?;
         let signed_tx = redeem_ticket_tx
             .sign_and_encode_to_eip2718(1, 1, None, &chain_key_bob)
             .await?;
@@ -736,11 +736,11 @@ pub(crate) mod tests {
     async fn redeem_ticket_safe() -> anyhow::Result<()> {
         let chain_key_bob = ChainKeypair::from_secret(&PRIVATE_KEY_2)?;
 
-        let acked_ticket = REDEEMABLE_TICKET.clone();
+        let acked_ticket = *REDEEMABLE_TICKET;
 
         // Bob redeems the ticket
         let generator =
-            SafePayloadGenerator::new((&chain_key_bob).into(), *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
+            SafePayloadGenerator::new(&chain_key_bob, *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
         let redeem_ticket_tx = generator.redeem_ticket(acked_ticket)?;
         let signed_tx = redeem_ticket_tx
             .sign_and_encode_to_eip2718(2, 1, None, &chain_key_bob)
@@ -764,7 +764,7 @@ pub(crate) mod tests {
         insta::assert_snapshot!("withdraw_basic", hex::encode(signed_tx));
 
         let generator =
-            SafePayloadGenerator::new((&chain_key_alice).into(), *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
+            SafePayloadGenerator::new(&chain_key_alice, *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
         let tx = generator.transfer((&chain_key_bob).into(), HoprBalance::from(100))?;
 
         let signed_tx = tx.sign_and_encode_to_eip2718(2, 1, None, &chain_key_bob).await?;

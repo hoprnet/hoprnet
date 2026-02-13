@@ -96,7 +96,7 @@ impl GroupElement<k256::Scalar> for k256::ProjectivePoint {
     }
 
     fn from_alpha(alpha: Alpha<typenum::U33>) -> Result<Self> {
-        EncodedPoint::from_bytes(&alpha)
+        EncodedPoint::from_bytes(alpha)
             .map_err(|_| CryptoError::InvalidInputValue("alpha"))
             .and_then(|ep| {
                 AffinePoint::from_encoded_point(&ep)

@@ -49,13 +49,13 @@ async fn test_keep_alive_session(cluster: &ClusterGuard) -> anyhow::Result<()> {
     sleep(Duration::from_secs(2)).await;
 
     src.inner()
-        .keep_alive_session(&session.id())
+        .keep_alive_session(session.id())
         .await
         .context("failed to keep alive session")?;
 
     sleep(Duration::from_secs(3)).await; // sleep longer than the session timeout
 
-    match src.inner().keep_alive_session(&session.id()).await {
+    match src.inner().keep_alive_session(session.id()).await {
         Err(HoprLibError::TransportError(HoprTransportError::Session(hopr_lib::TransportSessionError::Manager(
             hopr_lib::SessionManagerError::NonExistingSession,
         )))) => {}
@@ -120,20 +120,20 @@ async fn test_session_surb_balancer_config(cluster: &ClusterGuard) -> anyhow::Re
 
     let config = src
         .inner()
-        .get_session_surb_balancer_config(&session.id())
+        .get_session_surb_balancer_config(session.id())
         .await
         .context("failed to get surb balancer config")?;
 
     assert_eq!(config, Some(exp_config));
 
     src.inner()
-        .update_session_surb_balancer_config(&session.id(), SurbBalancerConfig::default())
+        .update_session_surb_balancer_config(session.id(), SurbBalancerConfig::default())
         .await
         .context("failed to update surb balancer config")?;
 
     let config = src
         .inner()
-        .get_session_surb_balancer_config(&session.id())
+        .get_session_surb_balancer_config(session.id())
         .await
         .context("failed to get surb balancer config")?;
 

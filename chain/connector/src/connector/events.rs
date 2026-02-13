@@ -110,7 +110,7 @@ mod tests {
         connector.register_safe(&[3u8; Address::SIZE].into()).await?.await?;
 
         connector
-            .announce(&[multiaddress.clone()], &offchain_key_1)
+            .announce(std::slice::from_ref(&multiaddress), &offchain_key_1)
             .await?
             .await?;
 

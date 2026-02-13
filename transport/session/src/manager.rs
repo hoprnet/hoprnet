@@ -1765,7 +1765,7 @@ mod tests {
                     session_tx: Arc::new(dummy_tx),
                     routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
                     abort_handles: Vec::new(),
-                    surb_mgmt: Some(balancer_cfg.clone()),
+                    surb_mgmt: Some(balancer_cfg),
                     surb_estimator: None,
                 },
             )

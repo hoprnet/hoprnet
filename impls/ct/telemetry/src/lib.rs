@@ -253,7 +253,7 @@ mod tests {
     #[tokio::test]
     async fn peers_should_not_be_passed_if_none_are_present() -> anyhow::Result<()> {
         let mut fetcher = MockScanInteraction::new();
-        fetcher.expect_discovered_peers().returning(|| HashSet::new());
+        fetcher.expect_discovered_peers().returning(HashSet::new);
 
         let channel_graph = ImmediateNeighborChannelGraph {
             network: Arc::new(fetcher),
@@ -322,7 +322,6 @@ mod tests {
         let cfg = ProberConfig {
             interval: std::time::Duration::from_millis(1),
             recheck_threshold: std::time::Duration::from_millis(1000),
-            ..Default::default()
         };
 
         let mut fetcher = MockScanInteraction::new();
@@ -332,7 +331,7 @@ mod tests {
                 .into();
             HashSet::from([peer])
         });
-        fetcher.expect_discovered_peers().returning(|| HashSet::new());
+        fetcher.expect_discovered_peers().returning(HashSet::new);
 
         let channel_graph = ImmediateNeighborChannelGraph {
             network: Arc::new(fetcher),

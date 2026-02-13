@@ -158,7 +158,7 @@ pub async fn peer_setup_for(
         let channels_dst = connector.domain_separators().await?.channel;
 
         let codec_config = HoprCodecConfig {
-            outgoing_ticket_price: Some((*DEFAULT_PRICE_PER_PACKET).into()),
+            outgoing_ticket_price: Some(*DEFAULT_PRICE_PER_PACKET),
             outgoing_win_prob: Some(WinningProbability::ALWAYS),
         };
 
@@ -218,7 +218,7 @@ pub async fn emulate_channel_communication(components: HashMap<PeerId, WireChann
     while let Some((sender, target, msg)) = stream_group.next().await {
         let target_sender = senders
             .get_mut(&target)
-            .expect(&format!("peer {target} should be part of the test setup"));
+            .unwrap_or_else(|| panic!("peer {target} should be part of the test setup"));
 
         tracing::trace!(%sender, %target, "transporting packet");
 
@@ -267,6 +267,7 @@ pub async fn resolve_mock_path(me: Address, peers_onchain: Vec<Address>) -> anyh
     Ok(path)
 }
 
+#[allow(dead_code)]
 pub fn random_packets_of_count(size: usize) -> Vec<ApplicationData> {
     (0..size)
         .map(|i| {

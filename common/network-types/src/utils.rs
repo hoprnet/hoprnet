@@ -669,7 +669,7 @@ mod tests {
 
         use futures::AsyncWriteExt;
 
-        let mut writer = AsyncWriteSink::<7, _>(tx.sink_map_err(|e| std::io::Error::other(e)));
+        let mut writer = AsyncWriteSink::<7, _>(tx.sink_map_err(std::io::Error::other));
 
         AsyncWriteExt::write_all(&mut writer, data).await?;
         AsyncWriteExt::flush(&mut writer).await?;

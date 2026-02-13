@@ -323,13 +323,13 @@ mod tests {
 
             match telemetry {
                 Ok(Telemetry::Neighbor(neighbor_telemetry)) => {
-                    let peer: PeerId = neighbor_telemetry.peer().clone();
+                    let peer: PeerId = *neighbor_telemetry.peer();
                     let duration = neighbor_telemetry.rtt();
                     on_finished.push((peer, Ok(duration)));
                 }
                 Err(TrafficGenerationError::ProbeNeighborTimeout(peer)) => {
                     on_finished.push((
-                        peer.clone(),
+                        peer,
                         Err(ProbeError::TrafficError(TrafficGenerationError::ProbeNeighborTimeout(
                             peer,
                         ))),
@@ -368,7 +368,7 @@ mod tests {
         F: Fn(TestInterface) -> Fut + Send + Sync + 'static,
         St: NetworkGraphUpdate + NetworkGraphView + Clone + Send + Sync + 'static,
     {
-        let probe = Probe::new(cfg.clone());
+        let probe = Probe::new(cfg);
 
         let (from_probing_up_tx, from_probing_up_rx) =
             futures::channel::mpsc::channel::<(HoprPseudonym, ApplicationDataIn)>(100);

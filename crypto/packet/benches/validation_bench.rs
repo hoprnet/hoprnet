@@ -26,9 +26,9 @@ pub fn validate_ticket_bench(c: &mut Criterion) {
         source.public().to_address(),
         dest.public().to_address(),
         HoprBalance::new_base(1000),
-        1_u32.into(),
+        1,
         ChannelStatus::Open,
-        1_u32.into(),
+        1,
     );
 
     let ticket = TicketBuilder::default()
@@ -47,7 +47,7 @@ pub fn validate_ticket_bench(c: &mut Criterion) {
     group.bench_function("validate_unack_ticket", |b| {
         b.iter(|| {
             validate_unacknowledged_ticket(
-                ticket.clone().leak(),
+                ticket.leak(),
                 &channel,
                 HoprBalance::new_base(10),
                 WinningProbability::ALWAYS,

@@ -62,7 +62,7 @@ async fn test_create_n_hop_session(cluster: &ClusterGuard, #[case] hops: usize) 
             SessionClientConfig {
                 forward_path_options: routing.clone(),
                 return_path_options: routing,
-                capabilities: capabilities,
+                capabilities,
                 pseudonym: None,
                 surb_management: None,
                 always_max_out_surbs: false,
