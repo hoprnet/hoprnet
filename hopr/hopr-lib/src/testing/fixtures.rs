@@ -189,7 +189,8 @@ impl ClusterGuard {
         res.insert(0, win_prob_lower[0]);
         res.push(win_prob_lower[1]);
 
-        res.try_into().expect("cannot find sufficient number of nodes")
+        res.try_into()
+            .unwrap_or_else(|_| panic!("cannot find sufficient number of nodes"))
     }
 
     pub fn sample_nodes_with_lower_win_prob_intermediaries<const N: usize>(&self) -> [&TestedHopr; N] {

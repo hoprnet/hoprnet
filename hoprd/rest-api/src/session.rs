@@ -7,7 +7,7 @@ use axum::{
 };
 use base64::Engine;
 use hopr_lib::{
-    Address, NodeId, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities, SessionClientConfig, SessionId,
+    Address, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities, SessionClientConfig, SessionId,
     SessionManagerError, SessionTarget, SurbBalancerConfig, TransportSessionError,
     errors::{HoprLibError, HoprTransportError},
 };
@@ -137,7 +137,7 @@ impl From<SessionCapability> for hopr_lib::SessionCapabilities {
 pub enum RoutingOptions {
     #[cfg(feature = "explicit-path")]
     #[schema(value_type = Vec<String>)]
-    IntermediatePath(#[serde_as(as = "Vec<DisplayFromStr>")] Vec<NodeId>),
+    IntermediatePath(#[serde_as(as = "Vec<DisplayFromStr>")] Vec<hopr_lib::NodeId>),
     Hops(usize),
 }
 
