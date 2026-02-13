@@ -1,0 +1,61 @@
+[package]
+name = "hoprd-api-client"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-only"
+description = "Generated Rust client for hoprd REST API"
+
+[dependencies]
+futures = { workspace = true }
+futures-core = { workspace = true }
+bytes = { workspace = true }
+http = { workspace = true }
+percent-encoding = { workspace = true }
+serde_urlencoded = { workspace = true }
+progenitor-client = { workspace = true }
+reqwest = { workspace = true, features = ["json", "stream"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+chrono = { workspace = true, features = ["serde", "clock"] }
+uuid = { workspace = true, features = ["serde", "v4"] }
+
+[build-dependencies]
+hoprd-api = { path = "../rest-api" }
+openapiv3 = { workspace = true }
+progenitor = { workspace = true }
+prettyplease = { workspace = true }
+serde_json = { workspace = true }
+syn = { workspace = true }
+utoipa = { workspace = true }
+
+[package.metadata.cargo-machete]
+ignored = [
+  "bytes",
+  "chrono",
+  "futures",
+  "futures-core",
+  "http",
+  "percent-encoding",
+  "progenitor-client",
+  "reqwest",
+  "serde",
+  "serde_json",
+  "serde_urlencoded",
+  "uuid",
+]
+
+[package.metadata.cargo-shear]
+ignored = [
+  "bytes",
+  "chrono",
+  "futures",
+  "futures-core",
+  "http",
+  "percent-encoding",
+  "progenitor-client",
+  "reqwest",
+  "serde",
+  "serde_json",
+  "serde_urlencoded",
+  "uuid",
+]

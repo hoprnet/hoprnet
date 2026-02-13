@@ -67,7 +67,7 @@ pub async fn create_hopr_instance(
         },
     )
     .await
-    .unwrap_or_else(|_| panic!("failed to create hopr instance on port {host_port}"))
+    .unwrap_or_else(|e| panic!("failed to create hopr instance on port {host_port}: {e:?}"))
 }
 
 pub struct TestedHopr {

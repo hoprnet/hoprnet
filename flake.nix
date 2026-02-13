@@ -141,10 +141,18 @@
             cargoExtraArgs = "-p hoprd-api -F allocator-jemalloc";
             cargoToml = ./hoprd/hoprd/Cargo.toml;
           };
+          localclusterBuildArgs = {
+            inherit src depsSrc rev;
+            cargoExtraArgs = "-p hoprd-localcluster";
+            cargoToml = ./localcluster/Cargo.toml;
+          };
 
           hoprd = rust-builder-local.callPackage nixLib.mkRustPackage hoprdBuildArgs;
+          hoprd-localcluster = rust-builder-local.callPackage nixLib.mkRustPackage localclusterBuildArgs;
           # also used for Docker image
           hoprd-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage hoprdBuildArgs;
+          # also used for Docker image
+          hoprd-localcluster-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage localclusterBuildArgs;
           # also used for Docker image
           hoprd-x86_64-linux-profile = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage (
             hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
@@ -295,7 +303,6 @@
               exec /bin/hoprd "$@"
             fi
           '';
-
           # Man pages using nix-lib
           hoprd-man = nixLib.mkManPage {
             pname = "hoprd";
@@ -667,6 +674,7 @@
               hoprd-docker
               hoprd-dev-docker
               hoprd-profile-docker
+              hoprd-localcluster
               ;
             inherit hopr-test-unit hopr-test-nightly;
             inherit docs;
