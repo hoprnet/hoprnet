@@ -740,6 +740,7 @@ pub(crate) mod tests {
 
         // Bob redeems the ticket
         let generator = SafePayloadGenerator::new(&chain_key_bob, *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
+
         let redeem_ticket_tx = generator.redeem_ticket(acked_ticket)?;
         let signed_tx = redeem_ticket_tx
             .sign_and_encode_to_eip2718(2, 1, None, &chain_key_bob)
@@ -763,6 +764,7 @@ pub(crate) mod tests {
         insta::assert_snapshot!("withdraw_basic", hex::encode(signed_tx));
 
         let generator = SafePayloadGenerator::new(&chain_key_alice, *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
+
         let tx = generator.transfer((&chain_key_bob).into(), HoprBalance::from(100))?;
 
         let signed_tx = tx.sign_and_encode_to_eip2718(2, 1, None, &chain_key_bob).await?;

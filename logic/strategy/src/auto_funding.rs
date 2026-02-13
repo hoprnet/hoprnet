@@ -193,10 +193,10 @@ impl<A: ChainReadChannelOperations + ChainWriteChannelOperations + Send + Sync> 
     /// the configured threshold. Skips channels that already have in-flight funding transactions.
     ///
     /// This handles two cases that event-driven funding misses:
-    /// - Channels opened with balance already below threshold (only a `ChannelOpened` event
-    ///   is emitted, which doesn't trigger balance-based funding)
-    /// - Channels that were underfunded when the node started or restarted (no events are
-    ///   replayed to the strategy at startup)
+    /// - Channels opened with balance already below threshold (only a `ChannelOpened` event is emitted, which doesn't
+    ///   trigger balance-based funding)
+    /// - Channels that were underfunded when the node started or restarted (no events are replayed to the strategy at
+    ///   startup)
     async fn on_tick(&self) -> crate::errors::Result<()> {
         let mut channels = self
             .hopr_chain_actions
@@ -256,11 +256,6 @@ impl<A: ChainReadChannelOperations + ChainWriteChannelOperations + Send + Sync> 
 mod tests {
     use std::str::FromStr;
 
-    use super::*;
-    use crate::{
-        auto_funding::{AutoFundingStrategy, AutoFundingStrategyConfig},
-        strategy::SingularStrategy,
-    };
     use futures::StreamExt;
     use futures_time::future::FutureExt;
     use hex_literal::hex;
@@ -268,6 +263,12 @@ mod tests {
     use hopr_lib::{
         Address, BytesRepresentable, ChainKeypair, Keypair, XDaiBalance,
         api::chain::{ChainEvent, ChainEvents},
+    };
+
+    use super::*;
+    use crate::{
+        auto_funding::{AutoFundingStrategy, AutoFundingStrategyConfig},
+        strategy::SingularStrategy,
     };
 
     lazy_static::lazy_static! {
@@ -403,24 +404,10 @@ mod tests {
         let fund_amount = HoprBalance::from(5_u32);
 
         // BOB -> CHRIS channel with balance below threshold
-        let c1 = ChannelEntry::new(
-            *BOB,
-            *CHRIS,
-            3_u32.into(),
-            0_u32.into(),
-            ChannelStatus::Open,
-            0_u32.into(),
-        );
+        let c1 = ChannelEntry::new(*BOB, *CHRIS, 3_u32.into(), 0_u32.into(), ChannelStatus::Open, 0_u32);
 
         // BOB -> DAVE channel with balance above threshold
-        let c2 = ChannelEntry::new(
-            *BOB,
-            *DAVE,
-            10_u32.into(),
-            0_u32.into(),
-            ChannelStatus::Open,
-            0_u32.into(),
-        );
+        let c2 = ChannelEntry::new(*BOB, *DAVE, 10_u32.into(), 0_u32.into(), ChannelStatus::Open, 0_u32);
 
         let blokli_sim = BlokliTestStateBuilder::default()
             .with_generated_accounts(
@@ -467,14 +454,7 @@ mod tests {
         let stake_limit = HoprBalance::from(7_u32);
         let fund_amount = HoprBalance::from(5_u32);
 
-        let c1 = ChannelEntry::new(
-            *BOB,
-            *CHRIS,
-            3_u32.into(),
-            0_u32.into(),
-            ChannelStatus::Open,
-            0_u32.into(),
-        );
+        let c1 = ChannelEntry::new(*BOB, *CHRIS, 3_u32.into(), 0_u32.into(), ChannelStatus::Open, 0_u32);
 
         let blokli_sim = BlokliTestStateBuilder::default()
             .with_generated_accounts(
@@ -529,7 +509,11 @@ mod tests {
         .await?;
 
         // The in-flight set should still contain exactly one entry (unchanged)
-        assert_eq!(afs.in_flight.len(), 1, "in-flight set should still have exactly one entry");
+        assert_eq!(
+            afs.in_flight.len(),
+            1,
+            "in-flight set should still have exactly one entry"
+        );
         assert!(
             afs.in_flight.contains(c1.get_id()),
             "channel should still be in the in-flight set"
@@ -543,14 +527,7 @@ mod tests {
         let stake_limit = HoprBalance::from(7_u32);
         let fund_amount = HoprBalance::from(5_u32);
 
-        let c1 = ChannelEntry::new(
-            *BOB,
-            *CHRIS,
-            3_u32.into(),
-            0_u32.into(),
-            ChannelStatus::Open,
-            0_u32.into(),
-        );
+        let c1 = ChannelEntry::new(*BOB, *CHRIS, 3_u32.into(), 0_u32.into(), ChannelStatus::Open, 0_u32);
 
         let blokli_sim = BlokliTestStateBuilder::default()
             .with_generated_accounts(
@@ -624,14 +601,7 @@ mod tests {
         let fund_amount = HoprBalance::from(5_u32);
 
         // BOB -> CHRIS channel with balance below threshold
-        let c1 = ChannelEntry::new(
-            *BOB,
-            *CHRIS,
-            3_u32.into(),
-            0_u32.into(),
-            ChannelStatus::Open,
-            0_u32.into(),
-        );
+        let c1 = ChannelEntry::new(*BOB, *CHRIS, 3_u32.into(), 0_u32.into(), ChannelStatus::Open, 0_u32);
 
         let blokli_sim = BlokliTestStateBuilder::default()
             .with_generated_accounts(
@@ -677,7 +647,11 @@ mod tests {
         afs.on_tick().await?;
 
         // Verify the in-flight set still has exactly one entry (channel was not re-funded)
-        assert_eq!(afs.in_flight.len(), 1, "in-flight set should still have exactly one entry");
+        assert_eq!(
+            afs.in_flight.len(),
+            1,
+            "in-flight set should still have exactly one entry"
+        );
         assert!(
             afs.in_flight.contains(c1.get_id()),
             "channel should still be in the in-flight set"
