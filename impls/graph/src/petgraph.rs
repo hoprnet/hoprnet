@@ -46,11 +46,7 @@ impl ChannelGraph {
 
         Self {
             me,
-            inner: RwLock::new(InnerGraph {
-                graph,
-                indices,
-                ..Default::default()
-            }),
+            inner: RwLock::new(InnerGraph { graph, indices }),
         }
     }
 
@@ -540,7 +536,7 @@ mod tests {
         graph.add_edge(&me, &peer_key)?;
 
         let telemetry: Result<EdgeTransportTelemetry<TestNeighbor, TestPath>, NetworkGraphError<TestPath>> =
-            Err(NetworkGraphError::ProbeNeighborTimeout(peer_key));
+            Err(NetworkGraphError::ProbeNeighborTimeout(Box::new(peer_key)));
         graph
             .record_edge(hopr_api::graph::MeasurableEdge::Probe(telemetry))
             .await;

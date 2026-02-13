@@ -128,7 +128,6 @@ use tokio::{
     time::{sleep, timeout},
 };
 
-// #[ignore]    // TODO return back once compiling
 #[tokio::test]
 async fn p2p_only_communication_quic() -> anyhow::Result<()> {
     let (mut api1, (_swarm1, process1)) = build_p2p_swarm(Announcement::QUIC).await?;

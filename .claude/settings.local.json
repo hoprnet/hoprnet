@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(cargo check:*)",
-      "Bash(cargo test:*)"
+      "Bash(cargo test:*)",
+      "Bash(find:*)"
     ]
   }
 }

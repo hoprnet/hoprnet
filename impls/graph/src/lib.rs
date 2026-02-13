@@ -41,8 +41,8 @@ pub type SharedChannelGraph = std::sync::Arc<ChannelGraph>;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct GraphNode(OffchainPublicKey);
 
-impl Into<OffchainPublicKey> for GraphNode {
-    fn into(self) -> OffchainPublicKey {
-        self.0
+impl From<GraphNode> for OffchainPublicKey {
+    fn from(val: GraphNode) -> Self {
+        val.0
     }
 }

@@ -13,7 +13,7 @@ license = "GPL-3.0-only"
 default = []
 ct = []
 db = []
-chain = ["db"]
+chain = ["db", "dep:auto_impl"]
 network = []
 graph = ["dep:auto_impl", "dep:hopr-network-types"]
 node = ["chain", "db", "graph", "network", "dep:atomic_enum"]
@@ -39,3 +39,4 @@ hopr-crypto-types = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
+insta = { workspace = true }

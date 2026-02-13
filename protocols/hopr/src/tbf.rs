@@ -13,7 +13,6 @@ pub struct TagBloomFilter {
     capacity: usize,
 }
 
-#[allow(unused)]
 impl TagBloomFilter {
     // The default maximum number of packet tags this Bloom filter can hold.
     // After these many packets, the Bloom filter resets and packet replays are possible.
@@ -93,7 +92,6 @@ impl Default for TagBloomFilter {
 }
 
 #[cfg(test)]
-#[allow(unused)]
 mod tests {
     use hopr_crypto_types::types::PACKET_TAG_LENGTH;
 

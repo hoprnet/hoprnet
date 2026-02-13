@@ -50,6 +50,7 @@ testing = [
   "session-server",
   "session-client",
   "dep:futures-concurrency",
+  "dep:parking_lot",
   "dep:rand",
   "dep:rstest",
   "dep:tokio",
@@ -77,6 +78,7 @@ futures-concurrency = { workspace = true, optional = true }
 futures-time = { workspace = true }
 hex-literal = { workspace = true, optional = true }
 lazy_static = { workspace = true }
+parking_lot = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 rstest = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }

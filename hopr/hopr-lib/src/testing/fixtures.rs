@@ -412,6 +412,7 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
                     let _jh = tokio::spawn(
                         async move {
                             use futures_concurrency::stream::StreamExt;
+                            use hopr_api::chain::ChainValues;
 
                             enum Event {
                                 Chain(ChainEvent),
@@ -422,21 +423,39 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
                                 .map(Event::Network)
                                 .merge(chain_events.map(Event::Chain))
                                 .for_each(|event| async {
+
+                                    let ticket_price = std::sync::Arc::new(parking_lot::RwLock::new(chain_reader.minimum_ticket_price().await.unwrap_or_default()));
+                                    let win_probability = std::sync::Arc::new(parking_lot::RwLock::new(chain_reader.minimum_incoming_ticket_win_prob().await.unwrap_or_default()));
+
                                     match event {
                                         Event::Chain(chain_event) => {
-
                                             match chain_event {
                                                 ChainEvent::Announcement(account) =>{
                                                     graph_updater.record_node(account.public_key).await;
                                                 },
-                                                ChainEvent::ChannelOpened(channel) => {
+                                                ChainEvent::ChannelOpened(channel) |
+                                                ChainEvent::ChannelClosed(channel) |
+                                                ChainEvent::ChannelBalanceIncreased(channel, _) |
+                                                ChainEvent::ChannelBalanceDecreased(channel, _) => {
                                                     let from = chain_reader.chain_key_to_packet_key(&channel.source).await;
                                                     let to = chain_reader.chain_key_to_packet_key(&channel.destination).await;
 
                                                     match (from, to) {
-                                                        (Ok(Some(_from)), Ok(Some(_to))) => {
-                                                            // graph_updater.record_edge(from, to).await;
-                                                            // TODO: update here
+                                                        (Ok(Some(from)), Ok(Some(to))) => {
+                                                            use hopr_api::graph::EdgeCapacityUpdate;
+                                                            use crate::{ChannelStatus, NeighborTelemetry, PathTelemetry};
+
+                                                            let capacity =  if matches!(channel.status, ChannelStatus::Closed) {
+                                                                None
+                                                            } else {
+                                                                Some(channel.balance.amount().low_u128().saturating_div(ticket_price.read().amount().low_u128()).saturating_mul(win_probability.read().as_luck() as u128))
+                                                            };
+
+                                                            graph_updater.record_edge(hopr_api::graph::MeasurableEdge::<NeighborTelemetry, PathTelemetry>::Capacity(Box::new(EdgeCapacityUpdate{
+                                                                capacity,
+                                                                src: from,
+                                                                dest: to
+                                                        }))).await;
                                                         },
                                                         (Ok(_), Ok(_)) => {
                                                             tracing::error!(%channel, "could not find packet keys for the channel endpoints");
@@ -447,13 +466,14 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
                                                     }
                                                 },
                                                 ChainEvent::ChannelClosureInitiated(_channel) => {},
-                                                ChainEvent::ChannelClosed(_channel) => {},
-                                                ChainEvent::ChannelBalanceIncreased(_channel, _balance) => {},
-                                                ChainEvent::ChannelBalanceDecreased(_channel, _balance) => {},
-                                                ChainEvent::WinningProbabilityIncreased(_probability) => {},
-                                                ChainEvent::WinningProbabilityDecreased(_probability) => {},
-                                                ChainEvent::TicketPriceChanged(_price) => {},
-                                                ChainEvent::TicketRedeemed(_channel_entry, _verified_ticket) => {},
+                                                ChainEvent::WinningProbabilityIncreased(probability) |
+                                                ChainEvent::WinningProbabilityDecreased(probability) => {
+                                                    *win_probability.write() = probability;
+                                                }
+                                                ChainEvent::TicketPriceChanged(price) => {
+                                                    *ticket_price.write() = price;
+                                                },
+                                                _ => {}
                                             }
                                         }
                                         Event::Network(network_event) => {

@@ -6,7 +6,7 @@ where
     P: MeasurablePath,
 {
     #[error("timed out for near neighbor probe '{0:?}'")]
-    ProbeNeighborTimeout(OffchainPublicKey),
+    ProbeNeighborTimeout(Box<OffchainPublicKey>),
 
     #[error("timed out for loopback probe")]
     ProbeLoopbackTimeout(P),
