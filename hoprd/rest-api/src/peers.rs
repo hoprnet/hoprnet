@@ -225,9 +225,9 @@ pub(super) async fn peer_stats(
 ) -> impl IntoResponse {
     #[cfg(not(feature = "telemetry"))]
     {
-        return Err::<(StatusCode, Json<PeerPacketStatsResponse>), _>(ApiErrorStatus::UnknownFailure(
+        Err::<(StatusCode, Json<PeerPacketStatsResponse>), _>(ApiErrorStatus::UnknownFailure(
             "BUILT WITHOUT STATS SUPPORT".into(),
-        ));
+        ))
     }
 
     #[cfg(feature = "telemetry")]

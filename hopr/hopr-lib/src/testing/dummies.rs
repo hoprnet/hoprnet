@@ -12,12 +12,6 @@ impl EchoServer {
     }
 }
 
-impl Default for EchoServer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[async_trait::async_trait]
 impl HoprSessionServer for EchoServer {
     async fn process(&self, session: IncomingSession) -> std::result::Result<(), HoprLibError> {

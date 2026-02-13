@@ -3,7 +3,7 @@ use std::process::Child;
 use anyhow::{Context, Result};
 use futures::future::try_join_all;
 use hopr_lib::HoprBalance;
-use hoprd_rest_api_client as hoprd_api_client;
+use hoprd_api_client;
 use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 
 #[derive(Debug, Clone)]
