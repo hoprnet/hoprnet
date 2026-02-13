@@ -230,10 +230,8 @@ impl<A: ChainReadChannelOperations + ChainWriteChannelOperations + Send + Sync +
 
         if let ChannelChange::Balance { left: old, right: new } = change {
             // If balance increased, clear in-flight state for this channel
-            if new > old {
-                if self.in_flight.remove(channel.get_id()).is_some() {
-                    debug!(%channel, "cleared in-flight funding state after balance increase");
-                }
+            if new > old && self.in_flight.remove(channel.get_id()).is_some() {
+                debug!(%channel, "cleared in-flight funding state after balance increase");
             }
 
             if new.le(&self.cfg.min_stake_threshold) && channel.status == ChannelStatus::Open {
@@ -567,7 +565,7 @@ mod tests {
             (3_u32 + 5_u32).into(),
             0_u32.into(),
             ChannelStatus::Open,
-            0_u32.into(),
+            0,
         );
 
         afs.on_own_channel_changed(
@@ -595,7 +593,7 @@ mod tests {
         let fund_amount = HoprBalance::from(5_u32);
 
         // BOB -> CHRIS channel with balance below threshold
-        let c1 = ChannelEntry::new(*BOB, *CHRIS, 3_u32.into(), 0_u32.into(), ChannelStatus::Open, 0_u32);
+        let c1 = ChannelEntry::new(*BOB, *CHRIS, 3_u32.into(), 0_u32.into(), ChannelStatus::Open, 0);
 
         let blokli_sim = BlokliTestStateBuilder::default()
             .with_generated_accounts(
