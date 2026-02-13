@@ -1,8 +1,6 @@
 use anyhow::Context;
-use hopr_lib::{
-    HoprNodeChainOperations,
-    testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_2_cluster_fixture as cluster},
-};
+use hopr_lib::HoprNodeChainOperations;
+use hopr_reference::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_2_cluster_fixture as cluster};
 use rstest::*;
 use serial_test::serial;
 

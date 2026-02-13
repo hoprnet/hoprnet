@@ -9,7 +9,6 @@ use std::{
 
 use backon::BackoffBuilder;
 use futures::stream::{BoxStream, Stream, StreamExt};
-use hopr_api::network::PeerDiscovery;
 use libp2p::{
     Multiaddr, PeerId,
     core::Endpoint,
@@ -19,10 +18,7 @@ use libp2p::{
     },
 };
 
-#[derive(Debug)]
-pub enum DiscoveryInput {
-    Indexer(PeerDiscovery),
-}
+use crate::PeerDiscovery;
 
 /// Data structure holding the item alongside a release timemestamp.
 ///
@@ -73,7 +69,7 @@ fn initial_backoff() -> backon::ExponentialBackoff {
 
 pub struct Behaviour {
     me: PeerId,
-    events: BoxStream<'static, DiscoveryInput>,
+    events: BoxStream<'static, PeerDiscovery>,
     pending_events: VecDeque<
         libp2p::swarm::ToSwarm<
             <Self as NetworkBehaviour>::ToSwarm,
@@ -93,7 +89,7 @@ impl Behaviour {
     {
         Self {
             me,
-            events: Box::pin(external_discovery_events.map(DiscoveryInput::Indexer)),
+            events: Box::pin(external_discovery_events),
             bootstrap_peers: HashMap::new(),
             pending_events: VecDeque::new(),
             connected_peers: HashMap::new(),
@@ -249,7 +245,7 @@ impl NetworkBehaviour for Behaviour {
         };
 
         let poll_result = self.events.poll_next_unpin(cx).map(|e| {
-            if let Some(DiscoveryInput::Indexer(PeerDiscovery::Announce(peer, multiaddresses))) = e
+            if let Some(PeerDiscovery::Announce(peer, multiaddresses)) = e
                 && peer != self.me
             {
                 tracing::debug!(%peer, addresses = ?&multiaddresses, "Announcement");

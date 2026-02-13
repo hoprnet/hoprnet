@@ -2,22 +2,15 @@ use std::{num::NonZeroUsize, process::ExitCode, str::FromStr, sync::Arc};
 
 use async_signal::{Signal, Signals};
 use futures::{FutureExt, StreamExt, future::abortable};
-use hopr_chain_connector::{
-    BlockchainConnectorConfig, HoprBlockchainSafeConnector,
-    api::{ChainEvent, ChainKeyOperations, StateSyncOptions},
-    blokli_client,
-    blokli_client::BlokliClient,
-    create_trustful_hopr_blokli_connector,
-};
-use hopr_db_node::{HoprNodeDb, init_hopr_node_db};
+use hopr_chain_connector::{HoprBlockchainSafeConnector, blokli_client::BlokliClient};
+use hopr_db_node::HoprNodeDb;
 use hopr_lib::{
-    AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex,
-    api::{chain::ChainEvents, graph::NetworkGraphUpdate, node::HoprNodeChainOperations},
+    AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, api::node::HoprNodeChainOperations,
     config::HoprLibConfig,
 };
 use hopr_network_graph::SharedChannelGraph;
 use hopr_transport_p2p::HoprNetwork;
-use hoprd::{cli::CliArgs, config::HoprdConfig, errors::HoprdError, exit::HoprServerIpForwardingReactor};
+use hoprd::{cli::CliArgs, config::HoprdConfig, errors::HoprdError};
 use hoprd_api::{RestApiParameters, serve_api};
 use signal_hook::low_level;
 use tracing::{debug, error, info, warn};
@@ -148,8 +141,6 @@ enum HoprdProcess {
     Strategies,
     #[strum(to_string = "REST API process")]
     RestApi,
-    #[strum(to_string = "Graph update process")]
-    GraphUpdate,
 }
 
 #[cfg(not(feature = "runtime-tokio"))]
@@ -260,6 +251,11 @@ fn main() -> ExitCode {
 
 #[cfg(feature = "runtime-tokio")]
 async fn main_inner() -> anyhow::Result<()> {
+    use hopr_api::chain::ChainEvents;
+    use hopr_chain_connector::{BlockchainConnectorConfig, blokli_client, create_trustful_hopr_blokli_connector};
+    use hopr_db_node::init_hopr_node_db;
+    use hopr_reference::exit::HoprServerIpForwardingReactor;
+
     #[cfg(all(target_os = "linux", feature = "allocator-jemalloc-stats"))]
     let _jemalloc_stats = jemalloc_stats::JemallocStats::start().await;
 
@@ -307,6 +303,11 @@ async fn main_inner() -> anyhow::Result<()> {
         "Node public identifiers"
     );
 
+    // Create the node instance
+    info!("creating the HOPRd node instance from hopr-lib");
+
+    let mut processes = AbortableList::<HoprdProcess>::default();
+
     let node_db = init_hopr_node_db(&cfg.db.data, cfg.db.initialize, cfg.db.force_initialize).await?;
 
     let mut chain_connector = create_trustful_hopr_blokli_connector(
@@ -332,148 +333,22 @@ async fn main_inner() -> anyhow::Result<()> {
     chain_connector.connect().await?;
     let chain_connector = Arc::new(chain_connector);
 
-    // Create the node instance
-    info!("creating the HOPRd node instance from hopr-lib");
-
-    // create network
-    let network_builder = hopr_transport_p2p::HoprLibp2pNetworkBuilder::new();
-    // create graph
-    let graph = std::sync::Arc::new(hopr_network_graph::ChannelGraph::new(*hopr_lib::Keypair::public(
+    let (node, hopr_process) = hopr_reference::build_from_chain_and_db(
+        &hopr_keys.chain_key,
         &hopr_keys.packet_key,
-    )));
-
-    let mut processes = AbortableList::<HoprdProcess>::default();
-
-    // START = process chain and network events into graph updates
-    let chain_events = chain_connector.subscribe_with_state_sync([
-        if cfg.hopr.network.announce_local_addresses {
-            StateSyncOptions::AllAccounts
-        } else {
-            StateSyncOptions::PublicAccounts
-        },
-        StateSyncOptions::OpenedChannels,
-    ])?;
-    let network_events = network_builder.subscribe_network_events();
-    let graph_updater = graph.clone();
-    let chain_reader = chain_connector.clone();
-
-    let (proc, abort_handle) = abortable(
-        async move {
-            use futures_concurrency::stream::StreamExt;
-
-            enum Event {
-                Chain(ChainEvent),
-                Network(hopr_lib::api::network::NetworkEvent),
-            }
-
-            network_events
-                .map(Event::Network)
-                .merge(chain_events.map(Event::Chain))
-                .for_each(|event| async {
-                    use hopr_api::chain::ChainValues;
-
-                    let ticket_price = std::sync::Arc::new(parking_lot::RwLock::new(chain_reader.minimum_ticket_price().await.unwrap_or_default()));
-                    let win_probability = std::sync::Arc::new(parking_lot::RwLock::new(chain_reader.minimum_incoming_ticket_win_prob().await.unwrap_or_default()));
-
-                    match event {
-                        Event::Chain(chain_event) => {
-                            match chain_event {
-                                ChainEvent::Announcement(account) =>{
-                                    graph_updater.record_node(account.public_key).await;
-                                },
-                                ChainEvent::ChannelOpened(channel) |
-                                ChainEvent::ChannelClosed(channel) |
-                                ChainEvent::ChannelBalanceIncreased(channel, _) |
-                                ChainEvent::ChannelBalanceDecreased(channel, _) => {
-                                    let from = chain_reader.chain_key_to_packet_key(&channel.source).await;
-                                    let to = chain_reader.chain_key_to_packet_key(&channel.destination).await;
-
-                                    match (from, to) {
-                                        (Ok(Some(from)), Ok(Some(to))) => {
-                                            use hopr_api::graph::EdgeCapacityUpdate;
-                                            use hopr_lib::{ChannelStatus, NeighborTelemetry, PathTelemetry};
-
-                                            let capacity =  if matches!(channel.status, ChannelStatus::Closed) {
-                                                None
-                                            } else {
-                                                Some(channel.balance.amount().low_u128().saturating_div(ticket_price.read().amount().low_u128()).saturating_mul(win_probability.read().as_luck() as u128))
-                                            };
-
-                                            graph_updater.record_edge(hopr_api::graph::MeasurableEdge::<NeighborTelemetry, PathTelemetry>::Capacity(Box::new(EdgeCapacityUpdate{
-                                                capacity,
-                                                src: from,
-                                                dest: to
-                                        }))).await;
-                                        },
-                                        (Ok(_), Ok(_)) => {
-                                            tracing::error!(%channel, "could not find packet keys for the channel endpoints");
-                                        },
-                                        (Err(e), _) | (_, Err(e)) => {
-                                            tracing::error!(%e, %channel, "failed to convert chain keys to packet keys for graph update");
-                                        }
-                                    }
-                                },
-                                ChainEvent::ChannelClosureInitiated(_channel) => {},
-                                ChainEvent::WinningProbabilityIncreased(probability) |
-                                ChainEvent::WinningProbabilityDecreased(probability) => {
-                                    *win_probability.write() = probability;
-                                }
-                                ChainEvent::TicketPriceChanged(price) => {
-                                    *ticket_price.write() = price;
-                                },
-                                _ => {}
-                            }
-                        }
-                        Event::Network(network_event) => {
-                            match network_event {
-                                hopr_api::network::NetworkEvent::PeerConnected(peer_id) =>
-                                    if let Ok(opk) = hopr_lib::peer_id_to_public_key(&peer_id).await {
-                                        graph_updater.record_node(opk).await;
-                                    } else {
-                                        tracing::error!(%peer_id, "failed to convert peer ID to public key for graph update");
-                                    },
-                                hopr_api::network::NetworkEvent::PeerDisconnected(peer_id) =>
-                                    if let Ok(opk) = hopr_lib::peer_id_to_public_key(&peer_id).await {
-                                        graph_updater.record_node(opk).await;
-                                    } else {
-                                        tracing::error!(%peer_id, "failed to convert peer ID to public key for graph update");
-                                    },
-                            };
-                        }
-                    }
-                })
-                .await;
-        }
-        .inspect(|_| tracing::warn!(task = "hoprd - Graph", "long-running background task finished")),
-    );
-    let _jh = tokio::spawn(proc);
-    processes.insert(HoprdProcess::GraphUpdate, abort_handle);
-    // END = process chain and network events into graph updates
-
-    // create the node
-    let node = Arc::new(
-        hopr_lib::Hopr::new(
-            (&hopr_keys).into(),
-            chain_connector.clone(),
-            node_db,
-            graph.clone(),
-            hopr_lib_cfg,
-        )
-        .await?,
-    );
+        cfg.hopr.clone().into(),
+        chain_connector.clone(),
+        node_db,
+        HoprServerIpForwardingReactor::new(hopr_keys.packet_key.clone(), cfg.session_ip_forwarding.clone()),
+    )
+    .await?;
 
     if cfg.api.enable {
         let list = init_rest_api(&cfg, node.clone()).await?;
         processes.extend_from(list);
     }
 
-    let _hopr_socket = node
-        .run(
-            hopr_ct_telemetry::ImmediateNeighborProber::new(Default::default(), graph.clone()),
-            network_builder,
-            HoprServerIpForwardingReactor::new(hopr_keys.packet_key.clone(), cfg.session_ip_forwarding),
-        )
-        .await?;
+    let _hopr_socket = hopr_process.await?;
 
     let multi_strategy = Arc::new(hopr_strategy::strategy::MultiStrategy::new(
         cfg.strategy.clone(),

@@ -48,6 +48,12 @@ pub use crate::{
     swarm::HoprLibp2pNetworkBuilder,
 };
 
+/// Events required for bootstrapping the p2p network.
+#[derive(Debug, Clone)]
+pub enum PeerDiscovery {
+    Announce(PeerId, Vec<Multiaddr>),
+}
+
 #[derive(Clone)]
 pub struct HoprNetwork {
     tracker: Arc<DashSet<PeerId>>,

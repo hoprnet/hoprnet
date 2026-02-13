@@ -1,15 +1,10 @@
 use futures::StreamExt;
-use hopr_crypto_random::Randomizable;
-use hopr_crypto_types::prelude::*;
-use hopr_internal_types::prelude::*;
 use hopr_lib::{
     ApplicationDataIn, ApplicationDataOut,
     exports::transport::session::{
         Capabilities, Capability, HoprSession, HoprSessionConfig, SessionId, transfer_session,
     },
 };
-use hopr_network_types::prelude::*;
-use hopr_primitive_types::prelude::Address;
 use rstest::*;
 use tokio::{io::AsyncReadExt, net::UdpSocket, sync::oneshot};
 
@@ -20,6 +15,11 @@ use tokio::{io::AsyncReadExt, net::UdpSocket, sync::oneshot};
 /// Creates paired Hopr sessions bridged to a UDP listener to prove that messages
 /// sent over UDP end up in the remote session buffer regardless of capability set.
 async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
+    use hopr_lib::{
+        Address, ChainKeypair, ConnectedUdpStream, DestinationRouting, HoprPseudonym, Keypair, RoutingOptions,
+        UdpStreamParallelism, crypto_traits::Randomizable,
+    };
+
     let dst: Address = (&ChainKeypair::random()).into();
     let id = SessionId::new(1u64, HoprPseudonym::random());
     let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
@@ -76,7 +76,8 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
     });
     ready_rx.await.ok();
 
-    let msg: [u8; 9183] = hopr_crypto_random::random_bytes();
+    let mut msg = [0u8; 9183];
+    rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut msg);
     let sender = UdpSocket::bind(("127.0.0.1", 0)).await?;
 
     let w = sender.send_to(&msg[..8192], addr).await?;

@@ -22,8 +22,8 @@ pub enum HoprState {
     ValidatingNetworkConfig = 3,
 
     /// Subscribing to on-chain account announcements
-    #[strum(to_string = "Subscribing to network announcements")]
-    SubscribingToAnnouncements = 4,
+    #[strum(to_string = "Checking onchain address")]
+    CheckingOnchainAddress = 4,
 
     /// Registering the Safe contract with this node
     #[strum(to_string = "Registering Safe contract")]

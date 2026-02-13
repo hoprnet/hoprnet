@@ -31,10 +31,10 @@ use hopr_chain_connector::HoprBlockchainSafeConnector;
 use hopr_db_node::HoprNodeDb;
 use hopr_lib::{Address, Hopr, errors::HoprLibError};
 use hopr_network_graph::SharedChannelGraph;
+// pub use hopr_reference::config::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
 use hopr_transport_p2p::HoprNetwork;
 use hopr_utils_session::ListenerJoinHandles;
 use serde::Serialize;
-pub use session::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{

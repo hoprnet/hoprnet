@@ -4,7 +4,7 @@ use futures::{AsyncRead, AsyncWrite, Stream, future::BoxFuture};
 use hopr_crypto_types::keypairs::OffchainKeypair;
 
 use super::Health;
-use crate::{Multiaddr, PeerId, network::PeerDiscovery};
+use crate::{Multiaddr, PeerId};
 
 /// Type alias for a boxed function returning a boxed future.
 pub type BoxedProcessFn = Box<dyn FnOnce() -> BoxFuture<'static, ()> + Send>;
@@ -43,14 +43,11 @@ pub trait NetworkStreamControl: std::fmt::Debug {
 pub trait NetworkBuilder {
     type Network: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static;
 
-    async fn build<T>(
+    async fn build(
         self,
         identity: &OffchainKeypair,
         my_multiaddresses: Vec<Multiaddr>,
         protocol: &'static str,
         allow_private_addresses: bool,
-        network_discovery_events: T,
-    ) -> Result<(Self::Network, BoxedProcessFn), impl std::error::Error>
-    where
-        T: Stream<Item = PeerDiscovery> + Send + 'static;
+    ) -> Result<(Self::Network, BoxedProcessFn), impl std::error::Error>;
 }

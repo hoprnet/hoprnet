@@ -2,19 +2,16 @@ use std::{fmt::Formatter, sync::Arc, time::Duration};
 
 use anyhow::Context;
 use futures::future::join_all;
-use hopr_crypto_types::prelude::*;
-use hopr_db_node::HoprNodeDb;
-use hopr_primitive_types::prelude::*;
-use hopr_transport::{Hash, config::HoprCodecConfig};
+use hopr_lib::{
+    Address, ChannelEntry, ChannelStatus, Hash, HoprBalance, HoprNodeChainOperations, HoprNodeNetworkOperations,
+    HoprNodeOperations, HoprTransportIO, PeerId,
+    api::node::state::HoprState,
+    config::{HoprLibConfig, SessionGlobalConfig},
+    prelude,
+};
 use tokio::time::sleep;
 
-use crate::{
-    Address, ChannelEntry, ChannelStatus, HoprNodeChainOperations, HoprNodeNetworkOperations, HoprNodeOperations,
-    HoprState, HoprTransportIO, PeerId,
-    config::HoprLibConfig,
-    prelude,
-    testing::{TestingConnector, TestingGraph, TestingHopr},
-};
+use crate::testing::{TestingConnector, TestingHopr};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct NodeSafeConfig {
@@ -22,59 +19,43 @@ pub struct NodeSafeConfig {
     pub module_address: Address,
 }
 
-pub async fn create_hopr_instance(
-    identity: (&ChainKeypair, &OffchainKeypair),
-    host_port: u16,
-    node_db: HoprNodeDb,
-    connector: TestingConnector,
-    graph: TestingGraph,
-    safe: NodeSafeConfig,
-    winn_prob: f64,
-) -> TestingHopr {
-    crate::Hopr::new(
-        identity,
-        connector,
-        node_db,
-        graph,
-        HoprLibConfig {
-            host: crate::config::HostConfig {
-                address: crate::config::HostType::default(),
-                port: host_port,
-            },
-            safe_module: crate::config::SafeModule {
-                safe_address: safe.safe_address,
-                module_address: safe.module_address,
-                ..Default::default()
-            },
-            protocol: crate::config::HoprProtocolConfig {
-                transport: crate::config::TransportConfig {
-                    prefer_local_addresses: true,
-                    announce_local_addresses: true,
-                },
-                session: hopr_transport::config::SessionGlobalConfig {
-                    idle_timeout: Duration::from_millis(2500),
-                    ..Default::default()
-                },
-                probe: crate::config::ProbeConfig {
-                    timeout: Duration::from_secs(2),
-                    max_parallel_probes: 10,
-                    recheck_threshold: Duration::from_secs(1),
-                    ..Default::default()
-                },
-                packet: crate::config::HoprPacketPipelineConfig {
-                    codec: HoprCodecConfig {
-                        outgoing_win_prob: Some(winn_prob.try_into().expect("invalid winning probability")),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                },
-            },
-            publish: true,
+pub fn create_hopr_instance_config(host_port: u16, safe: NodeSafeConfig, winn_prob: f64) -> HoprLibConfig {
+    HoprLibConfig {
+        host: hopr_lib::config::HostConfig {
+            address: hopr_lib::config::HostType::default(),
+            port: host_port,
+        },
+        safe_module: hopr_lib::config::SafeModule {
+            safe_address: safe.safe_address,
+            module_address: safe.module_address,
             ..Default::default()
         },
-    )
-    .await
-    .expect(format!("failed to create hopr instance on port {host_port}").as_str())
+        protocol: hopr_lib::config::HoprProtocolConfig {
+            transport: hopr_lib::config::TransportConfig {
+                prefer_local_addresses: true,
+                announce_local_addresses: true,
+            },
+            session: SessionGlobalConfig {
+                idle_timeout: Duration::from_millis(2500),
+                ..Default::default()
+            },
+            probe: hopr_lib::config::ProbeConfig {
+                timeout: Duration::from_secs(2),
+                max_parallel_probes: 10,
+                recheck_threshold: Duration::from_secs(1),
+                ..Default::default()
+            },
+            packet: hopr_lib::config::HoprPacketPipelineConfig {
+                codec: hopr_lib::exports::transport::config::HoprCodecConfig {
+                    outgoing_win_prob: Some(winn_prob.try_into().expect("invalid winning probability")),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+        },
+        publish: true,
+        ..Default::default()
+    }
 }
 
 pub struct TestedHopr {
@@ -84,6 +65,7 @@ pub struct TestedHopr {
     pub instance: Arc<TestingHopr>,
     /// Transport socket that can be used to send and receive data via the HOPR node.
     pub socket: HoprTransportIO,
+    pub connector: TestingConnector,
 }
 
 impl std::fmt::Debug for TestedHopr {
@@ -95,12 +77,18 @@ impl std::fmt::Debug for TestedHopr {
 }
 
 impl TestedHopr {
-    pub fn new(runtime: tokio::runtime::Runtime, instance: TestingHopr, socket: HoprTransportIO) -> Self {
+    pub fn new(
+        runtime: tokio::runtime::Runtime,
+        instance: Arc<TestingHopr>,
+        socket: HoprTransportIO,
+        connector: TestingConnector,
+    ) -> Self {
         assert_eq!(HoprState::Running, instance.status(), "hopr instance must be running");
         Self {
             runtime: Some(runtime),
-            instance: Arc::new(instance),
+            instance: instance,
             socket,
+            connector,
         }
     }
 }
@@ -130,7 +118,7 @@ impl TestedHopr {
     }
 
     pub fn connector(&self) -> &TestingConnector {
-        &self.instance.chain_api
+        &self.connector
     }
 
     pub fn config(&self) -> &HoprLibConfig {

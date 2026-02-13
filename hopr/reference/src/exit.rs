@@ -6,7 +6,6 @@ use hopr_lib::{
     prelude::{ConnectedUdpStream, ForeignDataMode, UdpStreamParallelism},
     transfer_session,
 };
-use hoprd_api::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
 
 use crate::config::SessionIpForwardingConfig;
 
@@ -18,6 +17,15 @@ lazy_static::lazy_static! {
         &["type"]
     ).unwrap();
 }
+
+/// Size of the buffer for forwarding data to/from a TCP stream.
+pub const HOPR_TCP_BUFFER_SIZE: usize = 4096;
+
+/// Size of the buffer for forwarding data to/from a UDP stream.
+pub const HOPR_UDP_BUFFER_SIZE: usize = 16384;
+
+/// Size of the queue (back-pressure) for data incoming from a UDP stream.
+pub const HOPR_UDP_QUEUE_SIZE: usize = 8192;
 
 /// Implementation of [`hopr_lib::HoprSessionReactor`] that facilitates
 /// bridging of TCP or UDP sockets from the Session Exit node to a destination.

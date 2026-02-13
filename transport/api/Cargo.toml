@@ -43,7 +43,6 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 cfg-if = { workspace = true }
 futures = { workspace = true }
-futures-concurrency = { workspace = true }
 humantime-serde = { workspace = true, optional = true }
 lazy_static = { workspace = true }
 moka = { workspace = true }

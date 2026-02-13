@@ -39,6 +39,7 @@ members = [
   "db/node",
   "utils/session",
   # implementations
+  "hopr/reference",
   "impls/ct/telemetry",
   "impls/graph",
   "impls/transport/p2p",
@@ -261,6 +262,7 @@ hopr-chain-connector = { path = "chain/connector" }
 hopr-statistics = { path = "common/statistics" }
 
 # referential implementations
+hopr-reference = { path = "hopr/reference" }
 hopr-transport-p2p = { path = "impls/transport/p2p" }
 hopr-ct-telemetry = { path = "impls/ct/telemetry" }
 hopr-network-graph = { path = "impls/graph" }
