@@ -31,7 +31,6 @@ scrape_configs:
 - `hopr_strategy_closure_auto_finalization_count`: Count of channels where closure finalizing was initiated automatically
 - `hopr_strategy_enabled_strategies`: List of enabled strategies, keys: `strategy`
 - `hopr_strategy_auto_funding_funding_count`: Count of initiated automatic fundings
-- `hopr_strategy_auto_funding_failure_count`: Count of failed automatic funding attempts (enqueue or confirmation failure)
 - `hopr_strategy_auto_redeem_redeem_count`: Count of initiated automatic redemptions
 - `hopr_transport_p2p_active_connection_count`: Count of the currently active p2p connections as observed from the rust-libp2p events
 - `hopr_http_api_call_count`: Number of different REST API calls and their statuses, keys: `path`, `method`, `status`
