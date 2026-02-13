@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["DEFAULT_MAXIMUM_INCOMING_TICKET_WIN_PROB","DEFAULT_MINIMUM_INCOMING_TICKET_WIN_PROB","INTERMEDIATE_HOPS","MIN_BATCH_SIZE"],"enum":["PendingAcknowledgement"],"struct":["Acknowledgement","VerifiedAcknowledgement"],"type":["HoprPseudonym"]};

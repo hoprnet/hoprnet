@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["f64_approx_eq","to_hex_shortened"],"mod":["balance","bounded","errors","prelude","primitives","traits"]};

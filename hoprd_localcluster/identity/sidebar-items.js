@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["DEFAULT_BLOKLI_URL","DEFAULT_CONFIG_HOME","DEFAULT_IDENTITY_PASSWORD","DEFAULT_NUM_NODES","DEFAULT_PRIVATE_KEY"],"fn":["generate"],"struct":["GenerationConfig"]};
