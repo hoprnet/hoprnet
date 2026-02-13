@@ -5388,28 +5388,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "hoprd-localcluster"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "futures",
- "hopr-chain-connector",
- "hopr-lib",
- "hopr-primitive-types 0.10.0",
- "hoprd",
- "hoprd-api",
- "hoprd-rest-api-client",
- "lazy_static",
- "reqwest 0.13.2",
- "serde_yaml",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "hoprd-rest-api-client"
+name = "hoprd-api-client"
 version = "0.1.0"
 dependencies = [
  "bytes",
@@ -5430,6 +5409,27 @@ dependencies = [
  "syn 2.0.114",
  "utoipa",
  "uuid",
+]
+
+[[package]]
+name = "hoprd-localcluster"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "futures",
+ "hopr-chain-connector",
+ "hopr-lib",
+ "hopr-primitive-types 0.10.0",
+ "hoprd",
+ "hoprd-api",
+ "hoprd-api-client",
+ "lazy_static",
+ "reqwest 0.13.2",
+ "serde_yaml",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

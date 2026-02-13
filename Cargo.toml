@@ -258,7 +258,6 @@ hopr-protocol-app = { path = "protocols/app" }
 hopr-protocol-hopr = { path = "protocols/hopr" }
 hopr-protocol-session = { path = "protocols/session" }
 hopr-protocol-start = { path = "protocols/start" }
-hoprd-rest-api-client = { path = "hoprd/rest-api-client" }
 hopr-strategy = { path = "logic/strategy", default-features = false }
 hopr-transport = { path = "transport/api" }
 hopr-transport-identity = { path = "transport/identity" }
@@ -268,8 +267,9 @@ hopr-transport-probe = { path = "transport/probe" }
 hopr-transport-protocol = { path = "transport/protocol" }
 hopr-transport-p2p = { path = "transport/p2p" }
 hopr-transport-session = { path = "transport/session" }
-hoprd-api = { path = "hoprd/rest-api", default-features = false }
 hoprd = { path = "hoprd/hoprd" }
+hoprd-api = { path = "hoprd/rest-api", default-features = false }
+hoprd-api-client = { path = "hoprd/rest-api-client" }
 hopr-db-entity = { path = "db/entity" }
 hopr-db-migration = { path = "db/migration" }
 hopr-utils-session = { path = "utils/session" }
