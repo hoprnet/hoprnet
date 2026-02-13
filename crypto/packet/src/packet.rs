@@ -609,9 +609,7 @@ mod tests {
 
     impl HoprPacket {
         pub fn to_bytes(&self) -> Box<[u8]> {
-            let dummy_ticket = hex!(
-                "67f0ca18102feec505e5bfedcc25963e9c64a6f8a250adcad7d2830dd607585700000000000000000000000000000000000000000000000000000000000000003891bf6fd4a78e868fc7ad477c09b16fc70dd01ea67e18264d17e3d04f6d8576de2e6472b0072e510df6e9fa1dfcc2727cc7633edfeb9ec13860d9ead29bee71d68de3736c2f7a9f42de76ccd57a5f5847bc7349"
-            );
+            let dummy_ticket = hex!("67f0ca18102feec505e5bfedcc25963e9c64a6f8a250adcad7d2830dd607585700000000000000000000000000000000000000000000000000000000000000003891bf6fd4a78e868fc7ad477c09b16fc70dd01ea67e18264d17e3d04f6d8576de2e6472b0072e510df6e9fa1dfcc2727cc7633edfeb9ec13860d9ead29bee71d68de3736c2f7a9f42de76ccd57a5f5847bc7349");
             let (packet, ticket) = match self {
                 Self::Final(packet) => (packet.plain_text.clone(), dummy_ticket.as_ref().into()),
                 Self::Forwarded(fwd) => (

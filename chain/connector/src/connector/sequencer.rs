@@ -127,7 +127,6 @@ where
 impl<C, R> TransactionSequencer<C, R>
 where
     C: BlokliTransactionClient + Send + Sync + 'static,
-    R: Send,
 {
     /// Adds the transaction to the [`TransactionSequencer`] queue.
     ///
@@ -136,7 +135,7 @@ where
         &self,
         transaction: R,
         timeout_until_finalized: std::time::Duration,
-    ) -> errors::Result<impl Future<Output = errors::Result<blokli_client::api::types::Transaction>> + Send> {
+    ) -> errors::Result<impl Future<Output = errors::Result<blokli_client::api::types::Transaction>>> {
         let (notifier_tx, notifier_rx) = futures::channel::oneshot::channel();
 
         self.sender

@@ -4352,7 +4352,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "0.10.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4400,7 +4400,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.15.0"
+version = "0.14.1"
 dependencies = [
  "ahash",
  "anyhow",
