@@ -866,14 +866,20 @@ where
     /// closed due to inactivity.
     #[cfg(feature = "session-client")]
     pub async fn keep_alive_session(&self, id: &SessionId) -> errors::Result<()> {
-        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for session operations".into())?;
         Ok(self.transport_api.probe_session(id).await?)
     }
 
     #[cfg(feature = "session-client")]
     pub async fn get_session_surb_balancer_config(&self, id: &SessionId) -> errors::Result<Option<SurbBalancerConfig>> {
-        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for session operations".into())?;
         Ok(self.transport_api.session_surb_balancing_cfg(id).await?)
+    }
+
+    #[cfg(all(feature = "session-client", feature = "telemetry"))]
+    pub async fn get_session_stats(&self, id: &SessionId) -> errors::Result<SessionStatsSnapshot> {
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for session operations".into())?;
+        Ok(self.transport_api.session_stats(id).await?)
     }
 
     #[cfg(feature = "session-client")]
@@ -882,7 +888,7 @@ where
         id: &SessionId,
         cfg: SurbBalancerConfig,
     ) -> errors::Result<()> {
-        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for session operations".into())?;
         Ok(self.transport_api.update_session_surb_balancing_cfg(id, cfg).await?)
     }
 
@@ -944,6 +950,18 @@ where
     /// Get all data collected from the network relevant for a PeerId
     pub async fn network_peer_info(&self, peer: &PeerId) -> errors::Result<Option<Observations>> {
         Ok(self.transport_api.network_peer_observations(peer).await?)
+    }
+
+    /// Get packet stats for a specific peer.
+    #[cfg(feature = "telemetry")]
+    pub async fn network_peer_packet_stats(&self, peer: &PeerId) -> errors::Result<Option<PeerPacketStatsSnapshot>> {
+        Ok(self.transport_api.network_peer_packet_stats(peer).await?)
+    }
+
+    /// Get packet stats for all connected peers.
+    #[cfg(feature = "telemetry")]
+    pub async fn network_all_packet_stats(&self) -> errors::Result<Vec<(PeerId, PeerPacketStatsSnapshot)>> {
+        Ok(self.transport_api.network_all_packet_stats().await?)
     }
 
     /// Get peers connected peers with quality higher than some value

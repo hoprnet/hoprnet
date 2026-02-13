@@ -4,16 +4,23 @@ use hopr_api::PeerId;
 
 use super::observation::Observations;
 
-/// Tracker of [`Observations`] for network peers.
+/// Entry containing both observations and packet stats for a peer.
+#[derive(Debug, Default)]
+pub struct PeerEntry {
+    pub observations: Observations,
+}
+
+/// Tracker of [`Observations`] and packet statistics for network peers.
 ///
 /// This structure maintains a mapping between [`PeerId`] and their associated
-/// [`Observations`], allowing for efficient tracking and updating of peer telemetry data.
+/// [`PeerEntry`] (containing [`Observations`] and [`PeerPacketStats`]),
+/// allowing for efficient tracking and updating of peer telemetry data.
 ///
 /// It can be combined with other objects to offer a complete view of the network state in regards
 /// to immediate peer probing.
 #[derive(Debug, Default, Clone)]
 pub struct NetworkPeerTracker {
-    peers: Arc<dashmap::DashMap<PeerId, Observations>>,
+    peers: Arc<dashmap::DashMap<PeerId, PeerEntry>>,
 }
 
 impl NetworkPeerTracker {
@@ -33,12 +40,15 @@ impl NetworkPeerTracker {
     where
         F: FnOnce(&PeerId, Observations) -> Observations,
     {
-        self.peers.alter(peer, f);
+        self.peers.alter(peer, |peer_id: &PeerId, mut entry: PeerEntry| {
+            entry.observations = f(peer_id, entry.observations);
+            entry
+        });
     }
 
     #[inline]
     pub fn get(&self, peer: &PeerId) -> Option<Observations> {
-        self.peers.get(peer).map(|o| *o.value())
+        self.peers.get(peer).map(|entry| entry.value().observations)
     }
 
     #[inline]

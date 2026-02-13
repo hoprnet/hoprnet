@@ -1,0 +1,15 @@
+---
+source: protocols/session/src/socket/mod.rs
+expression: bob_tracker
+---
+frames_emitted: 12
+frames_completed: 12
+frames_discarded: 1
+incomplete_frames: 1
+errors: 0
+incoming_messages_Segment: 24
+incoming_messages_Request: 0
+incoming_messages_Acknowledge: 0
+outgoing_messages_Segment: 1
+outgoing_messages_Request: 0
+outgoing_messages_Acknowledge: 0

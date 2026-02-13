@@ -255,7 +255,7 @@ impl Hash for SessionId {
     }
 }
 
-fn caps_to_ack_mode(caps: Capabilities) -> AcknowledgementMode {
+pub(crate) fn caps_to_ack_mode(caps: Capabilities) -> AcknowledgementMode {
     if caps.contains(Capability::RetransmissionAck | Capability::RetransmissionNack) {
         AcknowledgementMode::Both
     } else if caps.contains(Capability::RetransmissionAck) {
@@ -341,7 +341,11 @@ pub struct HoprSession {
     routing: DestinationRouting,
     cfg: HoprSessionConfig,
     on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
+    #[cfg(feature = "telemetry")]
+    metrics: std::sync::Arc<crate::telemetry::SessionTelemetry>,
 }
+
+pub(crate) const SESSION_SOCKET_CAPACITY: usize = 16384;
 
 impl HoprSession {
     /// Creates a new HOPR Session.
@@ -351,13 +355,14 @@ impl HoprSession {
     /// based on the given `capabilities`.
     ///
     /// The `on_close` closure can be optionally called when the Session has been closed via `poll_close`.
-    #[tracing::instrument(skip(hopr, on_close), fields(session_id = %id))]
+    #[tracing::instrument(skip_all, fields(id, routing, cfg, session_id = %id))]
     pub fn new<Tx, Rx>(
         id: SessionId,
         routing: DestinationRouting,
         cfg: HoprSessionConfig,
         hopr: (Tx, Rx),
         on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
+        #[cfg(feature = "telemetry")] metrics: std::sync::Arc<crate::telemetry::SessionTelemetry>,
     ) -> Result<Self, TransportSessionError>
     where
         Tx: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Send + Sync + Unpin + 'static,
@@ -366,10 +371,15 @@ impl HoprSession {
     {
         let routing_clone = routing.clone();
 
+        #[cfg(feature = "telemetry")]
+        let (metrics_write, metrics_read) = (metrics.clone(), metrics.clone());
+
         // Wrap the HOPR transport so that it appears as regular transport to the SessionSocket
         let transport = DuplexIO(
             AsyncWriteSink::<{ ApplicationData::PAYLOAD_SIZE }, _>(hopr.0.sink_map_err(std::io::Error::other).with(
                 move |buf: Box<[u8]>| {
+                    #[cfg(feature = "telemetry")]
+                    metrics_write.record_write(buf.len());
                     // The Session protocol does not set any packet info on outgoing packets.
                     // However, the SessionManager on top usually overrides this.
                     futures::future::ready(
@@ -382,7 +392,11 @@ impl HoprSession {
             // The Session protocol ignores the packet info on incoming packets.
             // It is typically SessionManager's job to interpret those.
             hopr.1
-                .map(|data| Ok::<_, std::io::Error>(data.data.plain_text))
+                .map(move |data| {
+                    #[cfg(feature = "telemetry")]
+                    metrics_read.record_read(data.data.plain_text.len());
+                    Ok::<_, std::io::Error>(data.data.plain_text)
+                })
                 .into_async_read(),
         );
 
@@ -391,7 +405,7 @@ impl HoprSession {
             let socket_cfg = SessionSocketConfig {
                 frame_size: cfg.frame_mtu,
                 frame_timeout: cfg.frame_timeout,
-                capacity: 16384,
+                capacity: SESSION_SOCKET_CAPACITY,
                 flush_immediately: cfg.capabilities.contains(Capability::NoDelay),
                 ..Default::default()
             };
@@ -421,12 +435,18 @@ impl HoprSession {
                     transport,
                     AcknowledgementState::<{ ApplicationData::PAYLOAD_SIZE }>::new(id, ack_cfg),
                     socket_cfg,
+                    #[cfg(feature = "telemetry")]
+                    metrics.clone(),
                 )?)
             } else {
                 debug!(?socket_cfg, "opening new stateless session socket");
 
                 Box::new(UnreliableSocket::<{ ApplicationData::PAYLOAD_SIZE }>::new_stateless(
-                    id, transport, socket_cfg,
+                    id,
+                    transport,
+                    socket_cfg,
+                    #[cfg(feature = "telemetry")]
+                    metrics.clone(),
                 )?)
             }
         } else {
@@ -440,6 +460,8 @@ impl HoprSession {
             routing,
             cfg,
             on_close,
+            #[cfg(feature = "telemetry")]
+            metrics,
         })
     }
 
@@ -457,6 +479,11 @@ impl HoprSession {
     pub fn config(&self) -> &HoprSessionConfig {
         &self.cfg
     }
+
+    #[cfg(feature = "telemetry")]
+    pub fn metrics(&self) -> &std::sync::Arc<crate::telemetry::SessionTelemetry> {
+        &self.metrics
+    }
 }
 
 impl std::fmt::Debug for HoprSession {
@@ -469,7 +496,7 @@ impl std::fmt::Debug for HoprSession {
 }
 
 impl futures::AsyncRead for HoprSession {
-    #[instrument(name = "Session::poll_read", level = "trace", skip(self, cx, buf), fields(session_id = %self.id), ret)]
+    #[instrument(name = "Session::poll_read", level = "trace", skip_all, fields(session_id = %self.id), ret)]
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
         let this = self.project();
         let read = futures::ready!(this.inner.poll_read(cx, buf))?;
@@ -486,21 +513,24 @@ impl futures::AsyncRead for HoprSession {
 }
 
 impl futures::AsyncWrite for HoprSession {
-    #[instrument(name = "Session::poll_write", level = "trace", skip(self, cx, buf), fields(session_id = %self.id), ret)]
+    #[instrument(name = "Session::poll_write", level = "trace", skip_all, fields(session_id = %self.id), ret)]
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
         self.project().inner.poll_write(cx, buf)
     }
 
-    #[instrument(name = "Session::poll_flush", level = "trace", skip(self, cx), fields(session_id = %self.id), ret)]
+    #[instrument(name = "Session::poll_flush", level = "trace", skip_all, fields(session_id = %self.id), ret)]
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         self.project().inner.poll_flush(cx)
     }
 
-    #[instrument(name = "Session::poll_close", level = "trace", skip(self, cx), fields(session_id = %self.id), ret)]
+    #[instrument(name = "Session::poll_close", level = "trace", skip_all, fields(session_id = %self.id), ret)]
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         let this = self.project();
         futures::ready!(this.inner.poll_close(cx))?;
         tracing::trace!("hopr session closed");
+
+        #[cfg(feature = "telemetry")]
+        this.metrics.set_state(crate::telemetry::SessionLifecycleState::Closing);
 
         if let Some(notifier) = this.on_close.take() {
             tracing::trace!("notifying write half closure of session");
@@ -542,6 +572,8 @@ impl tokio::io::AsyncWrite for HoprSession {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use anyhow::Context;
     use futures::{AsyncReadExt, AsyncWriteExt};
     use hopr_crypto_random::Randomizable;
@@ -550,6 +582,7 @@ mod tests {
     use hopr_primitive_types::prelude::*;
 
     use super::*;
+    use crate::telemetry::SessionTelemetry;
 
     #[test]
     fn test_session_id_to_str_from_str() -> anyhow::Result<()> {
@@ -598,6 +631,9 @@ mod tests {
         let id = SessionId::new(1234_u64, HoprPseudonym::random());
         const DATA_LEN: usize = 5000;
 
+        let alice_metrics = Arc::new(SessionTelemetry::new(id, Default::default()));
+        let bob_metrics = Arc::new(SessionTelemetry::new(id, Default::default()));
+
         let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
         let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
 
@@ -615,6 +651,8 @@ mod tests {
                     .inspect(|d| debug!("alice rcvd: {}", d.data.total_len())),
             ),
             None,
+            #[cfg(feature = "telemetry")]
+            alice_metrics,
         )?;
 
         let mut bob_session = HoprSession::new(
@@ -631,6 +669,8 @@ mod tests {
                     .inspect(|d| debug!("bob rcvd: {}", d.data.total_len())),
             ),
             None,
+            #[cfg(feature = "telemetry")]
+            bob_metrics,
         )?;
 
         let alice_sent = hopr_crypto_random::random_bytes::<DATA_LEN>();
@@ -673,6 +713,9 @@ mod tests {
         let id = SessionId::new(1234_u64, HoprPseudonym::random());
         const DATA_LEN: usize = 5000;
 
+        let alice_metrics = Arc::new(SessionTelemetry::new(id, Default::default()));
+        let bob_metrics = Arc::new(SessionTelemetry::new(id, Default::default()));
+
         let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
         let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
 
@@ -693,6 +736,8 @@ mod tests {
                     .inspect(|d| debug!("alice rcvd: {}", d.data.total_len())),
             ),
             None,
+            #[cfg(feature = "telemetry")]
+            alice_metrics,
         )?;
 
         let mut bob_session = HoprSession::new(
@@ -712,6 +757,8 @@ mod tests {
                     .inspect(|d| debug!("bob rcvd: {}", d.data.total_len())),
             ),
             None,
+            #[cfg(feature = "telemetry")]
+            bob_metrics,
         )?;
 
         let alice_sent = hopr_crypto_random::random_bytes::<DATA_LEN>();

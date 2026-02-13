@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-network"
-version = "0.8.1"
+version = "0.9.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"
@@ -9,6 +9,7 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
+telemetry = []
 default = ["compat-ping"]
 compat-ping = []
 prometheus = ["dep:hopr-metrics"]
@@ -18,16 +19,18 @@ dashmap = { workspace = true }
 lazy_static = { workspace = true }
 libp2p-identity = { workspace = true }
 humantime-serde = { workspace = true }
+serde = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
 hopr-api = { workspace = true, features = ["network"] }
 hopr-metrics = { workspace = true, optional = true }
-hopr-statistics = { workspace = true }
+hopr-statistics = { workspace = true, features = ["moving"] }
 
 [dev-dependencies]
 assertables = { workspace = true }
 anyhow = { workspace = true }
+insta = { workspace = true }
 
 [package.metadata.cargo-machete]
 ignored = ["humantime-serde"]

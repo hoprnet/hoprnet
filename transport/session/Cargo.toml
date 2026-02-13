@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-session"
-version = "0.14.0"
+version = "0.16.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Session functionality providing session abstraction over the HOPR transport"
@@ -18,6 +18,7 @@ runtime-tokio = [
   "hopr-protocol-session/runtime-tokio",
   "dep:tokio",
 ]
+telemetry = ["hopr-protocol-session/telemetry"]
 prometheus = [
   "hopr-network-types/prometheus",
   "hopr-protocol-session/prometheus",
@@ -39,6 +40,7 @@ futures = { workspace = true }
 futures-time = { workspace = true }
 lazy_static = { workspace = true, optional = true }
 moka = { workspace = true }
+parking_lot = { workspace = true }
 pid = { workspace = true }
 pin-project = { workspace = true }
 serde = { workspace = true }
