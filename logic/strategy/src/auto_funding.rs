@@ -9,15 +9,15 @@
 //!
 //! ### In-flight tracking
 //! To prevent duplicate funding when multiple balance-decrease events arrive in quick succession,
-//! the strategy maintains a map of channel IDs to the time they were marked in-flight.
-//! A channel is added to the map when a funding tx is successfully enqueued, and removed when:
-//! - A balance increase event is observed for that channel (indicating the funding confirmed),
-//! - An `on_tick` scan finds the channel's balance has risen above the threshold, or
-//! - The entry has exceeded [`IN_FLIGHT_TTL`] (guarding against lost/dropped transactions).
+//! the strategy maintains a set of channel IDs currently being funded.
+//! A channel is added to the set when a funding tx is successfully enqueued, and removed when:
+//! - The spawned confirmation task observes a transaction failure,
+//! - A balance increase event is observed for that channel (indicating the funding confirmed), or
+//! - An `on_tick` scan finds the channel's balance has risen above the threshold.
 //!
 //! ### Metrics
 //! - `hopr_strategy_auto_funding_funding_count` — incremented when a funding tx is successfully enqueued
-//! - `hopr_strategy_auto_funding_failure_count` — incremented when a funding tx fails to enqueue
+//! - `hopr_strategy_auto_funding_failure_count` — incremented when a funding tx fails to enqueue or confirm
 //!
 //! For details on default parameters see [AutoFundingStrategyConfig].
 use std::{
