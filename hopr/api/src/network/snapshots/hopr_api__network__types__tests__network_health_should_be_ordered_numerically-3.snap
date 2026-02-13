@@ -1,0 +1,5 @@
+---
+source: hopr/api/src/network/types.rs
+expression: value as i32
+---
+2
