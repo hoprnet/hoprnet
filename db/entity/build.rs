@@ -1,9 +1,6 @@
 //! Creates a build specification for the ORM codegen.
 
-use std::{
-    env::{self, temp_dir},
-    path::Path,
-};
+use std::{env, path::Path};
 
 use anyhow::Context;
 use clap::Parser;
@@ -66,7 +63,7 @@ fn main() -> anyhow::Result<()> {
 
     let codegen_path_str = codegen_path.to_string_lossy().to_string();
 
-    let tmp_db = temp_dir().join("tmp_migration.db");
+    let tmp_db = Path::new(&out_dir).join("tmp_migration.db");
 
     let _ = std::fs::remove_file(
         tmp_db

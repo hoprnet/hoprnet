@@ -1,6 +1,6 @@
 [package]
 name = "hopr-strategy"
-version = "0.16.0"
+version = "0.17.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains implementations of different HOPR strategies"
 edition = "2021"
@@ -25,6 +25,7 @@ humantime-serde = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
 lazy_static = { workspace = true }
+dashmap = { workspace = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }

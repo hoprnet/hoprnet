@@ -572,6 +572,7 @@ impl tokio::io::AsyncWrite for HoprSession {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "telemetry")]
     use std::sync::Arc;
 
     use anyhow::Context;
@@ -582,6 +583,7 @@ mod tests {
     use hopr_primitive_types::prelude::*;
 
     use super::*;
+    #[cfg(feature = "telemetry")]
     use crate::telemetry::SessionTelemetry;
 
     #[test]
@@ -631,7 +633,9 @@ mod tests {
         let id = SessionId::new(1234_u64, HoprPseudonym::random());
         const DATA_LEN: usize = 5000;
 
+        #[cfg(feature = "telemetry")]
         let alice_metrics = Arc::new(SessionTelemetry::new(id, Default::default()));
+        #[cfg(feature = "telemetry")]
         let bob_metrics = Arc::new(SessionTelemetry::new(id, Default::default()));
 
         let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
@@ -713,7 +717,9 @@ mod tests {
         let id = SessionId::new(1234_u64, HoprPseudonym::random());
         const DATA_LEN: usize = 5000;
 
+        #[cfg(feature = "telemetry")]
         let alice_metrics = Arc::new(SessionTelemetry::new(id, Default::default()));
+        #[cfg(feature = "telemetry")]
         let bob_metrics = Arc::new(SessionTelemetry::new(id, Default::default()));
 
         let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
