@@ -583,7 +583,6 @@ mod tests {
     use hopr_primitive_types::prelude::*;
 
     use super::*;
-
     #[cfg(feature = "telemetry")]
     use crate::telemetry::SessionTelemetry;
 
