@@ -17,7 +17,7 @@ sdk-api = { workspace = true }
 members = ["sdk/python/localcluster", "sdk/python/api"]
 
 [dependency-groups]
-dev = ["ruff>=0.15.0"]
+dev = ["ruff>=0.15.1"]
 lint = ["black==26.1.0"]
 
 [tool.black]
