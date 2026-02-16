@@ -90,6 +90,8 @@ validator = { workspace = true }
 opentelemetry = { workspace = true, optional = true }
 opentelemetry-otlp = { workspace = true, default-features = false, features = [
   "trace",
+  "metrics",
+  "logs",
   "reqwest-client",
   "tls-roots",
   "http-proto",

@@ -3,9 +3,18 @@ use prometheus::{
     TextEncoder, core::Collector,
 };
 
+pub type PrometheusMetricFamily = prometheus::proto::MetricFamily;
+pub type PrometheusMetric = prometheus::proto::Metric;
+pub type PrometheusMetricType = prometheus::proto::MetricType;
+
+/// Gathers all global Prometheus metric families.
+pub fn gather_metric_families() -> Vec<PrometheusMetricFamily> {
+    prometheus::gather()
+}
+
 /// Gathers all the global Prometheus metrics.
 pub fn gather_all_metrics() -> prometheus::Result<String> {
-    let families = prometheus::gather();
+    let families = gather_metric_families();
 
     let encoder = TextEncoder::new();
     encoder.encode_to_string(&families)

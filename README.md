@@ -44,7 +44,7 @@
       - [Test execution](#test-execution)
 - [Profiling \& Instrumentation](#profiling--instrumentation)
   - [`tokio` executor instrumentation](#tokio-executor-instrumentation)
-  - [OpenTelemetry tracing](#opentelemetry-tracing)
+  - [OpenTelemetry export](#opentelemetry-export)
   - [Profiling Criterion benchmarks via `flamegraph`](#profiling-criterion-benchmarks-via-flamegraph)
     - [Prerequisites](#prerequisites)
     - [Profiling the benchmarking binaries](#profiling-the-benchmarking-binaries)
@@ -188,6 +188,8 @@ On top of the default configuration options generated for the command line, the 
 - `ENV_WORKER_THREADS` - the number of environment worker threads for the tokio executor
 - `HOPRD_LOG_FORMAT` - override for the default stdout log formatter (follows tracing formatting options)
 - `HOPRD_USE_OPENTELEMETRY` - enable the OpenTelemetry output for this node
+- `HOPRD_OTEL_SIGNALS` - comma-separated OTLP signals to export when OpenTelemetry is enabled (`traces`, `logs`, `metrics`), defaults to `traces`
+- `HOPRD_OTEL_PROTOCOL` - OTLP transport protocol (`grpc` or `http`), defaults to `grpc`
 - `OTEL_SERVICE_NAME` - the name of this node for the OpenTelemetry service
 - `HOPR_INTERNAL_CHAIN_DISCOVERY_CHANNEL_CAPACITY` - the maximum capacity of the channel for chain generated discovery signals for the p2p transport
 - `HOPR_INTERNAL_DISCOVERY_UPDATES_CAPACITY` - the maximum capacity of the transport component handling chain discovery events
@@ -444,13 +446,21 @@ Requires a special build:
 
 Once an instrumented tokio is built into hoprd, the application can be instrumented by `tokio_console` as described in the [official crate documentation](https://docs.rs/tokio-console/latest/tokio_console/#instrumenting-the-application).
 
-### OpenTelemetry tracing
+### OpenTelemetry export
 
-`hoprd` is adapted to stream OpenTelemetry to a compatible endpoint. This behavior is turned off by default. To enable it, these environment variables have to be specified:
+`hoprd` can stream OpenTelemetry to a compatible endpoint. This behavior is turned off by default. To enable it, configure these environment variables:
 
 - `HOPRD_USE_OPENTELEMETRY` - `true` to enable the OpenTelemetry streaming, `false` to disable it
-- `OTEL_SERVICE_NAME` - the identifier used to assign traces from this instance to (e.g. `my_hoprd_instance`)
-- `OTEL_EXPORTER_OTLP_ENDPOINT` - URL of an endpoint accepting the OpenTelemetry format (e.g. http://jaeger:4317/)
+- `HOPRD_OTEL_SIGNALS` - comma-separated signal list from `traces`, `logs`, `metrics` (default: `traces`)
+- `HOPRD_OTEL_PROTOCOL` - `grpc` or `http` (default: `grpc`)
+- `OTEL_SERVICE_NAME` - identifier used as `service.name` for this instance (for example `my_hoprd_instance`)
+- `OTEL_EXPORTER_OTLP_ENDPOINT` - base URL of an OTLP endpoint (for example `http://jaeger:4317/`)
+
+Examples:
+
+- Traces only (backward-compatible default): `HOPRD_OTEL_SIGNALS=traces`
+- Metrics only: `HOPRD_OTEL_SIGNALS=metrics`
+- Full export: `HOPRD_OTEL_SIGNALS=traces,logs,metrics`
 
 ### Profiling Criterion benchmarks via `flamegraph`
 
