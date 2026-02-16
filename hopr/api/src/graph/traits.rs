@@ -1,4 +1,4 @@
-use hopr_network_types::types::DestinationRouting;
+use futures::stream::BoxStream;
 
 use super::{MeasurablePath, MeasurablePeer};
 use crate::graph::{MeasurableEdge, MeasurableNode};
@@ -178,11 +178,37 @@ pub trait NetworkGraphUpdate {
 }
 
 /// A trait specifying the graph traversal functionality
-#[async_trait::async_trait]
 #[auto_impl::auto_impl(&, Box, Arc)]
 pub trait NetworkGraphTraverse {
     type NodeId: Send + Sync;
+    type Cost: PartialOrd + Send + Sync;
 
-    /// Returns a list of all routes to the given destination of the specified length.
-    async fn simple_route(&self, destination: &Self::NodeId, length: usize) -> Vec<DestinationRouting>;
+    /// Returns a stream of routes from the source to the destination with the specified length.
+    ///
+    /// The length argument specifies the number of edges in the graph, over which the path should
+    /// be formed, i.e. source -> intermediate -> destination is 2 edges.
+    ///
+    /// The stream should only terminate, if there's no more routes available.
+    fn simple_paths_stream(
+        &self,
+        source: &Self::NodeId,
+        destination: &Self::NodeId,
+        length: usize,
+    ) -> BoxStream<'static, (Vec<Self::NodeId>, Self::Cost)>;
+
+    /// Returns a list of routes from the source to the destination with the specified length
+    /// at the time of calling.
+    ///
+    /// The length argument specifies the number of edges in the graph, over which the path should
+    /// be formed, i.e. source -> intermediate -> destination is 2 edges.
+    ///
+    /// The take count argument should be set in case the graph is expected to be large enough
+    /// to be traversed slowly.
+    fn simple_paths(
+        &self,
+        source: &Self::NodeId,
+        destination: &Self::NodeId,
+        length: usize,
+        take_count: Option<usize>,
+    ) -> Vec<(Vec<Self::NodeId>, Self::Cost)>;
 }

@@ -13,13 +13,15 @@ crate-type = ["rlib"]
 
 [features]
 default = ["petgraph"]
-petgraph = ["dep:petgraph"]
+petgraph = ["dep:async-stream", "dep:petgraph", "dep:indexmap"]
 
 [dependencies]
+async-stream = { workspace = true, optional = true }
 async-trait = { workspace = true }
 anyhow = { workspace = true }
 bimap = { workspace = true }
 futures = { workspace = true }
+indexmap = { workspace = true, optional = true }
 parking_lot = { workspace = true }
 petgraph = { workspace = true, optional = true }
 thiserror = { workspace = true }
@@ -27,9 +29,6 @@ tracing = { workspace = true }
 
 hopr-api = { workspace = true, features = ["ct", "graph", "network"] }
 hopr-crypto-types = { workspace = true }
-hopr-internal-types = { workspace = true }
-hopr-network-types = { workspace = true }
-hopr-primitive-types = { workspace = true }
 hopr-statistics = { workspace = true, features = ["moving"] }
 
 [dev-dependencies]

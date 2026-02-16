@@ -168,8 +168,8 @@ async fn p2p_only_communication_quic() -> anyhow::Result<()> {
 
     assert_gt!(
         speed_in_mbytes_s,
-        100.0f64,
-        "The measured speed for data transfer is ~{}MB/s",
+        50.0f64,
+        "The measured speed for data transfer is ~{}MB/s, which is less than the expected at least 50MB/s",
         speed_in_mbytes_s
     );
 

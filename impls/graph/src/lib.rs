@@ -25,7 +25,10 @@ pub mod petgraph;
 pub mod errors;
 pub mod weight;
 
-use hopr_api::OffchainPublicKey;
+use hopr_api::{
+    OffchainPublicKey,
+    graph::traits::{EdgeNetworkObservableRead, EdgeObservableRead, EdgeProtocolObservable},
+};
 #[cfg(feature = "petgraph")]
 pub use petgraph::*;
 pub use weight::Observations;
@@ -44,5 +47,40 @@ pub struct GraphNode(OffchainPublicKey);
 impl From<GraphNode> for OffchainPublicKey {
     fn from(val: GraphNode) -> Self {
         val.0
+    }
+}
+
+/// Build a HOPR cost function for network graph traversals
+// TODO: implement precise cost function for path traversal
+pub fn build_hopr_cost_fn(length: usize) -> impl Fn(f64, &crate::Observations, usize) -> f64 {
+    move |initial_cost: f64, observation: &crate::Observations, path_index: usize| {
+        match path_index {
+            0 => {
+                // the first edge should always go to an already connected and measured peer,
+                // otherwise use a negative cost that should remove the edge from consideration
+                if observation.immediate_qos().is_some_and(|o| o.is_connected()) {
+                    // TODO(20260217: extend once 1-hop probing verifiably works)
+                    // && o.average_latency().is_some_and(|latency| latency)
+                    if observation.intermediate_qos().is_some_and(|o| o.capacity().is_some()) {
+                        return initial_cost;
+                    }
+                }
+
+                -initial_cost
+            }
+            v if v == length => {
+                // the last edge should always go from an already connected and measured peer,
+                // otherwise use a negative cost that should remove the edge from consideration
+                if observation.immediate_qos().is_some_and(|o| o.is_connected()) {
+                    // TODO(20260217: extend once 1-hop probing verifiably works)
+                    // if observation.intermediate_qos().is_some_and(|o| o.capacity().o.score()()) {
+                    return initial_cost;
+                    // }
+                }
+
+                -initial_cost
+            }
+            _ => initial_cost,
+        }
     }
 }
