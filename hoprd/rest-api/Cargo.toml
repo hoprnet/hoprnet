@@ -13,7 +13,7 @@ crate-type = ["rlib"]
 
 [features]
 default = ["prometheus"]
-telemetry = []
+telemetry = ["hopr-lib/telemetry"]
 prometheus = [
   "hopr-lib/prometheus",
   "dep:hopr-metrics",

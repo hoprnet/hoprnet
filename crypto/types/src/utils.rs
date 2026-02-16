@@ -26,10 +26,20 @@ use crate::{
 /// Returns the encoded secret scalar and the corresponding point.
 pub(crate) fn random_group_element() -> ([u8; 32], NonIdentity<AffinePoint>) {
     // Since sep256k1 has a group of prime order, a non-zero scalar cannot result into an identity point.
-    let scalar = k256::NonZeroScalar::random(&mut hopr_crypto_random::rng());
-    let point =
-        PublicKey::from_privkey(&scalar.to_bytes()).expect("non-zero scalar cannot represent an invalid public key");
-    (scalar.to_bytes().into(), point.into())
+    // let scalar = k256::NonZeroScalar::random(&mut hopr_crypto_random::rng());
+
+    // Requires manual rejection sampling implementation due to incompatible rand crates
+    let mut rng = hopr_crypto_random::rng();
+    let mut bytes = k256::FieldBytes::default();
+    use hopr_crypto_random::Rng;
+    loop {
+        rng.fill_bytes(&mut bytes);
+        if let Some::<k256::Scalar>(scalar) = k256::Scalar::from_repr(bytes).into() {
+            let point =
+                PublicKey::from_privkey(&scalar.to_bytes()).expect("non-zero scalar cannot represent an invalid public key");
+            return (scalar.to_bytes().into(), point.into())
+        }
+    }
 }
 
 /// Creates X25519 secret scalar (also compatible with Ed25519 scalar) from the given bytes.

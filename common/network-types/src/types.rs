@@ -222,8 +222,9 @@ impl SealedHost {
     pub const PADDING_CHAR: char = '@';
 
     /// Seals the given [`IpOrHost`] using the Exit node's peer ID.
-    pub fn seal(host: IpOrHost, peer_id: PeerId) -> crate::errors::Result<Self> {
-        let mut host_str = host.to_string();
+    pub fn seal(_host: IpOrHost, _peer_id: PeerId) -> crate::errors::Result<Self> {
+        unimplemented!("seling not implemented")
+        /*let mut host_str = host.to_string();
 
         // Add randomly long padding, so the length of the short hosts is obscured
         if host_str.len() < Self::MAX_LEN_WITH_PADDING {
@@ -235,21 +236,24 @@ impl SealedHost {
 
         hopr_crypto_types::seal::seal_data(host_str.as_bytes(), peer_id)
             .map(Self::Sealed)
-            .map_err(|e| NetworkTypeError::Other(e.to_string()))
+            .map_err(|e| NetworkTypeError::Other(e.to_string())) */
     }
 
     /// Tries to unseal the sealed [`IpOrHost`] using the private key as Exit node.
     /// No-op, if the data is already unsealed.
-    pub fn unseal(self, key: &hopr_crypto_types::keypairs::OffchainKeypair) -> crate::errors::Result<IpOrHost> {
+    pub fn unseal(self, _key: &hopr_crypto_types::keypairs::OffchainKeypair) -> crate::errors::Result<IpOrHost> {
         match self {
             SealedHost::Plain(host) => Ok(host),
-            SealedHost::Sealed(enc) => hopr_crypto_types::seal::unseal_data(&enc, key)
-                .map_err(|e| NetworkTypeError::Other(e.to_string()))
-                .and_then(|data| {
-                    String::from_utf8(data.into_vec())
-                        .map_err(|e| NetworkTypeError::Other(e.to_string()))
-                        .and_then(|s| IpOrHost::from_str(s.trim_end_matches(Self::PADDING_CHAR)))
-                }),
+            SealedHost::Sealed(_enc) => {
+                unimplemented!("sealing not implemented")
+                /*hopr_crypto_types::seal::unseal_data(&enc, key)
+                    .map_err(|e| NetworkTypeError::Other(e.to_string()))
+                    .and_then(|data| {
+                        String::from_utf8(data.into_vec())
+                            .map_err(|e| NetworkTypeError::Other(e.to_string()))
+                            .and_then(|s| IpOrHost::from_str(s.trim_end_matches(Self::PADDING_CHAR)))
+                    })*/
+            },
         }
     }
 }

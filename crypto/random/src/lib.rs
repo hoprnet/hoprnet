@@ -5,8 +5,8 @@
 //! exclusively rely on randomness functions only from this crate.
 
 use generic_array::{ArrayLength, GenericArray};
-use rand::CryptoRng;
-pub use rand::{Rng, RngCore};
+use rand::{CryptoRng, RngExt};
+pub use rand::{Rng};
 
 /// Maximum random integer that can be generated.
 /// This is the last positive 64-bit value in the two's complement representation.
@@ -30,7 +30,7 @@ lazy_static::lazy_static! {
 /// This is reserved for deterministic testing.
 #[cfg(all(debug_assertions, feature = "fixed-rng"))]
 #[inline]
-pub fn rng() -> impl RngCore + CryptoRng {
+pub fn rng() -> impl CryptoRng {
     let mut global_rng = FIXED_RNG.lock().expect("failed to lock fixed RNG");
     let mut seed = [0u8; 32];
     global_rng.fill_bytes(&mut seed);
@@ -41,8 +41,8 @@ pub fn rng() -> impl RngCore + CryptoRng {
 /// Gets the default cryptographically secure random number generator.
 #[cfg(any(not(debug_assertions), not(feature = "fixed-rng")))]
 #[inline]
-pub fn rng() -> impl RngCore + CryptoRng {
-    rand::rngs::OsRng
+pub fn rng() -> impl CryptoRng {
+    rand::rngs::ThreadRng::default()
 }
 
 /// Returns `true` if the build is using an **insecure** RNG with a fixed seed.
@@ -56,13 +56,13 @@ pub const fn is_rng_fixed() -> bool {
 /// Generates a random float uniformly distributed between 0 (inclusive) and 1 (exclusive).
 #[inline]
 pub fn random_float() -> f64 {
-    rng().r#gen()
+    rng().random()
 }
 
 /// Generates a random float uniformly distributed in the given range.
 #[inline]
 pub fn random_float_in_range(range: std::ops::Range<f64>) -> f64 {
-    rng().gen_range(range)
+    rng().random_range(range)
 }
 
 /// Generates a random unsigned integer which is at least `start` and optionally strictly less than `end`.
@@ -77,7 +77,7 @@ pub fn random_integer(start: u64, end: Option<u64>) -> u64 {
     );
 
     let bound = real_end - start;
-    start + rng().gen_range(0..bound)
+    start + rng().random_range(0..bound)
 }
 
 /// Fills the specific number of bytes starting from the given offset in the given buffer.
