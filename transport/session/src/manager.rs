@@ -1891,6 +1891,7 @@ mod tests {
                     session_tx: Arc::new(dummy_tx),
                     routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
                     abort_handles: Vec::new(),
+                    #[cfg(feature = "telemetry")]
                     stats: Arc::new(SessionTelemetry::new(
                         SessionId::new(16u64, alice_pseudonym),
                         Default::default(),
