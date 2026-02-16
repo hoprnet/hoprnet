@@ -35,7 +35,7 @@ jobs:
 
       - name: Setup GCP
         id: gcp
-        uses: hoprnet/hopr-workflows/actions/setup-gcp@644d936de4e1c8f5c50ba50f8526209455c28b4a # master
+        uses: hoprnet/hopr-workflows/actions/setup-gcp@0fb4a957528bdcc9c9bf13a3f32b09ae3bd774d8 # master
         with:
           google_credentials: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
           login_artifact_registry: 'true'
