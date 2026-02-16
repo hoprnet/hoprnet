@@ -27,12 +27,12 @@ allocator-jemalloc = [
 [dependencies]
 aes = "0.8.4"
 blake3 = { version = "1.8.3", features = ["traits-preview"] }
-cipher = "0.4.4"
-chacha20 = "0.9.1"
+cipher = "0.5.0"
+chacha20 = "0.10.0"
 crypto_box = { version = "0.9.1", features = ["seal"] }
 ctr = "0.9.2"
 curve25519-dalek = { workspace = true }
-digest = "0.10.7"
+digest = "0.11.0"
 ed25519-dalek = { version = "2.2.0", features = ["hazmat", "batch"] }
 generic-array = { workspace = true, features = ["zeroize"] }
 hex = { workspace = true }
