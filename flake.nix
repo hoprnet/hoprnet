@@ -83,6 +83,17 @@
           # Import nix-lib for shared Nix utilities
           nixLib = nix-lib.lib.${system};
 
+          # Load nightly toolchain from file (single source of truth)
+          nightlyToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain-nightly.toml;
+
+          # Wrapper for rustfmt to fix macOS dylib loading issue
+          # On macOS, rust-overlay symlinks rustfmt to a standalone package that can't find its dylibs.
+          # This wrapper sets DYLD_LIBRARY_PATH to the toolchain's lib directory.
+          rustfmtWrapper = pkgs.writeShellScriptBin "rustfmt" ''
+            export DYLD_LIBRARY_PATH="${nightlyToolchain}/lib:$DYLD_LIBRARY_PATH"
+            exec "${nightlyToolchain}/bin/rustfmt" "$@"
+          '';
+
           craneLib = (crane.mkLib pkgs).overrideToolchain (p: p.rust-bin.stable.latest.default);
           hoprdCrateInfoOriginal = craneLib.crateNameFromCargoToml {
             cargoToml = ./hopr/hopr-lib/Cargo.toml;
@@ -458,6 +469,8 @@
               envsubst
             ];
             shellHook = ''
+              # Fix macOS dylib loading for nightly rustfmt (rust-overlay symlink issue)
+              export DYLD_LIBRARY_PATH="${nightlyToolchain}/lib:$DYLD_LIBRARY_PATH"
               ${pre-commit-check.shellHook}
             '';
           };
@@ -652,7 +665,7 @@
             programs.ruff-format.enable = true;
 
             settings.formatter.rustfmt = {
-              command = "${pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default)}/bin/rustfmt";
+              command = "${rustfmtWrapper}/bin/rustfmt";
             };
           };
 
