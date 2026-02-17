@@ -4371,7 +4371,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4503,7 +4503,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-packet"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "anyhow",
  "bimap",
@@ -4691,7 +4691,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-node"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "async-lock",
@@ -4915,7 +4915,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-hopr"
-version = "4.1.0"
+version = "4.2.0"
 dependencies = [
  "anyhow",
  "async-trait",

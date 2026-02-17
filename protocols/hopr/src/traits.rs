@@ -161,7 +161,7 @@ pub trait TicketTracker {
     type Error: std::error::Error + Send + Sync + 'static;
 
     /// Gets the next ticket index for an outgoing ticket for the given channel.
-    async fn next_outgoing_ticket_index(&self, channel_id: &ChannelId, epoch: u32) -> Result<u64, Self::Error>;
+    async fn next_outgoing_ticket_index(&self, channel: &ChannelEntry) -> Result<u64, Self::Error>;
 
     /// Retrieves the unrealized balance of the given channel.
     ///
@@ -171,6 +171,7 @@ pub trait TicketTracker {
         &self,
         channel_id: &ChannelId,
         epoch: u32,
+        index: u64,
     ) -> Result<HoprBalance, Self::Error>;
 
     /// Convenience function that allows creating multi-hop tickets.
@@ -198,7 +199,7 @@ pub trait TicketTracker {
             .counterparty(channel.destination)
             .balance(amount)
             .index(
-                self.next_outgoing_ticket_index(channel.get_id(), channel.channel_epoch)
+                self.next_outgoing_ticket_index(channel)
                     .await
                     .map_err(TicketCreationError::Other)?,
             )
