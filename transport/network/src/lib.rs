@@ -30,6 +30,4 @@ pub mod observation;
 
 pub use libp2p_identity::PeerId;
 pub use observation::Observations;
-#[cfg(feature = "telemetry")]
-pub use observation::{PeerPacketStats, PeerPacketStatsSnapshot};
-pub use track::{NetworkPeerTracker, PeerEntry};
+pub use track::NetworkPeerTracker;

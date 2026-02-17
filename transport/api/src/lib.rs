@@ -20,6 +20,9 @@ pub mod constants;
 pub mod errors;
 mod helpers;
 
+#[cfg(feature = "telemetry")]
+pub mod stats;
+
 #[cfg(feature = "capture")]
 mod capture;
 mod pipeline;
@@ -62,8 +65,6 @@ use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId, Protocol};
 use hopr_transport_mixer::MixerConfig;
 pub use hopr_transport_network::observation::Observations;
-#[cfg(feature = "telemetry")]
-pub use hopr_transport_network::observation::PeerPacketStatsSnapshot;
 use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork};
 use hopr_transport_probe::{
     Probe, TrafficGeneration,
@@ -84,9 +85,13 @@ use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfi
 pub use hopr_transport_session::{
     SessionAckMode, SessionLifecycleState, SessionLifetimeSnapshot, SessionStatsSnapshot,
 };
+#[cfg(feature = "telemetry")]
+pub use stats::PeerPacketStats;
 use tracing::{Instrument, debug, error, info, trace, warn};
 
 pub use crate::config::HoprProtocolConfig;
+#[cfg(feature = "telemetry")]
+pub use crate::stats::PeerPacketStatsSnapshot;
 use crate::{
     constants::SESSION_INITIATION_TIMEOUT_BASE, errors::HoprTransportError, pipeline::HoprPipelineComponents,
     socket::HoprSocket,
@@ -319,13 +324,8 @@ where
             .map_err(|_| HoprTransportError::Api("transport network viewer already set".into()))?;
 
         let msg_codec = hopr_transport_protocol::HoprBinaryCodec {};
-        let (wire_msg_tx, wire_msg_rx) = hopr_transport_protocol::stream::process_stream_protocol(
-            msg_codec,
-            transport_network.clone(),
-            #[cfg(feature = "telemetry")]
-            move |_| None, // TODO (@TeeborChoka): please fill this in
-        )
-        .await?;
+        let (wire_msg_tx, wire_msg_rx) =
+            hopr_transport_protocol::stream::process_stream_protocol(msg_codec, transport_network.clone()).await?;
 
         let (mixing_channel_tx, mixing_channel_rx) =
             hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(build_mixer_cfg_from_env());
@@ -692,7 +692,6 @@ where
     #[cfg(feature = "telemetry")]
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_peer_packet_stats(&self, peer: &PeerId) -> errors::Result<Option<PeerPacketStatsSnapshot>> {
-        // TODO (@TeeborChoka): please fill this in
         Err(HoprTransportError::Api("not implemented yet".into()))
     }
 
@@ -700,7 +699,6 @@ where
     #[cfg(feature = "telemetry")]
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_all_packet_stats(&self) -> errors::Result<Vec<(PeerId, PeerPacketStatsSnapshot)>> {
-        // TODO (@TeeborChoka): please fill this in
         Err(HoprTransportError::Api("not implemented yet".into()))
     }
 }
