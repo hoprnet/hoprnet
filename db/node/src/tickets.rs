@@ -1139,7 +1139,7 @@ mod tests {
         assert_eq!(None, idx, "initial index must be None");
 
         let idx = db.get_or_create_outgoing_ticket_index(&hash, 1, 0).await?;
-        assert_eq!(Some(10), idx, "index must be zero");
+        assert_eq!(Some(10), idx, "index must be 10");
 
         Ok(())
     }

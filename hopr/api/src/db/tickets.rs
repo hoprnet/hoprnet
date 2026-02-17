@@ -324,9 +324,7 @@ pub trait HoprDbTicketOperations {
 
     /// Gets the index of the next outgoing ticket for the given channel.
     ///
-    /// The `current_index` value is used to initialize the entry in the DB if it does not exist yet.
-    ///
-    /// If such an entry does not exist, it is initialized with 0 and `None` is returned.
+    /// If such an entry does not exist, it is initialized with `current_index` and `None` is returned.
     async fn get_or_create_outgoing_ticket_index(
         &self,
         channel_id: &ChannelId,

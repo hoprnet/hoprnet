@@ -76,7 +76,7 @@ pub fn validate_unacknowledged_ticket(
         });
     }
 
-    // The ticket's index MUST be strictly greater than the channel's ticketIndex
+    // The ticket's index MUST be greater or equal than the channel's ticketIndex
     if inner_ticket.index < channel.ticket_index {
         return Err(TicketValidationError {
             reason: format!(
