@@ -104,7 +104,7 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
                     }
                 }
             },
-            Some(concurrency),
+            concurrency,
         )
         .filter_map(futures::future::ready)
         .map(Ok)
@@ -226,7 +226,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                     }
                 }
             }.instrument(tracing::debug_span!("incoming_packet_decode", %peer))
-        }, Some(concurrency))
+        }, concurrency)
         .filter_map(futures::future::ready)
         .then_concurrent(move |packet| {
             let ticket_proc = ticket_proc_success.clone();
@@ -321,7 +321,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                         None
                     }
                 }
-            }}, None) // No concurrency limit here, already limited before
+            }}, concurrency)
         .filter_map(|maybe_data| futures::future::ready(
             // Create the ApplicationDataIn data structure for incoming data
             maybe_data
