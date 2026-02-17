@@ -13,7 +13,7 @@ pub fn seal_data(_data: &[u8], _peer_id: PeerId) -> crate::errors::Result<Box<[u
 
 /// **CURRENTLY NOT IMPLEMENTED**, see https://github.com/hoprnet/hoprnet/issues/7172
 ///
-/// Decrypts a data previously encrypted with [`seal_data`].
+/// Decrypts data previously encrypted with [`seal_data`].
 ///
 /// The given `keypair` must correspond to the `peer_id` given during encryption.
 ///
