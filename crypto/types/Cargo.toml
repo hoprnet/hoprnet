@@ -8,7 +8,6 @@ license = "GPL-3.0-only"
 [features]
 rust-ecdsa = []
 fixed-rng = ["hopr-crypto-random/fixed-rng"]
-seal = []
 serde = [
   "dep:serde",
   "dep:serde_bytes",
@@ -30,7 +29,6 @@ aes = "0.8.4"
 blake3 = { version = "1.8.3", features = ["traits-preview"] }
 cipher = "0.4.4"
 chacha20 = "0.9.1"
-crypto_box = { version = "0.9.1", features = ["seal"] }
 ctr = "0.9.2"
 curve25519-dalek = { workspace = true }
 digest = "0.10.7"

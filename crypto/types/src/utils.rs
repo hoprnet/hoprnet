@@ -1,4 +1,3 @@
-use cipher::zeroize;
 use generic_array::{ArrayLength, GenericArray};
 use hopr_crypto_random::{Randomizable, random_array};
 use k256::{
@@ -35,9 +34,9 @@ pub(crate) fn random_group_element() -> ([u8; 32], NonIdentity<AffinePoint>) {
     loop {
         rng.fill_bytes(&mut bytes);
         if let Some::<k256::Scalar>(scalar) = k256::Scalar::from_repr(bytes).into() {
-            let point =
-                PublicKey::from_privkey(&scalar.to_bytes()).expect("non-zero scalar cannot represent an invalid public key");
-            return (scalar.to_bytes().into(), point.into())
+            let point = PublicKey::from_privkey(&scalar.to_bytes())
+                .expect("non-zero scalar cannot represent an invalid public key");
+            return (scalar.to_bytes().into(), point.into());
         }
     }
 }

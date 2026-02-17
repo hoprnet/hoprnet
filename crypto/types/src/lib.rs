@@ -14,7 +14,6 @@ pub mod lioness;
 pub mod primitives;
 /// Enables randomized encryption (sealing)
 /// and decryption of data using [`OffchainKeypair`](keypairs::OffchainKeypair).
-#[cfg(feature = "seal")]
 pub mod seal;
 /// Separate module for signature algorithms.
 pub mod signing;
@@ -49,9 +48,6 @@ pub mod prelude {
     pub use libp2p_identity::PeerId;
 
     pub use super::{
-        crypto_traits, errors::CryptoError, keypairs::*, primitives::*, signing::*, types::*, utils::*, vrf::*,
+        crypto_traits, errors::CryptoError, keypairs::*, primitives::*, seal::*, signing::*, types::*, utils::*, vrf::*,
     };
-
-    #[cfg(feature = "seal")]
-    use super::seal::*;
 }

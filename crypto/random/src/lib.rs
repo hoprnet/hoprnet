@@ -5,8 +5,8 @@
 //! exclusively rely on randomness functions only from this crate.
 
 use generic_array::{ArrayLength, GenericArray};
+pub use rand::Rng;
 use rand::{CryptoRng, RngExt};
-pub use rand::{Rng};
 
 /// Maximum random integer that can be generated.
 /// This is the last positive 64-bit value in the two's complement representation.
