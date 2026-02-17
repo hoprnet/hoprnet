@@ -228,7 +228,7 @@ impl<const C: usize> Decoder for SessionCodec<C> {
 mod tests {
     use hex_literal::hex;
     use hopr_protocol_app::prelude::ApplicationData;
-    use rand::{Rng, thread_rng};
+    use rand::{RngExt, rngs::ThreadRng};
 
     use super::*;
     use crate::{
@@ -300,9 +300,9 @@ mod tests {
 
     #[test]
     fn session_message_ack_should_serialize_and_deserialize() -> anyhow::Result<()> {
-        let mut rng = thread_rng();
+        let mut rng = ThreadRng::default();
         let frame_ids: Vec<u32> = (0..FrameAcknowledgements::<466>::MAX_ACK_FRAMES)
-            .map(|_| rng.r#gen())
+            .map(|_| rng.random())
             .collect();
 
         let msg_1 = SessionMessage::<466>::Acknowledge(frame_ids.try_into()?);
