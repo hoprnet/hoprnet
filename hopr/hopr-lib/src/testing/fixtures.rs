@@ -115,9 +115,9 @@ impl ClusterGuard {
     pub fn sample_nodes<const N: usize>(&self) -> [&TestedHopr; N] {
         assert!(N <= self.size(), "Requested count exceeds {}", self.size());
 
-        let mut res = self.cluster.iter().choose_multiple(&mut rand::thread_rng(), N);
+        let mut res = self.cluster.iter().sample(&mut rand::rng(), N);
 
-        res.shuffle(&mut rand::thread_rng());
+        res.shuffle(&mut rand::rng());
 
         res.try_into().unwrap()
     }
@@ -136,9 +136,9 @@ impl ClusterGuard {
                     .outgoing_win_prob
                     .is_some_and(|p| p.as_f64() > 0.99)
             })
-            .choose_multiple(&mut rand::thread_rng(), N);
+            .sample(&mut rand::rng(), N);
 
-        res.shuffle(&mut rand::thread_rng());
+        res.shuffle(&mut rand::rng());
 
         res.try_into()
             .unwrap_or_else(|_| panic!("cannot find {N} nodes with win prob 1.0"))
@@ -158,9 +158,9 @@ impl ClusterGuard {
                     .outgoing_win_prob
                     .is_some_and(|p| p.as_f64() < 0.99)
             })
-            .choose_multiple(&mut rand::thread_rng(), N);
+            .sample(&mut rand::rng(), N);
 
-        res.shuffle(&mut rand::thread_rng());
+        res.shuffle(&mut rand::rng());
 
         res.try_into()
             .unwrap_or_else(|_| panic!("cannot find {N} nodes with win prob < 0.99"))
@@ -182,9 +182,9 @@ impl ClusterGuard {
                     .outgoing_win_prob
                     .is_some_and(|p| p.as_f64() > 0.99)
             })
-            .choose_multiple(&mut rand::thread_rng(), N - 2);
+            .sample(&mut rand::rng(), N - 2);
 
-        res.shuffle(&mut rand::thread_rng());
+        res.shuffle(&mut rand::rng());
 
         res.insert(0, win_prob_lower[0]);
         res.push(win_prob_lower[1]);
@@ -209,9 +209,9 @@ impl ClusterGuard {
                     .outgoing_win_prob
                     .is_some_and(|p| p.as_f64() < 0.99)
             })
-            .choose_multiple(&mut rand::thread_rng(), N - 2);
+            .sample(&mut rand::rng(), N - 2);
 
-        res.shuffle(&mut rand::thread_rng());
+        res.shuffle(&mut rand::rng());
 
         res.insert(0, win_prob_1[0]);
         res.push(win_prob_1[1]);

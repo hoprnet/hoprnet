@@ -327,7 +327,12 @@ mod tests {
 
     #[test]
     fn lioness_forward_inverse_random() {
-        let (k, iv) = LionessBlake3ChaCha20::<U1024>::generate_key_iv(hopr_crypto_random::rng());
+        // let (k, iv) = LionessBlake3ChaCha20::<U1024>::generate_key_iv(hopr_crypto_random::rng());
+        let mut k = Key::<LionessBlake3ChaCha20<U1024>>::default();
+        let mut iv = Iv::<LionessBlake3ChaCha20<U1024>>::default();
+        hopr_crypto_random::random_fill(&mut k);
+        hopr_crypto_random::random_fill(&mut iv);
+
         let lioness = LionessBlake3ChaCha20::<U1024>::new(&k, &iv);
 
         let mut data = GenericArray::<u8, U1024>::default();
@@ -344,7 +349,12 @@ mod tests {
 
     #[test]
     fn lioness_forward_inverse_random_separate_buffers() {
-        let (k, iv) = LionessBlake3ChaCha20::<U1024>::generate_key_iv(hopr_crypto_random::rng());
+        // let (k, iv) = LionessBlake3ChaCha20::<U1024>::generate_key_iv(hopr_crypto_random::rng());
+        let mut k = Key::<LionessBlake3ChaCha20<U1024>>::default();
+        let mut iv = Iv::<LionessBlake3ChaCha20<U1024>>::default();
+        hopr_crypto_random::random_fill(&mut k);
+        hopr_crypto_random::random_fill(&mut iv);
+
         let lioness = LionessBlake3ChaCha20::<U1024>::new(&k, &iv);
 
         let mut data_in = GenericArray::<u8, U1024>::default();
