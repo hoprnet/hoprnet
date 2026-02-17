@@ -2,23 +2,24 @@ use libp2p_identity::PeerId;
 
 use crate::keypairs::OffchainKeypair;
 
+/// **CURRENTLY NOT IMPLEMENTED**, see https://github.com/hoprnet/hoprnet/issues/7172
+///
 /// Performs randomized encryption of the given data so that
 /// only the recipient with the given `peer_id` can [decrypt it](unseal_data).
-///
-/// CURRENTLY NOT IMPLEMENTED, see https://github.com/hoprnet/hoprnet/issues/7172"
 pub fn seal_data(_data: &[u8], _peer_id: PeerId) -> crate::errors::Result<Box<[u8]>> {
     // TODO: sealing not implemented, see https://github.com/hoprnet/hoprnet/issues/7172"
-    Err(crate::errors::CryptoError::SealingError.into())
+    Err(crate::errors::CryptoError::SealingError)
 }
 
+/// **CURRENTLY NOT IMPLEMENTED**, see https://github.com/hoprnet/hoprnet/issues/7172
+///
 /// Decrypts a data previously encrypted with [`seal_data`].
 ///
 /// The given `keypair` must correspond to the `peer_id` given during encryption.
 ///
-/// CURRENTLY NOT IMPLEMENTED, see https://github.com/hoprnet/hoprnet/issues/7172"
 pub fn unseal_data(_data: &[u8], _keypair: &OffchainKeypair) -> crate::errors::Result<Box<[u8]>> {
     // TODO: sealing not implemented, see https://github.com/hoprnet/hoprnet/issues/7172"
-    Err(crate::errors::CryptoError::SealingError.into())
+    Err(crate::errors::CryptoError::SealingError)
 }
 
 #[cfg(test)]
