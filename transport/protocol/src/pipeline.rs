@@ -104,7 +104,7 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
                     }
                 }
             },
-            concurrency
+            concurrency,
         )
         .filter_map(futures::future::ready)
         .map(Ok)
