@@ -267,8 +267,10 @@ mod tests {
     async fn test_ticket_validation_fail_when_index_is_lower_than_channel_index() -> anyhow::Result<()> {
         let ticket = create_valid_ticket()?;
         let mut channel = create_channel_entry();
-        channel.balance = 0.into();
+        channel.ticket_index = 2;
         channel.channel_epoch = ticket.channel_epoch;
+
+        assert!(ticket.index < channel.ticket_index);
 
         let ret =
             validate_unacknowledged_ticket(ticket, &channel, 1.into(), 1.0.try_into()?, 0.into(), &Hash::default());
