@@ -64,7 +64,7 @@ mockall = { workspace = true }
 parameterized = { workspace = true }
 serde = { workspace = true }
 rand = { workspace = true }
-rand_distr = "0.6.0"
+rand_distr = { workspace = true }
 test-log = { workspace = true, features = ["trace"] }
 tokio = { workspace = true, features = ["io-util", "io-std", "net", "signal"] }
 tokio-util = { workspace = true }
