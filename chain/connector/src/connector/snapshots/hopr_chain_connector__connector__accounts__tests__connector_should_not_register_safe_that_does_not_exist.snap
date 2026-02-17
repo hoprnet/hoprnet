@@ -22,7 +22,7 @@ chain_info:
   key_binding_fee: 0.01 wxHOPR
   safe_registry_dst: "0000000000000000000000000000000000000000000000000000000000000000"
   ticket_price: 1 wxHOPR
-  network: jura
+  network: rotsee
   contract_addresses: "{\"announcements\":\"0xe08E8EfAc66c83a5e2cE9E0a696f8416A5AB6136\",\"channels\":\"0x81a79fcDe8FFE6452e51D8E0493B37C2a5a09c57\",\"module_implementation\":\"0x5F36592e29D90558bc629a4afd87D37d38d9a595\",\"node_safe_migration\":\"0xb9a6F18b40f632869dEFa4bbB2212c63767Eb159\",\"node_safe_registry\":\"0x8cDf9A10646403C9aA797610D4C782aD26D334f4\",\"node_stake_factory\":\"0x6827eC1Bf6232B07f30C2F2924Ea681412b07687\",\"ticket_price_oracle\":\"0xca2c60433eC6a10dDEabBbE3Ce7f9737b1a0628C\",\"token\":\"0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1\",\"winning_probability_oracle\":\"0x5136Bac09C78af89bDA56F5086A3F3E2Ee4EAfCa\"}"
   expected_block_time: "5"
   finality: "8"

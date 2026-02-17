@@ -85,4 +85,4 @@ test:
     cargo clippy --workspace --all-targets -- -D warnings
     echo ""
     echo "==> Running unit & integration tests..."
-    cargo test
+    cargo test --test '*' -- --test-threads=1
