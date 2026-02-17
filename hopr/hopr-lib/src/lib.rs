@@ -737,6 +737,8 @@ where
             .await?;
 
         while let Some(channel) = channels.next().await {
+            // Set the state of all unredeemed tickets with a higher index than the current
+            // channel index as untouched.
             self.node_db
                 .update_ticket_states_and_fetch(
                     [TicketSelector::from(&channel)
@@ -751,6 +753,15 @@ where
                     futures::future::ready(())
                 })
                 .await;
+
+            // Mark all the tickets with a lower ticket index than the current channel index as neglected.
+            self.node_db
+                .mark_tickets_as(
+                    [TicketSelector::from(&channel).with_index_range(..channel.ticket_index)],
+                    TicketMarker::Neglected,
+                )
+                .map_err(HoprLibError::db)
+                .await?;
         }
 
         self.state.store(HoprState::Running, Ordering::Relaxed);
