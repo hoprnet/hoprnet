@@ -76,30 +76,29 @@ strategy:
         # Automatically funds channels with the given funding amount
         # if the stake on any channel drops below the given threshold
         #
-        #- !AutoFunding
-        #
-        # Amount to automatically fund a channel that dropped
-        # below the threshold
-        # funding_amount: "10 wxHOPR"
-        #
-        # Auto funding threshold
-        # min_stake_threshold: "1 wxHOPR"
-        #
-        ############################################
-        #
-        # Passive strategy does nothing. This is equivalent to leaving
-        # the `strategies` array empty.
-        #
-        #- !Passive
-        #
-        ############################################
-        #
-        # Strategy that monitors channels that are in `PendingToClose` state and
-        # their channel closure grace period has already elapsed, and on more issuing
-        # channel close transaction on these channels to finalize the closure.
-        #
-      # -
-      # ClosureFinalizer:
+      # - AutoFunding:
+      #
+      # Amount to automatically fund a channel that dropped
+      # below the threshold
+      # funding_amount: "10 wxHOPR"
+      #
+      # Auto funding threshold
+      # min_stake_threshold: "1 wxHOPR"
+      #
+      ############################################
+      #
+      # Passive strategy does nothing. This is equivalent to leaving
+      # the `strategies` array empty.
+      #
+      # - Passive:
+      #
+      ############################################
+      #
+      # Strategy that monitors channels that are in `PendingToClose` state and
+      # their channel closure grace period has already elapsed, and on more issuing
+      # channel close transaction on these channels to finalize the closure.
+      #
+      # - ClosureFinalizer:
       #
       # Does not attempt to finalize closure of channels that have been overdue for closure for more than
       # this number of seconds.
