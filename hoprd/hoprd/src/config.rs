@@ -1,7 +1,7 @@
 use std::{collections::HashSet, net::SocketAddr, time::Duration};
 
 use hopr_lib::{
-    HoprProtocolConfig, SafeModule, WinningProbability,
+    HoprBalance, HoprProtocolConfig, SafeModule, WinningProbability,
     config::{
         HoprLibConfig, HoprPacketPipelineConfig, HostConfig, HostType, ProbeConfig, SessionGlobalConfig,
         TransportConfig,
@@ -160,6 +160,12 @@ pub struct UserHoprNetworkConfig {
     #[default(default_outgoing_ticket_winning_prob())]
     #[serde(default = "default_outgoing_ticket_winning_prob")]
     pub outgoing_ticket_winning_prob: Option<f64>,
+    /// Minimum incoming ticket price.
+    ///
+    /// The value cannot be lower than the minimum network ticket price multiplied by the node's path position,
+    /// and will default to that value whenever it is lower.
+    #[serde(default)]
+    pub min_incoming_ticket_price: Option<HoprBalance>,
 }
 
 /// Subset of the [`HoprLibConfig`] that is tuned to be user-facing and more user-friendly.
@@ -209,6 +215,7 @@ impl From<UserHoprLibConfig> for HoprLibConfig {
                             .network
                             .outgoing_ticket_winning_prob
                             .and_then(|v| WinningProbability::try_from_f64(v).ok()),
+                        min_incoming_ticket_price: value.network.min_incoming_ticket_price,
                         ..Default::default()
                     },
                     ..Default::default()
