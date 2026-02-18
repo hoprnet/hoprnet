@@ -88,8 +88,8 @@ mod tests {
     fn test_config_should_be_serializable_using_serde() -> Result<(), Box<dyn std::error::Error>> {
         let cfg = super::HoprLibConfig::default();
 
-        let yaml = serde_yaml::to_string(&cfg)?;
-        let cfg_after_serde: super::HoprLibConfig = serde_yaml::from_str(&yaml)?;
+        let yaml = serde_saphyr::to_string(&cfg)?;
+        let cfg_after_serde: super::HoprLibConfig = serde_saphyr::from_str(&yaml)?;
         assert_eq!(cfg, cfg_after_serde);
 
         Ok(())

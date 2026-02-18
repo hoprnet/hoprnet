@@ -241,7 +241,7 @@ impl TryFrom<CliArgs> for HoprdConfig {
             debug!(cfg_path, "fetching configuration from file");
             let yaml_configuration = std::fs::read_to_string(cfg_path.as_str())
                 .map_err(|e| crate::errors::HoprdError::ConfigError(e.to_string()))?;
-            serde_yaml::from_str(&yaml_configuration)
+            serde_saphyr::from_str(&yaml_configuration)
                 .map_err(|e| crate::errors::HoprdError::SerializationError(e.to_string()))?
         } else {
             debug!("loading default configuration");

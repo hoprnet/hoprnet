@@ -214,7 +214,7 @@ pub async fn generate(config: &GenerationConfig) -> anyhow::Result<()> {
             .to_str()
             .ok_or(anyhow::anyhow!("Invalid path"))?
             .to_owned();
-        std::fs::write(&cfg_file, serde_yaml::to_string(&node_cfg)?)?;
+        std::fs::write(&cfg_file, serde_saphyr::to_string(&node_cfg)?)?;
         kp.write_eth_keystore(&id_file, &config.identity_password)?;
 
         eprintln!("\x1b[2K\rNode {id}: Node config written to {cfg_file}");

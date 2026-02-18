@@ -424,7 +424,7 @@ mod tests {
     fn test_config_should_be_serializable_into_string() -> anyhow::Result<()> {
         let cfg = example_cfg()?;
 
-        let from_yaml: HoprdConfig = serde_yaml::from_str(include_str!("../example_cfg.yaml"))?;
+        let from_yaml: HoprdConfig = serde_saphyr::from_str(include_str!("../example_cfg.yaml"))?;
         assert_eq!(cfg, from_yaml);
 
         Ok(())
@@ -436,12 +436,12 @@ mod tests {
         let mut prepared_config_file = config_file.reopen()?;
 
         let cfg = example_cfg()?;
-        let yaml = serde_yaml::to_string(&cfg)?;
+        let yaml = serde_saphyr::to_string(&cfg)?;
         config_file.write_all(yaml.as_bytes())?;
 
         let mut buf = String::new();
         prepared_config_file.read_to_string(&mut buf)?;
-        let deserialized_cfg: HoprdConfig = serde_yaml::from_str(&buf)?;
+        let deserialized_cfg: HoprdConfig = serde_saphyr::from_str(&buf)?;
 
         assert_eq!(deserialized_cfg, cfg);
 
@@ -461,7 +461,7 @@ mod tests {
         let mut cfg = example_cfg()?;
         cfg.blokli_url = Some(pwnd.to_owned());
 
-        let yaml = serde_yaml::to_string(&cfg)?;
+        let yaml = serde_saphyr::to_string(&cfg)?;
         config_file.write_all(yaml.as_bytes())?;
         let cfg_file_path = config_file
             .path()
