@@ -28,7 +28,19 @@ impl Scalar for curve25519_dalek::scalar::Scalar {
 impl Scalar for k256::Scalar {
     fn random() -> Self {
         // Beware, this is not constant-time
-        k256::Scalar::generate_vartime(&mut hopr_crypto_random::rng())
+        let mut rng = hopr_crypto_random::rng();
+        let mut bytes = k256::FieldBytes::default();
+        use elliptic_curve::PrimeField;
+        use hopr_crypto_random::Rng;
+        // Needs manual implementation due to incompatible rand crates
+        // k256::Scalar::generate_vartime(&mut hopr_crypto_random::rng())
+
+        loop {
+            rng.fill_bytes(&mut bytes);
+            if let Some(scalar) = k256::Scalar::from_repr(bytes).into() {
+                return scalar;
+            }
+        }
     }
 
     fn from_bytes(bytes: &[u8]) -> Result<Self> {

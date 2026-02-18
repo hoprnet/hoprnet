@@ -12,12 +12,7 @@ crate-type = ["rlib"]
 [features]
 default = []
 capture = ["dep:pcap-file"]
-telemetry = [
-  "hopr-transport-protocol/telemetry",
-  "hopr-transport-session/telemetry",
-  "hopr-transport-network/telemetry",
-  "hopr-transport-p2p/telemetry",
-]
+telemetry = ["hopr-transport-session/telemetry"]
 p2p-announce-quic = []
 p2p-transport-quic = ["hopr-transport-p2p/transport-quic"]
 prometheus = [
@@ -87,6 +82,8 @@ hopr-ct-telemetry = { workspace = true }
 
 [dev-dependencies]
 hex-literal = { workspace = true }
+insta = { workspace = true, features = ["yaml"] }
+
 hopr-crypto-random = { workspace = true }
 hopr-protocol-start = { workspace = true }
 hopr-protocol-session = { workspace = true, features = [

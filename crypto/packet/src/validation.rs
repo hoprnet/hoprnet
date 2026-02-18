@@ -76,6 +76,18 @@ pub fn validate_unacknowledged_ticket(
         });
     }
 
+    // The ticket's index MUST be greater or equal than the channel's ticketIndex
+    if inner_ticket.index < channel.ticket_index {
+        return Err(TicketValidationError {
+            reason: format!(
+                "ticket index {} is lower than channel ticket index {}",
+                inner_ticket.index, channel.ticket_index
+            ),
+            ticket: (*inner_ticket).into(),
+            issuer: Some(*verified_ticket.verified_issuer()),
+        });
+    }
+
     // Ensure that the sender has enough funds
     debug!(%unrealized_balance, channel_id = %channel.get_id(), "checking if sender has enough funds");
     if inner_ticket.amount.gt(&unrealized_balance) {
@@ -242,6 +254,23 @@ mod tests {
         let mut channel = create_channel_entry();
         channel.balance = 0.into();
         channel.channel_epoch = ticket.channel_epoch;
+
+        let ret =
+            validate_unacknowledged_ticket(ticket, &channel, 1.into(), 1.0.try_into()?, 0.into(), &Hash::default());
+
+        assert!(ret.is_err());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_ticket_validation_fail_when_index_is_lower_than_channel_index() -> anyhow::Result<()> {
+        let ticket = create_valid_ticket()?;
+        let mut channel = create_channel_entry();
+        channel.ticket_index = 2;
+        channel.channel_epoch = ticket.channel_epoch;
+
+        assert!(ticket.index < channel.ticket_index);
 
         let ret =
             validate_unacknowledged_ticket(ticket, &channel, 1.into(), 1.0.try_into()?, 0.into(), &Hash::default());
