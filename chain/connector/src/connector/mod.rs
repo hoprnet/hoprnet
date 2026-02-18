@@ -38,7 +38,7 @@ type EventsChannel = (
 
 const MIN_CONNECTION_TIMEOUT: Duration = Duration::from_millis(100);
 const MIN_TX_CONFIRM_TIMEOUT: Duration = Duration::from_secs(1);
-
+const TX_TIMEOUT_MULTIPLIER: u64 = 2;
 const DEFAULT_SYNC_TOLERANCE_PCT: usize = 90;
 
 /// Configuration of the [`HoprBlockchainConnector`].
@@ -537,7 +537,7 @@ where
         tx_req: P::TxRequest,
     ) -> Result<impl Future<Output = Result<ChainReceipt, ConnectorError>> + Send + 'a, ConnectorError> {
         let chain_info = self.query_cached_chain_info().await?;
-        let tx_timeout = 2 * chain_info.finality * chain_info.expected_block_time;
+        let tx_timeout = TX_TIMEOUT_MULTIPLIER * chain_info.finality * chain_info.expected_block_time;
         Ok(self
             .sequencer
             .enqueue_transaction(tx_req, tx_timeout.max(MIN_TX_CONFIRM_TIMEOUT))
