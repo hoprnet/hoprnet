@@ -15,11 +15,7 @@
     { "matchCategories": ["rust"], "enabled": true },
     { "matchCategories": ["docker"], "enabled": true, "pinDigests": true },
     {
-      "matchPackageNames": [
-        "libp2p-stream",
-        "rand",
-        "parameterized"
-      ],
+      "matchPackageNames": ["libp2p-stream", "rand", "parameterized"],
       "enabled": false
     }
   ]
