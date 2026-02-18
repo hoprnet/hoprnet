@@ -221,7 +221,7 @@ mod tests {
         let cp = ChainKeypair::random();
 
         let account = AccountEntry {
-            public_key: (*kp_a.public()).into(),
+            public_key: (*kp_a.public()),
             chain_addr: cp.public().to_address(),
             entry_type: AccountType::NotAnnounced,
             safe_address: None,
@@ -232,7 +232,7 @@ mod tests {
         // Update same ID with a different offchain key
         let kp_b = OffchainKeypair::random();
         let updated = AccountEntry {
-            public_key: (*kp_b.public()).into(),
+            public_key: (*kp_b.public()),
             chain_addr: cp.public().to_address(),
             entry_type: AccountType::NotAnnounced,
             safe_address: None,
@@ -241,9 +241,9 @@ mod tests {
         backend.insert_account(updated.clone())?;
 
         // Old key should no longer resolve
-        assert!(backend.get_account_by_key(&kp_a.public())?.is_none());
+        assert!(backend.get_account_by_key(kp_a.public())?.is_none());
         // New key should resolve
-        assert_eq!(backend.get_account_by_key(&kp_b.public())?, Some(updated));
+        assert_eq!(backend.get_account_by_key(kp_b.public())?, Some(updated));
 
         Ok(())
     }
@@ -256,7 +256,7 @@ mod tests {
         let cp_a = ChainKeypair::random();
 
         let account = AccountEntry {
-            public_key: (*kp.public()).into(),
+            public_key: (*kp.public()),
             chain_addr: cp_a.public().to_address(),
             entry_type: AccountType::NotAnnounced,
             safe_address: None,
@@ -267,7 +267,7 @@ mod tests {
         // Update same ID with a different chain address
         let cp_b = ChainKeypair::random();
         let updated = AccountEntry {
-            public_key: (*kp.public()).into(),
+            public_key: (*kp.public()),
             chain_addr: cp_b.public().to_address(),
             entry_type: AccountType::NotAnnounced,
             safe_address: None,
@@ -299,10 +299,10 @@ mod tests {
             HoprBalance::new_base(100),
             1u32.into(),
             ChannelStatus::Open,
-            1u32.into(),
+            1u32,
         );
 
-        let first_insert = backend.insert_channel(channel_v1.clone())?;
+        let first_insert = backend.insert_channel(channel_v1)?;
         assert!(first_insert.is_none(), "first insert should return None");
 
         let channel_v2 = ChannelEntry::new(
@@ -311,7 +311,7 @@ mod tests {
             HoprBalance::new_base(200),
             2u32.into(),
             ChannelStatus::Open,
-            2u32.into(),
+            2u32,
         );
 
         let second_insert = backend.insert_channel(channel_v2)?;
@@ -329,7 +329,7 @@ mod tests {
         let channel_id = generate_channel_id(&Address::new(&[1u8; 20]), &Address::new(&[2u8; 20]));
 
         assert!(backend.get_account_by_id(&42.into())?.is_none());
-        assert!(backend.get_account_by_key(&kp.public())?.is_none());
+        assert!(backend.get_account_by_key(kp.public())?.is_none());
         assert!(backend.get_account_by_address(&cp.public().to_address())?.is_none());
         assert!(backend.get_channel_by_id(&channel_id)?.is_none());
 
@@ -344,7 +344,7 @@ mod tests {
         let cp = ChainKeypair::random();
 
         let account = AccountEntry {
-            public_key: (*kp.public()).into(),
+            public_key: (*kp.public()),
             chain_addr: cp.public().to_address(),
             entry_type: AccountType::NotAnnounced,
             safe_address: None,
@@ -353,7 +353,7 @@ mod tests {
         backend.insert_account(account.clone())?;
 
         // Verify lookups via both index paths return the correct account
-        let by_key = backend.get_account_by_key(&kp.public())?;
+        let by_key = backend.get_account_by_key(kp.public())?;
         assert_eq!(by_key, Some(account.clone()));
 
         let by_addr = backend.get_account_by_address(&cp.public().to_address())?;

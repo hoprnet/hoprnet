@@ -18,6 +18,8 @@ use hopr_chain_connector::{
     create_trustful_hopr_blokli_connector,
 };
 use hopr_db_node::{HoprNodeDb, HoprNodeDbApi, init_hopr_node_db};
+#[cfg(feature = "runtime-tokio")]
+pub use hopr_lib;
 use hopr_lib::Keypair;
 #[cfg(feature = "session-server")]
 use hopr_lib::traits::HoprSessionServer;

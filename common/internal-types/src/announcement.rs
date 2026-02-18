@@ -166,7 +166,7 @@ mod tests {
     #[test]
     fn test_key_binding() -> anyhow::Result<()> {
         let kb_1 = KeyBinding::new(*CHAIN_ADDR, &KEY_PAIR);
-        let kb_2 = KeyBinding::from_parts(kb_1.chain_key, kb_1.packet_key, kb_1.signature.clone())?;
+        let kb_2 = KeyBinding::from_parts(kb_1.chain_key, kb_1.packet_key, kb_1.signature)?;
 
         assert_eq!(kb_1, kb_2, "must be equal");
 
@@ -178,7 +178,7 @@ mod tests {
         let key_binding = KeyBinding::new(*CHAIN_ADDR, &KEY_PAIR);
         let peer_id = KEY_PAIR.public().to_peerid_str();
 
-        for (ma_str, decapsulated_ma_str) in vec![
+        for (ma_str, decapsulated_ma_str) in [
             (
                 format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}"),
                 "/ip4/127.0.0.1/tcp/10000".to_string(),
@@ -202,7 +202,7 @@ mod tests {
         ] {
             let maddr: Multiaddr = ma_str.parse()?;
 
-            let ad = AnnouncementData::new(key_binding.clone(), Some(maddr))?;
+            let ad = AnnouncementData::new(key_binding, Some(maddr))?;
             assert_eq!(Some(decapsulated_ma_str), ad.multiaddress().map(|m| m.to_string()));
             assert_eq!(&key_binding, ad.key_binding());
         }
@@ -225,7 +225,7 @@ mod tests {
         let key_binding = KeyBinding::new(*CHAIN_ADDR, &KEY_PAIR);
         let maddr: Multiaddr = "/ip4/127.0.0.1/tcp/10000".to_string().parse()?;
 
-        let ad = AnnouncementData::new(key_binding.clone(), Some(maddr))?;
+        let ad = AnnouncementData::new(key_binding, Some(maddr))?;
         assert_eq!(
             Some("/ip4/127.0.0.1/tcp/10000".to_string()),
             ad.multiaddress().map(|m| m.to_string())

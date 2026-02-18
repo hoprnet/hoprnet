@@ -616,11 +616,11 @@ mod tests {
                 Self::Final(packet) => (packet.plain_text.clone(), dummy_ticket.as_ref().into()),
                 Self::Forwarded(fwd) => (
                     Vec::from(fwd.outgoing.packet.as_ref()).into_boxed_slice(),
-                    fwd.outgoing.ticket.clone().into_boxed(),
+                    fwd.outgoing.ticket.into_boxed(),
                 ),
                 Self::Outgoing(out) => (
                     Vec::from(out.packet.as_ref()).into_boxed_slice(),
-                    out.ticket.clone().into_boxed(),
+                    out.ticket.into_boxed(),
                 ),
             };
 
@@ -662,7 +662,7 @@ mod tests {
             "return hops must be between 1 and 3"
         );
 
-        let ticket = mock_ticket(&PEERS[1].0.public(), forward_hops + 1)?;
+        let ticket = mock_ticket(PEERS[1].0.public(), forward_hops + 1)?;
         let forward_path = TransportPath::new(PEERS[1..=forward_hops + 1].iter().map(|kp| *kp.1.public()))?;
 
         let return_paths = return_hops
@@ -695,7 +695,7 @@ mod tests {
         assert!((1..=4).contains(&sender_node), "sender_node must be between 1 and 4");
 
         let ticket = mock_ticket(
-            &PEERS[sender_node - 1].0.public(),
+            PEERS[sender_node - 1].0.public(),
             surb.additional_data_receiver.proof_of_relay_values().chain_length() as usize,
         )?;
 
@@ -738,10 +738,10 @@ mod tests {
             HoprPacket::Final(_) => Ok(packet),
             HoprPacket::Forwarded(_) => {
                 let next_hop = match (node_pos, is_reply) {
-                    (3, false) => PEERS[4].0.public().clone(),
-                    (_, false) => PEERS[node_pos + 1].0.public().clone(),
-                    (1, true) => PEERS[0].0.public().clone(),
-                    (_, true) => PEERS[node_pos - 1].0.public().clone(),
+                    (3, false) => *PEERS[4].0.public(),
+                    (_, false) => *PEERS[node_pos + 1].0.public(),
+                    (1, true) => *PEERS[0].0.public(),
+                    (_, true) => *PEERS[node_pos - 1].0.public(),
                 };
 
                 let next_ticket = mock_ticket(&next_hop, path_len)?;

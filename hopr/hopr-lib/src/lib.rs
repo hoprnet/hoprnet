@@ -334,6 +334,20 @@ where
         self.cfg.publish
     }
 
+    // TODO(20260218): @NumberFour8 abstract the telemetry objects properly and extract this API into a telemetry trait
+    /// Get packet stats for a specific peer.
+    #[cfg(feature = "telemetry")]
+    pub async fn network_peer_packet_stats(&self, peer: &PeerId) -> errors::Result<Option<PeerPacketStatsSnapshot>> {
+        Ok(self.transport_api.network_peer_packet_stats(peer).await?)
+    }
+
+    // TODO(20260218): @NumberFour8 abstract the telemetry objects properly and extract this API into a telemetry trait
+    /// Get packet stats for all connected peers.
+    #[cfg(feature = "telemetry")]
+    pub async fn network_all_packet_stats(&self) -> errors::Result<Vec<(PeerId, PeerPacketStatsSnapshot)>> {
+        Ok(self.transport_api.network_all_packet_stats().await?)
+    }
+
     pub async fn run<
         Ct,
         NetBuilder,
@@ -701,6 +715,8 @@ where
             .await?;
 
         while let Some(channel) = channels.next().await {
+            // Set the state of all unredeemed tickets with a higher index than the current
+            // channel index as untouched.
             self.node_db
                 .update_ticket_states_and_fetch(
                     [TicketSelector::from(&channel)
@@ -715,6 +731,15 @@ where
                     futures::future::ready(())
                 })
                 .await;
+
+            // Mark all the tickets with a lower ticket index than the current channel index as neglected.
+            self.node_db
+                .mark_tickets_as(
+                    [TicketSelector::from(&channel).with_index_range(..channel.ticket_index)],
+                    TicketMarker::Neglected,
+                )
+                .map_err(HoprLibError::db)
+                .await?;
         }
 
         self.state.store(HoprState::Running, Ordering::Relaxed);
@@ -789,14 +814,20 @@ where
     /// closed due to inactivity.
     #[cfg(feature = "session-client")]
     pub async fn keep_alive_session(&self, id: &SessionId) -> errors::Result<()> {
-        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for session operations".into())?;
         Ok(self.transport_api.probe_session(id).await?)
     }
 
     #[cfg(feature = "session-client")]
     pub async fn get_session_surb_balancer_config(&self, id: &SessionId) -> errors::Result<Option<SurbBalancerConfig>> {
-        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for session operations".into())?;
         Ok(self.transport_api.session_surb_balancing_cfg(id).await?)
+    }
+
+    #[cfg(all(feature = "session-client", feature = "telemetry"))]
+    pub async fn get_session_stats(&self, id: &SessionId) -> errors::Result<SessionStatsSnapshot> {
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for session operations".into())?;
+        Ok(self.transport_api.session_stats(id).await?)
     }
 
     #[cfg(feature = "session-client")]
@@ -805,7 +836,7 @@ where
         id: &SessionId,
         cfg: SurbBalancerConfig,
     ) -> errors::Result<()> {
-        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for session operations".into())?;
         Ok(self.transport_api.update_session_surb_balancing_cfg(id, cfg).await?)
     }
 

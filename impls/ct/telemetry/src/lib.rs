@@ -196,7 +196,6 @@ mod tests {
         let cfg = ProberConfig {
             interval: std::time::Duration::from_millis(1),
             recheck_threshold: std::time::Duration::from_millis(1000),
-            ..Default::default()
         };
 
         let channel_graph = Arc::new(ChannelGraph::new(OffchainKeypair::random().public().clone()));

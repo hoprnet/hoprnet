@@ -126,10 +126,7 @@ impl TestedHopr {
     }
 
     pub async fn channel_from_hash(&self, channel_hash: &prelude::Hash) -> Option<ChannelEntry> {
-        self.instance
-            .channel_from_hash(channel_hash)
-            .await
-            .unwrap_or_else(|_| None)
+        self.instance.channel_from_hash(channel_hash).await.unwrap_or(None)
     }
 
     pub async fn outgoing_channels_by_status(&self, status: ChannelStatus) -> Option<Vec<ChannelEntry>> {
@@ -180,7 +177,7 @@ impl ChannelGuard {
 
     pub async fn try_to_get_all_ticket_counts(&self) -> anyhow::Result<Vec<usize>> {
         let futures = self.channels.iter().map(|(hopr, channel_id)| async move {
-            hopr.tickets_in_channel(&channel_id)
+            hopr.tickets_in_channel(channel_id)
                 .await
                 .context("getting ticket statistics must succeed")
                 .into_iter()
@@ -209,7 +206,7 @@ impl ChannelGuard {
     pub async fn try_close_channels_all_channels(&self) -> anyhow::Result<()> {
         let futures = self.channels.iter().map(|(hopr, channel_id)| {
             let hopr = hopr.clone();
-            let channel_id = channel_id.clone();
+            let channel_id = *channel_id;
             async move {
                 if hopr
                     .channel_from_hash(&channel_id)
@@ -232,7 +229,7 @@ impl ChannelGuard {
 
         let futures = self.channels.iter().map(|(hopr, channel_id)| {
             let hopr = hopr.clone();
-            let channel_id = channel_id.clone();
+            let channel_id = *channel_id;
             async move {
                 if hopr
                     .channel_from_hash(&channel_id)

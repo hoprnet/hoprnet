@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use hopr_lib::BoundedVec;
 #[cfg(feature = "session-client")]
 use hopr_lib::{
     HoprBalance, RoutingOptions, SessionCapabilities, SessionClientConfig, SessionTarget,
@@ -48,9 +49,7 @@ async fn test_create_n_hop_session(cluster: &ClusterGuard, #[case] hops: usize) 
         (RoutingOptions::Hops(0_u32.try_into()?), SessionCapabilities::empty())
     } else {
         (
-            RoutingOptions::IntermediatePath(hopr_lib::exports::types::primitive::bounded::BoundedVec::from_iter(
-                mid.iter().map(|node| node.address().into()),
-            )),
+            RoutingOptions::IntermediatePath(BoundedVec::from_iter(mid.iter().map(|node| node.address().into()))),
             SessionCapabilities::default(),
         )
     };
@@ -63,7 +62,7 @@ async fn test_create_n_hop_session(cluster: &ClusterGuard, #[case] hops: usize) 
             SessionClientConfig {
                 forward_path_options: routing.clone(),
                 return_path_options: routing,
-                capabilities: capabilities,
+                capabilities,
                 pseudonym: None,
                 surb_management: None,
                 always_max_out_surbs: false,

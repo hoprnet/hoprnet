@@ -19,4 +19,4 @@ runtime-tokio = ["dep:tokio"]
 auto_impl = { workspace = true }
 indexmap = { workspace = true }
 futures = { workspace = true }
-tokio = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true, features = ["time"] }

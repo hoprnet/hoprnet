@@ -32,7 +32,7 @@ where
     C: Encoder<<C as Decoder>::Item> + Decoder + Send + Sync + Clone + 'static,
     <C as Encoder<<C as Decoder>::Item>>::Error: std::fmt::Debug + std::fmt::Display + Send + Sync + 'static,
     <C as Decoder>::Error: std::fmt::Debug + std::fmt::Display + Send + Sync + 'static,
-    <C as Decoder>::Item: Clone + Send + 'static,
+    <C as Decoder>::Item: AsRef<[u8]> + Clone + Send + 'static,
 {
     let (stream_rx, stream_tx) = stream.split();
     let (send, recv) = channel::<<C as Decoder>::Item>(1000);
@@ -56,8 +56,8 @@ where
     // Read all incoming data from that peer and pass it to the general ingress stream
     hopr_async_runtime::prelude::spawn(
         FramedRead::new(stream_rx.compat(), codec)
-            .filter_map(move |v| async move {
-                match v {
+            .filter_map(move |v| {
+                futures::future::ready(match v {
                     Ok(v) => {
                         tracing::trace!(%peer, "read message from peer stream");
                         Some((peer, v))
@@ -66,7 +66,7 @@ where
                         tracing::error!(%error, "Error decoding object from the underlying stream");
                         None
                     }
-                }
+                })
             })
             .map(Ok)
             .forward(ingress_from_peers)
@@ -100,7 +100,7 @@ where
     C: Encoder<<C as Decoder>::Item> + Decoder + Send + Sync + Clone + 'static,
     <C as Encoder<<C as Decoder>::Item>>::Error: std::fmt::Debug + std::fmt::Display + Send + Sync + 'static,
     <C as Decoder>::Error: std::fmt::Debug + std::fmt::Display + Send + Sync + 'static,
-    <C as Decoder>::Item: Clone + Send + 'static,
+    <C as Decoder>::Item: AsRef<[u8]> + Clone + Send + 'static,
     V: NetworkStreamControl + Clone + Send + Sync + 'static,
 {
     let (tx_out, rx_out) = channel::<(PeerId, <C as Decoder>::Item)>(100_000);
@@ -131,7 +131,6 @@ where
                 let tx_in = tx_in_ingress.clone();
 
                 tracing::debug!(%peer, "received incoming peer-to-peer stream");
-
                 let send = build_peer_stream_io(peer, stream, cache.clone(), codec.clone(), tx_in.clone());
 
                 async move {

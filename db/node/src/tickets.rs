@@ -601,11 +601,13 @@ impl HoprDbTicketOperations for HoprNodeDb {
             .await?)
     }
 
-    async fn get_tickets_value(&self, id: &ChannelId, epoch: u32) -> Result<HoprBalance, NodeDbError> {
+    // This caches the value for the given ChannelId and Epoch,
+    // no matter what else the TicketSelector specifies as restriction criteria.
+    async fn get_tickets_value(&self, selector: TicketSelector) -> Result<HoprBalance, NodeDbError> {
         Ok(self
             .unrealized_value
-            .try_get_with((*id, epoch), async {
-                get_tickets_value_int(&self.tickets_db, TicketSelector::new(*id, epoch))
+            .try_get_with(selector.channel_identifier, async {
+                get_tickets_value_int(&self.tickets_db, selector)
                     .await
                     .map(|(_, value)| value)
             })
@@ -616,6 +618,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
         &self,
         channel_id: &ChannelId,
         epoch: u32,
+        current_index: u64,
     ) -> Result<Option<u64>, Self::Error> {
         let _lock = self.tickets_write_lock.lock().await;
         let channel_id = hex::encode(channel_id);
@@ -665,15 +668,19 @@ impl HoprDbTicketOperations for HoprNodeDb {
                         .await?;
 
                     Ok(match maybe_index {
-                        Some(model) => Some(u64::from_be_bytes(model.index.try_into().map_err(|_| {
-                            NodeDbError::LogicalError(format!(
-                                "could not convert outgoing ticket index to u64 for channel {channel_id}"
-                            ))
-                        })?)),
+                        Some(model) => Some(
+                            u64::from_be_bytes(model.index.try_into().map_err(|_| {
+                                NodeDbError::LogicalError(format!(
+                                    "could not convert outgoing ticket index to u64 for channel {channel_id}"
+                                ))
+                            })?)
+                            .max(current_index),
+                        ),
                         None => {
                             outgoing_ticket_index::ActiveModel {
                                 channel_id: Set(channel_id),
                                 epoch: Set(epoch as i32),
+                                index: Set(current_index.to_be_bytes().into()),
                                 ..Default::default()
                             }
                             .insert(tx)
@@ -841,7 +848,7 @@ mod tests {
             .collect::<anyhow::Result<Vec<RedeemableTicket>>>()?;
 
         for t in &tickets {
-            db.upsert_ticket(t.clone()).await?;
+            db.upsert_ticket(*t).await?;
         }
 
         Ok(tickets)
@@ -1113,11 +1120,26 @@ mod tests {
 
         let hash = Hash::default();
 
-        let idx = db.get_or_create_outgoing_ticket_index(&hash, 1).await?;
+        let idx = db.get_or_create_outgoing_ticket_index(&hash, 1, 0).await?;
         assert_eq!(None, idx, "initial index must be None");
 
-        let idx = db.get_or_create_outgoing_ticket_index(&hash, 1).await?;
+        let idx = db.get_or_create_outgoing_ticket_index(&hash, 1, 0).await?;
         assert_eq!(Some(0), idx, "index must be zero");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_outgoing_ticket_index_should_be_default_if_not_yet_present() -> anyhow::Result<()> {
+        let db = HoprNodeDb::new_in_memory().await?;
+
+        let hash = Hash::default();
+
+        let idx = db.get_or_create_outgoing_ticket_index(&hash, 1, 10).await?;
+        assert_eq!(None, idx, "initial index must be None");
+
+        let idx = db.get_or_create_outgoing_ticket_index(&hash, 1, 0).await?;
+        assert_eq!(Some(10), idx, "index must be 10");
 
         Ok(())
     }
@@ -1128,10 +1150,10 @@ mod tests {
 
         let hash = Hash::default();
 
-        db.get_or_create_outgoing_ticket_index(&hash, 1).await?;
-        db.get_or_create_outgoing_ticket_index(&hash, 2).await?;
+        db.get_or_create_outgoing_ticket_index(&hash, 1, 0).await?;
+        db.get_or_create_outgoing_ticket_index(&hash, 2, 0).await?;
 
-        assert!(db.get_or_create_outgoing_ticket_index(&hash, 1).await.is_err());
+        assert!(db.get_or_create_outgoing_ticket_index(&hash, 1, 0).await.is_err());
 
         Ok(())
     }
@@ -1142,10 +1164,10 @@ mod tests {
 
         let hash = Hash::default();
 
-        db.get_or_create_outgoing_ticket_index(&hash, 1).await?;
+        db.get_or_create_outgoing_ticket_index(&hash, 1, 0).await?;
         db.update_outgoing_ticket_index(&hash, 1, 2).await?;
 
-        assert_eq!(Some(2), db.get_or_create_outgoing_ticket_index(&hash, 1).await?);
+        assert_eq!(Some(2), db.get_or_create_outgoing_ticket_index(&hash, 1, 0).await?);
 
         Ok(())
     }
@@ -1158,7 +1180,7 @@ mod tests {
 
         db.update_outgoing_ticket_index(&hash, 1, 2).await?;
 
-        assert_eq!(None, db.get_or_create_outgoing_ticket_index(&hash, 1).await?);
+        assert_eq!(None, db.get_or_create_outgoing_ticket_index(&hash, 1, 0).await?);
 
         Ok(())
     }
@@ -1169,14 +1191,14 @@ mod tests {
 
         let hash = Hash::default();
 
-        db.get_or_create_outgoing_ticket_index(&hash, 1).await?;
+        db.get_or_create_outgoing_ticket_index(&hash, 1, 0).await?;
         db.update_outgoing_ticket_index(&hash, 1, 2).await?;
 
-        assert_eq!(Some(2), db.get_or_create_outgoing_ticket_index(&hash, 1).await?);
+        assert_eq!(Some(2), db.get_or_create_outgoing_ticket_index(&hash, 1, 0).await?);
 
         assert!(db.update_outgoing_ticket_index(&hash, 1, 1).await.is_err());
 
-        assert_eq!(Some(2), db.get_or_create_outgoing_ticket_index(&hash, 1).await?);
+        assert_eq!(Some(2), db.get_or_create_outgoing_ticket_index(&hash, 1, 0).await?);
 
         Ok(())
     }
@@ -1187,15 +1209,15 @@ mod tests {
 
         let hash = Hash::default();
 
-        let idx = db.get_or_create_outgoing_ticket_index(&hash, 1).await?;
+        let idx = db.get_or_create_outgoing_ticket_index(&hash, 1, 0).await?;
         assert!(idx.is_none());
 
-        let idx = db.get_or_create_outgoing_ticket_index(&hash, 1).await?;
+        let idx = db.get_or_create_outgoing_ticket_index(&hash, 1, 0).await?;
         assert_eq!(Some(0), idx);
 
         db.remove_outgoing_ticket_index(&hash, 1).await?;
 
-        let idx = db.get_or_create_outgoing_ticket_index(&hash, 1).await?;
+        let idx = db.get_or_create_outgoing_ticket_index(&hash, 1, 0).await?;
         assert!(idx.is_none());
 
         Ok(())

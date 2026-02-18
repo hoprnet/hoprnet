@@ -1,0 +1,8 @@
+---
+source: transport/api/src/stats.rs
+expression: snapshot
+---
+packetsOut: 2
+packetsIn: 2
+bytesOut: 3000
+bytesIn: 2000

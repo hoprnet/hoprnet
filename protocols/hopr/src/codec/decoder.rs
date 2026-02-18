@@ -99,10 +99,14 @@ where
                 .mul(U256::from(fwd.path_pos))
         });
 
-        let remaining_balance = trace_timed!("remaining_balance lookup", {
+        let remaining_balance = trace_timed!("unrealized_balance lookup", {
             incoming_channel.balance.sub(
                 self.tracker
-                    .incoming_channel_unrealized_balance(incoming_channel.get_id(), incoming_channel.channel_epoch)
+                    .incoming_channel_unrealized_balance(
+                        incoming_channel.get_id(),
+                        incoming_channel.channel_epoch,
+                        incoming_channel.ticket_index,
+                    )
                     .await
                     .map_err(|e| HoprProtocolError::TicketTrackerError(e.into()))?,
             )

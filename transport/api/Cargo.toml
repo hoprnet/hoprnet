@@ -10,7 +10,9 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
+default = []
 capture = ["dep:pcap-file"]
+telemetry = ["serde", "hopr-transport-session/telemetry"]
 p2p-announce-quic = []
 prometheus = [
   "dep:hopr-metrics",
@@ -74,6 +76,8 @@ hopr-transport-session = { workspace = true }
 
 [dev-dependencies]
 hex-literal = { workspace = true }
+insta = { workspace = true, features = ["yaml"] }
+
 hopr-crypto-random = { workspace = true }
 hopr-protocol-start = { workspace = true }
 hopr-protocol-session = { workspace = true, features = [

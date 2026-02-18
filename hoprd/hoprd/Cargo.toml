@@ -66,7 +66,6 @@ async-signal = { workspace = true }
 clap = { workspace = true }
 console-subscriber = { workspace = true, optional = true }
 futures = { workspace = true }
-hex = { workspace = true }
 home = "0.5.12"
 humansize = { workspace = true, optional = true, features = ["no_alloc"] }
 humantime-serde = { workspace = true }
@@ -90,7 +89,6 @@ opentelemetry-otlp = { workspace = true, default-features = false, features = [
   "http-proto",
   "grpc-tonic",
 ], optional = true }
-lazy_static = { workspace = true }
 opentelemetry_sdk = { workspace = true, optional = true }
 tracing-opentelemetry = { workspace = true, optional = true }
 
@@ -101,9 +99,10 @@ hopr-lib = { workspace = true, features = [
   "session-client",
   "session-server",
   "utils_parallel",
+  "telemetry",
 ] }
 hopr-utils-session = { workspace = true }
-hoprd-api = { workspace = true }
+hoprd-api = { workspace = true, features = ["telemetry"] }
 # impls
 hopr-reference = { workspace = true, features = [
   "runtime-tokio",

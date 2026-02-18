@@ -1,0 +1,31 @@
+[package]
+name = "hoprd-localcluster"
+version = "0.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+license = "GPL-3.0-only"
+
+description = "Local HOPR cluster runner using external hoprd processes"
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+futures = { workspace = true }
+hoprd = { workspace = true }
+hoprd-api = { workspace = true }
+hopr-chain-connector = { workspace = true }
+hopr-lib = { workspace = true }
+hopr-reference = { workspace = true }
+hoprd-api-client = { workspace = true }
+hopr-primitive-types = { workspace = true }
+lazy_static = { workspace = true }
+reqwest = { workspace = true, features = ["json"] }
+serde_yaml = { workspace = true }
+tokio = { workspace = true, features = [
+  "macros",
+  "rt-multi-thread",
+  "signal",
+  "time",
+] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }

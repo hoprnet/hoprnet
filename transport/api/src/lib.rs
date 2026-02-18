@@ -20,6 +20,9 @@ pub mod constants;
 pub mod errors;
 mod helpers;
 
+#[cfg(feature = "telemetry")]
+pub mod stats;
+
 #[cfg(feature = "capture")]
 mod capture;
 mod pipeline;
@@ -77,9 +80,17 @@ pub use hopr_transport_session::{
     errors::{SessionManagerError, TransportSessionError},
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
+#[cfg(feature = "telemetry")]
+pub use hopr_transport_session::{
+    SessionAckMode, SessionLifecycleState, SessionLifetimeSnapshot, SessionStatsSnapshot,
+};
+#[cfg(feature = "telemetry")]
+pub use stats::PeerPacketStats;
 use tracing::{Instrument, debug, error, trace, warn};
 
 pub use crate::config::HoprProtocolConfig;
+#[cfg(feature = "telemetry")]
+pub use crate::stats::PeerPacketStatsSnapshot;
 use crate::{
     constants::SESSION_INITIATION_TIMEOUT_BASE, errors::HoprTransportError, pipeline::HoprPipelineComponents,
     socket::HoprSocket,
@@ -522,6 +533,11 @@ where
         Ok(self.smgr.get_surb_balancer_config(id).await?)
     }
 
+    #[cfg(feature = "telemetry")]
+    pub async fn session_stats(&self, id: &SessionId) -> errors::Result<SessionStatsSnapshot> {
+        Ok(self.smgr.get_session_stats(id).await?)
+    }
+
     pub async fn update_session_surb_balancing_cfg(
         &self,
         id: &SessionId,
@@ -659,6 +675,20 @@ where
                 }
             })
             .collect::<Vec<_>>())
+    }
+
+    /// Get packet stats snapshot for a specific peer.
+    #[cfg(feature = "telemetry")]
+    #[tracing::instrument(level = "debug", skip(self))]
+    pub async fn network_peer_packet_stats(&self, peer: &PeerId) -> errors::Result<Option<PeerPacketStatsSnapshot>> {
+        Err(HoprTransportError::Api("not implemented yet".into()))
+    }
+
+    /// Get packet stats for all connected peers.
+    #[cfg(feature = "telemetry")]
+    #[tracing::instrument(level = "debug", skip(self))]
+    pub async fn network_all_packet_stats(&self) -> errors::Result<Vec<(PeerId, PeerPacketStatsSnapshot)>> {
+        Err(HoprTransportError::Api("not implemented yet".into()))
     }
 }
 

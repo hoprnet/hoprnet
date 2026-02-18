@@ -110,7 +110,7 @@ mod tests {
     #[test]
     fn network_peer_store_should_recognize_self() {
         let me = PeerId::random();
-        let store = NetworkPeerStore::new(me.clone(), HashSet::new());
+        let store = NetworkPeerStore::new(me, HashSet::new());
 
         assert!(store.has(&me));
     }
@@ -131,7 +131,7 @@ mod tests {
     #[test]
     fn network_peer_store_own_peer_should_fail_on_adding() {
         let me = PeerId::random();
-        let store = NetworkPeerStore::new(me.clone(), HashSet::new());
+        let store = NetworkPeerStore::new(me, HashSet::new());
 
         assert!(store.add(me, HashSet::new()).is_err());
     }
@@ -141,12 +141,12 @@ mod tests {
         let store = NetworkPeerStore::new(PeerId::random(), HashSet::new());
 
         let peer = PeerId::random();
-        assert!(store.add(peer.clone(), HashSet::new()).is_ok());
+        assert!(store.add(peer, HashSet::new()).is_ok());
 
         assert_eq!(store.get(&peer).context("should contain a value")?, HashSet::new());
 
         let multiaddresses = HashSet::from(["/ip4/127.0.0.1/tcp/12345".try_into()?]);
-        assert!(store.add(peer.clone(), multiaddresses.clone()).is_ok());
+        assert!(store.add(peer, multiaddresses.clone()).is_ok());
 
         assert_eq!(store.get(&peer).context("should contain a value")?, multiaddresses);
 
@@ -157,7 +157,7 @@ mod tests {
     fn network_peer_store_should_return_own_multiaddresses() -> anyhow::Result<()> {
         let me = PeerId::random();
         let multiaddresses = HashSet::from(["/ip4/127.0.0.1/tcp/12345".try_into()?]);
-        let store = NetworkPeerStore::new(me.clone(), multiaddresses.clone());
+        let store = NetworkPeerStore::new(me, multiaddresses.clone());
 
         assert_eq!(store.get(&me), Some(multiaddresses));
 
@@ -170,7 +170,7 @@ mod tests {
 
         let peer = PeerId::random();
         let multiaddresses = HashSet::from(["/ip4/127.0.0.1/tcp/12345".try_into()?]);
-        assert!(store.add(peer.clone(), multiaddresses.clone()).is_ok());
+        assert!(store.add(peer, multiaddresses.clone()).is_ok());
 
         assert_eq!(store.get(&peer), Some(multiaddresses));
 
@@ -181,7 +181,7 @@ mod tests {
     fn network_peer_store_should_fail_on_removing_self() -> anyhow::Result<()> {
         let me = PeerId::random();
         let multiaddresses = HashSet::from(["/ip4/127.0.0.1/tcp/12345".try_into()?]);
-        let store = NetworkPeerStore::new(me.clone(), multiaddresses.clone());
+        let store = NetworkPeerStore::new(me, multiaddresses.clone());
 
         assert!(store.remove(&me).is_err());
 
@@ -194,7 +194,7 @@ mod tests {
 
         let peer = PeerId::random();
         let multiaddresses = HashSet::from(["/ip4/127.0.0.1/tcp/12345".try_into()?]);
-        assert!(store.add(peer.clone(), multiaddresses.clone()).is_ok());
+        assert!(store.add(peer, multiaddresses.clone()).is_ok());
 
         store.remove(&peer)?;
 

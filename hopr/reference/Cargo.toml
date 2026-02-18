@@ -43,6 +43,7 @@ testing = [
   "dep:rstest",
   "hopr-chain-connector/testing",
 ]
+telemetry = ["hopr-lib/telemetry"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -73,7 +74,11 @@ hopr-network-graph = { workspace = true }
 hopr-transport-p2p = { workspace = true }
 
 [dev-dependencies]
+insta = { workspace = true, features = ["yaml", "redactions"] }
 rstest = { workspace = true }
 serial_test = { workspace = true }
 test-log = { workspace = true }
+
 hopr-reference = { workspace = true, features = ["testing"] }
+hopr-crypto-random = { workspace = true }
+hopr-lib = { workspace = true, features = ["telemetry"] }

@@ -1,29 +1,24 @@
 use libp2p_identity::PeerId;
 
-use crate::{errors::CryptoError, keypairs::OffchainKeypair, types::OffchainPublicKey};
+use crate::keypairs::OffchainKeypair;
 
-/// Performs randomized encryption of the given data, so that
+/// **CURRENTLY NOT IMPLEMENTED**, see https://github.com/hoprnet/hoprnet/issues/7172
+///
+/// Performs randomized encryption of the given data so that
 /// only the recipient with the given `peer_id` can [decrypt it](unseal_data).
-pub fn seal_data(data: &[u8], peer_id: PeerId) -> crate::errors::Result<Box<[u8]>> {
-    let recipient_pk: crypto_box::PublicKey =
-        curve25519_dalek::MontgomeryPoint::from(&OffchainPublicKey::from_peerid(&peer_id)?).into();
-
-    recipient_pk
-        .seal(&mut hopr_crypto_random::rng(), data)
-        .map_err(|_| CryptoError::SealingError)
-        .map(|vec| vec.into_boxed_slice())
+pub fn seal_data(_data: &[u8], _peer_id: PeerId) -> crate::errors::Result<Box<[u8]>> {
+    // TODO: sealing not implemented, see https://github.com/hoprnet/hoprnet/issues/7172"
+    Err(crate::errors::CryptoError::SealingError)
 }
 
-/// Decrypts a data previously encrypted with [`seal_data`].
+/// **CURRENTLY NOT IMPLEMENTED**, see https://github.com/hoprnet/hoprnet/issues/7172
+///
+/// Decrypts data previously encrypted with [`seal_data`].
 ///
 /// The given `keypair` must correspond to the `peer_id` given during encryption.
-pub fn unseal_data(data: &[u8], keypair: &OffchainKeypair) -> crate::errors::Result<Box<[u8]>> {
-    let recipient_sk = crypto_box::SecretKey::from(curve25519_dalek::scalar::Scalar::from(keypair));
-
-    recipient_sk
-        .unseal(data)
-        .map(|vec| vec.into_boxed_slice())
-        .map_err(|_| CryptoError::SealingError)
+pub fn unseal_data(_data: &[u8], _keypair: &OffchainKeypair) -> crate::errors::Result<Box<[u8]>> {
+    // TODO: sealing not implemented, see https://github.com/hoprnet/hoprnet/issues/7172"
+    Err(crate::errors::CryptoError::SealingError)
 }
 
 #[cfg(test)]
@@ -35,6 +30,7 @@ mod tests {
     use super::*;
     use crate::keypairs::Keypair;
 
+    #[ignore = "sealing is not implemented yet, see https://github.com/hoprnet/hoprnet/issues/7172"]
     #[test]
     fn seal_unseal_should_be_identity() -> anyhow::Result<()> {
         let data = "some test data".to_string();
@@ -50,6 +46,7 @@ mod tests {
         Ok(())
     }
 
+    #[ignore = "sealing is not implemented yet, see https://github.com/hoprnet/hoprnet/issues/7172"]
     #[test]
     fn unseal_should_fail_with_different_private_key() -> anyhow::Result<()> {
         let data = "some test data".to_string();
@@ -59,11 +56,15 @@ mod tests {
 
         let sealed = seal_data(data.as_bytes(), keypair_1.public().into())?;
 
-        assert_eq!(Err(CryptoError::SealingError), unseal_data(&sealed, &keypair_2));
+        assert_eq!(
+            Err(crate::errors::CryptoError::SealingError),
+            unseal_data(&sealed, &keypair_2)
+        );
 
         Ok(())
     }
 
+    #[ignore = "sealing is not implemented yet, see https://github.com/hoprnet/hoprnet/issues/7172"]
     #[test]
     fn unseal_should_fail_when_ciphertext_has_been_tampered_with() -> anyhow::Result<()> {
         let data = "some test data".to_string();
@@ -73,11 +74,15 @@ mod tests {
         let mut sealed = seal_data(data.as_bytes(), keypair.public().into())?;
         sealed[1] = sealed[1].not();
 
-        assert_eq!(Err(CryptoError::SealingError), unseal_data(&sealed, &keypair));
+        assert_eq!(
+            Err(crate::errors::CryptoError::SealingError),
+            unseal_data(&sealed, &keypair)
+        );
 
         Ok(())
     }
 
+    #[ignore = "sealing is not implemented yet, see https://github.com/hoprnet/hoprnet/issues/7172"]
     #[test]
     fn unseal_fixed_test() -> anyhow::Result<()> {
         let data = hex!(

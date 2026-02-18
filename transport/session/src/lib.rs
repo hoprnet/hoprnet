@@ -10,12 +10,20 @@
 pub(crate) mod balancer;
 pub mod errors;
 mod manager;
+#[cfg(feature = "telemetry")]
+mod telemetry;
 mod types;
 mod utils;
 
-pub use balancer::{MIN_BALANCER_SAMPLING_INTERVAL, SurbBalancerConfig};
+pub use balancer::{AtomicSurbFlowEstimator, MIN_BALANCER_SAMPLING_INTERVAL, SurbBalancerConfig};
 pub use hopr_network_types::types::*;
+pub use hopr_protocol_session::AcknowledgementMode;
 pub use manager::{DispatchResult, MIN_SURB_BUFFER_DURATION, SessionManager, SessionManagerConfig};
+#[cfg(feature = "telemetry")]
+pub use telemetry::{
+    AckSnapshot, FrameBufferSnapshot, SessionAckMode, SessionLifecycleState, SessionLifetimeSnapshot,
+    SessionStatsSnapshot, SessionTelemetry, SurbSnapshot, TransportSnapshot,
+};
 pub use types::{
     ByteCapabilities, HoprSession, HoprSessionConfig, IncomingSession, ServiceId, SessionId, SessionTarget,
 };

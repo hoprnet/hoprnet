@@ -7,10 +7,12 @@ use axum::{
 };
 use base64::Engine;
 use hopr_lib::{
-    Address, NodeId, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities, SessionClientConfig, SessionId,
+    Address, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities, SessionClientConfig, SessionId,
     SessionManagerError, SessionTarget, SurbBalancerConfig, TransportSessionError,
     errors::{HoprLibError, HoprTransportError},
 };
+#[cfg(feature = "telemetry")]
+use hopr_lib::{SessionAckMode, SessionLifecycleState, SessionStatsSnapshot};
 use hopr_utils_session::{ListenerId, build_binding_host, create_tcp_client_binding, create_udp_client_binding};
 use serde::{Deserialize, Serialize};
 // Imported for some IDEs to not treat the `json!` macro inside the `schema` macro as an error
@@ -121,15 +123,15 @@ impl From<SessionCapability> for hopr_lib::SessionCapabilities {
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({ "Hops": 1 }))]
-/// Routing options for the Session.
 pub enum RoutingOptions {
     #[cfg(feature = "explicit-path")]
     #[schema(value_type = Vec<String>)]
-    IntermediatePath(#[serde_as(as = "Vec<DisplayFromStr>")] Vec<NodeId>),
+    IntermediatePath(#[serde_as(as = "Vec<DisplayFromStr>")] Vec<hopr_lib::NodeId>),
     Hops(usize),
 }
 
 impl RoutingOptions {
+    /// Converts the API routing options into protocol-level routing options.
     pub(crate) async fn resolve(self) -> Result<hopr_lib::RoutingOptions, ApiErrorStatus> {
         Ok(match self {
             #[cfg(feature = "explicit-path")]
@@ -142,14 +144,15 @@ impl RoutingOptions {
 impl From<hopr_lib::RoutingOptions> for RoutingOptions {
     fn from(opts: hopr_lib::RoutingOptions) -> Self {
         match opts {
-            #[cfg(feature = "explicit-path")]
             hopr_lib::RoutingOptions::IntermediatePath(path) => {
-                RoutingOptions::IntermediatePath(path.into_iter().collect())
-            }
-            #[cfg(not(feature = "explicit-path"))]
-            hopr_lib::RoutingOptions::IntermediatePath(path) => {
-                // Convert path length to hops when explicit-path feature is disabled
-                RoutingOptions::Hops(path.into_iter().count())
+                #[cfg(feature = "explicit-path")]
+                {
+                    RoutingOptions::IntermediatePath(path.into_iter().collect())
+                }
+                #[cfg(not(feature = "explicit-path"))]
+                {
+                    RoutingOptions::Hops(path.as_ref().len())
+                }
             }
             hopr_lib::RoutingOptions::Hops(hops) => RoutingOptions::Hops(usize::from(hops)),
         }
@@ -236,6 +239,7 @@ pub(crate) struct SessionClientRequest {
 }
 
 impl SessionClientRequest {
+    /// Converts the API client session request into protocol-level session configuration.
     pub(crate) async fn into_protocol_session_config(
         self,
         target_protocol: IpProtocol,
@@ -595,6 +599,7 @@ pub(crate) struct SessionConfig {
 }
 
 impl From<SessionConfig> for Option<SurbBalancerConfig> {
+    /// Converts the API session config into protocol-level SURB balancer config.
     fn from(value: SessionConfig) -> Self {
         match value.response_buffer {
             // Buffer worth at least 2 reply packets
@@ -615,6 +620,7 @@ impl From<SessionConfig> for Option<SurbBalancerConfig> {
 }
 
 impl From<SurbBalancerConfig> for SessionConfig {
+    /// Converts protocol-level SURB balancer config into the API session config format.
     fn from(value: SurbBalancerConfig) -> Self {
         Self {
             response_buffer: Some(bytesize::ByteSize::b(
@@ -712,6 +718,277 @@ pub(crate) async fn session_config(
             StatusCode::UNPROCESSABLE_ENTITY,
             ApiErrorStatus::UnknownFailure(e.to_string()),
         )),
+    }
+}
+
+/// Session lifecycle state for metrics.
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum SessionStatsState {
+    /// Session is active and running.
+    Active,
+    /// Session is in the process of closing.
+    Closing,
+    /// Session has been fully closed.
+    Closed,
+}
+
+#[cfg(feature = "telemetry")]
+impl From<SessionLifecycleState> for SessionStatsState {
+    /// Converts protocol-level lifecycle state into the API metrics state format.
+    fn from(value: SessionLifecycleState) -> Self {
+        match value {
+            SessionLifecycleState::Active => SessionStatsState::Active,
+            SessionLifecycleState::Closing => SessionStatsState::Closing,
+            SessionLifecycleState::Closed => SessionStatsState::Closed,
+        }
+    }
+}
+
+/// Session acknowledgement mode for metrics.
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum SessionStatsAckMode {
+    /// No acknowledgements.
+    None,
+    /// Partial acknowledgements.
+    Partial,
+    /// Full acknowledgements.
+    Full,
+    /// Both (if applicable).
+    Both,
+}
+
+#[cfg(feature = "telemetry")]
+impl From<SessionAckMode> for SessionStatsAckMode {
+    /// Converts protocol-level acknowledgement mode into the API metrics mode format.
+    fn from(value: SessionAckMode) -> Self {
+        match value {
+            SessionAckMode::None => SessionStatsAckMode::None,
+            SessionAckMode::Partial => SessionStatsAckMode::Partial,
+            SessionAckMode::Full => SessionStatsAckMode::Full,
+            SessionAckMode::Both => SessionStatsAckMode::Both,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+/// Session lifetime metrics.
+pub(crate) struct SessionStatsLifetime {
+    /// Time when the session was created (in milliseconds since UNIX epoch).
+    pub created_at_ms: u64,
+    /// Time of the last read or write activity (in milliseconds since UNIX epoch).
+    pub last_activity_at_ms: u64,
+    /// Total duration the session has been alive (in milliseconds).
+    pub uptime_ms: u64,
+    /// Duration since the last activity (in milliseconds).
+    pub idle_ms: u64,
+    /// Current lifecycle state of the session.
+    pub state: SessionStatsState,
+}
+
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+/// Session frame buffer metrics.
+pub(crate) struct SessionStatsFrameBuffer {
+    /// Maximum Transmission Unit for frames.
+    pub frame_mtu: usize,
+    /// Configured timeout for frame reassembly/acknowledgement (in milliseconds).
+    pub frame_timeout_ms: u64,
+    /// Configured capacity of the frame buffer.
+    pub frame_capacity: usize,
+    /// Number of frames currently being assembled (incomplete).
+    pub incomplete_frames: usize,
+    /// Total number of frames successfully completed/assembled.
+    pub frames_completed: u64,
+    /// Total number of frames emitted to the application.
+    pub frames_emitted: u64,
+    /// Total number of frames discarded (e.g. due to timeout or errors).
+    pub frames_discarded: u64,
+}
+
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+/// Session acknowledgement metrics.
+pub(crate) struct SessionStatsAck {
+    /// Configured acknowledgement mode.
+    pub mode: SessionStatsAckMode,
+    /// Total incoming segments received.
+    pub incoming_segments: u64,
+    /// Total incoming retransmission requests received.
+    pub incoming_retransmission_requests: u64,
+    /// Total incoming frame acknowledgements.
+    pub incoming_acknowledged_frames: u64,
+    /// Total outgoing segments sent.
+    pub outgoing_segments: u64,
+    /// Total outgoing retransmission requests received.
+    pub outgoing_retransmission_requests: u64,
+    /// Total outgoing frames acknowledgements
+    pub outgoing_acknowledged_frames: u64,
+}
+
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+/// Session SURB (Single Use Reply Block) metrics.
+pub(crate) struct SessionStatsSurb {
+    /// Total SURBs produced/minted.
+    pub produced_total: u64,
+    /// Total SURBs consumed/used.
+    pub consumed_total: u64,
+    /// Estimated number of SURBs currently available.
+    pub buffer_estimate: u64,
+    /// Target number of SURBs to maintain in buffer (if configured).
+    pub target_buffer: Option<u64>,
+    /// Rate of SURB consumption/production per second.
+    pub rate_per_sec: f64,
+    /// Whether a SURB refill request is currently in flight.
+    pub refill_in_flight: bool,
+}
+
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+/// Session transport-level metrics.
+pub(crate) struct SessionStatsTransport {
+    /// Total bytes received.
+    pub bytes_in: u64,
+    /// Total bytes sent.
+    pub bytes_out: u64,
+    /// Total packets received.
+    pub packets_in: u64,
+    /// Total packets sent.
+    pub packets_out: u64,
+}
+
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+/// Complete snapshot of session metrics.
+pub(crate) struct SessionStatsResponse {
+    /// The session ID.
+    pub session_id: String,
+    /// Time when this snapshot was taken (in milliseconds since UNIX epoch).
+    pub snapshot_at_ms: u64,
+    /// Lifetime metrics.
+    pub lifetime: SessionStatsLifetime,
+    /// Frame buffer metrics.
+    pub frame_buffer: SessionStatsFrameBuffer,
+    /// Acknowledgement metrics.
+    pub ack: SessionStatsAck,
+    /// SURB metrics.
+    pub surb: SessionStatsSurb,
+    /// Transport metrics.
+    pub transport: SessionStatsTransport,
+}
+
+#[cfg(feature = "telemetry")]
+impl From<SessionStatsSnapshot> for SessionStatsResponse {
+    /// Converts protocol-level metrics snapshot into the API response format.
+    fn from(value: SessionStatsSnapshot) -> Self {
+        Self {
+            session_id: value.session_id.to_string(),
+            snapshot_at_ms: value
+                .snapshot_at
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64,
+            lifetime: SessionStatsLifetime {
+                created_at_ms: value
+                    .lifetime
+                    .created_at
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as u64,
+                last_activity_at_ms: value
+                    .lifetime
+                    .last_activity_at
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as u64,
+                uptime_ms: value.lifetime.uptime.as_millis() as u64,
+                idle_ms: value.lifetime.idle.as_millis() as u64,
+                state: value.lifetime.state.into(),
+            },
+            frame_buffer: SessionStatsFrameBuffer {
+                frame_mtu: value.frame_buffer.frame_mtu,
+                frame_timeout_ms: value.frame_buffer.frame_timeout.as_millis() as u64,
+                frame_capacity: value.frame_buffer.frame_capacity,
+                incomplete_frames: value.frame_buffer.frames_being_assembled,
+                frames_completed: value.frame_buffer.frames_completed,
+                frames_emitted: value.frame_buffer.frames_emitted,
+                frames_discarded: value.frame_buffer.frames_discarded,
+            },
+            ack: SessionStatsAck {
+                mode: value.ack.mode.into(),
+                incoming_segments: value.ack.incoming_segments,
+                incoming_retransmission_requests: value.ack.incoming_retransmission_requests,
+                incoming_acknowledged_frames: value.ack.incoming_acknowledged_frames,
+                outgoing_segments: value.ack.outgoing_segments,
+                outgoing_acknowledged_frames: value.ack.outgoing_acknowledged_frames,
+                outgoing_retransmission_requests: value.ack.outgoing_retransmission_requests,
+            },
+            surb: SessionStatsSurb {
+                produced_total: value.surb.produced_total,
+                consumed_total: value.surb.consumed_total,
+                buffer_estimate: value.surb.buffer_estimate,
+                target_buffer: value.surb.target_buffer,
+                rate_per_sec: value.surb.rate_per_sec,
+                refill_in_flight: value.surb.refill_in_flight,
+            },
+            transport: SessionStatsTransport {
+                bytes_in: value.transport.bytes_in,
+                bytes_out: value.transport.bytes_out,
+                packets_in: value.transport.packets_in,
+                packets_out: value.transport.packets_out,
+            },
+        }
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = const_format::formatcp!("{BASE_PATH}/session/stats/{{id}}"),
+    description = "Gets stats for an existing active session.",
+    params(
+        ("id" = String, Path, description = "Session ID", example = "0x5112D584a1C72Fc25017:487"),
+    ),
+    responses(
+            (status = 200, description = "Retrieved session stats.", body = SessionStatsResponse),
+            (status = 400, description = "Invalid session ID.", body = ApiError),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 404, description = "Given session ID does not refer to an existing Session", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError),
+    ),
+    security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+    ),
+    tag = "Session"
+)]
+pub(crate) async fn session_stats(
+    State(_state): State<Arc<InternalState>>,
+    Path(_session_id): Path<String>,
+) -> Result<impl IntoResponse, impl IntoResponse> {
+    #[cfg(feature = "telemetry")]
+    {
+        let session_id = SessionId::from_str(&_session_id)
+            .map_err(|_| (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidSessionId))?;
+
+        match _state.hopr.get_session_stats(&session_id).await {
+            Ok(metrics) => Ok::<_, (StatusCode, ApiErrorStatus)>(
+                (StatusCode::OK, Json(SessionStatsResponse::from(metrics))).into_response(),
+            ),
+            Err(HoprLibError::TransportError(HoprTransportError::Session(TransportSessionError::Manager(
+                SessionManagerError::NonExistingSession,
+            )))) => Err((StatusCode::NOT_FOUND, ApiErrorStatus::SessionNotFound)),
+            Err(e) => Err((
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ApiErrorStatus::UnknownFailure(e.to_string()),
+            )),
+        }
+    }
+    #[cfg(not(feature = "telemetry"))]
+    {
+        Err::<(StatusCode, Json<SessionStatsResponse>), _>((StatusCode::NOT_FOUND, ApiErrorStatus::SessionNotFound))
     }
 }
 

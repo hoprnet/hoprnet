@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-network"
-version = "0.8.1"
+version = "0.9.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"
@@ -9,8 +9,8 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = ["compat-ping"]
-compat-ping = []
+telemetry = []
+default = []
 prometheus = ["dep:hopr-metrics"]
 
 [dependencies]

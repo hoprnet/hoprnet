@@ -2,10 +2,12 @@ use std::{ops::Mul, time::Duration};
 
 use anyhow::Context;
 use futures::AsyncWriteExt;
-use hopr_lib::{ChannelId, HoprBalance, HoprLibError, HoprNodeChainOperations, UnitaryFloatOps};
-use hopr_reference::testing::{
-    fixtures::{ClusterGuard, MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, cluster_fixture},
-    wait_until,
+use hopr_reference::{
+    hopr_lib::{ChannelId, HoprBalance, HoprLibError, HoprNodeChainOperations, UnitaryFloatOps},
+    testing::{
+        fixtures::{ClusterGuard, MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, cluster_fixture},
+        wait_until,
+    },
 };
 use rstest::*;
 use serial_test::serial;
@@ -27,11 +29,7 @@ async fn ticket_statistics_should_reset_when_cleaned(#[with(5)] cluster_fixture:
         .await?;
 
     const BUF_LEN: usize = 5000;
-    let sent_data = {
-        let mut data = [0u8; BUF_LEN];
-        rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut data);
-        data
-    };
+    let sent_data = hopr_crypto_random::random_bytes::<BUF_LEN>();
 
     tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
         .await
@@ -65,8 +63,8 @@ async fn ticket_statistics_should_reset_when_cleaned(#[with(5)] cluster_fixture:
         .map(|t| *t.channel_id())
         .collect::<Vec<ChannelId>>();
 
-    assert!(channels_with_pending_tickets.contains(&fw_channels.channel_id(0)));
-    assert!(channels_with_pending_tickets.contains(&bw_channels.channel_id(0)));
+    assert!(channels_with_pending_tickets.contains(fw_channels.channel_id(0)));
+    assert!(channels_with_pending_tickets.contains(bw_channels.channel_id(0)));
 
     let stats_before = mid
         .inner()
@@ -115,11 +113,7 @@ async fn test_reject_relaying_a_message_when_the_channel_is_out_of_funding(
         cluster_fixture.create_session(&[src, mid, dst], ticket_price).await?;
 
     const BUF_LEN: usize = 500;
-    let sent_data = {
-        let mut data = [0u8; BUF_LEN];
-        rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut data);
-        data
-    };
+    let sent_data = hopr_crypto_random::random_bytes::<BUF_LEN>();
 
     tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
         .await
@@ -170,11 +164,7 @@ async fn test_redeem_ticket_on_request(#[with(5)] cluster_fixture: ClusterGuard)
         cluster_fixture.create_session(&[src, mid, dst], funding_amount).await?;
 
     const BUF_LEN: usize = 400;
-    let sent_data = {
-        let mut data = [0u8; BUF_LEN];
-        rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut data);
-        data
-    };
+    let sent_data = hopr_crypto_random::random_bytes::<BUF_LEN>();
 
     tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
         .await
@@ -244,11 +234,7 @@ async fn test_neglect_ticket_on_closing(#[with(5)] cluster_fixture: ClusterGuard
         cluster_fixture.create_session(&[src, mid, dst], funding_amount).await?;
 
     const BUF_LEN: usize = 400;
-    let sent_data = {
-        let mut data = [0u8; BUF_LEN];
-        rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut data);
-        data
-    };
+    let sent_data = hopr_crypto_random::random_bytes::<BUF_LEN>();
 
     tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
         .await
@@ -322,11 +308,7 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
         cluster_fixture.create_session(&[src, mid, dst], funding_amount).await?;
 
     const BUF_LEN: usize = 400;
-    let sent_data = {
-        let mut data = [0u8; BUF_LEN];
-        rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut data);
-        data
-    };
+    let sent_data = hopr_crypto_random::random_bytes::<BUF_LEN>();
 
     tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
         .await
@@ -426,11 +408,7 @@ async fn relay_with_win_prob_higher_than_min_win_prob_should_succeed(
         cluster_fixture.create_session(&[src, mid, dst], funding_amount).await?;
 
     const BUF_LEN: usize = 400;
-    let sent_data = {
-        let mut data = [0u8; BUF_LEN];
-        rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut data);
-        data
-    };
+    let sent_data = hopr_crypto_random::random_bytes::<BUF_LEN>();
 
     tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
         .await

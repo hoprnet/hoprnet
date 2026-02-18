@@ -13,6 +13,7 @@ crate-type = ["rlib"]
 
 [features]
 default = ["prometheus", "runtime-tokio"]
+telemetry = ["hopr-lib/telemetry"]
 prometheus = [
   "hopr-lib/prometheus",
   "hopr-transport-p2p/prometheus",
@@ -61,5 +62,7 @@ hopr-metrics = { workspace = true, optional = true }
 hopr-utils-session = { workspace = true }
 
 [dev-dependencies]
-oas3 = { workspace = true }
 anyhow = { workspace = true }
+oas3 = { workspace = true }
+
+hopr-lib = { workspace = true, features = ["session-server"] }

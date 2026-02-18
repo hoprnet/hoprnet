@@ -1319,7 +1319,7 @@ pub mod tests {
 
         assert_ne!(initial_ticket.verified_hash().as_ref(), [0u8; Hash::SIZE]);
 
-        let ticket_bytes: [u8; Ticket::SIZE] = initial_ticket.verified_ticket().clone().into();
+        let ticket_bytes: [u8; Ticket::SIZE] = (*initial_ticket.verified_ticket()).into();
         assert_eq!(
             initial_ticket.verified_ticket(),
             &Ticket::try_from(ticket_bytes.as_ref())?
@@ -1476,7 +1476,7 @@ pub mod tests {
         let unack = verified.into_unacknowledged(hk1);
         let acknowledged = unack.acknowledge(&hk2).expect("should acknowledge");
 
-        let redeemable_1 = acknowledged.clone().into_redeemable(&BOB, &Hash::default())?;
+        let redeemable_1 = acknowledged.into_redeemable(&BOB, &Hash::default())?;
 
         let transferable = acknowledged.into_transferable(&BOB, &Hash::default())?;
 

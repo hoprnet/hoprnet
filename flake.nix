@@ -83,6 +83,17 @@
           # Import nix-lib for shared Nix utilities
           nixLib = nix-lib.lib.${system};
 
+          # Load nightly toolchain from file (single source of truth)
+          nightlyToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain-nightly.toml;
+
+          # Wrapper for rustfmt to fix macOS dylib loading issue
+          # On macOS, rust-overlay symlinks rustfmt to a standalone package that can't find its dylibs.
+          # This wrapper sets DYLD_LIBRARY_PATH to the toolchain's lib directory.
+          rustfmtWrapper = pkgs.writeShellScriptBin "rustfmt" ''
+            export DYLD_LIBRARY_PATH="${nightlyToolchain}/lib:$DYLD_LIBRARY_PATH"
+            exec "${nightlyToolchain}/bin/rustfmt" "$@"
+          '';
+
           craneLib = (crane.mkLib pkgs).overrideToolchain (p: p.rust-bin.stable.latest.default);
           hoprdCrateInfoOriginal = craneLib.crateNameFromCargoToml {
             cargoToml = ./hopr/hopr-lib/Cargo.toml;
@@ -141,10 +152,18 @@
             cargoExtraArgs = "-p hoprd-api -F allocator-jemalloc";
             cargoToml = ./hoprd/hoprd/Cargo.toml;
           };
+          localclusterBuildArgs = {
+            inherit src depsSrc rev;
+            cargoExtraArgs = "-p hoprd-localcluster";
+            cargoToml = ./localcluster/Cargo.toml;
+          };
 
           hoprd = rust-builder-local.callPackage nixLib.mkRustPackage hoprdBuildArgs;
+          hoprd-localcluster = rust-builder-local.callPackage nixLib.mkRustPackage localclusterBuildArgs;
           # also used for Docker image
           hoprd-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage hoprdBuildArgs;
+          # also used for Docker image
+          hoprd-localcluster-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage localclusterBuildArgs;
           # also used for Docker image
           hoprd-x86_64-linux-profile = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage (
             hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
@@ -295,7 +314,6 @@
               exec /bin/hoprd "$@"
             fi
           '';
-
           # Man pages using nix-lib
           hoprd-man = nixLib.mkManPage {
             pname = "hoprd";
@@ -451,6 +469,8 @@
               envsubst
             ];
             shellHook = ''
+              # Fix macOS dylib loading for nightly rustfmt (rust-overlay symlink issue)
+              export DYLD_LIBRARY_PATH="${nightlyToolchain}/lib:$DYLD_LIBRARY_PATH"
               ${pre-commit-check.shellHook}
             '';
           };
@@ -645,7 +665,7 @@
             programs.ruff-format.enable = true;
 
             settings.formatter.rustfmt = {
-              command = "${pkgs.rust-bin.nightly."2026-01-08".default}/bin/rustfmt";
+              command = "${rustfmtWrapper}/bin/rustfmt";
             };
           };
 
@@ -667,6 +687,7 @@
               hoprd-docker
               hoprd-dev-docker
               hoprd-profile-docker
+              hoprd-localcluster
               ;
             inherit hopr-test-unit hopr-test-nightly;
             inherit docs;

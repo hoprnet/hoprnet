@@ -648,8 +648,10 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn connector_should_not_connect_when_blokli_not_healthy() -> anyhow::Result<()> {
-        let mut state = BlokliTestState::default();
-        state.health = "DOWN".into();
+        let state = BlokliTestState {
+            health: "DOWN".into(),
+            ..Default::default()
+        };
 
         let blokli_client = BlokliTestStateBuilder::from(state).build_static_client();
 

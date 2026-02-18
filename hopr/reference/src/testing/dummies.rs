@@ -2,12 +2,12 @@ use futures::AsyncReadExt;
 use hopr_lib::{IncomingSession, errors::HoprLibError, traits::session::HoprSessionServer};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, FuturesAsyncWriteCompatExt};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct EchoServer {}
 
 impl EchoServer {
     pub fn new() -> Self {
-        Self {}
+        Self::default()
     }
 }
 

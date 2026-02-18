@@ -474,7 +474,10 @@ mod tests {
             Err(AnnouncementError::AlreadyAnnounced)
         ));
 
-        connector.announce(&[multiaddr.clone()], &offchain_key).await?.await?;
+        connector
+            .announce(std::slice::from_ref(&multiaddr), &offchain_key)
+            .await?
+            .await?;
 
         insta::assert_yaml_snapshot!(*connector.client.snapshot());
 

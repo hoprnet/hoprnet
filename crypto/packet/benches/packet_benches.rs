@@ -232,7 +232,7 @@ pub fn packet_forwarding_bench(c: &mut Criterion) {
     .map(|data| {
         let mut ret = Vec::with_capacity(HoprPacket::SIZE);
         ret.extend_from_slice(data.packet.as_ref());
-        ret.extend_from_slice(&data.ticket.clone().into_encoded());
+        ret.extend_from_slice(&data.ticket.into_encoded());
         ret.into_boxed_slice()
     })
     .unwrap();
@@ -292,7 +292,7 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
     .map(|data| {
         let mut ret = Vec::with_capacity(HoprPacket::SIZE);
         ret.extend_from_slice(data.packet.as_ref());
-        ret.extend_from_slice(&data.ticket.clone().into_encoded());
+        ret.extend_from_slice(&data.ticket.into_encoded());
         ret.into_boxed_slice()
     })
     .unwrap();
@@ -310,7 +310,7 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
     .map(|data| {
         let mut ret = Vec::with_capacity(HoprPacket::SIZE);
         ret.extend_from_slice(data.outgoing.packet.as_ref());
-        ret.extend_from_slice(&data.outgoing.ticket.clone().into_encoded());
+        ret.extend_from_slice(&data.outgoing.ticket.into_encoded());
         ret.into_boxed_slice()
     })
     .unwrap();

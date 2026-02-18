@@ -6,6 +6,8 @@ use axum::{
     response::IntoResponse,
 };
 use futures::{StreamExt, stream::FuturesUnordered};
+#[cfg(feature = "telemetry")]
+use hopr_lib::PeerPacketStatsSnapshot;
 use hopr_lib::{
     Address, Multiaddr,
     api::{
@@ -102,6 +104,38 @@ pub(crate) struct HeartbeatInfo {
     success: u64,
 }
 
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
+    "packetsOut": 100,
+    "packetsIn": 50,
+    "bytesOut": 102400,
+    "bytesIn": 51200
+}))]
+#[serde(rename_all = "camelCase")]
+/// Packet statistics for a peer.
+pub(crate) struct PeerPacketStatsResponse {
+    #[schema(example = 100)]
+    pub packets_out: u64,
+    #[schema(example = 50)]
+    pub packets_in: u64,
+    #[schema(example = 102400)]
+    pub bytes_out: u64,
+    #[schema(example = 51200)]
+    pub bytes_in: u64,
+}
+
+#[cfg(feature = "telemetry")]
+impl From<PeerPacketStatsSnapshot> for PeerPacketStatsResponse {
+    fn from(snapshot: PeerPacketStatsSnapshot) -> Self {
+        Self {
+            packets_out: snapshot.packets_out,
+            packets_in: snapshot.packets_in,
+            bytes_out: snapshot.bytes_out,
+            bytes_in: snapshot.bytes_in,
+        }
+    }
+}
+
 #[serde_as]
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -112,6 +146,12 @@ pub(crate) struct HeartbeatInfo {
     "lastSeen": 1690000000,
     "averageLatency": 100,
     "score": 0.7,
+    "packetStats": {
+        "packetsOut": 100,
+        "packetsIn": 50,
+        "bytesOut": 102400,
+        "bytesIn": 51200
+    }
 }))]
 /// All information about a known peer.
 pub(crate) struct PeerObservations {
@@ -129,6 +169,10 @@ pub(crate) struct PeerObservations {
     average_latency: u128,
     #[schema(example = 0.7)]
     score: f64,
+    /// Packet statistics for this peer (if available).
+    #[cfg(feature = "telemetry")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    packet_stats: Option<PeerPacketStatsResponse>,
 }
 
 #[serde_as]
@@ -230,41 +274,38 @@ pub(super) async fn peers(
             let hopr = hopr.clone();
 
             async move {
-                if let Some(info) = hopr.network_peer_info(&peer) {
-                    if info.score() >= score {
-                        Some((peer, info))
-                    } else {
-                        None
-                    }
-                } else {
-                    None
+                // no observations recorded yet
+                let info = hopr.network_peer_info(&peer)?;
+
+                // peer score is low enough not to be considered
+                if info.score() < score {
+                    return None;
                 }
+
+                // no known chain address for the current peer can be found
+                let address = hopr.peerid_to_chain_key(&peer).await.ok().flatten()?;
+
+                let multiaddresses = hopr.network_observed_multiaddresses(&peer).await;
+
+                Some(PeerObservations {
+                    address,
+                    multiaddr: multiaddresses.first().cloned(),
+                    last_update: info.last_update().as_millis(),
+                    average_latency: info
+                        .immediate_qos()
+                        .and_then(|qos| qos.average_latency())
+                        .map_or(0, |latency| latency.as_millis()),
+                    probe_rate: info.immediate_qos().map_or(0.0, |qos| qos.average_probe_rate()),
+                    score: info.score(),
+                    #[cfg(feature = "telemetry")]
+                    packet_stats: hopr
+                        .network_peer_packet_stats(&peer)
+                        .await
+                        .ok()
+                        .flatten()
+                        .map(PeerPacketStatsResponse::from),
+                })
             }
-        })
-        .filter_map(|(peer_id, info)| {
-            let hopr = hopr.clone();
-
-            async move {
-                let address = hopr.peerid_to_chain_key(&peer_id).await.ok().flatten();
-
-                // WARNING: Only in Providence and Saint-Louis are all peers public
-                let multiaddresses = hopr.network_observed_multiaddresses(&peer_id).await;
-
-                Some((address, multiaddresses, info))
-            }
-        })
-        // Filter out peers without a known chain address
-        .filter_map(|(address, mas, info)| async move { address.map(|addr| (addr, mas, info)) })
-        .map(|(address, mas, info)| PeerObservations {
-            address,
-            multiaddr: mas.first().cloned(),
-            last_update: info.last_update().as_millis(),
-            average_latency: info
-                .immediate_qos()
-                .and_then(|qos| qos.average_latency())
-                .map_or(0, |latency| latency.as_millis()),
-            probe_rate: info.immediate_qos().map_or(0.0, |qos| qos.average_probe_rate()),
-            score: info.score(),
         })
         .collect::<Vec<_>>()
         .await;

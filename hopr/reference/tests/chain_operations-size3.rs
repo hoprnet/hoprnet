@@ -46,14 +46,14 @@ async fn test_open_close_channel(cluster: &ClusterGuard) -> anyhow::Result<()> {
     );
 
     src.inner()
-        .close_channel_by_id(&channel.channel_id(0))
+        .close_channel_by_id(channel.channel_id(0))
         .await
         .context("failed to put channel in PendingToClose state")?;
 
     sleep(Duration::from_secs(2)).await;
 
     match src
-        .channel_from_hash(&channel.channel_id(0))
+        .channel_from_hash(channel.channel_id(0))
         .await
         .context("failed to get channel from id")?
         .status
@@ -79,10 +79,10 @@ async fn channel_funding_should_be_visible_in_channel_stake(cluster: &ClusterGua
         .await
         .context("failed to open channel")?;
 
-    let _ = src.inner().fund_channel(&channel.channel_id(0), funding_amount).await;
+    let _ = src.inner().fund_channel(channel.channel_id(0), funding_amount).await;
 
     let updated_channel = src
-        .channel_from_hash(&channel.channel_id(0))
+        .channel_from_hash(channel.channel_id(0))
         .await
         .context("failed to retrieve channel by id")?;
 
@@ -134,8 +134,8 @@ async fn test_channel_retrieval(cluster: &ClusterGuard) -> anyhow::Result<()> {
 
     let channel_id = channel.channel_id(0);
     assert_eq!(channel_by_parties.get_id(), channel_id);
-    assert!(channel_from_ids.contains(&channel_id));
-    assert!(channel_to_ids.contains(&channel_id));
+    assert!(channel_from_ids.contains(channel_id));
+    assert!(channel_to_ids.contains(channel_id));
 
     channel.try_close_channels_all_channels().await?;
 

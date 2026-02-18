@@ -1,5 +1,6 @@
+use std::path::PathBuf;
+
 use anyhow::Context;
-use clap::Parser;
 use hopr_chain_connector::{
     BlockchainConnectorConfig,
     api::*,
@@ -9,44 +10,36 @@ use hopr_chain_connector::{
 };
 use hopr_lib::{ChainKeypair, HoprKeys, Keypair, SafeModule, XDaiBalance, crypto_traits::Randomizable};
 use hopr_reference::config::SessionIpForwardingConfig;
-use hoprd::config::{Db, HoprdConfig, Identity, UserHoprLibConfig};
+use hoprd::config::{Db, HoprdConfig, Identity, UserHoprLibConfig, UserHoprNetworkConfig};
 use hoprd_api::config::{Api, Auth};
 
-/// Tool used to generate test node Safes and hoprd configuration files.
-///
-/// This tool generates nodes identities, deploys and funds its Safes, and generates node
-/// configuration files to be used with `hoprd`.
-///
-/// This is mostly useful for testing purposes.
-#[derive(Parser, Debug)]
-#[command(name = "hoprd-gen-test", author, version, about = "Tool used to generate test node Safes and hoprd configuration files", long_about = None)]
-struct Args {
-    /// Blokli URL
-    #[arg(long, short, default_value = "http://localhost:8080")]
-    blokli_url: String,
+pub const DEFAULT_BLOKLI_URL: &str = "http://localhost:8080";
+pub const DEFAULT_PRIVATE_KEY: &str = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+pub const DEFAULT_CONFIG_HOME: &str = "/tmp/hopr-nodes";
+pub const DEFAULT_IDENTITY_PASSWORD: &str = "password";
+pub const DEFAULT_NUM_NODES: usize = 3;
 
-    /// Private key of the Smart Contract deployer
-    #[arg(
-        long,
-        short,
-        default_value = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-    )]
-    private_key: String,
+#[derive(Clone, Debug)]
+pub struct GenerationConfig {
+    pub blokli_url: String,
+    pub private_key: String,
+    pub num_nodes: usize,
+    pub config_home: PathBuf,
+    pub identity_password: String,
+    pub random_identities: bool,
+}
 
-    /// Number of nodes to generate.
-    #[arg(long, short, default_value = "3")]
-    num_nodes: usize,
-
-    /// Home path where all the node data (config, identity, db) will be stored.
-    #[arg(long, short, default_value = "/tmp/hopr-nodes")]
-    config_home: String,
-
-    #[arg(long, default_value = "password")]
-    identity_password: String,
-
-    /// Whether to generate random IDs or fixed deterministic ones.
-    #[arg(long, short, default_value = "false")]
-    random_identities: bool,
+impl Default for GenerationConfig {
+    fn default() -> Self {
+        Self {
+            blokli_url: DEFAULT_BLOKLI_URL.to_string(),
+            private_key: DEFAULT_PRIVATE_KEY.to_string(),
+            num_nodes: DEFAULT_NUM_NODES,
+            config_home: PathBuf::from(DEFAULT_CONFIG_HOME),
+            identity_password: DEFAULT_IDENTITY_PASSWORD.to_string(),
+            random_identities: false,
+        }
+    }
 }
 
 lazy_static::lazy_static! {
@@ -74,15 +67,15 @@ lazy_static::lazy_static! {
     ];
 }
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let args = Args::parse();
+/// Generate test node Safes and hoprd configuration files.
+///
+/// This generates node identities, deploys/funds Safes, and writes hoprd config files.
+pub async fn generate(config: &GenerationConfig) -> anyhow::Result<()> {
+    std::fs::create_dir_all(&config.config_home)?;
+    let home_path = &config.config_home;
+    let private_key = hex::decode(&config.private_key).context("invalid private key")?;
 
-    std::fs::create_dir_all(&args.config_home)?;
-    let home_path = std::path::Path::new(&args.config_home);
-    let private_key = hex::decode(&args.private_key).context("invalid private key")?;
-
-    let blokli_client = BlokliClient::new(args.blokli_url.parse()?, BlokliClientConfig::default());
+    let blokli_client = BlokliClient::new(config.blokli_url.parse()?, BlokliClientConfig::default());
     let status = blokli_client.query_health().await?;
     if !status.eq_ignore_ascii_case("ok") {
         return Err(anyhow::anyhow!("Blokli is not usable: {status}"));
@@ -100,8 +93,8 @@ async fn main() -> anyhow::Result<()> {
     let initial_token_balance: HoprBalance = "1000 wxHOPR".parse()?;
     let initial_native_balance: XDaiBalance = "1 xDai".parse()?;
 
-    for id in 0..args.num_nodes.clamp(1, NODE_KEYS.len()) {
-        let kp = if args.random_identities {
+    for id in 0..config.num_nodes.clamp(1, NODE_KEYS.len()) {
+        let kp = if config.random_identities {
             HoprKeys::random()
         } else {
             NODE_KEYS[id].clone()
@@ -179,6 +172,11 @@ async fn main() -> anyhow::Result<()> {
         let node_cfg = HoprdConfig {
             hopr: UserHoprLibConfig {
                 announce: true,
+                network: UserHoprNetworkConfig {
+                    announce_local_addresses: true,
+                    prefer_local_addresses: true,
+                    ..Default::default()
+                },
                 safe_module: SafeModule {
                     safe_address: safe.address,
                     module_address: safe.module,
@@ -187,7 +185,7 @@ async fn main() -> anyhow::Result<()> {
             },
             identity: Identity {
                 file: id_file.clone(),
-                password: args.identity_password.clone(),
+                password: config.identity_password.clone(),
                 private_key: None,
             },
             db: Db {
@@ -204,7 +202,7 @@ async fn main() -> anyhow::Result<()> {
                 auth: Auth::None,
                 ..Default::default()
             },
-            blokli_url: Some(args.blokli_url.clone()),
+            blokli_url: Some(config.blokli_url.clone()),
             session_ip_forwarding: SessionIpForwardingConfig {
                 use_target_allow_list: false,
                 ..Default::default()
@@ -218,7 +216,7 @@ async fn main() -> anyhow::Result<()> {
             .ok_or(anyhow::anyhow!("Invalid path"))?
             .to_owned();
         std::fs::write(&cfg_file, serde_yaml::to_string(&node_cfg)?)?;
-        kp.write_eth_keystore(&id_file, &args.identity_password)?;
+        kp.write_eth_keystore(&id_file, &config.identity_password)?;
 
         eprintln!("\x1b[2K\rNode {id}: Node config written to {cfg_file}");
     }

@@ -53,7 +53,8 @@ impl ClusterGuard {
     /// Update winning probability
     pub async fn update_winning_probability(&self, new_prob: f64) -> anyhow::Result<()> {
         tracing::debug!(new_prob, "updating winning probability");
-        Ok(self.chain_client.update_price_and_win_prob(None, Some(new_prob)))
+        self.chain_client.update_price_and_win_prob(None, Some(new_prob));
+        Ok(())
     }
 
     /// Create a session between two nodes, ensuring channels are open and funded as needed
@@ -110,9 +111,9 @@ impl ClusterGuard {
     pub fn sample_nodes<const N: usize>(&self) -> [&TestedHopr; N] {
         assert!(N <= self.size(), "Requested count exceeds {}", self.size());
 
-        let mut res = self.cluster.iter().choose_multiple(&mut rand::thread_rng(), N);
+        let mut res = self.cluster.iter().sample(&mut rand::rng(), N);
 
-        res.shuffle(&mut rand::thread_rng());
+        res.shuffle(&mut rand::rng());
 
         res.try_into().unwrap()
     }
@@ -131,12 +132,12 @@ impl ClusterGuard {
                     .outgoing_win_prob
                     .is_some_and(|p| p.as_f64() > 0.99)
             })
-            .choose_multiple(&mut rand::thread_rng(), N);
+            .sample(&mut rand::rng(), N);
 
-        res.shuffle(&mut rand::thread_rng());
+        res.shuffle(&mut rand::rng());
 
         res.try_into()
-            .expect(&format!("cannot find {N} nodes with win prob 1.0"))
+            .unwrap_or_else(|_| panic!("cannot find {N} nodes with win prob 1.0"))
     }
 
     pub fn sample_nodes_with_lower_win_prob<const N: usize>(&self) -> [&TestedHopr; N] {
@@ -153,12 +154,12 @@ impl ClusterGuard {
                     .outgoing_win_prob
                     .is_some_and(|p| p.as_f64() < 0.99)
             })
-            .choose_multiple(&mut rand::thread_rng(), N);
+            .sample(&mut rand::rng(), N);
 
-        res.shuffle(&mut rand::thread_rng());
+        res.shuffle(&mut rand::rng());
 
         res.try_into()
-            .expect(&format!("cannot find {N} nodes with win prob < 0.99"))
+            .unwrap_or_else(|_| panic!("cannot find {N} nodes with win prob < 0.99"))
     }
 
     pub fn sample_nodes_with_win_prob_1_intermediaries<const N: usize>(&self) -> [&TestedHopr; N] {
@@ -177,14 +178,15 @@ impl ClusterGuard {
                     .outgoing_win_prob
                     .is_some_and(|p| p.as_f64() > 0.99)
             })
-            .choose_multiple(&mut rand::thread_rng(), N - 2);
+            .sample(&mut rand::rng(), N - 2);
 
-        res.shuffle(&mut rand::thread_rng());
+        res.shuffle(&mut rand::rng());
 
         res.insert(0, win_prob_lower[0]);
         res.push(win_prob_lower[1]);
 
-        res.try_into().expect("cannot find sufficient number of nodes")
+        res.try_into()
+            .unwrap_or_else(|_| panic!("cannot find sufficient number of nodes"))
     }
 
     pub fn sample_nodes_with_lower_win_prob_intermediaries<const N: usize>(&self) -> [&TestedHopr; N] {
@@ -203,9 +205,9 @@ impl ClusterGuard {
                     .outgoing_win_prob
                     .is_some_and(|p| p.as_f64() < 0.99)
             })
-            .choose_multiple(&mut rand::thread_rng(), N - 2);
+            .sample(&mut rand::rng(), N - 2);
 
-        res.shuffle(&mut rand::thread_rng());
+        res.shuffle(&mut rand::rng());
 
         res.insert(0, win_prob_1[0]);
         res.push(win_prob_1[1]);
@@ -259,7 +261,7 @@ pub const INITIAL_SAFE_NATIVE: u64 = 1;
 pub const INITIAL_SAFE_TOKEN: u64 = 1000;
 pub const INITIAL_NODE_NATIVE: u64 = 1;
 pub const INITIAL_NODE_TOKEN: u64 = 10;
-pub const DEFAULT_SAFE_ALLOWANCE: u128 = 1000_000_000_000_u128;
+pub const DEFAULT_SAFE_ALLOWANCE: u128 = 1_000_000_000_000_u128;
 pub const MINIMUM_INCOMING_WIN_PROB: f64 = 0.2;
 
 pub fn build_blokli_client() -> BlokliTestClient<FullStateEmulator> {
@@ -330,8 +332,8 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
     let safes = NODE_SAFES_MODULES[0..size]
         .iter()
         .map(|(safe, module)| NodeSafeConfig {
-            safe_address: safe.clone(),
-            module_address: module.clone(),
+            safe_address: *safe,
+            module_address: *module,
         })
         .collect::<Vec<_>>();
 
@@ -344,7 +346,7 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
 
             let blokli_client = chain_client
                 .clone()
-                .with_mutator(FullStateEmulator::new(safes[i].module_address.clone()));
+                .with_mutator(FullStateEmulator::new(safes[i].module_address));
 
             std::thread::spawn(move || {
                 // This runtime holds all the tasks spawned by the Hopr node.

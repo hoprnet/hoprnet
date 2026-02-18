@@ -9,11 +9,8 @@ use std::{
 
 use futures::{AsyncRead, AsyncReadExt, AsyncWrite, StreamExt, channel::mpsc::UnboundedSender, stream::BoxStream};
 use hopr_network_types::utils::DuplexIO;
-use rand::{
-    Rng, SeedableRng,
-    distributions::{Bernoulli, Distribution},
-    prelude::StdRng,
-};
+use rand::{RngExt, SeedableRng, prelude::StdRng};
+use rand_distr::{Bernoulli, Distribution};
 use tracing::instrument;
 
 // Using static RNG seed to make tests reproducible between different runs
@@ -153,7 +150,7 @@ impl<const C: usize> FaultyNetwork<'_, C> {
 
                 let mut rng = StdRng::from_seed(cfg.rng_seed);
                 let wait = if !avg_delay.is_zero() {
-                    rng.gen_range(Duration::ZERO..2 * avg_delay)
+                    rng.random_range(Duration::ZERO..2 * avg_delay)
                 } else {
                     Duration::ZERO
                 };

@@ -1,0 +1,29 @@
+---
+# FIXME: The nodes can't dial each other within the docker container. 
+
+services:
+  chain:
+    container_name: hoprd-blokli-anvil
+    platform: linux/amd64
+    image: europe-west3-docker.pkg.dev/hoprassociation/docker-images/bloklid-anvil:latest
+    ports:
+      - "8080:8080"
+
+  cluster:
+    container_name: hoprd-localcluster
+    platform: linux/amd64
+    image: hoprd-localcluster:latest
+    depends_on:
+      - chain
+    environment:
+      HOPRD_CHAIN_URL: http://chain:8080
+      RUST_LOG: debug
+    command:
+      - --size
+      - "${CLUSTER_SIZE:-3}"
+      - --api-port-base
+      - "3001"
+      - --p2p-port-base
+      - "9001"
+    ports:
+      - "3001-300${CLUSTER_SIZE:-3}:3001-300${CLUSTER_SIZE:-3}"
