@@ -16,7 +16,6 @@
     { "matchCategories": ["docker"], "enabled": true, "pinDigests": true },
     {
       "matchPackageNames": [
-        "serde_yaml",
         "libp2p-stream",
         "rand",
         "parameterized"
