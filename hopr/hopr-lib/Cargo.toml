@@ -86,5 +86,5 @@ hopr-primitive-types = { workspace = true }
 hopr-transport = { workspace = true }
 
 [dev-dependencies]
-serde_yaml = { workspace = true }
+serde-saphyr = { workspace = true }
 tokio = { workspace = true }

@@ -23,6 +23,18 @@ pub struct HoprCodecConfig {
         serde_as(as = "Option<serde_with::DisplayFromStr>")
     )]
     pub outgoing_ticket_price: Option<hopr_primitive_types::balance::HoprBalance>,
+    /// Optional minimum price of incoming tickets.
+    ///
+    /// The value cannot be lower than the default outgoing ticket price times the node's path position.
+    ///
+    /// If not set (default), the network default outgoing ticket price times the node's path position
+    /// will be used.
+    #[cfg_attr(
+        feature = "serde",
+        serde(default),
+        serde_as(as = "Option<serde_with::DisplayFromStr>")
+    )]
+    pub min_incoming_ticket_price: Option<hopr_primitive_types::balance::HoprBalance>,
     /// Optional probability of winning an outgoing ticket.
     ///
     /// If not set (default), the network default will be used, which is the minimum allowed winning probability in the
