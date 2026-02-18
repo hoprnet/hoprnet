@@ -1,5 +1,8 @@
 use futures::{StreamExt, stream::BoxStream};
-use hopr_api::ct::{DestinationRouting, NetworkGraphView, ProbeRouting, ProbingTrafficGeneration};
+use hopr_api::{
+    ct::{CoverTrafficGeneration, DestinationRouting, ProbeRouting, ProbingTrafficGeneration},
+    graph::{NetworkGraphTraverse, NetworkGraphView},
+};
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::protocol::HoprPseudonym;
@@ -53,6 +56,16 @@ pub struct ImmediateNeighborProber<U> {
 impl<U> ImmediateNeighborProber<U> {
     pub fn new(cfg: ProberConfig, graph: U) -> Self {
         Self { cfg, graph }
+    }
+}
+
+impl<U> CoverTrafficGeneration for ImmediateNeighborProber<U>
+where
+    U: NetworkGraphTraverse<NodeId = OffchainPublicKey> + Clone + Send + Sync + 'static,
+{
+    fn build(&self) -> BoxStream<'static, DestinationRouting> {
+        // Cover traffic not currently generating any data
+        Box::pin(futures::stream::empty())
     }
 }
 
@@ -140,7 +153,7 @@ mod tests {
         let channel_graph = Arc::new(ChannelGraph::new(OffchainKeypair::random().public().clone()));
 
         let prober = ImmediateNeighborProber::new(Default::default(), channel_graph);
-        let stream = prober.build();
+        let stream = ProbingTrafficGeneration::build(&prober);
         pin_mut!(stream);
 
         assert!(timeout(TINY_TIMEOUT, stream.next()).await.is_err());
@@ -164,7 +177,7 @@ mod tests {
             channel_graph,
         );
 
-        let stream = prober.build();
+        let stream = ProbingTrafficGeneration::build(&prober);
         pin_mut!(stream);
 
         let actual = timeout(
@@ -204,7 +217,7 @@ mod tests {
             .await;
 
         let prober = ImmediateNeighborProber::new(cfg, channel_graph);
-        let stream = prober.build();
+        let stream = ProbingTrafficGeneration::build(&prober);
         pin_mut!(stream);
 
         assert!(timeout(TINY_TIMEOUT, stream.next()).await?.is_some());

@@ -1,4 +1,4 @@
-use hopr_api::OffchainPublicKey;
+use hopr_api::{OffchainPublicKey, ct::PathId};
 use hopr_crypto_random::Randomizable;
 use hopr_internal_types::{NodeId, protocol::HoprPseudonym};
 use hopr_network_types::types::{DestinationRouting, RoutingOptions};
@@ -139,7 +139,7 @@ pub struct PathTelemetry {
 
 impl PathTelemetry {
     pub const ID_SIZE: usize = 8;
-    pub const PATH_SIZE: usize = 5 * size_of::<u64>();
+    pub const PATH_SIZE: usize = size_of::<PathId>();
     pub const SIZE: usize = Self::ID_SIZE + Self::PATH_SIZE + size_of::<u128>();
 
     pub fn to_bytes(self) -> Box<[u8]> {

@@ -31,16 +31,19 @@ pub mod socket;
 use std::{
     sync::{Arc, OnceLock},
     time::Duration,
+    u8,
 };
 
 use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
 use futures::{
     FutureExt, StreamExt,
     channel::mpsc::{Sender, channel},
+    stream::select_with_strategy,
 };
 use helpers::PathPlanner;
 use hopr_api::{
     chain::{ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
+    ct::{CoverTrafficGeneration, ProbingTrafficGeneration},
     db::HoprDbTicketOperations,
     graph::{NetworkGraphUpdate, NetworkGraphView, traits::EdgeObservableRead},
     network::{NetworkBuilder, NetworkStreamControl},
@@ -61,13 +64,14 @@ pub use hopr_network_types::prelude::RoutingOptions;
 use hopr_network_types::prelude::{DestinationRouting, *};
 use hopr_primitive_types::prelude::*;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
+use hopr_protocol_app::v1::ReservedTag;
 use hopr_protocol_hopr::MemorySurbStore;
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId, Protocol};
 use hopr_transport_mixer::MixerConfig;
 pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
 use hopr_transport_probe::{
-    Probe, ProbingTrafficGeneration,
+    Probe,
     ping::{PingConfig, Pinger},
 };
 pub use hopr_transport_protocol::TicketEvent;
@@ -108,6 +112,8 @@ lazy_static::lazy_static! {
         .time_to_idle(Duration::from_mins(15))
         .max_capacity(10_000)
         .build();
+
+    static ref RANDOM_DATA: [u8; 400] = hopr_crypto_random::random_bytes();
 }
 
 /// PeerId -> OffchainPublicKey is a CPU-intensive blocking operation.
@@ -256,7 +262,7 @@ where
     where
         T: futures::Sink<TicketEvent> + Clone + Send + Unpin + 'static,
         T::Error: std::error::Error,
-        Ct: ProbingTrafficGeneration + Send + Sync + 'static,
+        Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
         NetBuilder: NetworkBuilder<Network = Net> + Send + Sync + 'static,
     {
         let mut processes = AbortableList::<HoprTransportProcess>::default();
@@ -331,11 +337,41 @@ where
         let (tx_from_protocol, rx_from_protocol) =
             channel::<(HoprPseudonym, ApplicationDataIn)>(msg_protocol_bidirectional_channel_capacity);
 
+        // === START === cover traffic control
+        // generate a random looping cover traffic tag to fast drop on receive of the looping traffic
+        let cover_traffic_tag: Tag = hopr_crypto_random::random_integer(ReservedTag::range().end, None).into();
+
+        // filter out the known cover traffic not to lose processing time with it
+        let rx_from_protocol = rx_from_protocol.filter_map(move |(pseudonym, data)| async move {
+            (data.data.application_tag != cover_traffic_tag).then_some((pseudonym, data))
+        });
+
+        // prepare a cover traffic stream
+        let cover_traffic_stream = CoverTrafficGeneration::build(&cover_traffic).filter_map(move |routing| {
+            let start = hopr_crypto_random::random_integer(0, Some((RANDOM_DATA.len() - 100) as u64)) as usize;
+            let data = &RANDOM_DATA[start..start + 100];
+
+            futures::future::ready(if let Ok(data) = ApplicationData::new(cover_traffic_tag, data) {
+                Some((routing, ApplicationDataOut::with_no_packet_info(data)))
+            } else {
+                tracing::error!("failed to construct cover traffic packet");
+                None
+            })
+        });
+
+        // merge cover traffic with other outgoing data
+        let merged_unresolved_output_data =
+            select_with_strategy(unresolved_routing_msg_rx, cover_traffic_stream, |_: &mut ()| {
+                futures::stream::PollNext::Left
+            });
+
+        // === END === cover traffic control
+
         // We have to resolve DestinationRouting -> ResolvedTransportRouting before
         // sending the external packets to the transport pipeline.
         let path_planner = self.path_planner.clone();
         let distress_threshold = self.cfg.packet.surb_store.distress_threshold;
-        let all_resolved_external_msg_rx = unresolved_routing_msg_rx.filter_map(move |(unresolved, mut data)| {
+        let all_resolved_external_msg_rx = merged_unresolved_output_data.filter_map(move |(unresolved, mut data)| {
             let path_planner = path_planner.clone();
             async move {
                 trace!(?unresolved, "resolving routing for packet");

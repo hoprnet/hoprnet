@@ -117,23 +117,25 @@ fn normalize_response_content(value: &mut Value) {
                 }
 
                 if let Some(keep) = keep_key
-                    && let Some(mut kept_response) = responses.remove(&keep) {
-                        if let Value::Object(resp_obj) = &mut kept_response
-                            && let Some(Value::Object(content)) = resp_obj.get_mut("content")
-                                && content.len() > 1 {
-                                    if let Some(json_value) = content.remove("application/json") {
-                                        content.clear();
-                                        content.insert("application/json".to_string(), json_value);
-                                    } else if let Some((first_key, first_value)) =
-                                        content.iter().next().map(|(k, v)| (k.clone(), v.clone()))
-                                    {
-                                        content.clear();
-                                        content.insert(first_key, first_value);
-                                    }
-                                }
-                        responses.clear();
-                        responses.insert(keep, kept_response);
+                    && let Some(mut kept_response) = responses.remove(&keep)
+                {
+                    if let Value::Object(resp_obj) = &mut kept_response
+                        && let Some(Value::Object(content)) = resp_obj.get_mut("content")
+                        && content.len() > 1
+                    {
+                        if let Some(json_value) = content.remove("application/json") {
+                            content.clear();
+                            content.insert("application/json".to_string(), json_value);
+                        } else if let Some((first_key, first_value)) =
+                            content.iter().next().map(|(k, v)| (k.clone(), v.clone()))
+                        {
+                            content.clear();
+                            content.insert(first_key, first_value);
+                        }
                     }
+                    responses.clear();
+                    responses.insert(keep, kept_response);
+                }
             }
 
             for v in map.values_mut() {

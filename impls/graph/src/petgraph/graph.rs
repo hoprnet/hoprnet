@@ -143,10 +143,10 @@ impl hopr_api::graph::NetworkGraphWrite for ChannelGraph {
         if let (Some(src_idx), Some(dest_idx)) = (
             inner.indices.get_by_left(src).copied(),
             inner.indices.get_by_left(dest).copied(),
-        )
-            && let Some(edge_idx) = inner.graph.find_edge(src_idx, dest_idx) {
-                inner.graph.remove_edge(edge_idx);
-            }
+        ) && let Some(edge_idx) = inner.graph.find_edge(src_idx, dest_idx)
+        {
+            inner.graph.remove_edge(edge_idx);
+        }
     }
 
     /// Mutably updates the edge observations between two nodes.

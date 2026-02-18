@@ -24,7 +24,7 @@ humantime-serde = { workspace = true, optional = true }
 validator = { workspace = true }
 moka = { workspace = true }
 
-hopr-api = { workspace = true, features = ["ct", "network"] }
+hopr-api = { workspace = true, features = ["ct", "network", "graph"] }
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }

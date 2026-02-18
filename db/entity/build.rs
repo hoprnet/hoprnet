@@ -122,10 +122,12 @@ fn main() -> anyhow::Result<()> {
     if let Ok(entries) = std::fs::read_dir(&codegen_path) {
         for entry in entries.flatten() {
             if let Some(file_name) = entry.file_name().to_str()
-                && file_name.ends_with(".rs") && file_name != "mod.rs" {
-                    let module_name = file_name.trim_end_matches(".rs");
-                    mod_content.push_str(&format!("pub mod {};\n", module_name));
-                }
+                && file_name.ends_with(".rs")
+                && file_name != "mod.rs"
+            {
+                let module_name = file_name.trim_end_matches(".rs");
+                mod_content.push_str(&format!("pub mod {};\n", module_name));
+            }
         }
     }
 

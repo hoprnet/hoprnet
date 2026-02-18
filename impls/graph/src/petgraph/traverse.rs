@@ -428,6 +428,39 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn stream_should_terminate_when_destination_is_source_via_two_intermediates() -> anyhow::Result<()> {
+        // Topology: me → a → b → me (cycle back to source)
+        //
+        // The algorithm tracks visited nodes to enforce simple paths (no repeated
+        // nodes). Since the source is always in the visited set, reaching it again
+        // as a destination is impossible — the stream should terminate immediately.
+        let me = pubkey_from(&SECRET_0);
+        let a = pubkey_from(&SECRET_1);
+        let b = pubkey_from(&SECRET_2);
+
+        let graph = ChannelGraph::new(me);
+        graph.add_node(a);
+        graph.add_node(b);
+        graph.add_edge(&me, &a)?;
+        graph.add_edge(&a, &b)?;
+        graph.add_edge(&b, &me)?;
+        mark_edge_connected(&graph, &b, &me);
+
+        let stream = graph.simple_paths_stream(&me, &me, 3);
+
+        let paths: Vec<_> = tokio::time::timeout(std::time::Duration::from_secs(5), stream.collect::<Vec<_>>())
+            .await
+            .context("stream should have terminated — timed out after 5s")?;
+
+        assert!(
+            paths.is_empty(),
+            "simple paths cannot loop back to the source (visited set prevents revisiting)"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn stream_should_terminate_after_edge_removal() -> anyhow::Result<()> {
         // Simple 1-hop graph: me → dest
         let me = pubkey_from(&SECRET_0);

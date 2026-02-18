@@ -300,9 +300,10 @@ where
                     // If the other party has closed the stream, we don't care about the update.
                     let level = self.update(current_cfg.surb_decay.as_ref());
                     if !level_tx.is_closed()
-                        && let Err(error) = level_tx.try_send(level) {
-                            tracing::error!(%error, "cannot send balancer level update");
-                        }
+                        && let Err(error) = level_tx.try_send(level)
+                    {
+                        tracing::error!(%error, "cannot send balancer level update");
+                    }
 
                     // See if the setpoint has been updated at the controller as a result
                     // of the update step, because some controllers (such as the SimpleBalancerController)

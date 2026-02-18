@@ -114,14 +114,16 @@ impl AccountSelector {
         }
 
         if let Some(chain_key) = &self.chain_key
-            && &account.chain_addr != chain_key {
-                return false;
-            }
+            && &account.chain_addr != chain_key
+        {
+            return false;
+        }
 
         if let Some(packet_key) = &self.offchain_key
-            && &account.public_key != packet_key {
-                return false;
-            }
+            && &account.public_key != packet_key
+        {
+            return false;
+        }
 
         true
     }

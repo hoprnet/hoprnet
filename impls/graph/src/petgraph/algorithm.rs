@@ -135,9 +135,10 @@ where
 
                 // Prune branch if cost drops below threshold
                 if let Some(ref min) = min_cost
-                    && new_cost < *min {
-                        continue;
-                    }
+                    && new_cost < *min
+                {
+                    continue;
+                }
 
                 let mut valid_path: Option<(TargetColl, C)> = None;
 

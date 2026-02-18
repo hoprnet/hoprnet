@@ -1,9 +1,7 @@
 use futures::stream::BoxStream;
 pub use hopr_network_types::types::DestinationRouting;
 
-pub use crate::graph::traits::NetworkGraphView;
-
-pub type PathId = [u128; 10];
+pub type PathId = [u64; 5];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProbeRouting {
