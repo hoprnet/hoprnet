@@ -69,7 +69,7 @@ hopr-lib = { workspace = true, features = ["utils_parallel"] }
 # impls
 hopr-db-node = { workspace = true }
 hopr-chain-connector = { workspace = true }
-hopr-ct-telemetry = { workspace = true }
+hopr-ct-immediate = { workspace = true }
 hopr-network-graph = { workspace = true }
 hopr-transport-p2p = { workspace = true }
 

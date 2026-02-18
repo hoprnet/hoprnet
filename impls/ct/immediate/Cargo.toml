@@ -1,6 +1,6 @@
 [package]
-name = "hopr-ct-telemetry"
-version = "0.1.0"
+name = "hopr-ct-immediate"
+version = "0.2.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Basic implementation of the CT Telemetry functionality as specified in the HOPR RFCs describing the 0-hop probing."
 edition = "2024"

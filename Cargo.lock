@@ -1136,9 +1136,9 @@ dependencies = [
 
 [[package]]
 name = "assertables"
-version = "9.8.4"
+version = "9.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4dcd1f7f2f608b9a888a851f234086946c2ca1dfeadf1431c5082fee0942eeb6"
+checksum = "e58d4dd3e6f507b037ac5878d4502a7b0c04ab5247521a7679944e4dd2f9d15d"
 
 [[package]]
 name = "async-broadcast"
@@ -4634,8 +4634,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-ct-telemetry"
-version = "0.1.0"
+name = "hopr-ct-immediate"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "futures",
@@ -5029,7 +5029,7 @@ dependencies = [
  "hex-literal",
  "hopr-chain-connector",
  "hopr-crypto-random 0.4.0",
- "hopr-ct-telemetry",
+ "hopr-ct-immediate",
  "hopr-db-node",
  "hopr-lib",
  "hopr-network-graph",
@@ -5225,7 +5225,7 @@ dependencies = [
  "hopr-crypto-packet",
  "hopr-crypto-random 0.4.0",
  "hopr-crypto-types 0.9.1",
- "hopr-ct-telemetry",
+ "hopr-ct-immediate",
  "hopr-internal-types",
  "hopr-network-types",
  "hopr-platform",

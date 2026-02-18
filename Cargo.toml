@@ -42,7 +42,7 @@ members = [
   "localcluster",
   # implementations
   "hopr/reference",
-  "impls/ct/telemetry",
+  "impls/ct/immediate",
   "impls/graph",
   "impls/transport/p2p",
 ]
@@ -52,7 +52,7 @@ ahash = "0.8.12"
 anyhow = "1.0.101"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
-assertables = "9.8.4"
+assertables = "9.8.5"
 async-broadcast = "0.7.2"
 async-lock = "3.4.2"
 async-signal = "0.2.13"
@@ -191,7 +191,7 @@ sqlx = { version = "0.8.6", default-features = false, features = [
 ] }
 strum = { version = "0.27.2", features = ["derive"] }
 subtle = "2.6.1"
-syn = { version = "2.0.98", features = ["full"] }
+syn = { version = "2.0.116", features = ["full"] }
 tempfile = "3.24.0"
 test-log = { version = "0.2.19", features = ["trace"] }
 thiserror = "2.0.18"
@@ -282,7 +282,7 @@ hopr-statistics = { path = "common/statistics" }
 # referential implementations
 hopr-reference = { path = "hopr/reference" }
 hopr-transport-p2p = { path = "impls/transport/p2p" }
-hopr-ct-telemetry = { path = "impls/ct/telemetry" }
+hopr-ct-immediate = { path = "impls/ct/immediate" }
 hopr-network-graph = { path = "impls/graph" }
 
 [profile.dev]

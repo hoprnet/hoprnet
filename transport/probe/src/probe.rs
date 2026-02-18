@@ -348,7 +348,7 @@ mod tests {
         traits::{EdgeNetworkObservableRead, EdgeObservableRead, EdgeObservableWrite, EdgeProtocolObservable},
     };
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-    use hopr_ct_telemetry::{ImmediateNeighborProber, ProberConfig};
+    use hopr_ct_immediate::{ImmediateNeighborProber, ProberConfig};
     use hopr_protocol_app::prelude::{ApplicationData, Tag};
 
     use super::*;

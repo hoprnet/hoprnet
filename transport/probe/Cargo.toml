@@ -49,7 +49,7 @@ tokio = { workspace = true }
 
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 hopr-crypto-packet = { workspace = true }
-hopr-ct-telemetry = { workspace = true }
+hopr-ct-immediate = { workspace = true }
 
 [package.metadata.cargo-machete]
 ignored = ["humantime-serde"]
