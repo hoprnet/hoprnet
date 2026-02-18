@@ -2,7 +2,7 @@
 name = "hopr-transport-mixer"
 version = "0.1.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-edition = "2021"
+edition = "2024"
 description = "Mixer functionality responsible for mixing and delaying packets with a channel-like interface"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"

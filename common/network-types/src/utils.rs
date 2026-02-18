@@ -227,22 +227,20 @@ mod tokio_utils {
             }
 
             // Once B-side is done, initiate shutdown of A-side
-            if let TransferState::Done(_) = b_to_a {
-                if let TransferState::Running(buf) = &a_to_b {
+            if let TransferState::Done(_) = b_to_a
+                && let TransferState::Running(buf) = &a_to_b {
                     tracing::trace!("B-side has completed, terminating A-side.");
                     a_to_b = TransferState::ShuttingDown(buf.amt);
                     a_to_b_result = transfer_one_direction(cx, &mut a_to_b, a, b)?;
                 }
-            }
 
             // Once A-side is done, initiate shutdown of B-side
-            if let TransferState::Done(_) = a_to_b {
-                if let TransferState::Running(buf) = &b_to_a {
+            if let TransferState::Done(_) = a_to_b
+                && let TransferState::Running(buf) = &b_to_a {
                     tracing::trace!("A-side has completed, terminate B-side.");
                     b_to_a = TransferState::ShuttingDown(buf.amt);
                     b_to_a_result = transfer_one_direction(cx, &mut b_to_a, b, a)?;
                 }
-            }
 
             // Not a problem if ready! returns early
             let a_to_b_bytes_transferred = std::task::ready!(a_to_b_result);

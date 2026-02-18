@@ -2,7 +2,7 @@
 name = "hoprd"
 version = "4.0.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-edition = "2021"
+edition = "2024"
 description = "HOPR node executable"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"

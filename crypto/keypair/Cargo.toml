@@ -2,7 +2,7 @@
 name = "hopr-crypto-keypair"
 version = "0.5.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-edition = "2021"
+edition = "2024"
 description = "Rust keypair modules for HOPRd"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"

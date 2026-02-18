@@ -2,7 +2,7 @@
 name = "hoprd-api"
 version = "4.6.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-edition = "2021"
+edition = "2024"
 description = "API enabling developers to interact with a hoprd node programatically through HTTP REST API."
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"

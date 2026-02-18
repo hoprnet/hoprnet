@@ -330,8 +330,8 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
                     .copy_from_slice(ret.mac());
 
                 // The additional relayer data is optional
-                if H::RELAYER_DATA_SIZE > 0 {
-                    if let Some(relayer_data) = additional_data_relayer.get(inverted_idx).map(|d| d.as_ref()) {
+                if H::RELAYER_DATA_SIZE > 0
+                    && let Some(relayer_data) = additional_data_relayer.get(inverted_idx).map(|d| d.as_ref()) {
                         if relayer_data.len() != H::RELAYER_DATA_SIZE {
                             return Err(CryptoError::InvalidParameterSize {
                                 name: "additional_data_relayer[..]",
@@ -343,7 +343,6 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
                             ..HeaderPrefix::SIZE + H::KEY_ID_SIZE.get() + H::TAG_SIZE + H::RELAYER_DATA_SIZE]
                             .copy_from_slice(relayer_data);
                     }
-                }
 
                 // Encrypt the entire extended header
                 prg.apply_keystream(&mut extended_header[0..H::HEADER_LEN]);

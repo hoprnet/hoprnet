@@ -134,11 +134,10 @@ where
                 let new_cost = cost_fn(costs.last().unwrap().clone(), edge.weight(), current_nodes);
 
                 // Prune branch if cost drops below threshold
-                if let Some(ref min) = min_cost {
-                    if new_cost < *min {
+                if let Some(ref min) = min_cost
+                    && new_cost < *min {
                         continue;
                     }
-                }
 
                 let mut valid_path: Option<(TargetColl, C)> = None;
 
