@@ -417,6 +417,8 @@ mod tests {
     fn test_config_should_be_serializable_into_string() -> anyhow::Result<()> {
         let cfg = example_cfg()?;
 
+        let str = serde_saphyr::to_string(&cfg)?;
+
         let from_yaml: HoprdConfig = serde_saphyr::from_str(include_str!("../example_cfg.yaml"))?;
         assert_eq!(cfg, from_yaml);
 
