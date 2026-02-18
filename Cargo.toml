@@ -43,6 +43,7 @@ members = [
   # implementations
   "hopr/reference",
   "impls/ct/immediate",
+  "impls/ct/full-network",
   "impls/graph",
   "impls/transport/p2p",
 ]
@@ -283,6 +284,7 @@ hopr-statistics = { path = "common/statistics" }
 hopr-reference = { path = "hopr/reference" }
 hopr-transport-p2p = { path = "impls/transport/p2p" }
 hopr-ct-immediate = { path = "impls/ct/immediate" }
+hopr-ct-full-network = { path = "impls/ct/full-network" }
 hopr-network-graph = { path = "impls/graph" }
 
 [profile.dev]

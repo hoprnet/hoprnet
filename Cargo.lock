@@ -4634,6 +4634,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-ct-full-network"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cfg-if",
+ "futures",
+ "futures-concurrency",
+ "hopr-api",
+ "hopr-async-runtime",
+ "hopr-crypto-random 0.4.0",
+ "hopr-crypto-types 0.9.1",
+ "hopr-internal-types",
+ "hopr-network-graph",
+ "hopr-network-types",
+ "humantime-serde",
+ "lazy_static",
+ "moka",
+ "serde",
+ "smart-default",
+ "tokio",
+ "validator",
+]
+
+[[package]]
 name = "hopr-ct-immediate"
 version = "0.2.0"
 dependencies = [

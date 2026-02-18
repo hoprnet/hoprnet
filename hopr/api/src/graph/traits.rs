@@ -1,4 +1,4 @@
-use futures::stream::BoxStream;
+use hopr_network_types::types::PathId;
 
 use super::{MeasurablePath, MeasurablePeer};
 use crate::graph::{MeasurableEdge, MeasurableNode};
@@ -200,6 +200,19 @@ pub trait NetworkGraphUpdate {
         N: MeasurableNode + Clone + Send + Sync + 'static;
 }
 
+/// Definition of a fold like cost function usable with graph traversal trait.
+#[allow(clippy::type_complexity)]
+pub trait CostFn {
+    type Weight: EdgeObservableRead + Send;
+    type Cost: Clone + PartialOrd + Send + Sync;
+
+    fn initial_cost(&self) -> Self::Cost;
+
+    fn min_cost(&self) -> Option<Self::Cost>;
+
+    fn into_cost_fn(self) -> Box<dyn Fn(Self::Cost, &Self::Weight, usize) -> Self::Cost>;
+}
+
 /// A trait specifying the graph traversal functionality.
 ///
 /// Provides methods for finding simple paths between nodes in the network graph.
@@ -207,21 +220,8 @@ pub trait NetworkGraphUpdate {
 pub trait NetworkGraphTraverse {
     /// The identifier type used to reference nodes in the graph.
     type NodeId: Send + Sync;
-    /// The cost metric associated with a path, used for ordering routes.
-    type Cost: PartialOrd + Send + Sync;
-
-    /// Returns a stream of routes from the source to the destination with the specified length.
-    ///
-    /// The length argument specifies the number of edges in the graph, over which the path should
-    /// be formed, i.e. source -> intermediate -> destination is 2 edges.
-    ///
-    /// The stream should only terminate, if there's no more routes available.
-    fn simple_paths_stream(
-        &self,
-        source: &Self::NodeId,
-        destination: &Self::NodeId,
-        length: usize,
-    ) -> BoxStream<'static, (Vec<Self::NodeId>, Self::Cost)>;
+    /// The concrete edge observation type used by cost functions during traversal.
+    type Observed: EdgeObservableRead + Send;
 
     /// Returns a list of routes from the source to the destination with the specified length
     /// at the time of calling.
@@ -231,11 +231,20 @@ pub trait NetworkGraphTraverse {
     ///
     /// The take count argument should be set in case the graph is expected to be large enough
     /// to be traversed slowly.
-    fn simple_paths(
+    fn simple_paths<C: CostFn<Weight = Self::Observed>>(
         &self,
         source: &Self::NodeId,
         destination: &Self::NodeId,
         length: usize,
         take_count: Option<usize>,
-    ) -> Vec<(Vec<Self::NodeId>, Self::Cost)>;
+        cost_fn: C,
+    ) -> Vec<(Vec<Self::NodeId>, PathId, C::Cost)>;
+
+    /// Return a list of nodes with a full loopback from myself to myself.
+    ///
+    /// The length argument specifies the number of edges in the graph, over which the path should
+    /// be formed, i.e. source -> intermediate -> destination is 2 edges.
+    ///
+    /// At least length 2 is required to provide a path through a single relay.
+    fn simple_loopback_to_self(&self, length: usize, take_count: Option<usize>) -> Vec<(Vec<Self::NodeId>, PathId)>;
 }
