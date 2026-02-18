@@ -320,7 +320,8 @@ impl SessionTelemetry {
         let snapshot_at_us = now_us();
         let created_at_us = self.created_at_us.load(Ordering::Relaxed);
         let last_activity_us = self.last_activity_us.load(Ordering::Relaxed);
-        let state = SessionLifecycleState::from_repr(self.state.load(Ordering::Relaxed)).unwrap_or(SessionLifecycleState::Active);
+        let state = SessionLifecycleState::from_repr(self.state.load(Ordering::Relaxed))
+            .unwrap_or(SessionLifecycleState::Active);
         let uptime_us = snapshot_at_us.saturating_sub(created_at_us);
         let idle_us = snapshot_at_us.saturating_sub(last_activity_us);
 

@@ -1,8 +1,10 @@
 use cipher::Block;
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
-use hopr_crypto_types::{crypto_traits::KeyIvInit, lioness::LionessBlake3ChaCha20};
+use hopr_crypto_types::{
+    crypto_traits::{Iv, Key, KeyIvInit},
+    lioness::LionessBlake3ChaCha20,
+};
 use typenum::{U1024, Unsigned};
-use hopr_crypto_types::crypto_traits::{Iv, Key};
 
 // Avoid musl's default allocator due to degraded performance
 //
