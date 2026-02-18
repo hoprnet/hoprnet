@@ -147,6 +147,11 @@ hopr:
     # Outgoing ticket winning probability.
     # Should not be lower than the minimum ticket winning probability set on-chain
     # outgoing_ticket_winning_prob: 1.0
+    #
+    # Minimum incoming ticket price.
+    # The value cannot be lower than the minimum network ticket price multiplied by the node's path position,
+    # and will default to that value whenever it is lower.
+    # min_incoming_ticket_price: "1 wxHOPR"
 
 # Session Entry/Exit IP forwarding configuration for this node
 # This applies whenever the node is an Exit node of a Session.
