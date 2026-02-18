@@ -2,13 +2,12 @@ use hopr_api::graph::{MeasurableEdge, MeasurableNode, NetworkGraphWrite, traits:
 
 use crate::{ChannelGraph, Observations};
 
-#[async_trait::async_trait]
 impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
-    #[tracing::instrument(level = "debug", skip(self))]
-    async fn record_edge<N, P>(&self, update: MeasurableEdge<N, P>)
+    #[tracing::instrument(level = "debug", skip(self, update))]
+    fn record_edge<N, P>(&self, update: MeasurableEdge<N, P>)
     where
-        N: hopr_api::graph::MeasurablePeer + std::fmt::Debug + Send + Clone,
-        P: hopr_api::graph::MeasurablePath + std::fmt::Debug + Send + Clone,
+        N: hopr_api::graph::MeasurablePeer + Send + Clone,
+        P: hopr_api::graph::MeasurablePath + Send + Clone,
     {
         use hopr_api::graph::traits::EdgeWeightType;
 
@@ -55,12 +54,11 @@ impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
         }
     }
 
-    #[tracing::instrument(level = "debug", skip(self))]
-    async fn record_node<N>(&self, update: N)
+    #[tracing::instrument(level = "debug", skip(self, update))]
+    fn record_node<N>(&self, update: N)
     where
-        N: MeasurableNode + std::fmt::Debug + Clone + Send + Sync + 'static,
+        N: MeasurableNode + Clone + Send + Sync + 'static,
     {
-        tracing::trace!(?update, "recording node update");
         hopr_api::graph::NetworkGraphWrite::add_node(self, update.into());
     }
 }
@@ -137,9 +135,7 @@ mod tests {
         let rtt = std::time::Duration::from_millis(100);
         let telemetry: Result<EdgeTransportTelemetry<TestNeighbor, TestPath>, NetworkGraphError<TestPath>> =
             Ok(EdgeTransportTelemetry::Neighbor(TestNeighbor { peer: peer_key, rtt }));
-        graph
-            .record_edge(hopr_api::graph::MeasurableEdge::Probe(telemetry))
-            .await;
+        graph.record_edge(hopr_api::graph::MeasurableEdge::Probe(telemetry));
 
         let obs = graph.edge(&me, &peer_key).context("edge observation should exist")?;
         let immediate = obs
@@ -162,9 +158,7 @@ mod tests {
 
         let telemetry: Result<EdgeTransportTelemetry<TestNeighbor, TestPath>, NetworkGraphError<TestPath>> =
             Err(NetworkGraphError::ProbeNeighborTimeout(Box::new(peer_key)));
-        graph
-            .record_edge(hopr_api::graph::MeasurableEdge::Probe(telemetry))
-            .await;
+        graph.record_edge(hopr_api::graph::MeasurableEdge::Probe(telemetry));
 
         let obs = graph.edge(&me, &peer_key).context("edge observation should exist")?;
         let immediate = obs
@@ -188,9 +182,9 @@ mod tests {
             dest: peer,
             capacity: Some(1000),
         };
-        graph
-            .record_edge::<TestNeighbor, TestPath>(hopr_api::graph::MeasurableEdge::Capacity(Box::new(capacity_update)))
-            .await;
+        graph.record_edge::<TestNeighbor, TestPath>(hopr_api::graph::MeasurableEdge::Capacity(Box::new(
+            capacity_update,
+        )));
 
         let obs = graph.edge(&me, &peer).context("edge should exist")?;
         let intermediate = obs
@@ -213,9 +207,9 @@ mod tests {
             dest: peer,
             capacity: None,
         };
-        graph
-            .record_edge::<TestNeighbor, TestPath>(hopr_api::graph::MeasurableEdge::Capacity(Box::new(capacity_update)))
-            .await;
+        graph.record_edge::<TestNeighbor, TestPath>(hopr_api::graph::MeasurableEdge::Capacity(Box::new(
+            capacity_update,
+        )));
 
         let obs = graph.edge(&me, &peer).context("edge should exist")?;
         let intermediate = obs.intermediate_qos().context("intermediate QoS should be present")?;
@@ -230,7 +224,7 @@ mod tests {
         let graph = ChannelGraph::new(me);
 
         assert!(!graph.contains_node(&peer));
-        graph.record_node(peer).await;
+        graph.record_node(peer);
         assert!(graph.contains_node(&peer));
     }
 
@@ -245,9 +239,7 @@ mod tests {
         let rtt = std::time::Duration::from_millis(80);
         let telemetry: Result<EdgeTransportTelemetry<TestNeighbor, TestPath>, NetworkGraphError<TestPath>> =
             Ok(EdgeTransportTelemetry::Neighbor(TestNeighbor { peer: peer, rtt }));
-        graph
-            .record_edge(hopr_api::graph::MeasurableEdge::Probe(telemetry))
-            .await;
+        graph.record_edge(hopr_api::graph::MeasurableEdge::Probe(telemetry));
 
         assert!(graph.has_edge(&me, &peer), "probe should create edge via upsert");
         let obs = graph.edge(&me, &peer).context("edge should exist")?;
@@ -270,9 +262,7 @@ mod tests {
                     peer: peer,
                     rtt: std::time::Duration::from_millis(60),
                 }));
-            graph
-                .record_edge(hopr_api::graph::MeasurableEdge::Probe(telemetry))
-                .await;
+            graph.record_edge(hopr_api::graph::MeasurableEdge::Probe(telemetry));
         }
 
         let obs = graph.edge(&me, &peer).context("edge should exist")?;

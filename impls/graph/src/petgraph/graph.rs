@@ -55,7 +55,6 @@ impl ChannelGraph {
     }
 }
 
-#[async_trait::async_trait]
 impl hopr_api::graph::NetworkGraphView for ChannelGraph {
     type NodeId = OffchainPublicKey;
     type Observed = Observations;
@@ -311,8 +310,8 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn view_edge_returns_observations_for_existing_edge() -> anyhow::Result<()> {
+    #[test]
+    fn view_edge_returns_observations_for_existing_edge() -> anyhow::Result<()> {
         let me = pubkey_from(&SECRET_0);
         let graph = ChannelGraph::new(me);
         let peer = pubkey_from(&SECRET_1);
@@ -322,8 +321,8 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn view_edge_returns_none_for_missing_edge() -> anyhow::Result<()> {
+    #[test]
+    fn view_edge_returns_none_for_missing_edge() -> anyhow::Result<()> {
         let me = pubkey_from(&SECRET_0);
         let graph = ChannelGraph::new(me);
         let peer = pubkey_from(&SECRET_1);

@@ -178,7 +178,7 @@ where
                             Event::Chain(chain_event) => {
                                 match chain_event {
                                     ChainEvent::Announcement(account) =>{
-                                        graph_updater.record_node(account.public_key).await;
+                                        graph_updater.record_node(account.public_key);
                                         let peer_id: PeerId = account.public_key.into();
                                         if let Err(error) = indexer_peer_update_tx.send(PeerDiscovery::Announce(peer_id, account.get_multiaddrs().to_vec())).await {
                                             tracing::error!(peer = %peer_id, %error, reason = "failed to propagate the record", "ignoring announced peer")
@@ -203,7 +203,7 @@ where
                                                 capacity,
                                                 src: from,
                                                 dest: to
-                                        }))).await;
+                                        })));
                                         },
                                         (Ok(_), Ok(_)) => {
                                             tracing::error!(%channel, "could not find packet keys for the channel endpoints");
@@ -228,15 +228,13 @@ where
                             match network_event {
                                 NetworkEvent::PeerConnected(peer_id) =>
                                     if let Ok(opk) = hopr_lib::peer_id_to_public_key(&peer_id).await {
-
-                                        graph_updater.record_node(opk).await;
+                                        graph_updater.record_node(opk);
                                     } else {
                                         tracing::error!(%peer_id, "failed to convert peer ID to public key for graph update");
                                     },
                                 NetworkEvent::PeerDisconnected(peer_id) =>
                                     if let Ok(opk) = hopr_lib::peer_id_to_public_key(&peer_id).await {
-
-                                        graph_updater.record_node(opk).await;
+                                        graph_updater.record_node(opk);
                                     } else {
                                         tracing::error!(%peer_id, "failed to convert peer ID to public key for graph update");
                                     },

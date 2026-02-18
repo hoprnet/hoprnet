@@ -31,7 +31,6 @@ pub mod socket;
 use std::{
     sync::{Arc, OnceLock},
     time::Duration,
-    u8,
 };
 
 use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;

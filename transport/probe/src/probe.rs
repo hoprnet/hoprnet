@@ -97,15 +97,14 @@ impl Probe {
 
                             if let NodeId::Offchain(opk) = peer.as_ref() {
                                 let opk: OffchainPublicKey = *opk;
-                                futures::FutureExt::boxed(async move {
-                                    store
-                                        .record_edge::<NeighborTelemetry, PathTelemetry>(
-                                            hopr_api::graph::MeasurableEdge::Probe(Err(
-                                                NetworkGraphError::ProbeNeighborTimeout(Box::new(opk)),
-                                            )),
-                                        )
-                                        .await
-                                })
+                                store
+                                    .record_edge::<NeighborTelemetry, PathTelemetry>(
+                                        hopr_api::graph::MeasurableEdge::Probe(Err(
+                                            NetworkGraphError::ProbeNeighborTimeout(Box::new(opk)),
+                                        )),
+                                    );
+                                futures::FutureExt::boxed(futures::future::ready(()))
+
                             } else {
                                 futures::FutureExt::boxed(futures::future::ready(()))
                             }
@@ -128,15 +127,10 @@ impl Probe {
 
                         tracing::debug!(%tag, reason = "timeout", "loopback probe failed");
 
-                        Box::pin(async move {
-                            store
-                                .record_edge::<NeighborTelemetry, PathTelemetry>(
-                                    hopr_api::graph::MeasurableEdge::Probe(Err(
-                                        NetworkGraphError::ProbeLoopbackTimeout(path),
-                                    )),
-                                )
-                                .await;
-                        })
+                        store.record_edge::<NeighborTelemetry, PathTelemetry>(hopr_api::graph::MeasurableEdge::Probe(
+                            Err(NetworkGraphError::ProbeLoopbackTimeout(path)),
+                        ));
+                        futures::FutureExt::boxed(futures::future::ready(()))
                     } else {
                         // If the eviction cause is not expiration, nothing needs to be done
                         futures::FutureExt::boxed(futures::future::ready(()))
@@ -281,7 +275,7 @@ impl Probe {
                             Ok(message) => {
                                 match message {
                                     Message::Telemetry(path_telemetry) => {
-                                        store.record_edge::<NeighborTelemetry, PathTelemetry>(hopr_api::graph::MeasurableEdge::Probe(Ok(EdgeTransportTelemetry::Loopback(path_telemetry)))).await
+                                        store.record_edge::<NeighborTelemetry, PathTelemetry>(hopr_api::graph::MeasurableEdge::Probe(Ok(EdgeTransportTelemetry::Loopback(path_telemetry))))
                                     },
                                     Message::Probe(NeighborProbe::Ping(ping)) => {
                                         tracing::debug!(%pseudonym, nonce = hex::encode(ping), "received ping");
@@ -312,7 +306,7 @@ impl Probe {
                                                 store.record_edge::<NeighborTelemetry, PathTelemetry>(hopr_api::graph::MeasurableEdge::Probe(Ok(EdgeTransportTelemetry::Neighbor(NeighborTelemetry {
                                                     peer: *opk,
                                                     rtt: latency,
-                                                })))).await
+                                                }))))
                                             } else {
                                                 tracing::warn!(%pseudonym, nonce = hex::encode(pong), latency_ms = latency.as_millis(), "probe successful to non-offchain peer");
                                             }
@@ -440,9 +434,8 @@ mod tests {
         on_finished: Arc<RwLock<Vec<(OffchainPublicKey, crate::errors::Result<Duration>)>>>,
     }
 
-    #[async_trait]
     impl NetworkGraphUpdate for PeerStore {
-        async fn record_edge<N, P>(&self, telemetry: MeasurableEdge<N, P>)
+        fn record_edge<N, P>(&self, telemetry: MeasurableEdge<N, P>)
         where
             N: hopr_api::graph::MeasurablePeer + Send + Clone,
             P: hopr_api::graph::MeasurablePath + Send + Clone,
@@ -465,7 +458,7 @@ mod tests {
             }
         }
 
-        async fn record_node<N>(&self, _node: N)
+        fn record_node<N>(&self, _node: N)
         where
             N: hopr_api::graph::MeasurableNode + Send + Clone,
         {

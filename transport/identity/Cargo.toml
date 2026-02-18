@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-identity"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Identity related operations for the HOPR transport"
 edition = "2024"

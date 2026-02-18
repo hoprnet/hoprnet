@@ -71,7 +71,6 @@ humansize = { workspace = true, optional = true, features = ["no_alloc"] }
 humantime-serde = { workspace = true }
 proc-macro-regex = { workspace = true }
 serde = { workspace = true }
-serde_with = { workspace = true }
 serde-saphyr = { workspace = true }
 serde_json = { workspace = true }
 signal-hook = { workspace = true }

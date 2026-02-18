@@ -1,5 +1,6 @@
 use hopr_crypto_types::types::OffchainPublicKey;
 
+/// Error observed during the measurements updating the graph edges.
 #[derive(thiserror::Error, Debug)]
 pub enum NetworkGraphError<P>
 where
@@ -16,19 +17,24 @@ pub trait MeasurableNode: Into<OffchainPublicKey> {}
 
 impl<T: Into<OffchainPublicKey>> MeasurableNode for T {}
 
-/// Measurable peer attributes.
+/// Measurable neighbor peer attributes.
 pub trait MeasurablePeer {
     fn peer(&self) -> &OffchainPublicKey;
     fn rtt(&self) -> std::time::Duration;
 }
 
-/// Measurable path telemetry.
+/// Measurable path segment telemetry.
 pub trait MeasurablePath {
     fn id(&self) -> &[u8];
     fn path(&self) -> &[u8];
     fn timestamp(&self) -> u128;
 }
 
+/// Update for the edge between src and dest.
+///
+/// The capacity can be either `None` or a `Some(u128)` value.
+/// * `None` - the capacity of the channel disappeared
+/// * `Some(u128)` - the capacity was updated
 #[derive(Debug, Copy, Clone)]
 pub struct EdgeCapacityUpdate {
     pub capacity: Option<u128>,
@@ -36,6 +42,7 @@ pub struct EdgeCapacityUpdate {
     pub dest: OffchainPublicKey,
 }
 
+/// Edge measurements accepted for an edge in the graph.
 #[derive(Debug)]
 pub enum MeasurableEdge<N, P>
 where

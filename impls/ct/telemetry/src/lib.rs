@@ -166,7 +166,7 @@ mod tests {
         let channel_graph = Arc::new(ChannelGraph::new(OffchainKeypair::random().public().clone()));
 
         for node in RANDOM_PEERS.iter() {
-            channel_graph.record_node(node.clone()).await;
+            channel_graph.record_node(node.clone());
         }
 
         let prober = ImmediateNeighborProber::new(
@@ -212,9 +212,7 @@ mod tests {
         };
 
         let channel_graph = Arc::new(ChannelGraph::new(OffchainKeypair::random().public().clone()));
-        channel_graph
-            .record_node(RANDOM_PEERS.iter().next().unwrap().clone())
-            .await;
+        channel_graph.record_node(RANDOM_PEERS.iter().next().unwrap().clone());
 
         let prober = ImmediateNeighborProber::new(cfg, channel_graph);
         let stream = ProbingTrafficGeneration::build(&prober);

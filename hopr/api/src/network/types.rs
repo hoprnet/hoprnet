@@ -1,4 +1,5 @@
-use multiaddr::PeerId;
+pub use hopr_network_types::types::PathId;
+pub use multiaddr::PeerId;
 
 /// Network health represented with colors, where green is the best and red
 /// is the worst possible observed network quality.
@@ -32,22 +33,18 @@ pub enum NetworkEvent {
 
 #[cfg(test)]
 mod tests {
-    use insta::assert_snapshot;
+    use insta::assert_debug_snapshot;
     use strum::IntoEnumIterator;
 
     use super::Health;
 
     #[test]
     fn network_health_should_be_representable_numerically_and_ordered() {
-        for value in Health::iter() {
-            assert_snapshot!(value as i32)
-        }
+        assert_debug_snapshot!(Health::iter().map(|v| v as i32).collect::<Vec::<_>>());
     }
 
     #[test]
     fn network_health_should_serialize_to_and_deserialize_from_a_proper_string() {
-        for value in Health::iter() {
-            assert_snapshot!(value)
-        }
+        assert_debug_snapshot!(Health::iter().collect::<Vec::<_>>());
     }
 }

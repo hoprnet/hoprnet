@@ -7,8 +7,8 @@ pub mod ct;
 /// Node database related API traits.
 #[cfg(feature = "db")]
 pub mod db;
-#[cfg(feature = "graph")]
 /// Network graph related API traits.
+#[cfg(feature = "graph")]
 pub mod graph;
 /// Network state and peer observation API traits.
 #[cfg(feature = "network")]

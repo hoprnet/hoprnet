@@ -22,12 +22,10 @@ pub mod config;
 pub mod constants;
 /// Lists all errors thrown from this library.
 pub mod errors;
-
-/// Utility module with helper types and functionality over hopr-lib behavior.
-pub mod utils;
-
 /// Public traits for interactions with this library.
 pub mod traits;
+/// Utility module with helper types and functionality over hopr-lib behavior.
+pub mod utils;
 
 pub use hopr_api as api;
 

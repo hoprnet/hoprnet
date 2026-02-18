@@ -30,6 +30,8 @@ pub trait NetworkView {
     fn health(&self) -> Health;
 }
 
+/// Control object for the opening and receiving of network connections in the
+/// form of network streams.
 #[async_trait::async_trait]
 pub trait NetworkStreamControl: std::fmt::Debug {
     fn accept(
@@ -39,10 +41,14 @@ pub trait NetworkStreamControl: std::fmt::Debug {
     async fn open(self, peer: PeerId) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error>;
 }
 
+/// Builder for a network object that returns the network specified in
+/// the `NetworkBuilder::Network` associated type.
 #[async_trait::async_trait]
 pub trait NetworkBuilder {
     type Network: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static;
 
+    /// Build and return an instance of a network viewer along with a process to start
+    /// and run the network component.
     async fn build(
         self,
         identity: &OffchainKeypair,

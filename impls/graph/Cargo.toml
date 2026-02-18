@@ -17,7 +17,6 @@ petgraph = ["dep:async-stream", "dep:petgraph", "dep:indexmap"]
 
 [dependencies]
 async-stream = { workspace = true, optional = true }
-async-trait = { workspace = true }
 anyhow = { workspace = true }
 bimap = { workspace = true }
 futures = { workspace = true }

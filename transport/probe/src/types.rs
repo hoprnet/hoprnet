@@ -1,4 +1,4 @@
-use hopr_api::{OffchainPublicKey, ct::PathId};
+use hopr_api::{OffchainPublicKey, network::PathId};
 use hopr_crypto_random::Randomizable;
 use hopr_internal_types::{NodeId, protocol::HoprPseudonym};
 use hopr_network_types::types::{DestinationRouting, RoutingOptions};
