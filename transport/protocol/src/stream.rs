@@ -7,8 +7,6 @@ use futures::{
     AsyncRead, AsyncReadExt, AsyncWrite, FutureExt, SinkExt as _, Stream, StreamExt,
     channel::mpsc::{Receiver, Sender, channel},
 };
-#[cfg(feature = "telemetry")]
-use hopr_transport_network::PeerPacketStats;
 use libp2p::PeerId;
 use tokio_util::{
     codec::{Decoder, Encoder, FramedRead, FramedWrite},
@@ -36,7 +34,6 @@ fn build_peer_stream_io<S, C>(
     cache: moka::future::Cache<PeerId, Sender<<C as Decoder>::Item>>,
     codec: C,
     ingress_from_peers: Sender<(PeerId, <C as Decoder>::Item)>,
-    #[cfg(feature = "telemetry")] packet_stats: Option<Arc<PeerPacketStats>>,
 ) -> Sender<<C as Decoder>::Item>
 where
     S: AsyncRead + AsyncWrite + Send + 'static,
@@ -53,17 +50,6 @@ where
 
     // Lower the backpressure boundary to make sure each message is flushed after writing to buffer
     frame_writer.set_backpressure_boundary(1);
-
-    #[cfg(feature = "telemetry")]
-    let frame_writer = {
-        let packet_stats_out = packet_stats.clone();
-        frame_writer.with(move |item: <C as Decoder>::Item| {
-            if let Some(stats) = &packet_stats_out {
-                stats.record_packet_out(item.as_ref().len());
-            }
-            futures::future::ok::<_, <C as Encoder<<C as Decoder>::Item>>::Error>(item)
-        })
-    };
 
     // Send all outgoing data to the peer
     hopr_async_runtime::prelude::spawn(
@@ -82,10 +68,6 @@ where
                 futures::future::ready(match v {
                     Ok(v) => {
                         tracing::trace!(%peer, "read message from peer stream");
-                        #[cfg(feature = "telemetry")]
-                        if let Some(stats) = &packet_stats {
-                            stats.record_packet_in(v.as_ref().len());
-                        }
                         Some((peer, v))
                     }
                     Err(error) => {
@@ -118,11 +100,6 @@ where
 pub async fn process_stream_protocol<C, V>(
     codec: C,
     control: V,
-    #[cfg(feature = "telemetry")] get_packet_stats: impl Fn(&PeerId) -> Option<Arc<PeerPacketStats>>
-    + Clone
-    + Send
-    + Sync
-    + 'static,
 ) -> crate::errors::Result<(
     Sender<(PeerId, <C as Decoder>::Item)>, // impl Sink<(PeerId, <C as Decoder>::Item)>,
     Receiver<(PeerId, <C as Decoder>::Item)>, // impl Stream<Item = (PeerId, <C as Decoder>::Item)>,
@@ -153,9 +130,6 @@ where
     let codec_ingress = codec.clone();
     let tx_in_ingress = tx_in.clone();
 
-    #[cfg(feature = "telemetry")]
-    let get_stats_ingress = get_packet_stats.clone();
-
     // terminated when the incoming is dropped
     let _ingress_process = hopr_async_runtime::prelude::spawn(
         incoming
@@ -165,15 +139,7 @@ where
                 let tx_in = tx_in_ingress.clone();
 
                 tracing::debug!(%peer, "received incoming peer-to-peer stream");
-                let send = build_peer_stream_io(
-                    peer,
-                    stream,
-                    cache.clone(),
-                    codec.clone(),
-                    tx_in.clone(),
-                    #[cfg(feature = "telemetry")]
-                    get_stats_ingress.clone()(&peer),
-                );
+                let send = build_peer_stream_io(peer, stream, cache.clone(), codec.clone(), tx_in.clone());
 
                 async move {
                     cache.insert(peer, send).await;
@@ -207,8 +173,6 @@ where
                 let control = control.clone();
                 let codec = codec.clone();
                 let tx_in = tx_in.clone();
-                #[cfg(feature = "telemetry")]
-                let packet_stats = get_packet_stats.clone()(&peer);
 
                 async move {
                     let cache_clone = cache.clone();
@@ -238,8 +202,6 @@ where
                                 cache_clone.clone(),
                                 codec.clone(),
                                 tx_in.clone(),
-                                #[cfg(feature = "telemetry")]
-                                packet_stats,
                             ))
                         })
                         .await;

@@ -1,5 +1,5 @@
 ---
-source: transport/network/src/observation.rs
+source: transport/api/src/stats.rs
 expression: snapshot
 ---
 packetsOut: 0
