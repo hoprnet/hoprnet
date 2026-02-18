@@ -69,8 +69,8 @@ fn close_session(session_id: SessionId, session_data: SessionSlot, reason: Closu
 
     #[cfg(feature = "telemetry")]
     {
-        session_data.stats.set_state(SessionLifecycleState::Closed);
-        session_data.stats.touch_activity();
+        session_data.telemetry.set_state(SessionLifecycleState::Closed);
+        session_data.telemetry.touch_activity();
     }
 
     if reason != ClosureReason::EmptyRead {
@@ -116,7 +116,7 @@ struct SessionSlot {
     routing_opts: DestinationRouting,
     abort_handles: Vec<AbortHandle>,
     #[cfg(feature = "telemetry")]
-    stats: Arc<SessionTelemetry>,
+    telemetry: Arc<SessionTelemetry>,
     // Allows reconfiguring of the SURB balancer on-the-fly
     // Set on both Entry and Exit sides.
     surb_mgmt: Option<SurbBalancerConfig>,
@@ -242,6 +242,7 @@ pub struct SessionManagerConfig {
     /// Default is 10 packets/second.
     #[default(10)]
     pub initial_return_session_egress_rate: usize,
+
     /// Minimum period of time for which a SURB buffer at the Exit must
     /// endure if no SURBs are being received.
     ///
@@ -254,6 +255,7 @@ pub struct SessionManagerConfig {
     /// Default is 5 seconds, minimum is 1 second.
     #[default(Duration::from_secs(5))]
     pub minimum_surb_buffer_duration: Duration,
+    
     /// Indicates the maximum number of SURBs in the SURB buffer to be requested when creating a new Session.
     ///
     /// This value is theoretically capped by the size of the global transport SURB ring buffer,
@@ -803,7 +805,7 @@ where
                             surb_mgmt: Some(balancer_config),
                             surb_estimator: None, // Outgoing sessions do not have SURB estimator
                             #[cfg(feature = "telemetry")]
-                            stats: metrics.clone(),
+                            telemetry: metrics.clone(),
                         },
                     )
                     .await?;
@@ -868,7 +870,7 @@ where
                             surb_mgmt: None,
                             surb_estimator: None,
                             #[cfg(feature = "telemetry")]
-                            stats: metrics.clone(),
+                            telemetry: metrics.clone(),
                         },
                     )
                     .await?;
@@ -1015,7 +1017,7 @@ where
     #[cfg(feature = "telemetry")]
     pub async fn get_session_stats(&self, id: &SessionId) -> crate::errors::Result<SessionStatsSnapshot> {
         match self.sessions.get(id).await {
-            Some(session) => Ok(session.stats.snapshot()),
+            Some(session) => Ok(session.telemetry.snapshot()),
             None => Err(SessionManagerError::NonExistingSession.into()),
         }
     }
@@ -1112,7 +1114,7 @@ where
                     surb_mgmt: None,
                     surb_estimator: None,
                     #[cfg(feature = "telemetry")]
-                    stats: SessionTelemetry::new(
+                    telemetry: SessionTelemetry::new(
                         _sid,
                         HoprSessionConfig {
                             capabilities: session_req.capabilities.0,
@@ -1135,7 +1137,7 @@ where
             debug!(%session_id, ?session_req, "assigned a new session");
 
             #[cfg(feature = "telemetry")]
-            let stats = _slot.stats;
+            let stats = _slot.telemetry;
 
             let closure_notifier = Box::new(move |session_id: SessionId, reason: ClosureReason| {
                 if let Err(error) = close_session_notifier.try_send((session_id, reason)) {
@@ -1229,7 +1231,7 @@ where
                             cached_session.surb_estimator = Some(surb_estimator.clone());
                             #[cfg(feature = "telemetry")]
                             {
-                                cached_session.stats = stats.clone();
+                                cached_session.telemetry = stats.clone();
                             }
                             futures::future::ready(moka::ops::compute::Op::Put(cached_session))
                         } else {
@@ -1841,7 +1843,7 @@ mod tests {
                     surb_mgmt: Some(balancer_cfg),
                     surb_estimator: None,
                     #[cfg(feature = "telemetry")]
-                    stats: Arc::new(SessionTelemetry::new(session_id, Default::default())),
+                    telemetry: Arc::new(SessionTelemetry::new(session_id, Default::default())),
                 },
             )
             .await;
@@ -1892,7 +1894,7 @@ mod tests {
                     routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
                     abort_handles: Vec::new(),
                     #[cfg(feature = "telemetry")]
-                    stats: Arc::new(SessionTelemetry::new(
+                    telemetry: Arc::new(SessionTelemetry::new(
                         SessionId::new(16u64, alice_pseudonym),
                         Default::default(),
                     )),
@@ -2015,7 +2017,7 @@ mod tests {
                     surb_mgmt: None,
                     surb_estimator: None,
                     #[cfg(feature = "telemetry")]
-                    stats: Arc::new(SessionTelemetry::new(
+                    telemetry: Arc::new(SessionTelemetry::new(
                         SessionId::new(16u64, alice_pseudonym),
                         Default::default(),
                     )),

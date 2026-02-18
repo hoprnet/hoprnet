@@ -19,18 +19,20 @@ use crate::{
 };
 
 /// The lifecycle state of a session from the perspective of metrics.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, strum::FromRepr, serde::Serialize)]
+#[repr(u8)]
 pub enum SessionLifecycleState {
     /// Session is active and running.
-    Active,
+    Active = 0,
     /// Session is in the process of closing (e.g. sending/receiving close frames).
-    Closing,
+    Closing = 1,
     /// Session has been fully closed.
-    Closed,
+    Closed = 2,
 }
 
 /// The acknowledgement mode configured for the session.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[repr(u8)]
 pub enum SessionAckMode {
     /// No acknowledgements.
     None,
@@ -42,26 +44,8 @@ pub enum SessionAckMode {
     Both,
 }
 
-impl SessionLifecycleState {
-    fn as_u8(self) -> u8 {
-        match self {
-            SessionLifecycleState::Active => 0,
-            SessionLifecycleState::Closing => 1,
-            SessionLifecycleState::Closed => 2,
-        }
-    }
-
-    fn from_u8(value: u8) -> SessionLifecycleState {
-        match value {
-            1 => SessionLifecycleState::Closing,
-            2 => SessionLifecycleState::Closed,
-            _ => SessionLifecycleState::Active,
-        }
-    }
-}
-
 /// Snapshot of session lifetime metrics.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub struct SessionLifetimeSnapshot {
     /// Time when the session was created.
     pub created_at: SystemTime,
@@ -78,7 +62,7 @@ pub struct SessionLifetimeSnapshot {
 }
 
 /// Snapshot of frame buffer metrics.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub struct FrameBufferSnapshot {
     /// Maximum Transmission Unit for frames.
     pub frame_mtu: usize,
@@ -97,7 +81,7 @@ pub struct FrameBufferSnapshot {
 }
 
 /// Snapshot of acknowledgement metrics.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub struct AckSnapshot {
     /// Configured acknowledgement mode.
     pub mode: SessionAckMode,
@@ -116,7 +100,7 @@ pub struct AckSnapshot {
 }
 
 /// Snapshot of SURB (Single Use Reply Block) metrics.
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
 pub struct SurbSnapshot {
     /// Total SURBs produced/minted.
     pub produced_total: u64,
@@ -133,7 +117,7 @@ pub struct SurbSnapshot {
 }
 
 /// Snapshot of transport-level data metrics.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub struct TransportSnapshot {
     /// Total bytes received.
     pub bytes_in: u64,
@@ -146,7 +130,7 @@ pub struct TransportSnapshot {
 }
 
 /// Complete snapshot of all session metrics at a point in time.
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
 pub struct SessionStatsSnapshot {
     /// The ID of the session.
     pub session_id: SessionId,
@@ -222,7 +206,7 @@ impl SessionTelemetry {
             session_id,
             created_at_us: AtomicU64::new(now),
             last_activity_us: AtomicU64::new(now),
-            state: AtomicU8::new(SessionLifecycleState::Active.as_u8()),
+            state: AtomicU8::new(SessionLifecycleState::Active as u8),
             ack_mode,
             frame_mtu: cfg.frame_mtu,
             frame_timeout: cfg.frame_timeout,
@@ -261,7 +245,7 @@ impl SessionTelemetry {
     /// This method atomically stores the new state, which affects the metrics snapshot
     /// and indicates the session's current phase (Active, Closing, or Closed).
     pub fn set_state(&self, state: SessionLifecycleState) {
-        self.state.store(state.as_u8(), Ordering::Relaxed);
+        self.state.store(state as u8, Ordering::Relaxed);
     }
 
     /// Records activity on the session by updating the last activity timestamp.
@@ -336,7 +320,7 @@ impl SessionTelemetry {
         let snapshot_at_us = now_us();
         let created_at_us = self.created_at_us.load(Ordering::Relaxed);
         let last_activity_us = self.last_activity_us.load(Ordering::Relaxed);
-        let state = SessionLifecycleState::from_u8(self.state.load(Ordering::Relaxed));
+        let state = SessionLifecycleState::from_repr(self.state.load(Ordering::Relaxed)).unwrap_or(SessionLifecycleState::Active);
         let uptime_us = snapshot_at_us.saturating_sub(created_at_us);
         let idle_us = snapshot_at_us.saturating_sub(last_activity_us);
 
