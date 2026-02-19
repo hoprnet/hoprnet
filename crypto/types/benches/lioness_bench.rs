@@ -1,6 +1,9 @@
 use cipher::Block;
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
-use hopr_crypto_types::{crypto_traits::KeyIvInit, lioness::LionessBlake3ChaCha20};
+use hopr_crypto_types::{
+    crypto_traits::{Iv, Key, KeyIvInit},
+    lioness::LionessBlake3ChaCha20,
+};
 use typenum::{U1024, Unsigned};
 
 // Avoid musl's default allocator due to degraded performance
@@ -24,8 +27,11 @@ pub fn lioness_bench(c: &mut Criterion) {
     group.throughput(Throughput::Bytes(BlockSize::USIZE as u64));
 
     group.bench_function("lioness_encrypt", |b| {
-        let (k, iv) =
-            hopr_crypto_types::lioness::LionessBlake3ChaCha20::<BlockSize>::generate_key_iv(hopr_crypto_random::rng());
+        let mut k = Key::<LionessBlake3ChaCha20<BlockSize>>::default();
+        let mut iv = Iv::<LionessBlake3ChaCha20<BlockSize>>::default();
+        hopr_crypto_random::random_fill(&mut k);
+        hopr_crypto_random::random_fill(&mut iv);
+
         let lioness = hopr_crypto_types::lioness::LionessBlake3ChaCha20::<BlockSize>::new(&k, &iv);
         let mut data = Block::<LionessBlake3ChaCha20<BlockSize>>::default();
         hopr_crypto_random::random_fill(&mut data);
@@ -35,8 +41,11 @@ pub fn lioness_bench(c: &mut Criterion) {
     });
 
     group.bench_function("lioness_decrypt", |b| {
-        let (k, iv) =
-            hopr_crypto_types::lioness::LionessBlake3ChaCha20::<BlockSize>::generate_key_iv(hopr_crypto_random::rng());
+        let mut k = Key::<LionessBlake3ChaCha20<BlockSize>>::default();
+        let mut iv = Iv::<LionessBlake3ChaCha20<BlockSize>>::default();
+        hopr_crypto_random::random_fill(&mut k);
+        hopr_crypto_random::random_fill(&mut iv);
+
         let lioness = hopr_crypto_types::lioness::LionessBlake3ChaCha20::<BlockSize>::new(&k, &iv);
         let mut data = Block::<LionessBlake3ChaCha20<BlockSize>>::default();
         hopr_crypto_random::random_fill(&mut data);

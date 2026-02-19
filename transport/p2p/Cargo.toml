@@ -11,10 +11,6 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-telemetry = [
-  "hopr-transport-network/telemetry",
-  "hopr-transport-protocol/telemetry",
-]
 prometheus = [
   "dep:lazy_static",
   "dep:hopr-metrics",

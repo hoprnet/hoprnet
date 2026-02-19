@@ -162,7 +162,10 @@ where
                     .surb_store
                     .find_surb(matcher)
                     .await
-                    .ok_or(HoprTransportError::Api("no surb".into()))?;
+                    .ok_or(HoprTransportError::Api(format!(
+                        "no surb for pseudonym {}",
+                        matcher.pseudonym()
+                    )))?;
                 Ok((ResolvedTransportRouting::Return(sender_id, surb), Some(remaining)))
             }
         }

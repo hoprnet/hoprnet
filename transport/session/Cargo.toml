@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-session"
-version = "0.16.0"
+version = "0.16.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Session functionality providing session abstraction over the HOPR transport"

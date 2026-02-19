@@ -38,22 +38,17 @@ type EventsChannel = (
 
 const MIN_CONNECTION_TIMEOUT: Duration = Duration::from_millis(100);
 const MIN_TX_CONFIRM_TIMEOUT: Duration = Duration::from_secs(1);
-
+const TX_TIMEOUT_MULTIPLIER: u32 = 2;
 const DEFAULT_SYNC_TOLERANCE_PCT: usize = 90;
 
 /// Configuration of the [`HoprBlockchainConnector`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, smart_default::SmartDefault)]
 pub struct BlockchainConnectorConfig {
-    /// Default time to wait until a transaction is confirmed.
-    ///
-    /// Default is 90 seconds, minimum is 1 second.
-    #[default(Duration::from_secs(90))]
-    pub tx_confirm_timeout: Duration,
-    /// Time to wait for [connection](HoprBlockchainConnector::connect) to complete.
+    /// Maximum time to wait for [connection](HoprBlockchainConnector::connect) to complete.
     ///
     /// Default is 30 seconds, minimum is 100 milliseconds.
     #[default(Duration::from_secs(30))]
-    pub connection_timeout: Duration,
+    pub connection_sync_timeout: Duration,
     /// Percentage of the total number of accounts and opened channels that must
     /// be received during a [connection attempt](HoprBlockchainConnector::connect)
     /// to be successful.
@@ -511,7 +506,7 @@ where
         }
 
         let abort_handle = self
-            .do_connect(self.cfg.connection_timeout.max(MIN_CONNECTION_TIMEOUT))
+            .do_connect(self.cfg.connection_sync_timeout.max(MIN_CONNECTION_TIMEOUT))
             .await?;
 
         self.connection_handle = Some(abort_handle);
@@ -533,7 +528,7 @@ where
 
 impl<B, C, P> HoprBlockchainConnector<C, B, P, P::TxRequest>
 where
-    C: BlokliTransactionClient + Send + Sync + 'static,
+    C: BlokliTransactionClient + BlokliQueryClient + Send + Sync + 'static,
     P: PayloadGenerator + Send + Sync,
     P::TxRequest: Send + Sync,
 {
@@ -541,9 +536,11 @@ where
         &'a self,
         tx_req: P::TxRequest,
     ) -> Result<impl Future<Output = Result<ChainReceipt, ConnectorError>> + Send + 'a, ConnectorError> {
+        let chain_info = self.query_cached_chain_info().await?;
+        let tx_timeout = TX_TIMEOUT_MULTIPLIER * chain_info.finality * chain_info.expected_block_time;
         Ok(self
             .sequencer
-            .enqueue_transaction(tx_req, self.cfg.tx_confirm_timeout.max(MIN_TX_CONFIRM_TIMEOUT))
+            .enqueue_transaction(tx_req, tx_timeout.max(MIN_TX_CONFIRM_TIMEOUT))
             .await?
             .and_then(|tx| {
                 futures::future::ready(

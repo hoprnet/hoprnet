@@ -1,7 +1,7 @@
 use std::{collections::HashSet, net::SocketAddr, time::Duration};
 
 use hopr_lib::{
-    HoprProtocolConfig, SafeModule, WinningProbability,
+    HoprBalance, HoprProtocolConfig, SafeModule, WinningProbability,
     config::{
         HoprLibConfig, HoprPacketPipelineConfig, HostConfig, HostType, ProbeConfig, SessionGlobalConfig,
         TransportConfig,
@@ -160,6 +160,12 @@ pub struct UserHoprNetworkConfig {
     #[default(default_outgoing_ticket_winning_prob())]
     #[serde(default = "default_outgoing_ticket_winning_prob")]
     pub outgoing_ticket_winning_prob: Option<f64>,
+    /// Minimum incoming ticket price.
+    ///
+    /// The value cannot be lower than the minimum network ticket price multiplied by the node's path position,
+    /// and will default to that value whenever it is lower.
+    #[serde(default)]
+    pub min_incoming_ticket_price: Option<HoprBalance>,
 }
 
 /// Subset of the [`HoprLibConfig`] that is tuned to be user-facing and more user-friendly.
@@ -209,6 +215,7 @@ impl From<UserHoprLibConfig> for HoprLibConfig {
                             .network
                             .outgoing_ticket_winning_prob
                             .and_then(|v| WinningProbability::try_from_f64(v).ok()),
+                        min_incoming_ticket_price: value.network.min_incoming_ticket_price,
                         ..Default::default()
                     },
                     ..Default::default()
@@ -417,7 +424,7 @@ mod tests {
     fn test_config_should_be_serializable_into_string() -> anyhow::Result<()> {
         let cfg = example_cfg()?;
 
-        let from_yaml: HoprdConfig = serde_yaml::from_str(include_str!("../example_cfg.yaml"))?;
+        let from_yaml: HoprdConfig = serde_saphyr::from_str(include_str!("../example_cfg.yaml"))?;
         assert_eq!(cfg, from_yaml);
 
         Ok(())
@@ -429,12 +436,12 @@ mod tests {
         let mut prepared_config_file = config_file.reopen()?;
 
         let cfg = example_cfg()?;
-        let yaml = serde_yaml::to_string(&cfg)?;
+        let yaml = serde_saphyr::to_string(&cfg)?;
         config_file.write_all(yaml.as_bytes())?;
 
         let mut buf = String::new();
         prepared_config_file.read_to_string(&mut buf)?;
-        let deserialized_cfg: HoprdConfig = serde_yaml::from_str(&buf)?;
+        let deserialized_cfg: HoprdConfig = serde_saphyr::from_str(&buf)?;
 
         assert_eq!(deserialized_cfg, cfg);
 
@@ -454,7 +461,7 @@ mod tests {
         let mut cfg = example_cfg()?;
         cfg.blokli_url = Some(pwnd.to_owned());
 
-        let yaml = serde_yaml::to_string(&cfg)?;
+        let yaml = serde_saphyr::to_string(&cfg)?;
         config_file.write_all(yaml.as_bytes())?;
         let cfg_file_path = config_file
             .path()
