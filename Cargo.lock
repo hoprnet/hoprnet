@@ -4875,6 +4875,7 @@ dependencies = [
  "futures",
  "hopr-metrics",
  "lazy_static",
+ "libc",
  "rayon",
  "serial_test",
  "thiserror 2.0.18",
