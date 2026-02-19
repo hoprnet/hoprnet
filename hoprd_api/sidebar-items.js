@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["HOPR_TCP_BUFFER_SIZE","HOPR_UDP_BUFFER_SIZE","HOPR_UDP_QUEUE_SIZE"],"fn":["serve_api"],"mod":["config"],"struct":["ApiDoc","RestApiParameters","SecurityAddon"],"type":["MessageEncoder"]};

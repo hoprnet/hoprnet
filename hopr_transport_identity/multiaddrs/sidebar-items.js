@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["Protocol"],"fn":["is_dns","is_private","is_supported","replace_transport_with_unspecified","resolve_dns_if_any","strip_p2p_protocol"],"struct":["Multiaddr"]};

@@ -1,0 +1,85 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Implements traits for types that wrap a database value type."><title>DeriveValueType in migration::sea_orm - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-b7b9f40b.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="migration" data-themes="" data-resource-suffix="" data-rustdoc-version="1.95.0-nightly (7057231bd 2026-02-11)" data-channel="nightly" data-search-js="search-fb33671b.js" data-stringdex-js="stringdex-b897f86f.js" data-settings-js="settings-170eb4bf.js" ><script src="../../static.files/storage-f9617a14.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../static.files/main-12f88f4f.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc derive"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">DeriveValueType</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../migration/index.html">migration</a><span class="version">0.5.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Derive<wbr>Value<wbr>Type</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#usage" title="Usage">Usage</a></li><li><a href="#example" title="Example">Example</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="index.html">In migration::<wbr>sea_<wbr>orm</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../index.html">migration</a>::<wbr><a href="index.html">sea_orm</a></div><h1>Derive Macro <span class="derive">Derive<wbr>Value<wbr>Type</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"></span></div><pre class="rust item-decl"><code>#[derive(DeriveValueType)]
+{
+    <span class="comment">// Attributes available to this derive:</span>
+    #[sea_orm]
+}
+</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Implements traits for types that wrap a database value type.</p>
+<p>This procedure macro implements <code>From&lt;T&gt; for Value</code>, <code>sea_orm::TryGetTable</code>, and
+<code>sea_query::ValueType</code> for the wrapper type <code>T</code>.</p>
+<p>The wrapped type must be <code>sea_orm::Value</code> compatible.</p>
+<h3 id="usage"><a class="doc-anchor" href="#usage">§</a>Usage</h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::DeriveValueType;
+
+<span class="attr">#[derive(DeriveValueType)]
+</span><span class="kw">struct </span>MyString(String);
+
+<span class="attr">#[derive(DeriveValueType)]
+</span><span class="kw">struct </span>MyNumber(i32);</code></pre></div>
+<p>It’s also possible to derive value type for enum-strings.
+Basically the underlying type is String, and the custom must implement methods <code>to_str</code> and <code>from_str</code>.</p>
+<h3 id="example"><a class="doc-anchor" href="#example">§</a>Example</h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::{sea_query::ValueTypeErr, DeriveValueType};
+
+<span class="attr">#[derive(DeriveValueType)]
+#[sea_orm(value_type = <span class="string">"String"</span>)]
+</span><span class="kw">pub enum </span>Tag {
+    Hard,
+    Soft,
+}
+
+<span class="kw">impl </span>std::fmt::Display <span class="kw">for </span>Tag {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">'_</span>&gt;) -&gt; std::fmt::Result {
+        <span class="macro">write!</span>(
+            f,
+            <span class="string">"{}"</span>,
+            <span class="kw">match </span><span class="self">self </span>{
+                <span class="self">Self</span>::Hard =&gt; <span class="string">"hard"</span>,
+                <span class="self">Self</span>::Soft =&gt; <span class="string">"soft"</span>,
+            }
+        )
+    }
+}
+
+<span class="kw">impl </span>std::str::FromStr <span class="kw">for </span>Tag {
+    <span class="kw">type </span><span class="prelude-val">Err </span>= ValueTypeErr;
+
+    <span class="kw">fn </span>from_str(s: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Err&gt; {
+        <span class="prelude-val">Ok</span>(<span class="kw">match </span>s {
+            <span class="string">"hard" </span>=&gt; <span class="self">Self</span>::Hard,
+            <span class="string">"soft" </span>=&gt; <span class="self">Self</span>::Soft,
+            <span class="kw">_ </span>=&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(ValueTypeErr),
+        })
+    }
+}</code></pre></div>
+<p><code>from_str</code> defaults to <code>std::str::FromStr::from_str</code>. <code>to_str</code> defaults to <code>std::string::ToString::to_string</code>.
+They can be overridden with custom functions.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::{sea_query::ValueTypeErr, DeriveValueType};
+
+<span class="attr">#[derive(DeriveValueType)]
+#[sea_orm(
+    value_type = <span class="string">"String"</span>,
+    from_str = <span class="string">"Tag::from_str"</span>,
+    to_str = <span class="string">"Tag::to_str"
+</span>)]
+</span><span class="kw">pub enum </span>Tag {
+    Color,
+    Grey,
+}
+
+<span class="kw">impl </span>Tag {
+    <span class="kw">fn </span>to_str(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str {
+        <span class="kw">match </span><span class="self">self </span>{
+            <span class="self">Self</span>::Color =&gt; <span class="string">"color"</span>,
+            <span class="self">Self</span>::Grey =&gt; <span class="string">"grey"</span>,
+        }
+    }
+
+    <span class="kw">fn </span>from_str(s: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, ValueTypeErr&gt; {
+        <span class="prelude-val">Ok</span>(<span class="kw">match </span>s {
+            <span class="string">"color" </span>=&gt; <span class="self">Self</span>::Color,
+            <span class="string">"grey" </span>=&gt; <span class="self">Self</span>::Grey,
+            <span class="kw">_ </span>=&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(ValueTypeErr),
+        })
+    }
+}</code></pre></div></div></details></section></div></main></body></html>

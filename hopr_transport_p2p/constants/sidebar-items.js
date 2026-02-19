@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["HOPR_SWARM_IDLE_CONNECTION_TIMEOUT"]};

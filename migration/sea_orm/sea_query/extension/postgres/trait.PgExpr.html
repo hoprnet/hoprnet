@@ -1,0 +1,127 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Postgres-specific operator methods for building expressions."><title>PgExpr in migration::sea_orm::sea_query::extension::postgres - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../../static.files/rustdoc-b7b9f40b.css"><meta name="rustdoc-vars" data-root-path="../../../../../" data-static-root-path="../../../../../static.files/" data-current-crate="migration" data-themes="" data-resource-suffix="" data-rustdoc-version="1.95.0-nightly (7057231bd 2026-02-11)" data-channel="nightly" data-search-js="search-fb33671b.js" data-stringdex-js="stringdex-b897f86f.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../../static.files/storage-f9617a14.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../../../../static.files/main-12f88f4f.js"></script><noscript><link rel="stylesheet" href="../../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc trait"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">PgExpr</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../../../migration/index.html">migration</a><span class="version">0.5.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">PgExpr</a></h2><h3><a href="#provided-methods">Provided Methods</a></h3><ul class="block"><li><a href="#method.cast_json_field" title="cast_json_field">cast_json_field</a></li><li><a href="#method.concat" title="concat">concat</a></li><li><a href="#method.concatenate" title="concatenate">concatenate</a></li><li><a href="#method.contained" title="contained">contained</a></li><li><a href="#method.contains" title="contains">contains</a></li><li><a href="#method.get_json_field" title="get_json_field">get_json_field</a></li><li><a href="#method.ilike" title="ilike">ilike</a></li><li><a href="#method.matches" title="matches">matches</a></li><li><a href="#method.not_ilike" title="not_ilike">not_ilike</a></li></ul><h3><a href="#dyn-compatibility">Dyn Compatibility</a></h3><h3><a href="#implementors">Implementors</a></h3></section><div id="rustdoc-modnav"><h2><a href="index.html">In migration::<wbr>sea_<wbr>orm::<wbr>sea_<wbr>query::<wbr>extension::<wbr>postgres</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../../../index.html">migration</a>::<wbr><a href="../../../index.html">sea_orm</a>::<wbr><a href="../../index.html">sea_query</a>::<wbr><a href="../index.html">extension</a>::<wbr><a href="index.html">postgres</a></div><h1>Trait <span class="trait">PgExpr</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"></span></div><pre class="rust item-decl"><code>pub trait PgExpr: <a class="trait" href="../../../../trait.ExprTrait.html" title="trait migration::ExprTrait">ExprTrait</a> {
+    // Provided methods
+    fn <a href="#method.concatenate" class="fn">concatenate</a>&lt;T&gt;(self, right: T) -&gt; <a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>
+       <span class="where">where T: <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;<a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>&gt;</span> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.concat" class="fn">concat</a>&lt;T&gt;(self, right: T) -&gt; <a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>
+       <span class="where">where T: <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;<a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>&gt;</span> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.matches" class="fn">matches</a>&lt;T&gt;(self, expr: T) -&gt; <a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>
+       <span class="where">where T: <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;<a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>&gt;</span> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.contains" class="fn">contains</a>&lt;T&gt;(self, expr: T) -&gt; <a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>
+       <span class="where">where T: <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;<a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>&gt;</span> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.contained" class="fn">contained</a>&lt;T&gt;(self, expr: T) -&gt; <a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>
+       <span class="where">where T: <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;<a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>&gt;</span> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.ilike" class="fn">ilike</a>&lt;L&gt;(self, like: L) -&gt; <a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>
+       <span class="where">where L: <a class="trait" href="../../../../trait.IntoLikeExpr.html" title="trait migration::IntoLikeExpr">IntoLikeExpr</a></span> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.not_ilike" class="fn">not_ilike</a>&lt;L&gt;(self, like: L) -&gt; <a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>
+       <span class="where">where L: <a class="trait" href="../../../../trait.IntoLikeExpr.html" title="trait migration::IntoLikeExpr">IntoLikeExpr</a></span> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.get_json_field" class="fn">get_json_field</a>&lt;T&gt;(self, right: T) -&gt; <a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>
+       <span class="where">where T: <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;<a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>&gt;</span> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.cast_json_field" class="fn">cast_json_field</a>&lt;T&gt;(self, right: T) -&gt; <a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>
+       <span class="where">where T: <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;<a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>&gt;</span> { ... }
+}</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Postgres-specific operator methods for building expressions.</p>
+</div></details><h2 id="provided-methods" class="section-header">Provided Methods<a href="#provided-methods" class="anchor">§</a></h2><div class="methods"><details class="toggle method-toggle" open><summary><section id="method.concatenate" class="method"><h4 class="code-header">fn <a href="#method.concatenate" class="fn">concatenate</a>&lt;T&gt;(self, right: T) -&gt; <a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a><div class="where">where
+    T: <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;<a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>&gt;,</div></h4></section></summary><div class="docblock"><p>Express an postgres concatenate (<code>||</code>) expression.</p>
+<h5 id="examples"><a class="doc-anchor" href="#examples">§</a>Examples</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_query::{extension::postgres::PgExpr, tests_cfg::<span class="kw-2">*</span>, <span class="kw-2">*</span>};
+
+<span class="kw">let </span>query = Query::select()
+    .columns([Font::Name, Font::Variant, Font::Language])
+    .from(Font::Table)
+    .and_where(Expr::val(<span class="string">"a"</span>).concatenate(<span class="string">"b"</span>).concat(<span class="string">"c"</span>).concat(<span class="string">"d"</span>))
+    .to_owned();
+
+<span class="macro">assert_eq!</span>(
+    query.to_string(PostgresQueryBuilder),
+    <span class="string">r#"SELECT "name", "variant", "language" FROM "font" WHERE 'a' || 'b' || 'c' || 'd'"#
+</span>);</code></pre></div></div></details><details class="toggle method-toggle" open><summary><section id="method.concat" class="method"><h4 class="code-header">fn <a href="#method.concat" class="fn">concat</a>&lt;T&gt;(self, right: T) -&gt; <a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a><div class="where">where
+    T: <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;<a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>&gt;,</div></h4></section></summary><div class="docblock"><p>Alias of <a href="trait.PgExpr.html#method.concatenate" title="method migration::sea_orm::sea_query::extension::postgres::PgExpr::concatenate"><code>PgExpr::concatenate</code></a></p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.matches" class="method"><h4 class="code-header">fn <a href="#method.matches" class="fn">matches</a>&lt;T&gt;(self, expr: T) -&gt; <a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a><div class="where">where
+    T: <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;<a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>&gt;,</div></h4></section></summary><div class="docblock"><p>Express an postgres fulltext search matches (<code>@@</code>) expression.</p>
+<h5 id="examples-1"><a class="doc-anchor" href="#examples-1">§</a>Examples</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_query::{<span class="kw-2">*</span>, tests_cfg::<span class="kw-2">*</span>, extension::postgres::PgExpr};
+
+<span class="kw">let </span>query = Query::select()
+    .columns([Font::Name, Font::Variant, Font::Language])
+    .from(Font::Table)
+    .and_where(Expr::val(<span class="string">"a &amp; b"</span>).matches(<span class="string">"a b"</span>))
+    .and_where(Expr::col(Font::Name).matches(<span class="string">"a b"</span>))
+    .to_owned();
+
+<span class="macro">assert_eq!</span>(
+    query.to_string(PostgresQueryBuilder),
+    <span class="string">r#"SELECT "name", "variant", "language" FROM "font" WHERE 'a &amp; b' @@ 'a b' AND "name" @@ 'a b'"#
+</span>);</code></pre></div></div></details><details class="toggle method-toggle" open><summary><section id="method.contains" class="method"><h4 class="code-header">fn <a href="#method.contains" class="fn">contains</a>&lt;T&gt;(self, expr: T) -&gt; <a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a><div class="where">where
+    T: <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;<a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>&gt;,</div></h4></section></summary><div class="docblock"><p>Express an postgres fulltext search contains (<code>@&gt;</code>) expression.</p>
+<h5 id="examples-2"><a class="doc-anchor" href="#examples-2">§</a>Examples</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_query::{<span class="kw-2">*</span>, tests_cfg::<span class="kw-2">*</span>, extension::postgres::PgExpr};
+
+<span class="kw">let </span>query = Query::select()
+    .columns([Font::Name, Font::Variant, Font::Language])
+    .from(Font::Table)
+    .and_where(Expr::val(<span class="string">"a &amp; b"</span>).contains(<span class="string">"a b"</span>))
+    .and_where(Expr::col(Font::Name).contains(<span class="string">"a b"</span>))
+    .to_owned();
+
+<span class="macro">assert_eq!</span>(
+    query.to_string(PostgresQueryBuilder),
+    <span class="string">r#"SELECT "name", "variant", "language" FROM "font" WHERE 'a &amp; b' @&gt; 'a b' AND "name" @&gt; 'a b'"#
+</span>);</code></pre></div></div></details><details class="toggle method-toggle" open><summary><section id="method.contained" class="method"><h4 class="code-header">fn <a href="#method.contained" class="fn">contained</a>&lt;T&gt;(self, expr: T) -&gt; <a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a><div class="where">where
+    T: <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;<a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>&gt;,</div></h4></section></summary><div class="docblock"><p>Express an postgres fulltext search contained (<code>&lt;@</code>) expression.</p>
+<h5 id="examples-3"><a class="doc-anchor" href="#examples-3">§</a>Examples</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_query::{<span class="kw-2">*</span>, tests_cfg::<span class="kw-2">*</span>, extension::postgres::PgExpr};
+
+<span class="kw">let </span>query = Query::select()
+    .columns([Font::Name, Font::Variant, Font::Language])
+    .from(Font::Table)
+    .and_where(Expr::val(<span class="string">"a &amp; b"</span>).contained(<span class="string">"a b"</span>))
+    .and_where(Expr::col(Font::Name).contained(<span class="string">"a b"</span>))
+    .to_owned();
+
+<span class="macro">assert_eq!</span>(
+    query.to_string(PostgresQueryBuilder),
+    <span class="string">r#"SELECT "name", "variant", "language" FROM "font" WHERE 'a &amp; b' &lt;@ 'a b' AND "name" &lt;@ 'a b'"#
+</span>);</code></pre></div></div></details><details class="toggle method-toggle" open><summary><section id="method.ilike" class="method"><h4 class="code-header">fn <a href="#method.ilike" class="fn">ilike</a>&lt;L&gt;(self, like: L) -&gt; <a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a><div class="where">where
+    L: <a class="trait" href="../../../../trait.IntoLikeExpr.html" title="trait migration::IntoLikeExpr">IntoLikeExpr</a>,</div></h4></section></summary><div class="docblock"><p>Express a <code>ILIKE</code> expression.</p>
+<h5 id="examples-4"><a class="doc-anchor" href="#examples-4">§</a>Examples</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_query::{<span class="kw-2">*</span>, tests_cfg::<span class="kw-2">*</span>, extension::postgres::PgExpr};
+
+<span class="kw">let </span>query = Query::select()
+    .columns([Char::Character, Char::SizeW, Char::SizeH])
+    .from(Char::Table)
+    .and_where(Expr::col((Char::Table, Char::Character)).ilike(<span class="string">"Ours'%"</span>))
+    .to_owned();
+
+<span class="macro">assert_eq!</span>(
+    query.to_string(PostgresQueryBuilder),
+    <span class="string">r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "character"."character" ILIKE E'Ours\'%'"#
+</span>);</code></pre></div></div></details><details class="toggle method-toggle" open><summary><section id="method.not_ilike" class="method"><h4 class="code-header">fn <a href="#method.not_ilike" class="fn">not_ilike</a>&lt;L&gt;(self, like: L) -&gt; <a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a><div class="where">where
+    L: <a class="trait" href="../../../../trait.IntoLikeExpr.html" title="trait migration::IntoLikeExpr">IntoLikeExpr</a>,</div></h4></section></summary><div class="docblock"><p>Express a <code>NOT ILIKE</code> expression</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.get_json_field" class="method"><h4 class="code-header">fn <a href="#method.get_json_field" class="fn">get_json_field</a>&lt;T&gt;(self, right: T) -&gt; <a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a><div class="where">where
+    T: <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;<a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>&gt;,</div></h4></section></summary><div class="docblock"><p>Express a postgres retrieves JSON field as JSON value (<code>-&gt;</code>).</p>
+<h5 id="examples-5"><a class="doc-anchor" href="#examples-5">§</a>Examples</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_query::{extension::postgres::PgExpr, tests_cfg::<span class="kw-2">*</span>, <span class="kw-2">*</span>};
+
+<span class="kw">let </span>query = Query::select()
+    .column(Font::Variant)
+    .from(Font::Table)
+    .and_where(Expr::col(Font::Variant).get_json_field(<span class="string">"a"</span>))
+    .to_owned();
+
+<span class="macro">assert_eq!</span>(
+    query.to_string(PostgresQueryBuilder),
+    <span class="string">r#"SELECT "variant" FROM "font" WHERE "variant" -&gt; 'a'"#
+</span>);</code></pre></div></div></details><details class="toggle method-toggle" open><summary><section id="method.cast_json_field" class="method"><h4 class="code-header">fn <a href="#method.cast_json_field" class="fn">cast_json_field</a>&lt;T&gt;(self, right: T) -&gt; <a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a><div class="where">where
+    T: <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;<a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>&gt;,</div></h4></section></summary><div class="docblock"><p>Express a postgres retrieves JSON field and casts it to an appropriate SQL type (<code>-&gt;&gt;</code>).</p>
+<h5 id="examples-6"><a class="doc-anchor" href="#examples-6">§</a>Examples</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_query::{extension::postgres::PgExpr, tests_cfg::<span class="kw-2">*</span>, <span class="kw-2">*</span>};
+
+<span class="kw">let </span>query = Query::select()
+    .column(Font::Variant)
+    .from(Font::Table)
+    .and_where(Expr::col(Font::Variant).cast_json_field(<span class="string">"a"</span>))
+    .to_owned();
+
+<span class="macro">assert_eq!</span>(
+    query.to_string(PostgresQueryBuilder),
+    <span class="string">r#"SELECT "variant" FROM "font" WHERE "variant" -&gt;&gt; 'a'"#
+</span>);</code></pre></div></div></details></div><h2 id="dyn-compatibility" class="section-header">Dyn Compatibility<a href="#dyn-compatibility" class="anchor">§</a></h2><div class="dyn-compatibility-info"><p>This trait is <b>not</b> <a href="https://doc.rust-lang.org/nightly/reference/items/traits.html#dyn-compatibility">dyn compatible</a>.</p><p><i>In older versions of Rust, dyn compatibility was called "object safety", so this trait is not object safe.</i></p></div><h2 id="implementors" class="section-header">Implementors<a href="#implementors" class="anchor">§</a></h2><div id="implementors-list"><div class="negative-marker"></div><section id="impl-PgExpr-for-ColumnRef" class="impl"><a href="#impl-PgExpr-for-ColumnRef" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="trait.PgExpr.html" title="trait migration::sea_orm::sea_query::extension::postgres::PgExpr">PgExpr</a> for <a class="enum" href="../../../../enum.ColumnRef.html" title="enum migration::ColumnRef">ColumnRef</a></h3></section><section id="impl-PgExpr-for-Keyword" class="impl"><a href="#impl-PgExpr-for-Keyword" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="trait.PgExpr.html" title="trait migration::sea_orm::sea_query::extension::postgres::PgExpr">PgExpr</a> for <a class="enum" href="../../../../enum.Keyword.html" title="enum migration::Keyword">Keyword</a></h3></section><section id="impl-PgExpr-for-SimpleExpr" class="impl"><a href="#impl-PgExpr-for-SimpleExpr" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="trait.PgExpr.html" title="trait migration::sea_orm::sea_query::extension::postgres::PgExpr">PgExpr</a> for <a class="enum" href="../../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a></h3></section><section id="impl-PgExpr-for-Value" class="impl"><a href="#impl-PgExpr-for-Value" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="trait.PgExpr.html" title="trait migration::sea_orm::sea_query::extension::postgres::PgExpr">PgExpr</a> for <a class="enum" href="../../../../enum.Value.html" title="enum migration::Value">Value</a></h3></section><section id="impl-PgExpr-for-Expr" class="impl"><a href="#impl-PgExpr-for-Expr" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="trait.PgExpr.html" title="trait migration::sea_orm::sea_query::extension::postgres::PgExpr">PgExpr</a> for <a class="struct" href="../../../../struct.Expr.html" title="struct migration::Expr">Expr</a></h3></section><section id="impl-PgExpr-for-FunctionCall" class="impl"><a href="#impl-PgExpr-for-FunctionCall" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="trait.PgExpr.html" title="trait migration::sea_orm::sea_query::extension::postgres::PgExpr">PgExpr</a> for <a class="struct" href="../../../../struct.FunctionCall.html" title="struct migration::FunctionCall">FunctionCall</a></h3></section><section id="impl-PgExpr-for-LikeExpr" class="impl"><a href="#impl-PgExpr-for-LikeExpr" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="trait.PgExpr.html" title="trait migration::sea_orm::sea_query::extension::postgres::PgExpr">PgExpr</a> for <a class="struct" href="../../../../struct.LikeExpr.html" title="struct migration::LikeExpr">LikeExpr</a></h3></section></div><script src="../../../../../trait.impl/sea_query/extension/postgres/expr/trait.PgExpr.js" data-ignore-extern-crates="sea_query" async></script></section></div></main></body></html>

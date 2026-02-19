@@ -1,0 +1,497 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="An abstract base class for defining Entities."><title>EntityTrait in migration::sea_orm::entity::prelude - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-b7b9f40b.css"><meta name="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="migration" data-themes="" data-resource-suffix="" data-rustdoc-version="1.95.0-nightly (7057231bd 2026-02-11)" data-channel="nightly" data-search-js="search-fb33671b.js" data-stringdex-js="stringdex-b897f86f.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../static.files/storage-f9617a14.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../../../static.files/main-12f88f4f.js"></script><noscript><link rel="stylesheet" href="../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc trait"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">EntityTrait</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../../migration/index.html">migration</a><span class="version">0.5.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Entity<wbr>Trait</a></h2><h3><a href="#required-associated-types">Required Associated Types</a></h3><ul class="block"><li><a href="#associatedtype.ActiveModel" title="ActiveModel">ActiveModel</a></li><li><a href="#associatedtype.Column" title="Column">Column</a></li><li><a href="#associatedtype.Model" title="Model">Model</a></li><li><a href="#associatedtype.PrimaryKey" title="PrimaryKey">PrimaryKey</a></li><li><a href="#associatedtype.Relation" title="Relation">Relation</a></li></ul><h3><a href="#provided-methods">Provided Methods</a></h3><ul class="block"><li><a href="#method.belongs_to" title="belongs_to">belongs_to</a></li><li><a href="#method.delete" title="delete">delete</a></li><li><a href="#method.delete_by_id" title="delete_by_id">delete_by_id</a></li><li><a href="#method.delete_many" title="delete_many">delete_many</a></li><li><a href="#method.find" title="find">find</a></li><li><a href="#method.find_by_id" title="find_by_id">find_by_id</a></li><li><a href="#method.has_many" title="has_many">has_many</a></li><li><a href="#method.has_one" title="has_one">has_one</a></li><li><a href="#method.insert" title="insert">insert</a></li><li><a href="#method.insert_many" title="insert_many">insert_many</a></li><li><a href="#method.update" title="update">update</a></li><li><a href="#method.update_many" title="update_many">update_many</a></li></ul><h3><a href="#foreign-impls">Implementations on Foreign Types</a></h3><ul class="block"><li><a href="#impl-EntityTrait-for-Entity" title="Entity">Entity</a></li></ul><h3><a href="#dyn-compatibility">Dyn Compatibility</a></h3><h3><a href="#implementors">Implementors</a></h3></section><div id="rustdoc-modnav"><h2><a href="index.html">In migration::<wbr>sea_<wbr>orm::<wbr>entity::<wbr>prelude</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../../index.html">migration</a>::<wbr><a href="../../index.html">sea_orm</a>::<wbr><a href="../index.html">entity</a>::<wbr><a href="index.html">prelude</a></div><h1>Trait <span class="trait">Entity<wbr>Trait</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"></span></div><pre class="rust item-decl"><code>pub trait EntityTrait: <a class="trait" href="../../trait.EntityName.html" title="trait migration::sea_orm::EntityName">EntityName</a> {
+    type <a href="#associatedtype.Model" class="associatedtype">Model</a>: <a class="trait" href="../../trait.ModelTrait.html" title="trait migration::sea_orm::ModelTrait">ModelTrait</a>&lt;Entity = Self&gt; + <a class="trait" href="../../trait.FromQueryResult.html" title="trait migration::sea_orm::FromQueryResult">FromQueryResult</a>;
+    type <a href="#associatedtype.ActiveModel" class="associatedtype">ActiveModel</a>: <a class="trait" href="../../trait.ActiveModelBehavior.html" title="trait migration::sea_orm::ActiveModelBehavior">ActiveModelBehavior</a>&lt;Entity = Self&gt;;
+    type <a href="#associatedtype.Column" class="associatedtype">Column</a>: <a class="trait" href="../../trait.ColumnTrait.html" title="trait migration::sea_orm::ColumnTrait">ColumnTrait</a>;
+    type <a href="#associatedtype.Relation" class="associatedtype">Relation</a>: <a class="trait" href="../../trait.RelationTrait.html" title="trait migration::sea_orm::RelationTrait">RelationTrait</a>;
+    type <a href="#associatedtype.PrimaryKey" class="associatedtype">PrimaryKey</a>: <a class="trait" href="../../trait.PrimaryKeyTrait.html" title="trait migration::sea_orm::PrimaryKeyTrait">PrimaryKeyTrait</a> + <a class="trait" href="../../trait.PrimaryKeyToColumn.html" title="trait migration::sea_orm::PrimaryKeyToColumn">PrimaryKeyToColumn</a>&lt;Column = Self::<a class="associatedtype" href="../../trait.EntityTrait.html#associatedtype.Column" title="type migration::sea_orm::EntityTrait::Column">Column</a>&gt;;
+
+    // Provided methods
+    fn <a href="#method.belongs_to" class="fn">belongs_to</a>&lt;R&gt;(related: R) -&gt; <a class="struct" href="../../struct.RelationBuilder.html" title="struct migration::sea_orm::RelationBuilder">RelationBuilder</a>&lt;Self, R&gt;
+       <span class="where">where R: <a class="trait" href="../../trait.EntityTrait.html" title="trait migration::sea_orm::EntityTrait">EntityTrait</a></span> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.has_one" class="fn">has_one</a>&lt;R&gt;(_: R) -&gt; <a class="struct" href="../../struct.RelationBuilder.html" title="struct migration::sea_orm::RelationBuilder">RelationBuilder</a>&lt;Self, R&gt;
+       <span class="where">where R: <a class="trait" href="../../trait.EntityTrait.html" title="trait migration::sea_orm::EntityTrait">EntityTrait</a> + <a class="trait" href="../../trait.Related.html" title="trait migration::sea_orm::Related">Related</a>&lt;Self&gt;</span> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.has_many" class="fn">has_many</a>&lt;R&gt;(_: R) -&gt; <a class="struct" href="../../struct.RelationBuilder.html" title="struct migration::sea_orm::RelationBuilder">RelationBuilder</a>&lt;Self, R&gt;
+       <span class="where">where R: <a class="trait" href="../../trait.EntityTrait.html" title="trait migration::sea_orm::EntityTrait">EntityTrait</a> + <a class="trait" href="../../trait.Related.html" title="trait migration::sea_orm::Related">Related</a>&lt;Self&gt;</span> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.find" class="fn">find</a>() -&gt; <a class="struct" href="../../struct.Select.html" title="struct migration::sea_orm::Select">Select</a>&lt;Self&gt; { ... }
+<span class="item-spacer"></span>    fn <a href="#method.find_by_id" class="fn">find_by_id</a>&lt;T&gt;(values: T) -&gt; <a class="struct" href="../../struct.Select.html" title="struct migration::sea_orm::Select">Select</a>&lt;Self&gt;
+       <span class="where">where T: <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;&lt;Self::<a class="associatedtype" href="../../trait.EntityTrait.html#associatedtype.PrimaryKey" title="type migration::sea_orm::EntityTrait::PrimaryKey">PrimaryKey</a> as <a class="trait" href="../../trait.PrimaryKeyTrait.html" title="trait migration::sea_orm::PrimaryKeyTrait">PrimaryKeyTrait</a>&gt;::<a class="associatedtype" href="../../trait.PrimaryKeyTrait.html#associatedtype.ValueType" title="type migration::sea_orm::PrimaryKeyTrait::ValueType">ValueType</a>&gt;</span> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.insert" class="fn">insert</a>&lt;A&gt;(model: A) -&gt; <a class="struct" href="../../struct.Insert.html" title="struct migration::sea_orm::Insert">Insert</a>&lt;A&gt;
+       <span class="where">where A: <a class="trait" href="../../trait.ActiveModelTrait.html" title="trait migration::sea_orm::ActiveModelTrait">ActiveModelTrait</a>&lt;Entity = Self&gt;</span> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.insert_many" class="fn">insert_many</a>&lt;A, I&gt;(models: I) -&gt; <a class="struct" href="../../struct.Insert.html" title="struct migration::sea_orm::Insert">Insert</a>&lt;A&gt;
+       <span class="where">where A: <a class="trait" href="../../trait.ActiveModelTrait.html" title="trait migration::sea_orm::ActiveModelTrait">ActiveModelTrait</a>&lt;Entity = Self&gt;,
+             I: <a class="trait" href="https://doc.rust-lang.org/nightly/core/iter/traits/collect/trait.IntoIterator.html" title="trait core::iter::traits::collect::IntoIterator">IntoIterator</a>&lt;Item = A&gt;</span> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.update" class="fn">update</a>&lt;A&gt;(model: A) -&gt; <a class="struct" href="../../struct.UpdateOne.html" title="struct migration::sea_orm::UpdateOne">UpdateOne</a>&lt;A&gt;
+       <span class="where">where A: <a class="trait" href="../../trait.ActiveModelTrait.html" title="trait migration::sea_orm::ActiveModelTrait">ActiveModelTrait</a>&lt;Entity = Self&gt;</span> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.update_many" class="fn">update_many</a>() -&gt; <a class="struct" href="../../struct.UpdateMany.html" title="struct migration::sea_orm::UpdateMany">UpdateMany</a>&lt;Self&gt; { ... }
+<span class="item-spacer"></span>    fn <a href="#method.delete" class="fn">delete</a>&lt;A&gt;(model: A) -&gt; <a class="struct" href="../../struct.DeleteOne.html" title="struct migration::sea_orm::DeleteOne">DeleteOne</a>&lt;A&gt;
+       <span class="where">where A: <a class="trait" href="../../trait.ActiveModelTrait.html" title="trait migration::sea_orm::ActiveModelTrait">ActiveModelTrait</a>&lt;Entity = Self&gt;</span> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.delete_many" class="fn">delete_many</a>() -&gt; <a class="struct" href="../../struct.DeleteMany.html" title="struct migration::sea_orm::DeleteMany">DeleteMany</a>&lt;Self&gt; { ... }
+<span class="item-spacer"></span>    fn <a href="#method.delete_by_id" class="fn">delete_by_id</a>&lt;T&gt;(values: T) -&gt; <a class="struct" href="../../struct.DeleteMany.html" title="struct migration::sea_orm::DeleteMany">DeleteMany</a>&lt;Self&gt;
+       <span class="where">where T: <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;&lt;Self::<a class="associatedtype" href="../../trait.EntityTrait.html#associatedtype.PrimaryKey" title="type migration::sea_orm::EntityTrait::PrimaryKey">PrimaryKey</a> as <a class="trait" href="../../trait.PrimaryKeyTrait.html" title="trait migration::sea_orm::PrimaryKeyTrait">PrimaryKeyTrait</a>&gt;::<a class="associatedtype" href="../../trait.PrimaryKeyTrait.html#associatedtype.ValueType" title="type migration::sea_orm::PrimaryKeyTrait::ValueType">ValueType</a>&gt;</span> { ... }
+}</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>An abstract base class for defining Entities.</p>
+<p>This trait provides an API for you to inspect it’s properties</p>
+<ul>
+<li>Column (implemented <a href="../../trait.ColumnTrait.html" title="trait migration::sea_orm::ColumnTrait"><code>ColumnTrait</code></a>)</li>
+<li>Relation (implemented <a href="../../trait.RelationTrait.html" title="trait migration::sea_orm::RelationTrait"><code>RelationTrait</code></a>)</li>
+<li>Primary Key (implemented <a href="../../trait.PrimaryKeyTrait.html" title="trait migration::sea_orm::PrimaryKeyTrait"><code>PrimaryKeyTrait</code></a> and <a href="../../trait.PrimaryKeyToColumn.html" title="trait migration::sea_orm::PrimaryKeyToColumn"><code>PrimaryKeyToColumn</code></a>)</li>
+</ul>
+<p>This trait also provides an API for CRUD actions</p>
+<ul>
+<li>Select: <code>find</code>, <code>find_*</code></li>
+<li>Insert: <code>insert</code>, <code>insert_*</code></li>
+<li>Update: <code>update</code>, <code>update_*</code></li>
+<li>Delete: <code>delete</code>, <code>delete_*</code></li>
+</ul>
+</div></details><h2 id="required-associated-types" class="section-header">Required Associated Types<a href="#required-associated-types" class="anchor">§</a></h2><div class="methods"><section id="associatedtype.Model" class="method"><h4 class="code-header">type <a href="#associatedtype.Model" class="associatedtype">Model</a>: <a class="trait" href="../../trait.ModelTrait.html" title="trait migration::sea_orm::ModelTrait">ModelTrait</a>&lt;Entity = Self&gt; + <a class="trait" href="../../trait.FromQueryResult.html" title="trait migration::sea_orm::FromQueryResult">FromQueryResult</a></h4></section><section id="associatedtype.ActiveModel" class="method"><h4 class="code-header">type <a href="#associatedtype.ActiveModel" class="associatedtype">ActiveModel</a>: <a class="trait" href="../../trait.ActiveModelBehavior.html" title="trait migration::sea_orm::ActiveModelBehavior">ActiveModelBehavior</a>&lt;Entity = Self&gt;</h4></section><section id="associatedtype.Column" class="method"><h4 class="code-header">type <a href="#associatedtype.Column" class="associatedtype">Column</a>: <a class="trait" href="../../trait.ColumnTrait.html" title="trait migration::sea_orm::ColumnTrait">ColumnTrait</a></h4></section><section id="associatedtype.Relation" class="method"><h4 class="code-header">type <a href="#associatedtype.Relation" class="associatedtype">Relation</a>: <a class="trait" href="../../trait.RelationTrait.html" title="trait migration::sea_orm::RelationTrait">RelationTrait</a></h4></section><section id="associatedtype.PrimaryKey" class="method"><h4 class="code-header">type <a href="#associatedtype.PrimaryKey" class="associatedtype">PrimaryKey</a>: <a class="trait" href="../../trait.PrimaryKeyTrait.html" title="trait migration::sea_orm::PrimaryKeyTrait">PrimaryKeyTrait</a> + <a class="trait" href="../../trait.PrimaryKeyToColumn.html" title="trait migration::sea_orm::PrimaryKeyToColumn">PrimaryKeyToColumn</a>&lt;Column = Self::<a class="associatedtype" href="../../trait.EntityTrait.html#associatedtype.Column" title="type migration::sea_orm::EntityTrait::Column">Column</a>&gt;</h4></section></div><h2 id="provided-methods" class="section-header">Provided Methods<a href="#provided-methods" class="anchor">§</a></h2><div class="methods"><details class="toggle method-toggle" open><summary><section id="method.belongs_to" class="method"><h4 class="code-header">fn <a href="#method.belongs_to" class="fn">belongs_to</a>&lt;R&gt;(related: R) -&gt; <a class="struct" href="../../struct.RelationBuilder.html" title="struct migration::sea_orm::RelationBuilder">RelationBuilder</a>&lt;Self, R&gt;<div class="where">where
+    R: <a class="trait" href="../../trait.EntityTrait.html" title="trait migration::sea_orm::EntityTrait">EntityTrait</a>,</div></h4></section></summary><div class="docblock"><p>Construct a belongs to relation</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.has_one" class="method"><h4 class="code-header">fn <a href="#method.has_one" class="fn">has_one</a>&lt;R&gt;(_: R) -&gt; <a class="struct" href="../../struct.RelationBuilder.html" title="struct migration::sea_orm::RelationBuilder">RelationBuilder</a>&lt;Self, R&gt;<div class="where">where
+    R: <a class="trait" href="../../trait.EntityTrait.html" title="trait migration::sea_orm::EntityTrait">EntityTrait</a> + <a class="trait" href="../../trait.Related.html" title="trait migration::sea_orm::Related">Related</a>&lt;Self&gt;,</div></h4></section></summary><div class="docblock"><p>Construct a has one relation</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.has_many" class="method"><h4 class="code-header">fn <a href="#method.has_many" class="fn">has_many</a>&lt;R&gt;(_: R) -&gt; <a class="struct" href="../../struct.RelationBuilder.html" title="struct migration::sea_orm::RelationBuilder">RelationBuilder</a>&lt;Self, R&gt;<div class="where">where
+    R: <a class="trait" href="../../trait.EntityTrait.html" title="trait migration::sea_orm::EntityTrait">EntityTrait</a> + <a class="trait" href="../../trait.Related.html" title="trait migration::sea_orm::Related">Related</a>&lt;Self&gt;,</div></h4></section></summary><div class="docblock"><p>Construct a has many relation</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.find" class="method"><h4 class="code-header">fn <a href="#method.find" class="fn">find</a>() -&gt; <a class="struct" href="../../struct.Select.html" title="struct migration::sea_orm::Select">Select</a>&lt;Self&gt;</h4></section></summary><div class="docblock"><p>Construct select statement to find one / all models</p>
+<ul>
+<li>To select columns, join tables and group by expressions, see <a href="../../trait.QuerySelect.html" title="trait migration::sea_orm::QuerySelect"><code>QuerySelect</code></a></li>
+<li>To apply where conditions / filters, see <a href="../../trait.QueryFilter.html" title="trait migration::sea_orm::QueryFilter"><code>QueryFilter</code></a></li>
+<li>To apply order by expressions, see <a href="../../trait.QueryOrder.html" title="trait migration::sea_orm::QueryOrder"><code>QueryOrder</code></a></li>
+</ul>
+<h5 id="example"><a class="doc-anchor" href="#example">§</a>Example</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::{entity::<span class="kw-2">*</span>, query::<span class="kw-2">*</span>, tests_cfg::cake};
+
+<span class="macro">assert_eq!</span>(
+    cake::Entity::find().one(<span class="kw-2">&amp;</span>db).<span class="kw">await</span><span class="question-mark">?</span>,
+    <span class="prelude-val">Some</span>(cake::Model {
+        id: <span class="number">1</span>,
+        name: <span class="string">"New York Cheese"</span>.to_owned(),
+    })
+);
+
+<span class="macro">assert_eq!</span>(
+    cake::Entity::find().all(<span class="kw-2">&amp;</span>db).<span class="kw">await</span><span class="question-mark">?</span>,
+    [
+        cake::Model {
+            id: <span class="number">1</span>,
+            name: <span class="string">"New York Cheese"</span>.to_owned(),
+        },
+        cake::Model {
+            id: <span class="number">2</span>,
+            name: <span class="string">"Chocolate Forest"</span>.to_owned(),
+        },
+    ]
+);
+
+<span class="macro">assert_eq!</span>(
+    db.into_transaction_log(),
+    [
+        Transaction::from_sql_and_values(
+            DbBackend::Postgres,
+            <span class="string">r#"SELECT "cake"."id", "cake"."name" FROM "cake" LIMIT $1"#</span>,
+            [<span class="number">1u64</span>.into()]
+        ),
+        Transaction::from_sql_and_values(
+            DbBackend::Postgres,
+            <span class="string">r#"SELECT "cake"."id", "cake"."name" FROM "cake""#</span>,
+            []
+        ),
+    ]
+);</code></pre></div></div></details><details class="toggle method-toggle" open><summary><section id="method.find_by_id" class="method"><h4 class="code-header">fn <a href="#method.find_by_id" class="fn">find_by_id</a>&lt;T&gt;(values: T) -&gt; <a class="struct" href="../../struct.Select.html" title="struct migration::sea_orm::Select">Select</a>&lt;Self&gt;<div class="where">where
+    T: <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;&lt;Self::<a class="associatedtype" href="../../trait.EntityTrait.html#associatedtype.PrimaryKey" title="type migration::sea_orm::EntityTrait::PrimaryKey">PrimaryKey</a> as <a class="trait" href="../../trait.PrimaryKeyTrait.html" title="trait migration::sea_orm::PrimaryKeyTrait">PrimaryKeyTrait</a>&gt;::<a class="associatedtype" href="../../trait.PrimaryKeyTrait.html#associatedtype.ValueType" title="type migration::sea_orm::PrimaryKeyTrait::ValueType">ValueType</a>&gt;,</div></h4></section></summary><div class="docblock"><p>Find a model by primary key</p>
+<h5 id="example-1"><a class="doc-anchor" href="#example-1">§</a>Example</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::{entity::<span class="kw-2">*</span>, query::<span class="kw-2">*</span>, tests_cfg::cake};
+
+<span class="macro">assert_eq!</span>(
+    cake::Entity::find_by_id(<span class="number">11</span>).all(<span class="kw-2">&amp;</span>db).<span class="kw">await</span><span class="question-mark">?</span>,
+    [cake::Model {
+        id: <span class="number">11</span>,
+        name: <span class="string">"Sponge Cake"</span>.to_owned(),
+    }]
+);
+
+<span class="macro">assert_eq!</span>(
+    db.into_transaction_log(),
+    [Transaction::from_sql_and_values(
+        DbBackend::Postgres,
+        <span class="string">r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" = $1"#</span>,
+        [<span class="number">11i32</span>.into()]
+    )]
+);</code></pre></div>
+<p>Find by composite key</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::{entity::<span class="kw-2">*</span>, query::<span class="kw-2">*</span>, tests_cfg::cake_filling};
+
+<span class="macro">assert_eq!</span>(
+    cake_filling::Entity::find_by_id((<span class="number">2</span>, <span class="number">3</span>)).all(<span class="kw-2">&amp;</span>db).<span class="kw">await</span><span class="question-mark">?</span>,
+    [cake_filling::Model {
+        cake_id: <span class="number">2</span>,
+        filling_id: <span class="number">3</span>,
+    }]
+);
+
+<span class="macro">assert_eq!</span>(
+    db.into_transaction_log(),
+    [Transaction::from_sql_and_values(
+        DbBackend::Postgres,
+        [
+            <span class="string">r#"SELECT "cake_filling"."cake_id", "cake_filling"."filling_id" FROM "cake_filling""#</span>,
+            <span class="string">r#"WHERE "cake_filling"."cake_id" = $1 AND "cake_filling"."filling_id" = $2"#</span>,
+        ].join(<span class="string">" "</span>).as_str(),
+        [<span class="number">2i32</span>.into(), <span class="number">3i32</span>.into()]
+    )]);</code></pre></div><h5 id="panics"><a class="doc-anchor" href="#panics">§</a>Panics</h5>
+<p>Panics if arity of input values don’t match arity of primary key</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.insert" class="method"><h4 class="code-header">fn <a href="#method.insert" class="fn">insert</a>&lt;A&gt;(model: A) -&gt; <a class="struct" href="../../struct.Insert.html" title="struct migration::sea_orm::Insert">Insert</a>&lt;A&gt;<div class="where">where
+    A: <a class="trait" href="../../trait.ActiveModelTrait.html" title="trait migration::sea_orm::ActiveModelTrait">ActiveModelTrait</a>&lt;Entity = Self&gt;,</div></h4></section></summary><div class="docblock"><p>Insert a model into database</p>
+<h5 id="example-postgres"><a class="doc-anchor" href="#example-postgres">§</a>Example (Postgres)</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::{entity::<span class="kw-2">*</span>, query::<span class="kw-2">*</span>, tests_cfg::cake};
+
+<span class="kw">let </span>apple = cake::ActiveModel {
+    name: Set(<span class="string">"Apple Pie"</span>.to_owned()),
+    ..Default::default()
+};
+
+<span class="kw">let </span>insert_result = cake::Entity::insert(apple).exec(<span class="kw-2">&amp;</span>db).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="macro">assert_eq!</span>(<span class="macro">dbg!</span>(insert_result.last_insert_id), <span class="number">15</span>);
+
+<span class="macro">assert_eq!</span>(
+    db.into_transaction_log(),
+    [Transaction::from_sql_and_values(
+        DbBackend::Postgres,
+        <span class="string">r#"INSERT INTO "cake" ("name") VALUES ($1) RETURNING "id""#</span>,
+        [<span class="string">"Apple Pie"</span>.into()]
+    )]
+);</code></pre></div><h5 id="example-mysql"><a class="doc-anchor" href="#example-mysql">§</a>Example (MySQL)</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::{entity::<span class="kw-2">*</span>, query::<span class="kw-2">*</span>, tests_cfg::cake};
+
+<span class="kw">let </span>apple = cake::ActiveModel {
+    name: Set(<span class="string">"Apple Pie"</span>.to_owned()),
+    ..Default::default()
+};
+
+<span class="kw">let </span>insert_result = cake::Entity::insert(apple).exec(<span class="kw-2">&amp;</span>db).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="macro">assert_eq!</span>(insert_result.last_insert_id, <span class="number">15</span>);
+
+<span class="macro">assert_eq!</span>(
+    db.into_transaction_log(),
+    [Transaction::from_sql_and_values(
+        DbBackend::MySql,
+        <span class="string">r#"INSERT INTO `cake` (`name`) VALUES (?)"#</span>,
+        [<span class="string">"Apple Pie"</span>.into()]
+    )]
+);</code></pre></div>
+<p>To get back inserted Model</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::{entity::<span class="kw-2">*</span>, query::<span class="kw-2">*</span>, tests_cfg::fruit};
+
+<span class="macro">assert_eq!</span>(
+    cake::Entity::insert(cake::ActiveModel {
+        id: NotSet,
+        name: Set(<span class="string">"Apple Pie"</span>.to_owned()),
+    })
+    .exec_with_returning(<span class="kw-2">&amp;</span>db)
+    .<span class="kw">await</span><span class="question-mark">?</span>,
+    cake::Model {
+        id: <span class="number">1</span>,
+        name: <span class="string">"Apple Pie"</span>.to_owned(),
+    }
+);
+
+<span class="macro">assert_eq!</span>(
+    db.into_transaction_log()[<span class="number">0</span>].statements()[<span class="number">0</span>].sql,
+    <span class="string">r#"INSERT INTO "cake" ("name") VALUES ($1) RETURNING "id", "name""#
+</span>);</code></pre></div></div></details><details class="toggle method-toggle" open><summary><section id="method.insert_many" class="method"><h4 class="code-header">fn <a href="#method.insert_many" class="fn">insert_many</a>&lt;A, I&gt;(models: I) -&gt; <a class="struct" href="../../struct.Insert.html" title="struct migration::sea_orm::Insert">Insert</a>&lt;A&gt;<div class="where">where
+    A: <a class="trait" href="../../trait.ActiveModelTrait.html" title="trait migration::sea_orm::ActiveModelTrait">ActiveModelTrait</a>&lt;Entity = Self&gt;,
+    I: <a class="trait" href="https://doc.rust-lang.org/nightly/core/iter/traits/collect/trait.IntoIterator.html" title="trait core::iter::traits::collect::IntoIterator">IntoIterator</a>&lt;Item = A&gt;,</div></h4></section></summary><div class="docblock"><p>Insert many models into database</p>
+<h5 id="example-postgres-1"><a class="doc-anchor" href="#example-postgres-1">§</a>Example (Postgres)</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::{entity::<span class="kw-2">*</span>, query::<span class="kw-2">*</span>, tests_cfg::cake};
+
+<span class="kw">let </span>apple = cake::ActiveModel {
+    name: Set(<span class="string">"Apple Pie"</span>.to_owned()),
+    ..Default::default()
+};
+<span class="kw">let </span>orange = cake::ActiveModel {
+    name: Set(<span class="string">"Orange Scone"</span>.to_owned()),
+    ..Default::default()
+};
+
+<span class="kw">let </span>insert_result = cake::Entity::insert_many([apple, orange]).exec(<span class="kw-2">&amp;</span>db).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="macro">assert_eq!</span>(insert_result.last_insert_id, <span class="number">28</span>);
+
+<span class="macro">assert_eq!</span>(
+    db.into_transaction_log(),
+    [Transaction::from_sql_and_values(
+        DbBackend::Postgres,
+        <span class="string">r#"INSERT INTO "cake" ("name") VALUES ($1), ($2) RETURNING "id""#</span>,
+        [<span class="string">"Apple Pie"</span>.into(), <span class="string">"Orange Scone"</span>.into()]
+    )]
+);</code></pre></div><h5 id="example-mysql-1"><a class="doc-anchor" href="#example-mysql-1">§</a>Example (MySQL)</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::{entity::<span class="kw-2">*</span>, query::<span class="kw-2">*</span>, tests_cfg::cake};
+
+<span class="kw">let </span>apple = cake::ActiveModel {
+    name: Set(<span class="string">"Apple Pie"</span>.to_owned()),
+    ..Default::default()
+};
+<span class="kw">let </span>orange = cake::ActiveModel {
+    name: Set(<span class="string">"Orange Scone"</span>.to_owned()),
+    ..Default::default()
+};
+
+<span class="kw">let </span>insert_result = cake::Entity::insert_many([apple, orange]).exec(<span class="kw-2">&amp;</span>db).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="macro">assert_eq!</span>(insert_result.last_insert_id, <span class="number">28</span>);
+
+<span class="macro">assert_eq!</span>(
+    db.into_transaction_log(),
+    [Transaction::from_sql_and_values(
+        DbBackend::MySql,
+        <span class="string">r#"INSERT INTO `cake` (`name`) VALUES (?), (?)"#</span>,
+        [<span class="string">"Apple Pie"</span>.into(), <span class="string">"Orange Scone"</span>.into()]
+    )]
+);</code></pre></div>
+<p>Before 1.1.3, if the active models have different column set, this method would panic.
+Now, it’d attempt to fill in the missing columns with null
+(which may or may not be correct, depending on whether the column is nullable):</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::{
+    entity::<span class="kw-2">*</span>,
+    query::<span class="kw-2">*</span>,
+    tests_cfg::{cake, cake_filling},
+    DbBackend,
+};
+
+<span class="macro">assert_eq!</span>(
+    cake::Entity::insert_many([
+        cake::ActiveModel {
+            id: NotSet,
+            name: Set(<span class="string">"Apple Pie"</span>.to_owned()),
+        },
+        cake::ActiveModel {
+            id: NotSet,
+            name: Set(<span class="string">"Orange Scone"</span>.to_owned()),
+        }
+    ])
+    .build(DbBackend::Postgres)
+    .to_string(),
+    <span class="string">r#"INSERT INTO "cake" ("name") VALUES ('Apple Pie'), ('Orange Scone')"#</span>,
+);
+
+<span class="macro">assert_eq!</span>(
+    cake_filling::Entity::insert_many([
+        cake_filling::ActiveModel {
+            cake_id: ActiveValue::set(<span class="number">2</span>),
+            filling_id: ActiveValue::NotSet,
+        },
+        cake_filling::ActiveModel {
+            cake_id: ActiveValue::NotSet,
+            filling_id: ActiveValue::set(<span class="number">3</span>),
+        }
+    ])
+    .build(DbBackend::Postgres)
+    .to_string(),
+    <span class="string">r#"INSERT INTO "cake_filling" ("cake_id", "filling_id") VALUES (2, NULL), (NULL, 3)"#</span>,
+);</code></pre></div>
+<p>To get back inserted Models</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::{entity::<span class="kw-2">*</span>, query::<span class="kw-2">*</span>, tests_cfg::fruit};
+
+<span class="macro">assert_eq!</span>(
+    cake::Entity::insert_many([
+        cake::ActiveModel {
+            id: NotSet,
+            name: Set(<span class="string">"Apple Pie"</span>.to_owned()),
+        },
+        cake::ActiveModel {
+            id: NotSet,
+            name: Set(<span class="string">"Choco Pie"</span>.to_owned()),
+        },
+    ])
+    .exec_with_returning_many(<span class="kw-2">&amp;</span>db)
+    .<span class="kw">await</span><span class="question-mark">?</span>,
+    [
+        cake::Model {
+            id: <span class="number">1</span>,
+            name: <span class="string">"Apple Pie"</span>.to_owned(),
+        },
+        cake::Model {
+            id: <span class="number">2</span>,
+            name: <span class="string">"Choco Pie"</span>.to_owned(),
+        }
+    ]
+);
+
+<span class="macro">assert_eq!</span>(
+    db.into_transaction_log()[<span class="number">0</span>].statements()[<span class="number">0</span>].sql,
+    <span class="string">r#"INSERT INTO "cake" ("name") VALUES ($1), ($2) RETURNING "id", "name""#
+</span>);</code></pre></div></div></details><details class="toggle method-toggle" open><summary><section id="method.update" class="method"><h4 class="code-header">fn <a href="#method.update" class="fn">update</a>&lt;A&gt;(model: A) -&gt; <a class="struct" href="../../struct.UpdateOne.html" title="struct migration::sea_orm::UpdateOne">UpdateOne</a>&lt;A&gt;<div class="where">where
+    A: <a class="trait" href="../../trait.ActiveModelTrait.html" title="trait migration::sea_orm::ActiveModelTrait">ActiveModelTrait</a>&lt;Entity = Self&gt;,</div></h4></section></summary><div class="docblock"><p>Update a model in database</p>
+<ul>
+<li>To apply where conditions / filters, see <a href="../../trait.QueryFilter.html" title="trait migration::sea_orm::QueryFilter"><code>QueryFilter</code></a></li>
+</ul>
+<h5 id="example-postgres-2"><a class="doc-anchor" href="#example-postgres-2">§</a>Example (Postgres)</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::{entity::<span class="kw-2">*</span>, query::<span class="kw-2">*</span>, tests_cfg::fruit};
+
+<span class="kw">let </span>orange = fruit::ActiveModel {
+    id: Set(<span class="number">1</span>),
+    name: Set(<span class="string">"Orange"</span>.to_owned()),
+    ..Default::default()
+};
+
+<span class="macro">assert_eq!</span>(
+    fruit::Entity::update(orange.clone())
+        .filter(fruit::Column::Name.contains(<span class="string">"orange"</span>))
+        .exec(<span class="kw-2">&amp;</span>db)
+        .<span class="kw">await</span><span class="question-mark">?</span>,
+    fruit::Model {
+        id: <span class="number">1</span>,
+        name: <span class="string">"Orange"</span>.to_owned(),
+        cake_id: <span class="prelude-val">None</span>,
+    }
+);
+
+<span class="macro">assert_eq!</span>(
+    db.into_transaction_log(),
+    [Transaction::from_sql_and_values(
+        DbBackend::Postgres,
+        <span class="string">r#"UPDATE "fruit" SET "name" = $1 WHERE "fruit"."id" = $2 AND "fruit"."name" LIKE $3 RETURNING "id", "name", "cake_id""#</span>,
+        [<span class="string">"Orange"</span>.into(), <span class="number">1i32</span>.into(), <span class="string">"%orange%"</span>.into()]
+    )]);</code></pre></div><h5 id="example-mysql-2"><a class="doc-anchor" href="#example-mysql-2">§</a>Example (MySQL)</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::{entity::<span class="kw-2">*</span>, query::<span class="kw-2">*</span>, tests_cfg::fruit};
+
+<span class="kw">let </span>orange = fruit::ActiveModel {
+    id: Set(<span class="number">1</span>),
+    name: Set(<span class="string">"Orange"</span>.to_owned()),
+    ..Default::default()
+};
+
+<span class="macro">assert_eq!</span>(
+    fruit::Entity::update(orange.clone())
+        .filter(fruit::Column::Name.contains(<span class="string">"orange"</span>))
+        .exec(<span class="kw-2">&amp;</span>db)
+        .<span class="kw">await</span><span class="question-mark">?</span>,
+    fruit::Model {
+        id: <span class="number">1</span>,
+        name: <span class="string">"Orange"</span>.to_owned(),
+        cake_id: <span class="prelude-val">None</span>,
+    }
+);
+
+<span class="macro">assert_eq!</span>(
+    db.into_transaction_log(),
+    [
+        Transaction::from_sql_and_values(
+            DbBackend::MySql,
+            <span class="string">r#"UPDATE `fruit` SET `name` = ? WHERE `fruit`.`id` = ? AND `fruit`.`name` LIKE ?"#</span>,
+            [<span class="string">"Orange"</span>.into(), <span class="number">1i32</span>.into(), <span class="string">"%orange%"</span>.into()]
+        ),
+        Transaction::from_sql_and_values(
+            DbBackend::MySql,
+            <span class="string">r#"SELECT `fruit`.`id`, `fruit`.`name`, `fruit`.`cake_id` FROM `fruit` WHERE `fruit`.`id` = ? LIMIT ?"#</span>,
+            [<span class="number">1i32</span>.into(), <span class="number">1u64</span>.into()]
+        )]);</code></pre></div></div></details><details class="toggle method-toggle" open><summary><section id="method.update_many" class="method"><h4 class="code-header">fn <a href="#method.update_many" class="fn">update_many</a>() -&gt; <a class="struct" href="../../struct.UpdateMany.html" title="struct migration::sea_orm::UpdateMany">UpdateMany</a>&lt;Self&gt;</h4></section></summary><div class="docblock"><p>Update many models in database</p>
+<ul>
+<li>To apply where conditions / filters, see <a href="../../trait.QueryFilter.html" title="trait migration::sea_orm::QueryFilter"><code>QueryFilter</code></a></li>
+</ul>
+<h5 id="example-2"><a class="doc-anchor" href="#example-2">§</a>Example</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::{
+    entity::<span class="kw-2">*</span>,
+    query::<span class="kw-2">*</span>,
+    sea_query::{Expr, Value},
+    tests_cfg::fruit,
+};
+
+<span class="kw">let </span>update_result = fruit::Entity::update_many()
+    .col_expr(fruit::Column::CakeId, Expr::value(Value::Int(<span class="prelude-val">None</span>)))
+    .filter(fruit::Column::Name.contains(<span class="string">"Apple"</span>))
+    .exec(<span class="kw-2">&amp;</span>db)
+    .<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="macro">assert_eq!</span>(update_result.rows_affected, <span class="number">5</span>);
+
+<span class="macro">assert_eq!</span>(
+    db.into_transaction_log(),
+    [Transaction::from_sql_and_values(
+        DbBackend::Postgres,
+        <span class="string">r#"UPDATE "fruit" SET "cake_id" = $1 WHERE "fruit"."name" LIKE $2"#</span>,
+        [Value::Int(<span class="prelude-val">None</span>), <span class="string">"%Apple%"</span>.into()]
+    )]
+);</code></pre></div></div></details><details class="toggle method-toggle" open><summary><section id="method.delete" class="method"><h4 class="code-header">fn <a href="#method.delete" class="fn">delete</a>&lt;A&gt;(model: A) -&gt; <a class="struct" href="../../struct.DeleteOne.html" title="struct migration::sea_orm::DeleteOne">DeleteOne</a>&lt;A&gt;<div class="where">where
+    A: <a class="trait" href="../../trait.ActiveModelTrait.html" title="trait migration::sea_orm::ActiveModelTrait">ActiveModelTrait</a>&lt;Entity = Self&gt;,</div></h4></section></summary><div class="docblock"><p>Delete a model from database</p>
+<ul>
+<li>To apply where conditions / filters, see <a href="../../trait.QueryFilter.html" title="trait migration::sea_orm::QueryFilter"><code>QueryFilter</code></a></li>
+</ul>
+<h5 id="example-3"><a class="doc-anchor" href="#example-3">§</a>Example</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::{entity::<span class="kw-2">*</span>, query::<span class="kw-2">*</span>, tests_cfg::fruit};
+
+<span class="kw">let </span>orange = fruit::ActiveModel {
+    id: Set(<span class="number">3</span>),
+    ..Default::default()
+};
+
+<span class="kw">let </span>delete_result = fruit::Entity::delete(orange).exec(<span class="kw-2">&amp;</span>db).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="macro">assert_eq!</span>(delete_result.rows_affected, <span class="number">1</span>);
+
+<span class="macro">assert_eq!</span>(
+    db.into_transaction_log(),
+    [Transaction::from_sql_and_values(
+        DbBackend::Postgres,
+        <span class="string">r#"DELETE FROM "fruit" WHERE "fruit"."id" = $1"#</span>,
+        [<span class="number">3i32</span>.into()]
+    )]
+);</code></pre></div></div></details><details class="toggle method-toggle" open><summary><section id="method.delete_many" class="method"><h4 class="code-header">fn <a href="#method.delete_many" class="fn">delete_many</a>() -&gt; <a class="struct" href="../../struct.DeleteMany.html" title="struct migration::sea_orm::DeleteMany">DeleteMany</a>&lt;Self&gt;</h4></section></summary><div class="docblock"><p>Delete many models from database</p>
+<ul>
+<li>To apply where conditions / filters, see <a href="../../trait.QueryFilter.html" title="trait migration::sea_orm::QueryFilter"><code>QueryFilter</code></a></li>
+</ul>
+<h5 id="example-4"><a class="doc-anchor" href="#example-4">§</a>Example</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::{entity::<span class="kw-2">*</span>, query::<span class="kw-2">*</span>, tests_cfg::fruit};
+
+<span class="kw">let </span>delete_result = fruit::Entity::delete_many()
+    .filter(fruit::Column::Name.contains(<span class="string">"Apple"</span>))
+    .exec(<span class="kw-2">&amp;</span>db)
+    .<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="macro">assert_eq!</span>(delete_result.rows_affected, <span class="number">5</span>);
+
+<span class="macro">assert_eq!</span>(
+    db.into_transaction_log(),
+    [Transaction::from_sql_and_values(
+        DbBackend::Postgres,
+        <span class="string">r#"DELETE FROM "fruit" WHERE "fruit"."name" LIKE $1"#</span>,
+        [<span class="string">"%Apple%"</span>.into()]
+    )]
+);</code></pre></div></div></details><details class="toggle method-toggle" open><summary><section id="method.delete_by_id" class="method"><h4 class="code-header">fn <a href="#method.delete_by_id" class="fn">delete_by_id</a>&lt;T&gt;(values: T) -&gt; <a class="struct" href="../../struct.DeleteMany.html" title="struct migration::sea_orm::DeleteMany">DeleteMany</a>&lt;Self&gt;<div class="where">where
+    T: <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;&lt;Self::<a class="associatedtype" href="../../trait.EntityTrait.html#associatedtype.PrimaryKey" title="type migration::sea_orm::EntityTrait::PrimaryKey">PrimaryKey</a> as <a class="trait" href="../../trait.PrimaryKeyTrait.html" title="trait migration::sea_orm::PrimaryKeyTrait">PrimaryKeyTrait</a>&gt;::<a class="associatedtype" href="../../trait.PrimaryKeyTrait.html#associatedtype.ValueType" title="type migration::sea_orm::PrimaryKeyTrait::ValueType">ValueType</a>&gt;,</div></h4></section></summary><div class="docblock"><p>Delete a model based on primary key</p>
+<h5 id="example-5"><a class="doc-anchor" href="#example-5">§</a>Example</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::{entity::<span class="kw-2">*</span>, query::<span class="kw-2">*</span>, tests_cfg::fruit};
+
+<span class="kw">let </span>delete_result = fruit::Entity::delete_by_id(<span class="number">1</span>).exec(<span class="kw-2">&amp;</span>db).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="macro">assert_eq!</span>(delete_result.rows_affected, <span class="number">1</span>);
+
+<span class="macro">assert_eq!</span>(
+    db.into_transaction_log(),
+    [Transaction::from_sql_and_values(
+        DbBackend::Postgres,
+        <span class="string">r#"DELETE FROM "fruit" WHERE "fruit"."id" = $1"#</span>,
+        [<span class="number">1i32</span>.into()]
+    )]
+);</code></pre></div>
+<p>Delete by composite key</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code>
+<span class="kw">use </span>sea_orm::{entity::<span class="kw-2">*</span>, query::<span class="kw-2">*</span>, tests_cfg::cake_filling};
+
+<span class="kw">let </span>delete_result = cake_filling::Entity::delete_by_id((<span class="number">2</span>, <span class="number">3</span>)).exec(<span class="kw-2">&amp;</span>db).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="macro">assert_eq!</span>(delete_result.rows_affected, <span class="number">1</span>);
+
+<span class="macro">assert_eq!</span>(
+    db.into_transaction_log(),
+    [Transaction::from_sql_and_values(
+        DbBackend::Postgres,
+        <span class="string">r#"DELETE FROM "cake_filling" WHERE "cake_filling"."cake_id" = $1 AND "cake_filling"."filling_id" = $2"#</span>,
+        [<span class="number">2i32</span>.into(), <span class="number">3i32</span>.into()]
+    )]
+);</code></pre></div><h5 id="panics-1"><a class="doc-anchor" href="#panics-1">§</a>Panics</h5>
+<p>Panics if arity of input values don’t match arity of primary key</p>
+</div></details></div><h2 id="dyn-compatibility" class="section-header">Dyn Compatibility<a href="#dyn-compatibility" class="anchor">§</a></h2><div class="dyn-compatibility-info"><p>This trait is <b>not</b> <a href="https://doc.rust-lang.org/nightly/reference/items/traits.html#dyn-compatibility">dyn compatible</a>.</p><p><i>In older versions of Rust, dyn compatibility was called "object safety", so this trait is not object safe.</i></p></div><h2 id="foreign-impls" class="section-header">Implementations on Foreign Types<a href="#foreign-impls" class="anchor">§</a></h2><details class="toggle implementors-toggle"><summary><section id="impl-EntityTrait-for-Entity" class="impl"><a href="#impl-EntityTrait-for-Entity" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="../../trait.EntityTrait.html" title="trait migration::sea_orm::EntityTrait">EntityTrait</a> for Entity</h3></section></summary><div class="impl-items"><section id="associatedtype.Model-1" class="associatedtype trait-impl"><a href="#associatedtype.Model-1" class="anchor">§</a><h4 class="code-header">type <a href="#associatedtype.Model" class="associatedtype">Model</a> = Model</h4></section><section id="associatedtype.ActiveModel-1" class="associatedtype trait-impl"><a href="#associatedtype.ActiveModel-1" class="anchor">§</a><h4 class="code-header">type <a href="#associatedtype.ActiveModel" class="associatedtype">ActiveModel</a> = ActiveModel</h4></section><section id="associatedtype.Column-1" class="associatedtype trait-impl"><a href="#associatedtype.Column-1" class="anchor">§</a><h4 class="code-header">type <a href="#associatedtype.Column" class="associatedtype">Column</a> = Column</h4></section><section id="associatedtype.PrimaryKey-1" class="associatedtype trait-impl"><a href="#associatedtype.PrimaryKey-1" class="anchor">§</a><h4 class="code-header">type <a href="#associatedtype.PrimaryKey" class="associatedtype">PrimaryKey</a> = PrimaryKey</h4></section><section id="associatedtype.Relation-1" class="associatedtype trait-impl"><a href="#associatedtype.Relation-1" class="anchor">§</a><h4 class="code-header">type <a href="#associatedtype.Relation" class="associatedtype">Relation</a> = Relation</h4></section></div></details><h2 id="implementors" class="section-header">Implementors<a href="#implementors" class="anchor">§</a></h2><div id="implementors-list"></div><script src="../../../../trait.impl/sea_orm/entity/base_entity/trait.EntityTrait.js" data-ignore-extern-crates="sea_orm_migration" async></script></section></div></main></body></html>

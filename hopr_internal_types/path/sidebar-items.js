@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["ChainPath","NoPathSelector","TransportPath","ValidatedPath"],"trait":["NonEmptyPath","Path","PathAddressResolver","PathSelector"],"type":["ChannelPath"]};

@@ -1,0 +1,158 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Perform a FILTER opertation on a statement"><title>QueryFilter in migration::sea_orm - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-b7b9f40b.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="migration" data-themes="" data-resource-suffix="" data-rustdoc-version="1.95.0-nightly (7057231bd 2026-02-11)" data-channel="nightly" data-search-js="search-fb33671b.js" data-stringdex-js="stringdex-b897f86f.js" data-settings-js="settings-170eb4bf.js" ><script src="../../static.files/storage-f9617a14.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../static.files/main-12f88f4f.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc trait"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">QueryFilter</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../migration/index.html">migration</a><span class="version">0.5.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Query<wbr>Filter</a></h2><h3><a href="#required-associated-types">Required Associated Types</a></h3><ul class="block"><li><a href="#associatedtype.QueryStatement" title="QueryStatement">QueryStatement</a></li></ul><h3><a href="#required-methods">Required Methods</a></h3><ul class="block"><li><a href="#tymethod.query" title="query">query</a></li></ul><h3><a href="#provided-methods">Provided Methods</a></h3><ul class="block"><li><a href="#method.belongs_to" title="belongs_to">belongs_to</a></li><li><a href="#method.belongs_to_tbl_alias" title="belongs_to_tbl_alias">belongs_to_tbl_alias</a></li><li><a href="#method.filter" title="filter">filter</a></li></ul><h3><a href="#dyn-compatibility">Dyn Compatibility</a></h3><h3><a href="#implementors">Implementors</a></h3></section><div id="rustdoc-modnav"><h2><a href="index.html">In migration::<wbr>sea_<wbr>orm</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../index.html">migration</a>::<wbr><a href="index.html">sea_orm</a></div><h1>Trait <span class="trait">Query<wbr>Filter</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"></span></div><pre class="rust item-decl"><code>pub trait QueryFilter: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a> {
+    type <a href="#associatedtype.QueryStatement" class="associatedtype">QueryStatement</a>: <a class="trait" href="../trait.ConditionalStatement.html" title="trait migration::ConditionalStatement">ConditionalStatement</a>;
+
+    // Required method
+    fn <a href="#tymethod.query" class="fn">query</a>(&amp;mut self) -&gt; &amp;mut Self::<a class="associatedtype" href="trait.QueryFilter.html#associatedtype.QueryStatement" title="type migration::sea_orm::QueryFilter::QueryStatement">QueryStatement</a>;
+
+    // Provided methods
+    fn <a href="#method.filter" class="fn">filter</a>&lt;F&gt;(self, filter: F) -&gt; Self
+       <span class="where">where F: <a class="trait" href="../trait.IntoCondition.html" title="trait migration::IntoCondition">IntoCondition</a></span> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.belongs_to" class="fn">belongs_to</a>&lt;M&gt;(self, model: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;M</a>) -&gt; Self
+       <span class="where">where M: <a class="trait" href="trait.ModelTrait.html" title="trait migration::sea_orm::ModelTrait">ModelTrait</a></span> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.belongs_to_tbl_alias" class="fn">belongs_to_tbl_alias</a>&lt;M&gt;(self, model: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;M</a>, tbl_alias: &amp;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a>) -&gt; Self
+       <span class="where">where M: <a class="trait" href="trait.ModelTrait.html" title="trait migration::sea_orm::ModelTrait">ModelTrait</a></span> { ... }
+}</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Perform a FILTER opertation on a statement</p>
+</div></details><h2 id="required-associated-types" class="section-header">Required Associated Types<a href="#required-associated-types" class="anchor">§</a></h2><div class="methods"><section id="associatedtype.QueryStatement" class="method"><h4 class="code-header">type <a href="#associatedtype.QueryStatement" class="associatedtype">QueryStatement</a>: <a class="trait" href="../trait.ConditionalStatement.html" title="trait migration::ConditionalStatement">ConditionalStatement</a></h4></section></div><h2 id="required-methods" class="section-header">Required Methods<a href="#required-methods" class="anchor">§</a></h2><div class="methods"><details class="toggle method-toggle" open><summary><section id="tymethod.query" class="method"><h4 class="code-header">fn <a href="#tymethod.query" class="fn">query</a>(&amp;mut self) -&gt; &amp;mut Self::<a class="associatedtype" href="trait.QueryFilter.html#associatedtype.QueryStatement" title="type migration::sea_orm::QueryFilter::QueryStatement">QueryStatement</a></h4></section></summary><div class="docblock"><p>Add the query to perform a FILTER on</p>
+</div></details></div><h2 id="provided-methods" class="section-header">Provided Methods<a href="#provided-methods" class="anchor">§</a></h2><div class="methods"><details class="toggle method-toggle" open><summary><section id="method.filter" class="method"><h4 class="code-header">fn <a href="#method.filter" class="fn">filter</a>&lt;F&gt;(self, filter: F) -&gt; Self<div class="where">where
+    F: <a class="trait" href="../trait.IntoCondition.html" title="trait migration::IntoCondition">IntoCondition</a>,</div></h4></section></summary><div class="docblock"><p>Add an AND WHERE expression</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::{entity::<span class="kw-2">*</span>, query::<span class="kw-2">*</span>, tests_cfg::cake, DbBackend};
+
+<span class="macro">assert_eq!</span>(
+    cake::Entity::find()
+        .filter(cake::Column::Id.eq(<span class="number">4</span>))
+        .filter(cake::Column::Id.eq(<span class="number">5</span>))
+        .build(DbBackend::MySql)
+        .to_string(),
+    <span class="string">"SELECT `cake`.`id`, `cake`.`name` FROM `cake` WHERE `cake`.`id` = 4 AND `cake`.`id` = 5"
+</span>);</code></pre></div>
+<p>Add a condition tree.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::{entity::<span class="kw-2">*</span>, query::<span class="kw-2">*</span>, tests_cfg::cake, DbBackend};
+
+<span class="macro">assert_eq!</span>(
+    cake::Entity::find()
+        .filter(
+            Condition::any()
+                .add(cake::Column::Id.eq(<span class="number">4</span>))
+                .add(cake::Column::Id.eq(<span class="number">5</span>))
+        )
+        .build(DbBackend::MySql)
+        .to_string(),
+    <span class="string">"SELECT `cake`.`id`, `cake`.`name` FROM `cake` WHERE `cake`.`id` = 4 OR `cake`.`id` = 5"
+</span>);</code></pre></div>
+<p>Like above, but using the <code>IN</code> operator.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::{entity::<span class="kw-2">*</span>, query::<span class="kw-2">*</span>, tests_cfg::cake, DbBackend};
+
+<span class="macro">assert_eq!</span>(
+    cake::Entity::find()
+        .filter(cake::Column::Id.is_in([<span class="number">4</span>, <span class="number">5</span>]))
+        .build(DbBackend::MySql)
+        .to_string(),
+    <span class="string">"SELECT `cake`.`id`, `cake`.`name` FROM `cake` WHERE `cake`.`id` IN (4, 5)"
+</span>);</code></pre></div>
+<p>Like above, but using the <code>ANY</code> operator. Postgres only.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::sea_query::{extension::postgres::PgFunc, Expr};
+<span class="kw">use </span>sea_orm::{entity::<span class="kw-2">*</span>, query::<span class="kw-2">*</span>, tests_cfg::cake, DbBackend};
+
+<span class="macro">assert_eq!</span>(
+    cake::Entity::find()
+        .filter(Expr::col((cake::Entity, cake::Column::Id)).eq(PgFunc::any(<span class="macro">vec!</span>[<span class="number">4</span>, <span class="number">5</span>])))
+        .build(DbBackend::Postgres)
+        .to_string(),
+    <span class="string">r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" = ANY(ARRAY [4,5])"#
+</span>);</code></pre></div>
+<p>Add a runtime-built condition tree.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::{entity::<span class="kw-2">*</span>, query::<span class="kw-2">*</span>, tests_cfg::cake, DbBackend};
+<span class="kw">struct </span>Input {
+    name: <span class="prelude-ty">Option</span>&lt;String&gt;,
+}
+<span class="kw">let </span>input = Input {
+    name: <span class="prelude-val">Some</span>(<span class="string">"cheese"</span>.to_owned()),
+};
+
+<span class="kw">let </span><span class="kw-2">mut </span>conditions = Condition::all();
+<span class="kw">if let </span><span class="prelude-val">Some</span>(name) = input.name {
+    conditions = conditions.add(cake::Column::Name.contains(<span class="kw-2">&amp;</span>name));
+}
+
+<span class="macro">assert_eq!</span>(
+    cake::Entity::find()
+        .filter(conditions)
+        .build(DbBackend::MySql)
+        .to_string(),
+    <span class="string">"SELECT `cake`.`id`, `cake`.`name` FROM `cake` WHERE `cake`.`name` LIKE '%cheese%'"
+</span>);</code></pre></div>
+<p>Add a runtime-built condition tree, functional-way.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::{entity::<span class="kw-2">*</span>, query::<span class="kw-2">*</span>, tests_cfg::cake, DbBackend};
+<span class="kw">struct </span>Input {
+    name: <span class="prelude-ty">Option</span>&lt;String&gt;,
+}
+<span class="kw">let </span>input = Input {
+    name: <span class="prelude-val">Some</span>(<span class="string">"cheese"</span>.to_owned()),
+};
+
+<span class="macro">assert_eq!</span>(
+    cake::Entity::find()
+        .filter(
+            Condition::all().add_option(input.name.map(|n| cake::Column::Name.contains(<span class="kw-2">&amp;</span>n)))
+        )
+        .build(DbBackend::MySql)
+        .to_string(),
+    <span class="string">"SELECT `cake`.`id`, `cake`.`name` FROM `cake` WHERE `cake`.`name` LIKE '%cheese%'"
+</span>);</code></pre></div>
+<p>A slightly more complex example.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::{entity::<span class="kw-2">*</span>, query::<span class="kw-2">*</span>, tests_cfg::cake, sea_query::Expr, DbBackend};
+
+<span class="macro">assert_eq!</span>(
+    cake::Entity::find()
+        .filter(
+            Condition::all()
+                .add(
+                    Condition::all()
+                        .not()
+                        .add(Expr::val(<span class="number">1</span>).eq(<span class="number">1</span>))
+                        .add(Expr::val(<span class="number">2</span>).eq(<span class="number">2</span>))
+                )
+                .add(
+                    Condition::any()
+                        .add(Expr::val(<span class="number">3</span>).eq(<span class="number">3</span>))
+                        .add(Expr::val(<span class="number">4</span>).eq(<span class="number">4</span>))
+                )
+        )
+        .build(DbBackend::Postgres)
+        .to_string(),
+    <span class="string">r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE (NOT (1 = 1 AND 2 = 2)) AND (3 = 3 OR 4 = 4)"#
+</span>);</code></pre></div>
+<p>Use a sea_query expression</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::{entity::<span class="kw-2">*</span>, query::<span class="kw-2">*</span>, sea_query::Expr, tests_cfg::fruit, DbBackend};
+
+<span class="macro">assert_eq!</span>(
+    fruit::Entity::find()
+        .filter(Expr::col(fruit::Column::CakeId).is_null())
+        .build(DbBackend::MySql)
+        .to_string(),
+    <span class="string">"SELECT `fruit`.`id`, `fruit`.`name`, `fruit`.`cake_id` FROM `fruit` WHERE `cake_id` IS NULL"
+</span>);</code></pre></div></div></details><details class="toggle method-toggle" open><summary><section id="method.belongs_to" class="method"><h4 class="code-header">fn <a href="#method.belongs_to" class="fn">belongs_to</a>&lt;M&gt;(self, model: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;M</a>) -&gt; Self<div class="where">where
+    M: <a class="trait" href="trait.ModelTrait.html" title="trait migration::sea_orm::ModelTrait">ModelTrait</a>,</div></h4></section></summary><div class="docblock"><p>Apply a where condition using the model’s primary key</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.belongs_to_tbl_alias" class="method"><h4 class="code-header">fn <a href="#method.belongs_to_tbl_alias" class="fn">belongs_to_tbl_alias</a>&lt;M&gt;(self, model: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;M</a>, tbl_alias: &amp;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a>) -&gt; Self<div class="where">where
+    M: <a class="trait" href="trait.ModelTrait.html" title="trait migration::sea_orm::ModelTrait">ModelTrait</a>,</div></h4></section></summary><div class="docblock"><p>Perform a check to determine table belongs to a Model through it’s name alias</p>
+</div></details></div><h2 id="dyn-compatibility" class="section-header">Dyn Compatibility<a href="#dyn-compatibility" class="anchor">§</a></h2><div class="dyn-compatibility-info"><p>This trait is <b>not</b> <a href="https://doc.rust-lang.org/nightly/reference/items/traits.html#dyn-compatibility">dyn compatible</a>.</p><p><i>In older versions of Rust, dyn compatibility was called "object safety", so this trait is not object safe.</i></p></div><h2 id="implementors" class="section-header">Implementors<a href="#implementors" class="anchor">§</a></h2><div id="implementors-list"><div class="negative-marker"></div><details class="toggle implementors-toggle"><summary><section id="impl-QueryFilter-for-DeleteOne%3CA%3E" class="impl"><a href="#impl-QueryFilter-for-DeleteOne%3CA%3E" class="anchor">§</a><h3 class="code-header">impl&lt;A&gt; <a class="trait" href="trait.QueryFilter.html" title="trait migration::sea_orm::QueryFilter">QueryFilter</a> for <a class="struct" href="struct.DeleteOne.html" title="struct migration::sea_orm::DeleteOne">DeleteOne</a>&lt;A&gt;<div class="where">where
+    A: <a class="trait" href="trait.ActiveModelTrait.html" title="trait migration::sea_orm::ActiveModelTrait">ActiveModelTrait</a>,</div></h3></section></summary><div class="impl-items"><section id="associatedtype.QueryStatement-1" class="associatedtype trait-impl"><a href="#associatedtype.QueryStatement-1" class="anchor">§</a><h4 class="code-header">type <a href="#associatedtype.QueryStatement" class="associatedtype">QueryStatement</a> = <a class="struct" href="../struct.DeleteStatement.html" title="struct migration::DeleteStatement">DeleteStatement</a></h4></section></div></details><details class="toggle implementors-toggle"><summary><section id="impl-QueryFilter-for-UpdateOne%3CA%3E" class="impl"><a href="#impl-QueryFilter-for-UpdateOne%3CA%3E" class="anchor">§</a><h3 class="code-header">impl&lt;A&gt; <a class="trait" href="trait.QueryFilter.html" title="trait migration::sea_orm::QueryFilter">QueryFilter</a> for <a class="struct" href="struct.UpdateOne.html" title="struct migration::sea_orm::UpdateOne">UpdateOne</a>&lt;A&gt;<div class="where">where
+    A: <a class="trait" href="trait.ActiveModelTrait.html" title="trait migration::sea_orm::ActiveModelTrait">ActiveModelTrait</a>,</div></h3></section></summary><div class="impl-items"><section id="associatedtype.QueryStatement-2" class="associatedtype trait-impl"><a href="#associatedtype.QueryStatement-2" class="anchor">§</a><h4 class="code-header">type <a href="#associatedtype.QueryStatement" class="associatedtype">QueryStatement</a> = <a class="struct" href="../struct.UpdateStatement.html" title="struct migration::UpdateStatement">UpdateStatement</a></h4></section></div></details><details class="toggle implementors-toggle"><summary><section id="impl-QueryFilter-for-DeleteMany%3CE%3E" class="impl"><a href="#impl-QueryFilter-for-DeleteMany%3CE%3E" class="anchor">§</a><h3 class="code-header">impl&lt;E&gt; <a class="trait" href="trait.QueryFilter.html" title="trait migration::sea_orm::QueryFilter">QueryFilter</a> for <a class="struct" href="struct.DeleteMany.html" title="struct migration::sea_orm::DeleteMany">DeleteMany</a>&lt;E&gt;<div class="where">where
+    E: <a class="trait" href="trait.EntityTrait.html" title="trait migration::sea_orm::EntityTrait">EntityTrait</a>,</div></h3></section></summary><div class="impl-items"><section id="associatedtype.QueryStatement-3" class="associatedtype trait-impl"><a href="#associatedtype.QueryStatement-3" class="anchor">§</a><h4 class="code-header">type <a href="#associatedtype.QueryStatement" class="associatedtype">QueryStatement</a> = <a class="struct" href="../struct.DeleteStatement.html" title="struct migration::DeleteStatement">DeleteStatement</a></h4></section></div></details><details class="toggle implementors-toggle"><summary><section id="impl-QueryFilter-for-Select%3CE%3E" class="impl"><a href="#impl-QueryFilter-for-Select%3CE%3E" class="anchor">§</a><h3 class="code-header">impl&lt;E&gt; <a class="trait" href="trait.QueryFilter.html" title="trait migration::sea_orm::QueryFilter">QueryFilter</a> for <a class="struct" href="struct.Select.html" title="struct migration::sea_orm::Select">Select</a>&lt;E&gt;<div class="where">where
+    E: <a class="trait" href="trait.EntityTrait.html" title="trait migration::sea_orm::EntityTrait">EntityTrait</a>,</div></h3></section></summary><div class="impl-items"><section id="associatedtype.QueryStatement-4" class="associatedtype trait-impl"><a href="#associatedtype.QueryStatement-4" class="anchor">§</a><h4 class="code-header">type <a href="#associatedtype.QueryStatement" class="associatedtype">QueryStatement</a> = <a class="struct" href="../struct.SelectStatement.html" title="struct migration::SelectStatement">SelectStatement</a></h4></section></div></details><details class="toggle implementors-toggle"><summary><section id="impl-QueryFilter-for-UpdateMany%3CE%3E" class="impl"><a href="#impl-QueryFilter-for-UpdateMany%3CE%3E" class="anchor">§</a><h3 class="code-header">impl&lt;E&gt; <a class="trait" href="trait.QueryFilter.html" title="trait migration::sea_orm::QueryFilter">QueryFilter</a> for <a class="struct" href="struct.UpdateMany.html" title="struct migration::sea_orm::UpdateMany">UpdateMany</a>&lt;E&gt;<div class="where">where
+    E: <a class="trait" href="trait.EntityTrait.html" title="trait migration::sea_orm::EntityTrait">EntityTrait</a>,</div></h3></section></summary><div class="impl-items"><section id="associatedtype.QueryStatement-5" class="associatedtype trait-impl"><a href="#associatedtype.QueryStatement-5" class="anchor">§</a><h4 class="code-header">type <a href="#associatedtype.QueryStatement" class="associatedtype">QueryStatement</a> = <a class="struct" href="../struct.UpdateStatement.html" title="struct migration::UpdateStatement">UpdateStatement</a></h4></section></div></details><details class="toggle implementors-toggle"><summary><section id="impl-QueryFilter-for-SelectTwo%3CE,+F%3E" class="impl"><a href="#impl-QueryFilter-for-SelectTwo%3CE,+F%3E" class="anchor">§</a><h3 class="code-header">impl&lt;E, F&gt; <a class="trait" href="trait.QueryFilter.html" title="trait migration::sea_orm::QueryFilter">QueryFilter</a> for <a class="struct" href="struct.SelectTwo.html" title="struct migration::sea_orm::SelectTwo">SelectTwo</a>&lt;E, F&gt;<div class="where">where
+    E: <a class="trait" href="trait.EntityTrait.html" title="trait migration::sea_orm::EntityTrait">EntityTrait</a>,
+    F: <a class="trait" href="trait.EntityTrait.html" title="trait migration::sea_orm::EntityTrait">EntityTrait</a>,</div></h3></section></summary><div class="impl-items"><section id="associatedtype.QueryStatement-6" class="associatedtype trait-impl"><a href="#associatedtype.QueryStatement-6" class="anchor">§</a><h4 class="code-header">type <a href="#associatedtype.QueryStatement" class="associatedtype">QueryStatement</a> = <a class="struct" href="../struct.SelectStatement.html" title="struct migration::SelectStatement">SelectStatement</a></h4></section></div></details><details class="toggle implementors-toggle"><summary><section id="impl-QueryFilter-for-SelectTwoMany%3CE,+F%3E" class="impl"><a href="#impl-QueryFilter-for-SelectTwoMany%3CE,+F%3E" class="anchor">§</a><h3 class="code-header">impl&lt;E, F&gt; <a class="trait" href="trait.QueryFilter.html" title="trait migration::sea_orm::QueryFilter">QueryFilter</a> for <a class="struct" href="struct.SelectTwoMany.html" title="struct migration::sea_orm::SelectTwoMany">SelectTwoMany</a>&lt;E, F&gt;<div class="where">where
+    E: <a class="trait" href="trait.EntityTrait.html" title="trait migration::sea_orm::EntityTrait">EntityTrait</a>,
+    F: <a class="trait" href="trait.EntityTrait.html" title="trait migration::sea_orm::EntityTrait">EntityTrait</a>,</div></h3></section></summary><div class="impl-items"><section id="associatedtype.QueryStatement-7" class="associatedtype trait-impl"><a href="#associatedtype.QueryStatement-7" class="anchor">§</a><h4 class="code-header">type <a href="#associatedtype.QueryStatement" class="associatedtype">QueryStatement</a> = <a class="struct" href="../struct.SelectStatement.html" title="struct migration::SelectStatement">SelectStatement</a></h4></section></div></details><details class="toggle implementors-toggle"><summary><section id="impl-QueryFilter-for-SelectThree%3CE,+F,+G%3E" class="impl"><a href="#impl-QueryFilter-for-SelectThree%3CE,+F,+G%3E" class="anchor">§</a><h3 class="code-header">impl&lt;E, F, G&gt; <a class="trait" href="trait.QueryFilter.html" title="trait migration::sea_orm::QueryFilter">QueryFilter</a> for <a class="struct" href="struct.SelectThree.html" title="struct migration::sea_orm::SelectThree">SelectThree</a>&lt;E, F, G&gt;<div class="where">where
+    E: <a class="trait" href="trait.EntityTrait.html" title="trait migration::sea_orm::EntityTrait">EntityTrait</a>,
+    F: <a class="trait" href="trait.EntityTrait.html" title="trait migration::sea_orm::EntityTrait">EntityTrait</a>,
+    G: <a class="trait" href="trait.EntityTrait.html" title="trait migration::sea_orm::EntityTrait">EntityTrait</a>,</div></h3></section></summary><div class="impl-items"><section id="associatedtype.QueryStatement-8" class="associatedtype trait-impl"><a href="#associatedtype.QueryStatement-8" class="anchor">§</a><h4 class="code-header">type <a href="#associatedtype.QueryStatement" class="associatedtype">QueryStatement</a> = <a class="struct" href="../struct.SelectStatement.html" title="struct migration::SelectStatement">SelectStatement</a></h4></section></div></details></div><script src="../../trait.impl/sea_orm/query/helper/trait.QueryFilter.js" data-ignore-extern-crates="sea_orm" async></script></section></div></main></body></html>

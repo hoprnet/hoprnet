@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["Strategy"],"fn":["hopr_default_strategies","stream_events_to_strategy_with_tick"],"mod":["auto_funding","auto_redeeming","channel_finalizer","errors","strategy"],"type":["StrategyConfig"]};

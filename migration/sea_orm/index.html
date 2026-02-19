@@ -1,0 +1,317 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="      crate docs build status"><title>migration::sea_orm - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-b7b9f40b.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="migration" data-themes="" data-resource-suffix="" data-rustdoc-version="1.95.0-nightly (7057231bd 2026-02-11)" data-channel="nightly" data-search-js="search-fb33671b.js" data-stringdex-js="stringdex-b897f86f.js" data-settings-js="settings-170eb4bf.js" ><script src="../../static.files/storage-f9617a14.js"></script><script defer src="../../crates.js"></script><script defer src="../../static.files/main-12f88f4f.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod crate"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Crate sea_orm</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../migration/index.html">migration</a><span class="version">0.5.0</span></h2></div><div class="sidebar-elems"><ul class="block"><li><a id="all-types" href="all.html">All Items</a></li></ul><section id="rustdoc-toc"><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#seaorm" title="SeaORM">SeaORM</a><ul><li><a href="#seaorm-is-a-relational-orm-to-help-you-build-web-services-in-rust-with-the-familiarity-of-dynamic-languages" title="SeaORM is a relational ORM to help you build web services in Rust with the familiarity of dynamic languages.">SeaORM is a relational ORM to help you build web services in Rust with the familiarity of dynamic languages.</a></li><li><a href="#getting-started" title="Getting Started">Getting Started</a></li><li><a href="#features" title="Features">Features</a></li><li><a href="#a-quick-taste-of-seaorm" title="A quick taste of SeaORM">A quick taste of SeaORM</a></li><li><a href="#-seaography-instant-graphql-api" title="🧭 Seaography: instant GraphQL API">🧭 Seaography: instant GraphQL API</a></li><li><a href="#-seaorm-pro-effortless-admin-panel" title="🖥️ SeaORM Pro: Effortless Admin Panel">🖥️ SeaORM Pro: Effortless Admin Panel</a></li><li><a href="#releases" title="Releases">Releases</a></li><li><a href="#license" title="License">License</a></li><li><a href="#contribution" title="Contribution">Contribution</a></li><li><a href="#sponsorship" title="Sponsorship">Sponsorship</a></li><li><a href="#mascot" title="Mascot">Mascot</a></li></ul></li></ul><h3><a href="#modules">Crate Items</a></h3><ul class="block"><li><a href="#modules" title="Modules">Modules</a></li><li><a href="#macros" title="Macros">Macros</a></li><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#enums" title="Enums">Enums</a></li><li><a href="#traits" title="Traits">Traits</a></li><li><a href="#functions" title="Functions">Functions</a></li><li><a href="#types" title="Type Aliases">Type Aliases</a></li><li><a href="#derives" title="Derive Macros">Derive Macros</a></li></ul></section><div id="rustdoc-modnav"></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../index.html">migration</a></div><h1>Crate <span>sea_orm</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"></span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><div align="center">
+  <img src="https://www.sea-ql.org/SeaORM/img/SeaORM banner.png"/>
+  <h1>SeaORM</h1>
+  <h3>🐚 An async & dynamic ORM for Rust</h3>
+<p><a href="https://crates.io/crates/sea-orm"><img src="https://img.shields.io/crates/v/sea-orm.svg" alt="crate" /></a>
+<a href="https://docs.rs/sea-orm"><img src="https://docs.rs/sea-orm/badge.svg" alt="docs" /></a>
+<a href="https://github.com/SeaQL/sea-orm/actions/workflows/rust.yml"><img src="https://github.com/SeaQL/sea-orm/actions/workflows/rust.yml/badge.svg" alt="build status" /></a></p>
+</div>
+<h2 id="seaorm"><a class="doc-anchor" href="#seaorm">§</a>SeaORM</h2>
+<p><a href="https://github.com/SeaQL/sea-orm/blob/1.1.x/README-zh.md">中文文档</a></p>
+<h5 id="seaorm-is-a-relational-orm-to-help-you-build-web-services-in-rust-with-the-familiarity-of-dynamic-languages"><a class="doc-anchor" href="#seaorm-is-a-relational-orm-to-help-you-build-web-services-in-rust-with-the-familiarity-of-dynamic-languages">§</a>SeaORM is a relational ORM to help you build web services in Rust with the familiarity of dynamic languages.</h5>
+<p><a href="https://github.com/SeaQL/sea-orm/stargazers/"><img src="https://img.shields.io/github/stars/SeaQL/sea-orm.svg?style=social&amp;label=Star&amp;maxAge=1" alt="GitHub stars" /></a>
+If you like what we do, consider starring, sharing and contributing!</p>
+<p>Please help us with maintaining SeaORM by completing the <a href="https://www.sea-ql.org/community-survey/">SeaQL Community Survey 2025</a>!</p>
+<p><a href="https://discord.com/invite/uCPdDXzbdv"><img src="https://img.shields.io/discord/873880840487206962?label=Discord" alt="Discord" /></a>
+Join our Discord server to chat with other members of the SeaQL community!</p>
+<h3 id="getting-started"><a class="doc-anchor" href="#getting-started">§</a>Getting Started</h3>
+<ul>
+<li><a href="https://www.sea-ql.org/SeaORM">Documentation</a></li>
+<li><a href="https://www.sea-ql.org/sea-orm-tutorial">Tutorial</a></li>
+<li><a href="https://www.sea-ql.org/sea-orm-cookbook">Cookbook</a></li>
+</ul>
+<p>Integration examples:</p>
+<ul>
+<li><a href="https://github.com/SeaQL/sea-orm/tree/master/examples/actix_example">Actix v4 Example</a></li>
+<li><a href="https://github.com/SeaQL/sea-orm/tree/master/examples/axum_example">Axum Example</a></li>
+<li><a href="https://github.com/SeaQL/sea-orm/tree/master/examples/graphql_example">GraphQL Example</a></li>
+<li><a href="https://github.com/SeaQL/sea-orm/tree/master/examples/jsonrpsee_example">jsonrpsee Example</a></li>
+<li><a href="https://github.com/SeaQL/sea-orm/tree/master/examples/loco_example">Loco TODO Example</a> / <a href="https://github.com/SeaQL/sea-orm/tree/master/examples/loco_starter">Loco REST Starter</a></li>
+<li><a href="https://github.com/SeaQL/sea-orm/tree/master/examples/poem_example">Poem Example</a></li>
+<li><a href="https://github.com/SeaQL/sea-orm/tree/master/examples/rocket_example">Rocket Example</a> / <a href="https://github.com/SeaQL/sea-orm/tree/master/examples/rocket_okapi_example">Rocket OpenAPI Example</a></li>
+<li><a href="https://github.com/SeaQL/sea-orm/tree/master/examples/salvo_example">Salvo Example</a></li>
+<li><a href="https://github.com/SeaQL/sea-orm/tree/master/examples/tonic_example">Tonic Example</a></li>
+<li><a href="https://github.com/SeaQL/sea-orm/tree/master/examples/seaography_example">Seaography Example</a></li>
+</ul>
+<h3 id="features"><a class="doc-anchor" href="#features">§</a>Features</h3>
+<ol>
+<li>
+<p>Async</p>
+<p>Relying on <a href="https://github.com/launchbadge/sqlx">SQLx</a>, SeaORM is a new library with async support from day 1.</p>
+</li>
+<li>
+<p>Dynamic</p>
+<p>Built upon <a href="https://github.com/SeaQL/sea-query">SeaQuery</a>, SeaORM allows you to build complex dynamic queries.</p>
+</li>
+<li>
+<p>Service Oriented</p>
+<p>Quickly build services that join, filter, sort and paginate data in REST, GraphQL and gRPC APIs.</p>
+</li>
+<li>
+<p>Production Ready</p>
+<p>SeaORM is feature-rich, well-tested and used in production by companies and startups.</p>
+</li>
+</ol>
+<h3 id="a-quick-taste-of-seaorm"><a class="doc-anchor" href="#a-quick-taste-of-seaorm">§</a>A quick taste of SeaORM</h3><h4 id="entity"><a class="doc-anchor" href="#entity">§</a>Entity</h4>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::entity::prelude::<span class="kw-2">*</span>;
+
+<span class="attr">#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+#[sea_orm(table_name = <span class="string">"cake"</span>)]
+</span><span class="kw">pub struct </span>Model {
+    <span class="attr">#[sea_orm(primary_key)]
+    </span><span class="kw">pub </span>id: i32,
+    <span class="kw">pub </span>name: String,
+}
+
+<span class="attr">#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+</span><span class="kw">pub enum </span>Relation {
+    <span class="attr">#[sea_orm(has_many = <span class="string">"super::fruit::Entity"</span>)]
+    </span>Fruit,
+}
+
+<span class="kw">impl </span>Related&lt;<span class="kw">super</span>::fruit::Entity&gt; <span class="kw">for </span>Entity {
+    <span class="kw">fn </span>to() -&gt; RelationDef {
+        Relation::Fruit.def()
+    }
+}</code></pre></div><h4 id="select"><a class="doc-anchor" href="#select">§</a>Select</h4>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="comment">// find all models
+</span><span class="kw">let </span>cakes: Vec&lt;cake::Model&gt; = Cake::find().all(db).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="comment">// find and filter
+</span><span class="kw">let </span>chocolate: Vec&lt;cake::Model&gt; = Cake::find()
+    .filter(cake::Column::Name.contains(<span class="string">"chocolate"</span>))
+    .all(db)
+    .<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="comment">// find one model
+</span><span class="kw">let </span>cheese: <span class="prelude-ty">Option</span>&lt;cake::Model&gt; = Cake::find_by_id(<span class="number">1</span>).one(db).<span class="kw">await</span><span class="question-mark">?</span>;
+<span class="kw">let </span>cheese: cake::Model = cheese.unwrap();
+
+<span class="comment">// find related models (lazy)
+</span><span class="kw">let </span>fruits: Vec&lt;fruit::Model&gt; = cheese.find_related(Fruit).all(db).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="comment">// find related models (eager)
+</span><span class="kw">let </span>cake_with_fruits: Vec&lt;(cake::Model, Vec&lt;fruit::Model&gt;)&gt; =
+    Cake::find().find_with_related(Fruit).all(db).<span class="kw">await</span><span class="question-mark">?</span>;
+</code></pre></div><h4 id="nested-select"><a class="doc-anchor" href="#nested-select">§</a>Nested Select</h4>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::DerivePartialModel;
+
+<span class="attr">#[derive(DerivePartialModel)]
+#[sea_orm(entity = <span class="string">"cake::Entity"</span>, from_query_result)]
+</span><span class="kw">struct </span>CakeWithFruit {
+    id: i32,
+    name: String,
+    <span class="attr">#[sea_orm(nested)]
+    </span>fruit: <span class="prelude-ty">Option</span>&lt;Fruit&gt;,
+}
+
+<span class="attr">#[derive(DerivePartialModel)]
+#[sea_orm(entity = <span class="string">"fruit::Entity"</span>, from_query_result)]
+</span><span class="kw">struct </span>Fruit {
+    id: i32,
+    name: String,
+}
+
+<span class="kw">let </span>cakes: Vec&lt;CakeWithFruit&gt; = cake::Entity::find()
+    .left_join(fruit::Entity)
+    .into_partial_model()
+    .all(db)
+    .<span class="kw">await</span><span class="question-mark">?</span>;</code></pre></div><h4 id="insert"><a class="doc-anchor" href="#insert">§</a>Insert</h4>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>apple = fruit::ActiveModel {
+    name: Set(<span class="string">"Apple"</span>.to_owned()),
+    ..Default::default() <span class="comment">// no need to set primary key
+</span>};
+
+<span class="kw">let </span>pear = fruit::ActiveModel {
+    name: Set(<span class="string">"Pear"</span>.to_owned()),
+    ..Default::default()
+};
+
+<span class="comment">// insert one
+</span><span class="kw">let </span>pear = pear.insert(db).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="comment">// insert many
+</span>Fruit::insert_many([apple, pear]).exec(db).<span class="kw">await</span><span class="question-mark">?</span>;</code></pre></div><h4 id="insert-advanced"><a class="doc-anchor" href="#insert-advanced">§</a>Insert (advanced)</h4>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="comment">// insert many with returning (if supported by database)
+</span><span class="kw">let </span>models: Vec&lt;fruit::Model&gt; = Fruit::insert_many([apple, pear])
+    .exec_with_returning_many(db)
+    .<span class="kw">await</span><span class="question-mark">?</span>;
+models[<span class="number">0</span>]
+    == fruit::Model {
+        id: <span class="number">1</span>,
+        name: <span class="string">"Apple"</span>.to_owned(),
+        cake_id: <span class="prelude-val">None</span>,
+    };
+
+<span class="comment">// insert with ON CONFLICT on primary key do nothing, with MySQL specific polyfill
+</span><span class="kw">let </span>result = Fruit::insert_many([apple, pear])
+    .on_conflict_do_nothing()
+    .exec(db)
+    .<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="macro">matches!</span>(result, TryInsertResult::Conflicted);</code></pre></div><h4 id="update"><a class="doc-anchor" href="#update">§</a>Update</h4>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::sea_query::{Expr, Value};
+
+<span class="kw">let </span>pear: <span class="prelude-ty">Option</span>&lt;fruit::Model&gt; = Fruit::find_by_id(<span class="number">1</span>).one(db).<span class="kw">await</span><span class="question-mark">?</span>;
+<span class="kw">let </span><span class="kw-2">mut </span>pear: fruit::ActiveModel = pear.unwrap().into();
+
+pear.name = Set(<span class="string">"Sweet pear"</span>.to_owned());
+
+<span class="comment">// update one
+</span><span class="kw">let </span>pear: fruit::Model = pear.update(db).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="comment">// update many: UPDATE "fruit" SET "cake_id" = NULL WHERE "fruit"."name" LIKE '%Apple%'
+</span>Fruit::update_many()
+    .col_expr(fruit::Column::CakeId, Expr::value(Value::Int(<span class="prelude-val">None</span>)))
+    .filter(fruit::Column::Name.contains(<span class="string">"Apple"</span>))
+    .exec(db)
+    .<span class="kw">await</span><span class="question-mark">?</span>;
+</code></pre></div><h4 id="save"><a class="doc-anchor" href="#save">§</a>Save</h4>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>banana = fruit::ActiveModel {
+    id: NotSet,
+    name: Set(<span class="string">"Banana"</span>.to_owned()),
+    ..Default::default()
+};
+
+<span class="comment">// create, because primary key `id` is `NotSet`
+</span><span class="kw">let </span><span class="kw-2">mut </span>banana = banana.save(db).<span class="kw">await</span><span class="question-mark">?</span>;
+
+banana.name = Set(<span class="string">"Banana Mongo"</span>.to_owned());
+
+<span class="comment">// update, because primary key `id` is `Set`
+</span><span class="kw">let </span>banana = banana.save(db).<span class="kw">await</span><span class="question-mark">?</span>;
+</code></pre></div><h4 id="delete"><a class="doc-anchor" href="#delete">§</a>Delete</h4>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="comment">// delete one
+</span><span class="kw">let </span>orange: <span class="prelude-ty">Option</span>&lt;fruit::Model&gt; = Fruit::find_by_id(<span class="number">1</span>).one(db).<span class="kw">await</span><span class="question-mark">?</span>;
+<span class="kw">let </span>orange: fruit::Model = orange.unwrap();
+fruit::Entity::delete(orange.into_active_model())
+    .exec(db)
+    .<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="comment">// or simply
+</span><span class="kw">let </span>orange: <span class="prelude-ty">Option</span>&lt;fruit::Model&gt; = Fruit::find_by_id(<span class="number">1</span>).one(db).<span class="kw">await</span><span class="question-mark">?</span>;
+<span class="kw">let </span>orange: fruit::Model = orange.unwrap();
+orange.delete(db).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="comment">// delete many: DELETE FROM "fruit" WHERE "fruit"."name" LIKE '%Orange%'
+</span>fruit::Entity::delete_many()
+    .filter(fruit::Column::Name.contains(<span class="string">"Orange"</span>))
+    .exec(db)
+    .<span class="kw">await</span><span class="question-mark">?</span>;
+</code></pre></div><h3 id="-seaography-instant-graphql-api"><a class="doc-anchor" href="#-seaography-instant-graphql-api">§</a>🧭 Seaography: instant GraphQL API</h3>
+<p><a href="https://github.com/SeaQL/seaography">Seaography</a> is a GraphQL framework built on top of SeaORM. Seaography allows you to build GraphQL resolvers quickly. With just a few commands, you can launch a GraphQL server from SeaORM entities!</p>
+<p>Look at the <a href="https://github.com/SeaQL/sea-orm/tree/master/examples/seaography_example">Seaography Example</a> to learn more.</p>
+<img src="https://raw.githubusercontent.com/SeaQL/sea-orm/master/examples/seaography_example/Seaography%20example.png"/>
+<h3 id="-seaorm-pro-effortless-admin-panel"><a class="doc-anchor" href="#-seaorm-pro-effortless-admin-panel">§</a>🖥️ SeaORM Pro: Effortless Admin Panel</h3>
+<p><a href="https://www.sea-ql.org/sea-orm-pro/">SeaORM Pro</a> is an admin panel solution allowing you to quickly and easily launch an admin panel for your application - frontend development skills not required, but certainly nice to have!</p>
+<p>Features:</p>
+<ul>
+<li>Full CRUD</li>
+<li>Built on React + GraphQL</li>
+<li>Built-in GraphQL resolver</li>
+<li>Customize the UI with simple TOML</li>
+</ul>
+<p>Learn More</p>
+<ul>
+<li><a href="https://github.com/SeaQL/sea-orm-pro">Example Repo</a></li>
+<li><a href="https://www.sea-ql.org/sea-orm-pro/docs/install-and-config/getting-started-loco/">Getting Started with Loco</a></li>
+<li><a href="https://www.sea-ql.org/sea-orm-pro/docs/install-and-config/getting-started-axum/">Getting Started with Axum</a></li>
+</ul>
+<p><img src="https://raw.githubusercontent.com/SeaQL/sea-orm/refs/heads/master/docs/sea-orm-pro-dark.png#gh-dark-mode-only" alt="" />
+<img src="https://raw.githubusercontent.com/SeaQL/sea-orm/refs/heads/master/docs/sea-orm-pro-light.png#gh-light-mode-only" alt="" /></p>
+<h3 id="releases"><a class="doc-anchor" href="#releases">§</a>Releases</h3>
+<p><a href="https://www.sea-ql.org/blog/2024-08-04-sea-orm-1.0/">SeaORM 1.0</a> is a stable release. The 1.x version will be updated until at least October 2025, and we’ll decide whether to release a 2.0 version or extend the 1.x life cycle.</p>
+<p>It doesn’t mean that SeaORM is ‘done’, we’ve designed an architecture to allow us to deliver new features without major breaking changes. In fact, more features are coming!</p>
+<ul>
+<li><a href="https://github.com/SeaQL/sea-orm/tree/master/CHANGELOG.md">Change Log</a></li>
+</ul>
+<h4 id="whos-using-seaorm"><a class="doc-anchor" href="#whos-using-seaorm">§</a>Who’s using SeaORM?</h4>
+<p>Here is a short list of awesome open source software built with SeaORM. <a href="https://github.com/SeaQL/sea-orm/blob/master/COMMUNITY.md#built-with-seaorm">Full list here</a>. Feel free to submit yours!</p>
+<div><table><thead><tr><th>Project</th><th>GitHub</th><th>Tagline</th></tr></thead><tbody>
+<tr><td><a href="https://github.com/zed-industries/zed">Zed</a></td><td><img src="https://img.shields.io/github/stars/zed-industries/zed.svg?style=social" alt="GitHub stars" /></td><td>A high-performance, multiplayer code editor</td></tr>
+<tr><td><a href="https://github.com/openobserve/openobserve">OpenObserve</a></td><td><img src="https://img.shields.io/github/stars/openobserve/openobserve.svg?style=social" alt="GitHub stars" /></td><td>Open-source observability platform</td></tr>
+<tr><td><a href="https://github.com/risingwavelabs/risingwave">RisingWave</a></td><td><img src="https://img.shields.io/github/stars/risingwavelabs/risingwave.svg?style=social" alt="GitHub stars" /></td><td>Stream processing and management platform</td></tr>
+<tr><td><a href="https://github.com/nitnelave/lldap">LLDAP</a></td><td><img src="https://img.shields.io/github/stars/nitnelave/lldap.svg?style=social" alt="GitHub stars" /></td><td>A light LDAP server for user management</td></tr>
+<tr><td><a href="https://github.com/warp-tech/warpgate">Warpgate</a></td><td><img src="https://img.shields.io/github/stars/warp-tech/warpgate.svg?style=social" alt="GitHub stars" /></td><td>Smart SSH bastion that works with any SSH client</td></tr>
+<tr><td><a href="https://github.com/svix/svix-webhooks">Svix</a></td><td><img src="https://img.shields.io/github/stars/svix/svix-webhooks.svg?style=social" alt="GitHub stars" /></td><td>The enterprise ready webhooks service</td></tr>
+<tr><td><a href="https://github.com/IgnisDa/ryot">Ryot</a></td><td><img src="https://img.shields.io/github/stars/ignisda/ryot.svg?style=social" alt="GitHub stars" /></td><td>The only self hosted tracker you will ever need</td></tr>
+<tr><td><a href="https://github.com/lapce/lapdev">Lapdev</a></td><td><img src="https://img.shields.io/github/stars/lapce/lapdev.svg?style=social" alt="GitHub stars" /></td><td>Self-hosted remote development enviroment</td></tr>
+<tr><td><a href="https://github.com/systeminit/si">System Initiative</a></td><td><img src="https://img.shields.io/github/stars/systeminit/si.svg?style=social" alt="GitHub stars" /></td><td>DevOps Automation Platform</td></tr>
+<tr><td><a href="https://github.com/toeverything/OctoBase">OctoBase</a></td><td><img src="https://img.shields.io/github/stars/toeverything/OctoBase.svg?style=social" alt="GitHub stars" /></td><td>A light-weight, scalable, offline collaborative data backend</td></tr>
+</tbody></table>
+</div><h3 id="license"><a class="doc-anchor" href="#license">§</a>License</h3>
+<p>Licensed under either of</p>
+<ul>
+<li>Apache License, Version 2.0
+(<a href="LICENSE-APACHE">LICENSE-APACHE</a> or <a href="http://www.apache.org/licenses/LICENSE-2.0">http://www.apache.org/licenses/LICENSE-2.0</a>)</li>
+<li>MIT license
+(<a href="LICENSE-MIT">LICENSE-MIT</a> or <a href="http://opensource.org/licenses/MIT">http://opensource.org/licenses/MIT</a>)</li>
+</ul>
+<p>at your option.</p>
+<h3 id="contribution"><a class="doc-anchor" href="#contribution">§</a>Contribution</h3>
+<p>Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
+dual licensed as above, without any additional terms or conditions.</p>
+<p>We invite you to participate, contribute and together help build Rust’s future.</p>
+<p>A big shout out to our contributors!</p>
+<p><a href="https://github.com/SeaQL/sea-orm/graphs/contributors"><img src="https://opencollective.com/sea-orm/contributors.svg?width=1000&amp;button=false" alt="Contributors" /></a></p>
+<h3 id="sponsorship"><a class="doc-anchor" href="#sponsorship">§</a>Sponsorship</h3>
+<p><a href="https://www.sea-ql.org/">SeaQL.org</a> is an independent open-source organization run by passionate developers. If you enjoy using our libraries, please star and share our repositories. If you feel generous, a small donation via <a href="https://github.com/sponsors/SeaQL">GitHub Sponsor</a> will be greatly appreciated, and goes a long way towards sustaining the organization.</p>
+<h4 id="gold-sponsors"><a class="doc-anchor" href="#gold-sponsors">§</a>Gold Sponsors</h4><table><tr>
+<td><a href="https://qdx.co/">
+  <img src="https://www.sea-ql.org/static/sponsors/QDX.svg" width="138"/>
+</a></td>
+</tr></table>
+<p><a href="https://qdx.co/">QDX</a> pioneers quantum dynamics-powered drug discovery, leveraging AI and supercomputing to accelerate molecular modeling.
+We’re immensely grateful to QDX for sponsoring the development of SeaORM, the SQL toolkit that powers their data engineering workflows.</p>
+<h4 id="silver-sponsors"><a class="doc-anchor" href="#silver-sponsors">§</a>Silver Sponsors</h4>
+<p>We’re grateful to our silver sponsors: Digital Ocean, for sponsoring our servers. And JetBrains, for sponsoring our IDE.</p>
+<table><tr>
+<td><a href="https://www.digitalocean.com/">
+  <img src="https://www.sea-ql.org/static/sponsors/DigitalOcean.svg" width="125">
+</a></td>
+<td><a href="https://www.jetbrains.com/">
+  <img src="https://www.sea-ql.org/static/sponsors/JetBrains.svg" width="125">
+</a></td>
+</tr></table>
+<h3 id="mascot"><a class="doc-anchor" href="#mascot">§</a>Mascot</h3>
+<p>A friend of Ferris, Terres the hermit crab is the official mascot of SeaORM. His hobby is collecting shells.</p>
+<img alt="Terres" src="https://www.sea-ql.org/SeaORM/img/Terres.png" width="400"/>
+<h4 id="rustacean-sticker-pack-"><a class="doc-anchor" href="#rustacean-sticker-pack-">§</a>Rustacean Sticker Pack 🦀</h4>
+<p>The Rustacean Sticker Pack is the perfect way to express your passion for Rust.
+Our stickers are made with a premium water-resistant vinyl with a unique matte finish.
+Stick them on your laptop, notebook, or any gadget to show off your love for Rust!</p>
+<p>Sticker Pack Contents:</p>
+<ul>
+<li>Logo of SeaQL projects: SeaQL, SeaORM, SeaQuery, Seaography, FireDBG</li>
+<li>Mascot of SeaQL: Terres the Hermit Crab</li>
+<li>Mascot of Rust: Ferris the Crab</li>
+<li>The Rustacean word</li>
+</ul>
+<p><a href="https://www.sea-ql.org/sticker-pack/">Support SeaQL and get a Sticker Pack!</a> All proceeds contributes directly to the ongoing development of SeaQL projects.</p>
+<p><a href="https://www.sea-ql.org/sticker-pack/"><img alt="Rustacean Sticker Pack by SeaQL" src="https://www.sea-ql.org/static/sticker-pack-1s.jpg" width="600"/></a></p>
+</div></details><h2 id="modules" class="section-header">Modules<a href="#modules" class="anchor">§</a></h2><dl class="item-table"><dt><a class="mod" href="entity/index.html" title="mod migration::sea_orm::entity">entity</a></dt><dd>Module for the Entity type and operations</dd><dt><a class="mod" href="error/index.html" title="mod migration::sea_orm::error">error</a></dt><dd>Error types for all database operations</dd><dt><a class="mod" href="metric/index.html" title="mod migration::sea_orm::metric">metric</a></dt><dd>Types and methods to perform metric collection</dd><dt><a class="mod" href="query/index.html" title="mod migration::sea_orm::query">query</a></dt><dd>Types and methods to perform queries</dd><dt><a class="mod" href="schema/index.html" title="mod migration::sea_orm::schema">schema</a></dt><dd>Types that defines the schemas of an Entity</dd><dt><a class="mod" href="sea_query/index.html" title="mod migration::sea_orm::sea_query">sea_<wbr>query</a></dt><dd><div align="center">
+</dd><dt><a class="mod" href="sqlx/index.html" title="mod migration::sea_orm::sqlx">sqlx</a></dt><dd>The async SQL toolkit for Rust, built with ❤️ by <a href="https://www.launchbadge.com">the LaunchBadge team</a>.</dd><dt><a class="mod" href="strum/index.html" title="mod migration::sea_orm::strum">strum</a></dt><dd>Strum</dd><dt><a class="mod" href="value/index.html" title="mod migration::sea_orm::value">value</a></dt><dd>Helpers for working with Value</dd></dl><h2 id="macros" class="section-header">Macros<a href="#macros" class="anchor">§</a></h2><dl class="item-table"><dt><a class="macro" href="macro.debug_print.html" title="macro migration::sea_orm::debug_print">debug_<wbr>print</a></dt><dd>Uses the <code>log</code> crate to perform logging.
+This must be enabled using the feature flag <code>debug-print</code>.</dd><dt><a class="macro" href="macro.debug_query.html" title="macro migration::sea_orm::debug_query">debug_<wbr>query</a></dt><dd>Helper to get a raw SQL string from an object that impl <code>QueryTrait</code>.</dd><dt><a class="macro" href="macro.debug_query_stmt.html" title="macro migration::sea_orm::debug_query_stmt">debug_<wbr>query_<wbr>stmt</a></dt><dd>Helper to get a <code>Statement</code> from an object that impl <code>QueryTrait</code>.</dd></dl><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.ColumnDef.html" title="struct migration::sea_orm::ColumnDef">Column<wbr>Def</a></dt><dd>Defines a Column for an Entity</dd><dt><a class="struct" href="struct.ColumnFromStrErr.html" title="struct migration::sea_orm::ColumnFromStrErr">Column<wbr>From<wbr>StrErr</a></dt><dd>Error during <code>impl FromStr for Entity::Column</code></dd><dt><a class="struct" href="struct.Condition.html" title="struct migration::sea_orm::Condition">Condition</a></dt><dd>Represents the value of an <a href="../struct.Condition.html#method.any" title="associated function migration::Condition::any"><code>Condition::any</code></a> or <a href="../struct.Condition.html#method.all" title="associated function migration::Condition::all"><code>Condition::all</code></a>: a set of disjunctive or conjunctive conditions.</dd><dt><a class="struct" href="struct.ConnectOptions.html" title="struct migration::sea_orm::ConnectOptions">Connect<wbr>Options</a></dt><dd>Defines the configuration options of a database</dd><dt><a class="struct" href="struct.Cursor.html" title="struct migration::sea_orm::Cursor">Cursor</a></dt><dd>Cursor pagination</dd><dt><a class="struct" href="struct.Database.html" title="struct migration::sea_orm::Database">Database</a></dt><dd>Defines a database</dd><dt><a class="struct" href="struct.DatabaseTransaction.html" title="struct migration::sea_orm::DatabaseTransaction">Database<wbr>Transaction</a></dt><dd>Defines a database transaction, whether it is an open transaction and the type of
+backend to use</dd><dt><a class="struct" href="struct.DebugQuery.html" title="struct migration::sea_orm::DebugQuery">Debug<wbr>Query</a></dt><dd>This structure provides debug capabilities</dd><dt><a class="struct" href="struct.Delete.html" title="struct migration::sea_orm::Delete">Delete</a></dt><dd>Defines the structure for a delete operation</dd><dt><a class="struct" href="struct.DeleteMany.html" title="struct migration::sea_orm::DeleteMany">Delete<wbr>Many</a></dt><dd>Perform a delete operation on multiple models</dd><dt><a class="struct" href="struct.DeleteOne.html" title="struct migration::sea_orm::DeleteOne">Delete<wbr>One</a></dt><dd>Perform a delete operation on a model</dd><dt><a class="struct" href="struct.DeleteResult.html" title="struct migration::sea_orm::DeleteResult">Delete<wbr>Result</a></dt><dd>The result of a DELETE operation</dd><dt><a class="struct" href="struct.Deleter.html" title="struct migration::sea_orm::Deleter">Deleter</a></dt><dd>Handles DELETE operations in a ActiveModel using <a href="../struct.DeleteStatement.html" title="struct migration::DeleteStatement">DeleteStatement</a></dd><dt><a class="struct" href="struct.ExecResult.html" title="struct migration::sea_orm::ExecResult">Exec<wbr>Result</a></dt><dd>Defines the result of executing an operation</dd><dt><a class="struct" href="struct.Insert.html" title="struct migration::sea_orm::Insert">Insert</a></dt><dd>Performs INSERT operations on a ActiveModel</dd><dt><a class="struct" href="struct.InsertResult.html" title="struct migration::sea_orm::InsertResult">Insert<wbr>Result</a></dt><dd>The result of an INSERT operation on an ActiveModel</dd><dt><a class="struct" href="struct.Inserter.html" title="struct migration::sea_orm::Inserter">Inserter</a></dt><dd>Defines a structure to perform INSERT operations in an ActiveModel</dd><dt><a class="struct" href="struct.ItemsAndPagesNumber.html" title="struct migration::sea_orm::ItemsAndPagesNumber">Items<wbr>AndPages<wbr>Number</a></dt><dd>Define a structure containing the numbers of items and pages of a Paginator</dd><dt><a class="struct" href="struct.Paginator.html" title="struct migration::sea_orm::Paginator">Paginator</a></dt><dd>Defined a structure to handle pagination of a result from a query operation on a Model</dd><dt><a class="struct" href="struct.QueryResult.html" title="struct migration::sea_orm::QueryResult">Query<wbr>Result</a></dt><dd>Defines the result of a query operation on a Model</dd><dt><a class="struct" href="struct.QueryStream.html" title="struct migration::sea_orm::QueryStream">Query<wbr>Stream</a></dt><dd>The self-referencing struct.</dd><dt><a class="struct" href="struct.RelationBuilder.html" title="struct migration::sea_orm::RelationBuilder">Relation<wbr>Builder</a></dt><dd>Defines a helper to build a relation</dd><dt><a class="struct" href="struct.RelationDef.html" title="struct migration::sea_orm::RelationDef">Relation<wbr>Def</a></dt><dd>Defines a relationship</dd><dt><a class="struct" href="struct.Schema.html" title="struct migration::sea_orm::Schema">Schema</a></dt><dd>This is a helper struct to convert <a href="trait.EntityTrait.html" title="trait migration::sea_orm::EntityTrait"><code>EntityTrait</code></a>
+into different <a href="sea_query/index.html" title="mod migration::sea_orm::sea_query"><code>sea_query</code></a> statements.</dd><dt><a class="struct" href="struct.Select.html" title="struct migration::sea_orm::Select">Select</a></dt><dd>Defines a structure to perform select operations</dd><dt><a class="struct" href="struct.SelectA.html" title="struct migration::sea_orm::SelectA">SelectA</a></dt><dd>Implements the traits <a href="../trait.Iden.html" title="trait migration::Iden">Iden</a> and <a href="trait.IdenStatic.html" title="trait migration::sea_orm::IdenStatic">IdenStatic</a> for a type</dd><dt><a class="struct" href="struct.SelectB.html" title="struct migration::sea_orm::SelectB">SelectB</a></dt><dd>Implements the traits <a href="../trait.Iden.html" title="trait migration::Iden">Iden</a> and <a href="trait.IdenStatic.html" title="trait migration::sea_orm::IdenStatic">IdenStatic</a> for a type</dd><dt><a class="struct" href="struct.SelectC.html" title="struct migration::sea_orm::SelectC">SelectC</a></dt><dd>Implements the traits <a href="../trait.Iden.html" title="trait migration::Iden">Iden</a> and <a href="trait.IdenStatic.html" title="trait migration::sea_orm::IdenStatic">IdenStatic</a> for a type</dd><dt><a class="struct" href="struct.SelectGetableTuple.html" title="struct migration::sea_orm::SelectGetableTuple">Select<wbr>Getable<wbr>Tuple</a></dt><dd>Get tuple from query result based on column index</dd><dt><a class="struct" href="struct.SelectGetableValue.html" title="struct migration::sea_orm::SelectGetableValue">Select<wbr>Getable<wbr>Value</a></dt><dd>Get tuple from query result based on a list of column identifiers</dd><dt><a class="struct" href="struct.SelectModel.html" title="struct migration::sea_orm::SelectModel">Select<wbr>Model</a></dt><dd>Helper class to handle query result for 1 Model</dd><dt><a class="struct" href="struct.SelectThree.html" title="struct migration::sea_orm::SelectThree">Select<wbr>Three</a></dt><dd>Defines a structure to perform a SELECT operation on two Models</dd><dt><a class="struct" href="struct.SelectThreeModel.html" title="struct migration::sea_orm::SelectThreeModel">Select<wbr>Three<wbr>Model</a></dt><dd>Helper class to handle query result for 3 Models</dd><dt><a class="struct" href="struct.SelectTwo.html" title="struct migration::sea_orm::SelectTwo">Select<wbr>Two</a></dt><dd>Defines a structure to perform a SELECT operation on two Models</dd><dt><a class="struct" href="struct.SelectTwoMany.html" title="struct migration::sea_orm::SelectTwoMany">Select<wbr>TwoMany</a></dt><dd>Defines a structure to perform a SELECT operation on many Models</dd><dt><a class="struct" href="struct.SelectTwoModel.html" title="struct migration::sea_orm::SelectTwoModel">Select<wbr>TwoModel</a></dt><dd>Helper class to handle query result for 2 Models</dd><dt><a class="struct" href="struct.Selector.html" title="struct migration::sea_orm::Selector">Selector</a></dt><dd>Defines a type to do <code>SELECT</code> operations through a <a href="../struct.SelectStatement.html" title="struct migration::SelectStatement">SelectStatement</a> on a Model</dd><dt><a class="struct" href="struct.SelectorRaw.html" title="struct migration::sea_orm::SelectorRaw">Selector<wbr>Raw</a></dt><dd>Performs a raw <code>SELECT</code> operation on a model</dd><dt><a class="struct" href="struct.SqlxSqliteConnector.html" title="struct migration::sea_orm::SqlxSqliteConnector">Sqlx<wbr>Sqlite<wbr>Connector</a></dt><dd>Defines the <a href="sqlx/sqlite/index.html" title="mod migration::sea_orm::sqlx::sqlite">sqlx::sqlite</a> connector</dd><dt><a class="struct" href="struct.SqlxSqliteError.html" title="struct migration::sea_orm::SqlxSqliteError">Sqlx<wbr>Sqlite<wbr>Error</a></dt><dt><a class="struct" href="struct.SqlxSqlitePoolConnection.html" title="struct migration::sea_orm::SqlxSqlitePoolConnection">Sqlx<wbr>Sqlite<wbr>Pool<wbr>Connection</a></dt><dd>Defines a sqlx SQLite pool</dd><dt><a class="struct" href="struct.Statement.html" title="struct migration::sea_orm::Statement">Statement</a></dt><dd>Defines an SQL statement</dd><dt><a class="struct" href="struct.TransactionStream.html" title="struct migration::sea_orm::TransactionStream">Transaction<wbr>Stream</a></dt><dd>The self-referencing struct.</dd><dt><a class="struct" href="struct.TryInsert.html" title="struct migration::sea_orm::TryInsert">TryInsert</a></dt><dd>Performs INSERT operations on a ActiveModel, will do nothing if input is empty.</dd><dt><a class="struct" href="struct.Update.html" title="struct migration::sea_orm::Update">Update</a></dt><dd>Defines a structure to perform UPDATE query operations on a ActiveModel</dd><dt><a class="struct" href="struct.UpdateMany.html" title="struct migration::sea_orm::UpdateMany">Update<wbr>Many</a></dt><dd>Defines an UPDATE operation on multiple ActiveModels</dd><dt><a class="struct" href="struct.UpdateOne.html" title="struct migration::sea_orm::UpdateOne">Update<wbr>One</a></dt><dd>Defines an UPDATE operation on one ActiveModel</dd><dt><a class="struct" href="struct.UpdateResult.html" title="struct migration::sea_orm::UpdateResult">Update<wbr>Result</a></dt><dd>The result of an update operation on an ActiveModel</dd><dt><a class="struct" href="struct.Updater.html" title="struct migration::sea_orm::Updater">Updater</a></dt><dd>Defines an update operation</dd><dt><a class="struct" href="struct.Values.html" title="struct migration::sea_orm::Values">Values</a></dt></dl><h2 id="enums" class="section-header">Enums<a href="#enums" class="anchor">§</a></h2><dl class="item-table"><dt><a class="enum" href="enum.AccessMode.html" title="enum migration::sea_orm::AccessMode">Access<wbr>Mode</a></dt><dd>Access mode</dd><dt><a class="enum" href="enum.ActiveValue.html" title="enum migration::sea_orm::ActiveValue">Active<wbr>Value</a></dt><dd>Defines a stateful value used in ActiveModel.</dd><dt><a class="enum" href="enum.ColumnType.html" title="enum migration::sea_orm::ColumnType">Column<wbr>Type</a></dt><dd>All column types</dd><dt><a class="enum" href="enum.ConnAcquireErr.html" title="enum migration::sea_orm::ConnAcquireErr">Conn<wbr>Acquire<wbr>Err</a></dt><dd>Connection Acquire error</dd><dt><a class="enum" href="enum.DatabaseBackend.html" title="enum migration::sea_orm::DatabaseBackend">Database<wbr>Backend</a></dt><dd>The type of database backend for real world databases.
+This is enabled by feature flags as specified in the crate documentation</dd><dt><a class="enum" href="enum.DatabaseConnection.html" title="enum migration::sea_orm::DatabaseConnection">Database<wbr>Connection</a></dt><dd>Handle a database connection depending on the backend enabled by the feature
+flags. This creates a database pool. This will be <code>Clone</code> unless the feature
+flag <code>mock</code> is enabled.</dd><dt><a class="enum" href="enum.DbErr.html" title="enum migration::sea_orm::DbErr">DbErr</a></dt><dd>An error from unsuccessful database operations</dd><dt><a class="enum" href="enum.Identity.html" title="enum migration::sea_orm::Identity">Identity</a></dt><dd>List of column identifier</dd><dt><a class="enum" href="enum.IsolationLevel.html" title="enum migration::sea_orm::IsolationLevel">Isolation<wbr>Level</a></dt><dd>Isolation level</dd><dt><a class="enum" href="enum.JoinType.html" title="enum migration::sea_orm::JoinType">Join<wbr>Type</a></dt><dd>Join types</dd><dt><a class="enum" href="enum.JsonValue.html" title="enum migration::sea_orm::JsonValue">Json<wbr>Value</a></dt><dd>Represents any valid JSON value.</dd><dt><a class="enum" href="enum.Order.html" title="enum migration::sea_orm::Order">Order</a></dt><dd>Ordering options</dd><dt><a class="enum" href="enum.RelationType.html" title="enum migration::sea_orm::RelationType">Relation<wbr>Type</a></dt><dd>Defines the type of relationship</dd><dt><a class="enum" href="enum.RuntimeErr.html" title="enum migration::sea_orm::RuntimeErr">Runtime<wbr>Err</a></dt><dd>Runtime error</dd><dt><a class="enum" href="enum.SqlErr.html" title="enum migration::sea_orm::SqlErr">SqlErr</a></dt><dd>An error from unsuccessful SQL query</dd><dt><a class="enum" href="enum.SqlxError.html" title="enum migration::sea_orm::SqlxError">Sqlx<wbr>Error</a></dt><dd>Represents all the ways a method can fail within SQLx.</dd><dt><a class="enum" href="enum.TransactionError.html" title="enum migration::sea_orm::TransactionError">Transaction<wbr>Error</a></dt><dd>Defines errors for handling transaction failures</dd><dt><a class="enum" href="enum.TryGetError.html" title="enum migration::sea_orm::TryGetError">TryGet<wbr>Error</a></dt><dd>An error from trying to get a row from a Model</dd><dt><a class="enum" href="enum.TryInsertResult.html" title="enum migration::sea_orm::TryInsertResult">TryInsert<wbr>Result</a></dt><dd>The types of results for an INSERT operation</dd><dt><a class="enum" href="enum.Value.html" title="enum migration::sea_orm::Value">Value</a></dt><dd>Value variants</dd></dl><h2 id="traits" class="section-header">Traits<a href="#traits" class="anchor">§</a></h2><dl class="item-table"><dt><a class="trait" href="trait.ActiveEnum.html" title="trait migration::sea_orm::ActiveEnum">Active<wbr>Enum</a></dt><dd>A Rust representation of enum defined in database.</dd><dt><a class="trait" href="trait.ActiveEnumValue.html" title="trait migration::sea_orm::ActiveEnumValue">Active<wbr>Enum<wbr>Value</a></dt><dd>The Rust Value backing ActiveEnums</dd><dt><a class="trait" href="trait.ActiveModelBehavior.html" title="trait migration::sea_orm::ActiveModelBehavior">Active<wbr>Model<wbr>Behavior</a></dt><dd>A Trait for overriding the ActiveModel behavior</dd><dt><a class="trait" href="trait.ActiveModelTrait.html" title="trait migration::sea_orm::ActiveModelTrait">Active<wbr>Model<wbr>Trait</a></dt><dd>A Trait for ActiveModel to perform Create, Update or Delete operation.
+The type must also implement the <a href="trait.EntityTrait.html" title="trait migration::sea_orm::EntityTrait">EntityTrait</a>.
+See module level docs <a href="entity/index.html" title="mod migration::sea_orm::entity">crate::entity</a> for a full example</dd><dt><a class="trait" href="trait.ColIdx.html" title="trait migration::sea_orm::ColIdx">ColIdx</a></dt><dd>Column Index, used by <a href="trait.TryGetable.html" title="trait migration::sea_orm::TryGetable"><code>TryGetable</code></a>. Implemented for <code>&amp;str</code> and <code>usize</code></dd><dt><a class="trait" href="trait.ColumnAsExpr.html" title="trait migration::sea_orm::ColumnAsExpr">Column<wbr>AsExpr</a></dt><dd>Extending <a href="trait.IntoSimpleExpr.html" title="trait migration::sea_orm::IntoSimpleExpr">IntoSimpleExpr</a> to support casting ActiveEnum as TEXT in select expression</dd><dt><a class="trait" href="trait.ColumnTrait.html" title="trait migration::sea_orm::ColumnTrait">Column<wbr>Trait</a></dt><dd>API for working with a <code>Column</code>. Mostly a wrapper of the identically named methods in <a href="../struct.Expr.html" title="struct migration::Expr"><code>sea_query::Expr</code></a></dd><dt><a class="trait" href="trait.ColumnTypeTrait.html" title="trait migration::sea_orm::ColumnTypeTrait">Column<wbr>Type<wbr>Trait</a></dt><dd>SeaORM’s utility methods that act on <a href="../enum.ColumnType.html" title="enum migration::ColumnType">ColumnType</a></dd><dt><a class="trait" href="trait.ConditionalStatement.html" title="trait migration::sea_orm::ConditionalStatement">Conditional<wbr>Statement</a></dt><dt><a class="trait" href="trait.ConnectionTrait.html" title="trait migration::sea_orm::ConnectionTrait">Connection<wbr>Trait</a></dt><dd>The generic API for a database connection that can perform query or execute statements.
+It abstracts database connection and transaction</dd><dt><a class="trait" href="trait.CursorTrait.html" title="trait migration::sea_orm::CursorTrait">Cursor<wbr>Trait</a></dt><dd>A trait for any type that can be turn into a cursor</dd><dt><a class="trait" href="trait.EntityName.html" title="trait migration::sea_orm::EntityName">Entity<wbr>Name</a></dt><dd>A Trait for mapping an Entity to a database table</dd><dt><a class="trait" href="trait.EntityOrSelect.html" title="trait migration::sea_orm::EntityOrSelect">Entity<wbr>OrSelect</a></dt><dd>Entity, or a Select<Entity>; to be used as parameters in <a href="trait.LoaderTrait.html" title="trait migration::sea_orm::LoaderTrait"><code>LoaderTrait</code></a></dd><dt><a class="trait" href="trait.EntityTrait.html" title="trait migration::sea_orm::EntityTrait">Entity<wbr>Trait</a></dt><dd>An abstract base class for defining Entities.</dd><dt><a class="trait" href="trait.FromQueryResult.html" title="trait migration::sea_orm::FromQueryResult">From<wbr>Query<wbr>Result</a></dt><dd>A Trait for implementing a <a href="struct.QueryResult.html" title="struct migration::sea_orm::QueryResult">QueryResult</a></dd><dt><a class="trait" href="trait.Iden.html" title="trait migration::sea_orm::Iden">Iden</a></dt><dd>Identifier</dd><dt><a class="trait" href="trait.IdenStatic.html" title="trait migration::sea_orm::IdenStatic">Iden<wbr>Static</a></dt><dd>Ensure the identifier for an Entity can be converted to a static str</dd><dt><a class="trait" href="trait.IdentityOf.html" title="trait migration::sea_orm::IdentityOf">Identity<wbr>Of</a></dt><dd>Check the <a href="enum.Identity.html" title="enum migration::sea_orm::Identity">Identity</a> of an Entity</dd><dt><a class="trait" href="trait.IntoActiveModel.html" title="trait migration::sea_orm::IntoActiveModel">Into<wbr>Active<wbr>Model</a></dt><dd>A Trait for any type that can be converted into an ActiveModel</dd><dt><a class="trait" href="trait.IntoActiveValue.html" title="trait migration::sea_orm::IntoActiveValue">Into<wbr>Active<wbr>Value</a></dt><dd>Any type that can be converted into an <a href="enum.ActiveValue.html" title="enum migration::sea_orm::ActiveValue">ActiveValue</a></dd><dt><a class="trait" href="trait.IntoIdentity.html" title="trait migration::sea_orm::IntoIdentity">Into<wbr>Identity</a></dt><dd>Performs a conversion into an <a href="enum.Identity.html" title="enum migration::sea_orm::Identity">Identity</a></dd><dt><a class="trait" href="trait.IntoSimpleExpr.html" title="trait migration::sea_orm::IntoSimpleExpr">Into<wbr>Simple<wbr>Expr</a></dt><dd>Performs a conversion to <a href="../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a></dd><dt><a class="trait" href="trait.Iterable.html" title="trait migration::sea_orm::Iterable">Iterable</a></dt><dd>This trait designates that an <code>Enum</code> can be iterated over. It can
+be auto generated using the <a href="derive.EnumIter.html"><code>EnumIter</code></a> derive macro.</dd><dt><a class="trait" href="trait.Linked.html" title="trait migration::sea_orm::Linked">Linked</a></dt><dd>A Trait for links between Entities</dd><dt><a class="trait" href="trait.LoaderTrait.html" title="trait migration::sea_orm::LoaderTrait">Loader<wbr>Trait</a></dt><dd>This trait implements the Data Loader API</dd><dt><a class="trait" href="trait.ModelTrait.html" title="trait migration::sea_orm::ModelTrait">Model<wbr>Trait</a></dt><dd>The interface for Model, implemented by data structs</dd><dt><a class="trait" href="trait.OrderedStatement.html" title="trait migration::sea_orm::OrderedStatement">Ordered<wbr>Statement</a></dt><dt><a class="trait" href="trait.PaginatorTrait.html" title="trait migration::sea_orm::PaginatorTrait">Paginator<wbr>Trait</a></dt><dd>A Trait for any type that can paginate results</dd><dt><a class="trait" href="trait.PartialModelTrait.html" title="trait migration::sea_orm::PartialModelTrait">Partial<wbr>Model<wbr>Trait</a></dt><dd>A trait for a part of <a href="trait.ModelTrait.html" title="trait migration::sea_orm::ModelTrait">Model</a></dd><dt><a class="trait" href="trait.PrimaryKeyArity.html" title="trait migration::sea_orm::PrimaryKeyArity">Primary<wbr>KeyArity</a></dt><dd>How many columns this Primary Key comprises</dd><dt><a class="trait" href="trait.PrimaryKeyToColumn.html" title="trait migration::sea_orm::PrimaryKeyToColumn">Primary<wbr>KeyTo<wbr>Column</a></dt><dd>How to map a Primary Key to a column</dd><dt><a class="trait" href="trait.PrimaryKeyTrait.html" title="trait migration::sea_orm::PrimaryKeyTrait">Primary<wbr>KeyTrait</a></dt><dd>A Trait for to be used to define a Primary Key.</dd><dt><a class="trait" href="trait.QueryFilter.html" title="trait migration::sea_orm::QueryFilter">Query<wbr>Filter</a></dt><dd>Perform a FILTER opertation on a statement</dd><dt><a class="trait" href="trait.QueryOrder.html" title="trait migration::sea_orm::QueryOrder">Query<wbr>Order</a></dt><dd>Performs ORDER BY operations</dd><dt><a class="trait" href="trait.QuerySelect.html" title="trait migration::sea_orm::QuerySelect">Query<wbr>Select</a></dt><dd>Abstract API for performing queries</dd><dt><a class="trait" href="trait.QueryTrait.html" title="trait migration::sea_orm::QueryTrait">Query<wbr>Trait</a></dt><dd>A Trait for any type performing queries on a Model or ActiveModel</dd><dt><a class="trait" href="trait.Related.html" title="trait migration::sea_orm::Related">Related</a></dt><dd>Checks if Entities are related</dd><dt><a class="trait" href="trait.RelationTrait.html" title="trait migration::sea_orm::RelationTrait">Relation<wbr>Trait</a></dt><dd>Defines the relations of an Entity</dd><dt><a class="trait" href="trait.SelectColumns.html" title="trait migration::sea_orm::SelectColumns">Select<wbr>Columns</a></dt><dd>Select specific column for partial model queries</dd><dt><a class="trait" href="trait.SelectorTrait.html" title="trait migration::sea_orm::SelectorTrait">Selector<wbr>Trait</a></dt><dd>A Trait for any type that can perform SELECT queries</dd><dt><a class="trait" href="trait.StatementBuilder.html" title="trait migration::sea_orm::StatementBuilder">Statement<wbr>Builder</a></dt><dd>Any type that can build a <a href="struct.Statement.html" title="struct migration::sea_orm::Statement">Statement</a></dd><dt><a class="trait" href="trait.StreamTrait.html" title="trait migration::sea_orm::StreamTrait">Stream<wbr>Trait</a></dt><dd>Stream query results</dd><dt><a class="trait" href="trait.TransactionTrait.html" title="trait migration::sea_orm::TransactionTrait">Transaction<wbr>Trait</a></dt><dd>Spawn database transaction</dd><dt><a class="trait" href="trait.TryFromU64.html" title="trait migration::sea_orm::TryFromU64">TryFrom<wbr>U64</a></dt><dd>Try to convert a type to a u64</dd><dt><a class="trait" href="trait.TryGetable.html" title="trait migration::sea_orm::TryGetable">TryGetable</a></dt><dd>An interface to get a value from the query result</dd><dt><a class="trait" href="trait.TryGetableArray.html" title="trait migration::sea_orm::TryGetableArray">TryGetable<wbr>Array</a></dt><dd>An interface to get an array of values from the query result.
+A type can only implement <code>ActiveEnum</code> or <code>TryGetableFromJson</code>, but not both.
+A blanket impl is provided for <code>TryGetableFromJson</code>, while the impl for <code>ActiveEnum</code>
+is provided by the <code>DeriveActiveEnum</code> macro. So as an end user you won’t normally
+touch this trait.</dd><dt><a class="trait" href="trait.TryGetableFromJson.html" title="trait migration::sea_orm::TryGetableFromJson">TryGetable<wbr>From<wbr>Json</a></dt><dd>An interface to get a JSON from the query result</dd><dt><a class="trait" href="trait.TryGetableMany.html" title="trait migration::sea_orm::TryGetableMany">TryGetable<wbr>Many</a></dt><dd>An interface to get a tuple value from the query result</dd><dt><a class="trait" href="trait.TryIntoModel.html" title="trait migration::sea_orm::TryIntoModel">TryInto<wbr>Model</a></dt><dd>A Trait for any type that can be converted into an Model</dd></dl><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt class="deprecated"><a class="fn" href="fn.Unset.html" title="fn migration::sea_orm::Unset">Unset</a><wbr><span class="stab deprecated" title="">Deprecated</span></dt><dd>Defines an not set operation on an <a href="enum.ActiveValue.html" title="enum migration::sea_orm::ActiveValue">ActiveValue</a></dd></dl><h2 id="types" class="section-header">Type Aliases<a href="#types" class="anchor">§</a></h2><dl class="item-table"><dt><a class="type" href="type.DbBackend.html" title="type migration::sea_orm::DbBackend">DbBackend</a></dt><dd>The same as <a href="enum.DatabaseBackend.html" title="enum migration::sea_orm::DatabaseBackend">DatabaseBackend</a> just shorter :)</dd><dt><a class="type" href="type.DbConn.html" title="type migration::sea_orm::DbConn">DbConn</a></dt><dd>The same as a <a href="enum.DatabaseConnection.html" title="enum migration::sea_orm::DatabaseConnection">DatabaseConnection</a></dd><dt><a class="type" href="type.DynIden.html" title="type migration::sea_orm::DynIden">DynIden</a></dt><dt><a class="type" href="type.ForeignKeyAction.html" title="type migration::sea_orm::ForeignKeyAction">Foreign<wbr>KeyAction</a></dt><dd>Action to perform on a foreign key whenever there are changes
+to an ActiveModel</dd><dt><a class="type" href="type.LinkDef.html" title="type migration::sea_orm::LinkDef">LinkDef</a></dt><dd>Same as <a href="struct.RelationDef.html" title="struct migration::sea_orm::RelationDef">RelationDef</a></dd><dt><a class="type" href="type.PinBoxStream.html" title="type migration::sea_orm::PinBoxStream">PinBox<wbr>Stream</a></dt><dd>Pin a Model so that stream operations can be performed on the model</dd></dl><h2 id="derives" class="section-header">Derive Macros<a href="#derives" class="anchor">§</a></h2><dl class="item-table"><dt><a class="derive" href="derive.DeriveActiveEnum.html" title="derive migration::sea_orm::DeriveActiveEnum">Derive<wbr>Active<wbr>Enum</a></dt><dd>A derive macro to implement <code>sea_orm::ActiveEnum</code> trait for enums.</dd><dt><a class="derive" href="derive.DeriveActiveModel.html" title="derive migration::sea_orm::DeriveActiveModel">Derive<wbr>Active<wbr>Model</a></dt><dd>The DeriveActiveModel derive macro will implement ActiveModelTrait for ActiveModel
+which provides setters and getters for all active values in the active model.</dd><dt><a class="derive" href="derive.DeriveActiveModelBehavior.html" title="derive migration::sea_orm::DeriveActiveModelBehavior">Derive<wbr>Active<wbr>Model<wbr>Behavior</a></dt><dd>Models that a user can override</dd><dt><a class="derive" href="derive.DeriveColumn.html" title="derive migration::sea_orm::DeriveColumn">Derive<wbr>Column</a></dt><dd>The DeriveColumn derive macro will implement [ColumnTrait] for Columns.
+It defines the identifier of each column by implementing Iden and IdenStatic.
+The EnumIter is also derived, allowing iteration over all enum variants.</dd><dt><a class="derive" href="derive.DeriveCustomColumn.html" title="derive migration::sea_orm::DeriveCustomColumn">Derive<wbr>Custom<wbr>Column</a></dt><dd>Derive a column if column names are not in snake-case</dd><dt><a class="derive" href="derive.DeriveDisplay.html" title="derive migration::sea_orm::DeriveDisplay">Derive<wbr>Display</a></dt><dt><a class="derive" href="derive.DeriveEntity.html" title="derive migration::sea_orm::DeriveEntity">Derive<wbr>Entity</a></dt><dd>Create an Entity</dd><dt><a class="derive" href="derive.DeriveEntityModel.html" title="derive migration::sea_orm::DeriveEntityModel">Derive<wbr>Entity<wbr>Model</a></dt><dd>This derive macro is the ‘almighty’ macro which automatically generates
+Entity, Column, and PrimaryKey from a given Model.</dd><dt><a class="derive" href="derive.DeriveIden.html" title="derive migration::sea_orm::DeriveIden">Derive<wbr>Iden</a></dt><dd>The DeriveIden derive macro will implement <code>sea_orm::sea_query::Iden</code> for simplify Iden implementation.</dd><dt><a class="derive" href="derive.DeriveIntoActiveModel.html" title="derive migration::sea_orm::DeriveIntoActiveModel">Derive<wbr>Into<wbr>Active<wbr>Model</a></dt><dd>Derive into an active model</dd><dt><a class="derive" href="derive.DeriveMigrationName.html" title="derive migration::sea_orm::DeriveMigrationName">Derive<wbr>Migration<wbr>Name</a></dt><dd>The DeriveMigrationName derive macro will implement <code>sea_orm_migration::MigrationName</code> for a migration.</dd><dt><a class="derive" href="derive.DeriveModel.html" title="derive migration::sea_orm::DeriveModel">Derive<wbr>Model</a></dt><dd>The DeriveModel derive macro will implement ModelTrait for Model,
+which provides setters and getters for all attributes in the mod
+It also implements FromQueryResult to convert a query result into the corresponding Model.</dd><dt><a class="derive" href="derive.DerivePartialModel.html" title="derive migration::sea_orm::DerivePartialModel">Derive<wbr>Partial<wbr>Model</a></dt><dd>The DerivePartialModel derive macro will implement [<code>sea_orm::PartialModelTrait</code>] for simplify partial model queries.</dd><dt><a class="derive" href="derive.DerivePrimaryKey.html" title="derive migration::sea_orm::DerivePrimaryKey">Derive<wbr>Primary<wbr>Key</a></dt><dd>The DerivePrimaryKey derive macro will implement [PrimaryKeyToColumn]
+for PrimaryKey which defines tedious mappings between primary keys and columns.
+The <a href="derive.EnumIter.html" title="derive migration::sea_orm::EnumIter">EnumIter</a> is also derived, allowing iteration over all enum variants.</dd><dt><a class="derive" href="derive.DeriveRelatedEntity.html" title="derive migration::sea_orm::DeriveRelatedEntity">Derive<wbr>Related<wbr>Entity</a></dt><dd>The DeriveRelatedEntity derive macro will implement seaography::RelationBuilder for RelatedEntity enumeration.</dd><dt><a class="derive" href="derive.DeriveRelation.html" title="derive migration::sea_orm::DeriveRelation">Derive<wbr>Relation</a></dt><dd>The DeriveRelation derive macro will implement RelationTrait for Relation.</dd><dt><a class="derive" href="derive.DeriveValueType.html" title="derive migration::sea_orm::DeriveValueType">Derive<wbr>Value<wbr>Type</a></dt><dd>Implements traits for types that wrap a database value type.</dd><dt><a class="derive" href="derive.EnumIter.html" title="derive migration::sea_orm::EnumIter">Enum<wbr>Iter</a></dt><dd>Creates a new type that iterates of the variants of an enum.</dd><dt><a class="derive" href="derive.FromJsonQueryResult.html" title="derive migration::sea_orm::FromJsonQueryResult">From<wbr>Json<wbr>Query<wbr>Result</a></dt><dt><a class="derive" href="derive.FromQueryResult.html" title="derive migration::sea_orm::FromQueryResult">From<wbr>Query<wbr>Result</a></dt><dd>Convert a query result into the corresponding Model.</dd><dt><a class="derive" href="derive.Iden.html" title="derive migration::sea_orm::Iden">Iden</a></dt></dl></section></div></main></body></html>

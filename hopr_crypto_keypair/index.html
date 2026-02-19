@@ -1,0 +1,31 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Generates, reads, and writes hopr key material following the Ethereum KeyStore standard."><title>hopr_crypto_keypair - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../static.files/rustdoc-b7b9f40b.css"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="hopr_crypto_keypair" data-themes="" data-resource-suffix="" data-rustdoc-version="1.95.0-nightly (7057231bd 2026-02-11)" data-channel="nightly" data-search-js="search-fb33671b.js" data-stringdex-js="stringdex-b897f86f.js" data-settings-js="settings-170eb4bf.js" ><script src="../static.files/storage-f9617a14.js"></script><script defer src="../crates.js"></script><script defer src="../static.files/main-12f88f4f.js"></script><noscript><link rel="stylesheet" href="../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-044be391.svg"></head><body class="rustdoc mod crate"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Crate hopr_crypto_keypair</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../hopr_crypto_keypair/index.html">hopr_<wbr>crypto_<wbr>keypair</a><span class="version">0.5.0</span></h2></div><div class="sidebar-elems"><ul class="block"><li><a id="all-types" href="all.html">All Items</a></li></ul><section id="rustdoc-toc"><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#key-format" title="Key format">Key format</a></li><li><a href="#example" title="Example">Example</a></li></ul><h3><a href="#modules">Crate Items</a></h3><ul class="block"><li><a href="#modules" title="Modules">Modules</a></li></ul></section><div id="rustdoc-modnav"></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1>Crate <span>hopr_<wbr>crypto_<wbr>keypair</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../src/hopr_crypto_keypair/lib.rs.html#1-49">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Generates, reads, and writes hopr key material following the Ethereum KeyStore standard.</p>
+<p>Reimplements the <code>eth_keystore</code> crate to support WASM which cannot be used because using custom FS access is not
+foreseen and utilized version of <code>uuid</code> cannot use JS <code>getrandom</code> entropy.</p>
+<p>Automatically migrates keyStore that only have a <code>chain_key</code> to those who also store a <code>packet_key</code>.</p>
+<h2 id="key-format"><a class="doc-anchor" href="#key-format">§</a>Key format</h2><div class="example-wrap"><pre class="language-json"><code>{
+  &quot;version&quot;: 2,
+  &quot;chain_key&quot;: &quot;7a714c922cd769ab6702ffac411fb1a4d28500613e2ac8bf71f14c3604bba091&quot;,
+  &quot;packet_key&quot;: &quot;5d147b58bce1664f88e60921a9aa8195cc54081e587b24e66005bbf60fbf480c&quot;
+}</code></pre></div><h2 id="example"><a class="doc-anchor" href="#example">§</a>Example</h2>
+<p>Key store file (password: <code>e2e-test</code>)</p>
+<div class="example-wrap"><pre class="language-json"><code>{
+  &quot;crypto&quot;: {
+    &quot;cipher&quot;: &quot;aes-128-ctr&quot;,
+    &quot;cipherparams&quot;: { &quot;iv&quot;: &quot;3b0551f925bfd0ded154ec487dc78d29&quot; },
+    &quot;ciphertext&quot;: &quot;bbdb25cdbeff683926999baee0e929c4e9922ca0b4c99e90351aa8fa286b10d7a5bcdfe2e58cffc9d4f9df10121d0b4b1ac697f97909e8f9fdf15aff91b555cb7ca8b5e10ed747de9a99c0e9d3c540ed09997689ec5aba0d0a946e5ea167c7e4be91fa67be419fd0169aca1d73229d0049bff82e3f6c3256c7a2ba24bb4b02aefa224f0ad70479a5e117b3cc133adf03021aceb2152b8727ccd559ce3758bf523e429a4f4806b58fa5597532&quot;,
+    &quot;kdf&quot;: &quot;scrypt&quot;,
+    &quot;kdfparams&quot;: {
+      &quot;dklen&quot;: 32,
+      &quot;n&quot;: 2,
+      &quot;p&quot;: 1,
+      &quot;r&quot;: 8,
+      &quot;salt&quot;: &quot;01da6de6a096ba594fd1119ad907e8fbf531874a4bcc234a3a88b2e9e4d8cb06&quot;
+    },
+    &quot;mac&quot;: &quot;a18ae65efbc0d0085ff6a26956695f704509cdb6a05ee168e2017c4399e8be43&quot;
+  },
+  &quot;id&quot;: &quot;68172b5b-e4e7-4ac9-9932-352a95f11561&quot;,
+  &quot;version&quot;: 3
+}</code></pre></div>
+<p>leading to following PeerIds:</p>
+<div class="example-wrap"><pre class="language-shell"><code>  chain_key 16Uiu2HAmJqfGeZPa8VJ8263NDjehHkMXYqYzbi4zqhH7Y3RKsEoV (secp256k1)
+  packet_key 12D3KooWPGsW7vZ8VsmJ9Lws9vsKaBiACZXQ3omRm3rFUho5BpvF (ed25519)</code></pre></div></div></details><h2 id="modules" class="section-header">Modules<a href="#modules" class="anchor">§</a></h2><dl class="item-table"><dt><a class="mod" href="errors/index.html" title="mod hopr_crypto_keypair::errors">errors</a></dt><dt><a class="mod" href="key_pair/index.html" title="mod hopr_crypto_keypair::key_pair">key_<wbr>pair</a></dt><dt><a class="mod" href="keystore/index.html" title="mod hopr_crypto_keypair::keystore">keystore</a></dt></dl></section></div></main></body></html>

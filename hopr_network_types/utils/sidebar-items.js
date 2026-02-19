@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["copy_duplex","copy_duplex_abortable"],"struct":["AsyncReadStreamer","AsyncWriteSink","DuplexIO"]};

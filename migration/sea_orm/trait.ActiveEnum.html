@@ -1,0 +1,123 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="A Rust representation of enum defined in database."><title>ActiveEnum in migration::sea_orm - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-b7b9f40b.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="migration" data-themes="" data-resource-suffix="" data-rustdoc-version="1.95.0-nightly (7057231bd 2026-02-11)" data-channel="nightly" data-search-js="search-fb33671b.js" data-stringdex-js="stringdex-b897f86f.js" data-settings-js="settings-170eb4bf.js" ><script src="../../static.files/storage-f9617a14.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../static.files/main-12f88f4f.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc trait"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">ActiveEnum</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../migration/index.html">migration</a><span class="version">0.5.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Active<wbr>Enum</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#implementations-1" title="Implementations">Implementations</a></li><li><a href="#examples" title="Examples">Examples</a></li></ul><h3><a href="#required-associated-types">Required Associated Types</a></h3><ul class="block"><li><a href="#associatedtype.Value" title="Value">Value</a></li><li><a href="#associatedtype.ValueVec" title="ValueVec">ValueVec</a></li></ul><h3><a href="#required-methods">Required Methods</a></h3><ul class="block"><li><a href="#tymethod.db_type" title="db_type">db_type</a></li><li><a href="#tymethod.name" title="name">name</a></li><li><a href="#tymethod.to_value" title="to_value">to_value</a></li><li><a href="#tymethod.try_from_value" title="try_from_value">try_from_value</a></li></ul><h3><a href="#provided-methods">Provided Methods</a></h3><ul class="block"><li><a href="#method.as_enum" title="as_enum">as_enum</a></li><li><a href="#method.into_value" title="into_value">into_value</a></li><li><a href="#method.values" title="values">values</a></li></ul><h3><a href="#dyn-compatibility">Dyn Compatibility</a></h3><h3><a href="#implementors">Implementors</a></h3></section><div id="rustdoc-modnav"><h2><a href="index.html">In migration::<wbr>sea_<wbr>orm</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../index.html">migration</a>::<wbr><a href="index.html">sea_orm</a></div><h1>Trait <span class="trait">Active<wbr>Enum</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"></span></div><pre class="rust item-decl"><code>pub trait ActiveEnum: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a> + <a class="trait" href="trait.Iterable.html" title="trait migration::sea_orm::Iterable">IntoEnumIterator</a> {
+    type <a href="#associatedtype.Value" class="associatedtype">Value</a>: <a class="trait" href="trait.ActiveEnumValue.html" title="trait migration::sea_orm::ActiveEnumValue">ActiveEnumValue</a>;
+    type <a href="#associatedtype.ValueVec" class="associatedtype">ValueVec</a>;
+
+    // Required methods
+    fn <a href="#tymethod.name" class="fn">name</a>() -&gt; <a class="struct" href="../struct.SeaRc.html" title="struct migration::SeaRc">SeaRc</a>&lt;dyn <a class="trait" href="../trait.Iden.html" title="trait migration::Iden">Iden</a>&gt;;
+<span class="item-spacer"></span>    fn <a href="#tymethod.to_value" class="fn">to_value</a>(&amp;self) -&gt; Self::<a class="associatedtype" href="trait.ActiveEnum.html#associatedtype.Value" title="type migration::sea_orm::ActiveEnum::Value">Value</a>;
+<span class="item-spacer"></span>    fn <a href="#tymethod.try_from_value" class="fn">try_from_value</a>(v: &amp;Self::<a class="associatedtype" href="trait.ActiveEnum.html#associatedtype.Value" title="type migration::sea_orm::ActiveEnum::Value">Value</a>) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;Self, <a class="enum" href="../enum.DbErr.html" title="enum migration::DbErr">DbErr</a>&gt;;
+<span class="item-spacer"></span>    fn <a href="#tymethod.db_type" class="fn">db_type</a>() -&gt; <a class="struct" href="struct.ColumnDef.html" title="struct migration::sea_orm::ColumnDef">ColumnDef</a>;
+
+    // Provided methods
+    fn <a href="#method.into_value" class="fn">into_value</a>(self) -&gt; Self::<a class="associatedtype" href="trait.ActiveEnum.html#associatedtype.Value" title="type migration::sea_orm::ActiveEnum::Value">Value</a> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.as_enum" class="fn">as_enum</a>(&amp;self) -&gt; <a class="enum" href="../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.values" class="fn">values</a>() -&gt; <a class="struct" href="https://doc.rust-lang.org/nightly/alloc/vec/struct.Vec.html" title="struct alloc::vec::Vec">Vec</a>&lt;Self::<a class="associatedtype" href="trait.ActiveEnum.html#associatedtype.Value" title="type migration::sea_orm::ActiveEnum::Value">Value</a>&gt; { ... }
+}</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>A Rust representation of enum defined in database.</p>
+<h2 id="implementations-1"><a class="doc-anchor" href="#implementations-1">§</a>Implementations</h2>
+<p>You can implement <a href="trait.ActiveEnum.html" title="trait migration::sea_orm::ActiveEnum">ActiveEnum</a> manually by hand or use the derive macro <a href="derive.DeriveActiveEnum.html" title="derive migration::sea_orm::DeriveActiveEnum">DeriveActiveEnum</a>.</p>
+<h2 id="examples"><a class="doc-anchor" href="#examples">§</a>Examples</h2>
+<p>Implementing it manually versus using the derive macro <a href="derive.DeriveActiveEnum.html" title="derive migration::sea_orm::DeriveActiveEnum">DeriveActiveEnum</a>.</p>
+<blockquote>
+<p>See <a href="derive.DeriveActiveEnum.html" title="derive migration::sea_orm::DeriveActiveEnum">DeriveActiveEnum</a> for the full specification of macro attributes.</p>
+</blockquote>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::entity::prelude::<span class="kw-2">*</span>;
+
+<span class="comment">// Using the derive macro
+</span><span class="attr">#[derive(Debug, PartialEq, EnumIter, DeriveActiveEnum, DeriveDisplay)]
+#[sea_orm(
+    rs_type = <span class="string">"String"</span>,
+    db_type = <span class="string">"String(StringLen::N(1))"</span>,
+    enum_name = <span class="string">"category"
+</span>)]
+</span><span class="kw">pub enum </span>DeriveCategory {
+    <span class="attr">#[sea_orm(string_value = <span class="string">"B"</span>)]
+    </span>Big,
+    <span class="attr">#[sea_orm(string_value = <span class="string">"S"</span>)]
+    </span>Small,
+}
+
+<span class="comment">// Implementing it manually
+</span><span class="attr">#[derive(Debug, PartialEq, EnumIter)]
+</span><span class="kw">pub enum </span>Category {
+    Big,
+    Small,
+}
+
+<span class="attr">#[derive(Debug, DeriveIden)]
+</span><span class="kw">pub struct </span>CategoryEnum;
+
+<span class="kw">impl </span>ActiveEnum <span class="kw">for </span>Category {
+    <span class="comment">// The macro attribute `rs_type` is being pasted here
+    </span><span class="kw">type </span>Value = String;
+
+    <span class="kw">type </span>ValueVec = Vec&lt;String&gt;;
+
+    <span class="comment">// Will be atomically generated by `DeriveActiveEnum`
+    </span><span class="kw">fn </span>name() -&gt; DynIden {
+        SeaRc::new(CategoryEnum)
+    }
+
+    <span class="comment">// Will be atomically generated by `DeriveActiveEnum`
+    </span><span class="kw">fn </span>to_value(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self</span>::Value {
+        <span class="kw">match </span><span class="self">self </span>{
+            <span class="self">Self</span>::Big =&gt; <span class="string">"B"</span>,
+            <span class="self">Self</span>::Small =&gt; <span class="string">"S"</span>,
+        }
+        .to_owned()
+    }
+
+    <span class="comment">// Will be atomically generated by `DeriveActiveEnum`
+    </span><span class="kw">fn </span>try_from_value(v: <span class="kw-2">&amp;</span><span class="self">Self</span>::Value) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, DbErr&gt; {
+        <span class="kw">match </span>v.as_ref() {
+            <span class="string">"B" </span>=&gt; <span class="prelude-val">Ok</span>(<span class="self">Self</span>::Big),
+            <span class="string">"S" </span>=&gt; <span class="prelude-val">Ok</span>(<span class="self">Self</span>::Small),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(DbErr::Type(<span class="macro">format!</span>(
+                <span class="string">"unexpected value for Category enum: {}"</span>,
+                v
+            ))),
+        }
+    }
+
+    <span class="kw">fn </span>db_type() -&gt; ColumnDef {
+        <span class="comment">// The macro attribute `db_type` is being pasted here
+        </span>ColumnType::String(StringLen::N(<span class="number">1</span>)).def()
+    }
+}</code></pre></div>
+<p>Using <a href="trait.ActiveEnum.html" title="trait migration::sea_orm::ActiveEnum">ActiveEnum</a> on Model.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::entity::prelude::<span class="kw-2">*</span>;
+
+<span class="comment">// Define the `Category` active enum
+</span><span class="attr">#[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, DeriveDisplay)]
+#[sea_orm(rs_type = <span class="string">"String"</span>, db_type = <span class="string">"String(StringLen::N(1))"</span>)]
+</span><span class="kw">pub enum </span>Category {
+    <span class="attr">#[sea_orm(string_value = <span class="string">"B"</span>)]
+    </span>Big,
+    <span class="attr">#[sea_orm(string_value = <span class="string">"S"</span>)]
+    </span>Small,
+}
+
+<span class="attr">#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+#[sea_orm(table_name = <span class="string">"active_enum"</span>)]
+</span><span class="kw">pub struct </span>Model {
+    <span class="attr">#[sea_orm(primary_key)]
+    </span><span class="kw">pub </span>id: i32,
+    <span class="comment">// Represents a db column using `Category` active enum
+    </span><span class="kw">pub </span>category: Category,
+    <span class="kw">pub </span>category_opt: <span class="prelude-ty">Option</span>&lt;Category&gt;,
+}
+
+<span class="attr">#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+</span><span class="kw">pub enum </span>Relation {}
+
+<span class="kw">impl </span>ActiveModelBehavior <span class="kw">for </span>ActiveModel {}</code></pre></div></div></details><h2 id="required-associated-types" class="section-header">Required Associated Types<a href="#required-associated-types" class="anchor">§</a></h2><div class="methods"><details class="toggle" open><summary><section id="associatedtype.Value" class="method"><h4 class="code-header">type <a href="#associatedtype.Value" class="associatedtype">Value</a>: <a class="trait" href="trait.ActiveEnumValue.html" title="trait migration::sea_orm::ActiveEnumValue">ActiveEnumValue</a></h4></section></summary><div class="docblock"><p>Define the Rust type that each enum variant corresponds.</p>
+</div></details><details class="toggle" open><summary><section id="associatedtype.ValueVec" class="method"><h4 class="code-header">type <a href="#associatedtype.ValueVec" class="associatedtype">ValueVec</a></h4></section></summary><div class="docblock"><p>This has no purpose. It will be removed in the next major version.</p>
+</div></details></div><h2 id="required-methods" class="section-header">Required Methods<a href="#required-methods" class="anchor">§</a></h2><div class="methods"><details class="toggle method-toggle" open><summary><section id="tymethod.name" class="method"><h4 class="code-header">fn <a href="#tymethod.name" class="fn">name</a>() -&gt; <a class="struct" href="../struct.SeaRc.html" title="struct migration::SeaRc">SeaRc</a>&lt;dyn <a class="trait" href="../trait.Iden.html" title="trait migration::Iden">Iden</a>&gt;</h4></section></summary><div class="docblock"><p>Get the name of enum</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="tymethod.to_value" class="method"><h4 class="code-header">fn <a href="#tymethod.to_value" class="fn">to_value</a>(&amp;self) -&gt; Self::<a class="associatedtype" href="trait.ActiveEnum.html#associatedtype.Value" title="type migration::sea_orm::ActiveEnum::Value">Value</a></h4></section></summary><div class="docblock"><p>Convert enum variant into the corresponding value.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="tymethod.try_from_value" class="method"><h4 class="code-header">fn <a href="#tymethod.try_from_value" class="fn">try_from_value</a>(v: &amp;Self::<a class="associatedtype" href="trait.ActiveEnum.html#associatedtype.Value" title="type migration::sea_orm::ActiveEnum::Value">Value</a>) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;Self, <a class="enum" href="../enum.DbErr.html" title="enum migration::DbErr">DbErr</a>&gt;</h4></section></summary><div class="docblock"><p>Try to convert the corresponding value into enum variant.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="tymethod.db_type" class="method"><h4 class="code-header">fn <a href="#tymethod.db_type" class="fn">db_type</a>() -&gt; <a class="struct" href="struct.ColumnDef.html" title="struct migration::sea_orm::ColumnDef">ColumnDef</a></h4></section></summary><div class="docblock"><p>Get the database column definition of this active enum.</p>
+</div></details></div><h2 id="provided-methods" class="section-header">Provided Methods<a href="#provided-methods" class="anchor">§</a></h2><div class="methods"><details class="toggle method-toggle" open><summary><section id="method.into_value" class="method"><h4 class="code-header">fn <a href="#method.into_value" class="fn">into_value</a>(self) -&gt; Self::<a class="associatedtype" href="trait.ActiveEnum.html#associatedtype.Value" title="type migration::sea_orm::ActiveEnum::Value">Value</a></h4></section></summary><div class="docblock"><p>Convert an owned enum variant into the corresponding value.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.as_enum" class="method"><h4 class="code-header">fn <a href="#method.as_enum" class="fn">as_enum</a>(&amp;self) -&gt; <a class="enum" href="../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a></h4></section></summary><div class="docblock"><p>Construct a enum expression with casting</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.values" class="method"><h4 class="code-header">fn <a href="#method.values" class="fn">values</a>() -&gt; <a class="struct" href="https://doc.rust-lang.org/nightly/alloc/vec/struct.Vec.html" title="struct alloc::vec::Vec">Vec</a>&lt;Self::<a class="associatedtype" href="trait.ActiveEnum.html#associatedtype.Value" title="type migration::sea_orm::ActiveEnum::Value">Value</a>&gt;</h4></section></summary><div class="docblock"><p>Get the name of all enum variants</p>
+</div></details></div><h2 id="dyn-compatibility" class="section-header">Dyn Compatibility<a href="#dyn-compatibility" class="anchor">§</a></h2><div class="dyn-compatibility-info"><p>This trait is <b>not</b> <a href="https://doc.rust-lang.org/nightly/reference/items/traits.html#dyn-compatibility">dyn compatible</a>.</p><p><i>In older versions of Rust, dyn compatibility was called "object safety", so this trait is not object safe.</i></p></div><h2 id="implementors" class="section-header">Implementors<a href="#implementors" class="anchor">§</a></h2><div id="implementors-list"></div><script src="../../trait.impl/sea_orm/entity/active_enum/trait.ActiveEnum.js" async></script></section></div></main></body></html>

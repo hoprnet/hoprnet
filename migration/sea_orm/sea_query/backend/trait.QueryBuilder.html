@@ -1,0 +1,409 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `QueryBuilder` trait in crate `migration`."><title>QueryBuilder in migration::sea_orm::sea_query::backend - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-b7b9f40b.css"><meta name="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="migration" data-themes="" data-resource-suffix="" data-rustdoc-version="1.95.0-nightly (7057231bd 2026-02-11)" data-channel="nightly" data-search-js="search-fb33671b.js" data-stringdex-js="stringdex-b897f86f.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../static.files/storage-f9617a14.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../../../static.files/main-12f88f4f.js"></script><noscript><link rel="stylesheet" href="../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc trait"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">QueryBuilder</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../../migration/index.html">migration</a><span class="version">0.5.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Query<wbr>Builder</a></h2><h3><a href="#required-methods">Required Methods</a></h3><ul class="block"><li><a href="#tymethod.prepare_query_statement" title="prepare_query_statement">prepare_query_statement</a></li><li><a href="#tymethod.prepare_value" title="prepare_value">prepare_value</a></li></ul><h3><a href="#provided-methods">Provided Methods</a></h3><ul class="block"><li><a href="#method.insert_default_keyword" title="insert_default_keyword">insert_default_keyword</a></li><li><a href="#method.insert_default_values" title="insert_default_values">insert_default_values</a></li><li><a href="#method.placeholder" title="placeholder">placeholder</a></li><li><a href="#method.prepare_bin_oper" title="prepare_bin_oper">prepare_bin_oper</a></li><li><a href="#method.prepare_bin_oper_common" title="prepare_bin_oper_common">prepare_bin_oper_common</a></li><li><a href="#method.prepare_case_statement" title="prepare_case_statement">prepare_case_statement</a></li><li><a href="#method.prepare_column_ref" title="prepare_column_ref">prepare_column_ref</a></li><li><a href="#method.prepare_constant" title="prepare_constant">prepare_constant</a></li><li><a href="#method.prepare_constant_false" title="prepare_constant_false">prepare_constant_false</a></li><li><a href="#method.prepare_constant_true" title="prepare_constant_true">prepare_constant_true</a></li><li><a href="#method.prepare_delete_limit" title="prepare_delete_limit">prepare_delete_limit</a></li><li><a href="#method.prepare_delete_order_by" title="prepare_delete_order_by">prepare_delete_order_by</a></li><li><a href="#method.prepare_delete_statement" title="prepare_delete_statement">prepare_delete_statement</a></li><li><a href="#method.prepare_field_order" title="prepare_field_order">prepare_field_order</a></li><li><a href="#method.prepare_function_arguments" title="prepare_function_arguments">prepare_function_arguments</a></li><li><a href="#method.prepare_function_name" title="prepare_function_name">prepare_function_name</a></li><li><a href="#method.prepare_function_name_common" title="prepare_function_name_common">prepare_function_name_common</a></li><li><a href="#method.prepare_index_hints" title="prepare_index_hints">prepare_index_hints</a></li><li><a href="#method.prepare_insert" title="prepare_insert">prepare_insert</a></li><li><a href="#method.prepare_insert_statement" title="prepare_insert_statement">prepare_insert_statement</a></li><li><a href="#method.prepare_join_expr" title="prepare_join_expr">prepare_join_expr</a></li><li><a href="#method.prepare_join_on" title="prepare_join_on">prepare_join_on</a></li><li><a href="#method.prepare_join_table_ref" title="prepare_join_table_ref">prepare_join_table_ref</a></li><li><a href="#method.prepare_join_type" title="prepare_join_type">prepare_join_type</a></li><li><a href="#method.prepare_join_type_common" title="prepare_join_type_common">prepare_join_type_common</a></li><li><a href="#method.prepare_keyword" title="prepare_keyword">prepare_keyword</a></li><li><a href="#method.prepare_logical_chain_oper" title="prepare_logical_chain_oper">prepare_logical_chain_oper</a></li><li><a href="#method.prepare_on_conflict_action_common" title="prepare_on_conflict_action_common">prepare_on_conflict_action_common</a></li><li><a href="#method.prepare_order" title="prepare_order">prepare_order</a></li><li><a href="#method.prepare_order_expr" title="prepare_order_expr">prepare_order_expr</a></li><li><a href="#method.prepare_select_distinct" title="prepare_select_distinct">prepare_select_distinct</a></li><li><a href="#method.prepare_select_expr" title="prepare_select_expr">prepare_select_expr</a></li><li><a href="#method.prepare_select_limit_offset" title="prepare_select_limit_offset">prepare_select_limit_offset</a></li><li><a href="#method.prepare_select_lock" title="prepare_select_lock">prepare_select_lock</a></li><li><a href="#method.prepare_select_statement" title="prepare_select_statement">prepare_select_statement</a></li><li><a href="#method.prepare_simple_expr" title="prepare_simple_expr">prepare_simple_expr</a></li><li><a href="#method.prepare_simple_expr_common" title="prepare_simple_expr_common">prepare_simple_expr_common</a></li><li><a href="#method.prepare_sub_query_oper" title="prepare_sub_query_oper">prepare_sub_query_oper</a></li><li><a href="#method.prepare_table_ref" title="prepare_table_ref">prepare_table_ref</a></li><li><a href="#method.prepare_table_sample" title="prepare_table_sample">prepare_table_sample</a></li><li><a href="#method.prepare_tuple" title="prepare_tuple">prepare_tuple</a></li><li><a href="#method.prepare_un_oper" title="prepare_un_oper">prepare_un_oper</a></li><li><a href="#method.prepare_union_statement" title="prepare_union_statement">prepare_union_statement</a></li><li><a href="#method.prepare_update_column" title="prepare_update_column">prepare_update_column</a></li><li><a href="#method.prepare_update_condition" title="prepare_update_condition">prepare_update_condition</a></li><li><a href="#method.prepare_update_from" title="prepare_update_from">prepare_update_from</a></li><li><a href="#method.prepare_update_join" title="prepare_update_join">prepare_update_join</a></li><li><a href="#method.prepare_update_limit" title="prepare_update_limit">prepare_update_limit</a></li><li><a href="#method.prepare_update_order_by" title="prepare_update_order_by">prepare_update_order_by</a></li><li><a href="#method.prepare_update_statement" title="prepare_update_statement">prepare_update_statement</a></li><li><a href="#method.prepare_values_list" title="prepare_values_list">prepare_values_list</a></li><li><a href="#method.prepare_with_clause" title="prepare_with_clause">prepare_with_clause</a></li><li><a href="#method.prepare_with_clause_common_tables" title="prepare_with_clause_common_tables">prepare_with_clause_common_tables</a></li><li><a href="#method.prepare_with_clause_recursive_options" title="prepare_with_clause_recursive_options">prepare_with_clause_recursive_options</a></li><li><a href="#method.prepare_with_clause_start" title="prepare_with_clause_start">prepare_with_clause_start</a></li><li><a href="#method.prepare_with_query" title="prepare_with_query">prepare_with_query</a></li><li><a href="#method.prepare_with_query_clause_common_table" title="prepare_with_query_clause_common_table">prepare_with_query_clause_common_table</a></li><li><a href="#method.prepare_with_query_clause_materialization" title="prepare_with_query_clause_materialization">prepare_with_query_clause_materialization</a></li><li><a href="#method.value_to_string" title="value_to_string">value_to_string</a></li><li><a href="#method.value_to_string_common" title="value_to_string_common">value_to_string_common</a></li><li><a href="#method.values_list_tuple_prefix" title="values_list_tuple_prefix">values_list_tuple_prefix</a></li></ul><h3><a href="#implementors">Implementors</a></h3></section><div id="rustdoc-modnav"><h2><a href="index.html">In migration::<wbr>sea_<wbr>orm::<wbr>sea_<wbr>query::<wbr>backend</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../../index.html">migration</a>::<wbr><a href="../../index.html">sea_orm</a>::<wbr><a href="../index.html">sea_query</a>::<wbr><a href="index.html">backend</a></div><h1>Trait <span class="trait">Query<wbr>Builder</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"></span></div><pre class="rust item-decl"><code>pub trait QueryBuilder:
+    <a class="trait" href="../../../trait.QuotedBuilder.html" title="trait migration::QuotedBuilder">QuotedBuilder</a>
+    + <a class="trait" href="../../../trait.EscapeBuilder.html" title="trait migration::EscapeBuilder">EscapeBuilder</a>
+    + <a class="trait" href="../../../trait.TableRefBuilder.html" title="trait migration::TableRefBuilder">TableRefBuilder</a>
+    + <a class="trait" href="../../../trait.OperLeftAssocDecider.html" title="trait migration::OperLeftAssocDecider">OperLeftAssocDecider</a>
+    + <a class="trait" href="../../../trait.PrecedenceDecider.html" title="trait migration::PrecedenceDecider">PrecedenceDecider</a> {
+<details class="toggle type-contents-toggle"><summary class="hideme"><span>Show 63 methods</span></summary>    // Required methods
+    fn <a href="#tymethod.prepare_query_statement" class="fn">prepare_query_statement</a>(
+        &amp;self,
+        query: &amp;<a class="enum" href="../../../enum.SubQueryStatement.html" title="enum migration::SubQueryStatement">SubQueryStatement</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    );
+<span class="item-spacer"></span>    fn <a href="#tymethod.prepare_value" class="fn">prepare_value</a>(&amp;self, value: &amp;<a class="enum" href="../../../enum.Value.html" title="enum migration::Value">Value</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>);
+
+    // Provided methods
+    fn <a href="#method.placeholder" class="fn">placeholder</a>(&amp;self) -&gt; (&amp;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a>, <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a>) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.values_list_tuple_prefix" class="fn">values_list_tuple_prefix</a>(&amp;self) -&gt; &amp;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_insert_statement" class="fn">prepare_insert_statement</a>(
+        &amp;self,
+        insert: &amp;<a class="struct" href="../../../struct.InsertStatement.html" title="struct migration::InsertStatement">InsertStatement</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_union_statement" class="fn">prepare_union_statement</a>(
+        &amp;self,
+        union_type: <a class="enum" href="../../../enum.UnionType.html" title="enum migration::UnionType">UnionType</a>,
+        select_statement: &amp;<a class="struct" href="../../../struct.SelectStatement.html" title="struct migration::SelectStatement">SelectStatement</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_select_statement" class="fn">prepare_select_statement</a>(
+        &amp;self,
+        select: &amp;<a class="struct" href="../../../struct.SelectStatement.html" title="struct migration::SelectStatement">SelectStatement</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_select_limit_offset" class="fn">prepare_select_limit_offset</a>(
+        &amp;self,
+        select: &amp;<a class="struct" href="../../../struct.SelectStatement.html" title="struct migration::SelectStatement">SelectStatement</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_update_statement" class="fn">prepare_update_statement</a>(
+        &amp;self,
+        update: &amp;<a class="struct" href="../../../struct.UpdateStatement.html" title="struct migration::UpdateStatement">UpdateStatement</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_update_join" class="fn">prepare_update_join</a>(
+        &amp;self,
+        _: &amp;[<a class="enum" href="../../../enum.TableRef.html" title="enum migration::TableRef">TableRef</a>],
+        _: &amp;<a class="struct" href="../../../struct.ConditionHolder.html" title="struct migration::ConditionHolder">ConditionHolder</a>,
+        _: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_update_from" class="fn">prepare_update_from</a>(&amp;self, from: &amp;[<a class="enum" href="../../../enum.TableRef.html" title="enum migration::TableRef">TableRef</a>], sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_update_column" class="fn">prepare_update_column</a>(
+        &amp;self,
+        _: &amp;<a class="enum" href="https://doc.rust-lang.org/nightly/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;<a class="struct" href="https://doc.rust-lang.org/nightly/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;<a class="enum" href="../../../enum.TableRef.html" title="enum migration::TableRef">TableRef</a>&gt;&gt;,
+        _: &amp;[<a class="enum" href="../../../enum.TableRef.html" title="enum migration::TableRef">TableRef</a>],
+        column: &amp;<a class="struct" href="../../../struct.SeaRc.html" title="struct migration::SeaRc">SeaRc</a>&lt;dyn <a class="trait" href="../../../trait.Iden.html" title="trait migration::Iden">Iden</a>&gt;,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_update_condition" class="fn">prepare_update_condition</a>(
+        &amp;self,
+        _: &amp;[<a class="enum" href="../../../enum.TableRef.html" title="enum migration::TableRef">TableRef</a>],
+        condition: &amp;<a class="struct" href="../../../struct.ConditionHolder.html" title="struct migration::ConditionHolder">ConditionHolder</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_update_order_by" class="fn">prepare_update_order_by</a>(
+        &amp;self,
+        update: &amp;<a class="struct" href="../../../struct.UpdateStatement.html" title="struct migration::UpdateStatement">UpdateStatement</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_update_limit" class="fn">prepare_update_limit</a>(
+        &amp;self,
+        update: &amp;<a class="struct" href="../../../struct.UpdateStatement.html" title="struct migration::UpdateStatement">UpdateStatement</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_delete_statement" class="fn">prepare_delete_statement</a>(
+        &amp;self,
+        delete: &amp;<a class="struct" href="../../../struct.DeleteStatement.html" title="struct migration::DeleteStatement">DeleteStatement</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_delete_order_by" class="fn">prepare_delete_order_by</a>(
+        &amp;self,
+        delete: &amp;<a class="struct" href="../../../struct.DeleteStatement.html" title="struct migration::DeleteStatement">DeleteStatement</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_delete_limit" class="fn">prepare_delete_limit</a>(
+        &amp;self,
+        delete: &amp;<a class="struct" href="../../../struct.DeleteStatement.html" title="struct migration::DeleteStatement">DeleteStatement</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_simple_expr" class="fn">prepare_simple_expr</a>(
+        &amp;self,
+        simple_expr: &amp;<a class="enum" href="../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_simple_expr_common" class="fn">prepare_simple_expr_common</a>(
+        &amp;self,
+        simple_expr: &amp;<a class="enum" href="../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_case_statement" class="fn">prepare_case_statement</a>(
+        &amp;self,
+        stmts: &amp;<a class="struct" href="../../../struct.CaseStatement.html" title="struct migration::CaseStatement">CaseStatement</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_select_distinct" class="fn">prepare_select_distinct</a>(
+        &amp;self,
+        select_distinct: &amp;<a class="enum" href="../../../enum.SelectDistinct.html" title="enum migration::SelectDistinct">SelectDistinct</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_index_hints" class="fn">prepare_index_hints</a>(
+        &amp;self,
+        _select: &amp;<a class="struct" href="../../../struct.SelectStatement.html" title="struct migration::SelectStatement">SelectStatement</a>,
+        _sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_table_sample" class="fn">prepare_table_sample</a>(
+        &amp;self,
+        _select: &amp;<a class="struct" href="../../../struct.SelectStatement.html" title="struct migration::SelectStatement">SelectStatement</a>,
+        _sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_select_lock" class="fn">prepare_select_lock</a>(&amp;self, lock: &amp;<a class="struct" href="../../../struct.LockClause.html" title="struct migration::LockClause">LockClause</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_select_expr" class="fn">prepare_select_expr</a>(
+        &amp;self,
+        select_expr: &amp;<a class="struct" href="../../../struct.SelectExpr.html" title="struct migration::SelectExpr">SelectExpr</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_join_expr" class="fn">prepare_join_expr</a>(&amp;self, join_expr: &amp;<a class="struct" href="../../../struct.JoinExpr.html" title="struct migration::JoinExpr">JoinExpr</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_join_table_ref" class="fn">prepare_join_table_ref</a>(
+        &amp;self,
+        join_expr: &amp;<a class="struct" href="../../../struct.JoinExpr.html" title="struct migration::JoinExpr">JoinExpr</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_table_ref" class="fn">prepare_table_ref</a>(&amp;self, table_ref: &amp;<a class="enum" href="../../../enum.TableRef.html" title="enum migration::TableRef">TableRef</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_column_ref" class="fn">prepare_column_ref</a>(
+        &amp;self,
+        column_ref: &amp;<a class="enum" href="../../../enum.ColumnRef.html" title="enum migration::ColumnRef">ColumnRef</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_un_oper" class="fn">prepare_un_oper</a>(&amp;self, un_oper: &amp;<a class="enum" href="../../../enum.UnOper.html" title="enum migration::UnOper">UnOper</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_bin_oper_common" class="fn">prepare_bin_oper_common</a>(
+        &amp;self,
+        bin_oper: &amp;<a class="enum" href="../../../enum.BinOper.html" title="enum migration::BinOper">BinOper</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_bin_oper" class="fn">prepare_bin_oper</a>(&amp;self, bin_oper: &amp;<a class="enum" href="../../../enum.BinOper.html" title="enum migration::BinOper">BinOper</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_sub_query_oper" class="fn">prepare_sub_query_oper</a>(
+        &amp;self,
+        oper: &amp;<a class="enum" href="../../../enum.SubQueryOper.html" title="enum migration::SubQueryOper">SubQueryOper</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_logical_chain_oper" class="fn">prepare_logical_chain_oper</a>(
+        &amp;self,
+        log_chain_oper: &amp;<a class="enum" href="../../../enum.LogicalChainOper.html" title="enum migration::LogicalChainOper">LogicalChainOper</a>,
+        i: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a>,
+        length: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_function_name_common" class="fn">prepare_function_name_common</a>(
+        &amp;self,
+        function: &amp;<a class="enum" href="../../../enum.Function.html" title="enum migration::Function">Function</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_function_arguments" class="fn">prepare_function_arguments</a>(
+        &amp;self,
+        func: &amp;<a class="struct" href="../../../struct.FunctionCall.html" title="struct migration::FunctionCall">FunctionCall</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_with_query" class="fn">prepare_with_query</a>(&amp;self, query: &amp;<a class="struct" href="../../../struct.WithQuery.html" title="struct migration::WithQuery">WithQuery</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_with_clause" class="fn">prepare_with_clause</a>(
+        &amp;self,
+        with_clause: &amp;<a class="struct" href="../../../struct.WithClause.html" title="struct migration::WithClause">WithClause</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_with_clause_recursive_options" class="fn">prepare_with_clause_recursive_options</a>(
+        &amp;self,
+        with_clause: &amp;<a class="struct" href="../../../struct.WithClause.html" title="struct migration::WithClause">WithClause</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_with_clause_common_tables" class="fn">prepare_with_clause_common_tables</a>(
+        &amp;self,
+        with_clause: &amp;<a class="struct" href="../../../struct.WithClause.html" title="struct migration::WithClause">WithClause</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_with_query_clause_common_table" class="fn">prepare_with_query_clause_common_table</a>(
+        &amp;self,
+        cte: &amp;<a class="struct" href="../../../struct.CommonTableExpression.html" title="struct migration::CommonTableExpression">CommonTableExpression</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_with_query_clause_materialization" class="fn">prepare_with_query_clause_materialization</a>(
+        &amp;self,
+        cte: &amp;<a class="struct" href="../../../struct.CommonTableExpression.html" title="struct migration::CommonTableExpression">CommonTableExpression</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_with_clause_start" class="fn">prepare_with_clause_start</a>(
+        &amp;self,
+        with_clause: &amp;<a class="struct" href="../../../struct.WithClause.html" title="struct migration::WithClause">WithClause</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_insert" class="fn">prepare_insert</a>(&amp;self, replace: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_function_name" class="fn">prepare_function_name</a>(
+        &amp;self,
+        function: &amp;<a class="enum" href="../../../enum.Function.html" title="enum migration::Function">Function</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_join_type" class="fn">prepare_join_type</a>(&amp;self, join_type: &amp;<a class="enum" href="../../../enum.JoinType.html" title="enum migration::JoinType">JoinType</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_join_type_common" class="fn">prepare_join_type_common</a>(
+        &amp;self,
+        join_type: &amp;<a class="enum" href="../../../enum.JoinType.html" title="enum migration::JoinType">JoinType</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_order_expr" class="fn">prepare_order_expr</a>(
+        &amp;self,
+        order_expr: &amp;<a class="struct" href="../../../struct.OrderExpr.html" title="struct migration::OrderExpr">OrderExpr</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_join_on" class="fn">prepare_join_on</a>(&amp;self, join_on: &amp;<a class="enum" href="../../../enum.JoinOn.html" title="enum migration::JoinOn">JoinOn</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_order" class="fn">prepare_order</a>(&amp;self, order_expr: &amp;<a class="struct" href="../../../struct.OrderExpr.html" title="struct migration::OrderExpr">OrderExpr</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_field_order" class="fn">prepare_field_order</a>(
+        &amp;self,
+        order_expr: &amp;<a class="struct" href="../../../struct.OrderExpr.html" title="struct migration::OrderExpr">OrderExpr</a>,
+        values: &amp;<a class="struct" href="../../../struct.Values.html" title="struct migration::Values">Values</a>,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_constant" class="fn">prepare_constant</a>(&amp;self, value: &amp;<a class="enum" href="../../../enum.Value.html" title="enum migration::Value">Value</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_values_list" class="fn">prepare_values_list</a>(
+        &amp;self,
+        value_tuples: &amp;[<a class="enum" href="../../../enum.ValueTuple.html" title="enum migration::ValueTuple">ValueTuple</a>],
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_tuple" class="fn">prepare_tuple</a>(&amp;self, exprs: &amp;[<a class="enum" href="../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>], sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_keyword" class="fn">prepare_keyword</a>(&amp;self, keyword: &amp;<a class="enum" href="../../../enum.Keyword.html" title="enum migration::Keyword">Keyword</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.value_to_string" class="fn">value_to_string</a>(&amp;self, v: &amp;<a class="enum" href="../../../enum.Value.html" title="enum migration::Value">Value</a>) -&gt; <a class="struct" href="https://doc.rust-lang.org/nightly/alloc/string/struct.String.html" title="struct alloc::string::String">String</a> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.value_to_string_common" class="fn">value_to_string_common</a>(&amp;self, v: &amp;<a class="enum" href="../../../enum.Value.html" title="enum migration::Value">Value</a>) -&gt; <a class="struct" href="https://doc.rust-lang.org/nightly/alloc/string/struct.String.html" title="struct alloc::string::String">String</a> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_on_conflict_action_common" class="fn">prepare_on_conflict_action_common</a>(
+        &amp;self,
+        on_conflict_action: &amp;<a class="enum" href="https://doc.rust-lang.org/nightly/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;<a class="enum" href="../../../enum.OnConflictAction.html" title="enum migration::OnConflictAction">OnConflictAction</a>&gt;,
+        sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+    ) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.insert_default_keyword" class="fn">insert_default_keyword</a>(&amp;self) -&gt; &amp;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.insert_default_values" class="fn">insert_default_values</a>(&amp;self, num_rows: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u32.html">u32</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_constant_true" class="fn">prepare_constant_true</a>(&amp;self, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>) { ... }
+<span class="item-spacer"></span>    fn <a href="#method.prepare_constant_false" class="fn">prepare_constant_false</a>(&amp;self, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>) { ... }
+</details>}</code></pre><h2 id="required-methods" class="section-header">Required Methods<a href="#required-methods" class="anchor">§</a></h2><div class="methods"><details class="toggle method-toggle" open><summary><section id="tymethod.prepare_query_statement" class="method"><h4 class="code-header">fn <a href="#tymethod.prepare_query_statement" class="fn">prepare_query_statement</a>(
+    &amp;self,
+    query: &amp;<a class="enum" href="../../../enum.SubQueryStatement.html" title="enum migration::SubQueryStatement">SubQueryStatement</a>,
+    sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section></summary><div class="docblock"><p>Translate <a href="../../../enum.QueryStatement.html" title="enum migration::QueryStatement"><code>QueryStatement</code></a> into SQL statement.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="tymethod.prepare_value" class="method"><h4 class="code-header">fn <a href="#tymethod.prepare_value" class="fn">prepare_value</a>(&amp;self, value: &amp;<a class="enum" href="../../../enum.Value.html" title="enum migration::Value">Value</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>)</h4></section></summary><div class="docblock"><p>Write <a href="../../../enum.Value.html" title="enum migration::Value"><code>Value</code></a> into SQL statement as parameter.</p>
+</div></details></div><h2 id="provided-methods" class="section-header">Provided Methods<a href="#provided-methods" class="anchor">§</a></h2><div class="methods"><details class="toggle method-toggle" open><summary><section id="method.placeholder" class="method"><h4 class="code-header">fn <a href="#method.placeholder" class="fn">placeholder</a>(&amp;self) -&gt; (&amp;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a>, <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a>)</h4></section></summary><div class="docblock"><p>The type of placeholder the builder uses for values, and whether it is numbered.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.values_list_tuple_prefix" class="method"><h4 class="code-header">fn <a href="#method.values_list_tuple_prefix" class="fn">values_list_tuple_prefix</a>(&amp;self) -&gt; &amp;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a></h4></section></summary><div class="docblock"><p>Prefix for tuples in VALUES list (e.g. ROW for MySQL)</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.prepare_insert_statement" class="method"><h4 class="code-header">fn <a href="#method.prepare_insert_statement" class="fn">prepare_insert_statement</a>(
+    &amp;self,
+    insert: &amp;<a class="struct" href="../../../struct.InsertStatement.html" title="struct migration::InsertStatement">InsertStatement</a>,
+    sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section></summary><div class="docblock"><p>Translate <a href="../../../struct.InsertStatement.html" title="struct migration::InsertStatement"><code>InsertStatement</code></a> into SQL statement.</p>
+</div></details><section id="method.prepare_union_statement" class="method"><h4 class="code-header">fn <a href="#method.prepare_union_statement" class="fn">prepare_union_statement</a>(
+    &amp;self,
+    union_type: <a class="enum" href="../../../enum.UnionType.html" title="enum migration::UnionType">UnionType</a>,
+    select_statement: &amp;<a class="struct" href="../../../struct.SelectStatement.html" title="struct migration::SelectStatement">SelectStatement</a>,
+    sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section><details class="toggle method-toggle" open><summary><section id="method.prepare_select_statement" class="method"><h4 class="code-header">fn <a href="#method.prepare_select_statement" class="fn">prepare_select_statement</a>(
+    &amp;self,
+    select: &amp;<a class="struct" href="../../../struct.SelectStatement.html" title="struct migration::SelectStatement">SelectStatement</a>,
+    sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section></summary><div class="docblock"><p>Translate <a href="../../../struct.SelectStatement.html" title="struct migration::SelectStatement"><code>SelectStatement</code></a> into SQL statement.</p>
+</div></details><section id="method.prepare_select_limit_offset" class="method"><h4 class="code-header">fn <a href="#method.prepare_select_limit_offset" class="fn">prepare_select_limit_offset</a>(
+    &amp;self,
+    select: &amp;<a class="struct" href="../../../struct.SelectStatement.html" title="struct migration::SelectStatement">SelectStatement</a>,
+    sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section><details class="toggle method-toggle" open><summary><section id="method.prepare_update_statement" class="method"><h4 class="code-header">fn <a href="#method.prepare_update_statement" class="fn">prepare_update_statement</a>(
+    &amp;self,
+    update: &amp;<a class="struct" href="../../../struct.UpdateStatement.html" title="struct migration::UpdateStatement">UpdateStatement</a>,
+    sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section></summary><div class="docblock"><p>Translate <a href="../../../struct.UpdateStatement.html" title="struct migration::UpdateStatement"><code>UpdateStatement</code></a> into SQL statement.</p>
+</div></details><section id="method.prepare_update_join" class="method"><h4 class="code-header">fn <a href="#method.prepare_update_join" class="fn">prepare_update_join</a>(
+    &amp;self,
+    _: &amp;[<a class="enum" href="../../../enum.TableRef.html" title="enum migration::TableRef">TableRef</a>],
+    _: &amp;<a class="struct" href="../../../struct.ConditionHolder.html" title="struct migration::ConditionHolder">ConditionHolder</a>,
+    _: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section><section id="method.prepare_update_from" class="method"><h4 class="code-header">fn <a href="#method.prepare_update_from" class="fn">prepare_update_from</a>(&amp;self, from: &amp;[<a class="enum" href="../../../enum.TableRef.html" title="enum migration::TableRef">TableRef</a>], sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>)</h4></section><section id="method.prepare_update_column" class="method"><h4 class="code-header">fn <a href="#method.prepare_update_column" class="fn">prepare_update_column</a>(
+    &amp;self,
+    _: &amp;<a class="enum" href="https://doc.rust-lang.org/nightly/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;<a class="struct" href="https://doc.rust-lang.org/nightly/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;<a class="enum" href="../../../enum.TableRef.html" title="enum migration::TableRef">TableRef</a>&gt;&gt;,
+    _: &amp;[<a class="enum" href="../../../enum.TableRef.html" title="enum migration::TableRef">TableRef</a>],
+    column: &amp;<a class="struct" href="../../../struct.SeaRc.html" title="struct migration::SeaRc">SeaRc</a>&lt;dyn <a class="trait" href="../../../trait.Iden.html" title="trait migration::Iden">Iden</a>&gt;,
+    sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section><section id="method.prepare_update_condition" class="method"><h4 class="code-header">fn <a href="#method.prepare_update_condition" class="fn">prepare_update_condition</a>(
+    &amp;self,
+    _: &amp;[<a class="enum" href="../../../enum.TableRef.html" title="enum migration::TableRef">TableRef</a>],
+    condition: &amp;<a class="struct" href="../../../struct.ConditionHolder.html" title="struct migration::ConditionHolder">ConditionHolder</a>,
+    sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section><details class="toggle method-toggle" open><summary><section id="method.prepare_update_order_by" class="method"><h4 class="code-header">fn <a href="#method.prepare_update_order_by" class="fn">prepare_update_order_by</a>(
+    &amp;self,
+    update: &amp;<a class="struct" href="../../../struct.UpdateStatement.html" title="struct migration::UpdateStatement">UpdateStatement</a>,
+    sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section></summary><div class="docblock"><p>Translate ORDER BY expression in <a href="../../../struct.UpdateStatement.html" title="struct migration::UpdateStatement"><code>UpdateStatement</code></a>.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.prepare_update_limit" class="method"><h4 class="code-header">fn <a href="#method.prepare_update_limit" class="fn">prepare_update_limit</a>(
+    &amp;self,
+    update: &amp;<a class="struct" href="../../../struct.UpdateStatement.html" title="struct migration::UpdateStatement">UpdateStatement</a>,
+    sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section></summary><div class="docblock"><p>Translate LIMIT expression in <a href="../../../struct.UpdateStatement.html" title="struct migration::UpdateStatement"><code>UpdateStatement</code></a>.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.prepare_delete_statement" class="method"><h4 class="code-header">fn <a href="#method.prepare_delete_statement" class="fn">prepare_delete_statement</a>(
+    &amp;self,
+    delete: &amp;<a class="struct" href="../../../struct.DeleteStatement.html" title="struct migration::DeleteStatement">DeleteStatement</a>,
+    sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section></summary><div class="docblock"><p>Translate <a href="../../../struct.DeleteStatement.html" title="struct migration::DeleteStatement"><code>DeleteStatement</code></a> into SQL statement.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.prepare_delete_order_by" class="method"><h4 class="code-header">fn <a href="#method.prepare_delete_order_by" class="fn">prepare_delete_order_by</a>(
+    &amp;self,
+    delete: &amp;<a class="struct" href="../../../struct.DeleteStatement.html" title="struct migration::DeleteStatement">DeleteStatement</a>,
+    sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section></summary><div class="docblock"><p>Translate ORDER BY expression in <a href="../../../struct.DeleteStatement.html" title="struct migration::DeleteStatement"><code>DeleteStatement</code></a>.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.prepare_delete_limit" class="method"><h4 class="code-header">fn <a href="#method.prepare_delete_limit" class="fn">prepare_delete_limit</a>(
+    &amp;self,
+    delete: &amp;<a class="struct" href="../../../struct.DeleteStatement.html" title="struct migration::DeleteStatement">DeleteStatement</a>,
+    sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section></summary><div class="docblock"><p>Translate LIMIT expression in <a href="../../../struct.DeleteStatement.html" title="struct migration::DeleteStatement"><code>DeleteStatement</code></a>.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.prepare_simple_expr" class="method"><h4 class="code-header">fn <a href="#method.prepare_simple_expr" class="fn">prepare_simple_expr</a>(&amp;self, simple_expr: &amp;<a class="enum" href="../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>)</h4></section></summary><div class="docblock"><p>Translate <a href="../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr"><code>SimpleExpr</code></a> into SQL statement.</p>
+</div></details><section id="method.prepare_simple_expr_common" class="method"><h4 class="code-header">fn <a href="#method.prepare_simple_expr_common" class="fn">prepare_simple_expr_common</a>(
+    &amp;self,
+    simple_expr: &amp;<a class="enum" href="../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>,
+    sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section><details class="toggle method-toggle" open><summary><section id="method.prepare_case_statement" class="method"><h4 class="code-header">fn <a href="#method.prepare_case_statement" class="fn">prepare_case_statement</a>(&amp;self, stmts: &amp;<a class="struct" href="../../../struct.CaseStatement.html" title="struct migration::CaseStatement">CaseStatement</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>)</h4></section></summary><div class="docblock"><p>Translate <a href="../../../struct.CaseStatement.html" title="struct migration::CaseStatement"><code>CaseStatement</code></a> into SQL statement.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.prepare_select_distinct" class="method"><h4 class="code-header">fn <a href="#method.prepare_select_distinct" class="fn">prepare_select_distinct</a>(
+    &amp;self,
+    select_distinct: &amp;<a class="enum" href="../../../enum.SelectDistinct.html" title="enum migration::SelectDistinct">SelectDistinct</a>,
+    sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section></summary><div class="docblock"><p>Translate <a href="../../../enum.SelectDistinct.html" title="enum migration::SelectDistinct"><code>SelectDistinct</code></a> into SQL statement.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.prepare_index_hints" class="method"><h4 class="code-header">fn <a href="#method.prepare_index_hints" class="fn">prepare_index_hints</a>(
+    &amp;self,
+    _select: &amp;<a class="struct" href="../../../struct.SelectStatement.html" title="struct migration::SelectStatement">SelectStatement</a>,
+    _sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section></summary><div class="docblock"><p>Translate [<code>IndexHint</code>] into SQL statement.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.prepare_table_sample" class="method"><h4 class="code-header">fn <a href="#method.prepare_table_sample" class="fn">prepare_table_sample</a>(
+    &amp;self,
+    _select: &amp;<a class="struct" href="../../../struct.SelectStatement.html" title="struct migration::SelectStatement">SelectStatement</a>,
+    _sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section></summary><div class="docblock"><p>Translate [<code>TableSample</code>] into SQL statement.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.prepare_select_lock" class="method"><h4 class="code-header">fn <a href="#method.prepare_select_lock" class="fn">prepare_select_lock</a>(&amp;self, lock: &amp;<a class="struct" href="../../../struct.LockClause.html" title="struct migration::LockClause">LockClause</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>)</h4></section></summary><div class="docblock"><p>Translate <a href="../../../enum.LockType.html" title="enum migration::LockType"><code>LockType</code></a> into SQL statement.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.prepare_select_expr" class="method"><h4 class="code-header">fn <a href="#method.prepare_select_expr" class="fn">prepare_select_expr</a>(&amp;self, select_expr: &amp;<a class="struct" href="../../../struct.SelectExpr.html" title="struct migration::SelectExpr">SelectExpr</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>)</h4></section></summary><div class="docblock"><p>Translate <a href="../../../struct.SelectExpr.html" title="struct migration::SelectExpr"><code>SelectExpr</code></a> into SQL statement.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.prepare_join_expr" class="method"><h4 class="code-header">fn <a href="#method.prepare_join_expr" class="fn">prepare_join_expr</a>(&amp;self, join_expr: &amp;<a class="struct" href="../../../struct.JoinExpr.html" title="struct migration::JoinExpr">JoinExpr</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>)</h4></section></summary><div class="docblock"><p>Translate <a href="../../../struct.JoinExpr.html" title="struct migration::JoinExpr"><code>JoinExpr</code></a> into SQL statement.</p>
+</div></details><section id="method.prepare_join_table_ref" class="method"><h4 class="code-header">fn <a href="#method.prepare_join_table_ref" class="fn">prepare_join_table_ref</a>(&amp;self, join_expr: &amp;<a class="struct" href="../../../struct.JoinExpr.html" title="struct migration::JoinExpr">JoinExpr</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>)</h4></section><details class="toggle method-toggle" open><summary><section id="method.prepare_table_ref" class="method"><h4 class="code-header">fn <a href="#method.prepare_table_ref" class="fn">prepare_table_ref</a>(&amp;self, table_ref: &amp;<a class="enum" href="../../../enum.TableRef.html" title="enum migration::TableRef">TableRef</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>)</h4></section></summary><div class="docblock"><p>Translate <a href="../../../enum.TableRef.html" title="enum migration::TableRef"><code>TableRef</code></a> into SQL statement.</p>
+</div></details><section id="method.prepare_column_ref" class="method"><h4 class="code-header">fn <a href="#method.prepare_column_ref" class="fn">prepare_column_ref</a>(&amp;self, column_ref: &amp;<a class="enum" href="../../../enum.ColumnRef.html" title="enum migration::ColumnRef">ColumnRef</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>)</h4></section><details class="toggle method-toggle" open><summary><section id="method.prepare_un_oper" class="method"><h4 class="code-header">fn <a href="#method.prepare_un_oper" class="fn">prepare_un_oper</a>(&amp;self, un_oper: &amp;<a class="enum" href="../../../enum.UnOper.html" title="enum migration::UnOper">UnOper</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>)</h4></section></summary><div class="docblock"><p>Translate <a href="../../../enum.UnOper.html" title="enum migration::UnOper"><code>UnOper</code></a> into SQL statement.</p>
+</div></details><section id="method.prepare_bin_oper_common" class="method"><h4 class="code-header">fn <a href="#method.prepare_bin_oper_common" class="fn">prepare_bin_oper_common</a>(&amp;self, bin_oper: &amp;<a class="enum" href="../../../enum.BinOper.html" title="enum migration::BinOper">BinOper</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>)</h4></section><details class="toggle method-toggle" open><summary><section id="method.prepare_bin_oper" class="method"><h4 class="code-header">fn <a href="#method.prepare_bin_oper" class="fn">prepare_bin_oper</a>(&amp;self, bin_oper: &amp;<a class="enum" href="../../../enum.BinOper.html" title="enum migration::BinOper">BinOper</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>)</h4></section></summary><div class="docblock"><p>Translate <a href="../../../enum.BinOper.html" title="enum migration::BinOper"><code>BinOper</code></a> into SQL statement.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.prepare_sub_query_oper" class="method"><h4 class="code-header">fn <a href="#method.prepare_sub_query_oper" class="fn">prepare_sub_query_oper</a>(&amp;self, oper: &amp;<a class="enum" href="../../../enum.SubQueryOper.html" title="enum migration::SubQueryOper">SubQueryOper</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>)</h4></section></summary><div class="docblock"><p>Translate <a href="../../../enum.SubQueryOper.html" title="enum migration::SubQueryOper"><code>SubQueryOper</code></a> into SQL statement.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.prepare_logical_chain_oper" class="method"><h4 class="code-header">fn <a href="#method.prepare_logical_chain_oper" class="fn">prepare_logical_chain_oper</a>(
+    &amp;self,
+    log_chain_oper: &amp;<a class="enum" href="../../../enum.LogicalChainOper.html" title="enum migration::LogicalChainOper">LogicalChainOper</a>,
+    i: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a>,
+    length: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a>,
+    sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section></summary><div class="docblock"><p>Translate <a href="../../../enum.LogicalChainOper.html" title="enum migration::LogicalChainOper"><code>LogicalChainOper</code></a> into SQL statement.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.prepare_function_name_common" class="method"><h4 class="code-header">fn <a href="#method.prepare_function_name_common" class="fn">prepare_function_name_common</a>(
+    &amp;self,
+    function: &amp;<a class="enum" href="../../../enum.Function.html" title="enum migration::Function">Function</a>,
+    sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section></summary><div class="docblock"><p>Translate <a href="../../../enum.Function.html" title="enum migration::Function"><code>Function</code></a> into SQL statement.</p>
+</div></details><section id="method.prepare_function_arguments" class="method"><h4 class="code-header">fn <a href="#method.prepare_function_arguments" class="fn">prepare_function_arguments</a>(
+    &amp;self,
+    func: &amp;<a class="struct" href="../../../struct.FunctionCall.html" title="struct migration::FunctionCall">FunctionCall</a>,
+    sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section><section id="method.prepare_with_query" class="method"><h4 class="code-header">fn <a href="#method.prepare_with_query" class="fn">prepare_with_query</a>(&amp;self, query: &amp;<a class="struct" href="../../../struct.WithQuery.html" title="struct migration::WithQuery">WithQuery</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>)</h4></section><section id="method.prepare_with_clause" class="method"><h4 class="code-header">fn <a href="#method.prepare_with_clause" class="fn">prepare_with_clause</a>(&amp;self, with_clause: &amp;<a class="struct" href="../../../struct.WithClause.html" title="struct migration::WithClause">WithClause</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>)</h4></section><section id="method.prepare_with_clause_recursive_options" class="method"><h4 class="code-header">fn <a href="#method.prepare_with_clause_recursive_options" class="fn">prepare_with_clause_recursive_options</a>(
+    &amp;self,
+    with_clause: &amp;<a class="struct" href="../../../struct.WithClause.html" title="struct migration::WithClause">WithClause</a>,
+    sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section><section id="method.prepare_with_clause_common_tables" class="method"><h4 class="code-header">fn <a href="#method.prepare_with_clause_common_tables" class="fn">prepare_with_clause_common_tables</a>(
+    &amp;self,
+    with_clause: &amp;<a class="struct" href="../../../struct.WithClause.html" title="struct migration::WithClause">WithClause</a>,
+    sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section><section id="method.prepare_with_query_clause_common_table" class="method"><h4 class="code-header">fn <a href="#method.prepare_with_query_clause_common_table" class="fn">prepare_with_query_clause_common_table</a>(
+    &amp;self,
+    cte: &amp;<a class="struct" href="../../../struct.CommonTableExpression.html" title="struct migration::CommonTableExpression">CommonTableExpression</a>,
+    sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section><section id="method.prepare_with_query_clause_materialization" class="method"><h4 class="code-header">fn <a href="#method.prepare_with_query_clause_materialization" class="fn">prepare_with_query_clause_materialization</a>(
+    &amp;self,
+    cte: &amp;<a class="struct" href="../../../struct.CommonTableExpression.html" title="struct migration::CommonTableExpression">CommonTableExpression</a>,
+    sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section><section id="method.prepare_with_clause_start" class="method"><h4 class="code-header">fn <a href="#method.prepare_with_clause_start" class="fn">prepare_with_clause_start</a>(
+    &amp;self,
+    with_clause: &amp;<a class="struct" href="../../../struct.WithClause.html" title="struct migration::WithClause">WithClause</a>,
+    sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section><section id="method.prepare_insert" class="method"><h4 class="code-header">fn <a href="#method.prepare_insert" class="fn">prepare_insert</a>(&amp;self, replace: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>)</h4></section><section id="method.prepare_function_name" class="method"><h4 class="code-header">fn <a href="#method.prepare_function_name" class="fn">prepare_function_name</a>(&amp;self, function: &amp;<a class="enum" href="../../../enum.Function.html" title="enum migration::Function">Function</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>)</h4></section><details class="toggle method-toggle" open><summary><section id="method.prepare_join_type" class="method"><h4 class="code-header">fn <a href="#method.prepare_join_type" class="fn">prepare_join_type</a>(&amp;self, join_type: &amp;<a class="enum" href="../../../enum.JoinType.html" title="enum migration::JoinType">JoinType</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>)</h4></section></summary><div class="docblock"><p>Translate <a href="../../../enum.JoinType.html" title="enum migration::JoinType"><code>JoinType</code></a> into SQL statement.</p>
+</div></details><section id="method.prepare_join_type_common" class="method"><h4 class="code-header">fn <a href="#method.prepare_join_type_common" class="fn">prepare_join_type_common</a>(
+    &amp;self,
+    join_type: &amp;<a class="enum" href="../../../enum.JoinType.html" title="enum migration::JoinType">JoinType</a>,
+    sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section><details class="toggle method-toggle" open><summary><section id="method.prepare_order_expr" class="method"><h4 class="code-header">fn <a href="#method.prepare_order_expr" class="fn">prepare_order_expr</a>(&amp;self, order_expr: &amp;<a class="struct" href="../../../struct.OrderExpr.html" title="struct migration::OrderExpr">OrderExpr</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>)</h4></section></summary><div class="docblock"><p>Translate <a href="../../../struct.OrderExpr.html" title="struct migration::OrderExpr"><code>OrderExpr</code></a> into SQL statement.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.prepare_join_on" class="method"><h4 class="code-header">fn <a href="#method.prepare_join_on" class="fn">prepare_join_on</a>(&amp;self, join_on: &amp;<a class="enum" href="../../../enum.JoinOn.html" title="enum migration::JoinOn">JoinOn</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>)</h4></section></summary><div class="docblock"><p>Translate <a href="../../../enum.JoinOn.html" title="enum migration::JoinOn"><code>JoinOn</code></a> into SQL statement.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.prepare_order" class="method"><h4 class="code-header">fn <a href="#method.prepare_order" class="fn">prepare_order</a>(&amp;self, order_expr: &amp;<a class="struct" href="../../../struct.OrderExpr.html" title="struct migration::OrderExpr">OrderExpr</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>)</h4></section></summary><div class="docblock"><p>Translate <a href="../../../enum.Order.html" title="enum migration::Order"><code>Order</code></a> into SQL statement.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.prepare_field_order" class="method"><h4 class="code-header">fn <a href="#method.prepare_field_order" class="fn">prepare_field_order</a>(
+    &amp;self,
+    order_expr: &amp;<a class="struct" href="../../../struct.OrderExpr.html" title="struct migration::OrderExpr">OrderExpr</a>,
+    values: &amp;<a class="struct" href="../../../struct.Values.html" title="struct migration::Values">Values</a>,
+    sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section></summary><div class="docblock"><p>Translate <a href="../../../enum.Order.html#variant.Field" title="variant migration::Order::Field"><code>Order::Field</code></a> into SQL statement</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.prepare_constant" class="method"><h4 class="code-header">fn <a href="#method.prepare_constant" class="fn">prepare_constant</a>(&amp;self, value: &amp;<a class="enum" href="../../../enum.Value.html" title="enum migration::Value">Value</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>)</h4></section></summary><div class="docblock"><p>Write <a href="../../../enum.Value.html" title="enum migration::Value"><code>Value</code></a> inline.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.prepare_values_list" class="method"><h4 class="code-header">fn <a href="#method.prepare_values_list" class="fn">prepare_values_list</a>(
+    &amp;self,
+    value_tuples: &amp;[<a class="enum" href="../../../enum.ValueTuple.html" title="enum migration::ValueTuple">ValueTuple</a>],
+    sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section></summary><div class="docblock"><p>Translate a <code>&amp;[ValueTuple]</code> into a VALUES list.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.prepare_tuple" class="method"><h4 class="code-header">fn <a href="#method.prepare_tuple" class="fn">prepare_tuple</a>(&amp;self, exprs: &amp;[<a class="enum" href="../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>], sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>)</h4></section></summary><div class="docblock"><p>Translate <a href="../../../enum.SimpleExpr.html#variant.Tuple" title="variant migration::SimpleExpr::Tuple"><code>SimpleExpr::Tuple</code></a> into SQL statement.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.prepare_keyword" class="method"><h4 class="code-header">fn <a href="#method.prepare_keyword" class="fn">prepare_keyword</a>(&amp;self, keyword: &amp;<a class="enum" href="../../../enum.Keyword.html" title="enum migration::Keyword">Keyword</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>)</h4></section></summary><div class="docblock"><p>Translate <a href="../../../enum.Keyword.html" title="enum migration::Keyword"><code>Keyword</code></a> into SQL statement.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.value_to_string" class="method"><h4 class="code-header">fn <a href="#method.value_to_string" class="fn">value_to_string</a>(&amp;self, v: &amp;<a class="enum" href="../../../enum.Value.html" title="enum migration::Value">Value</a>) -&gt; <a class="struct" href="https://doc.rust-lang.org/nightly/alloc/string/struct.String.html" title="struct alloc::string::String">String</a></h4></section></summary><div class="docblock"><p>Convert a SQL value into syntax-specific string</p>
+</div></details><section id="method.value_to_string_common" class="method"><h4 class="code-header">fn <a href="#method.value_to_string_common" class="fn">value_to_string_common</a>(&amp;self, v: &amp;<a class="enum" href="../../../enum.Value.html" title="enum migration::Value">Value</a>) -&gt; <a class="struct" href="https://doc.rust-lang.org/nightly/alloc/string/struct.String.html" title="struct alloc::string::String">String</a></h4></section><section id="method.prepare_on_conflict_action_common" class="method"><h4 class="code-header">fn <a href="#method.prepare_on_conflict_action_common" class="fn">prepare_on_conflict_action_common</a>(
+    &amp;self,
+    on_conflict_action: &amp;<a class="enum" href="https://doc.rust-lang.org/nightly/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;<a class="enum" href="../../../enum.OnConflictAction.html" title="enum migration::OnConflictAction">OnConflictAction</a>&gt;,
+    sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>,
+)</h4></section><details class="toggle method-toggle" open><summary><section id="method.insert_default_keyword" class="method"><h4 class="code-header">fn <a href="#method.insert_default_keyword" class="fn">insert_default_keyword</a>(&amp;self) -&gt; &amp;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a></h4></section></summary><div class="docblock"><p>The keywords for insert default row.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.insert_default_values" class="method"><h4 class="code-header">fn <a href="#method.insert_default_values" class="fn">insert_default_values</a>(&amp;self, num_rows: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u32.html">u32</a>, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>)</h4></section></summary><div class="docblock"><p>Write insert default rows expression.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.prepare_constant_true" class="method"><h4 class="code-header">fn <a href="#method.prepare_constant_true" class="fn">prepare_constant_true</a>(&amp;self, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>)</h4></section></summary><div class="docblock"><p>Write TRUE constant</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.prepare_constant_false" class="method"><h4 class="code-header">fn <a href="#method.prepare_constant_false" class="fn">prepare_constant_false</a>(&amp;self, sql: &amp;mut dyn <a class="trait" href="../../../trait.SqlWriter.html" title="trait migration::SqlWriter">SqlWriter</a>)</h4></section></summary><div class="docblock"><p>Write FALSE constant</p>
+</div></details></div><h2 id="implementors" class="section-header">Implementors<a href="#implementors" class="anchor">§</a></h2><div id="implementors-list"><div class="negative-marker"></div><section id="impl-QueryBuilder-for-MysqlQueryBuilder" class="impl"><a href="#impl-QueryBuilder-for-MysqlQueryBuilder" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="../../../trait.QueryBuilder.html" title="trait migration::QueryBuilder">QueryBuilder</a> for <a class="struct" href="../../../struct.MysqlQueryBuilder.html" title="struct migration::MysqlQueryBuilder">MysqlQueryBuilder</a></h3></section><section id="impl-QueryBuilder-for-PostgresQueryBuilder" class="impl"><a href="#impl-QueryBuilder-for-PostgresQueryBuilder" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="../../../trait.QueryBuilder.html" title="trait migration::QueryBuilder">QueryBuilder</a> for <a class="struct" href="../../../struct.PostgresQueryBuilder.html" title="struct migration::PostgresQueryBuilder">PostgresQueryBuilder</a></h3></section><section id="impl-QueryBuilder-for-SqliteQueryBuilder" class="impl"><a href="#impl-QueryBuilder-for-SqliteQueryBuilder" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="../../../trait.QueryBuilder.html" title="trait migration::QueryBuilder">QueryBuilder</a> for <a class="struct" href="../../../struct.SqliteQueryBuilder.html" title="struct migration::SqliteQueryBuilder">SqliteQueryBuilder</a></h3></section></div><script src="../../../../trait.impl/sea_query/backend/query_builder/trait.QueryBuilder.js" data-ignore-extern-crates="sea_query" async></script></section></div></main></body></html>

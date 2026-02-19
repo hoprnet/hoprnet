@@ -1,0 +1,72 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="HOPR Metrics Collection"><title>hopr_metrics - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../static.files/rustdoc-b7b9f40b.css"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="hopr_metrics" data-themes="" data-resource-suffix="" data-rustdoc-version="1.95.0-nightly (7057231bd 2026-02-11)" data-channel="nightly" data-search-js="search-fb33671b.js" data-stringdex-js="stringdex-b897f86f.js" data-settings-js="settings-170eb4bf.js" ><script src="../static.files/storage-f9617a14.js"></script><script defer src="../crates.js"></script><script defer src="../static.files/main-12f88f4f.js"></script><noscript><link rel="stylesheet" href="../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-044be391.svg"></head><body class="rustdoc mod crate"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Crate hopr_metrics</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../hopr_metrics/index.html">hopr_<wbr>metrics</a><span class="version">1.3.0</span></h2></div><div class="sidebar-elems"><ul class="block"><li><a id="all-types" href="all.html">All Items</a></li></ul><section id="rustdoc-toc"><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#hopr-metrics-collection" title="HOPR Metrics Collection">HOPR Metrics Collection</a><ul><li><a href="#usage-in-rust-code" title="Usage in Rust code">Usage in Rust code</a></li></ul></li></ul><h3><a href="#macros">Crate Items</a></h3><ul class="block"><li><a href="#macros" title="Macros">Macros</a></li><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#functions" title="Functions">Functions</a></li></ul></section><div id="rustdoc-modnav"></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1>Crate <span>hopr_<wbr>metrics</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../src/hopr_metrics/lib.rs.html#1-83">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h2 id="hopr-metrics-collection"><a class="doc-anchor" href="#hopr-metrics-collection">§</a>HOPR Metrics Collection</h2>
+<p>The purpose of the <code>hopr_metrics</code> Rust crate is to create a thin wrapper
+over the <a href="https://docs.rs/prometheus/latest/prometheus/">Prometheus Metrics Rust API</a> or
+a similar metrics library, should it change in the future.</p>
+<p>This wrapper merely simplifies the 3 basic Metric Types:</p>
+<ul>
+<li>Counter (integer only)</li>
+<li>Gauge (floating point only)</li>
+<li>Histogram (floating point only)</li>
+</ul>
+<p>The above three types are wrapped using the following structs:</p>
+<ul>
+<li><a href="struct.SimpleCounter.html" title="struct hopr_metrics::SimpleCounter">SimpleCounter</a></li>
+<li><a href="struct.MultiCounter.html" title="struct hopr_metrics::MultiCounter">MultiCounter</a></li>
+<li><a href="struct.SimpleGauge.html" title="struct hopr_metrics::SimpleGauge">SimpleGauge</a></li>
+<li><a href="struct.MultiGauge.html" title="struct hopr_metrics::MultiGauge">MultiGauge</a></li>
+<li><a href="struct.SimpleHistogram.html" title="struct hopr_metrics::SimpleHistogram">SimpleHistogram</a></li>
+<li><a href="struct.MultiHistogram.html" title="struct hopr_metrics::MultiHistogram">MultiHistogram</a></li>
+</ul>
+<p>The “simple” types represent a singular named metrics, whereas the “multi” metrics represent a
+vector extension.</p>
+<p>The vector extensions basically maintain multiple labelled metrics in a single
+entity. This makes it possible to have categorized metric values within a single metric, e.g.
+counter of successful HTTP requests categorized by HTTP method.</p>
+<p>The metrics are registered within the global metrics registry (singleton).
+Currently, the crate does not support additional individual registries apart from the global one.</p>
+<h4 id="usage-in-rust-code"><a class="doc-anchor" href="#usage-in-rust-code">§</a>Usage in Rust code</h4>
+<p>When writing pure Rust code that uses this crate, one can use the above structs by directly instantiating them.
+During their construction, the metric registers itself in the global metrics registry.</p>
+<h5 id="example-use-in-rust"><a class="doc-anchor" href="#example-use-in-rust">§</a>Example use in Rust</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>hopr_metrics::<span class="kw-2">*</span>;
+
+<span class="kw">let </span>metric_counter = SimpleCounter::new(<span class="string">"test_counter"</span>, <span class="string">"Some testing counter"</span>).unwrap();
+
+<span class="comment">// Counter can be only incremented by integers only
+</span>metric_counter.increment_by(<span class="number">10</span>);
+
+<span class="kw">let </span>metric_gauge = SimpleGauge::new(<span class="string">"test_gauge"</span>, <span class="string">"Some testing gauge"</span>).unwrap();
+
+<span class="comment">// Gauges can be incremented and decrements and support floats
+</span>metric_gauge.increment(<span class="number">5.0</span>);
+metric_gauge.decrement(<span class="number">3.2</span>);
+
+<span class="kw">let </span>metric_histogram = SimpleHistogram::new(<span class="string">"test_histogram"</span>, <span class="string">"Some testing histogram"</span>, <span class="macro">vec!</span>[<span class="number">1.0</span>, <span class="number">2.0</span>]).unwrap();
+
+<span class="comment">// Histograms can observe floating point values
+</span>metric_histogram.observe(<span class="number">10.1</span>);
+
+<span class="comment">// ... and also can be used to measure time durations in seconds
+</span><span class="kw">let </span>timer = metric_histogram.start_measure();
+std::thread::sleep(std::time::Duration::from_secs(<span class="number">1</span>));
+metric_histogram.record_measure(timer);
+
+<span class="comment">// Multi-metrics are labeled extensions
+</span><span class="kw">let </span>metric_counts_per_version =
+    MultiCounter::new(<span class="string">"test_multi_counter"</span>, <span class="string">"Testing labeled counter"</span>, <span class="kw-2">&amp;</span>[<span class="string">"version"</span>]).unwrap();
+
+<span class="comment">// Tracks counters per different versions
+</span>metric_counts_per_version.increment_by(<span class="kw-2">&amp;</span>[<span class="string">"1.0.0"</span>], <span class="number">2</span>);
+metric_counts_per_version.increment_by(<span class="kw-2">&amp;</span>[<span class="string">"1.0.1"</span>], <span class="number">1</span>);
+
+<span class="comment">// All metrics live in a global state and can be serialized at any time
+</span><span class="kw">let </span>gathered_metrics = gather_all_metrics();
+
+<span class="comment">// Metrics are in text format and can be exposed using an HTTP API endpoint
+</span><span class="macro">println!</span>(<span class="string">"{:?}"</span>, gathered_metrics);</code></pre></div></div></details><h2 id="macros" class="section-header">Macros<a href="#macros" class="anchor">§</a></h2><dl class="item-table"><dt><a class="macro" href="macro.histogram_start_measure.html" title="macro hopr_metrics::histogram_start_measure">histogram_<wbr>start_<wbr>measure</a></dt></dl><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.GaugeGuard.html" title="struct hopr_metrics::GaugeGuard">Gauge<wbr>Guard</a></dt><dd>Creates a RAII guard for a simple gauge metric.</dd><dt><a class="struct" href="struct.MultiCounter.html" title="struct hopr_metrics::MultiCounter">Multi<wbr>Counter</a></dt><dd>Represents a vector of named monotonic unsigned integer counters.
+Wrapper for IntCounterVec type</dd><dt><a class="struct" href="struct.MultiGauge.html" title="struct hopr_metrics::MultiGauge">Multi<wbr>Gauge</a></dt><dd>Represents a vector of gauges with floating point values.
+Wrapper for GaugeVec type</dd><dt><a class="struct" href="struct.MultiGaugeGuard.html" title="struct hopr_metrics::MultiGaugeGuard">Multi<wbr>Gauge<wbr>Guard</a></dt><dd>Creates a RAII guard for a multi-gauge metric.</dd><dt><a class="struct" href="struct.MultiHistogram.html" title="struct hopr_metrics::MultiHistogram">Multi<wbr>Histogram</a></dt><dd>Represents a vector of histograms with floating point values.
+Wrapper for HistogramVec type</dd><dt><a class="struct" href="struct.SimpleCounter.html" title="struct hopr_metrics::SimpleCounter">Simple<wbr>Counter</a></dt><dd>Represents a simple monotonic unsigned integer counter.
+Wrapper for IntCounter type</dd><dt><a class="struct" href="struct.SimpleGauge.html" title="struct hopr_metrics::SimpleGauge">Simple<wbr>Gauge</a></dt><dd>Represents a simple gauge with floating point values.
+Wrapper for Gauge type</dd><dt><a class="struct" href="struct.SimpleHistogram.html" title="struct hopr_metrics::SimpleHistogram">Simple<wbr>Histogram</a></dt><dd>Represents a histogram with floating point values.
+Wrapper for Histogram type</dd><dt><a class="struct" href="struct.SimpleTimer.html" title="struct hopr_metrics::SimpleTimer">Simple<wbr>Timer</a></dt><dd>Represents a timer handle.</dd></dl><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.gather_all_metrics.html" title="fn hopr_metrics::gather_all_metrics">gather_<wbr>all_<wbr>metrics</a></dt><dd>Gathers all the global Prometheus metrics.</dd></dl></section></div></main></body></html>

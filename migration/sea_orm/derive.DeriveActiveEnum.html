@@ -1,0 +1,65 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="A derive macro to implement `sea_orm::ActiveEnum` trait for enums."><title>DeriveActiveEnum in migration::sea_orm - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-b7b9f40b.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="migration" data-themes="" data-resource-suffix="" data-rustdoc-version="1.95.0-nightly (7057231bd 2026-02-11)" data-channel="nightly" data-search-js="search-fb33671b.js" data-stringdex-js="stringdex-b897f86f.js" data-settings-js="settings-170eb4bf.js" ><script src="../../static.files/storage-f9617a14.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../static.files/main-12f88f4f.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc derive"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">DeriveActiveEnum</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../migration/index.html">migration</a><span class="version">0.5.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Derive<wbr>Active<wbr>Enum</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#limitations" title="Limitations">Limitations</a></li><li><a href="#macro-attributes" title="Macro Attributes">Macro Attributes</a></li><li><a href="#usage" title="Usage">Usage</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="index.html">In migration::<wbr>sea_<wbr>orm</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../index.html">migration</a>::<wbr><a href="index.html">sea_orm</a></div><h1>Derive Macro <span class="derive">Derive<wbr>Active<wbr>Enum</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"></span></div><pre class="rust item-decl"><code>#[derive(DeriveActiveEnum)]
+{
+    <span class="comment">// Attributes available to this derive:</span>
+    #[sea_orm]
+}
+</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>A derive macro to implement <code>sea_orm::ActiveEnum</code> trait for enums.</p>
+<h2 id="limitations"><a class="doc-anchor" href="#limitations">§</a>Limitations</h2>
+<p>This derive macros can only be used on enums.</p>
+<h2 id="macro-attributes"><a class="doc-anchor" href="#macro-attributes">§</a>Macro Attributes</h2>
+<p>All macro attributes listed below have to be annotated in the form of <code>#[sea_orm(attr = value)]</code>.</p>
+<ul>
+<li>
+<p>For enum</p>
+<ul>
+<li><code>rs_type</code>: Define <code>ActiveEnum::Value</code>
+<ul>
+<li>Possible values: <code>String</code>, <code>i8</code>, <code>i16</code>, <code>i32</code>, <code>i64</code>, <code>u8</code>, <code>u16</code>, <code>u32</code>, <code>u64</code></li>
+<li>Note that value has to be passed as string, i.e. <code>rs_type = "i8"</code></li>
+</ul>
+</li>
+<li><code>db_type</code>: Define <code>ColumnType</code> returned by <code>ActiveEnum::db_type()</code>
+<ul>
+<li>Possible values: all available enum variants of <code>ColumnType</code>, e.g. <code>String(StringLen::None)</code>, <code>String(StringLen::N(1))</code>, <code>Integer</code></li>
+<li>Note that value has to be passed as string, i.e. <code>db_type = "Integer"</code></li>
+</ul>
+</li>
+<li><code>enum_name</code>: Define <code>String</code> returned by <code>ActiveEnum::name()</code>
+<ul>
+<li>This attribute is optional with default value being the name of enum in camel-case</li>
+<li>Note that value has to be passed as string, i.e. <code>enum_name = "MyEnum"</code></li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p>For enum variant</p>
+<ul>
+<li><code>string_value</code> or <code>num_value</code>:
+<ul>
+<li>For <code>string_value</code>, value should be passed as string, i.e. <code>string_value = "A"</code>
+<ul>
+<li>Due to the way internal Enums are automatically derived, the following restrictions apply:
+<ul>
+<li>members cannot share identical <code>string_value</code>, case-insensitive.</li>
+<li>in principle, any future Titlecased Rust keywords are not valid <code>string_value</code>.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>For <code>num_value</code>, value should be passed as integer, i.e. <code>num_value = 1</code> or <code>num_value = 1i32</code></li>
+<li>Note that only one of it can be specified, and all variants of an enum have to annotate with the same <code>*_value</code> macro attribute</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h2 id="usage"><a class="doc-anchor" href="#usage">§</a>Usage</h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_orm::{entity::prelude::<span class="kw-2">*</span>, DeriveActiveEnum};
+
+<span class="attr">#[derive(EnumIter, DeriveActiveEnum)]
+#[sea_orm(rs_type = <span class="string">"i32"</span>, db_type = <span class="string">"Integer"</span>)]
+</span><span class="kw">pub enum </span>Color {
+    Black = <span class="number">0</span>,
+    White = <span class="number">1</span>,
+}</code></pre></div></div></details></section></div></main></body></html>

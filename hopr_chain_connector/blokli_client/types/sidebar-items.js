@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ChannelStatus","TransactionStatus"],"struct":["Account","ChainInfo","Channel","ContractAddressMap","DateTime","Hex32","HoprBalance","ModuleAddress","NativeBalance","OpenedChannelsGraphEntry","Safe","SafeHoprAllowance","TicketParameters","TokenValueString","Transaction","Uint64"]};

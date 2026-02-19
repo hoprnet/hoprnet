@@ -1,0 +1,121 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Alloy"><title>hopr_chain_types::exports::alloy - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-b7b9f40b.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="hopr_chain_types" data-themes="" data-resource-suffix="" data-rustdoc-version="1.95.0-nightly (7057231bd 2026-02-11)" data-channel="nightly" data-search-js="search-fb33671b.js" data-stringdex-js="stringdex-b897f86f.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-f9617a14.js"></script><script defer src="../../../crates.js"></script><script defer src="../../../static.files/main-12f88f4f.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod crate"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Crate alloy</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../hopr_chain_types/index.html">hopr_<wbr>chain_<wbr>types</a><span class="version">0.14.0</span></h2></div><div class="sidebar-elems"><ul class="block"><li><a id="all-types" href="all.html">All Items</a></li></ul><section id="rustdoc-toc"><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#alloy" title="Alloy">Alloy</a><ul><li><a href="#installation" title="Installation">Installation</a></li><li><a href="#overview" title="Overview">Overview</a></li><li><a href="#supported-rust-versions-msrv" title="Supported Rust Versions (MSRV)">Supported Rust Versions (MSRV)</a></li><li><a href="#contributing" title="Contributing">Contributing</a></li><li><a href="#note-on-no_std" title="Note on `no_std`">Note on <code>no_std</code></a></li><li><a href="#credits" title="Credits">Credits</a></li></ul></li></ul><h3><a href="#modules">Crate Items</a></h3><ul class="block"><li><a href="#modules" title="Modules">Modules</a></li><li><a href="#macros" title="Macros">Macros</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In hopr_<wbr>chain_<wbr>types::<wbr>exports</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">hopr_chain_types</a>::<wbr><a href="../index.html">exports</a></div><h1>Crate <span>alloy</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"></span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h2 id="alloy"><a class="doc-anchor" href="#alloy">§</a>Alloy</h2>
+<p>Alloy connects applications to blockchains.</p>
+<p>Alloy is a rewrite of <a href="https://github.com/gakonst/ethers-rs"><code>ethers-rs</code></a> from the ground up, with exciting new
+features, high performance, and excellent <a href="https://docs.rs/alloy">docs</a>.</p>
+<p>We also have a <a href="https://alloy.rs/">book</a> on all things Alloy and many <a href="https://github.com/alloy-rs/examples">examples</a> to help you get started.</p>
+<p><a href="https://t.me/ethers_rs"><img src="https://img.shields.io/endpoint?color=neon&amp;style=for-the-badge&amp;url=https%3A%2F%2Ftg.sumanjay.workers.dev%2Fethers_rs" alt="Telegram chat" /></a></p>
+<h3 id="installation"><a class="doc-anchor" href="#installation">§</a>Installation</h3>
+<p>Alloy consists of a number of crates that provide a range of functionality essential for interfacing with any Ethereum-based blockchain.</p>
+<p>The easiest way to get started is to add the <code>alloy</code> crate with the <code>full</code> feature flag from the command-line using Cargo:</p>
+<div class="example-wrap"><pre class="language-sh"><code>cargo add alloy --features full</code></pre></div>
+<p>Alternatively, you can add the following to your <code>Cargo.toml</code> file:</p>
+<div class="example-wrap"><pre class="language-toml"><code>alloy = { version = &quot;1&quot;, features = [&quot;full&quot;] }</code></pre></div>
+<p>For a more fine-grained control over the features you wish to include, you can add the individual crates to your <code>Cargo.toml</code> file, or use the <code>alloy</code> crate with the features you need.</p>
+<p>A comprehensive list of available features can be found on <a href="https://docs.rs/crate/alloy/latest/features">docs.rs</a> or in the <a href="https://github.com/alloy-rs/alloy/blob/main/crates/alloy/Cargo.toml"><code>alloy</code> crate’s <code>Cargo.toml</code></a>.</p>
+<h3 id="overview"><a class="doc-anchor" href="#overview">§</a>Overview</h3>
+<p>This repository contains the following crates:</p>
+<ul>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/alloy"><code>alloy</code></a>: Meta-crate for the entire project, including <a href="https://docs.rs/alloy-core"><code>alloy-core</code></a></li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/consensus"><code>alloy-consensus</code></a> - Ethereum consensus interface
+<ul>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/consensus-any"><code>alloy-consensus-any</code></a> - Catch-all consensus interface for multiple networks</li>
+</ul>
+</li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/contract"><code>alloy-contract</code></a> - Interact with on-chain contracts</li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/eips"><code>alloy-eips</code></a> - Ethereum Improvement Proposal (EIP) implementations</li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/genesis"><code>alloy-genesis</code></a> - Ethereum genesis file definitions</li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/json-rpc"><code>alloy-json-rpc</code></a> - Core data types for JSON-RPC 2.0 clients</li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/ens"><code>alloy-ens</code></a> - Ethereum Name Service (ENS) utilities</li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/network"><code>alloy-network</code></a> - Network abstraction for RPC types
+<ul>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/network-primitives"><code>alloy-network-primitives</code></a> - Primitive types for the network abstraction</li>
+</ul>
+</li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/node-bindings"><code>alloy-node-bindings</code></a> - Ethereum execution-layer client bindings</li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/provider"><code>alloy-provider</code></a> - Interface with an Ethereum blockchain</li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/pubsub"><code>alloy-pubsub</code></a> - Ethereum JSON-RPC <a href="https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern">publish-subscribe</a> tower service and type definitions</li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/rpc-client"><code>alloy-rpc-client</code></a> - Low-level Ethereum JSON-RPC client implementation</li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types"><code>alloy-rpc-types</code></a> - Meta-crate for all Ethereum JSON-RPC types
+<ul>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-admin"><code>alloy-rpc-types-admin</code></a> - Types for the <code>admin</code> Ethereum JSON-RPC namespace</li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-anvil"><code>alloy-rpc-types-anvil</code></a> - Types for the <a href="https://github.com/foundry-rs/foundry">Anvil</a> development node’s Ethereum JSON-RPC namespace</li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-any"><code>alloy-rpc-types-any</code></a> - Types for JSON-RPC namespaces across multiple networks</li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-beacon"><code>alloy-rpc-types-beacon</code></a> - Types for the <a href="https://ethereum.github.io/beacon-APIs">Ethereum Beacon Node API</a></li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-debug"><code>alloy-rpc-types-debug</code></a> - Types for the <code>debug</code> Ethereum JSON-RPC namespace</li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-engine"><code>alloy-rpc-types-engine</code></a> - Types for the <code>engine</code> Ethereum JSON-RPC namespace</li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-eth"><code>alloy-rpc-types-eth</code></a> - Types for the <code>eth</code> Ethereum JSON-RPC namespace</li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-mev"><code>alloy-rpc-types-mev</code></a> - Types for the MEV bundle JSON-RPC namespace</li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-trace"><code>alloy-rpc-types-trace</code></a> - Types for the <code>trace</code> Ethereum JSON-RPC namespace</li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-txpool"><code>alloy-rpc-types-txpool</code></a> - Types for the <code>txpool</code> Ethereum JSON-RPC namespace</li>
+</ul>
+</li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/serde"><code>alloy-serde</code></a> - <a href="https://serde.rs">Serde</a>-related utilities</li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/signer"><code>alloy-signer</code></a> - Ethereum signer abstraction
+<ul>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/signer-aws"><code>alloy-signer-aws</code></a> - <a href="https://aws.amazon.com/kms">AWS KMS</a> signer implementation</li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/signer-gcp"><code>alloy-signer-gcp</code></a> - <a href="https://cloud.google.com/kms">GCP KMS</a> signer implementation</li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/signer-ledger"><code>alloy-signer-ledger</code></a> - <a href="https://www.ledger.com">Ledger</a> signer implementation</li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/signer-local"><code>alloy-signer-local</code></a> - Local (private key, keystore, mnemonic, YubiHSM) signer implementations</li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/signer-trezor"><code>alloy-signer-trezor</code></a> - <a href="https://trezor.io">Trezor</a> signer implementation</li>
+</ul>
+</li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/transport"><code>alloy-transport</code></a> - Low-level Ethereum JSON-RPC transport abstraction
+<ul>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/transport-http"><code>alloy-transport-http</code></a> - HTTP transport implementation</li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/transport-ipc"><code>alloy-transport-ipc</code></a> - IPC transport implementation</li>
+<li><a href="https://github.com/alloy-rs/alloy/tree/main/crates/transport-ws"><code>alloy-transport-ws</code></a> - WS transport implementation</li>
+</ul>
+</li>
+</ul>
+<h3 id="supported-rust-versions-msrv"><a class="doc-anchor" href="#supported-rust-versions-msrv">§</a>Supported Rust Versions (MSRV)</h3><!--
+When updating this, also update:
+- clippy.toml
+- Cargo.toml
+- .github/workflows/ci.yml
+-->
+<p>The current MSRV (minimum supported rust version) is 1.86.</p>
+<p>Alloy will keep a rolling MSRV policy of <strong>at least</strong> two versions behind the
+latest stable release (so if the latest stable release is 1.58, we would
+support 1.56).</p>
+<p>Note that the MSRV is not increased automatically, and only as part of a patch
+(pre-1.0) or minor (post-1.0) release.</p>
+<h3 id="contributing"><a class="doc-anchor" href="#contributing">§</a>Contributing</h3>
+<p>Thanks for your help improving the project! We are so happy to have you! We have
+<a href="./CONTRIBUTING.md">a contributing guide</a> to help you get involved in the
+Alloy project.</p>
+<p>Pull requests will not be merged unless CI passes, so please ensure that your
+contribution follows the linting rules and passes clippy.</p>
+<h3 id="note-on-no_std"><a class="doc-anchor" href="#note-on-no_std">§</a>Note on <code>no_std</code></h3>
+<p>Because these crates are primarily network-focused, we do not intend to support
+<code>no_std</code> for most of them at this time.</p>
+<p>The following crates support <code>no_std</code>:</p>
+<div><table><thead><tr><th>Crate</th><th>Version Badge</th></tr></thead><tbody>
+<tr><td><strong>alloy-eips</strong></td><td><a href="https://crates.io/crates/alloy-eips"><img src="https://img.shields.io/crates/v/alloy-eips.svg" alt="Crates.io" /></a></td></tr>
+<tr><td><strong>alloy-genesis</strong></td><td><a href="https://crates.io/crates/alloy-genesis"><img src="https://img.shields.io/crates/v/alloy-genesis.svg" alt="Crates.io" /></a></td></tr>
+<tr><td><strong>alloy-serde</strong></td><td><a href="https://crates.io/crates/alloy-serde"><img src="https://img.shields.io/crates/v/alloy-serde.svg" alt="Crates.io" /></a></td></tr>
+<tr><td><strong>alloy-consensus</strong></td><td><a href="https://crates.io/crates/alloy-consensus"><img src="https://img.shields.io/crates/v/alloy-consensus.svg" alt="Crates.io" /></a></td></tr>
+</tbody></table>
+</div>
+<p>If you would like to add <code>no_std</code> support to a crate, please make sure to update
+<code>scripts/check_no_std.sh</code> as well.</p>
+<h3 id="credits"><a class="doc-anchor" href="#credits">§</a>Credits</h3>
+<p>None of these crates would have been possible without the great work done in:</p>
+<div><table><thead><tr><th>Project</th><th>Description</th></tr></thead><tbody>
+<tr><td><a href="https://github.com/ethers-io/ethers.js/"><code>ethers.js</code></a></td><td>A complete and compact JavaScript library for interacting with the Ethereum blockchain.</td></tr>
+<tr><td><a href="https://github.com/tomusdrw/rust-web3/"><code>rust-web3</code></a></td><td>Rust library for Ethereum JSON-RPC client communication, including support for async and WASM.</td></tr>
+<tr><td><a href="https://github.com/recmo/uint"><code>ruint</code></a></td><td>A fast, no-std, const-friendly implementation of fixed-size unsigned integers in Rust.</td></tr>
+<tr><td><a href="https://github.com/rust-ethereum/ethabi"><code>ethabi</code></a></td><td>Ethereum ABI encoding/decoding in Rust for contracts and transactions.</td></tr>
+<tr><td><a href="https://github.com/gnosis/ethcontract-rs/"><code>ethcontract-rs</code></a></td><td>Rust library to generate type-safe bindings to Ethereum smart contracts.</td></tr>
+<tr><td><a href="https://github.com/althea-net/guac_rs/"><code>guac_rs</code></a></td><td>Rust implementation of the GUAC protocol for Ethereum state channels.</td></tr>
+</tbody></table>
+</div><h5 id="license"><a class="doc-anchor" href="#license">§</a>License</h5><sup>
+Licensed under either of <a href="LICENSE-APACHE">Apache License, Version
+2.0</a> or <a href="LICENSE-MIT">MIT license</a> at your option.
+</sup>
+<br>
+<sub>
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in these crates by you, as defined in the Apache-2.0 license,
+shall be dual licensed as above, without any additional terms or conditions.
+</sub></div></details><h2 id="modules" class="section-header">Modules<a href="#modules" class="anchor">§</a></h2><dl class="item-table"><dt><a class="mod" href="consensus/index.html" title="mod hopr_chain_types::exports::alloy::consensus">consensus</a></dt><dd>alloy-consensus</dd><dt><a class="mod" href="contract/index.html" title="mod hopr_chain_types::exports::alloy::contract">contract</a></dt><dd>alloy-contract</dd><dt><a class="mod" href="core/index.html" title="mod hopr_chain_types::exports::alloy::core">core</a></dt><dd>Alloy</dd><dt><a class="mod" href="node_bindings/index.html" title="mod hopr_chain_types::exports::alloy::node_bindings">node_<wbr>bindings</a></dt><dd>alloy-node-bindings</dd><dt><a class="mod" href="providers/index.html" title="mod hopr_chain_types::exports::alloy::providers">providers</a></dt><dd>Interface with an Ethereum blockchain.</dd><dt><a class="mod" href="rpc/index.html" title="mod hopr_chain_types::exports::alloy::rpc">rpc</a></dt><dd>Ethereum JSON-RPC client and types.</dd><dt><a class="mod" href="signers/index.html" title="mod hopr_chain_types::exports::alloy::signers">signers</a></dt><dd>Ethereum signer abstraction and implementations.</dd><dt><a class="mod" href="transports/index.html" title="mod hopr_chain_types::exports::alloy::transports">transports</a></dt><dd>Low-level Ethereum JSON-RPC transport abstraction and implementations.</dd></dl><h2 id="macros" class="section-header">Macros<a href="#macros" class="anchor">§</a></h2><dl class="item-table"><dt><a class="macro" href="macro.hex.html" title="macro hopr_chain_types::exports::alloy::hex">hex</a></dt><dd>Macro for converting sequence of string literals containing hex-encoded data
+into an array of bytes.</dd><dt><a class="macro" href="macro.sol.html" title="macro hopr_chain_types::exports::alloy::sol">sol</a></dt><dd><a href="core/sol_types/macro.sol.html" title="macro hopr_chain_types::exports::alloy::core::sol_types::sol"><code>sol!</code></a> <code>macro_rules!</code> wrapper to set import attributes.</dd></dl></section></div></main></body></html>

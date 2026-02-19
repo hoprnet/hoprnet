@@ -1,0 +1,153 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `OrderedStatement` trait in crate `migration`."><title>OrderedStatement in migration::sea_orm::sea_query::query - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-b7b9f40b.css"><meta name="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="migration" data-themes="" data-resource-suffix="" data-rustdoc-version="1.95.0-nightly (7057231bd 2026-02-11)" data-channel="nightly" data-search-js="search-fb33671b.js" data-stringdex-js="stringdex-b897f86f.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../static.files/storage-f9617a14.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../../../static.files/main-12f88f4f.js"></script><noscript><link rel="stylesheet" href="../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc trait"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">OrderedStatement</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../../migration/index.html">migration</a><span class="version">0.5.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Ordered<wbr>Statement</a></h2><h3><a href="#required-methods">Required Methods</a></h3><ul class="block"><li><a href="#tymethod.clear_order_by" title="clear_order_by">clear_order_by</a></li></ul><h3><a href="#provided-methods">Provided Methods</a></h3><ul class="block"><li><a href="#method.order_by" title="order_by">order_by</a></li><li><a href="#method.order_by_columns" title="order_by_columns">order_by_columns</a></li><li><a href="#method.order_by_columns_with_nulls" title="order_by_columns_with_nulls">order_by_columns_with_nulls</a></li><li><a href="#method.order_by_customs" title="order_by_customs">order_by_customs</a></li><li><a href="#method.order_by_customs_with_nulls" title="order_by_customs_with_nulls">order_by_customs_with_nulls</a></li><li><a href="#method.order_by_expr" title="order_by_expr">order_by_expr</a></li><li><a href="#method.order_by_expr_with_nulls" title="order_by_expr_with_nulls">order_by_expr_with_nulls</a></li><li><a href="#method.order_by_with_nulls" title="order_by_with_nulls">order_by_with_nulls</a></li></ul><h3><a href="#dyn-compatibility">Dyn Compatibility</a></h3><h3><a href="#implementors">Implementors</a></h3></section><div id="rustdoc-modnav"><h2><a href="index.html">In migration::<wbr>sea_<wbr>orm::<wbr>sea_<wbr>query::<wbr>query</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../../index.html">migration</a>::<wbr><a href="../../index.html">sea_orm</a>::<wbr><a href="../index.html">sea_query</a>::<wbr><a href="index.html">query</a></div><h1>Trait <span class="trait">Ordered<wbr>Statement</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"></span></div><pre class="rust item-decl"><code>pub trait OrderedStatement {
+    // Required method
+    fn <a href="#tymethod.clear_order_by" class="fn">clear_order_by</a>(&amp;mut self) -&gt; &amp;mut Self;
+
+    // Provided methods
+    fn <a href="#method.order_by" class="fn">order_by</a>&lt;T&gt;(&amp;mut self, col: T, order: <a class="enum" href="../../../enum.Order.html" title="enum migration::Order">Order</a>) -&gt; &amp;mut Self
+       <span class="where">where T: <a class="trait" href="../../../trait.IntoColumnRef.html" title="trait migration::IntoColumnRef">IntoColumnRef</a></span> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.order_by_expr" class="fn">order_by_expr</a>(&amp;mut self, expr: <a class="enum" href="../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>, order: <a class="enum" href="../../../enum.Order.html" title="enum migration::Order">Order</a>) -&gt; &amp;mut Self { ... }
+<span class="item-spacer"></span>    fn <a href="#method.order_by_customs" class="fn">order_by_customs</a>&lt;I, T&gt;(&amp;mut self, cols: I) -&gt; &amp;mut Self
+       <span class="where">where T: <a class="trait" href="https://doc.rust-lang.org/nightly/alloc/string/trait.ToString.html" title="trait alloc::string::ToString">ToString</a>,
+             I: <a class="trait" href="https://doc.rust-lang.org/nightly/core/iter/traits/collect/trait.IntoIterator.html" title="trait core::iter::traits::collect::IntoIterator">IntoIterator</a>&lt;Item = (T, <a class="enum" href="../../../enum.Order.html" title="enum migration::Order">Order</a>)&gt;</span> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.order_by_columns" class="fn">order_by_columns</a>&lt;I, T&gt;(&amp;mut self, cols: I) -&gt; &amp;mut Self
+       <span class="where">where T: <a class="trait" href="../../../trait.IntoColumnRef.html" title="trait migration::IntoColumnRef">IntoColumnRef</a>,
+             I: <a class="trait" href="https://doc.rust-lang.org/nightly/core/iter/traits/collect/trait.IntoIterator.html" title="trait core::iter::traits::collect::IntoIterator">IntoIterator</a>&lt;Item = (T, <a class="enum" href="../../../enum.Order.html" title="enum migration::Order">Order</a>)&gt;</span> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.order_by_with_nulls" class="fn">order_by_with_nulls</a>&lt;T&gt;(
+        &amp;mut self,
+        col: T,
+        order: <a class="enum" href="../../../enum.Order.html" title="enum migration::Order">Order</a>,
+        nulls: <a class="enum" href="../../../enum.NullOrdering.html" title="enum migration::NullOrdering">NullOrdering</a>,
+    ) -&gt; &amp;mut Self
+       <span class="where">where T: <a class="trait" href="../../../trait.IntoColumnRef.html" title="trait migration::IntoColumnRef">IntoColumnRef</a></span> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.order_by_expr_with_nulls" class="fn">order_by_expr_with_nulls</a>(
+        &amp;mut self,
+        expr: <a class="enum" href="../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>,
+        order: <a class="enum" href="../../../enum.Order.html" title="enum migration::Order">Order</a>,
+        nulls: <a class="enum" href="../../../enum.NullOrdering.html" title="enum migration::NullOrdering">NullOrdering</a>,
+    ) -&gt; &amp;mut Self { ... }
+<span class="item-spacer"></span>    fn <a href="#method.order_by_customs_with_nulls" class="fn">order_by_customs_with_nulls</a>&lt;I, T&gt;(&amp;mut self, cols: I) -&gt; &amp;mut Self
+       <span class="where">where T: <a class="trait" href="https://doc.rust-lang.org/nightly/alloc/string/trait.ToString.html" title="trait alloc::string::ToString">ToString</a>,
+             I: <a class="trait" href="https://doc.rust-lang.org/nightly/core/iter/traits/collect/trait.IntoIterator.html" title="trait core::iter::traits::collect::IntoIterator">IntoIterator</a>&lt;Item = (T, <a class="enum" href="../../../enum.Order.html" title="enum migration::Order">Order</a>, <a class="enum" href="../../../enum.NullOrdering.html" title="enum migration::NullOrdering">NullOrdering</a>)&gt;</span> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.order_by_columns_with_nulls" class="fn">order_by_columns_with_nulls</a>&lt;I, T&gt;(&amp;mut self, cols: I) -&gt; &amp;mut Self
+       <span class="where">where T: <a class="trait" href="../../../trait.IntoColumnRef.html" title="trait migration::IntoColumnRef">IntoColumnRef</a>,
+             I: <a class="trait" href="https://doc.rust-lang.org/nightly/core/iter/traits/collect/trait.IntoIterator.html" title="trait core::iter::traits::collect::IntoIterator">IntoIterator</a>&lt;Item = (T, <a class="enum" href="../../../enum.Order.html" title="enum migration::Order">Order</a>, <a class="enum" href="../../../enum.NullOrdering.html" title="enum migration::NullOrdering">NullOrdering</a>)&gt;</span> { ... }
+}</code></pre><h2 id="required-methods" class="section-header">Required Methods<a href="#required-methods" class="anchor">§</a></h2><div class="methods"><details class="toggle method-toggle" open><summary><section id="tymethod.clear_order_by" class="method"><h4 class="code-header">fn <a href="#tymethod.clear_order_by" class="fn">clear_order_by</a>(&amp;mut self) -&gt; &amp;mut Self</h4></section></summary><div class="docblock"><p>Clear order expressions</p>
+</div></details></div><h2 id="provided-methods" class="section-header">Provided Methods<a href="#provided-methods" class="anchor">§</a></h2><div class="methods"><details class="toggle method-toggle" open><summary><section id="method.order_by" class="method"><h4 class="code-header">fn <a href="#method.order_by" class="fn">order_by</a>&lt;T&gt;(&amp;mut self, col: T, order: <a class="enum" href="../../../enum.Order.html" title="enum migration::Order">Order</a>) -&gt; &amp;mut Self<div class="where">where
+    T: <a class="trait" href="../../../trait.IntoColumnRef.html" title="trait migration::IntoColumnRef">IntoColumnRef</a>,</div></h4></section></summary><div class="docblock"><p>Order by column.</p>
+<h5 id="examples"><a class="doc-anchor" href="#examples">§</a>Examples</h5>
+<p>Order by ASC and DESC</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_query::{<span class="kw-2">*</span>, tests_cfg::<span class="kw-2">*</span>};
+
+<span class="kw">let </span>query = Query::select()
+    .column(Glyph::Aspect)
+    .from(Glyph::Table)
+    .and_where(Expr::col(Glyph::Aspect).if_null(<span class="number">0</span>).gt(<span class="number">2</span>))
+    .order_by(Glyph::Image, Order::Desc)
+    .order_by((Glyph::Table, Glyph::Aspect), Order::Asc)
+    .to_owned();
+
+<span class="macro">assert_eq!</span>(
+    query.to_string(MysqlQueryBuilder),
+    <span class="string">r#"SELECT `aspect` FROM `glyph` WHERE IFNULL(`aspect`, 0) &gt; 2 ORDER BY `image` DESC, `glyph`.`aspect` ASC"#
+</span>);</code></pre></div>
+<p>Order by custom field ordering</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_query::{tests_cfg::<span class="kw-2">*</span>, <span class="kw-2">*</span>};
+
+<span class="kw">let </span>query = Query::select()
+    .columns([Glyph::Aspect])
+    .from(Glyph::Table)
+    .order_by(
+        Glyph::Id,
+        Order::Field(Values(<span class="macro">vec!</span>[<span class="number">4</span>.into(), <span class="number">5</span>.into(), <span class="number">1</span>.into(), <span class="number">3</span>.into()])),
+    )
+    .to_owned();
+
+<span class="macro">assert_eq!</span>(
+    query.to_string(MysqlQueryBuilder),
+    [
+        <span class="string">r#"SELECT `aspect`"#</span>,
+        <span class="string">r#"FROM `glyph`"#</span>,
+        <span class="string">r#"ORDER BY CASE"#</span>,
+        <span class="string">r#"WHEN `id`=4 THEN 0"#</span>,
+        <span class="string">r#"WHEN `id`=5 THEN 1"#</span>,
+        <span class="string">r#"WHEN `id`=1 THEN 2"#</span>,
+        <span class="string">r#"WHEN `id`=3 THEN 3"#</span>,
+        <span class="string">r#"ELSE 4 END"#</span>,
+    ]
+    .join(<span class="string">" "</span>)
+);
+
+<span class="macro">assert_eq!</span>(
+    query.to_string(PostgresQueryBuilder),
+    [
+        <span class="string">r#"SELECT "aspect""#</span>,
+        <span class="string">r#"FROM "glyph""#</span>,
+        <span class="string">r#"ORDER BY CASE"#</span>,
+        <span class="string">r#"WHEN "id"=4 THEN 0"#</span>,
+        <span class="string">r#"WHEN "id"=5 THEN 1"#</span>,
+        <span class="string">r#"WHEN "id"=1 THEN 2"#</span>,
+        <span class="string">r#"WHEN "id"=3 THEN 3"#</span>,
+        <span class="string">r#"ELSE 4 END"#</span>,
+    ]
+    .join(<span class="string">" "</span>)
+);
+
+<span class="macro">assert_eq!</span>(
+    query.to_string(SqliteQueryBuilder),
+    [
+        <span class="string">r#"SELECT "aspect""#</span>,
+        <span class="string">r#"FROM "glyph""#</span>,
+        <span class="string">r#"ORDER BY CASE"#</span>,
+        <span class="string">r#"WHEN "id"=4 THEN 0"#</span>,
+        <span class="string">r#"WHEN "id"=5 THEN 1"#</span>,
+        <span class="string">r#"WHEN "id"=1 THEN 2"#</span>,
+        <span class="string">r#"WHEN "id"=3 THEN 3"#</span>,
+        <span class="string">r#"ELSE 4 END"#</span>,
+    ]
+    .join(<span class="string">" "</span>)
+);</code></pre></div></div></details><details class="toggle method-toggle" open><summary><section id="method.order_by_expr" class="method"><h4 class="code-header">fn <a href="#method.order_by_expr" class="fn">order_by_expr</a>(&amp;mut self, expr: <a class="enum" href="../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>, order: <a class="enum" href="../../../enum.Order.html" title="enum migration::Order">Order</a>) -&gt; &amp;mut Self</h4></section></summary><div class="docblock"><p>Order by <a href="../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr"><code>SimpleExpr</code></a>.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.order_by_customs" class="method"><h4 class="code-header">fn <a href="#method.order_by_customs" class="fn">order_by_customs</a>&lt;I, T&gt;(&amp;mut self, cols: I) -&gt; &amp;mut Self<div class="where">where
+    T: <a class="trait" href="https://doc.rust-lang.org/nightly/alloc/string/trait.ToString.html" title="trait alloc::string::ToString">ToString</a>,
+    I: <a class="trait" href="https://doc.rust-lang.org/nightly/core/iter/traits/collect/trait.IntoIterator.html" title="trait core::iter::traits::collect::IntoIterator">IntoIterator</a>&lt;Item = (T, <a class="enum" href="../../../enum.Order.html" title="enum migration::Order">Order</a>)&gt;,</div></h4></section></summary><div class="docblock"><p>Order by custom string.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.order_by_columns" class="method"><h4 class="code-header">fn <a href="#method.order_by_columns" class="fn">order_by_columns</a>&lt;I, T&gt;(&amp;mut self, cols: I) -&gt; &amp;mut Self<div class="where">where
+    T: <a class="trait" href="../../../trait.IntoColumnRef.html" title="trait migration::IntoColumnRef">IntoColumnRef</a>,
+    I: <a class="trait" href="https://doc.rust-lang.org/nightly/core/iter/traits/collect/trait.IntoIterator.html" title="trait core::iter::traits::collect::IntoIterator">IntoIterator</a>&lt;Item = (T, <a class="enum" href="../../../enum.Order.html" title="enum migration::Order">Order</a>)&gt;,</div></h4></section></summary><div class="docblock"><p>Order by vector of columns.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.order_by_with_nulls" class="method"><h4 class="code-header">fn <a href="#method.order_by_with_nulls" class="fn">order_by_with_nulls</a>&lt;T&gt;(
+    &amp;mut self,
+    col: T,
+    order: <a class="enum" href="../../../enum.Order.html" title="enum migration::Order">Order</a>,
+    nulls: <a class="enum" href="../../../enum.NullOrdering.html" title="enum migration::NullOrdering">NullOrdering</a>,
+) -&gt; &amp;mut Self<div class="where">where
+    T: <a class="trait" href="../../../trait.IntoColumnRef.html" title="trait migration::IntoColumnRef">IntoColumnRef</a>,</div></h4></section></summary><div class="docblock"><p>Order by column with nulls order option.</p>
+<h5 id="examples-1"><a class="doc-anchor" href="#examples-1">§</a>Examples</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>sea_query::{<span class="kw-2">*</span>, tests_cfg::<span class="kw-2">*</span>};
+
+<span class="kw">let </span>query = Query::select()
+    .column(Glyph::Aspect)
+    .from(Glyph::Table)
+    .order_by_with_nulls(Glyph::Image, Order::Desc, NullOrdering::Last)
+    .order_by_with_nulls((Glyph::Table, Glyph::Aspect), Order::Asc, NullOrdering::First)
+    .to_owned();
+
+<span class="macro">assert_eq!</span>(
+    query.to_string(PostgresQueryBuilder),
+    <span class="string">r#"SELECT "aspect" FROM "glyph" ORDER BY "image" DESC NULLS LAST, "glyph"."aspect" ASC NULLS FIRST"#
+</span>);
+<span class="macro">assert_eq!</span>(
+    query.to_string(MysqlQueryBuilder),
+    <span class="string">r#"SELECT `aspect` FROM `glyph` ORDER BY `image` IS NULL ASC, `image` DESC, `glyph`.`aspect` IS NULL DESC, `glyph`.`aspect` ASC"#
+</span>);</code></pre></div></div></details><details class="toggle method-toggle" open><summary><section id="method.order_by_expr_with_nulls" class="method"><h4 class="code-header">fn <a href="#method.order_by_expr_with_nulls" class="fn">order_by_expr_with_nulls</a>(
+    &amp;mut self,
+    expr: <a class="enum" href="../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr">SimpleExpr</a>,
+    order: <a class="enum" href="../../../enum.Order.html" title="enum migration::Order">Order</a>,
+    nulls: <a class="enum" href="../../../enum.NullOrdering.html" title="enum migration::NullOrdering">NullOrdering</a>,
+) -&gt; &amp;mut Self</h4></section></summary><div class="docblock"><p>Order by <a href="../../../enum.SimpleExpr.html" title="enum migration::SimpleExpr"><code>SimpleExpr</code></a> with nulls order option.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.order_by_customs_with_nulls" class="method"><h4 class="code-header">fn <a href="#method.order_by_customs_with_nulls" class="fn">order_by_customs_with_nulls</a>&lt;I, T&gt;(&amp;mut self, cols: I) -&gt; &amp;mut Self<div class="where">where
+    T: <a class="trait" href="https://doc.rust-lang.org/nightly/alloc/string/trait.ToString.html" title="trait alloc::string::ToString">ToString</a>,
+    I: <a class="trait" href="https://doc.rust-lang.org/nightly/core/iter/traits/collect/trait.IntoIterator.html" title="trait core::iter::traits::collect::IntoIterator">IntoIterator</a>&lt;Item = (T, <a class="enum" href="../../../enum.Order.html" title="enum migration::Order">Order</a>, <a class="enum" href="../../../enum.NullOrdering.html" title="enum migration::NullOrdering">NullOrdering</a>)&gt;,</div></h4></section></summary><div class="docblock"><p>Order by custom string with nulls order option.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.order_by_columns_with_nulls" class="method"><h4 class="code-header">fn <a href="#method.order_by_columns_with_nulls" class="fn">order_by_columns_with_nulls</a>&lt;I, T&gt;(&amp;mut self, cols: I) -&gt; &amp;mut Self<div class="where">where
+    T: <a class="trait" href="../../../trait.IntoColumnRef.html" title="trait migration::IntoColumnRef">IntoColumnRef</a>,
+    I: <a class="trait" href="https://doc.rust-lang.org/nightly/core/iter/traits/collect/trait.IntoIterator.html" title="trait core::iter::traits::collect::IntoIterator">IntoIterator</a>&lt;Item = (T, <a class="enum" href="../../../enum.Order.html" title="enum migration::Order">Order</a>, <a class="enum" href="../../../enum.NullOrdering.html" title="enum migration::NullOrdering">NullOrdering</a>)&gt;,</div></h4></section></summary><div class="docblock"><p>Order by vector of columns with nulls order option.</p>
+</div></details></div><h2 id="dyn-compatibility" class="section-header">Dyn Compatibility<a href="#dyn-compatibility" class="anchor">§</a></h2><div class="dyn-compatibility-info"><p>This trait is <b>not</b> <a href="https://doc.rust-lang.org/nightly/reference/items/traits.html#dyn-compatibility">dyn compatible</a>.</p><p><i>In older versions of Rust, dyn compatibility was called "object safety", so this trait is not object safe.</i></p></div><h2 id="implementors" class="section-header">Implementors<a href="#implementors" class="anchor">§</a></h2><div id="implementors-list"><div class="negative-marker"></div><section id="impl-OrderedStatement-for-DeleteStatement" class="impl"><a href="#impl-OrderedStatement-for-DeleteStatement" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="../../../trait.OrderedStatement.html" title="trait migration::OrderedStatement">OrderedStatement</a> for <a class="struct" href="../../../struct.DeleteStatement.html" title="struct migration::DeleteStatement">DeleteStatement</a></h3></section><section id="impl-OrderedStatement-for-SelectStatement" class="impl"><a href="#impl-OrderedStatement-for-SelectStatement" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="../../../trait.OrderedStatement.html" title="trait migration::OrderedStatement">OrderedStatement</a> for <a class="struct" href="../../../struct.SelectStatement.html" title="struct migration::SelectStatement">SelectStatement</a></h3></section><section id="impl-OrderedStatement-for-UpdateStatement" class="impl"><a href="#impl-OrderedStatement-for-UpdateStatement" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="../../../trait.OrderedStatement.html" title="trait migration::OrderedStatement">OrderedStatement</a> for <a class="struct" href="../../../struct.UpdateStatement.html" title="struct migration::UpdateStatement">UpdateStatement</a></h3></section><section id="impl-OrderedStatement-for-WindowStatement" class="impl"><a href="#impl-OrderedStatement-for-WindowStatement" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="../../../trait.OrderedStatement.html" title="trait migration::OrderedStatement">OrderedStatement</a> for <a class="struct" href="../../../struct.WindowStatement.html" title="struct migration::WindowStatement">WindowStatement</a></h3></section></div><script src="../../../../trait.impl/sea_query/query/ordered/trait.OrderedStatement.js" data-ignore-extern-crates="sea_query" async></script></section></div></main></body></html>
