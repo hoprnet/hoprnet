@@ -1,6 +1,4 @@
-use std::time::Duration;
-
-use std::hint::black_box;
+use std::{hint::black_box, time::Duration};
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use hopr_api::{
@@ -38,10 +36,9 @@ fn key_from_index(i: u32) -> OffchainPublicKey {
 /// # Parameters
 ///
 /// * `node_count` — number of nodes in the graph (including `me`).
-/// * `density` — target edge-to-node ratio (e.g. `10`, `100`, `1_000`).
-///   Each node receives outgoing edges to the next `min(node_count − 1, density)`
-///   nodes in the ring (wrapping around), giving
-///   `node_count × min(node_count − 1, density)` total directed edges.
+/// * `density` — target edge-to-node ratio (e.g. `10`, `100`, `1_000`). Each node receives outgoing edges to the next
+///   `min(node_count − 1, density)` nodes in the ring (wrapping around), giving `node_count × min(node_count − 1,
+///   density)` total directed edges.
 ///
 /// # Edge counts by (node_count, density)
 ///
@@ -98,8 +95,7 @@ fn build_graph(node_count: usize, density: usize) -> (ChannelGraph, Vec<Offchain
 /// Destination nodes are chosen to sit at the "apex" of the ring where the
 /// maximum number of simple paths converge from `me`:
 ///
-/// * **2-hop apex** — node `(epn + 1)`: up to `epn` distinct 2-hop paths,
-///   where `epn = min(node_count − 1, density)`.
+/// * **2-hop apex** — node `(epn + 1)`: up to `epn` distinct 2-hop paths, where `epn = min(node_count − 1, density)`.
 /// * **3-hop apex** — node `(2 × epn + 1)`: up to `epn²` 3-hop paths.
 /// * **4-hop apex** — node `(3 × epn + 1)`: up to `epn³` 4-hop paths.
 ///
