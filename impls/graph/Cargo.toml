@@ -31,5 +31,10 @@ hopr-statistics = { workspace = true, features = ["moving"] }
 
 [dev-dependencies]
 assertables = { workspace = true }
+criterion = { workspace = true }
 hex-literal = { workspace = true }
 tokio = { workspace = true }
+
+[[bench]]
+name = "traverse"
+harness = false

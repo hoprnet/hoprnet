@@ -4854,6 +4854,7 @@ dependencies = [
  "anyhow",
  "assertables",
  "bimap",
+ "criterion",
  "futures",
  "hex-literal",
  "hopr-api",
