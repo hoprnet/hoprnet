@@ -84,18 +84,19 @@ impl SurbBalancerController for SimpleBalancerController {
         let raw_output = (self.bounds.output_limit() as f64 * ratio.clamp(0.0, 1.0)).floor() as u64;
         let output = raw_output.max(MIN_CONTROL_OUTPUT);
 
-        #[cfg(all(feature = "prometheus", not(test)))]
-        {
-            METRIC_SIMPLE_CONTROL_OUTPUT.observe(output as f64);
-            if raw_output < MIN_CONTROL_OUTPUT {
-                METRIC_SIMPLE_STARVATION_FLOOR_APPLIED.increment();
-                tracing::warn!(
-                    raw_output,
-                    applied_output = output,
-                    "SURB starvation detected, applying minimum rate floor"
-                );
-            }
+        if raw_output < MIN_CONTROL_OUTPUT {
+            #[cfg(all(feature = "prometheus", not(test)))]
+            METRIC_SIMPLE_STARVATION_FLOOR_APPLIED.increment();
+
+            tracing::warn!(
+                raw_output,
+                applied_output = output,
+                "SURB starvation detected, applying minimum rate floor"
+            );
         }
+
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_SIMPLE_CONTROL_OUTPUT.observe(output as f64);
 
         output
     }
