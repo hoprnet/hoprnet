@@ -29,12 +29,10 @@ impl SimpleBalancerController {
         let window_size = window_size.max(1);
         Self {
             bounds: BalancerControllerBounds::default(),
-            increasing: Some(
-                (
-                    ratio_threshold.clamp(0.0, 1.0),
-                    NoSumSMA::new_with_samples(window_size, std::iter::repeat(1.0).take(window_size))
-                )
-            ),
+            increasing: Some((
+                ratio_threshold.clamp(0.0, 1.0),
+                NoSumSMA::new_with_samples(window_size, std::iter::repeat_n(1.0, window_size)),
+            )),
         }
     }
 }
