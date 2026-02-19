@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::Context;
+use hopr_builder::config::SessionIpForwardingConfig;
 use hopr_chain_connector::{
     BlockchainConnectorConfig,
     api::*,
@@ -9,7 +10,6 @@ use hopr_chain_connector::{
     reexports::hopr_chain_types::exports::alloy::hex,
 };
 use hopr_lib::{ChainKeypair, HoprKeys, Keypair, SafeModule, XDaiBalance, crypto_traits::Randomizable};
-use hopr_reference::config::SessionIpForwardingConfig;
 use hoprd::config::{Db, HoprdConfig, Identity, UserHoprLibConfig, UserHoprNetworkConfig};
 use hoprd_api::config::{Api, Auth};
 

@@ -8,7 +8,7 @@ use hopr_lib::{
     },
     exports::transport::config::HoprCodecConfig,
 };
-use hopr_reference::config::SessionIpForwardingConfig;
+use hopr_builder::config::SessionIpForwardingConfig;
 use hoprd_api::config::{Api, Auth};
 use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};

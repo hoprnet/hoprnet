@@ -4415,6 +4415,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-builder"
+version = "4.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "futures",
+ "futures-concurrency",
+ "futures-time",
+ "hex-literal",
+ "hopr-builder",
+ "hopr-chain-connector",
+ "hopr-crypto-random 0.4.0",
+ "hopr-ct-immediate",
+ "hopr-db-node",
+ "hopr-lib",
+ "hopr-network-graph",
+ "hopr-transport-p2p",
+ "insta",
+ "lazy_static",
+ "parking_lot",
+ "rand 0.10.0",
+ "rstest",
+ "serde",
+ "serde_with",
+ "serial_test",
+ "smart-default",
+ "test-log",
+ "tokio",
+ "tokio-retry",
+ "tokio-util",
+ "tracing",
+ "validator",
+]
+
+[[package]]
 name = "hopr-chain-connector"
 version = "0.15.0"
 dependencies = [
@@ -5041,41 +5076,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-reference"
-version = "4.0.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "futures",
- "futures-concurrency",
- "futures-time",
- "hex-literal",
- "hopr-chain-connector",
- "hopr-crypto-random 0.4.0",
- "hopr-ct-immediate",
- "hopr-db-node",
- "hopr-lib",
- "hopr-network-graph",
- "hopr-reference",
- "hopr-transport-p2p",
- "insta",
- "lazy_static",
- "parking_lot",
- "rand 0.10.0",
- "rstest",
- "serde",
- "serde_with",
- "serial_test",
- "smart-default",
- "test-log",
- "tokio",
- "tokio-retry",
- "tokio-util",
- "tracing",
- "validator",
-]
-
-[[package]]
 name = "hopr-statistics"
 version = "0.1.0"
 dependencies = [
@@ -5397,11 +5397,11 @@ dependencies = [
  "futures",
  "home",
  "hopr-api",
+ "hopr-builder",
  "hopr-chain-connector",
  "hopr-db-node",
  "hopr-lib",
  "hopr-network-graph",
- "hopr-reference",
  "hopr-strategy",
  "hopr-transport-p2p",
  "hopr-utils-session",
@@ -5499,10 +5499,10 @@ dependencies = [
  "anyhow",
  "clap",
  "futures",
+ "hopr-builder",
  "hopr-chain-connector",
  "hopr-lib",
  "hopr-primitive-types 0.10.0",
- "hopr-reference",
  "hoprd",
  "hoprd-api",
  "hoprd-api-client",

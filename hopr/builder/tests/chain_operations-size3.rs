@@ -3,7 +3,7 @@ use std::{ops::Mul, time::Duration};
 use anyhow::Context;
 use hopr_chain_connector::blokli_client::BlokliQueryClient;
 use hopr_lib::{Address, BytesRepresentable, ChannelId, ChannelStatus, HoprBalance, HoprNodeChainOperations};
-use hopr_reference::testing::{
+use hopr_builder::testing::{
     fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster},
     hopr::ChannelGuard,
 };

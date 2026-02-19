@@ -1,5 +1,5 @@
 [package]
-name = "hopr-reference"
+name = "hopr-builder"
 version = "4.0.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2024"
@@ -79,6 +79,6 @@ rstest = { workspace = true }
 serial_test = { workspace = true }
 test-log = { workspace = true }
 
-hopr-reference = { workspace = true, features = ["testing"] }
+hopr-builder = { workspace = true, features = ["testing"] }
 hopr-crypto-random = { workspace = true }
 hopr-lib = { workspace = true, features = ["telemetry"] }

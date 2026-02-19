@@ -41,7 +41,7 @@ members = [
   "utils/session",
   "localcluster",
   # implementations
-  "hopr/reference",
+  "hopr/builder",
   "impls/ct/immediate",
   "impls/ct/full-network",
   "impls/graph",
@@ -281,7 +281,7 @@ hopr-chain-connector = { path = "chain/connector" }
 hopr-statistics = { path = "common/statistics" }
 
 # referential implementations
-hopr-reference = { path = "hopr/reference" }
+hopr-builder = { path = "hopr/builder" }
 hopr-transport-p2p = { path = "impls/transport/p2p" }
 hopr-ct-immediate = { path = "impls/ct/immediate" }
 hopr-ct-full-network = { path = "impls/ct/full-network" }

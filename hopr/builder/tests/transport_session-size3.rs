@@ -6,7 +6,7 @@ use hopr_lib::{
     errors::{HoprLibError, HoprTransportError},
     exports::transport::session::{IpOrHost, SealedHost},
 };
-use hopr_reference::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster};
+use hopr_builder::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster};
 use rstest::*;
 use serial_test::serial;
 use tokio::time::sleep;

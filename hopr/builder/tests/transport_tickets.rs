@@ -2,7 +2,7 @@ use std::{ops::Mul, time::Duration};
 
 use anyhow::Context;
 use futures::AsyncWriteExt;
-use hopr_reference::{
+use hopr_builder::{
     hopr_lib::{ChannelId, HoprBalance, HoprLibError, HoprNodeChainOperations, UnitaryFloatOps},
     testing::{
         fixtures::{ClusterGuard, MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, cluster_fixture},

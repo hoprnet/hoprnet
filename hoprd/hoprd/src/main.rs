@@ -254,7 +254,7 @@ async fn main_inner() -> anyhow::Result<()> {
     use hopr_api::chain::ChainEvents;
     use hopr_chain_connector::{BlockchainConnectorConfig, blokli_client, create_trustful_hopr_blokli_connector};
     use hopr_db_node::init_hopr_node_db;
-    use hopr_reference::exit::HoprServerIpForwardingReactor;
+    use hopr_builder::exit::HoprServerIpForwardingReactor;
 
     #[cfg(all(target_os = "linux", feature = "allocator-jemalloc-stats"))]
     let _jemalloc_stats = jemalloc_stats::JemallocStats::start().await;
@@ -332,7 +332,7 @@ async fn main_inner() -> anyhow::Result<()> {
     chain_connector.connect().await?;
     let chain_connector = Arc::new(chain_connector);
 
-    let (node, hopr_process) = hopr_reference::build_from_chain_and_db(
+    let (node, hopr_process) = hopr_builder::build_from_chain_and_db(
         &hopr_keys.chain_key,
         &hopr_keys.packet_key,
         cfg.hopr.clone().into(),
