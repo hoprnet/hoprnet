@@ -4875,6 +4875,7 @@ dependencies = [
  "futures",
  "hopr-metrics",
  "lazy_static",
+ "libc",
  "rayon",
  "serial_test",
  "thiserror 2.0.18",
@@ -5083,7 +5084,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.17.0"
+version = "0.17.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5286,7 +5287,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "anyhow",
  "arrayvec",

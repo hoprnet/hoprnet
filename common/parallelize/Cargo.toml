@@ -27,6 +27,9 @@ tracing = { workspace = true }
 
 hopr-metrics = { workspace = true, optional = true }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+libc = { workspace = true }
+
 [dev-dependencies]
 serial_test = { workspace = true }
 tokio = { workspace = true, features = ["rt", "macros", "time"] }

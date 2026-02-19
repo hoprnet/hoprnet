@@ -11,6 +11,7 @@ use futures::{
     pin_mut,
 };
 use futures_time::future::FutureExt as TimeExt;
+use hopr_async_runtime::AbortableList;
 use hopr_crypto_random::Randomizable;
 use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::prelude::*;
@@ -69,8 +70,8 @@ fn close_session(session_id: SessionId, session_data: SessionSlot, reason: Closu
 
     #[cfg(feature = "telemetry")]
     {
-        session_data.stats.set_state(SessionLifecycleState::Closed);
-        session_data.stats.touch_activity();
+        session_data.telemetry.set_state(SessionLifecycleState::Closed);
+        session_data.telemetry.touch_activity();
     }
 
     if reason != ClosureReason::EmptyRead {
@@ -80,7 +81,7 @@ fn close_session(session_id: SessionId, session_data: SessionSlot, reason: Closu
     }
 
     // Terminate any additional tasks spawned by the Session
-    session_data.abort_handles.into_iter().for_each(|h| h.abort());
+    session_data.abort_handles.lock().abort_all();
 
     #[cfg(all(feature = "prometheus", not(test)))]
     METRIC_ACTIVE_SESSIONS.decrement(1.0);
@@ -108,15 +109,21 @@ const MIN_FRAME_TIMEOUT: Duration = Duration::from_millis(10);
 type SessionInitiationCache =
     moka::future::Cache<StartChallenge, UnboundedSender<Result<StartEstablished<SessionId>, StartErrorType>>>;
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
+enum SessionTasks {
+    KeepAlive,
+    Balancer,
+}
+
 #[derive(Clone)]
 struct SessionSlot {
     // Sender needs to be put in Arc, so that no clones are made by `moka`.
     // This makes sure that the entire channel closes once the one and only sender is closed.
     session_tx: Arc<UnboundedSender<ApplicationDataIn>>,
     routing_opts: DestinationRouting,
-    abort_handles: Vec<AbortHandle>,
+    abort_handles: Arc<parking_lot::Mutex<AbortableList<SessionTasks>>>,
     #[cfg(feature = "telemetry")]
-    stats: Arc<SessionTelemetry>,
+    telemetry: Arc<SessionTelemetry>,
     // Allows reconfiguring of the SURB balancer on-the-fly
     // Set on both Entry and Exit sides.
     surb_mgmt: Option<SurbBalancerConfig>,
@@ -242,6 +249,7 @@ pub struct SessionManagerConfig {
     /// Default is 10 packets/second.
     #[default(10)]
     pub initial_return_session_egress_rate: usize,
+
     /// Minimum period of time for which a SURB buffer at the Exit must
     /// endure if no SURBs are being received.
     ///
@@ -254,6 +262,7 @@ pub struct SessionManagerConfig {
     /// Default is 5 seconds, minimum is 1 second.
     #[default(Duration::from_secs(5))]
     pub minimum_surb_buffer_duration: Duration,
+
     /// Indicates the maximum number of SURBs in the SURB buffer to be requested when creating a new Session.
     ///
     /// This value is theoretically capped by the size of the global transport SURB ring buffer,
@@ -573,7 +582,6 @@ where
 
     async fn insert_session_slot(&self, session_id: SessionId, slot: SessionSlot) -> crate::errors::Result<()> {
         // We currently do not support loopback Sessions on ourselves.
-        let abort_handles_clone = slot.abort_handles.clone();
         if let moka::ops::compute::CompResult::Inserted(_) = self
             .sessions
             .entry(session_id)
@@ -596,7 +604,6 @@ where
         } else {
             // Session already exists; it means it is most likely a loopback attempt
             error!(%session_id, "session already exists - loopback attempt");
-            abort_handles_clone.into_iter().for_each(|ah| ah.abort());
             Err(SessionManagerError::Loopback.into())
         }
     }
@@ -765,12 +772,12 @@ where
                         },
                     );
 
-                    let mut abort_handles = Vec::new();
+                    let mut abort_handles = AbortableList::default();
 
                     // Spawn the SURB-bearing keep alive stream
                     let (ka_controller, ka_abort_handle) =
                         utils::spawn_keep_alive_stream(session_id, full_surb_scoring_sender, forward_routing.clone());
-                    abort_handles.push(ka_abort_handle);
+                    abort_handles.insert(SessionTasks::KeepAlive, ka_abort_handle);
 
                     #[cfg(feature = "telemetry")]
                     metrics.set_refill_in_flight(true);
@@ -791,7 +798,7 @@ where
                         SessionCacheBalancerFeedback(self.sessions.clone()),
                         None,
                     );
-                    abort_handles.push(balancer_abort_handle);
+                    abort_handles.insert(SessionTasks::Balancer, balancer_abort_handle);
 
                     // If the insertion fails prematurely, it will also kill all the abort handles
                     self.insert_session_slot(
@@ -799,11 +806,11 @@ where
                         SessionSlot {
                             session_tx: Arc::new(tx),
                             routing_opts: forward_routing.clone(),
-                            abort_handles,
+                            abort_handles: Arc::new(parking_lot::Mutex::new(abort_handles)),
                             surb_mgmt: Some(balancer_config),
                             surb_estimator: None, // Outgoing sessions do not have SURB estimator
                             #[cfg(feature = "telemetry")]
-                            stats: metrics.clone(),
+                            telemetry: metrics.clone(),
                         },
                     )
                     .await?;
@@ -864,11 +871,11 @@ where
                         SessionSlot {
                             session_tx: Arc::new(tx),
                             routing_opts: forward_routing.clone(),
-                            abort_handles: vec![],
+                            abort_handles: Default::default(),
                             surb_mgmt: None,
                             surb_estimator: None,
                             #[cfg(feature = "telemetry")]
-                            stats: metrics.clone(),
+                            telemetry: metrics.clone(),
                         },
                     )
                     .await?;
@@ -1015,7 +1022,7 @@ where
     #[cfg(feature = "telemetry")]
     pub async fn get_session_stats(&self, id: &SessionId) -> crate::errors::Result<SessionStatsSnapshot> {
         match self.sessions.get(id).await {
-            Some(session) => Ok(session.stats.snapshot()),
+            Some(session) => Ok(session.telemetry.snapshot()),
             None => Err(SessionManagerError::NonExistingSession.into()),
         }
     }
@@ -1108,11 +1115,11 @@ where
                 |_sid| SessionSlot {
                     session_tx: Arc::new(tx_session_data),
                     routing_opts: reply_routing.clone(),
-                    abort_handles: vec![],
+                    abort_handles: Default::default(),
                     surb_mgmt: None,
                     surb_estimator: None,
                     #[cfg(feature = "telemetry")]
-                    stats: SessionTelemetry::new(
+                    telemetry: SessionTelemetry::new(
                         _sid,
                         HoprSessionConfig {
                             capabilities: session_req.capabilities.0,
@@ -1135,7 +1142,7 @@ where
             debug!(%session_id, ?session_req, "assigned a new session");
 
             #[cfg(feature = "telemetry")]
-            let stats = _slot.stats;
+            let stats = _slot.telemetry;
 
             let closure_notifier = Box::new(move |session_id: SessionId, reason: ClosureReason| {
                 if let Err(error) = close_session_notifier.try_send((session_id, reason)) {
@@ -1224,12 +1231,15 @@ where
                     .entry(session_id)
                     .and_compute_with(|entry| {
                         if let Some(mut cached_session) = entry.map(|c| c.into_value()) {
-                            cached_session.abort_handles.push(balancer_abort_handle);
+                            cached_session
+                                .abort_handles
+                                .lock()
+                                .insert(SessionTasks::Balancer, balancer_abort_handle);
                             cached_session.surb_mgmt = Some(balancer_config);
                             cached_session.surb_estimator = Some(surb_estimator.clone());
                             #[cfg(feature = "telemetry")]
                             {
-                                cached_session.stats = stats.clone();
+                                cached_session.telemetry = stats.clone();
                             }
                             futures::future::ready(moka::ops::compute::Op::Put(cached_session))
                         } else {
@@ -1837,11 +1847,11 @@ mod tests {
                 SessionSlot {
                     session_tx: Arc::new(dummy_tx),
                     routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
-                    abort_handles: Vec::new(),
+                    abort_handles: Default::default(),
                     surb_mgmt: Some(balancer_cfg),
                     surb_estimator: None,
                     #[cfg(feature = "telemetry")]
-                    stats: Arc::new(SessionTelemetry::new(session_id, Default::default())),
+                    telemetry: Arc::new(SessionTelemetry::new(session_id, Default::default())),
                 },
             )
             .await;
@@ -1890,9 +1900,9 @@ mod tests {
                 SessionSlot {
                     session_tx: Arc::new(dummy_tx),
                     routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
-                    abort_handles: Vec::new(),
+                    abort_handles: Default::default(),
                     #[cfg(feature = "telemetry")]
-                    stats: Arc::new(SessionTelemetry::new(
+                    telemetry: Arc::new(SessionTelemetry::new(
                         SessionId::new(16u64, alice_pseudonym),
                         Default::default(),
                     )),
@@ -2011,11 +2021,11 @@ mod tests {
                 SessionSlot {
                     session_tx: Arc::new(dummy_tx),
                     routing_opts: DestinationRouting::Return(alice_pseudonym.into()),
-                    abort_handles: Vec::new(),
+                    abort_handles: Default::default(),
                     surb_mgmt: None,
                     surb_estimator: None,
                     #[cfg(feature = "telemetry")]
-                    stats: Arc::new(SessionTelemetry::new(
+                    telemetry: Arc::new(SessionTelemetry::new(
                         SessionId::new(16u64, alice_pseudonym),
                         Default::default(),
                     )),
