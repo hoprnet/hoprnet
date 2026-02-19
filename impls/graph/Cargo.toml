@@ -13,10 +13,9 @@ crate-type = ["rlib"]
 
 [features]
 default = ["petgraph"]
-petgraph = ["dep:async-stream", "dep:petgraph", "dep:indexmap"]
+petgraph = ["dep:petgraph", "dep:indexmap"]
 
 [dependencies]
-async-stream = { workspace = true, optional = true }
 anyhow = { workspace = true }
 bimap = { workspace = true }
 futures = { workspace = true }

@@ -7,7 +7,7 @@ use hopr_api::{
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::{NodeId, protocol::HoprPseudonym};
-use hopr_network_graph::costs::SimpleHoprCostFn;
+use hopr_network_graph::costs::HoprCostFn;
 use hopr_network_types::types::RoutingOptions;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -65,7 +65,7 @@ where
                             &me,
                             edge_count,
                             Some(100),
-                            SimpleHoprCostFn::new(edge_count),
+                            HoprCostFn::new(edge_count),
                         );
                         futures::stream::iter(simple_paths)
                     })
@@ -153,13 +153,8 @@ where
                 Some(edge_count)
             })
             .flat_map(move |edge_count| {
-                let simple_paths = graph_intermediates.simple_paths(
-                    &me,
-                    &me,
-                    edge_count,
-                    Some(100),
-                    SimpleHoprCostFn::new(edge_count),
-                );
+                let simple_paths =
+                    graph_intermediates.simple_paths(&me, &me, edge_count, Some(100), HoprCostFn::new(edge_count));
                 futures::stream::iter(simple_paths)
             })
             .filter_map(move |(path, path_id, _cost)| {

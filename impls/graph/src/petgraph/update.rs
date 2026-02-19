@@ -84,7 +84,12 @@ impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
                     "neighbor probe successful"
                 );
 
+                // Both directions are set for immediate connections, because the graph is directional
+                // and must be directionally complete for looping traffic.
                 self.upsert_edge(&self.me, telemetry.peer(), |obs| {
+                    obs.record(EdgeWeightType::Immediate(Ok(telemetry.rtt() / 2)));
+                });
+                self.upsert_edge(telemetry.peer(), &self.me, |obs| {
                     obs.record(EdgeWeightType::Immediate(Ok(telemetry.rtt() / 2)));
                 });
             }
@@ -139,7 +144,12 @@ impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
                     "neighbor probe failed"
                 );
 
+                // Both directions are set for immediate connections, because the graph is directional
+                // and must be directionally complete for looping traffic.
                 self.upsert_edge(&self.me, peer, |obs| {
+                    obs.record(EdgeWeightType::Immediate(Err(())));
+                });
+                self.upsert_edge(peer, &self.me, |obs| {
                     obs.record(EdgeWeightType::Immediate(Err(())));
                 });
             }
@@ -262,6 +272,83 @@ mod tests {
             .immediate_qos()
             .context("immediate QoS should be present after probe")?;
         assert_eq!(immediate.average_latency().context("latency should be set")?, rtt / 2,);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn neighbor_probe_should_create_symmetric_edges() -> anyhow::Result<()> {
+        let me = pubkey_from(&SECRET_0);
+        let peer = pubkey_from(&SECRET_1);
+
+        let graph = ChannelGraph::new(me);
+        graph.add_node(peer);
+        // No edges pre-created — upsert should create both directions
+
+        let rtt = std::time::Duration::from_millis(100);
+        let telemetry: Result<EdgeTransportTelemetry<TestNeighbor, TestPath>, NetworkGraphError<TestPath>> =
+            Ok(EdgeTransportTelemetry::Neighbor(TestNeighbor { peer, rtt }));
+        graph.record_edge(hopr_api::graph::MeasurableEdge::Probe(telemetry));
+
+        // me → peer
+        let obs_fwd = graph.edge(&me, &peer).context("edge me→peer should exist")?;
+        let imm_fwd = obs_fwd.immediate_qos().context("me→peer should have immediate QoS")?;
+        assert_eq!(
+            imm_fwd.average_latency().context("me→peer latency should be set")?,
+            rtt / 2
+        );
+
+        // peer → me
+        let obs_rev = graph.edge(&peer, &me).context("edge peer→me should exist")?;
+        let imm_rev = obs_rev.immediate_qos().context("peer→me should have immediate QoS")?;
+        assert_eq!(
+            imm_rev.average_latency().context("peer→me latency should be set")?,
+            rtt / 2
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn neighbor_probe_timeout_should_create_symmetric_edges() -> anyhow::Result<()> {
+        let me = pubkey_from(&SECRET_0);
+        let peer = pubkey_from(&SECRET_1);
+
+        let graph = ChannelGraph::new(me);
+        graph.add_node(peer);
+        // No edges pre-created
+
+        let telemetry: Result<EdgeTransportTelemetry<TestNeighbor, TestPath>, NetworkGraphError<TestPath>> =
+            Err(NetworkGraphError::ProbeNeighborTimeout(Box::new(peer)));
+        graph.record_edge(hopr_api::graph::MeasurableEdge::Probe(telemetry));
+
+        // me → peer
+        let obs_fwd = graph
+            .edge(&me, &peer)
+            .context("edge me→peer should exist after timeout")?;
+        let imm_fwd = obs_fwd.immediate_qos().context("me→peer should have immediate QoS")?;
+        assert!(
+            imm_fwd.average_latency().is_none(),
+            "failed probe should not set latency"
+        );
+        assert!(
+            imm_fwd.average_probe_rate() < 1.0,
+            "failed probe should lower success rate"
+        );
+
+        // peer → me
+        let obs_rev = graph
+            .edge(&peer, &me)
+            .context("edge peer→me should exist after timeout")?;
+        let imm_rev = obs_rev.immediate_qos().context("peer→me should have immediate QoS")?;
+        assert!(
+            imm_rev.average_latency().is_none(),
+            "failed probe should not set latency on reverse"
+        );
+        assert!(
+            imm_rev.average_probe_rate() < 1.0,
+            "failed probe should lower success rate on reverse"
+        );
+
         Ok(())
     }
 

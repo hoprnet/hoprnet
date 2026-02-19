@@ -323,4 +323,4 @@ insta.opt-level = 3
 similar.opt-level = 3
 
 [workspace.metadata.cargo-shear]
-ignored = ["oas3", "serde_bytes", "humantime-serde"]
+ignored = ["oas3", "serde_bytes", "humantime-serde", "hopr-ct-full-network"]
