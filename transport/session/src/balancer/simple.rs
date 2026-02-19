@@ -26,9 +26,15 @@ impl SimpleBalancerController {
     /// The given `ratio_threshold` must be between 0 and 1, otherwise it is clamped to this range.
     /// The `window_size` must be greater or equal to 1, otherwise it is set to 1.
     pub fn with_increasing_setpoint(ratio_threshold: f64, window_size: usize) -> Self {
+        let window_size = window_size.max(1);
         Self {
             bounds: BalancerControllerBounds::default(),
-            increasing: Some((ratio_threshold.clamp(0.0, 1.0), NoSumSMA::new(window_size.max(1)))),
+            increasing: Some(
+                (
+                    ratio_threshold.clamp(0.0, 1.0),
+                    NoSumSMA::new_with_samples(window_size, std::iter::repeat(1.0).take(window_size))
+                )
+            ),
         }
     }
 }
