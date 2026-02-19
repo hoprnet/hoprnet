@@ -2,12 +2,11 @@ use futures::{StreamExt, stream::BoxStream};
 use futures_concurrency::stream::StreamExt as _;
 use hopr_api::{
     ct::{CoverTrafficGeneration, DestinationRouting, ProbeRouting, ProbingTrafficGeneration},
-    graph::{NetworkGraphTraverse, NetworkGraphView},
+    graph::{NetworkGraphTraverse, NetworkGraphView, costs::HoprCostFn},
 };
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::{NodeId, protocol::HoprPseudonym};
-use hopr_network_graph::costs::HoprCostFn;
 use hopr_network_types::types::RoutingOptions;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};

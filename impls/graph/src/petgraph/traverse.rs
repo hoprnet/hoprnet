@@ -595,14 +595,16 @@ mod tests {
         graph.upsert_edge(src, dest, |obs| {
             obs.record(EdgeWeightType::Connected(true));
             obs.record(EdgeWeightType::Immediate(Ok(std::time::Duration::from_millis(50))));
+            obs.record(EdgeWeightType::Intermediate(Ok(std::time::Duration::from_millis(50))));
             obs.record(EdgeWeightType::Capacity(Some(1000)));
         });
     }
 
-    /// Marks an edge with intermediate capacity only (no connected flag).
+    /// Marks an edge with intermediate capacity and probe data (no connected flag).
     /// Satisfies `LoopbackPathCostFn` at index > 0 but NOT at index 0.
     fn mark_edge_with_capacity(graph: &ChannelGraph, src: &OffchainPublicKey, dest: &OffchainPublicKey) {
         graph.upsert_edge(src, dest, |obs| {
+            obs.record(EdgeWeightType::Intermediate(Ok(std::time::Duration::from_millis(50))));
             obs.record(EdgeWeightType::Capacity(Some(1000)));
         });
     }
