@@ -2,6 +2,10 @@ use hopr_statistics::moving::simple::{NoSumSMA, SMA};
 
 use crate::balancer::{BalancerControllerBounds, SurbBalancerController};
 
+/// Minimum control output (SURBs/sec) to prevent complete starvation and deadlock.
+/// This ensures that even when the buffer is empty, some traffic can flow to allow recovery.
+const MIN_CONTROL_OUTPUT: u64 = 10;
+
 /// Controller that uses the simple linear formula `limit * min(current / setpoint, 1.0)` to
 /// compute the control output.
 ///
@@ -62,7 +66,8 @@ impl SurbBalancerController for SimpleBalancerController {
             }
         }
 
-        (self.bounds.output_limit() as f64 * ratio.clamp(0.0, 1.0)).floor() as u64
+        let output = (self.bounds.output_limit() as f64 * ratio.clamp(0.0, 1.0)).floor() as u64;
+        output.max(MIN_CONTROL_OUTPUT)
     }
 }
 
@@ -93,5 +98,33 @@ mod tests {
         assert_eq!(100, controller.bounds.target());
         assert_eq!(140, controller.next_control_output(200));
         assert_eq!(140, controller.bounds.target());
+    }
+
+    #[test]
+    fn simple_controller_should_never_output_zero_for_empty_buffer() {
+        let mut controller = SimpleBalancerController::default();
+        controller.set_target_and_limit(BalancerControllerBounds::new(1000, 500));
+
+        // With buffer at 0, output should still be non-zero to allow recovery
+        let output = controller.next_control_output(0);
+        assert!(
+            output > 0,
+            "Controller output {} should never be zero to prevent deadlock",
+            output
+        );
+    }
+
+    #[test]
+    fn simple_controller_should_never_output_zero_for_very_low_buffer() {
+        let mut controller = SimpleBalancerController::default();
+        controller.set_target_and_limit(BalancerControllerBounds::new(10000, 5000));
+
+        // Even with a tiny buffer, output should be at least MIN_CONTROL_OUTPUT
+        let output = controller.next_control_output(1);
+        assert!(
+            output > 0,
+            "Controller output {} should never be zero to prevent deadlock",
+            output
+        );
     }
 }
