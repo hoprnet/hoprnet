@@ -7,6 +7,7 @@ use axum::{
 };
 use hopr_lib::{
     ChannelTicketStatistics, HoprBalance, ToHex,
+    api::node::HoprNodeChainOperations,
     errors::{HoprLibError, HoprStatusError},
     prelude::Hash,
 };

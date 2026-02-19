@@ -15,22 +15,12 @@ use hopr_lib::{
 use hopr_lib::{SessionAckMode, SessionLifecycleState, SessionStatsSnapshot};
 use hopr_utils_session::{ListenerId, build_binding_host, create_tcp_client_binding, create_udp_client_binding};
 use serde::{Deserialize, Serialize};
-use serde_with::{DisplayFromStr, serde_as};
-
-use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState};
-
-/// Size of the buffer for forwarding data to/from a TCP stream.
-pub const HOPR_TCP_BUFFER_SIZE: usize = 4096;
-
-/// Size of the buffer for forwarding data to/from a UDP stream.
-pub const HOPR_UDP_BUFFER_SIZE: usize = 16384;
-
-/// Size of the queue (back-pressure) for data incoming from a UDP stream.
-pub const HOPR_UDP_QUEUE_SIZE: usize = 8192;
-
 // Imported for some IDEs to not treat the `json!` macro inside the `schema` macro as an error
 #[allow(unused_imports)]
 use serde_json::json;
+use serde_with::{DisplayFromStr, serde_as};
+
+use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState};
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, utoipa::ToSchema)]
@@ -130,7 +120,6 @@ impl From<SessionCapability> for hopr_lib::SessionCapabilities {
     }
 }
 
-/// Request parameters for creating a websocket session.
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({ "Hops": 1 }))]

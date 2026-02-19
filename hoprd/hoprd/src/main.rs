@@ -2,15 +2,15 @@ use std::{num::NonZeroUsize, process::ExitCode, str::FromStr, sync::Arc};
 
 use async_signal::{Signal, Signals};
 use futures::{FutureExt, StreamExt, future::abortable};
-use hopr_chain_connector::{
-    BlockchainConnectorConfig, HoprBlockchainSafeConnector, blokli_client, blokli_client::BlokliClient,
-    create_trustful_hopr_blokli_connector,
-};
-use hopr_db_node::{HoprNodeDb, init_hopr_node_db};
+use hopr_chain_connector::{HoprBlockchainSafeConnector, blokli_client::BlokliClient};
+use hopr_db_node::HoprNodeDb;
 use hopr_lib::{
-    AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, api::chain::ChainEvents, config::HoprLibConfig,
+    AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, api::node::HoprNodeChainOperations,
+    config::HoprLibConfig,
 };
-use hoprd::{cli::CliArgs, config::HoprdConfig, errors::HoprdError, exit::HoprServerIpForwardingReactor};
+use hopr_network_graph::SharedChannelGraph;
+use hopr_transport_p2p::HoprNetwork;
+use hoprd::{cli::CliArgs, config::HoprdConfig, errors::HoprdError};
 use hoprd_api::{RestApiParameters, serve_api};
 use signal_hook::low_level;
 use tracing::{debug, error, info, warn};
@@ -39,6 +39,9 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 mod jemalloc_stats;
 
 const DEFAULT_BLOKLI_URL: &str = "https://blokli.dufour.hoprnet.link";
+
+type HoprBlokliConnector = HoprBlockchainSafeConnector<BlokliClient>;
+type HoprNode = hopr_lib::Hopr<Arc<HoprBlokliConnector>, HoprNodeDb, SharedChannelGraph, HoprNetwork>;
 
 fn init_logger() -> anyhow::Result<()> {
     let env_filter = match tracing_subscriber::EnvFilter::try_from_default_env() {
@@ -143,10 +146,7 @@ enum HoprdProcess {
 #[cfg(not(feature = "runtime-tokio"))]
 compile_error!("The 'runtime-tokio' feature must be enabled");
 
-async fn init_rest_api(
-    cfg: &HoprdConfig,
-    hopr: Arc<hopr_lib::Hopr<Arc<HoprBlockchainSafeConnector<BlokliClient>>, HoprNodeDb>>,
-) -> anyhow::Result<AbortableList<HoprdProcess>> {
+async fn init_rest_api(cfg: &HoprdConfig, hopr: Arc<HoprNode>) -> anyhow::Result<AbortableList<HoprdProcess>> {
     let node_cfg_value = serde_json::to_value(cfg.as_redacted()).map_err(|e| HoprdError::ConfigError(e.to_string()))?;
 
     let api_cfg = cfg.api.clone();
@@ -251,6 +251,11 @@ fn main() -> ExitCode {
 
 #[cfg(feature = "runtime-tokio")]
 async fn main_inner() -> anyhow::Result<()> {
+    use hopr_api::chain::ChainEvents;
+    use hopr_builder::exit::HoprServerIpForwardingReactor;
+    use hopr_chain_connector::{BlockchainConnectorConfig, blokli_client, create_trustful_hopr_blokli_connector};
+    use hopr_db_node::init_hopr_node_db;
+
     #[cfg(all(target_os = "linux", feature = "allocator-jemalloc-stats"))]
     let _jemalloc_stats = jemalloc_stats::JemallocStats::start().await;
 
@@ -279,6 +284,9 @@ async fn main_inner() -> anyhow::Result<()> {
         info!("The HOPRd node appears to run on DappNode");
     }
 
+    let mut hopr_lib_cfg: HoprLibConfig = cfg.hopr.clone().into();
+    update_hopr_lib_config_from_env_vars(&mut hopr_lib_cfg)?;
+
     // Find or create an identity
     let hopr_keys: HoprKeys = match &cfg.identity.private_key {
         Some(private_key) => IdentityRetrievalModes::FromPrivateKey { private_key },
@@ -294,6 +302,11 @@ async fn main_inner() -> anyhow::Result<()> {
         blockchain_address = hopr_lib::Keypair::public(&hopr_keys.chain_key).to_address().to_hex(),
         "Node public identifiers"
     );
+
+    // Create the node instance
+    info!("creating the HOPRd node instance from hopr-lib");
+
+    let mut processes = AbortableList::<HoprdProcess>::default();
 
     let node_db = init_hopr_node_db(&cfg.db.data, cfg.db.initialize, cfg.db.force_initialize).await?;
 
@@ -319,27 +332,22 @@ async fn main_inner() -> anyhow::Result<()> {
     chain_connector.connect().await?;
     let chain_connector = Arc::new(chain_connector);
 
-    let mut hopr_lib_cfg: HoprLibConfig = cfg.hopr.clone().into();
-    update_hopr_lib_config_from_env_vars(&mut hopr_lib_cfg)?;
-
-    // Create the node instance
-    info!("creating the HOPRd node instance from hopr-lib");
-    let node =
-        Arc::new(hopr_lib::Hopr::new((&hopr_keys).into(), chain_connector.clone(), node_db, hopr_lib_cfg).await?);
-
-    let mut processes = AbortableList::<HoprdProcess>::default();
+    let (node, hopr_process) = hopr_builder::build_from_chain_and_db(
+        &hopr_keys.chain_key,
+        &hopr_keys.packet_key,
+        cfg.hopr.clone().into(),
+        chain_connector.clone(),
+        node_db,
+        HoprServerIpForwardingReactor::new(hopr_keys.packet_key.clone(), cfg.session_ip_forwarding.clone()),
+    )
+    .await?;
 
     if cfg.api.enable {
         let list = init_rest_api(&cfg, node.clone()).await?;
         processes.extend_from(list);
     }
 
-    let _hopr_socket = node
-        .run(
-            hopr_ct_telemetry::ImmediateNeighborProber::new(Default::default()),
-            HoprServerIpForwardingReactor::new(hopr_keys.packet_key.clone(), cfg.session_ip_forwarding),
-        )
-        .await?;
+    let _hopr_socket = hopr_process.await?;
 
     let multi_strategy = Arc::new(hopr_strategy::strategy::MultiStrategy::new(
         cfg.strategy.clone(),

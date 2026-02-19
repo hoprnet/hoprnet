@@ -44,7 +44,10 @@ pub fn to_hex_shortened<const M: usize>(data: &impl AsRef<[u8]>) -> String {
 pub mod prelude {
     pub use chrono::{DateTime, Utc};
 
-    pub use super::{balance::*, errors::GeneralError, f64_approx_eq, primitives::*, to_hex_shortened, traits::*};
+    pub use super::{
+        balance::*, bounded::BoundedVec, errors::GeneralError, f64_approx_eq, primitives::*, to_hex_shortened,
+        traits::*,
+    };
 }
 
 #[cfg(test)]

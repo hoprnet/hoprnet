@@ -8,7 +8,14 @@ use axum::{
 use futures::{StreamExt, stream::FuturesUnordered};
 #[cfg(feature = "telemetry")]
 use hopr_lib::PeerPacketStatsSnapshot;
-use hopr_lib::{Address, Health, Multiaddr, api::network::Observable};
+use hopr_lib::{
+    Address, Multiaddr,
+    api::{
+        graph::{EdgeLinkObservable, traits::EdgeObservableRead},
+        network::Health,
+        node::{HoprNodeChainOperations, HoprNodeNetworkOperations},
+    },
+};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
@@ -267,39 +274,32 @@ pub(super) async fn peers(
             let hopr = hopr.clone();
 
             async move {
-                if let Ok(Some(info)) = hopr.network_peer_info(&peer).await {
-                    if info.score() >= score {
-                        Some((peer, info))
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            }
-        })
-        .filter_map(|(peer_id, info)| {
-            let hopr = hopr.clone();
+                // no observations recorded yet
+                let info = hopr.network_peer_info(&peer)?;
 
-            async move {
-                let Some(address) = hopr.peerid_to_chain_key(&peer_id).await.ok().flatten() else {
-                    // Filter out peers without a known chain address
+                // peer score is low enough not to be considered
+                if info.score() < score {
                     return None;
-                };
+                }
 
-                // WARNING: Only in Providence and Saint-Louis are all peers public
-                let multiaddresses = hopr.network_observed_multiaddresses(&peer_id).await;
+                // no known chain address for the current peer can be found
+                let address = hopr.peerid_to_chain_key(&peer).await.ok().flatten()?;
+
+                let multiaddresses = hopr.network_observed_multiaddresses(&peer).await;
 
                 Some(PeerObservations {
                     address,
                     multiaddr: multiaddresses.first().cloned(),
                     last_update: info.last_update().as_millis(),
-                    average_latency: info.average_latency().map_or(0, |d| d.as_millis()),
-                    probe_rate: info.average_probe_rate(),
+                    average_latency: info
+                        .immediate_qos()
+                        .and_then(|qos| qos.average_latency())
+                        .map_or(0, |latency| latency.as_millis()),
+                    probe_rate: info.immediate_qos().map_or(0.0, |qos| qos.average_probe_rate()),
                     score: info.score(),
                     #[cfg(feature = "telemetry")]
                     packet_stats: hopr
-                        .network_peer_packet_stats(&peer_id)
+                        .network_peer_packet_stats(&peer)
                         .await
                         .ok()
                         .flatten()

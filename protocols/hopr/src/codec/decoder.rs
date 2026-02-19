@@ -52,7 +52,7 @@ where
             channels_dst,
             cfg,
             tracker,
-            tbf: parking_lot::Mutex::new(TagBloomFilter::default()),
+            tbf: parking_lot::Mutex::new(Default::default()),
             peer_id_cache: moka::future::Cache::builder()
                 .time_to_idle(Duration::from_secs(600))
                 .max_capacity(100_000)

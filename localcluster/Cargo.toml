@@ -1,8 +1,8 @@
 [package]
 name = "hoprd-localcluster"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-edition = "2021"
+edition = "2024"
 license = "GPL-3.0-only"
 
 description = "Local HOPR cluster runner using external hoprd processes"
@@ -15,6 +15,7 @@ hoprd = { workspace = true }
 hoprd-api = { workspace = true }
 hopr-chain-connector = { workspace = true }
 hopr-lib = { workspace = true }
+hopr-builder = { workspace = true }
 hoprd-api-client = { workspace = true }
 hopr-primitive-types = { workspace = true }
 lazy_static = { workspace = true }

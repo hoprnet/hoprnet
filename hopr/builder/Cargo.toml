@@ -1,0 +1,84 @@
+[package]
+name = "hopr-builder"
+version = "4.0.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2024"
+description = "Referentail omplementation of the hopr-lib object using canonical trait implementations"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+default = ["runtime-tokio"]
+prometheus = ["hopr-lib/prometheus"]
+runtime-tokio = [
+  "dep:tokio",
+  "hopr-lib/runtime-tokio",
+  "hopr-db-node/runtime-tokio",
+  "hopr-transport-p2p/runtime-tokio",
+  "hopr-chain-connector/runtime-tokio",
+]
+session-server = [
+  "dep:async-trait",
+  "dep:serde",
+  "dep:serde_with",
+  "dep:smart-default",
+  "dep:tokio-retry",
+  "dep:validator",
+  "hopr-lib/session-server",
+]
+session-client = ["hopr-lib/session-client"]
+testing = [
+  "session-client",
+  "session-server",
+  "dep:async-trait",
+  "dep:futures-time",
+  "dep:tokio-util",
+  "dep:hex-literal",
+  "dep:lazy_static",
+  "dep:rand",
+  "dep:rstest",
+  "hopr-chain-connector/testing",
+]
+telemetry = ["hopr-lib/telemetry"]
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true, optional = true }
+futures = { workspace = true }
+futures-concurrency = { workspace = true }
+futures-time = { workspace = true, optional = true }
+hex-literal = { workspace = true, optional = true }
+lazy_static = { workspace = true, optional = true }
+parking_lot = { workspace = true }
+rand = { workspace = true, optional = true }
+rstest = { workspace = true, optional = true }
+smart-default = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+serde_with = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+tokio-retry = { workspace = true, optional = true }
+tokio-util = { workspace = true, optional = true }
+tracing = { workspace = true }
+validator = { workspace = true, optional = true }
+
+hopr-lib = { workspace = true, features = ["utils_parallel"] }
+# impls
+hopr-db-node = { workspace = true }
+hopr-chain-connector = { workspace = true }
+hopr-ct-immediate = { workspace = true }
+hopr-network-graph = { workspace = true }
+hopr-transport-p2p = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true, features = ["yaml", "redactions"] }
+rstest = { workspace = true }
+serial_test = { workspace = true }
+test-log = { workspace = true }
+
+hopr-builder = { workspace = true, features = ["testing"] }
+hopr-crypto-random = { workspace = true }
+hopr-lib = { workspace = true, features = ["telemetry"] }

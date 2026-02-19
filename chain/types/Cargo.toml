@@ -2,7 +2,7 @@
 name = "hopr-chain-types"
 version = "0.14.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-edition = "2021"
+edition = "2024"
 description = "Core-Ethereum-specific interaction with the backend database"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"

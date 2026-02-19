@@ -1,8 +1,8 @@
 [package]
 name = "hoprd-api"
-version = "4.6.0"
+version = "4.6.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-edition = "2021"
+edition = "2024"
 description = "API enabling developers to interact with a hoprd node programatically through HTTP REST API."
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
@@ -12,19 +12,18 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = ["prometheus"]
+default = ["prometheus", "runtime-tokio"]
 telemetry = ["hopr-lib/telemetry"]
 prometheus = [
   "hopr-lib/prometheus",
+  "hopr-transport-p2p/prometheus",
   "dep:hopr-metrics",
   "dep:lazy_static",
   "dep:regex",
 ]
 explicit-path = []
 # placeholder feature so we can enable it globally during tests
-runtime-tokio = []
-# feature for integration tests that use test fixtures
-test-fixtures = []
+runtime-tokio = ["hopr-transport-p2p/runtime-tokio", "hopr-lib/runtime-tokio"]
 
 [dependencies]
 axum = { workspace = true, features = ["http2"] }
@@ -50,7 +49,6 @@ utoipa-swagger-ui = { workspace = true }
 validator = { workspace = true }
 
 hopr-lib = { workspace = true, features = [
-  "runtime-tokio",
   "serde",
   "session-client",
   "utils_futures",
@@ -58,12 +56,13 @@ hopr-lib = { workspace = true, features = [
 
 hopr-db-node = { workspace = true }
 hopr-chain-connector = { workspace = true }
+hopr-network-graph = { workspace = true }
+hopr-transport-p2p = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-utils-session = { workspace = true }
 
 [dev-dependencies]
-oas3 = { workspace = true }
 anyhow = { workspace = true }
-reqwest = { workspace = true, features = ["json"] }
-hopr-lib = { workspace = true, features = ["testing", "session-server"] }
-insta = { workspace = true, features = ["yaml", "redactions"] }
+oas3 = { workspace = true }
+
+hopr-lib = { workspace = true, features = ["session-server"] }

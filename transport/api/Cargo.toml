@@ -1,9 +1,9 @@
 [package]
 name = "hopr-transport"
-version = "0.17.1"
+version = "0.18.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR transport interface for the core library"
-edition = "2021"
+edition = "2024"
 license = "GPL-3.0-only"
 
 [lib]
@@ -12,22 +12,19 @@ crate-type = ["rlib"]
 [features]
 default = []
 capture = ["dep:pcap-file"]
-telemetry = ["hopr-transport-session/telemetry"]
+telemetry = ["serde", "hopr-transport-session/telemetry"]
 p2p-announce-quic = []
-p2p-transport-quic = ["hopr-transport-p2p/transport-quic"]
 prometheus = [
   "dep:hopr-metrics",
   "hopr-network-types/prometheus",
   "hopr-transport-mixer/prometheus",
   "hopr-transport-network/prometheus",
-  "hopr-transport-p2p/prometheus",
   "hopr-transport-protocol/prometheus",
   "hopr-transport-session/prometheus",
 ]
 runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hopr-network-types/runtime-tokio",
-  "hopr-transport-p2p/runtime-tokio",
   "hopr-transport-protocol/runtime-tokio",
   "hopr-transport-session/runtime-tokio",
 ]
@@ -48,10 +45,9 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 cfg-if = { workspace = true }
 futures = { workspace = true }
-futures-concurrency = { workspace = true }
-futures-time = { workspace = true }
 humantime-serde = { workspace = true, optional = true }
 lazy_static = { workspace = true }
+moka = { workspace = true }
 proc-macro-regex = { workspace = true }
 pcap-file = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
@@ -64,6 +60,7 @@ validator = { workspace = true }
 hopr-api = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-crypto-packet = { workspace = true }
+hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
@@ -74,11 +71,9 @@ hopr-protocol-hopr = { workspace = true }
 hopr-transport-identity = { workspace = true }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-network = { workspace = true }
-hopr-transport-p2p = { workspace = true }
 hopr-transport-probe = { workspace = true }
 hopr-transport-protocol = { workspace = true }
 hopr-transport-session = { workspace = true }
-hopr-ct-telemetry = { workspace = true }
 
 [dev-dependencies]
 hex-literal = { workspace = true }
@@ -93,7 +88,6 @@ hopr-protocol-session = { workspace = true, features = [
 hopr-transport-network = { workspace = true }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-protocol = { workspace = true, features = ["runtime-tokio"] }
-hopr-transport-p2p = { workspace = true, features = ["runtime-tokio"] }
 temp-env = { workspace = true }
 tokio = { workspace = true }
 
@@ -101,4 +95,4 @@ tokio = { workspace = true }
 ignored = ["humantime-serde"]
 
 [package.metadata.cargo-shear]
-ignored = ["humantime-serde"]
+ignored = ["humantime-serde", "hopr-transport-probe"]

@@ -121,7 +121,7 @@
             root = ./.;
             inherit fs;
             extraFiles = [
-              ./hopr/hopr-lib/tests
+              ./hopr/builder/tests
               ./hoprd/hoprd/example_cfg.yaml
               (fs.fileFilter (file: file.hasExt "snap") ./.)
             ];
@@ -621,7 +621,7 @@
               "deploy/nfpm/nfpm.yaml"
               ".github/workflows/build-binaries.yaml"
               "docs/*"
-              "hopr/hopr-lib/tests/snapshots/*"
+              "hopr/builder/tests/snapshots/*"
               "hoprd/.dockerignore"
               "hoprd/rest-api/.cargo/config"
               "nix/setup-hook-darwin.sh"

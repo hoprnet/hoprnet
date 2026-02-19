@@ -1,8 +1,8 @@
 [package]
 name = "hopr-transport-probe"
-version = "0.3.1"
+version = "0.4.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-edition = "2021"
+edition = "2024"
 description = "Probing mechanism of the discovered network topology"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
@@ -21,7 +21,6 @@ async-trait = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
 hex = { workspace = true }
-libp2p-identity = { workspace = true }
 moka = { workspace = true, features = ["future"] }
 rand = { workspace = true, features = ["std"] }
 serde = { workspace = true }
@@ -43,13 +42,14 @@ hopr-primitive-types = { workspace = true }
 hopr-protocol-app = { workspace = true }
 
 [dev-dependencies]
+hex-literal = { workspace = true }
 lazy_static = { workspace = true }
 more-asserts = { workspace = true }
 tokio = { workspace = true }
 
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 hopr-crypto-packet = { workspace = true }
-hopr-ct-telemetry = { workspace = true }
+hopr-ct-immediate = { workspace = true }
 
 [package.metadata.cargo-machete]
 ignored = ["humantime-serde"]

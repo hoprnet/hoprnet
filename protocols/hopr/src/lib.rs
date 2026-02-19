@@ -11,6 +11,7 @@ pub(crate) mod utils;
 pub use codec::{HoprCodecConfig, HoprDecoder, HoprEncoder, MAX_ACKNOWLEDGEMENTS_BATCH_SIZE};
 pub use errors::*;
 pub use surb_store::{MemorySurbStore, SurbStoreConfig};
+pub use tbf::TagBloomFilter;
 pub use ticket_processing::{HoprTicketProcessor, HoprTicketProcessorConfig};
 pub use traits::*;
 pub use types::*;

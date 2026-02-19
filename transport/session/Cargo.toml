@@ -2,7 +2,7 @@
 name = "hopr-transport-session"
 version = "0.16.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-edition = "2021"
+edition = "2024"
 description = "Session functionality providing session abstraction over the HOPR transport"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"

@@ -74,16 +74,16 @@ impl ChannelSelector {
 
     /// Checks if the given [`channel`](ChannelEntry) satisfies the selector.
     pub fn satisfies(&self, channel: &ChannelEntry) -> bool {
-        if let Some(source) = &self.source {
-            if channel.source != *source {
-                return false;
-            }
+        if let Some(source) = &self.source
+            && channel.source != *source
+        {
+            return false;
         }
 
-        if let Some(dst) = &self.destination {
-            if channel.destination != *dst {
-                return false;
-            }
+        if let Some(dst) = &self.destination
+            && channel.destination != *dst
+        {
+            return false;
         }
 
         if !self.allowed_states.is_empty() && !self.allowed_states.contains(&channel.status.discriminant()) {
@@ -93,12 +93,11 @@ impl ChannelSelector {
         if self
             .allowed_states
             .contains(&ChannelStatusDiscriminants::PendingToClose)
+            && let ChannelStatus::PendingToClose(time) = &channel.status
         {
-            if let ChannelStatus::PendingToClose(time) = &channel.status {
-                let time = DateTime::from(*time);
-                if !self.closure_time_range.contains(&time) {
-                    return false;
-                }
+            let time = DateTime::from(*time);
+            if !self.closure_time_range.contains(&time) {
+                return false;
             }
         }
 

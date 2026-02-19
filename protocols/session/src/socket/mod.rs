@@ -304,7 +304,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 // The segment_sent event is raised only for segments coming from Upstream,
                 // not for the segments from the Control stream (= segment resends).
                 if let Err(error) = st_1.segment_sent(&segment) {
-                    tracing::debug!(%error, "outgoing segment state update failed");
+                    tracing::debug!(session_id = st_1.session_id(), %error, "outgoing segment state update failed");
                 }
                 future::ok::<_, futures::channel::mpsc::SendError>(SessionMessage::<C>::Segment(segment))
             })

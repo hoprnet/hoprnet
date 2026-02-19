@@ -4,9 +4,10 @@
 use std::sync::Arc;
 
 use futures::{
-    AsyncRead, AsyncReadExt, AsyncWrite, FutureExt, SinkExt as _, Stream, StreamExt,
+    AsyncRead, AsyncReadExt, AsyncWrite, FutureExt, SinkExt as _, StreamExt,
     channel::mpsc::{Receiver, Sender, channel},
 };
+use hopr_api::network::NetworkStreamControl;
 use libp2p::PeerId;
 use tokio_util::{
     codec::{Decoder, Encoder, FramedRead, FramedWrite},
@@ -18,15 +19,6 @@ use tokio_util::{
 /// Global timeout for the [`BidirectionalStreamControl::open`] operation.
 const GLOBAL_STREAM_OPEN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
 const MAX_CONCURRENT_PACKETS: usize = 30;
-
-#[async_trait::async_trait]
-pub trait BidirectionalStreamControl: std::fmt::Debug {
-    fn accept(
-        self,
-    ) -> Result<impl Stream<Item = (PeerId, impl AsyncRead + AsyncWrite + Send)> + Send, impl std::error::Error>;
-
-    async fn open(self, peer: PeerId) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error>;
-}
 
 fn build_peer_stream_io<S, C>(
     peer: PeerId,
@@ -109,7 +101,7 @@ where
     <C as Encoder<<C as Decoder>::Item>>::Error: std::fmt::Debug + std::fmt::Display + Send + Sync + 'static,
     <C as Decoder>::Error: std::fmt::Debug + std::fmt::Display + Send + Sync + 'static,
     <C as Decoder>::Item: AsRef<[u8]> + Clone + Send + 'static,
-    V: BidirectionalStreamControl + Clone + Send + Sync + 'static,
+    V: NetworkStreamControl + Clone + Send + Sync + 'static,
 {
     let (tx_out, rx_out) = channel::<(PeerId, <C as Decoder>::Item)>(100_000);
     let (tx_in, rx_in) = channel::<(PeerId, <C as Decoder>::Item)>(100_000);

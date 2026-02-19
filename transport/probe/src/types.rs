@@ -1,4 +1,4 @@
-use hopr_api::PeerId;
+use hopr_api::{OffchainPublicKey, network::PathId};
 use hopr_crypto_random::Randomizable;
 use hopr_internal_types::{NodeId, protocol::HoprPseudonym};
 use hopr_network_types::types::{DestinationRouting, RoutingOptions};
@@ -138,8 +138,8 @@ pub struct PathTelemetry {
 }
 
 impl PathTelemetry {
-    pub const ID_SIZE: usize = 10;
-    pub const PATH_SIZE: usize = 10;
+    pub const ID_SIZE: usize = 8;
+    pub const PATH_SIZE: usize = size_of::<PathId>();
     pub const SIZE: usize = Self::ID_SIZE + Self::PATH_SIZE + size_of::<u128>();
 
     pub fn to_bytes(self) -> Box<[u8]> {
@@ -151,7 +151,7 @@ impl PathTelemetry {
     }
 }
 
-impl hopr_api::ct::MeasurablePath for PathTelemetry {
+impl hopr_api::graph::MeasurablePath for PathTelemetry {
     fn id(&self) -> &[u8] {
         &self.id
     }
@@ -185,14 +185,14 @@ impl<'a> TryFrom<&'a [u8]> for PathTelemetry {
     fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
         if value.len() == Self::SIZE {
             Ok(Self {
-                id: (&value[0..10])
+                id: (&value[0..Self::ID_SIZE])
                     .try_into()
                     .map_err(|_| GeneralError::ParseError("PathTelemetry.id".into()))?,
-                path: (&value[10..20])
+                path: (&value[Self::ID_SIZE..(Self::ID_SIZE + Self::PATH_SIZE)])
                     .try_into()
                     .map_err(|_| GeneralError::ParseError("PathTelemetry.path".into()))?,
                 timestamp: u128::from_be_bytes(
-                    (&value[20..36])
+                    (&value[(Self::ID_SIZE + Self::PATH_SIZE)..Self::SIZE])
                         .try_into()
                         .map_err(|_| GeneralError::ParseError("PathTelemetry.timestamp".into()))?,
                 ),
@@ -208,12 +208,12 @@ impl<'a> TryFrom<&'a [u8]> for PathTelemetry {
 /// Represents the finding of an intermediate peer probing operation.
 #[derive(Debug, Clone)]
 pub struct NeighborTelemetry {
-    pub peer: PeerId,
+    pub peer: OffchainPublicKey,
     pub rtt: std::time::Duration,
 }
 
-impl hopr_api::ct::MeasurableNeighbor for NeighborTelemetry {
-    fn peer(&self) -> &PeerId {
+impl hopr_api::graph::MeasurablePeer for NeighborTelemetry {
+    fn peer(&self) -> &OffchainPublicKey {
         &self.peer
     }
 

@@ -24,7 +24,7 @@ mod pipeline;
 /// Stream processing utilities
 pub mod stream;
 
-use hopr_transport_identity::{Multiaddr, PeerId};
+use hopr_api::PeerId;
 pub use pipeline::{
     AcknowledgementPipelineConfig, PacketPipelineConfig, PacketPipelineProcesses, TicketEvent, run_packet_pipeline,
 };
@@ -33,9 +33,3 @@ const HOPR_PACKET_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::SIZE;
 
 pub type HoprBinaryCodec = codec::FixedLengthCodec<HOPR_PACKET_SIZE>;
 pub const CURRENT_HOPR_MSG_PROTOCOL: &str = "/hopr/mix/1.1.0";
-
-/// Processed indexer generated events.
-#[derive(Debug, Clone)]
-pub enum PeerDiscovery {
-    Announce(PeerId, Vec<Multiaddr>),
-}

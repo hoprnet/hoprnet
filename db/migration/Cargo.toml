@@ -2,7 +2,7 @@
 name = "hopr-db-migration"
 description = "Contains database migrations for the HOPR Node database"
 version = "0.5.0"
-edition = "2021"
+edition = "2024"
 publish = false
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"

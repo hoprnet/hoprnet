@@ -4366,10 +4366,10 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
- "anyhow",
  "async-trait",
+ "atomic_enum",
  "auto_impl",
  "chrono",
  "futures",
@@ -4379,6 +4379,8 @@ dependencies = [
  "hopr-internal-types",
  "hopr-network-types",
  "hopr-primitive-types 0.10.0",
+ "insta",
+ "libp2p-identity",
  "multiaddr",
  "strum 0.27.2",
  "thiserror 2.0.18",
@@ -4413,6 +4415,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-builder"
+version = "4.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "futures",
+ "futures-concurrency",
+ "futures-time",
+ "hex-literal",
+ "hopr-builder",
+ "hopr-chain-connector",
+ "hopr-crypto-random 0.4.0",
+ "hopr-ct-immediate",
+ "hopr-db-node",
+ "hopr-lib",
+ "hopr-network-graph",
+ "hopr-transport-p2p",
+ "insta",
+ "lazy_static",
+ "parking_lot",
+ "rand 0.10.0",
+ "rstest",
+ "serde",
+ "serde_with",
+ "serial_test",
+ "smart-default",
+ "test-log",
+ "tokio",
+ "tokio-retry",
+ "tokio-util",
+ "tracing",
+ "validator",
+]
+
+[[package]]
 name = "hopr-chain-connector"
 version = "0.15.0"
 dependencies = [
@@ -4430,7 +4467,6 @@ dependencies = [
  "hex-literal",
  "hopr-api",
  "hopr-async-runtime",
- "hopr-chain-connector",
  "hopr-chain-types",
  "hopr-crypto-random 0.4.0",
  "hopr-crypto-types 0.9.1",
@@ -4633,27 +4669,48 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-ct-telemetry"
+name = "hopr-ct-full-network"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "async-stream",
- "async-trait",
+ "cfg-if",
+ "futures",
+ "futures-concurrency",
+ "hopr-api",
+ "hopr-async-runtime",
+ "hopr-crypto-random 0.4.0",
+ "hopr-crypto-types 0.9.1",
+ "hopr-internal-types",
+ "hopr-network-graph",
+ "hopr-network-types",
+ "humantime-serde",
+ "lazy_static",
+ "moka",
+ "serde",
+ "smart-default",
+ "tokio",
+ "validator",
+]
+
+[[package]]
+name = "hopr-ct-immediate"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
  "futures",
  "hopr-api",
  "hopr-async-runtime",
  "hopr-crypto-random 0.4.0",
  "hopr-crypto-types 0.9.1",
  "hopr-internal-types",
+ "hopr-network-graph",
  "hopr-network-types",
+ "humantime-serde",
  "lazy_static",
- "mockall",
  "moka",
- "rand 0.10.0",
  "serde",
  "smart-default",
  "tokio",
- "tracing",
  "validator",
 ]
 
@@ -4751,45 +4808,33 @@ dependencies = [
  "anyhow",
  "async-broadcast",
  "async-trait",
- "atomic_enum",
  "backon",
  "cfg-if",
  "cfg_eval",
  "const_format",
  "futures",
  "futures-time",
- "hex-literal",
  "hopr-api",
  "hopr-async-runtime",
- "hopr-chain-connector",
  "hopr-chain-types",
  "hopr-crypto-keypair",
  "hopr-crypto-random 0.4.0",
  "hopr-crypto-types 0.9.1",
- "hopr-ct-telemetry",
- "hopr-db-node",
  "hopr-internal-types",
- "hopr-lib",
  "hopr-metrics",
  "hopr-network-types",
  "hopr-parallelize",
  "hopr-platform",
  "hopr-primitive-types 0.10.0",
  "hopr-transport",
- "insta",
  "lazy_static",
- "rand 0.10.0",
- "rstest",
  "serde",
  "serde-saphyr",
  "serde_with",
- "serial_test",
  "smart-default",
  "strum 0.27.2",
- "test-log",
  "thiserror 2.0.18",
  "tokio",
- "tokio-util",
  "tracing",
  "validator",
 ]
@@ -4803,8 +4848,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-network-graph"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "assertables",
+ "bimap",
+ "criterion",
+ "futures",
+ "hex-literal",
+ "hopr-api",
+ "hopr-crypto-types 0.9.1",
+ "hopr-statistics",
+ "indexmap 2.13.0",
+ "parking_lot",
+ "petgraph",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "hopr-network-types"
-version = "1.1.2"
+version = "1.1.3"
 dependencies = [
  "anyhow",
  "arrayvec",
@@ -4910,7 +4976,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-hopr"
-version = "4.3.0"
+version = "4.3.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5053,21 +5119,18 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.17.1"
+version = "0.18.0"
 dependencies = [
  "anyhow",
  "async-trait",
  "cfg-if",
  "futures",
- "futures-concurrency",
- "futures-time",
  "hex-literal",
  "hopr-api",
  "hopr-async-runtime",
  "hopr-crypto-packet",
  "hopr-crypto-random 0.4.0",
  "hopr-crypto-types 0.9.1",
- "hopr-ct-telemetry",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-network-types",
@@ -5079,13 +5142,13 @@ dependencies = [
  "hopr-transport-identity",
  "hopr-transport-mixer",
  "hopr-transport-network",
- "hopr-transport-p2p",
  "hopr-transport-probe",
  "hopr-transport-protocol",
  "hopr-transport-session",
  "humantime-serde",
  "insta",
  "lazy_static",
+ "moka",
  "pcap-file",
  "proc-macro-regex",
  "serde",
@@ -5100,7 +5163,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-identity"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "libp2p-identity",
@@ -5129,14 +5192,12 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-network"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "anyhow",
- "assertables",
  "dashmap",
  "hopr-api",
  "hopr-metrics",
- "hopr-statistics",
  "humantime-serde",
  "lazy_static",
  "libp2p-identity",
@@ -5149,8 +5210,10 @@ name = "hopr-transport-p2p"
 version = "0.8.2"
 dependencies = [
  "anyhow",
+ "async-broadcast",
  "async-trait",
  "backon",
+ "dashmap",
  "futures",
  "hopr-api",
  "hopr-crypto-packet",
@@ -5159,7 +5222,6 @@ dependencies = [
  "hopr-metrics",
  "hopr-network-types",
  "hopr-platform",
- "hopr-transport-identity",
  "hopr-transport-network",
  "hopr-transport-probe",
  "hopr-transport-protocol",
@@ -5167,6 +5229,7 @@ dependencies = [
  "libp2p",
  "libp2p-stream",
  "more-asserts",
+ "multiaddr",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -5174,19 +5237,20 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-probe"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "async-trait",
  "futures",
  "futures-concurrency",
  "hex",
+ "hex-literal",
  "hopr-api",
  "hopr-async-runtime",
  "hopr-crypto-packet",
  "hopr-crypto-random 0.4.0",
  "hopr-crypto-types 0.9.1",
- "hopr-ct-telemetry",
+ "hopr-ct-immediate",
  "hopr-internal-types",
  "hopr-network-types",
  "hopr-platform",
@@ -5194,7 +5258,6 @@ dependencies = [
  "hopr-protocol-app",
  "humantime-serde",
  "lazy_static",
- "libp2p-identity",
  "moka",
  "more-asserts",
  "rand 0.10.0",
@@ -5209,7 +5272,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "1.2.1"
+version = "1.3.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -5235,7 +5298,6 @@ dependencies = [
  "hopr-primitive-types 0.10.0",
  "hopr-protocol-app",
  "hopr-protocol-hopr",
- "hopr-transport-identity",
  "hopr-transport-mixer",
  "humantime-serde",
  "lazy_static",
@@ -5332,22 +5394,22 @@ version = "4.0.0"
 dependencies = [
  "anyhow",
  "async-signal",
- "async-trait",
  "clap",
  "console-subscriber",
  "futures",
  "home",
+ "hopr-api",
+ "hopr-builder",
  "hopr-chain-connector",
- "hopr-ct-telemetry",
  "hopr-db-node",
  "hopr-lib",
- "hopr-metrics",
+ "hopr-network-graph",
  "hopr-strategy",
+ "hopr-transport-p2p",
  "hopr-utils-session",
  "hoprd-api",
  "humansize",
  "humantime-serde",
- "lazy_static",
  "mimalloc",
  "opentelemetry",
  "opentelemetry-otlp",
@@ -5356,7 +5418,6 @@ dependencies = [
  "serde",
  "serde-saphyr",
  "serde_json",
- "serde_with",
  "signal-hook 0.4.3",
  "smart-default",
  "strum 0.27.2",
@@ -5366,7 +5427,6 @@ dependencies = [
  "tikv-jemalloc-ctl",
  "tikv-jemallocator",
  "tokio",
- "tokio-retry",
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber",
@@ -5376,7 +5436,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "4.6.0"
+version = "4.6.1"
 dependencies = [
  "anyhow",
  "axum",
@@ -5388,13 +5448,13 @@ dependencies = [
  "hopr-db-node",
  "hopr-lib",
  "hopr-metrics",
+ "hopr-network-graph",
+ "hopr-transport-p2p",
  "hopr-utils-session",
  "human-bandwidth",
- "insta",
  "lazy_static",
  "oas3",
  "regex",
- "reqwest 0.13.2",
  "serde",
  "serde_json",
  "serde_with",
@@ -5412,7 +5472,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api-client"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bytes",
  "chrono",
@@ -5436,11 +5496,12 @@ dependencies = [
 
 [[package]]
 name = "hoprd-localcluster"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "clap",
  "futures",
+ "hopr-builder",
  "hopr-chain-connector",
  "hopr-lib",
  "hopr-primitive-types 0.10.0",

@@ -1,8 +1,8 @@
 [package]
 name = "hopr-api"
-version = "0.10.0"
+version = "0.11.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-edition = "2021"
+edition = "2024"
 description = "Common HOPR-related high-level API traits used in the code base"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
@@ -11,17 +11,22 @@ license = "GPL-3.0-only"
 
 [features]
 default = []
+full = ["chain", "ct", "db", "network", "graph", "node", "serde"]
+chain = ["db", "dep:auto_impl"]
 ct = ["dep:hopr-network-types"]
 db = []
-chain = ["db"]
 network = []
+graph = ["dep:auto_impl", "dep:hopr-network-types"]
+node = ["chain", "db", "graph", "network", "dep:atomic_enum"]
 serde = ["hopr-primitive-types/serde"]
 
 [dependencies]
 async-trait = { workspace = true }
-auto_impl = { workspace = true }
+auto_impl = { workspace = true, optional = true }
+atomic_enum = { workspace = true, optional = true }
 chrono = { workspace = true }
 futures = { workspace = true }
+libp2p-identity = { workspace = true }
 multiaddr = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
@@ -34,4 +39,4 @@ hopr-crypto-packet = { workspace = true }
 hopr-crypto-types = { workspace = true }
 
 [dev-dependencies]
-anyhow = { workspace = true }
+insta = { workspace = true }
