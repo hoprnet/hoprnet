@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use hopr_builder::config::SessionIpForwardingConfig;
 use hopr_lib::{
     HoprBalance, HoprProtocolConfig, SafeModule, WinningProbability,
     config::{
@@ -8,7 +9,6 @@ use hopr_lib::{
     },
     exports::transport::config::HoprCodecConfig,
 };
-use hopr_builder::config::SessionIpForwardingConfig;
 use hoprd_api::config::{Api, Auth};
 use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};

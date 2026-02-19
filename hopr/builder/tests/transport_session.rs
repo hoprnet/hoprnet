@@ -1,14 +1,14 @@
 use std::str::FromStr;
 
+use hopr_builder::testing::{
+    fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster},
+    hopr::ChannelGuard,
+};
 use hopr_lib::BoundedVec;
 #[cfg(feature = "session-client")]
 use hopr_lib::{
     HoprBalance, RoutingOptions, SessionCapabilities, SessionClientConfig, SessionTarget,
     exports::transport::session::{IpOrHost, SealedHost},
-};
-use hopr_builder::testing::{
-    fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster},
-    hopr::ChannelGuard,
 };
 use rstest::*;
 use serial_test::serial;

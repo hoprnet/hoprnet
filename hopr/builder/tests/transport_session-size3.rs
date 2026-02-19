@@ -1,12 +1,12 @@
 use std::{str::FromStr, time::Duration};
 
 use anyhow::Context;
+use hopr_builder::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster};
 use hopr_lib::{
     RoutingOptions, SessionCapabilities, SessionClientConfig, SessionTarget,
     errors::{HoprLibError, HoprTransportError},
     exports::transport::session::{IpOrHost, SealedHost},
 };
-use hopr_builder::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster};
 use rstest::*;
 use serial_test::serial;
 use tokio::time::sleep;

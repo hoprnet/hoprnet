@@ -206,10 +206,13 @@ pub trait CostFn {
     type Weight: EdgeObservableRead + Send;
     type Cost: Clone + PartialOrd + Send + Sync;
 
+    /// The initial cost that will be modified by the cost function.
     fn initial_cost(&self) -> Self::Cost;
 
+    /// The minumum cost, below which the cost function will force discard upon traversal.
     fn min_cost(&self) -> Option<Self::Cost>;
 
+    /// The cost function accepting graph properties to establish the final cost.
     fn into_cost_fn(self) -> Box<dyn Fn(Self::Cost, &Self::Weight, usize) -> Self::Cost>;
 }
 

@@ -252,9 +252,9 @@ fn main() -> ExitCode {
 #[cfg(feature = "runtime-tokio")]
 async fn main_inner() -> anyhow::Result<()> {
     use hopr_api::chain::ChainEvents;
+    use hopr_builder::exit::HoprServerIpForwardingReactor;
     use hopr_chain_connector::{BlockchainConnectorConfig, blokli_client, create_trustful_hopr_blokli_connector};
     use hopr_db_node::init_hopr_node_db;
-    use hopr_builder::exit::HoprServerIpForwardingReactor;
 
     #[cfg(all(target_os = "linux", feature = "allocator-jemalloc-stats"))]
     let _jemalloc_stats = jemalloc_stats::JemallocStats::start().await;
