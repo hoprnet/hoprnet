@@ -255,7 +255,7 @@ const DEFAULT_SESSION_ESTABLISH_RETRY_DELAY: Duration = Duration::from_secs(2);
 
 const DEFAULT_SESSION_ESTABLISH_MAX_RETRIES: u32 = 3;
 
-const DEFAULT_SESSION_BALANCER_SAMPLING: Duration = Duration::from_millis(500);
+const DEFAULT_SESSION_BALANCER_SAMPLING: Duration = Duration::from_millis(100);
 
 const DEFAULT_SESSION_BALANCER_BUFFER_DURATION: Duration = Duration::from_secs(5);
 
