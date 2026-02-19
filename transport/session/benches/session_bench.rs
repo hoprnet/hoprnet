@@ -9,7 +9,6 @@ use hopr_protocol_app::{prelude::ApplicationDataOut, v1::ApplicationDataIn};
 #[cfg(feature = "telemetry")]
 use hopr_transport_session::SessionTelemetry;
 use hopr_transport_session::{Capabilities, Capability, HoprSession, HoprSessionConfig, SessionId};
-use rand::{Rng, thread_rng};
 
 // Avoid musl's default allocator due to degraded performance
 //
@@ -102,7 +101,7 @@ pub fn session_raw_benchmark(c: &mut Criterion) {
 
     for size in [16 * KB, 64 * KB, 128 * KB, 1024 * KB].iter() {
         let mut alice_data = vec![0u8; *size];
-        thread_rng().fill(&mut alice_data[..]);
+        rand::fill(&mut alice_data[..]);
 
         // Prepare data and make a sanity check
         let runtime = tokio::runtime::Runtime::new().unwrap();
@@ -131,7 +130,7 @@ pub fn session_segmentation_benchmark(c: &mut Criterion) {
 
     for size in [16 * KB, 64 * KB, 128 * KB, 1024 * KB].iter() {
         let mut alice_data = vec![0u8; *size];
-        thread_rng().fill(&mut alice_data[..]);
+        rand::fill(&mut alice_data[..]);
 
         // Prepare data and make a sanity check
         let runtime = tokio::runtime::Runtime::new().unwrap();
