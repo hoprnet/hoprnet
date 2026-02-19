@@ -26,19 +26,19 @@ use crate::errors::HoprTransportError;
 pub struct HoprProtocolConfig {
     /// Libp2p-related transport configuration
     #[validate(nested)]
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub transport: TransportConfig,
     /// HOPR packet pipeline configuration
     #[validate(nested)]
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub packet: HoprPacketPipelineConfig,
     /// Probing protocol configuration
     #[validate(nested)]
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub probe: ProbeConfig,
     /// Session protocol global configuration
     #[validate(nested)]
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub session: SessionGlobalConfig,
 }
 
@@ -52,19 +52,19 @@ pub struct HoprProtocolConfig {
 pub struct HoprPacketPipelineConfig {
     /// HOPR packet codec configuration
     #[validate(nested)]
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub codec: HoprCodecConfig,
     /// HOPR ticket processing configuration
     #[validate(nested)]
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub ticket_processing: HoprTicketProcessorConfig,
     /// Single Use Reply Block (SURB) handling configuration
     #[validate(nested)]
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub surb_store: SurbStoreConfig,
     /// Packet pipeline configuration controlling output/input concurrency and acknowledgement processing
     #[validate(nested)]
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub pipeline: PacketPipelineConfig,
 }
 
