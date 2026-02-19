@@ -8,6 +8,16 @@ use crate::{
     errors::SessionManagerError,
 };
 
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_PID_CONTROL_OUTPUT: hopr_metrics::SimpleHistogram =
+        hopr_metrics::SimpleHistogram::new(
+            "hopr_surb_balancer_pid_control_output",
+            "Control output of the PID SURB balancer controller",
+            vec![0.0, 10.0, 50.0, 100.0, 500.0, 1000.0, 2500.0, 5000.0]
+        ).unwrap();
+}
+
 /// Carries finite Proportional, Integral and Derivative controller gains for a PID controller.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PidControllerGains(f64, f64, f64);
@@ -127,6 +137,11 @@ impl SurbBalancerController for PidBalancerController {
     }
 
     fn next_control_output(&mut self, current_buffer_level: u64) -> u64 {
-        self.0.next_control_output(current_buffer_level as f64).output.max(0.0) as u64
+        let output = self.0.next_control_output(current_buffer_level as f64).output.max(0.0) as u64;
+
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_PID_CONTROL_OUTPUT.observe(output as f64);
+
+        output
     }
 }

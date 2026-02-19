@@ -6,6 +6,21 @@ use crate::balancer::{BalancerControllerBounds, SurbBalancerController};
 /// This ensures that even when the buffer is empty, some traffic can flow to allow recovery.
 const MIN_CONTROL_OUTPUT: u64 = 10;
 
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_SIMPLE_CONTROL_OUTPUT: hopr_metrics::SimpleHistogram =
+        hopr_metrics::SimpleHistogram::new(
+            "hopr_surb_balancer_simple_control_output",
+            "Control output of the simple SURB balancer controller",
+            vec![0.0, 10.0, 50.0, 100.0, 500.0, 1000.0, 2500.0, 5000.0]
+        ).unwrap();
+    static ref METRIC_SIMPLE_STARVATION_FLOOR_APPLIED: hopr_metrics::SimpleCounter =
+        hopr_metrics::SimpleCounter::new(
+            "hopr_surb_balancer_simple_starvation_floor_applied_total",
+            "Number of times the minimum floor was applied to prevent starvation"
+        ).unwrap();
+}
+
 /// Controller that uses the simple linear formula `limit * min(current / setpoint, 1.0)` to
 /// compute the control output.
 ///
@@ -66,8 +81,23 @@ impl SurbBalancerController for SimpleBalancerController {
             }
         }
 
-        let output = (self.bounds.output_limit() as f64 * ratio.clamp(0.0, 1.0)).floor() as u64;
-        output.max(MIN_CONTROL_OUTPUT)
+        let raw_output = (self.bounds.output_limit() as f64 * ratio.clamp(0.0, 1.0)).floor() as u64;
+        let output = raw_output.max(MIN_CONTROL_OUTPUT);
+
+        #[cfg(all(feature = "prometheus", not(test)))]
+        {
+            METRIC_SIMPLE_CONTROL_OUTPUT.observe(output as f64);
+            if raw_output < MIN_CONTROL_OUTPUT {
+                METRIC_SIMPLE_STARVATION_FLOOR_APPLIED.increment();
+                tracing::warn!(
+                    raw_output,
+                    applied_output = output,
+                    "SURB starvation detected, applying minimum rate floor"
+                );
+            }
+        }
+
+        output
     }
 }
 
