@@ -62,7 +62,6 @@ hopr-primitive-types = { workspace = true }
 hopr-protocol-app = { workspace = true, features = ["serde"] }
 hopr-protocol-session = { workspace = true, features = ["serde"] }
 hopr-protocol-start = { workspace = true }
-hopr-statistics = { workspace = true, features = ["serde", "moving"] }
 
 [dev-dependencies]
 anyhow = { workspace = true }
