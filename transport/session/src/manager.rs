@@ -361,20 +361,6 @@ pub struct SessionManagerConfig {
 /// Exit is detected.
 ///
 /// This behavior can be controlled via the `surb_decay` field of [`SurbBalancerConfig`].
-///
-/// ### Automatic `target_surb_buffer_size` increase
-/// This mechanism only applies to the Session recipient (Exit) and on Sessions without the
-/// [`Capability::NoRateControl`] flag set.
-/// In this case, the Exit throttles the Session egress based on the ratio between
-/// of the estimated SURB balance and the *hint* of Entry's `target_surb_buffer_size` set during the Session initiation.
-///
-/// However, as the Entry might [increase](SessionManager::update_surb_balancer_config) the `target_surb_buffer_size`
-/// of the Session dynamically, the new value is never hinted again to the Exit (this only happens once during
-/// the Session initiation).
-/// For this reason, the Exit then might observe the ratio going higher than 1. When this happens consistently
-/// over some given time period, the Exit can decide to increase the initial hint to the newly observed value.
-///
-/// See the `growable_target_surb_buffer` field in the [`SessionManagerConfig`] for details.
 pub struct SessionManager<S, T> {
     session_initiations: SessionInitiationCache,
     #[allow(clippy::type_complexity)]
@@ -1356,6 +1342,7 @@ where
                     // Allow updating SURB balancer target based on the received Keep-Alive message
                     if msg.flags.contains(KeepAliveFlag::BalancerTarget)
                         && msg.additional_data > 0
+                        && !session_slot.surb_mgmt.is_disabled()
                         && session_slot
                             .surb_mgmt
                             .target_surb_buffer_size
