@@ -6,13 +6,8 @@ use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_network_types::prelude::DestinationRouting;
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataOut};
 use tracing::{debug, error};
-
-use crate::{
-    SessionId,
-    balancer::{RateController, RateLimitStreamExt, SurbControllerWithCorrection},
-    errors::TransportSessionError,
-    types::HoprStartProtocol,
-};
+use hopr_protocol_start::{KeepAliveFlag, KeepAliveMessage};
+use crate::{SessionId, balancer::{RateController, RateLimitStreamExt, SurbControllerWithCorrection}, errors::TransportSessionError, types::HoprStartProtocol, SurbBalancerConfig};
 
 /// Convenience function to copy data in both directions between a [`Session`](crate::HoprSession) and arbitrary
 /// async IO stream.
@@ -117,22 +112,41 @@ where
     }
 }
 
+/// How often should the keep-alive stream report the desired SURB buffer target
+/// to the Session recipient
+const TARGET_BUFFER_REPORT_PERIOD: Duration = Duration::from_secs(5);
+
 pub(crate) fn spawn_keep_alive_stream<S>(
     session_id: SessionId,
     sender: S,
     routing: DestinationRouting,
+    cfg: std::sync::Arc<parking_lot::Mutex<Option<SurbBalancerConfig>>>
 ) -> (SurbControllerWithCorrection, AbortHandle)
 where
     S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
 {
-    let elem = HoprStartProtocol::KeepAlive(session_id.into());
-
     // The stream is suspended until the caller sets a rate via the Controller
     let controller = RateController::new(0, Duration::from_secs(1));
 
+    let mut last_target_buffer_emit = std::time::Instant::now();
     let (ka_stream, abort_handle) =
-        futures::stream::abortable(futures::stream::repeat(elem).rate_limit_with_controller(&controller));
+        futures::stream::abortable(futures::stream::repeat_with(move || {
+            // Periodically send our desired target buffer to the Session recipient
+            if last_target_buffer_emit.elapsed() > TARGET_BUFFER_REPORT_PERIOD &&
+                let Some(additional_data) = cfg.lock().as_ref()
+                    .map(|c| c.target_surb_buffer_size) {
+                last_target_buffer_emit = std::time::Instant::now();
+                HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                    session_id,
+                    flags: KeepAliveFlag::BalancerTarget.into(),
+                    additional_data,
+                })
+            } else {
+                HoprStartProtocol::KeepAlive(session_id.into())
+            }
+        })
+        .rate_limit_with_controller(&controller));
 
     let sender_clone = sender.clone();
     let fwd_routing_clone = routing.clone();

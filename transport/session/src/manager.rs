@@ -17,9 +17,7 @@ use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::Address;
 use hopr_protocol_app::prelude::*;
-use hopr_protocol_start::{
-    KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
-};
+use hopr_protocol_start::{KeepAliveFlag, KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation};
 use tracing::{debug, error, info, trace, warn};
 
 #[cfg(feature = "telemetry")]
@@ -126,7 +124,7 @@ struct SessionSlot {
     telemetry: Arc<SessionTelemetry>,
     // Allows reconfiguring of the SURB balancer on-the-fly
     // Set on both Entry and Exit sides.
-    surb_mgmt: Option<SurbBalancerConfig>,
+    surb_mgmt: Arc<parking_lot::Mutex<Option<SurbBalancerConfig>>>,
     // Set only on the Exit side.
     surb_estimator: Option<AtomicSurbFlowEstimator>,
 }
@@ -145,32 +143,17 @@ impl BalancerConfigFeedback for SessionCacheBalancerFeedback {
             .ok_or(SessionManagerError::NonExistingSession)?
             .1
             .surb_mgmt
+            .lock()
             .ok_or(SessionManagerError::Other("missing surb balancer config".into()).into())
     }
 
     async fn on_config_update(&self, id: &SessionId, cfg: SurbBalancerConfig) -> crate::errors::Result<()> {
-        if let moka::ops::compute::CompResult::ReplacedWith(_) = self
-            .0
-            .entry_by_ref(id)
-            .and_compute_with(|entry| {
-                futures::future::ready(match entry.map(|e| e.into_value()) {
-                    None => moka::ops::compute::Op::Nop,
-                    Some(mut updated_slot) => {
-                        if let Some(balancer_cfg) = &mut updated_slot.surb_mgmt {
-                            *balancer_cfg = cfg;
-                            moka::ops::compute::Op::Put(updated_slot)
-                        } else {
-                            moka::ops::compute::Op::Nop
-                        }
-                    }
-                })
-            })
-            .await
-        {
-            Ok(())
-        } else {
-            Err(SessionManagerError::NonExistingSession.into())
+        if let Some(balancer_cfg) = self.0.get(id).await.ok_or(SessionManagerError::NonExistingSession)?
+            .surb_mgmt
+            .lock().as_mut() {
+            *balancer_cfg = cfg;
         }
+        Ok(())
     }
 }
 
@@ -773,10 +756,11 @@ where
                     );
 
                     let mut abort_handles = AbortableList::default();
+                    let surb_mgmt = Arc::new(parking_lot::Mutex::new(Some(balancer_config)));
 
                     // Spawn the SURB-bearing keep alive stream
                     let (ka_controller, ka_abort_handle) =
-                        utils::spawn_keep_alive_stream(session_id, full_surb_scoring_sender, forward_routing.clone());
+                        utils::spawn_keep_alive_stream(session_id, full_surb_scoring_sender, forward_routing.clone(), surb_mgmt.clone());
                     abort_handles.insert(SessionTasks::KeepAlive, ka_abort_handle);
 
                     #[cfg(feature = "telemetry")]
@@ -807,7 +791,7 @@ where
                             session_tx: Arc::new(tx),
                             routing_opts: forward_routing.clone(),
                             abort_handles: Arc::new(parking_lot::Mutex::new(abort_handles)),
-                            surb_mgmt: Some(balancer_config),
+                            surb_mgmt,
                             surb_estimator: None, // Outgoing sessions do not have SURB estimator
                             #[cfg(feature = "telemetry")]
                             telemetry: metrics.clone(),
@@ -872,7 +856,7 @@ where
                             session_tx: Arc::new(tx),
                             routing_opts: forward_routing.clone(),
                             abort_handles: Default::default(),
-                            surb_mgmt: None,
+                            surb_mgmt: Arc::new(parking_lot::Mutex::new(None)),
                             surb_estimator: None,
                             #[cfg(feature = "telemetry")]
                             telemetry: metrics.clone(),
@@ -980,29 +964,16 @@ where
         id: &SessionId,
         config: SurbBalancerConfig,
     ) -> crate::errors::Result<()> {
-        match self
-            .sessions
-            .entry_by_ref(id)
-            .and_compute_with(|entry| {
-                futures::future::ready(if let Some(mut cached_session) = entry.map(|e| e.into_value()) {
-                    // Only update the config if there already was one before
-                    if cached_session.surb_mgmt.is_some() {
-                        cached_session.surb_mgmt = Some(config);
-                        moka::ops::compute::Op::Put(cached_session)
-                    } else {
-                        moka::ops::compute::Op::Nop
-                    }
-                } else {
-                    moka::ops::compute::Op::Nop
-                })
-            })
-            .await
-        {
-            moka::ops::compute::CompResult::ReplacedWith(_) => Ok(()),
-            moka::ops::compute::CompResult::Unchanged(_) => {
-                Err(SessionManagerError::Other("session does not use SURB balancing".into()).into())
-            }
-            _ => Err(SessionManagerError::NonExistingSession.into()),
+        // Only update the config if there already was one before
+        if let Some(cfg) = self.sessions.get(id).await
+            .ok_or(SessionManagerError::NonExistingSession)?
+            .surb_mgmt
+            .lock()
+            .as_mut() {
+            *cfg = config;
+            Ok(())
+        } else {
+            Err(SessionManagerError::Other("session does not use SURB balancing".into()).into())
         }
     }
 
@@ -1011,7 +982,7 @@ where
     /// Returns an error if the Session with the given `id` does not exist.
     pub async fn get_surb_balancer_config(&self, id: &SessionId) -> crate::errors::Result<Option<SurbBalancerConfig>> {
         match self.sessions.get(id).await {
-            Some(session) => Ok(session.surb_mgmt),
+            Some(session) => Ok(session.surb_mgmt.lock().as_ref().copied()),
             None => Err(SessionManagerError::NonExistingSession.into()),
         }
     }
@@ -1052,10 +1023,10 @@ where
         {
             let session_id = SessionId::new(in_data.data.application_tag, pseudonym);
 
-            return if let Some(session_data) = self.sessions.get(&session_id).await {
+            return if let Some(session_slot) = self.sessions.get(&session_id).await {
                 trace!(?session_id, "received data for a registered session");
 
-                Ok(session_data
+                Ok(session_slot
                     .session_tx
                     .unbounded_send(in_data)
                     .map(|_| DispatchResult::Processed)
@@ -1116,7 +1087,7 @@ where
                     session_tx: Arc::new(tx_session_data),
                     routing_opts: reply_routing.clone(),
                     abort_handles: Default::default(),
-                    surb_mgmt: None,
+                    surb_mgmt: Default::default(),
                     surb_estimator: None,
                     #[cfg(feature = "telemetry")]
                     telemetry: SessionTelemetry::new(
@@ -1235,7 +1206,7 @@ where
                                 .abort_handles
                                 .lock()
                                 .insert(SessionTasks::Balancer, balancer_abort_handle);
-                            cached_session.surb_mgmt = Some(balancer_config);
+                            cached_session.surb_mgmt = Arc::new(parking_lot::Mutex::new(Some(balancer_config)));
                             cached_session.surb_estimator = Some(surb_estimator.clone());
                             #[cfg(feature = "telemetry")]
                             {
@@ -1455,6 +1426,16 @@ where
                             KeepAliveMessage::<SessionId>::MIN_SURBS_PER_MESSAGE as u64,
                             std::sync::atomic::Ordering::Relaxed,
                         );
+                    }
+                    // Allow updating SURB balancer target based on the received Keep-Alive message
+                    if msg.flags.contains(KeepAliveFlag::BalancerTarget) && msg.additional_data > 0 &&
+                        let Some(cfg) = session_slot.surb_mgmt.lock().as_mut() &&
+                        cfg.target_surb_buffer_size != msg.additional_data {
+                        debug!(%session_id, target_surb_buffer_size = msg.additional_data, "keep-alive updated SURB balancer target buffer size");
+                        cfg.target_surb_buffer_size = msg.additional_data;
+
+                        #[cfg(feature = "telemetry")]
+                        session_slot.telemetry.set_surb_target_buffer(msg.additional_data);
                     }
                 } else {
                     debug!(%session_id, "received keep-alive request for an unknown session");
@@ -1848,7 +1829,7 @@ mod tests {
                     session_tx: Arc::new(dummy_tx),
                     routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
                     abort_handles: Default::default(),
-                    surb_mgmt: Some(balancer_cfg),
+                    surb_mgmt: Arc::new(parking_lot::Mutex::new(Some(balancer_cfg))),
                     surb_estimator: None,
                     #[cfg(feature = "telemetry")]
                     telemetry: Arc::new(SessionTelemetry::new(session_id, Default::default())),
@@ -1906,7 +1887,7 @@ mod tests {
                         SessionId::new(16u64, alice_pseudonym),
                         Default::default(),
                     )),
-                    surb_mgmt: None,
+                    surb_mgmt: Default::default(),
                     surb_estimator: None,
                 },
             )
@@ -2022,7 +2003,7 @@ mod tests {
                     session_tx: Arc::new(dummy_tx),
                     routing_opts: DestinationRouting::Return(alice_pseudonym.into()),
                     abort_handles: Default::default(),
-                    surb_mgmt: None,
+                    surb_mgmt: Default::default(),
                     surb_estimator: None,
                     #[cfg(feature = "telemetry")]
                     telemetry: Arc::new(SessionTelemetry::new(

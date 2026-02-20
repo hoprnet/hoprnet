@@ -165,7 +165,7 @@ mod tests {
 
         let msg = HoprStartProtocol::KeepAlive(KeepAliveMessage {
             session_id: SessionId::new(u64::MAX, HoprPseudonym::random()),
-            flags: 0xff,
+            flags: None.into(),
             additional_data: 0xffffffff,
         });
         assert!(
@@ -202,7 +202,7 @@ mod tests {
     fn hopr_start_protocol_message_keep_alive_message_should_allow_for_maximum_surbs() -> anyhow::Result<()> {
         let msg = HoprStartProtocol::KeepAlive(KeepAliveMessage {
             session_id: SessionId::new(u64::MAX, HoprPseudonym::random()),
-            flags: 0xff,
+            flags: None.into(),
             additional_data: 0xffffffff,
         });
         let len = msg.encode()?.1.len();

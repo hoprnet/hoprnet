@@ -183,7 +183,7 @@ pub struct SessionTelemetry {
     last_rate_snapshot: parking_lot::Mutex<(u64, u64)>,
     inspector: OnceLock<FrameInspector>,
     surb_estimator: OnceLock<AtomicSurbFlowEstimator>,
-    surb_target_buffer: OnceLock<u64>,
+    surb_target_buffer: AtomicU64,
 }
 
 impl SessionTelemetry {
@@ -231,7 +231,7 @@ impl SessionTelemetry {
             last_rate_snapshot: parking_lot::Mutex::new((0, now)),
             inspector: OnceLock::new(),
             surb_estimator: OnceLock::new(),
-            surb_target_buffer: OnceLock::new(),
+            surb_target_buffer: AtomicU64::new(0)
         }
     }
 
@@ -298,7 +298,12 @@ impl SessionTelemetry {
     /// The estimator and target buffer are initialized only once via `OnceLock`.
     pub fn set_surb_estimator(&self, estimator: AtomicSurbFlowEstimator, target_buffer: u64) {
         let _ = self.surb_estimator.set(estimator);
-        let _ = self.surb_target_buffer.set(target_buffer);
+        self.surb_target_buffer.store(target_buffer, Ordering::Relaxed);
+    }
+
+    /// Sets the `surb_target_buffer` to the specified value.
+    pub fn set_surb_target_buffer(&self, target_buffer: u64) {
+        self.surb_target_buffer.store(target_buffer, Ordering::Relaxed);
     }
 
     /// Updates the count of incomplete frames from the frame inspector.
@@ -331,7 +336,7 @@ impl SessionTelemetry {
             .map(|e| (e.produced.load(Ordering::Relaxed), e.consumed.load(Ordering::Relaxed)))
             .unwrap_or((0, 0));
 
-        let target = self.surb_target_buffer.get().copied();
+        let target = self.surb_target_buffer.load(Ordering::Relaxed);
 
         let buffer_estimate = produced.saturating_sub(consumed);
         let rate_per_sec = self.compute_rate_per_sec(produced, consumed, snapshot_at_us);
@@ -369,7 +374,7 @@ impl SessionTelemetry {
                 produced_total: produced,
                 consumed_total: consumed,
                 buffer_estimate,
-                target_buffer: target,
+                target_buffer: Some(target),
                 rate_per_sec,
                 refill_in_flight: self.surb_refill_in_flight.load(Ordering::Relaxed),
             },

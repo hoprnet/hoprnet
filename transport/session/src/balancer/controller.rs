@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use futures::{StreamExt, future::AbortRegistration, pin_mut};
 use hopr_async_runtime::AbortHandle;
-use tracing::{Instrument, debug, error, instrument, trace};
+use tracing::{Instrument, instrument};
 
 use super::{
     BalancerControllerBounds, MIN_BALANCER_SAMPLING_INTERVAL, SimpleSurbFlowEstimator, SurbBalancerController,
@@ -165,7 +165,7 @@ where
     fn update(&mut self, surb_decay: Option<&(Duration, f64)>) -> u64 {
         let dt = self.last_update.elapsed();
         if dt < Duration::from_millis(10) {
-            debug!("time elapsed since last update is too short, skipping update");
+            tracing::debug!("time elapsed since last update is too short, skipping update");
             return self.current_buffer;
         }
 
@@ -174,7 +174,7 @@ where
         // Take a snapshot of the active SURB estimator and calculate the balance change
         let snapshot = SimpleSurbFlowEstimator::from(&self.surb_estimator);
         let Some(target_buffer_change) = snapshot.estimated_surb_buffer_change(&self.last_estimator_state) else {
-            error!("non-monotonic change in SURB estimators");
+            tracing::error!("non-monotonic change in SURB estimators");
             return self.current_buffer;
         };
 
@@ -190,21 +190,21 @@ where
         {
             self.current_buffer = self.current_buffer.saturating_sub(num_decayed_surbs);
             self.last_decay = std::time::Instant::now();
-            trace!(num_decayed_surbs, "SURBs were discarded due to automatic decay");
+            tracing::trace!(num_decayed_surbs, "SURBs were discarded due to automatic decay");
         }
 
         // Error from the desired target SURB buffer size at counterparty
         let error = self.current_buffer as i64 - self.controller.bounds().target() as i64;
 
         if self.was_below_target && error >= 0 {
-            trace!(current = self.current_buffer, "reached target SURB buffer size");
+            tracing::trace!(current = self.current_buffer, "reached target SURB buffer size");
             self.was_below_target = false;
         } else if !self.was_below_target && error < 0 {
-            trace!(current = self.current_buffer, "SURB buffer size is below target");
+            tracing::trace!(current = self.current_buffer, "SURB buffer size is below target");
             self.was_below_target = true;
         }
 
-        trace!(
+        tracing::trace!(
             ?dt,
             delta = target_buffer_change,
             rate = target_buffer_change as f64 / dt.as_secs_f64(),
@@ -214,7 +214,7 @@ where
         );
 
         let output = self.controller.next_control_output(self.current_buffer);
-        trace!(output, "next balancer control output for session");
+        tracing::trace!(output, "next balancer control output for session");
 
         self.flow_control.adjust_surb_flow(output as usize);
 
@@ -278,7 +278,7 @@ where
                     // This call should not update the popularity estimator of the cache,
                     // so that it is still allowed to expire.
                     let Ok(mut current_cfg) = cfg_feedback.get_config(&self.session_id).await else {
-                        error!("cannot get config for session");
+                        tracing::error!("cannot get config for session");
                         break;
                     };
 
@@ -290,7 +290,7 @@ where
                     // Check if the balancer controller needs to be reconfigured
                     if current_bounds != self.controller.bounds() {
                         self.controller.set_target_and_limit(current_bounds);
-                        debug!(?current_cfg, "surb balancer has been reconfigured");
+                        tracing::debug!(?current_cfg, "surb balancer has been reconfigured");
                     }
 
                     let bounds_before_update = self.controller.bounds();
@@ -299,10 +299,9 @@ where
                     // and send an update about the current level to the outgoing stream.
                     // If the other party has closed the stream, we don't care about the update.
                     let level = self.update(current_cfg.surb_decay.as_ref());
-                    if !level_tx.is_closed() {
-                        if let Err(error) = level_tx.try_send(level) {
+                    if !level_tx.is_closed() &&
+                        let Err(error) = level_tx.try_send(level) {
                             tracing::error!(%error, "cannot send balancer level update");
-                        }
                     }
 
                     // See if the setpoint has been updated at the controller as a result
@@ -313,17 +312,17 @@ where
                         current_cfg.target_surb_buffer_size = bounds_after_update.target();
                         current_cfg.max_surbs_per_sec = bounds_after_update.output_limit();
                         match cfg_feedback.on_config_update(&self.session_id, current_cfg).await {
-                            Ok(_) => debug!(
+                            Ok(_) => tracing::debug!(
                                 ?bounds_before_update,
                                 ?bounds_after_update,
                                 "controller bounds has changed after update"
                             ),
-                            Err(error) => error!(%error, "failed to update controller bounds after it changed"),
+                            Err(error) => tracing::error!(%error, "failed to update controller bounds after it changed"),
                         }
                     }
                 }
 
-                debug!("balancer done");
+                tracing::debug!("balancer done");
             }
             .in_current_span(),
         );
