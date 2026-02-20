@@ -193,9 +193,6 @@ where
                 initial_return_session_egress_rate: 10,
                 minimum_surb_buffer_duration: Duration::from_secs(5),
                 maximum_surb_buffer_size: cfg.packet.surb_store.rb_capacity,
-                // Allow a 10% increase of the target SURB buffer on incoming Sessions
-                // if the SURB buffer level has surpassed it by at least 10% in the last 2 minutes.
-                growable_target_surb_buffer: Some((Duration::from_secs(120), 0.10)),
             }),
             db,
             chain_api: resolver,
@@ -582,7 +579,7 @@ where
 
     #[cfg(feature = "telemetry")]
     pub async fn session_stats(&self, id: &SessionId) -> errors::Result<SessionStatsSnapshot> {
-        Ok(self.smgr.get_session_stats(id).await?)
+        Ok(self.smgr.get_session_telemetry(id).await?)
     }
 
     pub async fn update_session_surb_balancing_cfg(

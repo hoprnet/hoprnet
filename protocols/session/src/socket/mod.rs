@@ -546,11 +546,8 @@ mod tests {
 
     use super::*;
     #[cfg(feature = "telemetry")]
-    use crate::socket::telemetry::NoopTracker;
-    use crate::{
-        AcknowledgementState, AcknowledgementStateConfig, socket::telemetry::tests::TestTelemetryTracker,
-        utils::test::*,
-    };
+    use crate::socket::telemetry::{NoopTracker, tests::TestTelemetryTracker};
+    use crate::{AcknowledgementState, AcknowledgementStateConfig, utils::test::*};
 
     const MTU: usize = HoprPacket::PAYLOAD_SIZE;
 

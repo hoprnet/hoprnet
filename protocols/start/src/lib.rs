@@ -140,6 +140,11 @@ flagset::flags! {
         /// The value of `additional_data` represents the optimal number of SURBs that the
         /// Session Initiator wishes to maintain at the Session Recipient.
         BalancerTarget = 0x01,
+        /// The `additional_data` field contains load balancer state information.
+        ///
+        /// The value of `additional_data` represents the current number of SURBs
+        /// that the Session Recipient estimates to have.
+        BalancerState = 0x02,
     }
 }
 

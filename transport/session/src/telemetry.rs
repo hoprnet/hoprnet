@@ -7,7 +7,7 @@
 use std::{
     sync::{
         OnceLock,
-        atomic::{AtomicBool, AtomicU8, AtomicU64, AtomicUsize, Ordering},
+        atomic::{AtomicU8, AtomicU64, AtomicUsize, Ordering},
     },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -177,7 +177,6 @@ pub struct SessionTelemetry {
     bytes_out: AtomicU64,
     packets_in: AtomicU64,
     packets_out: AtomicU64,
-    surb_refill_in_flight: AtomicBool,
     /// Previous (buffer_estimate, timestamp_us) for rate calculation, protected by mutex
     /// to ensure atomic read/update of the pair.
     last_rate_snapshot: parking_lot::Mutex<(u64, u64)>,
@@ -227,7 +226,6 @@ impl SessionTelemetry {
             bytes_out: AtomicU64::new(0),
             packets_in: AtomicU64::new(0),
             packets_out: AtomicU64::new(0),
-            surb_refill_in_flight: AtomicBool::new(false),
             last_rate_snapshot: parking_lot::Mutex::new((0, now)),
             inspector: OnceLock::new(),
             surb_estimator: OnceLock::new(),
@@ -279,11 +277,6 @@ impl SessionTelemetry {
         self.touch_activity();
         self.bytes_out.fetch_add(bytes as u64, Ordering::Relaxed);
         self.packets_out.fetch_add(1, Ordering::Relaxed);
-    }
-
-    /// Sets whether a SURB (Single Use Reply Block) refill request is currently in flight.
-    pub fn set_refill_in_flight(&self, active: bool) {
-        self.surb_refill_in_flight.store(active, Ordering::Relaxed);
     }
 
     /// Sets the frame inspector for tracking incomplete frames.
@@ -376,7 +369,7 @@ impl SessionTelemetry {
                 buffer_estimate,
                 target_buffer: Some(target),
                 rate_per_sec,
-                refill_in_flight: self.surb_refill_in_flight.load(Ordering::Relaxed),
+                refill_in_flight: self.surb_estimator.get().is_some(),
             },
             transport: TransportSnapshot {
                 bytes_in: self.bytes_in.load(Ordering::Relaxed),

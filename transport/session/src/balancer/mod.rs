@@ -7,7 +7,7 @@ mod rate_limiting;
 /// Contains a simple proportional output implementation of the [`SurbBalancerController`] trait.
 pub mod simple;
 
-pub use controller::{BalancerConfigFeedback, SurbBalancer, SurbBalancerConfig};
+pub use controller::{SurbBalancer, SurbBalancerConfig, UpdatableSurbBalancerConfig};
 pub use rate_limiting::{RateController, RateLimitSinkExt, RateLimitStreamExt};
 
 /// Smallest possible interval for balancer sampling.
