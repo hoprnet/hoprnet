@@ -298,7 +298,8 @@ where
                     }
 
                     StartProtocol::KeepAlive(KeepAliveMessage {
-                        flags: KeepAliveFlags::new(data[data_offset]).map_err(|_| StartProtocolError::ParseError("ka.flags".into()))?,
+                        flags: KeepAliveFlags::new(data[data_offset])
+                            .map_err(|_| StartProtocolError::ParseError("ka.flags".into()))?,
                         additional_data: u64::from_be_bytes(
                             data[data_offset + 1..data_offset + 1 + size_of::<u64>()]
                                 .try_into()

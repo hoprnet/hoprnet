@@ -17,7 +17,10 @@ use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::Address;
 use hopr_protocol_app::prelude::*;
-use hopr_protocol_start::{KeepAliveFlag, KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation};
+use hopr_protocol_start::{
+    KeepAliveFlag, KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished,
+    StartInitiation,
+};
 use tracing::{debug, error, info, trace, warn};
 
 #[cfg(feature = "telemetry")]
@@ -148,9 +151,15 @@ impl BalancerConfigFeedback for SessionCacheBalancerFeedback {
     }
 
     async fn on_config_update(&self, id: &SessionId, cfg: SurbBalancerConfig) -> crate::errors::Result<()> {
-        if let Some(balancer_cfg) = self.0.get(id).await.ok_or(SessionManagerError::NonExistingSession)?
+        if let Some(balancer_cfg) = self
+            .0
+            .get(id)
+            .await
+            .ok_or(SessionManagerError::NonExistingSession)?
             .surb_mgmt
-            .lock().as_mut() {
+            .lock()
+            .as_mut()
+        {
             *balancer_cfg = cfg;
         }
         Ok(())
@@ -759,8 +768,12 @@ where
                     let surb_mgmt = Arc::new(parking_lot::Mutex::new(Some(balancer_config)));
 
                     // Spawn the SURB-bearing keep alive stream
-                    let (ka_controller, ka_abort_handle) =
-                        utils::spawn_keep_alive_stream(session_id, full_surb_scoring_sender, forward_routing.clone(), surb_mgmt.clone());
+                    let (ka_controller, ka_abort_handle) = utils::spawn_keep_alive_stream(
+                        session_id,
+                        full_surb_scoring_sender,
+                        forward_routing.clone(),
+                        surb_mgmt.clone(),
+                    );
                     abort_handles.insert(SessionTasks::KeepAlive, ka_abort_handle);
 
                     #[cfg(feature = "telemetry")]
@@ -965,11 +978,15 @@ where
         config: SurbBalancerConfig,
     ) -> crate::errors::Result<()> {
         // Only update the config if there already was one before
-        if let Some(cfg) = self.sessions.get(id).await
+        if let Some(cfg) = self
+            .sessions
+            .get(id)
+            .await
             .ok_or(SessionManagerError::NonExistingSession)?
             .surb_mgmt
             .lock()
-            .as_mut() {
+            .as_mut()
+        {
             *cfg = config;
             Ok(())
         } else {
@@ -1428,9 +1445,11 @@ where
                         );
                     }
                     // Allow updating SURB balancer target based on the received Keep-Alive message
-                    if msg.flags.contains(KeepAliveFlag::BalancerTarget) && msg.additional_data > 0 &&
-                        let Some(cfg) = session_slot.surb_mgmt.lock().as_mut() &&
-                        cfg.target_surb_buffer_size != msg.additional_data {
+                    if msg.flags.contains(KeepAliveFlag::BalancerTarget)
+                        && msg.additional_data > 0
+                        && let Some(cfg) = session_slot.surb_mgmt.lock().as_mut()
+                        && cfg.target_surb_buffer_size != msg.additional_data
+                    {
                         debug!(%session_id, target_surb_buffer_size = msg.additional_data, "keep-alive updated SURB balancer target buffer size");
                         cfg.target_surb_buffer_size = msg.additional_data;
 

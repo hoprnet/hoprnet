@@ -299,9 +299,10 @@ where
                     // and send an update about the current level to the outgoing stream.
                     // If the other party has closed the stream, we don't care about the update.
                     let level = self.update(current_cfg.surb_decay.as_ref());
-                    if !level_tx.is_closed() &&
-                        let Err(error) = level_tx.try_send(level) {
-                            tracing::error!(%error, "cannot send balancer level update");
+                    if !level_tx.is_closed()
+                        && let Err(error) = level_tx.try_send(level)
+                    {
+                        tracing::error!(%error, "cannot send balancer level update");
                     }
 
                     // See if the setpoint has been updated at the controller as a result
@@ -317,7 +318,9 @@ where
                                 ?bounds_after_update,
                                 "controller bounds has changed after update"
                             ),
-                            Err(error) => tracing::error!(%error, "failed to update controller bounds after it changed"),
+                            Err(error) => {
+                                tracing::error!(%error, "failed to update controller bounds after it changed")
+                            }
                         }
                     }
                 }

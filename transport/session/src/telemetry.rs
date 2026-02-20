@@ -231,7 +231,7 @@ impl SessionTelemetry {
             last_rate_snapshot: parking_lot::Mutex::new((0, now)),
             inspector: OnceLock::new(),
             surb_estimator: OnceLock::new(),
-            surb_target_buffer: AtomicU64::new(0)
+            surb_target_buffer: AtomicU64::new(0),
         }
     }
 
