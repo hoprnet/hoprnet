@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use anyhow::anyhow;
 use pid::Pid;
 
 use crate::{
@@ -18,7 +19,7 @@ impl PidControllerGains {
         if p.is_finite() && i.is_finite() && d.is_finite() {
             Ok(Self(p, i, d))
         } else {
-            Err(SessionManagerError::Other("gains must be finite".into()).into())
+            Err(SessionManagerError::other(anyhow!("gains must be finite")).into())
         }
     }
 

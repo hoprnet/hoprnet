@@ -35,7 +35,7 @@ surb:
   produced_total: 0
   consumed_total: 0
   buffer_estimate: 0
-  target_buffer: ~
+  target_buffer: 0
   rate_per_sec: 0
   refill_in_flight: false
 transport:

@@ -66,8 +66,14 @@ pub enum SessionManagerError {
     TooManySessions,
     #[error("loopback sessions are not allowed")]
     Loopback,
-    #[error("non-specific session manager error: {0}")]
-    Other(String),
+    #[error(transparent)]
+    Other(anyhow::Error),
+}
+
+impl SessionManagerError {
+    pub fn other<E: Into<anyhow::Error>>(e: E) -> Self {
+        Self::Other(e.into())
+    }
 }
 
 pub type Result<T> = std::result::Result<T, TransportSessionError>;

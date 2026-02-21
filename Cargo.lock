@@ -4999,10 +4999,11 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-start"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "aquamarine",
+ "flagset",
  "hopr-crypto-packet",
  "hopr-protocol-app",
  "serde",
@@ -5256,7 +5257,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.16.2"
+version = "0.17.0"
 dependencies = [
  "anyhow",
  "arrayvec",
@@ -5276,7 +5277,6 @@ dependencies = [
  "hopr-protocol-app",
  "hopr-protocol-session",
  "hopr-protocol-start",
- "hopr-statistics",
  "lazy_static",
  "mimalloc",
  "mockall",

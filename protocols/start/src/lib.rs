@@ -122,9 +122,30 @@ pub struct KeepAliveMessage<I> {
     /// Session ID.
     pub session_id: I,
     /// Reserved for future use, always zero currently.
-    pub flags: u8,
-    /// Additional data (might be `flags` dependent), ignored if `0x00000000`.
+    pub flags: KeepAliveFlags,
+    /// Additional data (usually `flags` dependent), ignored if `0x00000000`.
     pub additional_data: u64,
+}
+
+/// [Flags](KeepAliveFlag) that can be sent via the [`KeepAliveMessage`].
+///
+/// The flags can define the meaning of the `additional_data` field.
+pub type KeepAliveFlags = flagset::FlagSet<KeepAliveFlag>;
+
+flagset::flags! {
+    /// Individual flags that can be set in a [`KeepAliveMessage`].
+    pub enum KeepAliveFlag: u8 {
+        /// The `additional_data` field contains load balancer target information.
+        ///
+        /// The value of `additional_data` represents the optimal number of SURBs that the
+        /// Session Initiator wishes to maintain at the Session Recipient.
+        BalancerTarget = 0x01,
+        /// The `additional_data` field contains load balancer state information.
+        ///
+        /// The value of `additional_data` represents the current number of SURBs
+        /// that the Session Recipient estimates to have.
+        BalancerState = 0x02,
+    }
 }
 
 impl<I> KeepAliveMessage<I> {
@@ -136,7 +157,7 @@ impl<I> From<I> for KeepAliveMessage<I> {
     fn from(value: I) -> Self {
         Self {
             session_id: value,
-            flags: 0,
+            flags: None.into(),
             additional_data: 0,
         }
     }
@@ -180,7 +201,7 @@ where
                 data.push(err.reason as u8);
             }
             StartProtocol::KeepAlive(ping) => {
-                data.push(ping.flags);
+                data.push(ping.flags.bits());
                 data.extend_from_slice(&ping.additional_data.to_be_bytes());
                 let session_id = serde_cbor_2::to_vec(&ping.session_id)?;
                 data.extend(session_id);
@@ -282,7 +303,8 @@ where
                     }
 
                     StartProtocol::KeepAlive(KeepAliveMessage {
-                        flags: data[data_offset],
+                        flags: KeepAliveFlags::new(data[data_offset])
+                            .map_err(|_| StartProtocolError::ParseError("ka.flags".into()))?,
                         additional_data: u64::from_be_bytes(
                             data[data_offset + 1..data_offset + 1 + size_of::<u64>()]
                                 .try_into()
@@ -405,7 +427,21 @@ mod tests {
     fn start_protocol_keep_alive_message_should_encode_and_decode() -> anyhow::Result<()> {
         let msg_1 = StartProtocol::KeepAlive(KeepAliveMessage {
             session_id: 10_i32,
-            flags: 0,
+            flags: None.into(),
+            additional_data: 0xffffffff,
+        });
+
+        let (tag, msg) = msg_1.clone().encode()?;
+        let expected: Tag = StartProtocol::<(), (), ()>::START_PROTOCOL_MESSAGE_TAG;
+        assert_eq!(tag, expected);
+
+        let msg_2 = StartProtocol::<i32, String, u8>::decode(tag, &msg)?;
+
+        assert_eq!(msg_1, msg_2);
+
+        let msg_1 = StartProtocol::KeepAlive(KeepAliveMessage {
+            session_id: 10_i32,
+            flags: KeepAliveFlag::BalancerTarget.into(),
             additional_data: 0xffffffff,
         });
 
@@ -459,8 +495,8 @@ mod tests {
 
         let msg = StartProtocol::<String, String, u8>::KeepAlive(KeepAliveMessage {
             session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
-            flags: 0xff,
-            additional_data: 0xffffffff,
+            flags: None.into(),
+            additional_data: 0,
         });
         assert!(
             msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
@@ -475,8 +511,8 @@ mod tests {
     fn start_protocol_message_keep_alive_message_should_allow_for_maximum_surbs() -> anyhow::Result<()> {
         let msg = StartProtocol::<String, String, u8>::KeepAlive(KeepAliveMessage {
             session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
-            flags: 0xff,
-            additional_data: 0xffffffff,
+            flags: None.into(),
+            additional_data: 0,
         });
         let len = msg.encode()?.1.len();
         assert_eq!(

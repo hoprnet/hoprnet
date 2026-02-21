@@ -2,14 +2,14 @@ use std::time::Duration;
 
 use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
 use hopr_async_runtime::AbortHandle;
-use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_network_types::prelude::DestinationRouting;
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataOut};
+use hopr_protocol_start::{KeepAliveFlag, KeepAliveMessage};
 use tracing::{debug, error};
 
 use crate::{
-    SessionId,
-    balancer::{RateController, RateLimitStreamExt, SurbControllerWithCorrection},
+    AtomicSurbFlowEstimator, SessionId,
+    balancer::{BalancerStateData, RateController, RateLimitStreamExt, SurbFlowEstimator},
     errors::TransportSessionError,
     types::HoprStartProtocol,
 };
@@ -117,22 +117,53 @@ where
     }
 }
 
+/// Indicates whether the [keep-alive stream](spawn_keep_alive_stream) should notify the Session counterparty
+/// about the SURB target (Entry) or SURB level (Exit).
+#[derive(Debug, Clone)]
+pub(crate) enum SurbNotificationMode {
+    /// No keep-alive messages are sent to the Session counterparty.
+    DoNotNotify,
+    /// Session initiator notifies the Session recipient about the desired SURB target level.
+    Target,
+    /// Session recipient notifies the Session initiator about the current SURB level.
+    Level(AtomicSurbFlowEstimator),
+}
+
+/// Spawns a task for a rate-limited stream of Keep-Alive messages to the Session counterparty.
 pub(crate) fn spawn_keep_alive_stream<S>(
     session_id: SessionId,
     sender: S,
     routing: DestinationRouting,
-) -> (SurbControllerWithCorrection, AbortHandle)
+    notification_mode: SurbNotificationMode,
+    cfg: std::sync::Arc<BalancerStateData>,
+) -> (RateController, AbortHandle)
 where
     S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
 {
-    let elem = HoprStartProtocol::KeepAlive(session_id.into());
-
     // The stream is suspended until the caller sets a rate via the Controller
     let controller = RateController::new(0, Duration::from_secs(1));
 
-    let (ka_stream, abort_handle) =
-        futures::stream::abortable(futures::stream::repeat(elem).rate_limit_with_controller(&controller));
+    let (ka_stream, abort_handle) = futures::stream::abortable(
+        futures::stream::repeat_with(move || match &notification_mode {
+            SurbNotificationMode::Target => HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                session_id,
+                flags: KeepAliveFlag::BalancerTarget.into(),
+                additional_data: cfg.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed),
+            }),
+            SurbNotificationMode::Level(estimator) => HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                session_id,
+                flags: KeepAliveFlag::BalancerState.into(),
+                additional_data: estimator.saturating_diff(),
+            }),
+            SurbNotificationMode::DoNotNotify => HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                session_id,
+                flags: None.into(),
+                additional_data: 0,
+            }),
+        })
+        .rate_limit_with_controller(&controller),
+    );
 
     let sender_clone = sender.clone();
     let fwd_routing_clone = routing.clone();
@@ -169,12 +200,7 @@ where
             }),
     );
 
-    // Currently, a keep-alive message can bear `HoprPacket::MAX_SURBS_IN_PACKET` SURBs,
-    // so the correction by this factor is applied.
-    (
-        SurbControllerWithCorrection(controller, HoprPacket::MAX_SURBS_IN_PACKET as u32),
-        abort_handle,
-    )
+    (controller, abort_handle)
 }
 
 #[cfg(test)]

@@ -4,6 +4,7 @@ use std::{
     time::Duration,
 };
 
+use anyhow::anyhow;
 use futures::{
     FutureExt, SinkExt, StreamExt, TryStreamExt,
     channel::mpsc::{Sender, UnboundedSender},
@@ -12,13 +13,15 @@ use futures::{
 };
 use futures_time::future::FutureExt as TimeExt;
 use hopr_async_runtime::AbortableList;
+use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_crypto_random::Randomizable;
 use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::Address;
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_start::{
-    KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
+    KeepAliveFlag, KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished,
+    StartInitiation,
 };
 use tracing::{debug, error, info, trace, warn};
 
@@ -28,7 +31,7 @@ use crate::{
     Capability, HoprSession, IncomingSession, SESSION_MTU, SessionClientConfig, SessionId, SessionTarget,
     SurbBalancerConfig,
     balancer::{
-        AtomicSurbFlowEstimator, BalancerConfigFeedback, RateController, RateLimitSinkExt, SurbBalancer,
+        AtomicSurbFlowEstimator, BalancerStateData, RateController, RateLimitSinkExt, SurbBalancer,
         SurbControllerWithCorrection,
         pid::{PidBalancerController, PidControllerGains},
         simple::SimpleBalancerController,
@@ -36,7 +39,7 @@ use crate::{
     errors::{SessionManagerError, TransportSessionError},
     types::{ByteCapabilities, ClosureReason, HoprSessionConfig, HoprStartProtocol},
     utils,
-    utils::insert_into_next_slot,
+    utils::{SurbNotificationMode, insert_into_next_slot},
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -93,6 +96,8 @@ fn initiation_timeout_max_one_way(base: Duration, hops: usize) -> Duration {
 
 /// Minimum time the SURB buffer must endure if no SURBs are being produced.
 pub const MIN_SURB_BUFFER_DURATION: Duration = Duration::from_secs(1);
+/// Minimum time between SURB buffer notifications to the Entry.
+pub const MIN_SURB_BUFFER_NOTIFICATION_PERIOD: Duration = Duration::from_secs(1);
 
 /// The first challenge value used in Start protocol to initiate a session.
 pub(crate) const MIN_CHALLENGE: StartChallenge = 1;
@@ -121,57 +126,17 @@ struct SessionSlot {
     // This makes sure that the entire channel closes once the one and only sender is closed.
     session_tx: Arc<UnboundedSender<ApplicationDataIn>>,
     routing_opts: DestinationRouting,
+    // Additional tasks spawned by the Session.
     abort_handles: Arc<parking_lot::Mutex<AbortableList<SessionTasks>>>,
+    // Additional per-session telemetry
     #[cfg(feature = "telemetry")]
     telemetry: Arc<SessionTelemetry>,
     // Allows reconfiguring of the SURB balancer on-the-fly
     // Set on both Entry and Exit sides.
-    surb_mgmt: Option<SurbBalancerConfig>,
-    // Set only on the Exit side.
-    surb_estimator: Option<AtomicSurbFlowEstimator>,
-}
-
-/// Allows forward and backward propagation of SURB management configuration changes.
-struct SessionCacheBalancerFeedback(moka::future::Cache<SessionId, SessionSlot>);
-
-#[async_trait::async_trait]
-impl BalancerConfigFeedback for SessionCacheBalancerFeedback {
-    async fn get_config(&self, id: &SessionId) -> crate::errors::Result<SurbBalancerConfig> {
-        // Intentionally using `iter().find()` instead of `get()` here,
-        // so that the popularity estimator is not hit.
-        self.0
-            .iter()
-            .find(|(sid, _)| sid.as_ref() == id)
-            .ok_or(SessionManagerError::NonExistingSession)?
-            .1
-            .surb_mgmt
-            .ok_or(SessionManagerError::Other("missing surb balancer config".into()).into())
-    }
-
-    async fn on_config_update(&self, id: &SessionId, cfg: SurbBalancerConfig) -> crate::errors::Result<()> {
-        if let moka::ops::compute::CompResult::ReplacedWith(_) = self
-            .0
-            .entry_by_ref(id)
-            .and_compute_with(|entry| {
-                futures::future::ready(match entry.map(|e| e.into_value()) {
-                    None => moka::ops::compute::Op::Nop,
-                    Some(mut updated_slot) => {
-                        if let Some(balancer_cfg) = &mut updated_slot.surb_mgmt {
-                            *balancer_cfg = cfg;
-                            moka::ops::compute::Op::Put(updated_slot)
-                        } else {
-                            moka::ops::compute::Op::Nop
-                        }
-                    }
-                })
-            })
-            .await
-        {
-            Ok(())
-        } else {
-            Err(SessionManagerError::NonExistingSession.into())
-        }
-    }
+    surb_mgmt: Arc<BalancerStateData>,
+    // SURB flow updates happening outside of Session protocol
+    // (e.g. due to Start protocol messages).
+    surb_estimator: AtomicSurbFlowEstimator,
 }
 
 /// Indicates the result of processing a message.
@@ -273,15 +238,24 @@ pub struct SessionManagerConfig {
     #[default(10_000)]
     pub maximum_surb_buffer_size: usize,
 
-    /// Determines if the `target_surb_buffer_size` can grow if the simple moving average of the
-    /// current SURB buffer size estimate surpasses the given threshold over the given period.
+    /// If set, the Session recipient (Exit) will notify the Session initiator (Entry) about
+    /// its SURB balance for the Session using keep-alive packets periodically.
     ///
-    /// This only applies if the used [`SurbBalancerController`] has this option.
+    /// Keep in mind that each notification also costs 1 SURB, so the notification period should
+    /// not be too frequent.
     ///
-    /// The default is `(60, 0.20)` (20% growth if the average SURB buffer size surpasses 20%
-    /// of the target buffer size in a 60-second window).
-    #[default(_code = "Some((Duration::from_secs(60), 0.20))")]
-    pub growable_target_surb_buffer: Option<(Duration, f64)>,
+    /// Default is None (no notification sent to the client), minimum is 1 second.
+    #[default(None)]
+    pub surb_balance_notify_period: Option<Duration>,
+
+    /// If set, the Session initiator (Entry) will notify the Session recipient (Exit) about
+    /// the local SURB balancer target using keep-alive packets from the SURB balancer.
+    ///
+    /// This is useful when the client plans to change the SURB balancer target dynamically.
+    ///
+    /// Default is true.
+    #[default(true)]
+    pub surb_target_notify: bool,
 }
 
 /// Manages lifecycles of Sessions.
@@ -413,19 +387,17 @@ pub struct SessionManagerConfig {
 ///
 /// This behavior can be controlled via the `surb_decay` field of [`SurbBalancerConfig`].
 ///
-/// ### Automatic `target_surb_buffer_size` increase
-/// This mechanism only applies to the Session recipient (Exit) and on Sessions without the
-/// [`Capability::NoRateControl`] flag set.
-/// In this case, the Exit throttles the Session egress based on the ratio between
-/// of the estimated SURB balance and the *hint* of Entry's `target_surb_buffer_size` set during the Session initiation.
+/// ### SURB balance and target notification
+/// The Session recipient (Exit) can notify the Session initiator (Entry) periodically about its estimated
+/// number of SURBs for the Session. This can help the Entry to adjust its approximation of that level so
+/// that its Local SURB balancer can better intervene.
+/// This can be set using the `surb_balance_notify_period` field of [`SessionManagerConfig`] for the Exit.
 ///
-/// However, as the Entry might [increase](SessionManager::update_surb_balancer_config) the `target_surb_buffer_size`
-/// of the Session dynamically, the new value is never hinted again to the Exit (this only happens once during
-/// the Session initiation).
-/// For this reason, the Exit then might observe the ratio going higher than 1. When this happens consistently
-/// over some given time period, the Exit can decide to increase the initial hint to the newly observed value.
+/// Likewise, the Entry can inform the Exit about its desired SURB buffer target so that the Exit
+/// can better accommodate its Remote SURB balancing.
+/// This can be set using the `surb_target_notify` field of the [`SessionManagerConfig`] of each new Session.
 ///
-/// See the `growable_target_surb_buffer` field in the [`SessionManagerConfig`] for details.
+/// Both mechanisms leverage the Keep Alive message to report the respective values.
 pub struct SessionManager<S, T> {
     session_initiations: SessionInitiationCache,
     #[allow(clippy::type_complexity)]
@@ -472,6 +444,10 @@ where
         cfg.maximum_sessions = cfg
             .maximum_sessions
             .clamp(1, (cfg.session_tag_range.end - cfg.session_tag_range.start) as usize);
+        cfg.surb_balance_notify_period = cfg
+            .surb_balance_notify_period
+            .map(|p| p.max(MIN_SURB_BUFFER_NOTIFICATION_PERIOD));
+        cfg.minimum_surb_buffer_duration = cfg.minimum_surb_buffer_duration.max(MIN_SURB_BUFFER_DURATION);
 
         // Ensure the Frame MTU is at least the size of the Session segment MTU payload
         cfg.frame_mtu = cfg.frame_mtu.max(SESSION_MTU);
@@ -721,7 +697,7 @@ where
                     .ok_or(SessionManagerError::NotStarted)?;
 
                 #[cfg(feature = "telemetry")]
-                let metrics = Arc::new(SessionTelemetry::new(
+                let telemetry = Arc::new(SessionTelemetry::new(
                     session_id,
                     HoprSessionConfig {
                         capabilities: cfg.capabilities,
@@ -735,9 +711,6 @@ where
                 // with our maximum value.
                 if let Some(balancer_config) = cfg.surb_management {
                     let surb_estimator = AtomicSurbFlowEstimator::default();
-
-                    #[cfg(feature = "telemetry")]
-                    metrics.set_surb_estimator(surb_estimator.clone(), balancer_config.target_surb_buffer_size);
 
                     // Sender responsible for keep-alive and Session data will be counting produced SURBs
                     let surb_estimator_clone = surb_estimator.clone();
@@ -773,31 +746,37 @@ where
                     );
 
                     let mut abort_handles = AbortableList::default();
+                    let surb_mgmt = Arc::new(BalancerStateData::from(balancer_config));
 
-                    // Spawn the SURB-bearing keep alive stream
-                    let (ka_controller, ka_abort_handle) =
-                        utils::spawn_keep_alive_stream(session_id, full_surb_scoring_sender, forward_routing.clone());
+                    // Spawn the SURB-bearing keep alive stream towards the Exit
+                    let (ka_controller, ka_abort_handle) = utils::spawn_keep_alive_stream(
+                        session_id,
+                        full_surb_scoring_sender,
+                        forward_routing.clone(),
+                        if self.cfg.surb_target_notify {
+                            SurbNotificationMode::Target
+                        } else {
+                            SurbNotificationMode::DoNotNotify
+                        },
+                        surb_mgmt.clone(),
+                    );
                     abort_handles.insert(SessionTasks::KeepAlive, ka_abort_handle);
-
-                    #[cfg(feature = "telemetry")]
-                    metrics.set_refill_in_flight(true);
 
                     // Spawn the SURB balancer, which will decide on the initial SURB rate.
                     debug!(%session_id, ?balancer_config ,"spawning entry SURB balancer");
                     let balancer = SurbBalancer::new(
                         session_id,
-                        // The setpoint and output limit is immediately reconfigured by SurbBalancer
+                        // The setpoint and output limit is immediately reconfigured by the SurbBalancer
                         PidBalancerController::from_gains(PidControllerGains::from_env_or_default()),
                         surb_estimator.clone(),
-                        ka_controller,
-                        balancer_config,
+                        // Currently, a keep-alive message can bear `HoprPacket::MAX_SURBS_IN_PACKET` SURBs,
+                        // so the correction by this factor is applied.
+                        SurbControllerWithCorrection(ka_controller, HoprPacket::MAX_SURBS_IN_PACKET as u32),
+                        surb_mgmt.clone(),
                     );
 
-                    let (level_stream, balancer_abort_handle) = balancer.start_control_loop(
-                        self.cfg.balancer_sampling_interval,
-                        SessionCacheBalancerFeedback(self.sessions.clone()),
-                        None,
-                    );
+                    let (level_stream, balancer_abort_handle) =
+                        balancer.start_control_loop(self.cfg.balancer_sampling_interval);
                     abort_handles.insert(SessionTasks::Balancer, balancer_abort_handle);
 
                     // If the insertion fails prematurely, it will also kill all the abort handles
@@ -807,16 +786,19 @@ where
                             session_tx: Arc::new(tx),
                             routing_opts: forward_routing.clone(),
                             abort_handles: Arc::new(parking_lot::Mutex::new(abort_handles)),
-                            surb_mgmt: Some(balancer_config),
-                            surb_estimator: None, // Outgoing sessions do not have SURB estimator
+                            surb_mgmt: surb_mgmt.clone(),
+                            surb_estimator: surb_estimator.clone(),
                             #[cfg(feature = "telemetry")]
-                            telemetry: metrics.clone(),
+                            telemetry: telemetry.clone(),
                         },
                     )
                     .await?;
 
                     #[cfg(feature = "telemetry")]
-                    metrics.set_state(SessionLifecycleState::Active);
+                    {
+                        telemetry.set_state(SessionLifecycleState::Active);
+                        telemetry.set_balancer_data(surb_estimator.clone(), surb_mgmt);
+                    }
 
                     // Wait for enough SURBs to be sent to the counterparty
                     // TODO: consider making this interactive = other party reports the exact level periodically
@@ -833,7 +815,7 @@ where
                         }
                         Ok(None) => {
                             return Err(
-                                SessionManagerError::Other("surb balancer was cancelled prematurely".into()).into(),
+                                SessionManagerError::other(anyhow!("surb balancer was cancelled prematurely")).into(),
                             );
                         }
                         Err(_) => {
@@ -861,7 +843,7 @@ where
                         ),
                         Some(notifier),
                         #[cfg(feature = "telemetry")]
-                        metrics,
+                        telemetry,
                     )
                 } else {
                     warn!(%session_id, "session ready without SURB balancing");
@@ -872,15 +854,15 @@ where
                             session_tx: Arc::new(tx),
                             routing_opts: forward_routing.clone(),
                             abort_handles: Default::default(),
-                            surb_mgmt: None,
-                            surb_estimator: None,
+                            surb_mgmt: Default::default(),      // Disabled SURB management
+                            surb_estimator: Default::default(), // No SURB estimator needed
                             #[cfg(feature = "telemetry")]
-                            telemetry: metrics.clone(),
+                            telemetry: telemetry.clone(),
                         },
                     )
                     .await?;
                     #[cfg(feature = "telemetry")]
-                    metrics.set_state(SessionLifecycleState::Active);
+                    telemetry.set_state(SessionLifecycleState::Active);
 
                     // For standard Session data we first reduce the number of SURBs we want to produce,
                     // unless requested to always max them out
@@ -909,13 +891,13 @@ where
                         (reduced_surb_sender, rx),
                         Some(notifier),
                         #[cfg(feature = "telemetry")]
-                        metrics,
+                        telemetry,
                     )
                 }
             }
-            Ok(Ok(None)) => Err(SessionManagerError::Other(
-                "internal error: sender has been closed without completing the session establishment".into(),
-            )
+            Ok(Ok(None)) => Err(SessionManagerError::other(anyhow!(
+                "internal error: sender has been closed without completing the session establishment"
+            ))
             .into()),
             Ok(Err(error)) => {
                 // The other side did not allow us to establish a session
@@ -980,29 +962,19 @@ where
         id: &SessionId,
         config: SurbBalancerConfig,
     ) -> crate::errors::Result<()> {
-        match self
+        let cfg = self
             .sessions
-            .entry_by_ref(id)
-            .and_compute_with(|entry| {
-                futures::future::ready(if let Some(mut cached_session) = entry.map(|e| e.into_value()) {
-                    // Only update the config if there already was one before
-                    if cached_session.surb_mgmt.is_some() {
-                        cached_session.surb_mgmt = Some(config);
-                        moka::ops::compute::Op::Put(cached_session)
-                    } else {
-                        moka::ops::compute::Op::Nop
-                    }
-                } else {
-                    moka::ops::compute::Op::Nop
-                })
-            })
+            .get(id)
             .await
-        {
-            moka::ops::compute::CompResult::ReplacedWith(_) => Ok(()),
-            moka::ops::compute::CompResult::Unchanged(_) => {
-                Err(SessionManagerError::Other("session does not use SURB balancing".into()).into())
-            }
-            _ => Err(SessionManagerError::NonExistingSession.into()),
+            .ok_or(SessionManagerError::NonExistingSession)?
+            .surb_mgmt;
+
+        // Only update the config if there already was one before
+        if !cfg.is_disabled() {
+            cfg.update(&config);
+            Ok(())
+        } else {
+            Err(SessionManagerError::other(anyhow!("session does not use SURB balancing")).into())
         }
     }
 
@@ -1011,7 +983,9 @@ where
     /// Returns an error if the Session with the given `id` does not exist.
     pub async fn get_surb_balancer_config(&self, id: &SessionId) -> crate::errors::Result<Option<SurbBalancerConfig>> {
         match self.sessions.get(id).await {
-            Some(session) => Ok(session.surb_mgmt),
+            Some(session) => Ok(Some(session.surb_mgmt.as_ref())
+                .filter(|c| !c.is_disabled())
+                .map(|d| d.as_config())),
             None => Err(SessionManagerError::NonExistingSession.into()),
         }
     }
@@ -1020,9 +994,9 @@ where
     ///
     /// Returns an error if the Session with the given `id` does not exist.
     #[cfg(feature = "telemetry")]
-    pub async fn get_session_stats(&self, id: &SessionId) -> crate::errors::Result<SessionStatsSnapshot> {
-        match self.sessions.get(id).await {
-            Some(session) => Ok(session.telemetry.snapshot()),
+    pub async fn get_session_telemetry(&self, id: &SessionId) -> crate::errors::Result<SessionStatsSnapshot> {
+        match self.sessions.get(id).await.map(|session| session.telemetry) {
+            Some(telemetry) => Ok(telemetry.snapshot()),
             None => Err(SessionManagerError::NonExistingSession.into()),
         }
     }
@@ -1052,14 +1026,14 @@ where
         {
             let session_id = SessionId::new(in_data.data.application_tag, pseudonym);
 
-            return if let Some(session_data) = self.sessions.get(&session_id).await {
+            return if let Some(session_slot) = self.sessions.get(&session_id).await {
                 trace!(?session_id, "received data for a registered session");
 
-                Ok(session_data
+                Ok(session_slot
                     .session_tx
                     .unbounded_send(in_data)
                     .map(|_| DispatchResult::Processed)
-                    .map_err(|e| SessionManagerError::Other(e.to_string()))?)
+                    .map_err(SessionManagerError::other)?)
             } else {
                 error!(%session_id, "received data from an unestablished session");
                 Err(TransportSessionError::UnknownData)
@@ -1116,18 +1090,17 @@ where
                     session_tx: Arc::new(tx_session_data),
                     routing_opts: reply_routing.clone(),
                     abort_handles: Default::default(),
-                    surb_mgmt: None,
-                    surb_estimator: None,
+                    surb_mgmt: Default::default(),
+                    surb_estimator: Default::default(),
                     #[cfg(feature = "telemetry")]
-                    telemetry: SessionTelemetry::new(
+                    telemetry: Arc::new(SessionTelemetry::new(
                         _sid,
                         HoprSessionConfig {
                             capabilities: session_req.capabilities.0,
                             frame_mtu: self.cfg.frame_mtu,
                             frame_timeout: self.cfg.max_frame_timeout,
                         },
-                    )
-                    .into(),
+                    )),
                 },
             )
             .await
@@ -1138,11 +1111,8 @@ where
 
         // If some of the following code throws an error, the allocated slot will be kept
         // but will be later re-claimed when it expires.
-        if let Some((session_id, _slot)) = allocated_slot {
+        if let Some((session_id, slot)) = allocated_slot {
             debug!(%session_id, ?session_req, "assigned a new session");
-
-            #[cfg(feature = "telemetry")]
-            let stats = _slot.telemetry;
 
             let closure_notifier = Box::new(move |session_id: SessionId, reason: ClosureReason| {
                 if let Err(error) = close_session_notifier.try_send((session_id, reason)) {
@@ -1169,8 +1139,6 @@ where
                             .max(MIN_SURB_BUFFER_DURATION)
                             .as_secs()
                 };
-                #[cfg(feature = "telemetry")]
-                stats.set_surb_estimator(surb_estimator.clone(), target_surb_buffer_size);
 
                 let surb_estimator_clone = surb_estimator.clone();
                 let session = HoprSession::new(
@@ -1204,7 +1172,7 @@ where
                     ),
                     Some(closure_notifier),
                     #[cfg(feature = "telemetry")]
-                    stats.clone(),
+                    slot.telemetry.clone(),
                 )?;
 
                 // The SURB balancer will start intervening by rate-limiting the
@@ -1213,74 +1181,65 @@ where
                 let balancer_config = SurbBalancerConfig {
                     target_surb_buffer_size,
                     // At maximum egress, the SURB buffer drains in `minimum_surb_buffer_duration` seconds
-                    max_surbs_per_sec: target_surb_buffer_size
-                        / self
-                            .cfg
-                            .minimum_surb_buffer_duration
-                            .max(MIN_SURB_BUFFER_DURATION)
-                            .as_secs(),
+                    max_surbs_per_sec: target_surb_buffer_size / self.cfg.minimum_surb_buffer_duration.as_secs(),
                     // No SURB decay at the Exit, since we know almost exactly how many SURBs
                     // were received
                     surb_decay: None,
                 };
 
-                // Assign the SURB balancer and abort handles to the already allocated Session slot
-                let (balancer_abort_handle, balancer_abort_reg) = AbortHandle::new_pair();
-                if let moka::ops::compute::CompResult::ReplacedWith(_) = self
-                    .sessions
-                    .entry(session_id)
-                    .and_compute_with(|entry| {
-                        if let Some(mut cached_session) = entry.map(|c| c.into_value()) {
-                            cached_session
-                                .abort_handles
-                                .lock()
-                                .insert(SessionTasks::Balancer, balancer_abort_handle);
-                            cached_session.surb_mgmt = Some(balancer_config);
-                            cached_session.surb_estimator = Some(surb_estimator.clone());
-                            #[cfg(feature = "telemetry")]
-                            {
-                                cached_session.telemetry = stats.clone();
-                            }
-                            futures::future::ready(moka::ops::compute::Op::Put(cached_session))
-                        } else {
-                            futures::future::ready(moka::ops::compute::Op::Nop)
-                        }
-                    })
-                    .await
+                slot.surb_mgmt.update(&balancer_config);
+
+                #[cfg(feature = "telemetry")]
                 {
-                    // Spawn the SURB balancer only once we know we have registered the
-                    // abort handle with the pre-allocated Session slot
-                    debug!(%session_id, ?balancer_config ,"spawning exit SURB balancer");
-                    let balancer = SurbBalancer::new(
+                    slot.telemetry.set_state(SessionLifecycleState::Active);
+                    slot.telemetry
+                        .set_balancer_data(surb_estimator.clone(), slot.surb_mgmt.clone());
+                }
+
+                // Spawn the SURB balancer only once we know we have registered the
+                // abort handle with the pre-allocated Session slot
+                debug!(%session_id, ?balancer_config ,"spawning exit SURB balancer");
+                let balancer = SurbBalancer::new(
+                    session_id,
+                    SimpleBalancerController::default(),
+                    surb_estimator.clone(),
+                    SurbControllerWithCorrection(egress_rate_control, 1), // 1 SURB per egress packet
+                    slot.surb_mgmt.clone(),
+                );
+
+                // Assign the SURB balancer and abort handles to the already allocated Session slot
+                let (_, balancer_abort_handle) = balancer.start_control_loop(self.cfg.balancer_sampling_interval);
+                slot.abort_handles
+                    .lock()
+                    .insert(SessionTasks::Balancer, balancer_abort_handle);
+
+                // Spawn a keep-alive stream notifying about the SURB buffer level towards the Entry
+                if let Some(period) = self.cfg.surb_balance_notify_period {
+                    let surb_estimator_clone = surb_estimator.clone();
+                    let (ka_controller, ka_abort_handle) = utils::spawn_keep_alive_stream(
                         session_id,
-                        if let Some((growth_window, ratio_threshold)) = self.cfg.growable_target_surb_buffer.as_ref() {
-                            // Allow automatic setpoint increase
-                            SimpleBalancerController::with_increasing_setpoint(
-                                *ratio_threshold,
-                                (growth_window
-                                    .div_duration_f64(self.cfg.balancer_sampling_interval)
-                                    .round() as usize)
-                                    .max(1),
-                            )
-                        } else {
-                            SimpleBalancerController::default()
-                        },
-                        surb_estimator,
-                        SurbControllerWithCorrection(egress_rate_control, 1), // 1 SURB per egress packet
-                        balancer_config,
+                        // Sent Keep-Alive packets also contribute to SURB consumption
+                        msg_sender
+                            .clone()
+                            .with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
+                                // Each sent keepalive consumes 1 SURB
+                                surb_estimator_clone
+                                    .consumed
+                                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                futures::future::ok::<_, S::Error>((routing, data))
+                            }),
+                        slot.routing_opts.clone(),
+                        SurbNotificationMode::Level(surb_estimator.clone()),
+                        slot.surb_mgmt.clone(),
                     );
 
-                    let _ = balancer.start_control_loop(
-                        self.cfg.balancer_sampling_interval,
-                        SessionCacheBalancerFeedback(self.sessions.clone()),
-                        Some(balancer_abort_reg),
-                    );
-                } else {
-                    // This should never happen, but be sure we handle this error
-                    return Err(SessionManagerError::Other(
-                        "failed to spawn SURB balancer - inconsistent cache".into(),
-                    )
-                    .into());
+                    // Start keepalive stream towards the Entry with a predefined period
+                    ka_controller.set_rate_per_unit(1, period);
+                    slot.abort_handles
+                        .lock()
+                        .insert(SessionTasks::KeepAlive, ka_abort_handle);
+
+                    debug!(%session_id, ?period, "started SURB level-notifying keep-alive stream");
                 }
 
                 session
@@ -1296,7 +1255,7 @@ where
                     (msg_sender.clone(), rx_session_data),
                     Some(closure_notifier),
                     #[cfg(feature = "telemetry")]
-                    stats,
+                    slot.telemetry.clone(),
                 )?
             };
 
@@ -1318,7 +1277,7 @@ where
                 }
                 Ok(Err(error)) => {
                     error!(%session_id, %error, "failed to notify about new incoming session");
-                    return Err(SessionManagerError::Other(error.to_string()).into());
+                    return Err(SessionManagerError::other(error).into());
                 }
                 _ => {}
             };
@@ -1340,10 +1299,9 @@ where
                     error!(%session_id, "timeout sending session establishment message");
                     TransportSessionError::Timeout
                 })?
-                .map_err(|e| {
-                    SessionManagerError::Other(format!(
-                        "failed to send session {session_id} establishment message: {e}"
-                    ))
+                .map_err(|error| {
+                    error!(%session_id, %error, "failed to send session establishment message");
+                    SessionManagerError::other(error)
                 })?;
 
             info!(%session_id, "new session established");
@@ -1371,8 +1329,9 @@ where
                     error!("timeout sending session error message");
                     TransportSessionError::Timeout
                 })?
-                .map_err(|e| {
-                    SessionManagerError::Other(format!("failed to send session establishment error message: {e}"))
+                .map_err(|error| {
+                    error!(%error, "failed to send session error message");
+                    SessionManagerError::other(error)
                 })?;
 
             trace!(%pseudonym, "session establishment failure message sent");
@@ -1401,60 +1360,90 @@ where
                 let challenge = est.orig_challenge;
                 let session_id = est.session_id;
                 if let Some(tx_est) = self.session_initiations.remove(&est.orig_challenge).await {
-                    if let Err(e) = tx_est.unbounded_send(Ok(est)) {
-                        return Err(SessionManagerError::Other(format!(
-                            "could not notify session {session_id} establishment: {e}"
-                        ))
-                        .into());
+                    if let Err(error) = tx_est.unbounded_send(Ok(est)) {
+                        error!(%challenge, %session_id, %error, "failed to send session establishment confirmation");
+                        return Err(SessionManagerError::other(error).into());
                     }
                     debug!(?session_id, challenge, "session establishment complete");
                 } else {
                     error!(%session_id, challenge, "unknown session establishment attempt or expired");
                 }
             }
-            HoprStartProtocol::SessionError(error) => {
+            HoprStartProtocol::SessionError(error_type) => {
                 trace!(
-                    challenge = error.challenge,
-                    error = ?error.reason,
+                    challenge = error_type.challenge,
+                    error = ?error_type.reason,
                     "failed to initialize a session",
                 );
                 // Currently, we do not distinguish between individual error types
                 // and just discard the initiation attempt and pass on the error.
-                if let Some(tx_est) = self.session_initiations.remove(&error.challenge).await {
-                    if let Err(e) = tx_est.unbounded_send(Err(error)) {
-                        return Err(SessionManagerError::Other(format!(
-                            "could not notify session establishment error {error:?}: {e}"
-                        ))
-                        .into());
+                if let Some(tx_est) = self.session_initiations.remove(&error_type.challenge).await {
+                    if let Err(error) = tx_est.unbounded_send(Err(error_type)) {
+                        error!(%error, ?error_type, "could not send session error message");
+                        return Err(SessionManagerError::other(error).into());
                     }
                     error!(
-                        challenge = error.challenge,
-                        ?error,
+                        challenge = error_type.challenge,
+                        ?error_type,
                         "session establishment error received"
                     );
                 } else {
                     error!(
-                        challenge = error.challenge,
-                        ?error,
+                        challenge = error_type.challenge,
+                        ?error_type,
                         "session establishment attempt expired before error could be delivered"
                     );
                 }
 
                 #[cfg(all(feature = "prometheus", not(test)))]
-                METRIC_RECEIVED_SESSION_ERRS.increment(&[&error.reason.to_string()])
+                METRIC_RECEIVED_SESSION_ERRS.increment(&[&error_type.reason.to_string()])
             }
             HoprStartProtocol::KeepAlive(msg) => {
                 let session_id = msg.session_id;
                 if let Some(session_slot) = self.sessions.get(&session_id).await {
-                    trace!(?session_id, "received keep-alive request");
-                    // If the session has a SURB flow estimator, increase the number of received SURBs.
-                    // This applies to the incoming sessions currently
-                    if let Some(estimator) = session_slot.surb_estimator.as_ref() {
-                        // Two SURBs per Keep-Alive message
-                        estimator.produced.fetch_add(
-                            KeepAliveMessage::<SessionId>::MIN_SURBS_PER_MESSAGE as u64,
-                            std::sync::atomic::Ordering::Relaxed,
-                        );
+                    trace!(?session_id, "received keep-alive message");
+                    match &session_slot.routing_opts {
+                        // Session is outgoing - keep-alive was received from the Exit
+                        DestinationRouting::Forward { .. } => {
+                            if msg.flags.contains(KeepAliveFlag::BalancerState)
+                                && !session_slot.surb_mgmt.is_disabled()
+                                && session_slot.surb_mgmt.buffer_level() != msg.additional_data
+                            {
+                                session_slot
+                                    .surb_mgmt
+                                    .target_surb_buffer_size
+                                    .store(msg.additional_data, std::sync::atomic::Ordering::Relaxed);
+                                debug!(%session_id, surb_level = msg.additional_data, "keep-alive updated SURB buffer size from the Exit");
+                            }
+
+                            // Increase the number of consumed SURBs in the estimator
+                            session_slot
+                                .surb_estimator
+                                .consumed
+                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        }
+                        // Session is incoming - keep-alive was received from the Entry
+                        DestinationRouting::Return(_) => {
+                            // Increase the number of received SURBs in the estimator.
+                            // Two SURBs per Keep-Alive message
+                            session_slot.surb_estimator.produced.fetch_add(
+                                KeepAliveMessage::<SessionId>::MIN_SURBS_PER_MESSAGE as u64,
+                                std::sync::atomic::Ordering::Relaxed,
+                            );
+
+                            // Allow updating SURB balancer target based on the received Keep-Alive message
+                            if msg.flags.contains(KeepAliveFlag::BalancerTarget)
+                                && msg.additional_data > 0
+                                && !session_slot.surb_mgmt.is_disabled()
+                                && session_slot.surb_mgmt.controller_bounds().target() != msg.additional_data
+                            {
+                                debug!(%session_id, target_surb_buffer_size = msg.additional_data, "keep-alive updated SURB balancer target buffer size from the Entry");
+                                session_slot
+                                    .surb_mgmt
+                                    .target_surb_buffer_size
+                                    .store(msg.additional_data, std::sync::atomic::Ordering::Relaxed);
+                            }
+                        }
                     }
                 } else {
                     debug!(%session_id, "received keep-alive request for an unknown session");
@@ -1848,8 +1837,8 @@ mod tests {
                     session_tx: Arc::new(dummy_tx),
                     routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
                     abort_handles: Default::default(),
-                    surb_mgmt: Some(balancer_cfg),
-                    surb_estimator: None,
+                    surb_mgmt: Arc::new(BalancerStateData::from(balancer_cfg)),
+                    surb_estimator: Default::default(),
                     #[cfg(feature = "telemetry")]
                     telemetry: Arc::new(SessionTelemetry::new(session_id, Default::default())),
                 },
@@ -1906,8 +1895,8 @@ mod tests {
                         SessionId::new(16u64, alice_pseudonym),
                         Default::default(),
                     )),
-                    surb_mgmt: None,
-                    surb_estimator: None,
+                    surb_mgmt: Default::default(),
+                    surb_estimator: Default::default(),
                 },
             )
             .await;
@@ -2022,8 +2011,8 @@ mod tests {
                     session_tx: Arc::new(dummy_tx),
                     routing_opts: DestinationRouting::Return(alice_pseudonym.into()),
                     abort_handles: Default::default(),
-                    surb_mgmt: None,
-                    surb_estimator: None,
+                    surb_mgmt: Default::default(),
+                    surb_estimator: Default::default(),
                     #[cfg(feature = "telemetry")]
                     telemetry: Arc::new(SessionTelemetry::new(
                         SessionId::new(16u64, alice_pseudonym),

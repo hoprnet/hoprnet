@@ -7,16 +7,15 @@
 use std::{
     sync::{
         OnceLock,
-        atomic::{AtomicBool, AtomicU8, AtomicU64, AtomicUsize, Ordering},
+        atomic::{AtomicU8, AtomicU64, AtomicUsize, Ordering},
     },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use hopr_protocol_session::{FrameInspector, SessionMessageDiscriminants};
 
-use crate::{
-    Capability, HoprSessionConfig, SessionId, balancer::AtomicSurbFlowEstimator, types::SESSION_SOCKET_CAPACITY,
-};
+pub use crate::balancer::{AtomicSurbFlowEstimator, BalancerStateData};
+use crate::{Capability, HoprSessionConfig, SessionId, types::SESSION_SOCKET_CAPACITY};
 
 /// The lifecycle state of a session from the perspective of metrics.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, strum::FromRepr, serde::Serialize)]
@@ -177,13 +176,11 @@ pub struct SessionTelemetry {
     bytes_out: AtomicU64,
     packets_in: AtomicU64,
     packets_out: AtomicU64,
-    surb_refill_in_flight: AtomicBool,
     /// Previous (buffer_estimate, timestamp_us) for rate calculation, protected by mutex
     /// to ensure atomic read/update of the pair.
     last_rate_snapshot: parking_lot::Mutex<(u64, u64)>,
     inspector: OnceLock<FrameInspector>,
-    surb_estimator: OnceLock<AtomicSurbFlowEstimator>,
-    surb_target_buffer: OnceLock<u64>,
+    balancer_data: OnceLock<(std::sync::Arc<BalancerStateData>, AtomicSurbFlowEstimator)>,
 }
 
 impl SessionTelemetry {
@@ -227,11 +224,9 @@ impl SessionTelemetry {
             bytes_out: AtomicU64::new(0),
             packets_in: AtomicU64::new(0),
             packets_out: AtomicU64::new(0),
-            surb_refill_in_flight: AtomicBool::new(false),
             last_rate_snapshot: parking_lot::Mutex::new((0, now)),
             inspector: OnceLock::new(),
-            surb_estimator: OnceLock::new(),
-            surb_target_buffer: OnceLock::new(),
+            balancer_data: OnceLock::new(),
         }
     }
 
@@ -281,11 +276,6 @@ impl SessionTelemetry {
         self.packets_out.fetch_add(1, Ordering::Relaxed);
     }
 
-    /// Sets whether a SURB (Single Use Reply Block) refill request is currently in flight.
-    pub fn set_refill_in_flight(&self, active: bool) {
-        self.surb_refill_in_flight.store(active, Ordering::Relaxed);
-    }
-
     /// Sets the frame inspector for tracking incomplete frames.
     ///
     /// The inspector is initialized only once via `OnceLock`.
@@ -296,9 +286,8 @@ impl SessionTelemetry {
     /// Sets the SURB flow estimator for tracking produced/consumed SURBs.
     ///
     /// The estimator and target buffer are initialized only once via `OnceLock`.
-    pub fn set_surb_estimator(&self, estimator: AtomicSurbFlowEstimator, target_buffer: u64) {
-        let _ = self.surb_estimator.set(estimator);
-        let _ = self.surb_target_buffer.set(target_buffer);
+    pub fn set_balancer_data(&self, estimator: AtomicSurbFlowEstimator, state: std::sync::Arc<BalancerStateData>) {
+        let _ = self.balancer_data.set((state, estimator));
     }
 
     /// Updates the count of incomplete frames from the frame inspector.
@@ -325,13 +314,17 @@ impl SessionTelemetry {
         let uptime_us = snapshot_at_us.saturating_sub(created_at_us);
         let idle_us = snapshot_at_us.saturating_sub(last_activity_us);
 
-        let (produced, consumed) = self
-            .surb_estimator
+        let (target, produced, consumed) = self
+            .balancer_data
             .get()
-            .map(|e| (e.produced.load(Ordering::Relaxed), e.consumed.load(Ordering::Relaxed)))
-            .unwrap_or((0, 0));
-
-        let target = self.surb_target_buffer.get().copied();
+            .map(|(s, e)| {
+                (
+                    s.target_surb_buffer_size.load(Ordering::Relaxed),
+                    e.produced.load(Ordering::Relaxed),
+                    e.consumed.load(Ordering::Relaxed),
+                )
+            })
+            .unwrap_or((0, 0, 0));
 
         let buffer_estimate = produced.saturating_sub(consumed);
         let rate_per_sec = self.compute_rate_per_sec(produced, consumed, snapshot_at_us);
@@ -369,9 +362,9 @@ impl SessionTelemetry {
                 produced_total: produced,
                 consumed_total: consumed,
                 buffer_estimate,
-                target_buffer: target,
+                target_buffer: Some(target),
                 rate_per_sec,
-                refill_in_flight: self.surb_refill_in_flight.load(Ordering::Relaxed),
+                refill_in_flight: self.balancer_data.get().is_some(),
             },
             transport: TransportSnapshot {
                 bytes_in: self.bytes_in.load(Ordering::Relaxed),
