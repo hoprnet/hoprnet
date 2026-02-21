@@ -5277,7 +5277,6 @@ dependencies = [
  "hopr-protocol-app",
  "hopr-protocol-session",
  "hopr-protocol-start",
- "hopr-statistics",
  "lazy_static",
  "mimalloc",
  "mockall",
