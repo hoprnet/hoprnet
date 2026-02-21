@@ -193,6 +193,7 @@ where
                 initial_return_session_egress_rate: 10,
                 minimum_surb_buffer_duration: Duration::from_secs(5),
                 maximum_surb_buffer_size: cfg.packet.surb_store.rb_capacity,
+                surb_balance_notify_period: None,
             }),
             db,
             chain_api: resolver,

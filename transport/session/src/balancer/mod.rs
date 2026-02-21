@@ -24,6 +24,11 @@ pub trait SurbFlowEstimator {
     /// Value returned on each call must be equal or greater to the value returned by a previous call.
     fn estimate_surbs_produced(&self) -> u64;
 
+    /// Subtracts SURBs produced from consumed, saturating at zero.
+    fn saturating_diff(&self) -> u64 {
+        self.estimate_surbs_produced().saturating_sub(self.estimate_surbs_consumed())
+    }
+
     /// Computes the estimated change in SURB buffer.
     ///
     /// This is done by computing the change in produced and consumed SURBs since the `earlier`
@@ -65,13 +70,21 @@ impl BalancerControllerBounds {
     }
 
     /// Gets the target (setpoint) of a controller.
+    #[inline]
     pub fn target(&self) -> u64 {
         self.0
     }
 
     /// Gets the output limit of a controller.
+    #[inline]
     pub fn output_limit(&self) -> u64 {
         self.1
+    }
+
+    /// Unpacks the controller bounds into two `u64`s (target and output limit).
+    #[inline]
+    pub fn unzip(&self) -> (u64, u64) {
+        (self.0, self.1)
     }
 }
 

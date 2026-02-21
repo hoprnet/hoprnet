@@ -8,12 +8,8 @@ use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataOut};
 use hopr_protocol_start::{KeepAliveFlag, KeepAliveMessage};
 use tracing::{debug, error};
 
-use crate::{
-    SessionId,
-    balancer::{RateController, RateLimitStreamExt, SurbControllerWithCorrection, UpdatableSurbBalancerConfig},
-    errors::TransportSessionError,
-    types::HoprStartProtocol,
-};
+use crate::{SessionId, balancer::{RateController, RateLimitStreamExt, SurbControllerWithCorrection, UpdatableSurbBalancerConfig}, errors::TransportSessionError, types::HoprStartProtocol, AtomicSurbFlowEstimator};
+use crate::balancer::SurbFlowEstimator;
 
 /// Convenience function to copy data in both directions between a [`Session`](crate::HoprSession) and arbitrary
 /// async IO stream.
@@ -118,12 +114,25 @@ where
     }
 }
 
+/// Indicates whether the [keep-alive stream](spawn_keep_alive_stream) should notify the Session counterparty
+/// about the SURB target (Entry) or SURB level (Exit).
+#[derive(Debug, Clone)]
+pub(crate) enum SurbNotificationMode {
+    /// Session initiator notifies the Session recipient about the desired SURB target level.
+    Target,
+    /// Session recipient notifies the Session initiator about the current SURB level.
+    Level(AtomicSurbFlowEstimator),
+}
+
+
+/// Spawns a task for a rate-limited stream of Keep-Alive messages to the Session counterparty.
 pub(crate) fn spawn_keep_alive_stream<S>(
     session_id: SessionId,
     sender: S,
     routing: DestinationRouting,
+    notification_mode: SurbNotificationMode,
     cfg: std::sync::Arc<UpdatableSurbBalancerConfig>,
-) -> (SurbControllerWithCorrection, AbortHandle)
+) -> (RateController, AbortHandle)
 where
     S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
@@ -131,14 +140,31 @@ where
     // The stream is suspended until the caller sets a rate via the Controller
     let controller = RateController::new(0, Duration::from_secs(1));
 
+    let mut started_at = std::time::Instant::now();
     let (ka_stream, abort_handle) = futures::stream::abortable(
         futures::stream::repeat_with(move || {
-            // Always send our desired target buffer to the Session recipient
-            HoprStartProtocol::KeepAlive(KeepAliveMessage {
-                session_id,
-                flags: KeepAliveFlag::BalancerTarget.into(),
-                additional_data: cfg.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed),
-            })
+            // For keep-alive messages to the Exit (Target mode) the notification period is
+            if let Some(period) = cfg.surb_state_notify_period() && started_at.elapsed() >= period {
+                started_at = std::time::Instant::now();
+                match &notification_mode {
+                    SurbNotificationMode::Target => {
+                        HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                            session_id,
+                            flags: KeepAliveFlag::BalancerTarget.into(),
+                            additional_data: cfg.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed),
+                        })
+                    }
+                    SurbNotificationMode::Level(estimator) => {
+                        HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                            session_id,
+                            flags: KeepAliveFlag::BalancerState.into(),
+                            additional_data: estimator.saturating_diff(),
+                        })
+                    }
+                }
+            } else {
+                HoprStartProtocol::KeepAlive(session_id.into())
+            }
         })
         .rate_limit_with_controller(&controller),
     );
@@ -178,10 +204,8 @@ where
             }),
     );
 
-    // Currently, a keep-alive message can bear `HoprPacket::MAX_SURBS_IN_PACKET` SURBs,
-    // so the correction by this factor is applied.
     (
-        SurbControllerWithCorrection(controller, HoprPacket::MAX_SURBS_IN_PACKET as u32),
+        controller,
         abort_handle,
     )
 }

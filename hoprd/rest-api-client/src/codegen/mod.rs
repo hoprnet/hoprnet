@@ -190,8 +190,8 @@ pub mod types {
     ///  "description": "Standardized error response for the API",
     ///  "examples": [
     ///    {
-    ///      "error": "Invalid value passed in parameter 'XYZ'",
-    ///      "status": "INVALID_INPUT"
+    ///      "status": "INVALID_INPUT",
+    ///      "error": "Invalid value passed in parameter 'XYZ'"
     ///    }
     ///  ],
     ///  "type": "object",
@@ -421,8 +421,8 @@ pub mod types {
     ///  "description": "Parameters for enumerating channels.",
     ///  "examples": [
     ///    {
-    ///      "fullTopology": false,
-    ///      "includingClosed": true
+    ///      "includingClosed": true,
+    ///      "fullTopology": false
     ///    }
     ///  ],
     ///  "type": "object",
@@ -467,8 +467,8 @@ pub mod types {
     ///  "description": "Status of the channel after a close operation.",
     ///  "examples": [
     ///    {
-    ///      "channelStatus": "PendingToClose",
-    ///      "receipt": "0xd77da7c1821249e663dead1464d185c03223d9663a06bc1d46ed0ad449a07118"
+    ///      "receipt": "0xd77da7c1821249e663dead1464d185c03223d9663a06bc1d46ed0ad449a07118",
+    ///      "channelStatus": "PendingToClose"
     ///    }
     ///  ],
     ///  "type": "object",
@@ -734,10 +734,10 @@ pub mod types {
     ///  "description": "Channel information as seen by the node.",
     ///  "examples": [
     ///    {
-    ///      "address": "0x188c4462b75e46f0c7262d7f48d182447b93a93c",
-    ///      "balance": "10 wxHOPR",
     ///      "id": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
-    ///      "status": "Open"
+    ///      "address": "0x188c4462b75e46f0c7262d7f48d182447b93a93c",
+    ///      "status": "Open",
+    ///      "balance": "10 wxHOPR"
     ///    }
     ///  ],
     ///  "type": "object",
@@ -795,14 +795,14 @@ pub mod types {
     ///    {
     ///      "all": [
     ///        {
-    ///          "balance": "10 wxHOPR",
-    ///          "channelEpoch": 1,
     ///          "channelId": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
-    ///          "closureTime": 0,
-    ///          "destination": "0x188c4462b75e46f0c7262d7f48d182447b93a93c",
     ///          "source": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6",
+    ///          "destination": "0x188c4462b75e46f0c7262d7f48d182447b93a93c",
+    ///          "balance": "10 wxHOPR",
     ///          "status": "Open",
-    ///          "ticketIndex": 0
+    ///          "ticketIndex": 0,
+    ///          "channelEpoch": 1,
+    ///          "closureTime": 0
     ///        }
     ///      ],
     ///      "incoming": [],
@@ -870,14 +870,14 @@ and indexer state.*/
     ///      "announcedAddress": [
     ///        "/ip4/10.0.2.100/tcp/19092"
     ///      ],
+    ///      "providerUrl": "https://staging.blokli.hoprnet.link",
+    ///      "hoprNetworkName": "rotsee",
     ///      "channelClosurePeriod": 15,
     ///      "connectivityStatus": "Green",
-    ///      "hoprNetworkName": "rotsee",
     ///      "hoprNodeSafe": "0x42bc901b1d040f984ed626eff550718498a6798a",
     ///      "listeningAddress": [
     ///        "/ip4/10.0.2.100/tcp/19092"
-    ///      ],
-    ///      "providerUrl": "https://staging.blokli.hoprnet.link"
+    ///      ]
     ///    }
     ///  ],
     ///  "type": "object",
@@ -1067,25 +1067,25 @@ and indexer state.*/
     ///  "description": "All connected and announced peers.",
     ///  "examples": [
     ///    {
-    ///      "announced": [
-    ///        {
-    ///          "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
-    ///          "multiaddr": "/ip4/178.12.1.9/tcp/19092"
-    ///        }
-    ///      ],
     ///      "connected": [
     ///        {
     ///          "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
-    ///          "backoff": 0.5,
+    ///          "multiaddr": "/ip4/178.12.1.9/tcp/19092",
     ///          "heartbeats": {
     ///            "sent": 10,
     ///            "success": 10
     ///          },
-    ///          "isNew": true,
     ///          "lastSeen": 1690000000,
     ///          "lastSeenLatency": 100,
-    ///          "multiaddr": "/ip4/178.12.1.9/tcp/19092",
-    ///          "quality": 0.7
+    ///          "quality": 0.7,
+    ///          "backoff": 0.5,
+    ///          "isNew": true
+    ///        }
+    ///      ],
+    ///      "announced": [
+    ///        {
+    ///          "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
+    ///          "multiaddr": "/ip4/178.12.1.9/tcp/19092"
     ///        }
     ///      ]
     ///    }
@@ -1115,16 +1115,16 @@ and indexer state.*/
     ///        [
     ///          {
     ///            "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
-    ///            "backoff": 0.5,
+    ///            "multiaddr": "/ip4/178.12.1.9/tcp/19092",
     ///            "heartbeats": {
     ///              "sent": 10,
     ///              "success": 10
     ///            },
-    ///            "isNew": true,
     ///            "lastSeen": 1690000000,
     ///            "lastSeenLatency": 100,
-    ///            "multiaddr": "/ip4/178.12.1.9/tcp/19092",
-    ///            "quality": 0.7
+    ///            "quality": 0.7,
+    ///            "backoff": 0.5,
+    ///            "isNew": true
     ///          }
     ///        ]
     ///      ],
@@ -1151,11 +1151,11 @@ and indexer state.*/
     ///  "description": "Received tickets statistics.",
     ///  "examples": [
     ///    {
+    ///      "winningCount": 0,
     ///      "neglectedValue": "0 wxHOPR",
     ///      "redeemedValue": "1000 wxHOPR",
     ///      "rejectedValue": "0 wxHOPR",
-    ///      "unredeemedValue": "2000 wxHOPR",
-    ///      "winningCount": 0
+    ///      "unredeemedValue": "2000 wxHOPR"
     ///    }
     ///  ],
     ///  "type": "object",
@@ -1347,17 +1347,17 @@ and indexer state.*/
     ///  "examples": [
     ///    {
     ///      "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
-    ///      "averageLatency": 100,
-    ///      "lastSeen": 1690000000,
     ///      "multiaddr": "/ip4/178.12.1.9/tcp/19092",
-    ///      "packetStats": {
-    ///        "bytesIn": 51200,
-    ///        "bytesOut": 102400,
-    ///        "packetsIn": 50,
-    ///        "packetsOut": 100
-    ///      },
     ///      "probeRate": 0.476,
-    ///      "score": 0.7
+    ///      "lastSeen": 1690000000,
+    ///      "averageLatency": 100,
+    ///      "score": 0.7,
+    ///      "packetStats": {
+    ///        "packetsOut": 100,
+    ///        "packetsIn": 50,
+    ///        "bytesOut": 102400,
+    ///        "bytesIn": 51200
+    ///      }
     ///    }
     ///  ],
     ///  "type": "object",
@@ -1438,10 +1438,10 @@ and indexer state.*/
     ///  "description": "Packet statistics for a peer.",
     ///  "examples": [
     ///    {
-    ///      "bytesIn": 51200,
-    ///      "bytesOut": 102400,
+    ///      "packetsOut": 100,
     ///      "packetsIn": 50,
-    ///      "packetsOut": 100
+    ///      "bytesOut": 102400,
+    ///      "bytesIn": 51200
     ///    }
     ///  ],
     ///  "type": "object",
@@ -1548,6 +1548,20 @@ and indexer state.*/
     ///    {
     ///      "type": "object",
     ///      "required": [
+    ///        "IntermediatePath"
+    ///      ],
+    ///      "properties": {
+    ///        "IntermediatePath": {
+    ///          "type": "array",
+    ///          "items": {
+    ///            "type": "string"
+    ///          }
+    ///        }
+    ///      }
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
     ///        "Hops"
     ///      ],
     ///      "properties": {
@@ -1563,7 +1577,14 @@ and indexer state.*/
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     pub enum RoutingOptions {
+        IntermediatePath(::std::vec::Vec<::std::string::String>),
         Hops(u64),
+    }
+    impl ::std::convert::From<::std::vec::Vec<::std::string::String>>
+    for RoutingOptions {
+        fn from(value: ::std::vec::Vec<::std::string::String>) -> Self {
+            Self::IntermediatePath(value)
+        }
     }
     impl ::std::convert::From<u64> for RoutingOptions {
         fn from(value: u64) -> Self {
@@ -1669,25 +1690,25 @@ and indexer state.*/
     ///  "description": "Request body for creating a new client session.",
     ///  "examples": [
     ///    {
-    ///      "capabilities": [
-    ///        "Retransmission",
-    ///        "Segmentation"
-    ///      ],
     ///      "destination": "0x1B482420Afa04aeC1Ef0e4a00C18451E84466c75",
     ///      "forwardPath": {
     ///        "Hops": 1
     ///      },
-    ///      "listenHost": "127.0.0.1:10000",
-    ///      "maxClientSessions": 2,
-    ///      "maxSurbUpstream": "2000 kb/s",
-    ///      "responseBuffer": "2 MB",
     ///      "returnPath": {
     ///        "Hops": 1
     ///      },
-    ///      "sessionPool": 0,
     ///      "target": {
     ///        "Plain": "localhost:8080"
-    ///      }
+    ///      },
+    ///      "listenHost": "127.0.0.1:10000",
+    ///      "capabilities": [
+    ///        "Retransmission",
+    ///        "Segmentation"
+    ///      ],
+    ///      "responseBuffer": "2 MB",
+    ///      "maxSurbUpstream": "2000 kb/s",
+    ///      "sessionPool": 0,
+    ///      "maxClientSessions": 2
     ///    }
     ///  ],
     ///  "type": "object",
@@ -1851,24 +1872,24 @@ Currently, the maximum value is 5.*/
     ///  "description": "Response body for creating a new client session.",
     ///  "examples": [
     ///    {
-    ///      "activeClients": [],
+    ///      "target": "example.com:80",
     ///      "destination": "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F",
     ///      "forwardPath": {
     ///        "Hops": 1
     ///      },
-    ///      "hoprMtu": 1002,
-    ///      "ip": "127.0.0.1",
-    ///      "maxClientSessions": 2,
-    ///      "maxSurbUpstream": "2000 kb/s",
-    ///      "port": 5542,
-    ///      "protocol": "tcp",
-    ///      "responseBuffer": "2 MB",
     ///      "returnPath": {
     ///        "Hops": 1
     ///      },
-    ///      "sessionPool": 0,
+    ///      "protocol": "tcp",
+    ///      "ip": "127.0.0.1",
+    ///      "port": 5542,
+    ///      "hoprMtu": 1002,
     ///      "surbLen": 398,
-    ///      "target": "example.com:80"
+    ///      "activeClients": [],
+    ///      "maxClientSessions": 2,
+    ///      "maxSurbUpstream": "2000 kb/s",
+    ///      "responseBuffer": "2 MB",
+    ///      "sessionPool": 0
     ///    }
     ///  ],
     ///  "type": "object",
@@ -2037,8 +2058,8 @@ This is useful for SURB balancing calculations.*/
     ///{
     ///  "examples": [
     ///    {
-    ///      "maxSurbUpstream": "2 Mbps",
-    ///      "responseBuffer": "2 MB"
+    ///      "responseBuffer": "2 MB",
+    ///      "maxSurbUpstream": "2 Mbps"
     ///    }
     ///  ],
     ///  "type": "object",

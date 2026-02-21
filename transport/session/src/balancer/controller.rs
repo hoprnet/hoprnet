@@ -5,7 +5,6 @@ use std::{
     },
     time::Duration,
 };
-
 use futures::{StreamExt, future::AbortRegistration, pin_mut};
 use hopr_async_runtime::AbortHandle;
 use tracing::{Instrument, instrument};
@@ -70,8 +69,8 @@ pub struct SurbBalancerConfig {
     pub target_surb_buffer_size: u64,
     /// Maximum outflow of SURBs.
     ///
-    /// - In the context of the local SURB buffer, this is the maximum egress Session traffic (= SURB consumption).
-    /// - In the context of the remote SURB buffer, this is the maximum egress of keep-alive messages to the
+    /// - In the context of the local SURB buffer (Entry), this is the maximum egress Session traffic (= SURB consumption).
+    /// - In the context of the remote SURB buffer (Exit), this is the maximum egress of keep-alive messages to the
     ///   counterparty (= artificial SURB production).
     ///
     /// The default is 5000 (which is 2500 packets/second currently)
@@ -86,6 +85,24 @@ pub struct SurbBalancerConfig {
     /// The default is `(60, 0.05)` (5% of the target buffer size is discarded every 60 seconds).
     #[default(_code = "Some((Duration::from_secs(60), 0.05))")]
     pub surb_decay: Option<(Duration, f64)>,
+    /// If set, the determined how often should be the SURB balancer target or SURB buffer level (depending on the context)
+    /// notified to the Session counterparty.
+    ///
+    /// ### Local SURB balancer (Entry)
+    /// The period indicates how often is the desired SURB buffer level notified to the Session recipient.
+    ///
+    /// Normally, the SURB balancer target is announced to the Session recipient in the Session initiation packet once.
+    /// When this option is set, the SURB balancer target will be notified periodically via the Session keep-alive packet.
+    /// This is useful when the client plans to change the SURB balancer target dynamically.
+    ///
+    /// ### Remote SURB balancer (Exit)
+    /// The period indicates how often is the current SURB buffer level notified to the Session counterparty.
+    ///
+    /// This allows the Session initiator to adjust its estimate of the remote SURB buffer level.
+    ///
+    /// Default is 500 ms
+    #[default(Some(Duration::from_millis(500)))]
+    pub surb_state_notify_period: Option<Duration>,
 }
 
 impl SurbBalancerConfig {
@@ -97,12 +114,15 @@ impl SurbBalancerConfig {
 }
 
 /// Runtime representation of the [`SurbBalancerConfig`] that can be updated atomically.
+///
+/// All the members are atomic variants of the [`SurbBalancerConfig`] members.
 #[derive(Default)]
 pub struct UpdatableSurbBalancerConfig {
     pub target_surb_buffer_size: AtomicU64,
     pub max_surbs_per_sec: AtomicU64,
-    pub decay_duration_sec: AtomicU64,
+    pub decay_duration_msec: AtomicU64,
     pub decay_volume_pct: AtomicU8,
+    pub surb_state_notify_msec: AtomicU64,
 }
 
 impl UpdatableSurbBalancerConfig {
@@ -113,7 +133,7 @@ impl UpdatableSurbBalancerConfig {
             .store(cfg.target_surb_buffer_size, std::sync::atomic::Ordering::Relaxed);
         self.max_surbs_per_sec
             .store(cfg.max_surbs_per_sec, std::sync::atomic::Ordering::Relaxed);
-        self.decay_duration_sec.store(
+        self.decay_duration_msec.store(
             cfg.surb_decay
                 .map(|(d, _)| d.as_millis().min(u64::MAX as u128) as u64)
                 .unwrap_or_default(),
@@ -125,11 +145,31 @@ impl UpdatableSurbBalancerConfig {
                 .unwrap_or_default(),
             std::sync::atomic::Ordering::Relaxed,
         );
+        self.surb_state_notify_msec.store(cfg.surb_state_notify_period.map(|d| d.as_millis().min(u64::MAX as u128) as u64).unwrap_or_default(), std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Checks if SURB balancing is disabled (no target buffer size set).
     pub fn is_disabled(&self) -> bool {
         self.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed) == 0
+    }
+
+    pub fn surb_decay(&self) -> Option<(Duration, f64)> {
+        Some((
+            self.decay_duration_msec.load(std::sync::atomic::Ordering::Relaxed),
+            self.decay_volume_pct.load(std::sync::atomic::Ordering::Relaxed),
+        ))
+            .filter(|&(d, p)| d > 0 && p > 0)
+            .map(|(d, p)| (Duration::from_millis(d), p as f64 / 100.0))
+    }
+
+    pub fn surb_state_notify_period(&self) -> Option<Duration> {
+        Some(self.surb_state_notify_msec.load(std::sync::atomic::Ordering::Relaxed))
+            .filter(|&d| d > 0)
+            .map(Duration::from_millis)
+    }
+
+    pub fn controller_bounds(&self) -> BalancerControllerBounds {
+        BalancerControllerBounds::new(self.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed), self.max_surbs_per_sec.load(std::sync::atomic::Ordering::Relaxed))
     }
 }
 
@@ -143,15 +183,12 @@ impl From<SurbBalancerConfig> for UpdatableSurbBalancerConfig {
 
 impl<'a> From<&'a UpdatableSurbBalancerConfig> for SurbBalancerConfig {
     fn from(value: &'a UpdatableSurbBalancerConfig) -> Self {
+        let (target_surb_buffer_size, max_surbs_per_sec) = value.controller_bounds().unzip();
         Self {
-            target_surb_buffer_size: value.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed),
-            max_surbs_per_sec: value.max_surbs_per_sec.load(std::sync::atomic::Ordering::Relaxed),
-            surb_decay: Some((
-                value.decay_duration_sec.load(std::sync::atomic::Ordering::Relaxed),
-                value.decay_volume_pct.load(std::sync::atomic::Ordering::Relaxed),
-            ))
-            .filter(|&(d, p)| d > 0 && p > 0)
-            .map(|(d, p)| (Duration::from_millis(d), p as f64 / 100.0)),
+            target_surb_buffer_size,
+            max_surbs_per_sec,
+            surb_decay: value.surb_decay(),
+            surb_state_notify_period: value.surb_state_notify_period(),
         }
     }
 }
@@ -375,6 +412,13 @@ mod tests {
     use super::*;
     use crate::balancer::{AtomicSurbFlowEstimator, MockSurbFlowController, pid::PidBalancerController};
 
+    #[test]
+    fn surb_balancer_config_should_be_convertible_to_atomics() {
+        let cfg = SurbBalancerConfig::default();
+        let cfg_atomic: UpdatableSurbBalancerConfig = cfg.into();
+        assert_eq!(cfg, SurbBalancerConfig::from(&cfg_atomic));
+    }
+
     #[test_log::test]
     fn surb_balancer_should_start_increase_level_when_below_target() {
         let production_rate = Arc::new(AtomicU64::new(0));
@@ -481,6 +525,7 @@ mod tests {
             target_surb_buffer_size: 5_000,
             max_surbs_per_sec: 2500,
             surb_decay: Some((Duration::from_millis(200), 0.05)),
+            surb_state_notify_period: None,
         };
 
         let mut mock_flow_ctl = MockSurbFlowController::new();

@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, OnceLock},
     time::Duration,
 };
-
+use anyhow::anyhow;
 use futures::{
     FutureExt, SinkExt, StreamExt, TryStreamExt,
     channel::mpsc::{Sender, UnboundedSender},
@@ -22,7 +22,7 @@ use hopr_protocol_start::{
     StartInitiation,
 };
 use tracing::{debug, error, info, trace, warn};
-
+use hopr_crypto_packet::prelude::HoprPacket;
 #[cfg(feature = "telemetry")]
 use crate::telemetry::{SessionLifecycleState, SessionStatsSnapshot, SessionTelemetry};
 use crate::{
@@ -39,6 +39,7 @@ use crate::{
     utils,
     utils::insert_into_next_slot,
 };
+use crate::utils::SurbNotificationMode;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -94,6 +95,8 @@ fn initiation_timeout_max_one_way(base: Duration, hops: usize) -> Duration {
 
 /// Minimum time the SURB buffer must endure if no SURBs are being produced.
 pub const MIN_SURB_BUFFER_DURATION: Duration = Duration::from_secs(1);
+/// Minimum time between SURB buffer notifications to the Entry.
+pub const MIN_SURB_BUFFER_NOTIFICATION_PERIOD: Duration = Duration::from_secs(1);
 
 /// The first challenge value used in Start protocol to initiate a session.
 pub(crate) const MIN_CHALLENGE: StartChallenge = 1;
@@ -231,6 +234,16 @@ pub struct SessionManagerConfig {
     /// Default is 10 000 SURBs.
     #[default(10_000)]
     pub maximum_surb_buffer_size: usize,
+
+    /// If set, the Session recipient (Exit) will notify the Session initiator (Entry) about
+    /// its SURB balance for the Session using keep-alive packets periodically.
+    ///
+    /// Keep in mind that each notification also costs 1 SURB, so the notification period should
+    /// not be too frequent.
+    ///
+    /// Default is None (no notification sent to the client), minimum is 1 second.
+    #[default(None)]
+    pub surb_balance_notify_period: Option<Duration>,
 }
 
 /// Manages lifecycles of Sessions.
@@ -361,6 +374,18 @@ pub struct SessionManagerConfig {
 /// Exit is detected.
 ///
 /// This behavior can be controlled via the `surb_decay` field of [`SurbBalancerConfig`].
+///
+/// ### SURB balance and target notification
+/// The Session recipient (Exit) can notify the Session initiator (Entry) periodically about its estimated
+/// number of SURBs for the Session. This can help the Entry to adjust its approximation of that level so
+/// that its Local SURB balancer can better intervene.
+/// This can be set using the `surb_balance_report_period` field of [`SessionManagerConfig`] for the Exit.
+///
+/// Likewise, the Entry can inform the Exit about its desired SURB buffer target so that the Exit
+/// can better accommodate its Remote SURB balancing.
+/// This can be set using the `notify_surb_target` field of the [`SurbBalancerConfig`] of each new Session.
+///
+/// Both mechanisms leverage the Keep Alive message to report the respective values.
 pub struct SessionManager<S, T> {
     session_initiations: SessionInitiationCache,
     #[allow(clippy::type_complexity)]
@@ -407,6 +432,8 @@ where
         cfg.maximum_sessions = cfg
             .maximum_sessions
             .clamp(1, (cfg.session_tag_range.end - cfg.session_tag_range.start) as usize);
+        cfg.surb_balance_notify_period = cfg.surb_balance_notify_period.map(|p| p.max(MIN_SURB_BUFFER_NOTIFICATION_PERIOD));
+        cfg.minimum_surb_buffer_duration = cfg.minimum_surb_buffer_duration.max(MIN_SURB_BUFFER_DURATION);
 
         // Ensure the Frame MTU is at least the size of the Session segment MTU payload
         cfg.frame_mtu = cfg.frame_mtu.max(SESSION_MTU);
@@ -712,6 +739,7 @@ where
                         session_id,
                         full_surb_scoring_sender,
                         forward_routing.clone(),
+                        SurbNotificationMode::Target,
                         surb_mgmt.clone(),
                     );
                     abort_handles.insert(SessionTasks::KeepAlive, ka_abort_handle);
@@ -720,10 +748,12 @@ where
                     debug!(%session_id, ?balancer_config ,"spawning entry SURB balancer");
                     let balancer = SurbBalancer::new(
                         session_id,
-                        // The setpoint and output limit is immediately reconfigured by SurbBalancer
+                        // The setpoint and output limit is immediately reconfigured by the SurbBalancer
                         PidBalancerController::from_gains(PidControllerGains::from_env_or_default()),
                         surb_estimator.clone(),
-                        ka_controller,
+                        // Currently, a keep-alive message can bear `HoprPacket::MAX_SURBS_IN_PACKET` SURBs,
+                        // so the correction by this factor is applied.
+                        SurbControllerWithCorrection(ka_controller, HoprPacket::MAX_SURBS_IN_PACKET as u32),
                         balancer_config,
                     );
 
@@ -767,7 +797,7 @@ where
                         }
                         Ok(None) => {
                             return Err(
-                                SessionManagerError::Other("surb balancer was cancelled prematurely".into()).into(),
+                                SessionManagerError::other(anyhow!("surb balancer was cancelled prematurely")).into(),
                             );
                         }
                         Err(_) => {
@@ -847,8 +877,8 @@ where
                     )
                 }
             }
-            Ok(Ok(None)) => Err(SessionManagerError::Other(
-                "internal error: sender has been closed without completing the session establishment".into(),
+            Ok(Ok(None)) => Err(SessionManagerError::other(anyhow!(
+                "internal error: sender has been closed without completing the session establishment"),
             )
             .into()),
             Ok(Err(error)) => {
@@ -926,7 +956,7 @@ where
             cfg.update(&config);
             Ok(())
         } else {
-            Err(SessionManagerError::Other("session does not use SURB balancing".into()).into())
+            Err(SessionManagerError::other(anyhow!("session does not use SURB balancing")).into())
         }
     }
 
@@ -985,7 +1015,7 @@ where
                     .session_tx
                     .unbounded_send(in_data)
                     .map(|_| DispatchResult::Processed)
-                    .map_err(|e| SessionManagerError::Other(e.to_string()))?)
+                    .map_err(SessionManagerError::other)?)
             } else {
                 error!(%session_id, "received data from an unestablished session");
                 Err(TransportSessionError::UnknownData)
@@ -1137,11 +1167,11 @@ where
                         / self
                             .cfg
                             .minimum_surb_buffer_duration
-                            .max(MIN_SURB_BUFFER_DURATION)
                             .as_secs(),
                     // No SURB decay at the Exit, since we know almost exactly how many SURBs
                     // were received
                     surb_decay: None,
+                    surb_state_notify_period: self.cfg.surb_balance_notify_period,
                 };
 
                 slot.surb_mgmt.update(&balancer_config);
@@ -1156,7 +1186,7 @@ where
                 let balancer = SurbBalancer::new(
                     session_id,
                     SimpleBalancerController::default(),
-                    surb_estimator,
+                    surb_estimator.clone(),
                     SurbControllerWithCorrection(egress_rate_control, 1), // 1 SURB per egress packet
                     balancer_config,
                 );
@@ -1167,6 +1197,33 @@ where
                 slot.abort_handles
                     .lock()
                     .insert(SessionTasks::Balancer, balancer_abort_handle);
+
+                // Spawn a keep-alive stream notifying about the SURB buffer level
+                if let Some(period) = self.cfg.surb_balance_notify_period {
+                    let surb_estimator_clone = surb_estimator.clone();
+                    let (ka_controller, ka_abort_handle) = utils::spawn_keep_alive_stream(
+                        session_id,
+                        // Sent Keep-Alive packets also contribute to SURB consumption
+                        msg_sender
+                            .clone()
+                            .with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
+                                // Each sent keepalive consumes 1 SURB
+                                surb_estimator_clone
+                                    .consumed
+                                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                futures::future::ok::<_, S::Error>((routing, data))
+                            }),
+                        slot.routing_opts.clone(),
+                        SurbNotificationMode::Level(surb_estimator.clone()),
+                        slot.surb_mgmt.clone(),
+                    );
+                    // Start keepalive stream towards the Entry with a predefined period
+                    ka_controller.set_rate_per_unit(1, period);
+                    slot.abort_handles
+                        .lock()
+                        .insert(SessionTasks::KeepAlive, ka_abort_handle);
+                    debug!(%session_id, ?period, "started SURB level-notifying keep-alive stream");
+                }
 
                 session
             } else {
@@ -1203,7 +1260,7 @@ where
                 }
                 Ok(Err(error)) => {
                     error!(%session_id, %error, "failed to notify about new incoming session");
-                    return Err(SessionManagerError::Other(error.to_string()).into());
+                    return Err(SessionManagerError::other(error).into());
                 }
                 _ => {}
             };
@@ -1225,10 +1282,9 @@ where
                     error!(%session_id, "timeout sending session establishment message");
                     TransportSessionError::Timeout
                 })?
-                .map_err(|e| {
-                    SessionManagerError::Other(format!(
-                        "failed to send session {session_id} establishment message: {e}"
-                    ))
+                .map_err(|error| {
+                    error!(%session_id, %error, "failed to send session establishment message");
+                    SessionManagerError::other(error)
                 })?;
 
             info!(%session_id, "new session established");
@@ -1256,8 +1312,9 @@ where
                     error!("timeout sending session error message");
                     TransportSessionError::Timeout
                 })?
-                .map_err(|e| {
-                    SessionManagerError::Other(format!("failed to send session establishment error message: {e}"))
+                .map_err(|error| {
+                    error!(%error, "failed to send session error message");
+                    SessionManagerError::other(error)
                 })?;
 
             trace!(%pseudonym, "session establishment failure message sent");
@@ -1286,78 +1343,81 @@ where
                 let challenge = est.orig_challenge;
                 let session_id = est.session_id;
                 if let Some(tx_est) = self.session_initiations.remove(&est.orig_challenge).await {
-                    if let Err(e) = tx_est.unbounded_send(Ok(est)) {
-                        return Err(SessionManagerError::Other(format!(
-                            "could not notify session {session_id} establishment: {e}"
-                        ))
-                        .into());
+                    if let Err(error) = tx_est.unbounded_send(Ok(est)) {
+                        error!(%challenge, %session_id, %error, "failed to send session establishment confirmation");
+                        return Err(SessionManagerError::other(error).into());
                     }
                     debug!(?session_id, challenge, "session establishment complete");
                 } else {
                     error!(%session_id, challenge, "unknown session establishment attempt or expired");
                 }
             }
-            HoprStartProtocol::SessionError(error) => {
+            HoprStartProtocol::SessionError(error_type) => {
                 trace!(
-                    challenge = error.challenge,
-                    error = ?error.reason,
+                    challenge = error_type.challenge,
+                    error = ?error_type.reason,
                     "failed to initialize a session",
                 );
                 // Currently, we do not distinguish between individual error types
                 // and just discard the initiation attempt and pass on the error.
-                if let Some(tx_est) = self.session_initiations.remove(&error.challenge).await {
-                    if let Err(e) = tx_est.unbounded_send(Err(error)) {
-                        return Err(SessionManagerError::Other(format!(
-                            "could not notify session establishment error {error:?}: {e}"
-                        ))
-                        .into());
+                if let Some(tx_est) = self.session_initiations.remove(&error_type.challenge).await {
+                    if let Err(error) = tx_est.unbounded_send(Err(error_type)) {
+                        error!(%error, ?error_type, "could not send session error message");
+                        return Err(SessionManagerError::other(error).into());
                     }
                     error!(
-                        challenge = error.challenge,
-                        ?error,
+                        challenge = error_type.challenge,
+                        ?error_type,
                         "session establishment error received"
                     );
                 } else {
                     error!(
-                        challenge = error.challenge,
-                        ?error,
+                        challenge = error_type.challenge,
+                        ?error_type,
                         "session establishment attempt expired before error could be delivered"
                     );
                 }
 
                 #[cfg(all(feature = "prometheus", not(test)))]
-                METRIC_RECEIVED_SESSION_ERRS.increment(&[&error.reason.to_string()])
+                METRIC_RECEIVED_SESSION_ERRS.increment(&[&error_type.reason.to_string()])
             }
             HoprStartProtocol::KeepAlive(msg) => {
                 let session_id = msg.session_id;
                 if let Some(session_slot) = self.sessions.get(&session_id).await {
-                    trace!(?session_id, "received keep-alive request");
-                    // Increase the number of received SURBs in the estimator.
-                    // Two SURBs per Keep-Alive message
-                    session_slot.surb_estimator.produced.fetch_add(
-                        KeepAliveMessage::<SessionId>::MIN_SURBS_PER_MESSAGE as u64,
-                        std::sync::atomic::Ordering::Relaxed,
-                    );
+                    trace!(?session_id, "received keep-alive message");
+                    match &session_slot.routing_opts {
+                        // Session is outgoing - keep-alive was received from the Exit
+                        DestinationRouting::Forward { .. } => {
+                            // TODO: update the SURB buffer target estimate
+                        }
+                        // Session is incoming - keep-alive was received from the Entry
+                        DestinationRouting::Return(_) => {
+                            // Increase the number of received SURBs in the estimator.
+                            // Two SURBs per Keep-Alive message
+                            session_slot.surb_estimator.produced.fetch_add(
+                                KeepAliveMessage::<SessionId>::MIN_SURBS_PER_MESSAGE as u64,
+                                std::sync::atomic::Ordering::Relaxed,
+                            );
 
-                    // Allow updating SURB balancer target based on the received Keep-Alive message
-                    if msg.flags.contains(KeepAliveFlag::BalancerTarget)
-                        && msg.additional_data > 0
-                        && !session_slot.surb_mgmt.is_disabled()
-                        && session_slot
-                            .surb_mgmt
-                            .target_surb_buffer_size
-                            .load(std::sync::atomic::Ordering::Relaxed)
-                            != msg.additional_data
-                    {
-                        debug!(%session_id, target_surb_buffer_size = msg.additional_data, "keep-alive updated SURB balancer target buffer size");
-                        session_slot
-                            .surb_mgmt
-                            .target_surb_buffer_size
-                            .store(msg.additional_data, std::sync::atomic::Ordering::Relaxed);
+                            // Allow updating SURB balancer target based on the received Keep-Alive message
+                            if msg.flags.contains(KeepAliveFlag::BalancerTarget)
+                                && msg.additional_data > 0 && !session_slot.surb_mgmt.is_disabled()
+                                && session_slot.surb_mgmt.controller_bounds().target()
+                                != msg.additional_data
+                            {
+                                trace!(%session_id, target_surb_buffer_size = msg.additional_data, "keep-alive updated SURB balancer target buffer size");
+                                session_slot
+                                    .surb_mgmt
+                                    .target_surb_buffer_size
+                                    .store(msg.additional_data, std::sync::atomic::Ordering::Relaxed);
 
-                        #[cfg(feature = "telemetry")]
-                        session_slot.telemetry.set_surb_target_buffer(msg.additional_data);
+                                #[cfg(feature = "telemetry")]
+                                session_slot.telemetry.set_surb_target_buffer(msg.additional_data);
+                            }
+                        }
                     }
+
+
                 } else {
                     debug!(%session_id, "received keep-alive request for an unknown session");
                 }

@@ -33,6 +33,7 @@ allocator-jemalloc = [
 ] # Use jemalloc as the global allocator on Linux
 
 [dependencies]
+anyhow = { workspace = true }
 arrayvec = { workspace = true }
 async-trait = { workspace = true }
 flagset = { workspace = true, features = ["serde"] }
@@ -64,7 +65,6 @@ hopr-protocol-session = { workspace = true, features = ["serde"] }
 hopr-protocol-start = { workspace = true }
 
 [dev-dependencies]
-anyhow = { workspace = true }
 criterion = { workspace = true }
 hopr-network-types = { workspace = true, features = ["runtime-tokio", "serde"] }
 hopr-protocol-session = { workspace = true, features = [

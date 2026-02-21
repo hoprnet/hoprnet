@@ -95,6 +95,7 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                         let codec_config = HoprCodecConfig {
                             outgoing_ticket_price: Some(HoprBalance::from_str("0.1 wxHOPR").unwrap()),
                             outgoing_win_prob: Some(WinningProbability::ALWAYS),
+                            ..Default::default()
                         };
 
                         let ticket_proc = HoprTicketProcessor::new(
