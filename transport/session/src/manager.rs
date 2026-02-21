@@ -3,6 +3,7 @@ use std::{
     sync::{Arc, OnceLock},
     time::Duration,
 };
+
 use anyhow::anyhow;
 use futures::{
     FutureExt, SinkExt, StreamExt, TryStreamExt,
@@ -12,6 +13,7 @@ use futures::{
 };
 use futures_time::future::FutureExt as TimeExt;
 use hopr_async_runtime::AbortableList;
+use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_crypto_random::Randomizable;
 use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::prelude::*;
@@ -22,7 +24,7 @@ use hopr_protocol_start::{
     StartInitiation,
 };
 use tracing::{debug, error, info, trace, warn};
-use hopr_crypto_packet::prelude::HoprPacket;
+
 #[cfg(feature = "telemetry")]
 use crate::telemetry::{SessionLifecycleState, SessionStatsSnapshot, SessionTelemetry};
 use crate::{
@@ -37,9 +39,8 @@ use crate::{
     errors::{SessionManagerError, TransportSessionError},
     types::{ByteCapabilities, ClosureReason, HoprSessionConfig, HoprStartProtocol},
     utils,
-    utils::insert_into_next_slot,
+    utils::{SurbNotificationMode, insert_into_next_slot},
 };
-use crate::utils::SurbNotificationMode;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -244,6 +245,15 @@ pub struct SessionManagerConfig {
     /// Default is None (no notification sent to the client), minimum is 1 second.
     #[default(None)]
     pub surb_balance_notify_period: Option<Duration>,
+
+    /// If set, the Session initiator (Entry) will notify the Session recipient (Exit) about
+    /// the local SURB balancer target using keep-alive packets from the SURB balancer.
+    ///
+    /// This is useful when the client plans to change the SURB balancer target dynamically.
+    ///
+    /// Default is true.
+    #[default(true)]
+    pub surb_target_notify: bool,
 }
 
 /// Manages lifecycles of Sessions.
@@ -379,11 +389,11 @@ pub struct SessionManagerConfig {
 /// The Session recipient (Exit) can notify the Session initiator (Entry) periodically about its estimated
 /// number of SURBs for the Session. This can help the Entry to adjust its approximation of that level so
 /// that its Local SURB balancer can better intervene.
-/// This can be set using the `surb_balance_report_period` field of [`SessionManagerConfig`] for the Exit.
+/// This can be set using the `surb_balance_notify_period` field of [`SessionManagerConfig`] for the Exit.
 ///
 /// Likewise, the Entry can inform the Exit about its desired SURB buffer target so that the Exit
 /// can better accommodate its Remote SURB balancing.
-/// This can be set using the `notify_surb_target` field of the [`SurbBalancerConfig`] of each new Session.
+/// This can be set using the `surb_target_notify` field of the [`SessionManagerConfig`] of each new Session.
 ///
 /// Both mechanisms leverage the Keep Alive message to report the respective values.
 pub struct SessionManager<S, T> {
@@ -432,7 +442,9 @@ where
         cfg.maximum_sessions = cfg
             .maximum_sessions
             .clamp(1, (cfg.session_tag_range.end - cfg.session_tag_range.start) as usize);
-        cfg.surb_balance_notify_period = cfg.surb_balance_notify_period.map(|p| p.max(MIN_SURB_BUFFER_NOTIFICATION_PERIOD));
+        cfg.surb_balance_notify_period = cfg
+            .surb_balance_notify_period
+            .map(|p| p.max(MIN_SURB_BUFFER_NOTIFICATION_PERIOD));
         cfg.minimum_surb_buffer_duration = cfg.minimum_surb_buffer_duration.max(MIN_SURB_BUFFER_DURATION);
 
         // Ensure the Frame MTU is at least the size of the Session segment MTU payload
@@ -734,12 +746,16 @@ where
                     let mut abort_handles = AbortableList::default();
                     let surb_mgmt = Arc::new(UpdatableSurbBalancerConfig::from(balancer_config));
 
-                    // Spawn the SURB-bearing keep alive stream
+                    // Spawn the SURB-bearing keep alive stream towards the Exit
                     let (ka_controller, ka_abort_handle) = utils::spawn_keep_alive_stream(
                         session_id,
                         full_surb_scoring_sender,
                         forward_routing.clone(),
-                        SurbNotificationMode::Target,
+                        if self.cfg.surb_target_notify {
+                            SurbNotificationMode::Target
+                        } else {
+                            SurbNotificationMode::DoNotNotify
+                        },
                         surb_mgmt.clone(),
                     );
                     abort_handles.insert(SessionTasks::KeepAlive, ka_abort_handle);
@@ -878,8 +894,8 @@ where
                 }
             }
             Ok(Ok(None)) => Err(SessionManagerError::other(anyhow!(
-                "internal error: sender has been closed without completing the session establishment"),
-            )
+                "internal error: sender has been closed without completing the session establishment"
+            ))
             .into()),
             Ok(Err(error)) => {
                 // The other side did not allow us to establish a session
@@ -1163,15 +1179,10 @@ where
                 let balancer_config = SurbBalancerConfig {
                     target_surb_buffer_size,
                     // At maximum egress, the SURB buffer drains in `minimum_surb_buffer_duration` seconds
-                    max_surbs_per_sec: target_surb_buffer_size
-                        / self
-                            .cfg
-                            .minimum_surb_buffer_duration
-                            .as_secs(),
+                    max_surbs_per_sec: target_surb_buffer_size / self.cfg.minimum_surb_buffer_duration.as_secs(),
                     // No SURB decay at the Exit, since we know almost exactly how many SURBs
                     // were received
                     surb_decay: None,
-                    surb_state_notify_period: self.cfg.surb_balance_notify_period,
                 };
 
                 slot.surb_mgmt.update(&balancer_config);
@@ -1198,7 +1209,7 @@ where
                     .lock()
                     .insert(SessionTasks::Balancer, balancer_abort_handle);
 
-                // Spawn a keep-alive stream notifying about the SURB buffer level
+                // Spawn a keep-alive stream notifying about the SURB buffer level towards the Entry
                 if let Some(period) = self.cfg.surb_balance_notify_period {
                     let surb_estimator_clone = surb_estimator.clone();
                     let (ka_controller, ka_abort_handle) = utils::spawn_keep_alive_stream(
@@ -1217,11 +1228,13 @@ where
                         SurbNotificationMode::Level(surb_estimator.clone()),
                         slot.surb_mgmt.clone(),
                     );
+
                     // Start keepalive stream towards the Entry with a predefined period
                     ka_controller.set_rate_per_unit(1, period);
                     slot.abort_handles
                         .lock()
                         .insert(SessionTasks::KeepAlive, ka_abort_handle);
+
                     debug!(%session_id, ?period, "started SURB level-notifying keep-alive stream");
                 }
 
@@ -1401,9 +1414,9 @@ where
 
                             // Allow updating SURB balancer target based on the received Keep-Alive message
                             if msg.flags.contains(KeepAliveFlag::BalancerTarget)
-                                && msg.additional_data > 0 && !session_slot.surb_mgmt.is_disabled()
-                                && session_slot.surb_mgmt.controller_bounds().target()
-                                != msg.additional_data
+                                && msg.additional_data > 0
+                                && !session_slot.surb_mgmt.is_disabled()
+                                && session_slot.surb_mgmt.controller_bounds().target() != msg.additional_data
                             {
                                 trace!(%session_id, target_surb_buffer_size = msg.additional_data, "keep-alive updated SURB balancer target buffer size");
                                 session_slot
@@ -1416,8 +1429,6 @@ where
                             }
                         }
                     }
-
-
                 } else {
                     debug!(%session_id, "received keep-alive request for an unknown session");
                 }

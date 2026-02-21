@@ -26,7 +26,8 @@ pub trait SurbFlowEstimator {
 
     /// Subtracts SURBs produced from consumed, saturating at zero.
     fn saturating_diff(&self) -> u64 {
-        self.estimate_surbs_produced().saturating_sub(self.estimate_surbs_consumed())
+        self.estimate_surbs_produced()
+            .saturating_sub(self.estimate_surbs_consumed())
     }
 
     /// Computes the estimated change in SURB buffer.

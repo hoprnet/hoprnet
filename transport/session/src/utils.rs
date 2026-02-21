@@ -2,14 +2,17 @@ use std::time::Duration;
 
 use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
 use hopr_async_runtime::AbortHandle;
-use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_network_types::prelude::DestinationRouting;
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataOut};
 use hopr_protocol_start::{KeepAliveFlag, KeepAliveMessage};
 use tracing::{debug, error};
 
-use crate::{SessionId, balancer::{RateController, RateLimitStreamExt, SurbControllerWithCorrection, UpdatableSurbBalancerConfig}, errors::TransportSessionError, types::HoprStartProtocol, AtomicSurbFlowEstimator};
-use crate::balancer::SurbFlowEstimator;
+use crate::{
+    AtomicSurbFlowEstimator, SessionId,
+    balancer::{RateController, RateLimitStreamExt, SurbFlowEstimator, UpdatableSurbBalancerConfig},
+    errors::TransportSessionError,
+    types::HoprStartProtocol,
+};
 
 /// Convenience function to copy data in both directions between a [`Session`](crate::HoprSession) and arbitrary
 /// async IO stream.
@@ -118,12 +121,13 @@ where
 /// about the SURB target (Entry) or SURB level (Exit).
 #[derive(Debug, Clone)]
 pub(crate) enum SurbNotificationMode {
+    /// No keep-alive messages are sent to the Session counterparty.
+    DoNotNotify,
     /// Session initiator notifies the Session recipient about the desired SURB target level.
     Target,
     /// Session recipient notifies the Session initiator about the current SURB level.
     Level(AtomicSurbFlowEstimator),
 }
-
 
 /// Spawns a task for a rate-limited stream of Keep-Alive messages to the Session counterparty.
 pub(crate) fn spawn_keep_alive_stream<S>(
@@ -140,31 +144,23 @@ where
     // The stream is suspended until the caller sets a rate via the Controller
     let controller = RateController::new(0, Duration::from_secs(1));
 
-    let mut started_at = std::time::Instant::now();
     let (ka_stream, abort_handle) = futures::stream::abortable(
-        futures::stream::repeat_with(move || {
-            // For keep-alive messages to the Exit (Target mode) the notification period is
-            if let Some(period) = cfg.surb_state_notify_period() && started_at.elapsed() >= period {
-                started_at = std::time::Instant::now();
-                match &notification_mode {
-                    SurbNotificationMode::Target => {
-                        HoprStartProtocol::KeepAlive(KeepAliveMessage {
-                            session_id,
-                            flags: KeepAliveFlag::BalancerTarget.into(),
-                            additional_data: cfg.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed),
-                        })
-                    }
-                    SurbNotificationMode::Level(estimator) => {
-                        HoprStartProtocol::KeepAlive(KeepAliveMessage {
-                            session_id,
-                            flags: KeepAliveFlag::BalancerState.into(),
-                            additional_data: estimator.saturating_diff(),
-                        })
-                    }
-                }
-            } else {
-                HoprStartProtocol::KeepAlive(session_id.into())
-            }
+        futures::stream::repeat_with(move || match &notification_mode {
+            SurbNotificationMode::Target => HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                session_id,
+                flags: KeepAliveFlag::BalancerTarget.into(),
+                additional_data: cfg.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed),
+            }),
+            SurbNotificationMode::Level(estimator) => HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                session_id,
+                flags: KeepAliveFlag::BalancerState.into(),
+                additional_data: estimator.saturating_diff(),
+            }),
+            SurbNotificationMode::DoNotNotify => HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                session_id,
+                flags: None.into(),
+                additional_data: 0,
+            }),
         })
         .rate_limit_with_controller(&controller),
     );
@@ -204,10 +200,7 @@ where
             }),
     );
 
-    (
-        controller,
-        abort_handle,
-    )
+    (controller, abort_handle)
 }
 
 #[cfg(test)]
