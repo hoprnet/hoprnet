@@ -9,7 +9,7 @@ use tracing::{debug, error};
 
 use crate::{
     AtomicSurbFlowEstimator, SessionId,
-    balancer::{RateController, RateLimitStreamExt, SurbFlowEstimator, UpdatableSurbBalancerConfig},
+    balancer::{BalancerStateData, RateController, RateLimitStreamExt, SurbFlowEstimator},
     errors::TransportSessionError,
     types::HoprStartProtocol,
 };
@@ -135,7 +135,7 @@ pub(crate) fn spawn_keep_alive_stream<S>(
     sender: S,
     routing: DestinationRouting,
     notification_mode: SurbNotificationMode,
-    cfg: std::sync::Arc<UpdatableSurbBalancerConfig>,
+    cfg: std::sync::Arc<BalancerStateData>,
 ) -> (RateController, AbortHandle)
 where
     S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,

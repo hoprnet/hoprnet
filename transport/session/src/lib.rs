@@ -15,7 +15,7 @@ mod telemetry;
 mod types;
 mod utils;
 
-pub use balancer::{AtomicSurbFlowEstimator, MIN_BALANCER_SAMPLING_INTERVAL, SurbBalancerConfig};
+pub use balancer::{AtomicSurbFlowEstimator, BalancerStateData, MIN_BALANCER_SAMPLING_INTERVAL, SurbBalancerConfig};
 pub use hopr_network_types::types::*;
 pub use hopr_protocol_session::AcknowledgementMode;
 pub use manager::{DispatchResult, MIN_SURB_BUFFER_DURATION, SessionManager, SessionManagerConfig};
