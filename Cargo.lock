@@ -4498,7 +4498,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-packet"
-version = "1.1.1"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "bimap",
@@ -5210,7 +5210,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "1.2.1"
+version = "1.2.2"
 dependencies = [
  "ahash",
  "anyhow",

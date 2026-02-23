@@ -67,7 +67,7 @@ pub enum ValidationErrorKind {
     #[error("ticket index is lower than channel index {0}")]
     IndexTooLow(u64),
     /// Not enough funds in the given channel to pay for the ticket.
-    #[error("ticket values is greater than remaining unrealized balance {1} in channel {0}")]
+    #[error("ticket value is greater than remaining unrealized balance {1} in channel {0}")]
     InsufficientFunds(ChannelId, HoprBalance),
 }
 
