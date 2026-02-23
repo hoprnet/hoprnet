@@ -121,7 +121,7 @@ pub enum StartProtocol<I, T, C> {
 pub struct KeepAliveMessage<I> {
     /// Session ID.
     pub session_id: I,
-    /// Reserved for future use, always zero currently.
+    /// Additional flags that govern how the `additional_data` field is interpreted, or 0.
     pub flags: KeepAliveFlags,
     /// Additional data (usually `flags` dependent), ignored if `0x00000000`.
     pub additional_data: u64,
@@ -139,11 +139,15 @@ flagset::flags! {
         ///
         /// The value of `additional_data` represents the optimal number of SURBs that the
         /// Session Initiator wishes to maintain at the Session Recipient.
+        ///
+        /// Mutually exclusive with `BalancerState`.
         BalancerTarget = 0x01,
         /// The `additional_data` field contains load balancer state information.
         ///
         /// The value of `additional_data` represents the current number of SURBs
         /// that the Session Recipient estimates to have.
+        ///
+        /// Mutually exclusive with `BalancerTarget`.
         BalancerState = 0x02,
     }
 }

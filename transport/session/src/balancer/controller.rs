@@ -108,6 +108,7 @@ pub struct BalancerStateValues {
 }
 
 impl BalancerStateValues {
+    /// Constructor from a [`SurbBalancerConfig`].
     pub fn new(cfg: SurbBalancerConfig) -> Self {
         let state = Self::default();
         state.update(&cfg);
