@@ -140,6 +140,7 @@ jobs:
 
       - name: Update Homebrew formula
         uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4.0.1
+        continue-on-error: true # We don't want to fail the release if the Homebrew update fails, as it's a separate repository
         with:
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           repository: hoprnet/homebrew-hoprd
