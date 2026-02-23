@@ -99,7 +99,7 @@ impl SurbBalancerConfig {
 
 /// Runtime state of the [`SurbBalancer`].
 #[derive(Debug, Default)]
-pub struct BalancerStateData {
+pub struct BalancerStateValues {
     pub target_surb_buffer_size: AtomicU64,
     pub max_surbs_per_sec: AtomicU64,
     pub decay_duration_msec: AtomicU64,
@@ -107,14 +107,14 @@ pub struct BalancerStateData {
     pub buffer_level: AtomicU64,
 }
 
-impl BalancerStateData {
+impl BalancerStateValues {
     pub fn new(cfg: SurbBalancerConfig) -> Self {
         let state = Self::default();
         state.update(&cfg);
         state
     }
 
-    /// Performs update of the [`BalancerStateData`] from the [`SurbBalancerConfig`] and
+    /// Performs update of the [`BalancerStateValues`] from the [`SurbBalancerConfig`] and
     /// enables it.
     pub fn update(&self, cfg: &SurbBalancerConfig) {
         self.target_surb_buffer_size
@@ -135,7 +135,7 @@ impl BalancerStateData {
         );
     }
 
-    /// Extracts the [`SurbBalancerConfig`] from the [`BalancerStateData`].
+    /// Extracts the [`SurbBalancerConfig`] from the [`BalancerStateValues`].
     pub fn as_config(&self) -> SurbBalancerConfig {
         SurbBalancerConfig {
             target_surb_buffer_size: self.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed),
@@ -149,7 +149,7 @@ impl BalancerStateData {
         self.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed) == 0
     }
 
-    /// Extracts the SURB decay configuration from the [`BalancerStateData`].
+    /// Extracts the SURB decay configuration from the [`BalancerStateValues`].
     pub fn surb_decay(&self) -> Option<(Duration, f64)> {
         Some((
             self.decay_duration_msec.load(std::sync::atomic::Ordering::Relaxed),
@@ -165,7 +165,7 @@ impl BalancerStateData {
         self.buffer_level.load(std::sync::atomic::Ordering::Relaxed)
     }
 
-    /// Returns the current [`BalancerControllerBounds`] from the [`BalancerStateData`].
+    /// Returns the current [`BalancerControllerBounds`] from the [`BalancerStateValues`].
     #[inline]
     pub fn controller_bounds(&self) -> BalancerControllerBounds {
         BalancerControllerBounds::new(
@@ -175,7 +175,7 @@ impl BalancerStateData {
     }
 }
 
-impl From<SurbBalancerConfig> for BalancerStateData {
+impl From<SurbBalancerConfig> for BalancerStateValues {
     fn from(cfg: SurbBalancerConfig) -> Self {
         Self::new(cfg)
     }
@@ -204,7 +204,7 @@ pub struct SurbBalancer<C, E, F> {
     controller: C,
     surb_estimator: E,
     flow_control: F,
-    state: Arc<BalancerStateData>,
+    state: Arc<BalancerStateValues>,
     last_estimator_state: SimpleSurbFlowEstimator,
     last_update: std::time::Instant,
     last_decay: std::time::Instant,
@@ -222,7 +222,7 @@ where
         mut controller: C,
         surb_estimator: E,
         flow_control: F,
-        state: Arc<BalancerStateData>,
+        state: Arc<BalancerStateValues>,
     ) -> Self {
         #[cfg(all(feature = "prometheus", not(test)))]
         {
@@ -402,7 +402,7 @@ mod tests {
     #[test]
     fn surb_balancer_config_should_be_convertible_to_atomics() {
         let cfg = SurbBalancerConfig::default();
-        let state_data = BalancerStateData::new(cfg);
+        let state_data = BalancerStateValues::new(cfg);
         assert_eq!(cfg, state_data.as_config());
     }
 

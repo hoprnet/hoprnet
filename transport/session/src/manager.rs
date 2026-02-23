@@ -31,7 +31,7 @@ use crate::{
     Capability, HoprSession, IncomingSession, SESSION_MTU, SessionClientConfig, SessionId, SessionTarget,
     SurbBalancerConfig,
     balancer::{
-        AtomicSurbFlowEstimator, BalancerStateData, RateController, RateLimitSinkExt, SurbBalancer,
+        AtomicSurbFlowEstimator, BalancerStateValues, RateController, RateLimitSinkExt, SurbBalancer,
         SurbControllerWithCorrection,
         pid::{PidBalancerController, PidControllerGains},
         simple::SimpleBalancerController,
@@ -133,7 +133,7 @@ struct SessionSlot {
     telemetry: Arc<SessionTelemetry>,
     // Allows reconfiguring of the SURB balancer on-the-fly
     // Set on both Entry and Exit sides.
-    surb_mgmt: Arc<BalancerStateData>,
+    surb_mgmt: Arc<BalancerStateValues>,
     // SURB flow updates happening outside of Session protocol
     // (e.g. due to Start protocol messages).
     surb_estimator: AtomicSurbFlowEstimator,
@@ -746,7 +746,7 @@ where
                     );
 
                     let mut abort_handles = AbortableList::default();
-                    let surb_mgmt = Arc::new(BalancerStateData::from(balancer_config));
+                    let surb_mgmt = Arc::new(BalancerStateValues::from(balancer_config));
 
                     // Spawn the SURB-bearing keep alive stream towards the Exit
                     let (ka_controller, ka_abort_handle) = utils::spawn_keep_alive_stream(
@@ -1409,9 +1409,10 @@ where
                                 && !session_slot.surb_mgmt.is_disabled()
                                 && session_slot.surb_mgmt.buffer_level() != msg.additional_data
                             {
+                                // Update the buffer level as sent to us from the Exit
                                 session_slot
                                     .surb_mgmt
-                                    .target_surb_buffer_size
+                                    .buffer_level
                                     .store(msg.additional_data, std::sync::atomic::Ordering::Relaxed);
                                 debug!(%session_id, surb_level = msg.additional_data, "keep-alive updated SURB buffer size from the Exit");
                             }
@@ -1424,25 +1425,26 @@ where
                         }
                         // Session is incoming - keep-alive was received from the Entry
                         DestinationRouting::Return(_) => {
-                            // Increase the number of received SURBs in the estimator.
-                            // Two SURBs per Keep-Alive message
-                            session_slot.surb_estimator.produced.fetch_add(
-                                KeepAliveMessage::<SessionId>::MIN_SURBS_PER_MESSAGE as u64,
-                                std::sync::atomic::Ordering::Relaxed,
-                            );
-
                             // Allow updating SURB balancer target based on the received Keep-Alive message
                             if msg.flags.contains(KeepAliveFlag::BalancerTarget)
                                 && msg.additional_data > 0
                                 && !session_slot.surb_mgmt.is_disabled()
                                 && session_slot.surb_mgmt.controller_bounds().target() != msg.additional_data
                             {
-                                debug!(%session_id, target_surb_buffer_size = msg.additional_data, "keep-alive updated SURB balancer target buffer size from the Entry");
+                                // Update the target buffer size as sent to us from the Entry
                                 session_slot
                                     .surb_mgmt
                                     .target_surb_buffer_size
                                     .store(msg.additional_data, std::sync::atomic::Ordering::Relaxed);
+                                debug!(%session_id, target_surb_buffer_size = msg.additional_data, "keep-alive updated SURB balancer target buffer size from the Entry");
                             }
+
+                            // Increase the number of received SURBs in the estimator.
+                            // Typically, 2 SURBs per Keep-Alive message
+                            session_slot.surb_estimator.produced.fetch_add(
+                                KeepAliveMessage::<SessionId>::MIN_SURBS_PER_MESSAGE as u64,
+                                std::sync::atomic::Ordering::Relaxed,
+                            );
                         }
                     }
                 } else {
@@ -1462,7 +1464,7 @@ mod tests {
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
     use hopr_primitive_types::prelude::Address;
-    use hopr_protocol_start::StartProtocolDiscriminants;
+    use hopr_protocol_start::{StartProtocol, StartProtocolDiscriminants};
     use tokio::time::timeout;
 
     use super::*;
@@ -1502,6 +1504,12 @@ mod tests {
     fn msg_type(data: &ApplicationDataOut, expected: StartProtocolDiscriminants) -> bool {
         HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)
             .map(|d| StartProtocolDiscriminants::from(d) == expected)
+            .unwrap_or(false)
+    }
+
+    fn start_msg_match(data: &ApplicationDataOut, msg: impl Fn(HoprStartProtocol) -> bool) -> bool {
+        HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)
+            .map(msg)
             .unwrap_or(false)
     }
 
@@ -1837,7 +1845,7 @@ mod tests {
                     session_tx: Arc::new(dummy_tx),
                     routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
                     abort_handles: Default::default(),
-                    surb_mgmt: Arc::new(BalancerStateData::from(balancer_cfg)),
+                    surb_mgmt: Arc::new(BalancerStateValues::from(balancer_cfg)),
                     surb_estimator: Default::default(),
                     #[cfg(feature = "telemetry")]
                     telemetry: Arc::new(SessionTelemetry::new(session_id, Default::default())),
@@ -2317,14 +2325,46 @@ mod tests {
                 })
             });
 
-        // Alice sends the KeepAlive messages
+        const INITIAL_BALANCER_TARGET: u64 = 10;
+
+        // Alice sends the KeepAlive messages reporting the initial balancer target
         let bob_mgr_clone = bob_mgr.clone();
         alice_transport
             .expect_send_message()
             .times(5..)
             //.in_sequence(&mut sequence)
             .withf(move |peer, data| {
-                msg_type(data, StartProtocolDiscriminants::KeepAlive)
+                start_msg_match(data, |msg| matches!(msg, StartProtocol::KeepAlive(ka) if ka.additional_data == INITIAL_BALANCER_TARGET))
+                //msg_type(data, StartProtocolDiscriminants::KeepAlive)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
+            })
+            .returning(move |_, data| {
+                let bob_mgr_clone = bob_mgr_clone.clone();
+                Box::pin(async move {
+                    bob_mgr_clone
+                        .dispatch_message(
+                            alice_pseudonym,
+                            ApplicationDataIn {
+                                data: data.data,
+                                packet_info: Default::default(),
+                            },
+                        )
+                        .await?;
+                    Ok(())
+                })
+            });
+
+        const NEXT_BALANCER_TARGET: u64 = 50;
+
+        // Alice sends also the KeepAlive messages reporting the updated balancer target
+        let bob_mgr_clone = bob_mgr.clone();
+        alice_transport
+            .expect_send_message()
+            .times(5..)
+            //.in_sequence(&mut sequence)
+            .withf(move |peer, data| {
+                start_msg_match(data, |msg| matches!(msg, StartProtocol::KeepAlive(ka) if ka.additional_data == NEXT_BALANCER_TARGET))
+                    //msg_type(data, StartProtocolDiscriminants::KeepAlive)
                     && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
             })
             .returning(move |_, data| {
@@ -2388,7 +2428,7 @@ mod tests {
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
 
         let balancer_cfg = SurbBalancerConfig {
-            target_surb_buffer_size: 10,
+            target_surb_buffer_size: INITIAL_BALANCER_TARGET,
             max_surbs_per_sec: 100,
             ..Default::default()
         };
@@ -2438,6 +2478,31 @@ mod tests {
 
         // Let the Surb balancer send enough KeepAlive messages
         tokio::time::sleep(Duration::from_millis(1500)).await;
+
+        let new_balancer_cfg = SurbBalancerConfig {
+            target_surb_buffer_size: NEXT_BALANCER_TARGET,
+            max_surbs_per_sec: 100,
+            ..Default::default()
+        };
+
+        // Update to a higher target
+        alice_mgr
+            .update_surb_balancer_config(alice_session.id(), new_balancer_cfg)
+            .await?;
+
+        // Let the Surb balancer send enough KeepAlive messages
+        tokio::time::sleep(Duration::from_millis(1500)).await;
+
+        // Bob should know about the updated target
+        let remote_cfg = bob_mgr
+            .get_surb_balancer_config(bob_session.session.id())
+            .await?
+            .ok_or(anyhow!("no remote config at bob"))?;
+        assert_eq!(
+            remote_cfg.target_surb_buffer_size,
+            new_balancer_cfg.target_surb_buffer_size
+        );
+
         alice_session.close().await?;
 
         tokio::time::sleep(Duration::from_millis(300)).await;

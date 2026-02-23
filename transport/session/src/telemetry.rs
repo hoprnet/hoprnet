@@ -14,7 +14,7 @@ use std::{
 
 use hopr_protocol_session::{FrameInspector, SessionMessageDiscriminants};
 
-pub use crate::balancer::{AtomicSurbFlowEstimator, BalancerStateData};
+pub use crate::balancer::{AtomicSurbFlowEstimator, BalancerStateValues};
 use crate::{Capability, HoprSessionConfig, SessionId, types::SESSION_SOCKET_CAPACITY};
 
 /// The lifecycle state of a session from the perspective of metrics.
@@ -180,7 +180,7 @@ pub struct SessionTelemetry {
     /// to ensure atomic read/update of the pair.
     last_rate_snapshot: parking_lot::Mutex<(u64, u64)>,
     inspector: OnceLock<FrameInspector>,
-    balancer_data: OnceLock<(std::sync::Arc<BalancerStateData>, AtomicSurbFlowEstimator)>,
+    balancer_data: OnceLock<(std::sync::Arc<BalancerStateValues>, AtomicSurbFlowEstimator)>,
 }
 
 impl SessionTelemetry {
@@ -286,7 +286,7 @@ impl SessionTelemetry {
     /// Sets the SURB flow estimator for tracking produced/consumed SURBs.
     ///
     /// The estimator and target buffer are initialized only once via `OnceLock`.
-    pub fn set_balancer_data(&self, estimator: AtomicSurbFlowEstimator, state: std::sync::Arc<BalancerStateData>) {
+    pub fn set_balancer_data(&self, estimator: AtomicSurbFlowEstimator, state: std::sync::Arc<BalancerStateValues>) {
         let _ = self.balancer_data.set((state, estimator));
     }
 

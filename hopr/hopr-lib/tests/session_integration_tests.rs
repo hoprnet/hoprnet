@@ -7,7 +7,7 @@ use hopr_internal_types::prelude::*;
 use hopr_lib::{
     ApplicationDataIn, ApplicationDataOut,
     exports::transport::session::{
-        AtomicSurbFlowEstimator, BalancerStateData, Capabilities, Capability, HoprSession, HoprSessionConfig,
+        AtomicSurbFlowEstimator, BalancerStateValues, Capabilities, Capability, HoprSession, HoprSessionConfig,
         SessionId, SessionTelemetry, transfer_session,
     },
 };
@@ -445,7 +445,7 @@ async fn surb_metrics_tracking() -> anyhow::Result<()> {
     surb_estimator.consumed.store(40, Ordering::Relaxed);
 
     // Set the estimator with target buffer
-    let state = BalancerStateData::new(Default::default());
+    let state = BalancerStateValues::new(Default::default());
     state.target_surb_buffer_size.store(200, Ordering::Relaxed);
     metrics.set_balancer_data(surb_estimator, state.into());
 
