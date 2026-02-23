@@ -1182,9 +1182,9 @@ dependencies = [
 
 [[package]]
 name = "async-compression"
-version = "0.4.41"
+version = "0.4.39"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0f9ee0f6e02ffd7ad5816e9464499fba7b3effd01123b515c41d1697c43dad1"
+checksum = "68650b7df54f0293fd061972a0fb05aaf4fc0879d3b3d21a638a182c5c543b9f"
 dependencies = [
  "compression-codecs",
  "compression-core",
@@ -1576,8 +1576,8 @@ dependencies = [
 
 [[package]]
 name = "blokli-client"
-version = "0.21.1"
-source = "git+https://github.com/hoprnet/blokli#f2c574f93d9beebbd66394bd35b8b47d7602c279"
+version = "0.18.0"
+source = "git+https://github.com/hoprnet/blokli#c9e67d3cf8baeb2cd994461efb07683bfa553fed"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -1589,7 +1589,7 @@ dependencies = [
  "futures",
  "futures-time",
  "hex",
- "hopr-types",
+ "hopr-crypto-types 0.9.0",
  "indexmap 2.13.0",
  "parking_lot",
  "rand 0.9.2",
@@ -1690,9 +1690,9 @@ dependencies = [
 
 [[package]]
 name = "bumpalo"
-version = "3.20.2"
+version = "3.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d20789868f4b01b2f2caec9f5c4e0213b41e3e5702a50157d699ae31ced2fcb"
+checksum = "5dd9dc738b7a8311c7ade152424974d8115f2cdad61e8dab8dac9f2362298510"
 
 [[package]]
 name = "byte-slice-cast"
@@ -2268,6 +2268,36 @@ dependencies = [
  "generic-array 0.14.7",
  "rand_core 0.6.4",
  "typenum",
+]
+
+[[package]]
+name = "crypto_box"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16182b4f39a82ec8a6851155cc4c0cda3065bb1db33651726a29e1951de0f009"
+dependencies = [
+ "aead",
+ "blake2",
+ "crypto_secretbox",
+ "curve25519-dalek",
+ "salsa20",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
+name = "crypto_secretbox"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9d6cf87adf719ddf43a805e92c6870a531aedda35ff640442cbaf8674e141e1"
+dependencies = [
+ "aead",
+ "cipher",
+ "generic-array 0.14.7",
+ "poly1305",
+ "salsa20",
+ "subtle",
+ "zeroize",
 ]
 
 [[package]]
@@ -3008,7 +3038,7 @@ checksum = "843fba2746e448b37e26a819579957415c8cef339bf08564fe8b7ddbd959573c"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
- "zlib-rs 0.6.3",
+ "zlib-rs 0.6.0",
 ]
 
 [[package]]
@@ -4485,9 +4515,9 @@ dependencies = [
  "async-trait",
  "hex-literal",
  "hopr-bindings",
- "hopr-crypto-types",
+ "hopr-crypto-types 1.2.0",
  "hopr-internal-types",
- "hopr-primitive-types",
+ "hopr-primitive-types 1.2.0",
  "lazy_static",
  "multiaddr",
  "serde",
@@ -4541,6 +4571,15 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-random"
+version = "0.3.0"
+source = "git+https://github.com/hoprnet/hoprnet?branch=master#cd0e80d708ac07f05f312002ca46e5d110b50a1e"
+dependencies = [
+ "generic-array 1.3.5",
+ "rand 0.8.5",
+]
+
+[[package]]
+name = "hopr-crypto-random"
 version = "1.2.0"
 source = "git+https://github.com/hoprnet/hopr-types?branch=main#c5a65c8c020748718e1b74d930ec21fe6dfd5f2e"
 dependencies = [
@@ -4572,6 +4611,37 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-types"
+version = "0.9.0"
+source = "git+https://github.com/hoprnet/hoprnet?branch=master#cd0e80d708ac07f05f312002ca46e5d110b50a1e"
+dependencies = [
+ "aes",
+ "blake3",
+ "chacha20 0.9.1",
+ "cipher",
+ "crypto_box",
+ "ctr",
+ "curve25519-dalek",
+ "digest 0.10.7",
+ "ed25519-dalek",
+ "generic-array 1.3.5",
+ "hex",
+ "hopr-crypto-random 0.3.0",
+ "hopr-primitive-types 0.10.0",
+ "k256",
+ "libp2p-identity",
+ "poly1305",
+ "primitive-types 0.14.0",
+ "secp256k1 0.31.1",
+ "sha2",
+ "sha3",
+ "subtle",
+ "thiserror 2.0.18",
+ "typenum",
+ "zeroize",
+]
+
+[[package]]
+name = "hopr-crypto-types"
 version = "1.2.0"
 source = "git+https://github.com/hoprnet/hopr-types?branch=main#c5a65c8c020748718e1b74d930ec21fe6dfd5f2e"
 dependencies = [
@@ -4585,8 +4655,8 @@ dependencies = [
  "ed25519-dalek",
  "generic-array 1.3.5",
  "hex",
- "hopr-crypto-random",
- "hopr-primitive-types",
+ "hopr-crypto-random 1.2.0",
+ "hopr-primitive-types 1.2.0",
  "k256",
  "libp2p-identity",
  "poly1305",
@@ -4702,9 +4772,9 @@ dependencies = [
  "async-trait",
  "hex",
  "hex-literal",
- "hopr-crypto-random",
- "hopr-crypto-types",
- "hopr-primitive-types",
+ "hopr-crypto-random 1.2.0",
+ "hopr-crypto-types 1.2.0",
+ "hopr-primitive-types 1.2.0",
  "multiaddr",
  "num_enum",
  "rayon",
@@ -4831,6 +4901,22 @@ version = "0.3.1"
 dependencies = [
  "thiserror 2.0.18",
  "tracing",
+]
+
+[[package]]
+name = "hopr-primitive-types"
+version = "0.10.0"
+source = "git+https://github.com/hoprnet/hoprnet?branch=master#cd0e80d708ac07f05f312002ca46e5d110b50a1e"
+dependencies = [
+ "bigdecimal",
+ "chrono",
+ "float-cmp",
+ "hex",
+ "lazy_static",
+ "primitive-types 0.14.0",
+ "regex",
+ "sha3",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -5270,10 +5356,10 @@ version = "1.2.0"
 source = "git+https://github.com/hoprnet/hopr-types?branch=main#c5a65c8c020748718e1b74d930ec21fe6dfd5f2e"
 dependencies = [
  "hopr-chain-types",
- "hopr-crypto-random",
- "hopr-crypto-types",
+ "hopr-crypto-random 1.2.0",
+ "hopr-crypto-types 1.2.0",
  "hopr-internal-types",
- "hopr-primitive-types",
+ "hopr-primitive-types 1.2.0",
 ]
 
 [[package]]
@@ -5674,7 +5760,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.6.3",
  "system-configuration",
  "tokio",
  "tower-service",
@@ -8065,7 +8151,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash",
  "rustls 0.23.37",
- "socket2 0.5.10",
+ "socket2 0.6.3",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -8102,7 +8188,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.5.10",
+ "socket2 0.6.3",
  "tracing",
  "windows-sys 0.60.2",
 ]
@@ -11910,9 +11996,9 @@ checksum = "40990edd51aae2c2b6907af74ffb635029d5788228222c4bb811e9351c0caad3"
 
 [[package]]
 name = "zlib-rs"
-version = "0.6.3"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3be3d40e40a133f9c916ee3f9f4fa2d9d63435b5fbe1bfc6d9dae0aa0ada1513"
+checksum = "a7948af682ccbc3342b6e9420e8c51c1fe5d7bf7756002b4a3c6cabfe96a7e3c"
 
 [[package]]
 name = "zmij"
