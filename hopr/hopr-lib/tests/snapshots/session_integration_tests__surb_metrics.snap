@@ -37,7 +37,7 @@ surb:
   buffer_estimate: 60
   target_buffer: 200
   rate_per_sec: "[rate_per_sec]"
-  refill_in_flight: false
+  refill_in_flight: true
 transport:
   bytes_in: 0
   bytes_out: 0
