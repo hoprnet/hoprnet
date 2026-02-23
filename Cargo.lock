@@ -4419,7 +4419,6 @@ dependencies = [
  "ahash",
  "anyhow",
  "async-broadcast",
- "async-lock",
  "async-trait",
  "blokli-client",
  "dashmap",
