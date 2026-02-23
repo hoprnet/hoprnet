@@ -56,6 +56,9 @@ impl GasEstimation {
         value.and_then(|raw| raw.parse::<u128>().ok()).unwrap_or(default)
     }
 
+    /// Creates a `GasEstimation` from optional chain info fees. All values fallback to defaults if the provided strings
+    /// are not parsable or missing. Additionally, the `max_priority_fee_per_gas` is clamped to the `max_fee_per_gas` if
+    /// it exceeds it.
     pub fn from_chain_info_fees(max_fee_per_gas: Option<&str>, max_priority_fee_per_gas: Option<&str>) -> Self {
         let mut gas_estimation = Self::default();
 
