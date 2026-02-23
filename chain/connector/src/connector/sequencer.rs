@@ -3,7 +3,10 @@ use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use hopr_chain_types::prelude::{GasEstimation, SignableTransaction};
 use hopr_crypto_types::prelude::*;
 
-use crate::errors::{self, ConnectorError};
+use crate::{
+    errors::{self, ConnectorError},
+    utils::model_to_chain_info,
+};
 
 type TxRequest<T> = (
     T,
@@ -47,11 +50,12 @@ where
                             Err(e) => return (Err(e), notifier),
                         };
 
-                        let chain_id = chain_info.chain_id as u64;
-                        let gas_estimation = GasEstimation::from_chain_info_fees(
-                            chain_info.max_fee_per_gas.as_deref(),
-                            chain_info.max_priority_fee_per_gas.as_deref(),
-                        );
+                        let parsed_chain_info = match model_to_chain_info(chain_info) {
+                            Ok(parsed_chain_info) => parsed_chain_info,
+                            Err(error) => return (Err(error), notifier),
+                        };
+                        let chain_id = parsed_chain_info.info.chain_id;
+                        let gas_estimation = GasEstimation::from(parsed_chain_info);
                         tracing::debug!(?gas_estimation, "gas estimation used for tx");
 
                         // We always query the transaction count for the signer and use
