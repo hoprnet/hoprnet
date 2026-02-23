@@ -47,10 +47,10 @@ members = [
 
 [workspace.dependencies]
 ahash = "0.8.12"
-anyhow = "1.0.101"
+anyhow = "1.0.102"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
-assertables = "9.8.4"
+assertables = "9.8.6"
 async-lock = "3.4.2"
 async-signal = "0.2.13"
 async-stream = "0.3.6"
@@ -75,7 +75,7 @@ chrono = { version = "0.4.43", default-features = false, features = [
   "std",
   "clock",
 ] }
-clap = { version = "4.5.58", features = ["derive", "env", "string"] }
+clap = { version = "4.5.60", features = ["derive", "env", "string"] }
 const_format = "0.2.35"
 console-subscriber = "0.5.0"
 criterion = { version = "0.8.2", features = ["async_tokio", "html_reports"] }
@@ -177,8 +177,8 @@ serde_json = "1.0.149"
 serde_repr = "0.1.20"
 serde_with = { version = "3.16.1", features = ["base64"] }
 serde_urlencoded = "0.7.1"
-serde-saphyr = "0.0.19"
-serial_test = "3.3.1"
+serde-saphyr = "0.0.20"
+serial_test = "3.4.0"
 sha3 = "0.10.8"
 signal-hook = "0.4.3"
 smart-default = "0.7.1"
@@ -188,9 +188,9 @@ sqlx = { version = "0.8.6", default-features = false, features = [
   "macros",
   "migrate",
 ] }
-strum = { version = "0.27.2", features = ["derive"] }
+strum = { version = "0.28.0", features = ["derive"] }
 subtle = "2.6.1"
-syn = { version = "2.0.116", features = ["full"] }
+syn = { version = "2.0.117", features = ["full"] }
 tempfile = "3.25.0"
 test-log = { version = "0.2.19", features = ["trace"] }
 thiserror = "2.0.18"
