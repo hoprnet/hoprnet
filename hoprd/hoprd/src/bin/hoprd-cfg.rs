@@ -59,7 +59,7 @@ fn main() -> Result<(), hoprd::errors::HoprdError> {
     if args.default {
         println!(
             "{}",
-            serde_yaml::to_string(&hoprd::config::HoprdConfig::default())
+            serde_saphyr::to_string(&hoprd::config::HoprdConfig::default())
                 .map_err(|e| hoprd::errors::HoprdError::ConfigError(e.to_string()))?
         );
     } else if let Some(cfg_path) = args.validate {
@@ -71,7 +71,7 @@ fn main() -> Result<(), hoprd::errors::HoprdError> {
         let yaml_configuration =
             std::fs::read_to_string(&cfg_path).map_err(|e| hoprd::errors::HoprdError::ConfigError(e.to_string()))?;
 
-        let cfg: HoprdConfig = serde_yaml::from_str(&yaml_configuration)
+        let cfg: HoprdConfig = serde_saphyr::from_str(&yaml_configuration)
             .map_err(|e| hoprd::errors::HoprdError::SerializationError(e.to_string()))?;
 
         if let Err(e) = cfg.validate() {

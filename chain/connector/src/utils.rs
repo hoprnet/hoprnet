@@ -92,6 +92,8 @@ pub(crate) struct ParsedChainInfo {
     pub info: ChainInfo,
     pub ticket_win_prob: WinningProbability,
     pub ticket_price: HoprBalance,
+    pub finality: u32,
+    pub expected_block_time: Duration,
 }
 
 pub(crate) fn model_to_chain_info(
@@ -143,6 +145,20 @@ pub(crate) fn model_to_chain_info(
             .0
             .parse()
             .map_err(|e| ConnectorError::TypeConversion(format!("invalid ticket price: {e}")))?,
+        finality: model
+            .finality
+            .0
+            .parse::<u32>()
+            .map_err(|e| ConnectorError::TypeConversion(format!("failed to parse finality: {e}")))?
+            .max(1),
+        expected_block_time: Duration::from_secs(
+            model
+                .expected_block_time
+                .0
+                .parse()
+                .map_err(|e| ConnectorError::TypeConversion(format!("failed to parse expected block time: {e}")))?,
+        )
+        .max(Duration::from_secs(1)),
     })
 }
 

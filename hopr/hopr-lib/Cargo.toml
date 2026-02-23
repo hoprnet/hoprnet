@@ -109,7 +109,7 @@ hex-literal = { workspace = true }
 rand = { workspace = true }
 rstest = { workspace = true }
 serial_test = { workspace = true }
-serde_yaml = { workspace = true }
+serde-saphyr = { workspace = true }
 tokio = { workspace = true }
 test-log = { workspace = true }
 

@@ -522,22 +522,16 @@ mod tests {
             surb_decay: None,
         };
 
-        let cfg_2 = SurbBalancerConfig {
-            target_surb_buffer_size: 5500,
-            max_surbs_per_sec: 3055,
-            surb_decay: None,
-        };
-
         let mut seq = mockall::Sequence::new();
 
         let mut mock_balancer_feedback = MockBalancerConfigFeedback::new();
         mock_balancer_feedback
             .expect_get_config()
-            .times(3)
+            .times(4)
             .in_sequence(&mut seq)
             .with(mockall::predicate::eq(session_id))
             .returning(move |_| {
-                tracing::trace!("get config 1");
+                tracing::debug!("get config 1");
                 Ok(cfg_1)
             });
 
@@ -545,20 +539,48 @@ mod tests {
             .expect_on_config_update()
             .once()
             .in_sequence(&mut seq)
-            .with(mockall::predicate::eq(session_id), mockall::predicate::eq(cfg_2))
+            .with(
+                mockall::predicate::eq(session_id),
+                mockall::predicate::eq(SurbBalancerConfig {
+                    target_surb_buffer_size: 5400,
+                    max_surbs_per_sec: 3000,
+                    surb_decay: None,
+                }),
+            )
             .returning(|_, _| {
-                tracing::trace!("on config update");
+                tracing::debug!("on config update");
                 Ok(())
             });
 
         mock_balancer_feedback
             .expect_get_config()
-            .times(2)
+            .times(1)
             .in_sequence(&mut seq)
             .with(mockall::predicate::eq(session_id))
             .returning(move |_| {
-                tracing::trace!("get config 2");
-                Ok(cfg_2)
+                tracing::debug!("get config 2");
+                Ok(SurbBalancerConfig {
+                    target_surb_buffer_size: 5400,
+                    max_surbs_per_sec: 3000,
+                    surb_decay: None,
+                })
+            });
+
+        mock_balancer_feedback
+            .expect_on_config_update()
+            .once()
+            .in_sequence(&mut seq)
+            .with(
+                mockall::predicate::eq(session_id),
+                mockall::predicate::eq(SurbBalancerConfig {
+                    target_surb_buffer_size: 6600,
+                    max_surbs_per_sec: 3666,
+                    surb_decay: None,
+                }),
+            )
+            .returning(|_, _| {
+                tracing::debug!("on config update");
+                Ok(())
             });
 
         let mut mock_flow_ctl = MockSurbFlowController::new();

@@ -300,8 +300,7 @@ async fn main_inner() -> anyhow::Result<()> {
     let mut chain_connector = create_trustful_hopr_blokli_connector(
         &hopr_keys.chain_key,
         BlockchainConnectorConfig {
-            tx_confirm_timeout: std::time::Duration::from_secs(90),
-            connection_timeout: std::time::Duration::from_mins(1),
+            connection_sync_timeout: std::time::Duration::from_mins(1),
             sync_tolerance: 90,
         },
         BlokliClient::new(

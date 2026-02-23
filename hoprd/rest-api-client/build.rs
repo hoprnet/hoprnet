@@ -28,8 +28,11 @@ fn main() {
     let ast = syn::parse2(tokens).expect("failed to parse generated tokens");
     let content = prettyplease::unparse(&ast);
 
-    let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR missing"));
-    let out_file = out_dir.join("codegen.rs");
+    let crate_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR missing"));
+    let out_dir = crate_dir.join("src/codegen/");
+    fs::create_dir_all(&out_dir).expect("failed to create generated client directory");
+
+    let out_file = out_dir.join("mod.rs");
     fs::write(&out_file, content).expect("failed to write generated client");
 }
 

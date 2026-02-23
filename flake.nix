@@ -616,6 +616,7 @@
               "LICENSE"
               "Makefile"
               "db/entity/src/codegen/*"
+              "hoprd/rest-api-client/src/codegen/*"
               "deploy/compose/grafana/config.monitoring"
               "deploy/nfpm/nfpm.yaml"
               ".github/workflows/build-binaries.yaml"

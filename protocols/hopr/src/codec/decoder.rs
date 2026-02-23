@@ -97,7 +97,8 @@ where
                 .await
                 .map_err(|e| HoprProtocolError::ResolverError(e.into()))?
                 .mul(U256::from(fwd.path_pos))
-        });
+        })
+        .max(self.cfg.min_incoming_ticket_price.unwrap_or_default());
 
         let remaining_balance = trace_timed!("unrealized_balance lookup", {
             incoming_channel.balance.sub(
