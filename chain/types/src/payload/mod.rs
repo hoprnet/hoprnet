@@ -33,11 +33,11 @@ pub struct GasEstimation {
     pub gas_limit: u64,
     /// Maximal fee per gas for the transaction.
     ///
-    /// Defaults to 0.01 Gwei
+    /// Defaults to 10 Gwei
     pub max_fee_per_gas: u128,
     /// Maximal priority fee per gas for the transaction.
     ///
-    /// Defaults to 0.002 Gwei
+    /// Defaults to 2 Gwei
     pub max_priority_fee_per_gas: u128,
 }
 
@@ -45,9 +45,29 @@ impl Default for GasEstimation {
     fn default() -> Self {
         Self {
             gas_limit: 10_000_000,
-            max_fee_per_gas: 10_000_000,         // 0.01 Gwei
-            max_priority_fee_per_gas: 2_000_000, // 0.002 Gwei
+            max_fee_per_gas: 10_000_000_000,         // 10 Gwei
+            max_priority_fee_per_gas: 2_000_000_000, // 2 Gwei
         }
+    }
+}
+
+impl GasEstimation {
+    fn parse_fee_or_default(value: Option<&str>, default: u128) -> u128 {
+        value.and_then(|raw| raw.parse::<u128>().ok()).unwrap_or(default)
+    }
+
+    pub fn from_chain_info_fees(max_fee_per_gas: Option<&str>, max_priority_fee_per_gas: Option<&str>) -> Self {
+        let mut gas_estimation = Self::default();
+
+        gas_estimation.max_fee_per_gas = Self::parse_fee_or_default(max_fee_per_gas, gas_estimation.max_fee_per_gas);
+        gas_estimation.max_priority_fee_per_gas =
+            Self::parse_fee_or_default(max_priority_fee_per_gas, gas_estimation.max_priority_fee_per_gas);
+
+        if gas_estimation.max_priority_fee_per_gas > gas_estimation.max_fee_per_gas {
+            gas_estimation.max_priority_fee_per_gas = gas_estimation.max_fee_per_gas;
+        }
+
+        gas_estimation
     }
 }
 
@@ -123,6 +143,7 @@ pub trait PayloadGenerator {
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use super::GasEstimation;
     use crate::ContractAddresses;
 
     lazy_static::lazy_static! {
@@ -139,5 +160,45 @@ pub(crate) mod tests {
             "ticket_price_oracle": "0x442df1d946303fB088C9377eefdaeA84146DA0A6",
             "winning_probability_oracle": "0xC15675d4CCa538D91a91a8D3EcFBB8499C3B0471"
         }"#).unwrap();
+    }
+
+    #[test]
+    fn gas_estimation_should_use_defaults_when_fees_are_missing() {
+        let defaults = GasEstimation::default();
+        let gas_estimation = GasEstimation::from_chain_info_fees(None, None);
+
+        assert_eq!(gas_estimation.max_fee_per_gas, defaults.max_fee_per_gas);
+        assert_eq!(
+            gas_estimation.max_priority_fee_per_gas,
+            defaults.max_priority_fee_per_gas
+        );
+    }
+
+    #[test]
+    fn gas_estimation_should_use_chain_info_fees_when_present() {
+        let gas_estimation = GasEstimation::from_chain_info_fees(Some("11"), Some("5"));
+
+        assert_eq!(gas_estimation.max_fee_per_gas, 11);
+        assert_eq!(gas_estimation.max_priority_fee_per_gas, 5);
+    }
+
+    #[test]
+    fn gas_estimation_should_fallback_to_defaults_for_invalid_fee_values() {
+        let defaults = GasEstimation::default();
+        let gas_estimation = GasEstimation::from_chain_info_fees(Some("invalid"), Some("also-invalid"));
+
+        assert_eq!(gas_estimation.max_fee_per_gas, defaults.max_fee_per_gas);
+        assert_eq!(
+            gas_estimation.max_priority_fee_per_gas,
+            defaults.max_priority_fee_per_gas
+        );
+    }
+
+    #[test]
+    fn gas_estimation_should_clamp_priority_fee_to_max_fee() {
+        let gas_estimation = GasEstimation::from_chain_info_fees(Some("10"), Some("20"));
+
+        assert_eq!(gas_estimation.max_fee_per_gas, 10);
+        assert_eq!(gas_estimation.max_priority_fee_per_gas, 10);
     }
 }
