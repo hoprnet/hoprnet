@@ -38,6 +38,11 @@ lazy_static::lazy_static! {
         "hopr_packet_decode_timeouts_total",
         "Number of incoming packets dropped due to decode timeout"
     ).unwrap();
+    static ref METRIC_VALIDATION_ERRORS: hopr_metrics::MultiCounter =  hopr_metrics::MultiCounter::new(
+        "hopr_packet_ticket_validation_errors",
+        "Number of different ticket validation errors encountered during packet processing",
+        &["type"]
+    ).unwrap();
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
@@ -211,6 +216,10 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             .unwrap_or_else(|error| {
                                 tracing::error!(%error, "failed to send ack to the egress queue");
                             });
+
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        METRIC_VALIDATION_ERRORS.increment(&[error.kind.as_ref()]);
+
                         None
                     }
                     Err(_) => {
@@ -218,10 +227,11 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                         tracing::error!(
                             %peer,
                             timeout_ms = PACKET_DECODING_TIMEOUT.as_millis() as u64,
-                            "dropped incoming packet: decode timeout - check hopr_rayon_queue_wait_seconds metric for pool saturation"
+                            "dropped incoming packet: decode timeout - check the 'hopr_rayon_queue_wait_seconds' metric for pool saturation"
                         );
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_PACKET_DECODE_TIMEOUTS.increment();
+
                         None
                     }
                 }
@@ -595,6 +605,7 @@ where
         // Initialize the lazy statics here
         lazy_static::initialize(&METRIC_PACKET_COUNT);
         lazy_static::initialize(&METRIC_PACKET_DECODE_TIMEOUTS);
+        lazy_static::initialize(&METRIC_VALIDATION_ERRORS);
     }
 
     let (outgoing_ack_tx, outgoing_ack_rx) =

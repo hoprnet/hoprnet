@@ -1,19 +1,9 @@
 use std::sync::Arc;
 
-use hopr_crypto_packet::errors::TicketValidationError;
 use sea_orm::TransactionError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum NodeDbError {
-    #[error("cannot find a surb: {0}")]
-    NoSurbAvailable(String),
-
-    #[error("ticket validation error for {}: {}", .0.ticket, .0.reason)]
-    TicketValidationError(#[from] TicketValidationError),
-
-    #[error("failed to process acknowledgement: {0}")]
-    AcknowledgementValidationError(String),
-
     #[error("logical error: {0}")]
     LogicalError(String),
 
