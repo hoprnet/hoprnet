@@ -2,7 +2,7 @@
 name = "hopr-primitive-types"
 version = "0.10.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-edition = "2021"
+edition = "2024"
 description = "Generic types used through the entire code base"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"

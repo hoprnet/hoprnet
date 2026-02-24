@@ -3,7 +3,7 @@ name = "hopr-transport-identity"
 version = "0.1.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Identity related operations for the HOPR transport"
-edition = "2021"
+edition = "2024"
 license = "GPL-3.0-only"
 
 [lib]

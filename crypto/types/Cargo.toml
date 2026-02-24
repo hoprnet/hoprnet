@@ -2,7 +2,7 @@
 name = "hopr-crypto-types"
 version = "0.9.1"
 description = "Implements basic cryptograpic primitives and cryptography related types"
-edition = "2021"
+edition = "2024"
 license = "GPL-3.0-only"
 
 [features]

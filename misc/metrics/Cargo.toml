@@ -2,7 +2,7 @@
 name = "hopr-metrics"
 version = "1.3.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-edition = "2021"
+edition = "2024"
 description = "Rust module containing support for general hopr-metrics collection"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
