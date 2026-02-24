@@ -5,7 +5,7 @@ use hopr_async_runtime::AbortHandle;
 use hopr_network_types::prelude::DestinationRouting;
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataOut};
 use hopr_protocol_start::{KeepAliveFlag, KeepAliveMessage};
-use tracing::{debug, error};
+use tracing::{Instrument, debug, error, instrument};
 
 use crate::{
     AtomicSurbFlowEstimator, SessionId,
@@ -130,6 +130,7 @@ pub(crate) enum SurbNotificationMode {
 }
 
 /// Spawns a task for a rate-limited stream of Keep-Alive messages to the Session counterparty.
+#[instrument(level = "debug", skip(sender, routing, notification_mode, cfg))]
 pub(crate) fn spawn_keep_alive_stream<S>(
     session_id: SessionId,
     sender: S,
@@ -183,12 +184,12 @@ where
                     sender_clone
                         .send(msg)
                         .await
-                        .map_err(|e| TransportSessionError::PacketSendingError(e.to_string()))
+                        .map_err(TransportSessionError::packet_sending)
                 }
             })
             .then(move |res| {
                 match res {
-                    Ok(_) => tracing::trace!(
+                    Ok(_) => tracing::debug!(
                         component = "session",
                         %session_id,
                         task = "session keepalive",
@@ -197,7 +198,8 @@ where
                     Err(error) => error!(%session_id, %error, "keep-alive stream failed"),
                 }
                 futures::future::ready(())
-            }),
+            })
+            .in_current_span(),
     );
 
     (controller, abort_handle)
