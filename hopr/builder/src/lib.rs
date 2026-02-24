@@ -198,7 +198,13 @@ where
                                             let capacity =  if matches!(channel.status, ChannelStatus::Closed) {
                                                 None
                                             } else {
-                                                Some(channel.balance.amount().low_u128().saturating_div(ticket_price.read().amount().low_u128()).saturating_mul(win_probability.read().as_luck() as u128))
+                                                Some(
+                                                    if let Some(division) = channel.balance.amount().low_u128().checked_div(ticket_price.read().amount().low_u128()) {
+                                                        division.saturating_mul(win_probability.read().as_luck() as u128)
+                                                    } else {
+                                                        u128::MAX
+                                                    }
+                                                )
                                             };
 
                                             graph_updater.record_edge(hopr_lib::api::graph::MeasurableEdge::<NeighborTelemetry, PathTelemetry>::Capacity(Box::new(EdgeCapacityUpdate{

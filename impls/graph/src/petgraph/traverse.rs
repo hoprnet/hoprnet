@@ -192,7 +192,7 @@ mod tests {
         let graph = ChannelGraph::new(me);
         graph.add_node(dest);
         graph.add_edge(&me, &dest)?;
-        mark_edge_connected(&graph, &me, &dest);
+        mark_edge_loopback_ready(&graph, &me, &dest);
 
         let routes = graph.simple_paths(&me, &dest, 1, None, SimpleHoprCostFn::new(1));
 
@@ -212,6 +212,7 @@ mod tests {
         graph.add_node(dest);
         graph.add_edge(&me, &hop)?;
         graph.add_edge(&hop, &dest)?;
+        mark_edge_loopback_ready(&graph, &me, &hop);
         mark_edge_connected(&graph, &hop, &dest);
 
         let routes = graph.simple_paths(&me, &dest, 2, None, SimpleHoprCostFn::new(2));
@@ -267,6 +268,8 @@ mod tests {
         graph.add_edge(&me, &b)?;
         graph.add_edge(&a, &dest)?;
         graph.add_edge(&b, &dest)?;
+        mark_edge_loopback_ready(&graph, &me, &a);
+        mark_edge_loopback_ready(&graph, &me, &b);
         mark_edge_connected(&graph, &a, &dest);
         mark_edge_connected(&graph, &b, &dest);
 
@@ -290,6 +293,7 @@ mod tests {
         graph.add_edge(&me, &a)?;
         graph.add_edge(&a, &b)?;
         graph.add_edge(&b, &dest)?;
+        mark_edge_loopback_ready(&graph, &me, &a);
         mark_edge_connected(&graph, &b, &dest);
 
         let routes = graph.simple_paths(&me, &dest, 3, None, SimpleHoprCostFn::new(3));
@@ -313,6 +317,7 @@ mod tests {
         graph.add_edge(&a, &b)?;
         graph.add_edge(&b, &dest)?;
         graph.add_edge(&a, &me)?; // back-edge
+        mark_edge_loopback_ready(&graph, &me, &a);
         mark_edge_connected(&graph, &b, &dest);
 
         let routes = graph.simple_paths(&me, &dest, 3, None, SimpleHoprCostFn::new(3));
@@ -434,6 +439,10 @@ mod tests {
         graph.add_edge(&d, &f)?;
         graph.add_edge(&e, &f)?;
 
+        // Mark first-hop edges with full QoS (connected + intermediate capacity)
+        mark_edge_loopback_ready(&graph, &me, &a);
+        mark_edge_loopback_ready(&graph, &me, &b);
+
         // Only mark c→f, d→f, e→f as connected (satisfies cost function for last edge)
         mark_edge_connected(&graph, &c, &f);
         mark_edge_connected(&graph, &d, &f);
@@ -505,7 +514,7 @@ mod tests {
         let graph = ChannelGraph::new(me);
         graph.add_node(dest);
         graph.add_edge(&me, &dest)?;
-        mark_edge_connected(&graph, &me, &dest);
+        mark_edge_loopback_ready(&graph, &me, &dest);
 
         let routes = graph.simple_paths(&me, &dest, 1, None, SimpleHoprCostFn::new(1));
         assert_eq!(routes.len(), 1);
@@ -533,6 +542,7 @@ mod tests {
         graph.add_edge(&me, &a)?;
         graph.add_edge(&a, &b)?;
         graph.add_edge(&b, &dest)?;
+        mark_edge_loopback_ready(&graph, &me, &a);
         mark_edge_connected(&graph, &b, &dest);
 
         let routes = graph.simple_paths(&me, &dest, 3, None, SimpleHoprCostFn::new(3));
@@ -566,6 +576,8 @@ mod tests {
         graph.add_edge(&me, &b)?;
         graph.add_edge(&a, &dest)?;
         graph.add_edge(&b, &dest)?;
+        mark_edge_loopback_ready(&graph, &me, &a);
+        mark_edge_loopback_ready(&graph, &me, &b);
         mark_edge_connected(&graph, &a, &dest);
         mark_edge_connected(&graph, &b, &dest);
 

@@ -133,7 +133,10 @@ impl hopr_api::graph::NetworkGraphWrite for ChannelGraph {
             .copied()
             .ok_or(ChannelGraphError::PublicKeyNodeNotFound(*dest))?;
 
-        inner.graph.add_edge(src_idx, dest_idx, Observations::default());
+        if inner.graph.find_edge(src_idx, dest_idx).is_none() {
+            inner.graph.add_edge(src_idx, dest_idx, Observations::default());
+        }
+
         Ok(())
     }
 
@@ -151,6 +154,8 @@ impl hopr_api::graph::NetworkGraphWrite for ChannelGraph {
     /// Mutably updates the edge observations between two nodes.
     ///
     /// If the edge does not exist, it gets created first.
+    ///
+    /// If the nodes do not exist, they are added as well.
     #[tracing::instrument(level = "debug", skip(self, f))]
     fn upsert_edge<F>(&self, src: &OffchainPublicKey, dest: &OffchainPublicKey, f: F)
     where
@@ -158,21 +163,32 @@ impl hopr_api::graph::NetworkGraphWrite for ChannelGraph {
     {
         let mut inner = self.inner.write();
 
-        if let (Some(src_idx), Some(dest_idx)) = (
-            inner.indices.get_by_left(src).copied(),
-            inner.indices.get_by_left(dest).copied(),
-        ) {
-            let edge_idx = inner
-                .graph
-                .find_edge(src_idx, dest_idx)
-                .unwrap_or_else(|| inner.graph.add_edge(src_idx, dest_idx, Observations::default()));
-
-            if let Some(weight) = inner.graph.edge_weight_mut(edge_idx) {
-                f(weight);
-                tracing::debug!(%src, %dest, ?weight, "updated edge weight with an observation");
-            }
+        let src_idx = if let Some(src_idx) = inner.indices.get_by_left(src) {
+            *src_idx
         } else {
-            tracing::warn!(%src, %dest, reason = "one or both of the nodes do not exist", "edge update failed" );
+            // src node missing, add it
+            let idx = inner.graph.add_node(*src);
+            inner.indices.insert(*src, idx);
+            idx
+        };
+
+        let dest_idx = if let Some(dest_idx) = inner.indices.get_by_left(dest) {
+            *dest_idx
+        } else {
+            // dest node missing, add it
+            let idx = inner.graph.add_node(*dest);
+            inner.indices.insert(*dest, idx);
+            idx
+        };
+
+        let edge_idx = inner
+            .graph
+            .find_edge(src_idx, dest_idx)
+            .unwrap_or_else(|| inner.graph.add_edge(src_idx, dest_idx, Observations::default()));
+
+        if let Some(weight) = inner.graph.edge_weight_mut(edge_idx) {
+            f(weight);
+            tracing::debug!(%src, %dest, ?weight, "updated edge weight with an observation");
         }
     }
 }
@@ -437,16 +453,51 @@ mod tests {
     }
 
     #[test]
-    fn upsert_edge_with_unknown_nodes_is_noop() {
+    fn upsert_edge_adds_missing_dest_node_and_creates_edge() {
         let me = pubkey_from(&SECRET_0);
         let unknown = pubkey_from(&SECRET_7);
         let graph = ChannelGraph::new(me);
 
-        // One or both nodes unknown — should not panic, no edge created
-        graph.upsert_edge(&me, &unknown, |_obs| {
-            panic!("closure should not be called when nodes are missing");
+        assert!(!graph.contains_node(&unknown));
+        graph.upsert_edge(&me, &unknown, |obs| {
+            obs.record(EdgeWeightType::Immediate(Ok(std::time::Duration::from_millis(50))));
         });
-        assert!(!graph.has_edge(&me, &unknown));
+        assert!(graph.contains_node(&unknown), "dest node should be auto-added");
+        assert!(graph.has_edge(&me, &unknown), "edge should be created");
+        assert!(graph.edge(&me, &unknown).unwrap().immediate_qos().is_some());
+    }
+
+    #[test]
+    fn upsert_edge_adds_missing_src_node_and_creates_edge() {
+        let me = pubkey_from(&SECRET_0);
+        let unknown = pubkey_from(&SECRET_7);
+        let graph = ChannelGraph::new(me);
+
+        assert!(!graph.contains_node(&unknown));
+        graph.upsert_edge(&unknown, &me, |obs| {
+            obs.record(EdgeWeightType::Immediate(Ok(std::time::Duration::from_millis(50))));
+        });
+        assert!(graph.contains_node(&unknown), "src node should be auto-added");
+        assert!(graph.has_edge(&unknown, &me), "edge should be created");
+        assert!(graph.edge(&unknown, &me).unwrap().immediate_qos().is_some());
+    }
+
+    #[test]
+    fn upsert_edge_adds_both_missing_nodes_and_creates_edge() {
+        let me = pubkey_from(&SECRET_0);
+        let a = pubkey_from(&SECRET_1);
+        let b = pubkey_from(&SECRET_2);
+        let graph = ChannelGraph::new(me);
+
+        assert!(!graph.contains_node(&a));
+        assert!(!graph.contains_node(&b));
+        graph.upsert_edge(&a, &b, |obs| {
+            obs.record(EdgeWeightType::Immediate(Ok(std::time::Duration::from_millis(50))));
+        });
+        assert!(graph.contains_node(&a), "src node should be auto-added");
+        assert!(graph.contains_node(&b), "dest node should be auto-added");
+        assert!(graph.has_edge(&a, &b), "edge should be created");
+        assert!(graph.edge(&a, &b).unwrap().immediate_qos().is_some());
     }
 
     #[test]

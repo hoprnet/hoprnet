@@ -52,6 +52,10 @@ where
     fn build(&self) -> BoxStream<'static, DestinationRouting> {
         cfg_if::cfg_if! {
             if #[cfg(feature = "noise")] {
+                let cfg = self.cfg;
+                let me = self.me;
+                let graph_intermediates = self.graph.clone();
+
                 let junk = futures::stream::repeat(futures::stream::iter([2, 3, 4]))
                     .flatten()
                     .filter_map(move |edge_count| async move {
@@ -59,32 +63,28 @@ where
                         Some(edge_count)
                     })
                     .flat_map(move |edge_count| {
-                        let simple_paths = graph_intermediates.simple_paths(
-                            &me,
-                            &me,
-                            edge_count,
-                            Some(100),
-                            HoprCostFn::new(edge_count),
-                        );
+                        let simple_paths =
+                            graph_intermediates.simple_paths(&me, &me, edge_count, Some(100), HoprCostFn::new(edge_count));
                         futures::stream::iter(simple_paths)
                     })
-                    .filter_map(move |(path, path_id, _cost)| {
+                    .filter_map(move |(path, _path_id, _cost)| {
                         let me_node: NodeId = me.into();
                         let path: Vec<NodeId> = path.into_iter().map(NodeId::from).collect();
 
-                        let routing = hopr_api::network::BoundedVec::try_from(path).ok().map(|path| {
-                            DestinationRouting::Forward {
-                                destination: Box::new(me_node),
-                                pseudonym: Some(HoprPseudonym::random()),
-                                forward_options: RoutingOptions::IntermediatePath(path),
-                                return_options: None,
-                            }
-                        });
+                        let routing =
+                            hopr_api::network::BoundedVec::try_from(path)
+                                .ok()
+                                .map(|path| DestinationRouting::Forward {
+                                    destination: Box::new(me_node),
+                                    pseudonym: Some(HoprPseudonym::random()),
+                                    forward_options: RoutingOptions::IntermediatePath(path),
+                                    return_options: None,
+                                });
 
                         futures::future::ready(routing)
                     });
 
-                    junk.boxed()
+                junk.boxed()
             } else {
                 // Cover traffic not generating any data
                 Box::pin(futures::stream::empty())

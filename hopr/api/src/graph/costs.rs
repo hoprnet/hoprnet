@@ -54,7 +54,7 @@ where
 
                         -initial_cost
                     }
-                    v if v == length => {
+                    v if v == (length - 1) => {
                         // the last edge should always go from an already connected and measured peer,
                         // otherwise use a negative cost that should remove the edge from consideration
                         if observation.immediate_qos().is_some_and(|o| o.is_connected()) {
@@ -121,7 +121,7 @@ where
 
                         -initial_cost
                     }
-                    v if v == length => {
+                    v if v == (length - 1) => {
                         // the last edge should always go from an already connected and measured peer,
                         // otherwise use a negative cost that should remove the edge from consideration
                         if observation.immediate_qos().is_some_and(|o| o.is_connected()) {

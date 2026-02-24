@@ -42,8 +42,9 @@ use petgraph::{
 /// * `min_cost`: an optional threshold. If the accumulated cost drops below this value (via `PartialOrd`), the branch
 ///   is pruned — it is neither yielded nor explored further.
 /// * `cost_fn`: an accumulator function `(accumulated_cost, &edge_weight, edge_count) -> new_cost` applied at each
-///   edge. The `edge_count` is the 1-based hop number from the source (i.e., 1 for the first edge, 2 for the second,
+///   edge. The `edge_count` is the 0-based hop number from the source (i.e., 0 for the first edge, 1 for the second,
 ///   etc.).
+///
 /// # Returns
 /// Returns an iterator that produces `(path, cost)` tuples for all simple paths from `from` node to any node in the
 /// `to` set, which contains at least `min_intermediate_nodes` and at most `max_intermediate_nodes` intermediate nodes,
@@ -130,8 +131,9 @@ where
                     continue;
                 }
 
+                // initialized by `from` so is always at least len 1
                 let current_nodes = visited.len();
-                let new_cost = cost_fn(costs.last().unwrap().clone(), edge.weight(), current_nodes);
+                let new_cost = cost_fn(costs.last().unwrap().clone(), edge.weight(), current_nodes - 1);
 
                 // Prune branch if cost drops below threshold
                 if let Some(ref min) = min_cost
@@ -151,7 +153,7 @@ where
                 }
 
                 // Expand the search only if within max length and unexplored target nodes remain
-                if (current_nodes < max_nodes) && to.iter().any(|n| *n != child && !visited.contains(n)) {
+                if (current_nodes < (max_nodes - 1)) && to.iter().any(|n| *n != child && !visited.contains(n)) {
                     visited.insert(child);
                     stack.push(graph.edges_directed(child, Outgoing));
                     costs.push(new_cost);
@@ -237,6 +239,31 @@ mod test {
         .map(|(v, _): (Vec<_>, _)| v.into_iter().map(|i| i.index()).collect())
         .collect();
         let expected: HashSet<Vec<_>> = HashSet::from_iter([vec![0, 1, 2, 3], vec![0, 1, 2, 4]]);
+        assert_eq!(paths, expected);
+    }
+
+    #[test]
+    fn max_intermediate_nodes_should_not_be_exceeded_when_target_connects_to_target() {
+        // Chain: 0->1->2->3, targets={2,3}, max_intermediate_nodes=1
+        // Only [0,1,2] is valid (1 intermediate node).
+        // Bug: the algorithm also yields [0,1,2,3] (2 intermediate nodes) because
+        // it expands through target 2 to reach target 3, pushing visited to max_nodes,
+        // then yields the grandchild path without checking the max length.
+        let graph = DiGraph::<i32, ()>::from_edges([(0, 1), (1, 2), (2, 3)]);
+        let targets = HashSet::from_iter([2.into(), 3.into()]);
+        let paths: HashSet<Vec<_>> = all_simple_paths_multi::<_, _, RandomState, _, _>(
+            &graph,
+            0.into(),
+            &targets,
+            0,
+            Some(1),
+            0,
+            None,
+            |c, _, _| c,
+        )
+        .map(|(v, _): (Vec<_>, _)| v.into_iter().map(|i| i.index()).collect())
+        .collect();
+        let expected: HashSet<Vec<_>> = HashSet::from_iter([vec![0, 1, 2]]);
         assert_eq!(paths, expected);
     }
 

@@ -131,7 +131,7 @@ mod tests {
         );
     }
 
-    // ── Last edge (path_index == length) ─────────────────────────────────
+    // ── Last edge (path_index == length - 1) ───────────────────────────────
 
     #[test]
     fn hopr_last_edge_positive_when_connected_with_score() {
@@ -139,7 +139,7 @@ mod tests {
         let f = cost_fn.into_cost_fn();
         let obs = obs_connected_with_capacity();
 
-        let cost = f(1.0, &obs, 3);
+        let cost = f(1.0, &obs, 2);
         assert!(
             cost > 0.0,
             "last edge should have positive cost when connected with score, got {cost}"
@@ -152,7 +152,7 @@ mod tests {
         let f = cost_fn.into_cost_fn();
         let obs = obs_connected_only_immediate();
 
-        let cost = f(1.0, &obs, 3);
+        let cost = f(1.0, &obs, 2);
         assert!(
             cost > 0.0,
             "last edge should have positive cost with only immediate observation, got {cost}"
@@ -165,7 +165,7 @@ mod tests {
         let f = cost_fn.into_cost_fn();
         let obs = obs_connected_with_capacity();
 
-        let cost = f(2.0, &obs, 3);
+        let cost = f(2.0, &obs, 2);
         assert!(
             cost > 0.0 && cost <= 2.0,
             "cost should be scaled by overall score, got {cost}"
@@ -178,7 +178,7 @@ mod tests {
         let f = cost_fn.into_cost_fn();
         let obs = obs_not_connected_with_intermediate();
 
-        let cost = f(1.0, &obs, 3);
+        let cost = f(1.0, &obs, 2);
         assert!(
             cost < 0.0,
             "last edge should be negative when not connected, got {cost}"
@@ -194,7 +194,7 @@ mod tests {
         obs.record(EdgeWeightType::Connected(true));
         obs.record(EdgeWeightType::Immediate(Err(())));
 
-        let cost = f(1.0, &obs, 3);
+        let cost = f(1.0, &obs, 2);
         assert!(
             cost < 0.0,
             "last edge should be negative when score is zero, got {cost}"
@@ -206,7 +206,7 @@ mod tests {
         let cost_fn = HoprCostFn::<_, Observations>::new(3);
         let f = cost_fn.into_cost_fn();
 
-        let cost = f(1.0, &obs_empty(), 3);
+        let cost = f(1.0, &obs_empty(), 2);
         assert!(
             cost < 0.0,
             "last edge should be negative with no observations, got {cost}"
@@ -300,13 +300,9 @@ mod tests {
         let f = cost_fn.into_cost_fn();
         let obs = obs_connected_with_capacity();
 
-        // path_index 0 = first edge
+        // path_index 0 = first edge (also last edge for length=1, but first-edge arm catches it)
         let first = f(1.0, &obs, 0);
         assert!(first > 0.0, "index 0 should be first-edge logic");
-
-        // path_index 1 = last edge (length == 1)
-        let last = f(1.0, &obs, 1);
-        assert!(last > 0.0, "index 1 should be last-edge logic");
     }
 
     #[test]
@@ -315,23 +311,16 @@ mod tests {
         let f = cost_fn.into_cost_fn();
         let obs = obs_connected_with_capacity();
 
-        // index 1 is intermediate (not first, not last) — positive with capacity
+        // index 1 = last edge (length - 1 = 1) — positive when connected
         let cost = f(1.0, &obs, 1);
         assert!(
             cost > 0.0,
-            "index 1 should be intermediate logic (positive with capacity)"
+            "index 1 should be last-edge logic (positive when connected with score)"
         );
 
-        // index 1 with empty obs — negative (no intermediate data)
+        // index 1 with empty obs — negative (not connected)
         let cost_empty = f(1.0, &obs_empty(), 1);
         assert!(cost_empty < 0.0, "index 1 should be negative with empty obs");
-
-        // index 2 = last
-        let cost_last = f(1.0, &obs_empty(), 2);
-        assert!(
-            cost_last < 0.0,
-            "index 2 should be last-edge logic (negative for empty obs)"
-        );
     }
 
     // ── Negative initial cost propagation ────────────────────────────────
