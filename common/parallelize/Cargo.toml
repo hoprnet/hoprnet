@@ -1,6 +1,6 @@
 [package]
 name = "hopr-parallelize"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2024"
 description = "Generic types used through the entire code base"

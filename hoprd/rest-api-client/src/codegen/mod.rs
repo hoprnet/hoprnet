@@ -1548,6 +1548,20 @@ and indexer state.*/
     ///    {
     ///      "type": "object",
     ///      "required": [
+    ///        "IntermediatePath"
+    ///      ],
+    ///      "properties": {
+    ///        "IntermediatePath": {
+    ///          "type": "array",
+    ///          "items": {
+    ///            "type": "string"
+    ///          }
+    ///        }
+    ///      }
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
     ///        "Hops"
     ///      ],
     ///      "properties": {
@@ -1563,7 +1577,14 @@ and indexer state.*/
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     pub enum RoutingOptions {
+        IntermediatePath(::std::vec::Vec<::std::string::String>),
         Hops(u64),
+    }
+    impl ::std::convert::From<::std::vec::Vec<::std::string::String>>
+    for RoutingOptions {
+        fn from(value: ::std::vec::Vec<::std::string::String>) -> Self {
+            Self::IntermediatePath(value)
+        }
     }
     impl ::std::convert::From<u64> for RoutingOptions {
         fn from(value: u64) -> Self {
@@ -2910,7 +2931,7 @@ at least the size of 2 Session packet payloads.*/
 
 API enabling developers to interact with a hoprd node programatically through HTTP REST API.
 
-Version: 4.6.0*/
+Version: 4.6.1*/
 pub struct Client {
     pub(crate) baseurl: String,
     pub(crate) client: reqwest::Client,
@@ -2946,7 +2967,7 @@ impl Client {
 }
 impl ClientInfo<()> for Client {
     fn api_version() -> &'static str {
-        "4.6.0"
+        "4.6.1"
     }
     fn baseurl(&self) -> &str {
         self.baseurl.as_str()
