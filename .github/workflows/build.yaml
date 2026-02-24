@@ -69,9 +69,9 @@ jobs:
           - name: aarch64-linux
             runner: self-hosted-hoprnet-bigger
           - name: aarch64-darwin
-            runner: macos-14 # M1 machine
+            runner: macos-15-xlarge # Uses Apple Silicon M2 hardware 5vCPU, 14GB RAM and 14GB SSD. 8-core GPU
           - name: x86_64-darwin
-            runner: macos-13 # Intel machine
+            runner: macos-15-intel # Uses Intel hardware 4vCPU, 14GB RAM and 14GB SSD
     name: ${{ matrix.binary }}-${{ matrix.target.name }}
     uses: ./.github/workflows/build-binaries.yaml
     with:

@@ -23,6 +23,7 @@ scrape_configs:
 ## List of metrics
 
 - `hopr_packets_count`: Number of processed packets of different types (sent, received, forwarded), keys: `type`
+- `hopr_packet_ticket_validation_errors`: Number of different ticket validation errors encountered during packet processing, keys: `type`
 - `hopr_mixer_queue_size`: Current mixer queue size
 - `hopr_mixer_average_packet_delay`: Average mixer packet delay averaged over a packet window
 - `hopr_network_health`: Connectivity health indicator

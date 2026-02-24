@@ -65,7 +65,7 @@ base64 = "0.22.1"
 bigdecimal = "0.4.10"
 bimap = "0.6.3"
 bitvec = "1.0.1"
-blokli-client = { git = "https://github.com/hoprnet/blokli", version = "0.19.0" }
+blokli-client = { git = "https://github.com/hoprnet/blokli" } # Always use latest for now
 bloomfilter = { version = "3.0.1", features = ["serde"] }
 bytesize = { version = "2.3.1", features = ["serde"] }
 bytes = "1.11.1"
@@ -177,7 +177,7 @@ serde_json = "1.0.149"
 serde_repr = "0.1.20"
 serde_with = { version = "3.16.1", features = ["base64"] }
 serde_urlencoded = "0.7.1"
-serde-saphyr = "0.0.19"
+serde-saphyr = "0.0.20"
 serial_test = "3.3.1"
 sha3 = "0.10.8"
 signal-hook = "0.4.3"
@@ -188,7 +188,7 @@ sqlx = { version = "0.8.6", default-features = false, features = [
   "macros",
   "migrate",
 ] }
-strum = { version = "0.27.2", features = ["derive"] }
+strum = { version = "0.28.0", features = ["derive"] }
 subtle = "2.6.1"
 syn = { version = "2.0.98", features = ["full"] }
 tempfile = "3.24.0"
