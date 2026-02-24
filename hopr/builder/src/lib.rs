@@ -162,6 +162,9 @@ where
                 Network(NetworkEvent),
             }
 
+            let ticket_price = std::sync::Arc::new(parking_lot::RwLock::new(chain_reader.minimum_ticket_price().await.unwrap_or_default()));
+            let win_probability = std::sync::Arc::new(parking_lot::RwLock::new(chain_reader.minimum_incoming_ticket_win_prob().await.unwrap_or_default()));
+
             network_events
                 .map(Event::Network)
                 .merge(chain_events.map(Event::Chain))
@@ -169,11 +172,10 @@ where
                     let mut indexer_peer_update_tx = indexer_peer_update_tx.clone();
                     let chain_reader = chain_reader.clone();
                     let graph_updater = graph_updater.clone();
+                    let ticket_price = ticket_price.clone();
+                    let win_probability = win_probability.clone();
+
                     async move {
-
-                        let ticket_price = std::sync::Arc::new(parking_lot::RwLock::new(chain_reader.minimum_ticket_price().await.unwrap_or_default()));
-                        let win_probability = std::sync::Arc::new(parking_lot::RwLock::new(chain_reader.minimum_incoming_ticket_win_prob().await.unwrap_or_default()));
-
                         match event {
                             Event::Chain(chain_event) => {
                                 match chain_event {
