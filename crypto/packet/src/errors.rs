@@ -71,7 +71,7 @@ pub enum ValidationErrorKind {
     InsufficientFunds(ChannelId, HoprBalance),
 }
 
-/// Contains errors returned by [validate_unacknowledged_ticket](crate::validation::validate_unacknowledged_ticket]).
+/// Contains errors returned by [validate_unacknowledged_ticket](crate::validation::validate_unacknowledged_ticket).
 #[derive(Debug, Clone, Error)]
 #[error("validation error of {ticket}: {kind}")]
 pub struct TicketValidationError {
