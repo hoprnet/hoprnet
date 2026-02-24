@@ -35,10 +35,10 @@ on:
         type: choice
         options:
           - self-hosted-hoprnet-bigger
-          - macos-13
-          - macos-14
+          - macos-15-xlarge
+          - macos-15-intel
         required: true
-        description: 'GH Runner to use: macos-13=x86_64-darwin and macos-14=aarch64-darwin'
+        description: 'GH Runner to use: macos-15-xlarge=aarch64-darwin and macos-15-intel=x86_64-darwin'
       target:
         type: choice
         options:
