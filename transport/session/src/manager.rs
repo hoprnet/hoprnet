@@ -2265,7 +2265,10 @@ mod tests {
         let alice_pseudonym = HoprPseudonym::random();
         let bob_peer: Address = (&ChainKeypair::random()).into();
 
-        let bob_cfg = SessionManagerConfig::default();
+        let bob_cfg = SessionManagerConfig {
+            surb_balance_notify_period: Some(Duration::from_millis(500)),
+            ..Default::default()
+        };
         let alice_mgr = SessionManager::new(Default::default());
         let bob_mgr = SessionManager::new(bob_cfg.clone());
 
@@ -2334,7 +2337,7 @@ mod tests {
             .times(5..)
             //.in_sequence(&mut sequence)
             .withf(move |peer, data| {
-                start_msg_match(data, |msg| matches!(msg, StartProtocol::KeepAlive(ka) if ka.additional_data == INITIAL_BALANCER_TARGET))
+                start_msg_match(data, |msg| matches!(msg, StartProtocol::KeepAlive(ka) if ka.flags.contains(KeepAliveFlag::BalancerTarget) && ka.additional_data == INITIAL_BALANCER_TARGET))
                 //msg_type(data, StartProtocolDiscriminants::KeepAlive)
                     && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
             })
@@ -2363,7 +2366,7 @@ mod tests {
             .times(5..)
             //.in_sequence(&mut sequence)
             .withf(move |peer, data| {
-                start_msg_match(data, |msg| matches!(msg, StartProtocol::KeepAlive(ka) if ka.additional_data == NEXT_BALANCER_TARGET))
+                start_msg_match(data, |msg| matches!(msg, StartProtocol::KeepAlive(ka) if ka.flags.contains(KeepAliveFlag::BalancerTarget) && ka.additional_data == NEXT_BALANCER_TARGET))
                     //msg_type(data, StartProtocolDiscriminants::KeepAlive)
                     && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
             })
@@ -2371,6 +2374,32 @@ mod tests {
                 let bob_mgr_clone = bob_mgr_clone.clone();
                 Box::pin(async move {
                     bob_mgr_clone
+                        .dispatch_message(
+                            alice_pseudonym,
+                            ApplicationDataIn {
+                                data: data.data,
+                                packet_info: Default::default(),
+                            },
+                        )
+                        .await?;
+                    Ok(())
+                })
+            });
+
+        // Bob sends at least 1 Keep Alive back reporting its SURB estimate
+        let alice_mgr_clone = alice_mgr.clone();
+        bob_transport
+            .expect_send_message()
+            .times(1..)
+            //.in_sequence(&mut open_sequence)
+            .withf(move |peer, data| {
+                start_msg_match(&data, |msg| matches!(msg, StartProtocol::KeepAlive(ka) if ka.flags.contains(KeepAliveFlag::BalancerState) && ka.additional_data > 0))
+                    && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
+            })
+            .returning(move |_, data| {
+                let alice_mgr_clone = alice_mgr_clone.clone();
+                Box::pin(async move {
+                    alice_mgr_clone
                         .dispatch_message(
                             alice_pseudonym,
                             ApplicationDataIn {
