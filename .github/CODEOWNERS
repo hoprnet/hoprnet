@@ -7,7 +7,7 @@
 # Last updated: 2025-08-06
 
 # Default owners for everything
-* @Teebor-Choka @tolbrino @NumberFour8 @jeandemeusy @QYuQianchen @ausias-armesto
+* @Teebor-Choka @NumberFour8
 
 # GitHub Actions workflows and CI/CD
 /.github/ @ausias-armesto @tolbrino @Teebor-Choka
@@ -23,20 +23,39 @@
 /protocols/ @NumberFour8 @Teebor-Choka
 
 # Common utilities and logic
+/impls/ @NumberFour8 @Teebor-Choka @jeandemeusy @QYuQianchen @tolbrino
 /common/ @NumberFour8 @Teebor-Choka @jeandemeusy @QYuQianchen @tolbrino
 /logic/ @NumberFour8 @Teebor-Choka @jeandemeusy @QYuQianchen @tolbrino
 /hopr/ @NumberFour8 @Teebor-Choka @jeandemeusy @QYuQianchen
 /db/ @NumberFour8 @Teebor-Choka
+/misc/ @NumberFour8 @Teebor-Choka
+/utils/ @NumberFour8 @Teebor-Choka
+/chain/ @NumberFour8 @Teebor-Choka
 
 # Testing
 /sdk/ @jeandemeusy @Teebor-Choka
+/localcluster/  @jeandemeusy @Teebor-Choka
 
 # Documentation
 /docs/ @Jaguaras @jeandemeusy
+*.md @NumberFour8 @Teebor-Choka @jeandemeusy @QYuQianchen @tolbrino
 
 # Build and configuration
 *.nix @tolbrino @ausias-armesto @Teebor-Choka
 *.toml @Teebor-Choka @NumberFour8
+flake.lock @tolbrino @ausias-armesto @Teebor-Choka
+Cargo.lock  @Teebor-Choka @NumberFour8
+uv.lock @jeandemeusy @tolbrino @QYuQianchen
+.envrc @NumberFour8 @Teebor-Choka @jeandemeusy @QYuQianchen @tolbrino
+.coderabbit.yml @NumberFour8 @Teebor-Choka @jeandemeusy @QYuQianchen @tolbrino
+.yamlfmt @NumberFour8 @Teebor-Choka @jeandemeusy @QYuQianchen @tolbrino
+.cargo/  @NumberFour8 @Teebor-Choka 
+justfile @NumberFour8 @Teebor-Choka @jeandemeusy @QYuQianchen @tolbrino
+Makefile @NumberFour8 @Teebor-Choka @jeandemeusy @QYuQianchen @tolbrino
+.editorconfig @NumberFour8 @Teebor-Choka @jeandemeusy @QYuQianchen @tolbrino
+.gcloudignore @NumberFour8 @Teebor-Choka @jeandemeusy @QYuQianchen @tolbrino
+.gitattributes @NumberFour8 @Teebor-Choka @jeandemeusy @QYuQianchen @tolbrino
+.gitignore @NumberFour8 @Teebor-Choka @jeandemeusy @QYuQianchen @tolbrino
 
 # Secure changes to critical files
 /.github/CODEOWNERS @tolbrino @QYuQianchen

@@ -25,11 +25,11 @@ pub async fn init_hopr_node_db(
     }
 
     // create DB dir if it does not exist
-    if let Some(parent_dir_path) = db_path.as_path().parent() {
-        if !parent_dir_path.is_dir() {
-            std::fs::create_dir_all(parent_dir_path)
-                .map_err(|e| anyhow::anyhow!("Failed to create DB parent directory at '{parent_dir_path:?}': {e}"))?
-        }
+    if let Some(parent_dir_path) = db_path.as_path().parent()
+        && !parent_dir_path.is_dir()
+    {
+        std::fs::create_dir_all(parent_dir_path)
+            .map_err(|e| anyhow::anyhow!("Failed to create DB parent directory at '{parent_dir_path:?}': {e}"))?
     }
 
     let db_cfg = HoprNodeDbConfig {
