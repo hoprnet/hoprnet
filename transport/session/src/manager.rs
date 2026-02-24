@@ -663,7 +663,7 @@ where
                 error!(challenge, %pseudonym, %destination, "timeout sending session request message");
                 TransportSessionError::Timeout
             })?
-            .map_err(|e| TransportSessionError::PacketSendingError(e.to_string()))?;
+            .map_err(TransportSessionError::packet_sending)?;
 
         // The timeout is given by the number of hops requested
         let initiation_timeout: futures_time::time::Duration = initiation_timeout_max_one_way(
@@ -941,7 +941,7 @@ where
                     error!("timeout sending session ping message");
                     TransportSessionError::Timeout
                 })?
-                .map_err(|e| TransportSessionError::PacketSendingError(e.to_string()))?)
+                .map_err(TransportSessionError::packet_sending)?)
         } else {
             Err(SessionManagerError::NonExistingSession.into())
         }
@@ -1121,8 +1121,6 @@ where
             });
 
             let session = if !session_req.capabilities.0.contains(Capability::NoRateControl) {
-                let surb_estimator = AtomicSurbFlowEstimator::default();
-
                 // Because of SURB scarcity, control the egress rate of incoming sessions
                 let egress_rate_control =
                     RateController::new(self.cfg.initial_return_session_egress_rate, Duration::from_secs(1));
@@ -1140,7 +1138,7 @@ where
                             .as_secs()
                 };
 
-                let surb_estimator_clone = surb_estimator.clone();
+                let surb_estimator_clone = slot.surb_estimator.clone();
                 let session = HoprSession::new(
                     session_id,
                     reply_routing.clone(),
@@ -1193,7 +1191,7 @@ where
                 {
                     slot.telemetry.set_state(SessionLifecycleState::Active);
                     slot.telemetry
-                        .set_balancer_data(surb_estimator.clone(), slot.surb_mgmt.clone());
+                        .set_balancer_data(slot.surb_estimator.clone(), slot.surb_mgmt.clone());
                 }
 
                 // Spawn the SURB balancer only once we know we have registered the
@@ -1202,7 +1200,7 @@ where
                 let balancer = SurbBalancer::new(
                     session_id,
                     SimpleBalancerController::default(),
-                    surb_estimator.clone(),
+                    slot.surb_estimator.clone(),
                     SurbControllerWithCorrection(egress_rate_control, 1), // 1 SURB per egress packet
                     slot.surb_mgmt.clone(),
                 );
@@ -1215,7 +1213,7 @@ where
 
                 // Spawn a keep-alive stream notifying about the SURB buffer level towards the Entry
                 if let Some(period) = self.cfg.surb_balance_notify_period {
-                    let surb_estimator_clone = surb_estimator.clone();
+                    let surb_estimator_clone = slot.surb_estimator.clone();
                     let (ka_controller, ka_abort_handle) = utils::spawn_keep_alive_stream(
                         session_id,
                         // Sent Keep-Alive packets also contribute to SURB consumption
@@ -1229,12 +1227,17 @@ where
                                 futures::future::ok::<_, S::Error>((routing, data))
                             }),
                         slot.routing_opts.clone(),
-                        SurbNotificationMode::Level(surb_estimator.clone()),
+                        SurbNotificationMode::Level(slot.surb_estimator.clone()),
                         slot.surb_mgmt.clone(),
                     );
 
                     // Start keepalive stream towards the Entry with a predefined period
-                    ka_controller.set_rate_per_unit(1, period);
+                    hopr_async_runtime::prelude::spawn(async move {
+                        // Delay the stream execution by one period
+                        hopr_async_runtime::prelude::sleep(period).await;
+                        ka_controller.set_rate_per_unit(1, period);
+                    });
+
                     slot.abort_handles
                         .lock()
                         .insert(SessionTasks::KeepAlive, ka_abort_handle);
@@ -2367,7 +2370,6 @@ mod tests {
             //.in_sequence(&mut sequence)
             .withf(move |peer, data| {
                 start_msg_match(data, |msg| matches!(msg, StartProtocol::KeepAlive(ka) if ka.flags.contains(KeepAliveFlag::BalancerTarget) && ka.additional_data == NEXT_BALANCER_TARGET))
-                    //msg_type(data, StartProtocolDiscriminants::KeepAlive)
                     && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
             })
             .returning(move |_, data| {
