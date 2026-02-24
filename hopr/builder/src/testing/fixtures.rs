@@ -11,8 +11,8 @@ use hopr_chain_connector::{
 };
 use hopr_db_node::HoprNodeDb;
 use hopr_lib::{
-    Address, ChainKeypair, HoprBalance, HoprNodeChainOperations, HoprNodeNetworkOperations, HoprNodeOperations,
-    HoprState, IpOrHost, Keypair, OffchainKeypair, RoutingOptions, SealedHost, WinningProbability, XDaiBalance,
+    Address, ChainKeypair, HoprBalance, HoprNodeNetworkOperations, HoprNodeOperations, HoprState, IpOrHost, Keypair,
+    OffchainKeypair, RoutingOptions, SealedHost, WinningProbability, XDaiBalance,
     exports::transport::{HoprSession, SessionClientConfig, SessionTarget},
 };
 use rand::seq::{IteratorRandom, SliceRandom};

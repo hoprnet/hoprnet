@@ -13,7 +13,7 @@ use hopr_lib::{
     api::{
         graph::{EdgeLinkObservable, traits::EdgeObservableRead},
         network::Health,
-        node::{HoprNodeChainOperations, HoprNodeNetworkOperations},
+        node::HoprNodeNetworkOperations,
     },
 };
 use serde::{Deserialize, Serialize};

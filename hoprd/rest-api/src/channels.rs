@@ -8,7 +8,6 @@ use axum::{
 use futures::TryFutureExt;
 use hopr_lib::{
     Address, AsUnixTimestamp, ChannelEntry, ChannelStatus, HoprBalance, ToHex,
-    api::node::HoprNodeChainOperations,
     errors::{HoprLibError, HoprStatusError},
     prelude::Hash,
 };

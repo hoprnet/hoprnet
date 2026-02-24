@@ -6,7 +6,7 @@ use hopr_builder::testing::{
     hopr::ChannelGuard,
 };
 use hopr_chain_connector::blokli_client::BlokliQueryClient;
-use hopr_lib::{Address, BytesRepresentable, ChannelId, ChannelStatus, HoprBalance, HoprNodeChainOperations};
+use hopr_lib::{Address, BytesRepresentable, ChannelId, ChannelStatus, HoprBalance};
 use rstest::*;
 use serial_test::serial;
 use tokio::time::sleep;

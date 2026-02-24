@@ -3,8 +3,8 @@ use std::{fmt::Formatter, sync::Arc, time::Duration};
 use anyhow::Context;
 use futures::future::join_all;
 use hopr_lib::{
-    Address, ChannelEntry, ChannelStatus, Hash, HoprBalance, HoprNodeChainOperations, HoprNodeNetworkOperations,
-    HoprNodeOperations, HoprTransportIO, PeerId,
+    Address, ChannelEntry, ChannelStatus, Hash, HoprBalance, HoprNodeNetworkOperations, HoprNodeOperations,
+    HoprTransportIO, PeerId,
     api::node::state::HoprState,
     config::{HoprLibConfig, SessionGlobalConfig},
     prelude,
