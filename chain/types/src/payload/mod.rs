@@ -33,11 +33,11 @@ pub struct GasEstimation {
     pub gas_limit: u64,
     /// Maximal fee per gas for the transaction.
     ///
-    /// Defaults to 0.01 Gwei
+    /// Defaults to 10 Gwei
     pub max_fee_per_gas: u128,
     /// Maximal priority fee per gas for the transaction.
     ///
-    /// Defaults to 0.002 Gwei
+    /// Defaults to 2 Gwei
     pub max_priority_fee_per_gas: u128,
 }
 
@@ -45,8 +45,8 @@ impl Default for GasEstimation {
     fn default() -> Self {
         Self {
             gas_limit: 10_000_000,
-            max_fee_per_gas: 10_000_000,         // 0.01 Gwei
-            max_priority_fee_per_gas: 2_000_000, // 0.002 Gwei
+            max_fee_per_gas: 10_000_000_000,         // 10 Gwei
+            max_priority_fee_per_gas: 2_000_000_000, // 2 Gwei
         }
     }
 }
