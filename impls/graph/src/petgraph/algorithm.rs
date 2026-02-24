@@ -53,7 +53,7 @@ use petgraph::{
 ///
 /// # Complexity
 /// * Time complexity: for computing the first **k** paths, the running time will be **O(k|V| + k|E|)**.
-/// * Auxillary space: **O(|V|)**.
+/// * Auxiliary space: **O(|V|)**.
 ///
 /// where **|V|** is the number of nodes and **|E|** is the number of edges.
 ///
