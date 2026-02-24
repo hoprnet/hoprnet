@@ -6,8 +6,8 @@ use hopr_lib::{
     Address, ApplicationDataIn, ApplicationDataOut, ChainKeypair, ConnectedUdpStream, DestinationRouting,
     HoprPseudonym, Keypair, RoutingOptions, UdpStreamParallelism,
     exports::transport::session::{
-        AtomicSurbFlowEstimator, Capabilities, Capability, HoprSession, HoprSessionConfig, SessionId, SessionTelemetry,
-        transfer_session,
+        AtomicSurbFlowEstimator, BalancerStateValues, Capabilities, Capability, HoprSession, HoprSessionConfig,
+        SessionId, SessionTelemetry, transfer_session,
     },
 };
 use rstest::*;
@@ -441,8 +441,9 @@ async fn surb_metrics_tracking() -> anyhow::Result<()> {
     surb_estimator.consumed.store(40, Ordering::Relaxed);
 
     // Set the estimator with target buffer
-    let target = 200;
-    metrics.set_surb_estimator(surb_estimator, target);
+    let state = BalancerStateValues::new(Default::default());
+    state.target_surb_buffer_size.store(200, Ordering::Relaxed);
+    metrics.set_balancer_data(surb_estimator, state.into());
 
     // Take snapshot - SURB values are non zero
     let snapshot = metrics.snapshot();

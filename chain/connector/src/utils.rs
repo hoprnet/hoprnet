@@ -1,7 +1,7 @@
 use std::{str::FromStr, time::Duration};
 
 use hopr_api::chain::{ChainInfo, DeployedSafe, DomainSeparators};
-use hopr_chain_types::chain_events::ChainEvent;
+use hopr_chain_types::{chain_events::ChainEvent, payload::GasEstimation};
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -89,6 +89,8 @@ pub(crate) struct ParsedChainInfo {
     pub channel_closure_grace_period: Duration,
     pub domain_separators: DomainSeparators,
     pub key_binding_fee: HoprBalance,
+    pub max_fee_per_gas: u128,
+    pub max_priority_fee_per_gas: u128,
     pub info: ChainInfo,
     pub ticket_win_prob: WinningProbability,
     pub ticket_price: HoprBalance,
@@ -96,9 +98,21 @@ pub(crate) struct ParsedChainInfo {
     pub expected_block_time: Duration,
 }
 
+impl From<ParsedChainInfo> for GasEstimation {
+    fn from(value: ParsedChainInfo) -> Self {
+        Self {
+            max_fee_per_gas: value.max_fee_per_gas,
+            max_priority_fee_per_gas: value.max_priority_fee_per_gas,
+            ..Self::default()
+        }
+    }
+}
+
 pub(crate) fn model_to_chain_info(
     model: blokli_client::api::types::ChainInfo,
 ) -> Result<ParsedChainInfo, ConnectorError> {
+    let gas_defaults = GasEstimation::default();
+
     Ok(ParsedChainInfo {
         channel_closure_grace_period: model
             .channel_closure_grace_period
@@ -132,6 +146,23 @@ pub(crate) fn model_to_chain_info(
             .0
             .parse()
             .map_err(|e| ConnectorError::TypeConversion(format!("invalid key binding fee: {e}")))?,
+        max_fee_per_gas: model
+            .max_fee_per_gas
+            .as_deref()
+            .and_then(|raw| raw.parse::<u128>().ok())
+            .unwrap_or(gas_defaults.max_fee_per_gas),
+        max_priority_fee_per_gas: model
+            .max_priority_fee_per_gas
+            .as_deref()
+            .and_then(|raw| raw.parse::<u128>().ok())
+            .unwrap_or(gas_defaults.max_priority_fee_per_gas)
+            .min(
+                model
+                    .max_fee_per_gas
+                    .as_deref()
+                    .and_then(|raw| raw.parse::<u128>().ok())
+                    .unwrap_or(gas_defaults.max_fee_per_gas),
+            ),
         info: ChainInfo {
             chain_id: model.chain_id as u64,
             hopr_network_name: model.network,
