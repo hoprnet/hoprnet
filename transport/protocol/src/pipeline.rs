@@ -605,6 +605,7 @@ where
         // Initialize the lazy statics here
         lazy_static::initialize(&METRIC_PACKET_COUNT);
         lazy_static::initialize(&METRIC_PACKET_DECODE_TIMEOUTS);
+        lazy_static::initialize(&METRIC_VALIDATION_ERRORS);
     }
 
     let (outgoing_ack_tx, outgoing_ack_rx) =
