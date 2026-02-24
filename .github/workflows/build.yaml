@@ -82,35 +82,35 @@ jobs:
       target: ${{ matrix.target.name }}
     secrets: inherit
 
-  package:
-    name: ${{ matrix.target.arch }}-${{ matrix.packager.package }}
-    needs: build-binaries
-    strategy:
-      fail-fast: false
-      matrix:
-        target:
-          - arch: x86_64-linux
-            runner: ubuntu-latest
-          - arch: aarch64-linux
-            runner: ubuntu-24.04-arm
-        packager:
-          - package: deb
-            extension: deb
-          - package: rpm
-            extension: rpm
-          - package: archlinux
-            extension: pkg.tar.zst
+  # package:
+  #   name: ${{ matrix.target.arch }}-${{ matrix.packager.package }}
+  #   needs: build-binaries
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       target:
+  #         - arch: x86_64-linux
+  #           runner: ubuntu-latest
+  #         - arch: aarch64-linux
+  #           runner: ubuntu-24.04-arm
+  #       packager:
+  #         - package: deb
+  #           extension: deb
+  #         - package: rpm
+  #           extension: rpm
+  #         - package: archlinux
+  #           extension: pkg.tar.zst
 
 
-    uses: ./.github/workflows/package.yaml
-    with:
-      runner: ${{ matrix.target.runner }}
-      branch: ${{ github.event.pull_request.head.ref }}
-      target: ${{ matrix.target.arch }}
-      packager: ${{ matrix.packager.package }}
-      extension: ${{ matrix.packager.extension }}
-      workflow_run_id: ${{ github.run_id }}
-    secrets: inherit
+  #   uses: ./.github/workflows/package.yaml
+  #   with:
+  #     runner: ${{ matrix.target.runner }}
+  #     branch: ${{ github.event.pull_request.head.ref }}
+  #     target: ${{ matrix.target.arch }}
+  #     packager: ${{ matrix.packager.package }}
+  #     extension: ${{ matrix.packager.extension }}
+  #     workflow_run_id: ${{ github.run_id }}
+  #   secrets: inherit
 
   docs:
     name: Docs
