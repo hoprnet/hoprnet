@@ -3,7 +3,10 @@ use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use hopr_chain_types::prelude::{GasEstimation, SignableTransaction};
 use hopr_crypto_types::prelude::*;
 
-use crate::errors::{self, ConnectorError};
+use crate::{
+    errors::{self, ConnectorError},
+    utils::model_to_chain_info,
+};
 
 type TxRequest<T> = (
     T,
@@ -30,7 +33,6 @@ where
 
         let client_clone = client.clone();
         let (sender, receiver) = futures::channel::mpsc::channel::<TxRequest<R>>(TX_QUEUE_CAPACITY);
-        let chain_info_cache = std::sync::Arc::new(async_lock::OnceCell::new());
         let current_nonce = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
         let current_nonce_clone = current_nonce.clone();
         hopr_async_runtime::prelude::spawn(
@@ -38,28 +40,22 @@ where
                 .then(move |(tx, notifier): (R, _)| {
                     let client = client_clone.clone();
                     let signer = signer.clone();
-                    let chain_info_cache = chain_info_cache.clone();
                     let current_nonce = current_nonce.clone();
                     async move {
-                        // The chain ID is fetched only once and cached for the lifetime of the sequencer.
-                        let chain_id = match chain_info_cache
-                            .get_or_try_init(|| {
-                                client
-                                    .query_chain_info()
-                                    .map_err(ConnectorError::from)
-                                    .and_then(|ci| futures::future::ok(ci.chain_id as u64))
-                            })
-                            .await
-                        {
-                            Ok(chain_id) => {
-                                tracing::debug!(chain_id, "chain id initialized");
-                                *chain_id
+                        let chain_info = match client.query_chain_info().map_err(ConnectorError::from).await {
+                            Ok(chain_info) => {
+                                tracing::debug!(chain_id = chain_info.chain_id, "chain info retrieved for tx");
+                                chain_info
                             }
                             Err(e) => return (Err(e), notifier),
                         };
 
-                        // Currently use fixed gas estimation.
-                        let gas_estimation = GasEstimation::default();
+                        let parsed_chain_info = match model_to_chain_info(chain_info) {
+                            Ok(parsed_chain_info) => parsed_chain_info,
+                            Err(error) => return (Err(error), notifier),
+                        };
+                        let chain_id = parsed_chain_info.info.chain_id;
+                        let gas_estimation = GasEstimation::from(parsed_chain_info);
                         tracing::debug!(?gas_estimation, "gas estimation used for tx");
 
                         // We always query the transaction count for the signer and use
