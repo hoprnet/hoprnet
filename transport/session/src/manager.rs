@@ -135,7 +135,7 @@ struct SessionSlot {
     // Set on both Entry and Exit sides.
     surb_mgmt: Arc<BalancerStateValues>,
     // SURB flow updates happening outside of Session protocol
-    // (e.g. due to Start protocol messages).
+    // (e.g., due to Start protocol messages).
     surb_estimator: AtomicSurbFlowEstimator,
 }
 
@@ -993,7 +993,7 @@ where
     /// Gets estimations produced/received and consumed SURBs by the Session.
     ///
     /// For an outgoing Session (Entry) the pair is the number of SURBs sent (by us) and used (by the Exit).
-    /// For an incoming session (Exit) the pair is the number of SURBs received (from Entry) and used (by us).
+    /// For an incoming Session (Exit) the pair is the number of SURBs received (from Entry) and used (by us).
     ///
     /// Returns an error if the Session with the given `id` does not exist.
     pub async fn get_surb_level_estimates(&self, id: &SessionId) -> crate::errors::Result<(u64, u64)> {
@@ -1461,6 +1461,11 @@ where
                                     .surb_mgmt
                                     .target_surb_buffer_size
                                     .store(msg.additional_data, std::sync::atomic::Ordering::Relaxed);
+                                // Update maximum SURBs per second based on the new target
+                                session_slot.surb_mgmt.max_surbs_per_sec.store(
+                                    msg.additional_data / self.cfg.minimum_surb_buffer_duration.as_secs(),
+                                    std::sync::atomic::Ordering::Relaxed,
+                                );
                                 debug!(%session_id, target_surb_buffer_size = msg.additional_data, "keep-alive updated SURB balancer target buffer size from the Entry");
                             }
 
@@ -2555,11 +2560,15 @@ mod tests {
             remote_cfg.target_surb_buffer_size,
             new_balancer_cfg.target_surb_buffer_size
         );
-
-        alice_session.close().await?;
+        assert_eq!(
+            remote_cfg.max_surbs_per_sec,
+            new_balancer_cfg.target_surb_buffer_size / bob_cfg.minimum_surb_buffer_duration.as_secs()
+        );
 
         let (alice_surb_sent, alice_surb_used) = alice_mgr.get_surb_level_estimates(alice_session.id()).await?;
         let (bob_surb_recv, bob_surb_used) = bob_mgr.get_surb_level_estimates(bob_session.session.id()).await?;
+
+        alice_session.close().await?;
 
         assert!(alice_surb_sent > 0, "alice must've sent surbs");
         assert!(bob_surb_recv > 0, "bob must've received surbs");
