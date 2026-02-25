@@ -360,11 +360,17 @@ mod tests {
 
         let fwd = selector.select_path(me, unreachable, 1).await;
         assert!(fwd.is_err(), "forward: should error when destination is unreachable");
-        assert!(matches!(fwd.unwrap_err(), PathPlannerError::Path(PathError::PathNotFound(..))));
+        assert!(matches!(
+            fwd.unwrap_err(),
+            PathPlannerError::Path(PathError::PathNotFound(..))
+        ));
 
         let rev = selector.select_path(unreachable, me, 1).await;
         assert!(rev.is_err(), "reverse: should error when destination is unreachable");
-        assert!(matches!(rev.unwrap_err(), PathPlannerError::Path(PathError::PathNotFound(..))));
+        assert!(matches!(
+            rev.unwrap_err(),
+            PathPlannerError::Path(PathError::PathNotFound(..))
+        ));
 
         Ok(())
     }

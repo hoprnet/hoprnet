@@ -281,7 +281,7 @@ impl std::fmt::Display for SealedHost {
 }
 
 /// Represents routing options in a mixnet with a maximum number of hops.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RoutingOptions {
     /// A fixed intermediate path consisting of at most [`RoutingOptions::MAX_INTERMEDIATE_HOPS`] hops.
