@@ -7,12 +7,15 @@ use hopr_network_types::prelude::*;
 use hopr_protocol_hopr::{FoundSurb, SurbStore};
 use tracing::trace;
 
+#[cfg(all(feature = "prometheus", not(test)))]
+use hopr_internal_types::path::Path;
+
+#[cfg(feature = "runtime-tokio")]
+use crate::traits::BackgroundRefreshable;
 use crate::{
     errors::{PathPlannerError, Result},
     traits::PathSelector,
 };
-#[cfg(feature = "runtime-tokio")]
-use crate::traits::BackgroundRefreshable;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -30,10 +33,10 @@ lazy_static::lazy_static! {
 /// network graph with a moka cache so the hot path is almost always served from cache.
 #[derive(Clone)]
 pub struct PathPlanner<Surb, R, S> {
+    me: OffchainPublicKey,
     pub surb_store: Surb,
     resolver: R,
     selector: S,
-    me: OffchainPublicKey,
 }
 
 impl<Surb, R, S> PathPlanner<Surb, R, S>
@@ -121,7 +124,6 @@ where
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
-            use hopr_internal_types::path::Path;
             hopr_metrics::SimpleHistogram::observe(&METRIC_PATH_LENGTH, (path.num_hops() - 1) as f64);
         }
 

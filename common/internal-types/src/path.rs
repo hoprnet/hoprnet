@@ -282,7 +282,7 @@ impl ValidatedPath {
                 return Err(LoopsNotAllowed(ticket_receiver.to_hex()));
             }
 
-            // Check if the channel is opened, if not the last hop
+            // Check if the channel is opened, does not apply for the last hop
             if i < num_hops - 1 {
                 let channel = resolver
                     .get_channel(&ticket_issuer, &ticket_receiver)
