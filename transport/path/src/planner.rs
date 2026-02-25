@@ -376,7 +376,7 @@ mod tests {
     // ── test: zero-hop path ───────────────────────────────────────────────────
 
     #[tokio::test]
-    async fn direct_zero_hop_path_bypasses_selector() {
+    async fn zero_hop_path_should_bypass_selector() {
         let me = pubkey(&SECRET_ME);
         let dest = pubkey(&SECRET_DEST);
 
@@ -415,7 +415,7 @@ mod tests {
     // ── test: one-hop path via graph selector ─────────────────────────────────
 
     #[tokio::test]
-    async fn one_hop_forward_path_uses_selector() {
+    async fn one_hop_path_should_use_selector() {
         let me = pubkey(&SECRET_ME);
         let a = pubkey(&SECRET_A);
         let dest = pubkey(&SECRET_DEST);
@@ -464,10 +464,8 @@ mod tests {
         }
     }
 
-    // ── test: explicit intermediate path ──────────────────────────────────────
-
     #[tokio::test]
-    async fn explicit_intermediate_path_bypasses_selector() {
+    async fn explicit_intermediate_path_should_bypass_selector() {
         let me = pubkey(&SECRET_ME);
         let a = pubkey(&SECRET_A);
         let dest = pubkey(&SECRET_DEST);
@@ -504,10 +502,8 @@ mod tests {
         }
     }
 
-    // ── test: SURB not found returns error ────────────────────────────────────
-
     #[tokio::test]
-    async fn return_routing_with_no_surb_returns_error() {
+    async fn return_routing_without_surb_should_return_error() {
         let me = pubkey(&SECRET_ME);
         let graph = ChannelGraph::new(me);
         let selector = GraphPathSelector::new(me, graph, small_config());
@@ -528,11 +524,9 @@ mod tests {
         );
     }
 
-    // ── test: background_refresh returns a future ─────────────────────────────
-
     #[cfg(feature = "runtime-tokio")]
     #[tokio::test]
-    async fn background_refresh_is_a_future() {
+    async fn background_refresh_should_produce_a_future() {
         let me = pubkey(&SECRET_ME);
         let graph = ChannelGraph::new(me);
         let selector = GraphPathSelector::new(me, graph, small_config());
