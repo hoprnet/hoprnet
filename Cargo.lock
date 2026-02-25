@@ -5147,6 +5147,7 @@ dependencies = [
  "hopr-transport-identity",
  "hopr-transport-mixer",
  "hopr-transport-network",
+ "hopr-transport-path",
  "hopr-transport-probe",
  "hopr-transport-protocol",
  "hopr-transport-session",
@@ -5235,6 +5236,34 @@ dependencies = [
  "libp2p-stream",
  "more-asserts",
  "multiaddr",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "hopr-transport-path"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bimap",
+ "futures",
+ "hex-literal",
+ "hopr-api",
+ "hopr-crypto-packet",
+ "hopr-crypto-random 0.4.1",
+ "hopr-crypto-types 0.9.2",
+ "hopr-internal-types",
+ "hopr-metrics",
+ "hopr-network-graph",
+ "hopr-network-types",
+ "hopr-primitive-types 0.10.1",
+ "hopr-protocol-hopr",
+ "lazy_static",
+ "mockall",
+ "moka",
+ "smart-default",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
