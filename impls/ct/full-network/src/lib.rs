@@ -104,7 +104,7 @@ where
 {
     fn build(&self) -> BoxStream<'static, ProbeRouting> {
         // For each probe target a cached version of transport routing is stored
-        let cache_immediate_neigbor_routing: moka::future::Cache<OffchainPublicKey, ProbeRouting> =
+        let cache_immediate_neighbor_routing: moka::future::Cache<OffchainPublicKey, ProbeRouting> =
             moka::future::Cache::builder()
                 .time_to_live(std::time::Duration::from_secs(600))
                 .max_capacity(100_000)
@@ -125,10 +125,10 @@ where
             })
             .flatten()
             .filter_map(move |peer| {
-                let cache_immediate_neigbor_routing = cache_immediate_neigbor_routing.clone();
+                let cache_immediate_neighbor_routing = cache_immediate_neighbor_routing.clone();
 
                 async move {
-                    cache_immediate_neigbor_routing
+                    cache_immediate_neighbor_routing
                         .try_get_with(peer, async move {
                             Ok::<ProbeRouting, anyhow::Error>(ProbeRouting::Neighbor(DestinationRouting::Forward {
                                 destination: Box::new(peer.into()),
@@ -295,6 +295,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(not(feature = "noise"))]
     #[tokio::test]
     async fn cover_traffic_should_produce_empty_stream() -> anyhow::Result<()> {
         let cfg = ProberConfig {

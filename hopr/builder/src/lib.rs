@@ -236,13 +236,19 @@ where
                             match network_event {
                                 NetworkEvent::PeerConnected(peer_id) =>
                                     if let Ok(opk) = hopr_lib::peer_id_to_public_key(&peer_id).await {
-                                        graph_updater.record_node(opk);
+                                        graph_updater.record_edge(hopr_lib::api::graph::MeasurableEdge::<NeighborTelemetry, PathTelemetry>::ConnectionStatus {
+                                            peer: opk,
+                                            connected: true
+                                        });
                                     } else {
                                         tracing::error!(%peer_id, "failed to convert peer ID to public key for graph update");
                                     },
                                 NetworkEvent::PeerDisconnected(peer_id) =>
                                     if let Ok(opk) = hopr_lib::peer_id_to_public_key(&peer_id).await {
-                                        graph_updater.record_node(opk);
+                                        graph_updater.record_edge(hopr_lib::api::graph::MeasurableEdge::<NeighborTelemetry, PathTelemetry>::ConnectionStatus {
+                                            peer: opk,
+                                            connected: false
+                                        });
                                     } else {
                                         tracing::error!(%peer_id, "failed to convert peer ID to public key for graph update");
                                     },

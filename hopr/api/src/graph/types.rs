@@ -51,6 +51,7 @@ where
 {
     Probe(std::result::Result<EdgeTransportTelemetry<N, P>, NetworkGraphError<P>>),
     Capacity(Box<EdgeCapacityUpdate>),
+    ConnectionStatus { peer: OffchainPublicKey, connected: bool },
 }
 
 /// Enum representing different types of telemetry data used by the CT mechanism.

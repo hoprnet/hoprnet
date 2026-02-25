@@ -179,6 +179,14 @@ impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
                     obs.record(EdgeWeightType::Capacity(update.capacity));
                 });
             }
+            MeasurableEdge::ConnectionStatus { peer, connected } => {
+                self.upsert_edge(&self.me, &peer, |obs| {
+                    obs.record(EdgeWeightType::Connected(connected));
+                });
+                self.upsert_edge(&peer, &self.me, |obs| {
+                    obs.record(EdgeWeightType::Connected(connected));
+                });
+            }
         }
     }
 
