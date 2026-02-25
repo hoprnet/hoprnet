@@ -5261,7 +5261,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.18.0"
+version = "0.18.1"
 dependencies = [
  "anyhow",
  "arrayvec",
