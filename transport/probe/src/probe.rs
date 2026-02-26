@@ -436,8 +436,7 @@ mod tests {
                             tokio::time::sleep(delay).await;
                         }
 
-                        if rand::Rng::gen_range(&mut rand::thread_rng(), NO_PROBE_PASSES..=ALL_PROBES_PASS) < pass_rate
-                        {
+                        if rand::random_range(NO_PROBE_PASSES..=ALL_PROBES_PASS) < pass_rate {
                             from_network_to_probing_tx
                                 .send((
                                     pseudonym.expect("the pseudonym is always known from cache"),

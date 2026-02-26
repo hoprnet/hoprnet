@@ -35,10 +35,10 @@ on:
         type: choice
         options:
           - self-hosted-hoprnet-bigger
-          - macos-13
-          - macos-14
+          - macos-15-xlarge
+          - macos-15-intel
         required: true
-        description: 'GH Runner to use: macos-13=x86_64-darwin and macos-14=aarch64-darwin'
+        description: 'GH Runner to use: macos-15-xlarge=aarch64-darwin and macos-15-intel=x86_64-darwin'
       target:
         type: choice
         options:
@@ -63,7 +63,7 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request_target' && inputs.target != '' && contains(github.event.pull_request.labels.*.name, format('binary:{0}', inputs.target)))
     runs-on: ${{ github.event.inputs.runner || inputs.runner }}
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2

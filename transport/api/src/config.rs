@@ -26,15 +26,19 @@ use crate::errors::HoprTransportError;
 pub struct HoprProtocolConfig {
     /// Libp2p-related transport configuration
     #[validate(nested)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub transport: TransportConfig,
     /// HOPR packet pipeline configuration
     #[validate(nested)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub packet: HoprPacketPipelineConfig,
     /// Probing protocol configuration
     #[validate(nested)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub probe: ProbeConfig,
     /// Session protocol global configuration
     #[validate(nested)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub session: SessionGlobalConfig,
 }
 
@@ -48,15 +52,19 @@ pub struct HoprProtocolConfig {
 pub struct HoprPacketPipelineConfig {
     /// HOPR packet codec configuration
     #[validate(nested)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub codec: HoprCodecConfig,
     /// HOPR ticket processing configuration
     #[validate(nested)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub ticket_processing: HoprTicketProcessorConfig,
     /// Single Use Reply Block (SURB) handling configuration
     #[validate(nested)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub surb_store: SurbStoreConfig,
     /// Packet pipeline configuration controlling output/input concurrency and acknowledgement processing
     #[validate(nested)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub pipeline: PacketPipelineConfig,
 }
 
@@ -255,7 +263,7 @@ const DEFAULT_SESSION_ESTABLISH_RETRY_DELAY: Duration = Duration::from_secs(2);
 
 const DEFAULT_SESSION_ESTABLISH_MAX_RETRIES: u32 = 3;
 
-const DEFAULT_SESSION_BALANCER_SAMPLING: Duration = Duration::from_millis(500);
+const DEFAULT_SESSION_BALANCER_SAMPLING: Duration = Duration::from_millis(100);
 
 const DEFAULT_SESSION_BALANCER_BUFFER_DURATION: Duration = Duration::from_secs(5);
 
@@ -357,7 +365,7 @@ pub struct SessionGlobalConfig {
 
     /// Sampling interval for SURB balancer in milliseconds.
     ///
-    /// Default is 500 milliseconds.
+    /// Default is 100 milliseconds.
     #[validate(custom(function = "validate_balancer_sampling"))]
     #[default(default_session_balancer_sampling())]
     #[cfg_attr(

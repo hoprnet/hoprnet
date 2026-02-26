@@ -69,9 +69,9 @@ jobs:
           - name: aarch64-linux
             runner: self-hosted-hoprnet-bigger
           - name: aarch64-darwin
-            runner: macos-14 # M1 machine
+            runner: macos-15-xlarge # Uses Apple Silicon M2 hardware 5vCPU, 14GB RAM and 14GB SSD. 8-core GPU
           - name: x86_64-darwin
-            runner: macos-13 # Intel machine
+            runner: macos-15-intel # Uses Intel hardware 4vCPU, 14GB RAM and 14GB SSD
     name: ${{ matrix.binary }}-${{ matrix.target.name }}
     uses: ./.github/workflows/build-binaries.yaml
     with:
@@ -82,35 +82,35 @@ jobs:
       target: ${{ matrix.target.name }}
     secrets: inherit
 
-  package:
-    name: ${{ matrix.target.arch }}-${{ matrix.packager.package }}
-    needs: build-binaries
-    strategy:
-      fail-fast: false
-      matrix:
-        target:
-          - arch: x86_64-linux
-            runner: ubuntu-latest
-          - arch: aarch64-linux
-            runner: ubuntu-24.04-arm
-        packager:
-          - package: deb
-            extension: deb
-          - package: rpm
-            extension: rpm
-          - package: archlinux
-            extension: pkg.tar.zst
+  # package:
+  #   name: ${{ matrix.target.arch }}-${{ matrix.packager.package }}
+  #   needs: build-binaries
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       target:
+  #         - arch: x86_64-linux
+  #           runner: ubuntu-latest
+  #         - arch: aarch64-linux
+  #           runner: ubuntu-24.04-arm
+  #       packager:
+  #         - package: deb
+  #           extension: deb
+  #         - package: rpm
+  #           extension: rpm
+  #         - package: archlinux
+  #           extension: pkg.tar.zst
 
 
-    uses: ./.github/workflows/package.yaml
-    with:
-      runner: ${{ matrix.target.runner }}
-      branch: ${{ github.event.pull_request.head.ref }}
-      target: ${{ matrix.target.arch }}
-      packager: ${{ matrix.packager.package }}
-      extension: ${{ matrix.packager.extension }}
-      workflow_run_id: ${{ github.run_id }}
-    secrets: inherit
+  #   uses: ./.github/workflows/package.yaml
+  #   with:
+  #     runner: ${{ matrix.target.runner }}
+  #     branch: ${{ github.event.pull_request.head.ref }}
+  #     target: ${{ matrix.target.arch }}
+  #     packager: ${{ matrix.packager.package }}
+  #     extension: ${{ matrix.packager.extension }}
+  #     workflow_run_id: ${{ github.run_id }}
+  #   secrets: inherit
 
   docs:
     name: Docs

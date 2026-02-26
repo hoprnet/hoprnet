@@ -39,8 +39,6 @@ use futures::{AsyncRead, AsyncWrite};
 pub use hopr_api::network::{Health, Observable};
 use hopr_api::network::{NetworkObservations, NetworkView};
 use hopr_transport_network::observation::Observations;
-#[cfg(feature = "telemetry")]
-pub use hopr_transport_network::observation::{PeerPacketStats, PeerPacketStatsSnapshot};
 use libp2p::{Multiaddr, PeerId};
 
 pub use crate::{

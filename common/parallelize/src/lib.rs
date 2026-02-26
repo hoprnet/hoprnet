@@ -272,7 +272,28 @@ pub mod cpu {
     ///
     /// Also initializes the queue limit metric.
     pub fn init_thread_pool(num_threads: usize) -> Result<(), rayon::ThreadPoolBuildError> {
-        let result = rayon::ThreadPoolBuilder::new().num_threads(num_threads).build_global();
+        let builder = rayon::ThreadPoolBuilder::new().num_threads(num_threads);
+
+        let builder = builder.spawn_handler(|thread| {
+            let mut thread_builder = std::thread::Builder::new();
+            if let Some(name) = thread.name() {
+                thread_builder = thread_builder.name(name.to_owned());
+            }
+            if let Some(stack_size) = thread.stack_size() {
+                thread_builder = thread_builder.stack_size(stack_size);
+            }
+            thread_builder.spawn(|| {
+                #[cfg(target_os = "macos")]
+                unsafe {
+                    // MacOS: Set the QOS class to "user initiated" to allow running on performance cores
+                    libc::pthread_set_qos_class_self_np(libc::qos_class_t::QOS_CLASS_USER_INITIATED, 0);
+                }
+                thread.run()
+            })?;
+            Ok(())
+        });
+
+        let result = builder.build_global();
         let _ = *QUEUE_LIMIT; // Initialize limit metric
         result
     }

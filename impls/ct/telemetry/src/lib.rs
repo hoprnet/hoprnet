@@ -172,11 +172,10 @@ where
     fn nodes(&self) -> futures::stream::BoxStream<'static, PeerId> {
         let fetcher = self.network.clone();
         let _recheck_threshold = self.recheck_threshold; // TODO: currently being ignored
-        let mut rng = hopr_crypto_random::rng();
 
         Box::pin(async_stream::stream! {
             let mut peers: Vec<PeerId> = fetcher.discovered_peers().into_iter().collect();
-            peers.shuffle(&mut rng);    // shuffle peers to randomize order between rounds
+            peers.shuffle(&mut hopr_crypto_random::rng());    // shuffle peers to randomize order between rounds
 
             for peer in peers {
                 yield peer;

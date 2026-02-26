@@ -1,9 +1,6 @@
 //! Creates a build specification for the ORM codegen.
 
-use std::{
-    env::{self, temp_dir},
-    path::Path,
-};
+use std::{env, path::Path};
 
 use anyhow::Context;
 use clap::Parser;
@@ -66,7 +63,7 @@ fn main() -> anyhow::Result<()> {
 
     let codegen_path_str = codegen_path.to_string_lossy().to_string();
 
-    let tmp_db = temp_dir().join("tmp_migration.db");
+    let tmp_db = Path::new(&out_dir).join("tmp_migration.db");
 
     let _ = std::fs::remove_file(
         tmp_db
@@ -124,11 +121,12 @@ fn main() -> anyhow::Result<()> {
     // Read the generated files and create module declarations
     if let Ok(entries) = std::fs::read_dir(&codegen_path) {
         for entry in entries.flatten() {
-            if let Some(file_name) = entry.file_name().to_str() {
-                if file_name.ends_with(".rs") && file_name != "mod.rs" {
-                    let module_name = file_name.trim_end_matches(".rs");
-                    mod_content.push_str(&format!("pub mod {};\n", module_name));
-                }
+            if let Some(file_name) = entry.file_name().to_str()
+                && file_name.ends_with(".rs")
+                && file_name != "mod.rs"
+            {
+                let module_name = file_name.trim_end_matches(".rs");
+                mod_content.push_str(&format!("pub mod {};\n", module_name));
             }
         }
     }

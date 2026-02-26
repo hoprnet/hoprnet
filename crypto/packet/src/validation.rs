@@ -3,7 +3,7 @@ use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use tracing::{debug, instrument};
 
-use crate::errors::TicketValidationError;
+use crate::errors::{TicketValidationError, ValidationErrorKind};
 
 /// Performs validations of the given unacknowledged ticket and channel.
 /// This is a higher-level function, hence it is not in `hopr-internal-types` crate.
@@ -22,7 +22,7 @@ pub fn validate_unacknowledged_ticket(
     let verified_ticket = ticket
         .verify(&channel.source, domain_separator)
         .map_err(|ticket| TicketValidationError {
-            reason: format!("ticket signer does not match the sender: {ticket}"),
+            kind: ValidationErrorKind::InvalidSigner,
             ticket,
             issuer: None,
         })?;
@@ -32,10 +32,7 @@ pub fn validate_unacknowledged_ticket(
     // The ticket amount MUST be greater or equal to min_ticket_amount
     if !inner_ticket.amount.ge(&min_ticket_amount) {
         return Err(TicketValidationError {
-            reason: format!(
-                "ticket amount {} in not at least {min_ticket_amount}",
-                inner_ticket.amount
-            ),
+            kind: ValidationErrorKind::LowValue(min_ticket_amount),
             ticket: (*inner_ticket).into(),
             issuer: Some(*verified_ticket.verified_issuer()),
         });
@@ -44,10 +41,7 @@ pub fn validate_unacknowledged_ticket(
     // The ticket must have at least the required winning probability
     if verified_ticket.win_prob().approx_cmp(&required_win_prob).is_lt() {
         return Err(TicketValidationError {
-            reason: format!(
-                "ticket winning probability {} is lower than required winning probability {required_win_prob}",
-                verified_ticket.win_prob()
-            ),
+            kind: ValidationErrorKind::LowWinProb(required_win_prob),
             ticket: (*inner_ticket).into(),
             issuer: Some(*verified_ticket.verified_issuer()),
         });
@@ -56,7 +50,7 @@ pub fn validate_unacknowledged_ticket(
     // The channel MUST be open or pending to close
     if channel.status == ChannelStatus::Closed {
         return Err(TicketValidationError {
-            reason: format!("payment channel {} is not opened or pending to close", channel.get_id()),
+            kind: ValidationErrorKind::ChannelClosed(*channel.get_id()),
             ticket: (*inner_ticket).into(),
             issuer: Some(*verified_ticket.verified_issuer()),
         });
@@ -65,12 +59,16 @@ pub fn validate_unacknowledged_ticket(
     // The ticket's channelEpoch MUST match the current channel's epoch
     if channel.channel_epoch != inner_ticket.channel_epoch {
         return Err(TicketValidationError {
-            reason: format!(
-                "ticket was created for a different channel iteration {} != {} of channel {}",
-                inner_ticket.channel_epoch,
-                channel.channel_epoch,
-                channel.get_id()
-            ),
+            kind: ValidationErrorKind::EpochMismatch(channel.channel_epoch),
+            ticket: (*inner_ticket).into(),
+            issuer: Some(*verified_ticket.verified_issuer()),
+        });
+    }
+
+    // The ticket's index MUST be greater or equal than the channel's ticketIndex
+    if inner_ticket.index < channel.ticket_index {
+        return Err(TicketValidationError {
+            kind: ValidationErrorKind::IndexTooLow(channel.ticket_index),
             ticket: (*inner_ticket).into(),
             issuer: Some(*verified_ticket.verified_issuer()),
         });
@@ -80,11 +78,7 @@ pub fn validate_unacknowledged_ticket(
     debug!(%unrealized_balance, channel_id = %channel.get_id(), "checking if sender has enough funds");
     if inner_ticket.amount.gt(&unrealized_balance) {
         return Err(TicketValidationError {
-            reason: format!(
-                "ticket value {} is greater than remaining unrealized balance {unrealized_balance} for channel {}",
-                inner_ticket.amount,
-                channel.get_id()
-            ),
+            kind: ValidationErrorKind::InsufficientFunds(*channel.get_id(), unrealized_balance),
             ticket: (*inner_ticket).into(),
             issuer: Some(*verified_ticket.verified_issuer()),
         });
@@ -242,6 +236,23 @@ mod tests {
         let mut channel = create_channel_entry();
         channel.balance = 0.into();
         channel.channel_epoch = ticket.channel_epoch;
+
+        let ret =
+            validate_unacknowledged_ticket(ticket, &channel, 1.into(), 1.0.try_into()?, 0.into(), &Hash::default());
+
+        assert!(ret.is_err());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_ticket_validation_fail_when_index_is_lower_than_channel_index() -> anyhow::Result<()> {
+        let ticket = create_valid_ticket()?;
+        let mut channel = create_channel_entry();
+        channel.ticket_index = 2;
+        channel.channel_epoch = ticket.channel_epoch;
+
+        assert!(ticket.index < channel.ticket_index);
 
         let ret =
             validate_unacknowledged_ticket(ticket, &channel, 1.into(), 1.0.try_into()?, 0.into(), &Hash::default());

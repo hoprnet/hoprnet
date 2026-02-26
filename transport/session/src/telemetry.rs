@@ -7,30 +7,31 @@
 use std::{
     sync::{
         OnceLock,
-        atomic::{AtomicBool, AtomicU8, AtomicU64, AtomicUsize, Ordering},
+        atomic::{AtomicU8, AtomicU64, AtomicUsize, Ordering},
     },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use hopr_protocol_session::{FrameInspector, SessionMessageDiscriminants};
 
-use crate::{
-    Capability, HoprSessionConfig, SessionId, balancer::AtomicSurbFlowEstimator, types::SESSION_SOCKET_CAPACITY,
-};
+pub use crate::balancer::{AtomicSurbFlowEstimator, BalancerStateValues};
+use crate::{Capability, HoprSessionConfig, SessionId, types::SESSION_SOCKET_CAPACITY};
 
 /// The lifecycle state of a session from the perspective of metrics.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, strum::FromRepr, serde::Serialize)]
+#[repr(u8)]
 pub enum SessionLifecycleState {
     /// Session is active and running.
-    Active,
+    Active = 0,
     /// Session is in the process of closing (e.g. sending/receiving close frames).
-    Closing,
+    Closing = 1,
     /// Session has been fully closed.
-    Closed,
+    Closed = 2,
 }
 
 /// The acknowledgement mode configured for the session.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[repr(u8)]
 pub enum SessionAckMode {
     /// No acknowledgements.
     None,
@@ -42,26 +43,8 @@ pub enum SessionAckMode {
     Both,
 }
 
-impl SessionLifecycleState {
-    fn as_u8(self) -> u8 {
-        match self {
-            SessionLifecycleState::Active => 0,
-            SessionLifecycleState::Closing => 1,
-            SessionLifecycleState::Closed => 2,
-        }
-    }
-
-    fn from_u8(value: u8) -> SessionLifecycleState {
-        match value {
-            1 => SessionLifecycleState::Closing,
-            2 => SessionLifecycleState::Closed,
-            _ => SessionLifecycleState::Active,
-        }
-    }
-}
-
 /// Snapshot of session lifetime metrics.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub struct SessionLifetimeSnapshot {
     /// Time when the session was created.
     pub created_at: SystemTime,
@@ -78,7 +61,7 @@ pub struct SessionLifetimeSnapshot {
 }
 
 /// Snapshot of frame buffer metrics.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub struct FrameBufferSnapshot {
     /// Maximum Transmission Unit for frames.
     pub frame_mtu: usize,
@@ -97,7 +80,7 @@ pub struct FrameBufferSnapshot {
 }
 
 /// Snapshot of acknowledgement metrics.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub struct AckSnapshot {
     /// Configured acknowledgement mode.
     pub mode: SessionAckMode,
@@ -116,7 +99,7 @@ pub struct AckSnapshot {
 }
 
 /// Snapshot of SURB (Single Use Reply Block) metrics.
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
 pub struct SurbSnapshot {
     /// Total SURBs produced/minted.
     pub produced_total: u64,
@@ -133,7 +116,7 @@ pub struct SurbSnapshot {
 }
 
 /// Snapshot of transport-level data metrics.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub struct TransportSnapshot {
     /// Total bytes received.
     pub bytes_in: u64,
@@ -146,7 +129,7 @@ pub struct TransportSnapshot {
 }
 
 /// Complete snapshot of all session metrics at a point in time.
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
 pub struct SessionStatsSnapshot {
     /// The ID of the session.
     pub session_id: SessionId,
@@ -193,13 +176,11 @@ pub struct SessionTelemetry {
     bytes_out: AtomicU64,
     packets_in: AtomicU64,
     packets_out: AtomicU64,
-    surb_refill_in_flight: AtomicBool,
     /// Previous (buffer_estimate, timestamp_us) for rate calculation, protected by mutex
     /// to ensure atomic read/update of the pair.
     last_rate_snapshot: parking_lot::Mutex<(u64, u64)>,
     inspector: OnceLock<FrameInspector>,
-    surb_estimator: OnceLock<AtomicSurbFlowEstimator>,
-    surb_target_buffer: OnceLock<u64>,
+    balancer_data: OnceLock<(std::sync::Arc<BalancerStateValues>, AtomicSurbFlowEstimator)>,
 }
 
 impl SessionTelemetry {
@@ -222,7 +203,7 @@ impl SessionTelemetry {
             session_id,
             created_at_us: AtomicU64::new(now),
             last_activity_us: AtomicU64::new(now),
-            state: AtomicU8::new(SessionLifecycleState::Active.as_u8()),
+            state: AtomicU8::new(SessionLifecycleState::Active as u8),
             ack_mode,
             frame_mtu: cfg.frame_mtu,
             frame_timeout: cfg.frame_timeout,
@@ -243,11 +224,9 @@ impl SessionTelemetry {
             bytes_out: AtomicU64::new(0),
             packets_in: AtomicU64::new(0),
             packets_out: AtomicU64::new(0),
-            surb_refill_in_flight: AtomicBool::new(false),
             last_rate_snapshot: parking_lot::Mutex::new((0, now)),
             inspector: OnceLock::new(),
-            surb_estimator: OnceLock::new(),
-            surb_target_buffer: OnceLock::new(),
+            balancer_data: OnceLock::new(),
         }
     }
 
@@ -261,7 +240,7 @@ impl SessionTelemetry {
     /// This method atomically stores the new state, which affects the metrics snapshot
     /// and indicates the session's current phase (Active, Closing, or Closed).
     pub fn set_state(&self, state: SessionLifecycleState) {
-        self.state.store(state.as_u8(), Ordering::Relaxed);
+        self.state.store(state as u8, Ordering::Relaxed);
     }
 
     /// Records activity on the session by updating the last activity timestamp.
@@ -297,11 +276,6 @@ impl SessionTelemetry {
         self.packets_out.fetch_add(1, Ordering::Relaxed);
     }
 
-    /// Sets whether a SURB (Single Use Reply Block) refill request is currently in flight.
-    pub fn set_refill_in_flight(&self, active: bool) {
-        self.surb_refill_in_flight.store(active, Ordering::Relaxed);
-    }
-
     /// Sets the frame inspector for tracking incomplete frames.
     ///
     /// The inspector is initialized only once via `OnceLock`.
@@ -312,9 +286,8 @@ impl SessionTelemetry {
     /// Sets the SURB flow estimator for tracking produced/consumed SURBs.
     ///
     /// The estimator and target buffer are initialized only once via `OnceLock`.
-    pub fn set_surb_estimator(&self, estimator: AtomicSurbFlowEstimator, target_buffer: u64) {
-        let _ = self.surb_estimator.set(estimator);
-        let _ = self.surb_target_buffer.set(target_buffer);
+    pub fn set_balancer_data(&self, estimator: AtomicSurbFlowEstimator, state: std::sync::Arc<BalancerStateValues>) {
+        let _ = self.balancer_data.set((state, estimator));
     }
 
     /// Updates the count of incomplete frames from the frame inspector.
@@ -336,17 +309,22 @@ impl SessionTelemetry {
         let snapshot_at_us = now_us();
         let created_at_us = self.created_at_us.load(Ordering::Relaxed);
         let last_activity_us = self.last_activity_us.load(Ordering::Relaxed);
-        let state = SessionLifecycleState::from_u8(self.state.load(Ordering::Relaxed));
+        let state = SessionLifecycleState::from_repr(self.state.load(Ordering::Relaxed))
+            .unwrap_or(SessionLifecycleState::Active);
         let uptime_us = snapshot_at_us.saturating_sub(created_at_us);
         let idle_us = snapshot_at_us.saturating_sub(last_activity_us);
 
-        let (produced, consumed) = self
-            .surb_estimator
+        let (target, produced, consumed) = self
+            .balancer_data
             .get()
-            .map(|e| (e.produced.load(Ordering::Relaxed), e.consumed.load(Ordering::Relaxed)))
-            .unwrap_or((0, 0));
-
-        let target = self.surb_target_buffer.get().copied();
+            .map(|(s, e)| {
+                (
+                    s.target_surb_buffer_size.load(Ordering::Relaxed),
+                    e.produced.load(Ordering::Relaxed),
+                    e.consumed.load(Ordering::Relaxed),
+                )
+            })
+            .unwrap_or((0, 0, 0));
 
         let buffer_estimate = produced.saturating_sub(consumed);
         let rate_per_sec = self.compute_rate_per_sec(produced, consumed, snapshot_at_us);
@@ -384,9 +362,9 @@ impl SessionTelemetry {
                 produced_total: produced,
                 consumed_total: consumed,
                 buffer_estimate,
-                target_buffer: target,
+                target_buffer: Some(target),
                 rate_per_sec,
-                refill_in_flight: self.surb_refill_in_flight.load(Ordering::Relaxed),
+                refill_in_flight: self.balancer_data.get().is_some(),
             },
             transport: TransportSnapshot {
                 bytes_in: self.bytes_in.load(Ordering::Relaxed),

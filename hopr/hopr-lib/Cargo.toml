@@ -1,8 +1,8 @@
 [package]
 name = "hopr-lib"
-version = "4.1.0"
+version = "4.0.0-rc.3"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-edition = "2021"
+edition = "2024"
 description = "HOPR library containing the entire functionality importable without the HOPRd daemon"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
@@ -109,7 +109,7 @@ hex-literal = { workspace = true }
 rand = { workspace = true }
 rstest = { workspace = true }
 serial_test = { workspace = true }
-serde_yaml = { workspace = true }
+serde-saphyr = { workspace = true }
 tokio = { workspace = true }
 test-log = { workspace = true }
 

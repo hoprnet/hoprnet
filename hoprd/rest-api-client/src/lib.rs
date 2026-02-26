@@ -1,1 +1,1 @@
-include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
+include!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/codegen/mod.rs"));

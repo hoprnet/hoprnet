@@ -84,6 +84,12 @@ impl<T> Default for AbortableList<T> {
     }
 }
 
+impl<T: std::fmt::Debug> std::fmt::Debug for AbortableList<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_list().entries(self.0.keys()).finish()
+    }
+}
+
 impl<T: Hash + Eq> AbortableList<T> {
     /// Appends a new [`abortable task`](Abortable) to the end of this list.
     pub fn insert<A: Abortable + Send + Sync + 'static>(&mut self, process: T, task: A) {

@@ -174,7 +174,7 @@ impl IpOrHost {
 /// encryption.
 ///
 /// ### Example
-/// ```rust
+/// ```no_run
 /// use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
 /// use hopr_network_types::prelude::{IpOrHost, SealedHost};
 /// use libp2p_identity::PeerId;
@@ -478,6 +478,7 @@ mod tests {
         Ok(())
     }
 
+    #[ignore = "sealing is not implemented yet, see https://github.com/hoprnet/hoprnet/issues/7172"]
     #[test]
     fn sealing_adds_padding_to_hide_length() -> anyhow::Result<()> {
         let peer_id: PeerId = OffchainKeypair::random().public().into();

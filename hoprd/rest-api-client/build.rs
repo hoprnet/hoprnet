@@ -28,8 +28,11 @@ fn main() {
     let ast = syn::parse2(tokens).expect("failed to parse generated tokens");
     let content = prettyplease::unparse(&ast);
 
-    let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR missing"));
-    let out_file = out_dir.join("codegen.rs");
+    let crate_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR missing"));
+    let out_dir = crate_dir.join("src/codegen/");
+    fs::create_dir_all(&out_dir).expect("failed to create generated client directory");
+
+    let out_file = out_dir.join("mod.rs");
     fs::write(&out_file, content).expect("failed to write generated client");
 }
 
@@ -116,26 +119,25 @@ fn normalize_response_content(value: &mut Value) {
                     }
                 }
 
-                if let Some(keep) = keep_key {
-                    if let Some(mut kept_response) = responses.remove(&keep) {
-                        if let Value::Object(resp_obj) = &mut kept_response {
-                            if let Some(Value::Object(content)) = resp_obj.get_mut("content") {
-                                if content.len() > 1 {
-                                    if let Some(json_value) = content.remove("application/json") {
-                                        content.clear();
-                                        content.insert("application/json".to_string(), json_value);
-                                    } else if let Some((first_key, first_value)) =
-                                        content.iter().next().map(|(k, v)| (k.clone(), v.clone()))
-                                    {
-                                        content.clear();
-                                        content.insert(first_key, first_value);
-                                    }
-                                }
-                            }
+                if let Some(keep) = keep_key
+                    && let Some(mut kept_response) = responses.remove(&keep)
+                {
+                    if let Value::Object(resp_obj) = &mut kept_response
+                        && let Some(Value::Object(content)) = resp_obj.get_mut("content")
+                        && content.len() > 1
+                    {
+                        if let Some(json_value) = content.remove("application/json") {
+                            content.clear();
+                            content.insert("application/json".to_string(), json_value);
+                        } else if let Some((first_key, first_value)) =
+                            content.iter().next().map(|(k, v)| (k.clone(), v.clone()))
+                        {
+                            content.clear();
+                            content.insert(first_key, first_value);
                         }
-                        responses.clear();
-                        responses.insert(keep, kept_response);
                     }
+                    responses.clear();
+                    responses.insert(keep, kept_response);
                 }
             }
 

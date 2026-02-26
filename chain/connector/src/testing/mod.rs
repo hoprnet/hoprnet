@@ -256,6 +256,7 @@ impl BlokliTestStateBuilder {
     #[must_use]
     pub fn with_chain_info(mut self, info: ChainInfo) -> Self {
         self.0.chain_info.chain_id = info.chain_id as i32;
+        self.0.chain_info.network = info.hopr_network_name;
         self.0.chain_info.contract_addresses = blokli_client::api::types::ContractAddressMap(
             serde_json::to_string(&info.contract_addresses).expect("failed to serialize contract addresses"),
         );
@@ -268,6 +269,7 @@ impl BlokliTestStateBuilder {
     #[must_use]
     pub fn with_hopr_network_chain_info(mut self, name: &str) -> Self {
         let (chain_id, addrs) = contract_addresses_for_network(name).expect("network name not found");
+        self.0.chain_info.network = name.to_string();
         self.0.chain_info.contract_addresses = blokli_client::api::types::ContractAddressMap(
             serde_json::to_string(&addrs).expect("failed to serialize contract addresses"),
         );

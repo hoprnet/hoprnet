@@ -737,6 +737,8 @@ where
             .await?;
 
         while let Some(channel) = channels.next().await {
+            // Set the state of all unredeemed tickets with a higher index than the current
+            // channel index as untouched.
             self.node_db
                 .update_ticket_states_and_fetch(
                     [TicketSelector::from(&channel)
@@ -751,6 +753,15 @@ where
                     futures::future::ready(())
                 })
                 .await;
+
+            // Mark all the tickets with a lower ticket index than the current channel index as neglected.
+            self.node_db
+                .mark_tickets_as(
+                    [TicketSelector::from(&channel).with_index_range(..channel.ticket_index)],
+                    TicketMarker::Neglected,
+                )
+                .map_err(HoprLibError::db)
+                .await?;
         }
 
         self.state.store(HoprState::Running, Ordering::Relaxed);
@@ -794,7 +805,7 @@ where
     }
 
     /// Allows external users to receive notifications about new winning tickets.
-    pub fn subscribe_winning_tickets(&self) -> impl Stream<Item = VerifiedTicket> + Send {
+    pub fn subscribe_winning_tickets(&self) -> impl Stream<Item = VerifiedTicket> + Send + use<Chain, Db> {
         self.winning_ticket_subscribers.1.activate_cloned()
     }
 
@@ -1314,7 +1325,7 @@ where
 
     pub fn redemption_requests(
         &self,
-    ) -> errors::Result<impl futures::Sink<TicketSelector, Error = HoprLibError> + Clone> {
+    ) -> errors::Result<impl futures::Sink<TicketSelector, Error = HoprLibError> + Clone + use<Chain, Db>> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         // TODO: add universal timeout sink here

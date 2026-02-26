@@ -159,6 +159,7 @@ pub async fn peer_setup_for(
 
         let codec_config = HoprCodecConfig {
             outgoing_ticket_price: Some(*DEFAULT_PRICE_PER_PACKET),
+            min_incoming_ticket_price: None,
             outgoing_win_prob: Some(WinningProbability::ALWAYS),
         };
 

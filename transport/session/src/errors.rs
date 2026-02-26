@@ -6,18 +6,6 @@ pub enum TransportSessionError {
     #[error("session operation timed out")]
     Timeout,
 
-    #[error("incorrect data size")]
-    PayloadSize,
-
-    #[error("invalid peer id")]
-    PeerId,
-
-    #[error("impossible transport path")]
-    Path,
-
-    #[error("no surb available for sending reply data")]
-    OutOfSurbs,
-
     #[error("unparseable session id")]
     InvalidSessionId,
 
@@ -28,7 +16,7 @@ pub enum TransportSessionError {
     UnknownData,
 
     #[error("packet sending error: {0}")]
-    PacketSendingError(String),
+    PacketSendingError(anyhow::Error),
 
     #[error(transparent)]
     StartProtocolError(#[from] hopr_protocol_start::errors::StartProtocolError),
@@ -44,6 +32,12 @@ pub enum TransportSessionError {
 
     #[error("session is closed")]
     Closed,
+}
+
+impl TransportSessionError {
+    pub fn packet_sending<E: Into<anyhow::Error>>(e: E) -> Self {
+        Self::PacketSendingError(e.into())
+    }
 }
 
 impl From<TransportSessionError> for std::io::Error {
@@ -66,8 +60,14 @@ pub enum SessionManagerError {
     TooManySessions,
     #[error("loopback sessions are not allowed")]
     Loopback,
-    #[error("non-specific session manager error: {0}")]
-    Other(String),
+    #[error(transparent)]
+    Other(anyhow::Error),
+}
+
+impl SessionManagerError {
+    pub fn other<E: Into<anyhow::Error>>(e: E) -> Self {
+        Self::Other(e.into())
+    }
 }
 
 pub type Result<T> = std::result::Result<T, TransportSessionError>;

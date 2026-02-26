@@ -317,18 +317,19 @@ pub trait HoprDbTicketOperations {
     /// Resets the ticket statistics about neglected, rejected, and redeemed tickets.
     async fn reset_ticket_statistics(&self) -> Result<(), Self::Error>;
 
-    /// Counts the total value of tickets matching the channel.
+    /// Counts the total value of tickets matching the [`selector`](TicketSelector).
     ///
     /// Returns the total ticket value.
-    async fn get_tickets_value(&self, id: &ChannelId, epoch: u32) -> Result<HoprBalance, Self::Error>;
+    async fn get_tickets_value(&self, selector: TicketSelector) -> Result<HoprBalance, Self::Error>;
 
     /// Gets the index of the next outgoing ticket for the given channel.
     ///
-    /// If such an entry does not exist, it is initialized with 0 and `None` is returned.
+    /// If such an entry does not exist, it is initialized with `current_index` and `None` is returned.
     async fn get_or_create_outgoing_ticket_index(
         &self,
         channel_id: &ChannelId,
         epoch: u32,
+        current_index: u64,
     ) -> Result<Option<u64>, Self::Error>;
 
     /// Stores the ticket index of the next outgoing ticket for the given channel.

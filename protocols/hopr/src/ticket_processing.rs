@@ -1,7 +1,10 @@
 use std::sync::{Arc, atomic::AtomicU64};
 
 use futures::StreamExt;
-use hopr_api::{chain::ChainReadChannelOperations, db::HoprDbTicketOperations};
+use hopr_api::{
+    chain::ChainReadChannelOperations,
+    db::{HoprDbTicketOperations, TicketSelector},
+};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 #[cfg(feature = "rayon")]
@@ -611,12 +614,14 @@ where
 {
     type Error = Arc<Db::Error>;
 
-    async fn next_outgoing_ticket_index(&self, channel_id: &ChannelId, epoch: u32) -> Result<u64, Self::Error> {
-        let channel_id = *channel_id;
+    async fn next_outgoing_ticket_index(&self, channel: &ChannelEntry) -> Result<u64, Self::Error> {
+        let channel_id = *channel.get_id();
+        let epoch = channel.channel_epoch;
+        let current_idx = channel.ticket_index;
         self.out_ticket_index
             .try_get_with((channel_id, epoch), async {
                 self.db
-                    .get_or_create_outgoing_ticket_index(&channel_id, epoch)
+                    .get_or_create_outgoing_ticket_index(&channel_id, epoch, current_idx)
                     .await
                     .map(|maybe_idx| Arc::new(AtomicU64::new(maybe_idx.unwrap_or_default())))
             })
@@ -628,10 +633,16 @@ where
         &self,
         channel_id: &ChannelId,
         epoch: u32,
+        index: u64,
     ) -> Result<HoprBalance, Self::Error> {
         // This value cannot be cached here and must be cached in the DB
         // because the cache invalidation logic can be only done from within the DB.
-        self.db.get_tickets_value(channel_id, epoch).await.map_err(Into::into)
+        // The DB caches this value based on the ChannelId and Epoch, regardless of the index,
+        // but the index is used to filter the ticket value.
+        self.db
+            .get_tickets_value(TicketSelector::new(*channel_id, epoch).with_index_range(index..))
+            .await
+            .map_err(Into::into)
     }
 }
 

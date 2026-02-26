@@ -73,7 +73,11 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> Reassembler<S, M> {
     fn new(inner: S, incomplete_frames: M, max_age: Duration, capacity: usize) -> Self {
         Self {
             inner,
-            timer: futures_time::task::sleep(max_age.max(Duration::from_millis(1)).into()),
+            timer: futures_time::task::sleep(
+                (max_age + Duration::from_millis(1))
+                    .max(Duration::from_millis(1))
+                    .into(),
+            ),
             incomplete_frames,
             expired_frames: Vec::with_capacity(capacity),
             last_expiration: None,
@@ -114,7 +118,7 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> futures::Stream for Reasse
             };
 
             // Poll the inner stream only if there's space in the reassembler
-            let inner_poll = if this.incomplete_frames.len() <= *this.capacity {
+            let inner_poll = if this.incomplete_frames.len() < *this.capacity {
                 this.inner.as_mut().poll_next(cx)
             } else {
                 // This essentially forces the incomplete frames to be expired

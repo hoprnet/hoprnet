@@ -1,8 +1,0 @@
----
-source: transport/network/src/track.rs
-expression: before_snapshot
----
-packetsOut: 1
-packetsIn: 0
-bytesOut: 1000
-bytesIn: 0
