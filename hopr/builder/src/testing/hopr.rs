@@ -256,6 +256,12 @@ impl Drop for ChannelGuard {
     fn drop(&mut self) {
         let channels = self.channels.clone();
         tokio::spawn(async move {
+            for (hopr, channel_id) in &channels {
+                let _ = hopr.close_channel_by_id(channel_id).await;
+            }
+
+            sleep(Duration::from_secs(2)).await;
+
             for (hopr, channel_id) in channels {
                 let _ = hopr.close_channel_by_id(&channel_id).await;
             }

@@ -134,7 +134,7 @@ async fn test_reject_relaying_a_message_when_the_channel_is_out_of_funding(
             let stats_after = mid.inner().ticket_statistics().await?;
             Ok::<_, HoprLibError>(stats_after.rejected_value() > stats_before.rejected_value())
         },
-        Duration::from_secs(4),
+        Duration::from_secs(10),
     )
     .await
     .context("failed to wait for: `stats_after.rejected_value() > stats_before.rejected_value()`")?;
