@@ -1,0 +1,11 @@
+---
+source: hopr/api/src/network/types.rs
+expression: "Health::iter().collect::<Vec::<_>>()"
+---
+[
+    Unknown,
+    Red,
+    Orange,
+    Yellow,
+    Green,
+]

@@ -5,7 +5,7 @@
 #rustdocflags = ["--enable-index-page", "-Z", "unstable-options"]
 
 [install]
-root = ".cargo"
+root = ".cargo/"
 
 [env]
 # Jemalloc runtime configuration parameters

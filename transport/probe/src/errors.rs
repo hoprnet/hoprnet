@@ -1,5 +1,4 @@
-use hopr_api::ct::types::TrafficGenerationError;
-use libp2p_identity::PeerId;
+use hopr_api::graph::NetworkGraphError;
 use thiserror::Error;
 
 use crate::types::PathTelemetry;
@@ -7,16 +6,13 @@ use crate::types::PathTelemetry;
 #[derive(Error, Debug)]
 pub enum ProbeError {
     #[error("probing traffic error: {0}")]
-    TrafficError(TrafficGenerationError<PathTelemetry>),
-
-    #[error("error while decoding message data")]
-    DecodingError,
+    TrafficError(NetworkGraphError<PathTelemetry>),
 
     #[error("peer does not exist")]
     NonExistingPeer,
 
-    #[error("error while pinging peer {0}: {1}")]
-    PingerError(PeerId, String),
+    #[error("error while pinging peer: {0}")]
+    PingerError(String),
 
     #[error("error sending probe: {0}")]
     SendError(String),

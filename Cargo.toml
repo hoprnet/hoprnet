@@ -32,7 +32,6 @@ members = [
   "transport/identity",
   "transport/mixer",
   "transport/network",
-  "transport/p2p",
   "transport/probe",
   "transport/protocol",
   "transport/session",
@@ -42,8 +41,17 @@ members = [
   "utils/session",
   "localcluster",
   # implementations
-  "impls/ct/telemetry",
+  "hopr/builder",
+  "impls/ct/immediate",
+  "impls/ct/full-network",
+  "impls/graph",
+  "impls/transport/p2p",
 ]
+
+[workspace.package]
+rust-version = "1.91"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2024"
 
 [workspace.dependencies]
 ahash = "0.8.12"
@@ -51,12 +59,12 @@ anyhow = "1.0.102"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
 assertables = "9.8.6"
+async-broadcast = "0.7.2"
 async-lock = "3.4.2"
 async-signal = "0.2.13"
 async-stream = "0.3.6"
 async-trait = "0.1.89"
 asynchronous-codec = { version = "0.7.0" }
-async-broadcast = "0.7.2"
 atomic_enum = "0.3.0"
 auto_impl = "1.3.0"
 axum = { version = "0.8.8", features = ["http2"] }
@@ -268,7 +276,6 @@ hopr-transport-network = { path = "transport/network" }
 hopr-transport-mixer = { path = "transport/mixer" }
 hopr-transport-probe = { path = "transport/probe" }
 hopr-transport-protocol = { path = "transport/protocol" }
-hopr-transport-p2p = { path = "transport/p2p" }
 hopr-transport-session = { path = "transport/session" }
 hoprd = { path = "hoprd/hoprd" }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
@@ -281,7 +288,11 @@ hopr-chain-connector = { path = "chain/connector" }
 hopr-statistics = { path = "common/statistics" }
 
 # referential implementations
-hopr-ct-telemetry = { path = "impls/ct/telemetry" }
+hopr-builder = { path = "hopr/builder" }
+hopr-transport-p2p = { path = "impls/transport/p2p" }
+hopr-ct-immediate = { path = "impls/ct/immediate" }
+hopr-ct-full-network = { path = "impls/ct/full-network" }
+hopr-network-graph = { path = "impls/graph" }
 
 [profile.dev]
 panic = "abort"
@@ -319,4 +330,4 @@ insta.opt-level = 3
 similar.opt-level = 3
 
 [workspace.metadata.cargo-shear]
-ignored = ["oas3", "serde_bytes", "humantime-serde"]
+ignored = ["oas3", "serde_bytes", "humantime-serde", "hopr-ct-full-network"]

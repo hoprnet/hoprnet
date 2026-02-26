@@ -2,7 +2,8 @@
 name = "hopr-parallelize"
 version = "0.2.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-edition = "2024"
+edition.workspace = true
+rust-version.workspace = true
 description = "Generic types used through the entire code base"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"

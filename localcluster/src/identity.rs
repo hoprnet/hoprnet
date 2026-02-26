@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::Context;
+use hopr_builder::config::SessionIpForwardingConfig;
 use hopr_chain_connector::{
     BlockchainConnectorConfig,
     api::*,
@@ -9,7 +10,7 @@ use hopr_chain_connector::{
     reexports::hopr_chain_types::exports::alloy::hex,
 };
 use hopr_lib::{ChainKeypair, HoprKeys, Keypair, SafeModule, XDaiBalance, crypto_traits::Randomizable};
-use hoprd::config::{Db, HoprdConfig, Identity, SessionIpForwardingConfig, UserHoprLibConfig, UserHoprNetworkConfig};
+use hoprd::config::{Db, HoprdConfig, Identity, UserHoprLibConfig, UserHoprNetworkConfig};
 use hoprd_api::config::{Api, Auth};
 
 pub const DEFAULT_BLOKLI_URL: &str = "http://localhost:8080";
