@@ -74,7 +74,7 @@ impl ClusterGuard {
         )
         .await?;
 
-        sleep(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(3)).await;
 
         let ip = IpOrHost::from_str(":0")?;
         let routing = RoutingOptions::Hops(hopr_lib::exports::types::primitive::bounded::BoundedSize::try_from(
@@ -393,6 +393,9 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
                         &onchain_keys[i],
                         &offchain_keys[i],
                         config,
+                        Some(hopr_ct_full_network::ProberConfig {
+                            interval: std::time::Duration::from_secs(1),
+                        }), // aggressive setting to facilitate fast n-hop telemetry probing
                         connector.clone(),
                         node_db,
                         EchoServer::new(),

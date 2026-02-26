@@ -31,6 +31,7 @@ where
 
     raw.into_iter()
         .filter_map(|(path, _, cost)| {
+            tracing::trace!(?path, ?cost, "evaluating candidate path");
             if cost > 0.0 {
                 // Drop the first element (src) — callers expect [intermediates..., dest].
                 Some(path.into_iter().skip(1).collect::<Vec<_>>())
@@ -92,6 +93,7 @@ where
     /// The function has a potential to run expensive operations, it should be benchmarked
     /// in a production environment and possibly guarded (e.g. by offloading the long execution
     /// in an async executor to avoid blocking the caller).
+    #[tracing::instrument(level = "trace", skip(self), fields(src = %src, dest = %dest, hops), ret, err)] // Logs the query parameters.
     fn select_path(
         &self,
         src: OffchainPublicKey,
@@ -111,8 +113,8 @@ where
         if paths.is_empty() {
             Err(PathPlannerError::Path(PathError::PathNotFound(
                 hops,
-                src.to_peerid_str(),
-                dest.to_peerid_str(),
+                src.to_string(),
+                dest.to_string(),
             )))
         } else {
             Ok(paths)

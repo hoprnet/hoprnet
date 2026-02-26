@@ -12,6 +12,7 @@ pub type EdgeTransportMeasurement = std::result::Result<std::time::Duration, ()>
 pub type Capacity = u128;
 
 /// Represents the different kinds of observations that can be recorded for a graph edge.
+#[derive(Debug)]
 pub enum EdgeWeightType {
     /// A direct transport measurement between this and another adjacent peer.
     Immediate(EdgeTransportMeasurement),

@@ -10,6 +10,7 @@ use hopr_crypto_types::{crypto_traits::Randomizable, types::OffchainPublicKey};
 use hopr_internal_types::path::Path;
 use hopr_internal_types::{errors::PathError, prelude::*};
 use hopr_network_types::prelude::*;
+use hopr_primitive_types::traits::ToHex;
 use hopr_protocol_hopr::{FoundSurb, SurbStore};
 use tracing::trace;
 
@@ -179,8 +180,8 @@ where
                         if valid_paths.is_empty() {
                             return Err(PathPlannerError::Path(PathError::PathNotFound(
                                 hops_usize,
-                                src_key.to_peerid_str(),
-                                dest_key.to_peerid_str(),
+                                src_key.to_hex(),
+                                dest_key.to_hex(),
                             )));
                         }
 
@@ -275,18 +276,6 @@ where
             }
         }
     }
-
-    /// Returns a future that runs the background path-cache refresh loop.
-    ///
-    /// The returned future iterates over all keys currently in the planner's cache
-    /// and recomputes their paths on a configurable schedule, so that steady-state
-    /// traffic is always served from cache.
-    ///
-    /// Only available with the `runtime-tokio` feature.
-    #[cfg(feature = "runtime-tokio")]
-    pub fn background_refresh(&self) -> impl std::future::Future<Output = ()> + 'static {
-        self.run_background_refresh()
-    }
 }
 
 #[cfg(feature = "runtime-tokio")]
@@ -296,6 +285,13 @@ where
     R: ChainKeyOperations + ChainReadChannelOperations + Send + Sync + 'static,
     S: PathSelector + 'static,
 {
+    /// Returns a future that runs the background path-cache refresh loop.
+    ///
+    /// The returned future iterates over all keys currently in the planner's cache
+    /// and recomputes their paths on a configurable schedule, so that steady-state
+    /// traffic is always served from cache.
+    ///
+    /// Only available with the `runtime-tokio` feature.
     fn run_background_refresh(&self) -> impl std::future::Future<Output = ()> + Send + 'static {
         // Clone only the fields we need — avoids requiring R: Clone + S: Clone.
         let cache = self.cache.clone();
@@ -775,6 +771,6 @@ mod tests {
 
         let planner = PathPlanner::new(me, surb_store, chain_api, selector, small_config());
         // Just ensure it compiles and produces a future.
-        let _future = planner.background_refresh();
+        let _future = planner.run_background_refresh();
     }
 }

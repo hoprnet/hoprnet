@@ -113,6 +113,7 @@ where
         let cfg = self.cfg;
         let graph = self.graph.clone();
         let graph_intermediates = self.graph.clone();
+        let me = self.me;
 
         let immediates = futures::stream::repeat(())
             .filter_map(move |_| {
@@ -124,6 +125,7 @@ where
                 }
             })
             .flatten()
+            .filter(move |peer| futures::future::ready(peer != &me))
             .filter_map(move |peer| {
                 let cache_immediate_neighbor_routing = cache_immediate_neighbor_routing.clone();
 
@@ -144,7 +146,7 @@ where
 
         let me = self.me;
 
-        // 2, 3 and 4 edges => 1-, 2- and 3-hops in the HOPR protocol
+        // 3 and 4 edges => 2- and 3-hops in the HOPR protocol
         let intermediates = futures::stream::repeat(futures::stream::iter([2, 3, 4]))
             .flatten()
             .filter_map(move |edge_count| async move {

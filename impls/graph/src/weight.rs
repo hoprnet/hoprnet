@@ -67,6 +67,7 @@ pub struct Observations {
 }
 
 impl EdgeObservableWrite for Observations {
+    #[tracing::instrument(level = "trace", skip(self), name = "record_observation")]
     fn record(&mut self, measurement: EdgeWeightType) {
         self.last_update = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

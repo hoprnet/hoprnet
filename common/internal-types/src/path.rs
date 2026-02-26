@@ -372,27 +372,6 @@ pub trait PathSelector {
     }
 }
 
-/// A path selector that does not resolve any path, always returns [`PathError::PathNotFound`].
-#[derive(Debug, Clone, Copy, Default)]
-pub struct NoPathSelector;
-
-#[async_trait::async_trait]
-impl PathSelector for NoPathSelector {
-    async fn select_path(
-        &self,
-        source: Address,
-        destination: Address,
-        min_hops: usize,
-        _max_hops: usize,
-    ) -> Result<ChannelPath, PathError> {
-        Err(PathError::PathNotFound(
-            min_hops,
-            source.to_string(),
-            destination.to_string(),
-        ))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::{

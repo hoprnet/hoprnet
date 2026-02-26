@@ -65,6 +65,8 @@ use hopr_protocol_hopr::MemorySurbStore;
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId, Protocol};
 use hopr_transport_mixer::MixerConfig;
+#[cfg(feature = "runtime-tokio")]
+use hopr_transport_path::BackgroundCacheRefreshable;
 use hopr_transport_path::{HoprGraphPathSelector, PathPlanner, PathPlannerConfig};
 pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
 use hopr_transport_probe::{
@@ -324,7 +326,7 @@ where
         #[cfg(feature = "runtime-tokio")]
         processes.insert(
             HoprTransportProcess::PathRefresh,
-            spawn_as_abortable!(self.path_planner.background_refresh()),
+            spawn_as_abortable!(self.path_planner.run_background_refresh()),
         );
 
         processes.insert(
