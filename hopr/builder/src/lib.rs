@@ -287,7 +287,7 @@ where
     let start = async move {
         node_for_run
             .run(
-                hopr_ct_immediate::ImmediateNeighborProber::new(Default::default(), graph),
+                hopr_ct_full_network::FullNetworkDiscovery::new(*packet_key.public(), Default::default(), graph),
                 network_builder,
                 #[cfg(feature = "session-server")]
                 server,

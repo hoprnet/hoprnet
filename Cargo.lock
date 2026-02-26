@@ -4432,7 +4432,7 @@ dependencies = [
  "hopr-builder",
  "hopr-chain-connector",
  "hopr-crypto-random 0.4.1",
- "hopr-ct-immediate",
+ "hopr-ct-full-network",
  "hopr-db-node",
  "hopr-lib",
  "hopr-network-graph",
