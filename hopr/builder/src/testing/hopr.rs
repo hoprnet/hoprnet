@@ -255,16 +255,24 @@ impl ChannelGuard {
 impl Drop for ChannelGuard {
     fn drop(&mut self) {
         let channels = self.channels.clone();
-        tokio::spawn(async move {
-            for (hopr, channel_id) in &channels {
-                let _ = hopr.close_channel_by_id(channel_id).await;
-            }
+        let cleanup = std::thread::Builder::new().spawn(move || {
+            if let Ok(runtime) = tokio::runtime::Builder::new_current_thread().enable_all().build() {
+                runtime.block_on(async move {
+                    for (hopr, channel_id) in &channels {
+                        let _ = hopr.close_channel_by_id(channel_id).await;
+                    }
 
-            sleep(Duration::from_secs(2)).await;
+                    sleep(Duration::from_secs(2)).await;
 
-            for (hopr, channel_id) in channels {
-                let _ = hopr.close_channel_by_id(&channel_id).await;
+                    for (hopr, channel_id) in channels {
+                        let _ = hopr.close_channel_by_id(&channel_id).await;
+                    }
+                });
             }
         });
+
+        if let Ok(handle) = cleanup {
+            let _ = handle.join();
+        }
     }
 }
