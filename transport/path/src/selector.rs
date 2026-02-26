@@ -20,14 +20,14 @@ fn compute_paths<G>(
     graph: &G,
     src: &OffchainPublicKey,
     dest: &OffchainPublicKey,
-    length: usize,
+    length: std::num::NonZeroUsize,
     take: usize,
 ) -> Vec<PathToDestination>
 where
     G: NetworkGraphTraverse<NodeId = OffchainPublicKey> + NetworkGraphView<NodeId = OffchainPublicKey>,
     <G as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
 {
-    let raw = graph.simple_paths(src, dest, length, Some(take), HoprCostFn::new(length));
+    let raw = graph.simple_paths(src, dest, length.get(), Some(take), HoprCostFn::new(length));
 
     raw.into_iter()
         .filter_map(|(path, _, cost)| {
@@ -99,7 +99,7 @@ where
         hops: usize,
     ) -> Result<Vec<Vec<OffchainPublicKey>>> {
         trace!(%src, %dest, hops, "computing paths from graph");
-        let paths = compute_paths(&self.graph, &src, &dest, hops + 1, self.max_paths);
+        let paths = compute_paths(&self.graph, &src, &dest, std::num::NonZeroUsize::new(hops + 1).expect("can never fail, it is physically at least 1 after the"), self.max_paths);
 
         if paths.is_empty() {
             Err(PathPlannerError::Path(PathError::PathNotFound(
@@ -127,9 +127,8 @@ mod tests {
     use hopr_network_graph::ChannelGraph;
     use hopr_network_types::types::RoutingOptions;
 
-    use crate::traits::PathSelector;
-
     use super::*;
+    use crate::traits::PathSelector;
 
     const SECRET_0: [u8; 32] = hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d");
     const SECRET_1: [u8; 32] = hex!("71bf1f42ebbfcd89c3e197a3fd7cda79b92499e509b6fefa0fe44d02821d146a");

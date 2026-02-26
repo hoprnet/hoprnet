@@ -4,13 +4,12 @@ use futures::{TryStreamExt, stream::FuturesUnordered};
 use hopr_api::chain::{ChainKeyOperations, ChainPathResolver, ChainReadChannelOperations};
 use hopr_crypto_packet::prelude::*;
 use hopr_crypto_types::{crypto_traits::Randomizable, types::OffchainPublicKey};
+#[cfg(all(feature = "prometheus", not(test)))]
+use hopr_internal_types::path::Path;
 use hopr_internal_types::{errors::PathError, prelude::*};
 use hopr_network_types::prelude::*;
 use hopr_protocol_hopr::{FoundSurb, SurbStore};
 use tracing::trace;
-
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_internal_types::path::Path;
 
 #[cfg(feature = "runtime-tokio")]
 use crate::traits::BackgroundRefreshable;
@@ -334,23 +333,23 @@ where
                             }
                         };
 
-                        if let (Some(src_key), Some(dest_key)) = (resolve_key(src).await, resolve_key(dest).await) {
-                            if let Ok(candidates) = selector.select_path(src_key, dest_key, hops_usize) {
-                                let chain_resolver = ChainPathResolver::from(&*resolver);
-                                let mut valid_paths: Vec<ValidatedPath> = Vec::new();
-                                for candidate in candidates {
-                                    let node_ids: Vec<NodeId> =
-                                        candidate.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
-                                    if let Ok(vp) = ValidatedPath::new(src, node_ids, &chain_resolver).await {
-                                        valid_paths.push(vp);
-                                    }
+                        if let (Some(src_key), Some(dest_key)) = (resolve_key(src).await, resolve_key(dest).await)
+                            && let Ok(candidates) = selector.select_path(src_key, dest_key, hops_usize)
+                        {
+                            let chain_resolver = ChainPathResolver::from(&*resolver);
+                            let mut valid_paths: Vec<ValidatedPath> = Vec::new();
+                            for candidate in candidates {
+                                let node_ids: Vec<NodeId> =
+                                    candidate.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
+                                if let Ok(vp) = ValidatedPath::new(src, node_ids, &chain_resolver).await {
+                                    valid_paths.push(vp);
                                 }
+                            }
 
-                                if !valid_paths.is_empty() {
-                                    cache
-                                        .insert((src, dest, RoutingOptions::Hops(hops)), Arc::new(valid_paths))
-                                        .await;
-                                }
+                            if !valid_paths.is_empty() {
+                                cache
+                                    .insert((src, dest, RoutingOptions::Hops(hops)), Arc::new(valid_paths))
+                                    .await;
                             }
                         }
                     }
@@ -368,10 +367,12 @@ mod tests {
     use bimap::BiMap;
     use futures::stream::{self, BoxStream};
     use hex_literal::hex;
-    use hopr_api::graph::traits::EdgeWeightType;
     use hopr_api::{
         chain::{ChainKeyOperations, ChainReadChannelOperations, ChannelSelector, HoprKeyIdent},
-        graph::{NetworkGraphWrite, traits::EdgeObservableWrite},
+        graph::{
+            NetworkGraphWrite,
+            traits::{EdgeObservableWrite, EdgeWeightType},
+        },
     };
     use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
     use hopr_internal_types::channels::{ChannelEntry, ChannelStatus, generate_channel_id};

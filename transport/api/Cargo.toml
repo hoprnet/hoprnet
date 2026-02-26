@@ -16,7 +16,6 @@ capture = ["dep:pcap-file"]
 telemetry = ["serde", "hopr-transport-session/telemetry"]
 p2p-announce-quic = []
 prometheus = [
-  "dep:hopr-metrics",
   "hopr-network-types/prometheus",
   "hopr-transport-mixer/prometheus",
   "hopr-transport-network/prometheus",
@@ -66,7 +65,6 @@ hopr-crypto-packet = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-internal-types = { workspace = true }
-hopr-metrics = { workspace = true, optional = true }
 hopr-primitive-types = { workspace = true }
 hopr-network-types = { workspace = true }
 hopr-protocol-app = { workspace = true }

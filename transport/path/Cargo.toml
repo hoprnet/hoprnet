@@ -11,10 +11,7 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-prometheus = [
-  "dep:hopr-metrics",
-  "hopr-network-types/prometheus",
-]
+prometheus = ["dep:hopr-metrics", "hopr-network-types/prometheus"]
 runtime-tokio = ["dep:tokio"]
 
 [dependencies]
@@ -43,7 +40,6 @@ async-trait = { workspace = true }
 bimap = { workspace = true }
 futures = { workspace = true }
 hex-literal = { workspace = true }
-mockall = { workspace = true }
 tokio = { workspace = true }
 
 hopr-network-graph = { workspace = true }
