@@ -2,7 +2,8 @@
 name = "hopr-builder"
 version = "4.0.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-edition = "2024"
+edition.workspace = true
+rust-version.workspace = true
 description = "Referentail omplementation of the hopr-lib object using canonical trait implementations"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"

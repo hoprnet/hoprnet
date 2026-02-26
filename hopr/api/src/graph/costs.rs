@@ -37,7 +37,8 @@ impl<W> SimpleHoprCostFn<f64, W>
 where
     W: EdgeObservableRead + Send + 'static,
 {
-    pub fn new(length: usize) -> Self {
+    pub fn new(length: std::num::NonZeroUsize) -> Self {
+        let length = length.get();
         Self {
             initial: 1.0,
             min: Some(0.0),
@@ -103,7 +104,8 @@ impl<W> HoprCostFn<f64, W>
 where
     W: EdgeObservableRead + Send + 'static,
 {
-    pub fn new(length: usize) -> Self {
+    pub fn new(length: std::num::NonZeroUsize) -> Self {
+        let length = length.get();
         Self {
             initial: 1.0,
             min: Some(0.0),

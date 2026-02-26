@@ -48,6 +48,11 @@ members = [
   "impls/transport/p2p",
 ]
 
+[workspace.package]
+rust-version = "1.88"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2024"
+
 [workspace.dependencies]
 ahash = "0.8.12"
 anyhow = "1.0.101"

@@ -1,7 +1,8 @@
 [package]
 name = "hopr-chain-connector"
 version = "0.15.0"
-edition = "2024"
+edition.workspace = true
+rust-version.workspace = true
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implementation of HOPR Chain APIs using Blokli client"
 homepage = "https://hoprnet.org/"

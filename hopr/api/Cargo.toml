@@ -2,7 +2,8 @@
 name = "hopr-api"
 version = "0.11.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-edition = "2024"
+edition.workspace = true
+rust-version.workspace = true
 description = "Common HOPR-related high-level API traits used in the code base"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"

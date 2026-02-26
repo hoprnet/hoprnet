@@ -149,11 +149,16 @@ where
             .flatten()
             .filter_map(move |edge_count| async move {
                 hopr_async_runtime::prelude::sleep(cfg.interval).await;
-                Some(edge_count)
+                std::num::NonZeroUsize::new(edge_count)
             })
             .flat_map(move |edge_count| {
-                let simple_paths =
-                    graph_intermediates.simple_paths(&me, &me, edge_count, Some(100), HoprCostFn::new(edge_count));
+                let simple_paths = graph_intermediates.simple_paths(
+                    &me,
+                    &me,
+                    edge_count.get(),
+                    Some(100),
+                    HoprCostFn::new(edge_count),
+                );
                 futures::stream::iter(simple_paths)
             })
             .filter_map(move |(path, path_id, _cost)| {
@@ -198,7 +203,7 @@ mod tests {
     const TINY_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(20);
 
     #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-    pub struct Node {
+    struct Node {
         pub id: OffchainPublicKey,
     }
 

@@ -2,7 +2,8 @@
 name = "hopr-db-migration"
 description = "Contains database migrations for the HOPR Node database"
 version = "0.5.1"
-edition = "2024"
+edition.workspace = true
+rust-version.workspace = true
 publish = false
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"

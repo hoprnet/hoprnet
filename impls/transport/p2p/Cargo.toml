@@ -3,7 +3,8 @@ name = "hopr-transport-p2p"
 version = "0.8.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "rust-libp2p based p2p transport implementation"
-edition = "2024"
+edition.workspace = true
+rust-version.workspace = true
 license = "GPL-3.0-only"
 
 [lib]

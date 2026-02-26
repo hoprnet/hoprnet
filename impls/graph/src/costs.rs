@@ -2,6 +2,7 @@ pub use hopr_api::graph::costs::*;
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Context;
     use hopr_api::graph::{
         CostFn,
         traits::{EdgeObservableWrite, EdgeWeightType},
@@ -44,17 +45,18 @@ mod tests {
     // ── HoprCostFn trait method tests ────────────────────────────────────
 
     #[test]
-    fn hopr_cost_fn_invariants() {
-        let cost_fn = HoprCostFn::<_, Observations>::new(3);
+    fn hopr_cost_fn_invariants() -> anyhow::Result<()> {
+        let cost_fn = HoprCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
         assert_eq!(cost_fn.initial_cost(), 1.0);
         assert_eq!(cost_fn.min_cost(), Some(0.0));
+        Ok(())
     }
 
     // ── First edge (path_index == 0) ─────────────────────────────────────
 
     #[test]
-    fn hopr_first_edge_positive_when_connected_with_capacity() {
-        let cost_fn = HoprCostFn::<_, Observations>::new(3);
+    fn hopr_first_edge_positive_when_connected_with_capacity() -> anyhow::Result<()> {
+        let cost_fn = HoprCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
         let f = cost_fn.into_cost_fn();
         let obs = obs_connected_with_capacity();
 
@@ -63,11 +65,12 @@ mod tests {
             cost > 0.0,
             "first edge should have positive cost when connected with capacity, got {cost}"
         );
+        Ok(())
     }
 
     #[test]
-    fn hopr_first_edge_scales_by_intermediate_score() {
-        let cost_fn = HoprCostFn::<_, Observations>::new(3);
+    fn hopr_first_edge_scales_by_intermediate_score() -> anyhow::Result<()> {
+        let cost_fn = HoprCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
         let f = cost_fn.into_cost_fn();
         let obs = obs_connected_with_capacity();
 
@@ -77,11 +80,12 @@ mod tests {
             cost > 0.0 && cost <= 2.0,
             "cost should be scaled by intermediate score, got {cost}"
         );
+        Ok(())
     }
 
     #[test]
-    fn hopr_first_edge_negative_when_not_connected() {
-        let cost_fn = HoprCostFn::<_, Observations>::new(3);
+    fn hopr_first_edge_negative_when_not_connected() -> anyhow::Result<()> {
+        let cost_fn = HoprCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
         let f = cost_fn.into_cost_fn();
         let obs = obs_not_connected_with_intermediate();
 
@@ -90,11 +94,12 @@ mod tests {
             cost < 0.0,
             "first edge should be negative when not connected, got {cost}"
         );
+        Ok(())
     }
 
     #[test]
-    fn hopr_first_edge_negative_when_connected_but_no_intermediate() {
-        let cost_fn = HoprCostFn::<_, Observations>::new(3);
+    fn hopr_first_edge_negative_when_connected_but_no_intermediate() -> anyhow::Result<()> {
+        let cost_fn = HoprCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
         let f = cost_fn.into_cost_fn();
         let obs = obs_connected_only_immediate();
 
@@ -103,11 +108,12 @@ mod tests {
             cost < 0.0,
             "first edge should be negative without intermediate QoS, got {cost}"
         );
+        Ok(())
     }
 
     #[test]
-    fn hopr_first_edge_negative_when_connected_intermediate_but_no_capacity() {
-        let cost_fn = HoprCostFn::<_, Observations>::new(3);
+    fn hopr_first_edge_negative_when_connected_intermediate_but_no_capacity() -> anyhow::Result<()> {
+        let cost_fn = HoprCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
         let f = cost_fn.into_cost_fn();
         let mut obs = Observations::default();
         obs.record(EdgeWeightType::Connected(true));
@@ -117,11 +123,12 @@ mod tests {
 
         let cost = f(1.0, &obs, 0);
         assert!(cost < 0.0, "first edge should be negative without capacity, got {cost}");
+        Ok(())
     }
 
     #[test]
-    fn hopr_first_edge_negative_when_empty() {
-        let cost_fn = HoprCostFn::<_, Observations>::new(3);
+    fn hopr_first_edge_negative_when_empty() -> anyhow::Result<()> {
+        let cost_fn = HoprCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
         let f = cost_fn.into_cost_fn();
 
         let cost = f(1.0, &obs_empty(), 0);
@@ -129,13 +136,14 @@ mod tests {
             cost < 0.0,
             "first edge should be negative with no observations, got {cost}"
         );
+        Ok(())
     }
 
     // ── Last edge (path_index == length - 1) ───────────────────────────────
 
     #[test]
-    fn hopr_last_edge_positive_when_connected_with_score() {
-        let cost_fn = HoprCostFn::<_, Observations>::new(3);
+    fn hopr_last_edge_positive_when_connected_with_score() -> anyhow::Result<()> {
+        let cost_fn = HoprCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
         let f = cost_fn.into_cost_fn();
         let obs = obs_connected_with_capacity();
 
@@ -144,11 +152,12 @@ mod tests {
             cost > 0.0,
             "last edge should have positive cost when connected with score, got {cost}"
         );
+        Ok(())
     }
 
     #[test]
-    fn hopr_last_edge_positive_when_connected_immediate_only() {
-        let cost_fn = HoprCostFn::<_, Observations>::new(3);
+    fn hopr_last_edge_positive_when_connected_immediate_only() -> anyhow::Result<()> {
+        let cost_fn = HoprCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
         let f = cost_fn.into_cost_fn();
         let obs = obs_connected_only_immediate();
 
@@ -157,11 +166,12 @@ mod tests {
             cost > 0.0,
             "last edge should have positive cost with only immediate observation, got {cost}"
         );
+        Ok(())
     }
 
     #[test]
-    fn hopr_last_edge_scales_by_overall_score() {
-        let cost_fn = HoprCostFn::<_, Observations>::new(3);
+    fn hopr_last_edge_scales_by_overall_score() -> anyhow::Result<()> {
+        let cost_fn = HoprCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
         let f = cost_fn.into_cost_fn();
         let obs = obs_connected_with_capacity();
 
@@ -170,11 +180,12 @@ mod tests {
             cost > 0.0 && cost <= 2.0,
             "cost should be scaled by overall score, got {cost}"
         );
+        Ok(())
     }
 
     #[test]
-    fn hopr_last_edge_negative_when_not_connected() {
-        let cost_fn = HoprCostFn::<_, Observations>::new(3);
+    fn hopr_last_edge_negative_when_not_connected() -> anyhow::Result<()> {
+        let cost_fn = HoprCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
         let f = cost_fn.into_cost_fn();
         let obs = obs_not_connected_with_intermediate();
 
@@ -183,11 +194,12 @@ mod tests {
             cost < 0.0,
             "last edge should be negative when not connected, got {cost}"
         );
+        Ok(())
     }
 
     #[test]
-    fn hopr_last_edge_negative_when_connected_but_zero_score() {
-        let cost_fn = HoprCostFn::<_, Observations>::new(3);
+    fn hopr_last_edge_negative_when_connected_but_zero_score() -> anyhow::Result<()> {
+        let cost_fn = HoprCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
         let f = cost_fn.into_cost_fn();
         // Connected but only failed probes → score == 0
         let mut obs = Observations::default();
@@ -199,11 +211,12 @@ mod tests {
             cost < 0.0,
             "last edge should be negative when score is zero, got {cost}"
         );
+        Ok(())
     }
 
     #[test]
-    fn hopr_last_edge_negative_when_empty() {
-        let cost_fn = HoprCostFn::<_, Observations>::new(3);
+    fn hopr_last_edge_negative_when_empty() -> anyhow::Result<()> {
+        let cost_fn = HoprCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
         let f = cost_fn.into_cost_fn();
 
         let cost = f(1.0, &obs_empty(), 2);
@@ -211,13 +224,14 @@ mod tests {
             cost < 0.0,
             "last edge should be negative with no observations, got {cost}"
         );
+        Ok(())
     }
 
     // ── Intermediate edges (0 < path_index < length) ─────────────────────
 
     #[test]
-    fn hopr_intermediate_edge_positive_when_capacity_and_score() {
-        let cost_fn = HoprCostFn::<_, Observations>::new(3);
+    fn hopr_intermediate_edge_positive_when_capacity_and_score() -> anyhow::Result<()> {
+        let cost_fn = HoprCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
         let f = cost_fn.into_cost_fn();
         let obs = obs_connected_with_capacity();
 
@@ -226,11 +240,12 @@ mod tests {
             cost > 0.0,
             "intermediate edge should have positive cost with capacity and score, got {cost}"
         );
+        Ok(())
     }
 
     #[test]
-    fn hopr_intermediate_edge_scales_by_intermediate_score() {
-        let cost_fn = HoprCostFn::<_, Observations>::new(3);
+    fn hopr_intermediate_edge_scales_by_intermediate_score() -> anyhow::Result<()> {
+        let cost_fn = HoprCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
         let f = cost_fn.into_cost_fn();
         let obs = obs_connected_with_capacity();
 
@@ -240,11 +255,12 @@ mod tests {
             cost > 0.0 && cost <= 2.0,
             "intermediate edge should be scaled by intermediate score, got {cost}"
         );
+        Ok(())
     }
 
     #[test]
-    fn hopr_intermediate_edge_negative_when_no_intermediate() {
-        let cost_fn = HoprCostFn::<_, Observations>::new(3);
+    fn hopr_intermediate_edge_negative_when_no_intermediate() -> anyhow::Result<()> {
+        let cost_fn = HoprCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
         let f = cost_fn.into_cost_fn();
         let obs = obs_connected_only_immediate();
 
@@ -253,11 +269,12 @@ mod tests {
             cost < 0.0,
             "intermediate edge should be negative without intermediate QoS, got {cost}"
         );
+        Ok(())
     }
 
     #[test]
-    fn hopr_intermediate_edge_negative_when_no_capacity() {
-        let cost_fn = HoprCostFn::<_, Observations>::new(3);
+    fn hopr_intermediate_edge_negative_when_no_capacity() -> anyhow::Result<()> {
+        let cost_fn = HoprCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
         let f = cost_fn.into_cost_fn();
         let mut obs = Observations::default();
         obs.record(EdgeWeightType::Intermediate(Ok(std::time::Duration::from_millis(50))));
@@ -268,11 +285,12 @@ mod tests {
             cost < 0.0,
             "intermediate edge should be negative without capacity, got {cost}"
         );
+        Ok(())
     }
 
     #[test]
-    fn hopr_intermediate_edge_negative_when_empty() {
-        let cost_fn = HoprCostFn::<_, Observations>::new(3);
+    fn hopr_intermediate_edge_negative_when_empty() -> anyhow::Result<()> {
+        let cost_fn = HoprCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
         let f = cost_fn.into_cost_fn();
 
         let cost = f(1.0, &obs_empty(), 1);
@@ -280,34 +298,37 @@ mod tests {
             cost < 0.0,
             "intermediate edge should be negative with no observations, got {cost}"
         );
+        Ok(())
     }
 
     #[test]
-    fn hopr_intermediate_edge_uses_observations() {
-        let cost_fn = HoprCostFn::<_, Observations>::new(3);
+    fn hopr_intermediate_edge_uses_observations() -> anyhow::Result<()> {
+        let cost_fn = HoprCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
         let f = cost_fn.into_cost_fn();
 
         let cost_empty = f(1.0, &obs_empty(), 1);
         let cost_full = f(1.0, &obs_connected_with_capacity(), 1);
         assert_ne!(cost_empty, cost_full, "intermediate edges should use observations");
+        Ok(())
     }
 
     // ── Length boundary tests ────────────────────────────────────────────
 
     #[test]
-    fn hopr_length_one_has_only_first_and_last_edge() {
-        let cost_fn = HoprCostFn::<_, Observations>::new(1);
+    fn hopr_length_one_has_only_first_and_last_edge() -> anyhow::Result<()> {
+        let cost_fn = HoprCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?);
         let f = cost_fn.into_cost_fn();
         let obs = obs_connected_with_capacity();
 
         // path_index 0 = first edge (also last edge for length=1, but first-edge arm catches it)
         let first = f(1.0, &obs, 0);
         assert!(first > 0.0, "index 0 should be first-edge logic");
+        Ok(())
     }
 
     #[test]
-    fn hopr_length_two_intermediate_at_index_one() {
-        let cost_fn = HoprCostFn::<_, Observations>::new(2);
+    fn hopr_length_two_intermediate_at_index_one() -> anyhow::Result<()> {
+        let cost_fn = HoprCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?);
         let f = cost_fn.into_cost_fn();
         let obs = obs_connected_with_capacity();
 
@@ -321,13 +342,14 @@ mod tests {
         // index 1 with empty obs — negative (not connected)
         let cost_empty = f(1.0, &obs_empty(), 1);
         assert!(cost_empty < 0.0, "index 1 should be negative with empty obs");
+        Ok(())
     }
 
     // ── Negative initial cost propagation ────────────────────────────────
 
     #[test]
-    fn hopr_negative_initial_cost_inverts_rejection() {
-        let cost_fn = HoprCostFn::<_, Observations>::new(3);
+    fn hopr_negative_initial_cost_inverts_rejection() -> anyhow::Result<()> {
+        let cost_fn = HoprCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
         let f = cost_fn.into_cost_fn();
 
         // Normally empty obs at index 0 → -initial_cost = -1.0
@@ -337,5 +359,6 @@ mod tests {
             cost > 0.0,
             "negative initial cost should invert the rejection, got {cost}"
         );
+        Ok(())
     }
 }

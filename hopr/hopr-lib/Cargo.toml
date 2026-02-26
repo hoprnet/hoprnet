@@ -2,7 +2,8 @@
 name = "hopr-lib"
 version = "4.0.0-rc.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-edition = "2024"
+edition.workspace = true
+rust-version.workspace = true
 description = "HOPR library containing the entire functionality importable without the HOPRd daemon"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"

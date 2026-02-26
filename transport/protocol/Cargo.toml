@@ -2,7 +2,8 @@
 name = "hopr-transport-protocol"
 version = "1.3.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-edition = "2024"
+edition.workspace = true
+rust-version.workspace = true
 license = "GPL-3.0-only"
 
 [lib]

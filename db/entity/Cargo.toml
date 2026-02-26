@@ -2,7 +2,8 @@
 name = "hopr-db-entity"
 description = "Contains all HOPR database entities"
 version = "0.6.2"
-edition = "2024"
+edition.workspace = true
+rust-version.workspace = true
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"

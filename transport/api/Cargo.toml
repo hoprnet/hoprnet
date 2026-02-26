@@ -3,7 +3,8 @@ name = "hopr-transport"
 version = "0.18.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR transport interface for the core library"
-edition = "2024"
+edition.workspace = true
+rust-version.workspace = true
 license = "GPL-3.0-only"
 
 [lib]

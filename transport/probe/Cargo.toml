@@ -2,7 +2,8 @@
 name = "hopr-transport-probe"
 version = "0.4.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-edition = "2024"
+edition.workspace = true
+rust-version.workspace = true
 description = "Probing mechanism of the discovered network topology"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"

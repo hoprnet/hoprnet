@@ -2,7 +2,8 @@
 name = "hopr-crypto-random"
 description = "Commonly used randomness using a cryptographically secure random generator"
 version = "0.4.1"
-edition = "2024"
+edition.workspace = true
+rust-version.workspace = true
 license = "GPL-3.0-only"
 
 [features]
