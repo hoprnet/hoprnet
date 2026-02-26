@@ -24,7 +24,7 @@ const FUNDING_AMOUNT: &str = "10 wxHOPR";
 async fn ticket_statistics_should_reset_when_cleaned(#[with(5)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1::<3>();
 
-    let (mut session, fw_channels, bw_channels) = cluster_fixture
+    let (mut session, fw_channels, bw_channels, _telemetry_channels) = cluster_fixture
         .create_session(&[src, mid, dst], FUNDING_AMOUNT.parse::<HoprBalance>()?)
         .await?;
 
@@ -109,7 +109,7 @@ async fn test_reject_relaying_a_message_when_the_channel_is_out_of_funding(
         .await
         .context("failed to get ticket price")?;
 
-    let (mut session, _fw_channel, _bw_channel) =
+    let (mut session, _fw_channel, _bw_channel, _telemetry_channels) =
         cluster_fixture.create_session(&[src, mid, dst], ticket_price).await?;
 
     const BUF_LEN: usize = 500;
@@ -160,7 +160,7 @@ async fn test_redeem_ticket_on_request(#[with(5)] cluster_fixture: ClusterGuard)
         .context("failed to get ticket price")?;
     let funding_amount = ticket_price.mul(message_count);
 
-    let (mut session, _fw_channel, _bw_channel) =
+    let (mut session, _fw_channel, _bw_channel, _telemetry_channels) =
         cluster_fixture.create_session(&[src, mid, dst], funding_amount).await?;
 
     const BUF_LEN: usize = 400;
@@ -230,7 +230,7 @@ async fn test_neglect_ticket_on_closing(#[with(5)] cluster_fixture: ClusterGuard
         .context("failed to get ticket statistics")?;
 
     let funding_amount = ticket_price.mul(message_count);
-    let (mut session, fw_channel, bw_channel) =
+    let (mut session, fw_channel, bw_channel, _telemetry_channels) =
         cluster_fixture.create_session(&[src, mid, dst], funding_amount).await?;
 
     const BUF_LEN: usize = 400;
@@ -304,7 +304,7 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
         .context("failed to get ticket price")?;
     let funding_amount = ticket_price.mul(message_count).div_f64(MINIMUM_INCOMING_WIN_PROB)?;
 
-    let (mut session, _fw_channel, _bw_channel) =
+    let (mut session, _fw_channel, _bw_channel, _telemetry_channels) =
         cluster_fixture.create_session(&[src, mid, dst], funding_amount).await?;
 
     const BUF_LEN: usize = 400;
@@ -404,7 +404,7 @@ async fn relay_with_win_prob_higher_than_min_win_prob_should_succeed(
         .context("failed to get ticket price")?;
     let funding_amount = ticket_price.mul(message_count + 2);
 
-    let (mut session, _fw_channel, _bw_channel) =
+    let (mut session, _fw_channel, _bw_channel, _telemetry_channel) =
         cluster_fixture.create_session(&[src, mid, dst], funding_amount).await?;
 
     const BUF_LEN: usize = 400;

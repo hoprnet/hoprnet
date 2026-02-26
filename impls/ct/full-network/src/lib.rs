@@ -2,7 +2,7 @@ use futures::{StreamExt, stream::BoxStream};
 use futures_concurrency::stream::StreamExt as _;
 use hopr_api::{
     ct::{CoverTrafficGeneration, DestinationRouting, ProbeRouting, ProbingTrafficGeneration},
-    graph::{NetworkGraphTraverse, NetworkGraphView, costs::HoprCostFn},
+    graph::{NetworkGraphTraverse, NetworkGraphView, costs::HoprForwardCostFn},
 };
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::types::OffchainPublicKey;
@@ -64,7 +64,7 @@ where
                     })
                     .flat_map(move |edge_count| {
                         let simple_paths =
-                            graph_intermediates.simple_paths(&me, &me, edge_count, Some(100), HoprCostFn::new(edge_count));
+                            graph_intermediates.simple_paths(&me, &me, edge_count, Some(100), HoprForwardCostFn::new(edge_count));
                         futures::stream::iter(simple_paths)
                     })
                     .filter_map(move |(path, _path_id, _cost)| {
@@ -159,7 +159,7 @@ where
                     &me,
                     edge_count.get(),
                     Some(100),
-                    HoprCostFn::new(edge_count),
+                    HoprForwardCostFn::new(edge_count),
                 );
                 futures::stream::iter(simple_paths)
             })

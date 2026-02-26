@@ -206,7 +206,7 @@ where
     ) -> Self {
         let me_offchain = *identity.1.public();
         let planner_config = PathPlannerConfig::default();
-        let selector = HoprGraphPathSelector::new(graph.clone(), planner_config.max_cached_paths);
+        let selector = HoprGraphPathSelector::new(me_offchain, graph.clone(), planner_config.max_cached_paths);
         Self {
             packet_key: identity.1.clone(),
             chain_key: identity.0.clone(),

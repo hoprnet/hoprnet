@@ -71,15 +71,15 @@ where
     }
 }
 
-/// Build a HOPR cost function for full graph traversals.
+/// Build a forward HOPR cost function for full graph traversals.
 #[allow(clippy::type_complexity)]
-pub struct HoprCostFn<C, W> {
+pub struct HoprForwardCostFn<C, W> {
     initial: C,
     min: Option<C>,
     cost_fn: Box<dyn Fn(C, &W, usize) -> C>,
 }
 
-impl<C, W> CostFn for HoprCostFn<C, W>
+impl<C, W> CostFn for HoprForwardCostFn<C, W>
 where
     C: Clone + PartialOrd + Send + Sync + 'static,
     W: EdgeObservableRead + Send + 'static,
@@ -100,7 +100,7 @@ where
     }
 }
 
-impl<W> HoprCostFn<f64, W>
+impl<W> HoprForwardCostFn<f64, W>
 where
     W: EdgeObservableRead + Send + 'static,
 {
@@ -125,7 +125,98 @@ where
                                     * immediate_observation.score().max(intermediate_observation.score());
                             }
                         }
-                        {}
+
+                        -initial_cost
+                    }
+                    v if v == (length - 1) => {
+                        // the last edge should always go from an already connected and measured peer,
+                        // otherwise use a negative cost that should remove the edge from consideration
+                        if observation.immediate_qos().is_some_and(|o| o.is_connected()) {
+                            let score = observation.score();
+                            if score > 0.0 {
+                                return initial_cost * score;
+                            }
+                        }
+
+                        -initial_cost
+                    }
+                    _ => {
+                        // intermediary edges only need to have capacity and score
+                        if let Some(intermediate_observation) = observation.intermediate_qos()
+                            && intermediate_observation.capacity().is_some()
+                        {
+                            return initial_cost * intermediate_observation.score();
+                        }
+
+                        -initial_cost
+                    }
+                }
+            }),
+        }
+    }
+}
+
+/// Build a HOPR cost function for full graph traversals in the return direction.
+///
+/// Used when the planner (`me`) constructs the return path `dest -> relay -> me`.
+/// The first edge (`dest -> relay`) has relaxed requirements compared to [`HoprCostFn`]
+/// because the planner lacks intermediate QoS (probe) data for that edge.
+/// Only payment channel capacity is required for the first edge;
+/// the cost is passed through without score scaling.
+#[allow(clippy::type_complexity)]
+pub struct HoprReturnCostFn<C, W> {
+    initial: C,
+    min: Option<C>,
+    cost_fn: Box<dyn Fn(C, &W, usize) -> C>,
+}
+
+impl<C, W> CostFn for HoprReturnCostFn<C, W>
+where
+    C: Clone + PartialOrd + Send + Sync + 'static,
+    W: EdgeObservableRead + Send + 'static,
+{
+    type Cost = C;
+    type Weight = W;
+
+    fn initial_cost(&self) -> Self::Cost {
+        self.initial.clone()
+    }
+
+    fn min_cost(&self) -> Option<Self::Cost> {
+        self.min.clone()
+    }
+
+    fn into_cost_fn(self) -> Box<dyn Fn(Self::Cost, &Self::Weight, usize) -> Self::Cost> {
+        self.cost_fn
+    }
+}
+
+impl<W> HoprReturnCostFn<f64, W>
+where
+    W: EdgeObservableRead + Send + 'static,
+{
+    pub fn new(length: std::num::NonZeroUsize) -> Self {
+        let length = length.get();
+        Self {
+            initial: 1.0,
+            min: Some(0.0),
+            cost_fn: Box::new(move |initial_cost: f64, observation: &W, path_index: usize| {
+                match path_index {
+                    0 => {
+                        // The first edge of the return path (dest -> relay) requires
+                        // payment channel capacity.
+                        // When probes exist, scale by score; otherwise pass through
+                        // the cost as baseline trust (capacity-only from on-chain).
+                        if let Some(intermediate_observation) = observation.intermediate_qos()
+                            && intermediate_observation.capacity().is_some()
+                        {
+                            let score = intermediate_observation.score();
+                            return if score > 0.0 {
+                                initial_cost * score
+                            } else {
+                                initial_cost
+                            };
+                        }
 
                         -initial_cost
                     }
@@ -208,21 +299,33 @@ where
                     0 => {
                         // the first edge should always go to an already connected and measured peer,
                         // otherwise use a negative cost that should remove the edge from consideration
-                        if observation.immediate_qos().is_some_and(|o| o.is_connected())
-                            && let Some(intermediate_observation) = observation.intermediate_qos()
-                            && intermediate_observation.capacity().is_some()
-                        {
-                            return initial_cost * intermediate_observation.score();
+                        if let Some(immediate_observation) = observation.immediate_qos() {
+                            if immediate_observation.is_connected()
+                                && let Some(intermediate_observation) = observation.intermediate_qos()
+                                && intermediate_observation.capacity().is_some()
+                            {
+                                // loopbacks through a single peer are forbidden, therefore the first edge
+                                // may consider the preexisting measurements over an immediate observation
+                                return initial_cost
+                                    * immediate_observation.score().max(intermediate_observation.score());
+                            }
                         }
 
                         -initial_cost
                     }
                     _ => {
-                        // intermediary edges only need to have capacity and score
+                        // intermediary edges only need to have capacity and score.
+                        // When capacity exists but no probes have run yet (score 0), pass through
+                        // initial_cost to allow the first probe to discover this path.
                         if let Some(intermediate_observation) = observation.intermediate_qos()
                             && intermediate_observation.capacity().is_some()
                         {
-                            return initial_cost * intermediate_observation.score();
+                            let score = intermediate_observation.score();
+                            return if score > 0.0 {
+                                initial_cost * score
+                            } else {
+                                initial_cost
+                            };
                         }
 
                         -initial_cost

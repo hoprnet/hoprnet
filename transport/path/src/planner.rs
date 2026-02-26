@@ -529,7 +529,7 @@ mod tests {
 
         // Build empty graph (no edges) — selector would fail if called.
         let graph = ChannelGraph::new(me);
-        let selector = HoprGraphPathSelector::new(graph, small_config().max_cached_paths);
+        let selector = HoprGraphPathSelector::new(me, graph, small_config().max_cached_paths);
 
         let chain_api = TestChainApi::new(me, me_addr(), vec![(dest, dest_addr())]);
         let surb_store = hopr_protocol_hopr::MemorySurbStore::default();
@@ -575,7 +575,7 @@ mod tests {
         mark_edge_full(&graph, &me, &a);
         mark_edge_last(&graph, &a, &dest);
 
-        let selector = HoprGraphPathSelector::new(graph, small_config().max_cached_paths);
+        let selector = HoprGraphPathSelector::new(me, graph, small_config().max_cached_paths);
 
         let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (dest, dest_addr())])
             .with_open_channel(me_addr(), a_addr())
@@ -614,7 +614,7 @@ mod tests {
 
         // Empty graph — selector would fail; explicit path should not use it.
         let graph = ChannelGraph::new(me);
-        let selector = HoprGraphPathSelector::new(graph, small_config().max_cached_paths);
+        let selector = HoprGraphPathSelector::new(me, graph, small_config().max_cached_paths);
 
         let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (dest, dest_addr())])
             .with_open_channel(me_addr(), a_addr())
@@ -648,7 +648,7 @@ mod tests {
     async fn return_routing_without_surb_should_return_error() {
         let me = pubkey(&SECRET_ME);
         let graph = ChannelGraph::new(me);
-        let selector = HoprGraphPathSelector::new(graph, small_config().max_cached_paths);
+        let selector = HoprGraphPathSelector::new(me, graph, small_config().max_cached_paths);
         let chain_api = TestChainApi::new(me, me_addr(), vec![]);
         let surb_store = hopr_protocol_hopr::MemorySurbStore::default();
 
@@ -682,7 +682,7 @@ mod tests {
         mark_edge_full(&graph, &me, &a);
         mark_edge_last(&graph, &a, &dest);
 
-        let selector = HoprGraphPathSelector::new(graph, small_config().max_cached_paths);
+        let selector = HoprGraphPathSelector::new(me, graph, small_config().max_cached_paths);
         let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (dest, dest_addr())])
             .with_open_channel(me_addr(), a_addr())
             .with_open_channel(a_addr(), dest_addr());
@@ -729,7 +729,7 @@ mod tests {
         mark_edge_full(&graph, &me, &a);
         mark_edge_last(&graph, &a, &dest);
 
-        let selector = HoprGraphPathSelector::new(graph, small_config().max_cached_paths);
+        let selector = HoprGraphPathSelector::new(me, graph, small_config().max_cached_paths);
         let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (dest, dest_addr())])
             .with_open_channel(me_addr(), a_addr())
             .with_open_channel(a_addr(), dest_addr());
@@ -765,7 +765,7 @@ mod tests {
     async fn background_refresh_should_produce_a_future() {
         let me = pubkey(&SECRET_ME);
         let graph = ChannelGraph::new(me);
-        let selector = HoprGraphPathSelector::new(graph, small_config().max_cached_paths);
+        let selector = HoprGraphPathSelector::new(me, graph, small_config().max_cached_paths);
         let chain_api = TestChainApi::new(me, me_addr(), vec![]);
         let surb_store = hopr_protocol_hopr::MemorySurbStore::default();
 

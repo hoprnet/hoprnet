@@ -1,5 +1,6 @@
 use std::{convert::identity, ops::Div, str::FromStr, time::Duration};
 
+use anyhow::Context;
 use futures_time::future::FutureExt as _;
 use hex_literal::hex;
 use hopr_chain_connector::{
@@ -62,7 +63,7 @@ impl ClusterGuard {
         &self,
         path: &[&TestedHopr],
         funding_amount: HoprBalance,
-    ) -> anyhow::Result<(HoprSession, ChannelGuard, ChannelGuard)> {
+    ) -> anyhow::Result<(HoprSession, ChannelGuard, ChannelGuard, ChannelGuard)> {
         let fw_channels = ChannelGuard::try_open_channels_for_path(
             path.iter().map(|n| n.instance.clone()).collect::<Vec<_>>(),
             funding_amount,
@@ -70,6 +71,20 @@ impl ClusterGuard {
         .await?;
         let bw_channels = ChannelGuard::try_open_channels_for_path(
             path.iter().rev().map(|n| n.instance.clone()).collect::<Vec<_>>(),
+            funding_amount,
+        )
+        .await?;
+        // without these channels it is not really possible to probe the network
+        // and get telemetry for the graph edges, which is needed for random
+        // path selection to work properly in the tests.
+        let connectedness_channels = ChannelGuard::try_open_channels_for_path(
+            [
+                path.first().context("Must contain the first element")?,
+                path.last().context("Must contain the last element")?,
+            ]
+            .into_iter()
+            .map(|n| n.instance.clone())
+            .collect::<Vec<_>>(),
             funding_amount,
         )
         .await?;
@@ -98,7 +113,7 @@ impl ClusterGuard {
             .await;
 
         match session_result {
-            Ok(Ok(s)) => Ok((s, fw_channels, bw_channels)),
+            Ok(Ok(s)) => Ok((s, fw_channels, bw_channels, connectedness_channels)),
             Ok(Err(e)) => Err(e.into()),
             Err(_) => Err(anyhow::anyhow!("Session opening timed out after 5s")),
         }

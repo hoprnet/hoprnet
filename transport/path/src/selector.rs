@@ -1,4 +1,8 @@
-use hopr_api::graph::{NetworkGraphTraverse, NetworkGraphView, costs::HoprCostFn, traits::EdgeObservableRead};
+use hopr_api::graph::{
+    CostFn, NetworkGraphTraverse, NetworkGraphView,
+    costs::{HoprForwardCostFn, HoprReturnCostFn},
+    traits::EdgeObservableRead,
+};
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::errors::PathError;
 use tracing::trace;
@@ -16,18 +20,20 @@ type PathToDestination = Vec<OffchainPublicKey>;
 /// `take` caps the number of candidate paths returned.
 /// The source node is stripped from every returned path; callers receive
 /// `[intermediates..., dest]`.
-fn compute_paths<G>(
+fn compute_paths<G, C>(
     graph: &G,
     src: &OffchainPublicKey,
     dest: &OffchainPublicKey,
     length: std::num::NonZeroUsize,
     take: usize,
+    cost_fn: C,
 ) -> Vec<PathToDestination>
 where
     G: NetworkGraphTraverse<NodeId = OffchainPublicKey> + NetworkGraphView<NodeId = OffchainPublicKey>,
     <G as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
+    C: CostFn<Weight = <G as NetworkGraphTraverse>::Observed, Cost = f64>,
 {
-    let raw = graph.simple_paths(src, dest, length.get(), Some(take), HoprCostFn::new(length));
+    let raw = graph.simple_paths(src, dest, length.get(), Some(take), cost_fn);
 
     raw.into_iter()
         .filter_map(|(path, _, cost)| {
@@ -48,8 +54,14 @@ where
 /// the network graph — no caching is performed here.  The caller (typically
 /// [`crate::planner::PathPlanner`]) is responsible for caching, TTL management,
 /// background refresh, and final path selection.
+///
+/// Stores the planner's own identity (`me`) so that it can choose the
+/// appropriate cost function:
+/// - forward path (`src == me`): [`HoprForwardCostFn`]
+/// - return path (`dest == me`): [`HoprReturnCostFn`]
 #[derive(Clone)]
 pub struct HoprGraphPathSelector<G> {
+    me: OffchainPublicKey,
     graph: G,
     max_paths: usize,
 }
@@ -66,10 +78,11 @@ where
 {
     /// Create a new selector.
     ///
+    /// * `me` – the planner's own offchain public key, used to determine path direction.
     /// * `graph` – the network graph to query.
     /// * `max_paths` – maximum number of candidate paths to return per query.
-    pub fn new(graph: G, max_paths: usize) -> Self {
-        Self { graph, max_paths }
+    pub fn new(me: OffchainPublicKey, graph: G, max_paths: usize) -> Self {
+        Self { me, graph, max_paths }
     }
 }
 
@@ -93,7 +106,7 @@ where
     /// The function has a potential to run expensive operations, it should be benchmarked
     /// in a production environment and possibly guarded (e.g. by offloading the long execution
     /// in an async executor to avoid blocking the caller).
-    #[tracing::instrument(level = "trace", skip(self), fields(src = %src, dest = %dest, hops), ret, err)] // Logs the query parameters.
+    #[tracing::instrument(level = "trace", skip(self), fields(src = %src, dest = %dest, hops), ret, err)]
     fn select_path(
         &self,
         src: OffchainPublicKey,
@@ -101,14 +114,14 @@ where
         hops: usize,
     ) -> Result<Vec<Vec<OffchainPublicKey>>> {
         trace!(%src, %dest, hops, "computing paths from graph");
-        let paths = compute_paths(
-            &self.graph,
-            &src,
-            &dest,
-            std::num::NonZeroUsize::new(hops + 1)
-                .expect("can never fail, it is physically at least 1 after the addition"),
-            self.max_paths,
-        );
+        let length = std::num::NonZeroUsize::new(hops + 1)
+            .expect("can never fail, it is physically at least 1 after the addition");
+
+        let paths = if src == self.me {
+            compute_paths(&self.graph, &src, &dest, length, self.max_paths, HoprForwardCostFn::new(length))
+        } else {
+            compute_paths(&self.graph, &src, &dest, length, self.max_paths, HoprReturnCostFn::new(length))
+        };
 
         if paths.is_empty() {
             Err(PathPlannerError::Path(PathError::PathNotFound(
@@ -196,7 +209,7 @@ mod tests {
         let unreachable = pubkey(&SECRET_1);
         let graph = ChannelGraph::new(me);
         // No edges at all — neither direction has a path.
-        let selector = HoprGraphPathSelector::new(graph, MAX_PATHS);
+        let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS);
 
         let fwd = selector.select_path(me, unreachable, 1);
         assert!(fwd.is_err(), "forward: should error when destination is unreachable");
@@ -218,7 +231,7 @@ mod tests {
     #[tokio::test]
     async fn path_should_exclude_source() -> anyhow::Result<()> {
         let (me, _hop, dest, graph) = two_hop_graph();
-        let selector = HoprGraphPathSelector::new(graph, MAX_PATHS);
+        let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS);
 
         let fwd = selector.select_path(me, dest, 1).context("forward path")?;
         assert!(!fwd.is_empty());
@@ -261,7 +274,7 @@ mod tests {
         mark_edge_full(&graph, &b, &a);
         mark_edge_last(&graph, &a, &me);
 
-        let selector = HoprGraphPathSelector::new(graph, MAX_PATHS);
+        let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS);
 
         let fwd = selector.select_path(me, dest, 2).context("forward 2-hop path")?;
         assert!(!fwd.is_empty());
@@ -284,7 +297,7 @@ mod tests {
     async fn one_hop_path_should_include_relay_and_destination() -> anyhow::Result<()> {
         // Bidirectional: me ↔ relay ↔ dest
         let (me, relay, dest, graph) = two_hop_graph();
-        let selector = HoprGraphPathSelector::new(graph, MAX_PATHS);
+        let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS);
 
         let fwd = selector.select_path(me, dest, 1).context("forward 1-hop path")?;
         assert!(!fwd.is_empty());
@@ -336,7 +349,7 @@ mod tests {
         mark_edge_last(&graph, &a, &me);
         mark_edge_last(&graph, &b, &me);
 
-        let selector = HoprGraphPathSelector::new(graph, MAX_PATHS);
+        let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS);
 
         let fwd = selector.select_path(me, dest, 1).context("forward path")?;
         assert_eq!(fwd.len(), 2, "forward: both paths via a and b should be returned");
@@ -364,7 +377,7 @@ mod tests {
         graph.add_edge(&dest, &me).unwrap();
         // No observations → cost function will return non-positive cost → pruned.
 
-        let selector = HoprGraphPathSelector::new(graph, MAX_PATHS);
+        let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS);
         assert!(
             selector.select_path(me, dest, 1).is_err(),
             "forward: edge with no observations should produce no valid path"
@@ -388,7 +401,7 @@ mod tests {
         mark_edge_full(&graph, &me, &dest);
         mark_edge_full(&graph, &dest, &me);
 
-        let selector = HoprGraphPathSelector::new(graph, MAX_PATHS);
+        let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS);
         assert!(
             selector.select_path(me, dest, 2).is_err(),
             "forward: no 2-hop path should exist for a direct edge"
@@ -431,7 +444,7 @@ mod tests {
         mark_edge_full(&graph, &b, &a);
         mark_edge_last(&graph, &a, &me);
 
-        let selector = HoprGraphPathSelector::new(graph, MAX_PATHS);
+        let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS);
 
         let fwd = selector
             .select_path(me, dest, RoutingOptions::MAX_INTERMEDIATE_HOPS)
