@@ -227,10 +227,13 @@ pub struct Hopr<Chain, Db, Graph, Net>
 where
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
+        + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
         + Clone
         + Send
         + Sync
         + 'static,
+    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
+        hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     me: OffchainKeypair,
@@ -250,10 +253,13 @@ where
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
+        + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
         + Clone
         + Send
         + Sync
         + 'static,
+    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
+        hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     pub async fn new(
@@ -884,10 +890,13 @@ impl<Chain, Db, Graph, Net> Hopr<Chain, Db, Graph, Net>
 where
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
+        + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
         + Clone
         + Send
         + Sync
         + 'static,
+    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
+        hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     // === telemetry
@@ -911,10 +920,13 @@ where
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
+        + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
         + Clone
         + Send
         + Sync
         + 'static,
+    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
+        hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     fn status(&self) -> HoprState {
@@ -929,14 +941,17 @@ where
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
+        + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
         + Clone
         + Send
         + Sync
         + 'static,
+    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
+        hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     type Error = HoprLibError;
-    type TransportObservable = Graph::Observed;
+    type TransportObservable = <Graph as hopr_api::graph::NetworkGraphView>::Observed;
 
     fn me_peer_id(&self) -> PeerId {
         (*self.me.public()).into()
@@ -1054,10 +1069,13 @@ where
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
+        + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
         + Clone
         + Send
         + Sync
         + 'static,
+    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
+        hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     pub fn me_onchain(&self) -> Address {

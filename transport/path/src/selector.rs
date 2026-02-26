@@ -1,44 +1,14 @@
-use std::{sync::Arc, time::Duration};
-
 use hopr_api::graph::{NetworkGraphTraverse, NetworkGraphView, costs::HoprCostFn, traits::EdgeObservableRead};
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::errors::PathError;
 use tracing::trace;
 
-#[cfg(feature = "runtime-tokio")]
-use crate::traits::BackgroundRefreshable;
 use crate::{
     errors::{PathPlannerError, Result},
     traits::PathSelector,
 };
 
-/// Configuration for [`GraphPathSelector`].
-#[derive(Debug, Clone, smart_default::SmartDefault)]
-pub struct PathSelectorConfig {
-    /// Maximum number of (destination, hops) entries in the path cache.
-    #[default = 10_000]
-    pub max_cache_capacity: u64,
-    /// Time-to-live for a cached path list. When an entry expires the next
-    /// [`GraphPathSelector::select_path`] call transparently recomputes it via
-    /// the graph (lazy refresh, always available).
-    #[default(Duration::from_secs(60))]
-    pub cache_ttl: Duration,
-    /// Period between proactive background cache-refresh sweeps.
-    ///
-    /// Only used when the `runtime-tokio` feature is enabled and
-    /// [`GraphPathSelector::run_background_refresh`] is spawned.
-    #[cfg(feature = "runtime-tokio")]
-    #[default(Duration::from_secs(30))]
-    pub refresh_period: Duration,
-    /// Maximum number of candidate paths cached per (destination, hops) slot.
-    #[default = 8]
-    pub max_cached_paths: usize,
-}
-
 type PathToDestination = Vec<OffchainPublicKey>;
-
-type CacheKey = (OffchainPublicKey, OffchainPublicKey, usize); // (src, dest, hops)
-type CacheValue = Arc<Vec<PathToDestination>>;
 
 /// Compute candidate paths from `src` to `dest` through `graph`.
 ///
@@ -46,13 +16,6 @@ type CacheValue = Arc<Vec<PathToDestination>>;
 /// `take` caps the number of candidate paths returned.
 /// The source node is stripped from every returned path; callers receive
 /// `[intermediates..., dest]`.
-///
-/// The complexity of this function call is at least the complexity of the
-/// underlying graph traversal, which may be expensive for large graphs and
-/// high `length` values.
-///
-/// For real networks, a simulation/benchmark should be performed to identify
-/// whether this function can be blocking, e.g. for an async executor.
 fn compute_paths<G>(
     graph: &G,
     src: &OffchainPublicKey,
@@ -78,34 +41,19 @@ where
         .collect::<Vec<_>>()
 }
 
-struct SelectorInner<G> {
-    config: PathSelectorConfig,
-    cache: moka::future::Cache<CacheKey, CacheValue>,
+/// A lightweight graph-backed path selector.
+///
+/// Returns all candidate paths for a `(src, dest, hops)` query directly from
+/// the network graph — no caching is performed here.  The caller (typically
+/// [`crate::planner::PathPlanner`]) is responsible for caching, TTL management,
+/// background refresh, and final path selection.
+#[derive(Clone)]
+pub struct HoprGraphPathSelector<G> {
     graph: G,
+    max_paths: usize,
 }
 
-/// A graph-backed path selector with a `moka` LRU/TTL cache.
-///
-/// **Default behaviour (no `runtime-tokio` feature)**: cache entries are populated
-/// lazily on the first [`select_path`][GraphPathSelector::select_path] call for a given
-/// `(destination, hops)` pair via moka's `optionally_get_with`, which is atomic and
-/// prevents thundering-herd re-computation. When a TTL expires the next call
-/// transparently recomputes the paths from the graph.
-///
-/// **With `runtime-tokio` feature**: additionally exposes
-/// [`run_background_refresh`][GraphPathSelector::run_background_refresh], a future that
-/// should be spawned as a long-lived background task. It periodically pre-warms the cache
-/// for all reachable `(destination, hops)` pairs so that steady-state traffic is always
-/// served from cache.
-pub struct GraphPathSelector<G>(Arc<SelectorInner<G>>, OffchainPublicKey);
-
-impl<G: Clone> Clone for GraphPathSelector<G> {
-    fn clone(&self) -> Self {
-        Self(Arc::clone(&self.0), self.1)
-    }
-}
-
-impl<G> GraphPathSelector<G>
+impl<G> HoprGraphPathSelector<G>
 where
     G: NetworkGraphTraverse<NodeId = OffchainPublicKey>
         + NetworkGraphView<NodeId = OffchainPublicKey>
@@ -117,24 +65,14 @@ where
 {
     /// Create a new selector.
     ///
-    /// `me` is the node's own [`OffchainPublicKey`] — it is used as the path source
-    /// when querying the graph and is excluded from returned path vectors.
-    pub fn new(me: OffchainPublicKey, graph: G, config: PathSelectorConfig) -> Self {
-        let cache = moka::future::Cache::builder()
-            .max_capacity(config.max_cache_capacity)
-            .time_to_live(config.cache_ttl)
-            .build();
-
-        Self(Arc::new(SelectorInner { graph, cache, config }), me)
-    }
-
-    /// Returns the node's own key that this selector uses as the path source.
-    pub fn me(&self) -> &OffchainPublicKey {
-        &self.1
+    /// * `graph` – the network graph to query.
+    /// * `max_paths` – maximum number of candidate paths to return per query.
+    pub fn new(graph: G, max_paths: usize) -> Self {
+        Self { graph, max_paths }
     }
 }
 
-impl<G> PathSelector for GraphPathSelector<G>
+impl<G> PathSelector for HoprGraphPathSelector<G>
 where
     G: NetworkGraphTraverse<NodeId = OffchainPublicKey>
         + NetworkGraphView<NodeId = OffchainPublicKey>
@@ -144,99 +82,41 @@ where
         + 'static,
     <G as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
 {
-    /// Select a path from `src` to `dest` using `hops` HOPR relays.
+    /// Return all candidate paths from `src` to `dest` via `hops` relays.
     ///
-    /// The HOPR hop count represents the number of intermediate relays,
-    /// so the total path length is `hops + 1`.
+    /// Each returned `Vec<OffchainPublicKey>` has length `hops + 1` and contains
+    /// `[intermediates..., dest]`; `src` is excluded.
     ///
-    /// Returns a `Vec<OffchainPublicKey>` containing the intermediate nodes
-    /// **and** `dest` (`src` is excluded).
+    /// Returns `Err(PathNotFound)` when the graph yields no positive-cost paths.
     ///
-    /// On a cache miss (or after TTL expiry) the graph is queried via moka's
-    /// `optionally_get_with`, which atomically computes and caches the result —
-    /// preventing thundering-herd re-computation. Paths with no candidates are
-    /// never cached, so the next call will retry immediately.
-    ///
-    async fn select_path(
+    /// The function has a potential to run expensive operations, it should be benchmarked
+    /// in a production environment and possibly guarded (e.g. by offloading the long execution
+    /// in an async executor to avoid blocking the caller).
+    fn select_path(
         &self,
         src: OffchainPublicKey,
         dest: OffchainPublicKey,
         hops: usize,
-    ) -> Result<Vec<OffchainPublicKey>> {
-        let key = (src, dest, hops);
-        let inner = Arc::clone(&self.0);
-        let compute_inner = Arc::clone(&inner);
+    ) -> Result<Vec<Vec<OffchainPublicKey>>> {
+        trace!(%src, %dest, hops, "computing paths from graph");
+        let paths = compute_paths(&self.graph, &src, &dest, hops + 1, self.max_paths);
 
-        let paths = inner
-            .cache
-            .optionally_get_with(key, async move {
-                trace!(%dest, hops, "path cache miss, computing from graph");
-                let paths = compute_paths(
-                    &compute_inner.graph,
-                    &src,
-                    &dest,
-                    hops + 1,
-                    compute_inner.config.max_cached_paths,
-                );
-                if paths.is_empty() { None } else { Some(Arc::new(paths)) }
-            })
-            .await
-            .ok_or_else(|| {
-                PathPlannerError::Path(PathError::PathNotFound(hops, src.to_peerid_str(), dest.to_peerid_str()))
-            })?;
-
-        // Randomly select among cached candidates for routing diversity.
-        let idx = if paths.len() > 1 {
-            hopr_crypto_random::random_integer(0, Some((paths.len() - 1) as u64)) as usize
+        if paths.is_empty() {
+            Err(PathPlannerError::Path(PathError::PathNotFound(
+                hops,
+                src.to_peerid_str(),
+                dest.to_peerid_str(),
+            )))
         } else {
-            0
-        };
-        trace!(%dest, hops, idx, "path selected");
-        Ok(paths[idx].clone())
-    }
-}
-
-/// Implements periodic background cache refresh for [`GraphPathSelector`].
-///
-/// The returned future pre-warms the path cache for all reachable
-/// `(destination, hops)` pairs on a configurable schedule, so that
-/// steady-state traffic is always served without a blocking graph query.
-#[cfg(feature = "runtime-tokio")]
-impl<G> BackgroundRefreshable for GraphPathSelector<G>
-where
-    G: NetworkGraphTraverse<NodeId = OffchainPublicKey>
-        + NetworkGraphView<NodeId = OffchainPublicKey>
-        + Clone
-        + Send
-        + Sync
-        + 'static,
-    <G as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
-{
-    fn run_background_refresh(&self) -> impl std::future::Future<Output = ()> + Send + 'static {
-        let inner = Arc::clone(&self.0);
-        async move {
-            let mut interval = tokio::time::interval(inner.config.refresh_period);
-            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-            loop {
-                interval.tick().await;
-                for (key, _) in inner.cache.iter() {
-                    let src = key.0;
-                    let dest = key.1;
-                    let hops = key.2;
-
-                    let paths = compute_paths(&inner.graph, &src, &dest, hops + 1, inner.config.max_cached_paths);
-                    if !paths.is_empty() {
-                        trace!(%dest, hops, count = paths.len(), "refreshing path cache");
-                        inner.cache.insert((src, dest, hops), Arc::new(paths)).await;
-                    }
-                }
-            }
+            Ok(paths)
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use anyhow::Context;
     use hex_literal::hex;
     use hopr_api::graph::{
@@ -257,22 +137,13 @@ mod tests {
     const SECRET_3: [u8; 32] = hex!("e0bf93e9c916104da00b1850adc4608bd7e9087bbd3f805451f4556aa6b3fd6e");
     const SECRET_4: [u8; 32] = hex!("cfc66f718ec66fb822391775d749d7a0d66b690927673634816b63339bc12a3c");
 
+    const MAX_PATHS: usize = 4;
+
     fn pubkey(secret: &[u8; 32]) -> OffchainPublicKey {
         *OffchainKeypair::from_secret(secret).expect("valid secret").public()
     }
 
-    fn test_config() -> PathSelectorConfig {
-        PathSelectorConfig {
-            max_cache_capacity: 1000,
-            cache_ttl: Duration::from_secs(60),
-            #[cfg(feature = "runtime-tokio")]
-            refresh_period: Duration::from_secs(30),
-            max_cached_paths: 4,
-        }
-    }
-
-    /// Mark an edge as fully ready for intermediate routing:
-    /// connected, immediate probe success, intermediate probe + capacity.
+    /// Mark an edge as fully ready for intermediate routing.
     fn mark_edge_full(graph: &ChannelGraph, src: &OffchainPublicKey, dst: &OffchainPublicKey) {
         graph.upsert_edge(src, dst, |obs| {
             obs.record(EdgeWeightType::Connected(true));
@@ -282,7 +153,7 @@ mod tests {
         });
     }
 
-    /// Mark an edge as ready only as the last hop: connected + immediate probe.
+    /// Mark an edge as ready only as the last hop.
     fn mark_edge_last(graph: &ChannelGraph, src: &OffchainPublicKey, dst: &OffchainPublicKey) {
         graph.upsert_edge(src, dst, |obs| {
             obs.record(EdgeWeightType::Connected(true));
@@ -312,60 +183,21 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn cache_miss_should_compute_and_cache_path() -> anyhow::Result<()> {
-        let (me, _hop, dest, graph) = two_hop_graph();
-        let selector = GraphPathSelector::new(me, graph, test_config());
-
-        assert!(selector.0.cache.get(&(me, dest, 1)).await.is_none());
-        assert!(selector.0.cache.get(&(dest, me, 1)).await.is_none());
-
-        let path = selector.select_path(me, dest, 1).await.context("forward path")?;
-        assert!(!path.is_empty());
-        assert_eq!(path.last(), Some(&dest));
-        assert!(selector.0.cache.get(&(me, dest, 1)).await.is_some());
-
-        let rev = selector.select_path(dest, me, 1).await.context("reverse path")?;
-        assert!(!rev.is_empty());
-        assert_eq!(rev.last(), Some(&me));
-        assert!(selector.0.cache.get(&(dest, me, 1)).await.is_some());
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn cache_hit_should_return_cached_path() -> anyhow::Result<()> {
-        let (me, _hop, dest, graph) = two_hop_graph();
-        let selector = GraphPathSelector::new(me, graph, test_config());
-
-        let p1 = selector.select_path(me, dest, 1).await.context("forward call 1")?;
-        let p2 = selector.select_path(me, dest, 1).await.context("forward call 2")?;
-        assert_eq!(p1.last(), Some(&dest));
-        assert_eq!(p2.last(), Some(&dest));
-
-        let r1 = selector.select_path(dest, me, 1).await.context("reverse call 1")?;
-        let r2 = selector.select_path(dest, me, 1).await.context("reverse call 2")?;
-        assert_eq!(r1.last(), Some(&me));
-        assert_eq!(r2.last(), Some(&me));
-
-        Ok(())
-    }
-
-    #[tokio::test]
     async fn unreachable_dest_should_return_error() -> anyhow::Result<()> {
         let me = pubkey(&SECRET_0);
         let unreachable = pubkey(&SECRET_1);
         let graph = ChannelGraph::new(me);
         // No edges at all — neither direction has a path.
-        let selector = GraphPathSelector::new(me, graph, test_config());
+        let selector = HoprGraphPathSelector::new(graph, MAX_PATHS);
 
-        let fwd = selector.select_path(me, unreachable, 1).await;
+        let fwd = selector.select_path(me, unreachable, 1);
         assert!(fwd.is_err(), "forward: should error when destination is unreachable");
         assert!(matches!(
             fwd.unwrap_err(),
             PathPlannerError::Path(PathError::PathNotFound(..))
         ));
 
-        let rev = selector.select_path(unreachable, me, 1).await;
+        let rev = selector.select_path(unreachable, me, 1);
         assert!(rev.is_err(), "reverse: should error when destination is unreachable");
         assert!(matches!(
             rev.unwrap_err(),
@@ -378,13 +210,19 @@ mod tests {
     #[tokio::test]
     async fn path_should_exclude_source() -> anyhow::Result<()> {
         let (me, _hop, dest, graph) = two_hop_graph();
-        let selector = GraphPathSelector::new(me, graph, test_config());
+        let selector = HoprGraphPathSelector::new(graph, MAX_PATHS);
 
-        let fwd = selector.select_path(me, dest, 1).await.context("forward path")?;
-        assert!(!fwd.contains(&me), "forward path must not contain the source");
+        let fwd = selector.select_path(me, dest, 1).context("forward path")?;
+        assert!(!fwd.is_empty());
+        for path in &fwd {
+            assert!(!path.contains(&me), "forward path must not contain the source");
+        }
 
-        let rev = selector.select_path(dest, me, 1).await.context("reverse path")?;
-        assert!(!rev.contains(&dest), "reverse path must not contain the source");
+        let rev = selector.select_path(dest, me, 1).context("reverse path")?;
+        assert!(!rev.is_empty());
+        for path in &rev {
+            assert!(!path.contains(&dest), "reverse path must not contain the source");
+        }
 
         Ok(())
     }
@@ -415,15 +253,21 @@ mod tests {
         mark_edge_full(&graph, &b, &a);
         mark_edge_last(&graph, &a, &me);
 
-        let selector = GraphPathSelector::new(me, graph, test_config());
+        let selector = HoprGraphPathSelector::new(graph, MAX_PATHS);
 
-        let fwd = selector.select_path(me, dest, 2).await.context("forward 2-hop path")?;
-        assert_eq!(fwd.len(), 3, "forward 2-hop path: [A, B, dest]");
-        assert_eq!(fwd.last(), Some(&dest));
+        let fwd = selector.select_path(me, dest, 2).context("forward 2-hop path")?;
+        assert!(!fwd.is_empty());
+        for path in &fwd {
+            assert_eq!(path.len(), 3, "forward 2-hop path: [A, B, dest]");
+            assert_eq!(path.last(), Some(&dest));
+        }
 
-        let rev = selector.select_path(dest, me, 2).await.context("reverse 2-hop path")?;
-        assert_eq!(rev.len(), 3, "reverse 2-hop path: [B, A, me]");
-        assert_eq!(rev.last(), Some(&me));
+        let rev = selector.select_path(dest, me, 2).context("reverse 2-hop path")?;
+        assert!(!rev.is_empty());
+        for path in &rev {
+            assert_eq!(path.len(), 3, "reverse 2-hop path: [B, A, me]");
+            assert_eq!(path.last(), Some(&me));
+        }
 
         Ok(())
     }
@@ -432,24 +276,30 @@ mod tests {
     async fn one_hop_path_should_include_relay_and_destination() -> anyhow::Result<()> {
         // Bidirectional: me ↔ relay ↔ dest
         let (me, relay, dest, graph) = two_hop_graph();
-        let selector = GraphPathSelector::new(me, graph, test_config());
+        let selector = HoprGraphPathSelector::new(graph, MAX_PATHS);
 
-        let fwd = selector.select_path(me, dest, 1).await.context("forward 1-hop path")?;
-        assert_eq!(fwd.len(), 2, "forward: [relay, dest]");
-        assert_eq!(fwd.last(), Some(&dest));
-        assert!(!fwd.contains(&me));
+        let fwd = selector.select_path(me, dest, 1).context("forward 1-hop path")?;
+        assert!(!fwd.is_empty());
+        for path in &fwd {
+            assert_eq!(path.len(), 2, "forward: [relay, dest]");
+            assert_eq!(path.last(), Some(&dest));
+            assert!(!path.contains(&me));
+        }
 
-        let rev = selector.select_path(dest, me, 1).await.context("reverse 1-hop path")?;
-        assert_eq!(rev.len(), 2, "reverse: [relay, me]");
-        assert_eq!(rev.last(), Some(&me));
-        assert!(!rev.contains(&dest));
+        let rev = selector.select_path(dest, me, 1).context("reverse 1-hop path")?;
+        assert!(!rev.is_empty());
+        for path in &rev {
+            assert_eq!(path.len(), 2, "reverse: [relay, me]");
+            assert_eq!(path.last(), Some(&me));
+            assert!(!path.contains(&dest));
+        }
 
         let _ = relay;
         Ok(())
     }
 
     #[tokio::test]
-    async fn diamond_topology_should_cache_multiple_paths() -> anyhow::Result<()> {
+    async fn diamond_topology_should_return_multiple_paths() -> anyhow::Result<()> {
         // Bidirectional diamond: me ↔ a ↔ dest and me ↔ b ↔ dest
         let me = pubkey(&SECRET_0);
         let a = pubkey(&SECRET_1);
@@ -478,27 +328,25 @@ mod tests {
         mark_edge_last(&graph, &a, &me);
         mark_edge_last(&graph, &b, &me);
 
-        let selector = GraphPathSelector::new(me, graph, test_config());
+        let selector = HoprGraphPathSelector::new(graph, MAX_PATHS);
 
-        selector.select_path(me, dest, 1).await.context("forward path")?;
-        let fwd_cached = selector.0.cache.get(&(me, dest, 1)).await.context("forward cache")?;
-        assert_eq!(fwd_cached.len(), 2, "forward: both paths via a and b should be cached");
-        for p in fwd_cached.iter() {
-            assert_eq!(p.last(), Some(&dest));
+        let fwd = selector.select_path(me, dest, 1).context("forward path")?;
+        assert_eq!(fwd.len(), 2, "forward: both paths via a and b should be returned");
+        for path in &fwd {
+            assert_eq!(path.last(), Some(&dest));
         }
 
-        selector.select_path(dest, me, 1).await.context("reverse path")?;
-        let rev_cached = selector.0.cache.get(&(dest, me, 1)).await.context("reverse cache")?;
-        assert_eq!(rev_cached.len(), 2, "reverse: both paths via a and b should be cached");
-        for p in rev_cached.iter() {
-            assert_eq!(p.last(), Some(&me));
+        let rev = selector.select_path(dest, me, 1).context("reverse path")?;
+        assert_eq!(rev.len(), 2, "reverse: both paths via a and b should be returned");
+        for path in &rev {
+            assert_eq!(path.last(), Some(&me));
         }
 
         Ok(())
     }
 
     #[tokio::test]
-    async fn zero_cost_paths_should_be_ignored() -> anyhow::Result<()> {
+    async fn zero_cost_paths_should_return_error() -> anyhow::Result<()> {
         // Graph has edges in both directions but no observations → all costs zero → pruned.
         let me = pubkey(&SECRET_0);
         let dest = pubkey(&SECRET_1);
@@ -508,13 +356,13 @@ mod tests {
         graph.add_edge(&dest, &me).unwrap();
         // No observations → cost function will return non-positive cost → pruned.
 
-        let selector = GraphPathSelector::new(me, graph, test_config());
+        let selector = HoprGraphPathSelector::new(graph, MAX_PATHS);
         assert!(
-            selector.select_path(me, dest, 1).await.is_err(),
+            selector.select_path(me, dest, 1).is_err(),
             "forward: edge with no observations should produce no valid path"
         );
         assert!(
-            selector.select_path(dest, me, 1).await.is_err(),
+            selector.select_path(dest, me, 1).is_err(),
             "reverse: edge with no observations should produce no valid path"
         );
         Ok(())
@@ -532,34 +380,14 @@ mod tests {
         mark_edge_full(&graph, &me, &dest);
         mark_edge_full(&graph, &dest, &me);
 
-        let selector = GraphPathSelector::new(me, graph, test_config());
+        let selector = HoprGraphPathSelector::new(graph, MAX_PATHS);
         assert!(
-            selector.select_path(me, dest, 2).await.is_err(),
+            selector.select_path(me, dest, 2).is_err(),
             "forward: no 2-hop path should exist for a direct edge"
         );
         assert!(
-            selector.select_path(dest, me, 2).await.is_err(),
+            selector.select_path(dest, me, 2).is_err(),
             "reverse: no 2-hop path should exist for a direct edge"
-        );
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn selector_clone_should_share_cache() -> anyhow::Result<()> {
-        let (me, _hop, dest, graph) = two_hop_graph();
-        let selector = GraphPathSelector::new(me, graph, test_config());
-        let clone = selector.clone();
-
-        selector.select_path(me, dest, 1).await.context("forward path")?;
-        selector.select_path(dest, me, 1).await.context("reverse path")?;
-
-        assert!(
-            clone.0.cache.get(&(me, dest, 1)).await.is_some(),
-            "clone must share the forward cache entry"
-        );
-        assert!(
-            clone.0.cache.get(&(dest, me, 1)).await.is_some(),
-            "clone must share the reverse cache entry"
         );
         Ok(())
     }
@@ -595,23 +423,27 @@ mod tests {
         mark_edge_full(&graph, &b, &a);
         mark_edge_last(&graph, &a, &me);
 
-        let selector = GraphPathSelector::new(me, graph, test_config());
+        let selector = HoprGraphPathSelector::new(graph, MAX_PATHS);
 
         let fwd = selector
             .select_path(me, dest, RoutingOptions::MAX_INTERMEDIATE_HOPS)
-            .await
             .context("forward 3-hop path")?;
-        assert_eq!(fwd.len(), 4, "forward: [a, b, c, dest]");
-        assert_eq!(fwd.last(), Some(&dest));
-        assert!(!fwd.contains(&me));
+        assert!(!fwd.is_empty());
+        for path in &fwd {
+            assert_eq!(path.len(), 4, "forward: [a, b, c, dest]");
+            assert_eq!(path.last(), Some(&dest));
+            assert!(!path.contains(&me));
+        }
 
         let rev = selector
             .select_path(dest, me, RoutingOptions::MAX_INTERMEDIATE_HOPS)
-            .await
             .context("reverse 3-hop path")?;
-        assert_eq!(rev.len(), 4, "reverse: [c, b, a, me]");
-        assert_eq!(rev.last(), Some(&me));
-        assert!(!rev.contains(&dest));
+        assert!(!rev.is_empty());
+        for path in &rev {
+            assert_eq!(path.len(), 4, "reverse: [c, b, a, me]");
+            assert_eq!(path.last(), Some(&me));
+            assert!(!path.contains(&dest));
+        }
 
         Ok(())
     }

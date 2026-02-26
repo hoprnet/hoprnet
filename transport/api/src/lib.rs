@@ -38,7 +38,6 @@ use futures::{
     channel::mpsc::{Sender, channel},
     stream::select_with_strategy,
 };
-use hopr_transport_path::{GraphPathSelector, PathPlanner, PathSelectorConfig};
 use hopr_api::{
     chain::{ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
     ct::{CoverTrafficGeneration, ProbingTrafficGeneration},
@@ -66,6 +65,7 @@ use hopr_protocol_hopr::MemorySurbStore;
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId, Protocol};
 use hopr_transport_mixer::MixerConfig;
+use hopr_transport_path::{HoprGraphPathSelector, PathPlanner, PathPlannerConfig};
 pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
 use hopr_transport_probe::{
     Probe,
@@ -165,7 +165,7 @@ where
     ping: Arc<OnceLock<Pinger>>,
     network: Arc<OnceLock<Net>>,
     graph: Graph,
-    path_planner: PathPlanner<MemorySurbStore, Chain, GraphPathSelector<Graph>>,
+    path_planner: PathPlanner<MemorySurbStore, Chain, HoprGraphPathSelector<Graph>>,
     my_multiaddresses: Vec<Multiaddr>,
     smgr: SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>, Sender<IncomingSession>>,
     cfg: HoprProtocolConfig,
@@ -203,7 +203,8 @@ where
         cfg: HoprProtocolConfig,
     ) -> Self {
         let me_offchain = *identity.1.public();
-        let selector = GraphPathSelector::new(me_offchain, graph.clone(), PathSelectorConfig::default());
+        let planner_config = PathPlannerConfig::default();
+        let selector = HoprGraphPathSelector::new(graph.clone(), planner_config.max_cached_paths);
         Self {
             packet_key: identity.1.clone(),
             chain_key: identity.0.clone(),
@@ -215,6 +216,7 @@ where
                 MemorySurbStore::new(cfg.packet.surb_store),
                 resolver.clone(),
                 selector,
+                planner_config,
             ),
             my_multiaddresses,
             smgr: SessionManager::new(SessionManagerConfig {
@@ -541,7 +543,10 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn ping(&self, peer: &OffchainPublicKey) -> errors::Result<(std::time::Duration, <Graph as NetworkGraphView>::Observed)> {
+    pub async fn ping(
+        &self,
+        peer: &OffchainPublicKey,
+    ) -> errors::Result<(std::time::Duration, <Graph as NetworkGraphView>::Observed)> {
         let me: &OffchainPublicKey = self.packet_key.public();
         if peer == me {
             return Err(HoprTransportError::Api("ping to self does not make sense".into()));

@@ -2,12 +2,13 @@
 //!
 //! This crate provides:
 //! - [`traits::PathSelector`]: Trait for selecting multi-hop paths through the network.
-//! - [`selector::GraphPathSelector`]: A path selector backed by the network graph and a moka
-//!   LRU/TTL cache. Hot-path selections are served from cache; a background sweep periodically
-//!   pre-warms the cache for all reachable `(destination, hops)` pairs.
+//! - [`selector::GraphPathSelector`]: A lightweight graph-backed path selector that returns all
+//!   candidate paths for a given `(src, dest, hops)` query without any caching.
 //! - [`PathPlanner`]: Resolves [`DestinationRouting`] to [`ResolvedTransportRouting`], delegating
-//!   path selection to any [`traits::PathSelector`] implementation.
-//! - [`PathSelectorConfig`]: Configuration mostly for the cache and background refresh.
+//!   path discovery to any [`traits::PathSelector`] implementation and maintaining a
+//!   `moka`-backed cache of fully-validated [`ValidatedPath`] objects keyed by
+//!   `(source, destination, options)`.
+//! - [`PathPlannerConfig`]: Configuration for the planner's cache and background refresh.
 
 pub mod errors;
 pub mod planner;
@@ -15,8 +16,8 @@ pub mod selector;
 pub mod traits;
 
 pub use errors::{PathPlannerError, Result};
-pub use planner::PathPlanner;
-pub use selector::{GraphPathSelector, PathSelectorConfig};
-pub use traits::PathSelector;
+pub use planner::{PathPlanner, PathPlannerConfig};
+pub use selector::HoprGraphPathSelector;
 #[cfg(feature = "runtime-tokio")]
 pub use traits::BackgroundRefreshable;
+pub use traits::PathSelector;

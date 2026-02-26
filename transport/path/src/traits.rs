@@ -2,21 +2,25 @@ use hopr_crypto_types::types::OffchainPublicKey;
 
 use crate::errors::Result;
 
-/// Selects a multi-hop path through the network.
+/// Selects multi-hop paths through the network.
 ///
 /// Implementors are responsible for determining how paths are found.
+/// The caller (e.g. [`crate::planner::PathPlanner`]) is responsible for caching,
+/// path selection strategy, and validation.
 pub trait PathSelector: Send + Sync {
-    /// Select a path from `src` to `dest` using `hops` number of relays.
+    /// Return **all** candidate paths from `src` to `dest` using `hops` relays.
     ///
-    /// Returns a `Vec<OffchainPublicKey>` of length `hops + 1` containing the
-    /// intermediate relay nodes **and** `dest` (in that order); `src` is
-    /// excluded from the result.
+    /// Each inner `Vec<OffchainPublicKey>` has length `hops + 1` and contains
+    /// the intermediate relay nodes **and** `dest` (in that order); `src` is
+    /// excluded from every path.
+    ///
+    /// Returns `Err` when no paths can be found.
     fn select_path(
         &self,
         src: OffchainPublicKey,
         dest: OffchainPublicKey,
         hops: usize,
-    ) -> impl std::future::Future<Output = Result<Vec<OffchainPublicKey>>> + Send;
+    ) -> Result<Vec<Vec<OffchainPublicKey>>>;
 }
 
 /// A selector that can run a background path-cache refresh loop.

@@ -20,7 +20,7 @@ use futures::{
 use hopr_api::{
     chain::HoprChainApi,
     db::HoprNodeDbApi,
-    graph::{NetworkGraphUpdate, NetworkGraphView},
+    graph::{NetworkGraphTraverse, NetworkGraphUpdate, NetworkGraphView, traits::EdgeObservableRead},
     network::NetworkStreamControl,
 };
 use hopr_async_runtime::Abortable;
@@ -221,7 +221,14 @@ impl SessionPool {
     where
         Chain: HoprChainApi + Clone + Send + Sync + 'static,
         Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
-        Graph: NetworkGraphView<NodeId = OffchainPublicKey> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
+        Graph: NetworkGraphView<NodeId = OffchainPublicKey>
+            + NetworkGraphUpdate
+            + NetworkGraphTraverse<NodeId = OffchainPublicKey>
+            + Clone
+            + Send
+            + Sync
+            + 'static,
+        <Graph as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
         Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
     {
         let pool = Arc::new(parking_lot::Mutex::new(VecDeque::with_capacity(size)));
@@ -316,7 +323,14 @@ pub async fn create_tcp_client_binding<Chain, Db, Graph, Net>(
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
-    Graph: NetworkGraphView<NodeId = OffchainPublicKey> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Graph: NetworkGraphView<NodeId = OffchainPublicKey>
+        + NetworkGraphUpdate
+        + NetworkGraphTraverse<NodeId = OffchainPublicKey>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+    <Graph as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     // Bind the TCP socket first
@@ -489,7 +503,14 @@ pub async fn create_udp_client_binding<Chain, Db, Graph, Net>(
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
-    Graph: NetworkGraphView<NodeId = OffchainPublicKey> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Graph: NetworkGraphView<NodeId = OffchainPublicKey>
+        + NetworkGraphUpdate
+        + NetworkGraphTraverse<NodeId = OffchainPublicKey>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+    <Graph as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     // Bind the UDP socket first
