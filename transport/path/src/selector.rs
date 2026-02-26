@@ -99,7 +99,14 @@ where
         hops: usize,
     ) -> Result<Vec<Vec<OffchainPublicKey>>> {
         trace!(%src, %dest, hops, "computing paths from graph");
-        let paths = compute_paths(&self.graph, &src, &dest, std::num::NonZeroUsize::new(hops + 1).expect("can never fail, it is physically at least 1 after the"), self.max_paths);
+        let paths = compute_paths(
+            &self.graph,
+            &src,
+            &dest,
+            std::num::NonZeroUsize::new(hops + 1)
+                .expect("can never fail, it is physically at least 1 after the addition"),
+            self.max_paths,
+        );
 
         if paths.is_empty() {
             Err(PathPlannerError::Path(PathError::PathNotFound(

@@ -1,5 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
+#[cfg(feature = "runtime-tokio")]
+use futures::StreamExt as _;
 use futures::{TryStreamExt, stream::FuturesUnordered};
 use hopr_api::chain::{ChainKeyOperations, ChainPathResolver, ChainReadChannelOperations};
 use hopr_crypto_packet::prelude::*;
@@ -12,7 +14,7 @@ use hopr_protocol_hopr::{FoundSurb, SurbStore};
 use tracing::trace;
 
 #[cfg(feature = "runtime-tokio")]
-use crate::traits::BackgroundRefreshable;
+use crate::traits::BackgroundCacheRefreshable;
 use crate::{
     errors::{PathPlannerError, Result},
     traits::PathSelector,
@@ -156,8 +158,8 @@ where
 
                 let cache_key: PlannerCacheKey = (source, destination, RoutingOptions::Hops(hops));
 
-                let selector = Arc::clone(&self.selector);
-                let resolver = Arc::clone(&self.resolver);
+                let selector = self.selector.clone();
+                let resolver = &self.resolver.clone();
 
                 let paths = self
                     .cache
@@ -165,7 +167,7 @@ where
                         trace!(hops = hops_usize, "path cache miss, querying selector");
                         let candidates = selector.select_path(src_key, dest_key, hops_usize)?;
 
-                        let chain_resolver = ChainPathResolver::from(&*resolver);
+                        let chain_resolver = ChainPathResolver::from(resolver);
                         let mut valid_paths: Vec<ValidatedPath> = Vec::new();
                         for candidate in candidates {
                             let node_ids: Vec<NodeId> = candidate.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
@@ -288,7 +290,7 @@ where
 }
 
 #[cfg(feature = "runtime-tokio")]
-impl<Surb, R, S> BackgroundRefreshable for PathPlanner<Surb, R, S>
+impl<Surb, R, S> BackgroundCacheRefreshable for PathPlanner<Surb, R, S>
 where
     Surb: SurbStore + Send + Sync + 'static,
     R: ChainKeyOperations + ChainReadChannelOperations + Send + Sync + 'static,
@@ -297,15 +299,20 @@ where
     fn run_background_refresh(&self) -> impl std::future::Future<Output = ()> + Send + 'static {
         // Clone only the fields we need — avoids requiring R: Clone + S: Clone.
         let cache = self.cache.clone();
-        let resolver = Arc::clone(&self.resolver);
-        let selector = Arc::clone(&self.selector);
+        let resolver = self.resolver.clone();
+        let selector = self.selector.clone();
         let refresh_period = self.refresh_period;
 
-        async move {
-            let mut interval = tokio::time::interval(refresh_period);
-            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-            loop {
-                interval.tick().await;
+        // run at a non-zero interval
+        futures_time::stream::interval(futures_time::time::Duration::from_millis(
+            refresh_period.as_millis() as u64 + 1u64,
+        ))
+        .for_each(move |_| {
+            let cache = cache.clone();
+            let resolver = resolver.clone();
+            let selector = selector.clone();
+
+            async move {
                 for (key, _) in cache.iter() {
                     let (src, dest, options) = {
                         let k = key.as_ref();
@@ -355,7 +362,7 @@ where
                     }
                 }
             }
-        }
+        })
     }
 }
 

@@ -118,19 +118,37 @@ fn bench_simple_paths(c: &mut Criterion) {
 
             group.bench_with_input(BenchmarkId::new("2-hop", &param), &size, |b, _| {
                 b.iter(|| {
-                    black_box(graph.simple_paths(me, black_box(dst_2hop), 2, Some(10), SimpleHoprCostFn::new(2)))
+                    black_box(graph.simple_paths(
+                        me,
+                        black_box(dst_2hop),
+                        2,
+                        Some(10),
+                        SimpleHoprCostFn::new(std::num::NonZeroUsize::new(2).expect("is greater than 1")),
+                    ))
                 });
             });
 
             group.bench_with_input(BenchmarkId::new("3-hop", &param), &size, |b, _| {
                 b.iter(|| {
-                    black_box(graph.simple_paths(me, black_box(dst_3hop), 3, Some(10), SimpleHoprCostFn::new(3)))
+                    black_box(graph.simple_paths(
+                        me,
+                        black_box(dst_3hop),
+                        3,
+                        Some(10),
+                        SimpleHoprCostFn::new(std::num::NonZeroUsize::new(3).expect("is greater than 1")),
+                    ))
                 });
             });
 
             group.bench_with_input(BenchmarkId::new("4-hop", &param), &size, |b, _| {
                 b.iter(|| {
-                    black_box(graph.simple_paths(me, black_box(dst_4hop), 4, Some(10), SimpleHoprCostFn::new(4)))
+                    black_box(graph.simple_paths(
+                        me,
+                        black_box(dst_4hop),
+                        4,
+                        Some(10),
+                        SimpleHoprCostFn::new(std::num::NonZeroUsize::new(4).expect("is greater than 1")),
+                    ))
                 });
             });
         }

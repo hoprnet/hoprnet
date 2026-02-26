@@ -12,11 +12,12 @@ crate-type = ["rlib"]
 [features]
 default = []
 prometheus = ["dep:hopr-metrics", "hopr-network-types/prometheus"]
-runtime-tokio = ["dep:tokio"]
+runtime-tokio = ["dep:futures-time", "dep:tokio"]
 
 [dependencies]
 anyhow = { workspace = true }
 futures = { workspace = true }
+futures-time = { workspace = true, optional = true }
 lazy_static = { workspace = true }
 moka = { workspace = true }
 smart-default = { workspace = true }

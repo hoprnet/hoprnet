@@ -33,7 +33,7 @@ pub trait PathSelector: Send + Sync {
 ///
 /// Only meaningful when the `runtime-tokio` feature is enabled.
 #[cfg(feature = "runtime-tokio")]
-pub trait BackgroundRefreshable: Send + Sync {
+pub trait BackgroundCacheRefreshable: Send + Sync {
     /// Returns a future that runs the periodic cache-refresh loop.
     ///
     /// The future never completes under normal operation.

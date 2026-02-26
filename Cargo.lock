@@ -5248,6 +5248,7 @@ dependencies = [
  "async-trait",
  "bimap",
  "futures",
+ "futures-time",
  "hex-literal",
  "hopr-api",
  "hopr-crypto-packet",
