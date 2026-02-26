@@ -307,6 +307,10 @@ async fn main_inner() -> anyhow::Result<()> {
 
     let node_db = init_hopr_node_db(&cfg.db.data, cfg.db.initialize, cfg.db.force_initialize).await?;
 
+    let blokli_url = cfg
+        .blokli_url
+        .clone()
+        .unwrap_or(DEFAULT_BLOKLI_URL.to_string());
     let mut chain_connector = create_trustful_hopr_blokli_connector(
         &hopr_keys.chain_key,
         BlockchainConnectorConfig {
@@ -322,10 +326,7 @@ async fn main_inner() -> anyhow::Result<()> {
                 .unwrap_or_else(|| BlockchainConnectorConfig::default().tx_timeout_multiplier),
         },
         BlokliClient::new(
-            cfg.blokli_url
-                .clone()
-                .unwrap_or(DEFAULT_BLOKLI_URL.to_string())
-                .parse()?,
+            blokli_url.parse()?,
             blokli_client::BlokliClientConfig {
                 timeout: std::time::Duration::from_secs(30),
                 stream_reconnect_timeout: std::time::Duration::from_secs(30),
@@ -334,6 +335,7 @@ async fn main_inner() -> anyhow::Result<()> {
         cfg.hopr.safe_module.module_address,
     )
     .await?;
+    chain_connector.set_blokli_url(blokli_url.parse()?);
     chain_connector.connect().await?;
     let chain_connector = Arc::new(chain_connector);
 

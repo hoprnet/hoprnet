@@ -72,6 +72,7 @@ pub struct HoprBlockchainConnector<C, B, P, R> {
     payload_generator: P,
     chain_key: ChainKeypair,
     client: std::sync::Arc<C>,
+    blokli_url: Option<blokli_client::exports::Url>,
     graph: std::sync::Arc<parking_lot::RwLock<DiGraphMap<HoprKeyIdent, ChannelId, ahash::RandomState>>>,
     backend: std::sync::Arc<B>,
     connection_handle: Option<AbortHandle>,
@@ -131,6 +132,7 @@ where
             sequencer: TransactionSequencer::new(chain_key.clone(), client.clone()),
             events: (events_tx, events_rx.deactivate()),
             client,
+            blokli_url: None,
             chain_key,
             cfg,
             mapper: HoprKeyMapper {
@@ -526,6 +528,16 @@ where
         self.client.as_ref()
     }
 
+    /// Sets the URL of the Blokli provider used by this connector.
+    pub fn set_blokli_url(&mut self, blokli_url: blokli_client::exports::Url) {
+        self.blokli_url = Some(blokli_url);
+    }
+
+    /// Returns the URL of the Blokli provider used by this connector.
+    pub fn blokli_url(&self) -> Option<&blokli_client::exports::Url> {
+        self.blokli_url.as_ref()
+    }
+
     /// Checks if the connector is [connected](HoprBlockchainConnector::connect) to the chain.
     pub fn is_connected(&self) -> bool {
         self.check_connection_state().is_ok()
@@ -664,6 +676,19 @@ pub(crate) mod tests {
 
         assert!(matches!(res, Err(ConnectorError::ServerNotHealthy)));
         assert!(!connector.is_connected());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connector_should_expose_blokli_url() -> anyhow::Result<()> {
+        let blokli_client = BlokliTestStateBuilder::default().build_static_client();
+        let mut connector = create_connector(blokli_client)?;
+        let url: blokli_client::exports::Url = "https://blokli.example.hoprnet.link".parse()?;
+
+        connector.set_blokli_url(url.clone());
+
+        assert_eq!(connector.blokli_url(), Some(&url));
 
         Ok(())
     }

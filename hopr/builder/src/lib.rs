@@ -58,7 +58,6 @@ pub async fn build_reference(
 )> {
     let (chain_key, packet_key) = identity;
     let node_db = init_hopr_node_db(&db_data_path, true, false).await?;
-
     let mut chain_connector = create_trustful_hopr_blokli_connector(
         chain_key,
         BlockchainConnectorConfig {
@@ -83,6 +82,7 @@ pub async fn build_reference(
         config.safe_module.module_address,
     )
     .await?;
+    chain_connector.set_blokli_url(blokli_url.parse()?);
     chain_connector.connect().await?;
     let chain_connector = Arc::new(chain_connector);
 
