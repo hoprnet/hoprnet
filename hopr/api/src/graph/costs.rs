@@ -114,12 +114,18 @@ where
                     0 => {
                         // the first edge should always go to an already connected and measured peer,
                         // otherwise use a negative cost that should remove the edge from consideration
-                        if observation.immediate_qos().is_some_and(|o| o.is_connected())
-                            && let Some(intermediate_observation) = observation.intermediate_qos()
-                            && intermediate_observation.capacity().is_some()
-                        {
-                            return initial_cost * intermediate_observation.score();
+                        if let Some(immediate_observation) = observation.immediate_qos() {
+                            if immediate_observation.is_connected()
+                                && let Some(intermediate_observation) = observation.intermediate_qos()
+                                && intermediate_observation.capacity().is_some()
+                            {
+                                // loopbacks through a single peer are forbidden, therefore the first edge
+                                // may consider the preexisting measurements over an immediate observation
+                                return initial_cost
+                                    * immediate_observation.score().max(intermediate_observation.score());
+                            }
                         }
+                        {}
 
                         -initial_cost
                     }

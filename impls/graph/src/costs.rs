@@ -69,16 +69,35 @@ mod tests {
     }
 
     #[test]
-    fn hopr_first_edge_scales_by_intermediate_score() -> anyhow::Result<()> {
+    fn hopr_first_edge_scales_by_immediate_score() -> anyhow::Result<()> {
         let cost_fn = HoprCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
         let f = cost_fn.into_cost_fn();
         let obs = obs_connected_with_capacity();
 
         let cost = f(2.0, &obs, 0);
-        // cost = initial_cost * intermediate_score; intermediate_score is in (0, 1]
+        // cost = initial_cost * immediate_score; immediate_score is in (0, 1]
         assert!(
             cost > 0.0 && cost <= 2.0,
-            "cost should be scaled by intermediate score, got {cost}"
+            "cost should be scaled by immediate score, got {cost}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn hopr_first_edge_positive_when_capacity_only_no_intermediate_probe() -> anyhow::Result<()> {
+        let cost_fn = HoprCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
+        let f = cost_fn.into_cost_fn();
+        // Capacity update creates intermediate_probe with default link data (score 0),
+        // but the first edge uses immediate_observation.score() instead.
+        let mut obs = Observations::default();
+        obs.record(EdgeWeightType::Connected(true));
+        obs.record(EdgeWeightType::Immediate(Ok(std::time::Duration::from_millis(50))));
+        obs.record(EdgeWeightType::Capacity(Some(1000)));
+
+        let cost = f(1.0, &obs, 0);
+        assert!(
+            cost > 0.0,
+            "first edge should be positive when connected with capacity even without intermediate probes, got {cost}"
         );
         Ok(())
     }
