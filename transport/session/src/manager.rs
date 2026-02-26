@@ -135,7 +135,7 @@ struct SessionSlot {
     // Set on both Entry and Exit sides.
     surb_mgmt: Arc<BalancerStateValues>,
     // SURB flow updates happening outside of Session protocol
-    // (e.g. due to Start protocol messages).
+    // (e.g., due to Start protocol messages).
     surb_estimator: AtomicSurbFlowEstimator,
 }
 
@@ -663,7 +663,7 @@ where
                 error!(challenge, %pseudonym, %destination, "timeout sending session request message");
                 TransportSessionError::Timeout
             })?
-            .map_err(|e| TransportSessionError::PacketSendingError(e.to_string()))?;
+            .map_err(TransportSessionError::packet_sending)?;
 
         // The timeout is given by the number of hops requested
         let initiation_timeout: futures_time::time::Duration = initiation_timeout_max_one_way(
@@ -941,7 +941,7 @@ where
                     error!("timeout sending session ping message");
                     TransportSessionError::Timeout
                 })?
-                .map_err(|e| TransportSessionError::PacketSendingError(e.to_string()))?)
+                .map_err(TransportSessionError::packet_sending)?)
         } else {
             Err(SessionManagerError::NonExistingSession.into())
         }
@@ -986,6 +986,28 @@ where
             Some(session) => Ok(Some(session.surb_mgmt.as_ref())
                 .filter(|c| !c.is_disabled())
                 .map(|d| d.as_config())),
+            None => Err(SessionManagerError::NonExistingSession.into()),
+        }
+    }
+
+    /// Gets estimations produced/received and consumed SURBs by the Session.
+    ///
+    /// For an outgoing Session (Entry) the pair is the number of SURBs sent (by us) and used (by the Exit).
+    /// For an incoming Session (Exit) the pair is the number of SURBs received (from Entry) and used (by us).
+    ///
+    /// Returns an error if the Session with the given `id` does not exist.
+    pub async fn get_surb_level_estimates(&self, id: &SessionId) -> crate::errors::Result<(u64, u64)> {
+        match self.sessions.get(id).await {
+            Some(session) => Ok((
+                session
+                    .surb_estimator
+                    .produced
+                    .load(std::sync::atomic::Ordering::Relaxed),
+                session
+                    .surb_estimator
+                    .consumed
+                    .load(std::sync::atomic::Ordering::Relaxed),
+            )),
             None => Err(SessionManagerError::NonExistingSession.into()),
         }
     }
@@ -1121,8 +1143,6 @@ where
             });
 
             let session = if !session_req.capabilities.0.contains(Capability::NoRateControl) {
-                let surb_estimator = AtomicSurbFlowEstimator::default();
-
                 // Because of SURB scarcity, control the egress rate of incoming sessions
                 let egress_rate_control =
                     RateController::new(self.cfg.initial_return_session_egress_rate, Duration::from_secs(1));
@@ -1140,7 +1160,7 @@ where
                             .as_secs()
                 };
 
-                let surb_estimator_clone = surb_estimator.clone();
+                let surb_estimator_clone = slot.surb_estimator.clone();
                 let session = HoprSession::new(
                     session_id,
                     reply_routing.clone(),
@@ -1193,7 +1213,7 @@ where
                 {
                     slot.telemetry.set_state(SessionLifecycleState::Active);
                     slot.telemetry
-                        .set_balancer_data(surb_estimator.clone(), slot.surb_mgmt.clone());
+                        .set_balancer_data(slot.surb_estimator.clone(), slot.surb_mgmt.clone());
                 }
 
                 // Spawn the SURB balancer only once we know we have registered the
@@ -1202,7 +1222,7 @@ where
                 let balancer = SurbBalancer::new(
                     session_id,
                     SimpleBalancerController::default(),
-                    surb_estimator.clone(),
+                    slot.surb_estimator.clone(),
                     SurbControllerWithCorrection(egress_rate_control, 1), // 1 SURB per egress packet
                     slot.surb_mgmt.clone(),
                 );
@@ -1215,7 +1235,7 @@ where
 
                 // Spawn a keep-alive stream notifying about the SURB buffer level towards the Entry
                 if let Some(period) = self.cfg.surb_balance_notify_period {
-                    let surb_estimator_clone = surb_estimator.clone();
+                    let surb_estimator_clone = slot.surb_estimator.clone();
                     let (ka_controller, ka_abort_handle) = utils::spawn_keep_alive_stream(
                         session_id,
                         // Sent Keep-Alive packets also contribute to SURB consumption
@@ -1229,12 +1249,17 @@ where
                                 futures::future::ok::<_, S::Error>((routing, data))
                             }),
                         slot.routing_opts.clone(),
-                        SurbNotificationMode::Level(surb_estimator.clone()),
+                        SurbNotificationMode::Level(slot.surb_estimator.clone()),
                         slot.surb_mgmt.clone(),
                     );
 
                     // Start keepalive stream towards the Entry with a predefined period
-                    ka_controller.set_rate_per_unit(1, period);
+                    hopr_async_runtime::prelude::spawn(async move {
+                        // Delay the stream execution by one period
+                        hopr_async_runtime::prelude::sleep(period).await;
+                        ka_controller.set_rate_per_unit(1, period);
+                    });
+
                     slot.abort_handles
                         .lock()
                         .insert(SessionTasks::KeepAlive, ka_abort_handle);
@@ -1436,6 +1461,11 @@ where
                                     .surb_mgmt
                                     .target_surb_buffer_size
                                     .store(msg.additional_data, std::sync::atomic::Ordering::Relaxed);
+                                // Update maximum SURBs per second based on the new target
+                                session_slot.surb_mgmt.max_surbs_per_sec.store(
+                                    msg.additional_data / self.cfg.minimum_surb_buffer_duration.as_secs(),
+                                    std::sync::atomic::Ordering::Relaxed,
+                                );
                                 debug!(%session_id, target_surb_buffer_size = msg.additional_data, "keep-alive updated SURB balancer target buffer size from the Entry");
                             }
 
@@ -2265,7 +2295,10 @@ mod tests {
         let alice_pseudonym = HoprPseudonym::random();
         let bob_peer: Address = (&ChainKeypair::random()).into();
 
-        let bob_cfg = SessionManagerConfig::default();
+        let bob_cfg = SessionManagerConfig {
+            surb_balance_notify_period: Some(Duration::from_millis(500)),
+            ..Default::default()
+        };
         let alice_mgr = SessionManager::new(Default::default());
         let bob_mgr = SessionManager::new(bob_cfg.clone());
 
@@ -2334,7 +2367,7 @@ mod tests {
             .times(5..)
             //.in_sequence(&mut sequence)
             .withf(move |peer, data| {
-                start_msg_match(data, |msg| matches!(msg, StartProtocol::KeepAlive(ka) if ka.additional_data == INITIAL_BALANCER_TARGET))
+                start_msg_match(data, |msg| matches!(msg, StartProtocol::KeepAlive(ka) if ka.flags.contains(KeepAliveFlag::BalancerTarget) && ka.additional_data == INITIAL_BALANCER_TARGET))
                 //msg_type(data, StartProtocolDiscriminants::KeepAlive)
                     && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
             })
@@ -2363,14 +2396,39 @@ mod tests {
             .times(5..)
             //.in_sequence(&mut sequence)
             .withf(move |peer, data| {
-                start_msg_match(data, |msg| matches!(msg, StartProtocol::KeepAlive(ka) if ka.additional_data == NEXT_BALANCER_TARGET))
-                    //msg_type(data, StartProtocolDiscriminants::KeepAlive)
+                start_msg_match(data, |msg| matches!(msg, StartProtocol::KeepAlive(ka) if ka.flags.contains(KeepAliveFlag::BalancerTarget) && ka.additional_data == NEXT_BALANCER_TARGET))
                     && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
             })
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
                 Box::pin(async move {
                     bob_mgr_clone
+                        .dispatch_message(
+                            alice_pseudonym,
+                            ApplicationDataIn {
+                                data: data.data,
+                                packet_info: Default::default(),
+                            },
+                        )
+                        .await?;
+                    Ok(())
+                })
+            });
+
+        // Bob sends at least 1 Keep Alive back reporting its SURB estimate
+        let alice_mgr_clone = alice_mgr.clone();
+        bob_transport
+            .expect_send_message()
+            .times(1..)
+            //.in_sequence(&mut open_sequence)
+            .withf(move |peer, data| {
+                start_msg_match(&data, |msg| matches!(msg, StartProtocol::KeepAlive(ka) if ka.flags.contains(KeepAliveFlag::BalancerState) && ka.additional_data > 0))
+                    && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
+            })
+            .returning(move |_, data| {
+                let alice_mgr_clone = alice_mgr_clone.clone();
+                Box::pin(async move {
+                    alice_mgr_clone
                         .dispatch_message(
                             alice_pseudonym,
                             ApplicationDataIn {
@@ -2502,8 +2560,29 @@ mod tests {
             remote_cfg.target_surb_buffer_size,
             new_balancer_cfg.target_surb_buffer_size
         );
+        assert_eq!(
+            remote_cfg.max_surbs_per_sec,
+            new_balancer_cfg.target_surb_buffer_size / bob_cfg.minimum_surb_buffer_duration.as_secs()
+        );
+
+        let (alice_surb_sent, alice_surb_used) = alice_mgr.get_surb_level_estimates(alice_session.id()).await?;
+        let (bob_surb_recv, bob_surb_used) = bob_mgr.get_surb_level_estimates(bob_session.session.id()).await?;
 
         alice_session.close().await?;
+
+        assert!(alice_surb_sent > 0, "alice must've sent surbs");
+        assert!(bob_surb_recv > 0, "bob must've received surbs");
+        assert!(
+            bob_surb_recv <= alice_surb_sent,
+            "bob cannot receive more surbs than alice sent"
+        );
+
+        assert!(alice_surb_used > 0, "alice must see bob used surbs");
+        assert!(bob_surb_used > 0, "bob must've used surbs");
+        assert!(
+            alice_surb_used <= bob_surb_used,
+            "alice cannot see bob used more surbs than bob actually used"
+        );
 
         tokio::time::sleep(Duration::from_millis(300)).await;
         assert!(matches!(

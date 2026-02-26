@@ -1,8 +1,8 @@
 [package]
 name = "hoprd-localcluster"
-version = "0.1.0"
+version = "0.1.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-edition = "2021"
+edition = "2024"
 license = "GPL-3.0-only"
 
 description = "Local HOPR cluster runner using external hoprd processes"

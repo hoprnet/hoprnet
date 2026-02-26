@@ -222,11 +222,11 @@ impl Display for MultiStrategy {
 impl SingularStrategy for MultiStrategy {
     async fn on_tick(&self) -> Result<()> {
         for strategy in self.strategies.iter() {
-            if let Err(e) = strategy.on_tick().await {
-                if !self.cfg.on_fail_continue {
-                    warn!(%self, %strategy, "on_tick chain stopped at strategy");
-                    return Err(e);
-                }
+            if let Err(e) = strategy.on_tick().await
+                && !self.cfg.on_fail_continue
+            {
+                warn!(%self, %strategy, "on_tick chain stopped at strategy");
+                return Err(e);
             }
         }
         Ok(())
@@ -234,11 +234,11 @@ impl SingularStrategy for MultiStrategy {
 
     async fn on_acknowledged_winning_ticket(&self, ack: &VerifiedTicket) -> Result<()> {
         for strategy in self.strategies.iter() {
-            if let Err(e) = strategy.on_acknowledged_winning_ticket(ack).await {
-                if !self.cfg.on_fail_continue {
-                    warn!(%self, %strategy, "on_acknowledged_ticket chain stopped at strategy");
-                    return Err(e);
-                }
+            if let Err(e) = strategy.on_acknowledged_winning_ticket(ack).await
+                && !self.cfg.on_fail_continue
+            {
+                warn!(%self, %strategy, "on_acknowledged_ticket chain stopped at strategy");
+                return Err(e);
             }
         }
         Ok(())
@@ -251,11 +251,11 @@ impl SingularStrategy for MultiStrategy {
         change: ChannelChange,
     ) -> Result<()> {
         for strategy in self.strategies.iter() {
-            if let Err(e) = strategy.on_own_channel_changed(channel, direction, change).await {
-                if !self.cfg.on_fail_continue {
-                    warn!(%self, "on_channel_state_changed chain stopped at strategy");
-                    return Err(e);
-                }
+            if let Err(e) = strategy.on_own_channel_changed(channel, direction, change).await
+                && !self.cfg.on_fail_continue
+            {
+                warn!(%self, "on_channel_state_changed chain stopped at strategy");
+                return Err(e);
             }
         }
         Ok(())

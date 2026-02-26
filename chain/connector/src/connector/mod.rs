@@ -56,6 +56,12 @@ pub struct BlockchainConnectorConfig {
     /// Default is 90%, minimum is 1, maximum is 100.
     #[default(DEFAULT_SYNC_TOLERANCE_PCT)]
     pub sync_tolerance: usize,
+    /// Transaction waits for confirmation by multiplying chain's blocktime, finality, and this multiplier.
+    /// Set it to higher values if transactions are failing due to timeout at the client.
+    ///
+    /// Default is 2, minimum is 1.
+    #[default(TX_TIMEOUT_MULTIPLIER)]
+    pub tx_timeout_multiplier: u32,
 }
 
 /// A connector acting as middleware between the HOPR APIs (see the [`hopr_api`] crate) and the Blokli Client API (see
@@ -537,7 +543,7 @@ where
         tx_req: P::TxRequest,
     ) -> Result<impl Future<Output = Result<ChainReceipt, ConnectorError>> + Send + 'a, ConnectorError> {
         let chain_info = self.query_cached_chain_info().await?;
-        let tx_timeout = TX_TIMEOUT_MULTIPLIER * chain_info.finality * chain_info.expected_block_time;
+        let tx_timeout = self.cfg.tx_timeout_multiplier.max(1) * chain_info.finality * chain_info.expected_block_time;
         Ok(self
             .sequencer
             .enqueue_transaction(tx_req, tx_timeout.max(MIN_TX_CONFIRM_TIMEOUT))
