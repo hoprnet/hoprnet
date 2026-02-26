@@ -64,6 +64,14 @@ pub async fn build_reference(
         BlockchainConnectorConfig {
             connection_sync_timeout: std::time::Duration::from_mins(1),
             sync_tolerance: 90,
+            tx_timeout_multiplier: std::env::var("HOPR_TX_TIMEOUT_MULTIPLIER")
+                .ok()
+                .and_then(|p| {
+                    p.parse()
+                        .inspect_err(|error| tracing::warn!(%error, "failed to parse HOPR_TX_TIMEOUT_MULTIPLIER"))
+                        .ok()
+                })
+                .unwrap_or_else(|| BlockchainConnectorConfig::default().tx_timeout_multiplier),
         },
         BlokliClient::new(
             blokli_url.parse()?,

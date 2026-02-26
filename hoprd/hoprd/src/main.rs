@@ -196,7 +196,7 @@ fn update_hopr_lib_config_from_env_vars(cfg: &mut HoprLibConfig) -> anyhow::Resu
         .ok()
         .and_then(|p| {
             p.parse()
-                .inspect_err(|error| error!(%error, "failed to parse HOPR_INTERNAL_OUT_PACKET_PIPELINE_CONCURRENCY"))
+                .inspect_err(|error| warn!(%error, "failed to parse HOPR_INTERNAL_OUT_PACKET_PIPELINE_CONCURRENCY"))
                 .ok()
         });
 
@@ -204,7 +204,7 @@ fn update_hopr_lib_config_from_env_vars(cfg: &mut HoprLibConfig) -> anyhow::Resu
         .ok()
         .and_then(|p| {
             p.parse()
-                .inspect_err(|error| error!(%error, "failed to parse HOPR_INTERNAL_IN_PACKET_PIPELINE_CONCURRENCY"))
+                .inspect_err(|error| warn!(%error, "failed to parse HOPR_INTERNAL_IN_PACKET_PIPELINE_CONCURRENCY"))
                 .ok()
         });
 
@@ -312,6 +312,14 @@ async fn main_inner() -> anyhow::Result<()> {
         BlockchainConnectorConfig {
             connection_sync_timeout: std::time::Duration::from_mins(1),
             sync_tolerance: 90,
+            tx_timeout_multiplier: std::env::var("HOPR_TX_TIMEOUT_MULTIPLIER")
+                .ok()
+                .and_then(|p| {
+                    p.parse()
+                        .inspect_err(|error| warn!(%error, "failed to parse HOPR_TX_TIMEOUT_MULTIPLIER"))
+                        .ok()
+                })
+                .unwrap_or_else(|| BlockchainConnectorConfig::default().tx_timeout_multiplier),
         },
         BlokliClient::new(
             cfg.blokli_url

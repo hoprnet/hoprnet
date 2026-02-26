@@ -199,7 +199,13 @@ mod tests {
         graph.add_edge(&me, &dest)?;
         mark_edge_loopback_ready(&graph, &me, &dest);
 
-        let routes = graph.simple_paths(&me, &dest, 1, None, SimpleHoprCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?));
+        let routes = graph.simple_paths(
+            &me,
+            &dest,
+            1,
+            None,
+            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?),
+        );
 
         assert_eq!(routes.len(), 1, "should find exactly one 1-hop route");
 
@@ -220,7 +226,13 @@ mod tests {
         mark_edge_loopback_ready(&graph, &me, &hop);
         mark_edge_connected(&graph, &hop, &dest);
 
-        let routes = graph.simple_paths(&me, &dest, 2, None, SimpleHoprCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?));
+        let routes = graph.simple_paths(
+            &me,
+            &dest,
+            2,
+            None,
+            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
+        );
 
         assert!(!routes.is_empty(), "should find at least one 2-hop route");
 
@@ -236,7 +248,13 @@ mod tests {
         graph.add_node(dest);
         // No edge between me and dest
 
-        let routes = graph.simple_paths(&me, &dest, 1, None, SimpleHoprCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?));
+        let routes = graph.simple_paths(
+            &me,
+            &dest,
+            1,
+            None,
+            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?),
+        );
 
         assert!(routes.is_empty(), "should return no routes when unreachable");
 
@@ -249,7 +267,13 @@ mod tests {
         let unknown = pubkey_from(&SECRET_1);
 
         let graph = ChannelGraph::new(me);
-        let routes = graph.simple_paths(&me, &unknown, 1, None, SimpleHoprCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?));
+        let routes = graph.simple_paths(
+            &me,
+            &unknown,
+            1,
+            None,
+            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?),
+        );
 
         assert!(routes.is_empty());
 
@@ -278,7 +302,13 @@ mod tests {
         mark_edge_connected(&graph, &a, &dest);
         mark_edge_connected(&graph, &b, &dest);
 
-        let routes = graph.simple_paths(&me, &dest, 2, None, SimpleHoprCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?));
+        let routes = graph.simple_paths(
+            &me,
+            &dest,
+            2,
+            None,
+            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
+        );
         assert_eq!(routes.len(), 2, "diamond topology should yield two 2-hop routes");
         Ok(())
     }
@@ -301,7 +331,13 @@ mod tests {
         mark_edge_loopback_ready(&graph, &me, &a);
         mark_edge_connected(&graph, &b, &dest);
 
-        let routes = graph.simple_paths(&me, &dest, 3, None, SimpleHoprCostFn::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?));
+        let routes = graph.simple_paths(
+            &me,
+            &dest,
+            3,
+            None,
+            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?),
+        );
         assert_eq!(routes.len(), 1, "should find exactly one 3-hop route");
         Ok(())
     }
@@ -325,7 +361,13 @@ mod tests {
         mark_edge_loopback_ready(&graph, &me, &a);
         mark_edge_connected(&graph, &b, &dest);
 
-        let routes = graph.simple_paths(&me, &dest, 3, None, SimpleHoprCostFn::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?));
+        let routes = graph.simple_paths(
+            &me,
+            &dest,
+            3,
+            None,
+            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?),
+        );
         assert_eq!(routes.len(), 1, "cycle should not produce extra paths");
         Ok(())
     }
@@ -339,7 +381,13 @@ mod tests {
         graph.add_node(dest);
         graph.add_edge(&me, &dest)?;
 
-        let routes = graph.simple_paths(&me, &dest, 2, None, SimpleHoprCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?));
+        let routes = graph.simple_paths(
+            &me,
+            &dest,
+            2,
+            None,
+            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
+        );
         assert!(routes.is_empty(), "no 2-hop route should exist for a direct edge");
         Ok(())
     }
@@ -351,7 +399,13 @@ mod tests {
         let graph = ChannelGraph::new(me);
 
         // length=0 returns empty before the cost fn is used; any NonZeroUsize value is fine
-        let routes = graph.simple_paths(&me, &other, 0, None, SimpleHoprCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?));
+        let routes = graph.simple_paths(
+            &me,
+            &other,
+            0,
+            None,
+            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?),
+        );
         assert!(routes.is_empty(), "zero-hop path should find no routes");
         Ok(())
     }
@@ -369,7 +423,13 @@ mod tests {
         graph.add_edge(&me, &a)?;
         graph.add_edge(&dest, &a)?; // wrong direction
 
-        let routes = graph.simple_paths(&me, &dest, 2, None, SimpleHoprCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?));
+        let routes = graph.simple_paths(
+            &me,
+            &dest,
+            2,
+            None,
+            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
+        );
         assert!(routes.is_empty(), "should not traverse edge in wrong direction");
         Ok(())
     }
@@ -455,7 +515,13 @@ mod tests {
         mark_edge_connected(&graph, &e, &f);
 
         // --- 3-hop paths: should find exactly 5 ---
-        let routes_3 = graph.simple_paths(&me, &f, 3, None, SimpleHoprCostFn::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?));
+        let routes_3 = graph.simple_paths(
+            &me,
+            &f,
+            3,
+            None,
+            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?),
+        );
         assert_eq!(routes_3.len(), 5, "should find exactly 5 three-hop paths");
 
         // Verify all returned paths have positive cost
@@ -467,14 +533,26 @@ mod tests {
         }
 
         // --- 2-hop paths: a→f and b→f are NOT connected, so cost is pruned ---
-        let routes_2 = graph.simple_paths(&me, &f, 2, None, SimpleHoprCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?));
+        let routes_2 = graph.simple_paths(
+            &me,
+            &f,
+            2,
+            None,
+            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
+        );
         assert!(
             routes_2.is_empty(),
             "2-hop paths should be pruned (last edge not connected)"
         );
 
         // --- 1-hop path: no direct me→f edge ---
-        let routes_1 = graph.simple_paths(&me, &f, 1, None, SimpleHoprCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?));
+        let routes_1 = graph.simple_paths(
+            &me,
+            &f,
+            1,
+            None,
+            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?),
+        );
         assert!(routes_1.is_empty(), "no direct edge from me to f");
 
         Ok(())
@@ -502,7 +580,13 @@ mod tests {
         graph.add_edge(&b, &me)?;
         mark_edge_connected(&graph, &b, &me);
 
-        let routes = graph.simple_paths(&me, &me, 3, None, SimpleHoprCostFn::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?));
+        let routes = graph.simple_paths(
+            &me,
+            &me,
+            3,
+            None,
+            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?),
+        );
         assert!(
             routes.is_empty(),
             "simple_paths cannot discover cycles (source == destination) due to visited-set semantics"
@@ -522,7 +606,13 @@ mod tests {
         graph.add_edge(&me, &dest)?;
         mark_edge_loopback_ready(&graph, &me, &dest);
 
-        let routes = graph.simple_paths(&me, &dest, 1, None, SimpleHoprCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?));
+        let routes = graph.simple_paths(
+            &me,
+            &dest,
+            1,
+            None,
+            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?),
+        );
         assert_eq!(routes.len(), 1);
 
         let (_path, path_id, _cost) = &routes[0];
@@ -551,7 +641,13 @@ mod tests {
         mark_edge_loopback_ready(&graph, &me, &a);
         mark_edge_connected(&graph, &b, &dest);
 
-        let routes = graph.simple_paths(&me, &dest, 3, None, SimpleHoprCostFn::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?));
+        let routes = graph.simple_paths(
+            &me,
+            &dest,
+            3,
+            None,
+            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?),
+        );
         assert_eq!(routes.len(), 1);
 
         let (_path, path_id, _cost) = &routes[0];
@@ -587,7 +683,13 @@ mod tests {
         mark_edge_connected(&graph, &a, &dest);
         mark_edge_connected(&graph, &b, &dest);
 
-        let routes = graph.simple_paths(&me, &dest, 2, None, SimpleHoprCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?));
+        let routes = graph.simple_paths(
+            &me,
+            &dest,
+            2,
+            None,
+            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
+        );
         assert_eq!(routes.len(), 2, "diamond should yield two 2-hop routes");
 
         let path_ids: Vec<PathId> = routes.iter().map(|(_, pid, _)| *pid).collect();
