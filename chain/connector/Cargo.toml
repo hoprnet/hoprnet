@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-connector"
-version = "0.15.0"
+version = "0.16.0"
 edition = "2024"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implementation of HOPR Chain APIs using Blokli client"
@@ -27,7 +27,7 @@ moka = { workspace = true, features = ["future", "sync"] }
 parking_lot = { workspace = true }
 petgraph = { workspace = true, features = ["rayon", "graphmap"] }
 postcard = { workspace = true }
-redb = "3.1.0"
+redb = { workspace = true }
 serde_json = { workspace = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }

@@ -9,7 +9,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use hoprd_localcluster::{
     blokli_helper, cli, client_helper,
-    identity::{self, DEFAULT_BLOKLI_URL},
+    identity::{self, DEFAULT_BLOKLI_URL, DEFAULT_TX_TIMEOUT_MULTIPLIER},
 };
 use tracing::{debug, error, info, warn};
 
@@ -166,6 +166,7 @@ async fn start_hoprd_nodes(
             .arg(format!("{}:{}", &args.p2p_host, p2p_port))
             .arg("--password")
             .arg(&args.identity_password)
+            .env("HOPR_TX_TIMEOUT_MULTIPLIER", DEFAULT_TX_TIMEOUT_MULTIPLIER.to_string())
             .stdout(Stdio::from(log_file))
             .stderr(Stdio::from(log_err));
 
