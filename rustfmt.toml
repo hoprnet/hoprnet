@@ -15,8 +15,4 @@ normalize_doc_attributes = true
 reorder_impl_items = true
 wrap_comments = true
 
-ignore = [
-  "db/entity/src/codegen",
-  "ethereum/bindings/src/codegen",
-  "hoprd/rest-api-client/src/codegen",
-]
+ignore = ["db/entity/src/codegen", "hoprd/rest-api-client/src/codegen"]

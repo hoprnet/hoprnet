@@ -23,11 +23,4 @@ pub mod errors;
 /// Implementation of a basic peer store.
 pub mod store;
 
-/// Observations related to the peer activity in the network.
-pub mod track;
-
-pub mod observation;
-
 pub use libp2p_identity::PeerId;
-pub use observation::Observations;
-pub use track::NetworkPeerTracker;

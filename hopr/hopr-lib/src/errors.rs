@@ -1,7 +1,6 @@
+use hopr_api::node::state::HoprState;
 pub use hopr_transport::errors::{HoprTransportError, ProbeError, ProtocolError};
 use thiserror::Error;
-
-use crate::state::HoprState;
 
 /// Enumeration of status errors thrown from this library.
 #[derive(Error, Debug)]

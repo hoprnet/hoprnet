@@ -346,6 +346,10 @@ impl From<&HoprPseudonym> for SurbMatcher {
     }
 }
 
+/// Identifier for a path traversed using an allowed [`DestinationRouting`]
+/// over the network.
+pub type PathId = [u64; 5];
+
 /// Routing information containing forward or return routing options.
 ///
 /// Information in this object represents the minimum required basis
