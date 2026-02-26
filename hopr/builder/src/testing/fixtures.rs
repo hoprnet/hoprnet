@@ -77,13 +77,9 @@ impl ClusterGuard {
         sleep(Duration::from_secs(1)).await;
 
         let ip = IpOrHost::from_str(":0")?;
-        let routing = RoutingOptions::IntermediatePath(
-            path.iter()
-                .skip(1)
-                .take(path.len() - 2)
-                .map(|n| n.address().into())
-                .collect(),
-        );
+        let routing = RoutingOptions::Hops(hopr_lib::exports::types::primitive::bounded::BoundedSize::try_from(
+            path.len() as u32 - 2,
+        )?);
         let session_result = path[0]
             .inner()
             .connect_to(
