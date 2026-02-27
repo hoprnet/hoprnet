@@ -18,6 +18,11 @@ pub(crate) mod discovery;
 pub struct HoprNetworkBehavior {
     discovery: discovery::Behaviour,
     pub(crate) streams: libp2p_stream::Behaviour,
+    pub(crate) relay_client: libp2p::relay::client::Behaviour,
+    relay_server: libp2p::relay::Behaviour,
+    dcutr: libp2p::dcutr::Behaviour,
+    #[cfg(feature = "runtime-tokio")]
+    upnp: libp2p::upnp::tokio::Behaviour,
     identify: libp2p::identify::Behaviour,
     autonat: libp2p::autonat::Behaviour,
 }
@@ -29,7 +34,7 @@ impl Debug for HoprNetworkBehavior {
 }
 
 impl HoprNetworkBehavior {
-    pub fn new<T>(me: PublicKey, external_discovery_events: T) -> Self
+    pub fn new<T>(me: PublicKey, external_discovery_events: T, relay_client: libp2p::relay::client::Behaviour) -> Self
     where
         T: Stream<Item = PeerDiscovery> + Send + 'static,
     {
@@ -37,6 +42,11 @@ impl HoprNetworkBehavior {
 
         Self {
             streams: libp2p_stream::Behaviour::new(),
+            relay_client,
+            relay_server: libp2p::relay::Behaviour::new(my_peer_id, Default::default()),
+            dcutr: libp2p::dcutr::Behaviour::new(my_peer_id),
+            #[cfg(feature = "runtime-tokio")]
+            upnp: libp2p::upnp::tokio::Behaviour::default(),
             discovery: discovery::Behaviour::new(my_peer_id, external_discovery_events),
             identify: libp2p::identify::Behaviour::new(libp2p::identify::Config::new(
                 "/hopr/identify/1.0.0".to_string(),
@@ -56,6 +66,11 @@ pub enum HoprNetworkBehaviorEvent {
     Discovery(()),
     Identify(Box<libp2p::identify::Event>),
     Autonat(libp2p::autonat::Event),
+    RelayClient(Box<libp2p::relay::client::Event>),
+    RelayServer(Box<libp2p::relay::Event>),
+    Dcutr(Box<libp2p::dcutr::Event>),
+    #[cfg(feature = "runtime-tokio")]
+    Upnp(Box<libp2p::upnp::Event>),
 }
 
 impl From<()> for HoprNetworkBehaviorEvent {
@@ -72,5 +87,30 @@ impl From<libp2p::identify::Event> for HoprNetworkBehaviorEvent {
 impl From<libp2p::autonat::Event> for HoprNetworkBehaviorEvent {
     fn from(event: libp2p::autonat::Event) -> Self {
         Self::Autonat(event)
+    }
+}
+
+impl From<libp2p::relay::client::Event> for HoprNetworkBehaviorEvent {
+    fn from(event: libp2p::relay::client::Event) -> Self {
+        Self::RelayClient(Box::new(event))
+    }
+}
+
+impl From<libp2p::relay::Event> for HoprNetworkBehaviorEvent {
+    fn from(event: libp2p::relay::Event) -> Self {
+        Self::RelayServer(Box::new(event))
+    }
+}
+
+impl From<libp2p::dcutr::Event> for HoprNetworkBehaviorEvent {
+    fn from(event: libp2p::dcutr::Event) -> Self {
+        Self::Dcutr(Box::new(event))
+    }
+}
+
+#[cfg(feature = "runtime-tokio")]
+impl From<libp2p::upnp::Event> for HoprNetworkBehaviorEvent {
+    fn from(event: libp2p::upnp::Event) -> Self {
+        Self::Upnp(Box::new(event))
     }
 }

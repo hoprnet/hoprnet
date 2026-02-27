@@ -624,8 +624,10 @@ where
             .get()
             .map(|network| network.listening_as().into_iter().collect())
             .unwrap_or_else(|| {
-                tracing::error!("transport network is not yet initialized, cannot fetch announced multiaddresses");
-                self.my_multiaddresses.clone()
+                tracing::error!(
+                    "transport network is not yet initialized, cannot fetch discovered local multiaddresses"
+                );
+                Vec::new()
             })
     }
 

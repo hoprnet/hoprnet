@@ -1,20 +1,26 @@
-use std::{num::NonZeroU8, sync::Arc};
+#[cfg(feature = "runtime-tokio")]
+use std::num::NonZeroU8;
+use std::sync::Arc;
 
 use dashmap::DashSet;
-use futures::{FutureExt, Stream, StreamExt, stream::BoxStream};
+#[cfg(feature = "runtime-tokio")]
+use futures::stream::BoxStream;
+use futures::{FutureExt, Stream, StreamExt};
 use hopr_api::{Multiaddr, OffchainKeypair, network::NetworkBuilder};
 use hopr_network_types::prelude::is_public_address;
+#[cfg(feature = "runtime-tokio")]
+use libp2p::identity::PublicKey;
 use libp2p::{
     autonat,
-    identity::PublicKey,
     swarm::{NetworkInfo, SwarmEvent},
 };
 use tracing::{debug, error, info, trace, warn};
 
-#[cfg(feature = "runtime-tokio")]
 use crate::PeerDiscovery;
+#[cfg(feature = "runtime-tokio")]
+use crate::constants;
 use crate::{
-    HoprNetwork, HoprNetworkBehavior, HoprNetworkBehaviorEvent, constants,
+    HoprNetwork, HoprNetworkBehavior, HoprNetworkBehaviorEvent,
     errors::Result,
     utils::{replace_transport_with_unspecified, resolve_dns_if_any},
 };
@@ -62,12 +68,18 @@ impl InactiveNetwork {
         #[cfg(feature = "transport-quic")]
         let swarm = swarm.with_quic();
 
-        let swarm = swarm.with_dns();
+        let swarm = swarm
+            .with_dns()
+            .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?;
+        let swarm = swarm
+            .with_relay_client(libp2p::noise::Config::new, libp2p::yamux::Config::default)
+            .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?;
 
         Ok(Self {
             swarm: swarm
-                .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
-                .with_behaviour(|_key| HoprNetworkBehavior::new(me_public, external_discovery_events))
+                .with_behaviour(|_key, relay_client| {
+                    HoprNetworkBehavior::new(me_public, external_discovery_events, relay_client)
+                })
                 .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
                 .with_swarm_config(|cfg| {
                     cfg.with_dial_concurrency_factor(
@@ -217,8 +229,8 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
             .with_listen_on(my_multiaddresses.clone())
             .expect("swarm must be configurable");
 
-        let swarm = swarm.swarm;
-        let store = hopr_transport_network::store::NetworkPeerStore::new(me, my_multiaddresses.into_iter().collect());
+        let mut swarm = swarm.swarm;
+        let store = hopr_transport_network::store::NetworkPeerStore::new(me, swarm.listeners().cloned().collect());
         let tracker: Arc<DashSet<libp2p::PeerId>> = Default::default();
 
         let network = HoprNetwork {
@@ -230,7 +242,6 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
 
         #[cfg(all(feature = "prometheus", not(test)))]
         let network_inner = network.clone();
-        let mut swarm = swarm;
         let process = async move {
             while let Some(event) = swarm.next().await {
                 match event {
@@ -256,6 +267,19 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
                         }
                     }
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Identify(_event)) => {}
+                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::RelayClient(event)) => {
+                        trace!(event = ?event, "relay client event");
+                    }
+                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::RelayServer(event)) => {
+                        trace!(event = ?event, "relay server event");
+                    }
+                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Dcutr(event)) => {
+                        trace!(event = ?event, "dcutr event");
+                    }
+                    #[cfg(feature = "runtime-tokio")]
+                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Upnp(event)) => {
+                        trace!(event = ?event, "upnp event");
+                    }
                     SwarmEvent::ConnectionEstablished {
                         peer_id,
                         connection_id,
@@ -364,12 +388,14 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
                         listener_id,
                         address,
                     } => {
+                        store.add_own(address.clone());
                         debug!(%listener_id, %address, transport="libp2p", "new listen address")
                     }
                     SwarmEvent::ExpiredListenAddr {
                         listener_id,
                         address,
                     } => {
+                        store.remove_own(&address);
                         debug!(%listener_id, %address, transport="libp2p", "expired listen address")
                     }
                     SwarmEvent::ListenerClosed {
@@ -377,6 +403,9 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
                         addresses,
                         reason,
                     } => {
+                        for address in &addresses {
+                            store.remove_own(address);
+                        }
                         debug!(%listener_id, ?addresses, ?reason, transport="libp2p", "listener closed", )
                     }
                     SwarmEvent::ListenerError {
@@ -395,11 +424,14 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
                         debug!(%address, "Detected new external address candidate")
                     }
                     SwarmEvent::ExternalAddrConfirmed { address } => {
+                        store.add_own(address.clone());
                         info!(%address, "Detected external address")
                     }
                     SwarmEvent::ExternalAddrExpired {
-                        ..  // address: Multiaddr
-                    } => {}
+                        address
+                    } => {
+                        store.remove_own(&address);
+                    }
                     SwarmEvent::NewExternalAddrOfPeer {
                         peer_id, address
                     } => {

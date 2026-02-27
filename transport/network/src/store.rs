@@ -20,15 +20,20 @@ lazy_static::lazy_static! {
 #[derive(Clone, Debug)]
 pub struct NetworkPeerStore {
     me: PeerId,
-    my_addresses: HashSet<Multiaddr>,
+    my_addresses: Arc<dashmap::DashSet<Multiaddr>>,
     addresses: Arc<dashmap::DashMap<PeerId, HashSet<Multiaddr>>>,
 }
 
 impl NetworkPeerStore {
     pub fn new(me: PeerId, my_addresses: HashSet<Multiaddr>) -> Self {
+        let own = Arc::new(dashmap::DashSet::new());
+        for address in my_addresses {
+            own.insert(address);
+        }
+
         Self {
             me,
-            my_addresses,
+            my_addresses: own,
             addresses: Arc::new(dashmap::DashMap::new()),
         }
     }
@@ -66,11 +71,23 @@ impl NetworkPeerStore {
         Ok(())
     }
 
+    /// Add or update one of own discoverable addresses.
+    #[tracing::instrument(level = "debug", skip(self), ret(level = "trace"))]
+    pub fn add_own(&self, address: Multiaddr) {
+        self.my_addresses.insert(address);
+    }
+
+    /// Remove one of own discoverable addresses.
+    #[tracing::instrument(level = "debug", skip(self), ret(level = "trace"))]
+    pub fn remove_own(&self, address: &Multiaddr) {
+        self.my_addresses.remove(address);
+    }
+
     /// Get multiaddresses of a peer.
     #[tracing::instrument(level = "trace", skip(self))]
     pub fn get(&self, peer: &PeerId) -> Option<HashSet<Multiaddr>> {
         if peer == &self.me {
-            Some(self.my_addresses.clone())
+            Some(self.my_addresses.iter().map(|entry| entry.key().clone()).collect())
         } else {
             self.addresses.get(peer).map(|addrs| addrs.value().clone())
         }
