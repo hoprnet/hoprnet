@@ -338,6 +338,10 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
         panic!("{size} must be between 1 and {SWARM_N}");
     }
 
+    // Reduce mixer delay range to 0–20 ms so tests don't stall on mixing latency.
+    // SAFETY: called once before any threads are spawned for this cluster.
+    unsafe { std::env::set_var("HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS", "20") };
+
     let chain_client = build_blokli_client();
 
     // Use the first SWARM_N onchain keypairs from the chainenv fixture
