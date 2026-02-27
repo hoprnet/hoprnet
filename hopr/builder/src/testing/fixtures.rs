@@ -1,6 +1,5 @@
 use std::{convert::identity, ops::Div, str::FromStr, time::Duration};
 
-use anyhow::Context;
 use futures_time::future::FutureExt as _;
 use hex_literal::hex;
 use hopr_chain_connector::{
@@ -58,38 +57,36 @@ impl ClusterGuard {
         Ok(())
     }
 
-    /// Create a session between two nodes, ensuring channels are open and funded as needed
-    pub async fn create_session(
+    /// Open channels for a list of paths.
+    ///
+    /// Each entry in `paths` is a slice of nodes defining a channel path.
+    /// Returns a `ChannelGuard` per path, in the same order.
+    pub async fn open_channels(
         &self,
-        path: &[&TestedHopr],
+        paths: &[&[&TestedHopr]],
         funding_amount: HoprBalance,
-    ) -> anyhow::Result<(HoprSession, ChannelGuard, ChannelGuard, ChannelGuard)> {
-        let fw_channels = ChannelGuard::try_open_channels_for_path(
-            path.iter().map(|n| n.instance.clone()).collect::<Vec<_>>(),
-            funding_amount,
-        )
-        .await?;
-        let bw_channels = ChannelGuard::try_open_channels_for_path(
-            path.iter().rev().map(|n| n.instance.clone()).collect::<Vec<_>>(),
-            funding_amount,
-        )
-        .await?;
-        // without these channels it is not really possible to probe the network
-        // and get telemetry for the graph edges, which is needed for random
-        // path selection to work properly in the tests.
-        let connectedness_channels = ChannelGuard::try_open_channels_for_path(
-            [
-                path.first().context("Must contain the first element")?,
-                path.last().context("Must contain the last element")?,
-            ]
-            .into_iter()
-            .map(|n| n.instance.clone())
-            .collect::<Vec<_>>(),
-            funding_amount,
-        )
-        .await?;
+    ) -> anyhow::Result<Vec<ChannelGuard>> {
+        let mut guards = Vec::with_capacity(paths.len());
+        for path in paths {
+            guards.push(
+                ChannelGuard::try_open_channels_for_path(
+                    path.iter().map(|n| n.instance.clone()).collect::<Vec<_>>(),
+                    funding_amount,
+                )
+                .await?,
+            );
+        }
 
         sleep(Duration::from_secs(3)).await;
+
+        Ok(guards)
+    }
+
+    /// Create a session between the first and last nodes in the path.
+    ///
+    /// Channels must already be open before calling this method.
+    pub async fn create_session(&self, path: &[&TestedHopr]) -> anyhow::Result<HoprSession> {
+        debug_assert!(path.len() >= 2, "path must contain at least source and destination");
 
         let ip = IpOrHost::from_str(":0")?;
         let routing = RoutingOptions::Hops(hopr_lib::exports::types::primitive::bounded::BoundedSize::try_from(
@@ -113,7 +110,7 @@ impl ClusterGuard {
             .await;
 
         match session_result {
-            Ok(Ok(s)) => Ok((s, fw_channels, bw_channels, connectedness_channels)),
+            Ok(Ok(s)) => Ok(s),
             Ok(Err(e)) => Err(e.into()),
             Err(_) => Err(anyhow::anyhow!("Session opening timed out after 5s")),
         }
@@ -327,6 +324,12 @@ pub fn size_2_cluster_fixture() -> ClusterGuard {
 #[once]
 pub fn size_3_cluster_fixture() -> ClusterGuard {
     cluster_fixture(3)
+}
+
+#[fixture]
+#[once]
+pub fn size_5_cluster_fixture() -> ClusterGuard {
+    cluster_fixture(5)
 }
 
 #[fixture]

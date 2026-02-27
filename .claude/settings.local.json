@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(cargo metadata --format-version 1 --no-deps)",
-      "Bash(python3 -c \"import sys,json; pkgs=json.load\\(sys.stdin\\)[''packages'']; [print\\(p[''name'']\\) for p in pkgs if ''path'' in p[''name''].lower\\(\\) or ''selector'' in p[''name''].lower\\(\\)]\")",
-      "Bash(python3 -c \"import sys,json; pkgs=json.load\\(sys.stdin\\)[''packages'']; [print\\(p[''name'']\\) for p in pkgs if ''transport'' in p[''name''].lower\\(\\) and ''api'' in p[''name''].lower\\(\\)]\")"
-    ]
-  }
-}

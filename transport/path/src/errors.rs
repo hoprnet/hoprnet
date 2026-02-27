@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use hopr_internal_types::errors::PathError;
 
 pub type Result<T> = std::result::Result<T, PathPlannerError>;
@@ -16,4 +18,7 @@ pub enum PathPlannerError {
 
     #[error("api: {0}")]
     Api(String),
+
+    #[error("cache error: {0}")]
+    CacheError(#[from] Arc<Self>),
 }

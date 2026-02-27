@@ -372,7 +372,8 @@ mod tests {
         let stream = ProbingTrafficGeneration::build(&prober);
         pin_mut!(stream);
 
-        // graph.nodes() returns me + peer_a + peer_b = 3 nodes per round.
+        // graph.nodes() returns me + peer_a + peer_b, but the prober skips `me`,
+        // so each round probes only peer_a and peer_b (2 nodes per round).
         // Collect enough items for at least 2 full rounds.
         let destinations: Vec<NodeId> = timeout(
             TINY_TIMEOUT * 50,
@@ -383,22 +384,22 @@ mod tests {
                         _ => None,
                     })
                 })
-                .take(6)
+                .take(4)
                 .collect::<Vec<_>>(),
         )
         .await?;
 
         let unique: HashSet<NodeId> = destinations.iter().cloned().collect();
-        let expected_nodes: HashSet<NodeId> = [me, peer_a, peer_b].into_iter().map(NodeId::from).collect();
+        let expected_nodes: HashSet<NodeId> = [peer_a, peer_b].into_iter().map(NodeId::from).collect();
 
         assert_eq!(
             unique, expected_nodes,
-            "probes should cover all known graph nodes (me + peers)"
+            "probes should cover all known graph peers (excluding me)"
         );
-        // With 3 unique nodes and 6 items, each node appeared in multiple rounds
+        // With 2 unique peers and 4 items, each peer appeared in multiple rounds
         assert_eq!(
             destinations.len(),
-            6,
+            4,
             "should have collected probes across multiple rounds"
         );
 

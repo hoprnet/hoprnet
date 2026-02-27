@@ -188,9 +188,7 @@ where
                         Ok(Arc::new(valid_paths))
                     })
                     .await
-                    .map_err(|e| {
-                        Arc::try_unwrap(e).unwrap_or_else(|e| PathPlannerError::Other(anyhow::anyhow!("{e}")))
-                    })?;
+                    .map_err(PathPlannerError::CacheError)?;
 
                 let idx = if paths.len() > 1 {
                     hopr_crypto_random::random_integer(0, Some((paths.len() - 1) as u64)) as usize
