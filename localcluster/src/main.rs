@@ -168,8 +168,8 @@ async fn start_hoprd_nodes(
             .arg(&args.identity_password)
             .env("HOPRD_USE_OPENTELEMETRY", "true")
             .env("HOPRD_OTEL_SIGNALS", "metrics")
-            .env("HOPRD_OTEL_PROTOCOL", "grpc")
-            .env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
+            .env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318")
+            .env("OTEL_SERVICE_NAME", format!("node-{id}"))
             .stdout(Stdio::from(log_file))
             .stderr(Stdio::from(log_err));
 

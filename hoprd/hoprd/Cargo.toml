@@ -92,7 +92,7 @@ opentelemetry-otlp = { workspace = true, default-features = false, features = [
   "trace",
   "metrics",
   "logs",
-  "reqwest-client",
+  "reqwest-blocking-client",
   "tls-roots",
   "http-proto",
   "grpc-tonic",

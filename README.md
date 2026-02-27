@@ -189,7 +189,6 @@ On top of the default configuration options generated for the command line, the 
 - `HOPRD_LOG_FORMAT` - override for the default stdout log formatter (follows tracing formatting options)
 - `HOPRD_USE_OPENTELEMETRY` - enable the OpenTelemetry output for this node
 - `HOPRD_OTEL_SIGNALS` - comma-separated OTLP signals to export when OpenTelemetry is enabled (`traces`, `logs`, `metrics`), defaults to `traces`
-- `HOPRD_OTEL_PROTOCOL` - OTLP transport protocol (`grpc` or `http`), defaults to `grpc`
 - `OTEL_SERVICE_NAME` - the name of this node for the OpenTelemetry service
 - `HOPR_INTERNAL_CHAIN_DISCOVERY_CHANNEL_CAPACITY` - the maximum capacity of the channel for chain generated discovery signals for the p2p transport
 - `HOPR_INTERNAL_DISCOVERY_UPDATES_CAPACITY` - the maximum capacity of the transport component handling chain discovery events
@@ -452,15 +451,15 @@ Once an instrumented tokio is built into hoprd, the application can be instrumen
 
 - `HOPRD_USE_OPENTELEMETRY` - `true` to enable the OpenTelemetry streaming, `false` to disable it
 - `HOPRD_OTEL_SIGNALS` - comma-separated signal list from `traces`, `logs`, `metrics` (default: `traces`)
-- `HOPRD_OTEL_PROTOCOL` - `grpc` or `http` (default: `grpc`)
 - `OTEL_SERVICE_NAME` - identifier used as `service.name` for this instance (for example `my_hoprd_instance`)
-- `OTEL_EXPORTER_OTLP_ENDPOINT` - base URL of an OTLP endpoint (for example `http://jaeger:4317/`)
+- `OTEL_EXPORTER_OTLP_ENDPOINT` - base URL of an OTLP endpoint. Transport is inferred from URL scheme (`grpc://...`, `http://...`, or `https://...`)
 
 Examples:
 
 - Traces only (backward-compatible default): `HOPRD_OTEL_SIGNALS=traces`
 - Metrics only: `HOPRD_OTEL_SIGNALS=metrics`
 - Full export: `HOPRD_OTEL_SIGNALS=traces,logs,metrics`
+- With metrics enabled, OTEL exports keep Prometheus family naming (`<metric>`, `<metric>_count`, `<metric>_sum`, `<metric>_bucket`) and labels (`le` for histogram buckets, `quantile` for summaries).
 
 ### Profiling Criterion benchmarks via `flamegraph`
 

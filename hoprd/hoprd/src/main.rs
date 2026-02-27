@@ -149,7 +149,7 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         })
         .unwrap_or_else(|error| {
-            eprintln!("hoprd exited with an error: {error}");
+            error!(%error, backtrace = ?error.backtrace(), "hoprd exited with an error");
             ExitCode::FAILURE
         })
 }
