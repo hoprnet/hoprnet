@@ -18,7 +18,7 @@ use {
 #[cfg(feature = "telemetry")]
 use {
     opentelemetry::{
-        Context, KeyValue,
+        KeyValue,
         logs::{AnyValue, LogRecord as _, Logger as _, LoggerProvider as _, Severity},
         metrics::MeterProvider as _,
         trace::TracerProvider,
@@ -143,7 +143,6 @@ where
     S: tracing::Subscriber,
 {
     fn on_event(&self, event: &tracing::Event<'_>, _ctx: tracing_subscriber::layer::Context<'_, S>) {
-        let _suppress = Context::enter_telemetry_suppressed_scope();
         let metadata = event.metadata();
         let mut visitor = TracingEventVisitor::default();
         event.record(&mut visitor);
@@ -733,12 +732,6 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
                 .map(|s| s.to_string())
                 .collect::<Vec<_>>()
                 .join(",");
-            info!(
-                otel_service_name = %config.service_name,
-                otel_signals = %enabled_signals,
-                otel_protocol = %config.transport.to_string(),
-                "OpenTelemetry enabled"
-            );
 
             match (trace_layer, logs_layer) {
                 (Some(trace_layer), Some(logs_layer)) => {
@@ -748,6 +741,13 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
                 (None, Some(logs_layer)) => tracing::subscriber::set_global_default(registry.with(logs_layer))?,
                 (None, None) => tracing::subscriber::set_global_default(registry)?,
             }
+
+            info!(
+                otel_service_name = %config.service_name,
+                otel_signals = %enabled_signals,
+                otel_protocol = %config.transport.to_string(),
+                "OpenTelemetry enabled"
+            );
         } else {
             tracing::subscriber::set_global_default(registry)?
         }
