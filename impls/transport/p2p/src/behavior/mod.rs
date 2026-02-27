@@ -18,7 +18,7 @@ pub(crate) mod discovery;
 pub struct HoprNetworkBehavior {
     discovery: discovery::Behaviour,
     pub(crate) streams: libp2p_stream::Behaviour,
-    pub(crate) relay_client: libp2p::relay::client::Behaviour,
+    relay_client: libp2p::relay::client::Behaviour,
     relay_server: libp2p::relay::Behaviour,
     dcutr: libp2p::dcutr::Behaviour,
     #[cfg(feature = "runtime-tokio")]

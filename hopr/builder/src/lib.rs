@@ -121,6 +121,9 @@ where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
 {
+    let should_reannounce_discovered_addresses = config.publish;
+    let announce_local_addresses = config.protocol.transport.announce_local_addresses;
+
     // Calculate the minimum capacity based on accounts (each account can generate 2 messages),
     // plus 100 as an additional buffer
     let minimum_capacity = chain_connector
@@ -162,6 +165,56 @@ where
     let graph_updater = graph.clone();
     let chain_reader = chain_connector.clone();
     let indexer_peer_update_tx = indexer_peer_update_tx.clone();
+    let (reannounce_addr_tx, mut reannounce_addr_rx) = futures::channel::mpsc::channel(128);
+
+    let reannounce_chain = chain_connector.clone();
+    let reannounce_packet_key = packet_key.clone();
+    let reannounce_process = async move {
+        let mut last_reannounced_address = None;
+        while let Some(address) = reannounce_addr_rx.next().await {
+            if !should_reannounce_discovered_addresses {
+                continue;
+            }
+
+            if !announce_local_addresses && !hopr_lib::is_public_address(&address) {
+                tracing::debug!(%address, "skipping re-announcement of non-public discovered address");
+                continue;
+            }
+
+            if last_reannounced_address.as_ref() == Some(&address) {
+                continue;
+            }
+
+            match reannounce_chain
+                .announce(std::slice::from_ref(&address), &reannounce_packet_key)
+                .await
+            {
+                Ok(awaiter) => match awaiter.await {
+                    Ok(receipt) => {
+                        tracing::info!(%address, %receipt, "re-announced discovered node address on chain");
+                        last_reannounced_address = Some(address);
+                    }
+                    Err(error) => {
+                        tracing::warn!(%address, %error, "re-announcement receipt failed");
+                    }
+                },
+                Err(hopr_chain_connector::api::AnnouncementError::AlreadyAnnounced) => {
+                    last_reannounced_address = Some(address.clone());
+                    tracing::debug!(%address, "discovered node address already announced on chain");
+                }
+                Err(hopr_chain_connector::api::AnnouncementError::ProcessingError(error)) => {
+                    tracing::warn!(%address, %error, "failed to submit address re-announcement");
+                }
+            }
+        }
+    }
+    .inspect(|_| {
+        tracing::warn!(
+            task = "Discovered-address re-announcement",
+            "long-running background task finished"
+        )
+    });
+    let _jh = tokio::spawn(reannounce_process);
 
     let proc =
         async move {
@@ -182,6 +235,7 @@ where
                     let graph_updater = graph_updater.clone();
                     let ticket_price = ticket_price.clone();
                     let win_probability = win_probability.clone();
+                    let mut reannounce_addr_tx = reannounce_addr_tx.clone();
 
                     async move {
                         match event {
@@ -260,6 +314,11 @@ where
                                     } else {
                                         tracing::error!(%peer_id, "failed to convert peer ID to public key for graph update");
                                     },
+                                NetworkEvent::OwnAddressDiscovered(address) => {
+                                    if let Err(error) = reannounce_addr_tx.send(address).await {
+                                        tracing::warn!(%error, "failed to enqueue discovered address for re-announcement");
+                                    }
+                                }
                             };
                         }
                     }

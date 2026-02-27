@@ -15,3 +15,5 @@ When built with `runtime-tokio`, the transport enables:
 The swarm is configured to include relay transport support so relayed connectivity is available as a fallback path when direct dialing is not possible.
 
 Own multiaddresses used for on-chain announcement are sourced from swarm-discovered addresses (`NewListenAddr` and confirmed external addresses), not directly from static config input.
+
+The swarm also emits `NetworkEvent::OwnAddressDiscovered` when a new own address is detected. The default builder (`hopr-builder`) consumes these events and triggers on-chain re-announcement for discovered addresses.

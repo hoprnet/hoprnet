@@ -70,8 +70,7 @@ impl InactiveNetwork {
 
         let swarm = swarm
             .with_dns()
-            .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?;
-        let swarm = swarm
+            .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
             .with_relay_client(libp2p::noise::Config::new, libp2p::yamux::Config::default)
             .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?;
 
@@ -182,7 +181,9 @@ impl HoprLibp2pNetworkBuilder {
     where
         T: Stream<Item = PeerDiscovery> + Send + Sync + 'static,
     {
-        let (tx, rx) = async_broadcast::broadcast(1000);
+        let (mut tx, rx) = async_broadcast::broadcast(1000);
+        tx.set_await_active(false);
+        tx.set_overflow(true);
         Self {
             subscribtions: (tx, rx.deactivate()),
             bootstrap: Box::pin(bootstrap),
@@ -230,6 +231,7 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
             .expect("swarm must be configurable");
 
         let mut swarm = swarm.swarm;
+        let network_events_tx = self.subscribtions.0;
         let store = hopr_transport_network::store::NetworkPeerStore::new(me, swarm.listeners().cloned().collect());
         let tracker: Arc<DashSet<libp2p::PeerId>> = Default::default();
 
@@ -389,6 +391,11 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
                         address,
                     } => {
                         store.add_own(address.clone());
+                        if let Err(error) = network_events_tx.try_broadcast(hopr_api::network::NetworkEvent::OwnAddressDiscovered(
+                            address.clone(),
+                        )) {
+                            trace!(%address, %error, "failed to broadcast own discovered address event");
+                        }
                         debug!(%listener_id, %address, transport="libp2p", "new listen address")
                     }
                     SwarmEvent::ExpiredListenAddr {
@@ -425,6 +432,11 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
                     }
                     SwarmEvent::ExternalAddrConfirmed { address } => {
                         store.add_own(address.clone());
+                        if let Err(error) = network_events_tx.try_broadcast(hopr_api::network::NetworkEvent::OwnAddressDiscovered(
+                            address.clone(),
+                        )) {
+                            trace!(%address, %error, "failed to broadcast own discovered address event");
+                        }
                         info!(%address, "Detected external address")
                     }
                     SwarmEvent::ExternalAddrExpired {
