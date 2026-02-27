@@ -1,6 +1,6 @@
 use hopr_api::graph::{
     CostFn, NetworkGraphTraverse, NetworkGraphView,
-    costs::{HoprForwardCostFn, HoprReturnCostFn},
+    costs::{ForwardPathCostFn, HoprForwardCostFn, HoprReturnCostFn},
     traits::EdgeObservableRead,
 };
 use hopr_crypto_types::types::OffchainPublicKey;
@@ -46,6 +46,54 @@ where
             }
         })
         .collect::<Vec<_>>()
+}
+
+/// Extended forward path search: find shorter paths using [`ForwardPathCostFn`]
+/// and append `dest` to each one.
+///
+/// This handles the case where the last edge (relay -> dest) has no graph edge
+/// (e.g. no payment channel) but the path planner can still assume the last hop
+/// is reachable. Paths already found by Phase 1 are excluded via `existing`.
+fn compute_extended_forward_paths<G>(
+    graph: &G,
+    src: &OffchainPublicKey,
+    dest: &OffchainPublicKey,
+    shorter_length: std::num::NonZeroUsize,
+    take: usize,
+    existing: &[PathToDestination],
+) -> Vec<PathToDestination>
+where
+    G: NetworkGraphTraverse<NodeId = OffchainPublicKey> + NetworkGraphView<NodeId = OffchainPublicKey>,
+    <G as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
+{
+    let raw = graph.simple_paths_from(src, shorter_length.get(), Some(take), ForwardPathCostFn::new());
+
+    raw.into_iter()
+        .filter_map(|(path, _, cost)| {
+            if cost <= 0.0 {
+                return None;
+            }
+
+            // Strip source and append dest.
+            let mut candidate: Vec<_> = path.into_iter().skip(1).collect();
+
+            // Ensure dest is not already in the path (would create a repeated node).
+            if candidate.contains(dest) {
+                return None;
+            }
+
+            candidate.push(*dest);
+
+            // Skip paths already found by Phase 1.
+            if existing.contains(&candidate) {
+                return None;
+            }
+
+            tracing::trace!(?candidate, ?cost, "extended forward path candidate");
+            Some(candidate)
+        })
+        .take(take)
+        .collect()
 }
 
 /// A lightweight graph-backed path selector.
@@ -117,11 +165,41 @@ where
         let length = std::num::NonZeroUsize::new(hops + 1)
             .expect("can never fail, it is physically at least 1 after the addition");
 
-        let paths = if src == self.me {
-            compute_paths(&self.graph, &src, &dest, length, self.max_paths, HoprForwardCostFn::new(length))
+        let mut paths = if src == self.me {
+            // Phase 1: search for full-length forward paths to dest.
+            let mut found = compute_paths(
+                &self.graph,
+                &src,
+                &dest,
+                length,
+                self.max_paths,
+                HoprForwardCostFn::new(length),
+            );
+
+            // Phase 2: if not enough paths, do an extended search with ForwardPathCostFn
+            // for (length - 1) edges and assume the last hop can be done by anybody.
+            if found.len() < self.max_paths
+                && let Some(shorter) = std::num::NonZeroUsize::new(length.get() - 1)
+            {
+                let remaining = self.max_paths - found.len();
+                let extended = compute_extended_forward_paths(&self.graph, &src, &dest, shorter, remaining, &found);
+                found.extend(extended);
+            }
+
+            found
         } else {
-            compute_paths(&self.graph, &src, &dest, length, self.max_paths, HoprReturnCostFn::new(length))
+            compute_paths(
+                &self.graph,
+                &src,
+                &dest,
+                length,
+                self.max_paths,
+                HoprReturnCostFn::new(length),
+            )
         };
+
+        // Deduplicate paths that may appear in both phases.
+        paths.dedup();
 
         if paths.is_empty() {
             Err(PathPlannerError::Path(PathError::PathNotFound(
@@ -174,11 +252,16 @@ mod tests {
         });
     }
 
-    /// Mark an edge as ready only as the last hop.
+    /// Mark an edge as ready only as the last hop (forward or return).
+    ///
+    /// Forward last edge requires capacity; return last edge requires connectivity + score.
+    /// This helper sets all of them so it works for either direction.
     fn mark_edge_last(graph: &ChannelGraph, src: &OffchainPublicKey, dst: &OffchainPublicKey) {
         graph.upsert_edge(src, dst, |obs| {
             obs.record(EdgeWeightType::Connected(true));
             obs.record(EdgeWeightType::Immediate(Ok(Duration::from_millis(50))));
+            obs.record(EdgeWeightType::Intermediate(Ok(Duration::from_millis(50))));
+            obs.record(EdgeWeightType::Capacity(Some(1000)));
         });
     }
 
@@ -410,6 +493,50 @@ mod tests {
             selector.select_path(dest, me, 2).is_err(),
             "reverse: no 2-hop path should exist for a direct edge"
         );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn forward_path_should_work_without_last_edge() -> anyhow::Result<()> {
+        // In the real network, the last edge (relay → dest) may not have a
+        // payment channel. The graph has me → relay but NO relay → dest edge.
+        // The virtual last hop fallback should still find the forward path.
+        let me = pubkey(&SECRET_0);
+        let relay = pubkey(&SECRET_1);
+        let dest = pubkey(&SECRET_2);
+        let graph = ChannelGraph::new(me);
+        graph.add_node(relay);
+        graph.add_node(dest);
+        // Forward: me → relay (fully observed). NO relay → dest edge.
+        graph.add_edge(&me, &relay).unwrap();
+        mark_edge_full(&graph, &me, &relay);
+        // Reverse: dest → relay → me (both edges exist for the return path).
+        graph.add_edge(&dest, &relay).unwrap();
+        graph.add_edge(&relay, &me).unwrap();
+        mark_edge_full(&graph, &dest, &relay);
+        mark_edge_last(&graph, &relay, &me);
+
+        let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS);
+
+        // Forward path should work via virtual last hop
+        let fwd = selector
+            .select_path(me, dest, 1)
+            .context("forward path with virtual last hop")?;
+        assert!(!fwd.is_empty(), "forward path should find at least one route");
+        for path in &fwd {
+            assert_eq!(path.len(), 2, "forward: [relay, dest]");
+            assert_eq!(path[0], relay);
+            assert_eq!(path[1], dest);
+        }
+
+        // Return path should work normally (both edges exist)
+        let rev = selector.select_path(dest, me, 1).context("return path")?;
+        assert!(!rev.is_empty(), "return path should find at least one route");
+        for path in &rev {
+            assert_eq!(path.len(), 2, "return: [relay, me]");
+            assert_eq!(path.last(), Some(&me));
+        }
+
         Ok(())
     }
 

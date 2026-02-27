@@ -176,9 +176,13 @@ mod tests {
     }
 
     // ── Forward last edge (path_index == length - 1) ────────────────────
+    //
+    // The forward last edge (relay -> dest) accepts EITHER:
+    //   1. Capacity (on-chain channel) — for edges between other nodes
+    //   2. Connectivity + score — for edges where me has direct data (e.g. relay -> me)
 
     #[test]
-    fn forward_last_edge_positive_when_connected_with_score() -> anyhow::Result<()> {
+    fn forward_last_edge_positive_when_capacity_and_score() -> anyhow::Result<()> {
         let cost_fn =
             HoprForwardCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
         let f = cost_fn.into_cost_fn();
@@ -187,84 +191,103 @@ mod tests {
         let cost = f(1.0, &obs, 2);
         assert!(
             cost > 0.0,
-            "last edge should have positive cost when connected with score, got {cost}"
+            "last edge should have positive cost with capacity and score, got {cost}"
         );
         Ok(())
     }
 
     #[test]
-    fn forward_last_edge_positive_when_connected_immediate_only() -> anyhow::Result<()> {
+    fn forward_last_edge_positive_with_capacity_only_no_probes() -> anyhow::Result<()> {
         let cost_fn =
             HoprForwardCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
         let f = cost_fn.into_cost_fn();
+
+        // Capacity creates intermediate_probe with default link data (score 0).
+        // The cost function passes through initial_cost as baseline trust.
+        let cost = f(1.0, &obs_capacity_only(), 2);
+        assert_eq!(
+            cost, 1.0,
+            "forward last edge with capacity-only should pass through initial_cost, got {cost}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn forward_last_edge_positive_without_connectivity() -> anyhow::Result<()> {
+        let cost_fn =
+            HoprForwardCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
+        let f = cost_fn.into_cost_fn();
+        // Has intermediate + capacity but no connectivity — still positive via capacity
+        let obs = obs_not_connected_with_intermediate();
+
+        let cost = f(1.0, &obs, 2);
+        assert!(
+            cost > 0.0,
+            "last edge should be positive with capacity even without connectivity, got {cost}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn forward_last_edge_positive_with_connectivity_no_capacity() -> anyhow::Result<()> {
+        let cost_fn =
+            HoprForwardCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
+        let f = cost_fn.into_cost_fn();
+        // Connected with immediate only — no capacity, but connectivity fallback accepts it
         let obs = obs_connected_only_immediate();
 
         let cost = f(1.0, &obs, 2);
         assert!(
             cost > 0.0,
-            "last edge should have positive cost with only immediate observation, got {cost}"
+            "last edge should be positive via connectivity fallback, got {cost}"
         );
         Ok(())
     }
 
     #[test]
-    fn forward_last_edge_scales_by_overall_score() -> anyhow::Result<()> {
+    fn forward_last_edge_scales_by_intermediate_score() -> anyhow::Result<()> {
         let cost_fn =
             HoprForwardCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
         let f = cost_fn.into_cost_fn();
         let obs = obs_connected_with_capacity();
 
         let cost = f(2.0, &obs, 2);
+        // cost = initial_cost * intermediate_score; intermediate_score is in (0, 1]
         assert!(
             cost > 0.0 && cost <= 2.0,
-            "cost should be scaled by overall score, got {cost}"
+            "cost should be scaled by intermediate score, got {cost}"
         );
         Ok(())
     }
 
     #[test]
-    fn forward_last_edge_negative_when_not_connected() -> anyhow::Result<()> {
+    fn forward_last_edge_positive_when_intermediate_but_no_capacity() -> anyhow::Result<()> {
         let cost_fn =
             HoprForwardCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
         let f = cost_fn.into_cost_fn();
-        let obs = obs_not_connected_with_intermediate();
-
-        let cost = f(1.0, &obs, 2);
-        assert!(
-            cost < 0.0,
-            "last edge should be negative when not connected, got {cost}"
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn forward_last_edge_negative_when_connected_but_zero_score() -> anyhow::Result<()> {
-        let cost_fn =
-            HoprForwardCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
-        let f = cost_fn.into_cost_fn();
-        // Connected but only failed probes → score == 0
+        // Has intermediate data but no capacity — no channel exists for the last edge,
+        // but the forward cost function passes through initial_cost as baseline trust.
         let mut obs = Observations::default();
-        obs.record(EdgeWeightType::Connected(true));
-        obs.record(EdgeWeightType::Immediate(Err(())));
+        obs.record(EdgeWeightType::Intermediate(Ok(std::time::Duration::from_millis(50))));
 
         let cost = f(1.0, &obs, 2);
-        assert!(
-            cost < 0.0,
-            "last edge should be negative when score is zero, got {cost}"
+        assert_eq!(
+            cost, 1.0,
+            "last edge should pass through initial_cost without capacity, got {cost}"
         );
         Ok(())
     }
 
     #[test]
-    fn forward_last_edge_negative_when_empty() -> anyhow::Result<()> {
+    fn forward_last_edge_positive_when_empty() -> anyhow::Result<()> {
         let cost_fn =
             HoprForwardCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
         let f = cost_fn.into_cost_fn();
 
         let cost = f(1.0, &obs_empty(), 2);
-        assert!(
-            cost < 0.0,
-            "last edge should be negative with no observations, got {cost}"
+        assert_eq!(
+            cost, 1.0,
+            "last edge should pass through initial_cost with no observations, got {cost}"
         );
         Ok(())
     }
@@ -389,9 +412,12 @@ mod tests {
             "index 1 should be last-edge logic (positive when connected with score)"
         );
 
-        // index 1 with empty obs — negative (not connected)
+        // index 1 with empty obs — forward last edge passes through initial_cost
         let cost_empty = f(1.0, &obs_empty(), 1);
-        assert!(cost_empty < 0.0, "index 1 should be negative with empty obs");
+        assert_eq!(
+            cost_empty, 1.0,
+            "index 1 (last edge) should pass through initial_cost with empty obs"
+        );
         Ok(())
     }
 
@@ -539,7 +565,33 @@ mod tests {
     // ── Return last edge ────────────────────────────────────────────────
 
     #[test]
-    fn return_last_edge_same_as_forward() -> anyhow::Result<()> {
+    fn return_last_edge_requires_connectivity() -> anyhow::Result<()> {
+        let length = std::num::NonZeroUsize::new(2).context("should be non-zero")?;
+
+        let ret = HoprReturnCostFn::<_, Observations>::new(length);
+        let ret_fn = ret.into_cost_fn();
+
+        // Return last edge (relay -> me) requires immediate_qos + is_connected
+        let obs = obs_connected_with_capacity();
+        let cost = ret_fn(1.0, &obs, 1);
+        assert!(
+            cost > 0.0,
+            "return last edge should be positive when connected, got {cost}"
+        );
+
+        // Without connectivity → rejected
+        let obs_no_conn = obs_not_connected_with_intermediate();
+        let cost = ret_fn(1.0, &obs_no_conn, 1);
+        assert!(
+            cost < 0.0,
+            "return last edge should be negative without connectivity, got {cost}"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn forward_last_edge_differs_from_return_last_edge() -> anyhow::Result<()> {
         let length = std::num::NonZeroUsize::new(2).context("should be non-zero")?;
 
         let fwd = HoprForwardCostFn::<_, Observations>::new(length);
@@ -547,14 +599,15 @@ mod tests {
         let fwd_fn = fwd.into_cost_fn();
         let ret_fn = ret.into_cost_fn();
 
-        let obs = obs_connected_with_capacity();
-
+        // Edge with capacity but no connectivity: forward accepts, return rejects
+        let obs = obs_not_connected_with_intermediate();
         let fwd_cost = fwd_fn(1.0, &obs, 1);
         let ret_cost = ret_fn(1.0, &obs, 1);
-        assert_eq!(
-            fwd_cost, ret_cost,
-            "return last edge should behave identically to forward last edge"
+        assert!(
+            fwd_cost > 0.0,
+            "forward last edge accepts capacity-only, got {fwd_cost}"
         );
+        assert!(ret_cost < 0.0, "return last edge requires connectivity, got {ret_cost}");
 
         Ok(())
     }
@@ -607,8 +660,9 @@ mod tests {
         let f = cost_fn.into_cost_fn();
 
         // Forward path: me -> relay -> dest
+        // me->relay has full data; relay->dest only has capacity (me can't see their connectivity)
         let me_to_relay = obs_connected_with_capacity();
-        let relay_to_dest = obs_connected_with_capacity();
+        let relay_to_dest = obs_capacity_only();
 
         let cost_after_first = f(1.0, &me_to_relay, 0);
         assert!(
@@ -619,7 +673,7 @@ mod tests {
         let cost_after_last = f(cost_after_first, &relay_to_dest, 1);
         assert!(
             cost_after_last > 0.0,
-            "forward last edge (relay->dest) should be positive, got {cost_after_last}"
+            "forward last edge (relay->dest) should be positive with capacity-only, got {cost_after_last}"
         );
 
         Ok(())
@@ -684,21 +738,23 @@ mod tests {
         let length = std::num::NonZeroUsize::new(2).context("should be non-zero")?;
 
         // Forward: me -> relay -> dest (using HoprForwardCostFn)
+        // relay->dest only has capacity — me can't observe their connectivity
         let fwd = HoprForwardCostFn::<_, Observations>::new(length);
         let fwd_fn = fwd.into_cost_fn();
 
         let me_to_relay = obs_connected_with_capacity();
-        let relay_to_dest = obs_connected_with_capacity();
+        let relay_to_dest = obs_capacity_only();
 
         let fwd_cost = fwd_fn(1.0, &me_to_relay, 0);
         let fwd_cost = fwd_fn(fwd_cost, &relay_to_dest, 1);
         assert!(fwd_cost > 0.0, "forward path should have positive cost, got {fwd_cost}");
 
         // Return: dest -> relay -> me (using HoprReturnCostFn)
+        // dest->relay only has capacity — me can't observe their connectivity
         let ret = HoprReturnCostFn::<_, Observations>::new(length);
         let ret_fn = ret.into_cost_fn();
 
-        let dest_to_relay = obs_not_connected_with_intermediate();
+        let dest_to_relay = obs_capacity_only();
         let relay_to_me = obs_connected_with_capacity();
 
         let ret_cost = ret_fn(1.0, &dest_to_relay, 0);

@@ -7,7 +7,7 @@ use hopr_api::{
 };
 use petgraph::graph::NodeIndex;
 
-use crate::{ChannelGraph, algorithm::all_simple_paths_multi, costs::LoopbackPathCostFn, graph::InnerGraph};
+use crate::{ChannelGraph, algorithm::all_simple_paths_multi, costs::ForwardPathCostFn, graph::InnerGraph};
 
 /// Core path-finding routine that runs `all_simple_paths_multi` on the
 /// inner petgraph.
@@ -105,6 +105,36 @@ impl hopr_api::graph::NetworkGraphTraverse for ChannelGraph {
         )
     }
 
+    fn simple_paths_from<C: CostFn<Weight = Self::Observed>>(
+        &self,
+        source: &Self::NodeId,
+        length: usize,
+        take_count: Option<usize>,
+        cost_fn: C,
+    ) -> Vec<(Vec<Self::NodeId>, PathId, C::Cost)> {
+        if length == 0 {
+            return Default::default();
+        }
+
+        let inner = self.inner.read();
+        let Some(start) = inner.indices.get_by_left(source) else {
+            return Default::default();
+        };
+
+        let destinations: HashSet<NodeIndex> = inner.graph.node_indices().filter(|idx| idx != start).collect();
+
+        find_paths(
+            &inner,
+            *start,
+            &destinations,
+            length,
+            take_count,
+            cost_fn.initial_cost(),
+            cost_fn.min_cost(),
+            cost_fn.into_cost_fn(),
+        )
+    }
+
     fn simple_loopback_to_self(&self, length: usize, take_count: Option<usize>) -> Vec<(Vec<Self::NodeId>, PathId)> {
         if length > 1 {
             let inner = self.inner.read();
@@ -123,7 +153,7 @@ impl hopr_api::graph::NetworkGraphTraverse for ChannelGraph {
                     })
                     .collect::<HashSet<_>>();
 
-                let cost_fn = LoopbackPathCostFn::new();
+                let cost_fn = ForwardPathCostFn::new();
 
                 return find_paths(
                     &inner,
@@ -709,7 +739,7 @@ mod tests {
     // ── simple_loopback_to_self tests ──────────────────────────────────
 
     /// Marks an edge as connected AND with intermediate capacity so that it
-    /// satisfies the `LoopbackPathCostFn` at edge index 0 (connected + capacity)
+    /// satisfies the `ForwardPathCostFn` at edge index 0 (connected + capacity)
     /// and at any other index (capacity).
     fn mark_edge_loopback_ready(graph: &ChannelGraph, src: &OffchainPublicKey, dest: &OffchainPublicKey) {
         graph.upsert_edge(src, dest, |obs| {
@@ -721,7 +751,7 @@ mod tests {
     }
 
     /// Marks an edge with intermediate capacity and probe data (no connected flag).
-    /// Satisfies `LoopbackPathCostFn` at index > 0 but NOT at index 0.
+    /// Satisfies `ForwardPathCostFn` at index > 0 but NOT at index 0.
     fn mark_edge_with_capacity(graph: &ChannelGraph, src: &OffchainPublicKey, dest: &OffchainPublicKey) {
         graph.upsert_edge(src, dest, |obs| {
             obs.record(EdgeWeightType::Intermediate(Ok(std::time::Duration::from_millis(50))));
@@ -809,7 +839,7 @@ mod tests {
 
         assert!(
             graph.simple_loopback_to_self(2, None).is_empty(),
-            "edge me→a lacks intermediate capacity, so LoopbackPathCostFn prunes it"
+            "edge me→a lacks intermediate capacity, so ForwardPathCostFn prunes it"
         );
 
         Ok(())
@@ -837,7 +867,7 @@ mod tests {
 
         assert!(
             graph.simple_loopback_to_self(2, None).is_empty(),
-            "edge a→b lacks capacity, so LoopbackPathCostFn prunes the path"
+            "edge a→b lacks capacity, so ForwardPathCostFn prunes the path"
         );
 
         Ok(())

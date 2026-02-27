@@ -507,6 +507,8 @@ mod tests {
         graph.upsert_edge(src, dst, |obs| {
             obs.record(EdgeWeightType::Connected(true));
             obs.record(EdgeWeightType::Immediate(Ok(std::time::Duration::from_millis(50))));
+            obs.record(EdgeWeightType::Intermediate(Ok(std::time::Duration::from_millis(50))));
+            obs.record(EdgeWeightType::Capacity(Some(1000)));
         });
     }
 

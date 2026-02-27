@@ -244,6 +244,20 @@ pub trait NetworkGraphTraverse {
         cost_fn: C,
     ) -> Vec<(Vec<Self::NodeId>, PathId, C::Cost)>;
 
+    /// Returns a list of routes from the source to **any** reachable node with the
+    /// specified edge length.
+    ///
+    /// Unlike [`simple_paths`](Self::simple_paths), this method does not target a
+    /// specific destination. All graph nodes (except the source) are eligible
+    /// destinations. The caller can further filter the results.
+    fn simple_paths_from<C: CostFn<Weight = Self::Observed>>(
+        &self,
+        source: &Self::NodeId,
+        length: usize,
+        take_count: Option<usize>,
+        cost_fn: C,
+    ) -> Vec<(Vec<Self::NodeId>, PathId, C::Cost)>;
+
     /// Return a list of nodes with a full loopback from myself to myself.
     ///
     /// The length argument specifies the number of edges in the graph, over which the path should
