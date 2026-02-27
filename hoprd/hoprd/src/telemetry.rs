@@ -196,26 +196,26 @@ struct TracingEventVisitor {
 
 #[cfg(feature = "telemetry")]
 trait UnixTimestampCandidate {
-    fn as_unix_timestamp(self) -> Option<u64>;
+    fn as_unix_timestamp(&self) -> Option<u64>;
 }
 
 #[cfg(feature = "telemetry")]
 impl UnixTimestampCandidate for u64 {
-    fn as_unix_timestamp(self) -> Option<u64> {
-        Some(self)
+    fn as_unix_timestamp(&self) -> Option<u64> {
+        Some(*self)
     }
 }
 
 #[cfg(feature = "telemetry")]
 impl UnixTimestampCandidate for i64 {
-    fn as_unix_timestamp(self) -> Option<u64> {
-        u64::try_from(self).ok()
+    fn as_unix_timestamp(&self) -> Option<u64> {
+        u64::try_from(*self).ok()
     }
 }
 
 #[cfg(feature = "telemetry")]
 impl UnixTimestampCandidate for &str {
-    fn as_unix_timestamp(self) -> Option<u64> {
+    fn as_unix_timestamp(&self) -> Option<u64> {
         self.parse::<u64>().ok()
     }
 }
@@ -284,7 +284,7 @@ fn unix_timestamp_to_system_time(value: u64) -> Option<std::time::SystemTime> {
     const MS_PER_SEC: u64 = 1_000;
 
     let (units_per_second, nanos_multiplier) = [
-        (NS_PER_SEC, NS_PER_SEC / NS_PER_SEC),
+        (NS_PER_SEC, 1),
         (US_PER_SEC, NS_PER_SEC / US_PER_SEC),
         (MS_PER_SEC, NS_PER_SEC / MS_PER_SEC),
     ]
