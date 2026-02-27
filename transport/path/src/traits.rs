@@ -7,12 +7,23 @@ use crate::errors::Result;
 /// Implementors are responsible for determining how paths are found.
 /// The caller (e.g. [`crate::planner::PathPlanner`]) is responsible for caching,
 /// path selection strategy, and validation.
+///
+/// # Cycle-free invariant
+///
+/// Implementations **must** return only cycle-free (simple) paths — no node may
+/// appear more than once in any returned path.  Cycles destroy path entropy and
+/// worsen anonymity.  The built-in [`crate::selector::HoprGraphPathSelector`]
+/// guarantees this by using the `simple_paths` graph algorithm, which by
+/// definition never revisits a node.  Alternative implementations must uphold
+/// the same invariant.
 pub trait PathSelector: Send + Sync {
     /// Return **all** candidate paths from `src` to `dest` using `hops` relays.
     ///
     /// Each inner `Vec<OffchainPublicKey>` has length `hops + 1` and contains
     /// the intermediate relay nodes **and** `dest` (in that order); `src` is
     /// excluded from every path.
+    ///
+    /// Every returned path must be cycle-free (see trait-level docs).
     ///
     /// Returns `Err` when no paths can be found.
     fn select_path(
@@ -33,7 +44,7 @@ pub trait PathSelector: Send + Sync {
 ///
 /// Only meaningful when the `runtime-tokio` feature is enabled.
 #[cfg(feature = "runtime-tokio")]
-pub trait BackgroundCacheRefreshable: Send + Sync {
+pub trait BackgroundPathCacheRefreshable: Send + Sync {
     /// Returns a future that runs the periodic cache-refresh loop.
     ///
     /// The future never completes under normal operation.

@@ -13,6 +13,8 @@ use hopr_lib::{
 use rand::seq::SliceRandom;
 use rstest::*;
 use serial_test::serial;
+#[cfg(feature = "session-client")]
+use tokio::time::sleep;
 
 const FUNDING_AMOUNT: &str = "10 wxHOPR";
 
@@ -65,6 +67,12 @@ async fn test_create_n_hop_session(cluster: &ClusterGuard, #[case] hops: usize) 
     } else {
         Vec::new()
     };
+
+    // wait for the probing to actually kick in and register opened channels in the graph,
+    // otherwise the planner might not find any paths and fail the test
+    if !all_channels.is_empty() {
+        sleep(std::time::Duration::from_secs(5)).await;
+    }
 
     let (routing, capabilities) = if hops == 0 {
         (RoutingOptions::Hops(0_u32.try_into()?), SessionCapabilities::empty())

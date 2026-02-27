@@ -15,7 +15,7 @@ use hopr_protocol_hopr::{FoundSurb, SurbStore};
 use tracing::trace;
 
 #[cfg(feature = "runtime-tokio")]
-use crate::traits::BackgroundCacheRefreshable;
+use crate::traits::BackgroundPathCacheRefreshable;
 use crate::{
     errors::{PathPlannerError, Result},
     traits::PathSelector,
@@ -159,8 +159,8 @@ where
 
                 let cache_key: PlannerCacheKey = (source, destination, RoutingOptions::Hops(hops));
 
+                let resolver = self.resolver.clone();
                 let selector = self.selector.clone();
-                let resolver = &self.resolver.clone();
 
                 let paths = self
                     .cache
@@ -168,7 +168,7 @@ where
                         trace!(hops = hops_usize, "path cache miss, querying selector");
                         let candidates = selector.select_path(src_key, dest_key, hops_usize)?;
 
-                        let chain_resolver = ChainPathResolver::from(resolver);
+                        let chain_resolver = ChainPathResolver::from(&*resolver);
                         let mut valid_paths: Vec<ValidatedPath> = Vec::new();
                         for candidate in candidates {
                             let node_ids: Vec<NodeId> = candidate.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
@@ -277,7 +277,7 @@ where
 }
 
 #[cfg(feature = "runtime-tokio")]
-impl<Surb, R, S> BackgroundCacheRefreshable for PathPlanner<Surb, R, S>
+impl<Surb, R, S> BackgroundPathCacheRefreshable for PathPlanner<Surb, R, S>
 where
     Surb: SurbStore + Send + Sync + 'static,
     R: ChainKeyOperations + ChainReadChannelOperations + Send + Sync + 'static,
