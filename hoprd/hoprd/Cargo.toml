@@ -36,6 +36,7 @@ telemetry = [
   "dep:opentelemetry",
   "dep:opentelemetry-otlp",
   "dep:opentelemetry_sdk",
+  "dep:flagset",
   "dep:tracing-opentelemetry",
 ]
 transport-quic = [
@@ -70,6 +71,7 @@ async-trait = { workspace = true }
 clap = { workspace = true }
 console-subscriber = { workspace = true, optional = true }
 futures = { workspace = true }
+flagset = { workspace = true, optional = true }
 home = "0.5.12"
 humansize = { workspace = true, optional = true, features = ["no_alloc"] }
 humantime-serde = { workspace = true }

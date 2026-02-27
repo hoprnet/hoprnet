@@ -1,6 +1,5 @@
 use std::{str::FromStr, string::ToString, time::Duration};
 
-use tracing::{info, warn};
 use tracing_subscriber::prelude::*;
 #[cfg(all(feature = "telemetry", feature = "prometheus"))]
 use {
@@ -33,16 +32,19 @@ use {
 };
 
 #[cfg(feature = "telemetry")]
-#[derive(Clone, Copy, Debug, Eq, PartialEq, strum::EnumString, strum::Display)]
-enum OtlpSignal {
-    #[strum(serialize = "traces")]
-    Traces,
+flagset::flags! {
+    #[repr(u8)]
+    #[derive(PartialOrd, Ord, strum::EnumString, strum::Display)]
+    enum OtlpSignal: u8 {
+        #[strum(serialize = "traces")]
+        Traces = 0b0000_0001,
 
-    #[strum(serialize = "logs")]
-    Logs,
+        #[strum(serialize = "logs")]
+        Logs = 0b0000_0010,
 
-    #[strum(serialize = "metrics")]
-    Metrics,
+        #[strum(serialize = "metrics")]
+        Metrics = 0b0000_0100,
+    }
 }
 
 #[cfg(feature = "telemetry")]
@@ -72,7 +74,7 @@ struct OtlpConfig {
     enabled: bool,
     service_name: String,
     transport: OtlpTransport,
-    signals: Vec<OtlpSignal>,
+    signals: flagset::FlagSet<OtlpSignal>,
 }
 
 #[cfg(feature = "telemetry")]
@@ -87,7 +89,7 @@ impl OtlpConfig {
         );
         let service_name = std::env::var("OTEL_SERVICE_NAME").unwrap_or_else(|_| env!("CARGO_PKG_NAME").into());
         let transport = OtlpTransport::from_env();
-        let mut signals = Vec::new();
+        let mut signals = flagset::FlagSet::<OtlpSignal>::default();
 
         if let Ok(raw_signals) = std::env::var("HOPRD_OTEL_SIGNALS") {
             for signal in raw_signals.split(',') {
@@ -96,19 +98,18 @@ impl OtlpConfig {
                     continue;
                 }
                 match OtlpSignal::from_str(signal) {
-                    Ok(parsed) if !signals.contains(&parsed) => signals.push(parsed),
+                    Ok(parsed) => signals |= parsed,
                     Err(_) => {
-                        warn!(otel_signal = %signal, "Invalid OpenTelemetry signal specified in HOPRD_OTEL_SIGNALS environment variable");
+                        tracing::warn!(otel_signal = %signal, "Invalid OpenTelemetry signal specified in HOPRD_OTEL_SIGNALS environment variable");
                     }
-                    _ => {}
                 }
             }
         } else {
-            signals.push(OtlpSignal::Traces);
+            signals |= OtlpSignal::Traces;
         }
 
         if signals.is_empty() {
-            signals.push(OtlpSignal::Traces);
+            signals |= OtlpSignal::Traces;
         }
 
         Self {
@@ -120,7 +121,7 @@ impl OtlpConfig {
     }
 
     fn has_signal(&self, signal: OtlpSignal) -> bool {
-        self.signals.contains(&signal)
+        self.signals.contains(signal)
     }
 }
 
@@ -195,32 +196,6 @@ struct TracingEventVisitor {
 }
 
 #[cfg(feature = "telemetry")]
-trait UnixTimestampCandidate {
-    fn as_unix_timestamp(&self) -> Option<u64>;
-}
-
-#[cfg(feature = "telemetry")]
-impl UnixTimestampCandidate for u64 {
-    fn as_unix_timestamp(&self) -> Option<u64> {
-        Some(*self)
-    }
-}
-
-#[cfg(feature = "telemetry")]
-impl UnixTimestampCandidate for i64 {
-    fn as_unix_timestamp(&self) -> Option<u64> {
-        u64::try_from(*self).ok()
-    }
-}
-
-#[cfg(feature = "telemetry")]
-impl UnixTimestampCandidate for &str {
-    fn as_unix_timestamp(&self) -> Option<u64> {
-        self.parse::<u64>().ok()
-    }
-}
-
-#[cfg(feature = "telemetry")]
 impl TracingEventVisitor {
     fn record_body_or_attribute<V>(&mut self, field: &Field, value: V)
     where
@@ -233,12 +208,9 @@ impl TracingEventVisitor {
         }
     }
 
-    fn maybe_record_unix_timestamp<T>(&mut self, field: &Field, value: T)
-    where
-        T: UnixTimestampCandidate,
-    {
+    fn maybe_record_unix_timestamp_millis(&mut self, field: &Field, value: u64) {
         if field.name() == "timestamp" && self.timestamp.is_none() {
-            self.timestamp = value.as_unix_timestamp().and_then(unix_timestamp_to_system_time);
+            self.timestamp = std::time::UNIX_EPOCH.checked_add(std::time::Duration::from_millis(value));
         }
     }
 }
@@ -246,12 +218,14 @@ impl TracingEventVisitor {
 #[cfg(feature = "telemetry")]
 impl Visit for TracingEventVisitor {
     fn record_i64(&mut self, field: &Field, value: i64) {
-        self.maybe_record_unix_timestamp(field, value);
+        if let Ok(value) = u64::try_from(value) {
+            self.maybe_record_unix_timestamp_millis(field, value);
+        }
         self.record_body_or_attribute(field, value);
     }
 
     fn record_u64(&mut self, field: &Field, value: u64) {
-        self.maybe_record_unix_timestamp(field, value);
+        self.maybe_record_unix_timestamp_millis(field, value);
         if value <= i64::MAX as u64 {
             self.record_body_or_attribute(field, value as i64);
         } else {
@@ -264,7 +238,6 @@ impl Visit for TracingEventVisitor {
     }
 
     fn record_str(&mut self, field: &Field, value: &str) {
-        self.maybe_record_unix_timestamp(field, value);
         self.record_body_or_attribute(field, value.to_string());
     }
 
@@ -275,27 +248,6 @@ impl Visit for TracingEventVisitor {
     fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
         self.record_body_or_attribute(field, format!("{value:?}"));
     }
-}
-
-#[cfg(feature = "telemetry")]
-fn unix_timestamp_to_system_time(value: u64) -> Option<std::time::SystemTime> {
-    const NS_PER_SEC: u64 = 1_000_000_000;
-    const US_PER_SEC: u64 = 1_000_000;
-    const MS_PER_SEC: u64 = 1_000;
-
-    let (units_per_second, nanos_multiplier) = [
-        (NS_PER_SEC, 1),
-        (US_PER_SEC, NS_PER_SEC / US_PER_SEC),
-        (MS_PER_SEC, NS_PER_SEC / MS_PER_SEC),
-    ]
-    .iter()
-    .find(|&&(units, _)| units == 1 || value >= units * NS_PER_SEC)
-    .copied()
-    .unwrap_or((1, 0));
-
-    let secs = value / units_per_second;
-    let nanos = ((value % units_per_second) * nanos_multiplier) as u32;
-    std::time::UNIX_EPOCH.checked_add(std::time::Duration::new(secs, nanos))
 }
 
 #[cfg(all(feature = "telemetry", feature = "prometheus"))]
@@ -354,7 +306,7 @@ fn build_prometheus_metric_bridge(meter_provider: &SdkMeterProvider) -> OtelProm
         }) {
         Ok(thread) => Some(thread),
         Err(error) => {
-            warn!(error = %error, "Failed to spawn Prometheus OTEL bridge refresh thread");
+            tracing::warn!(error = %error, "Failed to spawn Prometheus OTEL bridge refresh thread");
             None
         }
     };
@@ -721,15 +673,14 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
                 }
                 #[cfg(not(feature = "prometheus"))]
                 {
-                    warn!("OpenTelemetry metrics requested but the `prometheus` feature is disabled");
+                    tracing::warn!("OpenTelemetry metrics requested but the `prometheus` feature is disabled");
                 }
             }
 
-            let enabled_signals = config
-                .signals
-                .iter()
-                .copied()
-                .map(|s| s.to_string())
+            let enabled_signals = [OtlpSignal::Traces, OtlpSignal::Logs, OtlpSignal::Metrics]
+                .into_iter()
+                .filter(|signal| config.signals.contains(*signal))
+                .map(|signal| signal.to_string())
                 .collect::<Vec<_>>()
                 .join(",");
 
@@ -742,7 +693,7 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
                 (None, None) => tracing::subscriber::set_global_default(registry)?,
             }
 
-            info!(
+            tracing::info!(
                 otel_service_name = %config.service_name,
                 otel_signals = %enabled_signals,
                 otel_protocol = %config.transport.to_string(),
@@ -757,47 +708,4 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
     tracing::subscriber::set_global_default(registry)?;
 
     Ok(telemetry_handles)
-}
-
-#[cfg(all(test, feature = "telemetry"))]
-mod telemetry_timestamp_tests {
-    use std::time::{Duration, UNIX_EPOCH};
-
-    use super::unix_timestamp_to_system_time;
-
-    #[test]
-    fn parses_seconds_timestamp() {
-        let value = 1_700_000_000_u64;
-        assert_eq!(
-            unix_timestamp_to_system_time(value),
-            Some(UNIX_EPOCH + Duration::new(1_700_000_000, 0))
-        );
-    }
-
-    #[test]
-    fn parses_milliseconds_timestamp() {
-        let value = 1_700_000_000_123_u64;
-        assert_eq!(
-            unix_timestamp_to_system_time(value),
-            Some(UNIX_EPOCH + Duration::new(1_700_000_000, 123_000_000))
-        );
-    }
-
-    #[test]
-    fn parses_microseconds_timestamp() {
-        let value = 1_700_000_000_123_456_u64;
-        assert_eq!(
-            unix_timestamp_to_system_time(value),
-            Some(UNIX_EPOCH + Duration::new(1_700_000_000, 123_456_000))
-        );
-    }
-
-    #[test]
-    fn parses_nanoseconds_timestamp() {
-        let value = 1_700_000_000_123_456_789_u64;
-        assert_eq!(
-            unix_timestamp_to_system_time(value),
-            Some(UNIX_EPOCH + Duration::new(1_700_000_000, 123_456_789))
-        );
-    }
 }

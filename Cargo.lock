@@ -5339,6 +5339,7 @@ dependencies = [
  "async-trait",
  "clap",
  "console-subscriber",
+ "flagset",
  "futures",
  "home",
  "hopr-chain-connector",
