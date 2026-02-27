@@ -89,7 +89,7 @@ impl OtlpConfig {
         );
         let service_name = std::env::var("OTEL_SERVICE_NAME").unwrap_or_else(|_| env!("CARGO_PKG_NAME").into());
         let transport = OtlpTransport::from_env();
-        let mut signals = flagset::FlagSet::<OtlpSignal>::default();
+        let mut signals = flagset::FlagSet::empty();
 
         if let Ok(raw_signals) = std::env::var("HOPRD_OTEL_SIGNALS") {
             for signal in raw_signals.split(',') {
@@ -607,8 +607,14 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
                         .with_timeout(Duration::from_secs(5))
                         .build()?,
                 };
-                let tracer_provider = opentelemetry_sdk::trace::SdkTracerProvider::builder()
-                    .with_batch_exporter(exporter)
+                let batch_processor =
+                    opentelemetry_sdk::trace::span_processor_with_async_runtime::BatchSpanProcessor::builder(
+                        exporter,
+                        opentelemetry_sdk::runtime::Tokio,
+                    )
+                    .build();
+                let tracer_provider = SdkTracerProvider::builder()
+                    .with_span_processor(batch_processor)
                     .with_sampler(Sampler::AlwaysOn)
                     .with_id_generator(RandomIdGenerator::default())
                     .with_max_events_per_span(64)
@@ -636,8 +642,14 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
                         .build()?,
                 };
 
-                let logger_provider = opentelemetry_sdk::logs::SdkLoggerProvider::builder()
-                    .with_batch_exporter(exporter)
+                let batch_processor =
+                    opentelemetry_sdk::logs::log_processor_with_async_runtime::BatchLogProcessor::builder(
+                        exporter,
+                        opentelemetry_sdk::runtime::Tokio,
+                    )
+                    .build();
+                let logger_provider = SdkLoggerProvider::builder()
+                    .with_log_processor(batch_processor)
                     .with_resource(resource.clone())
                     .build();
                 let logger = logger_provider.logger(env!("CARGO_PKG_NAME"));
@@ -663,8 +675,14 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
                             .build()?,
                     };
 
+                    let reader =
+                        opentelemetry_sdk::metrics::periodic_reader_with_async_runtime::PeriodicReader::builder(
+                            exporter,
+                            opentelemetry_sdk::runtime::Tokio,
+                        )
+                        .build();
                     let meter_provider = SdkMeterProvider::builder()
-                        .with_periodic_exporter(exporter)
+                        .with_reader(reader)
                         .with_resource(resource.clone())
                         .build();
                     opentelemetry::global::set_meter_provider(meter_provider.clone());

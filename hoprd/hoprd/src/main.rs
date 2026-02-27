@@ -32,7 +32,6 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 #[cfg(all(target_os = "linux", feature = "allocator-jemalloc-stats"))]
 mod jemalloc_stats;
 
-#[cfg(feature = "telemetry")]
 mod telemetry;
 
 const DEFAULT_BLOKLI_URL: &str = "https://blokli.dufour.hoprnet.link";

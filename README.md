@@ -453,6 +453,7 @@ Once an instrumented tokio is built into hoprd, the application can be instrumen
 - `HOPRD_OTEL_SIGNALS` - comma-separated signal list from `traces`, `logs`, `metrics` (default: `traces`)
 - `OTEL_SERVICE_NAME` - identifier used as `service.name` for this instance (for example `my_hoprd_instance`)
 - `OTEL_EXPORTER_OTLP_ENDPOINT` - base URL of an OTLP endpoint. Transport is inferred from URL scheme (`grpc://...`, `http://...`, or `https://...`)
+- For OTLP HTTP endpoints, hoprd exports through the async reqwest client on the Tokio runtime.
 
 Examples:
 
