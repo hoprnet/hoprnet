@@ -4,15 +4,14 @@ use futures::{
     StreamExt,
     channel::mpsc::{Sender, channel},
 };
-use hopr_api::ct::types::TrafficGenerationError;
+use hopr_api::{OffchainPublicKey, graph::NetworkGraphError};
 use hopr_async_runtime::prelude::timeout_fut;
-use libp2p_identity::PeerId;
 use tracing::{debug, warn};
 
 use crate::errors::{ProbeError, Result};
 
 /// Heartbeat send ping TX type
-pub type HeartbeatSendPingTx = Sender<(PeerId, PingQueryReplier)>;
+pub type HeartbeatSendPingTx = Sender<(OffchainPublicKey, PingQueryReplier)>;
 
 /// Configuration for the [`Ping`] mechanism
 #[derive(Debug, Clone, PartialEq, Eq, smart_default::SmartDefault)]
@@ -24,7 +23,7 @@ pub struct PingConfig {
 
 /// Ping query result type holding data about the ping duration and the string
 /// containg an optional version information of the pinged peer, if provided.
-pub type PingQueryResult = Result<std::time::Duration>;
+pub type PingQueryResult = std::result::Result<std::time::Duration, ()>;
 
 /// Helper object allowing to send a ping query as a wrapped channel combination
 /// that can be filled up on the transport part and awaited locally by the `Pinger`.
@@ -66,11 +65,11 @@ impl Pinger {
 
     /// Performs a ping to a single peer.
     #[tracing::instrument(level = "info", skip(self))]
-    pub async fn ping(&self, peer: PeerId) -> Result<std::time::Duration> {
+    pub async fn ping(&self, peer: &OffchainPublicKey) -> Result<std::time::Duration> {
         let (tx, mut rx) = channel::<PingQueryResult>(1);
         let replier = PingQueryReplier::new(tx);
 
-        if let Err(error) = self.send_ping.clone().try_send((peer, replier)) {
+        if let Err(error) = self.send_ping.clone().try_send((*peer, replier)) {
             warn!(%peer, %error, "Failed to initiate a ping request");
         }
 
@@ -79,24 +78,18 @@ impl Pinger {
                 debug!(latency = latency.as_millis(), %peer, "Ping succeeded",);
                 Ok(latency)
             }
-            Ok(Some(Err(e))) => {
-                let error = if let ProbeError::DecodingError = e {
-                    ProbeError::PingerError(peer, "incorrect pong response".into())
-                } else {
-                    e
-                };
-
-                debug!(%peer, %error, "Ping failed internally",);
-                Err(error)
+            Ok(Some(Err(_))) => {
+                debug!(%peer, "Ping failed internally",);
+                Err(ProbeError::PingerError(format!("could not successfully ping: {peer}")))
             }
             Ok(None) => {
                 debug!(%peer, "Ping canceled");
-                Err(ProbeError::PingerError(peer, "canceled".into()))
+                Err(ProbeError::PingerError("canceled".into()))
             }
             Err(_) => {
-                debug!(%peer, "Ping failed due to timeout");
-                Err(ProbeError::TrafficError(TrafficGenerationError::ProbeNeighborTimeout(
-                    peer,
+                debug!(%peer, "ping failed due to timeout");
+                Err(ProbeError::TrafficError(NetworkGraphError::ProbeNeighborTimeout(
+                    Box::new(*peer),
                 )))
             }
         }
@@ -108,9 +101,12 @@ mod tests {
     use std::time::Duration;
 
     use anyhow::anyhow;
+    use hex_literal::hex;
 
     use super::*;
     use crate::ping::Pinger;
+
+    const SECRET_0: [u8; 32] = hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d");
 
     #[tokio::test]
     async fn ping_query_replier_should_yield_a_failed_probe() -> anyhow::Result<()> {
@@ -118,9 +114,7 @@ mod tests {
 
         let replier = PingQueryReplier::new(tx);
 
-        replier.notify(Err(ProbeError::TrafficError(
-            TrafficGenerationError::ProbeNeighborTimeout(PeerId::random()),
-        )));
+        replier.notify(Err(()));
 
         assert!(rx.next().await.is_some_and(|r| r.is_err()));
 
@@ -140,7 +134,7 @@ mod tests {
         let result = rx.next().await.ok_or(anyhow!("should contain a value"))?;
 
         assert!(result.is_ok());
-        let result = result?;
+        let result = result.map_err(|_| anyhow!("should succeed"))?;
         assert_eq!(result, RTT.div(2));
 
         Ok(())
@@ -148,7 +142,7 @@ mod tests {
 
     #[tokio::test]
     async fn pinger_should_return_an_error_if_the_latency_is_longer_than_the_configure_timeout() -> anyhow::Result<()> {
-        let (tx, mut rx) = futures::channel::mpsc::channel::<(PeerId, PingQueryReplier)>(256);
+        let (tx, mut rx) = futures::channel::mpsc::channel::<(OffchainPublicKey, PingQueryReplier)>(256);
 
         let delay = Duration::from_millis(10);
         let delaying_channel = tokio::task::spawn(async move {
@@ -165,7 +159,7 @@ mod tests {
             },
             tx,
         );
-        assert!(pinger.ping(PeerId::random()).await.is_err());
+        assert!(pinger.ping(&OffchainPublicKey::from_privkey(&SECRET_0)?).await.is_err());
 
         delaying_channel.abort();
 

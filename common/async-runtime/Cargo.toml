@@ -2,7 +2,8 @@
 name = "hopr-async-runtime"
 version = "0.4.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-edition = "2024"
+edition.workspace = true
+rust-version.workspace = true
 description = "Feature-selected async executor for HOPR"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"

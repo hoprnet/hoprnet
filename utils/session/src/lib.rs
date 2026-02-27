@@ -17,11 +17,16 @@ use futures::{
     FutureExt, StreamExt, TryStreamExt,
     future::{AbortHandle, AbortRegistration},
 };
-use hopr_api::{chain::HoprChainApi, db::HoprNodeDbApi};
+use hopr_api::{
+    chain::HoprChainApi,
+    db::HoprNodeDbApi,
+    graph::{NetworkGraphUpdate, NetworkGraphView},
+    network::NetworkStreamControl,
+};
 use hopr_async_runtime::Abortable;
 use hopr_lib::{
-    Address, Hopr, HoprSession, SURB_SIZE, ServiceId, SessionClientConfig, SessionId, SessionTarget,
-    errors::HoprLibError, transfer_session,
+    Address, Hopr, HoprSession, NetworkView, OffchainPublicKey, SURB_SIZE, ServiceId, SessionClientConfig, SessionId,
+    SessionTarget, errors::HoprLibError, transfer_session,
 };
 use hopr_network_types::{
     prelude::{ConnectedUdpStream, IpOrHost, IpProtocol, SealedHost, UdpStreamParallelism},
@@ -206,16 +211,18 @@ pub struct SessionPool {
 impl SessionPool {
     pub const MAX_SESSION_POOL_SIZE: usize = 5;
 
-    pub async fn new<Chain, Db>(
+    pub async fn new<Chain, Db, Graph, Net>(
         size: usize,
         dst: Address,
         target: SessionTarget,
         cfg: SessionClientConfig,
-        hopr: Arc<Hopr<Chain, Db>>,
+        hopr: Arc<Hopr<Chain, Db, Graph, Net>>,
     ) -> Result<Self, anyhow::Error>
     where
         Chain: HoprChainApi + Clone + Send + Sync + 'static,
         Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
+        Graph: NetworkGraphView<NodeId = OffchainPublicKey> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
+        Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
     {
         let pool = Arc::new(parking_lot::Mutex::new(VecDeque::with_capacity(size)));
         let hopr_clone = hopr.clone();
@@ -295,10 +302,10 @@ impl Drop for SessionPool {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn create_tcp_client_binding<Chain, Db>(
+pub async fn create_tcp_client_binding<Chain, Db, Graph, Net>(
     bind_host: std::net::SocketAddr,
     port_range: Option<String>,
-    hopr: Arc<Hopr<Chain, Db>>,
+    hopr: Arc<Hopr<Chain, Db, Graph, Net>>,
     open_listeners: Arc<ListenerJoinHandles>,
     destination: Address,
     target_spec: SessionTargetSpec,
@@ -309,6 +316,8 @@ pub async fn create_tcp_client_binding<Chain, Db>(
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
+    Graph: NetworkGraphView<NodeId = OffchainPublicKey> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     // Bind the TCP socket first
     let (bound_host, tcp_listener) = tcp_listen_on(bind_host, port_range).await.map_err(|e| {
@@ -468,10 +477,10 @@ pub enum BindError {
     UnknownFailure(String),
 }
 
-pub async fn create_udp_client_binding<Chain, Db>(
+pub async fn create_udp_client_binding<Chain, Db, Graph, Net>(
     bind_host: std::net::SocketAddr,
     port_range: Option<String>,
-    hopr: Arc<Hopr<Chain, Db>>,
+    hopr: Arc<Hopr<Chain, Db, Graph, Net>>,
     open_listeners: Arc<ListenerJoinHandles>,
     destination: Address,
     target_spec: SessionTargetSpec,
@@ -480,6 +489,8 @@ pub async fn create_udp_client_binding<Chain, Db>(
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
+    Graph: NetworkGraphView<NodeId = OffchainPublicKey> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     // Bind the UDP socket first
     let (bound_host, udp_socket) = udp_bind_to(bind_host, port_range).await.map_err(|e| {

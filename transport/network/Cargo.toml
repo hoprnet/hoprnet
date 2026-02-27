@@ -1,8 +1,9 @@
 [package]
 name = "hopr-transport-network"
-version = "0.9.1"
+version = "0.10.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-edition = "2024"
+edition.workspace = true
+rust-version.workspace = true
 license = "GPL-3.0-only"
 
 [lib]
@@ -10,8 +11,7 @@ crate-type = ["rlib"]
 
 [features]
 telemetry = []
-default = ["compat-ping"]
-compat-ping = []
+default = []
 prometheus = ["dep:hopr-metrics"]
 
 [dependencies]
@@ -24,10 +24,8 @@ tracing = { workspace = true }
 
 hopr-api = { workspace = true, features = ["network"] }
 hopr-metrics = { workspace = true, optional = true }
-hopr-statistics = { workspace = true, features = ["moving"] }
 
 [dev-dependencies]
-assertables = { workspace = true }
 anyhow = { workspace = true }
 
 [package.metadata.cargo-machete]

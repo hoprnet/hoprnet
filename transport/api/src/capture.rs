@@ -453,7 +453,7 @@ mod tests {
     use hopr_protocol_app::prelude::ApplicationData;
     use hopr_protocol_session::types::*;
     use hopr_protocol_start::{KeepAliveMessage, StartErrorReason, StartErrorType, StartEstablished, StartInitiation};
-    use hopr_transport_probe::content::{NeighborProbe, PathTelemetry};
+    use hopr_transport_probe::types::{NeighborProbe, PathTelemetry};
     use hopr_transport_session::{ByteCapabilities, Capability, SessionId, SessionTarget};
 
     use super::*;

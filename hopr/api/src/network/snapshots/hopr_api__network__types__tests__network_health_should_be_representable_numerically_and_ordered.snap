@@ -1,0 +1,11 @@
+---
+source: hopr/api/src/network/types.rs
+expression: "Health::iter().map(|v| v as i32).collect::<Vec::<_>>()"
+---
+[
+    0,
+    1,
+    2,
+    3,
+    4,
+]

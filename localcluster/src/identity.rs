@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::Context;
+use hopr_builder::config::SessionIpForwardingConfig;
 use hopr_chain_connector::{
     BlockchainConnectorConfig,
     api::*,
@@ -9,7 +10,7 @@ use hopr_chain_connector::{
     reexports::hopr_chain_types::exports::alloy::hex,
 };
 use hopr_lib::{ChainKeypair, HoprKeys, Keypair, SafeModule, XDaiBalance, crypto_traits::Randomizable};
-use hoprd::config::{Db, HoprdConfig, Identity, SessionIpForwardingConfig, UserHoprLibConfig, UserHoprNetworkConfig};
+use hoprd::config::{Db, HoprdConfig, Identity, UserHoprLibConfig, UserHoprNetworkConfig};
 use hoprd_api::config::{Api, Auth};
 
 pub const DEFAULT_BLOKLI_URL: &str = "http://localhost:8080";
@@ -17,6 +18,8 @@ pub const DEFAULT_PRIVATE_KEY: &str = "0xac0974bec39a17e36ba4a6b4d238ff944bacb47
 pub const DEFAULT_CONFIG_HOME: &str = "/tmp/hopr-nodes";
 pub const DEFAULT_IDENTITY_PASSWORD: &str = "password";
 pub const DEFAULT_NUM_NODES: usize = 3;
+// Increased tx client timeout multiplier for Anvil
+pub const DEFAULT_TX_TIMEOUT_MULTIPLIER: u32 = 10;
 
 #[derive(Clone, Debug)]
 pub struct GenerationConfig {
@@ -83,7 +86,10 @@ pub async fn generate(config: &GenerationConfig) -> anyhow::Result<()> {
     // Create connector for the deployer account
     let mut anvil_connector = create_trustful_safeless_hopr_blokli_connector(
         &ChainKeypair::from_secret(&private_key)?,
-        Default::default(),
+        BlockchainConnectorConfig {
+            tx_timeout_multiplier: DEFAULT_TX_TIMEOUT_MULTIPLIER,
+            ..Default::default()
+        },
         blokli_client.clone(),
     )
     .await?;
@@ -104,7 +110,10 @@ pub async fn generate(config: &GenerationConfig) -> anyhow::Result<()> {
         let node_connector = std::sync::Arc::new(
             create_trustful_safeless_hopr_blokli_connector(
                 &kp.chain_key,
-                BlockchainConnectorConfig::default(),
+                BlockchainConnectorConfig {
+                    tx_timeout_multiplier: DEFAULT_TX_TIMEOUT_MULTIPLIER,
+                    ..Default::default()
+                },
                 blokli_client.clone(),
             )
             .await?,
