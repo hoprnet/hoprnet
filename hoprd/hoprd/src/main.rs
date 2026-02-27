@@ -33,6 +33,9 @@ mod telemetry;
 
 const DEFAULT_BLOKLI_URL: &str = "https://blokli.dufour.hoprnet.link";
 
+type HoprBlokliConnector = HoprBlockchainSafeConnector<BlokliClient>;
+type HoprNode = hopr_lib::Hopr<Arc<HoprBlokliConnector>, HoprNodeDb, SharedChannelGraph, HoprNetwork>;
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, strum::Display)]
 enum HoprdProcess {
     #[strum(to_string = "session listener sockets")]

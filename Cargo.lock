@@ -5408,6 +5408,7 @@ dependencies = [
  "hopr-chain-connector",
  "hopr-db-node",
  "hopr-lib",
+ "hopr-metrics",
  "hopr-network-graph",
  "hopr-strategy",
  "hopr-transport-p2p",

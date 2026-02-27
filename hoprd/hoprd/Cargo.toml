@@ -120,6 +120,7 @@ hopr-builder = { workspace = true, features = [
 hopr-db-node = { workspace = true }
 hopr-chain-connector = { workspace = true }
 hopr-network-graph = { workspace = true }
+hopr-metrics = { workspace = true }
 hopr-transport-p2p = { workspace = true }
 
 # Target-specific dependencies for memory allocators
