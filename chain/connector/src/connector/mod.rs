@@ -111,7 +111,7 @@ enum SubscribedEventType {
 
 #[derive(Debug)]
 enum SubscriptionUpdate {
-    Data(SubscribedEventType),
+    Data(Box<SubscribedEventType>),
     Error(ConnectorError),
     StreamEnded(&'static str),
 }
@@ -300,7 +300,7 @@ where
                             })
                         })
                         .map(|res| match res {
-                            Ok(v) => SubscriptionUpdate::Data(v),
+                            Ok(v) => SubscriptionUpdate::Data(Box::new(v)),
                             Err(e) => SubscriptionUpdate::Error(e),
                         })
                         .chain(futures::stream::once(futures::future::ready(
@@ -347,7 +347,7 @@ where
                             })
                         })
                         .map(|res| match res {
-                            Ok(v) => SubscriptionUpdate::Data(v),
+                            Ok(v) => SubscriptionUpdate::Data(Box::new(v)),
                             Err(e) => SubscriptionUpdate::Error(e),
                         })
                         .chain(futures::stream::once(futures::future::ready(
@@ -412,7 +412,7 @@ where
                         })
                         .try_flatten()
                         .map(|res| match res {
-                            Ok(v) => SubscriptionUpdate::Data(v),
+                            Ok(v) => SubscriptionUpdate::Data(Box::new(v)),
                             Err(e) => SubscriptionUpdate::Error(e),
                         })
                         .chain(futures::stream::once(futures::future::ready(
@@ -427,7 +427,7 @@ where
                         match event_type {
                             SubscriptionUpdate::Data(event_type) => {
                                 if connection_ready_tx.is_some() {
-                                    match event_type {
+                                    match *event_type {
                                         SubscribedEventType::Account(_) => account_counter += 1,
                                         SubscribedEventType::Channel(_) => channel_counter += 1,
                                         _ => {}
@@ -455,7 +455,7 @@ where
                                     }
                                 }
 
-                                match event_type {
+                                match *event_type {
                                     SubscribedEventType::Account((new_account, old_account)) => {
                                         tracing::debug!(%new_account, "account inserted");
                                         if new_account.has_announced_with_routing_info()
@@ -548,7 +548,7 @@ where
                 Ok(Ok(Err(error))) => {
                     tracing::error!(%error, "connection failed while establishing subscriptions");
                     abort_handle.abort();
-                    Err(ConnectorError::from(error))
+                    Err(error)
                 }
                 Ok(Err(_)) => {
                     tracing::error!("subscription task ended before signaling readiness");
