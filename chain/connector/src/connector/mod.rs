@@ -228,12 +228,13 @@ where
         hopr_async_runtime::prelude::spawn(async move {
             let sync_started = std::time::Instant::now();
             let mut connection_ready_tx = connection_ready_tx;
-            let mut account_counter = 0;
-            let mut channel_counter = 0;
             let mut retry_delay = SUBSCRIPTION_RETRY_INITIAL_DELAY;
 
             let subscription_task = async {
                 loop {
+                    let mut account_counter = 0;
+                    let mut channel_counter = 0;
+
                     let connections = client
                         .subscribe_accounts(blokli_client::api::AccountSelector::Any)
                         .and_then(|accounts| Ok((accounts, client.subscribe_graph()?)))
