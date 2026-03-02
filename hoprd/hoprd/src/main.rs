@@ -119,8 +119,8 @@ fn update_hopr_lib_config_from_env_vars(cfg: &mut HoprLibConfig) -> anyhow::Resu
 
 fn apply_logs_snapshot_config_compat(cfg: &HoprdConfig) {
     if cfg.enable_logs_snapshot && std::env::var_os("HOPRD_ENABLE_LOGS_SNAPSHOT").is_none() {
-        // SAFETY: this runs once during startup to bridge config-file values into the legacy
-        // env-based initialization path. No environment mutation is performed afterwards.
+        // SAFETY: this runs in `main` before the runtime is started, while the process is still
+        // single-threaded, to bridge config-file values into the legacy env-based path.
         unsafe {
             std::env::set_var("HOPRD_ENABLE_LOGS_SNAPSHOT", "1");
         }
@@ -154,11 +154,28 @@ fn main() -> ExitCode {
             .ok()
     });
 
+    let cfg: anyhow::Result<HoprdConfig> = (|| {
+        let args = <CliArgs as clap::Parser>::parse();
+        let cfg = HoprdConfig::try_from(args).map_err(anyhow::Error::from)?;
+        cfg.validate().map_err(|error| anyhow::anyhow!(error.to_string()))?;
+        Ok(cfg)
+    })();
+
+    let cfg = match cfg {
+        Ok(cfg) => cfg,
+        Err(error) => {
+            error!(%error, backtrace = ?error.backtrace(), "hoprd exited with an error");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    apply_logs_snapshot_config_compat(&cfg);
+
     hopr_lib::prepare_tokio_runtime(num_cpu_threads, num_io_threads)
         .and_then(|runtime| {
             runtime.block_on(async {
                 let _telemetry = init_logger()?;
-                main_inner().await
+                main_inner(cfg).await
             })
         })
         .map(|_| {
@@ -172,7 +189,7 @@ fn main() -> ExitCode {
 }
 
 #[cfg(feature = "runtime-tokio")]
-async fn main_inner() -> anyhow::Result<()> {
+async fn main_inner(cfg: HoprdConfig) -> anyhow::Result<()> {
     use hopr_api::chain::ChainEvents;
     use hopr_builder::exit::HoprServerIpForwardingReactor;
     use hopr_chain_connector::{BlockchainConnectorConfig, blokli_client, create_trustful_hopr_blokli_connector};
@@ -186,11 +203,6 @@ async fn main_inner() -> anyhow::Result<()> {
     } else {
         info!("Executable was built using the RELEASE profile.");
     }
-
-    let args = <CliArgs as clap::Parser>::parse();
-    let cfg = HoprdConfig::try_from(args)?;
-    cfg.validate()?;
-    apply_logs_snapshot_config_compat(&cfg);
 
     let git_hash = option_env!("VERGEN_GIT_SHA").unwrap_or("unknown");
     info!(
@@ -321,4 +333,57 @@ async fn main_inner() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    #[test]
+    fn applies_logs_snapshot_env_vars_from_config() {
+        let _env_lock_guard = ENV_LOCK.lock().expect("environment lock should not be poisoned");
+
+        // SAFETY: tests hold a process-wide lock while mutating environment variables.
+        unsafe {
+            std::env::remove_var("HOPRD_ENABLE_LOGS_SNAPSHOT");
+            std::env::remove_var("HOPRD_LOGS_SNAPSHOT_URL");
+        }
+
+        let mut cfg = HoprdConfig::default();
+        cfg.enable_logs_snapshot = true;
+        cfg.logs_snapshot_url = Some("https://example.org/snapshot.tar.xz".to_owned());
+
+        apply_logs_snapshot_config_compat(&cfg);
+
+        assert_eq!(std::env::var("HOPRD_ENABLE_LOGS_SNAPSHOT").ok().as_deref(), Some("1"));
+        assert_eq!(
+            std::env::var("HOPRD_LOGS_SNAPSHOT_URL").ok().as_deref(),
+            Some("https://example.org/snapshot.tar.xz")
+        );
+    }
+
+    #[test]
+    fn keeps_existing_logs_snapshot_env_vars() {
+        let _env_lock_guard = ENV_LOCK.lock().expect("environment lock should not be poisoned");
+
+        // SAFETY: tests hold a process-wide lock while mutating environment variables.
+        unsafe {
+            std::env::set_var("HOPRD_ENABLE_LOGS_SNAPSHOT", "0");
+            std::env::set_var("HOPRD_LOGS_SNAPSHOT_URL", "https://example.org/original.tar.xz");
+        }
+
+        let mut cfg = HoprdConfig::default();
+        cfg.enable_logs_snapshot = true;
+        cfg.logs_snapshot_url = Some("https://example.org/new.tar.xz".to_owned());
+
+        apply_logs_snapshot_config_compat(&cfg);
+
+        assert_eq!(std::env::var("HOPRD_ENABLE_LOGS_SNAPSHOT").ok().as_deref(), Some("0"));
+        assert_eq!(
+            std::env::var("HOPRD_LOGS_SNAPSHOT_URL").ok().as_deref(),
+            Some("https://example.org/original.tar.xz")
+        );
+    }
 }
