@@ -117,6 +117,25 @@ fn update_hopr_lib_config_from_env_vars(cfg: &mut HoprLibConfig) -> anyhow::Resu
     Ok(())
 }
 
+fn apply_logs_snapshot_config_compat(cfg: &HoprdConfig) {
+    if cfg.enable_logs_snapshot && std::env::var_os("HOPRD_ENABLE_LOGS_SNAPSHOT").is_none() {
+        // SAFETY: this runs once during startup to bridge config-file values into the legacy
+        // env-based initialization path. No environment mutation is performed afterwards.
+        unsafe {
+            std::env::set_var("HOPRD_ENABLE_LOGS_SNAPSHOT", "1");
+        }
+    }
+
+    if let Some(url) = &cfg.logs_snapshot_url {
+        if std::env::var_os("HOPRD_LOGS_SNAPSHOT_URL").is_none() {
+            // SAFETY: see rationale above.
+            unsafe {
+                std::env::set_var("HOPRD_LOGS_SNAPSHOT_URL", url);
+            }
+        }
+    }
+}
+
 #[cfg(feature = "runtime-tokio")]
 fn main() -> ExitCode {
     let num_cpu_threads = std::env::var("HOPRD_NUM_CPU_THREADS").ok().and_then(|v| {
@@ -171,6 +190,7 @@ async fn main_inner() -> anyhow::Result<()> {
     let args = <CliArgs as clap::Parser>::parse();
     let cfg = HoprdConfig::try_from(args)?;
     cfg.validate()?;
+    apply_logs_snapshot_config_compat(&cfg);
 
     let git_hash = option_env!("VERGEN_GIT_SHA").unwrap_or("unknown");
     info!(

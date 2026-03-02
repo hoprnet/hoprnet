@@ -275,6 +275,12 @@ pub struct HoprdConfig {
     /// Blokli provider URL to connect to.
     #[validate(url)]
     pub blokli_url: Option<String>,
+    /// Enables using a chain logs snapshot during startup.
+    #[serde(default)]
+    pub enable_logs_snapshot: bool,
+    /// Optional custom URL for the chain logs snapshot.
+    #[validate(url)]
+    pub logs_snapshot_url: Option<String>,
     /// Configuration of underlying node behavior in the form strategies
     ///
     /// Strategies represent automatically executable behavior performed by
@@ -419,6 +425,21 @@ mod tests {
         let cfg = HoprdConfig::try_from(args)?;
 
         assert_eq!(cfg.blokli_url, Some(pwnd.to_owned()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn config_supports_logs_snapshot_compat_keys() -> anyhow::Result<()> {
+        let mut cfg = example_cfg()?;
+        cfg.enable_logs_snapshot = true;
+        cfg.logs_snapshot_url = Some("https://logs-snapshots-rotsee.hoprnet.org/rotsee-v3.0-latest.tar.xz".to_owned());
+
+        let yaml = serde_saphyr::to_string(&cfg)?;
+        let parsed: HoprdConfig = serde_saphyr::from_str(&yaml)?;
+
+        assert!(parsed.enable_logs_snapshot);
+        assert_eq!(parsed.logs_snapshot_url, cfg.logs_snapshot_url);
 
         Ok(())
     }
