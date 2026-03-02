@@ -62,11 +62,13 @@ impl InactiveNetwork {
         #[cfg(feature = "transport-quic")]
         let swarm = swarm.with_quic();
 
-        let swarm = swarm.with_dns();
+        let swarm = swarm.with_dns_config(
+            libp2p::dns::ResolverConfig::cloudflare(),
+            libp2p::dns::ResolverOpts::default(),
+        );
 
         Ok(Self {
             swarm: swarm
-                .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
                 .with_behaviour(|_key| HoprNetworkBehavior::new(me_public, external_discovery_events))
                 .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
                 .with_swarm_config(|cfg| {
