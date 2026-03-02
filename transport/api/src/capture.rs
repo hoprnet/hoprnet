@@ -2,7 +2,7 @@ use std::{borrow::Cow, fs::File};
 
 use futures::{StreamExt, pin_mut};
 use hopr_async_runtime::{AbortHandle, spawn_as_abortable};
-use hopr_crypto_packet::prelude::PacketSignals;
+use hopr_crypto_packet::{HoprSurb, prelude::PacketSignals};
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::{
     prelude::{Ticket, VerifiedAcknowledgement},
@@ -384,7 +384,7 @@ impl<C: PacketEncoder + Send + Sync> PacketEncoder for CapturePacketCodec<C> {
     async fn encode_packet<T: AsRef<[u8]> + Send + 'static, S: Into<PacketSignals> + Send + 'static>(
         &self,
         data: T,
-        routing: ResolvedTransportRouting,
+        routing: ResolvedTransportRouting<HoprSurb>,
         signals: S,
     ) -> Result<OutgoingPacket, Self::Error> {
         let data_clone = data.as_ref().to_vec();

@@ -220,7 +220,7 @@ impl HoprSenderId {
     /// Each item has the same [`pseudonym`](HoprSenderId::pseudonym)
     /// but different [`surb_id`](HoprSenderId::surb_id).
     ///
-    /// The `surb_id` of the `n`-th item (n > 1) is computed as `Blake3(n || I_prev)`
+    /// The `surb_id` of the `n`-th item (n > 1) is computed as `Blake3(n-1 || I_prev)`
     /// where `I_prev` is the whole `n-1`-th ID, the `n` is represented as big-endian and
     /// `||` denotes byte-array concatenation.
     /// The first item (n = 1) is always `self`.
@@ -254,7 +254,7 @@ impl<'a> TryFrom<&'a [u8]> for HoprSenderId {
         value
             .try_into()
             .map(Self)
-            .map_err(|_| GeneralError::ParseError("HoprPacketReceiverData.size".into()))
+            .map_err(|_| GeneralError::ParseError("HoprSenderId.size".into()))
     }
 }
 
