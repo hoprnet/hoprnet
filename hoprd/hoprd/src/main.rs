@@ -294,7 +294,7 @@ async fn main_inner() -> anyhow::Result<()> {
 
                 error!(signal = ?signal, "All processes stopped... emulating the default signal handler...");
                 low_level::emulate_default_handler(signal as i32)?;
-                info!("Shutting down!");
+                error!("Shutting down!");
                 break;
             }
             _ => {
