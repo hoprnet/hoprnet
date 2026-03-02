@@ -37,6 +37,13 @@ pub struct InactiveNetwork {
     swarm: libp2p::Swarm<HoprNetworkBehavior>,
 }
 
+fn swarm_dns_config() -> (libp2p::dns::ResolverConfig, libp2p::dns::ResolverOpts) {
+    (
+        libp2p::dns::ResolverConfig::cloudflare(),
+        libp2p::dns::ResolverOpts::default(),
+    )
+}
+
 /// Build objects comprising an inactive p2p network.
 ///
 /// Returns a built [libp2p::Swarm] object implementing the HoprNetworkBehavior functionality.
@@ -62,10 +69,8 @@ impl InactiveNetwork {
         #[cfg(feature = "transport-quic")]
         let swarm = swarm.with_quic();
 
-        let swarm = swarm.with_dns_config(
-            libp2p::dns::ResolverConfig::cloudflare(),
-            libp2p::dns::ResolverOpts::default(),
-        );
+        let (dns_resolver_config, dns_resolver_opts) = swarm_dns_config();
+        let swarm = swarm.with_dns_config(dns_resolver_config, dns_resolver_opts);
 
         Ok(Self {
             swarm: swarm
@@ -431,4 +436,14 @@ fn print_network_info(network_info: NetworkInfo, event: &str) {
         num_peers,
         num_incoming, num_outgoing, "swarm network status after {event}"
     );
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn uses_cloudflare_dns_resolver_config() {
+        let (resolver_config, resolver_opts) = super::swarm_dns_config();
+        assert_eq!(resolver_config, libp2p::dns::ResolverConfig::cloudflare());
+        assert_eq!(resolver_opts, libp2p::dns::ResolverOpts::default());
+    }
 }
