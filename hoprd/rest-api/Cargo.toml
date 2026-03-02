@@ -22,8 +22,6 @@ prometheus = [
   "dep:lazy_static",
   "dep:regex",
 ]
-explicit-path = []
-# placeholder feature so we can enable it globally during tests
 runtime-tokio = ["hopr-transport-p2p/runtime-tokio", "hopr-lib/runtime-tokio"]
 
 [dependencies]

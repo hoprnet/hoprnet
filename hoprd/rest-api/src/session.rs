@@ -124,38 +124,23 @@ impl From<SessionCapability> for hopr_lib::SessionCapabilities {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({ "Hops": 1 }))]
 pub enum RoutingOptions {
-    #[cfg(feature = "explicit-path")]
-    #[schema(value_type = Vec<String>)]
-    IntermediatePath(#[serde_as(as = "Vec<DisplayFromStr>")] Vec<hopr_lib::NodeId>),
     Hops(usize),
 }
 
-impl RoutingOptions {
-    /// Converts the API routing options into protocol-level routing options.
-    pub(crate) fn resolve(self) -> Result<hopr_lib::HopRouting, ApiErrorStatus> {
-        Ok(match self {
-            #[cfg(feature = "explicit-path")]
-            RoutingOptions::IntermediatePath(path) => HopRouting::try_from(path.len())?,
-            RoutingOptions::Hops(hops) => HopRouting::try_from(hops)?,
-        })
+impl TryFrom<RoutingOptions> for hopr_lib::HopRouting {
+    type Error = hopr_lib::GeneralError;
+
+    /// Converts API routing options into protocol-level hop routing.
+    fn try_from(value: RoutingOptions) -> Result<Self, Self::Error> {
+        match value {
+            RoutingOptions::Hops(hops) => HopRouting::try_from(hops),
+        }
     }
 }
 
-impl From<hopr_lib::RoutingOptions> for RoutingOptions {
-    fn from(opts: hopr_lib::RoutingOptions) -> Self {
-        match opts {
-            hopr_lib::RoutingOptions::IntermediatePath(path) => {
-                #[cfg(feature = "explicit-path")]
-                {
-                    RoutingOptions::IntermediatePath(path.into_iter().collect())
-                }
-                #[cfg(not(feature = "explicit-path"))]
-                {
-                    RoutingOptions::Hops(path.as_ref().len())
-                }
-            }
-            hopr_lib::RoutingOptions::Hops(hops) => RoutingOptions::Hops(usize::from(hops)),
-        }
+impl From<hopr_lib::HopRouting> for RoutingOptions {
+    fn from(opts: hopr_lib::HopRouting) -> Self {
+        RoutingOptions::Hops(opts.hop_count())
     }
 }
 
@@ -249,8 +234,8 @@ impl SessionClientRequest {
             self.destination,
             target_spec.into_target(target_protocol.into())?,
             HoprSessionClientConfig {
-                forward_path: self.forward_path.resolve()?,
-                return_path: self.return_path.resolve()?,
+                forward_path: self.forward_path.try_into()?,
+                return_path: self.return_path.try_into()?,
                 capabilities: self
                     .capabilities
                     .map(|vs| {
@@ -542,13 +527,17 @@ pub(crate) async fn list_clients(
         .map(|v| {
             let ListenerId(_, addr) = *v.key();
             let entry = v.value();
+            let forward_path = hopr_lib::HopRouting::try_from(entry.forward_path.count_hops())
+                .expect("stored routing options always have bounded hop count");
+            let return_path = hopr_lib::HopRouting::try_from(entry.return_path.count_hops())
+                .expect("stored routing options always have bounded hop count");
             SessionClientResponse {
                 protocol,
                 ip: addr.ip().to_string(),
                 port: addr.port(),
                 target: entry.target.to_string(),
-                forward_path: entry.forward_path.clone().into(),
-                return_path: entry.return_path.clone().into(),
+                forward_path: forward_path.into(),
+                return_path: return_path.into(),
                 destination: entry.destination,
                 hopr_mtu: SESSION_MTU,
                 surb_len: SURB_SIZE,
