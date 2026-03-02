@@ -118,19 +118,21 @@ fn update_hopr_lib_config_from_env_vars(cfg: &mut HoprLibConfig) -> anyhow::Resu
 }
 
 fn apply_logs_snapshot_config_compat(cfg: &HoprdConfig) {
-    if cfg.enable_logs_snapshot && std::env::var_os("HOPRD_ENABLE_LOGS_SNAPSHOT").is_none() {
-        // SAFETY: this runs in `main` before the runtime is started, while the process is still
-        // single-threaded, to bridge config-file values into the legacy env-based path.
-        unsafe {
-            std::env::set_var("HOPRD_ENABLE_LOGS_SNAPSHOT", "1");
-        }
-    }
-
-    if let Some(url) = &cfg.logs_snapshot_url {
-        if std::env::var_os("HOPRD_LOGS_SNAPSHOT_URL").is_none() {
-            // SAFETY: see rationale above.
+    if cfg.enable_logs_snapshot {
+        if std::env::var_os("HOPRD_ENABLE_LOGS_SNAPSHOT").is_none() {
+            // SAFETY: this runs in `main` before the runtime is started, while the process is still
+            // single-threaded, to bridge config-file values into the legacy env-based path.
             unsafe {
-                std::env::set_var("HOPRD_LOGS_SNAPSHOT_URL", url);
+                std::env::set_var("HOPRD_ENABLE_LOGS_SNAPSHOT", "1");
+            }
+        }
+
+        if let Some(url) = &cfg.logs_snapshot_url {
+            if std::env::var_os("HOPRD_LOGS_SNAPSHOT_URL").is_none() {
+                // SAFETY: see rationale above.
+                unsafe {
+                    std::env::set_var("HOPRD_LOGS_SNAPSHOT_URL", url);
+                }
             }
         }
     }
@@ -164,7 +166,7 @@ fn main() -> ExitCode {
     let cfg = match cfg {
         Ok(cfg) => cfg,
         Err(error) => {
-            error!(%error, backtrace = ?error.backtrace(), "hoprd exited with an error");
+            error!(%error, backtrace = ?error.backtrace(), "failed to parse or validate configuration");
             return ExitCode::FAILURE;
         }
     };
@@ -340,6 +342,7 @@ mod tests {
     use super::*;
 
     static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    const TEST_SNAPSHOT_URL: &str = "https://example.org/snapshot.tar.xz";
 
     #[test]
     fn applies_logs_snapshot_env_vars_from_config() {
@@ -353,15 +356,12 @@ mod tests {
 
         let mut cfg = HoprdConfig::default();
         cfg.enable_logs_snapshot = true;
-        cfg.logs_snapshot_url = Some("https://example.org/snapshot.tar.xz".to_owned());
+        cfg.logs_snapshot_url = Some(TEST_SNAPSHOT_URL.to_owned());
 
         apply_logs_snapshot_config_compat(&cfg);
 
         assert_eq!(std::env::var("HOPRD_ENABLE_LOGS_SNAPSHOT").ok().as_deref(), Some("1"));
-        assert_eq!(
-            std::env::var("HOPRD_LOGS_SNAPSHOT_URL").ok().as_deref(),
-            Some("https://example.org/snapshot.tar.xz")
-        );
+        assert_eq!(std::env::var("HOPRD_LOGS_SNAPSHOT_URL").ok().as_deref(), Some(TEST_SNAPSHOT_URL));
     }
 
     #[test]
@@ -385,5 +385,25 @@ mod tests {
             std::env::var("HOPRD_LOGS_SNAPSHOT_URL").ok().as_deref(),
             Some("https://example.org/original.tar.xz")
         );
+    }
+
+    #[test]
+    fn does_not_set_snapshot_url_when_logs_snapshot_disabled() {
+        let _env_lock_guard = ENV_LOCK.lock().expect("environment lock should not be poisoned");
+
+        // SAFETY: tests hold a process-wide lock while mutating environment variables.
+        unsafe {
+            std::env::remove_var("HOPRD_ENABLE_LOGS_SNAPSHOT");
+            std::env::remove_var("HOPRD_LOGS_SNAPSHOT_URL");
+        }
+
+        let mut cfg = HoprdConfig::default();
+        cfg.enable_logs_snapshot = false;
+        cfg.logs_snapshot_url = Some(TEST_SNAPSHOT_URL.to_owned());
+
+        apply_logs_snapshot_config_compat(&cfg);
+
+        assert!(std::env::var_os("HOPRD_ENABLE_LOGS_SNAPSHOT").is_none());
+        assert!(std::env::var_os("HOPRD_LOGS_SNAPSHOT_URL").is_none());
     }
 }
