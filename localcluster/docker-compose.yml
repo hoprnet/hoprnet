@@ -5,7 +5,7 @@ services:
   chain:
     container_name: hoprd-blokli-anvil
     platform: linux/amd64
-    image: europe-west3-docker.pkg.dev/hoprassociation/docker-images/bloklid-anvil:latest
+    image: europe-west3-docker.pkg.dev/hoprassociation/docker-images/bloklid-anvil:latest@sha256:82aedd8e6cdc60fced9d14b76d8693a9656ade1785451f3a7dc0913bfe956a2b
     ports:
       - "8080:8080"
 
