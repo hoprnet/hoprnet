@@ -247,7 +247,7 @@ async fn main_inner() -> anyhow::Result<()> {
     let (node, hopr_process) = hopr_builder::build_from_chain_and_db(
         &hopr_keys.chain_key,
         &hopr_keys.packet_key,
-        cfg.hopr.clone().into(),
+        hopr_lib_cfg,
         None,
         chain_connector.clone(),
         node_db,
@@ -281,24 +281,28 @@ async fn main_inner() -> anyhow::Result<()> {
         ),
     );
 
-    let mut signals = Signals::new([Signal::Hup, Signal::Int]).map_err(|e| HoprdError::OsError(e.to_string()))?;
+    let mut signals =
+        Signals::new([Signal::Hup, Signal::Int, Signal::Term]).map_err(|e| HoprdError::OsError(e.to_string()))?;
     while let Some(Ok(signal)) = signals.next().await {
         match signal {
             Signal::Hup => {
                 info!("Received the HUP signal... not doing anything");
             }
-            Signal::Int => {
-                info!("Received the INT signal... tearing down the node");
+            Signal::Int | Signal::Term => {
+                error!(signal = ?signal, "Received a termination signal... tearing down the node");
                 // Explicitly tear down running processes here
                 drop(node);
                 drop(processes);
 
-                info!("All processes stopped... emulating the default handler...");
+                error!(signal = ?signal, "All processes stopped... emulating the default signal handler...");
                 low_level::emulate_default_handler(signal as i32)?;
-                info!("Shutting down!");
+                error!("Shutting down!");
                 break;
             }
-            _ => low_level::emulate_default_handler(signal as i32)?,
+            _ => {
+                error!(signal = ?signal, "Received an unhandled signal... emulating the default signal handler...");
+                low_level::emulate_default_handler(signal as i32)?;
+            }
         }
     }
 

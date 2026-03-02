@@ -37,6 +37,14 @@ pub struct InactiveNetwork {
     swarm: libp2p::Swarm<HoprNetworkBehavior>,
 }
 
+#[cfg(any(target_os = "android", target_os = "ios"))]
+fn swarm_dns_config() -> (libp2p::dns::ResolverConfig, libp2p::dns::ResolverOpts) {
+    (
+        libp2p::dns::ResolverConfig::cloudflare(),
+        libp2p::dns::ResolverOpts::default(),
+    )
+}
+
 /// Build objects comprising an inactive p2p network.
 ///
 /// Returns a built [libp2p::Swarm] object implementing the HoprNetworkBehavior functionality.
@@ -62,11 +70,19 @@ impl InactiveNetwork {
         #[cfg(feature = "transport-quic")]
         let swarm = swarm.with_quic();
 
-        let swarm = swarm.with_dns();
+        #[cfg(any(target_os = "android", target_os = "ios"))]
+        let swarm = {
+            let (dns_resolver_config, dns_resolver_opts) = swarm_dns_config();
+            swarm.with_dns_config(dns_resolver_config, dns_resolver_opts)
+        };
+
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        let swarm = swarm
+            .with_dns()
+            .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?;
 
         Ok(Self {
             swarm: swarm
-                .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
                 .with_behaviour(|_key| HoprNetworkBehavior::new(me_public, external_discovery_events))
                 .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
                 .with_swarm_config(|cfg| {
@@ -443,4 +459,15 @@ fn print_network_info(network_info: NetworkInfo, event: &str) {
         num_peers,
         num_incoming, num_outgoing, "swarm network status after {event}"
     );
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    fn uses_cloudflare_dns_resolver_config() {
+        let (resolver_config, resolver_opts) = super::swarm_dns_config();
+        assert_eq!(resolver_config, libp2p::dns::ResolverConfig::cloudflare());
+        assert_eq!(resolver_opts, libp2p::dns::ResolverOpts::default());
+    }
 }
