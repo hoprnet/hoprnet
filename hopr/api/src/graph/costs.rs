@@ -165,8 +165,9 @@ where
 /// The first edge (`dest -> relay`) has relaxed requirements compared to [`HoprForwardCostFn`]
 /// because the planner lacks intermediate QoS (probe) data for that edge.
 ///
-/// Only payment channel capacity is required for the first edge;
-/// the cost is passed through without score scaling.
+/// Only payment channel capacity is required for the first edge. If probe-based QoS with a
+/// positive score is available, that score is used to scale the edge cost; otherwise the
+/// initial cost is effectively passed through without score-based scaling.
 #[allow(clippy::type_complexity)]
 pub struct HoprReturnCostFn<C, W> {
     initial: C,

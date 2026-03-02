@@ -5,7 +5,6 @@ use hopr_api::graph::{
 };
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::errors::PathError;
-use tracing::trace;
 
 use crate::{
     errors::{PathPlannerError, Result},
@@ -161,7 +160,7 @@ where
         dest: OffchainPublicKey,
         hops: usize,
     ) -> Result<Vec<Vec<OffchainPublicKey>>> {
-        trace!(%src, %dest, hops, "computing paths from graph");
+        tracing::trace!(%src, %dest, hops, "computing paths from graph");
         let length = std::num::NonZeroUsize::new(hops + 1)
             .expect("can never fail, it is physically at least 1 after the addition");
 
@@ -198,8 +197,7 @@ where
             )
         };
 
-        // Deduplicate paths that may appear in both phases.
-        paths.dedup();
+        // no need to deduplicate for now
 
         if paths.is_empty() {
             Err(PathPlannerError::Path(PathError::PathNotFound(

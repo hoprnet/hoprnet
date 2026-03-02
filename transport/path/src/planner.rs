@@ -191,7 +191,8 @@ where
                     .map_err(PathPlannerError::CacheError)?;
 
                 let idx = if paths.len() > 1 {
-                    hopr_crypto_random::random_integer(0, Some((paths.len() - 1) as u64)) as usize
+                    // Upper bound is exclusive; use len so the last path can be selected.
+                    hopr_crypto_random::random_integer(0, Some(paths.len() as u64)) as usize
                 } else {
                     0
                 };
