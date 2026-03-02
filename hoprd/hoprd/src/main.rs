@@ -10,15 +10,9 @@ use hopr_transport_p2p::HoprNetwork;
 use hoprd::{cli::CliArgs, config::HoprdConfig, errors::HoprdError};
 use hoprd_api::{RestApiParameters, serve_api};
 use signal_hook::low_level;
+use telemetry::init_logger;
 use tracing::{debug, error, info, warn};
-use tracing_subscriber::prelude::*;
 use validator::Validate;
-#[cfg(feature = "telemetry")]
-use {
-    opentelemetry::trace::TracerProvider,
-    opentelemetry_otlp::WithExportConfig as _,
-    opentelemetry_sdk::trace::{RandomIdGenerator, Sampler},
-};
 
 // Avoid musl's default allocator due to degraded performance
 //
@@ -35,100 +29,12 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 #[cfg(all(target_os = "linux", feature = "allocator-jemalloc-stats"))]
 mod jemalloc_stats;
 
+mod telemetry;
+
 const DEFAULT_BLOKLI_URL: &str = "https://blokli.dufour.hoprnet.link";
 
 type HoprBlokliConnector = HoprBlockchainSafeConnector<BlokliClient>;
 type HoprNode = hopr_lib::Hopr<Arc<HoprBlokliConnector>, HoprNodeDb, SharedChannelGraph, HoprNetwork>;
-
-fn init_logger() -> anyhow::Result<()> {
-    let env_filter = match tracing_subscriber::EnvFilter::try_from_default_env() {
-        Ok(filter) => filter,
-        Err(_) => tracing_subscriber::filter::EnvFilter::new("info")
-            .add_directive("libp2p_swarm=info".parse()?)
-            .add_directive("libp2p_mplex=info".parse()?)
-            .add_directive("libp2p_tcp=info".parse()?)
-            .add_directive("libp2p_dns=info".parse()?)
-            .add_directive("multistream_select=info".parse()?)
-            .add_directive("isahc=error".parse()?)
-            .add_directive("sea_orm=warn".parse()?)
-            .add_directive("sqlx=warn".parse()?)
-            .add_directive("hyper_util=warn".parse()?),
-    };
-
-    #[cfg(feature = "prof")]
-    let registry = tracing_subscriber::Registry::default()
-        .with(
-            env_filter
-                .add_directive("tokio=trace".parse()?)
-                .add_directive("runtime=trace".parse()?),
-        )
-        .with(console_subscriber::spawn());
-
-    #[cfg(not(feature = "prof"))]
-    let registry = tracing_subscriber::Registry::default().with(env_filter);
-
-    let format = tracing_subscriber::fmt::layer()
-        .with_level(true)
-        .with_target(true)
-        .with_thread_ids(true)
-        .with_thread_names(false);
-
-    let format = if std::env::var("HOPRD_LOG_FORMAT")
-        .map(|v| v.to_lowercase() == "json")
-        .unwrap_or(false)
-    {
-        format.json().boxed()
-    } else {
-        format.boxed()
-    };
-
-    let registry = registry.with(format);
-
-    let mut telemetry = None;
-
-    #[cfg(feature = "telemetry")]
-    {
-        match std::env::var("HOPRD_USE_OPENTELEMETRY") {
-            Ok(v) if v == "true" => {
-                let exporter = opentelemetry_otlp::SpanExporter::builder()
-                    .with_tonic()
-                    .with_protocol(opentelemetry_otlp::Protocol::Grpc)
-                    .with_timeout(std::time::Duration::from_secs(5))
-                    .build()?;
-                let service_name = std::env::var("OTEL_SERVICE_NAME").unwrap_or(env!("CARGO_PKG_NAME").into());
-
-                let tracer = opentelemetry_sdk::trace::SdkTracerProvider::builder()
-                    .with_batch_exporter(exporter)
-                    .with_sampler(Sampler::AlwaysOn)
-                    .with_id_generator(RandomIdGenerator::default())
-                    .with_max_events_per_span(64)
-                    .with_max_attributes_per_span(16)
-                    .with_resource(
-                        opentelemetry_sdk::Resource::builder()
-                            .with_service_name(service_name.to_string())
-                            .build(),
-                    )
-                    .build()
-                    .tracer(env!("CARGO_PKG_NAME"));
-                info!(
-                    otel_service_name = %service_name,
-                    otel_exporter = "otlp",
-                    "OpenTelemetry tracing enabled"
-                );
-                telemetry = Some(tracing_opentelemetry::layer().with_tracer(tracer))
-            }
-            _ => {}
-        }
-    }
-
-    if let Some(telemetry) = telemetry {
-        tracing::subscriber::set_global_default(registry.with(telemetry))?
-    } else {
-        tracing::subscriber::set_global_default(registry)?
-    }
-
-    Ok(())
-}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, strum::Display)]
 enum HoprdProcess {
@@ -213,11 +119,6 @@ fn update_hopr_lib_config_from_env_vars(cfg: &mut HoprLibConfig) -> anyhow::Resu
 
 #[cfg(feature = "runtime-tokio")]
 fn main() -> ExitCode {
-    if let Err(error) = init_logger() {
-        tracing::error!(%error, "failed to initialize the logger");
-        return ExitCode::FAILURE;
-    }
-
     let num_cpu_threads = std::env::var("HOPRD_NUM_CPU_THREADS").ok().and_then(|v| {
         usize::from_str(&v)
             .map_err(anyhow::Error::from)
@@ -235,13 +136,18 @@ fn main() -> ExitCode {
     });
 
     hopr_lib::prepare_tokio_runtime(num_cpu_threads, num_io_threads)
-        .and_then(|runtime| runtime.block_on(main_inner()))
+        .and_then(|runtime| {
+            runtime.block_on(async {
+                let _telemetry = init_logger()?;
+                main_inner().await
+            })
+        })
         .map(|_| {
             info!("hoprd exited successfully");
             ExitCode::SUCCESS
         })
         .unwrap_or_else(|error| {
-            tracing::error!(%error, backtrace = ?error.backtrace(), "hoprd exited with an error");
+            error!(%error, backtrace = ?error.backtrace(), "hoprd exited with an error");
             ExitCode::FAILURE
         })
 }
@@ -329,6 +235,7 @@ async fn main_inner() -> anyhow::Result<()> {
             blokli_client::BlokliClientConfig {
                 timeout: std::time::Duration::from_secs(30),
                 stream_reconnect_timeout: std::time::Duration::from_secs(30),
+                subscription_stream_restart_delay: Some(std::time::Duration::from_secs(1)),
             },
         ),
         cfg.hopr.safe_module.module_address,
@@ -340,7 +247,7 @@ async fn main_inner() -> anyhow::Result<()> {
     let (node, hopr_process) = hopr_builder::build_from_chain_and_db(
         &hopr_keys.chain_key,
         &hopr_keys.packet_key,
-        cfg.hopr.clone().into(),
+        hopr_lib_cfg,
         chain_connector.clone(),
         node_db,
         HoprServerIpForwardingReactor::new(hopr_keys.packet_key.clone(), cfg.session_ip_forwarding.clone()),
@@ -373,24 +280,28 @@ async fn main_inner() -> anyhow::Result<()> {
         ),
     );
 
-    let mut signals = Signals::new([Signal::Hup, Signal::Int]).map_err(|e| HoprdError::OsError(e.to_string()))?;
+    let mut signals =
+        Signals::new([Signal::Hup, Signal::Int, Signal::Term]).map_err(|e| HoprdError::OsError(e.to_string()))?;
     while let Some(Ok(signal)) = signals.next().await {
         match signal {
             Signal::Hup => {
                 info!("Received the HUP signal... not doing anything");
             }
-            Signal::Int => {
-                info!("Received the INT signal... tearing down the node");
+            Signal::Int | Signal::Term => {
+                error!(signal = ?signal, "Received a termination signal... tearing down the node");
                 // Explicitly tear down running processes here
                 drop(node);
                 drop(processes);
 
-                info!("All processes stopped... emulating the default handler...");
+                error!(signal = ?signal, "All processes stopped... emulating the default signal handler...");
                 low_level::emulate_default_handler(signal as i32)?;
-                info!("Shutting down!");
+                error!("Shutting down!");
                 break;
             }
-            _ => low_level::emulate_default_handler(signal as i32)?,
+            _ => {
+                error!(signal = ?signal, "Received an unhandled signal... emulating the default signal handler...");
+                low_level::emulate_default_handler(signal as i32)?;
+            }
         }
     }
 
