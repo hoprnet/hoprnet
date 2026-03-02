@@ -2,15 +2,17 @@
 
 This file provides guidance for AI coding agents working with this repository.
 
+All AI configuration lives in the [`.ai/`](.ai/) directory.
+
 ## Instructions
 
-For detailed development guidelines, coding standards, and project-specific conventions, refer to:
+- [.ai/INSTRUCTIONS.md](.ai/INSTRUCTIONS.md) — Development guidelines, architecture, conventions
+- [.ai/rust.md](.ai/rust.md) — Rust-specific rules (apply when editing `*.rs` files)
 
-- [.github/.copilot-instructions.md](.github/.copilot-instructions.md) - Main development guidelines
-- [.github/instructions/rust.instructions.md](.github/instructions/rust.instructions.md) - Rust-specific guidelines
+## Tool-Specific Wiring
 
-## Agents
-
-Custom agent configurations are available in:
-
-- [.github/agents/](.github/agents/) - Specialized agent definitions
+| Tool | Entry point | Purpose |
+|------|-------------|----------|
+| Claude Code | [CLAUDE.md](CLAUDE.md) | Auto-loaded; references `.ai/` |
+| GitHub Copilot | [.github/copilot-instructions.md](.github/copilot-instructions.md) | Auto-loaded; references `.ai/INSTRUCTIONS.md` |
+| Copilot (Rust) | [.github/instructions/rust.instructions.md](.github/instructions/rust.instructions.md) | `applyTo: **/*.rs`; references `.ai/rust.md` |
