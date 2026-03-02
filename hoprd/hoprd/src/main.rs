@@ -247,7 +247,7 @@ async fn main_inner() -> anyhow::Result<()> {
     let (node, hopr_process) = hopr_builder::build_from_chain_and_db(
         &hopr_keys.chain_key,
         &hopr_keys.packet_key,
-        cfg.hopr.clone().into(),
+        hopr_lib_cfg,
         chain_connector.clone(),
         node_db,
         HoprServerIpForwardingReactor::new(hopr_keys.packet_key.clone(), cfg.session_ip_forwarding.clone()),
