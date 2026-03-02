@@ -37,6 +37,7 @@ pub struct InactiveNetwork {
     swarm: libp2p::Swarm<HoprNetworkBehavior>,
 }
 
+#[cfg(any(target_os = "android", target_os = "ios", test))]
 fn swarm_dns_config() -> (libp2p::dns::ResolverConfig, libp2p::dns::ResolverOpts) {
     (
         libp2p::dns::ResolverConfig::cloudflare(),
@@ -69,8 +70,16 @@ impl InactiveNetwork {
         #[cfg(feature = "transport-quic")]
         let swarm = swarm.with_quic();
 
-        let (dns_resolver_config, dns_resolver_opts) = swarm_dns_config();
-        let swarm = swarm.with_dns_config(dns_resolver_config, dns_resolver_opts);
+        #[cfg(any(target_os = "android", target_os = "ios"))]
+        let swarm = {
+            let (dns_resolver_config, dns_resolver_opts) = swarm_dns_config();
+            swarm.with_dns_config(dns_resolver_config, dns_resolver_opts)
+        };
+
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        let swarm = swarm
+            .with_dns()
+            .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?;
 
         Ok(Self {
             swarm: swarm
