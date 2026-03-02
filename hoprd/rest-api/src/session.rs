@@ -7,7 +7,7 @@ use axum::{
 };
 use base64::Engine;
 use hopr_lib::{
-    Address, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities, SessionClientConfig, SessionId,
+    Address, HopRouting, HoprSessionClientConfig, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities, SessionId,
     SessionManagerError, SessionTarget, SurbBalancerConfig, TransportSessionError,
     errors::{HoprLibError, HoprTransportError},
 };
@@ -132,11 +132,11 @@ pub enum RoutingOptions {
 
 impl RoutingOptions {
     /// Converts the API routing options into protocol-level routing options.
-    pub(crate) async fn resolve(self) -> Result<hopr_lib::RoutingOptions, ApiErrorStatus> {
+    pub(crate) fn resolve(self) -> Result<hopr_lib::HopRouting, ApiErrorStatus> {
         Ok(match self {
             #[cfg(feature = "explicit-path")]
-            RoutingOptions::IntermediatePath(path) => hopr_lib::RoutingOptions::IntermediatePath(path.try_into()?),
-            RoutingOptions::Hops(hops) => hopr_lib::RoutingOptions::Hops(hops.try_into()?),
+            RoutingOptions::IntermediatePath(path) => HopRouting::try_from(path.len())?,
+            RoutingOptions::Hops(hops) => HopRouting::try_from(hops)?,
         })
     }
 }
@@ -243,14 +243,14 @@ impl SessionClientRequest {
     pub(crate) async fn into_protocol_session_config(
         self,
         target_protocol: IpProtocol,
-    ) -> Result<(hopr_lib::Address, SessionTarget, SessionClientConfig), ApiErrorStatus> {
+    ) -> Result<(hopr_lib::Address, SessionTarget, HoprSessionClientConfig), ApiErrorStatus> {
         let target_spec: hopr_utils_session::SessionTargetSpec = self.target.clone().into();
         Ok((
             self.destination,
             target_spec.into_target(target_protocol.into())?,
-            SessionClientConfig {
-                forward_path_options: self.forward_path.resolve().await?,
-                return_path_options: self.return_path.resolve().await?,
+            HoprSessionClientConfig {
+                forward_path: self.forward_path.resolve()?,
+                return_path: self.return_path.resolve()?,
                 capabilities: self
                     .capabilities
                     .map(|vs| {

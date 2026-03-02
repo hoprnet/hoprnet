@@ -115,6 +115,83 @@ pub use crate::{
     errors::{HoprLibError, HoprStatusError},
 };
 
+/// Public routing configuration for session opening in `hopr-lib`.
+///
+/// This intentionally exposes only hop-count based routing.
+#[cfg(feature = "session-client")]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, smart_default::SmartDefault)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct HopRouting(
+    #[default(hopr_primitive_types::bounded::BoundedSize::MIN)]
+    hopr_primitive_types::bounded::BoundedSize<{ hopr_network_types::types::RoutingOptions::MAX_INTERMEDIATE_HOPS }>,
+);
+
+#[cfg(feature = "session-client")]
+impl HopRouting {
+    /// Maximum number of hops that can be configured.
+    pub const MAX_HOPS: usize = hopr_network_types::types::RoutingOptions::MAX_INTERMEDIATE_HOPS;
+
+    /// Returns the configured number of hops.
+    pub fn hop_count(self) -> usize {
+        self.0.into()
+    }
+}
+
+#[cfg(feature = "session-client")]
+impl TryFrom<usize> for HopRouting {
+    type Error = hopr_primitive_types::errors::GeneralError;
+
+    fn try_from(value: usize) -> Result<Self, Self::Error> {
+        Ok(Self(value.try_into()?))
+    }
+}
+
+#[cfg(feature = "session-client")]
+impl From<HopRouting> for hopr_network_types::types::RoutingOptions {
+    fn from(value: HopRouting) -> Self {
+        Self::Hops(value.0)
+    }
+}
+
+/// Session client configuration for `hopr-lib`.
+///
+/// Unlike transport-level configuration, this API intentionally does not expose
+/// explicit intermediate paths.
+#[cfg(feature = "session-client")]
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault)]
+pub struct HoprSessionClientConfig {
+    /// Forward route selection policy.
+    pub forward_path: HopRouting,
+    /// Return route selection policy.
+    pub return_path: HopRouting,
+    /// Capabilities offered by the session.
+    #[default(_code = "SessionCapability::Segmentation.into()")]
+    pub capabilities: SessionCapabilities,
+    /// Optional pseudonym used for the session. Mostly useful for testing only.
+    #[default(None)]
+    pub pseudonym: Option<hopr_internal_types::protocol::HoprPseudonym>,
+    /// Enable automatic SURB management for the session.
+    #[default(Some(SurbBalancerConfig::default()))]
+    pub surb_management: Option<SurbBalancerConfig>,
+    /// If set, the maximum number of possible SURBs will always be sent with session data packets.
+    #[default(false)]
+    pub always_max_out_surbs: bool,
+}
+
+#[cfg(feature = "session-client")]
+impl From<HoprSessionClientConfig> for hopr_transport::SessionClientConfig {
+    fn from(value: HoprSessionClientConfig) -> Self {
+        Self {
+            forward_path_options: value.forward_path.into(),
+            return_path_options: value.return_path.into(),
+            capabilities: value.capabilities,
+            pseudonym: value.pseudonym,
+            surb_management: value.surb_management,
+            always_max_out_surbs: value.always_max_out_surbs,
+        }
+    }
+}
+
 /// Long-running tasks that are spawned by the HOPR node.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, strum::Display, strum::EnumCount)]
 pub enum HoprLibProcess {
@@ -793,7 +870,7 @@ where
         &self,
         destination: Address,
         target: SessionTarget,
-        cfg: SessionClientConfig,
+        cfg: HoprSessionClientConfig,
     ) -> errors::Result<HoprSession> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
@@ -805,7 +882,7 @@ where
         use backon::Retryable;
 
         Ok((|| {
-            let cfg = cfg.clone();
+            let cfg = hopr_transport::SessionClientConfig::from(cfg.clone());
             let target = target.clone();
             async { self.transport_api.new_session(destination, target, cfg).await }
         })

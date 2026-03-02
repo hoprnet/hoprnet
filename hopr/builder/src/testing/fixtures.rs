@@ -11,9 +11,10 @@ use hopr_chain_connector::{
 };
 use hopr_db_node::HoprNodeDb;
 use hopr_lib::{
-    Address, ChainKeypair, HoprBalance, HoprNodeNetworkOperations, HoprNodeOperations, HoprState, IpOrHost, Keypair,
-    OffchainKeypair, RoutingOptions, SealedHost, WinningProbability, XDaiBalance,
-    exports::transport::{HoprSession, SessionClientConfig, SessionTarget},
+    Address, ChainKeypair, HopRouting, HoprBalance, HoprNodeNetworkOperations, HoprNodeOperations,
+    HoprSessionClientConfig, HoprState, IpOrHost, Keypair, OffchainKeypair, SealedHost, WinningProbability,
+    XDaiBalance,
+    exports::transport::{HoprSession, SessionTarget},
 };
 use rand::seq::{IteratorRandom, SliceRandom};
 use rstest::fixture;
@@ -89,17 +90,15 @@ impl ClusterGuard {
         debug_assert!(path.len() >= 2, "path must contain at least source and destination");
 
         let ip = IpOrHost::from_str(":0")?;
-        let routing = RoutingOptions::Hops(hopr_lib::exports::types::primitive::bounded::BoundedSize::try_from(
-            path.len() as u32 - 2,
-        )?);
+        let routing = HopRouting::try_from(path.len() - 2)?;
         let session_result = path[0]
             .inner()
             .connect_to(
                 path[path.len() - 1].address(),
                 SessionTarget::UdpStream(SealedHost::Plain(ip)),
-                SessionClientConfig {
-                    forward_path_options: routing.clone(),
-                    return_path_options: routing.invert(),
+                HoprSessionClientConfig {
+                    forward_path: routing,
+                    return_path: routing,
                     capabilities: Default::default(),
                     pseudonym: None,
                     surb_management: None,

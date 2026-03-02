@@ -3,7 +3,7 @@ use std::{str::FromStr, time::Duration};
 use anyhow::Context;
 use hopr_builder::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster};
 use hopr_lib::{
-    RoutingOptions, SessionCapabilities, SessionClientConfig, SessionTarget,
+    HopRouting, HoprSessionClientConfig, SessionCapabilities, SessionTarget,
     errors::{HoprLibError, HoprTransportError},
     exports::transport::session::{IpOrHost, SealedHost},
 };
@@ -29,9 +29,9 @@ async fn test_keep_alive_session(cluster: &ClusterGuard) -> anyhow::Result<()> {
         .connect_to(
             dst.address(),
             SessionTarget::UdpStream(SealedHost::Plain(ip)),
-            SessionClientConfig {
-                forward_path_options: RoutingOptions::Hops(0_u32.try_into()?),
-                return_path_options: RoutingOptions::Hops(0_u32.try_into()?),
+            HoprSessionClientConfig {
+                forward_path: HopRouting::try_from(0_usize)?,
+                return_path: HopRouting::try_from(0_usize)?,
                 capabilities: SessionCapabilities::empty(),
                 pseudonym: None,
                 surb_management: None,

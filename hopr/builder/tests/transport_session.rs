@@ -4,10 +4,9 @@ use hopr_builder::testing::{
     fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_5_cluster_fixture as cluster},
     hopr::ChannelGuard,
 };
-use hopr_lib::BoundedVec;
 #[cfg(feature = "session-client")]
 use hopr_lib::{
-    HoprBalance, RoutingOptions, SessionCapabilities, SessionClientConfig, SessionTarget,
+    HopRouting, HoprBalance, HoprSessionClientConfig, SessionCapabilities, SessionTarget,
     exports::transport::session::{IpOrHost, SealedHost},
 };
 use rand::seq::SliceRandom;
@@ -75,12 +74,9 @@ async fn test_create_n_hop_session(cluster: &ClusterGuard, #[case] hops: usize) 
     }
 
     let (routing, capabilities) = if hops == 0 {
-        (RoutingOptions::Hops(0_u32.try_into()?), SessionCapabilities::empty())
+        (HopRouting::try_from(0_usize)?, SessionCapabilities::empty())
     } else {
-        (
-            RoutingOptions::IntermediatePath(BoundedVec::from_iter(mid.iter().map(|node| node.address().into()))),
-            SessionCapabilities::default(),
-        )
+        (HopRouting::try_from(mid.len())?, SessionCapabilities::default())
     };
 
     let _session = src
@@ -88,9 +84,9 @@ async fn test_create_n_hop_session(cluster: &ClusterGuard, #[case] hops: usize) 
         .connect_to(
             dst.address(),
             SessionTarget::UdpStream(SealedHost::Plain(IpOrHost::from_str(":0")?)),
-            SessionClientConfig {
-                forward_path_options: routing.clone(),
-                return_path_options: routing,
+            HoprSessionClientConfig {
+                forward_path: routing,
+                return_path: routing,
                 capabilities,
                 pseudonym: None,
                 surb_management: None,
