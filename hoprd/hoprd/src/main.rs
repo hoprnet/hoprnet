@@ -279,8 +279,8 @@ async fn main_inner() -> anyhow::Result<()> {
         ),
     );
 
-    let mut signals = Signals::new([Signal::Hup, Signal::Int, Signal::Term])
-        .map_err(|e| HoprdError::OsError(e.to_string()))?;
+    let mut signals =
+        Signals::new([Signal::Hup, Signal::Int, Signal::Term]).map_err(|e| HoprdError::OsError(e.to_string()))?;
     while let Some(Ok(signal)) = signals.next().await {
         match signal {
             Signal::Hup => {
