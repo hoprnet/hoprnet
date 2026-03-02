@@ -1,6 +1,6 @@
 [package]
 name = "hopr-api"
-version = "0.11.0"
+version = "0.12.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -14,10 +14,10 @@ license = "GPL-3.0-only"
 default = []
 full = ["chain", "ct", "db", "network", "graph", "node", "serde"]
 chain = ["db", "dep:auto_impl"]
-ct = ["dep:hopr-network-types"]
+ct = []
 db = []
 network = []
-graph = ["dep:auto_impl", "dep:hopr-network-types"]
+graph = ["dep:auto_impl"]
 node = ["chain", "db", "graph", "network", "dep:atomic_enum"]
 serde = ["hopr-primitive-types/serde"]
 
@@ -33,7 +33,6 @@ strum = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 hopr-internal-types = { workspace = true }
-hopr-network-types = { workspace = true, optional = true }
 hopr-primitive-types = { workspace = true }
 hopr-chain-types = { workspace = true }
 hopr-crypto-packet = { workspace = true }

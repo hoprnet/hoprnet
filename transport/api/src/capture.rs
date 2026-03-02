@@ -4,8 +4,10 @@ use futures::{StreamExt, pin_mut};
 use hopr_async_runtime::{AbortHandle, spawn_as_abortable};
 use hopr_crypto_packet::prelude::PacketSignals;
 use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_internal_types::prelude::{Ticket, VerifiedAcknowledgement};
-use hopr_network_types::prelude::ResolvedTransportRouting;
+use hopr_internal_types::{
+    prelude::{Ticket, VerifiedAcknowledgement},
+    routing::ResolvedTransportRouting,
+};
 use hopr_primitive_types::prelude::BytesEncodable;
 use hopr_protocol_hopr::{
     IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket, IncomingPacket, IncomingPacketError,

@@ -8,9 +8,9 @@ use std::{
 };
 
 use futures::{SinkExt, StreamExt, TryStreamExt};
-use hopr_internal_types::prelude::HoprPseudonym;
+use hopr_internal_types::{prelude::HoprPseudonym, routing::DestinationRouting};
 use hopr_network_types::{
-    prelude::{DestinationRouting, SealedHost},
+    prelude::SealedHost,
     utils::{AsyncWriteSink, DuplexIO},
 };
 use hopr_primitive_types::{
@@ -579,7 +579,7 @@ mod tests {
     use futures::{AsyncReadExt, AsyncWriteExt};
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::prelude::*;
-    use hopr_network_types::prelude::*;
+    use hopr_internal_types::routing::RoutingOptions;
     use hopr_primitive_types::prelude::*;
 
     use super::*;

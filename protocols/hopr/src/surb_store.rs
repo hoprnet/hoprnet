@@ -1,8 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use hopr_crypto_packet::prelude::*;
-use hopr_internal_types::prelude::HoprPseudonym;
-use hopr_network_types::prelude::SurbMatcher;
+use hopr_internal_types::{prelude::HoprPseudonym, routing::SurbMatcher};
 use moka::{future::Cache, notification::RemovalCause};
 use ringbuffer::RingBuffer;
 use validator::ValidationError;

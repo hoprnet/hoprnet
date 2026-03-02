@@ -21,6 +21,8 @@ pub mod errors;
 pub mod path;
 /// Types related to internal HOPR protocol logic.
 pub mod protocol;
+/// Implements types for packet routing.
+pub mod routing;
 /// Implements types for tickets.
 pub mod tickets;
 
@@ -89,7 +91,7 @@ pub use multiaddr::Multiaddr;
 pub mod prelude {
     pub use super::{
         Multiaddr, NodeId, account::*, announcement::*, channels::*, errors::CoreTypesError, path::*, protocol::*,
-        tickets::*,
+        routing::*, tickets::*,
     };
 }
 

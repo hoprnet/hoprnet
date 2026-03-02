@@ -3,7 +3,6 @@ use hopr_api::chain::{ChainKeyOperations, ChainPathResolver, ChainReadChannelOpe
 use hopr_crypto_packet::prelude::*;
 use hopr_crypto_types::crypto_traits::Randomizable;
 use hopr_internal_types::prelude::*;
-use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use hopr_protocol_hopr::{FoundSurb, SurbStore};
 use tracing::trace;
@@ -118,7 +117,7 @@ where
         size_hint: usize,
         max_surbs: usize,
         routing: DestinationRouting,
-    ) -> crate::errors::Result<(ResolvedTransportRouting, Option<usize>)> {
+    ) -> crate::errors::Result<(ResolvedTransportRouting<HoprSurb>, Option<usize>)> {
         match routing {
             DestinationRouting::Forward {
                 destination,
