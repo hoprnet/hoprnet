@@ -37,7 +37,7 @@ pub struct InactiveNetwork {
     swarm: libp2p::Swarm<HoprNetworkBehavior>,
 }
 
-#[cfg(any(target_os = "android", target_os = "ios", test))]
+#[cfg(any(target_os = "android", target_os = "ios"))]
 fn swarm_dns_config() -> (libp2p::dns::ResolverConfig, libp2p::dns::ResolverOpts) {
     (
         libp2p::dns::ResolverConfig::cloudflare(),
@@ -450,6 +450,7 @@ fn print_network_info(network_info: NetworkInfo, event: &str) {
 #[cfg(test)]
 mod tests {
     #[test]
+    #[cfg(any(target_os = "android", target_os = "ios"))]
     fn uses_cloudflare_dns_resolver_config() {
         let (resolver_config, resolver_opts) = super::swarm_dns_config();
         assert_eq!(resolver_config, libp2p::dns::ResolverConfig::cloudflare());
