@@ -6,8 +6,10 @@ use hopr_builder::testing::{
 };
 use hopr_lib::BoundedVec;
 #[cfg(feature = "session-client")]
+use hopr_lib::exports::types::internal::routing::RoutingOptions;
+#[cfg(feature = "session-client")]
 use hopr_lib::{
-    HoprBalance, RoutingOptions, SessionCapabilities, SessionClientConfig, SessionTarget,
+    HoprBalance, SessionCapabilities, SessionClientConfig, SessionTarget,
     exports::transport::session::{IpOrHost, SealedHost},
 };
 use rstest::*;

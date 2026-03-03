@@ -82,12 +82,14 @@ pub mod cpu {
                 .unwrap();
                 static ref TASKS_ORPHANED: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
                     "hopr_rayon_tasks_orphaned_total",
-                    "Total number of Rayon tasks whose results were discarded after completion (receiver dropped during execution)",
+                    "Total number of Rayon tasks whose results were discarded after completion (receiver dropped \
+                     during execution)",
                 )
                 .unwrap();
                 static ref TASKS_REJECTED: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
                     "hopr_rayon_tasks_rejected_total",
-                    "Total number of tasks rejected due to queue being full (only when HOPR_CPU_TASK_QUEUE_LIMIT is set)",
+                    "Total number of tasks rejected due to queue being full (only when HOPR_CPU_TASK_QUEUE_LIMIT is \
+                     set)",
                 )
                 .unwrap();
                 static ref QUEUE_WAIT: hopr_metrics::SimpleHistogram = hopr_metrics::SimpleHistogram::new(

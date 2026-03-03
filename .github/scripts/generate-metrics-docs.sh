@@ -113,9 +113,9 @@ normalize_table() {
 # Generate expected content and compare with the actual file (whitespace-tolerant)
 expected=$("$0" --generate)
 
-if ! diff -q <(echo "$expected" | normalize_table) <(normalize_table < "$METRICS_DOC") >/dev/null 2>&1; then
+if ! diff -q <(echo "$expected" | normalize_table) <(normalize_table <"$METRICS_DOC") >/dev/null 2>&1; then
   echo "ERROR: METRICS.md is out of date. Differences:"
-  diff -u <(normalize_table < "$METRICS_DOC") <(echo "$expected" | normalize_table) | head -40
+  diff -u <(normalize_table <"$METRICS_DOC") <(echo "$expected" | normalize_table) | head -40
   echo ""
   echo "Run:  $0 --generate > METRICS.md"
   exit 1

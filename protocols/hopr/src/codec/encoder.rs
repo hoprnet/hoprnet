@@ -2,7 +2,6 @@ use hopr_api::chain::*;
 use hopr_crypto_packet::prelude::*;
 use hopr_crypto_types::{crypto_traits::Randomizable, prelude::*};
 use hopr_internal_types::prelude::*;
-use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use tracing::Instrument;
 
@@ -159,7 +158,7 @@ where
     async fn encode_packet<D: AsRef<[u8]> + Send + 'static, Sig: Into<PacketSignals> + Send + 'static>(
         &self,
         data: D,
-        routing: ResolvedTransportRouting,
+        routing: ResolvedTransportRouting<HoprSurb>,
         signals: Sig,
     ) -> Result<OutgoingPacket, Self::Error> {
         // Get necessary packet routing values

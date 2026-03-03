@@ -1,12 +1,10 @@
 use futures::{SinkExt, StreamExt};
 use futures_time::{future::FutureExt as TimeExt, stream::StreamExt as TimeStreamExt};
 use hopr_async_runtime::{AbortableList, spawn_as_abortable};
+use hopr_crypto_packet::HoprSurb;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
-use hopr_network_types::{
-    prelude::*,
-    timeout::{SinkTimeoutError, TimeoutSinkExt, TimeoutStreamExt},
-};
+use hopr_network_types::timeout::{SinkTimeoutError, TimeoutSinkExt, TimeoutStreamExt};
 use hopr_primitive_types::prelude::Address;
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
@@ -75,7 +73,7 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
     wire_outgoing: WOut,
     concurrency: usize,
 ) where
-    AppOut: futures::Stream<Item = (ResolvedTransportRouting, ApplicationDataOut)> + Send + 'static,
+    AppOut: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
     E: PacketEncoder + Send + 'static,
     WOut: futures::Sink<(PeerId, Box<[u8]>), Error = SinkTimeoutError<WOutErr>> + Clone + Unpin + Send + 'static,
     WOutErr: std::error::Error,
@@ -596,7 +594,7 @@ where
     TEvt::Error: std::error::Error,
     AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
     AppOut::Error: std::error::Error,
-    AppIn: futures::Stream<Item = (ResolvedTransportRouting, ApplicationDataOut)> + Send + 'static,
+    AppIn: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
 {
     let mut processes = AbortableList::default();
 

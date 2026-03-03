@@ -33,17 +33,20 @@ mod validation;
 
 #[doc(hidden)]
 pub mod prelude {
+    pub use hopr_internal_types::routing::{HoprSenderId, HoprSurbId};
+
     pub use super::*;
     pub use crate::{
         packet::{
             HoprForwardedPacket, HoprIncomingPacket, HoprOutgoingPacket, HoprPacket, PacketRouting, PartialHoprPacket,
         },
-        types::{HoprSenderId, HoprSurbId, PacketSignal, PacketSignals},
+        types::{PacketSignal, PacketSignals},
         validation::validate_unacknowledged_ticket,
     };
 }
 
 pub use hopr_crypto_sphinx::prelude::{KeyIdMapper, ReplyOpener};
+use hopr_internal_types::routing;
 
 /// Currently used public key cipher suite for Sphinx.
 ///
@@ -58,7 +61,7 @@ pub struct HoprSphinxHeaderSpec;
 impl SphinxHeaderSpec for HoprSphinxHeaderSpec {
     type KeyId = HoprKeyIdent;
     type PRG = hopr_crypto_types::primitives::ChaCha20;
-    type PacketReceiverData = types::HoprSenderId;
+    type PacketReceiverData = routing::HoprSenderId;
     type Pseudonym = HoprPseudonym;
     type RelayerData = por::ProofOfRelayString;
     type SurbReceiverData = por::SurbReceiverInfo;
@@ -74,7 +77,7 @@ pub type HoprKeyIdent = KeyIdent<4>;
 pub type HoprSurb = SURB<HoprSphinxSuite, HoprSphinxHeaderSpec>;
 
 /// Type alias for identifiable [`ReplyOpener`].
-pub type HoprReplyOpener = (types::HoprSurbId, ReplyOpener);
+pub type HoprReplyOpener = (routing::HoprSurbId, ReplyOpener);
 
 /// Size of the maximum packet payload.
 ///
