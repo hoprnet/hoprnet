@@ -3,7 +3,7 @@
 # METRICS.md, and that METRICS.md does not reference non-existing metrics.
 #
 # Usage:  ./.github/scripts/generate-metrics-docs.sh              (lint — verify sync)
-#         ./.github/scripts/generate-metrics-docs.sh --changed     (only check changed files)
+
 #         ./.github/scripts/generate-metrics-docs.sh --generate    (print markdown table to stdout)
 #         just generate-metrics-docs                               (via justfile recipe)
 
