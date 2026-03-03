@@ -26,7 +26,7 @@ pub use crate::{
 };
 
 /// The lifecycle state of a session from the perspective of metrics.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, strum::FromRepr, serde::Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, strum::FromRepr, serde_repr::Serialize_repr)]
 #[repr(u8)]
 pub enum SessionLifecycleState {
     /// Session is active and running.
@@ -38,7 +38,7 @@ pub enum SessionLifecycleState {
 }
 
 /// The acknowledgement mode configured for the session.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, strum::FromRepr, serde::Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, strum::FromRepr, serde_repr::Serialize_repr)]
 #[repr(u8)]
 pub enum SessionAckMode {
     /// No acknowledgements.
