@@ -78,8 +78,8 @@ localcluster clustersize:
     cargo run -p hoprd-localcluster -- --chain-url http://localhost:8080  --hoprd-bin ./result/bin/hoprd --size {{clustersize}}
     
 # check that METRICS.md is in sync with code
-check-metrics:
-    ./scripts/check-metrics.sh
+generate-metrics-docs:
+    ./.github/scripts/generate-metrics-docs.sh
 
 # run the full test suite (unit tests, integration tests, clippy, formatting)
 test:
@@ -89,7 +89,7 @@ test:
     cargo clippy --workspace --all-targets -- -D warnings
     echo ""
     echo "==> Checking metrics documentation..."
-    ./scripts/check-metrics.sh
+    ./.github/scripts/generate-metrics-docs.sh
     echo ""
     echo "==> Running unit & integration tests..."
     cargo test --test '*' -- --test-threads=1

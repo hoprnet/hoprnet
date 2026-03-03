@@ -426,10 +426,10 @@
                 files = "";
                 language = "system";
               };
-              check-metrics = {
+              generate-metrics-docs = {
                 enable = true;
                 name = "METRICS.md must stay in sync with code";
-                entry = "bash scripts/check-metrics.sh";
+                entry = "bash .github/scripts/generate-metrics-docs.sh";
                 files = "(METRICS\\.md|\\.rs)$";
                 pass_filenames = false;
                 language = "system";
