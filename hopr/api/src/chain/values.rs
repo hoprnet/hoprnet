@@ -1,12 +1,14 @@
 use std::{error::Error, time::Duration};
 
-pub use hopr_chain_types::ContractAddresses;
-use hopr_crypto_types::prelude::Hash;
-pub use hopr_internal_types::prelude::WinningProbability;
-pub use hopr_primitive_types::balance::HoprBalance;
-use hopr_primitive_types::{
-    balance::{Balance, Currency},
-    prelude::Address,
+pub use hopr_types::{
+    chain::ContractAddresses, internal::prelude::WinningProbability, primitive::balance::HoprBalance,
+};
+use hopr_types::{
+    crypto::prelude::Hash,
+    primitive::{
+        balance::{Balance, Currency},
+        prelude::Address,
+    },
 };
 
 /// Contains domain separator information.

@@ -14,7 +14,7 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-prometheus = ["dep:hopr-metrics", "dep:lazy_static"]
+prometheus = ["dep:hopr-metrics", "dep:lazy_static", "hopr-types/prometheus"]
 
 [dependencies]
 futures = { workspace = true }
@@ -24,7 +24,7 @@ smart-default = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
-hopr-crypto-random = { workspace = true }
+hopr-types = { workspace = true, features = ["random"] }
 hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]

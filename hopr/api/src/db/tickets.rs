@@ -5,8 +5,7 @@ use std::{
 };
 
 use futures::stream::BoxStream;
-use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::*;
+use hopr_types::{internal::prelude::*, primitive::prelude::*};
 
 /// Allows selecting a range of ticket indices in [`TicketSelector`].
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

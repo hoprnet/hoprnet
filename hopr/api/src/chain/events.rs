@@ -1,4 +1,4 @@
-pub use hopr_chain_types::chain_events::ChainEvent;
+pub use hopr_types::chain::chain_events::ChainEvent;
 
 /// Indicates if the current state should be emitted in the form of events
 /// in the [subscription stream](ChainEvents::subscribe).

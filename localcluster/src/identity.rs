@@ -7,7 +7,7 @@ use hopr_chain_connector::{
     api::*,
     blokli_client::{BlokliClient, BlokliClientConfig, BlokliQueryClient},
     create_trustful_safeless_hopr_blokli_connector,
-    reexports::hopr_chain_types::exports::alloy::hex,
+    reexports::chain::exports::alloy::hex,
 };
 use hopr_lib::{ChainKeypair, HoprKeys, Keypair, SafeModule, XDaiBalance, crypto_traits::Randomizable};
 use hoprd::config::{Db, HoprdConfig, Identity, UserHoprLibConfig, UserHoprNetworkConfig};

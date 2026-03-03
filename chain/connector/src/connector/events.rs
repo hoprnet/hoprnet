@@ -1,7 +1,7 @@
 use ahash::HashSet;
 use futures::StreamExt;
 use hopr_api::chain::{AccountSelector, ChainEvent, ChannelSelector, StateSyncOptions};
-use hopr_internal_types::channels::ChannelStatusDiscriminants;
+use hopr_types::internal::channels::ChannelStatusDiscriminants;
 
 use crate::{Backend, connector::HoprBlockchainConnector, errors::ConnectorError};
 
@@ -57,9 +57,7 @@ mod tests {
         ChainEvent, ChainEvents, ChainWriteAccountOperations, ChainWriteChannelOperations, DeployedSafe,
         StateSyncOptions,
     };
-    use hopr_crypto_types::prelude::*;
-    use hopr_internal_types::prelude::*;
-    use hopr_primitive_types::prelude::*;
+    use hopr_types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*};
 
     use crate::{
         connector::tests::{MODULE_ADDR, PRIVATE_KEY_1, PRIVATE_KEY_2, create_connector},

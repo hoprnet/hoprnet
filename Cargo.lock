@@ -270,9 +270,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-eip7928"
-version = "0.3.2"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3231de68d5d6e75332b7489cfcc7f4dfabeba94d990a10e4b923af0e6623540"
+checksum = "f8222b1d88f9a6d03be84b0f5e76bb60cd83991b43ad8ab6477f0e4a7809b98d"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
@@ -1519,12 +1519,6 @@ dependencies = [
  "bitcoin-io",
  "hex-conservative",
 ]
-
-[[package]]
-name = "bitflags"
-version = "1.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "bitflags"
@@ -3326,20 +3320,20 @@ dependencies = [
  "cfg-if",
  "js-sys",
  "libc",
- "r-efi",
+ "r-efi 5.3.0",
  "wasip2",
  "wasm-bindgen",
 ]
 
 [[package]]
 name = "getrandom"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "139ef39800118c7683f2fd3c98c1b23c09ae076556b435f8e9064ae108aaeeec"
+checksum = "0de51e6874e94e7bf76d726fc5d13ba782deca734ff60d5bb2fb2607c7406555"
 dependencies = [
  "cfg-if",
  "libc",
- "r-efi",
+ "r-efi 6.0.0",
  "rand_core 0.10.0",
  "wasip2",
  "wasip3",
@@ -3507,7 +3501,7 @@ version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2409cffa4fe8b303847d5b6ba8df9da9ba65d302fc5ee474ea0cac5afde79840"
 dependencies = [
- "bitflags 2.11.0",
+ "bitflags",
  "bstr",
  "gix-path",
  "libc",
@@ -3646,7 +3640,7 @@ version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8546300aee4c65c5862c22a3e321124a69b654a61a8b60de546a9284812b7e2"
 dependencies = [
- "bitflags 2.11.0",
+ "bitflags",
  "bstr",
  "gix-features",
  "gix-path",
@@ -3694,7 +3688,7 @@ version = "0.45.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ea6d3e9e11647ba49f441dea0782494cc6d2875ff43fa4ad9094e6957f42051"
 dependencies = [
- "bitflags 2.11.0",
+ "bitflags",
  "bstr",
  "filetime",
  "fnv",
@@ -3817,7 +3811,7 @@ version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed9e0c881933c37a7ef45288d6c5779c4a7b3ad240b4c37657e1d9829eb90085"
 dependencies = [
- "bitflags 2.11.0",
+ "bitflags",
  "bstr",
  "gix-attributes",
  "gix-config-value",
@@ -3898,7 +3892,7 @@ version = "0.39.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "91898c83b18c635696f7355d171cfa74a52f38022ff89581f567768935ebc4c8"
 dependencies = [
- "bitflags 2.11.0",
+ "bitflags",
  "bstr",
  "gix-commitgraph",
  "gix-date",
@@ -3931,7 +3925,7 @@ version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ea9962ed6d9114f7f100efe038752f41283c225bb507a2888903ac593dffa6be"
 dependencies = [
- "bitflags 2.11.0",
+ "bitflags",
  "gix-path",
  "libc",
  "windows-sys 0.61.2",
@@ -4030,7 +4024,7 @@ version = "0.51.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d052b83d1d1744be95ac6448ac02f95f370a8f6720e466be9ce57146e39f5280"
 dependencies = [
- "bitflags 2.11.0",
+ "bitflags",
  "gix-commitgraph",
  "gix-date",
  "gix-hash",
@@ -4381,11 +4375,8 @@ dependencies = [
  "auto_impl",
  "chrono",
  "futures",
- "hopr-chain-types",
  "hopr-crypto-packet",
- "hopr-crypto-types 0.9.2",
- "hopr-internal-types",
- "hopr-primitive-types 0.10.1",
+ "hopr-types",
  "insta",
  "libp2p-identity",
  "multiaddr",
@@ -4433,12 +4424,12 @@ dependencies = [
  "hex-literal",
  "hopr-builder",
  "hopr-chain-connector",
- "hopr-crypto-random 0.4.1",
  "hopr-ct-immediate",
  "hopr-db-node",
  "hopr-lib",
  "hopr-network-graph",
  "hopr-transport-p2p",
+ "hopr-types",
  "insta",
  "lazy_static",
  "parking_lot",
@@ -4473,11 +4464,7 @@ dependencies = [
  "hex-literal",
  "hopr-api",
  "hopr-async-runtime",
- "hopr-chain-types",
- "hopr-crypto-random 0.4.1",
- "hopr-crypto-types 0.9.2",
- "hopr-internal-types",
- "hopr-primitive-types 0.10.1",
+ "hopr-types",
  "insta",
  "lazy_static",
  "moka",
@@ -4496,26 +4483,22 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-types"
-version = "0.14.2"
+version = "0.14.1"
+source = "git+https://github.com/hoprnet/hopr-types?branch=main#874498553726932c4e154ae3d5bdc8026992731d"
 dependencies = [
  "anyhow",
  "async-trait",
- "hex",
  "hex-literal",
  "hopr-bindings",
- "hopr-crypto-types 0.9.2",
+ "hopr-crypto-types 0.9.2 (git+https://github.com/hoprnet/hopr-types?branch=main)",
  "hopr-internal-types",
- "hopr-primitive-types 0.10.1",
- "insta",
+ "hopr-primitive-types 0.10.1 (git+https://github.com/hoprnet/hopr-types?branch=main)",
  "lazy_static",
  "multiaddr",
- "postcard",
  "serde",
- "serde_json",
  "serde_with",
  "strum 0.28.0",
  "thiserror 2.0.18",
- "tokio",
 ]
 
 [[package]]
@@ -4524,10 +4507,8 @@ version = "0.5.1"
 dependencies = [
  "anyhow",
  "hex",
- "hopr-crypto-random 0.4.1",
- "hopr-crypto-types 0.9.2",
  "hopr-platform",
- "hopr-primitive-types 0.10.1",
+ "hopr-types",
  "scrypt",
  "serde",
  "serde_json",
@@ -4548,12 +4529,8 @@ dependencies = [
  "flagset",
  "hex",
  "hex-literal",
- "hopr-crypto-random 0.4.1",
  "hopr-crypto-sphinx",
- "hopr-crypto-types 0.9.2",
- "hopr-internal-types",
- "hopr-parallelize",
- "hopr-primitive-types 0.10.1",
+ "hopr-types",
  "lazy_static",
  "mimalloc",
  "parameterized",
@@ -4569,6 +4546,7 @@ dependencies = [
 [[package]]
 name = "hopr-crypto-random"
 version = "0.4.1"
+source = "git+https://github.com/hoprnet/hopr-types?branch=main#874498553726932c4e154ae3d5bdc8026992731d"
 dependencies = [
  "generic-array 1.3.5",
  "lazy_static",
@@ -4578,7 +4556,7 @@ dependencies = [
 [[package]]
 name = "hopr-crypto-random"
 version = "0.4.1"
-source = "git+https://github.com/hoprnet/hoprnet?branch=master#899adb4760dd1c31e7880b1a3132b39b141ed7dd"
+source = "git+https://github.com/hoprnet/hoprnet?branch=master#56b7f2af738bb93829d5d7b01181278e80fd39a4"
 dependencies = [
  "generic-array 1.3.5",
  "rand 0.10.0",
@@ -4594,9 +4572,7 @@ dependencies = [
  "elliptic-curve",
  "generic-array 1.3.5",
  "hex",
- "hopr-crypto-random 0.4.1",
- "hopr-crypto-types 0.9.2",
- "hopr-primitive-types 0.10.1",
+ "hopr-types",
  "k256",
  "parameterized",
  "postcard",
@@ -4610,26 +4586,22 @@ dependencies = [
 [[package]]
 name = "hopr-crypto-types"
 version = "0.9.2"
+source = "git+https://github.com/hoprnet/hopr-types?branch=main#874498553726932c4e154ae3d5bdc8026992731d"
 dependencies = [
  "aes",
- "anyhow",
  "blake3",
  "chacha20 0.9.1",
  "cipher",
- "criterion",
  "ctr",
  "curve25519-dalek",
  "digest 0.10.7",
  "ed25519-dalek",
  "generic-array 1.3.5",
  "hex",
- "hex-literal",
- "hopr-crypto-random 0.4.1",
- "hopr-primitive-types 0.10.1",
+ "hopr-crypto-random 0.4.1 (git+https://github.com/hoprnet/hopr-types?branch=main)",
+ "hopr-primitive-types 0.10.1 (git+https://github.com/hoprnet/hopr-types?branch=main)",
  "k256",
- "lazy_static",
  "libp2p-identity",
- "mimalloc",
  "poly1305",
  "primitive-types 0.14.0",
  "secp256k1 0.31.1",
@@ -4639,7 +4611,6 @@ dependencies = [
  "sha3",
  "subtle",
  "thiserror 2.0.18",
- "tikv-jemallocator",
  "typenum",
  "zeroize",
 ]
@@ -4647,7 +4618,7 @@ dependencies = [
 [[package]]
 name = "hopr-crypto-types"
 version = "0.9.2"
-source = "git+https://github.com/hoprnet/hoprnet?branch=master#899adb4760dd1c31e7880b1a3132b39b141ed7dd"
+source = "git+https://github.com/hoprnet/hoprnet?branch=master#56b7f2af738bb93829d5d7b01181278e80fd39a4"
 dependencies = [
  "aes",
  "blake3",
@@ -4684,10 +4655,8 @@ dependencies = [
  "futures-concurrency",
  "hopr-api",
  "hopr-async-runtime",
- "hopr-crypto-random 0.4.1",
- "hopr-crypto-types 0.9.2",
- "hopr-internal-types",
  "hopr-network-graph",
+ "hopr-types",
  "humantime-serde",
  "lazy_static",
  "moka",
@@ -4705,10 +4674,8 @@ dependencies = [
  "futures",
  "hopr-api",
  "hopr-async-runtime",
- "hopr-crypto-random 0.4.1",
- "hopr-crypto-types 0.9.2",
- "hopr-internal-types",
  "hopr-network-graph",
+ "hopr-types",
  "humantime-serde",
  "lazy_static",
  "moka",
@@ -4725,10 +4692,8 @@ dependencies = [
  "anyhow",
  "clap",
  "hex",
- "hopr-crypto-types 0.9.2",
  "hopr-db-migration",
- "hopr-internal-types",
- "hopr-primitive-types 0.10.1",
+ "hopr-types",
  "sea-orm",
  "sea-orm-cli",
  "sea-orm-migration",
@@ -4757,13 +4722,10 @@ dependencies = [
  "hex-literal",
  "hopr-api",
  "hopr-crypto-packet",
- "hopr-crypto-random 0.4.1",
- "hopr-crypto-types 0.9.2",
  "hopr-db-entity",
  "hopr-db-migration",
- "hopr-internal-types",
- "hopr-metrics",
- "hopr-primitive-types 0.10.1",
+ "hopr-metrics 1.3.2",
+ "hopr-types",
  "lazy_static",
  "moka",
  "sea-orm",
@@ -4780,29 +4742,23 @@ dependencies = [
 [[package]]
 name = "hopr-internal-types"
 version = "0.18.0"
+source = "git+https://github.com/hoprnet/hopr-types?branch=main#874498553726932c4e154ae3d5bdc8026992731d"
 dependencies = [
- "anyhow",
  "aquamarine",
  "async-trait",
- "bimap",
  "hex",
  "hex-literal",
- "hopr-crypto-random 0.4.1",
- "hopr-crypto-types 0.9.2",
+ "hopr-crypto-random 0.4.1 (git+https://github.com/hoprnet/hopr-types?branch=main)",
+ "hopr-crypto-types 0.9.2 (git+https://github.com/hoprnet/hopr-types?branch=main)",
  "hopr-parallelize",
- "hopr-primitive-types 0.10.1",
- "lazy_static",
- "mockall",
+ "hopr-primitive-types 0.10.1 (git+https://github.com/hoprnet/hopr-types?branch=main)",
  "multiaddr",
  "num_enum",
- "parameterized",
- "postcard",
  "serde",
  "serde_bytes",
  "smart-default",
  "strum 0.28.0",
  "thiserror 2.0.18",
- "tokio",
  "tracing",
 ]
 
@@ -4821,17 +4777,12 @@ dependencies = [
  "futures-time",
  "hopr-api",
  "hopr-async-runtime",
- "hopr-chain-types",
  "hopr-crypto-keypair",
- "hopr-crypto-random 0.4.1",
- "hopr-crypto-types 0.9.2",
- "hopr-internal-types",
- "hopr-metrics",
+ "hopr-metrics 1.3.2",
  "hopr-network-types",
- "hopr-parallelize",
  "hopr-platform",
- "hopr-primitive-types 0.10.1",
  "hopr-transport",
+ "hopr-types",
  "lazy_static",
  "serde",
  "serde-saphyr",
@@ -4853,6 +4804,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-metrics"
+version = "1.4.0"
+source = "git+https://github.com/hoprnet/hopr-types?branch=main#874498553726932c4e154ae3d5bdc8026992731d"
+dependencies = [
+ "prometheus",
+]
+
+[[package]]
 name = "hopr-network-graph"
 version = "0.1.1"
 dependencies = [
@@ -4863,9 +4822,8 @@ dependencies = [
  "futures",
  "hex-literal",
  "hopr-api",
- "hopr-crypto-types 0.9.2",
- "hopr-internal-types",
  "hopr-statistics",
+ "hopr-types",
  "indexmap 2.13.0",
  "parking_lot",
  "petgraph",
@@ -4886,9 +4844,8 @@ dependencies = [
  "futures-time",
  "hickory-resolver",
  "hopr-async-runtime",
- "hopr-crypto-random 0.4.1",
- "hopr-crypto-types 0.9.2",
- "hopr-metrics",
+ "hopr-metrics 1.3.2",
+ "hopr-types",
  "lazy_static",
  "libp2p-identity",
  "multiaddr",
@@ -4909,15 +4866,14 @@ dependencies = [
 [[package]]
 name = "hopr-parallelize"
 version = "0.2.2"
+source = "git+https://github.com/hoprnet/hopr-types?branch=main#874498553726932c4e154ae3d5bdc8026992731d"
 dependencies = [
  "futures",
- "hopr-metrics",
+ "hopr-metrics 1.4.0",
  "lazy_static",
  "libc",
  "rayon",
- "serial_test",
  "thiserror 2.0.18",
- "tokio",
  "tracing",
 ]
 
@@ -4932,13 +4888,12 @@ dependencies = [
 [[package]]
 name = "hopr-primitive-types"
 version = "0.10.1"
+source = "git+https://github.com/hoprnet/hopr-types?branch=main#874498553726932c4e154ae3d5bdc8026992731d"
 dependencies = [
- "anyhow",
  "bigdecimal",
  "chrono",
  "float-cmp",
  "hex",
- "hex-literal",
  "lazy_static",
  "primitive-types 0.14.0",
  "regex",
@@ -4951,7 +4906,7 @@ dependencies = [
 [[package]]
 name = "hopr-primitive-types"
 version = "0.10.1"
-source = "git+https://github.com/hoprnet/hoprnet?branch=master#899adb4760dd1c31e7880b1a3132b39b141ed7dd"
+source = "git+https://github.com/hoprnet/hoprnet?branch=master#56b7f2af738bb93829d5d7b01181278e80fd39a4"
 dependencies = [
  "bigdecimal",
  "chrono",
@@ -4970,7 +4925,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "hopr-crypto-packet",
- "hopr-primitive-types 0.10.1",
+ "hopr-types",
  "serde",
  "serde_bytes",
  "strum 0.28.0",
@@ -4994,14 +4949,10 @@ dependencies = [
  "hopr-api",
  "hopr-chain-connector",
  "hopr-crypto-packet",
- "hopr-crypto-random 0.4.1",
- "hopr-crypto-types 0.9.2",
  "hopr-db-node",
- "hopr-internal-types",
- "hopr-metrics",
- "hopr-parallelize",
+ "hopr-metrics 1.3.2",
  "hopr-platform",
- "hopr-primitive-types 0.10.1",
+ "hopr-types",
  "humantime-serde",
  "lazy_static",
  "moka",
@@ -5037,11 +4988,10 @@ dependencies = [
  "hex-literal",
  "hopr-async-runtime",
  "hopr-crypto-packet",
- "hopr-crypto-random 0.4.1",
- "hopr-metrics",
+ "hopr-metrics 1.3.2",
  "hopr-network-types",
- "hopr-primitive-types 0.10.1",
  "hopr-protocol-app",
+ "hopr-types",
  "indexmap 2.13.0",
  "insta",
  "lazy_static",
@@ -5102,9 +5052,9 @@ dependencies = [
  "hex-literal",
  "hopr-async-runtime",
  "hopr-chain-connector",
- "hopr-crypto-random 0.4.1",
  "hopr-lib",
- "hopr-metrics",
+ "hopr-metrics 1.3.2",
+ "hopr-types",
  "humantime-serde",
  "insta",
  "lazy_static",
@@ -5132,12 +5082,8 @@ dependencies = [
  "hopr-api",
  "hopr-async-runtime",
  "hopr-crypto-packet",
- "hopr-crypto-random 0.4.1",
- "hopr-crypto-types 0.9.2",
- "hopr-internal-types",
- "hopr-metrics",
+ "hopr-metrics 1.3.2",
  "hopr-network-types",
- "hopr-primitive-types 0.10.1",
  "hopr-protocol-app",
  "hopr-protocol-hopr",
  "hopr-protocol-session",
@@ -5148,6 +5094,7 @@ dependencies = [
  "hopr-transport-probe",
  "hopr-transport-protocol",
  "hopr-transport-session",
+ "hopr-types",
  "humantime-serde",
  "insta",
  "lazy_static",
@@ -5183,8 +5130,8 @@ dependencies = [
  "criterion",
  "futures",
  "futures-timer",
- "hopr-crypto-random 0.4.1",
- "hopr-metrics",
+ "hopr-metrics 1.3.2",
+ "hopr-types",
  "lazy_static",
  "rust-stream-ext-concurrent",
  "smart-default",
@@ -5200,7 +5147,7 @@ dependencies = [
  "anyhow",
  "dashmap",
  "hopr-api",
- "hopr-metrics",
+ "hopr-metrics 1.3.2",
  "humantime-serde",
  "lazy_static",
  "libp2p-identity",
@@ -5220,14 +5167,13 @@ dependencies = [
  "futures",
  "hopr-api",
  "hopr-crypto-packet",
- "hopr-crypto-random 0.4.1",
- "hopr-crypto-types 0.9.2",
- "hopr-metrics",
+ "hopr-metrics 1.3.2",
  "hopr-network-types",
  "hopr-platform",
  "hopr-transport-network",
  "hopr-transport-probe",
  "hopr-transport-protocol",
+ "hopr-types",
  "lazy_static",
  "libp2p",
  "libp2p-stream",
@@ -5251,13 +5197,10 @@ dependencies = [
  "hopr-api",
  "hopr-async-runtime",
  "hopr-crypto-packet",
- "hopr-crypto-random 0.4.1",
- "hopr-crypto-types 0.9.2",
  "hopr-ct-immediate",
- "hopr-internal-types",
  "hopr-platform",
- "hopr-primitive-types 0.10.1",
  "hopr-protocol-app",
+ "hopr-types",
  "humantime-serde",
  "lazy_static",
  "moka",
@@ -5291,16 +5234,13 @@ dependencies = [
  "hopr-async-runtime",
  "hopr-chain-connector",
  "hopr-crypto-packet",
- "hopr-crypto-random 0.4.1",
- "hopr-crypto-types 0.9.2",
  "hopr-db-node",
- "hopr-internal-types",
- "hopr-metrics",
+ "hopr-metrics 1.3.2",
  "hopr-network-types",
- "hopr-primitive-types 0.10.1",
  "hopr-protocol-app",
  "hopr-protocol-hopr",
  "hopr-transport-mixer",
+ "hopr-types",
  "humantime-serde",
  "lazy_static",
  "libp2p",
@@ -5331,15 +5271,12 @@ dependencies = [
  "futures-time",
  "hopr-async-runtime",
  "hopr-crypto-packet",
- "hopr-crypto-random 0.4.1",
- "hopr-crypto-types 0.9.2",
- "hopr-internal-types",
- "hopr-metrics",
+ "hopr-metrics 1.3.2",
  "hopr-network-types",
- "hopr-primitive-types 0.10.1",
  "hopr-protocol-app",
  "hopr-protocol-session",
  "hopr-protocol-start",
+ "hopr-types",
  "lazy_static",
  "mimalloc",
  "mockall",
@@ -5362,6 +5299,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-types"
+version = "1.0.0"
+source = "git+https://github.com/hoprnet/hopr-types?branch=main#874498553726932c4e154ae3d5bdc8026992731d"
+dependencies = [
+ "hopr-chain-types",
+ "hopr-crypto-random 0.4.1 (git+https://github.com/hoprnet/hopr-types?branch=main)",
+ "hopr-crypto-types 0.9.2 (git+https://github.com/hoprnet/hopr-types?branch=main)",
+ "hopr-internal-types",
+ "hopr-parallelize",
+ "hopr-primitive-types 0.10.1 (git+https://github.com/hoprnet/hopr-types?branch=main)",
+]
+
+[[package]]
 name = "hopr-utils-session"
 version = "1.1.0"
 dependencies = [
@@ -5373,11 +5323,11 @@ dependencies = [
  "futures-time",
  "hopr-api",
  "hopr-async-runtime",
- "hopr-crypto-types 0.9.2",
  "hopr-lib",
- "hopr-metrics",
+ "hopr-metrics 1.3.2",
  "hopr-network-types",
  "hopr-transport",
+ "hopr-types",
  "human-bandwidth",
  "lazy_static",
  "parking_lot",
@@ -5406,7 +5356,7 @@ dependencies = [
  "hopr-chain-connector",
  "hopr-db-node",
  "hopr-lib",
- "hopr-metrics",
+ "hopr-metrics 1.3.2",
  "hopr-network-graph",
  "hopr-strategy",
  "hopr-transport-p2p",
@@ -5451,7 +5401,7 @@ dependencies = [
  "hopr-chain-connector",
  "hopr-db-node",
  "hopr-lib",
- "hopr-metrics",
+ "hopr-metrics 1.3.2",
  "hopr-network-graph",
  "hopr-transport-p2p",
  "hopr-utils-session",
@@ -5508,7 +5458,7 @@ dependencies = [
  "hopr-builder",
  "hopr-chain-connector",
  "hopr-lib",
- "hopr-primitive-types 0.10.1",
+ "hopr-types",
  "hoprd",
  "hoprd-api",
  "hoprd-api-client",
@@ -5760,7 +5710,7 @@ dependencies = [
  "percent-encoding",
  "pin-project-lite",
  "socket2 0.6.2",
- "system-configuration 0.7.0",
+ "system-configuration",
  "tokio",
  "tower-service",
  "tracing",
@@ -5779,7 +5729,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.62.2",
+ "windows-core",
 ]
 
 [[package]]
@@ -5907,19 +5857,19 @@ dependencies = [
 
 [[package]]
 name = "if-addrs"
-version = "0.10.2"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cabb0019d51a643781ff15c9c8a3e5dedc365c47211270f4e8f82812fedd8f0a"
+checksum = "c0a05c691e1fae256cf7013d99dad472dc52d5543322761f83ec8d47eab40d2b"
 dependencies = [
  "libc",
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
 name = "if-watch"
-version = "3.2.1"
+version = "3.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdf9d64cfcf380606e64f9a0bcf493616b65331199f984151a6fa11a7b3cde38"
+checksum = "71c02a5161c313f0cbdbadc511611893584a10a7b6153cb554bdf83ddce99ec2"
 dependencies = [
  "async-io",
  "core-foundation 0.9.4",
@@ -5933,7 +5883,7 @@ dependencies = [
  "netlink-proto",
  "netlink-sys",
  "rtnetlink",
- "system-configuration 0.6.1",
+ "system-configuration",
  "tokio",
  "windows",
 ]
@@ -6098,9 +6048,9 @@ dependencies = [
 
 [[package]]
 name = "ipnet"
-version = "2.11.0"
+version = "2.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "469fb0b9cefa57e3ef31275ee7cacb78f2fdca44e4765491884a2b119d4eb130"
+checksum = "d98f6fed1fde3f8c21bc40a1abb88dd75e67924f9cffc3ef95607bad8017f8e2"
 
 [[package]]
 name = "iri-string"
@@ -6677,7 +6627,7 @@ version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1744e39d1d6a9948f4f388969627434e31128196de472883b39f148769bfe30a"
 dependencies = [
- "bitflags 2.11.0",
+ "bitflags",
  "libc",
  "plain",
  "redox_syscall 0.7.3",
@@ -7032,46 +6982,30 @@ dependencies = [
 
 [[package]]
 name = "netlink-packet-core"
-version = "0.7.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72724faf704479d67b388da142b186f916188505e7e0b26719019c525882eda4"
+checksum = "3463cbb78394cb0141e2c926b93fc2197e473394b761986eca3b9da2c63ae0f4"
 dependencies = [
- "anyhow",
- "byteorder",
- "netlink-packet-utils",
+ "paste",
 ]
 
 [[package]]
 name = "netlink-packet-route"
-version = "0.17.1"
+version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "053998cea5a306971f88580d0829e90f270f940befd7cf928da179d4187a5a66"
+checksum = "4ce3636fa715e988114552619582b530481fd5ef176a1e5c1bf024077c2c9445"
 dependencies = [
- "anyhow",
- "bitflags 1.3.2",
- "byteorder",
+ "bitflags",
  "libc",
+ "log",
  "netlink-packet-core",
- "netlink-packet-utils",
-]
-
-[[package]]
-name = "netlink-packet-utils"
-version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ede8a08c71ad5a95cdd0e4e52facd37190977039a4704eb82a283f713747d34"
-dependencies = [
- "anyhow",
- "byteorder",
- "paste",
- "thiserror 1.0.69",
 ]
 
 [[package]]
 name = "netlink-proto"
-version = "0.11.5"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72452e012c2f8d612410d89eea01e2d9b56205274abb35d53f60200b2ec41d60"
+checksum = "b65d130ee111430e47eed7896ea43ca693c387f097dd97376bffafbf25812128"
 dependencies = [
  "bytes",
  "futures",
@@ -7096,12 +7030,13 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.26.4"
+version = "0.30.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "598beaf3cc6fdd9a5dfb1630c2800c7acd31df7aaf0f565796fba2b53ca1af1b"
+checksum = "74523f3a35e05aba87a1d978330aef40f67b0304ac79c1c00b294c9830543db6"
 dependencies = [
- "bitflags 1.3.2",
+ "bitflags",
  "cfg-if",
+ "cfg_aliases",
  "libc",
 ]
 
@@ -7318,7 +7253,7 @@ version = "0.10.75"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08838db121398ad17ab8531ce9de97b244589089e290a384c900cb9ff7434328"
 dependencies = [
- "bitflags 2.11.0",
+ "bitflags",
  "cfg-if",
  "foreign-types",
  "libc",
@@ -8112,7 +8047,7 @@ checksum = "37566cb3fdacef14c0737f9546df7cfeadbfbc9fef10991038bf5015d0c80532"
 dependencies = [
  "bit-set",
  "bit-vec",
- "bitflags 2.11.0",
+ "bitflags",
  "num-traits",
  "rand 0.9.2",
  "rand_chacha 0.9.0",
@@ -8275,6 +8210,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
 
 [[package]]
+name = "r-efi"
+version = "6.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
+
+[[package]]
 name = "radium"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8310,7 +8251,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc266eb313df6c5c09c1c7b1fbe2510961e5bcd3add930c1e31f7ed9da0feff8"
 dependencies = [
  "chacha20 0.10.0",
- "getrandom 0.4.1",
+ "getrandom 0.4.2",
  "rand_core 0.10.0",
 ]
 
@@ -8435,7 +8376,7 @@ version = "0.5.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed2bf2547551a7053d6fdfafda3f938979645c44812fbfcda098faae3f1a362d"
 dependencies = [
- "bitflags 2.11.0",
+ "bitflags",
 ]
 
 [[package]]
@@ -8444,7 +8385,7 @@ version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ce70a74e890531977d37e532c34d45e9055d2409ed08ddba14529471ed0be16"
 dependencies = [
- "bitflags 2.11.0",
+ "bitflags",
 ]
 
 [[package]]
@@ -8690,15 +8631,15 @@ dependencies = [
 
 [[package]]
 name = "rtnetlink"
-version = "0.13.1"
+version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a552eb82d19f38c3beed3f786bd23aa434ceb9ac43ab44419ca6d67a7e186c0"
+checksum = "4b960d5d873a75b5be9761b1e73b146f52dddcd27bac75263f40fba686d4d7b5"
 dependencies = [
- "futures",
+ "futures-channel",
+ "futures-util",
  "log",
  "netlink-packet-core",
  "netlink-packet-route",
- "netlink-packet-utils",
  "netlink-proto",
  "netlink-sys",
  "nix",
@@ -8840,7 +8781,7 @@ version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6fe4565b9518b83ef4f91bb47ce29620ca828bd32cb7e408f0062e9930ba190"
 dependencies = [
- "bitflags 2.11.0",
+ "bitflags",
  "errno",
  "libc",
  "linux-raw-sys",
@@ -9336,7 +9277,7 @@ version = "2.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "897b2245f0b511c87893af39b033e5ca9cce68824c4d7e7630b5a1d339658d02"
 dependencies = [
- "bitflags 2.11.0",
+ "bitflags",
  "core-foundation 0.9.4",
  "core-foundation-sys",
  "libc",
@@ -9349,7 +9290,7 @@ version = "3.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b7f4bc775c73d9a02cde8bf7b2ec4c9d12743edf609006c7facc23998404cd1d"
 dependencies = [
- "bitflags 2.11.0",
+ "bitflags",
  "core-foundation 0.10.1",
  "core-foundation-sys",
  "libc",
@@ -9406,9 +9347,9 @@ dependencies = [
 
 [[package]]
 name = "serde-saphyr"
-version = "0.0.20"
+version = "0.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfcaa44cda9e21eaf5fefc86175d544a359d4de9bcd1f3a90be7bbf77dfc3492"
+checksum = "4a6fc4aa0da972ba0f51cf5c1bb16e9dba35334adc6831b09b3ffb0ec20bb264"
 dependencies = [
  "ahash",
  "annotate-snippets",
@@ -9925,7 +9866,7 @@ checksum = "aa003f0038df784eb8fecbbac13affe3da23b45194bd57dba231c8f48199c526"
 dependencies = [
  "atoi",
  "base64 0.22.1",
- "bitflags 2.11.0",
+ "bitflags",
  "byteorder",
  "bytes",
  "chrono",
@@ -9968,7 +9909,7 @@ checksum = "db58fcd5a53cf07c184b154801ff91347e4c30d17a3562a635ff028ad5deda46"
 dependencies = [
  "atoi",
  "base64 0.22.1",
- "bitflags 2.11.0",
+ "bitflags",
  "byteorder",
  "chrono",
  "crc",
@@ -10168,22 +10109,11 @@ dependencies = [
 
 [[package]]
 name = "system-configuration"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c879d448e9d986b661742763247d3693ed13609438cf3d006f51f5368a5ba6b"
-dependencies = [
- "bitflags 2.11.0",
- "core-foundation 0.9.4",
- "system-configuration-sys",
-]
-
-[[package]]
-name = "system-configuration"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a13f3d0daba03132c0aa9767f98351b3488edc2c100cda2d2ec2b04f3d8d3c8b"
 dependencies = [
- "bitflags 2.11.0",
+ "bitflags",
  "core-foundation 0.9.4",
  "system-configuration-sys",
 ]
@@ -10226,7 +10156,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "82a72c767771b47409d2345987fda8628641887d5466101319899796367354a0"
 dependencies = [
  "fastrand",
- "getrandom 0.4.1",
+ "getrandom 0.4.2",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
@@ -10419,9 +10349,9 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tokio"
-version = "1.49.0"
+version = "1.50.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72a2903cd7736441aac9df9d7688bd0ce48edccaadf181c3b90be801e81d3d86"
+checksum = "27ad5e34374e03cfffefc301becb44e9dc3c17584f414349ebe29ed26661822d"
 dependencies = [
  "bytes",
  "libc",
@@ -10446,9 +10376,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-macros"
-version = "2.6.0"
+version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af407857209536a95c8e56f8231ef2c2e2aff839b22e07a1ffcbc617e9db9fa5"
+checksum = "5c55a2eff8b69ce66c84f85e1da1c233edc36ceb85a2058d11b0d6a3c7e7569c"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -10620,7 +10550,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d4e6559d53cc268e5031cd8429d05415bc4cb4aefc4aa5d6cc35fbf5b924a1f8"
 dependencies = [
  "async-compression",
- "bitflags 2.11.0",
+ "bitflags",
  "bytes",
  "futures-core",
  "futures-util",
@@ -11018,7 +10948,7 @@ version = "1.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b672338555252d43fd2240c714dc444b8c6fb0a5c5335e65a07bba7742735ddb"
 dependencies = [
- "getrandom 0.4.1",
+ "getrandom 0.4.2",
  "js-sys",
  "serde_core",
  "wasm-bindgen",
@@ -11269,7 +11199,7 @@ version = "0.244.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47b807c72e1bac69382b3a6fb3dbe8ea4c0ed87ff5629b8685ae6b9a611028fe"
 dependencies = [
- "bitflags 2.11.0",
+ "bitflags",
  "hashbrown 0.15.5",
  "indexmap 2.13.0",
  "semver 1.0.27",
@@ -11358,22 +11288,23 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "windows"
-version = "0.53.0"
+version = "0.62.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "efc5cf48f83140dcaab716eeaea345f9e93d0018fb81162753a3f76c3397b538"
+checksum = "527fadee13e0c05939a6a05d5bd6eec6cd2e3dbd648b9f8e447c6518133d8580"
 dependencies = [
- "windows-core 0.53.0",
- "windows-targets 0.52.6",
+ "windows-collections",
+ "windows-core",
+ "windows-future",
+ "windows-numerics",
 ]
 
 [[package]]
-name = "windows-core"
-version = "0.53.0"
+name = "windows-collections"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9dcc5b895a6377f1ab9fa55acedab1fd5ac0db66ad1e6c7f47e28a22e446a5dd"
+checksum = "23b2d95af1a8a14a3c7367e1ed4fc9c20e0a26e79551b1454d72583c97cc6610"
 dependencies = [
- "windows-result 0.1.2",
- "windows-targets 0.52.6",
+ "windows-core",
 ]
 
 [[package]]
@@ -11385,8 +11316,19 @@ dependencies = [
  "windows-implement",
  "windows-interface",
  "windows-link",
- "windows-result 0.4.1",
+ "windows-result",
  "windows-strings",
+]
+
+[[package]]
+name = "windows-future"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1d6f90251fe18a279739e78025bd6ddc52a7e22f921070ccdc67dde84c605cb"
+dependencies = [
+ "windows-core",
+ "windows-link",
+ "windows-threading",
 ]
 
 [[package]]
@@ -11418,23 +11360,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0805222e57f7521d6a62e36fa9163bc891acd422f971defe97d64e70d0a4fe5"
 
 [[package]]
+name = "windows-numerics"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e2e40844ac143cdb44aead537bbf727de9b044e107a0f1220392177d15b0f26"
+dependencies = [
+ "windows-core",
+ "windows-link",
+]
+
+[[package]]
 name = "windows-registry"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "02752bf7fbdcce7f2a27a742f798510f3e5ad88dbe84871e5168e2120c3d5720"
 dependencies = [
  "windows-link",
- "windows-result 0.4.1",
+ "windows-result",
  "windows-strings",
-]
-
-[[package]]
-name = "windows-result"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e383302e8ec8515204254685643de10811af0ed97ea37210dc26fb0032647f8"
-dependencies = [
- "windows-targets 0.52.6",
 ]
 
 [[package]]
@@ -11546,6 +11489,15 @@ dependencies = [
  "windows_x86_64_gnu 0.53.1",
  "windows_x86_64_gnullvm 0.53.1",
  "windows_x86_64_msvc 0.53.1",
+]
+
+[[package]]
+name = "windows-threading"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3949bd5b99cafdf1c7ca86b43ca564028dfe27d66958f2470940f73d86d75b37"
+dependencies = [
+ "windows-link",
 ]
 
 [[package]]
@@ -11763,7 +11715,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d66ea20e9553b30172b5e831994e35fbde2d165325bec84fc43dbf6f4eb9cb2"
 dependencies = [
  "anyhow",
- "bitflags 2.11.0",
+ "bitflags",
  "indexmap 2.13.0",
  "log",
  "serde",

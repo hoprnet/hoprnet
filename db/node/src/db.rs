@@ -5,8 +5,7 @@ use std::{
     time::Duration,
 };
 
-use hopr_internal_types::channels::ChannelId;
-use hopr_primitive_types::prelude::HoprBalance;
+use hopr_types::{internal::channels::ChannelId, primitive::prelude::HoprBalance};
 use migration::{MigratorTickets, MigratorTrait};
 use sea_orm::SqlxSqliteConnector;
 use sqlx::{

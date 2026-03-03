@@ -19,7 +19,7 @@ db = []
 network = []
 graph = ["dep:auto_impl"]
 node = ["chain", "db", "graph", "network", "dep:atomic_enum"]
-serde = ["hopr-primitive-types/serde"]
+serde = ["hopr-types/serde"]
 
 [dependencies]
 async-trait = { workspace = true }
@@ -32,11 +32,15 @@ multiaddr = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
-hopr-internal-types = { workspace = true }
-hopr-primitive-types = { workspace = true }
-hopr-chain-types = { workspace = true }
+
+hopr-types = { workspace = true, features = [
+  "crypto",
+  "chain",
+  "internal",
+  "primitive",
+] }
 hopr-crypto-packet = { workspace = true }
-hopr-crypto-types = { workspace = true }
+
 
 [dev-dependencies]
 insta = { workspace = true }

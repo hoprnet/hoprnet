@@ -1,13 +1,15 @@
 use hopr_api::chain::ChainValues;
 use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
-use hopr_crypto_types::prelude::{ChainKeypair, Keypair, OffchainKeypair};
-use hopr_internal_types::{
-    channels::ChannelStatus,
-    prelude::{AccountEntry, AccountType, ChannelEntry},
-};
-use hopr_primitive_types::{
-    balance::WxHOPR,
-    prelude::{Address, BytesRepresentable, HoprBalance, XDai, XDaiBalance},
+use hopr_types::{
+    crypto::prelude::{ChainKeypair, Keypair, OffchainKeypair},
+    internal::{
+        channels::ChannelStatus,
+        prelude::{AccountEntry, AccountType, ChannelEntry},
+    },
+    primitive::{
+        balance::WxHOPR,
+        prelude::{Address, BytesRepresentable, HoprBalance, XDai, XDaiBalance},
+    },
 };
 
 lazy_static::lazy_static! {

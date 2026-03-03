@@ -4,7 +4,7 @@ use hopr_crypto_sphinx::{
     errors::SphinxError,
     prelude::{PaddedPayload, SURB, SphinxHeaderSpec, SphinxSuite},
 };
-use hopr_primitive_types::prelude::GeneralError;
+use hopr_types::primitive::prelude::GeneralError;
 
 use crate::{HoprSphinxHeaderSpec, HoprSphinxSuite, PAYLOAD_SIZE_INT};
 
@@ -206,11 +206,10 @@ mod tests {
     use anyhow::anyhow;
     use bimap::BiHashMap;
     use hex_literal::hex;
-    use hopr_crypto_random::Randomizable;
     use hopr_crypto_sphinx::prelude::*;
-    use hopr_crypto_types::prelude::*;
-    use hopr_internal_types::routing::HoprSenderId;
-    use hopr_primitive_types::prelude::*;
+    use hopr_types::{
+        crypto::prelude::*, crypto_random::Randomizable, internal::routing::HoprSenderId, primitive::prelude::*,
+    };
 
     use super::*;
     use crate::{

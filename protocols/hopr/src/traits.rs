@@ -1,9 +1,7 @@
 use std::ops::Mul;
 
 use hopr_crypto_packet::prelude::*;
-use hopr_crypto_types::prelude::*;
-use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::*;
+use hopr_types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*};
 
 use crate::TicketCreationError;
 pub use crate::{

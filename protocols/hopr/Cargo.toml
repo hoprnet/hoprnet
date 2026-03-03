@@ -11,20 +11,15 @@ license = "GPL-3.0-only"
 
 [features]
 default = ["rayon"]
-rayon = [
-  "hopr-parallelize/rayon",
-  "hopr-crypto-packet/rayon",
-  "hopr-internal-types/rayon",
-]
+rayon = ["hopr-crypto-packet/rayon", "hopr-types/rayon"]
 serde = [
   "dep:cfg_eval",
   "dep:humantime-serde",
   "dep:serde",
   "dep:serde_with",
-  "hopr-internal-types/serde",
-  "hopr-crypto-types/serde",
+  "hopr-types/serde",
 ]
-prometheus = ["dep:hopr-metrics", "hopr-parallelize/prometheus"]
+prometheus = ["dep:hopr-metrics", "hopr-types/prometheus"]
 trace-timing = ["hopr-platform/trace-timing"]
 
 [dependencies]
@@ -50,14 +45,18 @@ tracing = { workspace = true }
 validator = { workspace = true }
 
 hopr-api = { workspace = true, features = ["db", "chain"] }
+hopr-types = { workspace = true, features = [
+  "crypto",
+  "internal",
+  "primitive",
+  "parallelize",
+  "random",
+] }
+
 hopr-crypto-packet = { workspace = true }
-hopr-crypto-random = { workspace = true }
-hopr-crypto-types = { workspace = true }
-hopr-internal-types = { workspace = true }
+
 hopr-metrics = { workspace = true, optional = true }
-hopr-parallelize = { workspace = true }
 hopr-platform = { workspace = true }
-hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }

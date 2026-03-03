@@ -5,7 +5,7 @@ use std::{
     fmt::{Debug, Display, Formatter},
 };
 
-use hopr_primitive_types::prelude::{GeneralError, to_hex_shortened};
+use hopr_types::primitive::prelude::{GeneralError, to_hex_shortened};
 
 use crate::errors::SessionError;
 

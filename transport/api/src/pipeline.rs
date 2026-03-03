@@ -4,11 +4,13 @@ use hopr_api::{
 };
 use hopr_async_runtime::AbortableList;
 use hopr_crypto_packet::HoprSurb;
-use hopr_crypto_types::prelude::*;
-use hopr_internal_types::{prelude::*, routing::ResolvedTransportRouting};
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
 use hopr_transport_protocol::{TicketEvent, run_packet_pipeline};
+use hopr_types::{
+    crypto::prelude::*,
+    internal::{prelude::*, routing::ResolvedTransportRouting},
+};
 
 use crate::{HoprTransportProcess, config::HoprPacketPipelineConfig};
 
