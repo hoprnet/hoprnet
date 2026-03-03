@@ -3,9 +3,12 @@ use std::{str::FromStr, time::Duration};
 use anyhow::Context;
 use hopr_builder::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster};
 use hopr_lib::{
-    RoutingOptions, SessionCapabilities, SessionClientConfig, SessionTarget,
+    SessionCapabilities, SessionClientConfig, SessionTarget,
     errors::{HoprLibError, HoprTransportError},
-    exports::transport::session::{IpOrHost, SealedHost},
+    exports::{
+        transport::session::{IpOrHost, SealedHost},
+        types::internal::routing::RoutingOptions,
+    },
 };
 use rstest::*;
 use serial_test::serial;

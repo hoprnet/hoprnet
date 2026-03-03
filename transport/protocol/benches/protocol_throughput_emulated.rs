@@ -8,12 +8,11 @@ use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_m
 use futures::{SinkExt, StreamExt};
 use hopr_api::chain::ChainValues;
 use hopr_chain_connector::create_trustful_hopr_blokli_connector;
-use hopr_crypto_packet::prelude::HoprPacket;
+use hopr_crypto_packet::{HoprSurb, prelude::HoprPacket};
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::keypairs::Keypair;
 use hopr_db_node::HoprNodeDb;
-use hopr_internal_types::prelude::*;
-use hopr_network_types::prelude::ResolvedTransportRouting;
+use hopr_internal_types::{prelude::*, routing::ResolvedTransportRouting};
 use hopr_primitive_types::prelude::HoprBalance;
 use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut};
 use hopr_protocol_hopr::{
@@ -84,8 +83,10 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                         let (_wire_msg_recv_tx, wire_msg_recv_rx) =
                             futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
 
-                        let (api_send_tx, api_send_rx) =
-                            futures::channel::mpsc::unbounded::<(ResolvedTransportRouting, ApplicationDataOut)>();
+                        let (api_send_tx, api_send_rx) = futures::channel::mpsc::unbounded::<(
+                            ResolvedTransportRouting<HoprSurb>,
+                            ApplicationDataOut,
+                        )>();
                         let (api_recv_tx, _api_recv_rx) =
                             futures::channel::mpsc::unbounded::<(HoprPseudonym, ApplicationDataIn)>();
 

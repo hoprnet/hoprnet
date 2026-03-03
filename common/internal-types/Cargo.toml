@@ -1,6 +1,6 @@
 [package]
 name = "hopr-internal-types"
-version = "0.17.1"
+version = "0.18.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains HOPR-specific types required internally by the HOPR node"
 edition.workspace = true
@@ -27,6 +27,7 @@ fixed-rng = ["hopr-crypto-random/fixed-rng", "hopr-crypto-types/fixed-rng"]
 aquamarine = { workspace = true }
 async-trait = { workspace = true }
 hex-literal = { workspace = true }
+hex = { workspace = true }
 num_enum = { workspace = true }
 multiaddr = { workspace = true }
 serde = { workspace = true, optional = true }

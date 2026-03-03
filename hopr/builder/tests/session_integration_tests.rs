@@ -3,11 +3,14 @@ use std::{sync::Arc, time::SystemTime};
 use futures::StreamExt;
 use hopr_crypto_random::Randomizable;
 use hopr_lib::{
-    Address, ApplicationDataIn, ApplicationDataOut, ChainKeypair, ConnectedUdpStream, DestinationRouting,
-    HoprPseudonym, Keypair, RoutingOptions, UdpStreamParallelism,
-    exports::transport::session::{
-        AtomicSurbFlowEstimator, BalancerStateValues, Capabilities, Capability, HoprSession, HoprSessionConfig,
-        SessionId, SessionTelemetry, transfer_session,
+    Address, ApplicationDataIn, ApplicationDataOut, ChainKeypair, ConnectedUdpStream, HoprPseudonym, Keypair,
+    UdpStreamParallelism,
+    exports::{
+        transport::session::{
+            AtomicSurbFlowEstimator, BalancerStateValues, Capabilities, Capability, HoprSession, HoprSessionConfig,
+            SessionId, SessionTelemetry, transfer_session,
+        },
+        types::internal::routing::{DestinationRouting, RoutingOptions},
     },
 };
 use rstest::*;
@@ -16,6 +19,7 @@ use tokio::{
     net::{TcpListener, TcpStream, UdpSocket},
     sync::oneshot,
 };
+
 #[rstest]
 #[case(Capabilities::empty())]
 #[case(Capabilities::from(Capability::Segmentation))]

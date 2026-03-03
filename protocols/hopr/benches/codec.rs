@@ -15,8 +15,8 @@ use hopr_db_node::HoprNodeDb;
 use hopr_internal_types::{
     path::ValidatedPath,
     prelude::{HoprPseudonym, VerifiedAcknowledgement},
+    routing::ResolvedTransportRouting,
 };
-use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, HoprTicketProcessor, HoprTicketProcessorConfig, MemorySurbStore,
     PacketDecoder, PacketEncoder, SurbStoreConfig,

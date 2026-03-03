@@ -1,7 +1,10 @@
-use hopr_api::{OffchainPublicKey, network::PathId};
+use hopr_api::OffchainPublicKey;
 use hopr_crypto_random::Randomizable;
-use hopr_internal_types::{NodeId, protocol::HoprPseudonym};
-use hopr_network_types::types::{DestinationRouting, RoutingOptions};
+use hopr_internal_types::{
+    NodeId,
+    protocol::HoprPseudonym,
+    routing::{DestinationRouting, PathId, RoutingOptions},
+};
 use hopr_primitive_types::{bounded::BoundedVec, errors::GeneralError};
 
 pub struct TaggedDestinationRouting {
