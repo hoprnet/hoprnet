@@ -16,8 +16,8 @@ METRICS_DOC="$REPO_ROOT/METRICS.md"
 # Outputs tab-separated rows:  name \t type \t description \t detail
 # Requires 8 lines of trailing context to capture buckets/keys on later lines.
 extract_metrics() {
-  git -C "$REPO_ROOT" grep -A8 -E '(Simple|Multi)(Counter|Gauge|Histogram)::new\(' -- '*.rs' 2>/dev/null \
-  | gawk '
+  git -C "$REPO_ROOT" grep -A8 -E '(Simple|Multi)(Counter|Gauge|Histogram)::new\(' -- '*.rs' 2>/dev/null |
+    gawk '
     /^misc\/metrics\// { next }
 
     # ── new ::new( call → flush previous metric and start fresh ──
@@ -83,12 +83,12 @@ extract_metrics() {
         printf "%s\t%s\t%s\t%s\n", name, type, desc, detail
       }
     }
-  ' \
-  | sort -t$'\t' -k1
+  ' |
+    sort -t$'\t' -k1
 }
 
 # ── --generate: print a markdown table and exit ──────────────────────────────
-if [[ "${1:-}" == "--generate" ]]; then
+if [[ ${1:-} == "--generate" ]]; then
   echo "| Name | Type | Description | Detail |"
   echo "|------|------|-------------|--------|"
   extract_metrics | while IFS=$'\t' read -r name type desc detail; do
@@ -99,17 +99,23 @@ fi
 
 # ── Lint mode ────────────────────────────────────────────────────────────────
 
-if [[ ! -f "$METRICS_DOC" ]]; then
+if [[ ! -f $METRICS_DOC ]]; then
   echo "ERROR: METRICS.md not found at $METRICS_DOC" >&2
   exit 1
 fi
 
-# Generate expected content and compare with the actual file
+# Normalize a markdown table: collapse runs of whitespace around pipes so that
+# column-aligned (prettified) tables compare equal to compact ones.
+normalize_table() {
+  sed -E 's/[ ]+\|/|/g; s/\|[ ]+/|/g; s/\|-+/|---/g'
+}
+
+# Generate expected content and compare with the actual file (whitespace-tolerant)
 expected=$("$0" --generate)
 
-if ! diff -q <(echo "$expected") "$METRICS_DOC" > /dev/null 2>&1; then
+if ! diff -q <(echo "$expected" | normalize_table) <(normalize_table < "$METRICS_DOC") >/dev/null 2>&1; then
   echo "ERROR: METRICS.md is out of date. Differences:"
-  diff -u "$METRICS_DOC" <(echo "$expected") | head -40
+  diff -u <(normalize_table < "$METRICS_DOC") <(echo "$expected" | normalize_table) | head -40
   echo ""
   echo "Run:  $0 --generate > METRICS.md"
   exit 1
