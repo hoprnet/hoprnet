@@ -426,6 +426,14 @@
                 files = "";
                 language = "system";
               };
+              check-metrics = {
+                enable = true;
+                name = "METRICS.md must stay in sync with code";
+                entry = "bash scripts/check-metrics.sh";
+                files = "(METRICS\\.md|\\.rs)$";
+                pass_filenames = false;
+                language = "system";
+              };
             };
             tools = pkgs;
             excludes = [ ".gcloudignore" ];
