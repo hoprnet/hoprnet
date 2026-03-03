@@ -1,4 +1,4 @@
-pub use hopr_network_types::types::PathId;
+pub use hopr_internal_types::routing::PathId;
 pub use hopr_primitive_types::bounded::BoundedVec;
 pub use multiaddr::PeerId;
 

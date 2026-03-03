@@ -18,6 +18,7 @@ mod types;
 mod utils;
 
 pub use balancer::{AtomicSurbFlowEstimator, BalancerStateValues, MIN_BALANCER_SAMPLING_INTERVAL, SurbBalancerConfig};
+use hopr_internal_types::routing::RoutingOptions;
 pub use hopr_network_types::types::*;
 pub use hopr_protocol_session::AcknowledgementMode;
 pub use manager::{DispatchResult, MIN_SURB_BUFFER_DURATION, SessionManager, SessionManagerConfig};

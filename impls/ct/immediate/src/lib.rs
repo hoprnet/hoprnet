@@ -1,12 +1,14 @@
 use futures::{StreamExt, stream::BoxStream};
 use hopr_api::{
-    ct::{CoverTrafficGeneration, DestinationRouting, ProbeRouting, ProbingTrafficGeneration},
+    ct::{CoverTrafficGeneration, ProbeRouting, ProbingTrafficGeneration},
     graph::{NetworkGraphTraverse, NetworkGraphView},
 };
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_internal_types::protocol::HoprPseudonym;
-use hopr_network_types::types::RoutingOptions;
+use hopr_internal_types::{
+    protocol::HoprPseudonym,
+    routing::{DestinationRouting, RoutingOptions},
+};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use validator::Validate;

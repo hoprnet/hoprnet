@@ -2,7 +2,10 @@ use std::fmt::{Display, Formatter};
 
 use hopr_crypto_sphinx::prelude::*;
 use hopr_crypto_types::prelude::*;
-use hopr_internal_types::prelude::*;
+use hopr_internal_types::{
+    prelude::*,
+    routing::{HoprSenderId, HoprSurbId},
+};
 #[cfg(feature = "rayon")]
 use hopr_parallelize::cpu::rayon::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -17,7 +20,7 @@ use crate::{
         ProofOfRelayString, ProofOfRelayValues, SurbReceiverInfo, derive_ack_key_share, generate_proof_of_relay,
         pre_verify,
     },
-    types::{HoprPacketMessage, HoprPacketParts, HoprSenderId, HoprSurbId, PacketSignals},
+    types::{HoprPacketMessage, HoprPacketParts, PacketSignals},
 };
 
 /// Represents an outgoing packet that has been only partially instantiated.

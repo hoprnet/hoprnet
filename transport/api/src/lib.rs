@@ -57,10 +57,9 @@ pub use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     types::{HalfKeyChallenge, Hash, OffchainPublicKey},
 };
-pub use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_internal_types::prelude::*;
-pub use hopr_network_types::prelude::RoutingOptions;
-use hopr_network_types::prelude::{DestinationRouting, *};
+pub use hopr_internal_types::{prelude::HoprPseudonym, routing::RoutingOptions};
+use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 use hopr_protocol_app::v1::ReservedTag;
@@ -104,6 +103,7 @@ use crate::{
 pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RANGE;
 
 pub use hopr_api as api;
+use hopr_internal_types::routing::DestinationRouting;
 
 // Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
 lazy_static::lazy_static! {
@@ -298,7 +298,7 @@ where
         let (mixing_channel_tx, mixing_channel_rx) =
             hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(build_mixer_cfg_from_env());
 
-        // the process is terminated, when the input stream runs out
+        // the process is terminated when the input stream runs out
         let _mixing_process_before_sending_out = spawn(
             mixing_channel_rx
                 .inspect(|(peer, _)| tracing::trace!(%peer, "moving message from mixer to p2p stream"))
