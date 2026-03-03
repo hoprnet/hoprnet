@@ -104,39 +104,16 @@ if [[ ! -f "$METRICS_DOC" ]]; then
   exit 1
 fi
 
-# 1. Metric names from code
-code_metrics=$(extract_metrics | cut -f1 | sort -u)
+# Generate expected content and compare with the actual file
+expected=$("$0" --generate)
 
-# 2. Metric names from the METRICS.md table (backtick-delimited in first column)
-doc_metrics=$(
-  grep -oP '`\Khopr_[a-z0-9_]+(?=`)' "$METRICS_DOC" \
-  | sort -u
-)
-
-# 3. Compare
-exit_code=0
-
-missing_from_doc=$(comm -23 <(echo "$code_metrics") <(echo "$doc_metrics") || true)
-if [[ -n "$missing_from_doc" ]]; then
-  echo "ERROR: Metrics defined in code but missing from METRICS.md:"
-  pattern=$(echo "$missing_from_doc" | paste -sd'|' -)
-  git -C "$REPO_ROOT" grep -n -E "\"($pattern)\"" -- '*.rs' 2>/dev/null \
-    | grep -v '^misc/metrics/' \
-    | while IFS=: read -r file line _rest; do
-        echo "  - $(echo "$_rest" | grep -oP '"hopr_[a-z0-9_]+"' | head -1 | tr -d '"')  ($file:$line)"
-      done
-  exit_code=1
+if ! diff -q <(echo "$expected") "$METRICS_DOC" > /dev/null 2>&1; then
+  echo "ERROR: METRICS.md is out of date. Differences:"
+  diff -u "$METRICS_DOC" <(echo "$expected") | head -40
+  echo ""
+  echo "Run:  $0 --generate > METRICS.md"
+  exit 1
 fi
 
-stale_in_doc=$(comm -13 <(echo "$code_metrics") <(echo "$doc_metrics") || true)
-if [[ -n "$stale_in_doc" ]]; then
-  echo "ERROR: Metrics documented in METRICS.md but not found in code:"
-  while IFS= read -r m; do echo "  - $m"; done <<< "$stale_in_doc"
-  exit_code=1
-fi
-
-if [[ $exit_code -eq 0 ]]; then
-  echo "OK: All $(echo "$code_metrics" | wc -l | tr -d ' ') metrics are in sync between code and METRICS.md."
-fi
-
-exit $exit_code
+count=$(echo "$expected" | tail -n +3 | wc -l | tr -d ' ')
+echo "OK: All $count metrics are in sync between code and METRICS.md."
