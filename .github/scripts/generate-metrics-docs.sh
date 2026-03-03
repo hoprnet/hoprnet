@@ -3,7 +3,7 @@
 # METRICS.md, and that METRICS.md does not reference non-existing metrics.
 #
 # Usage:  ./.github/scripts/generate-metrics-docs.sh              (lint — verify sync)
-
+#         ./.github/scripts/generate-metrics-docs.sh --fix         (update METRICS.md and git-add)
 #         ./.github/scripts/generate-metrics-docs.sh --generate    (print markdown table to stdout)
 #         just generate-metrics-docs                               (via justfile recipe)
 
@@ -66,8 +66,8 @@ extract_metrics() {
     }
 
     # ── collect named constant buckets ──
-    name != "" && buckets == "" && /TIMING_BUCKETS|BUCKETS/ {
-      buckets = "0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.15, 0.25, 0.5, 1.0"; next
+    name != "" && buckets == "" && match($0, /(TIMING_BUCKETS|BUCKETS)/, cb) {
+      buckets = cb[1]; next
     }
 
     # ── collect label keys (&["key1", "key2"]) ──
@@ -121,6 +121,15 @@ if [[ ${1:-} == "--generate" ]]; then
     printf "| %-${widths[0]}s | %-${widths[1]}s | %-${widths[2]}s | %-${widths[3]}s |\n" \
       "$c1" "$c2" "$c3" "$c4"
   done
+  exit 0
+fi
+
+# ── --fix: regenerate METRICS.md in place and stage it ─────────────────────────
+if [[ ${1:-} == "--fix" ]]; then
+  expected=$("$0" --generate)
+  echo "$expected" >"$METRICS_DOC"
+  git -C "$REPO_ROOT" add "$METRICS_DOC"
+  echo "METRICS.md updated and staged."
   exit 0
 fi
 
