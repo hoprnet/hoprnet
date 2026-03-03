@@ -8,8 +8,7 @@ pub mod state;
 
 use std::time::Duration;
 
-use hopr_crypto_types::prelude::Hash;
-use hopr_primitive_types::prelude::Address;
+use hopr_types::{crypto::prelude::Hash, primitive::prelude::Address};
 use multiaddr::Multiaddr;
 pub use multiaddr::PeerId;
 

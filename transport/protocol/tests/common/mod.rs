@@ -9,11 +9,7 @@ use hopr_api::chain::*;
 use hopr_async_runtime::AbortableList;
 use hopr_chain_connector::create_trustful_hopr_blokli_connector;
 use hopr_crypto_packet::HoprSurb;
-use hopr_crypto_random::{random_bytes, random_integer};
-use hopr_crypto_types::prelude::*;
 use hopr_db_node::HoprNodeDb;
-use hopr_internal_types::{errors::PathError, prelude::*, routing::ResolvedTransportRouting};
-use hopr_primitive_types::prelude::*;
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, HoprTicketProcessor, HoprTicketProcessorConfig, MemorySurbStore,
@@ -21,6 +17,12 @@ use hopr_protocol_hopr::{
 };
 use hopr_transport_mixer::config::MixerConfig;
 use hopr_transport_protocol::TicketEvent;
+use hopr_types::{
+    crypto::prelude::*,
+    crypto_random::{random_bytes, random_integer},
+    internal::{errors::PathError, prelude::*, routing::ResolvedTransportRouting},
+    primitive::prelude::*,
+};
 use lazy_static::lazy_static;
 use libp2p::PeerId;
 use tracing::debug;

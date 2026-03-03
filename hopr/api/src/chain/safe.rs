@@ -1,5 +1,5 @@
 use futures::future::BoxFuture;
-use hopr_primitive_types::{
+use hopr_types::primitive::{
     balance::{Balance, Currency},
     prelude::{Address, HoprBalance},
 };

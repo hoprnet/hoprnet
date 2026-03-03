@@ -1,8 +1,6 @@
 use std::fmt::Formatter;
 
-use hopr_crypto_random::Randomizable;
-use hopr_crypto_types::prelude::*;
-use hopr_primitive_types::prelude::*;
+use hopr_types::{crypto::prelude::*, crypto_random::Randomizable, primitive::prelude::*};
 use subtle::ConstantTimeEq;
 use typenum::Unsigned;
 
@@ -200,7 +198,7 @@ pub fn create_surb<S: SphinxSuite, H: SphinxHeaderSpec>(
     additional_data_relayer: &[H::RelayerData],
     receiver_data: H::PacketReceiverData,
     additional_data_receiver: H::SurbReceiverData,
-) -> hopr_crypto_types::errors::Result<(SURB<S, H>, ReplyOpener)>
+) -> hopr_types::crypto::errors::Result<(SURB<S, H>, ReplyOpener)>
 where
     H::KeyId: Copy,
 {
@@ -233,7 +231,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use hopr_crypto_random::Randomizable;
+    use hopr_types::crypto_random::Randomizable;
 
     use super::*;
     use crate::{ec_groups::X25519Suite, tests::*};

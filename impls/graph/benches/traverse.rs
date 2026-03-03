@@ -8,8 +8,8 @@ use hopr_api::{
         traits::{EdgeObservableWrite, EdgeWeightType},
     },
 };
-use hopr_crypto_types::prelude::Keypair;
 use hopr_network_graph::{ChannelGraph, costs::SimpleHoprCostFn};
+use hopr_types::crypto::prelude::Keypair;
 
 // ── Graph construction helpers ───────────────────────────────────────────────
 

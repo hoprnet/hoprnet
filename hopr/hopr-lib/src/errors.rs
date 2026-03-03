@@ -34,13 +34,13 @@ pub enum HoprLibError {
     TransportError(#[from] HoprTransportError),
 
     #[error(transparent)]
-    TypeError(#[from] hopr_primitive_types::errors::GeneralError),
+    TypeError(#[from] hopr_types::primitive::errors::GeneralError),
 
     #[error(transparent)]
     NetworkTypeError(#[from] hopr_network_types::errors::NetworkTypeError),
 
     #[error("rayon thread pool queue full: {0}")]
-    SpawnError(#[from] hopr_parallelize::cpu::SpawnError),
+    SpawnError(#[from] hopr_types::parallelize::cpu::SpawnError),
 
     #[error("unspecified error: {0}")]
     Other(#[source] anyhow::Error),

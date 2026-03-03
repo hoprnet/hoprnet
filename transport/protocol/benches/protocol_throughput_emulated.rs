@@ -9,17 +9,19 @@ use futures::{SinkExt, StreamExt};
 use hopr_api::chain::ChainValues;
 use hopr_chain_connector::create_trustful_hopr_blokli_connector;
 use hopr_crypto_packet::{HoprSurb, prelude::HoprPacket};
-use hopr_crypto_random::Randomizable;
-use hopr_crypto_types::keypairs::Keypair;
 use hopr_db_node::HoprNodeDb;
-use hopr_internal_types::{prelude::*, routing::ResolvedTransportRouting};
-use hopr_primitive_types::prelude::HoprBalance;
 use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut};
 use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, HoprTicketProcessor, HoprTicketProcessorConfig, MemorySurbStore,
     SurbStoreConfig,
 };
 use hopr_transport_protocol::TicketEvent;
+use hopr_types::{
+    crypto::keypairs::Keypair,
+    crypto_random::Randomizable,
+    internal::{prelude::*, routing::ResolvedTransportRouting},
+    primitive::prelude::HoprBalance,
+};
 use libp2p::PeerId;
 
 const SAMPLE_SIZE: usize = 50;

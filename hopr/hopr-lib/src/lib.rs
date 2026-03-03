@@ -33,14 +33,12 @@ pub use hopr_api as api;
 #[doc(hidden)]
 pub mod exports {
     pub mod types {
-        pub use hopr_chain_types as chain;
-        pub use hopr_internal_types as internal;
-        pub use hopr_primitive_types as primitive;
+        pub use hopr_types::{chain, internal, primitive};
     }
 
     pub mod crypto {
         pub use hopr_crypto_keypair as keypair;
-        pub use hopr_crypto_types as types;
+        pub use hopr_types::crypto as types;
     }
 
     pub mod network {
@@ -96,16 +94,14 @@ pub use hopr_api::{
 use hopr_async_runtime::prelude::spawn;
 pub use hopr_async_runtime::{Abortable, AbortableList};
 pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
-pub use hopr_crypto_types::prelude::*;
-pub use hopr_internal_types::prelude::*;
 pub use hopr_network_types::prelude::*;
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_platform::time::native::current_time;
-pub use hopr_primitive_types::prelude::*;
 use hopr_transport::errors::HoprTransportError;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport::transfer_session;
 pub use hopr_transport::*;
+pub use hopr_types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*};
 use tracing::{debug, error, info, warn};
 use validator::Validate;
 
@@ -160,7 +156,7 @@ pub fn prepare_tokio_runtime(
     use std::str::FromStr;
     let avail_parallelism = std::thread::available_parallelism().ok().map(|v| v.get() / 2);
 
-    hopr_parallelize::cpu::init_thread_pool(
+    hopr_types::parallelize::cpu::init_thread_pool(
         num_cpu_threads
             .map(|v| v.get())
             .or(avail_parallelism)
@@ -263,7 +259,7 @@ where
         graph: Graph,
         cfg: config::HoprLibConfig,
     ) -> errors::Result<Self> {
-        if hopr_crypto_random::is_rng_fixed() {
+        if hopr_types::crypto_random::is_rng_fixed() {
             warn!("!! FOR TESTING ONLY !! THIS BUILD IS USING AN INSECURE FIXED RNG !!")
         }
 

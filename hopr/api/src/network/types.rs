@@ -1,5 +1,4 @@
-pub use hopr_internal_types::routing::PathId;
-pub use hopr_primitive_types::bounded::BoundedVec;
+pub use hopr_types::{internal::routing::PathId, primitive::bounded::BoundedVec};
 pub use multiaddr::PeerId;
 
 /// Network health represented with colors, where green is the best and red

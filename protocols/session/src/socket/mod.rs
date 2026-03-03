@@ -582,7 +582,7 @@ mod tests {
             bob_tracker.clone(),
         )?;
 
-        let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
+        let data = hopr_types::crypto_random::random_bytes::<DATA_SIZE>();
 
         alice_socket
             .write_all(&data)
@@ -639,7 +639,7 @@ mod tests {
             NoopTracker,
         )?;
 
-        let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
+        let data = hopr_types::crypto_random::random_bytes::<DATA_SIZE>();
 
         alice_socket
             .write_all(&data)
@@ -687,14 +687,14 @@ mod tests {
             bob_tracker.clone(),
         )?;
 
-        let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
+        let alice_sent_data = hopr_types::crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket
             .write_all(&alice_sent_data)
             .timeout(futures_time::time::Duration::from_secs(2))
             .await??;
         alice_socket.flush().await?;
 
-        let bob_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
+        let bob_sent_data = hopr_types::crypto_random::random_bytes::<DATA_SIZE>();
         bob_socket
             .write_all(&bob_sent_data)
             .timeout(futures_time::time::Duration::from_secs(2))
@@ -757,14 +757,14 @@ mod tests {
             NoopTracker,
         )?;
 
-        let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
+        let alice_sent_data = hopr_types::crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket
             .write_all(&alice_sent_data)
             .timeout(futures_time::time::Duration::from_secs(2))
             .await??;
         alice_socket.flush().await?;
 
-        let bob_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
+        let bob_sent_data = hopr_types::crypto_random::random_bytes::<DATA_SIZE>();
         bob_socket
             .write_all(&bob_sent_data)
             .timeout(futures_time::time::Duration::from_secs(2))
@@ -817,7 +817,7 @@ mod tests {
             NoopTracker,
         )?;
 
-        let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
+        let data = hopr_types::crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket
             .write_all(&data)
             .timeout(futures_time::time::Duration::from_secs(2))
@@ -872,7 +872,7 @@ mod tests {
             NoopTracker,
         )?;
 
-        let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
+        let data = hopr_types::crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket
             .write_all(&data)
             .timeout(futures_time::time::Duration::from_secs(2))
@@ -921,14 +921,14 @@ mod tests {
             NoopTracker,
         )?;
 
-        let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
+        let alice_sent_data = hopr_types::crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket
             .write_all(&alice_sent_data)
             .timeout(futures_time::time::Duration::from_secs(2))
             .await??;
         alice_socket.flush().await?;
 
-        let bob_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
+        let bob_sent_data = hopr_types::crypto_random::random_bytes::<DATA_SIZE>();
         bob_socket
             .write_all(&bob_sent_data)
             .timeout(futures_time::time::Duration::from_secs(2))
@@ -990,14 +990,14 @@ mod tests {
             NoopTracker,
         )?;
 
-        let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
+        let alice_sent_data = hopr_types::crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket
             .write_all(&alice_sent_data)
             .timeout(futures_time::time::Duration::from_secs(2))
             .await??;
         alice_socket.flush().await?;
 
-        let bob_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
+        let bob_sent_data = hopr_types::crypto_random::random_bytes::<DATA_SIZE>();
         bob_socket
             .write_all(&bob_sent_data)
             .timeout(futures_time::time::Duration::from_secs(2))
@@ -1065,7 +1065,7 @@ mod tests {
             bob_tracker.clone(),
         )?;
 
-        let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
+        let data = hopr_types::crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket
             .write_all(&data)
             .timeout(futures_time::time::Duration::from_secs(2))
@@ -1138,7 +1138,7 @@ mod tests {
             NoopTracker,
         )?;
 
-        let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
+        let data = hopr_types::crypto_random::random_bytes::<DATA_SIZE>();
 
         let alice_jh = tokio::spawn(async move {
             alice_socket
@@ -1213,14 +1213,14 @@ mod tests {
             bob_tracker.clone(),
         )?;
 
-        let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
+        let alice_sent_data = hopr_types::crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket
             .write_all(&alice_sent_data)
             .timeout(futures_time::time::Duration::from_secs(2))
             .await??;
         alice_socket.flush().await?;
 
-        let bob_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
+        let bob_sent_data = hopr_types::crypto_random::random_bytes::<DATA_SIZE>();
         bob_socket
             .write_all(&bob_sent_data)
             .timeout(futures_time::time::Duration::from_secs(2))
@@ -1310,7 +1310,7 @@ mod tests {
         )?
         .split();
 
-        let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
+        let alice_sent_data = hopr_types::crypto_random::random_bytes::<DATA_SIZE>();
         let (alice_data_tx, alice_recv_data) = futures::channel::oneshot::channel();
         let alice_rx_jh = tokio::spawn(async move {
             let mut alice_recv_data = vec![0u8; DATA_SIZE];
@@ -1324,7 +1324,7 @@ mod tests {
             Ok::<_, std::io::Error>(())
         });
 
-        let bob_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
+        let bob_sent_data = hopr_types::crypto_random::random_bytes::<DATA_SIZE>();
         let (bob_data_tx, bob_recv_data) = futures::channel::oneshot::channel();
         let bob_rx_jh = tokio::spawn(async move {
             let mut bob_recv_data = vec![0u8; DATA_SIZE];

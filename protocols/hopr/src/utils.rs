@@ -5,10 +5,8 @@ use hopr_chain_connector::{
     HoprBlockchainSafeConnector, create_trustful_hopr_blokli_connector,
     testing::{BlokliTestClient, BlokliTestStateBuilder, StaticState},
 };
-use hopr_crypto_types::prelude::*;
 use hopr_db_node::HoprNodeDb;
-use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::*;
+use hopr_types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*};
 
 lazy_static::lazy_static! {
     pub static ref PEERS: [(ChainKeypair, OffchainKeypair); 5] = [

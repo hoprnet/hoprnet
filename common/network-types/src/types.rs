@@ -171,8 +171,8 @@ impl IpOrHost {
 ///
 /// ### Example
 /// ```no_run
-/// use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
 /// use hopr_network_types::prelude::{IpOrHost, SealedHost};
+/// use hopr_types::crypto::prelude::{Keypair, OffchainKeypair};
 /// use libp2p_identity::PeerId;
 ///
 /// # fn main() -> anyhow::Result<()> {
@@ -223,23 +223,23 @@ impl SealedHost {
 
         // Add randomly long padding, so the length of the short hosts is obscured
         if host_str.len() < Self::MAX_LEN_WITH_PADDING {
-            let pad_len = hopr_crypto_random::random_integer(0, (Self::MAX_LEN_WITH_PADDING as u64).into());
+            let pad_len = hopr_types::crypto_random::random_integer(0, (Self::MAX_LEN_WITH_PADDING as u64).into());
             for _ in 0..pad_len {
                 host_str.push(Self::PADDING_CHAR);
             }
         }
 
-        hopr_crypto_types::seal::seal_data(host_str.as_bytes(), peer_id)
+        hopr_types::crypto::seal::seal_data(host_str.as_bytes(), peer_id)
             .map(Self::Sealed)
             .map_err(|e| NetworkTypeError::Other(e.to_string()))
     }
 
     /// Tries to unseal the sealed [`IpOrHost`] using the private key as Exit node.
     /// No-op, if the data is already unsealed.
-    pub fn unseal(self, key: &hopr_crypto_types::keypairs::OffchainKeypair) -> crate::errors::Result<IpOrHost> {
+    pub fn unseal(self, key: &hopr_types::crypto::keypairs::OffchainKeypair) -> crate::errors::Result<IpOrHost> {
         match self {
             SealedHost::Plain(host) => Ok(host),
-            SealedHost::Sealed(enc) => hopr_crypto_types::seal::unseal_data(&enc, key)
+            SealedHost::Sealed(enc) => hopr_types::crypto::seal::unseal_data(&enc, key)
                 .map_err(|e| NetworkTypeError::Other(e.to_string()))
                 .and_then(|data| {
                     String::from_utf8(data.into_vec())
@@ -278,7 +278,7 @@ impl std::fmt::Display for SealedHost {
 
 #[cfg(test)]
 mod tests {
-    use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
+    use hopr_types::crypto::prelude::{Keypair, OffchainKeypair};
     #[cfg(feature = "runtime-tokio")]
     use {anyhow::anyhow, std::net::SocketAddr};
 

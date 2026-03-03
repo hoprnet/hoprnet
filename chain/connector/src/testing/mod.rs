@@ -4,13 +4,15 @@ pub use blokli_client::{BlokliTestClient, BlokliTestState, exports::Entry};
 pub use emulator::{FullStateEmulator, StaticState};
 pub use hopr_api::chain::ChainInfo;
 use hopr_api::chain::DeployedSafe;
-use hopr_chain_types::{ParsedHoprChainAction, contract_addresses_for_network};
-use hopr_crypto_types::{
-    prelude::{Keypair, OffchainKeypair},
-    types::Hash,
+use hopr_types::{
+    chain::{ParsedHoprChainAction, contract_addresses_for_network},
+    crypto::{
+        prelude::{Keypair, OffchainKeypair},
+        types::Hash,
+    },
+    internal::prelude::*,
+    primitive::prelude::*,
 };
-use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::*;
 
 /// Allows easily building the [`BlokliTestState`] using the HOPR native types.
 #[derive(Clone, Default)]
