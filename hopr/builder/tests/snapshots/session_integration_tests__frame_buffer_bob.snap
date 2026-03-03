@@ -5,13 +5,13 @@ expression: bob_snapshot
 session_id:
   tag: 1
   pseudonym: "[pseudonym]"
-snapshot_at_ms: 1772543893238
+snapshot_at_ms: 1772546328404
 lifetime:
-  created_at_ms: 1772543893178
-  last_activity_at_ms: 1772543893180
-  uptime_ms: 60
-  idle_ms: 58
-  state: Active
+  created_at_ms: 1772546328332
+  last_activity_at_ms: 1772546328335
+  uptime_ms: 72
+  idle_ms: 69
+  state: 0
   pipeline_errors_total: 0
 frame:
   mtu_bytes: 1500
@@ -22,7 +22,7 @@ frame:
   emitted_total: 5
   discarded_total: 0
 ack:
-  mode: None
+  mode: 0
   incoming_segments_total: 10
   incoming_retransmission_requests_total: 0
   incoming_acknowledged_frames_total: 0
