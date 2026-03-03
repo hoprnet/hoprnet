@@ -77,10 +77,6 @@ localcluster clustersize:
     docker run --rm --name anvil_blokli --platform linux/amd64 -p 8080:8080 -d europe-west3-docker.pkg.dev/hoprassociation/docker-images/bloklid-anvil:latest
     cargo run -p hoprd-localcluster -- --chain-url http://localhost:8080  --hoprd-bin ./result/bin/hoprd --size {{clustersize}}
     
-# check that METRICS.md is in sync with code
-generate-metrics-docs:
-    ./.github/scripts/generate-metrics-docs.sh
-
 # run the full test suite (unit tests, integration tests, clippy, formatting)
 test:
     #!/usr/bin/env bash
