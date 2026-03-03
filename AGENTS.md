@@ -11,8 +11,8 @@ Canonical AI configuration lives in the [`.claude/`](.claude/) directory.
 
 ## Tool-Specific Wiring
 
-| Tool | Entry point | Purpose |
-|------|-------------|----------|
-| Claude Code | [CLAUDE.md](CLAUDE.md) | Auto-loaded; references `.claude/` |
-| GitHub Copilot | [.github/.copilot-instructions.md](.github/.copilot-instructions.md) | Auto-loaded; references `.claude/INSTRUCTIONS.md` |
-| Copilot (Rust) | [.github/instructions/rust.instructions.md](.github/instructions/rust.instructions.md) | `applyTo: **/*.rs`; references `.claude/rust.md` |
+| Tool           | Entry point                                                                            | Purpose                                           |
+| -------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| Claude Code    | [CLAUDE.md](CLAUDE.md)                                                                 | Auto-loaded; references `.claude/`                |
+| GitHub Copilot | [.github/.copilot-instructions.md](.github/.copilot-instructions.md)                   | Auto-loaded; references `.claude/INSTRUCTIONS.md` |
+| Copilot (Rust) | [.github/instructions/rust.instructions.md](.github/instructions/rust.instructions.md) | `applyTo: **/*.rs`; references `.claude/rust.md`  |

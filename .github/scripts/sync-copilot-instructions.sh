@@ -14,11 +14,14 @@ dst="$REPO_ROOT/.github/.copilot-instructions.md"
 
 if [ -f "$src" ]; then
   header='<!-- Canonical source: .claude/INSTRUCTIONS.md — edit THERE, then sync this copy. -->'
-  expected="$(printf '%s\n\n' "$header"; cat "$src")"
+  expected="$(
+    printf '%s\n\n' "$header"
+    cat "$src"
+  )"
 
   if [ ! -f "$dst" ] || [ "$(cat "$dst")" != "$expected" ]; then
-    printf '%s\n\n' "$header" > "$dst"
-    cat "$src" >> "$dst"
+    printf '%s\n\n' "$header" >"$dst"
+    cat "$src" >>"$dst"
     git add "$dst"
     changed=1
   fi
@@ -34,11 +37,14 @@ applyTo: "**/*.rs"
 description: "Rust-specific guidelines"
 ---'
   header='<!-- Canonical source: .claude/rust.md — edit THERE, then sync this copy. -->'
-  expected="$(printf '%s\n\n%s\n\n' "$frontmatter" "$header"; cat "$src")"
+  expected="$(
+    printf '%s\n\n%s\n\n' "$frontmatter" "$header"
+    cat "$src"
+  )"
 
   if [ ! -f "$dst" ] || [ "$(cat "$dst")" != "$expected" ]; then
-    printf '%s\n\n%s\n\n' "$frontmatter" "$header" > "$dst"
-    cat "$src" >> "$dst"
+    printf '%s\n\n%s\n\n' "$frontmatter" "$header" >"$dst"
+    cat "$src" >>"$dst"
     git add "$dst"
     changed=1
   fi
