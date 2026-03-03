@@ -87,12 +87,39 @@ extract_metrics() {
     sort -t$'\t' -k1
 }
 
-# ── --generate: print a markdown table and exit ──────────────────────────────
+# ── --generate: print a column-aligned markdown table and exit ────────────────
 if [[ ${1:-} == "--generate" ]]; then
-  echo "| Name | Type | Description | Detail |"
-  echo "|------|------|-------------|--------|"
-  extract_metrics | while IFS=$'\t' read -r name type desc detail; do
-    printf "| \`%s\` | %s | %s | %s |\n" "$name" "$type" "$desc" "$detail"
+  # Collect rows first to compute column widths
+  rows=()
+  while IFS=$'\t' read -r name type desc detail; do
+    rows+=("$(printf "\`%s\`\t%s\t%s\t%s" "$name" "$type" "$desc" "$detail")")
+  done < <(extract_metrics)
+
+  # Compute max width per column (start with header widths)
+  headers=("Name" "Type" "Description" "Detail")
+  widths=(${#headers[0]} ${#headers[1]} ${#headers[2]} ${#headers[3]})
+  for row in "${rows[@]}"; do
+    IFS=$'\t' read -r c1 c2 c3 c4 <<< "$row"
+    (( ${#c1} > widths[0] )) && widths[0]=${#c1}
+    (( ${#c2} > widths[1] )) && widths[1]=${#c2}
+    (( ${#c3} > widths[2] )) && widths[2]=${#c3}
+    (( ${#c4} > widths[3] )) && widths[3]=${#c4}
+  done
+
+  # Print header
+  printf "| %-${widths[0]}s | %-${widths[1]}s | %-${widths[2]}s | %-${widths[3]}s |\n" \
+    "${headers[0]}" "${headers[1]}" "${headers[2]}" "${headers[3]}"
+  # Print separator
+  printf "| %s | %s | %s | %s |\n" \
+    "$(printf '%0.s-' $(seq 1 ${widths[0]}))" \
+    "$(printf '%0.s-' $(seq 1 ${widths[1]}))" \
+    "$(printf '%0.s-' $(seq 1 ${widths[2]}))" \
+    "$(printf '%0.s-' $(seq 1 ${widths[3]}))"
+  # Print rows
+  for row in "${rows[@]}"; do
+    IFS=$'\t' read -r c1 c2 c3 c4 <<< "$row"
+    printf "| %-${widths[0]}s | %-${widths[1]}s | %-${widths[2]}s | %-${widths[3]}s |\n" \
+      "$c1" "$c2" "$c3" "$c4"
   done
   exit 0
 fi
