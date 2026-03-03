@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::SystemTime};
 
-use futures::StreamExt;
+use futures::{AsyncReadExt, AsyncWriteExt, StreamExt};
 use hopr_crypto_random::Randomizable;
 use hopr_lib::{
     Address, ApplicationDataIn, ApplicationDataOut, ChainKeypair, ConnectedUdpStream, HoprPseudonym, Keypair,
@@ -15,7 +15,6 @@ use hopr_lib::{
 };
 use rstest::*;
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream, UdpSocket},
     sync::oneshot,
 };
@@ -82,7 +81,7 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
         bob_metrics.clone(),
     )?;
 
-    let mut listener = ConnectedUdpStream::builder()
+    let listener = ConnectedUdpStream::builder()
         .with_buffer_size(BUF_LEN)
         .with_queue_size(512)
         .with_receiver_parallelism(UdpStreamParallelism::Auto)
@@ -240,7 +239,7 @@ async fn tcp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
     });
 
     let msg: [u8; MSG_LEN] = hopr_crypto_random::random_bytes();
-    let mut sender = TcpStream::connect(addr).await?;
+    let mut sender = TcpStream::connect(addr).await?.compat();
 
     ready_rx.await.ok();
 

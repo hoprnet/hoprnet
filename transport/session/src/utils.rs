@@ -468,7 +468,7 @@ mod tests {
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::prelude::{ChainKeypair, Keypair};
     use hopr_internal_types::prelude::HoprPseudonym;
-    use hopr_network_types::prelude::{DestinationRouting, RoutingOptions};
+    use hopr_internal_types::prelude::{DestinationRouting, RoutingOptions};
     use hopr_primitive_types::prelude::Address;
     use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut};
 
@@ -521,7 +521,7 @@ mod tests {
         HoprSession,
         futures::channel::mpsc::UnboundedSender<ApplicationDataIn>,
         futures::channel::mpsc::UnboundedReceiver<(
-            hopr_network_types::prelude::DestinationRouting,
+            hopr_internal_types::prelude::DestinationRouting,
             ApplicationDataOut,
         )>,
     );
