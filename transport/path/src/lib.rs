@@ -15,6 +15,4 @@ pub mod traits;
 pub use errors::{PathPlannerError, Result};
 pub use planner::{PathPlanner, PathPlannerConfig};
 pub use selector::HoprGraphPathSelector;
-#[cfg(feature = "runtime-tokio")]
-pub use traits::BackgroundPathCacheRefreshable;
-pub use traits::PathSelector;
+pub use traits::{BackgroundPathCacheRefreshable, PathSelector};

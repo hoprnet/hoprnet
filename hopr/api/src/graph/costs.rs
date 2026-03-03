@@ -2,14 +2,16 @@ use super::traits::{
     CostFn, EdgeLinkObservable, EdgeNetworkObservableRead, EdgeObservableRead, EdgeProtocolObservable,
 };
 
+/// A boxed cost function accepting `(current_cost, edge_weight, path_index) -> new_cost`.
+pub type BasicCostFn<C, W> = Box<dyn Fn(C, &W, usize) -> C>;
+
 /// Build a HOPR cost function for immediate graph traversals.
 ///
 /// Represents a backwards compatible cost function for the heartbeat protocol in v3.
-#[allow(clippy::type_complexity)]
 pub struct SimpleHoprCostFn<C, W> {
     initial: C,
     min: Option<C>,
-    cost_fn: Box<dyn Fn(C, &W, usize) -> C>,
+    cost_fn: BasicCostFn<C, W>,
 }
 
 impl<C, W> CostFn for SimpleHoprCostFn<C, W>
@@ -72,11 +74,10 @@ where
 }
 
 /// Build a forward HOPR cost function for full graph traversals.
-#[allow(clippy::type_complexity)]
 pub struct HoprForwardCostFn<C, W> {
     initial: C,
     min: Option<C>,
-    cost_fn: Box<dyn Fn(C, &W, usize) -> C>,
+    cost_fn: BasicCostFn<C, W>,
 }
 
 impl<C, W> CostFn for HoprForwardCostFn<C, W>
@@ -168,11 +169,10 @@ where
 /// Only payment channel capacity is required for the first edge. If probe-based QoS with a
 /// positive score is available, that score is used to scale the edge cost; otherwise the
 /// initial cost is effectively passed through without score-based scaling.
-#[allow(clippy::type_complexity)]
 pub struct HoprReturnCostFn<C, W> {
     initial: C,
     min: Option<C>,
-    cost_fn: Box<dyn Fn(C, &W, usize) -> C>,
+    cost_fn: BasicCostFn<C, W>,
 }
 
 impl<C, W> CostFn for HoprReturnCostFn<C, W>
@@ -254,11 +254,10 @@ where
 }
 
 /// Used for finding simple paths without the final loopback in a loopback call.
-#[allow(clippy::type_complexity)]
 pub struct ForwardPathCostFn<C, W> {
     initial: C,
     min: Option<C>,
-    cost_fn: Box<dyn Fn(C, &W, usize) -> C>,
+    cost_fn: BasicCostFn<C, W>,
 }
 
 impl<W> Default for ForwardPathCostFn<f64, W>

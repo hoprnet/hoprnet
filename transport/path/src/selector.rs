@@ -164,7 +164,7 @@ where
         let length = std::num::NonZeroUsize::new(hops + 1)
             .expect("can never fail, it is physically at least 1 after the addition");
 
-        let mut paths = if src == self.me {
+        let paths = if src == self.me {
             // Phase 1: search for full-length forward paths to dest.
             let mut found = compute_paths(
                 &self.graph,

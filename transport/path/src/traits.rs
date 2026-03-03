@@ -16,7 +16,7 @@ use crate::errors::Result;
 /// guarantees this by using the `simple_paths` graph algorithm, which by
 /// definition never revisits a node.  Alternative implementations must uphold
 /// the same invariant.
-pub trait PathSelector: Send + Sync {
+pub trait PathSelector {
     /// Return **all** candidate paths from `src` to `dest` using `hops` relays.
     ///
     /// Each inner `Vec<OffchainPublicKey>` has length `hops + 1` and contains
@@ -41,9 +41,6 @@ pub trait PathSelector: Send + Sync {
 ///
 /// The returned future is `'static` because it is intended to be
 /// spawned as a long-lived background task.
-///
-/// Only meaningful when the `runtime-tokio` feature is enabled.
-#[cfg(feature = "runtime-tokio")]
 pub trait BackgroundPathCacheRefreshable: Send + Sync {
     /// Returns a future that runs the periodic cache-refresh loop.
     ///

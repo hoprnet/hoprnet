@@ -65,9 +65,7 @@ use hopr_protocol_hopr::MemorySurbStore;
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId, Protocol};
 use hopr_transport_mixer::MixerConfig;
-#[cfg(feature = "runtime-tokio")]
-use hopr_transport_path::BackgroundPathCacheRefreshable;
-use hopr_transport_path::{HoprGraphPathSelector, PathPlanner, PathPlannerConfig};
+use hopr_transport_path::{BackgroundPathCacheRefreshable, HoprGraphPathSelector, PathPlanner};
 pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
 use hopr_transport_probe::{
     Probe,
@@ -205,7 +203,7 @@ where
         cfg: HoprProtocolConfig,
     ) -> Self {
         let me_offchain = *identity.1.public();
-        let planner_config = PathPlannerConfig::default();
+        let planner_config = cfg.path_planner;
         let selector = HoprGraphPathSelector::new(me_offchain, graph.clone(), planner_config.max_cached_paths);
         Self {
             packet_key: identity.1.clone(),

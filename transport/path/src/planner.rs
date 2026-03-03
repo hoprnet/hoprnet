@@ -1,8 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-#[cfg(feature = "runtime-tokio")]
-use futures::StreamExt as _;
-use futures::{TryStreamExt, stream::FuturesUnordered};
+use futures::{StreamExt as _, TryStreamExt, stream::FuturesUnordered};
 use hopr_api::chain::{ChainKeyOperations, ChainPathResolver, ChainReadChannelOperations};
 use hopr_crypto_packet::prelude::*;
 use hopr_crypto_types::{crypto_traits::Randomizable, types::OffchainPublicKey};
@@ -14,11 +12,9 @@ use hopr_primitive_types::traits::ToHex;
 use hopr_protocol_hopr::{FoundSurb, SurbStore};
 use tracing::trace;
 
-#[cfg(feature = "runtime-tokio")]
-use crate::traits::BackgroundPathCacheRefreshable;
 use crate::{
     errors::{PathPlannerError, Result},
-    traits::PathSelector,
+    traits::{BackgroundPathCacheRefreshable, PathSelector},
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -31,7 +27,7 @@ lazy_static::lazy_static! {
 }
 
 /// Configuration for [`PathPlanner`]'s internal path cache.
-#[derive(Debug, Clone, smart_default::SmartDefault)]
+#[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault)]
 pub struct PathPlannerConfig {
     /// Maximum number of `(source, destination, options)` entries in the path cache.
     #[default = 10_000]
@@ -41,10 +37,6 @@ pub struct PathPlannerConfig {
     #[default(Duration::from_secs(60))]
     pub cache_ttl: Duration,
     /// Period between proactive background cache-refresh sweeps.
-    ///
-    /// Only used when the `runtime-tokio` feature is enabled and
-    /// [`PathPlanner::background_refresh`] is spawned.
-    #[cfg(feature = "runtime-tokio")]
     #[default(Duration::from_secs(30))]
     pub refresh_period: Duration,
     /// Maximum number of candidate paths the selector may return per query.
@@ -75,7 +67,6 @@ pub struct PathPlanner<Surb, R, S> {
     resolver: Arc<R>,
     selector: Arc<S>,
     cache: moka::future::Cache<PlannerCacheKey, PlannerCacheValue>,
-    #[cfg(feature = "runtime-tokio")]
     refresh_period: Duration,
 }
 
@@ -83,7 +74,7 @@ impl<Surb, R, S> PathPlanner<Surb, R, S>
 where
     Surb: SurbStore + Send + Sync + 'static,
     R: ChainKeyOperations + ChainReadChannelOperations + Send + Sync + 'static,
-    S: PathSelector + 'static,
+    S: PathSelector + Send + Sync + 'static,
 {
     /// Create a new path planner.
     ///
@@ -100,7 +91,6 @@ where
             resolver: Arc::new(resolver),
             selector: Arc::new(selector),
             cache,
-            #[cfg(feature = "runtime-tokio")]
             refresh_period: config.refresh_period,
         }
     }
@@ -277,20 +267,17 @@ where
     }
 }
 
-#[cfg(feature = "runtime-tokio")]
 impl<Surb, R, S> BackgroundPathCacheRefreshable for PathPlanner<Surb, R, S>
 where
     Surb: SurbStore + Send + Sync + 'static,
     R: ChainKeyOperations + ChainReadChannelOperations + Send + Sync + 'static,
-    S: PathSelector + 'static,
+    S: PathSelector + Send + Sync + 'static,
 {
     /// Returns a future that runs the background path-cache refresh loop.
     ///
     /// The returned future iterates over all keys currently in the planner's cache
     /// and recomputes their paths on a configurable schedule, so that steady-state
     /// traffic is always served from cache.
-    ///
-    /// Only available with the `runtime-tokio` feature.
     fn run_background_refresh(&self) -> impl std::future::Future<Output = ()> + Send + 'static {
         // Clone only the fields we need — avoids requiring R: Clone + S: Clone.
         let cache = self.cache.clone();
@@ -515,7 +502,6 @@ mod tests {
         PathPlannerConfig {
             max_cache_capacity: 100,
             cache_ttl: std::time::Duration::from_secs(60),
-            #[cfg(feature = "runtime-tokio")]
             refresh_period: std::time::Duration::from_secs(60),
             max_cached_paths: 2,
         }
@@ -761,7 +747,6 @@ mod tests {
         assert_eq!(hops2, 2);
     }
 
-    #[cfg(feature = "runtime-tokio")]
     #[tokio::test]
     async fn background_refresh_should_produce_a_future() {
         let me = pubkey(&SECRET_ME);
