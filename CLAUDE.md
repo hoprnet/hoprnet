@@ -1,10 +1,10 @@
 # HOPR — Claude Configuration
 
-Read `.ai/INSTRUCTIONS.md` for full development guidelines, coding standards, and project conventions.
+Read `.claude/INSTRUCTIONS.md` for full development guidelines, coding standards, and project conventions.
 
-When working on Rust files, also read `.ai/rust.md` for language-specific rules.
+When working on Rust files, also read `.claude/rust.md` for language-specific rules.
 
-Claude configuration and prompts live under `.ai/`.
+Claude configuration and instructions live under `.claude/`.
 
 ## Workflow
 

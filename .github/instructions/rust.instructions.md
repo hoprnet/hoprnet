@@ -3,7 +3,7 @@ applyTo: "**/*.rs"
 description: "Rust-specific guidelines"
 ---
 
-<!-- Canonical source: .ai/rust.md — edit THERE, then sync this copy. -->
+<!-- Canonical source: .claude/rust.md — edit THERE, then sync this copy. -->
 
 - Prefer immutable structures.
 - Use `Result` and `Option` types for error handling and optional values.
