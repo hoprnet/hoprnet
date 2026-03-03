@@ -20,8 +20,8 @@ pub use crate::{
     balancer::{AtomicSurbFlowEstimator, BalancerStateValues},
     metric_bridge::{
         SessionMetricDefinition, SessionMetricKind, SessionMetricSample, SessionMetricValue, serialize_duration_millis,
-        serialize_system_time_millis, session_snapshot_metric_definitions, session_snapshot_metric_value,
-        session_telemetry_snapshots,
+        serialize_system_time_millis, session_snapshot_metric_definitions, session_snapshot_metric_samples,
+        session_snapshot_metric_value, session_telemetry_snapshots,
     },
 };
 

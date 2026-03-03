@@ -200,6 +200,10 @@ pub fn session_snapshot_metric_value(snapshot: &SessionStatsSnapshot, metric_nam
         .map(|sample| sample.value)
 }
 
+pub fn session_snapshot_metric_samples(snapshot: &SessionStatsSnapshot) -> Vec<SessionMetricSample> {
+    collect_snapshot_metrics(snapshot)
+}
+
 fn session_telemetry_registry() -> &'static parking_lot::Mutex<HashMap<SessionId, Weak<SessionTelemetry>>> {
     static REGISTRY: OnceLock<parking_lot::Mutex<HashMap<SessionId, Weak<SessionTelemetry>>>> = OnceLock::new();
     REGISTRY.get_or_init(|| parking_lot::Mutex::new(HashMap::new()))

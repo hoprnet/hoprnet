@@ -86,7 +86,7 @@ use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfi
 pub use hopr_transport_session::{
     SessionAckMode, SessionLifecycleState, SessionLifetimeSnapshot, SessionMetricDefinition, SessionMetricKind,
     SessionMetricSample, SessionMetricValue, SessionStatsSnapshot, session_snapshot_metric_definitions,
-    session_snapshot_metric_value, session_telemetry_snapshots,
+    session_snapshot_metric_samples, session_snapshot_metric_value, session_telemetry_snapshots,
 };
 #[cfg(feature = "telemetry")]
 pub use stats::PeerPacketStats;

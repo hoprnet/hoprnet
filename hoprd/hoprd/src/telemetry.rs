@@ -1,4 +1,10 @@
-use std::{str::FromStr, string::ToString, time::Duration};
+use std::{
+    collections::HashMap,
+    str::FromStr,
+    string::ToString,
+    sync::{Arc, Mutex},
+    time::{Duration, Instant},
+};
 
 use opentelemetry::{
     KeyValue,
@@ -19,10 +25,7 @@ use {
     hopr_metrics::{PrometheusMetric, PrometheusMetricFamily, PrometheusMetricType, gather_metric_families},
     std::{
         collections::HashSet,
-        sync::{
-            Arc, Mutex,
-            mpsc::{self, Sender},
-        },
+        sync::mpsc::{self, Sender},
         thread::{self, JoinHandle},
     },
 };
@@ -242,23 +245,66 @@ struct OtelSessionMetricBridge {
     f64_gauges: Vec<ObservableGauge<f64>>,
 }
 
+#[derive(Default)]
+struct SessionMetricCallbackCache {
+    refreshed_at: Option<Instant>,
+    values_by_name: HashMap<String, Vec<(hopr_lib::SessionId, hopr_lib::SessionMetricValue)>>,
+}
+
+const SESSION_METRIC_CACHE_TTL: Duration = Duration::from_millis(100);
+
 fn session_metric_attributes(session_id: hopr_lib::SessionId) -> [KeyValue; 1] {
     [KeyValue::new("session_id", session_id.to_string())]
+}
+
+fn refresh_session_metric_callback_cache(cache: &mut SessionMetricCallbackCache) {
+    let now = Instant::now();
+    if cache
+        .refreshed_at
+        .is_some_and(|refreshed_at| now.duration_since(refreshed_at) <= SESSION_METRIC_CACHE_TTL)
+    {
+        return;
+    }
+
+    let mut values_by_name: HashMap<String, Vec<(hopr_lib::SessionId, hopr_lib::SessionMetricValue)>> = HashMap::new();
+    for snapshot in hopr_lib::session_telemetry_snapshots() {
+        let session_id = snapshot.session_id;
+        for sample in hopr_lib::session_snapshot_metric_samples(&snapshot) {
+            values_by_name
+                .entry(sample.name)
+                .or_default()
+                .push((session_id, sample.value));
+        }
+    }
+
+    cache.values_by_name = values_by_name;
+    cache.refreshed_at = Some(now);
+}
+
+fn get_cached_session_metric_values(
+    cache: &Arc<Mutex<SessionMetricCallbackCache>>,
+    metric_name: &str,
+) -> Vec<(hopr_lib::SessionId, hopr_lib::SessionMetricValue)> {
+    let mut cache_guard = match cache.lock() {
+        Ok(guard) => guard,
+        Err(_) => return Vec::new(),
+    };
+    refresh_session_metric_callback_cache(&mut cache_guard);
+    cache_guard.values_by_name.get(metric_name).cloned().unwrap_or_default()
 }
 
 fn build_session_u64_observable_gauge(
     meter: &opentelemetry::metrics::Meter,
     metric_name: String,
+    cache: Arc<Mutex<SessionMetricCallbackCache>>,
 ) -> ObservableGauge<u64> {
     let callback_metric_name = metric_name.clone();
     meter
         .u64_observable_gauge(metric_name)
         .with_callback(move |observer| {
-            for snapshot in hopr_lib::session_telemetry_snapshots() {
-                if let Some(hopr_lib::SessionMetricValue::U64(value)) =
-                    hopr_lib::session_snapshot_metric_value(&snapshot, &callback_metric_name)
-                {
-                    let attributes = session_metric_attributes(snapshot.session_id);
+            for (session_id, metric_value) in get_cached_session_metric_values(&cache, &callback_metric_name) {
+                if let hopr_lib::SessionMetricValue::U64(value) = metric_value {
+                    let attributes = session_metric_attributes(session_id);
                     observer.observe(value, &attributes);
                 }
             }
@@ -269,16 +315,15 @@ fn build_session_u64_observable_gauge(
 fn build_session_u64_observable_counter(
     meter: &opentelemetry::metrics::Meter,
     metric_name: String,
+    cache: Arc<Mutex<SessionMetricCallbackCache>>,
 ) -> ObservableCounter<u64> {
     let callback_metric_name = metric_name.clone();
     meter
         .u64_observable_counter(metric_name)
         .with_callback(move |observer| {
-            for snapshot in hopr_lib::session_telemetry_snapshots() {
-                if let Some(hopr_lib::SessionMetricValue::U64(value)) =
-                    hopr_lib::session_snapshot_metric_value(&snapshot, &callback_metric_name)
-                {
-                    let attributes = session_metric_attributes(snapshot.session_id);
+            for (session_id, metric_value) in get_cached_session_metric_values(&cache, &callback_metric_name) {
+                if let hopr_lib::SessionMetricValue::U64(value) = metric_value {
+                    let attributes = session_metric_attributes(session_id);
                     observer.observe(value, &attributes);
                 }
             }
@@ -289,16 +334,15 @@ fn build_session_u64_observable_counter(
 fn build_session_f64_observable_gauge(
     meter: &opentelemetry::metrics::Meter,
     metric_name: String,
+    cache: Arc<Mutex<SessionMetricCallbackCache>>,
 ) -> ObservableGauge<f64> {
     let callback_metric_name = metric_name.clone();
     meter
         .f64_observable_gauge(metric_name)
         .with_callback(move |observer| {
-            for snapshot in hopr_lib::session_telemetry_snapshots() {
-                if let Some(hopr_lib::SessionMetricValue::F64(value)) =
-                    hopr_lib::session_snapshot_metric_value(&snapshot, &callback_metric_name)
-                {
-                    let attributes = session_metric_attributes(snapshot.session_id);
+            for (session_id, metric_value) in get_cached_session_metric_values(&cache, &callback_metric_name) {
+                if let hopr_lib::SessionMetricValue::F64(value) = metric_value {
+                    let attributes = session_metric_attributes(session_id);
                     observer.observe(value, &attributes);
                 }
             }
@@ -309,18 +353,19 @@ fn build_session_f64_observable_gauge(
 fn build_session_metric_bridge(meter_provider: &SdkMeterProvider) -> OtelSessionMetricBridge {
     let meter = meter_provider.meter("hoprd_session_snapshot_bridge");
     let mut session_metrics = OtelSessionMetricBridge::default();
+    let cache = Arc::new(Mutex::new(SessionMetricCallbackCache::default()));
 
     for metric_definition in hopr_lib::session_snapshot_metric_definitions() {
         match metric_definition.kind {
-            hopr_lib::SessionMetricKind::U64Gauge => session_metrics
-                .u64_gauges
-                .push(build_session_u64_observable_gauge(&meter, metric_definition.name)),
-            hopr_lib::SessionMetricKind::U64Counter => session_metrics
-                .u64_counters
-                .push(build_session_u64_observable_counter(&meter, metric_definition.name)),
-            hopr_lib::SessionMetricKind::F64Gauge => session_metrics
-                .f64_gauges
-                .push(build_session_f64_observable_gauge(&meter, metric_definition.name)),
+            hopr_lib::SessionMetricKind::U64Gauge => session_metrics.u64_gauges.push(
+                build_session_u64_observable_gauge(&meter, metric_definition.name, Arc::clone(&cache)),
+            ),
+            hopr_lib::SessionMetricKind::U64Counter => session_metrics.u64_counters.push(
+                build_session_u64_observable_counter(&meter, metric_definition.name, Arc::clone(&cache)),
+            ),
+            hopr_lib::SessionMetricKind::F64Gauge => session_metrics.f64_gauges.push(
+                build_session_f64_observable_gauge(&meter, metric_definition.name, Arc::clone(&cache)),
+            ),
         }
     }
 

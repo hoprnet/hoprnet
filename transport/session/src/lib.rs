@@ -27,7 +27,7 @@ pub use telemetry::{
     AckSnapshot, FrameBufferSnapshot, SessionAckMode, SessionLifecycleState, SessionLifetimeSnapshot,
     SessionMetricDefinition, SessionMetricKind, SessionMetricSample, SessionMetricValue, SessionStatsSnapshot,
     SessionTelemetry, SurbSnapshot, TransportSnapshot, session_snapshot_metric_definitions,
-    session_snapshot_metric_value, session_telemetry_snapshots,
+    session_snapshot_metric_samples, session_snapshot_metric_value, session_telemetry_snapshots,
 };
 pub use types::{
     ByteCapabilities, HoprSession, HoprSessionConfig, IncomingSession, ServiceId, SessionId, SessionTarget,

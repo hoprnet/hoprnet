@@ -11,7 +11,7 @@ lifetime:
   last_activity_at_ms: "[last_activity_at]"
   uptime_ms: "[uptime]"
   idle_ms: "[idle]"
-  state: Active
+  state: 0
   pipeline_errors_total: 0
 frame:
   mtu_bytes: 1500
@@ -22,7 +22,7 @@ frame:
   emitted_total: 0
   discarded_total: 0
 ack:
-  mode: None
+  mode: 0
   incoming_segments_total: 0
   incoming_retransmission_requests_total: 0
   incoming_acknowledged_frames_total: 0

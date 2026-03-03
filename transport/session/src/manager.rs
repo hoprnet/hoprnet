@@ -28,7 +28,9 @@ use hopr_protocol_start::{
 use tracing::{debug, error, info, trace, warn};
 
 #[cfg(feature = "telemetry")]
-use crate::telemetry::{self, SessionLifecycleState, SessionStatsSnapshot, SessionTelemetry};
+use crate::telemetry::{
+    self, SessionLifecycleState, SessionStatsSnapshot, SessionTelemetry, register_session_telemetry,
+};
 use crate::{
     Capability, HoprSession, IncomingSession, SESSION_MTU, SessionClientConfig, SessionId, SessionTarget,
     SurbBalancerConfig,
@@ -700,14 +702,14 @@ where
                     .ok_or(SessionManagerError::NotStarted)?;
 
                 #[cfg(feature = "telemetry")]
-                let telemetry = SessionTelemetry::new_shared(
+                let telemetry = Arc::new(SessionTelemetry::new(
                     session_id,
                     HoprSessionConfig {
                         capabilities: cfg.capabilities,
                         frame_mtu: self.cfg.frame_mtu,
                         frame_timeout: self.cfg.max_frame_timeout,
                     },
-                );
+                ));
 
                 // NOTE: the Exit node can have different `max_surb_buffer_size`
                 // setting on the Session manager, so it does not make sense to cap it here
@@ -826,7 +828,7 @@ where
                         }
                     }
 
-                    HoprSession::new(
+                    let session = HoprSession::new(
                         session_id,
                         forward_routing,
                         HoprSessionConfig {
@@ -846,8 +848,12 @@ where
                         ),
                         Some(notifier),
                         #[cfg(feature = "telemetry")]
-                        telemetry,
-                    )
+                        telemetry.clone(),
+                    )?;
+
+                    #[cfg(feature = "telemetry")]
+                    register_session_telemetry(&telemetry);
+                    Ok(session)
                 } else {
                     warn!(%session_id, "session ready without SURB balancing");
 
@@ -883,7 +889,7 @@ where
                             futures::future::ok::<_, S::Error>((routing, data))
                         });
 
-                    HoprSession::new(
+                    let session = HoprSession::new(
                         session_id,
                         forward_routing,
                         HoprSessionConfig {
@@ -894,8 +900,13 @@ where
                         (reduced_surb_sender, rx),
                         Some(notifier),
                         #[cfg(feature = "telemetry")]
-                        telemetry,
-                    )
+                        telemetry.clone(),
+                    )?;
+
+                    #[cfg(feature = "telemetry")]
+                    register_session_telemetry(&telemetry);
+
+                    Ok(session)
                 }
             }
             Ok(Ok(None)) => Err(SessionManagerError::other(anyhow!(
@@ -1118,14 +1129,14 @@ where
                     surb_mgmt: Default::default(),
                     surb_estimator: Default::default(),
                     #[cfg(feature = "telemetry")]
-                    telemetry: SessionTelemetry::new_shared(
+                    telemetry: Arc::new(SessionTelemetry::new(
                         _sid,
                         HoprSessionConfig {
                             capabilities: session_req.capabilities.0,
                             frame_mtu: self.cfg.frame_mtu,
                             frame_timeout: self.cfg.max_frame_timeout,
                         },
-                    ),
+                    )),
                 },
             )
             .await
@@ -1333,6 +1344,9 @@ where
                 })?;
 
             info!(%session_id, "new session established");
+
+            #[cfg(feature = "telemetry")]
+            register_session_telemetry(&slot.telemetry);
 
             #[cfg(all(feature = "prometheus", not(test)))]
             {
@@ -2291,6 +2305,44 @@ mod tests {
             .await;
 
         assert!(matches!(result, Err(TransportSessionError::Timeout)));
+
+        Ok(())
+    }
+
+    #[cfg(feature = "telemetry")]
+    #[test_log::test(tokio::test)]
+    async fn failed_incoming_session_establishment_does_not_register_telemetry() -> anyhow::Result<()> {
+        let mgr = SessionManager::new(Default::default());
+
+        let transport = MockMsgSender::new();
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        drop(new_session_rx);
+        mgr.start(mock_packet_planning(transport), new_session_tx)?;
+
+        let pseudonym = HoprPseudonym::random();
+        let result = mgr
+            .handle_incoming_session_initiation(
+                pseudonym,
+                StartInitiation {
+                    challenge: MIN_CHALLENGE,
+                    target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                    capabilities: ByteCapabilities(Capabilities::empty()),
+                    additional_data: 0,
+                },
+            )
+            .await;
+
+        assert!(result.is_err());
+
+        let allocated_session_ids = mgr.active_sessions().await;
+        assert_eq!(1, allocated_session_ids.len());
+
+        let snapshots = crate::telemetry::session_telemetry_snapshots();
+        assert!(
+            allocated_session_ids
+                .iter()
+                .all(|session_id| snapshots.iter().all(|snapshot| snapshot.session_id != *session_id))
+        );
 
         Ok(())
     }
