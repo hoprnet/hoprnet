@@ -128,11 +128,11 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
     );
 
     insta::assert_yaml_snapshot!(format!("alice_metrics_udp_{}", cap_suffix), snapshot, {
-    ".snapshot_at" => "[snapshot_ts]",
-    ".lifetime.created_at" => "[created_at]",
-    ".lifetime.last_activity_at" => "[last_activity_at]",
-    ".lifetime.uptime" => "[uptime]",
-    ".lifetime.idle" => "[idle]",
+    ".snapshot_at_ms" => "[snapshot_ts]",
+    ".lifetime.created_at_ms" => "[created_at]",
+    ".lifetime.last_activity_at_ms" => "[last_activity_at]",
+    ".lifetime.uptime_ms" => "[uptime]",
+    ".lifetime.idle_ms" => "[idle]",
     ".session_id.pseudonym" => "[pseudonym]",
         });
 
@@ -150,11 +150,11 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
     );
 
     insta::assert_yaml_snapshot!(format!("bob_metrics_udp_{:}", cap_suffix),snapshot, {
-        ".snapshot_at" => "[snapshot_ts]",
-        ".lifetime.created_at" => "[created_at]",
-        ".lifetime.last_activity_at" => "[last_activity_at]",
-        ".lifetime.uptime" => "[uptime]",
-        ".lifetime.idle" => "[idle]",
+        ".snapshot_at_ms" => "[snapshot_ts]",
+        ".lifetime.created_at_ms" => "[created_at]",
+        ".lifetime.last_activity_at_ms" => "[last_activity_at]",
+        ".lifetime.uptime_ms" => "[uptime]",
+        ".lifetime.idle_ms" => "[idle]",
         ".session_id.pseudonym" => "[pseudonym]",
     });
 
@@ -280,11 +280,11 @@ async fn tcp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
         "seg"
     };
     insta::assert_yaml_snapshot!(format!("alice_metrics_tcp_{}", cap_suffix), snapshot, {
-    ".snapshot_at" => "[snapshot_ts]",
-    ".lifetime.created_at" => "[created_at]",
-    ".lifetime.last_activity_at" => "[last_activity_at]",
-    ".lifetime.uptime" => "[uptime]",
-    ".lifetime.idle" => "[idle]",
+    ".snapshot_at_ms" => "[snapshot_ts]",
+    ".lifetime.created_at_ms" => "[created_at]",
+    ".lifetime.last_activity_at_ms" => "[last_activity_at]",
+    ".lifetime.uptime_ms" => "[uptime]",
+    ".lifetime.idle_ms" => "[idle]",
     ".session_id.pseudonym" => "[pseudonym]",
         });
 
@@ -302,11 +302,11 @@ async fn tcp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
     );
 
     insta::assert_yaml_snapshot!(format!("bob_metrics_tcp_{}", cap_suffix), snapshot, {
-        ".snapshot_at" => "[snapshot_ts]",
-        ".lifetime.created_at" => "[created_at]",
-        ".lifetime.last_activity_at" => "[last_activity_at]",
-        ".lifetime.uptime" => "[uptime]",
-        ".lifetime.idle" => "[idle]",
+        ".snapshot_at_ms" => "[snapshot_ts]",
+        ".lifetime.created_at_ms" => "[created_at]",
+        ".lifetime.last_activity_at_ms" => "[last_activity_at]",
+        ".lifetime.uptime_ms" => "[uptime]",
+        ".lifetime.idle_ms" => "[idle]",
         ".session_id.pseudonym" => "[pseudonym]",
     });
 
@@ -406,11 +406,11 @@ async fn bidirectional_tcp_session(#[case] cap: Capabilities) -> anyhow::Result<
 
     let cap_suffix = if cap.is_empty() { "plain" } else { "seg" };
     insta::assert_yaml_snapshot!(format!("bidirectional_alice_{}", cap_suffix), alice_snapshot, {
-        ".snapshot_at" => "[snapshot_ts]",
-        ".lifetime.created_at" => "[created_at]",
-        ".lifetime.last_activity_at" => "[last_activity_at]",
-        ".lifetime.uptime" => "[uptime]",
-        ".lifetime.idle" => "[idle]",
+        ".snapshot_at_ms" => "[snapshot_ts]",
+        ".lifetime.created_at_ms" => "[created_at]",
+        ".lifetime.last_activity_at_ms" => "[last_activity_at]",
+        ".lifetime.uptime_ms" => "[uptime]",
+        ".lifetime.idle_ms" => "[idle]",
         ".session_id.pseudonym" => "[pseudonym]",
     });
 
@@ -420,11 +420,11 @@ async fn bidirectional_tcp_session(#[case] cap: Capabilities) -> anyhow::Result<
     assert!(bob_snapshot.snapshot_at >= start_time, "snapshot_at should be recent");
 
     insta::assert_yaml_snapshot!(format!("bidirectional_bob_{}", cap_suffix), bob_snapshot, {
-        ".snapshot_at" => "[snapshot_ts]",
-        ".lifetime.created_at" => "[created_at]",
-        ".lifetime.last_activity_at" => "[last_activity_at]",
-        ".lifetime.uptime" => "[uptime]",
-        ".lifetime.idle" => "[idle]",
+        ".snapshot_at_ms" => "[snapshot_ts]",
+        ".lifetime.created_at_ms" => "[created_at]",
+        ".lifetime.last_activity_at_ms" => "[last_activity_at]",
+        ".lifetime.uptime_ms" => "[uptime]",
+        ".lifetime.idle_ms" => "[idle]",
         ".session_id.pseudonym" => "[pseudonym]",
     });
 
@@ -453,11 +453,11 @@ async fn surb_metrics_tracking() -> anyhow::Result<()> {
     let snapshot = metrics.snapshot();
 
     insta::assert_yaml_snapshot!("surb_metrics", snapshot, {
-        ".snapshot_at" => "[snapshot_ts]",
-        ".lifetime.created_at" => "[created_at]",
-        ".lifetime.last_activity_at" => "[last_activity_at]",
-        ".lifetime.uptime" => "[uptime]",
-        ".lifetime.idle" => "[idle]",
+        ".snapshot_at_ms" => "[snapshot_ts]",
+        ".lifetime.created_at_ms" => "[created_at]",
+        ".lifetime.last_activity_at_ms" => "[last_activity_at]",
+        ".lifetime.uptime_ms" => "[uptime]",
+        ".lifetime.idle_ms" => "[idle]",
         ".session_id.pseudonym" => "[pseudonym]",
         ".surb.rate_per_sec" => "[rate_per_sec]",
     });
@@ -543,11 +543,11 @@ async fn frame_buffer_metrics(#[case] cap: Capabilities) -> anyhow::Result<()> {
     assert!(alice_snapshot.snapshot_at >= start_time, "snapshot_at should be recent");
 
     insta::assert_yaml_snapshot!("frame_buffer_alice", alice_snapshot, {
-        ".snapshot_at" => "[snapshot_ts]",
-        ".lifetime.created_at" => "[created_at]",
-        ".lifetime.last_activity_at" => "[last_activity_at]",
-        ".lifetime.uptime" => "[uptime]",
-        ".lifetime.idle" => "[idle]",
+        ".snapshot_at_ms" => "[snapshot_ts]",
+        ".lifetime.created_at_ms" => "[created_at]",
+        ".lifetime.last_activity_at_ms" => "[last_activity_at]",
+        ".lifetime.uptime_ms" => "[uptime]",
+        ".lifetime.idle_ms" => "[idle]",
         ".session_id.pseudonym" => "[pseudonym]",
     });
 
@@ -557,11 +557,11 @@ async fn frame_buffer_metrics(#[case] cap: Capabilities) -> anyhow::Result<()> {
     assert!(bob_snapshot.snapshot_at >= start_time, "snapshot_at should be recent");
 
     insta::assert_yaml_snapshot!("frame_buffer_bob", bob_snapshot, {
-        ".snapshot_at" => "[snapshot_ts]",
-        ".lifetime.created_at" => "[created_at]",
-        ".lifetime.last_activity_at" => "[last_activity_at]",
-        ".lifetime.uptime" => "[uptime]",
-        ".lifetime.idle" => "[idle]",
+        ".snapshot_at_ms" => "[snapshot_ts]",
+        ".lifetime.created_at_ms" => "[created_at]",
+        ".lifetime.last_activity_at_ms" => "[last_activity_at]",
+        ".lifetime.uptime_ms" => "[uptime]",
+        ".lifetime.idle_ms" => "[idle]",
         ".session_id.pseudonym" => "[pseudonym]",
     });
 
