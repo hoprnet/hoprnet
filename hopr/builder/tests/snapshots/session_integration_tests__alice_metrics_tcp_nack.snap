@@ -5,13 +5,13 @@ expression: snapshot
 session_id:
   tag: 1
   pseudonym: "[pseudonym]"
-snapshot_at_ms: 1772546328336
+snapshot_at_ms: 1772543893180
 lifetime:
-  created_at_ms: 1772546328332
-  last_activity_at_ms: 1772546328336
-  uptime_ms: 3
+  created_at_ms: 1772543893178
+  last_activity_at_ms: 1772543893180
+  uptime_ms: 2
   idle_ms: 0
-  state: 0
+  state: Active
   pipeline_errors_total: 0
 frame:
   mtu_bytes: 1500
@@ -22,7 +22,7 @@ frame:
   emitted_total: 0
   discarded_total: 0
 ack:
-  mode: 1
+  mode: Partial
   incoming_segments_total: 0
   incoming_retransmission_requests_total: 0
   incoming_acknowledged_frames_total: 0
