@@ -32,8 +32,10 @@ scrape_configs:
 - `hopr_strategy_closure_auto_finalization_count`: Count of channels where closure finalizing was initiated automatically
 - `hopr_strategy_enabled_strategies`: List of enabled strategies, keys: `strategy`
 - `hopr_strategy_auto_funding_funding_count`: Count of initiated automatic fundings
+- `hopr_strategy_auto_funding_failure_count`: Count of failed automatic funding attempts
 - `hopr_strategy_auto_redeem_redeem_count`: Count of initiated automatic redemptions
 - `hopr_transport_p2p_active_connection_count`: Count of the currently active p2p connections as observed from the rust-libp2p events
+- `hopr_transport_p2p_nat_status`: Current NAT status as reported by libp2p autonat. 0=Unknown, 1=Public, 2=Private
 - `hopr_http_api_call_count`: Number of different REST API calls and their statuses, keys: `path`, `method`, `status`
 - `hopr_http_api_call_timing_sec`: Timing of different REST API calls in seconds, keys: `path`, `method`, buckets: 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0
 - `hopr_http_api_last_used_time`: The unix timestamp in seconds at which any API endpoint was last fetched
