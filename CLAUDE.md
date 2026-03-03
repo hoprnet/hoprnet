@@ -4,7 +4,7 @@ Read `.ai/INSTRUCTIONS.md` for full development guidelines, coding standards, an
 
 When working on Rust files, also read `.ai/rust.md` for language-specific rules.
 
-Agent definitions are in `.ai/agents/`.
+Claude configuration and prompts live under `.ai/`.
 
 ## Workflow
 

@@ -14,5 +14,5 @@ All AI configuration lives in the [`.ai/`](.ai/) directory.
 | Tool | Entry point | Purpose |
 |------|-------------|----------|
 | Claude Code | [CLAUDE.md](CLAUDE.md) | Auto-loaded; references `.ai/` |
-| GitHub Copilot | [.github/copilot-instructions.md](.github/copilot-instructions.md) | Auto-loaded; references `.ai/INSTRUCTIONS.md` |
+| GitHub Copilot | [.github/.copilot-instructions.md](.github/.copilot-instructions.md) | Auto-loaded; references `.ai/INSTRUCTIONS.md` |
 | Copilot (Rust) | [.github/instructions/rust.instructions.md](.github/instructions/rust.instructions.md) | `applyTo: **/*.rs`; references `.ai/rust.md` |
