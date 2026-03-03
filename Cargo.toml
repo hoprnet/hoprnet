@@ -256,7 +256,7 @@ hopr-transport-mixer = { path = "transport/mixer" }
 hopr-transport-probe = { path = "transport/probe" }
 hopr-transport-protocol = { path = "transport/protocol" }
 hopr-transport-session = { path = "transport/session" }
-hopr-types = { git = "https://github.com/hoprnet/hopr-types", branch = "main", version = "1.0.0" }
+hopr-types = { git = "https://github.com/hoprnet/hopr-types", branch = "main" }
 hoprd = { path = "hoprd/hoprd" }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
 hoprd-api-client = { path = "hoprd/rest-api-client" }
