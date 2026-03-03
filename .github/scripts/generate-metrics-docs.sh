@@ -99,11 +99,11 @@ if [[ ${1:-} == "--generate" ]]; then
   headers=("Name" "Type" "Description" "Detail")
   widths=(${#headers[0]} ${#headers[1]} ${#headers[2]} ${#headers[3]})
   for row in "${rows[@]}"; do
-    IFS=$'\t' read -r c1 c2 c3 c4 <<< "$row"
-    (( ${#c1} > widths[0] )) && widths[0]=${#c1}
-    (( ${#c2} > widths[1] )) && widths[1]=${#c2}
-    (( ${#c3} > widths[2] )) && widths[2]=${#c3}
-    (( ${#c4} > widths[3] )) && widths[3]=${#c4}
+    IFS=$'\t' read -r c1 c2 c3 c4 <<<"$row"
+    ((${#c1} > widths[0])) && widths[0]=${#c1}
+    ((${#c2} > widths[1])) && widths[1]=${#c2}
+    ((${#c3} > widths[2])) && widths[2]=${#c3}
+    ((${#c4} > widths[3])) && widths[3]=${#c4}
   done
 
   # Print header
@@ -117,7 +117,7 @@ if [[ ${1:-} == "--generate" ]]; then
     "$(printf '%0.s-' $(seq 1 ${widths[3]}))"
   # Print rows
   for row in "${rows[@]}"; do
-    IFS=$'\t' read -r c1 c2 c3 c4 <<< "$row"
+    IFS=$'\t' read -r c1 c2 c3 c4 <<<"$row"
     printf "| %-${widths[0]}s | %-${widths[1]}s | %-${widths[2]}s | %-${widths[3]}s |\n" \
       "$c1" "$c2" "$c3" "$c4"
   done
