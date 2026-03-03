@@ -5,7 +5,7 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt, BufReader},
     select, signal,
 };
-use tokio_util::compat::TokioAsyncReadCompatExt;
+use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 
 const BUFFER_SIZE: usize = 4096;
 const SESSION_MTU: usize = 1458;
@@ -68,13 +68,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Default::default(),
                 )?;
 
-                handle_connection(session_socket).await?;
+                handle_connection(session_socket.compat()).await?;
             } else {
                 let session_socket = socket
                     .compat()
                     .unreliable_session::<SESSION_MTU>("session_sock", Default::default())?;
 
-                handle_connection(session_socket).await?;
+                handle_connection(session_socket.compat()).await?;
             }
         }
         Commands::Client { address } => {
@@ -86,13 +86,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Default::default(),
                 )?;
 
-                handle_connection(session_socket).await?;
+                handle_connection(session_socket.compat()).await?;
             } else {
                 let session_socket = socket
                     .compat()
                     .unreliable_session::<SESSION_MTU>("session_sock", Default::default())?;
 
-                handle_connection(session_socket).await?;
+                handle_connection(session_socket.compat()).await?;
             }
         }
     }

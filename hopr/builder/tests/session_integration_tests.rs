@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::SystemTime};
 
-use futures::StreamExt;
+use futures::{AsyncReadExt, AsyncWriteExt, StreamExt};
 use hopr_crypto_random::Randomizable;
 use hopr_lib::{
     Address, ApplicationDataIn, ApplicationDataOut, ChainKeypair, ConnectedUdpStream, HoprPseudonym, Keypair,
@@ -15,10 +15,10 @@ use hopr_lib::{
 };
 use rstest::*;
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream, UdpSocket},
     sync::oneshot,
 };
+use tokio_util::compat::TokioAsyncReadCompatExt;
 
 #[rstest]
 #[case(Capabilities::empty())]
@@ -81,7 +81,7 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
         bob_metrics.clone(),
     )?;
 
-    let mut listener = ConnectedUdpStream::builder()
+    let listener = ConnectedUdpStream::builder()
         .with_buffer_size(BUF_LEN)
         .with_queue_size(512)
         .with_receiver_parallelism(UdpStreamParallelism::Auto)
@@ -92,7 +92,8 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
     let (ready_tx, ready_rx) = oneshot::channel();
     let transfer_handle = tokio::task::spawn(async move {
         ready_tx.send(()).ok();
-        transfer_session(&mut alice_session, &mut listener, BUF_LEN, None).await
+        let mut listener_compat = listener.compat();
+        transfer_session(&mut alice_session, &mut listener_compat, BUF_LEN, None).await
     });
     ready_rx.await.ok();
 
@@ -231,13 +232,14 @@ async fn tcp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
 
     let (ready_tx, ready_rx) = oneshot::channel();
     let transfer_handle = tokio::task::spawn(async move {
-        let (mut stream, _) = listener.accept().await.unwrap();
+        let (stream, _) = listener.accept().await.unwrap();
         ready_tx.send(()).ok();
-        transfer_session(&mut alice_session, &mut stream, BUF_LEN, None).await
+        let mut stream_compat = stream.compat();
+        transfer_session(&mut alice_session, &mut stream_compat, BUF_LEN, None).await
     });
 
     let msg: [u8; MSG_LEN] = hopr_crypto_random::random_bytes();
-    let mut sender = TcpStream::connect(addr).await?;
+    let mut sender = TcpStream::connect(addr).await?.compat();
 
     ready_rx.await.ok();
 

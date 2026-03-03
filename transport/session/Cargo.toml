@@ -17,7 +17,6 @@ default = []
 runtime-tokio = [
   "hopr-network-types/runtime-tokio",
   "hopr-protocol-session/runtime-tokio",
-  "dep:tokio",
 ]
 telemetry = ["hopr-protocol-session/telemetry"]
 prometheus = [
@@ -51,7 +50,6 @@ smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
-tokio = { workspace = true, optional = true }
 
 hopr-async-runtime = { workspace = true }
 hopr-crypto-random = { workspace = true }

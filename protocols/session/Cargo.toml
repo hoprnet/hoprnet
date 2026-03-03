@@ -13,7 +13,7 @@ license = "GPL-3.0-only"
 default = ["hashbrown"]
 serde = ["dep:serde", "dep:serde_bytes", "hopr-crypto-packet/serde"]
 telemetry = ["dep:auto_impl"]
-runtime-tokio = ["dep:tokio", "hopr-async-runtime/runtime-tokio"]
+runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 hashbrown = ["dep:hashbrown"]
 prometheus = ["dep:hopr-metrics", "dep:lazy_static"]
 session-types = []
@@ -45,7 +45,6 @@ serde_bytes = { workspace = true, optional = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 
 hopr-async-runtime = { workspace = true }
