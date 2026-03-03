@@ -73,12 +73,6 @@ lazy_static::lazy_static! {
 fn close_session(session_id: SessionId, session_data: SessionSlot, reason: ClosureReason) {
     debug!(?session_id, ?reason, "closing session");
 
-    #[cfg(feature = "telemetry")]
-    {
-        session_data.telemetry.set_state(SessionLifecycleState::Closed);
-        session_data.telemetry.touch_activity();
-    }
-
     if reason != ClosureReason::EmptyRead {
         // Closing the data sender will also cause it to close from the read side
         session_data.session_tx.close_channel();
@@ -87,6 +81,12 @@ fn close_session(session_id: SessionId, session_data: SessionSlot, reason: Closu
 
     // Terminate any additional tasks spawned by the Session
     session_data.abort_handles.lock().abort_all();
+
+    #[cfg(feature = "telemetry")]
+    {
+        session_data.telemetry.set_state(SessionLifecycleState::Closed);
+        session_data.telemetry.touch_activity();
+    }
 
     #[cfg(all(feature = "prometheus", not(test)))]
     METRIC_ACTIVE_SESSIONS.decrement(1.0);

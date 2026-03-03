@@ -34,7 +34,7 @@ lazy_static::lazy_static! {
     // the bottleneck is queue depth, individual task duration, or both.
     static ref METRIC_PACKET_DECODE_TIMEOUTS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
         "hopr_packet_decode_timeouts_total",
-        "Number of incoming packets dropped due to decode timeout"
+        "Number of incoming packets dropped due to decode timeout (sustained rate indicates Rayon pool saturation)"
     ).unwrap();
     static ref METRIC_VALIDATION_ERRORS: hopr_metrics::MultiCounter =  hopr_metrics::MultiCounter::new(
         "hopr_packet_ticket_validation_errors",

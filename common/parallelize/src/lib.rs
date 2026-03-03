@@ -72,22 +72,24 @@ pub mod cpu {
                 .unwrap();
                 static ref TASKS_COMPLETED: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
                     "hopr_rayon_tasks_completed_total",
-                    "Total number of Rayon tasks that completed and delivered results",
+                    "Total number of Rayon tasks that completed successfully and delivered results to a live receiver",
                 )
                 .unwrap();
                 static ref TASKS_CANCELLED: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
                     "hopr_rayon_tasks_cancelled_total",
-                    "Total number of Rayon tasks skipped because receiver was already dropped",
+                    "Total number of Rayon tasks skipped via cooperative cancellation (receiver dropped while queued)",
                 )
                 .unwrap();
                 static ref TASKS_ORPHANED: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
                     "hopr_rayon_tasks_orphaned_total",
-                    "Total number of Rayon tasks whose results were discarded after completion",
+                    "Total number of Rayon tasks whose results were discarded after completion (receiver dropped \
+                     during execution)",
                 )
                 .unwrap();
                 static ref TASKS_REJECTED: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
                     "hopr_rayon_tasks_rejected_total",
-                    "Total number of tasks rejected due to queue being full",
+                    "Total number of tasks rejected due to queue being full (only when HOPR_CPU_TASK_QUEUE_LIMIT is \
+                     set)",
                 )
                 .unwrap();
                 static ref QUEUE_WAIT: hopr_metrics::SimpleHistogram = hopr_metrics::SimpleHistogram::new(
@@ -110,7 +112,7 @@ pub mod cpu {
                 .unwrap();
                 static ref QUEUE_LIMIT: hopr_metrics::SimpleGauge = hopr_metrics::SimpleGauge::new(
                     "hopr_rayon_queue_limit",
-                    "Configured maximum outstanding tasks for the Rayon thread pool",
+                    "Configured maximum outstanding tasks via HOPR_CPU_TASK_QUEUE_LIMIT (0 if unlimited)",
                 )
                 .unwrap();
             }

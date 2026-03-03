@@ -65,7 +65,7 @@ mod metrics {
             .unwrap();
             static ref UNACK_EVICTIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
                 "hopr_tickets_unack_evictions_total",
-                "Total number of unacknowledged tickets evicted from cache",
+                "Total number of unacknowledged tickets evicted from cache due to TTL or capacity limits",
             )
             .unwrap();
             static ref UNACK_PEER_EVICTIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
