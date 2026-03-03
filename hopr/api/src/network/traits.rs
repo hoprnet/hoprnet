@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use futures::{AsyncRead, AsyncWrite, Stream, future::BoxFuture};
-use hopr_crypto_types::keypairs::OffchainKeypair;
+use hopr_types::crypto::keypairs::OffchainKeypair;
 
 use super::Health;
 use crate::{Multiaddr, PeerId};

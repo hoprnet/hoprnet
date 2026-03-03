@@ -1,8 +1,8 @@
 use std::fmt::Formatter;
 
 use futures::{FutureExt, StreamExt, future::BoxFuture, stream::FuturesUnordered};
-use hopr_internal_types::prelude::AcknowledgedTicketStatus;
-pub use hopr_internal_types::prelude::{RedeemableTicket, VerifiedTicket};
+use hopr_types::internal::prelude::AcknowledgedTicketStatus;
+pub use hopr_types::internal::prelude::{RedeemableTicket, VerifiedTicket};
 
 use crate::{
     chain::ChainReceipt,

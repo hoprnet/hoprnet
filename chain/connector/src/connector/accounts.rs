@@ -4,13 +4,15 @@ use blokli_client::api::{BlokliQueryClient, BlokliSubscriptionClient, BlokliTran
 use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt, future::BoxFuture, pin_mut, stream::BoxStream};
 use futures_time::future::FutureExt as TimeFutureExt;
 use hopr_api::chain::{AccountSelector, AnnouncementError, ChainReceipt, Multiaddr, SafeRegistrationError};
-use hopr_chain_types::prelude::*;
-use hopr_crypto_types::prelude::*;
-use hopr_internal_types::{
-    account::AccountEntry,
-    prelude::{AnnouncementData, KeyBinding},
+use hopr_types::{
+    chain::prelude::*,
+    crypto::prelude::*,
+    internal::{
+        account::AccountEntry,
+        prelude::{AnnouncementData, KeyBinding},
+    },
+    primitive::prelude::*,
 };
-use hopr_primitive_types::prelude::*;
 
 use crate::{
     backend::Backend, connector::HoprBlockchainConnector, errors::ConnectorError, utils::model_to_account_entry,
@@ -239,7 +241,7 @@ where
 mod tests {
     use hex_literal::hex;
     use hopr_api::chain::{ChainReadAccountOperations, ChainWriteAccountOperations, DeployedSafe};
-    use hopr_internal_types::account::AccountType;
+    use hopr_types::internal::account::AccountType;
 
     use super::*;
     use crate::{

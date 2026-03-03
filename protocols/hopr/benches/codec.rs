@@ -9,17 +9,19 @@ use hopr_chain_connector::{
     testing::{BlokliTestClient, StaticState},
 };
 use hopr_crypto_packet::prelude::HoprPacket;
-use hopr_crypto_random::Randomizable;
-use hopr_crypto_types::prelude::*;
 use hopr_db_node::HoprNodeDb;
-use hopr_internal_types::{
-    path::ValidatedPath,
-    prelude::{HoprPseudonym, VerifiedAcknowledgement},
-    routing::ResolvedTransportRouting,
-};
 use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, HoprTicketProcessor, HoprTicketProcessorConfig, MemorySurbStore,
     PacketDecoder, PacketEncoder, SurbStoreConfig,
+};
+use hopr_types::{
+    crypto::prelude::*,
+    crypto_random::Randomizable,
+    internal::{
+        path::ValidatedPath,
+        prelude::{HoprPseudonym, VerifiedAcknowledgement},
+        routing::ResolvedTransportRouting,
+    },
 };
 
 use crate::utils::{Node, PEERS, create_blokli_client, create_node};
@@ -128,7 +130,7 @@ fn hopr_encoder_bench(c: &mut Criterion) {
         };
 
         let mut data = vec![0_u8; HoprPacket::max_message_with_surbs(rps)];
-        hopr_crypto_random::random_fill(&mut data);
+        hopr_types::crypto_random::random_fill(&mut data);
 
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}hop_{}surbs_{}b", hops, rps, data.len())),
@@ -174,7 +176,7 @@ fn hopr_decoder_bench(c: &mut Criterion) {
         )
     });
 
-    let data = hopr_crypto_random::random_bytes::<1024>();
+    let data = hopr_types::crypto_random::random_bytes::<1024>();
 
     let mut group = c.benchmark_group("hopr_decoder");
     group.throughput(Throughput::Elements(1));

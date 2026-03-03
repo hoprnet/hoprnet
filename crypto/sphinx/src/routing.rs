@@ -4,13 +4,15 @@ use std::{
     num::NonZeroUsize,
 };
 
-use hopr_crypto_random::random_fill;
-use hopr_crypto_types::{
-    crypto_traits::{StreamCipher, StreamCipherSeek, UniversalHash},
-    prelude::*,
-    types::Pseudonym,
+use hopr_types::{
+    crypto::{
+        crypto_traits::{StreamCipher, StreamCipherSeek, UniversalHash},
+        prelude::*,
+        types::Pseudonym,
+    },
+    crypto_random::random_fill,
+    primitive::prelude::*,
 };
-use hopr_primitive_types::prelude::*;
 use typenum::Unsigned;
 
 use crate::{
@@ -88,7 +90,7 @@ pub trait SphinxHeaderSpec {
     const EXT_HEADER_LEN: usize =
         HeaderPrefix::SIZE + Self::RECEIVER_DATA_SIZE + Self::MAX_HOPS.get() * Self::ROUTING_INFO_LEN;
 
-    fn generate_filler(secrets: &[SharedSecret]) -> hopr_crypto_types::errors::Result<Box<[u8]>> {
+    fn generate_filler(secrets: &[SharedSecret]) -> hopr_types::crypto::errors::Result<Box<[u8]>> {
         if secrets.len() < 2 {
             return Ok(vec![].into_boxed_slice());
         }
@@ -116,7 +118,7 @@ pub trait SphinxHeaderSpec {
     }
 
     /// Instantiates a new Pseudo-Random Generator.
-    fn new_prg(secret: &SecretKey) -> hopr_crypto_types::errors::Result<Self::PRG> {
+    fn new_prg(secret: &SecretKey) -> hopr_types::crypto::errors::Result<Self::PRG> {
         generate_key_iv(secret, HASH_KEY_PRG, None)
     }
 }
@@ -253,7 +255,7 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
         receiver_data: &H::PacketReceiverData,
         is_reply: bool,
         no_ack: bool,
-    ) -> hopr_crypto_types::errors::Result<Self> {
+    ) -> hopr_types::crypto::errors::Result<Self> {
         assert!(H::MAX_HOPS.get() <= 7, "maximum number of hops supported is 7");
 
         if path.len() != secrets.len() {
@@ -413,7 +415,7 @@ pub enum ForwardedHeader<H: SphinxHeaderSpec> {
 pub fn forward_header<H: SphinxHeaderSpec>(
     secret: &SecretKey,
     header: &mut [u8],
-) -> hopr_crypto_types::errors::Result<ForwardedHeader<H>> {
+) -> hopr_types::crypto::errors::Result<ForwardedHeader<H>> {
     if header.len() != RoutingInfo::<H>::SIZE {
         return Err(CryptoError::InvalidParameterSize {
             name: "header",
@@ -482,8 +484,10 @@ pub fn forward_header<H: SphinxHeaderSpec>(
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use hopr_crypto_random::Randomizable;
-    use hopr_crypto_types::{crypto_traits::BlockSizeUser, keypairs::OffchainKeypair};
+    use hopr_types::{
+        crypto::{crypto_traits::BlockSizeUser, keypairs::OffchainKeypair},
+        crypto_random::Randomizable,
+    };
     use parameterized::parameterized;
 
     use super::*;

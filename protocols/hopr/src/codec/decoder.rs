@@ -5,10 +5,8 @@ use std::{
 
 use hopr_api::chain::*;
 use hopr_crypto_packet::prelude::*;
-use hopr_crypto_types::prelude::*;
-use hopr_internal_types::prelude::*;
 use hopr_platform::trace_timed;
-use hopr_primitive_types::prelude::*;
+use hopr_types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*};
 
 use crate::{
     AuxiliaryPacketInfo, HoprCodecConfig, IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket,
@@ -127,7 +125,7 @@ where
         let domain_separator = self.channels_dst;
 
         let verified_incoming_ticket = trace_timed!("ticket_signature_verification", {
-            hopr_parallelize::cpu::spawn_fifo_blocking(
+            hopr_types::parallelize::cpu::spawn_fifo_blocking(
                 move || {
                     validate_unacknowledged_ticket(
                         fwd.outgoing.ticket,
@@ -229,7 +227,7 @@ where
             match self
                 .peer_id_cache
                 .try_get_with_by_ref(&sender, async {
-                    hopr_parallelize::cpu::spawn_fifo_blocking(
+                    hopr_types::parallelize::cpu::spawn_fifo_blocking(
                         move || OffchainPublicKey::from_peerid(&sender),
                         "peerid_lookup",
                     )
@@ -265,7 +263,7 @@ where
         // If the following operation fails, it means that the packet is not a valid Hopr packet,
         // and as such should not be acknowledged later.
         let packet = trace_timed!("sphinx_decode complete", {
-            hopr_parallelize::cpu::spawn_fifo_blocking(
+            hopr_types::parallelize::cpu::spawn_fifo_blocking(
                 move || {
                     HoprPacket::from_incoming(&data, &offchain_keypair, previous_hop, &mapper, |p| {
                         surb_store.find_reply_opener(p)

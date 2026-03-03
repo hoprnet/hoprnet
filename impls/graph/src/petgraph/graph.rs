@@ -200,7 +200,7 @@ mod tests {
         EdgeLinkObservable, NetworkGraphView, NetworkGraphWrite,
         traits::{EdgeObservableRead, EdgeObservableWrite, EdgeWeightType},
     };
-    use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
+    use hopr_types::crypto::prelude::{Keypair, OffchainKeypair};
 
     use super::*;
 

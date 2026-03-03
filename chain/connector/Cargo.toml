@@ -11,7 +11,7 @@ license = "GPL-3.0-only"
 
 [features]
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
-testing = ["dep:hex", "blokli-client/testing", "hopr-chain-types/use-bindings"]
+testing = ["dep:hex", "blokli-client/testing"]
 
 [dependencies]
 ahash = { workspace = true }
@@ -37,11 +37,14 @@ tempfile = { workspace = true }
 
 hopr-api = { workspace = true, features = ["chain"] }
 hopr-async-runtime = { workspace = true }
-hopr-chain-types = { workspace = true }
-hopr-crypto-types = { workspace = true }
-hopr-crypto-random = { workspace = true }
-hopr-internal-types = { workspace = true, features = ["serde"] }
-hopr-primitive-types = { workspace = true }
+hopr-types = { workspace = true, features = [
+  "chain",
+  "crypto",
+  "random",
+  "internal",
+  "primitive",
+  "serde",
+] }
 
 [dev-dependencies]
 hex-literal = { workspace = true }

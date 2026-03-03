@@ -1,8 +1,6 @@
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
 use hopr_crypto_packet::prelude::validate_unacknowledged_ticket;
-use hopr_crypto_types::prelude::*;
-use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::HoprBalance;
+use hopr_types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::HoprBalance};
 
 // Avoid musl's default allocator due to degraded performance
 //

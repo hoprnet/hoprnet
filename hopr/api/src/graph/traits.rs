@@ -1,4 +1,4 @@
-use hopr_internal_types::routing::PathId;
+use hopr_types::internal::routing::PathId;
 
 use super::{MeasurablePath, MeasurablePeer};
 use crate::graph::{MeasurableEdge, MeasurableNode};

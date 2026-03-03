@@ -3,15 +3,17 @@ use std::{borrow::Cow, fs::File};
 use futures::{StreamExt, pin_mut};
 use hopr_async_runtime::{AbortHandle, spawn_as_abortable};
 use hopr_crypto_packet::{HoprSurb, prelude::PacketSignals};
-use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_internal_types::{
-    prelude::{Ticket, VerifiedAcknowledgement},
-    routing::ResolvedTransportRouting,
-};
-use hopr_primitive_types::prelude::BytesEncodable;
 use hopr_protocol_hopr::{
     IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket, IncomingPacket, IncomingPacketError,
     OutgoingPacket, PacketDecoder, PacketEncoder,
+};
+use hopr_types::{
+    crypto::types::OffchainPublicKey,
+    internal::{
+        prelude::{Ticket, VerifiedAcknowledgement},
+        routing::ResolvedTransportRouting,
+    },
+    primitive::prelude::BytesEncodable,
 };
 use pcap_file::{
     DataLink,
@@ -440,23 +442,25 @@ mod tests {
     use futures::{SinkExt, pin_mut};
     use hex_literal::hex;
     use hopr_crypto_packet::prelude::PacketSignal;
-    use hopr_crypto_random::Randomizable;
-    use hopr_crypto_types::{
-        prelude::{ChainKeypair, HalfKeyChallenge, Keypair, OffchainKeypair, SimplePseudonym},
-        types::{HalfKey, Hash},
-    };
-    use hopr_internal_types::prelude::{HoprPseudonym, TicketBuilder, VerifiedAcknowledgement, WinningProbability};
     use hopr_network_types::types::SealedHost;
-    use hopr_primitive_types::{
-        prelude::{Address, BytesRepresentable},
-        primitives::EthereumChallenge,
-        traits::BytesEncodable,
-    };
     use hopr_protocol_app::prelude::ApplicationData;
     use hopr_protocol_session::types::*;
     use hopr_protocol_start::{KeepAliveMessage, StartErrorReason, StartErrorType, StartEstablished, StartInitiation};
     use hopr_transport_probe::types::{NeighborProbe, PathTelemetry};
     use hopr_transport_session::{ByteCapabilities, Capability, SessionId, SessionTarget};
+    use hopr_types::{
+        crypto::{
+            prelude::{ChainKeypair, HalfKeyChallenge, Keypair, OffchainKeypair, SimplePseudonym},
+            types::{HalfKey, Hash},
+        },
+        crypto_random::Randomizable,
+        internal::prelude::{HoprPseudonym, TicketBuilder, VerifiedAcknowledgement, WinningProbability},
+        primitive::{
+            prelude::{Address, BytesRepresentable},
+            primitives::EthereumChallenge,
+            traits::BytesEncodable,
+        },
+    };
 
     use super::*;
 
@@ -470,7 +474,7 @@ mod tests {
 
         let packet = IncomingPacket::Final(
             IncomingFinalPacket {
-                packet_tag: hopr_crypto_random::random_bytes(),
+                packet_tag: hopr_types::crypto_random::random_bytes(),
                 previous_hop: *OffchainKeypair::random().public(),
                 sender: SimplePseudonym::random(),
                 plain_text: ApplicationData::new(10u64, &hex!("deadbeef"))?.to_bytes(),
@@ -504,7 +508,7 @@ mod tests {
 
         let packet = IncomingPacket::Final(
             IncomingFinalPacket {
-                packet_tag: hopr_crypto_random::random_bytes(),
+                packet_tag: hopr_types::crypto_random::random_bytes(),
                 previous_hop: *OffchainKeypair::random().public(),
                 sender: SimplePseudonym::random(),
                 plain_text: ApplicationData::new(1024_u64, msg.into_encoded().into_vec())?.to_bytes(),
@@ -529,7 +533,7 @@ mod tests {
 
         let packet = IncomingPacket::Final(
             IncomingFinalPacket {
-                packet_tag: hopr_crypto_random::random_bytes(),
+                packet_tag: hopr_types::crypto_random::random_bytes(),
                 previous_hop: *OffchainKeypair::random().public(),
                 sender: SimplePseudonym::random(),
                 plain_text: ApplicationData::new(1024_u64, msg.into_encoded().into_vec())?.to_bytes(),
@@ -547,7 +551,7 @@ mod tests {
 
         let packet = IncomingPacket::Final(
             IncomingFinalPacket {
-                packet_tag: hopr_crypto_random::random_bytes(),
+                packet_tag: hopr_types::crypto_random::random_bytes(),
                 previous_hop: *OffchainKeypair::random().public(),
                 sender: SimplePseudonym::random(),
                 plain_text: ApplicationData::new(1024_u64, msg.into_encoded().into_vec())?.to_bytes(),
@@ -568,7 +572,7 @@ mod tests {
 
         let packet = IncomingPacket::Final(
             IncomingFinalPacket {
-                packet_tag: hopr_crypto_random::random_bytes(),
+                packet_tag: hopr_types::crypto_random::random_bytes(),
                 previous_hop: *OffchainKeypair::random().public(),
                 sender: SimplePseudonym::random(),
                 plain_text: ApplicationData::new(1024_u64, msg.into_encoded().into_vec())?.to_bytes(),
@@ -585,7 +589,7 @@ mod tests {
         let kp = OffchainKeypair::random();
         let packet = IncomingPacket::Acknowledgement(
             IncomingAcknowledgementPacket {
-                packet_tag: hopr_crypto_random::random_bytes(),
+                packet_tag: hopr_types::crypto_random::random_bytes(),
                 previous_hop: *kp.public(),
                 received_acks: vec![
                     VerifiedAcknowledgement::random(&kp).leak(),
@@ -601,7 +605,7 @@ mod tests {
 
         let packet = IncomingPacket::Forwarded(
             IncomingForwardedPacket {
-                packet_tag: hopr_crypto_random::random_bytes(),
+                packet_tag: hopr_types::crypto_random::random_bytes(),
                 previous_hop: *OffchainKeypair::random().public(),
                 next_hop: *OffchainKeypair::random().public(),
                 data: Box::new([0x08]),
@@ -622,8 +626,8 @@ mod tests {
             next_hop: *OffchainKeypair::random().public(),
             ack_challenge: hk.as_ref().into(),
             data: ApplicationData::try_from(hopr_transport_probe::content::Message::Telemetry(PathTelemetry {
-                id: hopr_crypto_random::random_bytes(),
-                path: hopr_crypto_random::random_bytes(),
+                id: hopr_types::crypto_random::random_bytes(),
+                path: hopr_types::crypto_random::random_bytes(),
                 timestamp: 123456789_u128,
             }))?
             .to_bytes()
@@ -662,7 +666,7 @@ mod tests {
             next_hop: *OffchainKeypair::random().public(),
             ack_challenge: hk.as_ref().into(),
             data: ApplicationData::try_from(hopr_transport_probe::content::Message::Probe(NeighborProbe::Pong(
-                hopr_crypto_random::random_bytes(),
+                hopr_types::crypto_random::random_bytes(),
             )))?
             .to_bytes()
             .to_vec()

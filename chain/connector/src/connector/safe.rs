@@ -3,9 +3,7 @@ use std::time::Duration;
 use blokli_client::api::{BlokliQueryClient, BlokliSubscriptionClient, BlokliTransactionClient};
 use futures::{FutureExt, future::BoxFuture};
 use hopr_api::chain::{ChainReceipt, ChainValues, DeployedSafe, SafeSelector};
-use hopr_chain_types::prelude::PayloadGenerator;
-use hopr_crypto_types::prelude::Keypair;
-use hopr_primitive_types::prelude::*;
+use hopr_types::{chain::prelude::PayloadGenerator, crypto::prelude::Keypair, primitive::prelude::*};
 
 use crate::{Backend, HoprBlockchainConnector, HoprBlockchainReader, errors::ConnectorError};
 
@@ -88,9 +86,9 @@ where
             return Err(ConnectorError::InvalidState("insufficient token balance at the signer"));
         }
 
-        let tx_req = self
-            .payload_generator
-            .deploy_safe(balance, &[admin], true, hopr_crypto_random::random_bytes())?;
+        let tx_req =
+            self.payload_generator
+                .deploy_safe(balance, &[admin], true, hopr_types::crypto_random::random_bytes())?;
         tracing::debug!(%balance, %admin, "deploying safe");
 
         Ok(self.send_tx(tx_req).await?.boxed())
@@ -100,8 +98,7 @@ where
 #[cfg(test)]
 mod tests {
     use hopr_api::chain::ChainReadSafeOperations;
-    use hopr_crypto_types::prelude::*;
-    use hopr_internal_types::prelude::*;
+    use hopr_types::{crypto::prelude::*, internal::prelude::*};
 
     use super::*;
     use crate::{

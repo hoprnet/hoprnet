@@ -1,8 +1,10 @@
 use hopr_api::chain::*;
 use hopr_crypto_packet::prelude::*;
-use hopr_crypto_types::{crypto_traits::Randomizable, prelude::*};
-use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::*;
+use hopr_types::{
+    crypto::{crypto_traits::Randomizable, prelude::*},
+    internal::prelude::*,
+    primitive::prelude::*,
+};
 use tracing::Instrument;
 
 use crate::{
@@ -105,7 +107,7 @@ where
         let chain_key = self.chain_key.clone();
         let mapper = self.chain_api.key_id_mapper_ref().clone();
         let domain_separator = self.channels_dst;
-        let (packet, openers) = hopr_parallelize::cpu::spawn_fifo_blocking(
+        let (packet, openers) = hopr_types::parallelize::cpu::spawn_fifo_blocking(
             move || {
                 HoprPacket::into_outgoing(
                     data.as_ref(),

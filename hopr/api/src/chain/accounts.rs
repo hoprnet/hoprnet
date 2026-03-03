@@ -1,8 +1,12 @@
 use futures::{future::BoxFuture, stream::BoxStream};
-use hopr_crypto_types::prelude::{OffchainKeypair, OffchainPublicKey};
-pub use hopr_internal_types::prelude::AccountEntry;
-use hopr_primitive_types::prelude::Address;
-pub use hopr_primitive_types::prelude::{Balance, Currency};
+use hopr_types::{
+    crypto::prelude::{OffchainKeypair, OffchainPublicKey},
+    primitive::prelude::Address,
+};
+pub use hopr_types::{
+    internal::prelude::AccountEntry,
+    primitive::prelude::{Balance, Currency},
+};
 pub use multiaddr::Multiaddr;
 
 use crate::chain::ChainReceipt;

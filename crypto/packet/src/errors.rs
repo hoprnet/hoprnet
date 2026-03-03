@@ -1,13 +1,15 @@
 use std::fmt::Debug;
 
-use hopr_crypto_types::errors::CryptoError;
-use hopr_internal_types::{
-    errors::CoreTypesError,
-    prelude::{ChannelId, Ticket, WinningProbability},
-};
-use hopr_primitive_types::{
-    errors::GeneralError,
-    prelude::{Address, HoprBalance},
+use hopr_types::{
+    crypto::errors::CryptoError,
+    internal::{
+        errors::CoreTypesError,
+        prelude::{ChannelId, Ticket, WinningProbability},
+    },
+    primitive::{
+        errors::GeneralError,
+        prelude::{Address, HoprBalance},
+    },
 };
 use thiserror::Error;
 
@@ -87,8 +89,10 @@ pub struct TicketValidationError {
 
 #[cfg(test)]
 mod tests {
-    use hopr_crypto_types::prelude::{ChainKeypair, Keypair};
-    use hopr_internal_types::prelude::TicketBuilder;
+    use hopr_types::{
+        crypto::prelude::{ChainKeypair, Keypair},
+        internal::prelude::TicketBuilder,
+    };
 
     use super::*;
 

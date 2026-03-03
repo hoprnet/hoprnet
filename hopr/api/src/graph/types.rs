@@ -1,4 +1,4 @@
-use hopr_crypto_types::types::OffchainPublicKey;
+use hopr_types::crypto::types::OffchainPublicKey;
 
 /// Error observed during the measurements updating the graph edges.
 #[derive(thiserror::Error, Debug)]
