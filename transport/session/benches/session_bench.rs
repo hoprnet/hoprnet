@@ -2,8 +2,10 @@ use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_m
 use futures::{AsyncReadExt, AsyncWriteExt, FutureExt, StreamExt};
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
-use hopr_internal_types::prelude::HoprPseudonym;
-use hopr_network_types::prelude::{DestinationRouting, RoutingOptions};
+use hopr_internal_types::{
+    prelude::HoprPseudonym,
+    routing::{DestinationRouting, RoutingOptions},
+};
 use hopr_primitive_types::prelude::Address;
 use hopr_protocol_app::{prelude::ApplicationDataOut, v1::ApplicationDataIn};
 #[cfg(feature = "telemetry")]

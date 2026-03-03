@@ -3,7 +3,6 @@ use std::ops::Mul;
 use hopr_crypto_packet::prelude::*;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
-use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
 use crate::TicketCreationError;
@@ -68,7 +67,7 @@ pub trait PacketEncoder {
     async fn encode_packet<T: AsRef<[u8]> + Send + 'static, S: Into<PacketSignals> + Send + 'static>(
         &self,
         data: T,
-        routing: ResolvedTransportRouting,
+        routing: ResolvedTransportRouting<HoprSurb>,
         signals: S,
     ) -> Result<OutgoingPacket, Self::Error>;
 

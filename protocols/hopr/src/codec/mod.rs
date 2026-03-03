@@ -69,8 +69,7 @@ mod tests {
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::prelude::*;
     use hopr_db_node::HoprNodeDb;
-    use hopr_internal_types::prelude::*;
-    use hopr_network_types::prelude::ResolvedTransportRouting;
+    use hopr_internal_types::{prelude::*, routing::ResolvedTransportRouting};
 
     use crate::{
         HoprCodecConfig, HoprDecoder, HoprEncoder, HoprTicketProcessor, HoprTicketProcessorConfig, MemorySurbStore,

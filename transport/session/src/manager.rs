@@ -15,8 +15,10 @@ use futures_time::future::FutureExt as TimeExt;
 use hopr_async_runtime::AbortableList;
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_crypto_random::Randomizable;
-use hopr_internal_types::prelude::HoprPseudonym;
-use hopr_network_types::prelude::*;
+use hopr_internal_types::{
+    prelude::HoprPseudonym,
+    routing::{DestinationRouting, RoutingOptions},
+};
 use hopr_primitive_types::prelude::Address;
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_start::{
@@ -1493,6 +1495,8 @@ mod tests {
     use futures::{AsyncWriteExt, future::BoxFuture};
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
+    use hopr_internal_types::routing::SurbMatcher;
+    use hopr_network_types::prelude::SealedHost;
     use hopr_primitive_types::prelude::Address;
     use hopr_protocol_start::{StartProtocol, StartProtocolDiscriminants};
     use tokio::time::timeout;

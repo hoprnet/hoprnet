@@ -6,7 +6,7 @@ use std::{
 
 use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt, io::{AsyncRead, AsyncWrite}};
 use hopr_async_runtime::AbortHandle;
-use hopr_network_types::prelude::DestinationRouting;
+use hopr_internal_types::routing::DestinationRouting;
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataOut};
 use hopr_protocol_start::{KeepAliveFlag, KeepAliveMessage};
 use tracing::{Instrument, debug, error, instrument};

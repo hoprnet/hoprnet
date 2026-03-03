@@ -1,6 +1,5 @@
 use futures::stream::BoxStream;
-pub use hopr_network_types::types::{DestinationRouting, PathId};
-
+pub use hopr_internal_types::routing::{DestinationRouting, PathId};
 /// Enum representation of different types of [`DestinationRouting`] the
 /// [`ProbingTrafficGeneration::build`] is able to generate.
 ///
