@@ -671,14 +671,16 @@ pub async fn udp_bind_to<A: std::net::ToSocketAddrs>(
 
 async fn bind_session_to_stream<T>(
     mut session: HoprSession,
-    mut stream: T,
+    stream: T,
     max_buf: usize,
     abort_reg: Option<AbortRegistration>,
 ) where
     T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
+    use tokio_util::compat::TokioAsyncReadCompatExt;
     let session_id = *session.id();
-    match transfer_session(&mut session, &mut stream, max_buf, abort_reg).await {
+    let mut stream_compat = stream.compat();
+    match transfer_session(&mut session, &mut stream_compat, max_buf, abort_reg).await {
         Ok((session_to_stream_bytes, stream_to_session_bytes)) => info!(
             session_id = ?session_id,
             session_to_stream_bytes, stream_to_session_bytes, "client session ended",

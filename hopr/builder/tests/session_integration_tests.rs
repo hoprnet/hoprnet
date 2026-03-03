@@ -16,6 +16,7 @@ use tokio::{
     net::{TcpListener, TcpStream, UdpSocket},
     sync::oneshot,
 };
+use tokio_util::compat::TokioAsyncReadCompatExt;
 #[rstest]
 #[case(Capabilities::empty())]
 #[case(Capabilities::from(Capability::Segmentation))]
@@ -88,7 +89,8 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
     let (ready_tx, ready_rx) = oneshot::channel();
     let transfer_handle = tokio::task::spawn(async move {
         ready_tx.send(()).ok();
-        transfer_session(&mut alice_session, &mut listener, BUF_LEN, None).await
+        let mut listener_compat = listener.compat();
+        transfer_session(&mut alice_session, &mut listener_compat, BUF_LEN, None).await
     });
     ready_rx.await.ok();
 
@@ -227,9 +229,10 @@ async fn tcp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
 
     let (ready_tx, ready_rx) = oneshot::channel();
     let transfer_handle = tokio::task::spawn(async move {
-        let (mut stream, _) = listener.accept().await.unwrap();
+        let (stream, _) = listener.accept().await.unwrap();
         ready_tx.send(()).ok();
-        transfer_session(&mut alice_session, &mut stream, BUF_LEN, None).await
+        let mut stream_compat = stream.compat();
+        transfer_session(&mut alice_session, &mut stream_compat, BUF_LEN, None).await
     });
 
     let msg: [u8; MSG_LEN] = hopr_crypto_random::random_bytes();

@@ -104,7 +104,7 @@ impl hopr_lib::traits::session::HoprSessionServer for HoprServerIpForwardingReac
                     )));
                 }
 
-                let mut udp_bridge = ConnectedUdpStream::builder()
+                let udp_bridge = ConnectedUdpStream::builder()
                     .with_buffer_size(HOPR_UDP_BUFFER_SIZE)
                     .with_counterparty(resolved_udp_target)
                     .with_foreign_data_mode(ForeignDataMode::Error)
@@ -135,7 +135,9 @@ impl hopr_lib::traits::session::HoprSessionServer for HoprServerIpForwardingReac
 
                     // The Session forwards the termination to the udp_bridge, terminating
                     // the UDP socket.
-                    match transfer_session(&mut session.session, &mut udp_bridge, HOPR_UDP_BUFFER_SIZE, None).await {
+                    use tokio_util::compat::TokioAsyncReadCompatExt;
+                    let mut udp_bridge_compat = udp_bridge.compat();
+                    match transfer_session(&mut session.session, &mut udp_bridge_compat, HOPR_UDP_BUFFER_SIZE, None).await {
                         Ok((session_to_stream_bytes, stream_to_session_bytes)) => tracing::info!(
                             ?session_id,
                             session_to_stream_bytes,
@@ -186,7 +188,7 @@ impl hopr_lib::traits::session::HoprSessionServer for HoprServerIpForwardingReac
                 let strategy = tokio_retry::strategy::FixedInterval::new(self.cfg.tcp_target_retry_delay)
                     .take(self.cfg.max_tcp_target_retries as usize);
 
-                let mut tcp_bridge = tokio_retry::Retry::spawn(strategy, || {
+                let tcp_bridge = tokio_retry::Retry::spawn(strategy, || {
                     tokio::net::TcpStream::connect(resolved_tcp_targets.as_slice())
                 })
                 .await
@@ -210,7 +212,9 @@ impl hopr_lib::traits::session::HoprSessionServer for HoprServerIpForwardingReac
                     #[cfg(all(feature = "prometheus", not(test)))]
                     let _g = hopr_metrics::MultiGaugeGuard::new(&METRIC_ACTIVE_TARGETS, &["tcp"], 1.0);
 
-                    match transfer_session(&mut session.session, &mut tcp_bridge, HOPR_TCP_BUFFER_SIZE, None).await {
+                    use tokio_util::compat::TokioAsyncReadCompatExt;
+                    let mut tcp_bridge_compat = tcp_bridge.compat();
+                    match transfer_session(&mut session.session, &mut tcp_bridge_compat, HOPR_TCP_BUFFER_SIZE, None).await {
                         Ok((session_to_stream_bytes, stream_to_session_bytes)) => tracing::info!(
                             ?session_id,
                             session_to_stream_bytes,

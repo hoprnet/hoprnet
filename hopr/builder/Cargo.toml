@@ -28,6 +28,7 @@ session-server = [
   "dep:serde_with",
   "dep:smart-default",
   "dep:tokio-retry",
+  "dep:tokio-util",
   "dep:validator",
   "hopr-lib/session-server",
 ]
