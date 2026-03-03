@@ -5,7 +5,6 @@ use hopr_chain_connector::Address;
 use hopr_lib::config::{HostConfig, HostType, looks_like_domain};
 use hoprd_api::config::Auth;
 use serde::{Deserialize, Serialize};
-use tracing::debug;
 
 use crate::{config::HoprdConfig, errors::HoprdError};
 
@@ -238,13 +237,13 @@ impl TryFrom<CliArgs> for HoprdConfig {
 
     fn try_from(value: CliArgs) -> Result<Self, Self::Error> {
         let mut cfg: HoprdConfig = if let Some(cfg_path) = value.configuration_file_path {
-            debug!(cfg_path, "fetching configuration from file");
+            tracing::debug!(cfg_path, "fetching configuration from file");
             let yaml_configuration = std::fs::read_to_string(cfg_path.as_str())
                 .map_err(|e| crate::errors::HoprdError::ConfigError(e.to_string()))?;
             serde_saphyr::from_str(&yaml_configuration)
                 .map_err(|e| crate::errors::HoprdError::SerializationError(e.to_string()))?
         } else {
-            debug!("loading default configuration");
+            tracing::debug!("loading default configuration");
             HoprdConfig::default()
         };
 

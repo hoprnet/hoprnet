@@ -1,10 +1,22 @@
 use std::{str::FromStr, string::ToString, time::Duration};
 
+use opentelemetry::{
+    KeyValue,
+    logs::{AnyValue, LogRecord as _, Logger as _, LoggerProvider as _, Severity},
+    metrics::{MeterProvider as _, ObservableCounter, ObservableGauge},
+    trace::TracerProvider,
+};
+use opentelemetry_otlp::WithExportConfig as _;
+use opentelemetry_sdk::{
+    logs::{SdkLogger, SdkLoggerProvider},
+    metrics::SdkMeterProvider,
+    trace::{RandomIdGenerator, Sampler, SdkTracerProvider},
+};
+use tracing::field::{Field, Visit};
 use tracing_subscriber::prelude::*;
-#[cfg(all(feature = "telemetry", feature = "prometheus"))]
+#[cfg(feature = "prometheus")]
 use {
     hopr_metrics::{PrometheusMetric, PrometheusMetricFamily, PrometheusMetricType, gather_metric_families},
-    opentelemetry::metrics::{ObservableCounter, ObservableGauge},
     std::{
         collections::HashSet,
         sync::{
@@ -14,24 +26,7 @@ use {
         thread::{self, JoinHandle},
     },
 };
-#[cfg(feature = "telemetry")]
-use {
-    opentelemetry::{
-        KeyValue,
-        logs::{AnyValue, LogRecord as _, Logger as _, LoggerProvider as _, Severity},
-        metrics::MeterProvider as _,
-        trace::TracerProvider,
-    },
-    opentelemetry_otlp::WithExportConfig as _,
-    opentelemetry_sdk::{
-        logs::{SdkLogger, SdkLoggerProvider},
-        metrics::SdkMeterProvider,
-        trace::{RandomIdGenerator, Sampler, SdkTracerProvider},
-    },
-    tracing::field::{Field, Visit},
-};
 
-#[cfg(feature = "telemetry")]
 flagset::flags! {
     #[repr(u8)]
     #[derive(PartialOrd, Ord, strum::EnumString, strum::Display)]
@@ -47,7 +42,6 @@ flagset::flags! {
     }
 }
 
-#[cfg(feature = "telemetry")]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, strum::EnumString, strum::Display)]
 enum OtlpTransport {
     #[strum(serialize = "grpc")]
@@ -57,7 +51,6 @@ enum OtlpTransport {
     Http,
 }
 
-#[cfg(feature = "telemetry")]
 impl OtlpTransport {
     fn from_env() -> Self {
         match std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT") {
@@ -68,7 +61,6 @@ impl OtlpTransport {
     }
 }
 
-#[cfg(feature = "telemetry")]
 #[derive(Debug)]
 struct OtlpConfig {
     enabled: bool,
@@ -77,7 +69,6 @@ struct OtlpConfig {
     signals: flagset::FlagSet<OtlpSignal>,
 }
 
-#[cfg(feature = "telemetry")]
 impl OtlpConfig {
     fn from_env() -> Self {
         let enabled = matches!(
@@ -125,20 +116,17 @@ impl OtlpConfig {
     }
 }
 
-#[cfg(feature = "telemetry")]
 #[derive(Clone)]
 struct OtelLogsLayer {
     logger: SdkLogger,
 }
 
-#[cfg(feature = "telemetry")]
 impl OtelLogsLayer {
     fn new(logger: SdkLogger) -> Self {
         Self { logger }
     }
 }
 
-#[cfg(feature = "telemetry")]
 impl<S> tracing_subscriber::Layer<S> for OtelLogsLayer
 where
     S: tracing::Subscriber,
@@ -187,7 +175,6 @@ where
     }
 }
 
-#[cfg(feature = "telemetry")]
 #[derive(Default)]
 struct TracingEventVisitor {
     body: Option<String>,
@@ -195,7 +182,6 @@ struct TracingEventVisitor {
     timestamp: Option<std::time::SystemTime>,
 }
 
-#[cfg(feature = "telemetry")]
 impl TracingEventVisitor {
     fn record_body_or_attribute<V>(&mut self, field: &Field, value: V)
     where
@@ -215,7 +201,6 @@ impl TracingEventVisitor {
     }
 }
 
-#[cfg(feature = "telemetry")]
 impl Visit for TracingEventVisitor {
     fn record_i64(&mut self, field: &Field, value: i64) {
         if let Ok(value) = u64::try_from(value) {
@@ -250,14 +235,106 @@ impl Visit for TracingEventVisitor {
     }
 }
 
-#[cfg(all(feature = "telemetry", feature = "prometheus"))]
+#[derive(Default)]
+struct OtelSessionMetricBridge {
+    u64_counters: Vec<ObservableCounter<u64>>,
+    u64_gauges: Vec<ObservableGauge<u64>>,
+    f64_gauges: Vec<ObservableGauge<f64>>,
+}
+
+fn session_metric_attributes(session_id: hopr_lib::SessionId) -> [KeyValue; 1] {
+    [KeyValue::new("session_id", session_id.to_string())]
+}
+
+fn build_session_u64_observable_gauge(
+    meter: &opentelemetry::metrics::Meter,
+    metric_name: String,
+) -> ObservableGauge<u64> {
+    let callback_metric_name = metric_name.clone();
+    meter
+        .u64_observable_gauge(metric_name)
+        .with_callback(move |observer| {
+            for snapshot in hopr_lib::session_telemetry_snapshots() {
+                if let Some(hopr_lib::SessionMetricValue::U64(value)) =
+                    hopr_lib::session_snapshot_metric_value(&snapshot, &callback_metric_name)
+                {
+                    let attributes = session_metric_attributes(snapshot.session_id);
+                    observer.observe(value, &attributes);
+                }
+            }
+        })
+        .build()
+}
+
+fn build_session_u64_observable_counter(
+    meter: &opentelemetry::metrics::Meter,
+    metric_name: String,
+) -> ObservableCounter<u64> {
+    let callback_metric_name = metric_name.clone();
+    meter
+        .u64_observable_counter(metric_name)
+        .with_callback(move |observer| {
+            for snapshot in hopr_lib::session_telemetry_snapshots() {
+                if let Some(hopr_lib::SessionMetricValue::U64(value)) =
+                    hopr_lib::session_snapshot_metric_value(&snapshot, &callback_metric_name)
+                {
+                    let attributes = session_metric_attributes(snapshot.session_id);
+                    observer.observe(value, &attributes);
+                }
+            }
+        })
+        .build()
+}
+
+fn build_session_f64_observable_gauge(
+    meter: &opentelemetry::metrics::Meter,
+    metric_name: String,
+) -> ObservableGauge<f64> {
+    let callback_metric_name = metric_name.clone();
+    meter
+        .f64_observable_gauge(metric_name)
+        .with_callback(move |observer| {
+            for snapshot in hopr_lib::session_telemetry_snapshots() {
+                if let Some(hopr_lib::SessionMetricValue::F64(value)) =
+                    hopr_lib::session_snapshot_metric_value(&snapshot, &callback_metric_name)
+                {
+                    let attributes = session_metric_attributes(snapshot.session_id);
+                    observer.observe(value, &attributes);
+                }
+            }
+        })
+        .build()
+}
+
+fn build_session_metric_bridge(meter_provider: &SdkMeterProvider) -> OtelSessionMetricBridge {
+    let meter = meter_provider.meter("hoprd_session_snapshot_bridge");
+    let mut session_metrics = OtelSessionMetricBridge::default();
+
+    for metric_definition in hopr_lib::session_snapshot_metric_definitions() {
+        match metric_definition.kind {
+            hopr_lib::SessionMetricKind::U64Gauge => session_metrics
+                .u64_gauges
+                .push(build_session_u64_observable_gauge(&meter, metric_definition.name)),
+            hopr_lib::SessionMetricKind::U64Counter => session_metrics
+                .u64_counters
+                .push(build_session_u64_observable_counter(&meter, metric_definition.name)),
+            hopr_lib::SessionMetricKind::F64Gauge => session_metrics
+                .f64_gauges
+                .push(build_session_f64_observable_gauge(&meter, metric_definition.name)),
+        }
+    }
+
+    session_metrics
+}
+
+#[cfg(feature = "prometheus")]
 struct OtelPrometheusMetricBridge {
     _state: Arc<Mutex<OtelPrometheusMetricBridgeState>>,
     refresh_stop_sender: Option<Sender<()>>,
     refresh_thread: Option<JoinHandle<()>>,
 }
 
-#[cfg(all(feature = "telemetry", feature = "prometheus"))]
+#[cfg(feature = "prometheus")]
 #[derive(Default)]
 struct OtelPrometheusMetricBridgeState {
     registered_families: HashSet<String>,
@@ -266,7 +343,7 @@ struct OtelPrometheusMetricBridgeState {
     u64_counters: Vec<ObservableCounter<u64>>,
 }
 
-#[cfg(all(feature = "telemetry", feature = "prometheus"))]
+#[cfg(feature = "prometheus")]
 impl Drop for OtelPrometheusMetricBridge {
     fn drop(&mut self) {
         if let Some(sender) = self.refresh_stop_sender.take() {
@@ -278,7 +355,7 @@ impl Drop for OtelPrometheusMetricBridge {
     }
 }
 
-#[cfg(all(feature = "telemetry", feature = "prometheus"))]
+#[cfg(feature = "prometheus")]
 fn build_prometheus_metric_bridge(meter_provider: &SdkMeterProvider) -> OtelPrometheusMetricBridge {
     let meter = meter_provider.meter("hoprd_prometheus_bridge");
     let state = Arc::new(Mutex::new(OtelPrometheusMetricBridgeState::default()));
@@ -318,7 +395,7 @@ fn build_prometheus_metric_bridge(meter_provider: &SdkMeterProvider) -> OtelProm
     }
 }
 
-#[cfg(all(feature = "telemetry", feature = "prometheus"))]
+#[cfg(feature = "prometheus")]
 fn sync_prometheus_metric_families(meter: &opentelemetry::metrics::Meter, state: &mut OtelPrometheusMetricBridgeState) {
     for family in gather_metric_families() {
         let family_key = format!("{:?}:{}", family.get_field_type(), family.name());
@@ -329,7 +406,7 @@ fn sync_prometheus_metric_families(meter: &opentelemetry::metrics::Meter, state:
     }
 }
 
-#[cfg(all(feature = "telemetry", feature = "prometheus"))]
+#[cfg(feature = "prometheus")]
 fn register_prometheus_metric_family(
     meter: &opentelemetry::metrics::Meter,
     family: &PrometheusMetricFamily,
@@ -492,14 +569,14 @@ fn register_prometheus_metric_family(
     }
 }
 
-#[cfg(all(feature = "telemetry", feature = "prometheus"))]
+#[cfg(feature = "prometheus")]
 fn find_prometheus_family(metric_name: &str, metric_type: PrometheusMetricType) -> Option<PrometheusMetricFamily> {
     gather_metric_families()
         .into_iter()
         .find(|family| family.name() == metric_name && family.get_field_type() == metric_type)
 }
 
-#[cfg(all(feature = "telemetry", feature = "prometheus"))]
+#[cfg(feature = "prometheus")]
 fn prometheus_metric_attributes(metric: &PrometheusMetric, extra: Option<(&str, String)>) -> Vec<KeyValue> {
     let mut attributes = Vec::with_capacity(metric.get_label().len() + usize::from(extra.is_some()));
     for label in metric.get_label() {
@@ -513,217 +590,160 @@ fn prometheus_metric_attributes(metric: &PrometheusMetric, extra: Option<(&str, 
 
 #[derive(Default)]
 pub(super) struct TelemetryHandles {
-    #[cfg(feature = "telemetry")]
     tracer_provider: Option<SdkTracerProvider>,
-    #[cfg(feature = "telemetry")]
     logger_provider: Option<SdkLoggerProvider>,
-    #[cfg(feature = "telemetry")]
     meter_provider: Option<SdkMeterProvider>,
-    #[cfg(all(feature = "telemetry", feature = "prometheus"))]
+    session_metric_bridge: Option<OtelSessionMetricBridge>,
+    #[cfg(feature = "prometheus")]
     metric_bridge: Option<OtelPrometheusMetricBridge>,
 }
 
 impl Drop for TelemetryHandles {
     fn drop(&mut self) {
-        #[cfg(feature = "telemetry")]
-        {
-            if let Some(tracer_provider) = self.tracer_provider.take() {
-                let _ = tracer_provider.shutdown();
-            }
-            if let Some(logger_provider) = self.logger_provider.take() {
-                let _ = logger_provider.shutdown();
-            }
-            if let Some(meter_provider) = self.meter_provider.take() {
-                let _ = meter_provider.shutdown();
-            }
+        if let Some(tracer_provider) = self.tracer_provider.take() {
+            let _ = tracer_provider.shutdown();
+        }
+        if let Some(logger_provider) = self.logger_provider.take() {
+            let _ = logger_provider.shutdown();
+        }
+        if let Some(meter_provider) = self.meter_provider.take() {
+            let _ = meter_provider.shutdown();
         }
     }
 }
 
 pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
-    let env_filter = match tracing_subscriber::EnvFilter::try_from_default_env() {
-        Ok(filter) => filter,
-        Err(_) => tracing_subscriber::filter::EnvFilter::new("info")
-            .add_directive("libp2p_swarm=info".parse()?)
-            .add_directive("libp2p_mplex=info".parse()?)
-            .add_directive("libp2p_tcp=info".parse()?)
-            .add_directive("libp2p_dns=info".parse()?)
-            .add_directive("multistream_select=info".parse()?)
-            .add_directive("isahc=error".parse()?)
-            .add_directive("sea_orm=warn".parse()?)
-            .add_directive("sqlx=warn".parse()?)
-            .add_directive("hyper_util=warn".parse()?),
-    };
-
-    #[cfg(feature = "prof")]
-    let registry = tracing_subscriber::Registry::default()
-        .with(
-            env_filter
-                .add_directive("tokio=trace".parse()?)
-                .add_directive("runtime=trace".parse()?),
-        )
-        .with(console_subscriber::spawn());
-
-    #[cfg(not(feature = "prof"))]
-    let registry = tracing_subscriber::Registry::default().with(env_filter);
-
-    let format = tracing_subscriber::fmt::layer()
-        .with_level(true)
-        .with_target(true)
-        .with_thread_ids(true)
-        .with_thread_names(false);
-
-    let format = if std::env::var("HOPRD_LOG_FORMAT")
-        .map(|v| v.to_lowercase() == "json")
-        .unwrap_or(false)
-    {
-        format.json().boxed()
-    } else {
-        format.boxed()
-    };
-
-    let registry = registry.with(format);
-
     let mut telemetry_handles = TelemetryHandles::default();
+    let registry = crate::telemetry_common::build_base_subscriber()?;
+    let config = OtlpConfig::from_env();
 
-    #[cfg(feature = "telemetry")]
-    {
-        let config = OtlpConfig::from_env();
-        if config.enabled {
-            let resource = opentelemetry_sdk::Resource::builder()
-                .with_service_name(config.service_name.clone())
+    if config.enabled {
+        let resource = opentelemetry_sdk::Resource::builder()
+            .with_service_name(config.service_name.clone())
+            .build();
+
+        let trace_layer = if config.has_signal(OtlpSignal::Traces) {
+            let exporter = match config.transport {
+                OtlpTransport::Grpc => opentelemetry_otlp::SpanExporter::builder()
+                    .with_tonic()
+                    .with_protocol(opentelemetry_otlp::Protocol::Grpc)
+                    .with_timeout(Duration::from_secs(5))
+                    .build()?,
+                OtlpTransport::Http => opentelemetry_otlp::SpanExporter::builder()
+                    .with_http()
+                    .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
+                    .with_timeout(Duration::from_secs(5))
+                    .build()?,
+            };
+            let batch_processor =
+                opentelemetry_sdk::trace::span_processor_with_async_runtime::BatchSpanProcessor::builder(
+                    exporter,
+                    opentelemetry_sdk::runtime::Tokio,
+                )
                 .build();
-
-            let trace_layer = if config.has_signal(OtlpSignal::Traces) {
-                let exporter = match config.transport {
-                    OtlpTransport::Grpc => opentelemetry_otlp::SpanExporter::builder()
-                        .with_tonic()
-                        .with_protocol(opentelemetry_otlp::Protocol::Grpc)
-                        .with_timeout(Duration::from_secs(5))
-                        .build()?,
-                    OtlpTransport::Http => opentelemetry_otlp::SpanExporter::builder()
-                        .with_http()
-                        .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
-                        .with_timeout(Duration::from_secs(5))
-                        .build()?,
-                };
-                let batch_processor =
-                    opentelemetry_sdk::trace::span_processor_with_async_runtime::BatchSpanProcessor::builder(
-                        exporter,
-                        opentelemetry_sdk::runtime::Tokio,
-                    )
-                    .build();
-                let tracer_provider = SdkTracerProvider::builder()
-                    .with_span_processor(batch_processor)
-                    .with_sampler(Sampler::AlwaysOn)
-                    .with_id_generator(RandomIdGenerator::default())
-                    .with_max_events_per_span(64)
-                    .with_max_attributes_per_span(16)
-                    .with_resource(resource.clone())
-                    .build();
-                let tracer = tracer_provider.tracer(env!("CARGO_PKG_NAME"));
-                telemetry_handles.tracer_provider = Some(tracer_provider);
-                Some(tracing_opentelemetry::layer().with_tracer(tracer))
-            } else {
-                None
-            };
-
-            let logs_layer = if config.has_signal(OtlpSignal::Logs) {
-                let exporter = match config.transport {
-                    OtlpTransport::Grpc => opentelemetry_otlp::LogExporter::builder()
-                        .with_tonic()
-                        .with_protocol(opentelemetry_otlp::Protocol::Grpc)
-                        .with_timeout(Duration::from_secs(5))
-                        .build()?,
-                    OtlpTransport::Http => opentelemetry_otlp::LogExporter::builder()
-                        .with_http()
-                        .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
-                        .with_timeout(Duration::from_secs(5))
-                        .build()?,
-                };
-
-                let batch_processor =
-                    opentelemetry_sdk::logs::log_processor_with_async_runtime::BatchLogProcessor::builder(
-                        exporter,
-                        opentelemetry_sdk::runtime::Tokio,
-                    )
-                    .build();
-                let logger_provider = SdkLoggerProvider::builder()
-                    .with_log_processor(batch_processor)
-                    .with_resource(resource.clone())
-                    .build();
-                let logger = logger_provider.logger(env!("CARGO_PKG_NAME"));
-                telemetry_handles.logger_provider = Some(logger_provider);
-                Some(OtelLogsLayer::new(logger))
-            } else {
-                None
-            };
-
-            if config.has_signal(OtlpSignal::Metrics) {
-                #[cfg(feature = "prometheus")]
-                {
-                    let exporter = match config.transport {
-                        OtlpTransport::Grpc => opentelemetry_otlp::MetricExporter::builder()
-                            .with_tonic()
-                            .with_protocol(opentelemetry_otlp::Protocol::Grpc)
-                            .with_timeout(Duration::from_secs(5))
-                            .build()?,
-                        OtlpTransport::Http => opentelemetry_otlp::MetricExporter::builder()
-                            .with_http()
-                            .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
-                            .with_timeout(Duration::from_secs(5))
-                            .build()?,
-                    };
-
-                    let reader =
-                        opentelemetry_sdk::metrics::periodic_reader_with_async_runtime::PeriodicReader::builder(
-                            exporter,
-                            opentelemetry_sdk::runtime::Tokio,
-                        )
-                        .build();
-                    let meter_provider = SdkMeterProvider::builder()
-                        .with_reader(reader)
-                        .with_resource(resource.clone())
-                        .build();
-                    opentelemetry::global::set_meter_provider(meter_provider.clone());
-                    telemetry_handles.metric_bridge = Some(build_prometheus_metric_bridge(&meter_provider));
-                    telemetry_handles.meter_provider = Some(meter_provider);
-                }
-                #[cfg(not(feature = "prometheus"))]
-                {
-                    tracing::warn!("OpenTelemetry metrics requested but the `prometheus` feature is disabled");
-                }
-            }
-
-            let enabled_signals = [OtlpSignal::Traces, OtlpSignal::Logs, OtlpSignal::Metrics]
-                .into_iter()
-                .filter(|signal| config.signals.contains(*signal))
-                .map(|signal| signal.to_string())
-                .collect::<Vec<_>>()
-                .join(",");
-
-            match (trace_layer, logs_layer) {
-                (Some(trace_layer), Some(logs_layer)) => {
-                    tracing::subscriber::set_global_default(registry.with(trace_layer).with(logs_layer))?
-                }
-                (Some(trace_layer), None) => tracing::subscriber::set_global_default(registry.with(trace_layer))?,
-                (None, Some(logs_layer)) => tracing::subscriber::set_global_default(registry.with(logs_layer))?,
-                (None, None) => tracing::subscriber::set_global_default(registry)?,
-            }
-
-            tracing::info!(
-                otel_service_name = %config.service_name,
-                otel_signals = %enabled_signals,
-                otel_protocol = %config.transport.to_string(),
-                "OpenTelemetry enabled"
-            );
+            let tracer_provider = SdkTracerProvider::builder()
+                .with_span_processor(batch_processor)
+                .with_sampler(Sampler::AlwaysOn)
+                .with_id_generator(RandomIdGenerator::default())
+                .with_max_events_per_span(64)
+                .with_max_attributes_per_span(16)
+                .with_resource(resource.clone())
+                .build();
+            let tracer = tracer_provider.tracer(env!("CARGO_PKG_NAME"));
+            telemetry_handles.tracer_provider = Some(tracer_provider);
+            Some(tracing_opentelemetry::layer().with_tracer(tracer))
         } else {
-            tracing::subscriber::set_global_default(registry)?
-        }
-    }
+            None
+        };
 
-    #[cfg(not(feature = "telemetry"))]
-    tracing::subscriber::set_global_default(registry)?;
+        let logs_layer = if config.has_signal(OtlpSignal::Logs) {
+            let exporter = match config.transport {
+                OtlpTransport::Grpc => opentelemetry_otlp::LogExporter::builder()
+                    .with_tonic()
+                    .with_protocol(opentelemetry_otlp::Protocol::Grpc)
+                    .with_timeout(Duration::from_secs(5))
+                    .build()?,
+                OtlpTransport::Http => opentelemetry_otlp::LogExporter::builder()
+                    .with_http()
+                    .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
+                    .with_timeout(Duration::from_secs(5))
+                    .build()?,
+            };
+
+            let batch_processor =
+                opentelemetry_sdk::logs::log_processor_with_async_runtime::BatchLogProcessor::builder(
+                    exporter,
+                    opentelemetry_sdk::runtime::Tokio,
+                )
+                .build();
+            let logger_provider = SdkLoggerProvider::builder()
+                .with_log_processor(batch_processor)
+                .with_resource(resource.clone())
+                .build();
+            let logger = logger_provider.logger(env!("CARGO_PKG_NAME"));
+            telemetry_handles.logger_provider = Some(logger_provider);
+            Some(OtelLogsLayer::new(logger))
+        } else {
+            None
+        };
+
+        if config.has_signal(OtlpSignal::Metrics) {
+            let exporter = match config.transport {
+                OtlpTransport::Grpc => opentelemetry_otlp::MetricExporter::builder()
+                    .with_tonic()
+                    .with_protocol(opentelemetry_otlp::Protocol::Grpc)
+                    .with_timeout(Duration::from_secs(5))
+                    .build()?,
+                OtlpTransport::Http => opentelemetry_otlp::MetricExporter::builder()
+                    .with_http()
+                    .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
+                    .with_timeout(Duration::from_secs(5))
+                    .build()?,
+            };
+
+            let reader = opentelemetry_sdk::metrics::periodic_reader_with_async_runtime::PeriodicReader::builder(
+                exporter,
+                opentelemetry_sdk::runtime::Tokio,
+            )
+            .build();
+            let meter_provider = SdkMeterProvider::builder()
+                .with_reader(reader)
+                .with_resource(resource.clone())
+                .build();
+            opentelemetry::global::set_meter_provider(meter_provider.clone());
+            telemetry_handles.session_metric_bridge = Some(build_session_metric_bridge(&meter_provider));
+            #[cfg(feature = "prometheus")]
+            {
+                telemetry_handles.metric_bridge = Some(build_prometheus_metric_bridge(&meter_provider));
+            }
+            telemetry_handles.meter_provider = Some(meter_provider);
+        }
+
+        let enabled_signals = [OtlpSignal::Traces, OtlpSignal::Logs, OtlpSignal::Metrics]
+            .into_iter()
+            .filter(|signal| config.signals.contains(*signal))
+            .map(|signal| signal.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+
+        match (trace_layer, logs_layer) {
+            (Some(trace_layer), Some(logs_layer)) => {
+                tracing::subscriber::set_global_default(registry.with(trace_layer).with(logs_layer))?
+            }
+            (Some(trace_layer), None) => tracing::subscriber::set_global_default(registry.with(trace_layer))?,
+            (None, Some(logs_layer)) => tracing::subscriber::set_global_default(registry.with(logs_layer))?,
+            (None, None) => tracing::subscriber::set_global_default(registry)?,
+        }
+
+        tracing::info!(
+            otel_service_name = %config.service_name,
+            otel_signals = %enabled_signals,
+            otel_protocol = %config.transport.to_string(),
+            "OpenTelemetry enabled"
+        );
+    } else {
+        tracing::subscriber::set_global_default(registry)?;
+    }
 
     Ok(telemetry_handles)
 }

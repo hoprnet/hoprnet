@@ -26,7 +26,7 @@ use hopr_protocol_start::{
 use tracing::{debug, error, info, trace, warn};
 
 #[cfg(feature = "telemetry")]
-use crate::telemetry::{SessionLifecycleState, SessionStatsSnapshot, SessionTelemetry};
+use crate::telemetry::{self, SessionLifecycleState, SessionStatsSnapshot, SessionTelemetry};
 use crate::{
     Capability, HoprSession, IncomingSession, SESSION_MTU, SessionClientConfig, SessionId, SessionTarget,
     SurbBalancerConfig,
@@ -75,6 +75,7 @@ fn close_session(session_id: SessionId, session_data: SessionSlot, reason: Closu
     {
         session_data.telemetry.set_state(SessionLifecycleState::Closed);
         session_data.telemetry.touch_activity();
+        telemetry::unregister_session_telemetry(&session_id);
     }
 
     if reason != ClosureReason::EmptyRead {
@@ -697,14 +698,14 @@ where
                     .ok_or(SessionManagerError::NotStarted)?;
 
                 #[cfg(feature = "telemetry")]
-                let telemetry = Arc::new(SessionTelemetry::new(
+                let telemetry = SessionTelemetry::new_shared(
                     session_id,
                     HoprSessionConfig {
                         capabilities: cfg.capabilities,
                         frame_mtu: self.cfg.frame_mtu,
                         frame_timeout: self.cfg.max_frame_timeout,
                     },
-                ));
+                );
 
                 // NOTE: the Exit node can have different `max_surb_buffer_size`
                 // setting on the Session manager, so it does not make sense to cap it here
@@ -1115,14 +1116,14 @@ where
                     surb_mgmt: Default::default(),
                     surb_estimator: Default::default(),
                     #[cfg(feature = "telemetry")]
-                    telemetry: Arc::new(SessionTelemetry::new(
+                    telemetry: SessionTelemetry::new_shared(
                         _sid,
                         HoprSessionConfig {
                             capabilities: session_req.capabilities.0,
                             frame_mtu: self.cfg.frame_mtu,
                             frame_timeout: self.cfg.max_frame_timeout,
                         },
-                    )),
+                    ),
                 },
             )
             .await
