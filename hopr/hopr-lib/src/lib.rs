@@ -103,9 +103,7 @@ pub use hopr_network_types::prelude::*;
 use hopr_platform::time::native::current_time;
 pub use hopr_primitive_types::prelude::*;
 use hopr_transport::errors::HoprTransportError;
-#[cfg(feature = "runtime-tokio")]
-pub use hopr_transport::transfer_session;
-pub use hopr_transport::*;
+pub use hopr_transport::{transfer_session, *};
 use tracing::{debug, error, info, warn};
 use validator::Validate;
 

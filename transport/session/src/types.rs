@@ -541,35 +541,6 @@ impl futures::AsyncWrite for HoprSession {
     }
 }
 
-#[cfg(feature = "runtime-tokio")]
-impl tokio::io::AsyncRead for HoprSession {
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut tokio::io::ReadBuf<'_>,
-    ) -> Poll<std::io::Result<()>> {
-        let slice = buf.initialize_unfilled();
-        let n = std::task::ready!(futures::AsyncRead::poll_read(self.as_mut(), cx, slice))?;
-        buf.advance(n);
-        Poll::Ready(Ok(()))
-    }
-}
-
-#[cfg(feature = "runtime-tokio")]
-impl tokio::io::AsyncWrite for HoprSession {
-    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, std::io::Error>> {
-        futures::AsyncWrite::poll_write(self.as_mut(), cx, buf)
-    }
-
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
-        futures::AsyncWrite::poll_flush(self.as_mut(), cx)
-    }
-
-    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
-        futures::AsyncWrite::poll_close(self.as_mut(), cx)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "telemetry")]

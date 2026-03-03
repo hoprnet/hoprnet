@@ -4,7 +4,10 @@ use std::{
     time::Duration,
 };
 
-use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt, io::{AsyncRead, AsyncWrite}};
+use futures::{
+    FutureExt, SinkExt, StreamExt, TryStreamExt,
+    io::{AsyncRead, AsyncWrite},
+};
 use hopr_async_runtime::AbortHandle;
 use hopr_internal_types::routing::DestinationRouting;
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataOut};
@@ -301,14 +304,9 @@ where
     let (_, stream_dummy) = futures::future::AbortHandle::new_pair();
     let stream_abort = abort_stream.unwrap_or(stream_dummy);
 
-    copy_duplex_abortable(
-        session,
-        stream,
-        (max_buffer, max_buffer),
-        (session_dummy, stream_abort),
-    )
-    .await
-    .map(|(a, b)| (a as usize, b as usize))
+    copy_duplex_abortable(session, stream, (max_buffer, max_buffer), (session_dummy, stream_abort))
+        .await
+        .map(|(a, b)| (a as usize, b as usize))
 }
 
 /// This function will use the given generator to generate an initial seeding key.
@@ -499,21 +497,13 @@ mod tests {
     }
 
     impl futures::AsyncRead for MockStream {
-        fn poll_read(
-            mut self: Pin<&mut Self>,
-            _cx: &mut Context<'_>,
-            buf: &mut [u8],
-        ) -> Poll<std::io::Result<usize>> {
+        fn poll_read(mut self: Pin<&mut Self>, _cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
             Poll::Ready(self.read_data.read(buf))
         }
     }
 
     impl futures::AsyncWrite for MockStream {
-        fn poll_write(
-            self: Pin<&mut Self>,
-            _cx: &mut Context<'_>,
-            buf: &[u8],
-        ) -> Poll<std::io::Result<usize>> {
+        fn poll_write(self: Pin<&mut Self>, _cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
             self.get_mut().write_data.lock().extend_from_slice(buf);
             Poll::Ready(Ok(buf.len()))
         }
@@ -530,12 +520,14 @@ mod tests {
     type SessionChannels = (
         HoprSession,
         futures::channel::mpsc::UnboundedSender<ApplicationDataIn>,
-        futures::channel::mpsc::UnboundedReceiver<(hopr_network_types::prelude::DestinationRouting, ApplicationDataOut)>,
+        futures::channel::mpsc::UnboundedReceiver<(
+            hopr_network_types::prelude::DestinationRouting,
+            ApplicationDataOut,
+        )>,
     );
 
     fn make_session(id: SessionId, dst: Address) -> anyhow::Result<SessionChannels> {
-        let (out_tx, out_rx) =
-            futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
+        let (out_tx, out_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
         let (in_tx, in_rx) = futures::channel::mpsc::unbounded::<ApplicationDataIn>();
 
         let cfg = HoprSessionConfig::default();
@@ -615,35 +607,21 @@ mod tests {
         struct InfiniteStream;
 
         impl futures::AsyncRead for InfiniteStream {
-            fn poll_read(
-                self: Pin<&mut Self>,
-                _cx: &mut Context<'_>,
-                _buf: &mut [u8],
-            ) -> Poll<std::io::Result<usize>> {
+            fn poll_read(self: Pin<&mut Self>, _cx: &mut Context<'_>, _buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
                 Poll::Pending
             }
         }
 
         impl futures::AsyncWrite for InfiniteStream {
-            fn poll_write(
-                self: Pin<&mut Self>,
-                _cx: &mut Context<'_>,
-                buf: &[u8],
-            ) -> Poll<std::io::Result<usize>> {
+            fn poll_write(self: Pin<&mut Self>, _cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
                 Poll::Ready(Ok(buf.len()))
             }
 
-            fn poll_flush(
-                self: Pin<&mut Self>,
-                _cx: &mut Context<'_>,
-            ) -> Poll<std::io::Result<()>> {
+            fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
                 Poll::Ready(Ok(()))
             }
 
-            fn poll_close(
-                self: Pin<&mut Self>,
-                _cx: &mut Context<'_>,
-            ) -> Poll<std::io::Result<()>> {
+            fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
                 Poll::Ready(Ok(()))
             }
         }
@@ -651,9 +629,8 @@ mod tests {
         let (abort_handle, abort_reg) = futures::future::AbortHandle::new_pair();
         let mut stream = InfiniteStream;
 
-        let transfer = tokio::task::spawn(async move {
-            transfer_session(&mut session, &mut stream, 256, Some(abort_reg)).await
-        });
+        let transfer =
+            tokio::task::spawn(async move { transfer_session(&mut session, &mut stream, 256, Some(abort_reg)).await });
 
         // Give transfer_session time to start, then abort from the stream side.
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;

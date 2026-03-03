@@ -137,7 +137,9 @@ impl hopr_lib::traits::session::HoprSessionServer for HoprServerIpForwardingReac
                     // the UDP socket.
                     use tokio_util::compat::TokioAsyncReadCompatExt;
                     let mut udp_bridge_compat = udp_bridge.compat();
-                    match transfer_session(&mut session.session, &mut udp_bridge_compat, HOPR_UDP_BUFFER_SIZE, None).await {
+                    match transfer_session(&mut session.session, &mut udp_bridge_compat, HOPR_UDP_BUFFER_SIZE, None)
+                        .await
+                    {
                         Ok((session_to_stream_bytes, stream_to_session_bytes)) => tracing::info!(
                             ?session_id,
                             session_to_stream_bytes,
@@ -214,7 +216,9 @@ impl hopr_lib::traits::session::HoprSessionServer for HoprServerIpForwardingReac
 
                     use tokio_util::compat::TokioAsyncReadCompatExt;
                     let mut tcp_bridge_compat = tcp_bridge.compat();
-                    match transfer_session(&mut session.session, &mut tcp_bridge_compat, HOPR_TCP_BUFFER_SIZE, None).await {
+                    match transfer_session(&mut session.session, &mut tcp_bridge_compat, HOPR_TCP_BUFFER_SIZE, None)
+                        .await
+                    {
                         Ok((session_to_stream_bytes, stream_to_session_bytes)) => tracing::info!(
                             ?session_id,
                             session_to_stream_bytes,
@@ -235,13 +239,13 @@ impl hopr_lib::traits::session::HoprSessionServer for HoprServerIpForwardingReac
             }
             hopr_lib::SessionTarget::ExitNode(SERVICE_ID_LOOPBACK) => {
                 tracing::debug!(?session_id, "bridging the session to the loopback service");
-                let (mut reader, mut writer) = tokio::io::split(session.session);
 
                 #[cfg(all(feature = "prometheus", not(test)))]
                 let _g = hopr_metrics::MultiGaugeGuard::new(&METRIC_ACTIVE_TARGETS, &["loopback"], 1.0);
 
                 // Uses 4 kB buffer for copying
-                match tokio::io::copy(&mut reader, &mut writer).await {
+                let (mut reader, mut writer) = futures::AsyncReadExt::split(session.session);
+                match futures::io::copy(&mut reader, &mut writer).await {
                     Ok(copied) => tracing::info!(?session_id, copied, "server loopback session service ended"),
                     Err(error) => tracing::error!(
                         ?session_id,
