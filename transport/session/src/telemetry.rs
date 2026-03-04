@@ -6,7 +6,7 @@
 
 use std::{
     sync::{
-        OnceLock,
+        Arc, OnceLock,
         atomic::{AtomicU8, AtomicU64, AtomicUsize, Ordering},
     },
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -14,11 +14,19 @@ use std::{
 
 use hopr_protocol_session::{FrameInspector, SessionMessageDiscriminants};
 
-pub use crate::balancer::{AtomicSurbFlowEstimator, BalancerStateValues};
+pub(crate) use crate::metric_bridge::{register_session_telemetry, unregister_session_telemetry};
 use crate::{Capability, HoprSessionConfig, SessionId, types::SESSION_SOCKET_CAPACITY};
+pub use crate::{
+    balancer::{AtomicSurbFlowEstimator, BalancerStateValues},
+    metric_bridge::{
+        SessionMetricDefinition, SessionMetricKind, SessionMetricSample, SessionMetricValue, serialize_duration_millis,
+        serialize_system_time_millis, session_snapshot_metric_definitions, session_snapshot_metric_samples,
+        session_snapshot_metric_value, session_telemetry_snapshots,
+    },
+};
 
 /// The lifecycle state of a session from the perspective of metrics.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, strum::FromRepr, serde::Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, strum::FromRepr, serde_repr::Serialize_repr)]
 #[repr(u8)]
 pub enum SessionLifecycleState {
     /// Session is active and running.
@@ -30,7 +38,7 @@ pub enum SessionLifecycleState {
 }
 
 /// The acknowledgement mode configured for the session.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, strum::FromRepr, serde_repr::Serialize_repr)]
 #[repr(u8)]
 pub enum SessionAckMode {
     /// No acknowledgements.
@@ -47,16 +55,25 @@ pub enum SessionAckMode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub struct SessionLifetimeSnapshot {
     /// Time when the session was created.
+    #[serde(rename = "created_at_ms")]
+    #[serde(serialize_with = "serialize_system_time_millis")]
     pub created_at: SystemTime,
     /// Time of the last read or write activity.
+    #[serde(rename = "last_activity_at_ms")]
+    #[serde(serialize_with = "serialize_system_time_millis")]
     pub last_activity_at: SystemTime,
     /// Total duration the session has been alive.
+    #[serde(rename = "uptime_ms")]
+    #[serde(serialize_with = "serialize_duration_millis")]
     pub uptime: Duration,
     /// Duration since the last activity.
+    #[serde(rename = "idle_ms")]
+    #[serde(serialize_with = "serialize_duration_millis")]
     pub idle: Duration,
     /// Current lifecycle state of the session.
     pub state: SessionLifecycleState,
     /// Errors during pipeline processing.
+    #[serde(rename = "pipeline_errors_total")]
     pub pipeline_errors: u64,
 }
 
@@ -64,18 +81,25 @@ pub struct SessionLifetimeSnapshot {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub struct FrameBufferSnapshot {
     /// Maximum Transmission Unit for frames.
+    #[serde(rename = "mtu_bytes")]
     pub frame_mtu: usize,
     /// Configured timeout for frame reassembly/acknowledgement.
+    #[serde(rename = "timeout_ms")]
+    #[serde(serialize_with = "serialize_duration_millis")]
     pub frame_timeout: Duration,
     /// Configured capacity of the frame buffer.
     pub frame_capacity: usize,
     /// Number of frames currently being assembled (incomplete).
+    #[serde(rename = "being_assembled")]
     pub frames_being_assembled: usize,
     /// Total number of frames successfully completed/assembled.
+    #[serde(rename = "completed_total")]
     pub frames_completed: u64,
     /// Total number of frames emitted to the application.
+    #[serde(rename = "emitted_total")]
     pub frames_emitted: u64,
     /// Total number of frames discarded (e.g. due to timeout or errors).
+    #[serde(rename = "discarded_total")]
     pub frames_discarded: u64,
 }
 
@@ -85,16 +109,22 @@ pub struct AckSnapshot {
     /// Configured acknowledgement mode.
     pub mode: SessionAckMode,
     /// Total incoming segments received.
+    #[serde(rename = "incoming_segments_total")]
     pub incoming_segments: u64,
     /// Total retransmission requests received.
+    #[serde(rename = "incoming_retransmission_requests_total")]
     pub incoming_retransmission_requests: u64,
     /// Total frame acknowledgements received.
+    #[serde(rename = "incoming_acknowledged_frames_total")]
     pub incoming_acknowledged_frames: u64,
     /// Total outgoing segments sent.
+    #[serde(rename = "outgoing_segments_total")]
     pub outgoing_segments: u64,
     /// Total retransmission requests sent.
+    #[serde(rename = "outgoing_retransmission_requests_total")]
     pub outgoing_retransmission_requests: u64,
     /// Total frame acknowledgements sent.
+    #[serde(rename = "outgoing_acknowledged_frames_total")]
     pub outgoing_acknowledged_frames: u64,
 }
 
@@ -119,12 +149,16 @@ pub struct SurbSnapshot {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub struct TransportSnapshot {
     /// Total bytes received.
+    #[serde(rename = "bytes_in_total")]
     pub bytes_in: u64,
     /// Total bytes sent.
+    #[serde(rename = "bytes_out_total")]
     pub bytes_out: u64,
     /// Total packets received.
+    #[serde(rename = "packets_in_total")]
     pub packets_in: u64,
     /// Total packets sent.
+    #[serde(rename = "packets_out_total")]
     pub packets_out: u64,
 }
 
@@ -134,10 +168,13 @@ pub struct SessionStatsSnapshot {
     /// The ID of the session.
     pub session_id: SessionId,
     /// Time when this snapshot was taken.
+    #[serde(rename = "snapshot_at_ms")]
+    #[serde(serialize_with = "serialize_system_time_millis")]
     pub snapshot_at: SystemTime,
     /// Lifetime-related metrics.
     pub lifetime: SessionLifetimeSnapshot,
     /// Frame buffer-related metrics.
+    #[serde(rename = "frame")]
     pub frame_buffer: FrameBufferSnapshot,
     /// Acknowledgement-related metrics.
     pub ack: AckSnapshot,
@@ -180,7 +217,7 @@ pub struct SessionTelemetry {
     /// to ensure atomic read/update of the pair.
     last_rate_snapshot: parking_lot::Mutex<(u64, u64)>,
     inspector: OnceLock<FrameInspector>,
-    balancer_data: OnceLock<(std::sync::Arc<BalancerStateValues>, AtomicSurbFlowEstimator)>,
+    balancer_data: OnceLock<(Arc<BalancerStateValues>, AtomicSurbFlowEstimator)>,
 }
 
 impl SessionTelemetry {
@@ -228,6 +265,12 @@ impl SessionTelemetry {
             inspector: OnceLock::new(),
             balancer_data: OnceLock::new(),
         }
+    }
+
+    pub fn new_shared(session_id: SessionId, cfg: HoprSessionConfig) -> Arc<Self> {
+        let session_telemetry = Arc::new(Self::new(session_id, cfg));
+        register_session_telemetry(&session_telemetry);
+        session_telemetry
     }
 
     /// Returns a reference to the session ID.
@@ -286,7 +329,7 @@ impl SessionTelemetry {
     /// Sets the SURB flow estimator for tracking produced/consumed SURBs.
     ///
     /// The estimator and target buffer are initialized only once via `OnceLock`.
-    pub fn set_balancer_data(&self, estimator: AtomicSurbFlowEstimator, state: std::sync::Arc<BalancerStateValues>) {
+    pub fn set_balancer_data(&self, estimator: AtomicSurbFlowEstimator, state: Arc<BalancerStateValues>) {
         let _ = self.balancer_data.set((state, estimator));
     }
 
@@ -503,5 +546,69 @@ mod tests {
         assert_eq!(snapshot.frame_buffer.frames_completed, 1);
         assert_eq!(snapshot.frame_buffer.frames_emitted, 1);
         assert_eq!(snapshot.frame_buffer.frames_discarded, 1);
+    }
+
+    #[test]
+    fn shared_session_telemetry_is_discoverable_and_removed_after_drop() {
+        let id = SessionId::new(3_u64, HoprPseudonym::random());
+        let metrics = SessionTelemetry::new_shared(id, HoprSessionConfig::default());
+        metrics.record_write(7);
+
+        assert!(
+            session_telemetry_snapshots()
+                .into_iter()
+                .any(|snapshot| snapshot.session_id == id && snapshot.transport.bytes_out == 7)
+        );
+
+        drop(metrics);
+
+        assert!(
+            !session_telemetry_snapshots()
+                .into_iter()
+                .any(|snapshot| snapshot.session_id == id)
+        );
+    }
+
+    #[test]
+    fn inferred_session_metric_definitions_include_expected_metrics() {
+        let definitions = session_snapshot_metric_definitions();
+        let has_state_metric = definitions
+            .iter()
+            .any(|definition| definition.name == "hopr_session_lifetime_state");
+        let has_ack_counter_metric = definitions
+            .iter()
+            .any(|definition| definition.name == "hopr_session_ack_incoming_segments_total");
+        let has_f64_metric = definitions
+            .iter()
+            .any(|definition| definition.name == "hopr_session_surb_rate_per_sec");
+
+        assert!(has_state_metric);
+        assert!(has_ack_counter_metric);
+        assert!(has_f64_metric);
+
+        assert!(definitions.iter().any(
+            |definition| definition.name == "hopr_session_ack_incoming_segments_total"
+                && definition.kind == SessionMetricKind::U64Counter
+        ));
+        assert!(
+            definitions
+                .iter()
+                .any(|definition| definition.name == "hopr_session_lifetime_state"
+                    && definition.kind == SessionMetricKind::U64Gauge)
+        );
+    }
+
+    #[test]
+    fn inferred_session_metric_values_are_readable_by_metric_name() {
+        let id = SessionId::new(4_u64, HoprPseudonym::random());
+        let metrics = SessionTelemetry::new(id, HoprSessionConfig::default());
+        metrics.record_read(10);
+
+        let snapshot = metrics.snapshot();
+        let bytes_in_total = session_snapshot_metric_value(&snapshot, "hopr_session_transport_bytes_in_total");
+        let ack_mode = session_snapshot_metric_value(&snapshot, "hopr_session_ack_mode");
+
+        assert_eq!(Some(SessionMetricValue::U64(10)), bytes_in_total);
+        assert_eq!(Some(SessionMetricValue::U64(SessionAckMode::None as u64)), ack_mode);
     }
 }

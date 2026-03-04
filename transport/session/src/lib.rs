@@ -11,6 +11,8 @@ pub(crate) mod balancer;
 pub mod errors;
 mod manager;
 #[cfg(feature = "telemetry")]
+mod metric_bridge;
+#[cfg(feature = "telemetry")]
 mod telemetry;
 mod types;
 mod utils;
@@ -23,7 +25,9 @@ pub use manager::{DispatchResult, MIN_SURB_BUFFER_DURATION, SessionManager, Sess
 #[cfg(feature = "telemetry")]
 pub use telemetry::{
     AckSnapshot, FrameBufferSnapshot, SessionAckMode, SessionLifecycleState, SessionLifetimeSnapshot,
-    SessionStatsSnapshot, SessionTelemetry, SurbSnapshot, TransportSnapshot,
+    SessionMetricDefinition, SessionMetricKind, SessionMetricSample, SessionMetricValue, SessionStatsSnapshot,
+    SessionTelemetry, SurbSnapshot, TransportSnapshot, session_snapshot_metric_definitions,
+    session_snapshot_metric_samples, session_snapshot_metric_value, session_telemetry_snapshots,
 };
 pub use types::{
     ByteCapabilities, HoprSession, HoprSessionConfig, IncomingSession, ServiceId, SessionId, SessionTarget,
