@@ -48,8 +48,8 @@ use validator::Validate;
 /// These values are used to estimate the gas price for transactions.
 /// As GasOracleMiddleware is migrated to GasFiller, they are replaced with
 /// default values.
-pub const EIP1559_FEE_ESTIMATION_DEFAULT_MAX_FEE_GNOSIS: u128 = 3_000_000_000;
-pub const EIP1559_FEE_ESTIMATION_DEFAULT_PRIORITY_FEE_GNOSIS: u128 = 100_000_000;
+pub const EIP1559_FEE_ESTIMATION_DEFAULT_MAX_FEE_GNOSIS: u128 = 10_000_000_000; // 10 Gwei
+pub const EIP1559_FEE_ESTIMATION_DEFAULT_PRIORITY_FEE_GNOSIS: u128 = 4_000_000_000; // 4 Gwei
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, MultiHistogram};
