@@ -233,7 +233,7 @@ typenum = "1.18.0"
 uuid = { version = "1.18.1" }
 url = { version = "2.5.7", features = ["serde"] }
 validator = { version = "0.20.0", features = ["derive"] }
-vergen-gix = { version = "1.0.9", features = ["build"] }
+vergen-gix = { version = "9.1.0", features = ["build"] }
 tikv-jemallocator = "0.6.0"
 
 hopr-api = { path = "common/api" }
