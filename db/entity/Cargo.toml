@@ -19,7 +19,6 @@ sqlite = []
 [build-dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }
-futures = { workspace = true }
 sea-orm = { workspace = true }
 sea-orm-cli = { workspace = true }
 sea-orm-migration = { workspace = true }

@@ -9,10 +9,7 @@ use alloy::{
     network::EthereumWallet,
     providers::{
         CallItemBuilder, Identity, PendingTransaction, Provider, ProviderBuilder, RootProvider,
-        fillers::{
-            BlobGasFiller, CachedNonceManager, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
-            WalletFiller,
-        },
+        fillers::{CachedNonceManager, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller},
     },
     rpc::{
         client::RpcClient,
@@ -115,15 +112,12 @@ pub(crate) type HoprProvider<R> = FillProvider<
     JoinFill<
         JoinFill<
             JoinFill<
-                JoinFill<
-                    JoinFill<JoinFill<Identity, WalletFiller<EthereumWallet>>, ChainIdFiller>,
-                    NonceFiller<CachedNonceManager>,
-                >,
-                GasFiller,
+                JoinFill<JoinFill<Identity, WalletFiller<EthereumWallet>>, ChainIdFiller>,
+                NonceFiller<CachedNonceManager>,
             >,
-            GasOracleFiller<R>,
+            GasFiller,
         >,
-        BlobGasFiller,
+        GasOracleFiller<R>,
     >,
     RootProvider,
 >;
@@ -157,7 +151,6 @@ impl<R: HttpRequestor + 'static + Clone> RpcOperations<R> {
             .filler(NonceFiller::new(CachedNonceManager::default()))
             .filler(GasFiller)
             .filler(GasOracleFiller::new(requestor.clone(), cfg.gas_oracle_url.clone()))
-            .filler(BlobGasFiller)
             .connect_client(rpc_client);
 
         debug!("{:?}", cfg.contract_addrs);

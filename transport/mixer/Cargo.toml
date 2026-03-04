@@ -32,10 +32,7 @@ anyhow = { workspace = true }
 bytesize = { workspace = true }
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 futures = { workspace = true }
-mockall = { workspace = true }
-more-asserts = { workspace = true }
 tokio = { workspace = true, features = ["time"] }
-tracing-test = { workspace = true }
 
 [[bench]]
 name = "mixer_throughput"

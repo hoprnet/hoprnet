@@ -179,7 +179,5 @@ class TestWebsocketWithSwarm:
                     try:
                         msg = await asyncio.wait_for(ws.recv(), timeout=5)
                     except Exception:
-                        pytest.fail(
-                            f"Timeout when receiving msg {i} from {src} to {dest}"
-                        )  # ty: ignore[call-non-callable]
+                        pytest.fail(f"Timeout when receiving msg {i} from {src} to {dest}")  # ty: ignore[call-non-callable]
                     assert body == msg.decode(), "sent data content should be identical"

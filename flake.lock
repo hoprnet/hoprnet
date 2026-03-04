@@ -132,16 +132,32 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1758880150,
-        "narHash": "sha256-zolCmvSK11f7ElYR3AnwoNvtlwrla7/29K5ntP4qMj0=",
+        "lastModified": 1772654862,
+        "narHash": "sha256-nTBVC2/p6xGGRfUamV61o5dkDWIIfKe8t9//Zm2BgxE=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "9fcebba73397bda79121aa787c5df75f6b802ae4",
+        "rev": "cd6f948512ec01c041bbcc49bf34fb6b6c58aba0",
         "type": "github"
       },
       "original": {
         "owner": "NixOS",
-        "ref": "release-25.05",
+        "ref": "release-25.11",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs-unstable": {
+      "locked": {
+        "lastModified": 1772630323,
+        "narHash": "sha256-Lj649cAmhzSE9tgVp5D6bpn7w8rLUULojJrbnyR7JhA=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "ed52aa01456d779999473ecdd49020f196d1108d",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "master",
         "repo": "nixpkgs",
         "type": "github"
       }
@@ -176,6 +192,7 @@
         "flake-utils": "flake-utils",
         "foundry": "foundry",
         "nixpkgs": "nixpkgs",
+        "nixpkgs-unstable": "nixpkgs-unstable",
         "pre-commit": "pre-commit",
         "rust-overlay": "rust-overlay",
         "solc": "solc",
@@ -189,11 +206,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1758854041,
-        "narHash": "sha256-kZ+24pbf4FiHlYlcvts64BhpxpHkPKIQXBmx1OmBAIo=",
+        "lastModified": 1772593411,
+        "narHash": "sha256-47WOnCSyOL6AghZiMIJaTLWM359DHe3be9R1cNCdGUE=",
         "owner": "oxalica",
         "repo": "rust-overlay",
-        "rev": "02227ca8c229c968dbb5de95584cfb12b4313104",
+        "rev": "a741b36b77440f5db15fcf2ab6d7d592d2f9ee8f",
         "type": "github"
       },
       "original": {

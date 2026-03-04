@@ -19,7 +19,6 @@ hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 
 [dev-dependencies]
-anyhow = { workspace = true }
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 
 [[bench]]

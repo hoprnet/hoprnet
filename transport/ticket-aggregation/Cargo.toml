@@ -36,13 +36,5 @@ hopr-transport-identity = { workspace = true }
 [dev-dependencies]
 anyhow = { workspace = true }
 tokio = { workspace = true }
-async-channel = { workspace = true }
-async_channel_io = { version = "0.3.0" }
-bytesize = { workspace = true }
-criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
-more-asserts = { workspace = true }
-serial_test = { workspace = true }
-tracing-test = { workspace = true }
 
 hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
-hopr-transport-mixer = { workspace = true }

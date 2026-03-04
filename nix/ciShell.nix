@@ -22,6 +22,8 @@ let
 
     # testing utilities
     cargo-audit
+    cargo-machete
+    cargo-shear
 
     # docker image inspection and handling
     dive
