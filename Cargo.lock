@@ -4753,7 +4753,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-lib"
-version = "4.0.0-rc.3"
+version = "4.0.0-rc.4"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -5336,7 +5336,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd"
-version = "4.0.0-rc.3"
+version = "4.0.0-rc.4"
 dependencies = [
  "anyhow",
  "async-signal",

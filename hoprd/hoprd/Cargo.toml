@@ -118,7 +118,7 @@ hopr-ct-telemetry = { workspace = true }
 hopr-db-node = { workspace = true }
 hopr-chain-connector = { workspace = true }
 hopr-utils-session = { workspace = true }
-hopr-metrics = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
 hoprd-api = { workspace = true, features = ["telemetry"] }
 
 # Target-specific dependencies for memory allocators
