@@ -895,9 +895,6 @@
             programs.taplo.enable = true;
             programs.ruff-format.enable = true;
 
-            settings.formatter.rustfmt = {
-              command = "${pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default)}/bin/rustfmt";
-            };
             settings.formatter.solc = {
               command = "sh";
               options = [

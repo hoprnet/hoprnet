@@ -9,10 +9,7 @@ use alloy::{
     network::EthereumWallet,
     providers::{
         CallItemBuilder, Identity, PendingTransaction, Provider, ProviderBuilder, RootProvider,
-        fillers::{
-            CachedNonceManager, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
-            WalletFiller,
-        },
+        fillers::{CachedNonceManager, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller},
     },
     rpc::{
         client::RpcClient,

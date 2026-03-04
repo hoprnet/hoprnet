@@ -20,10 +20,7 @@ use alloy::{
     network::EthereumWallet,
     providers::{
         Identity, ProviderBuilder, RootProvider,
-        fillers::{
-            CachedNonceManager, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
-            WalletFiller,
-        },
+        fillers::{CachedNonceManager, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller},
     },
     rpc::client::ClientBuilder,
     signers::local::PrivateKeySigner,

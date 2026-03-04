@@ -29,8 +29,8 @@ use alloy::{
     providers::{
         Identity, Provider, RootProvider, SendableTx,
         fillers::{
-            BlobGasFiller, ChainIdFiller, FillProvider, FillerControlFlow, GasFiller, JoinFill, NonceFiller,
-            TxFiller, WalletFiller,
+            BlobGasFiller, ChainIdFiller, FillProvider, FillerControlFlow, GasFiller, JoinFill, NonceFiller, TxFiller,
+            WalletFiller,
         },
     },
     rpc::json_rpc::{ErrorPayload, RequestPacket, ResponsePacket, ResponsePayload},
