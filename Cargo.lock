@@ -4483,8 +4483,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-types"
-version = "1.0.1"
-source = "git+https://github.com/hoprnet/hopr-types?branch=main#bdfa78c491d040d5a29e803d6cf6d84dad79e97f"
+version = "1.0.2"
+source = "git+https://github.com/hoprnet/hopr-types?branch=main#db8192132466b5fe38299ef5d4c31f7c0e2efd83"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4545,8 +4545,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-random"
-version = "1.0.1"
-source = "git+https://github.com/hoprnet/hopr-types?branch=main#bdfa78c491d040d5a29e803d6cf6d84dad79e97f"
+version = "1.0.2"
+source = "git+https://github.com/hoprnet/hopr-types?branch=main#db8192132466b5fe38299ef5d4c31f7c0e2efd83"
 dependencies = [
  "generic-array 1.3.5",
  "lazy_static",
@@ -4576,8 +4576,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-types"
-version = "1.0.1"
-source = "git+https://github.com/hoprnet/hopr-types?branch=main#bdfa78c491d040d5a29e803d6cf6d84dad79e97f"
+version = "1.0.2"
+source = "git+https://github.com/hoprnet/hopr-types?branch=main#db8192132466b5fe38299ef5d4c31f7c0e2efd83"
 dependencies = [
  "aes",
  "blake3",
@@ -4702,8 +4702,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-internal-types"
-version = "1.0.1"
-source = "git+https://github.com/hoprnet/hopr-types?branch=main#bdfa78c491d040d5a29e803d6cf6d84dad79e97f"
+version = "1.0.2"
+source = "git+https://github.com/hoprnet/hopr-types?branch=main#db8192132466b5fe38299ef5d4c31f7c0e2efd83"
 dependencies = [
  "aquamarine",
  "async-trait",
@@ -4818,8 +4818,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-parallelize"
-version = "1.0.1"
-source = "git+https://github.com/hoprnet/hopr-types?branch=main#bdfa78c491d040d5a29e803d6cf6d84dad79e97f"
+version = "1.0.2"
+source = "git+https://github.com/hoprnet/hopr-types?branch=main#db8192132466b5fe38299ef5d4c31f7c0e2efd83"
 dependencies = [
  "futures",
  "lazy_static",
@@ -4840,8 +4840,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-primitive-types"
-version = "1.0.1"
-source = "git+https://github.com/hoprnet/hopr-types?branch=main#bdfa78c491d040d5a29e803d6cf6d84dad79e97f"
+version = "1.0.2"
+source = "git+https://github.com/hoprnet/hopr-types?branch=main#db8192132466b5fe38299ef5d4c31f7c0e2efd83"
 dependencies = [
  "bigdecimal",
  "chrono",
@@ -5236,8 +5236,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-types"
-version = "1.0.1"
-source = "git+https://github.com/hoprnet/hopr-types?branch=main#bdfa78c491d040d5a29e803d6cf6d84dad79e97f"
+version = "1.0.2"
+source = "git+https://github.com/hoprnet/hopr-types?branch=main#db8192132466b5fe38299ef5d4c31f7c0e2efd83"
 dependencies = [
  "hopr-chain-types",
  "hopr-crypto-random",
