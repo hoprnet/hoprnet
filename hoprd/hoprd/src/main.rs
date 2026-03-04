@@ -36,9 +36,6 @@ mod telemetry_common;
 
 const DEFAULT_BLOKLI_URL: &str = "https://blokli.dufour.hoprnet.link";
 
-type HoprBlokliConnector = HoprBlockchainSafeConnector<BlokliClient>;
-type HoprNode = hopr_lib::Hopr<Arc<HoprBlokliConnector>, HoprNodeDb, SharedChannelGraph, HoprNetwork>;
-
 #[derive(Clone, Debug, PartialEq, Eq, Hash, strum::Display)]
 enum HoprdProcess {
     #[strum(to_string = "session listener sockets")]
@@ -241,7 +238,7 @@ async fn main_inner() -> anyhow::Result<()> {
     update_hopr_lib_config_from_env_vars(&mut hopr_lib_cfg)?;
 
     // Create the node instance
-    info!("creating the HOPRd node instance from hopr-lib");
+    tracing::info!("creating the HOPRd node instance from hopr-lib");
     let node =
         Arc::new(hopr_lib::Hopr::new((&hopr_keys).into(), chain_connector.clone(), node_db, hopr_lib_cfg).await?);
 
@@ -290,7 +287,7 @@ async fn main_inner() -> anyhow::Result<()> {
                 drop(node);
                 drop(processes);
 
-                info!("All processes stopped... emulating the default handler...");
+                tracing::info!("All processes stopped... emulating the default handler...");
                 low_level::emulate_default_handler(signal as i32)?;
                 tracing::info!("Shutting down!");
                 break;
