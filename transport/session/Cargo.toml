@@ -22,7 +22,6 @@ runtime-tokio = [
 telemetry = ["hopr-protocol-session/telemetry"]
 prometheus = [
   "hopr-network-types/prometheus",
-  "hopr-types/prometheus",
   "hopr-protocol-session/prometheus",
   "dep:hopr-metrics",
   "dep:lazy_static",
