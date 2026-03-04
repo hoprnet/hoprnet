@@ -8,12 +8,8 @@ use hex_literal::hex;
 use hopr_api::chain::*;
 use hopr_async_runtime::AbortableList;
 use hopr_chain_connector::create_trustful_hopr_blokli_connector;
-use hopr_crypto_random::{random_bytes, random_integer};
-use hopr_crypto_types::prelude::*;
+use hopr_crypto_packet::HoprSurb;
 use hopr_db_node::HoprNodeDb;
-use hopr_internal_types::{errors::PathError, prelude::*};
-use hopr_network_types::prelude::ResolvedTransportRouting;
-use hopr_primitive_types::prelude::*;
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, HoprTicketProcessor, HoprTicketProcessorConfig, MemorySurbStore,
@@ -21,6 +17,12 @@ use hopr_protocol_hopr::{
 };
 use hopr_transport_mixer::config::MixerConfig;
 use hopr_transport_protocol::TicketEvent;
+use hopr_types::{
+    crypto::prelude::*,
+    crypto_random::{random_bytes, random_integer},
+    internal::{errors::PathError, prelude::*, routing::ResolvedTransportRouting},
+    primitive::prelude::*,
+};
 use lazy_static::lazy_static;
 use libp2p::PeerId;
 use tracing::debug;
@@ -86,7 +88,7 @@ pub type WireChannels = (
 
 #[allow(dead_code)]
 pub type LogicalChannels = (
-    futures::channel::mpsc::UnboundedSender<(ResolvedTransportRouting, ApplicationDataOut)>,
+    futures::channel::mpsc::UnboundedSender<(ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)>,
     futures::channel::mpsc::UnboundedReceiver<(HoprPseudonym, ApplicationDataIn)>,
 );
 
@@ -139,7 +141,7 @@ pub async fn peer_setup_for(
             hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(MixerConfig::default());
 
         let (api_send_tx, api_send_rx) =
-            futures::channel::mpsc::unbounded::<(ResolvedTransportRouting, ApplicationDataOut)>();
+            futures::channel::mpsc::unbounded::<(ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)>();
         let (api_recv_tx, api_recv_rx) = futures::channel::mpsc::unbounded::<(HoprPseudonym, ApplicationDataIn)>();
 
         let node_db = HoprNodeDb::new_in_memory().await?;

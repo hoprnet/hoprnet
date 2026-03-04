@@ -1,6 +1,6 @@
 [package]
 name = "hopr-network-graph"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implementation of the HOPR network graph."
 edition.workspace = true
@@ -27,7 +27,8 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 hopr-api = { workspace = true, features = ["ct", "graph", "network"] }
-hopr-crypto-types = { workspace = true }
+hopr-types = { workspace = true, features = ["crypto", "internal"] }
+
 hopr-statistics = { workspace = true, features = ["moving"] }
 
 [dev-dependencies]

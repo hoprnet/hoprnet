@@ -1,8 +1,13 @@
-use hopr_api::{OffchainPublicKey, network::PathId};
-use hopr_crypto_random::Randomizable;
-use hopr_internal_types::{NodeId, protocol::HoprPseudonym};
-use hopr_network_types::types::{DestinationRouting, RoutingOptions};
-use hopr_primitive_types::{bounded::BoundedVec, errors::GeneralError};
+use hopr_api::OffchainPublicKey;
+use hopr_types::{
+    crypto_random::Randomizable,
+    internal::{
+        NodeId,
+        protocol::HoprPseudonym,
+        routing::{DestinationRouting, PathId, RoutingOptions},
+    },
+    primitive::{bounded::BoundedVec, errors::GeneralError},
+};
 
 pub struct TaggedDestinationRouting {
     /// The destination node.
@@ -62,7 +67,7 @@ impl NeighborProbe {
 
     /// Creates a new Ping probe with a random nonce
     pub fn random_nonce() -> Self {
-        Self::Ping(hopr_crypto_random::random_bytes::<{ Self::NONCE_SIZE }>())
+        Self::Ping(hopr_types::crypto_random::random_bytes::<{ Self::NONCE_SIZE }>())
     }
 
     pub fn is_complement_to(&self, other: Self) -> bool {

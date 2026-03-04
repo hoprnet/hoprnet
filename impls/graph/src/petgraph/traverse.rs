@@ -2,9 +2,9 @@ use std::{collections::HashSet, hash::RandomState};
 
 use hopr_api::{
     OffchainPublicKey,
-    ct::PathId,
     graph::traits::{CostFn, EdgeNetworkObservableRead, EdgeObservableRead},
 };
+use hopr_types::internal::routing::PathId;
 use petgraph::graph::NodeIndex;
 
 use crate::{ChannelGraph, algorithm::all_simple_paths_multi, costs::LoopbackPathCostFn, graph::InnerGraph};
@@ -161,7 +161,10 @@ mod tests {
         NetworkGraphTraverse, NetworkGraphWrite,
         traits::{EdgeObservableWrite, EdgeWeightType},
     };
-    use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
+    use hopr_types::{
+        crypto::prelude::{Keypair, OffchainKeypair},
+        internal::routing::PathId,
+    };
 
     use super::*;
     use crate::costs::SimpleHoprCostFn;

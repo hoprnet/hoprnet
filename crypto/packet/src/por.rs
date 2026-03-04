@@ -1,8 +1,7 @@
 use std::fmt::Formatter;
 
 use hopr_crypto_sphinx::prelude::SharedSecret;
-use hopr_crypto_types::prelude::*;
-use hopr_primitive_types::prelude::*;
+use hopr_types::{crypto::prelude::*, primitive::prelude::*};
 use tracing::instrument;
 
 use crate::errors::{PacketError, Result};
@@ -249,7 +248,7 @@ pub fn generate_proof_of_relay(secrets: &[SharedSecret]) -> Result<(Vec<ProofOfR
                 .to_challenge()?
                 .to_ethereum_challenge()
         } else {
-            EthereumChallenge(hopr_crypto_random::random_bytes::<{ Address::SIZE }>().into())
+            EthereumChallenge(hopr_types::crypto_random::random_bytes::<{ Address::SIZE }>().into())
         };
 
         if i > 0 {
@@ -271,7 +270,7 @@ pub fn generate_proof_of_relay(secrets: &[SharedSecret]) -> Result<(Vec<ProofOfR
 
 #[cfg(test)]
 mod tests {
-    use hopr_crypto_random::Randomizable;
+    use hopr_types::crypto_random::Randomizable;
 
     use super::*;
 
@@ -280,7 +279,7 @@ mod tests {
             secret_b: &SharedSecret,
             secret_c: Option<&SharedSecret>,
             chain_length: u8,
-        ) -> hopr_crypto_types::errors::Result<(Self, HalfKey)> {
+        ) -> hopr_types::crypto::errors::Result<(Self, HalfKey)> {
             let s0 = derive_own_key_share(secret_b);
             let s1 = derive_ack_key_share(secret_c.unwrap_or(&SharedSecret::random()));
 
@@ -294,7 +293,10 @@ mod tests {
     }
     impl ProofOfRelayString {
         /// Creates an instance from the shared secrets with node+2 and node+3
-        fn create(secret_c: &SharedSecret, secret_d: Option<&SharedSecret>) -> hopr_crypto_types::errors::Result<Self> {
+        fn create(
+            secret_c: &SharedSecret,
+            secret_d: Option<&SharedSecret>,
+        ) -> hopr_types::crypto::errors::Result<Self> {
             let s0 = derive_ack_key_share(secret_c); // s0_ack
             let s1 = derive_own_key_share(secret_c); // s1_own
             let s2 = derive_ack_key_share(secret_d.unwrap_or(&SharedSecret::random())); // s2_ack
@@ -309,7 +311,9 @@ mod tests {
 
         /// Generates Proof of Relay challenges from the shared secrets of the
         /// outgoing packet.
-        fn from_shared_secrets(secrets: &[SharedSecret]) -> hopr_crypto_types::errors::Result<Vec<ProofOfRelayString>> {
+        fn from_shared_secrets(
+            secrets: &[SharedSecret],
+        ) -> hopr_types::crypto::errors::Result<Vec<ProofOfRelayString>> {
             (1..secrets.len())
                 .map(|i| ProofOfRelayString::create(&secrets[i], secrets.get(i + 1)))
                 .collect()

@@ -5,10 +5,6 @@ use std::{
 };
 
 use hickory_resolver::name_server::ConnectionProvider;
-use hopr_crypto_packet::{HoprSurb, prelude::HoprSenderId};
-use hopr_crypto_random::Randomizable;
-use hopr_internal_types::prelude::*;
-use hopr_primitive_types::bounded::{BoundedSize, BoundedVec};
 use libp2p_identity::PeerId;
 
 use crate::errors::NetworkTypeError;
@@ -175,8 +171,8 @@ impl IpOrHost {
 ///
 /// ### Example
 /// ```no_run
-/// use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
 /// use hopr_network_types::prelude::{IpOrHost, SealedHost};
+/// use hopr_types::crypto::prelude::{Keypair, OffchainKeypair};
 /// use libp2p_identity::PeerId;
 ///
 /// # fn main() -> anyhow::Result<()> {
@@ -227,23 +223,23 @@ impl SealedHost {
 
         // Add randomly long padding, so the length of the short hosts is obscured
         if host_str.len() < Self::MAX_LEN_WITH_PADDING {
-            let pad_len = hopr_crypto_random::random_integer(0, (Self::MAX_LEN_WITH_PADDING as u64).into());
+            let pad_len = hopr_types::crypto_random::random_integer(0, (Self::MAX_LEN_WITH_PADDING as u64).into());
             for _ in 0..pad_len {
                 host_str.push(Self::PADDING_CHAR);
             }
         }
 
-        hopr_crypto_types::seal::seal_data(host_str.as_bytes(), peer_id)
+        hopr_types::crypto::seal::seal_data(host_str.as_bytes(), peer_id)
             .map(Self::Sealed)
             .map_err(|e| NetworkTypeError::Other(e.to_string()))
     }
 
     /// Tries to unseal the sealed [`IpOrHost`] using the private key as Exit node.
     /// No-op, if the data is already unsealed.
-    pub fn unseal(self, key: &hopr_crypto_types::keypairs::OffchainKeypair) -> crate::errors::Result<IpOrHost> {
+    pub fn unseal(self, key: &hopr_types::crypto::keypairs::OffchainKeypair) -> crate::errors::Result<IpOrHost> {
         match self {
             SealedHost::Plain(host) => Ok(host),
-            SealedHost::Sealed(enc) => hopr_crypto_types::seal::unseal_data(&enc, key)
+            SealedHost::Sealed(enc) => hopr_types::crypto::seal::unseal_data(&enc, key)
                 .map_err(|e| NetworkTypeError::Other(e.to_string()))
                 .and_then(|data| {
                     String::from_utf8(data.into_vec())
@@ -280,162 +276,9 @@ impl std::fmt::Display for SealedHost {
     }
 }
 
-/// Represents routing options in a mixnet with a maximum number of hops.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum RoutingOptions {
-    /// A fixed intermediate path consisting of at most [`RoutingOptions::MAX_INTERMEDIATE_HOPS`] hops.
-    IntermediatePath(BoundedVec<NodeId, { RoutingOptions::MAX_INTERMEDIATE_HOPS }>),
-    /// Random intermediate path with at least the given number of hops,
-    /// but at most [`RoutingOptions::MAX_INTERMEDIATE_HOPS`].
-    Hops(BoundedSize<{ RoutingOptions::MAX_INTERMEDIATE_HOPS }>),
-}
-
-impl RoutingOptions {
-    /// The maximum number of hops this instance can represent.
-    pub const MAX_INTERMEDIATE_HOPS: usize = 3;
-
-    /// Inverts the intermediate path if this is an instance of [`RoutingOptions::IntermediatePath`].
-    /// Otherwise, does nothing.
-    pub fn invert(self) -> RoutingOptions {
-        match self {
-            RoutingOptions::IntermediatePath(v) => RoutingOptions::IntermediatePath(v.into_iter().rev().collect()),
-            _ => self,
-        }
-    }
-
-    /// Returns the number of hops this instance represents.
-    /// This value is guaranteed to be between 0 and [`RoutingOptions::MAX_INTERMEDIATE_HOPS`].
-    pub fn count_hops(&self) -> usize {
-        match &self {
-            RoutingOptions::IntermediatePath(v) => v.as_ref().len(),
-            RoutingOptions::Hops(h) => (*h).into(),
-        }
-    }
-}
-
-/// Allows finding saved SURBs based on different criteria.
-#[derive(Clone, Debug, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum SurbMatcher {
-    /// Try to find a SURB that has the exact given [`HoprSenderId`].
-    Exact(HoprSenderId),
-    /// Find any SURB with the given pseudonym.
-    Pseudonym(HoprPseudonym),
-}
-
-impl SurbMatcher {
-    /// Get the pseudonym part of the match.
-    pub fn pseudonym(&self) -> HoprPseudonym {
-        match self {
-            SurbMatcher::Exact(id) => id.pseudonym(),
-            SurbMatcher::Pseudonym(p) => *p,
-        }
-    }
-}
-
-impl From<HoprPseudonym> for SurbMatcher {
-    fn from(value: HoprPseudonym) -> Self {
-        Self::Pseudonym(value)
-    }
-}
-
-impl From<&HoprPseudonym> for SurbMatcher {
-    fn from(pseudonym: &HoprPseudonym) -> Self {
-        (*pseudonym).into()
-    }
-}
-
-/// Identifier for a path traversed using an allowed [`DestinationRouting`]
-/// over the network.
-pub type PathId = [u64; 5];
-
-/// Routing information containing forward or return routing options.
-///
-/// Information in this object represents the minimum required basis
-/// to generate forward paths and return paths.
-///
-/// See also [`RoutingOptions`].
-#[derive(Debug, Clone, PartialEq, Eq, strum::EnumIs)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum DestinationRouting {
-    /// Forward routing using the destination node and path,
-    /// with a possible return path.
-    Forward {
-        /// The destination node.
-        destination: Box<NodeId>,
-        /// Our pseudonym shown to the destination.
-        ///
-        /// If not given, it will be resolved as random.
-        pseudonym: Option<HoprPseudonym>,
-        /// The path to the destination.
-        forward_options: RoutingOptions,
-        /// Optional return path.
-        return_options: Option<RoutingOptions>,
-    },
-    /// Return routing using a SURB with the given pseudonym.
-    ///
-    /// Will fail if no SURB for this pseudonym is found.
-    Return(SurbMatcher),
-}
-
-impl DestinationRouting {
-    /// Shortcut for routing that does not create any SURBs for a return path.
-    pub fn forward_only<T: Into<NodeId>>(destination: T, forward_options: RoutingOptions) -> Self {
-        Self::Forward {
-            destination: Box::new(destination.into()),
-            pseudonym: None,
-            forward_options,
-            return_options: None,
-        }
-    }
-}
-
-/// Contains the resolved routing information for the packet.
-///
-/// Instance of this object is typically constructed via some resolution of a
-/// [`DestinationRouting`] instance.
-///
-/// It contains the actual forward and return paths for forward packets,
-/// or an actual SURB for return (reply) packets.
-#[derive(Clone, Debug, strum::EnumIs)]
-pub enum ResolvedTransportRouting {
-    /// Concrete routing information for a forward packet.
-    Forward {
-        /// Pseudonym of the sender.
-        pseudonym: HoprPseudonym,
-        /// Forward path.
-        forward_path: ValidatedPath,
-        /// Optional list of return paths.
-        return_paths: Vec<ValidatedPath>,
-    },
-    /// Sender ID and the corresponding SURB.
-    Return(HoprSenderId, HoprSurb),
-}
-
-impl ResolvedTransportRouting {
-    /// Shortcut for routing that does not create any SURBs for a return path.
-    pub fn forward_only(forward_path: ValidatedPath) -> Self {
-        Self::Forward {
-            pseudonym: HoprPseudonym::random(),
-            forward_path,
-            return_paths: vec![],
-        }
-    }
-
-    /// Returns the number of return paths (SURBs) on the [`ResolvedTransportRouting::Forward`]
-    /// variant, or always 0 on the [`ResolvedTransportRouting::Return`] variant.
-    pub fn count_return_paths(&self) -> usize {
-        match self {
-            ResolvedTransportRouting::Forward { return_paths, .. } => return_paths.len(),
-            ResolvedTransportRouting::Return(..) => 0,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
+    use hopr_types::crypto::prelude::{Keypair, OffchainKeypair};
     #[cfg(feature = "runtime-tokio")]
     use {anyhow::anyhow, std::net::SocketAddr};
 

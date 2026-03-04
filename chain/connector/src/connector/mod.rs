@@ -6,10 +6,7 @@ use futures_concurrency::stream::Merge;
 use futures_time::future::FutureExt as FuturesTimeExt;
 use hopr_api::chain::{ChainPathResolver, ChainReceipt, HoprKeyIdent};
 use hopr_async_runtime::AbortHandle;
-use hopr_chain_types::prelude::*;
-use hopr_crypto_types::prelude::*;
-use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::*;
+use hopr_types::{chain::prelude::*, crypto::prelude::*, internal::prelude::*, primitive::prelude::*};
 use petgraph::prelude::DiGraphMap;
 
 use crate::{
@@ -602,7 +599,7 @@ where
 pub(crate) mod tests {
     use blokli_client::BlokliTestState;
     use hex_literal::hex;
-    use hopr_chain_types::contract_addresses_for_network;
+    use hopr_types::chain::contract_addresses_for_network;
 
     use super::*;
     use crate::{InMemoryBackend, testing::BlokliTestStateBuilder};

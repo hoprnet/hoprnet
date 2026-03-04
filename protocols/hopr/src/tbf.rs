@@ -1,5 +1,4 @@
-use hopr_crypto_random::random_bytes;
-use hopr_crypto_types::types::PacketTag;
+use hopr_types::{crypto::types::PacketTag, crypto_random::random_bytes};
 
 /// Bloom filter for packet tags to detect packet replays.
 ///
@@ -93,7 +92,7 @@ impl Default for TagBloomFilter {
 
 #[cfg(test)]
 mod tests {
-    use hopr_crypto_types::types::PACKET_TAG_LENGTH;
+    use hopr_types::crypto::types::PACKET_TAG_LENGTH;
 
     #[allow(unused_imports)]
     use super::*;
@@ -123,7 +122,7 @@ mod tests {
     fn tag_bloom_filter_wrap_around() {
         let mut filter = TagBloomFilter::with_capacity(1000);
         for _ in 1..filter.capacity() {
-            let mut tag: PacketTag = hopr_crypto_random::random_bytes();
+            let mut tag: PacketTag = hopr_types::crypto_random::random_bytes();
             tag[0] = 0xaa; // ensure it's not all zeroes
             assert!(!filter.check_and_set(&tag));
         }

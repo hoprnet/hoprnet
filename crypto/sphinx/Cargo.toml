@@ -23,7 +23,7 @@ serde = [
   "generic-array/serde",
   "elliptic-curve/serde",
   "curve25519-dalek/serde",
-  "hopr-crypto-types/serde",
+  "hopr-types/serde",
 ]
 
 [dependencies]
@@ -38,9 +38,7 @@ subtle = { workspace = true }
 thiserror = { workspace = true }
 typenum = { workspace = true }
 
-hopr-crypto-types = { workspace = true }
-hopr-crypto-random = { workspace = true }
-hopr-primitive-types = { workspace = true }
+hopr-types = { workspace = true, features = ["crypto", "random", "primitive"] }
 
 [dev-dependencies]
 anyhow = { workspace = true }

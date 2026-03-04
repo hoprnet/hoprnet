@@ -8,14 +8,9 @@ use std::{
 };
 
 use futures::{SinkExt, StreamExt, TryStreamExt};
-use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::{
-    prelude::{DestinationRouting, SealedHost},
+    prelude::SealedHost,
     utils::{AsyncWriteSink, DuplexIO},
-};
-use hopr_primitive_types::{
-    errors::GeneralError,
-    prelude::{BytesRepresentable, ToHex},
 };
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 use hopr_protocol_session::{
@@ -23,6 +18,13 @@ use hopr_protocol_session::{
     UnreliableSocket,
 };
 use hopr_protocol_start::StartProtocol;
+use hopr_types::{
+    internal::{prelude::HoprPseudonym, routing::DestinationRouting},
+    primitive::{
+        errors::GeneralError,
+        prelude::{BytesRepresentable, ToHex},
+    },
+};
 use tracing::{debug, instrument};
 
 use crate::{Capabilities, Capability, errors::TransportSessionError};
@@ -577,10 +579,9 @@ mod tests {
 
     use anyhow::Context;
     use futures::{AsyncReadExt, AsyncWriteExt};
-    use hopr_crypto_random::Randomizable;
-    use hopr_crypto_types::prelude::*;
-    use hopr_network_types::prelude::*;
-    use hopr_primitive_types::prelude::*;
+    use hopr_types::{
+        crypto::prelude::*, crypto_random::Randomizable, internal::routing::RoutingOptions, primitive::prelude::*,
+    };
 
     use super::*;
     #[cfg(feature = "telemetry")]
@@ -677,8 +678,8 @@ mod tests {
             bob_metrics,
         )?;
 
-        let alice_sent = hopr_crypto_random::random_bytes::<DATA_LEN>();
-        let bob_sent = hopr_crypto_random::random_bytes::<DATA_LEN>();
+        let alice_sent = hopr_types::crypto_random::random_bytes::<DATA_LEN>();
+        let bob_sent = hopr_types::crypto_random::random_bytes::<DATA_LEN>();
 
         let mut bob_recv = [0u8; DATA_LEN];
         let mut alice_recv = [0u8; DATA_LEN];
@@ -767,8 +768,8 @@ mod tests {
             bob_metrics,
         )?;
 
-        let alice_sent = hopr_crypto_random::random_bytes::<DATA_LEN>();
-        let bob_sent = hopr_crypto_random::random_bytes::<DATA_LEN>();
+        let alice_sent = hopr_types::crypto_random::random_bytes::<DATA_LEN>();
+        let bob_sent = hopr_types::crypto_random::random_bytes::<DATA_LEN>();
 
         let mut bob_recv = [0u8; DATA_LEN];
         let mut alice_recv = [0u8; DATA_LEN];

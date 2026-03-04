@@ -14,7 +14,12 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-serde = ["dep:serde", "dep:humantime-serde", "hopr-api/serde"]
+serde = [
+  "dep:serde",
+  "dep:humantime-serde",
+  "hopr-api/serde",
+  "hopr-types/serde",
+]
 noise = []
 
 [dependencies]
@@ -29,12 +34,9 @@ validator = { workspace = true }
 moka = { workspace = true }
 
 hopr-api = { workspace = true, features = ["ct", "network", "graph"] }
+hopr-types = { workspace = true, features = ["crypto", "internal", "random"] }
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
-hopr-crypto-random = { workspace = true }
-hopr-crypto-types = { workspace = true }
-hopr-internal-types = { workspace = true }
 hopr-network-graph = { workspace = true }
-hopr-network-types = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }

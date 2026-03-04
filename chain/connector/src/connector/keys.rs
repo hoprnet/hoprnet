@@ -1,6 +1,5 @@
 use hopr_api::chain::{HoprKeyIdent, HoprSphinxHeaderSpec, HoprSphinxSuite};
-use hopr_crypto_types::prelude::OffchainPublicKey;
-use hopr_primitive_types::prelude::Address;
+use hopr_types::{crypto::prelude::OffchainPublicKey, primitive::prelude::Address};
 
 use crate::{backend::Backend, connector::HoprBlockchainConnector, errors::ConnectorError};
 
@@ -134,9 +133,7 @@ where
 mod tests {
     use hex_literal::hex;
     use hopr_api::chain::{ChainKeyOperations, KeyIdMapper};
-    use hopr_crypto_types::prelude::*;
-    use hopr_internal_types::prelude::*;
-    use hopr_primitive_types::prelude::*;
+    use hopr_types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*};
 
     use crate::{connector::tests::create_connector, testing::BlokliTestStateBuilder};
 

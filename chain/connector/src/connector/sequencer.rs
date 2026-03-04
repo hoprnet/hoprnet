@@ -1,7 +1,9 @@
 use blokli_client::api::{BlokliQueryClient, BlokliTransactionClient};
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
-use hopr_chain_types::prelude::{GasEstimation, SignableTransaction};
-use hopr_crypto_types::prelude::*;
+use hopr_types::{
+    chain::prelude::{GasEstimation, SignableTransaction},
+    crypto::prelude::*,
+};
 
 use crate::{
     errors::{self, ConnectorError},

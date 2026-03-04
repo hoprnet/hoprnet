@@ -1,4 +1,4 @@
-use std::{hint::black_box, time::Duration};
+use std::{hint::black_box, num::NonZeroUsize, time::Duration};
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use hopr_api::{
@@ -8,8 +8,8 @@ use hopr_api::{
         traits::{EdgeObservableWrite, EdgeWeightType},
     },
 };
-use hopr_crypto_types::prelude::Keypair;
 use hopr_network_graph::{ChannelGraph, costs::SimpleHoprCostFn};
+use hopr_types::crypto::prelude::Keypair;
 
 // ── Graph construction helpers ───────────────────────────────────────────────
 
@@ -118,19 +118,37 @@ fn bench_simple_paths(c: &mut Criterion) {
 
             group.bench_with_input(BenchmarkId::new("2-hop", &param), &size, |b, _| {
                 b.iter(|| {
-                    black_box(graph.simple_paths(me, black_box(dst_2hop), 2, Some(10), SimpleHoprCostFn::new(2)))
+                    black_box(graph.simple_paths(
+                        me,
+                        black_box(dst_2hop),
+                        2,
+                        Some(10),
+                        SimpleHoprCostFn::new(NonZeroUsize::new(2).unwrap()),
+                    ))
                 });
             });
 
             group.bench_with_input(BenchmarkId::new("3-hop", &param), &size, |b, _| {
                 b.iter(|| {
-                    black_box(graph.simple_paths(me, black_box(dst_3hop), 3, Some(10), SimpleHoprCostFn::new(3)))
+                    black_box(graph.simple_paths(
+                        me,
+                        black_box(dst_3hop),
+                        3,
+                        Some(10),
+                        SimpleHoprCostFn::new(NonZeroUsize::new(3).unwrap()),
+                    ))
                 });
             });
 
             group.bench_with_input(BenchmarkId::new("4-hop", &param), &size, |b, _| {
                 b.iter(|| {
-                    black_box(graph.simple_paths(me, black_box(dst_4hop), 4, Some(10), SimpleHoprCostFn::new(4)))
+                    black_box(graph.simple_paths(
+                        me,
+                        black_box(dst_4hop),
+                        4,
+                        Some(10),
+                        SimpleHoprCostFn::new(NonZeroUsize::new(4).unwrap()),
+                    ))
                 });
             });
         }

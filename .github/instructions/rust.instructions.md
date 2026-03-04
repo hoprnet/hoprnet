@@ -3,6 +3,10 @@ applyTo: "**/*.rs"
 description: "Rust-specific guidelines"
 ---
 
+<!-- Canonical source: .claude/rust.md — edit THERE, then sync this copy. -->
+
+# Rust Guidelines
+
 - Prefer immutable structures.
 - Use `Result` and `Option` types for error handling and optional values.
 - Follow Rust's naming conventions: `snake_case` for variables and functions, `CamelCase` for types and traits.
@@ -16,5 +20,5 @@ description: "Rust-specific guidelines"
 - Use natural phrasing for test names, do not use the `test_` prefix.
 - Tests containing `expect` or `unwrap` in the test body should be returning an instance of `anyhow::Result<()>` with proper `.context()` on errors.
 - Upon editing tests or code, always rerun the closest package test suite to ensure no unintended failures.
-- Use TDD to drive the design of new modules and features, when unsure, request guidance for the user.
+- Use TDD to drive the design of new modules and features; when unsure, request guidance from the user.
 - Once a cycle is finished, `cargo shear --fix` should be run followed by a `cargo check` to ensure dependency hygiene and code correctness.

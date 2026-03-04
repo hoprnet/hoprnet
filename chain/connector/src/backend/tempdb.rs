@@ -1,10 +1,12 @@
 use hopr_api::chain::HoprKeyIdent;
-use hopr_crypto_types::prelude::OffchainPublicKey;
-use hopr_internal_types::{
-    account::AccountEntry,
-    channels::{ChannelEntry, ChannelId},
+use hopr_types::{
+    crypto::prelude::OffchainPublicKey,
+    internal::{
+        account::AccountEntry,
+        channels::{ChannelEntry, ChannelId},
+    },
+    primitive::prelude::{Address, BytesRepresentable},
 };
-use hopr_primitive_types::prelude::{Address, BytesRepresentable};
 use redb::{ReadableDatabase, TableDefinition};
 
 /// Errors from the temporary database backend.
@@ -197,12 +199,14 @@ impl super::Backend for TempDbBackend {
 
 #[cfg(test)]
 mod tests {
-    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-    use hopr_internal_types::{
-        account::AccountType,
-        channels::{ChannelStatus, generate_channel_id},
+    use hopr_types::{
+        crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair},
+        internal::{
+            account::AccountType,
+            channels::{ChannelStatus, generate_channel_id},
+        },
+        primitive::balance::HoprBalance,
     };
-    use hopr_primitive_types::balance::HoprBalance;
 
     use super::*;
     use crate::{Backend, backend::tests::test_backend};
