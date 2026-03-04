@@ -77,3 +77,6 @@ harness = false
 # Target-specific dependencies for memory allocators
 [target.'cfg(target_os = "linux")'.dependencies]
 tikv-jemallocator = "0.6.0"
+
+[package.metadata.cargo-shear]
+ignored = ["serde_bytes"]

@@ -54,5 +54,4 @@ hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
-tokio = { workspace = true }
 hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
