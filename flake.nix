@@ -644,6 +644,7 @@
               nfpm
               envsubst
               pkgs-unstable.cargo-audit
+              cargo-machete
             ];
           };
           ciShell = import ./nix/ciShell.nix { inherit pkgs config crane; };
