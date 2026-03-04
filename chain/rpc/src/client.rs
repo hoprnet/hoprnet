@@ -29,8 +29,8 @@ use alloy::{
     providers::{
         Identity, Provider, RootProvider, SendableTx,
         fillers::{
-            ChainIdFiller, FillProvider, FillerControlFlow, GasFiller, JoinFill, NonceFiller, TxFiller,
-            WalletFiller,
+            BlobGasFiller, ChainIdFiller, FillProvider, FillerControlFlow, GasFiller, JoinFill, NonceFiller,
+            TxFiller, WalletFiller,
         },
     },
     rpc::json_rpc::{ErrorPayload, RequestPacket, ResponsePacket, ResponsePayload},
@@ -848,7 +848,7 @@ where
 
 pub type AnvilRpcClient = FillProvider<
     JoinFill<
-        JoinFill<Identity, JoinFill<GasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
+        JoinFill<Identity, JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>>,
         WalletFiller<EthereumWallet>,
     >,
     RootProvider,
