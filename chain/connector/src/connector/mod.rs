@@ -538,9 +538,12 @@ where
     async fn send_tx<'a>(
         &'a self,
         tx_req: P::TxRequest,
+        custom_tx_multiplier: Option<u32>,
     ) -> Result<impl Future<Output = Result<ChainReceipt, ConnectorError>> + Send + 'a, ConnectorError> {
         let chain_info = self.query_cached_chain_info().await?;
-        let tx_timeout = self.cfg.tx_timeout_multiplier.max(1) * chain_info.finality * chain_info.expected_block_time;
+        let tx_timeout = custom_tx_multiplier.unwrap_or(self.cfg.tx_timeout_multiplier).max(1)
+            * chain_info.finality
+            * chain_info.expected_block_time;
         Ok(self
             .sequencer
             .enqueue_transaction(tx_req, tx_timeout.max(MIN_TX_CONFIRM_TIMEOUT))
