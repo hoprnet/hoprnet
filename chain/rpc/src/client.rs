@@ -48,8 +48,8 @@ use validator::Validate;
 /// These values are used to estimate the gas price for transactions.
 /// As GasOracleMiddleware is migrated to GasFiller, they are replaced with
 /// default values.
-pub const EIP1559_FEE_ESTIMATION_DEFAULT_MAX_FEE_GNOSIS: u128 = 3_000_000_000;
-pub const EIP1559_FEE_ESTIMATION_DEFAULT_PRIORITY_FEE_GNOSIS: u128 = 100_000_000;
+pub const EIP1559_FEE_ESTIMATION_DEFAULT_MAX_FEE_GNOSIS: u128 = 10_000_000_000; // 10 Gwei
+pub const EIP1559_FEE_ESTIMATION_DEFAULT_PRIORITY_FEE_GNOSIS: u128 = 3_000_000_000; // 3 Gwei
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, MultiHistogram};
@@ -397,7 +397,7 @@ where
 
     // returns hardcoded (max_fee_per_gas, max_priority_fee_per_gas)
     // Due to foundry is unable to estimate EIP-1559 fees for L2s https://github.com/foundry-rs/foundry/issues/5709,
-    // a hardcoded value of (3 gwei, 0.1 gwei) for Gnosischain is returned.
+    // a hardcoded value of (10 gwei, 3 gwei) for Gnosischain is returned.
     fn estimate_eip1559_fees(&self) -> Eip1559Estimation {
         Eip1559Estimation {
             max_fee_per_gas: EIP1559_FEE_ESTIMATION_DEFAULT_MAX_FEE_GNOSIS,
