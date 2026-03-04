@@ -885,7 +885,7 @@ mod tests {
         primitives::{U256, address},
         providers::{
             Provider, ProviderBuilder,
-            fillers::{BlobGasFiller, CachedNonceManager, ChainIdFiller, GasFiller, NonceFiller},
+            fillers::{CachedNonceManager, ChainIdFiller, GasFiller, NonceFiller},
         },
         rpc::{client::ClientBuilder, types::TransactionRequest},
         signers::local::PrivateKeySigner,
@@ -1501,7 +1501,6 @@ mod tests {
                 Some((server.url() + "/gasapi.ashx?apikey=key&method=gasoracle").parse()?),
             ))
             .filler(GasFiller)
-            .filler(BlobGasFiller)
             .connect_client(rpc_client);
 
         // GasEstimationLayer requires chain_id to be set to handle EIP-1559 tx

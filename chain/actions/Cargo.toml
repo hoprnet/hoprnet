@@ -58,6 +58,5 @@ anyhow = { workspace = true }
 mockall = { workspace = true }
 hex-literal = { workspace = true }
 tokio = { workspace = true }
-test-log = { workspace = true }
 
 hopr-crypto-random = { workspace = true }

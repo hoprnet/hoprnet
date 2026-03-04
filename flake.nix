@@ -4,7 +4,8 @@
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
     flake-parts.url = "github:hercules-ci/flake-parts";
-    nixpkgs.url = "github:NixOS/nixpkgs/release-25.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/release-25.11";
+    nixpkgs-unstable.url = "github:NixOS/nixpkgs/master";
     rust-overlay.url = "github:oxalica/rust-overlay/master";
     crane.url = "github:ipetkov/crane/v0.21.0";
     # pin it to a version which we are compatible with
@@ -28,6 +29,7 @@
     {
       self,
       nixpkgs,
+      nixpkgs-unstable,
       flake-utils,
       flake-parts,
       rust-overlay,
@@ -59,6 +61,7 @@
             solc.overlay
           ];
           pkgs = import nixpkgs { inherit localSystem overlays; };
+          pkgs-unstable = import nixpkgs-unstable { inherit localSystem overlays; };
           buildPlatform = pkgs.stdenv.buildPlatform;
           solcDefault = solc.mkDefault pkgs pkgs.solc_0_8_19;
           craneLib = (crane.mkLib pkgs).overrideToolchain (p: p.rust-bin.stable.latest.default);
@@ -718,6 +721,8 @@
             extraPackages = with pkgs; [
               nfpm
               envsubst
+              pkgs-unstable.cargo-audit
+              cargo-machete
             ];
           };
           ciShell = import ./nix/ciShell.nix { inherit pkgs config crane; };
@@ -781,7 +786,7 @@
               name = "audit";
               runtimeInputs = [
                 pkgs.cargo
-                pkgs.cargo-audit
+                pkgs-unstable.cargo-audit
               ];
               text = ''
                 cargo audit
@@ -890,9 +895,6 @@
             programs.taplo.enable = true;
             programs.ruff-format.enable = true;
 
-            settings.formatter.rustfmt = {
-              command = "${pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default)}/bin/rustfmt";
-            };
             settings.formatter.solc = {
               command = "sh";
               options = [
@@ -965,7 +967,11 @@
             inherit hoprd-bench;
             inherit hoprd-man hopli-man;
             # binary packages
-            inherit hoprd-x86_64-linux hoprd-x86_64-linux-dev hoprd-x86_64-linux-profile;
+            inherit
+              hoprd-x86_64-linux
+              hoprd-x86_64-linux-dev
+              hoprd-x86_64-linux-profile
+              ;
             inherit hoprd-aarch64-linux hoprd-aarch64-linux-profile;
             inherit hopli-x86_64-linux hopli-x86_64-linux-dev;
             inherit hopli-aarch64-linux;

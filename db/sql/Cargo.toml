@@ -80,3 +80,6 @@ hopr-crypto-random = { workspace = true }
 
 [package.metadata.cargo-machete]
 ignored = ["hopr-db-migration"]
+
+[package.metadata.cargo-shear]
+ignored = ["sea-query-binder"]
