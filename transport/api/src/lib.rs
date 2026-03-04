@@ -77,7 +77,9 @@ pub use hopr_transport_session::{
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
 #[cfg(feature = "telemetry")]
 pub use hopr_transport_session::{
-    SessionAckMode, SessionLifecycleState, SessionLifetimeSnapshot, SessionStatsSnapshot,
+    SessionAckMode, SessionLifecycleState, SessionLifetimeSnapshot, SessionMetricDefinition, SessionMetricKind,
+    SessionMetricSample, SessionMetricValue, SessionStatsSnapshot, session_snapshot_metric_definitions,
+    session_snapshot_metric_samples, session_snapshot_metric_value, session_telemetry_snapshots,
 };
 pub use hopr_types::{
     crypto::{

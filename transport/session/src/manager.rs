@@ -30,7 +30,9 @@ use hopr_types::{
 use tracing::{debug, error, info, trace, warn};
 
 #[cfg(feature = "telemetry")]
-use crate::telemetry::{SessionLifecycleState, SessionStatsSnapshot, SessionTelemetry};
+use crate::telemetry::{
+    self, SessionLifecycleState, SessionStatsSnapshot, SessionTelemetry, register_session_telemetry,
+};
 use crate::{
     Capability, HoprSession, IncomingSession, SESSION_MTU, SessionClientConfig, SessionId, SessionTarget,
     SurbBalancerConfig,
@@ -74,6 +76,13 @@ lazy_static::lazy_static! {
 
 fn close_session(session_id: SessionId, session_data: SessionSlot, reason: ClosureReason) {
     debug!(?session_id, ?reason, "closing session");
+
+    #[cfg(feature = "telemetry")]
+    {
+        session_data.telemetry.set_state(SessionLifecycleState::Closed);
+        session_data.telemetry.touch_activity();
+        telemetry::unregister_session_telemetry(&session_id);
+    }
 
     if reason != ClosureReason::EmptyRead {
         // Closing the data sender will also cause it to close from the read side
@@ -827,7 +836,7 @@ where
                         }
                     }
 
-                    HoprSession::new(
+                    let session = HoprSession::new(
                         session_id,
                         forward_routing,
                         HoprSessionConfig {
@@ -847,8 +856,12 @@ where
                         ),
                         Some(notifier),
                         #[cfg(feature = "telemetry")]
-                        telemetry,
-                    )
+                        telemetry.clone(),
+                    )?;
+
+                    #[cfg(feature = "telemetry")]
+                    register_session_telemetry(&telemetry);
+                    Ok(session)
                 } else {
                     warn!(%session_id, "session ready without SURB balancing");
 
@@ -884,7 +897,7 @@ where
                             futures::future::ok::<_, S::Error>((routing, data))
                         });
 
-                    HoprSession::new(
+                    let session = HoprSession::new(
                         session_id,
                         forward_routing,
                         HoprSessionConfig {
@@ -895,8 +908,13 @@ where
                         (reduced_surb_sender, rx),
                         Some(notifier),
                         #[cfg(feature = "telemetry")]
-                        telemetry,
-                    )
+                        telemetry.clone(),
+                    )?;
+
+                    #[cfg(feature = "telemetry")]
+                    register_session_telemetry(&telemetry);
+
+                    Ok(session)
                 }
             }
             Ok(Ok(None)) => Err(SessionManagerError::other(anyhow!(
@@ -1334,6 +1352,9 @@ where
                 })?;
 
             info!(%session_id, "new session established");
+
+            #[cfg(feature = "telemetry")]
+            register_session_telemetry(&slot.telemetry);
 
             #[cfg(all(feature = "prometheus", not(test)))]
             {
@@ -2294,6 +2315,44 @@ mod tests {
             .await;
 
         assert!(matches!(result, Err(TransportSessionError::Timeout)));
+
+        Ok(())
+    }
+
+    #[cfg(feature = "telemetry")]
+    #[test_log::test(tokio::test)]
+    async fn failed_incoming_session_establishment_does_not_register_telemetry() -> anyhow::Result<()> {
+        let mgr = SessionManager::new(Default::default());
+
+        let transport = MockMsgSender::new();
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        drop(new_session_rx);
+        mgr.start(mock_packet_planning(transport), new_session_tx)?;
+
+        let pseudonym = HoprPseudonym::random();
+        let result = mgr
+            .handle_incoming_session_initiation(
+                pseudonym,
+                StartInitiation {
+                    challenge: MIN_CHALLENGE,
+                    target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                    capabilities: ByteCapabilities(Capabilities::empty()),
+                    additional_data: 0,
+                },
+            )
+            .await;
+
+        assert!(result.is_err());
+
+        let allocated_session_ids = mgr.active_sessions().await;
+        assert_eq!(1, allocated_session_ids.len());
+
+        let snapshots = crate::telemetry::session_telemetry_snapshots();
+        assert!(
+            allocated_session_ids
+                .iter()
+                .all(|session_id| snapshots.iter().all(|snapshot| snapshot.session_id != *session_id))
+        );
 
         Ok(())
     }

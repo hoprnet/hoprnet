@@ -66,7 +66,7 @@ backon = { version = "1.6.0", default-features = false }
 base64 = "0.22.1"
 bimap = "0.6.3"
 bitvec = "1.0.1"
-blokli-client = { git = "https://github.com/hoprnet/blokli" } # Always use latest for now
+blokli-client = { git = "https://github.com/hoprnet/blokli" } # Always use the latest for now
 bloomfilter = { version = "3.0.1", features = ["serde"] }
 bytesize = { version = "2.3.1", features = ["serde"] }
 bytes = "1.11.1"
