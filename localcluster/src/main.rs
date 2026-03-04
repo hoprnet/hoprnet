@@ -170,7 +170,6 @@ async fn start_hoprd_nodes(
             .env("HOPRD_OTEL_SIGNALS", "metrics")
             .env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318")
             .env("OTEL_SERVICE_NAME", format!("node-{id}"))
-            .env("HOPR_TX_TIMEOUT_MULTIPLIER", DEFAULT_TX_TIMEOUT_MULTIPLIER.to_string())
             .stdout(Stdio::from(log_file))
             .stderr(Stdio::from(log_err));
 
