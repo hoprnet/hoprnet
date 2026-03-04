@@ -5061,7 +5061,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.17.2"
+version = "0.20.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5264,7 +5264,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.18.1"
+version = "0.19.0"
 dependencies = [
  "anyhow",
  "arrayvec",
@@ -5294,6 +5294,7 @@ dependencies = [
  "rand 0.10.0",
  "serde",
  "serde_cbor_2",
+ "serde_json",
  "serde_repr",
  "smart-default",
  "strum 0.28.0",

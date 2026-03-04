@@ -13,8 +13,6 @@ use hopr_lib::{
 use hoprd::{cli::CliArgs, config::HoprdConfig, errors::HoprdError, exit::HoprServerIpForwardingReactor};
 use hoprd_api::{RestApiParameters, serve_api};
 use signal_hook::low_level;
-use telemetry::init_logger;
-use tracing::{debug, error, info, warn};
 use validator::Validate;
 
 // Avoid musl's default allocator due to degraded performance
@@ -32,7 +30,9 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 #[cfg(all(target_os = "linux", feature = "allocator-jemalloc-stats"))]
 mod jemalloc_stats;
 
+#[cfg(feature = "telemetry")]
 mod telemetry;
+mod telemetry_common;
 
 const DEFAULT_BLOKLI_URL: &str = "https://blokli.dufour.hoprnet.link";
 
@@ -70,7 +70,7 @@ async fn init_rest_api(
         hopr_lib::errors::HoprLibError::GeneralError(format!("REST API bind failed for {listen_address}: {e}"))
     })?;
 
-    info!(listen_address, "Running a REST API");
+    tracing::info!(listen_address, "Running a REST API");
 
     let session_listener_sockets = Arc::new(hopr_utils_session::ListenerJoinHandles::default());
 
@@ -91,7 +91,7 @@ async fn init_rest_api(
             })
             .await
             {
-                error!(error = %e, "the REST API server could not start")
+                tracing::error!(error = %e, "the REST API server could not start")
             }
         }
         .inspect(|_| tracing::warn!(task = "hoprd - REST API", "long-running background task finished")),
@@ -108,7 +108,9 @@ fn update_hopr_lib_config_from_env_vars(cfg: &mut HoprLibConfig) -> anyhow::Resu
         .ok()
         .and_then(|p| {
             p.parse()
-                .inspect_err(|error| error!(%error, "failed to parse HOPR_INTERNAL_OUT_PACKET_PIPELINE_CONCURRENCY"))
+                .inspect_err(
+                    |error| tracing::warn!(%error, "failed to parse HOPR_INTERNAL_OUT_PACKET_PIPELINE_CONCURRENCY"),
+                )
                 .ok()
         });
 
@@ -116,7 +118,9 @@ fn update_hopr_lib_config_from_env_vars(cfg: &mut HoprLibConfig) -> anyhow::Resu
         .ok()
         .and_then(|p| {
             p.parse()
-                .inspect_err(|error| error!(%error, "failed to parse HOPR_INTERNAL_IN_PACKET_PIPELINE_CONCURRENCY"))
+                .inspect_err(
+                    |error| tracing::warn!(%error, "failed to parse HOPR_INTERNAL_IN_PACKET_PIPELINE_CONCURRENCY"),
+                )
                 .ok()
         });
 
@@ -129,7 +133,7 @@ fn main() -> ExitCode {
         usize::from_str(&v)
             .map_err(anyhow::Error::from)
             .and_then(|v| NonZeroUsize::try_from(v).map_err(anyhow::Error::from))
-            .inspect_err(|error| error!(%error, "failed to parse HOPRD_NUM_CPU_THREADS"))
+            .inspect_err(|error| tracing::error!(%error, "failed to parse HOPRD_NUM_CPU_THREADS"))
             .ok()
     });
 
@@ -137,23 +141,27 @@ fn main() -> ExitCode {
         usize::from_str(&v)
             .map_err(anyhow::Error::from)
             .and_then(|v| NonZeroUsize::try_from(v).map_err(anyhow::Error::from))
-            .inspect_err(|error| error!(%error, "failed to parse HOPRD_NUM_IO_THREADS"))
+            .inspect_err(|error| tracing::error!(%error, "failed to parse HOPRD_NUM_IO_THREADS"))
             .ok()
     });
 
     hopr_lib::prepare_tokio_runtime(num_cpu_threads, num_io_threads)
         .and_then(|runtime| {
             runtime.block_on(async {
-                let _telemetry = init_logger()?;
+                #[cfg(feature = "telemetry")]
+                let _telemetry = telemetry::init_logger()?;
+                #[cfg(not(feature = "telemetry"))]
+                tracing::subscriber::set_global_default(telemetry_common::build_base_subscriber()?)?;
+
                 main_inner().await
             })
         })
         .map(|_| {
-            info!("hoprd exited successfully");
+            tracing::info!("hoprd exited successfully");
             ExitCode::SUCCESS
         })
         .unwrap_or_else(|error| {
-            error!(%error, backtrace = ?error.backtrace(), "hoprd exited with an error");
+            tracing::error!(%error, backtrace = ?error.backtrace(), "hoprd exited with an error");
             ExitCode::FAILURE
         })
 }
@@ -164,9 +172,9 @@ async fn main_inner() -> anyhow::Result<()> {
     let _jemalloc_stats = jemalloc_stats::JemallocStats::start().await;
 
     if cfg!(debug_assertions) {
-        warn!("Executable was built using the DEBUG profile.");
+        tracing::warn!("Executable was built using the DEBUG profile.");
     } else {
-        info!("Executable was built using the RELEASE profile.");
+        tracing::info!("Executable was built using the RELEASE profile.");
     }
 
     let args = <CliArgs as clap::Parser>::parse();
@@ -174,7 +182,7 @@ async fn main_inner() -> anyhow::Result<()> {
     cfg.validate()?;
 
     let git_hash = option_env!("VERGEN_GIT_SHA").unwrap_or("unknown");
-    info!(
+    tracing::info!(
         version = hopr_lib::constants::APP_VERSION,
         hash = git_hash,
         cfg = cfg.as_redacted_string()?,
@@ -185,7 +193,7 @@ async fn main_inner() -> anyhow::Result<()> {
         .map(|v| v.to_lowercase() == "true")
         .unwrap_or(false)
     {
-        info!("The HOPRd node appears to run on DappNode");
+        tracing::info!("The HOPRd node appears to run on DappNode");
     }
 
     // Find or create an identity
@@ -198,7 +206,7 @@ async fn main_inner() -> anyhow::Result<()> {
     }
     .try_into()?;
 
-    info!(
+    tracing::info!(
         packet_key = hopr_lib::Keypair::public(&hopr_keys.packet_key).to_peerid_str(),
         blockchain_address = hopr_lib::Keypair::public(&hopr_keys.chain_key).to_address().to_hex(),
         "Node public identifiers"
@@ -256,9 +264,9 @@ async fn main_inner() -> anyhow::Result<()> {
         chain_connector.clone(),
         node.redemption_requests()?,
     ));
-    debug!(strategies = ?multi_strategy, "initialized strategies");
+    tracing::debug!(strategies = ?multi_strategy, "initialized strategies");
 
-    debug!("starting up strategies");
+    tracing::debug!("starting up strategies");
     processes.insert(
         HoprdProcess::Strategies,
         hopr_strategy::stream_events_to_strategy_with_tick(
@@ -274,17 +282,17 @@ async fn main_inner() -> anyhow::Result<()> {
     while let Some(Ok(signal)) = signals.next().await {
         match signal {
             Signal::Hup => {
-                info!("Received the HUP signal... not doing anything");
+                tracing::info!("Received the HUP signal... not doing anything");
             }
             Signal::Int => {
-                info!("Received the INT signal... tearing down the node");
+                tracing::info!("Received the INT signal... tearing down the node");
                 // Explicitly tear down running processes here
                 drop(node);
                 drop(processes);
 
                 info!("All processes stopped... emulating the default handler...");
                 low_level::emulate_default_handler(signal as i32)?;
-                info!("Shutting down!");
+                tracing::info!("Shutting down!");
                 break;
             }
             _ => low_level::emulate_default_handler(signal as i32)?,

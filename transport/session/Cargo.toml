@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-session"
-version = "0.18.1"
+version = "0.19.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2024"
 description = "Session functionality providing session abstraction over the HOPR transport"
@@ -18,7 +18,7 @@ runtime-tokio = [
   "hopr-protocol-session/runtime-tokio",
   "dep:tokio",
 ]
-telemetry = ["hopr-protocol-session/telemetry"]
+telemetry = ["hopr-protocol-session/telemetry", "dep:serde_json"]
 prometheus = [
   "hopr-network-types/prometheus",
   "hopr-protocol-session/prometheus",
@@ -45,6 +45,7 @@ parking_lot = { workspace = true }
 pid = { workspace = true }
 pin-project = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true, optional = true }
 serde_repr = { workspace = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
