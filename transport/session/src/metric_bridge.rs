@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     sync::{Arc, OnceLock, Weak},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -43,6 +42,11 @@ pub struct SessionMetricSample {
     pub name: String,
     pub value: SessionMetricValue,
 }
+
+/// Duration after which session telemetry entries are automatically removed from the registry if not accessed or
+/// updated. This helps to prevent memory leaks by ensuring that stale telemetry data is cleaned up after a reasonable
+/// period of inactivity. Should be enough for long running sessions.
+const SESSION_TELEMETRY_REGISTRY_TTL: Duration = Duration::from_hours(12);
 
 pub fn serialize_system_time_millis<S>(timestamp: &SystemTime, serializer: S) -> Result<S::Ok, S::Error>
 where
@@ -204,37 +208,44 @@ pub fn session_snapshot_metric_samples(snapshot: &SessionStatsSnapshot) -> Vec<S
     collect_snapshot_metrics(snapshot)
 }
 
-fn session_telemetry_registry() -> &'static parking_lot::Mutex<HashMap<SessionId, Weak<SessionTelemetry>>> {
-    static REGISTRY: OnceLock<parking_lot::Mutex<HashMap<SessionId, Weak<SessionTelemetry>>>> = OnceLock::new();
-    REGISTRY.get_or_init(|| parking_lot::Mutex::new(HashMap::new()))
+fn session_telemetry_registry() -> &'static moka::sync::Cache<SessionId, Weak<SessionTelemetry>> {
+    static REGISTRY: OnceLock<moka::sync::Cache<SessionId, Weak<SessionTelemetry>>> = OnceLock::new();
+    REGISTRY.get_or_init(|| {
+        moka::sync::Cache::builder()
+            .time_to_live(SESSION_TELEMETRY_REGISTRY_TTL)
+            .build()
+    })
 }
 
 pub(crate) fn register_session_telemetry(session_telemetry: &Arc<SessionTelemetry>) {
-    session_telemetry_registry()
-        .lock()
-        .insert(*session_telemetry.session_id(), Arc::downgrade(session_telemetry));
+    session_telemetry_registry().insert(*session_telemetry.session_id(), Arc::downgrade(session_telemetry));
 }
 
 pub(crate) fn unregister_session_telemetry(session_id: &SessionId) {
-    session_telemetry_registry().lock().remove(session_id);
+    session_telemetry_registry().remove(session_id);
 }
 
 pub fn session_telemetry_snapshots() -> Vec<SessionStatsSnapshot> {
-    let mut registry = session_telemetry_registry().lock();
-    let mut stale_sessions = Vec::new();
-    let mut snapshots = Vec::with_capacity(registry.len());
+    let registry = session_telemetry_registry();
+    registry.run_pending_tasks();
 
-    for (session_id, session_telemetry) in registry.iter() {
-        if let Some(session_telemetry) = session_telemetry.upgrade() {
-            snapshots.push(session_telemetry.snapshot());
-        } else {
-            stale_sessions.push(*session_id);
-        }
-    }
+    registry
+        .iter()
+        .filter_map(|(session_id, session_telemetry)| session_telemetry.upgrade().is_none().then_some(session_id))
+        .collect::<Vec<_>>()
+        .into_iter()
+        .for_each(|session_id| {
+            registry.remove(session_id.as_ref());
+        });
 
-    for session_id in stale_sessions {
-        registry.remove(&session_id);
-    }
+    let mut snapshots: Vec<_> = registry
+        .iter()
+        .filter_map(|(_, session_telemetry)| {
+            session_telemetry
+                .upgrade()
+                .map(|session_telemetry| session_telemetry.snapshot())
+        })
+        .collect();
 
     snapshots.sort_by(|left, right| left.session_id.as_str().cmp(right.session_id.as_str()));
     snapshots
