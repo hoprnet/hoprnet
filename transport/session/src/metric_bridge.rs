@@ -45,8 +45,8 @@ pub struct SessionMetricSample {
 
 /// Duration after which session telemetry entries are automatically removed from the registry if not accessed or
 /// updated. This helps to prevent memory leaks by ensuring that stale telemetry data is cleaned up after a reasonable
-/// period of inactivity. Should be enough for long running sessions.
-const SESSION_TELEMETRY_REGISTRY_TTL: Duration = Duration::from_hours(12);
+/// period of inactivity.
+const SESSION_TELEMETRY_REGISTRY_TTL: Duration = Duration::from_mins(30);
 
 pub fn serialize_system_time_millis<S>(timestamp: &SystemTime, serializer: S) -> Result<S::Ok, S::Error>
 where
