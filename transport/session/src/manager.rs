@@ -14,14 +14,18 @@ use futures::{
 use futures_time::future::FutureExt as TimeExt;
 use hopr_async_runtime::AbortableList;
 use hopr_crypto_packet::prelude::HoprPacket;
-use hopr_crypto_random::Randomizable;
-use hopr_internal_types::prelude::HoprPseudonym;
-use hopr_network_types::prelude::*;
-use hopr_primitive_types::prelude::Address;
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_start::{
     KeepAliveFlag, KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished,
     StartInitiation,
+};
+use hopr_types::{
+    crypto_random::Randomizable,
+    internal::{
+        prelude::HoprPseudonym,
+        routing::{DestinationRouting, RoutingOptions},
+    },
+    primitive::prelude::Address,
 };
 use tracing::{debug, error, info, trace, warn};
 
@@ -71,12 +75,6 @@ lazy_static::lazy_static! {
 fn close_session(session_id: SessionId, session_data: SessionSlot, reason: ClosureReason) {
     debug!(?session_id, ?reason, "closing session");
 
-    #[cfg(feature = "telemetry")]
-    {
-        session_data.telemetry.set_state(SessionLifecycleState::Closed);
-        session_data.telemetry.touch_activity();
-    }
-
     if reason != ClosureReason::EmptyRead {
         // Closing the data sender will also cause it to close from the read side
         session_data.session_tx.close_channel();
@@ -85,6 +83,12 @@ fn close_session(session_id: SessionId, session_data: SessionSlot, reason: Closu
 
     // Terminate any additional tasks spawned by the Session
     session_data.abort_handles.lock().abort_all();
+
+    #[cfg(feature = "telemetry")]
+    {
+        session_data.telemetry.set_state(SessionLifecycleState::Closed);
+        session_data.telemetry.touch_activity();
+    }
 
     #[cfg(all(feature = "prometheus", not(test)))]
     METRIC_ACTIVE_SESSIONS.decrement(1.0);
@@ -528,7 +532,7 @@ where
         // and their closure is timely notified to the other party.
         let myself = self.clone();
         let ah_session_expiration = hopr_async_runtime::spawn_as_abortable!(async move {
-            let jitter = hopr_crypto_random::random_float_in_range(1.0..1.5);
+            let jitter = hopr_types::crypto_random::random_float_in_range(1.0..1.5);
             let timeout = 2 * initiation_timeout_max_one_way(
                 myself.cfg.initiation_timeout_base,
                 RoutingOptions::MAX_INTERMEDIATE_HOPS,
@@ -609,9 +613,9 @@ where
             &self.session_initiations,
             |ch| {
                 if let Some(challenge) = ch {
-                    ((challenge + 1) % hopr_crypto_random::MAX_RANDOM_INTEGER).max(MIN_CHALLENGE)
+                    ((challenge + 1) % hopr_types::crypto_random::MAX_RANDOM_INTEGER).max(MIN_CHALLENGE)
                 } else {
-                    hopr_crypto_random::random_integer(MIN_CHALLENGE, None)
+                    hopr_types::crypto_random::random_integer(MIN_CHALLENGE, None)
                 }
             },
             |_| tx_initiation_done,
@@ -1100,7 +1104,7 @@ where
                         Some(session_id) => ((session_id.tag().as_u64() + 1) % self.cfg.session_tag_range.end)
                             .max(self.cfg.session_tag_range.start)
                             .into(),
-                        None => hopr_crypto_random::random_integer(
+                        None => hopr_types::crypto_random::random_integer(
                             self.cfg.session_tag_range.start,
                             Some(self.cfg.session_tag_range.end),
                         )
@@ -1491,10 +1495,14 @@ where
 mod tests {
     use anyhow::anyhow;
     use futures::{AsyncWriteExt, future::BoxFuture};
-    use hopr_crypto_random::Randomizable;
-    use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
-    use hopr_primitive_types::prelude::Address;
+    use hopr_network_types::prelude::SealedHost;
     use hopr_protocol_start::{StartProtocol, StartProtocolDiscriminants};
+    use hopr_types::{
+        crypto::{keypairs::ChainKeypair, prelude::Keypair},
+        crypto_random::Randomizable,
+        internal::routing::SurbMatcher,
+        primitive::prelude::Address,
+    };
     use tokio::time::timeout;
 
     use super::*;

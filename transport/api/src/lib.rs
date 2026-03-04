@@ -51,14 +51,7 @@ pub use hopr_api::{
 };
 use hopr_async_runtime::{AbortableList, prelude::spawn, spawn_as_abortable};
 use hopr_crypto_packet::prelude::PacketSignal;
-pub use hopr_crypto_types::{
-    keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-    types::{HalfKeyChallenge, Hash, OffchainPublicKey},
-};
-pub use hopr_internal_types::prelude::HoprPseudonym;
-pub use hopr_network_types::prelude::RoutingOptions;
-use hopr_network_types::prelude::{DestinationRouting, *};
-use hopr_primitive_types::prelude::*;
+use hopr_network_types::prelude::*;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 use hopr_protocol_app::v1::ReservedTag;
 use hopr_protocol_hopr::MemorySurbStore;
@@ -85,6 +78,14 @@ use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfi
 pub use hopr_transport_session::{
     SessionAckMode, SessionLifecycleState, SessionLifetimeSnapshot, SessionStatsSnapshot,
 };
+use hopr_types::primitive::prelude::*;
+pub use hopr_types::{
+    crypto::{
+        keypairs::{ChainKeypair, Keypair, OffchainKeypair},
+        types::{HalfKeyChallenge, Hash, OffchainPublicKey},
+    },
+    internal::{prelude::HoprPseudonym, routing::RoutingOptions},
+};
 #[cfg(feature = "telemetry")]
 pub use stats::PeerPacketStats;
 use tracing::{Instrument, debug, error, trace, warn};
@@ -100,6 +101,7 @@ use crate::{
 pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RANGE;
 
 pub use hopr_api as api;
+use hopr_types::internal::routing::DestinationRouting;
 
 // Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
 lazy_static::lazy_static! {
@@ -110,7 +112,7 @@ lazy_static::lazy_static! {
         .max_capacity(10_000)
         .build();
 
-    static ref RANDOM_DATA: [u8; 400] = hopr_crypto_random::random_bytes();
+    static ref RANDOM_DATA: [u8; 400] = hopr_types::crypto_random::random_bytes();
 }
 
 /// PeerId -> OffchainPublicKey is a CPU-intensive blocking operation.
@@ -306,7 +308,7 @@ where
         let (mixing_channel_tx, mixing_channel_rx) =
             hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(build_mixer_cfg_from_env());
 
-        // the process is terminated, when the input stream runs out
+        // the process is terminated when the input stream runs out
         let _mixing_process_before_sending_out = spawn(
             mixing_channel_rx
                 .inspect(|(peer, _)| tracing::trace!(%peer, "moving message from mixer to p2p stream"))
@@ -354,7 +356,7 @@ where
 
         // === START === cover traffic control
         // generate a random looping cover traffic tag to fast drop on receive of the looping traffic
-        let cover_traffic_tag: Tag = hopr_crypto_random::random_integer(ReservedTag::range().end, None).into();
+        let cover_traffic_tag: Tag = hopr_types::crypto_random::random_integer(ReservedTag::range().end, None).into();
 
         // filter out the known cover traffic not to lose processing time with it
         let rx_from_protocol = rx_from_protocol.filter_map(move |(pseudonym, data)| async move {
@@ -363,7 +365,7 @@ where
 
         // prepare a cover traffic stream
         let cover_traffic_stream = CoverTrafficGeneration::build(&cover_traffic).filter_map(move |routing| {
-            let start = hopr_crypto_random::random_integer(0, Some((RANDOM_DATA.len() - 100) as u64)) as usize;
+            let start = hopr_types::crypto_random::random_integer(0, Some((RANDOM_DATA.len() - 100) as u64)) as usize;
             let data = &RANDOM_DATA[start..start + 100];
 
             futures::future::ready(if let Ok(data) = ApplicationData::new(cover_traffic_tag, data) {

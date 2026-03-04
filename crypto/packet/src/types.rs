@@ -4,9 +4,7 @@ use hopr_crypto_sphinx::{
     errors::SphinxError,
     prelude::{PaddedPayload, SURB, SphinxHeaderSpec, SphinxSuite},
 };
-use hopr_crypto_types::prelude::HashFast;
-use hopr_internal_types::prelude::HoprPseudonym;
-use hopr_primitive_types::prelude::{BytesRepresentable, GeneralError};
+use hopr_types::primitive::prelude::GeneralError;
 
 use crate::{HoprSphinxHeaderSpec, HoprSphinxSuite, PAYLOAD_SIZE_INT};
 
@@ -34,111 +32,6 @@ flagset::flags! {
 /// These signals can be typically propagated up to the application layer to take an appropriate
 /// action to the signaled states.
 pub type PacketSignals = flagset::FlagSet<PacketSignal>;
-
-/// Size of the [`HoprSurbId`] in bytes.
-pub const SURB_ID_SIZE: usize = 8;
-
-/// An ID that uniquely identifies SURB for a certain pseudonym.
-pub type HoprSurbId = [u8; SURB_ID_SIZE];
-
-/// Identifier of a single packet sender.
-///
-/// This consists of two parts:
-/// - [`HoprSenderId::pseudonym`] of the sender
-/// - [`HoprSenderId::surb_id`] is an identifier a single SURB that routes the packet back to the sender.
-///
-/// The `surb_id` always identifies a single SURB. The instance can be turned into a pseudorandom
-/// sequence using [`HoprSenderId::into_sequence`] to create identifiers for more SURBs
-/// with the same pseudonym.
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct HoprSenderId(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
-
-impl std::fmt::Debug for HoprSenderId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("HoprSenderId")
-            .field(&hex::encode(&self.0[0..HoprPseudonym::SIZE]))
-            .field(&hex::encode(&self.0[HoprPseudonym::SIZE..]))
-            .finish()
-    }
-}
-
-impl HoprSenderId {
-    pub fn new(pseudonym: &HoprPseudonym) -> Self {
-        let mut ret: [u8; Self::SIZE] = hopr_crypto_random::random_bytes();
-        ret[..HoprPseudonym::SIZE].copy_from_slice(pseudonym.as_ref());
-        Self(ret)
-    }
-
-    pub fn from_pseudonym_and_id(pseudonym: &HoprPseudonym, id: HoprSurbId) -> Self {
-        let mut ret = [0u8; Self::SIZE];
-        ret[..HoprPseudonym::SIZE].copy_from_slice(pseudonym.as_ref());
-        ret[HoprPseudonym::SIZE..HoprPseudonym::SIZE + SURB_ID_SIZE].copy_from_slice(&id);
-        Self(ret)
-    }
-
-    pub fn pseudonym(&self) -> HoprPseudonym {
-        HoprPseudonym::try_from(&self.0[..HoprPseudonym::SIZE]).expect("must have valid pseudonym")
-    }
-
-    pub fn surb_id(&self) -> HoprSurbId {
-        self.0[HoprPseudonym::SIZE..HoprPseudonym::SIZE + SURB_ID_SIZE]
-            .try_into()
-            .expect("must have valid nonce")
-    }
-
-    /// Creates a pseudorandom sequence of IDs.
-    ///
-    /// Each item has the same [`pseudonym`](HoprSenderId::pseudonym)
-    /// but different [`surb_id`](HoprSenderId::surb_id).
-    ///
-    /// The `surb_id` of the `n`-th item (n > 1) is computed as `Blake3(n || I_prev)`
-    /// where `I_prev` is the whole `n-1`-th ID, the `n` is represented as big-endian and
-    /// `||` denotes byte-array concatenation.
-    /// The first item (n = 1) is always `self`.
-    ///
-    /// The entropy of the whole pseudorandom sequence is completely given by `self` (the first
-    /// item in the sequence). It follows that the next element of the sequence can be computed
-    /// by just knowing any preceding element; therefore, the sequence is fully predictable
-    /// once an element is known.
-    pub fn into_sequence(self) -> impl Iterator<Item = Self> {
-        std::iter::successors(Some((1u32, self)), |&(i, prev)| {
-            let hash = HashFast::create(&[&i.to_be_bytes(), prev.as_ref()]);
-            Some((
-                i + 1,
-                Self::from_pseudonym_and_id(&prev.pseudonym(), hash.as_ref()[0..SURB_ID_SIZE].try_into().unwrap()),
-            ))
-        })
-        .map(|(_, v)| v)
-    }
-}
-
-impl AsRef<[u8]> for HoprSenderId {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
-    }
-}
-
-impl<'a> TryFrom<&'a [u8]> for HoprSenderId {
-    type Error = GeneralError;
-
-    fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
-        value
-            .try_into()
-            .map(Self)
-            .map_err(|_| GeneralError::ParseError("HoprPacketReceiverData.size".into()))
-    }
-}
-
-impl BytesRepresentable for HoprSenderId {
-    const SIZE: usize = HoprPseudonym::SIZE + SURB_ID_SIZE;
-}
-
-impl hopr_crypto_random::Randomizable for HoprSenderId {
-    fn random() -> Self {
-        Self::new(&HoprPseudonym::random())
-    }
-}
 
 /// Additional encoding of a packet message that can be preceded by a number of [`SURBs`](SURB).
 pub struct PacketMessage<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize>(PaddedPayload<P>, PhantomData<(S, H)>);
@@ -313,10 +206,10 @@ mod tests {
     use anyhow::anyhow;
     use bimap::BiHashMap;
     use hex_literal::hex;
-    use hopr_crypto_random::Randomizable;
     use hopr_crypto_sphinx::prelude::*;
-    use hopr_crypto_types::prelude::*;
-    use hopr_primitive_types::prelude::*;
+    use hopr_types::{
+        crypto::prelude::*, crypto_random::Randomizable, internal::routing::HoprSenderId, primitive::prelude::*,
+    };
 
     use super::*;
     use crate::{

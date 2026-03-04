@@ -1,5 +1,5 @@
-use hopr_primitive_types::prelude::GeneralError;
 use hopr_protocol_app::prelude::{ApplicationData, ReservedTag, Tag};
+use hopr_types::primitive::prelude::GeneralError;
 
 use crate::{
     errors::ProbeError,
@@ -96,7 +96,7 @@ impl TryFrom<ApplicationData> for Message {
 #[cfg(test)]
 mod tests {
     use hopr_platform::time::native::current_time;
-    use hopr_primitive_types::traits::AsUnixTimestamp;
+    use hopr_types::primitive::traits::AsUnixTimestamp;
     use more_asserts::assert_lt;
 
     use super::*;
@@ -114,8 +114,8 @@ mod tests {
     #[test]
     fn probe_message_variant_telemetry_should_serialize_and_deserialize() -> anyhow::Result<()> {
         let m1 = Message::Telemetry(PathTelemetry {
-            id: hopr_crypto_random::random_bytes(),
-            path: hopr_crypto_random::random_bytes(),
+            id: hopr_types::crypto_random::random_bytes(),
+            path: hopr_types::crypto_random::random_bytes(),
             timestamp: 1234567890,
         });
         let m2 = Message::try_from(m1.to_bytes().as_ref())?;

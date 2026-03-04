@@ -1,8 +1,10 @@
 use hopr_api::Address;
 use hopr_crypto_packet::errors::TicketValidationError;
-use hopr_crypto_types::{prelude::HalfKeyChallenge, types::OffchainPublicKey};
-use hopr_internal_types::prelude::ChannelId;
-use hopr_primitive_types::balance::HoprBalance;
+use hopr_types::{
+    crypto::{prelude::HalfKeyChallenge, types::OffchainPublicKey},
+    internal::prelude::ChannelId,
+    primitive::balance::HoprBalance,
+};
 use thiserror::Error;
 
 /// Error that can occur when processing an incoming packet.
@@ -68,14 +70,14 @@ pub enum HoprProtocolError {
     TicketValidationError(#[from] TicketValidationError),
 
     #[error(transparent)]
-    CoreTypesError(#[from] hopr_internal_types::errors::CoreTypesError),
+    CoreTypesError(#[from] hopr_types::internal::errors::CoreTypesError),
 
     #[error(transparent)]
     PacketError(#[from] hopr_crypto_packet::errors::PacketError),
 
     #[error(transparent)]
-    GeneralError(#[from] hopr_primitive_types::errors::GeneralError),
+    GeneralError(#[from] hopr_types::primitive::errors::GeneralError),
 
     #[error("rayon thread pool queue full: {0}")]
-    SpawnError(#[from] hopr_parallelize::cpu::SpawnError),
+    SpawnError(#[from] hopr_types::parallelize::cpu::SpawnError),
 }

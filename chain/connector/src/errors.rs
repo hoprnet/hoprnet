@@ -1,6 +1,5 @@
 use blokli_client::errors::{ErrorKind, TrackingErrorKind};
-use hopr_internal_types::prelude::ChannelId;
-use hopr_primitive_types::prelude::Address;
+use hopr_types::{internal::prelude::ChannelId, primitive::prelude::Address};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -45,13 +44,13 @@ pub enum ConnectorError {
     ClientError(#[from] blokli_client::errors::BlokliClientError),
 
     #[error(transparent)]
-    GeneralError(#[from] hopr_primitive_types::errors::GeneralError),
+    GeneralError(#[from] hopr_types::primitive::errors::GeneralError),
 
     #[error(transparent)]
-    ChainTypesError(#[from] hopr_chain_types::errors::ChainTypesError),
+    ChainTypesError(#[from] hopr_types::chain::errors::ChainTypesError),
 
     #[error(transparent)]
-    CoreTypesError(#[from] hopr_internal_types::errors::CoreTypesError),
+    CoreTypesError(#[from] hopr_types::internal::errors::CoreTypesError),
 
     #[error(transparent)]
     IoError(#[from] std::io::Error),

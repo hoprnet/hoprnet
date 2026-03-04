@@ -1,4 +1,4 @@
-use std::{hint::black_box, time::Duration};
+use std::{hint::black_box, num::NonZeroUsize, time::Duration};
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use hopr_api::{
@@ -8,8 +8,8 @@ use hopr_api::{
         traits::{EdgeObservableWrite, EdgeWeightType},
     },
 };
-use hopr_crypto_types::prelude::Keypair;
 use hopr_network_graph::{ChannelGraph, costs::SimpleHoprCostFn};
+use hopr_types::crypto::prelude::Keypair;
 
 // ── Graph construction helpers ───────────────────────────────────────────────
 

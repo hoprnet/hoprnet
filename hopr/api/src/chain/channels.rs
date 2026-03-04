@@ -4,10 +4,14 @@ use std::{
 };
 
 use futures::{future::BoxFuture, stream::BoxStream};
-pub use hopr_internal_types::prelude::{ChannelDirection, ChannelEntry, ChannelId, ChannelStatusDiscriminants};
-use hopr_internal_types::prelude::{ChannelStatus, generate_channel_id};
-use hopr_primitive_types::prelude::Address;
-pub use hopr_primitive_types::prelude::HoprBalance;
+pub use hopr_types::{
+    internal::prelude::{ChannelDirection, ChannelEntry, ChannelId, ChannelStatusDiscriminants},
+    primitive::prelude::HoprBalance,
+};
+use hopr_types::{
+    internal::prelude::{ChannelStatus, generate_channel_id},
+    primitive::prelude::Address,
+};
 pub type DateTime = chrono::DateTime<chrono::Utc>;
 pub use chrono::Utc;
 use strum::IntoDiscriminant;

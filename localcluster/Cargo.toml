@@ -18,7 +18,7 @@ hopr-chain-connector = { workspace = true }
 hopr-lib = { workspace = true }
 hopr-builder = { workspace = true }
 hoprd-api-client = { workspace = true }
-hopr-primitive-types = { workspace = true }
+hopr-types = { workspace = true, features = ["primitive"] }
 lazy_static = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
 serde-saphyr = { workspace = true }

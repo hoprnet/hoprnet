@@ -419,11 +419,20 @@
               check-merge-conflicts.enable = true;
               check-added-large-files.enable = true;
               commitizen.enable = true;
-              immutable-files = {
-                enable = false;
-                name = "Immutable files - the files should not change";
-                entry = "bash .github/scripts/immutable-files-check.sh";
-                files = "";
+              sync-copilot-instructions = {
+                enable = true;
+                name = "Sync .claude/ instructions to Copilot files";
+                entry = "bash .github/scripts/sync-copilot-instructions.sh";
+                files = "(\\.claude/INSTRUCTIONS\\.md|\\.claude/rust\\.md)";
+                language = "system";
+                pass_filenames = false;
+              };
+              generate-metrics-docs = {
+                enable = true;
+                name = "METRICS.md must stay in sync with code";
+                entry = "bash .github/scripts/generate-metrics-docs.sh --fix";
+                files = "(METRICS\\.md|\\.rs)$";
+                pass_filenames = false;
                 language = "system";
               };
             };

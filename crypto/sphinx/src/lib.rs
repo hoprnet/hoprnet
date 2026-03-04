@@ -53,8 +53,10 @@ pub(crate) mod tests {
         num::{NonZero, NonZeroUsize},
     };
 
-    use hopr_crypto_types::prelude::*;
-    use hopr_primitive_types::{errors::GeneralError, prelude::*};
+    use hopr_types::{
+        crypto::prelude::*,
+        primitive::{errors::GeneralError, prelude::*},
+    };
 
     use crate::routing::SphinxHeaderSpec;
 

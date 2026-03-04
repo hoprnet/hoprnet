@@ -3,8 +3,7 @@ use hopr_api::graph::{
     costs::{ForwardPathCostFn, HoprForwardCostFn, HoprReturnCostFn},
     traits::EdgeObservableRead,
 };
-use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_internal_types::errors::PathError;
+use hopr_types::{crypto::types::OffchainPublicKey, internal::errors::PathError};
 
 use crate::{
     errors::{PathPlannerError, Result},
@@ -221,9 +220,11 @@ mod tests {
         NetworkGraphWrite,
         traits::{EdgeObservableWrite, EdgeWeightType},
     };
-    use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
     use hopr_network_graph::ChannelGraph;
-    use hopr_network_types::types::RoutingOptions;
+    use hopr_types::{
+        crypto::prelude::{Keypair, OffchainKeypair},
+        internal::routing::RoutingOptions,
+    };
 
     use super::*;
     use crate::traits::PathSelector;

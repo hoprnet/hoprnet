@@ -229,7 +229,7 @@ mod tests {
             traits::{EdgeObservableRead, EdgeProtocolObservable},
         },
     };
-    use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
+    use hopr_types::crypto::prelude::{Keypair, OffchainKeypair};
 
     use super::*;
 

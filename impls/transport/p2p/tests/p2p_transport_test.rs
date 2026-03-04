@@ -9,10 +9,10 @@ use futures::{
     channel::mpsc::{Receiver, Sender},
 };
 use hopr_api::network::NetworkBuilder;
-use hopr_crypto_types::{keypairs::Keypair, prelude::OffchainKeypair};
 use hopr_platform::time::native::current_time;
 use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork, PeerDiscovery};
 use hopr_transport_probe::ping::PingQueryReplier;
+use hopr_types::crypto::{keypairs::Keypair, prelude::OffchainKeypair};
 use lazy_static::lazy_static;
 
 pub fn random_free_local_ipv4_port() -> Option<u16> {
@@ -87,7 +87,7 @@ const TRANSPORT_PAYLOAD_SIZE: usize = HoprPacket::SIZE;
 
 lazy_static! {
     pub static ref RANDOM_GIBBERISH: Box<[u8]> =
-        Box::from(hopr_crypto_random::random_bytes::<TRANSPORT_PAYLOAD_SIZE>());
+        Box::from(hopr_types::crypto_random::random_bytes::<TRANSPORT_PAYLOAD_SIZE>());
 }
 
 pub fn generate_packets_of_hopr_payload_size(count: usize) -> Vec<Box<[u8]>> {

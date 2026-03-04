@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-session"
-version = "0.18.1"
+version = "0.18.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -22,6 +22,7 @@ runtime-tokio = [
 telemetry = ["hopr-protocol-session/telemetry"]
 prometheus = [
   "hopr-network-types/prometheus",
+  "hopr-types/prometheus",
   "hopr-protocol-session/prometheus",
   "dep:hopr-metrics",
   "dep:lazy_static",
@@ -54,13 +55,17 @@ tracing = { workspace = true }
 tokio = { workspace = true, optional = true }
 
 hopr-async-runtime = { workspace = true }
-hopr-crypto-random = { workspace = true }
-hopr-crypto-types = { workspace = true }
+hopr-types = { workspace = true, features = [
+  "crypto",
+  "internal",
+  "primitive",
+  "random",
+] }
+
 hopr-crypto-packet = { workspace = true }
-hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true, features = ["serde"] }
-hopr-primitive-types = { workspace = true }
+
 hopr-protocol-app = { workspace = true, features = ["serde"] }
 hopr-protocol-session = { workspace = true, features = ["serde"] }
 hopr-protocol-start = { workspace = true }

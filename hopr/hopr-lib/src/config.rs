@@ -1,8 +1,8 @@
-use hopr_primitive_types::prelude::*;
 pub use hopr_transport::config::{
     HoprPacketPipelineConfig, HoprProtocolConfig, HostConfig, HostType, ProbeConfig, SessionGlobalConfig,
     TransportConfig, looks_like_domain,
 };
+use hopr_types::primitive::prelude::*;
 use validator::{Validate, ValidationError};
 
 pub const DEFAULT_HOST: &str = "0.0.0.0";

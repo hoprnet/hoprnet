@@ -11,7 +11,7 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-prometheus = ["dep:hopr-metrics", "hopr-network-types/prometheus"]
+prometheus = ["dep:hopr-metrics"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -25,12 +25,14 @@ tracing = { workspace = true }
 
 hopr-api = { workspace = true, features = ["chain", "graph"] }
 hopr-crypto-packet = { workspace = true }
-hopr-crypto-random = { workspace = true }
-hopr-crypto-types = { workspace = true }
-hopr-internal-types = { workspace = true }
-hopr-network-types = { workspace = true }
-hopr-primitive-types = { workspace = true }
 hopr-protocol-hopr = { workspace = true }
+hopr-types = { workspace = true, features = [
+  "crypto",
+  "random",
+  "internal",
+  "primitive",
+  "serde",
+] }
 
 hopr-metrics = { workspace = true, optional = true }
 
@@ -42,5 +44,4 @@ hex-literal = { workspace = true }
 tokio = { workspace = true }
 
 hopr-network-graph = { workspace = true }
-hopr-crypto-types = { workspace = true }
 hopr-protocol-hopr = { workspace = true }

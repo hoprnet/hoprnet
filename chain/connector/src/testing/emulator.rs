@@ -1,11 +1,13 @@
 use std::{ops::Add, str::FromStr};
 
 use blokli_client::{BlokliTestState, BlokliTestStateMutator};
-use hopr_chain_types::{ContractAddresses, ParsedHoprChainAction};
-use hopr_internal_types::channels::generate_channel_id;
-use hopr_primitive_types::{
-    balance::{HoprBalance, XDaiBalance},
-    prelude::Address,
+use hopr_types::{
+    chain::{ContractAddresses, ParsedHoprChainAction},
+    internal::channels::generate_channel_id,
+    primitive::{
+        balance::{HoprBalance, XDaiBalance},
+        prelude::Address,
+    },
 };
 
 use crate::testing::Entry;

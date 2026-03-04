@@ -16,7 +16,7 @@ crate-type = ["rlib"]
 capture = ["hopr-transport/capture"]
 default = []
 telemetry = ["hopr-transport/telemetry"]
-fixed-rng = ["hopr-crypto-random/fixed-rng", "hopr-internal-types/fixed-rng"]
+fixed-rng = ["hopr-types/fixed-rng"]
 prometheus = [
   "dep:hopr-metrics",
   "hopr-transport/prometheus",
@@ -32,11 +32,9 @@ serde = [
   "dep:cfg_eval",
   "dep:serde",
   "dep:serde_with",
-  "hopr-internal-types/serde",
+  "hopr-types/serde",
   "hopr-network-types/serde",
   "hopr-transport/serde",
-  "hopr-primitive-types/serde",
-  "hopr-crypto-types/serde",
 ]
 session-client = []
 session-server = []
@@ -73,17 +71,20 @@ tracing = { workspace = true }
 validator = { workspace = true }
 
 hopr-api = { workspace = true, features = ["full"] }
+hopr-types = { workspace = true, features = [
+  "chain",
+  "crypto",
+  "internal",
+  "primitive",
+  "random",
+  "parallelize",
+] }
+
 hopr-async-runtime = { workspace = true }
-hopr-chain-types = { workspace = true }
 hopr-crypto-keypair = { workspace = true }
-hopr-crypto-random = { workspace = true }
-hopr-crypto-types = { workspace = true }
-hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true }
-hopr-parallelize = { workspace = true }
 hopr-platform = { workspace = true }
-hopr-primitive-types = { workspace = true }
 hopr-transport = { workspace = true }
 
 [dev-dependencies]

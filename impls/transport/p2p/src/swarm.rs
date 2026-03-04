@@ -23,7 +23,7 @@ use crate::{
 lazy_static::lazy_static! {
     static ref METRIC_TRANSPORT_P2P_OPEN_CONNECTION_COUNT:  hopr_metrics::SimpleGauge =  hopr_metrics::SimpleGauge::new(
         "hopr_transport_p2p_active_connection_count",
-        "Number of currently active connections"
+        "Number of currently active p2p connections as observed from libp2p events"
     ).unwrap();
     static ref METRIC_TRANSPORT_NAT_STATUS: hopr_metrics::SimpleGauge = hopr_metrics::SimpleGauge::new(
         "hopr_transport_p2p_nat_status",

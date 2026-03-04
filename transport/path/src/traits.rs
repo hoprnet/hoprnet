@@ -1,4 +1,4 @@
-use hopr_crypto_types::types::OffchainPublicKey;
+use hopr_types::crypto::types::OffchainPublicKey;
 
 use crate::errors::Result;
 

@@ -25,14 +25,13 @@ use hopr_api::{
 };
 use hopr_async_runtime::Abortable;
 use hopr_lib::{
-    Address, Hopr, HoprSession, HoprSessionClientConfig, NetworkView, OffchainPublicKey, SURB_SIZE, ServiceId,
-    SessionId, SessionTarget, errors::HoprLibError, transfer_session,
+    Address, Hopr, HoprSession, HoprSessionClientConfig, NetworkView, OffchainPublicKey, RoutingOptions, SURB_SIZE,
+    ServiceId, SessionId, SessionTarget, errors::HoprLibError, transfer_session,
 };
 use hopr_network_types::{
     prelude::{ConnectedUdpStream, IpOrHost, IpProtocol, SealedHost, UdpStreamParallelism},
     udp::ForeignDataMode,
 };
-use hopr_transport::RoutingOptions;
 use human_bandwidth::re::bandwidth::Bandwidth;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -722,12 +721,12 @@ mod tests {
         channel::mpsc::{UnboundedReceiver, UnboundedSender},
     };
     use futures_time::future::FutureExt as TimeFutureExt;
-    use hopr_crypto_types::crypto_traits::Randomizable;
     use hopr_lib::{
-        Address, ApplicationData, ApplicationDataIn, ApplicationDataOut, DestinationRouting, HoprPseudonym,
-        HoprSession, RoutingOptions, SessionId,
+        Address, ApplicationData, ApplicationDataIn, ApplicationDataOut, HoprPseudonym, HoprSession, SessionId,
+        exports::types::internal::routing::{DestinationRouting, RoutingOptions},
     };
     use hopr_transport::session::{HoprSessionConfig, SessionTelemetry};
+    use hopr_types::crypto::crypto_traits::Randomizable;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     use super::*;

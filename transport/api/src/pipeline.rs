@@ -3,12 +3,14 @@ use hopr_api::{
     db::HoprDbTicketOperations,
 };
 use hopr_async_runtime::AbortableList;
-use hopr_crypto_types::prelude::*;
-use hopr_internal_types::prelude::*;
-use hopr_network_types::prelude::ResolvedTransportRouting;
+use hopr_crypto_packet::HoprSurb;
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
 use hopr_transport_protocol::{TicketEvent, run_packet_pipeline};
+use hopr_types::{
+    crypto::prelude::*,
+    internal::{prelude::*, routing::ResolvedTransportRouting},
+};
 
 use crate::{HoprTransportProcess, config::HoprPacketPipelineConfig};
 
@@ -44,7 +46,7 @@ where
     TEvt::Error: std::error::Error,
     AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
     AppOut::Error: std::error::Error,
-    AppIn: futures::Stream<Item = (ResolvedTransportRouting, ApplicationDataOut)> + Send + 'static,
+    AppIn: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
 {
     let HoprPipelineComponents {
         ticket_events,

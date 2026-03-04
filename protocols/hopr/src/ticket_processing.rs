@@ -5,11 +5,9 @@ use hopr_api::{
     chain::ChainReadChannelOperations,
     db::{HoprDbTicketOperations, TicketSelector},
 };
-use hopr_crypto_types::prelude::*;
-use hopr_internal_types::prelude::*;
 #[cfg(feature = "rayon")]
-use hopr_parallelize::cpu::rayon::prelude::*;
-use hopr_primitive_types::balance::HoprBalance;
+use hopr_types::parallelize::cpu::rayon::prelude::*;
+use hopr_types::{crypto::prelude::*, internal::prelude::*, primitive::balance::HoprBalance};
 use validator::ValidationError;
 
 use crate::{
@@ -65,7 +63,7 @@ mod metrics {
             .unwrap();
             static ref UNACK_EVICTIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
                 "hopr_tickets_unack_evictions_total",
-                "Total number of unacknowledged tickets evicted from cache",
+                "Total number of unacknowledged tickets evicted from cache due to TTL or capacity limits",
             )
             .unwrap();
             static ref UNACK_PEER_EVICTIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
@@ -476,7 +474,7 @@ where
 
         // Verify all the acknowledgements and compute challenges from half-keys
         let use_batch_verify = self.cfg.use_batch_verification;
-        let half_keys_challenges = hopr_parallelize::cpu::spawn_fifo_blocking(
+        let half_keys_challenges = hopr_types::parallelize::cpu::spawn_fifo_blocking(
             move || {
                 if use_batch_verify {
                     // Uses regular verifications for small batches but switches to a more effective
@@ -561,7 +559,7 @@ where
 
         let domain_separator = self.channels_dst;
         let chain_key = self.chain_key.clone();
-        Ok(hopr_parallelize::cpu::spawn_fifo_blocking(
+        Ok(hopr_types::parallelize::cpu::spawn_fifo_blocking(
             move || {
                 #[cfg(feature = "rayon")]
                 let iter = unack_tickets.into_par_iter();
@@ -648,7 +646,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use hopr_crypto_random::Randomizable;
+    use hopr_types::crypto_random::Randomizable;
 
     use super::*;
     use crate::utils::*;

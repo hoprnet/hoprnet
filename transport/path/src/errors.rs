@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use hopr_internal_types::errors::PathError;
+use hopr_types::internal::errors::PathError;
 
 pub type Result<T> = std::result::Result<T, PathPlannerError>;
 

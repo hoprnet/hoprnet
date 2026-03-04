@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use hopr_api::chain::ChainValues;
-use hopr_primitive_types::prelude::{Address, XDai, XDaiBalance};
+use hopr_types::primitive::prelude::{Address, XDai, XDaiBalance};
 
 use crate::errors::HoprLibError;
 

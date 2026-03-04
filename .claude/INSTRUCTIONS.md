@@ -1,5 +1,3 @@
-<!-- Canonical source: .claude/INSTRUCTIONS.md — edit THERE, then sync this copy. -->
-
 # HOPR Network Development Guidelines
 
 ## Project Overview

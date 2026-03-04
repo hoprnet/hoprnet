@@ -5,8 +5,7 @@ use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt, stream::BoxStream};
 use hopr_api::db::*;
 use hopr_db_entity::{outgoing_ticket_index, ticket, ticket_statistics};
-use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::*;
+use hopr_types::{internal::prelude::*, primitive::prelude::*};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, QuerySelect, Set,
     TransactionTrait,
@@ -795,10 +794,7 @@ mod tests {
     use futures::StreamExt;
     use hex_literal::hex;
     use hopr_api::db::{ChannelTicketStatistics, TicketMarker};
-    use hopr_crypto_random::Randomizable;
-    use hopr_crypto_types::prelude::*;
-    use hopr_internal_types::prelude::*;
-    use hopr_primitive_types::prelude::*;
+    use hopr_types::{crypto::prelude::*, crypto_random::Randomizable, internal::prelude::*, primitive::prelude::*};
 
     use crate::{
         db::HoprNodeDb,

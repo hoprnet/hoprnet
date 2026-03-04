@@ -12,8 +12,8 @@ pub enum SphinxError {
     PaddingError,
 
     #[error(transparent)]
-    CryptoError(#[from] hopr_crypto_types::errors::CryptoError),
+    CryptoError(#[from] hopr_types::crypto::errors::CryptoError),
 
     #[error(transparent)]
-    GeneralError(#[from] hopr_primitive_types::errors::GeneralError),
+    GeneralError(#[from] hopr_types::primitive::errors::GeneralError),
 }

@@ -1,10 +1,3 @@
----
-applyTo: "**/*.rs"
-description: "Rust-specific guidelines"
----
-
-<!-- Canonical source: .claude/rust.md — edit THERE, then sync this copy. -->
-
 # Rust Guidelines
 
 - Prefer immutable structures.

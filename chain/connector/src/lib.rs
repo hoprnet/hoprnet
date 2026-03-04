@@ -12,7 +12,7 @@ pub use backend::InMemoryBackend;
 pub use backend::{Backend, TempDbBackend, TempDbError};
 pub use connector::{BlockchainConnectorConfig, HoprBlockchainConnector};
 pub use hopr_api::chain as api;
-pub use hopr_chain_types::payload::{BasicPayloadGenerator, SafePayloadGenerator};
+pub use hopr_types::chain::payload::{BasicPayloadGenerator, SafePayloadGenerator};
 pub use reader::HoprBlockchainReader;
 
 /// Re-exports of the `blokli_client` crate.
@@ -25,13 +25,15 @@ pub mod blokli_client {
 
 #[doc(hidden)]
 pub mod reexports {
-    pub use hopr_chain_types;
+    pub use hopr_types::chain;
 }
 
-pub use hopr_chain_types::prelude::{ContractAddresses, PayloadGenerator};
-pub use hopr_crypto_types::prelude::ChainKeypair;
-use hopr_crypto_types::prelude::Keypair;
-pub use hopr_primitive_types::prelude::Address;
+use hopr_types::crypto::prelude::Keypair;
+pub use hopr_types::{
+    chain::prelude::{ContractAddresses, PayloadGenerator},
+    crypto::prelude::ChainKeypair,
+    primitive::prelude::Address,
+};
 
 /// Connector to HOPR on-chain contracts that uses multisig Safe as a signer and [`TempDbBackend`].
 pub type HoprBlockchainSafeConnector<C> = HoprBlockchainConnector<
@@ -51,7 +53,8 @@ pub type HoprBlockchainBasicConnector<C> = HoprBlockchainConnector<
 
 /// Convenience function to create [`HoprBlockchainConnector`] with own contract addresses.
 ///
-/// The returned instance uses [`TempDbBackend`] and [`hopr_chain_types::payload::bindings_based::SafePayloadGenerator`]
+/// The returned instance uses [`TempDbBackend`] and
+/// [`hopr_types::chain::payload::bindings_based::SafePayloadGenerator`]
 pub fn create_trustless_hopr_blokli_connector<C>(
     chain_key: &ChainKeypair,
     cfg: BlockchainConnectorConfig,

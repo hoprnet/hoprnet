@@ -84,5 +84,8 @@ test:
     echo "==> Running clippy..."
     cargo clippy --workspace --all-targets -- -D warnings
     echo ""
+    echo "==> Checking metrics documentation..."
+    ./.github/scripts/generate-metrics-docs.sh
+    echo ""
     echo "==> Running unit & integration tests..."
     cargo test --test '*' -- --test-threads=1

@@ -15,7 +15,7 @@ pub use tickets::*;
 pub use values::*;
 
 /// Receipt of an on-chain operation.
-pub type ChainReceipt = hopr_crypto_types::prelude::Hash;
+pub type ChainReceipt = hopr_types::crypto::prelude::Hash;
 
 /// Complete set of HOPR on-chain operation APIs.
 ///
@@ -94,37 +94,36 @@ impl<'a, R: ChainKeyOperations + ChainReadChannelOperations> From<&'a R> for Cha
 }
 
 #[async_trait::async_trait]
-impl<'c, R: ChainKeyOperations + ChainReadChannelOperations + Sync> hopr_internal_types::path::PathAddressResolver
+impl<'c, R: ChainKeyOperations + ChainReadChannelOperations + Sync> hopr_types::internal::path::PathAddressResolver
     for ChainPathResolver<'c, R>
 {
     async fn resolve_transport_address(
         &self,
-        address: &hopr_primitive_types::prelude::Address,
-    ) -> Result<Option<hopr_crypto_types::prelude::OffchainPublicKey>, hopr_internal_types::errors::PathError> {
+        address: &hopr_types::primitive::prelude::Address,
+    ) -> Result<Option<hopr_types::crypto::prelude::OffchainPublicKey>, hopr_types::internal::errors::PathError> {
         self.0
             .chain_key_to_packet_key(address)
             .await
-            .map_err(|e| hopr_internal_types::errors::PathError::UnknownPeer(format!("{address}: {e}")))
+            .map_err(|e| hopr_types::internal::errors::PathError::UnknownPeer(format!("{address}: {e}")))
     }
 
     async fn resolve_chain_address(
         &self,
-        key: &hopr_crypto_types::prelude::OffchainPublicKey,
-    ) -> Result<Option<hopr_primitive_types::prelude::Address>, hopr_internal_types::errors::PathError> {
+        key: &hopr_types::crypto::prelude::OffchainPublicKey,
+    ) -> Result<Option<hopr_types::primitive::prelude::Address>, hopr_types::internal::errors::PathError> {
         self.0
             .packet_key_to_chain_key(key)
             .await
-            .map_err(|e| hopr_internal_types::errors::PathError::UnknownPeer(format!("{key}: {e}")))
+            .map_err(|e| hopr_types::internal::errors::PathError::UnknownPeer(format!("{key}: {e}")))
     }
 
     async fn get_channel(
         &self,
-        src: &hopr_primitive_types::prelude::Address,
-        dst: &hopr_primitive_types::prelude::Address,
-    ) -> Result<Option<ChannelEntry>, hopr_internal_types::errors::PathError> {
-        self.0
-            .channel_by_parties(src, dst)
-            .await
-            .map_err(|e| hopr_internal_types::errors::PathError::MissingChannel(src.to_string(), format!("{dst}: {e}")))
+        src: &hopr_types::primitive::prelude::Address,
+        dst: &hopr_types::primitive::prelude::Address,
+    ) -> Result<Option<ChannelEntry>, hopr_types::internal::errors::PathError> {
+        self.0.channel_by_parties(src, dst).await.map_err(|e| {
+            hopr_types::internal::errors::PathError::MissingChannel(src.to_string(), format!("{dst}: {e}"))
+        })
     }
 }

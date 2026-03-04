@@ -1,15 +1,11 @@
 use futures::{SinkExt, StreamExt};
 use futures_time::{future::FutureExt as TimeExt, stream::StreamExt as TimeStreamExt};
 use hopr_async_runtime::{AbortableList, spawn_as_abortable};
-use hopr_crypto_types::prelude::*;
-use hopr_internal_types::prelude::*;
-use hopr_network_types::{
-    prelude::*,
-    timeout::{SinkTimeoutError, TimeoutSinkExt, TimeoutStreamExt},
-};
-use hopr_primitive_types::prelude::Address;
+use hopr_crypto_packet::HoprSurb;
+use hopr_network_types::timeout::{SinkTimeoutError, TimeoutSinkExt, TimeoutStreamExt};
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
+use hopr_types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::Address};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::Instrument;
 use validator::{Validate, ValidationError, ValidationErrors};
@@ -36,7 +32,7 @@ lazy_static::lazy_static! {
     // the bottleneck is queue depth, individual task duration, or both.
     static ref METRIC_PACKET_DECODE_TIMEOUTS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
         "hopr_packet_decode_timeouts_total",
-        "Number of incoming packets dropped due to decode timeout"
+        "Number of incoming packets dropped due to decode timeout (sustained rate indicates Rayon pool saturation)"
     ).unwrap();
     static ref METRIC_VALIDATION_ERRORS: hopr_metrics::MultiCounter =  hopr_metrics::MultiCounter::new(
         "hopr_packet_ticket_validation_errors",
@@ -75,7 +71,7 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
     wire_outgoing: WOut,
     concurrency: usize,
 ) where
-    AppOut: futures::Stream<Item = (ResolvedTransportRouting, ApplicationDataOut)> + Send + 'static,
+    AppOut: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
     E: PacketEncoder + Send + 'static,
     WOut: futures::Sink<(PeerId, Box<[u8]>), Error = SinkTimeoutError<WOutErr>> + Clone + Unpin + Send + 'static,
     WOutErr: std::error::Error,
@@ -596,7 +592,7 @@ where
     TEvt::Error: std::error::Error,
     AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
     AppOut::Error: std::error::Error,
-    AppIn: futures::Stream<Item = (ResolvedTransportRouting, ApplicationDataOut)> + Send + 'static,
+    AppIn: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
 {
     let mut processes = AbortableList::default();
 

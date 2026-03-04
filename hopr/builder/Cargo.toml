@@ -81,5 +81,6 @@ serial_test = { workspace = true }
 test-log = { workspace = true }
 
 hopr-builder = { workspace = true, features = ["testing"] }
-hopr-crypto-random = { workspace = true }
+hopr-types = { workspace = true, features = ["random"] }
+
 hopr-lib = { workspace = true, features = ["telemetry"] }

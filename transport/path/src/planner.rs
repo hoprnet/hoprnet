@@ -3,13 +3,14 @@ use std::{sync::Arc, time::Duration};
 use futures::{StreamExt as _, TryStreamExt, stream::FuturesUnordered};
 use hopr_api::chain::{ChainKeyOperations, ChainPathResolver, ChainReadChannelOperations};
 use hopr_crypto_packet::prelude::*;
-use hopr_crypto_types::{crypto_traits::Randomizable, types::OffchainPublicKey};
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_internal_types::path::Path;
-use hopr_internal_types::{errors::PathError, prelude::*};
-use hopr_network_types::prelude::*;
-use hopr_primitive_types::traits::ToHex;
 use hopr_protocol_hopr::{FoundSurb, SurbStore};
+#[cfg(all(feature = "prometheus", not(test)))]
+use hopr_types::internal::path::Path;
+use hopr_types::{
+    crypto::{crypto_traits::Randomizable, types::OffchainPublicKey},
+    internal::{errors::PathError, prelude::*},
+    primitive::traits::ToHex,
+};
 use tracing::trace;
 
 use crate::{
@@ -45,14 +46,18 @@ pub struct PathPlannerConfig {
     pub max_cached_paths: usize,
 }
 
-type PlannerCacheKey = (NodeId, NodeId, RoutingOptions);
+/// Cache key for the path planner: `(source, destination, hops)`.
+///
+/// Only the `Hops` variant of [`RoutingOptions`] is cached (explicit intermediate
+/// paths bypass the cache), so the key stores the hop count as a plain `u32`.
+type PlannerCacheKey = (NodeId, NodeId, u32);
 type PlannerCacheValue = Arc<Vec<ValidatedPath>>;
 
 /// Path planner that resolves [`DestinationRouting`] to [`ResolvedTransportRouting`].
 ///
 /// The planner delegates path *discovery* to any [`PathSelector`] implementation and
 /// owns the `moka` cache of fully-validated [`ValidatedPath`] objects, keyed by
-/// `(source: NodeId, destination: NodeId, options: RoutingOptions)`.
+/// `(source: NodeId, destination: NodeId, hops: u32)`.
 ///
 /// On a cache miss the planner calls the selector, validates every candidate against
 /// the chain resolver, and stores `Arc<Vec<ValidatedPath>>` in the cache.
@@ -147,7 +152,7 @@ where
                 let src_key = self.resolve_node_id_to_offchain_key(&source).await?;
                 let dest_key = self.resolve_node_id_to_offchain_key(&destination).await?;
 
-                let cache_key: PlannerCacheKey = (source, destination, RoutingOptions::Hops(hops));
+                let cache_key: PlannerCacheKey = (source, destination, u32::from(hops));
 
                 let resolver = self.resolver.clone();
                 let selector = self.selector.clone();
@@ -182,7 +187,7 @@ where
 
                 let idx = if paths.len() > 1 {
                     // Upper bound is exclusive; use len so the last path can be selected.
-                    hopr_crypto_random::random_integer(0, Some(paths.len() as u64)) as usize
+                    hopr_types::crypto_random::random_integer(0, Some(paths.len() as u64)) as usize
                 } else {
                     0
                 };
@@ -209,7 +214,7 @@ where
         size_hint: usize,
         max_surbs: usize,
         routing: DestinationRouting,
-    ) -> Result<(ResolvedTransportRouting, Option<usize>)> {
+    ) -> Result<(ResolvedTransportRouting<HoprSurb>, Option<usize>)> {
         match routing {
             DestinationRouting::Forward {
                 destination,
@@ -296,50 +301,45 @@ where
 
             async move {
                 for (key, _) in cache.iter() {
-                    let (src, dest, options) = {
+                    let (src, dest, hops_u32) = {
                         let k = key.as_ref();
-                        (k.0, k.1, k.2.clone())
+                        (k.0, k.1, k.2)
                     };
 
-                    if let RoutingOptions::Hops(hops) = options {
-                        if u32::from(hops) == 0 {
-                            continue;
+                    if hops_u32 == 0 {
+                        continue;
+                    }
+                    let hops_usize = hops_u32 as usize;
+
+                    let resolve_key = |node: NodeId| {
+                        let resolver = resolver.clone();
+
+                        async move {
+                            match node {
+                                NodeId::Offchain(k) => Some(k),
+                                NodeId::Chain(addr) => ChainPathResolver::from(&*resolver)
+                                    .resolve_transport_address(&addr)
+                                    .await
+                                    .ok()
+                                    .flatten(),
+                            }
                         }
-                        let hops_usize: usize = hops.into();
+                    };
 
-                        let resolve_key = |node: NodeId| {
-                            let resolver = resolver.clone();
-
-                            async move {
-                                match node {
-                                    NodeId::Offchain(k) => Some(k),
-                                    NodeId::Chain(addr) => ChainPathResolver::from(&*resolver)
-                                        .resolve_transport_address(&addr)
-                                        .await
-                                        .ok()
-                                        .flatten(),
-                                }
+                    if let (Some(src_key), Some(dest_key)) = (resolve_key(src).await, resolve_key(dest).await)
+                        && let Ok(candidates) = selector.select_path(src_key, dest_key, hops_usize)
+                    {
+                        let chain_resolver = ChainPathResolver::from(&*resolver);
+                        let mut valid_paths: Vec<ValidatedPath> = Vec::new();
+                        for candidate in candidates {
+                            let node_ids: Vec<NodeId> = candidate.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
+                            if let Ok(vp) = ValidatedPath::new(src, node_ids, &chain_resolver).await {
+                                valid_paths.push(vp);
                             }
-                        };
+                        }
 
-                        if let (Some(src_key), Some(dest_key)) = (resolve_key(src).await, resolve_key(dest).await)
-                            && let Ok(candidates) = selector.select_path(src_key, dest_key, hops_usize)
-                        {
-                            let chain_resolver = ChainPathResolver::from(&*resolver);
-                            let mut valid_paths: Vec<ValidatedPath> = Vec::new();
-                            for candidate in candidates {
-                                let node_ids: Vec<NodeId> =
-                                    candidate.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
-                                if let Ok(vp) = ValidatedPath::new(src, node_ids, &chain_resolver).await {
-                                    valid_paths.push(vp);
-                                }
-                            }
-
-                            if !valid_paths.is_empty() {
-                                cache
-                                    .insert((src, dest, RoutingOptions::Hops(hops)), Arc::new(valid_paths))
-                                    .await;
-                            }
+                        if !valid_paths.is_empty() {
+                            cache.insert((src, dest, hops_u32), Arc::new(valid_paths)).await;
                         }
                     }
                 }
@@ -363,10 +363,12 @@ mod tests {
             traits::{EdgeObservableWrite, EdgeWeightType},
         },
     };
-    use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
-    use hopr_internal_types::channels::{ChannelEntry, ChannelStatus, generate_channel_id};
     use hopr_network_graph::ChannelGraph;
-    use hopr_primitive_types::prelude::*;
+    use hopr_types::{
+        crypto::prelude::{Keypair, OffchainKeypair},
+        internal::channels::{ChannelEntry, ChannelStatus, generate_channel_id},
+        primitive::prelude::*,
+    };
 
     use super::*;
     use crate::selector::HoprGraphPathSelector;
@@ -610,7 +612,7 @@ mod tests {
         let surb_store = hopr_protocol_hopr::MemorySurbStore::default();
         let planner = PathPlanner::new(me, surb_store, chain_api, selector, small_config());
 
-        use hopr_primitive_types::prelude::BoundedVec;
+        use hopr_types::primitive::prelude::BoundedVec;
         let intermediate_path = BoundedVec::try_from(vec![NodeId::Offchain(a)]).expect("valid");
 
         let routing = DestinationRouting::Forward {
@@ -641,7 +643,7 @@ mod tests {
 
         let planner = PathPlanner::new(me, surb_store, chain_api, selector, small_config());
 
-        use hopr_network_types::prelude::SurbMatcher;
+        use hopr_types::internal::routing::SurbMatcher;
         let matcher = SurbMatcher::Pseudonym(HoprPseudonym::random());
         let routing = DestinationRouting::Return(matcher);
 
@@ -676,11 +678,7 @@ mod tests {
         let surb_store = hopr_protocol_hopr::MemorySurbStore::default();
         let planner = PathPlanner::new(me, surb_store, chain_api, selector, small_config());
 
-        let cache_key = (
-            NodeId::Offchain(me),
-            NodeId::Offchain(dest),
-            RoutingOptions::Hops(1.try_into().expect("valid 1")),
-        );
+        let cache_key: PlannerCacheKey = (NodeId::Offchain(me), NodeId::Offchain(dest), 1);
 
         assert!(
             planner.cache.get(&cache_key).await.is_none(),
