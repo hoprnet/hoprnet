@@ -21,7 +21,7 @@ use alloy::{
     providers::{
         Identity, ProviderBuilder, RootProvider,
         fillers::{
-            BlobGasFiller, CachedNonceManager, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
+            CachedNonceManager, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
             WalletFiller,
         },
     },
@@ -37,10 +37,8 @@ use serde_with::{DisplayFromStr, serde_as};
 
 use crate::utils::HelperErrors;
 
-type SharedFillerChain = JoinFill<
-    JoinFill<JoinFill<JoinFill<Identity, ChainIdFiller>, NonceFiller<CachedNonceManager>>, GasFiller>,
-    BlobGasFiller,
->;
+type SharedFillerChain =
+    JoinFill<JoinFill<JoinFill<Identity, ChainIdFiller>, NonceFiller<CachedNonceManager>>, GasFiller>;
 pub type RpcProvider = FillProvider<JoinFill<SharedFillerChain, WalletFiller<EthereumWallet>>, RootProvider>;
 pub type RpcProviderWithoutSigner = FillProvider<SharedFillerChain, RootProvider>;
 
@@ -151,7 +149,6 @@ impl NetworkProviderArgs {
             .filler(ChainIdFiller::default())
             .filler(NonceFiller::new(CachedNonceManager::default()))
             .filler(GasFiller)
-            .filler(BlobGasFiller)
             .wallet(wallet)
             .connect_client(rpc_client);
 
@@ -178,7 +175,6 @@ impl NetworkProviderArgs {
             .filler(ChainIdFiller::default())
             .filler(NonceFiller::new(CachedNonceManager::default()))
             .filler(GasFiller)
-            .filler(BlobGasFiller)
             .connect_client(rpc_client);
 
         Ok(Arc::new(provider))
