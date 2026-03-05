@@ -226,17 +226,18 @@ mod tests {
             (hex!("e306ebfb0d01d0da0952c9a567d758093a80622c6cb55052bf5f1a6ebd8d7b5c"), hex!("9a82976f7182c05126313bead5617c623b93d11f9f9691c87b1a26f869d569ed"))
         ].map(|(p1,p2)| (ChainKeypair::from_secret(&p1).expect("lazy static keypair should be valid"), OffchainKeypair::from_secret(&p2).expect("lazy static keypair should be valid")));
 
-        static ref MAPPER: bimap::BiMap<KeyIdent, OffchainPublicKey> = PEERS
+        static ref MAPPER: SimpleBiMapper<HoprSphinxSuite, HoprSphinxHeaderSpec> = PEERS
             .iter()
             .enumerate()
             .map(|(i, (_, k))| (KeyIdent::from(i as u32), *k.public()))
-            .collect::<BiHashMap<_, _>>();
+            .collect::<BiHashMap<_, _>>()
+            .into();
     }
 
     fn generate_surbs(count: usize) -> anyhow::Result<Vec<SURB<HoprSphinxSuite, HoprSphinxHeaderSpec>>> {
         let path = PEERS.iter().map(|(_, k)| *k.public()).collect::<Vec<_>>();
-        let path_ids =
-            <BiHashMap<_, _> as KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>>::map_keys_to_ids(&*MAPPER, &path)
+        let path_ids = MAPPER
+                .map_keys_to_ids(&path)
                 .into_iter()
                 .map(|v| v.ok_or(anyhow!("missing id")))
                 .collect::<Result<Vec<_>, _>>()?;

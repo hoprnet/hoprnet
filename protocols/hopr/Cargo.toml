@@ -19,7 +19,7 @@ serde = [
   "dep:serde_with",
   "hopr-types/serde",
 ]
-prometheus = ["dep:hopr-metrics", "hopr-types/telemetry"]
+prometheus = ["dep:hopr-metrics", "hopr-parallelize/prometheus" ]
 trace-timing = ["hopr-platform/trace-timing"]
 
 [dependencies]
@@ -45,11 +45,11 @@ tracing = { workspace = true }
 validator = { workspace = true }
 
 hopr-api = { workspace = true, features = ["db", "chain"] }
+hopr-parallelize = { workspace = true }
 hopr-types = { workspace = true, features = [
   "crypto",
   "internal",
   "primitive",
-  "parallelize",
   "random",
 ] }
 

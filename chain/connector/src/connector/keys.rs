@@ -1,4 +1,4 @@
-use hopr_api::chain::{HoprKeyIdent, HoprSphinxHeaderSpec, HoprSphinxSuite};
+use hopr_api::chain::{HoprKeyIdent, KeyIdMapping};
 use hopr_types::{crypto::prelude::OffchainPublicKey, primitive::prelude::Address};
 
 use crate::{backend::Backend, connector::HoprBlockchainConnector, errors::ConnectorError};
@@ -22,7 +22,7 @@ impl<B> Clone for HoprKeyMapper<B> {
 // These lookups run synchronously on Rayon threads (called from `HoprPacket::from_incoming`
 // inside `spawn_fifo_blocking`). The elapsed_ms timing in each init closure makes the rayon
 // execution time visible in structured logs.
-impl<B> hopr_api::chain::KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec> for HoprKeyMapper<B>
+impl<B> KeyIdMapping<HoprKeyIdent, OffchainPublicKey> for HoprKeyMapper<B>
 where
     B: Backend + Send + Sync + 'static,
 {
@@ -132,7 +132,7 @@ where
 #[cfg(test)]
 mod tests {
     use hex_literal::hex;
-    use hopr_api::chain::{ChainKeyOperations, KeyIdMapper};
+    use hopr_api::chain::{ChainKeyOperations};
     use hopr_types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*};
 
     use crate::{connector::tests::create_connector, testing::BlokliTestStateBuilder};

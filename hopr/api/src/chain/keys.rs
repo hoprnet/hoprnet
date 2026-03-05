@@ -1,16 +1,19 @@
 use std::error::Error;
 
-pub use hopr_crypto_packet::{HoprKeyIdent, HoprSphinxHeaderSpec, HoprSphinxSuite, KeyIdMapper};
 use hopr_types::{crypto::prelude::OffchainPublicKey, primitive::prelude::Address};
+pub use hopr_types::primitive::prelude::{KeyIdMapping, KeyIdent as HoprKeyIdent};
 
 /// Operations for offchain keys.
 ///
 /// This typically translates to optimized (and cached) versions of [`ChainReadChannelOperations`].
+///
+/// The `Id` is a unique identifier for offchain public keys.
 #[async_trait::async_trait]
 #[auto_impl::auto_impl(&, Box, Arc)]
 pub trait ChainKeyOperations {
     type Error: Error + Send + Sync + 'static;
-    type Mapper: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec> + Clone + Send + Sync + 'static;
+    /// [Mapping](KeyIdMapping) between [`KeyIdent`] and [`OffchainPublicKey`]
+    type Mapper: KeyIdMapping<HoprKeyIdent, OffchainPublicKey> + Clone + Send + Sync + 'static;
     /// Translates [`Address`] into [`OffchainPublicKey`].
     async fn chain_key_to_packet_key(&self, chain: &Address) -> Result<Option<OffchainPublicKey>, Self::Error>;
     /// Translates [`OffchainPublicKey`] into [`Address`].

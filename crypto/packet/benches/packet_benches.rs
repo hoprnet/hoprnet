@@ -10,6 +10,7 @@ use hopr_types::{
     internal::prelude::*,
     primitive::prelude::{BytesEncodable, KeyIdent},
 };
+use hopr_crypto_sphinx::prelude::SimpleBiMapper;
 
 // Avoid musl's default allocator due to degraded performance
 //
@@ -39,11 +40,12 @@ const PACKET_BENCHMARK: [(usize, usize); 7] = [
 lazy_static::lazy_static! {
     static ref CHAIN_KEYS: [ChainKeypair; 5] = (0..5).map(|_| ChainKeypair::random()).collect::<Vec<_>>().try_into().unwrap();
     static ref OFFCHAIN_KEYS: [OffchainKeypair; 5] = (0..5).map(|_| OffchainKeypair::random()).collect::<Vec<_>>().try_into().unwrap();
-    static ref MAPPER: bimap::BiMap<KeyIdent, OffchainPublicKey> = OFFCHAIN_KEYS
+    static ref MAPPER: SimpleBiMapper::<HoprSphinxSuite, HoprSphinxHeaderSpec> = OFFCHAIN_KEYS
         .iter()
         .enumerate()
         .map(|(i, k)| (KeyIdent::from(i as u32), *k.public()))
-        .collect::<BiHashMap<_, _>>();
+        .collect::<BiHashMap<_, _>>()
+        .into();
     static ref PSEUDONYM: HoprPseudonym = HoprPseudonym::random();
     static ref DST: Hash = Hash::default();
 }
