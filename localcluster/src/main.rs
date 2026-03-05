@@ -166,6 +166,10 @@ async fn start_hoprd_nodes(
             .arg(format!("{}:{}", &args.p2p_host, p2p_port))
             .arg("--password")
             .arg(&args.identity_password)
+            .env("HOPRD_USE_OPENTELEMETRY", "true")
+            .env("HOPRD_OTEL_SIGNALS", "metrics")
+            .env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318")
+            .env("OTEL_SERVICE_NAME", format!("node-{id}"))
             .stdout(Stdio::from(log_file))
             .stderr(Stdio::from(log_err));
 

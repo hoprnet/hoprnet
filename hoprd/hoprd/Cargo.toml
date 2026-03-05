@@ -30,12 +30,16 @@ runtime-tokio = [
   "hopr-lib/runtime-tokio",
   "hopr-db-node/runtime-tokio",
   "opentelemetry_sdk?/rt-tokio",
+  "opentelemetry_sdk?/experimental_trace_batch_span_processor_with_async_runtime",
+  "opentelemetry_sdk?/experimental_logs_batch_log_processor_with_async_runtime",
+  "opentelemetry_sdk?/experimental_metrics_periodicreader_with_async_runtime",
   "hopr-strategy/runtime-tokio",
 ]
 telemetry = [
   "dep:opentelemetry",
   "dep:opentelemetry-otlp",
   "dep:opentelemetry_sdk",
+  "dep:flagset",
   "dep:tracing-opentelemetry",
 ]
 transport-quic = [
@@ -70,6 +74,7 @@ async-trait = { workspace = true }
 clap = { workspace = true }
 console-subscriber = { workspace = true, optional = true }
 futures = { workspace = true }
+flagset = { workspace = true, optional = true }
 home = "0.5.12"
 humansize = { workspace = true, optional = true, features = ["no_alloc"] }
 humantime-serde = { workspace = true }
@@ -90,6 +95,8 @@ validator = { workspace = true }
 opentelemetry = { workspace = true, optional = true }
 opentelemetry-otlp = { workspace = true, default-features = false, features = [
   "trace",
+  "metrics",
+  "logs",
   "reqwest-client",
   "tls-roots",
   "http-proto",
