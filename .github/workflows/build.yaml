@@ -13,7 +13,7 @@ concurrency:
   group: ${{ github.event.pull_request.head.ref || github.ref_name }}-build
   cancel-in-progress: true
 permissions:
-  contents: read
+  contents: write
 env:
   CARGO_TERM_COLOR: always
 jobs:
