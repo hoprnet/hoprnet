@@ -7,7 +7,7 @@ use std::{
 };
 
 use opentelemetry::{
-    KeyValue,
+    Key, KeyValue,
     logs::{AnyValue, LogRecord as _, Logger as _, LoggerProvider as _, Severity},
     metrics::{MeterProvider as _, ObservableCounter, ObservableGauge},
     trace::TracerProvider,
@@ -172,57 +172,45 @@ where
         record.set_severity_number(severity_number);
         record.set_severity_text(severity_text);
 
-        let mut body = serde_json::Map::new();
+        let mut body = HashMap::<Key, AnyValue>::new();
         if let Some(message) = visitor.body.take() {
-            body.insert("message".to_string(), serde_json::Value::String(message));
+            body.insert(Key::new("message"), AnyValue::String(message.into()));
         }
-        body.insert(
-            "level".to_string(),
-            serde_json::Value::String(metadata.level().to_string()),
-        );
-        body.insert(
-            "target".to_string(),
-            serde_json::Value::String(metadata.target().to_string()),
-        );
+        body.insert(Key::new("level"), AnyValue::String(metadata.level().to_string().into()));
+        body.insert(Key::new("target"), AnyValue::String(metadata.target().to_string().into()));
         if let Some(module_path) = metadata.module_path() {
-            body.insert(
-                "module_path".to_string(),
-                serde_json::Value::String(module_path.to_string()),
-            );
+            body.insert(Key::new("module_path"), AnyValue::String(module_path.to_string().into()));
             record.add_attribute("module_path", module_path.to_string());
         }
         if let Some(file) = metadata.file() {
-            body.insert("file".to_string(), serde_json::Value::String(file.to_string()));
+            body.insert(Key::new("file"), AnyValue::String(file.to_string().into()));
             record.add_attribute("file", file.to_string());
         }
         if let Some(line) = metadata.line() {
-            body.insert(
-                "line".to_string(),
-                serde_json::Value::Number(serde_json::Number::from(line)),
-            );
+            body.insert(Key::new("line"), AnyValue::Int(i64::from(line)));
             record.add_attribute("line", i64::from(line));
         }
         body.insert(
-            "node_address".to_string(),
-            serde_json::Value::String(self.node_identity.node_address.clone()),
+            Key::new("node_address"),
+            AnyValue::String(self.node_identity.node_address.clone().into()),
         );
         body.insert(
-            "node_peer_id".to_string(),
-            serde_json::Value::String(self.node_identity.node_peer_id.clone()),
+            Key::new("node_peer_id"),
+            AnyValue::String(self.node_identity.node_peer_id.clone().into()),
         );
         if !visitor.attributes.is_empty() {
             body.insert(
-                "attributes".to_string(),
-                serde_json::Value::Object(
+                Key::new("attributes"),
+                AnyValue::Map(Box::new(
                     visitor
                         .attributes
                         .iter()
-                        .map(|(key, value)| (key.clone(), serde_json::Value::String(format!("{value:?}"))))
+                        .map(|(key, value)| (Key::new(key.clone()), value.clone()))
                         .collect(),
-                ),
+                )),
             );
         }
-        record.set_body(serde_json::Value::Object(body).to_string().into());
+        record.set_body(AnyValue::Map(Box::new(body)));
 
         record.add_attribute("target", metadata.target().to_string());
         record.add_attribute("node_address", self.node_identity.node_address.clone());
@@ -836,7 +824,7 @@ pub(super) fn init_logging(node_identity: NodeTelemetryIdentity) -> anyhow::Resu
                     .build()?,
                 OtlpTransport::Http => opentelemetry_otlp::LogExporter::builder()
                     .with_http()
-                    .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
+                    .with_protocol(opentelemetry_otlp::Protocol::HttpJson)
                     .with_timeout(Duration::from_secs(5))
                     .build()?,
             };

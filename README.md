@@ -460,6 +460,8 @@ Examples:
 - Traces only (backward-compatible default): `HOPRD_OTEL_SIGNALS=traces`
 - Metrics only: `HOPRD_OTEL_SIGNALS=metrics`
 - Full export: `HOPRD_OTEL_SIGNALS=traces,logs,metrics`
+- OTEL traces, logs, and metrics include `node_address` and `node_peer_id`.
+- OTLP logs are emitted as structured objects (typed fields/attributes), and use OTLP HTTP JSON protocol when `OTEL_EXPORTER_OTLP_ENDPOINT` is `http(s)://...`.
 - With metrics enabled, OTEL exports keep Prometheus family naming (`<metric>`, `<metric>_count`, `<metric>_sum`, `<metric>_bucket`) and labels (`le` for histogram buckets, `quantile` for summaries).
 - Session snapshot metrics are also exported directly to OTEL (`hopr_session_*` series with `session_id` attribute) without being added to the Prometheus `/metrics` endpoint.
 
