@@ -207,7 +207,7 @@ where
                                             let capacity =  if matches!(channel.status, ChannelStatus::Closed) {
                                                 None
                                             } else {
-                                                let ticket_value = ticket_price.read().div_f64(win_probability.read().as_f64()).expect("win prob is always between 0 and 1").amount();
+                                                let ticket_value = ticket_price.read().div_f64(win_probability.read().as_f64()).unwrap_or_default().amount();
                                                 Some(
                                                     channel.balance
                                                         .amount()
