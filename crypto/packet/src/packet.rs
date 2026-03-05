@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter};
 
 use hopr_crypto_sphinx::prelude::*;
 #[cfg(feature = "rayon")]
-use hopr_types::parallelize::cpu::rayon::prelude::*;
+use hopr_parallelize::cpu::rayon::prelude::*;
 use hopr_types::{
     crypto::prelude::*,
     internal::{

@@ -27,6 +27,7 @@ runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hopr-network-types/runtime-tokio",
   "hopr-transport/runtime-tokio",
+  "hopr-parallelize/runtime-tokio",
   "dep:tokio",
 ]
 serde = [
@@ -72,13 +73,13 @@ tracing = { workspace = true }
 validator = { workspace = true }
 
 hopr-api = { workspace = true, features = ["full"] }
+hopr-parallelize = { workspace = true }
 hopr-types = { workspace = true, features = [
   "chain",
   "crypto",
   "internal",
   "primitive",
   "random",
-  "parallelize",
 ] }
 
 hopr-async-runtime = { workspace = true }

@@ -1,6 +1,6 @@
 [package]
 name = "hopr-crypto-packet"
-version = "1.2.0"
+version = "1.2.1"
 description = "Contains high-level HOPR protocol building blocks for packet interaction"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
@@ -14,7 +14,7 @@ crate-type = ["rlib"]
 
 [features]
 default = ["rayon"]
-rayon = ["hopr-types/rayon"]
+rayon = ["hopr-parallelize/rayon"]
 serde = [
   "dep:serde",
   "dep:serde_bytes",
@@ -39,12 +39,12 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 hopr-crypto-sphinx = { workspace = true }
+hopr-parallelize = { workspace = true }
 hopr-types = { workspace = true, features = [
   "crypto",
   "random",
   "internal",
   "primitive",
-  "parallelize",
 ] }
 
 [dev-dependencies]

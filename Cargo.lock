@@ -4521,7 +4521,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-packet"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "bimap",
@@ -4530,6 +4530,7 @@ dependencies = [
  "hex",
  "hex-literal",
  "hopr-crypto-sphinx",
+ "hopr-parallelize 0.2.2",
  "hopr-types",
  "lazy_static",
  "mimalloc",
@@ -4711,7 +4712,7 @@ dependencies = [
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-parallelize",
+ "hopr-parallelize 1.0.2",
  "hopr-primitive-types",
  "multiaddr",
  "num_enum",
@@ -4741,6 +4742,7 @@ dependencies = [
  "hopr-crypto-keypair",
  "hopr-metrics",
  "hopr-network-types",
+ "hopr-parallelize 0.2.2",
  "hopr-platform",
  "hopr-transport",
  "hopr-types",
@@ -4818,6 +4820,21 @@ dependencies = [
 
 [[package]]
 name = "hopr-parallelize"
+version = "0.2.2"
+dependencies = [
+ "futures",
+ "hopr-metrics",
+ "lazy_static",
+ "libc",
+ "rayon",
+ "serial_test",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "hopr-parallelize"
 version = "1.0.2"
 source = "git+https://github.com/hoprnet/hopr-types?branch=main#db8192132466b5fe38299ef5d4c31f7c0e2efd83"
 dependencies = [
@@ -4871,7 +4888,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-hopr"
-version = "4.4.0"
+version = "4.4.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4888,6 +4905,7 @@ dependencies = [
  "hopr-crypto-packet",
  "hopr-db-node",
  "hopr-metrics",
+ "hopr-parallelize 0.2.2",
  "hopr-platform",
  "hopr-types",
  "humantime-serde",
@@ -5244,7 +5262,7 @@ dependencies = [
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-internal-types",
- "hopr-parallelize",
+ "hopr-parallelize 1.0.2",
  "hopr-primitive-types",
 ]
 
