@@ -1,6 +1,6 @@
 [package]
 name = "hopr-builder"
-version = "4.0.0"
+version = "4.0.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true

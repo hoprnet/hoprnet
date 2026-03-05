@@ -7,7 +7,7 @@ pub mod config;
 #[cfg(any(feature = "testing", test))]
 pub mod testing;
 
-use std::sync::Arc;
+use std::{ops::Mul, sync::Arc};
 
 use futures::{FutureExt, StreamExt as _};
 use futures_concurrency::stream::StreamExt;
@@ -20,7 +20,6 @@ use hopr_chain_connector::{
 use hopr_db_node::{HoprNodeDb, HoprNodeDbApi, init_hopr_node_db};
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_lib;
-use hopr_lib::Keypair;
 #[cfg(feature = "session-server")]
 use hopr_lib::traits::HoprSessionServer;
 #[cfg(feature = "runtime-tokio")]
@@ -28,6 +27,7 @@ use hopr_lib::{
     ChainKeypair, Hopr, HoprLibError, HoprTransportIO, OffchainKeypair, api::network::NetworkEvent,
     config::HoprLibConfig,
 };
+use hopr_lib::{Keypair, UnitaryFloatOps};
 use hopr_network_graph::{ChannelGraph, SharedChannelGraph};
 use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork, PeerDiscovery};
 #[cfg(feature = "runtime-tokio")]
@@ -208,11 +208,12 @@ where
                                                 None
                                             } else {
                                                 Some(
-                                                    if let Some(division) = channel.balance.amount().low_u128().checked_div(ticket_price.read().amount().low_u128()) {
-                                                        division.saturating_mul(win_probability.read().as_luck() as u128)
-                                                    } else {
-                                                        u128::MAX
-                                                    }
+                                                    channel.balance
+                                                        .mul(*ticket_price.read())
+                                                        .div_f64(win_probability.read().as_f64())
+                                                        .expect("win prob is always between 0 and 1")
+                                                        .amount()
+                                                        .low_u128()
                                                 )
                                             };
 
