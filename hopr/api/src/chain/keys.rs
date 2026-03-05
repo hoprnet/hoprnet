@@ -1,7 +1,7 @@
 use std::error::Error;
 
-use hopr_types::{crypto::prelude::OffchainPublicKey, primitive::prelude::Address};
 pub use hopr_types::primitive::prelude::{KeyIdMapping, KeyIdent as HoprKeyIdent};
+use hopr_types::{crypto::prelude::OffchainPublicKey, primitive::prelude::Address};
 
 /// Operations for offchain keys.
 ///

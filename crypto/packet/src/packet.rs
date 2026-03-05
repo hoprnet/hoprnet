@@ -96,7 +96,10 @@ impl PartialHoprPacket {
     /// * `ticket` ticket builder for the first hop on the path.
     /// * `mapper` of the public key identifiers.
     /// * `domain_separator` channels contract domain separator.
-    pub fn new<M: ProtocolKeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>, P: NonEmptyPath<OffchainPublicKey> + Send>(
+    pub fn new<
+        M: ProtocolKeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>,
+        P: NonEmptyPath<OffchainPublicKey> + Send,
+    >(
         pseudonym: &HoprPseudonym,
         routing: PacketRouting<P>,
         chain_keypair: &ChainKeypair,
@@ -395,7 +398,10 @@ pub enum PacketRouting<P: NonEmptyPath<OffchainPublicKey> = TransportPath> {
     NoAck(OffchainPublicKey),
 }
 
-fn create_surb_for_path<M: ProtocolKeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>, P: NonEmptyPath<OffchainPublicKey>>(
+fn create_surb_for_path<
+    M: ProtocolKeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>,
+    P: NonEmptyPath<OffchainPublicKey>,
+>(
     return_path: (P, PathKeyData),
     recv_data: HoprSenderId,
     mapper: &M,

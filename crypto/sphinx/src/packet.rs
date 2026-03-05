@@ -3,6 +3,7 @@ use std::{
     marker::PhantomData,
     ops::{Deref, DerefMut},
 };
+
 use hopr_types::{
     crypto::{crypto_traits::PRP, prelude::*},
     primitive::prelude::*,
@@ -124,19 +125,26 @@ impl<const P: usize> DerefMut for PaddedPayload<P> {
 }
 
 /// Protocol instantiation specific implementation of the [`KeyIdMapping`]
-pub trait ProtocolKeyIdMapper<S: SphinxSuite, H: SphinxHeaderSpec>: KeyIdMapping<H::KeyId, <S::P as Keypair>::Public>
-{ }
+pub trait ProtocolKeyIdMapper<S: SphinxSuite, H: SphinxHeaderSpec>:
+    KeyIdMapping<H::KeyId, <S::P as Keypair>::Public>
+{
+}
 
 impl<S, H, T> ProtocolKeyIdMapper<S, H> for T
 where
     S: SphinxSuite,
     H: SphinxHeaderSpec,
-    T: KeyIdMapping<H::KeyId, <S::P as Keypair>::Public>
-{}
+    T: KeyIdMapping<H::KeyId, <S::P as Keypair>::Public>,
+{
+}
 
-pub struct SimpleBiMapper<S: SphinxSuite, H: SphinxHeaderSpec>(pub(crate) bimap::BiHashMap<H::KeyId, <S::P as Keypair>::Public>);
+pub struct SimpleBiMapper<S: SphinxSuite, H: SphinxHeaderSpec>(
+    pub(crate) bimap::BiHashMap<H::KeyId, <S::P as Keypair>::Public>,
+);
 
-impl<S: SphinxSuite, H: SphinxHeaderSpec> From<bimap::BiHashMap<H::KeyId, <S::P as Keypair>::Public>> for SimpleBiMapper<S, H> {
+impl<S: SphinxSuite, H: SphinxHeaderSpec> From<bimap::BiHashMap<H::KeyId, <S::P as Keypair>::Public>>
+    for SimpleBiMapper<S, H>
+{
     fn from(value: bimap::BiHashMap<H::KeyId, <S::P as Keypair>::Public>) -> Self {
         Self(value)
     }
@@ -194,7 +202,10 @@ pub struct PartialPacket<S: SphinxSuite, H: SphinxHeaderSpec> {
 impl<S: SphinxSuite, H: SphinxHeaderSpec> PartialPacket<S, H> {
     /// Creates a new partial packet using the given routing information and
     /// public key identifier mapper.
-    pub fn new<M: ProtocolKeyIdMapper<S, H>>(routing: MetaPacketRouting<S, H>, key_mapper: &M) -> Result<Self, SphinxError> {
+    pub fn new<M: ProtocolKeyIdMapper<S, H>>(
+        routing: MetaPacketRouting<S, H>,
+        key_mapper: &M,
+    ) -> Result<Self, SphinxError> {
         match routing {
             MetaPacketRouting::ForwardPath {
                 shared_keys,
@@ -606,11 +617,13 @@ pub(crate) mod tests {
             From<&'a <<S as SphinxSuite>::P as Keypair>::Public>,
     {
         let pubkeys = keypairs.iter().map(|kp| kp.public().clone()).collect::<Vec<_>>();
-        let mapper = SimpleBiMapper::<S, TestHeader<S>>(keypairs
-            .iter()
-            .enumerate()
-            .map(|(i, k)| (KeyIdent::from(i as u32), k.public().clone()))
-            .collect::<BiHashMap<_, _>>());
+        let mapper = SimpleBiMapper::<S, TestHeader<S>>(
+            keypairs
+                .iter()
+                .enumerate()
+                .map(|(i, k)| (KeyIdent::from(i as u32), k.public().clone()))
+                .collect::<BiHashMap<_, _>>(),
+        );
 
         let shared_keys = S::new_shared_keys(&pubkeys)?;
         let por_strings = vec![WrappedBytes::<53>::default(); shared_keys.secrets.len() - 1];
@@ -641,11 +654,13 @@ pub(crate) mod tests {
         for<'a> &'a Alpha<<S::G as GroupElement<S::E>>::AlphaLen>: From<&'a <S::P as Keypair>::Public>,
     {
         let pubkeys = keypairs.iter().map(|kp| kp.public().clone()).collect::<Vec<_>>();
-        let mapper = SimpleBiMapper::<S, TestHeader<S>>(keypairs
-            .iter()
-            .enumerate()
-            .map(|(i, k)| (KeyIdent::from(i as u32), k.public().clone()))
-            .collect::<BiHashMap<_, _>>());
+        let mapper = SimpleBiMapper::<S, TestHeader<S>>(
+            keypairs
+                .iter()
+                .enumerate()
+                .map(|(i, k)| (KeyIdent::from(i as u32), k.public().clone()))
+                .collect::<BiHashMap<_, _>>(),
+        );
 
         let shared_keys = S::new_shared_keys(&pubkeys)?;
         let por_strings = vec![WrappedBytes::<53>::default(); shared_keys.secrets.len() - 1];
@@ -701,18 +716,21 @@ pub(crate) mod tests {
             From<&'a <<S as SphinxSuite>::P as Keypair>::Public>,
     {
         let pubkeys = keypairs.iter().map(|kp| kp.public().clone()).collect::<Vec<_>>();
-        let mapper = SimpleBiMapper::<S, TestHeader<S>>(keypairs
-            .iter()
-            .enumerate()
-            .map(|(i, k)| (KeyIdent::from(i as u32), k.public().clone()))
-            .collect::<BiHashMap<_, _>>());
+        let mapper = SimpleBiMapper::<S, TestHeader<S>>(
+            keypairs
+                .iter()
+                .enumerate()
+                .map(|(i, k)| (KeyIdent::from(i as u32), k.public().clone()))
+                .collect::<BiHashMap<_, _>>(),
+        );
 
         let shared_keys = S::new_shared_keys(&pubkeys)?;
         let por_strings = vec![WrappedBytes::default(); shared_keys.secrets.len() - 1];
         let por_values = WrappedBytes::default();
         let pseudonym = SimplePseudonym::random();
 
-        let ids = mapper.map_keys_to_ids(&pubkeys)
+        let ids = mapper
+            .map_keys_to_ids(&pubkeys)
             .into_iter()
             .map(|v| v.ok_or_else(|| anyhow!("failed to map keys to ids")))
             .collect::<anyhow::Result<Vec<KeyIdent>>>()?;

@@ -237,10 +237,10 @@ mod tests {
     fn generate_surbs(count: usize) -> anyhow::Result<Vec<SURB<HoprSphinxSuite, HoprSphinxHeaderSpec>>> {
         let path = PEERS.iter().map(|(_, k)| *k.public()).collect::<Vec<_>>();
         let path_ids = MAPPER
-                .map_keys_to_ids(&path)
-                .into_iter()
-                .map(|v| v.ok_or(anyhow!("missing id")))
-                .collect::<Result<Vec<_>, _>>()?;
+            .map_keys_to_ids(&path)
+            .into_iter()
+            .map(|v| v.ok_or(anyhow!("missing id")))
+            .collect::<Result<Vec<_>, _>>()?;
         let pseudonym = SimplePseudonym::random();
         let recv_data = HoprSenderId::new(&pseudonym);
 

@@ -132,7 +132,7 @@ where
 #[cfg(test)]
 mod tests {
     use hex_literal::hex;
-    use hopr_api::chain::{ChainKeyOperations};
+    use hopr_api::chain::ChainKeyOperations;
     use hopr_types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*};
 
     use crate::{connector::tests::create_connector, testing::BlokliTestStateBuilder};
