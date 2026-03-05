@@ -4375,7 +4375,6 @@ dependencies = [
  "auto_impl",
  "chrono",
  "futures",
- "hopr-crypto-packet",
  "hopr-types",
  "insta",
  "libp2p-identity",

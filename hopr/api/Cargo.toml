@@ -2,13 +2,12 @@
 name = "hopr-api"
 version = "0.13.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-edition.workspace = true
-rust-version.workspace = true
 description = "Common HOPR-related high-level API traits used in the code base"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
-
+edition.workspace = true
+rust-version.workspace = true
 
 [features]
 default = []
@@ -39,7 +38,6 @@ hopr-types = { workspace = true, features = [
   "internal",
   "primitive",
 ] }
-hopr-crypto-packet = { workspace = true }
 
 
 [dev-dependencies]
