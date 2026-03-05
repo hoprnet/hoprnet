@@ -177,9 +177,15 @@ where
             body.insert(Key::new("message"), AnyValue::String(message.into()));
         }
         body.insert(Key::new("level"), AnyValue::String(metadata.level().to_string().into()));
-        body.insert(Key::new("target"), AnyValue::String(metadata.target().to_string().into()));
+        body.insert(
+            Key::new("target"),
+            AnyValue::String(metadata.target().to_string().into()),
+        );
         if let Some(module_path) = metadata.module_path() {
-            body.insert(Key::new("module_path"), AnyValue::String(module_path.to_string().into()));
+            body.insert(
+                Key::new("module_path"),
+                AnyValue::String(module_path.to_string().into()),
+            );
             record.add_attribute("module_path", module_path.to_string());
         }
         if let Some(file) = metadata.file() {
