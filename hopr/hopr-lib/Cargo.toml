@@ -21,12 +21,13 @@ prometheus = [
   "dep:hopr-metrics",
   "hopr-transport/prometheus",
   "hopr-network-types/prometheus",
-  "hopr-types/telemetry",
+  "hopr-parallelize/prometheus",
 ]
 runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hopr-network-types/runtime-tokio",
   "hopr-transport/runtime-tokio",
+  "hopr-parallelize/runtime-tokio",
   "dep:tokio",
 ]
 serde = [
@@ -78,7 +79,6 @@ hopr-types = { workspace = true, features = [
   "internal",
   "primitive",
   "random",
-  "parallelize",
 ] }
 
 hopr-async-runtime = { workspace = true }
@@ -86,6 +86,7 @@ hopr-crypto-keypair = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true }
 hopr-platform = { workspace = true }
+hopr-parallelize = { workspace = true }
 hopr-transport = { workspace = true }
 
 [dev-dependencies]
