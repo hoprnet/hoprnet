@@ -24,7 +24,7 @@ jobs:
         include:
           - architecture: x86_64-linux
             runner: self-hosted-hoprnet-bigger
-            build_command: nix build -L .#binary-blokli-x86_64-linux
+            build_command: nix build -L .#binary-hoprd-x86_64-linux
     uses: hoprnet/hopr-workflows/.github/workflows/build-binaries.yaml@build-binaries-v2
     permissions:
       contents: read
@@ -32,10 +32,10 @@ jobs:
       source_branch: ${{ github.ref }}
       version_type: release
       architecture: ${{ matrix.architecture }}
-      cachix_cache_name: blokli
-      build_file: bloklid/Cargo.toml
+      cachix_cache_name: hoprnet
+      build_file: ./hopr/hopr-lib/Cargo.toml
       build_command: ${{ matrix.build_command }}
-      binary: bloklid
+      binary: hoprd
       runner: ${{ matrix.runner }}
     secrets:
       gcp_service_account: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
@@ -56,16 +56,14 @@ jobs:
           {
             "runner": "self-hosted-hoprnet-bigger",
             "architecture": "x86_64-linux",
-            "build_command": "nix build -L .#docker-blokli-x86_64-linux",
+            "build_command": "nix build -L .#docker-hoprd-x86_64-linux",
             "smoke_test_command": "nix develop -c just smoke-test"
           }
         ]
-      cachix_cache_name: blokli
-      build_file: bloklid/Cargo.toml
-      docker_image_name: bloklid
+      cachix_cache_name: hoprnet
+      build_file: ./hopr/hopr-lib/Cargo.toml
+      docker_image_name: hoprd
       docker_image_format: skopeo
-      deployment_namespace: blokli
-      deployment_label_selector: app.kubernetes.io/name=blokli
     secrets:
       gcp_service_account: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -84,14 +82,14 @@ jobs:
         uses: hoprnet/hopr-workflows/actions/release-version@27fb7c9ad22da3361b1fb783c61ce06aa39dd62a # release-version-v2
         with:
           source_branch: ${{ github.ref_name }}
-          file: bloklid/Cargo.toml
+          file: ./hopr/hopr-lib/Cargo.toml
           release_type: ${{ inputs.release_type }}
-          package_name: bloklid
-          cachix_cache_name: blokli
+          package_name: hoprd
+          cachix_cache_name: hoprnet
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           zulip_api_key: ${{ secrets.ZULIP_API_KEY }}
           zulip_email: ${{ secrets.ZULIP_EMAIL }}
-          zulip_channel: Blokli
+          zulip_channel: HOPRd
           zulip_topic: Releases
           gcp_service_account: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
           github_token: ${{ secrets.GH_RUNNER_TOKEN }}

@@ -110,6 +110,8 @@ jobs:
       docker_image_name: hoprd
       docker_image_format: skopeo
       fail_on_scan_vulnerabilities: ${{ vars.FAIL_ON_SCAN_VULNERABILITIES }}
+      deployment_namespace: core-team
+      deployment_label_selector: app.kubernetes.io/component=node
     secrets:
       gcp_service_account: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
