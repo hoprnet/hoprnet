@@ -156,7 +156,7 @@ pub fn prepare_tokio_runtime(
     use std::str::FromStr;
     let avail_parallelism = std::thread::available_parallelism().ok().map(|v| v.get() / 2);
 
-    hopr_types::parallelize::cpu::init_thread_pool(
+    hopr_parallelize::cpu::init_thread_pool(
         num_cpu_threads
             .map(|v| v.get())
             .or(avail_parallelism)
