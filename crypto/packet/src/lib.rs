@@ -44,7 +44,7 @@ pub mod prelude {
     };
 }
 
-pub use hopr_crypto_sphinx::prelude::{KeyIdMapper, ReplyOpener};
+pub use hopr_crypto_sphinx::prelude::{ProtocolKeyIdMapper, ReplyOpener};
 use hopr_types::internal::routing;
 
 /// Currently used public key cipher suite for Sphinx.
