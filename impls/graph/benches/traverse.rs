@@ -123,7 +123,7 @@ fn bench_simple_paths(c: &mut Criterion) {
                         black_box(dst_2hop),
                         2,
                         Some(10),
-                        SimpleHoprCostFn::new(NonZeroUsize::new(2).unwrap()),
+                        SimpleHoprCostFn::new(std::num::NonZeroUsize::new(2).expect("is greater than 1")),
                     ))
                 });
             });
@@ -135,7 +135,7 @@ fn bench_simple_paths(c: &mut Criterion) {
                         black_box(dst_3hop),
                         3,
                         Some(10),
-                        SimpleHoprCostFn::new(NonZeroUsize::new(3).unwrap()),
+                        SimpleHoprCostFn::new(std::num::NonZeroUsize::new(3).expect("is greater than 1")),
                     ))
                 });
             });
@@ -147,7 +147,7 @@ fn bench_simple_paths(c: &mut Criterion) {
                         black_box(dst_4hop),
                         4,
                         Some(10),
-                        SimpleHoprCostFn::new(NonZeroUsize::new(4).unwrap()),
+                        SimpleHoprCostFn::new(std::num::NonZeroUsize::new(4).expect("is greater than 1")),
                     ))
                 });
             });

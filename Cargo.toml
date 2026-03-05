@@ -27,6 +27,7 @@ members = [
   "transport/identity",
   "transport/mixer",
   "transport/network",
+  "transport/path",
   "transport/probe",
   "transport/protocol",
   "transport/session",
@@ -257,6 +258,7 @@ hopr-transport = { path = "transport/api" }
 hopr-transport-identity = { path = "transport/identity" }
 hopr-transport-network = { path = "transport/network" }
 hopr-transport-mixer = { path = "transport/mixer" }
+hopr-transport-path = { path = "transport/path" }
 hopr-transport-probe = { path = "transport/probe" }
 hopr-transport-protocol = { path = "transport/protocol" }
 hopr-transport-session = { path = "transport/session" }
@@ -314,4 +316,4 @@ insta.opt-level = 3
 similar.opt-level = 3
 
 [workspace.metadata.cargo-shear]
-ignored = ["oas3", "serde_bytes", "humantime-serde", "hopr-ct-full-network"]
+ignored = ["oas3", "serde_bytes", "humantime-serde"]

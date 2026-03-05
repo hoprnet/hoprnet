@@ -12,6 +12,7 @@ pub type EdgeTransportMeasurement = std::result::Result<std::time::Duration, ()>
 pub type Capacity = u128;
 
 /// Represents the different kinds of observations that can be recorded for a graph edge.
+#[derive(Debug)]
 pub enum EdgeWeightType {
     /// A direct transport measurement between this and another adjacent peer.
     Immediate(EdgeTransportMeasurement),
@@ -238,6 +239,20 @@ pub trait NetworkGraphTraverse {
         &self,
         source: &Self::NodeId,
         destination: &Self::NodeId,
+        length: usize,
+        take_count: Option<usize>,
+        cost_fn: C,
+    ) -> Vec<(Vec<Self::NodeId>, PathId, C::Cost)>;
+
+    /// Returns a list of routes from the source to **any** reachable node with the
+    /// specified edge length.
+    ///
+    /// Unlike [`simple_paths`](Self::simple_paths), this method does not target a
+    /// specific destination. All graph nodes (except the source) are eligible
+    /// destinations. The caller can further filter the results.
+    fn simple_paths_from<C: CostFn<Weight = Self::Observed>>(
+        &self,
+        source: &Self::NodeId,
         length: usize,
         take_count: Option<usize>,
         cost_fn: C,

@@ -1,17 +1,13 @@
 use futures::{StreamExt, stream::BoxStream};
 use futures_concurrency::stream::StreamExt as _;
 use hopr_api::{
-    ct::{CoverTrafficGeneration, ProbeRouting, ProbingTrafficGeneration},
-    graph::{NetworkGraphTraverse, NetworkGraphView, costs::HoprCostFn},
+    ct::{CoverTrafficGeneration, DestinationRouting, ProbeRouting, ProbingTrafficGeneration},
+    graph::{NetworkGraphTraverse, NetworkGraphView, costs::HoprForwardCostFn},
 };
 use hopr_types::{
     crypto::types::OffchainPublicKey,
     crypto_random::Randomizable,
-    internal::{
-        NodeId,
-        protocol::HoprPseudonym,
-        routing::{DestinationRouting, RoutingOptions},
-    },
+    internal::{NodeId, protocol::HoprPseudonym, routing::RoutingOptions},
 };
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -69,7 +65,7 @@ where
                     })
                     .flat_map(move |edge_count| {
                         let simple_paths =
-                            graph_intermediates.simple_paths(&me, &me, edge_count, Some(100), HoprCostFn::new(edge_count));
+                            graph_intermediates.simple_paths(&me, &me, edge_count, Some(100), HoprForwardCostFn::new(edge_count));
                         futures::stream::iter(simple_paths)
                     })
                     .filter_map(move |(path, _path_id, _cost)| {
@@ -118,6 +114,7 @@ where
         let cfg = self.cfg;
         let graph = self.graph.clone();
         let graph_intermediates = self.graph.clone();
+        let me = self.me;
 
         let immediates = futures::stream::repeat(())
             .filter_map(move |_| {
@@ -129,6 +126,7 @@ where
                 }
             })
             .flatten()
+            .filter(move |peer| futures::future::ready(peer != &me))
             .filter_map(move |peer| {
                 let cache_immediate_neighbor_routing = cache_immediate_neighbor_routing.clone();
 
@@ -149,7 +147,7 @@ where
 
         let me = self.me;
 
-        // 2, 3 and 4 edges => 1-, 2- and 3-hops in the HOPR protocol
+        // 3 and 4 edges => 2- and 3-hops in the HOPR protocol
         let intermediates = futures::stream::repeat(futures::stream::iter([2, 3, 4]))
             .flatten()
             .filter_map(move |edge_count| async move {
@@ -162,7 +160,7 @@ where
                     &me,
                     edge_count.get(),
                     Some(100),
-                    HoprCostFn::new(edge_count),
+                    HoprForwardCostFn::new(edge_count),
                 );
                 futures::stream::iter(simple_paths)
             })
@@ -374,7 +372,8 @@ mod tests {
         let stream = ProbingTrafficGeneration::build(&prober);
         pin_mut!(stream);
 
-        // graph.nodes() returns me + peer_a + peer_b = 3 nodes per round.
+        // graph.nodes() returns me + peer_a + peer_b, but the prober skips `me`,
+        // so each round probes only peer_a and peer_b (2 nodes per round).
         // Collect enough items for at least 2 full rounds.
         let destinations: Vec<NodeId> = timeout(
             TINY_TIMEOUT * 50,
@@ -385,22 +384,22 @@ mod tests {
                         _ => None,
                     })
                 })
-                .take(6)
+                .take(4)
                 .collect::<Vec<_>>(),
         )
         .await?;
 
         let unique: HashSet<NodeId> = destinations.iter().cloned().collect();
-        let expected_nodes: HashSet<NodeId> = [me, peer_a, peer_b].into_iter().map(NodeId::from).collect();
+        let expected_nodes: HashSet<NodeId> = [peer_a, peer_b].into_iter().map(NodeId::from).collect();
 
         assert_eq!(
             unique, expected_nodes,
-            "probes should cover all known graph nodes (me + peers)"
+            "probes should cover all known graph peers (excluding me)"
         );
-        // With 3 unique nodes and 6 items, each node appeared in multiple rounds
+        // With 2 unique peers and 4 items, each peer appeared in multiple rounds
         assert_eq!(
             destinations.len(),
-            6,
+            4,
             "should have collected probes across multiple rounds"
         );
 

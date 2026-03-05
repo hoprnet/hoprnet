@@ -15,7 +15,6 @@ default = [
   "runtime-tokio",
   "prometheus",
   "telemetry",
-  "explicit-path",
   "transport-quic",
 ] # uses tokio by default because of axum
 prometheus = [
@@ -44,7 +43,6 @@ telemetry = [
   "dep:tracing-opentelemetry",
 ]
 transport-quic = ["hopr-transport-p2p/transport-quic"]
-explicit-path = ["hoprd-api/explicit-path"]
 capture = ["hopr-lib/capture"]
 # To use profiling:
 # 1. Set RUSTFLAGS="--cfg tokio_unstable" before building
