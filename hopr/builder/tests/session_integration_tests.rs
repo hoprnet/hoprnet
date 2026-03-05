@@ -242,6 +242,7 @@ async fn tcp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
     ready_rx.await.ok();
 
     sender.write_all(&msg).await?;
+    sender.flush().await?;
 
     let mut recv_msg = [0u8; MSG_LEN];
     bob_session.read_exact(&mut recv_msg).await?;

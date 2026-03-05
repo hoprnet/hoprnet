@@ -31,9 +31,8 @@ async fn ticket_statistics_should_reset_when_cleaned(#[with(5)] cluster_fixture:
     const BUF_LEN: usize = 5000;
     let sent_data = hopr_types::crypto_random::random_bytes::<BUF_LEN>();
 
-    tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
-        .await
-        .context("write failed")??;
+    session.write_all(&sent_data).await?;
+    session.flush().await?;
 
     tokio::time::sleep(Duration::from_secs(2)).await;
 
@@ -109,25 +108,22 @@ async fn test_reject_relaying_a_message_when_the_channel_is_out_of_funding(
         .await
         .context("failed to get ticket price")?;
 
-    let (mut session, _fw_channel, _bw_channel) =
-        cluster_fixture.create_session(&[src, mid, dst], ticket_price).await?;
-
-    const BUF_LEN: usize = 500;
-    let sent_data = hopr_types::crypto_random::random_bytes::<BUF_LEN>();
-
-    tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
-        .await
-        .context("write failed")??;
-
     let stats_before = mid
         .inner()
         .ticket_statistics()
         .await
         .context("failed to get ticket statistics")?;
 
-    tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
-        .await
-        .context("write failed")??;
+    // session with enough funds for the channel opening packets, but not enough to relay the message
+    let (mut session, _fw_channel, _bw_channel) =
+        cluster_fixture.create_session(&[src, mid, dst], ticket_price).await?;
+
+    sleep(Duration::from_secs(5)).await;
+
+    session
+        .write_all(&hopr_types::crypto_random::random_bytes::<500>())
+        .await?;
+    session.flush().await?;
 
     wait_until(
         || async {
@@ -166,14 +162,12 @@ async fn test_redeem_ticket_on_request(#[with(5)] cluster_fixture: ClusterGuard)
     const BUF_LEN: usize = 400;
     let sent_data = hopr_types::crypto_random::random_bytes::<BUF_LEN>();
 
-    tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
-        .await
-        .context("write failed")??;
+    session.write_all(&sent_data).await?;
+    session.flush().await?;
 
     for _ in 1..=message_count {
-        tokio::time::timeout(Duration::from_millis(1000), session.write_all(&sent_data))
-            .await
-            .context("write failed")??;
+        session.write_all(&sent_data).await?;
+        session.flush().await?;
     }
 
     wait_until(
@@ -236,14 +230,12 @@ async fn test_neglect_ticket_on_closing(#[with(5)] cluster_fixture: ClusterGuard
     const BUF_LEN: usize = 400;
     let sent_data = hopr_types::crypto_random::random_bytes::<BUF_LEN>();
 
-    tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
-        .await
-        .context("write failed")??;
+    session.write_all(&sent_data).await?;
+    session.flush().await?;
 
     for _ in 1..=message_count {
-        tokio::time::timeout(Duration::from_millis(1000), session.write_all(&sent_data))
-            .await
-            .context("write failed")??;
+        session.write_all(&sent_data).await?;
+        session.flush().await?;
     }
 
     wait_until(
@@ -310,9 +302,8 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
     const BUF_LEN: usize = 400;
     let sent_data = hopr_types::crypto_random::random_bytes::<BUF_LEN>();
 
-    tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
-        .await
-        .context("write failed")??;
+    session.write_all(&sent_data).await?;
+    session.flush().await?;
 
     let stats_before = mid
         .inner()
@@ -321,9 +312,8 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
         .context("failed to get ticket statistics")?;
 
     for _ in 1..=message_count {
-        tokio::time::timeout(Duration::from_millis(500), session.write_all(&sent_data))
-            .await
-            .context("write failed")??;
+        session.write_all(&sent_data).await?;
+        session.flush().await?;
     }
 
     sleep(Duration::from_secs(5)).await;
@@ -410,9 +400,8 @@ async fn relay_with_win_prob_higher_than_min_win_prob_should_succeed(
     const BUF_LEN: usize = 400;
     let sent_data = hopr_types::crypto_random::random_bytes::<BUF_LEN>();
 
-    tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
-        .await
-        .context("write failed")??;
+    session.write_all(&sent_data).await?;
+    session.flush().await?;
 
     let stats_before = mid
         .inner()
@@ -421,9 +410,8 @@ async fn relay_with_win_prob_higher_than_min_win_prob_should_succeed(
         .context("failed to get ticket statistics")?;
 
     for _ in 1..=message_count {
-        tokio::time::timeout(Duration::from_millis(500), session.write_all(&sent_data))
-            .await
-            .context("write failed")??;
+        session.write_all(&sent_data).await?;
+        session.flush().await?;
     }
     sleep(Duration::from_secs(5)).await;
 
