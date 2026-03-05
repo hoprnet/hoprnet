@@ -870,7 +870,7 @@ pub(super) fn init_logging(node_identity: NodeTelemetryIdentity) -> anyhow::Resu
             otel_protocol = %config.transport.to_string(),
             node_address = %node_identity.node_address,
             node_peer_id = %node_identity.node_peer_id,
-            "OpenTelemetry logging initialized"
+            "OpenTelemetry initialized"
         );
     } else {
         tracing::subscriber::set_global_default(registry)?;
