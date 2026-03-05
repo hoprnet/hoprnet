@@ -142,15 +142,50 @@ fn main() -> ExitCode {
             .ok()
     });
 
+    let args = <CliArgs as clap::Parser>::parse();
+    let cfg = match HoprdConfig::try_from(args) {
+        Ok(cfg) => cfg,
+        Err(error) => {
+            tracing::error!(%error, "hoprd exited with an error");
+            return ExitCode::FAILURE;
+        }
+    };
+    if let Err(error) = cfg.validate() {
+        tracing::error!(%error, "hoprd exited with an error");
+        return ExitCode::FAILURE;
+    }
+
+    let hopr_keys: HoprKeys = match (match &cfg.identity.private_key {
+        Some(private_key) => IdentityRetrievalModes::FromPrivateKey { private_key },
+        None => IdentityRetrievalModes::FromFile {
+            password: &cfg.identity.password,
+            id_path: &cfg.identity.file,
+        },
+    })
+    .try_into()
+    {
+        Ok(hopr_keys) => hopr_keys,
+        Err(error) => {
+            tracing::error!(%error, "hoprd exited with an error");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    #[cfg(feature = "telemetry")]
+    let node_identity = telemetry::NodeTelemetryIdentity {
+        node_address: hopr_lib::Keypair::public(&hopr_keys.chain_key).to_address().to_hex(),
+        node_peer_id: hopr_lib::Keypair::public(&hopr_keys.packet_key).to_peerid_str(),
+    };
+
     hopr_lib::prepare_tokio_runtime(num_cpu_threads, num_io_threads)
         .and_then(|runtime| {
-            runtime.block_on(async {
+            runtime.block_on(async move {
                 #[cfg(feature = "telemetry")]
-                let _telemetry = telemetry::init_logger()?;
+                let _telemetry = telemetry::init_telemetry(node_identity)?;
                 #[cfg(not(feature = "telemetry"))]
                 tracing::subscriber::set_global_default(telemetry_common::build_base_subscriber()?)?;
 
-                main_inner().await
+                main_inner(cfg, hopr_keys).await
             })
         })
         .map(|_| {
@@ -164,7 +199,7 @@ fn main() -> ExitCode {
 }
 
 #[cfg(feature = "runtime-tokio")]
-async fn main_inner() -> anyhow::Result<()> {
+async fn main_inner(cfg: HoprdConfig, hopr_keys: HoprKeys) -> anyhow::Result<()> {
     #[cfg(all(target_os = "linux", feature = "allocator-jemalloc-stats"))]
     let _jemalloc_stats = jemalloc_stats::JemallocStats::start().await;
 
@@ -173,10 +208,6 @@ async fn main_inner() -> anyhow::Result<()> {
     } else {
         tracing::info!("Executable was built using the RELEASE profile.");
     }
-
-    let args = <CliArgs as clap::Parser>::parse();
-    let cfg = HoprdConfig::try_from(args)?;
-    cfg.validate()?;
 
     let git_hash = option_env!("VERGEN_GIT_SHA").unwrap_or("unknown");
     tracing::info!(
@@ -192,16 +223,6 @@ async fn main_inner() -> anyhow::Result<()> {
     {
         tracing::info!("The HOPRd node appears to run on DappNode");
     }
-
-    // Find or create an identity
-    let hopr_keys: HoprKeys = match &cfg.identity.private_key {
-        Some(private_key) => IdentityRetrievalModes::FromPrivateKey { private_key },
-        None => IdentityRetrievalModes::FromFile {
-            password: &cfg.identity.password,
-            id_path: &cfg.identity.file,
-        },
-    }
-    .try_into()?;
 
     tracing::info!(
         packet_key = hopr_lib::Keypair::public(&hopr_keys.packet_key).to_peerid_str(),

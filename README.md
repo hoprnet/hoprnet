@@ -453,12 +453,15 @@ Once an instrumented tokio is built into hoprd, the application can be instrumen
 - `HOPRD_OTEL_SIGNALS` - comma-separated signal list from `traces`, `logs`, `metrics` (default: `traces`)
 - `OTEL_SERVICE_NAME` - identifier used as `service.name` for this instance (for example `my_hoprd_instance`)
 - `OTEL_EXPORTER_OTLP_ENDPOINT` - base URL of an OTLP endpoint. Transport is inferred from URL scheme (`grpc://...`, `http://...`, or `https://...`)
+- `OTEL_METRIC_EXPORT_INTERVAL` - duration in ms between each push
 
 Examples:
 
 - Traces only (backward-compatible default): `HOPRD_OTEL_SIGNALS=traces`
 - Metrics only: `HOPRD_OTEL_SIGNALS=metrics`
 - Full export: `HOPRD_OTEL_SIGNALS=traces,logs,metrics`
+- OTEL traces, logs, and metrics include `node_address` and `node_peer_id`.
+- OTLP logs are emitted as structured objects (typed fields/attributes), and use OTLP HTTP JSON protocol when `OTEL_EXPORTER_OTLP_ENDPOINT` is `http(s)://...`.
 - With metrics enabled, OTEL exports keep Prometheus family naming (`<metric>`, `<metric>_count`, `<metric>_sum`, `<metric>_bucket`) and labels (`le` for histogram buckets, `quantile` for summaries).
 - Session snapshot metrics are also exported directly to OTEL (`hopr_session_*` series with `session_id` attribute) without being added to the Prometheus `/metrics` endpoint.
 
