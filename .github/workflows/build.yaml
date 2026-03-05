@@ -76,7 +76,7 @@ jobs:
             "runner": "self-hosted-hoprnet-bigger",
             "architecture": "x86_64-linux",
             "build_command": "nix build -L .#docker-hoprd-x86_64-linux",
-            "build_debug_command": "nix build -L .#docker-hoprd-x86_64-linux-dev"
+            "build_debug_command": "nix build -L .#docker-hoprd-dev-x86_64-linux"
           }
         ]
       cachix_cache_name: hoprnet
