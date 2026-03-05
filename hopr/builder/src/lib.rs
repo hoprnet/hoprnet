@@ -206,18 +206,16 @@ where
                                         (Ok(Some(from)), Ok(Some(to))) => {
                                             let capacity =  if matches!(channel.status, ChannelStatus::Closed) {
                                                 None
+                                            } else if let Ok(ticket_value) = ticket_price.read().div_f64(win_probability.read().as_f64()) {
+                                                Some(
+                                                    channel.balance
+                                                        .amount()
+                                                        .checked_div(ticket_value.amount())
+                                                        .map(|v| v.low_u128())
+                                                        .unwrap_or(u128::MAX)
+                                                )
                                             } else {
-                                                if let Ok(ticket_value) = ticket_price.read().div_f64(win_probability.read().as_f64()) {
-                                                    Some(
-                                                        channel.balance
-                                                            .amount()
-                                                            .checked_div(ticket_value.amount())
-                                                            .map(|v| v.low_u128())
-                                                            .unwrap_or(u128::MAX)
-                                                    )
-                                                } else {
-                                                    None
-                                                }
+                                                None
                                             };
 
                                             graph_updater.record_edge(hopr_lib::api::graph::MeasurableEdge::<NeighborTelemetry, PathTelemetry>::Capacity(Box::new(EdgeCapacityUpdate{
