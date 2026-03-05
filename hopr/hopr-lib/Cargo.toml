@@ -73,7 +73,6 @@ tracing = { workspace = true }
 validator = { workspace = true }
 
 hopr-api = { workspace = true, features = ["full"] }
-hopr-parallelize = { workspace = true }
 hopr-types = { workspace = true, features = [
   "chain",
   "crypto",
