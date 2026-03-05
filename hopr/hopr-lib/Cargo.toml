@@ -21,7 +21,7 @@ prometheus = [
   "dep:hopr-metrics",
   "hopr-transport/prometheus",
   "hopr-network-types/prometheus",
-  "hopr-types/telemetry",
+  "hopr-parallelize/prometheus",
 ]
 runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
@@ -73,7 +73,6 @@ tracing = { workspace = true }
 validator = { workspace = true }
 
 hopr-api = { workspace = true, features = ["full"] }
-hopr-parallelize = { workspace = true }
 hopr-types = { workspace = true, features = [
   "chain",
   "crypto",
@@ -87,6 +86,7 @@ hopr-crypto-keypair = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true }
 hopr-platform = { workspace = true }
+hopr-parallelize = { workspace = true }
 hopr-transport = { workspace = true }
 
 [dev-dependencies]

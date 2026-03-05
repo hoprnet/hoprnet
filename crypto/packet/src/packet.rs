@@ -96,7 +96,10 @@ impl PartialHoprPacket {
     /// * `ticket` ticket builder for the first hop on the path.
     /// * `mapper` of the public key identifiers.
     /// * `domain_separator` channels contract domain separator.
-    pub fn new<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>, P: NonEmptyPath<OffchainPublicKey> + Send>(
+    pub fn new<
+        M: ProtocolKeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>,
+        P: NonEmptyPath<OffchainPublicKey> + Send,
+    >(
         pseudonym: &HoprPseudonym,
         routing: PacketRouting<P>,
         chain_keypair: &ChainKeypair,
@@ -395,7 +398,10 @@ pub enum PacketRouting<P: NonEmptyPath<OffchainPublicKey> = TransportPath> {
     NoAck(OffchainPublicKey),
 }
 
-fn create_surb_for_path<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>, P: NonEmptyPath<OffchainPublicKey>>(
+fn create_surb_for_path<
+    M: ProtocolKeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>,
+    P: NonEmptyPath<OffchainPublicKey>,
+>(
     return_path: (P, PathKeyData),
     recv_data: HoprSenderId,
     mapper: &M,
@@ -453,7 +459,7 @@ impl HoprPacket {
     /// For the given pseudonym, the [`ReplyOpener`] order matters.
     #[allow(clippy::too_many_arguments)] // TODO: needs refactoring (perhaps introduce a builder pattern?)
     pub fn into_outgoing<
-        M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>,
+        M: ProtocolKeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>,
         P: NonEmptyPath<OffchainPublicKey> + Send,
         S: Into<PacketSignals>,
     >(
@@ -492,7 +498,7 @@ impl HoprPacket {
         reply_openers: F,
     ) -> Result<Self>
     where
-        M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>,
+        M: ProtocolKeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>,
         F: FnMut(&HoprSenderId) -> Option<ReplyOpener>,
     {
         if data.len() == Self::SIZE {
@@ -588,11 +594,12 @@ mod tests {
             (hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"), hex!("e0bf93e9c916104da00b1850adc4608bd7e9087bbd3f805451f4556aa6b3fd6e")),
         ].map(|(p1,p2)| (ChainKeypair::from_secret(&p1).expect("lazy static keypair should be valid"), OffchainKeypair::from_secret(&p2).expect("lazy static keypair should be valid")));
 
-        static ref MAPPER: bimap::BiMap<KeyIdent, OffchainPublicKey> = PEERS
+        static ref MAPPER: SimpleBiMapper<HoprSphinxSuite, HoprSphinxHeaderSpec> = PEERS
             .iter()
             .enumerate()
             .map(|(i, (_, k))| (KeyIdent::from(i as u32), *k.public()))
-            .collect::<BiHashMap<_, _>>();
+            .collect::<BiHashMap<_, _>>()
+            .into();
     }
 
     fn forward(
