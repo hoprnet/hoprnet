@@ -7,7 +7,7 @@ pub mod config;
 #[cfg(any(feature = "testing", test))]
 pub mod testing;
 
-use std::{ops::Mul, sync::Arc};
+use std::sync::Arc;
 
 use futures::{FutureExt, StreamExt as _};
 use futures_concurrency::stream::StreamExt;
@@ -207,13 +207,13 @@ where
                                             let capacity =  if matches!(channel.status, ChannelStatus::Closed) {
                                                 None
                                             } else {
+                                                let ticket_value = ticket_price.read().div_f64(win_probability.read().as_f64()).expect("win prob is always between 0 and 1").amount();
                                                 Some(
                                                     channel.balance
-                                                        .mul(*ticket_price.read())
-                                                        .div_f64(win_probability.read().as_f64())
-                                                        .expect("win prob is always between 0 and 1")
                                                         .amount()
-                                                        .low_u128()
+                                                        .checked_div(ticket_value)
+                                                        .map(|v| v.low_u128())
+                                                        .unwrap_or(u128::MAX)
                                                 )
                                             };
 
