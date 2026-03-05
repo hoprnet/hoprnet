@@ -138,6 +138,9 @@ where
 {
 }
 
+/// Basic implementation of the [`KeyIdMapping`] trait for a simple bi-map.
+///
+/// Useful for testing or simple protocol implementations.
 pub struct SimpleBiMapper<S: SphinxSuite, H: SphinxHeaderSpec>(
     pub(crate) bimap::BiHashMap<H::KeyId, <S::P as Keypair>::Public>,
 );
