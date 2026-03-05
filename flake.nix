@@ -648,14 +648,17 @@
             audit = run-audit;
           };
 
-          packages = hoprdPackages // hoprdDocker // {
-            inherit docs;
-            inherit pre-commit-check;
-            inherit hoprd-bench;
-            inherit hoprd-man;
-            default = hoprdPackages.binary-hoprd;
-            hoprd-candidate = (mkHoprdCandidate "");
-          };
+          packages = 
+            hoprdPackages
+            // hoprdDocker 
+            // {
+              inherit docs;
+              inherit pre-commit-check;
+              inherit hoprd-bench;
+              inherit hoprd-man;
+              default = hoprdPackages.binary-hoprd;
+              hoprd-candidate = (mkHoprdCandidate "");
+            };
 
           devShells.default = devShell;
           devShells.nightly = devShellNightly;
