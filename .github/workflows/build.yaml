@@ -42,7 +42,7 @@ jobs:
         include:
           - architecture: x86_64-linux
             runner: self-hosted-hoprnet-bigger
-            build_command: nix build -L .#hoprd-x86_64-linux
+            build_command: nix build -L .#binary-hoprd-x86_64-linux
     uses: hoprnet/hopr-workflows/.github/workflows/build-binaries.yaml@build-binaries-v2
     permissions:
       contents: read
