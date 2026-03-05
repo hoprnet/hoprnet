@@ -137,12 +137,11 @@ impl NodeTelemetryIdentity {
 #[derive(Clone)]
 struct OtelLogsLayer {
     logger: SdkLogger,
-    node_identity: NodeTelemetryIdentity,
 }
 
 impl OtelLogsLayer {
-    fn new(logger: SdkLogger, node_identity: NodeTelemetryIdentity) -> Self {
-        Self { logger, node_identity }
+    fn new(logger: SdkLogger) -> Self {
+        Self { logger }
     }
 }
 
@@ -172,55 +171,21 @@ where
         record.set_severity_number(severity_number);
         record.set_severity_text(severity_text);
 
-        let mut body = HashMap::<Key, AnyValue>::new();
         if let Some(message) = visitor.body.take() {
-            body.insert(Key::new("message"), AnyValue::String(message.into()));
+            let body = HashMap::from([(Key::new("message"), AnyValue::String(message.into()))]);
+            record.set_body(AnyValue::Map(Box::new(body)));
         }
-        body.insert(Key::new("level"), AnyValue::String(metadata.level().to_string().into()));
-        body.insert(
-            Key::new("target"),
-            AnyValue::String(metadata.target().to_string().into()),
-        );
         if let Some(module_path) = metadata.module_path() {
-            body.insert(
-                Key::new("module_path"),
-                AnyValue::String(module_path.to_string().into()),
-            );
             record.add_attribute("module_path", module_path.to_string());
         }
         if let Some(file) = metadata.file() {
-            body.insert(Key::new("file"), AnyValue::String(file.to_string().into()));
             record.add_attribute("file", file.to_string());
         }
         if let Some(line) = metadata.line() {
-            body.insert(Key::new("line"), AnyValue::Int(i64::from(line)));
             record.add_attribute("line", i64::from(line));
         }
-        body.insert(
-            Key::new("node_address"),
-            AnyValue::String(self.node_identity.node_address.clone().into()),
-        );
-        body.insert(
-            Key::new("node_peer_id"),
-            AnyValue::String(self.node_identity.node_peer_id.clone().into()),
-        );
-        if !visitor.attributes.is_empty() {
-            body.insert(
-                Key::new("attributes"),
-                AnyValue::Map(Box::new(
-                    visitor
-                        .attributes
-                        .iter()
-                        .map(|(key, value)| (Key::new(key.clone()), value.clone()))
-                        .collect(),
-                )),
-            );
-        }
-        record.set_body(AnyValue::Map(Box::new(body)));
 
         record.add_attribute("target", metadata.target().to_string());
-        record.add_attribute("node_address", self.node_identity.node_address.clone());
-        record.add_attribute("node_peer_id", self.node_identity.node_peer_id.clone());
         if !visitor.attributes.is_empty() {
             record.add_attributes(visitor.attributes);
         }
@@ -847,7 +812,7 @@ pub(super) fn init_logging(node_identity: NodeTelemetryIdentity) -> anyhow::Resu
                 .build();
             let logger = logger_provider.logger(env!("CARGO_PKG_NAME"));
             telemetry_handles.logger_provider = Some(logger_provider);
-            Some(OtelLogsLayer::new(logger, node_identity.clone()))
+            Some(OtelLogsLayer::new(logger))
         } else {
             None
         };
