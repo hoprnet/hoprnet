@@ -349,7 +349,7 @@ impl<C: PacketDecoder + Send + Sync> PacketDecoder for CapturePacketCodec<C> {
             }
             .into(),
         ) {
-            tracing::error!(%error, "failed to send packet to capture");
+            tracing::debug!(%error, "failed to send incoming packet to capture");
         }
 
         match &packet {
@@ -369,7 +369,7 @@ impl<C: PacketDecoder + Send + Sync> PacketDecoder for CapturePacketCodec<C> {
                     }
                     .into(),
                 ) {
-                    tracing::error!(%error, "failed to send packet to capture");
+                    tracing::debug!(%error, "failed to send forwarded packet to capture");
                 }
             }
             _ => {}
@@ -408,7 +408,7 @@ impl<C: PacketEncoder + Send + Sync> PacketEncoder for CapturePacketCodec<C> {
             }
             .into(),
         ) {
-            tracing::error!(%error, "failed to send packet to capture");
+            tracing::debug!(%error, "failed to send outgoing packet to capture");
         }
 
         Ok(packet)
@@ -430,7 +430,7 @@ impl<C: PacketEncoder + Send + Sync> PacketEncoder for CapturePacketCodec<C> {
             }
             .into(),
         ) {
-            tracing::error!(%error, "failed to send packet to capture");
+            tracing::debug!(%error, "failed to send acknowledgement packet to capture");
         }
 
         Ok(packet_ack)
