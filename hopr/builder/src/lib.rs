@@ -216,7 +216,7 @@ where
                                                             .unwrap_or(u128::MAX)
                                                     )
                                                 } else {
-                                                    Some(0)
+                                                    None
                                                 }
                                             };
 
