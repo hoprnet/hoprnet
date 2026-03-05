@@ -207,14 +207,17 @@ where
                                             let capacity =  if matches!(channel.status, ChannelStatus::Closed) {
                                                 None
                                             } else {
-                                                let ticket_value = ticket_price.read().div_f64(win_probability.read().as_f64()).unwrap_or_default().amount();
-                                                Some(
-                                                    channel.balance
-                                                        .amount()
-                                                        .checked_div(ticket_value)
-                                                        .map(|v| v.low_u128())
-                                                        .unwrap_or(u128::MAX)
-                                                )
+                                                if let Ok(ticket_value) = ticket_price.read().div_f64(win_probability.read().as_f64()) {
+                                                    Some(
+                                                        channel.balance
+                                                            .amount()
+                                                            .checked_div(ticket_value.amount())
+                                                            .map(|v| v.low_u128())
+                                                            .unwrap_or(u128::MAX)
+                                                    )
+                                                } else {
+                                                    Some(0)
+                                                }
                                             };
 
                                             graph_updater.record_edge(hopr_lib::api::graph::MeasurableEdge::<NeighborTelemetry, PathTelemetry>::Capacity(Box::new(EdgeCapacityUpdate{
