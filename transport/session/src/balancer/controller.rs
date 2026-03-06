@@ -394,7 +394,7 @@ where
 mod tests {
     use std::sync::{Arc, atomic::AtomicU64};
 
-    use hopr_api::types::{crypto_random::Randomizable, internal::prelude::HoprPseudonym};
+    use hopr_types::{crypto_random::Randomizable, internal::prelude::HoprPseudonym};
 
     use super::*;
     use crate::balancer::{AtomicSurbFlowEstimator, MockSurbFlowController, pid::PidBalancerController};

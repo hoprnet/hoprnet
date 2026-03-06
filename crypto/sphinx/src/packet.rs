@@ -4,7 +4,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use hopr_api::types::{
+use hopr_types::{
     crypto::{crypto_traits::PRP, prelude::*},
     primitive::prelude::*,
 };
@@ -541,7 +541,7 @@ pub(crate) mod tests {
 
     use anyhow::anyhow;
     use bimap::BiHashMap;
-    use hopr_api::types::{
+    use hopr_types::{
         crypto::keypairs::{Keypair, OffchainKeypair},
         crypto_random::Randomizable,
     };
@@ -556,12 +556,12 @@ pub(crate) mod tests {
 
     impl<S: SphinxSuite> SphinxHeaderSpec for TestHeader<S> {
         type KeyId = KeyIdent<4>;
-        type PRG = hopr_api::types::crypto::primitives::ChaCha20;
+        type PRG = hopr_types::crypto::primitives::ChaCha20;
         type PacketReceiverData = SimplePseudonym;
         type Pseudonym = SimplePseudonym;
         type RelayerData = WrappedBytes<53>;
         type SurbReceiverData = WrappedBytes<54>;
-        type UH = hopr_api::types::crypto::primitives::Poly1305;
+        type UH = hopr_types::crypto::primitives::Poly1305;
 
         const MAX_HOPS: NonZeroUsize = NonZeroUsize::new(4).unwrap();
     }
@@ -830,7 +830,7 @@ pub(crate) mod tests {
     fn test_secp256k1_meta_packet(amount: usize) -> anyhow::Result<()> {
         generic_test_meta_packet::<crate::ec_groups::Secp256k1Suite>(
             (0..amount)
-                .map(|_| hopr_api::types::crypto::keypairs::ChainKeypair::random())
+                .map(|_| hopr_types::crypto::keypairs::ChainKeypair::random())
                 .collect(),
         )
     }
@@ -840,7 +840,7 @@ pub(crate) mod tests {
     fn test_secp256k1_reply_meta_packet(amount: usize) -> anyhow::Result<()> {
         generic_meta_packet_reply_test::<crate::ec_groups::Secp256k1Suite>(
             (0..amount)
-                .map(|_| hopr_api::types::crypto::keypairs::ChainKeypair::random())
+                .map(|_| hopr_types::crypto::keypairs::ChainKeypair::random())
                 .collect(),
         )
     }
@@ -850,7 +850,7 @@ pub(crate) mod tests {
     fn test_secp256k1_partial_packet_serialize(amount: usize) -> anyhow::Result<()> {
         generic_test_partial_packet_serialization::<crate::ec_groups::Secp256k1Suite>(
             (0..amount)
-                .map(|_| hopr_api::types::crypto::keypairs::ChainKeypair::random())
+                .map(|_| hopr_types::crypto::keypairs::ChainKeypair::random())
                 .collect(),
         )
     }

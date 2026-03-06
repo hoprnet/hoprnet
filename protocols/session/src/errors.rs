@@ -1,4 +1,4 @@
-use hopr_api::types::primitive::prelude::GeneralError;
+use hopr_types::primitive::prelude::GeneralError;
 use thiserror::Error;
 
 use crate::protocol::FrameId;

@@ -1,7 +1,8 @@
 // use hex;
 use std::{fmt::Debug, str::FromStr};
 
-use hopr_api::types::{
+use hopr_platform::file::native::{metadata, read_to_string, write};
+use hopr_types::{
     crypto::{
         crypto_traits::{Digest, KeyIvInit, StreamCipher, Update},
         prelude::*,
@@ -9,7 +10,6 @@ use hopr_api::types::{
     crypto_random::{Randomizable, random_bytes},
     primitive::prelude::*,
 };
-use hopr_platform::file::native::{metadata, read_to_string, write};
 use scrypt::{Params as ScryptParams, scrypt};
 use serde_json::{from_str as from_json_string, to_string as to_json_string};
 use typenum::Unsigned;
@@ -448,7 +448,7 @@ mod tests {
     use std::fs;
 
     use anyhow::Context;
-    use hopr_api::types::{crypto::prelude::*, crypto_random::Randomizable};
+    use hopr_types::{crypto::prelude::*, crypto_random::Randomizable};
     use tempfile::tempdir;
     use uuid::Uuid;
 

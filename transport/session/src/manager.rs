@@ -12,20 +12,20 @@ use futures::{
     pin_mut,
 };
 use futures_time::future::FutureExt as TimeExt;
-use hopr_api::types::{
-    crypto_random::Randomizable,
-    internal::{
-        prelude::HoprPseudonym,
-        routing::{DestinationRouting, RoutingOptions},
-    },
-    primitive::prelude::Address,
-};
 use hopr_async_runtime::AbortableList;
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_start::{
     KeepAliveFlag, KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished,
     StartInitiation,
+};
+use hopr_types::{
+    crypto_random::Randomizable,
+    internal::{
+        prelude::HoprPseudonym,
+        routing::{DestinationRouting, RoutingOptions},
+    },
+    primitive::prelude::Address,
 };
 use tracing::{debug, error, info, trace, warn};
 
@@ -541,7 +541,7 @@ where
         // and their closure is timely notified to the other party.
         let myself = self.clone();
         let ah_session_expiration = hopr_async_runtime::spawn_as_abortable!(async move {
-            let jitter = hopr_api::types::crypto_random::random_float_in_range(1.0..1.5);
+            let jitter = hopr_types::crypto_random::random_float_in_range(1.0..1.5);
             let timeout = 2 * initiation_timeout_max_one_way(
                 myself.cfg.initiation_timeout_base,
                 RoutingOptions::MAX_INTERMEDIATE_HOPS,
@@ -622,9 +622,9 @@ where
             &self.session_initiations,
             |ch| {
                 if let Some(challenge) = ch {
-                    ((challenge + 1) % hopr_api::types::crypto_random::MAX_RANDOM_INTEGER).max(MIN_CHALLENGE)
+                    ((challenge + 1) % hopr_types::crypto_random::MAX_RANDOM_INTEGER).max(MIN_CHALLENGE)
                 } else {
-                    hopr_api::types::crypto_random::random_integer(MIN_CHALLENGE, None)
+                    hopr_types::crypto_random::random_integer(MIN_CHALLENGE, None)
                 }
             },
             |_| tx_initiation_done,
@@ -1122,7 +1122,7 @@ where
                         Some(session_id) => ((session_id.tag().as_u64() + 1) % self.cfg.session_tag_range.end)
                             .max(self.cfg.session_tag_range.start)
                             .into(),
-                        None => hopr_api::types::crypto_random::random_integer(
+                        None => hopr_types::crypto_random::random_integer(
                             self.cfg.session_tag_range.start,
                             Some(self.cfg.session_tag_range.end),
                         )
@@ -1516,14 +1516,14 @@ where
 mod tests {
     use anyhow::anyhow;
     use futures::{AsyncWriteExt, future::BoxFuture};
-    use hopr_api::types::{
+    use hopr_network_types::prelude::SealedHost;
+    use hopr_protocol_start::{StartProtocol, StartProtocolDiscriminants};
+    use hopr_types::{
         crypto::{keypairs::ChainKeypair, prelude::Keypair},
         crypto_random::Randomizable,
         internal::routing::SurbMatcher,
         primitive::prelude::Address,
     };
-    use hopr_network_types::prelude::SealedHost;
-    use hopr_protocol_start::{StartProtocol, StartProtocolDiscriminants};
     use tokio::time::timeout;
 
     use super::*;

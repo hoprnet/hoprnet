@@ -1,4 +1,4 @@
-use hopr_api::types::crypto::prelude::*;
+use hopr_types::crypto::prelude::*;
 
 // Module-specific constants
 const HASH_KEY_PACKET_TAG: &str = "HASH_KEY_PACKET_TAG";
@@ -7,7 +7,7 @@ pub(crate) fn create_kdf_instance<S: AsRef<[u8]>>(
     secret: &S,
     context: &str,
     salt: Option<&[u8]>,
-) -> hopr_api::types::crypto::errors::Result<Blake3Output> {
+) -> hopr_types::crypto::errors::Result<Blake3Output> {
     let key_material = secret.as_ref();
     if key_material.len() < 16 {
         return Err(CryptoError::InvalidInputValue("secret must have at least 128-bits"));
@@ -29,7 +29,7 @@ pub(crate) fn create_kdf_instance<S: AsRef<[u8]>>(
 }
 
 /// Derives the packet tag used during packet construction by expanding the given secret.
-pub fn derive_packet_tag(secret: &SecretKey) -> hopr_api::types::crypto::errors::Result<PacketTag> {
+pub fn derive_packet_tag(secret: &SecretKey) -> hopr_types::crypto::errors::Result<PacketTag> {
     let mut packet_tag: PacketTag = [0u8; PACKET_TAG_LENGTH];
 
     let mut output = create_kdf_instance(secret, HASH_KEY_PACKET_TAG, None)?;
@@ -52,7 +52,7 @@ pub(crate) fn generate_key<T: crypto_traits::KeyInit, S: AsRef<[u8]>>(
     secret: &S,
     context: &str,
     with_salt: Option<&[u8]>,
-) -> hopr_api::types::crypto::errors::Result<T> {
+) -> hopr_types::crypto::errors::Result<T> {
     let mut out = crypto_traits::Key::<T>::default();
 
     let mut output = create_kdf_instance(secret, context, with_salt)?;
@@ -69,7 +69,7 @@ pub(crate) fn generate_key_iv<T: crypto_traits::KeyIvInit, S: AsRef<[u8]>>(
     secret: &S,
     context: &str,
     with_salt: Option<&[u8]>,
-) -> hopr_api::types::crypto::errors::Result<T> {
+) -> hopr_types::crypto::errors::Result<T> {
     let mut output = create_kdf_instance(secret, context, with_salt)?;
 
     let mut key = crypto_traits::Key::<T>::default();

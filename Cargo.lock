@@ -5388,6 +5388,7 @@ dependencies = [
  "hopr-lib",
  "hopr-types",
  "hoprd",
+ "hoprd-api",
  "hoprd-api-client",
  "lazy_static",
  "reqwest 0.13.2",

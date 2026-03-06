@@ -275,7 +275,7 @@ mod tests {
         let expected = (1u32..=10)
             .map(|frame_id| Frame {
                 frame_id,
-                data: hopr_api::types::crypto_random::random_bytes::<100>().into(),
+                data: hopr_types::crypto_random::random_bytes::<100>().into(),
                 is_terminating: false,
             })
             .collect::<Vec<_>>();
@@ -313,7 +313,7 @@ mod tests {
         let expected = (1u32..=10)
             .map(|frame_id| Frame {
                 frame_id,
-                data: hopr_api::types::crypto_random::random_bytes::<100>().into(),
+                data: hopr_types::crypto_random::random_bytes::<100>().into(),
                 is_terminating: false,
             })
             .collect::<Vec<_>>();
@@ -363,7 +363,7 @@ mod tests {
         let expected = (1u32..=10)
             .map(|frame_id| Frame {
                 frame_id,
-                data: hopr_api::types::crypto_random::random_bytes::<100>().into(),
+                data: hopr_types::crypto_random::random_bytes::<100>().into(),
                 is_terminating: false,
             })
             .collect::<Vec<_>>();
@@ -411,7 +411,7 @@ mod tests {
         let expected = (1u32..=5)
             .map(|frame_id| Frame {
                 frame_id,
-                data: hopr_api::types::crypto_random::random_bytes::<30>().into(),
+                data: hopr_types::crypto_random::random_bytes::<30>().into(),
                 is_terminating: false,
             })
             .collect::<Vec<_>>();

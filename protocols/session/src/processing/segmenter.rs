@@ -317,7 +317,7 @@ mod tests {
 
         let mut all_data = Vec::new();
         for _ in 0..num_frames {
-            let data = hopr_api::types::crypto_random::random_bytes::<FRAME_SIZE>();
+            let data = hopr_types::crypto_random::random_bytes::<FRAME_SIZE>();
             writer.write_all(&data).await?;
             all_data.extend(data);
         }
@@ -338,7 +338,7 @@ mod tests {
         let (segments_tx, segments) = futures::channel::mpsc::unbounded();
         let mut writer = segments_tx.segmenter::<MTU>(FRAME_SIZE);
 
-        let data = hopr_api::types::crypto_random::random_bytes::<FRAME_SIZE>();
+        let data = hopr_types::crypto_random::random_bytes::<FRAME_SIZE>();
 
         writer.write_all(&data).await?;
         writer.flush().await?;
@@ -358,7 +358,7 @@ mod tests {
         let (segments_tx, segments) = futures::channel::mpsc::unbounded();
         let mut writer = segments_tx.segmenter_with_terminating_segment::<MTU>(FRAME_SIZE);
 
-        let data = hopr_api::types::crypto_random::random_bytes::<FRAME_SIZE>();
+        let data = hopr_types::crypto_random::random_bytes::<FRAME_SIZE>();
 
         writer.write_all(&data).await?;
         writer.flush().await?;
@@ -382,7 +382,7 @@ mod tests {
         // Make sure the FRAME_SIZE is not a multiple of MTU
         assert_ne!(0, FRAME_SIZE % MTU);
 
-        let data = hopr_api::types::crypto_random::random_bytes::<FRAME_SIZE>();
+        let data = hopr_types::crypto_random::random_bytes::<FRAME_SIZE>();
         writer.write_all(&data).await?;
         writer.flush().await?;
         writer.close().await?;
@@ -414,7 +414,7 @@ mod tests {
         let (segments_tx, segments) = futures::channel::mpsc::unbounded();
         let mut writer = segments_tx.segmenter::<MTU>(FRAME_SIZE);
 
-        let data = hopr_api::types::crypto_random::random_bytes::<{ FRAME_SIZE + 4 }>();
+        let data = hopr_types::crypto_random::random_bytes::<{ FRAME_SIZE + 4 }>();
         writer.write_all(&data).await?;
 
         pin_mut!(segments);
@@ -444,7 +444,7 @@ mod tests {
         assert_eq!(&data[FRAME_SIZE..], seg.data.as_ref());
 
         // The next full frame should come out normally after a flush
-        let data = hopr_api::types::crypto_random::random_bytes::<FRAME_SIZE>();
+        let data = hopr_types::crypto_random::random_bytes::<FRAME_SIZE>();
         writer.write_all(&data).await?;
         writer.flush().await?;
 
@@ -458,7 +458,7 @@ mod tests {
         let (tx, rx) = futures::channel::mpsc::channel(5);
         let mut writer = tx.segmenter::<MTU>(FRAME_SIZE);
 
-        let data = hopr_api::types::crypto_random::random_bytes::<{ 10 * FRAME_SIZE }>();
+        let data = hopr_types::crypto_random::random_bytes::<{ 10 * FRAME_SIZE }>();
 
         let jh_recv = tokio::task::spawn(
             rx.collect::<Vec<_>>()

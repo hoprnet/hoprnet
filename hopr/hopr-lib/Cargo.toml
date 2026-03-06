@@ -72,10 +72,7 @@ tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
-hopr-api = { workspace = true, features = [
-  "full",
-  "types-random",
-] }
+hopr-api = { workspace = true, features = ["full", "types-random"] }
 
 hopr-async-runtime = { workspace = true }
 hopr-crypto-keypair = { workspace = true }

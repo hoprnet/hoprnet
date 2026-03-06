@@ -33,7 +33,7 @@ impl MixerConfig {
         let random_delay = if max_delay.as_millis() == 0 {
             max_delay.as_millis() as u64
         } else {
-            hopr_api::types::crypto_random::random_integer(
+            hopr_types::crypto_random::random_integer(
                 self.min_delay.as_millis() as u64,
                 Some(max_delay.as_millis() as u64),
             )

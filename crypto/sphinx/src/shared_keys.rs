@@ -1,7 +1,7 @@
 use std::{marker::PhantomData, ops::Mul};
 
 use generic_array::{ArrayLength, GenericArray};
-use hopr_api::types::crypto::prelude::*;
+use hopr_types::crypto::prelude::*;
 
 use crate::derivation::{create_kdf_instance, generate_key_iv};
 
@@ -14,7 +14,7 @@ pub trait Scalar: Mul<Output = Self> + Sized {
     fn random() -> Self;
 
     /// Create scalar from bytes
-    fn from_bytes(bytes: &[u8]) -> hopr_api::types::crypto::errors::Result<Self>;
+    fn from_bytes(bytes: &[u8]) -> hopr_types::crypto::errors::Result<Self>;
 }
 
 /// Represents the Alpha value of a certain length in the Sphinx protocol
@@ -32,7 +32,7 @@ pub trait GroupElement<E: Scalar>: Clone + for<'a> Mul<&'a E, Output = Self> {
     fn to_alpha(&self) -> Alpha<Self::AlphaLen>;
 
     /// Converts the group element from the binary format representing an Alpha value.
-    fn from_alpha(alpha: Alpha<Self::AlphaLen>) -> hopr_api::types::crypto::errors::Result<Self>;
+    fn from_alpha(alpha: Alpha<Self::AlphaLen>) -> hopr_types::crypto::errors::Result<Self>;
 
     /// Create a group element using the group generator and the given scalar
     fn generate(scalar: &E) -> Self;
@@ -73,7 +73,7 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
     /// The order of the peer group elements is preserved for resulting shared keys.
     pub(crate) fn generate(
         peer_group_elements: Vec<(G, &Alpha<G::AlphaLen>)>,
-    ) -> hopr_api::types::crypto::errors::Result<SharedKeys<E, G>> {
+    ) -> hopr_types::crypto::errors::Result<SharedKeys<E, G>> {
         let mut shared_keys = Vec::with_capacity(peer_group_elements.len());
 
         // coeff_prev becomes: x * b_0 * b_1 * b_2 * ...
@@ -125,7 +125,7 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
         alpha: &Alpha<G::AlphaLen>,
         private_scalar: &E,
         public_element_alpha: &Alpha<G::AlphaLen>,
-    ) -> hopr_api::types::crypto::errors::Result<(Alpha<G::AlphaLen>, SharedSecret)> {
+    ) -> hopr_types::crypto::errors::Result<(Alpha<G::AlphaLen>, SharedSecret)> {
         let alpha_point = G::from_alpha(alpha.clone())?;
 
         let s_k = alpha_point.clone().mul(private_scalar);
@@ -162,7 +162,7 @@ pub trait SphinxSuite {
     /// Convenience function to generate shared keys from the path of public keys.
     fn new_shared_keys<'a>(
         public_keys: &'a [<Self::P as Keypair>::Public],
-    ) -> hopr_api::types::crypto::errors::Result<SharedKeys<Self::E, Self::G>>
+    ) -> hopr_types::crypto::errors::Result<SharedKeys<Self::E, Self::G>>
     where
         &'a Alpha<<Self::G as GroupElement<Self::E>>::AlphaLen>: From<&'a <Self::P as Keypair>::Public>,
     {
@@ -170,15 +170,12 @@ pub trait SphinxSuite {
     }
 
     /// Instantiates a new Pseudo-Random Permutation IV and key for general packet data.
-    fn new_prp_init(secret: &SecretKey) -> hopr_api::types::crypto::errors::Result<IvKey<Self::PRP>> {
+    fn new_prp_init(secret: &SecretKey) -> hopr_types::crypto::errors::Result<IvKey<Self::PRP>> {
         generate_key_iv(secret, HASH_KEY_PRP, None)
     }
 
     /// Instantiates a new Pseudo-Random Permutation IV and key for reply data.
-    fn new_reply_prp_init(
-        secret: &SecretKey16,
-        salt: &[u8],
-    ) -> hopr_api::types::crypto::errors::Result<IvKey<Self::PRP>> {
+    fn new_reply_prp_init(secret: &SecretKey16, salt: &[u8]) -> hopr_types::crypto::errors::Result<IvKey<Self::PRP>> {
         generate_key_iv(secret, HASH_KEY_REPLY_PRP, Some(salt))
     }
 }

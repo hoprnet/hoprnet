@@ -1,4 +1,4 @@
-use hopr_api::types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*};
+use hopr_types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*};
 use sea_orm::Set;
 
 use crate::{errors::DbEntityError, ticket};

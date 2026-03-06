@@ -16,8 +16,8 @@
 //!
 //! This crate implements [RFC-0003](https://github.com/hoprnet/rfc/tree/main/rfcs/RFC-0003-hopr-packet-protocol).
 
-use hopr_api::types::{internal::prelude::*, primitive::prelude::*};
 use hopr_crypto_sphinx::prelude::*;
+use hopr_types::{internal::prelude::*, primitive::prelude::*};
 
 /// Lists all errors in this crate.
 pub mod errors;
@@ -32,7 +32,7 @@ mod validation;
 
 #[doc(hidden)]
 pub mod prelude {
-    pub use hopr_api::types::internal::routing::{HoprSenderId, HoprSurbId};
+    pub use hopr_types::internal::routing::{HoprSenderId, HoprSurbId};
 
     pub use super::*;
     pub use crate::{
@@ -44,8 +44,8 @@ pub mod prelude {
     };
 }
 
-use hopr_api::types::internal::routing;
 pub use hopr_crypto_sphinx::prelude::{ProtocolKeyIdMapper, ReplyOpener};
+use hopr_types::internal::routing;
 
 /// Currently used public key cipher suite for Sphinx.
 ///
@@ -59,12 +59,12 @@ pub struct HoprSphinxHeaderSpec;
 
 impl SphinxHeaderSpec for HoprSphinxHeaderSpec {
     type KeyId = HoprKeyIdent;
-    type PRG = hopr_api::types::crypto::primitives::ChaCha20;
+    type PRG = hopr_types::crypto::primitives::ChaCha20;
     type PacketReceiverData = routing::HoprSenderId;
     type Pseudonym = HoprPseudonym;
     type RelayerData = por::ProofOfRelayString;
     type SurbReceiverData = por::SurbReceiverInfo;
-    type UH = hopr_api::types::crypto::primitives::Poly1305;
+    type UH = hopr_types::crypto::primitives::Poly1305;
 
     const MAX_HOPS: std::num::NonZeroUsize = std::num::NonZeroUsize::new(INTERMEDIATE_HOPS + 1).unwrap();
 }

@@ -1,4 +1,4 @@
-use hopr_api::types::{crypto::types::Hash, internal::prelude::*, primitive::prelude::*};
+use hopr_types::{crypto::types::Hash, internal::prelude::*, primitive::prelude::*};
 use tracing::{debug, instrument};
 
 use crate::errors::{TicketValidationError, ValidationErrorKind};
@@ -90,7 +90,7 @@ mod tests {
     use std::ops::Add;
 
     use hex_literal::hex;
-    use hopr_api::types::crypto::prelude::*;
+    use hopr_types::crypto::prelude::*;
     use lazy_static::lazy_static;
 
     use super::*;

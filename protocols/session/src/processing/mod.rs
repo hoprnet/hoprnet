@@ -41,7 +41,7 @@ mod tests {
         let expected = (1u32..=10)
             .map(|frame_id| Frame {
                 frame_id,
-                data: hopr_api::types::crypto_random::random_bytes::<100>().into(),
+                data: hopr_types::crypto_random::random_bytes::<100>().into(),
                 is_terminating: false,
             })
             .collect::<Vec<_>>();
@@ -83,7 +83,7 @@ mod tests {
         let expected = (1u32..=10)
             .map(|frame_id| Frame {
                 frame_id,
-                data: hopr_api::types::crypto_random::random_bytes::<100>().into(),
+                data: hopr_types::crypto_random::random_bytes::<100>().into(),
                 is_terminating: false,
             })
             .collect::<Vec<_>>();
@@ -150,7 +150,7 @@ mod tests {
             .sink_map_err(|_| SessionError::InvalidSegment)
             .segmenter::<MTU>(FRAME_SIZE);
 
-        let data_written = hopr_api::types::crypto_random::random_bytes::<DATA_SIZE>();
+        let data_written = hopr_types::crypto_random::random_bytes::<DATA_SIZE>();
 
         let data_read = tokio::task::spawn(async move {
             let mut frame_count = 0;
