@@ -55,6 +55,7 @@ jobs:
     uses: hoprnet/hopr-workflows/.github/workflows/build-docker.yaml@build-docker-v1
     permissions:
       contents: read
+      pull-requests: write
       id-token: write
     with:
       source_branch: ${{ github.event.pull_request.base.ref }}
