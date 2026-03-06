@@ -1,4 +1,4 @@
-use hopr_types::primitive::balance::XDaiBalance;
+use hopr_api::types::primitive::balance::XDaiBalance;
 
 /// Application version as presented externally using the heartbeat mechanism
 pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");

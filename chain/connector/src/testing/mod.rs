@@ -3,15 +3,17 @@ mod emulator;
 pub use blokli_client::{BlokliTestClient, BlokliTestState, exports::Entry};
 pub use emulator::{FullStateEmulator, StaticState};
 pub use hopr_api::chain::ChainInfo;
-use hopr_api::chain::DeployedSafe;
-use hopr_types::{
-    chain::{ParsedHoprChainAction, contract_addresses_for_network},
-    crypto::{
-        prelude::{Keypair, OffchainKeypair},
-        types::Hash,
+use hopr_api::{
+    chain::DeployedSafe,
+    types::{
+        chain::{ParsedHoprChainAction, contract_addresses_for_network},
+        crypto::{
+            prelude::{Keypair, OffchainKeypair},
+            types::Hash,
+        },
+        internal::prelude::*,
+        primitive::prelude::*,
     },
-    internal::prelude::*,
-    primitive::prelude::*,
 };
 
 /// Allows easily building the [`BlokliTestState`] using the HOPR native types.

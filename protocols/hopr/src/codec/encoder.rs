@@ -1,10 +1,12 @@
-use hopr_api::chain::*;
-use hopr_crypto_packet::prelude::*;
-use hopr_types::{
-    crypto::{crypto_traits::Randomizable, prelude::*},
-    internal::prelude::*,
-    primitive::prelude::*,
+use hopr_api::{
+    chain::*,
+    types::{
+        crypto::{crypto_traits::Randomizable, prelude::*},
+        internal::prelude::*,
+        primitive::prelude::*,
+    },
 };
+use hopr_crypto_packet::prelude::*;
 use tracing::Instrument;
 
 use crate::{

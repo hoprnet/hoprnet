@@ -1,11 +1,11 @@
 use futures::{SinkExt, StreamExt};
 use futures_time::{future::FutureExt as TimeExt, stream::StreamExt as TimeStreamExt};
+use hopr_api::types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::Address};
 use hopr_async_runtime::{AbortableList, spawn_as_abortable};
 use hopr_crypto_packet::HoprSurb;
 use hopr_network_types::timeout::{SinkTimeoutError, TimeoutSinkExt, TimeoutStreamExt};
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
-use hopr_types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::Address};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::Instrument;
 use validator::{Validate, ValidationError, ValidationErrors};

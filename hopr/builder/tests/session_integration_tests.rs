@@ -1,6 +1,7 @@
 use std::{sync::Arc, time::SystemTime};
 
 use futures::StreamExt;
+use hopr_api::types::crypto_random::Randomizable;
 use hopr_lib::{
     Address, ApplicationDataIn, ApplicationDataOut, ChainKeypair, ConnectedUdpStream, HoprPseudonym, Keypair,
     UdpStreamParallelism,
@@ -12,7 +13,6 @@ use hopr_lib::{
         types::internal::routing::{DestinationRouting, RoutingOptions},
     },
 };
-use hopr_types::crypto_random::Randomizable;
 use rstest::*;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -96,7 +96,7 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
     });
     ready_rx.await.ok();
 
-    let msg: [u8; MSG_LEN] = hopr_types::crypto_random::random_bytes();
+    let msg: [u8; MSG_LEN] = hopr_api::types::crypto_random::random_bytes();
     let sender = UdpSocket::bind(("127.0.0.1", 0)).await?;
 
     let w = sender.send_to(&msg, addr).await?;
@@ -236,7 +236,7 @@ async fn tcp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
         transfer_session(&mut alice_session, &mut stream, BUF_LEN, None).await
     });
 
-    let msg: [u8; MSG_LEN] = hopr_types::crypto_random::random_bytes();
+    let msg: [u8; MSG_LEN] = hopr_api::types::crypto_random::random_bytes();
     let mut sender = TcpStream::connect(addr).await?;
 
     ready_rx.await.ok();
@@ -382,7 +382,7 @@ async fn bidirectional_tcp_session(#[case] cap: Capabilities) -> anyhow::Result<
     )?;
 
     // Alice sends to Bob
-    let alice_msg: [u8; MSG_LEN] = hopr_types::crypto_random::random_bytes();
+    let alice_msg: [u8; MSG_LEN] = hopr_api::types::crypto_random::random_bytes();
     alice_session.write_all(&alice_msg).await?;
     alice_session.flush().await?;
 
@@ -391,7 +391,7 @@ async fn bidirectional_tcp_session(#[case] cap: Capabilities) -> anyhow::Result<
     assert_eq!(recv_from_alice, alice_msg);
 
     // Bob sends to Alice
-    let bob_msg: [u8; MSG_LEN] = hopr_types::crypto_random::random_bytes();
+    let bob_msg: [u8; MSG_LEN] = hopr_api::types::crypto_random::random_bytes();
     bob_session.write_all(&bob_msg).await?;
     bob_session.flush().await?;
 
@@ -528,7 +528,7 @@ async fn frame_buffer_metrics(#[case] cap: Capabilities) -> anyhow::Result<()> {
     )?;
 
     // Send enough data to create multiple frames
-    let msg: [u8; MSG_LEN] = hopr_types::crypto_random::random_bytes();
+    let msg: [u8; MSG_LEN] = hopr_api::types::crypto_random::random_bytes();
     alice_session.write_all(&msg).await?;
     alice_session.flush().await?;
 

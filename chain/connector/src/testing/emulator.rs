@@ -1,7 +1,7 @@
 use std::{ops::Add, str::FromStr};
 
 use blokli_client::{BlokliTestState, BlokliTestStateMutator};
-use hopr_types::{
+use hopr_api::types::{
     chain::{ContractAddresses, ParsedHoprChainAction},
     internal::channels::generate_channel_id,
     primitive::{

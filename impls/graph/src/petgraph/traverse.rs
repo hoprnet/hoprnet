@@ -3,8 +3,8 @@ use std::{collections::HashSet, hash::RandomState};
 use hopr_api::{
     OffchainPublicKey,
     graph::traits::{CostFn, EdgeNetworkObservableRead, EdgeObservableRead},
+    types::internal::routing::PathId,
 };
-use hopr_types::internal::routing::PathId;
 use petgraph::graph::NodeIndex;
 
 use crate::{ChannelGraph, algorithm::all_simple_paths_multi, costs::LoopbackPathCostFn, graph::InnerGraph};
@@ -157,13 +157,15 @@ impl hopr_api::graph::NetworkGraphTraverse for ChannelGraph {
 mod tests {
     use anyhow::Context;
     use hex_literal::hex;
-    use hopr_api::graph::{
-        NetworkGraphTraverse, NetworkGraphWrite,
-        traits::{EdgeObservableWrite, EdgeWeightType},
-    };
-    use hopr_types::{
-        crypto::prelude::{Keypair, OffchainKeypair},
-        internal::routing::PathId,
+    use hopr_api::{
+        graph::{
+            NetworkGraphTraverse, NetworkGraphWrite,
+            traits::{EdgeObservableWrite, EdgeWeightType},
+        },
+        types::{
+            crypto::prelude::{Keypair, OffchainKeypair},
+            internal::routing::PathId,
+        },
     };
 
     use super::*;

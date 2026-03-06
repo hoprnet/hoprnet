@@ -54,14 +54,13 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true, optional = true }
 
-hopr-async-runtime = { workspace = true }
 hopr-types = { workspace = true, features = [
   "crypto",
   "internal",
   "primitive",
   "random",
 ] }
-
+hopr-async-runtime = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true, features = ["serde"] }

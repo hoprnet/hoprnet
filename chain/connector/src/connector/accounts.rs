@@ -3,15 +3,17 @@ use std::str::FromStr;
 use blokli_client::api::{BlokliQueryClient, BlokliSubscriptionClient, BlokliTransactionClient};
 use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt, future::BoxFuture, pin_mut, stream::BoxStream};
 use futures_time::future::FutureExt as TimeFutureExt;
-use hopr_api::chain::{AccountSelector, AnnouncementError, ChainReceipt, Multiaddr, SafeRegistrationError};
-use hopr_types::{
-    chain::prelude::*,
-    crypto::prelude::*,
-    internal::{
-        account::AccountEntry,
-        prelude::{AnnouncementData, KeyBinding},
+use hopr_api::{
+    chain::{AccountSelector, AnnouncementError, ChainReceipt, Multiaddr, SafeRegistrationError},
+    types::{
+        chain::prelude::*,
+        crypto::prelude::*,
+        internal::{
+            account::AccountEntry,
+            prelude::{AnnouncementData, KeyBinding},
+        },
+        primitive::prelude::*,
     },
-    primitive::prelude::*,
 };
 
 use crate::{
@@ -240,8 +242,10 @@ where
 #[cfg(test)]
 mod tests {
     use hex_literal::hex;
-    use hopr_api::chain::{ChainReadAccountOperations, ChainWriteAccountOperations, DeployedSafe};
-    use hopr_types::internal::account::AccountType;
+    use hopr_api::{
+        chain::{ChainReadAccountOperations, ChainWriteAccountOperations, DeployedSafe},
+        types::internal::account::AccountType,
+    };
 
     use super::*;
     use crate::{

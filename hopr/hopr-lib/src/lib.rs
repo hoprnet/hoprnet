@@ -33,12 +33,12 @@ pub use hopr_api as api;
 #[doc(hidden)]
 pub mod exports {
     pub mod types {
-        pub use hopr_types::{chain, internal, primitive};
+        pub use hopr_api::types::{chain, internal, primitive};
     }
 
     pub mod crypto {
+        pub use hopr_api::types::crypto as types;
         pub use hopr_crypto_keypair as keypair;
-        pub use hopr_types::crypto as types;
     }
 
     pub mod network {
@@ -90,6 +90,7 @@ pub use hopr_api::{
     graph::EdgeLinkObservable,
     network::{NetworkBuilder, NetworkStreamControl},
     node::{HoprNodeNetworkOperations, HoprNodeOperations, state::HoprState},
+    types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*},
 };
 use hopr_async_runtime::prelude::spawn;
 pub use hopr_async_runtime::{Abortable, AbortableList};
@@ -101,7 +102,6 @@ use hopr_transport::errors::HoprTransportError;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport::transfer_session;
 pub use hopr_transport::*;
-pub use hopr_types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*};
 use tracing::{debug, error, info, warn};
 use validator::Validate;
 
@@ -259,7 +259,7 @@ where
         graph: Graph,
         cfg: config::HoprLibConfig,
     ) -> errors::Result<Self> {
-        if hopr_types::crypto_random::is_rng_fixed() {
+        if hopr_api::types::crypto_random::is_rng_fixed() {
             warn!("!! FOR TESTING ONLY !! THIS BUILD IS USING AN INSECURE FIXED RNG !!")
         }
 

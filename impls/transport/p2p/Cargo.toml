@@ -53,8 +53,7 @@ lazy_static = { workspace = true }
 more-asserts = { workspace = true }
 tokio = { workspace = true }
 
-hopr-api = { workspace = true, features = ["network"] }
-hopr-types = { workspace = true, features = ["crypto", "random"] }
+hopr-api = { workspace = true, features = ["network", "types-random"] }
 
 hopr-crypto-packet = { workspace = true }
 

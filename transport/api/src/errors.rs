@@ -12,10 +12,10 @@ pub enum HoprTransportError {
     Api(String),
 
     #[error("General error: {0}")]
-    General(#[from] hopr_types::primitive::errors::GeneralError),
+    General(#[from] hopr_api::types::primitive::errors::GeneralError),
 
     #[error("Path error: {0}")]
-    Path(#[from] hopr_types::internal::errors::PathError),
+    Path(#[from] hopr_api::types::internal::errors::PathError),
 
     #[error("Protocol error: {0}")]
     Protocol(#[from] ProtocolError),
@@ -30,7 +30,7 @@ pub enum HoprTransportError {
     Packet(#[from] PacketError),
 
     #[error("Type error: {0}")]
-    Types(#[from] hopr_types::internal::errors::CoreTypesError),
+    Types(#[from] hopr_api::types::internal::errors::CoreTypesError),
 
     #[error("Network monitoring error: {0}")]
     NetworkError(#[from] NetworkError),
