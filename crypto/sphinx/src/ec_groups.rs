@@ -1,4 +1,4 @@
-use hopr_types::crypto::errors::Result;
+use hopr_api::types::crypto::errors::Result;
 #[cfg(feature = "secp256k1")]
 use {
     elliptic_curve::{
@@ -6,7 +6,7 @@ use {
         ops::MulByGenerator,
         sec1::{FromEncodedPoint, ToEncodedPoint},
     },
-    hopr_types::crypto::prelude::CryptoError,
+    hopr_api::types::crypto::prelude::CryptoError,
     k256::{AffinePoint, EncodedPoint},
 };
 
@@ -15,12 +15,12 @@ use crate::shared_keys::{Alpha, GroupElement, Scalar, SphinxSuite};
 #[cfg(any(feature = "x25519", feature = "ed25519"))]
 impl Scalar for curve25519_dalek::scalar::Scalar {
     fn random() -> Self {
-        let bytes = hopr_types::crypto_random::random_bytes::<32>();
+        let bytes = hopr_api::types::crypto_random::random_bytes::<32>();
         Self::from_bytes(&bytes).unwrap()
     }
 
     fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        hopr_types::crypto::utils::x25519_scalar_from_bytes(bytes)
+        hopr_api::types::crypto::utils::x25519_scalar_from_bytes(bytes)
     }
 }
 
@@ -28,12 +28,12 @@ impl Scalar for curve25519_dalek::scalar::Scalar {
 impl Scalar for k256::Scalar {
     fn random() -> Self {
         // Beware, this is not constant-time
-        let mut rng = hopr_types::crypto_random::rng();
+        let mut rng = hopr_api::types::crypto_random::rng();
         let mut bytes = k256::FieldBytes::default();
         use elliptic_curve::PrimeField;
-        use hopr_types::crypto_random::Rng;
+        use hopr_api::types::crypto_random::Rng;
         // Needs manual implementation due to incompatible rand crates
-        // k256::Scalar::generate_vartime(&mut hopr_types::crypto_random::rng())
+        // k256::Scalar::generate_vartime(&mut hopr_api::types::crypto_random::rng())
 
         loop {
             rng.fill_bytes(&mut bytes);
@@ -44,7 +44,7 @@ impl Scalar for k256::Scalar {
     }
 
     fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        hopr_types::crypto::utils::k256_scalar_from_bytes(bytes)
+        hopr_api::types::crypto::utils::k256_scalar_from_bytes(bytes)
     }
 }
 
@@ -81,7 +81,7 @@ impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::Edward
     fn from_alpha(alpha: Alpha<typenum::U32>) -> Result<Self> {
         curve25519_dalek::edwards::CompressedEdwardsY(alpha.into())
             .decompress()
-            .ok_or(hopr_types::crypto::errors::CryptoError::InvalidInputValue("alpha"))
+            .ok_or(hopr_api::types::crypto::errors::CryptoError::InvalidInputValue("alpha"))
     }
 
     fn generate(scalar: &curve25519_dalek::scalar::Scalar) -> Self {
@@ -145,8 +145,8 @@ pub struct Secp256k1Suite;
 impl SphinxSuite for Secp256k1Suite {
     type E = k256::Scalar;
     type G = k256::ProjectivePoint;
-    type P = hopr_types::crypto::keypairs::ChainKeypair;
-    type PRP = hopr_types::crypto::lioness::LionessBlake3ChaCha20<DefaultSphinxPacketSize>;
+    type P = hopr_api::types::crypto::keypairs::ChainKeypair;
+    type PRP = hopr_api::types::crypto::lioness::LionessBlake3ChaCha20<DefaultSphinxPacketSize>;
 }
 
 /// Represents an instantiation of the Sphinx protocol using the ed25519 curve and `OffchainKeypair`
@@ -159,8 +159,8 @@ pub struct Ed25519Suite;
 impl SphinxSuite for Ed25519Suite {
     type E = curve25519_dalek::scalar::Scalar;
     type G = curve25519_dalek::edwards::EdwardsPoint;
-    type P = hopr_types::crypto::keypairs::OffchainKeypair;
-    type PRP = hopr_types::crypto::lioness::LionessBlake3ChaCha20<DefaultSphinxPacketSize>;
+    type P = hopr_api::types::crypto::keypairs::OffchainKeypair;
+    type PRP = hopr_api::types::crypto::lioness::LionessBlake3ChaCha20<DefaultSphinxPacketSize>;
 }
 
 /// Represents an instantiation of the Sphinx protocol using the Curve25519 curve and `OffchainKeypair`
@@ -173,8 +173,8 @@ pub struct X25519Suite;
 impl SphinxSuite for X25519Suite {
     type E = curve25519_dalek::scalar::Scalar;
     type G = curve25519_dalek::montgomery::MontgomeryPoint;
-    type P = hopr_types::crypto::keypairs::OffchainKeypair;
-    type PRP = hopr_types::crypto::lioness::LionessBlake3ChaCha20<DefaultSphinxPacketSize>;
+    type P = hopr_api::types::crypto::keypairs::OffchainKeypair;
+    type PRP = hopr_api::types::crypto::lioness::LionessBlake3ChaCha20<DefaultSphinxPacketSize>;
 }
 
 #[cfg(test)]

@@ -453,10 +453,10 @@ mod tests {
     async fn test_copy_duplex() -> anyhow::Result<()> {
         const DATA_LEN: usize = 2000;
 
-        let alice_tx = hopr_types::crypto_random::random_bytes::<DATA_LEN>();
+        let alice_tx = hopr_api::types::crypto_random::random_bytes::<DATA_LEN>();
         let mut alice_rx = [0u8; DATA_LEN];
 
-        let bob_tx = hopr_types::crypto_random::random_bytes::<DATA_LEN>();
+        let bob_tx = hopr_api::types::crypto_random::random_bytes::<DATA_LEN>();
         let mut bob_rx = [0u8; DATA_LEN];
 
         let alice = DuplexIO(futures::io::Cursor::new(alice_rx.as_mut()), alice_tx.as_ref());
@@ -541,10 +541,10 @@ mod tests {
     async fn test_copy_duplex_small() -> anyhow::Result<()> {
         const DATA_LEN: usize = 100;
 
-        let alice_tx = hopr_types::crypto_random::random_bytes::<DATA_LEN>();
+        let alice_tx = hopr_api::types::crypto_random::random_bytes::<DATA_LEN>();
         let mut alice_rx = [0u8; DATA_LEN];
 
-        let bob_tx = hopr_types::crypto_random::random_bytes::<DATA_LEN>();
+        let bob_tx = hopr_api::types::crypto_random::random_bytes::<DATA_LEN>();
         let mut bob_rx = [0u8; DATA_LEN];
 
         let alice = DuplexIO(futures::io::Cursor::new(alice_rx.as_mut()), alice_tx.as_ref());

@@ -729,7 +729,7 @@ mod tests {
 
         for _ in 1..1000 {
             let mut w_buf = [0u8; DATA_SIZE];
-            hopr_types::crypto_random::random_fill(&mut w_buf);
+            hopr_api::types::crypto_random::random_fill(&mut w_buf);
             let written = stream.write(&w_buf).await?;
             assert_eq!(written, DATA_SIZE);
 

@@ -196,11 +196,13 @@ impl hopr_api::graph::NetworkGraphWrite for ChannelGraph {
 #[cfg(test)]
 mod tests {
     use hex_literal::hex;
-    use hopr_api::graph::{
-        EdgeLinkObservable, NetworkGraphView, NetworkGraphWrite,
-        traits::{EdgeObservableRead, EdgeObservableWrite, EdgeWeightType},
+    use hopr_api::{
+        graph::{
+            EdgeLinkObservable, NetworkGraphView, NetworkGraphWrite,
+            traits::{EdgeObservableRead, EdgeObservableWrite, EdgeWeightType},
+        },
+        types::crypto::prelude::{Keypair, OffchainKeypair},
     };
-    use hopr_types::crypto::prelude::{Keypair, OffchainKeypair};
 
     use super::*;
 

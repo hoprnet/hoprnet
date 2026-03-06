@@ -1,11 +1,13 @@
 use std::{str::FromStr, time::Duration};
 
-use hopr_api::chain::{ChainInfo, DeployedSafe, DomainSeparators};
-use hopr_types::{
-    chain::{chain_events::ChainEvent, payload::GasEstimation},
-    crypto::types::Hash,
-    internal::prelude::*,
-    primitive::prelude::*,
+use hopr_api::{
+    chain::{ChainInfo, DeployedSafe, DomainSeparators},
+    types::{
+        chain::{chain_events::ChainEvent, payload::GasEstimation},
+        crypto::types::Hash,
+        internal::prelude::*,
+        primitive::prelude::*,
+    },
 };
 
 use crate::errors::ConnectorError;

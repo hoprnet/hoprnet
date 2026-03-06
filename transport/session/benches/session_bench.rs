@@ -1,10 +1,6 @@
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use futures::{AsyncReadExt, AsyncWriteExt, FutureExt, StreamExt};
-use hopr_protocol_app::{prelude::ApplicationDataOut, v1::ApplicationDataIn};
-#[cfg(feature = "telemetry")]
-use hopr_transport_session::SessionTelemetry;
-use hopr_transport_session::{Capabilities, Capability, HoprSession, HoprSessionConfig, SessionId};
-use hopr_types::{
+use hopr_api::types::{
     crypto::{keypairs::ChainKeypair, prelude::Keypair},
     crypto_random::Randomizable,
     internal::{
@@ -13,6 +9,10 @@ use hopr_types::{
     },
     primitive::prelude::Address,
 };
+use hopr_protocol_app::{prelude::ApplicationDataOut, v1::ApplicationDataIn};
+#[cfg(feature = "telemetry")]
+use hopr_transport_session::SessionTelemetry;
+use hopr_transport_session::{Capabilities, Capability, HoprSession, HoprSessionConfig, SessionId};
 
 // Avoid musl's default allocator due to degraded performance
 //

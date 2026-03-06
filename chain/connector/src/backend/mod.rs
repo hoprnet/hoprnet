@@ -1,13 +1,15 @@
 mod tempdb;
 
-pub use hopr_api::chain::HoprKeyIdent;
-pub use hopr_types::{
-    crypto::prelude::OffchainPublicKey,
-    internal::{
-        account::AccountEntry,
-        channels::{ChannelEntry, ChannelId},
+pub use hopr_api::{
+    chain::HoprKeyIdent,
+    types::{
+        crypto::prelude::OffchainPublicKey,
+        internal::{
+            account::AccountEntry,
+            channels::{ChannelEntry, ChannelId},
+        },
+        primitive::prelude::Address,
     },
-    primitive::prelude::Address,
 };
 
 /// Represents a cache backend for the connector.
@@ -103,7 +105,7 @@ impl Backend for InMemoryBackend {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use hopr_types::{
+    use hopr_api::types::{
         crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         internal::{
             account::{AccountEntry, AccountType},

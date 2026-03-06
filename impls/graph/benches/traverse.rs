@@ -7,9 +7,9 @@ use hopr_api::{
         NetworkGraphTraverse, NetworkGraphWrite,
         traits::{EdgeObservableWrite, EdgeWeightType},
     },
+    types::crypto::prelude::Keypair,
 };
 use hopr_network_graph::{ChannelGraph, costs::SimpleHoprCostFn};
-use hopr_types::crypto::prelude::Keypair;
 
 // ── Graph construction helpers ───────────────────────────────────────────────
 

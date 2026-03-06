@@ -1,7 +1,9 @@
 use blokli_client::api::{BlokliQueryClient, BlokliTransactionClient};
 use futures::{FutureExt, StreamExt, future::BoxFuture, stream::BoxStream};
-use hopr_api::chain::{ChainReceipt, ChannelSelector};
-use hopr_types::{chain::prelude::*, crypto::prelude::Keypair, internal::prelude::*, primitive::prelude::*};
+use hopr_api::{
+    chain::{ChainReceipt, ChannelSelector},
+    types::{chain::prelude::*, crypto::prelude::Keypair, internal::prelude::*, primitive::prelude::*},
+};
 
 use crate::{backend::Backend, connector::HoprBlockchainConnector, errors::ConnectorError};
 
@@ -213,8 +215,10 @@ mod tests {
     use std::time::Duration;
 
     use hex_literal::hex;
-    use hopr_api::chain::{ChainReadChannelOperations, ChainWriteChannelOperations};
-    use hopr_types::crypto::keypairs::{ChainKeypair, OffchainKeypair};
+    use hopr_api::{
+        chain::{ChainReadChannelOperations, ChainWriteChannelOperations},
+        types::crypto::keypairs::{ChainKeypair, OffchainKeypair},
+    };
 
     use super::*;
     use crate::{

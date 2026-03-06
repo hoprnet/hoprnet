@@ -3,10 +3,12 @@ use std::{
     time::Duration,
 };
 
-use hopr_api::chain::*;
+use hopr_api::{
+    chain::*,
+    types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*},
+};
 use hopr_crypto_packet::prelude::*;
 use hopr_platform::trace_timed;
-use hopr_types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*};
 
 use crate::{
     AuxiliaryPacketInfo, HoprCodecConfig, IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket,

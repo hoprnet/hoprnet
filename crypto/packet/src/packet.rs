@@ -1,9 +1,6 @@
 use std::fmt::{Display, Formatter};
 
-use hopr_crypto_sphinx::prelude::*;
-#[cfg(feature = "rayon")]
-use hopr_parallelize::cpu::rayon::prelude::*;
-use hopr_types::{
+use hopr_api::types::{
     crypto::prelude::*,
     internal::{
         prelude::*,
@@ -11,6 +8,9 @@ use hopr_types::{
     },
     primitive::prelude::*,
 };
+use hopr_crypto_sphinx::prelude::*;
+#[cfg(feature = "rayon")]
+use hopr_parallelize::cpu::rayon::prelude::*;
 
 use crate::{
     HoprPseudonym, HoprReplyOpener, HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, PAYLOAD_SIZE_INT,
@@ -579,7 +579,7 @@ mod tests {
     use anyhow::{Context, bail};
     use bimap::BiHashMap;
     use hex_literal::hex;
-    use hopr_types::crypto_random::Randomizable;
+    use hopr_api::types::crypto_random::Randomizable;
     use parameterized::parameterized;
 
     use super::*;
@@ -680,7 +680,7 @@ mod tests {
         let return_paths = return_hops
             .into_iter()
             .map(|h| TransportPath::new(PEERS[0..=h].iter().rev().map(|kp| *kp.1.public())))
-            .collect::<std::result::Result<Vec<_>, hopr_types::internal::errors::PathError>>()?;
+            .collect::<std::result::Result<Vec<_>, hopr_api::types::internal::errors::PathError>>()?;
 
         Ok(HoprPacket::into_outgoing(
             msg,

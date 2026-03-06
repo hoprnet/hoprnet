@@ -1,10 +1,10 @@
 use std::time::Duration;
 
 use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
+use hopr_api::types::internal::routing::DestinationRouting;
 use hopr_async_runtime::AbortHandle;
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataOut};
 use hopr_protocol_start::{KeepAliveFlag, KeepAliveMessage};
-use hopr_types::internal::routing::DestinationRouting;
 use tracing::{Instrument, debug, error, instrument};
 
 use crate::{

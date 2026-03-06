@@ -4,9 +4,11 @@ use blokli_client::api::{BlokliQueryClient, BlokliSubscriptionClient, BlokliTran
 use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use futures_concurrency::stream::Merge;
 use futures_time::future::FutureExt as FuturesTimeExt;
-use hopr_api::chain::{ChainPathResolver, ChainReceipt, HoprKeyIdent};
+use hopr_api::{
+    chain::{ChainPathResolver, ChainReceipt, HoprKeyIdent},
+    types::{chain::prelude::*, crypto::prelude::*, internal::prelude::*, primitive::prelude::*},
+};
 use hopr_async_runtime::AbortHandle;
-use hopr_types::{chain::prelude::*, crypto::prelude::*, internal::prelude::*, primitive::prelude::*};
 use petgraph::prelude::DiGraphMap;
 
 use crate::{
@@ -602,7 +604,7 @@ where
 pub(crate) mod tests {
     use blokli_client::BlokliTestState;
     use hex_literal::hex;
-    use hopr_types::chain::contract_addresses_for_network;
+    use hopr_api::types::chain::contract_addresses_for_network;
 
     use super::*;
     use crate::{InMemoryBackend, testing::BlokliTestStateBuilder};

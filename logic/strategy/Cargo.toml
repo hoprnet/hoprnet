@@ -47,7 +47,7 @@ hopr-chain-connector = { workspace = true, features = [
   "testing",
   "runtime-tokio",
 ] }
-hopr-types = { workspace = true, features = ["random"] }
+hopr-api = { workspace = true, features = ["types-random"] }
 insta = { workspace = true }
 mockall = { workspace = true }
 test-log = { workspace = true }

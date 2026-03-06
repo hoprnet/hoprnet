@@ -1,7 +1,7 @@
 use std::{borrow::Cow, fmt::Formatter, ops::Range, str::FromStr};
 
+use hopr_api::types::primitive::to_hex_shortened;
 use hopr_crypto_packet::prelude::{HoprPacket, PacketSignals};
-use hopr_types::primitive::to_hex_shortened;
 use strum::IntoEnumIterator;
 
 use crate::errors::ApplicationLayerError;

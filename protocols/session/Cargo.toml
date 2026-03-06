@@ -48,8 +48,8 @@ thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 
+hopr-api = { workspace = true, features = ["types-random"] }
 hopr-async-runtime = { workspace = true }
-hopr-types = { workspace = true, features = ["primitive", "random"] }
 hopr-crypto-packet = { workspace = true }
 
 hopr-metrics = { workspace = true, optional = true }

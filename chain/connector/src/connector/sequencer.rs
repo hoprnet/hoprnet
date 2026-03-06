@@ -1,6 +1,6 @@
 use blokli_client::api::{BlokliQueryClient, BlokliTransactionClient};
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
-use hopr_types::{
+use hopr_api::types::{
     chain::prelude::{GasEstimation, SignableTransaction},
     crypto::prelude::*,
 };

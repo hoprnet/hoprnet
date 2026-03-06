@@ -4,10 +4,10 @@ use futures::StreamExt;
 use hopr_api::{
     chain::ChainReadChannelOperations,
     db::{HoprDbTicketOperations, TicketSelector},
+    types::{crypto::prelude::*, internal::prelude::*, primitive::balance::HoprBalance},
 };
 #[cfg(feature = "rayon")]
 use hopr_parallelize::cpu::rayon::prelude::*;
-use hopr_types::{crypto::prelude::*, internal::prelude::*, primitive::balance::HoprBalance};
 use validator::ValidationError;
 
 use crate::{
@@ -646,7 +646,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use hopr_types::crypto_random::Randomizable;
+    use hopr_api::types::crypto_random::Randomizable;
 
     use super::*;
     use crate::utils::*;

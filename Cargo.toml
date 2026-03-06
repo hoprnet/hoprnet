@@ -11,7 +11,6 @@ members = [
   "crypto/keypair",
   "crypto/packet",
   "crypto/sphinx",
-  "hopr/api",
   "hopr/hopr-lib",
   "hoprd/hoprd",
   "hoprd/rest-api",
@@ -235,7 +234,7 @@ mimalloc = { version = "0.1.48", default-features = false, features = [
   "secure",
 ] }
 
-hopr-api = { path = "hopr/api" }
+hopr-api = { git = "https://github.com/hoprnet/hopr-api", rev = "0403f9d9470bf7e60234f8d4725260106f0fe2c7" }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-crypto-keypair = { path = "crypto/keypair", default-features = false }
 hopr-crypto-packet = { path = "crypto/packet", default-features = false }
@@ -260,7 +259,6 @@ hopr-transport-mixer = { path = "transport/mixer" }
 hopr-transport-probe = { path = "transport/probe" }
 hopr-transport-protocol = { path = "transport/protocol" }
 hopr-transport-session = { path = "transport/session" }
-hopr-types = { git = "https://github.com/hoprnet/hopr-types", branch = "main" }
 hoprd = { path = "hoprd/hoprd" }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
 hoprd-api-client = { path = "hoprd/rest-api-client" }

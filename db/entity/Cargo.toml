@@ -32,8 +32,4 @@ sea-orm = { workspace = true }
 hex = { workspace = true }
 thiserror = { workspace = true }
 
-hopr-types = { workspace = true, features = [
-  "crypto",
-  "internal",
-  "primitive",
-] }
+hopr-api = { workspace = true }

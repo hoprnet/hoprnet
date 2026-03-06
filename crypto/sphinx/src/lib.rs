@@ -56,7 +56,7 @@ pub(crate) mod tests {
         num::{NonZero, NonZeroUsize},
     };
 
-    use hopr_types::{
+    use hopr_api::types::{
         crypto::prelude::*,
         primitive::{errors::GeneralError, prelude::*},
     };

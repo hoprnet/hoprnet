@@ -321,7 +321,7 @@ mod tests {
             NoopTracker,
         )?;
 
-        let alice_sent_data = hopr_types::crypto_random::random_bytes::<{ NUM_FRAMES * FRAME_SIZE }>();
+        let alice_sent_data = hopr_api::types::crypto_random::random_bytes::<{ NUM_FRAMES * FRAME_SIZE }>();
         alice_socket
             .write_all(&alice_sent_data)
             .timeout(futures_time::time::Duration::from_secs(2))

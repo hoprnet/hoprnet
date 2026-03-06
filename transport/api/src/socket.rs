@@ -1,6 +1,6 @@
 use futures::{Sink, Stream};
+use hopr_api::types::internal::routing::DestinationRouting;
 use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut};
-use hopr_types::internal::routing::DestinationRouting;
 
 /// Represents the socket behavior of the hopr-lib spawned [`Hopr`] object.
 ///

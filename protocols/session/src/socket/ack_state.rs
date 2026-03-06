@@ -683,7 +683,7 @@ mod tests {
         let num_segments_in_frame = FRAME_SIZE / MTU + 1;
         for i in 1..=num_frames {
             let expected_segments = segment(
-                hopr_types::crypto_random::random_bytes::<FRAME_SIZE>(),
+                hopr_api::types::crypto_random::random_bytes::<FRAME_SIZE>(),
                 MTU,
                 i as FrameId,
             )?;
@@ -743,7 +743,7 @@ mod tests {
             ctl_tx,
         })?;
 
-        let expected_segments = segment(hopr_types::crypto_random::random_bytes::<FRAME_SIZE>(), MTU, 1)?;
+        let expected_segments = segment(hopr_api::types::crypto_random::random_bytes::<FRAME_SIZE>(), MTU, 1)?;
         for segment in &expected_segments {
             state.segment_sent(segment)?;
         }
@@ -776,7 +776,11 @@ mod tests {
             ctl_tx,
         })?;
 
-        let expected_segments = segment(hopr_types::crypto_random::random_bytes::<{ FRAME_SIZE * 2 }>(), MTU, 1)?;
+        let expected_segments = segment(
+            hopr_api::types::crypto_random::random_bytes::<{ FRAME_SIZE * 2 }>(),
+            MTU,
+            1,
+        )?;
         for segment in &expected_segments {
             state.segment_sent(segment)?;
         }
@@ -812,7 +816,11 @@ mod tests {
             ctl_tx,
         })?;
 
-        let expected_segments = segment(hopr_types::crypto_random::random_bytes::<{ FRAME_SIZE * 2 }>(), MTU, 1)?;
+        let expected_segments = segment(
+            hopr_api::types::crypto_random::random_bytes::<{ FRAME_SIZE * 2 }>(),
+            MTU,
+            1,
+        )?;
 
         // Load segments into the ring buffer
         for segment in &expected_segments {
@@ -852,13 +860,21 @@ mod tests {
             ctl_tx,
         })?;
 
-        let expected_segments_1 = segment(hopr_types::crypto_random::random_bytes::<{ FRAME_SIZE * 2 }>(), MTU, 1)?;
+        let expected_segments_1 = segment(
+            hopr_api::types::crypto_random::random_bytes::<{ FRAME_SIZE * 2 }>(),
+            MTU,
+            1,
+        )?;
         // Load frame 1 segments into the ring buffer
         for segment in &expected_segments_1 {
             state.segment_sent(segment)?;
         }
 
-        let expected_segments_2 = segment(hopr_types::crypto_random::random_bytes::<{ FRAME_SIZE * 2 }>(), MTU, 2)?;
+        let expected_segments_2 = segment(
+            hopr_api::types::crypto_random::random_bytes::<{ FRAME_SIZE * 2 }>(),
+            MTU,
+            2,
+        )?;
         // Load frame 2 segments into the ring buffer
         for segment in &expected_segments_2 {
             state.segment_sent(segment)?;
@@ -915,7 +931,7 @@ mod tests {
         let mut inspector = FrameInspector(FrameDashMap::with_capacity(10));
         let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
 
-        let segments = segment(hopr_types::crypto_random::random_bytes::<FRAME_SIZE>(), MTU, 1)?;
+        let segments = segment(hopr_api::types::crypto_random::random_bytes::<FRAME_SIZE>(), MTU, 1)?;
 
         inspector
             .0
@@ -961,7 +977,7 @@ mod tests {
         let mut inspector = FrameInspector(FrameDashMap::with_capacity(10));
         let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
 
-        let segments = segment(hopr_types::crypto_random::random_bytes::<FRAME_SIZE>(), MTU, 1)?;
+        let segments = segment(hopr_api::types::crypto_random::random_bytes::<FRAME_SIZE>(), MTU, 1)?;
 
         inspector
             .0
@@ -1004,7 +1020,11 @@ mod tests {
         let mut inspector = FrameInspector(FrameDashMap::with_capacity(10));
         let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
 
-        let segments = segment(hopr_types::crypto_random::random_bytes::<{ 2 * FRAME_SIZE }>(), MTU, 1)?;
+        let segments = segment(
+            hopr_api::types::crypto_random::random_bytes::<{ 2 * FRAME_SIZE }>(),
+            MTU,
+            1,
+        )?;
 
         inspector
             .0
@@ -1069,7 +1089,11 @@ mod tests {
         let mut inspector = FrameInspector(FrameDashMap::with_capacity(10));
         let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
 
-        let segments = segment(hopr_types::crypto_random::random_bytes::<{ 2 * FRAME_SIZE }>(), MTU, 1)?;
+        let segments = segment(
+            hopr_api::types::crypto_random::random_bytes::<{ 2 * FRAME_SIZE }>(),
+            MTU,
+            1,
+        )?;
 
         // Segment 1
         inspector

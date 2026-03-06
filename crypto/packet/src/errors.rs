@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use hopr_types::{
+use hopr_api::types::{
     crypto::errors::CryptoError,
     internal::{
         errors::CoreTypesError,
@@ -89,7 +89,7 @@ pub struct TicketValidationError {
 
 #[cfg(test)]
 mod tests {
-    use hopr_types::{
+    use hopr_api::types::{
         crypto::prelude::{ChainKeypair, Keypair},
         internal::prelude::TicketBuilder,
     };

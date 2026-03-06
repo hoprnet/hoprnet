@@ -6,13 +6,13 @@ pub enum DbEntityError {
     ConversionError(String),
 
     #[error(transparent)]
-    TypesError(#[from] hopr_types::internal::errors::CoreTypesError),
+    TypesError(#[from] hopr_api::types::internal::errors::CoreTypesError),
 
     #[error(transparent)]
-    CryptoError(#[from] hopr_types::crypto::errors::CryptoError),
+    CryptoError(#[from] hopr_api::types::crypto::errors::CryptoError),
 
     #[error(transparent)]
-    GeneralError(#[from] hopr_types::primitive::errors::GeneralError),
+    GeneralError(#[from] hopr_api::types::primitive::errors::GeneralError),
 }
 
 pub type Result<T> = std::result::Result<T, DbEntityError>;

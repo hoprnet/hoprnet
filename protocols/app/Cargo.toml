@@ -19,8 +19,8 @@ serde = { workspace = true, optional = true }
 serde_bytes = { workspace = true, optional = true }
 thiserror = { workspace = true }
 
+hopr-api = { workspace = true }
 hopr-crypto-packet = { workspace = true }
-hopr-types = { workspace = true, features = ["primitive"] }
 
 [dev-dependencies]
 anyhow = { workspace = true }
