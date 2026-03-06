@@ -75,7 +75,6 @@ validator = { workspace = true }
 hopr-api = { workspace = true, features = [
   "full",
   "types-random",
-  "types-fixed-rng",
 ] }
 
 hopr-async-runtime = { workspace = true }
