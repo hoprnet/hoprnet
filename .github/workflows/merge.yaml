@@ -9,7 +9,7 @@ concurrency:
   group: merge-${{ github.event.pull_request.base.ref }}
   cancel-in-progress: false
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
   id-token: write
 jobs:
@@ -98,6 +98,8 @@ jobs:
       - build-docker
     uses: ./.github/workflows/build-docs.yaml
     secrets: inherit
+    permissions:
+      contents: write
     with:
       source_repo: ${{ github.event.pull_request.base.repo.full_name }}
       source_branch: ${{ github.event.pull_request.base.ref }}
