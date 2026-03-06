@@ -56,7 +56,7 @@ jobs:
           IFS='-' read -a current_version_splitted <<<"${current_version}"
           current_version_without_rc="${current_version_splitted[0]}"
           IFS='.' read -r major_version minor_version patch_version <<< "${current_version_without_rc}"
-          
+
           release_branch_name="release/${major_version}.${minor_version}"
           if git branch -al "${release_branch_name}" | grep -F "${release_branch_name}"; then
             echo "Branch ${release_branch_name} already exists. Skipping promotion..."
