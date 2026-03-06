@@ -44,6 +44,19 @@ jobs:
           - architecture: x86_64-linux
             runner: self-hosted-hoprnet-bigger
             build_command: nix build -L .#binary-hoprd-x86_64-linux
+            required_label: ""
+          - architecture: aarch64-linux
+            runner: self-hosted-hoprnet-bigger
+            build_command: nix build -L .#binary-hoprd-aarch64-linux
+            required_label: "binary:aarch64-linux"
+          - architecture: aarch64-darwin
+            runner: macos-15-xlarge
+            build_command: nix build -L .#binary-hoprd-aarch64-darwin
+            required_label: binary:aarch64-darwin
+          - architecture: x86_64-darwin
+            runner: macos-15-intel
+            build_command: nix build -L .#binary-hoprd-x86_64-darwin
+            required_label: binary:x86_64-darwin
     uses: hoprnet/hopr-workflows/.github/workflows/build-binaries.yaml@build-binaries-v2
     permissions:
       contents: read
@@ -56,6 +69,7 @@ jobs:
       build_command: ${{ matrix.build_command }}
       binary: hoprd
       runner: ${{ matrix.runner }}
+      enabled: ${{ matrix.required_label == '' || contains(github.event.pull_request.labels.*.name, matrix.required_label) }}
     secrets:
       gcp_service_account: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
