@@ -166,7 +166,7 @@ where
             .map_err(AnnouncementError::processing)?;
 
         Ok(self
-            .send_tx(tx_req)
+            .send_tx(tx_req, None)
             .map_err(AnnouncementError::processing)
             .await?
             .boxed())
@@ -181,7 +181,7 @@ where
 
         let tx_req = self.payload_generator.transfer(*recipient, balance)?;
 
-        Ok(self.send_tx(tx_req).await?.boxed())
+        Ok(self.send_tx(tx_req, None).await?.boxed())
     }
 
     async fn register_safe(
@@ -230,7 +230,7 @@ where
             .map_err(SafeRegistrationError::processing)?;
 
         Ok(self
-            .send_tx(tx_req)
+            .send_tx(tx_req, None)
             .map_err(SafeRegistrationError::processing)
             .await?
             .boxed())

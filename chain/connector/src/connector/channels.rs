@@ -140,7 +140,7 @@ where
         let tx_req = self.payload_generator.fund_channel(*dst, amount)?;
         tracing::debug!( %dst, %amount, "opening channel");
 
-        Ok(self.send_tx(tx_req).await?.boxed())
+        Ok(self.send_tx(tx_req, None).await?.boxed())
     }
 
     async fn fund_channel<'a>(
@@ -159,7 +159,7 @@ where
         let tx_req = self.payload_generator.fund_channel(channel.destination, amount)?;
         tracing::debug!(%channel_id, %amount, "funding channel");
 
-        Ok(self.send_tx(tx_req).await?.boxed())
+        Ok(self.send_tx(tx_req, None).await?.boxed())
     }
 
     async fn close_channel<'a>(
@@ -204,7 +204,7 @@ where
             _ => return Err(ConnectorError::InvalidState("channel closure time has not elapsed")),
         };
 
-        Ok(self.send_tx(tx_req).await?.boxed())
+        Ok(self.send_tx(tx_req, None).await?.boxed())
     }
 }
 

@@ -58,6 +58,8 @@ where
     }
 }
 
+const DEPLOY_SAFE_CUSTOM_TX_TIMEOUT_MULTIPLIER: u32 = 8;
+
 #[async_trait::async_trait]
 impl<B, C, P> hopr_api::chain::ChainWriteSafeOperations for HoprBlockchainConnector<C, B, P, P::TxRequest>
 where
@@ -91,7 +93,10 @@ where
                 .deploy_safe(balance, &[admin], true, hopr_types::crypto_random::random_bytes())?;
         tracing::debug!(%balance, %admin, "deploying safe");
 
-        Ok(self.send_tx(tx_req).await?.boxed())
+        Ok(self
+            .send_tx(tx_req, DEPLOY_SAFE_CUSTOM_TX_TIMEOUT_MULTIPLIER.into())
+            .await?
+            .boxed())
     }
 }
 
