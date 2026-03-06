@@ -648,9 +648,9 @@
             audit = run-audit;
           };
 
-          packages = 
+          packages =
             hoprdPackages
-            // hoprdDocker 
+            // hoprdDocker
             // {
               inherit docs;
               inherit pre-commit-check;
