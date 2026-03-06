@@ -1,6 +1,6 @@
 ---
 #################################################################################
-# Pipeline triggered on pull request approval to check benchmark results 
+# Pipeline triggered on pull request approval to check benchmark results        #
 #################################################################################
 name: Benchmarks
 
