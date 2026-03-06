@@ -12,6 +12,7 @@ permissions:
   contents: write
   pull-requests: write
   id-token: write
+  security-events: write
 jobs:
   build-binaries:
     name: Binary ${{ matrix.architecture }}
@@ -107,6 +108,9 @@ jobs:
   zizmor:
     name: Zizmor
     uses: ./.github/workflows/checks-zizmor.yaml
+    permissions:
+      contents: read
+      security-events: write
     with:
       source_repo: ${{ github.event.pull_request.base.repo.full_name || github.repository }}
       source_branch: ${{ github.event.pull_request.base.ref || github.ref }}
