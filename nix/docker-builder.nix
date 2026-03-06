@@ -10,6 +10,8 @@
 }:
 let
   libPath = pkgs.lib.makeLibraryPath [ pkgs.openssl ];
+  caBundlePath = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+  caCertsDir = "${pkgs.cacert}/etc/ssl/certs";
   contents =
     with pkgs;
     [
@@ -30,6 +32,8 @@ let
     # "RUST_LOG=info"   # 'info' level is set by default with some spamming components set to override
     "RUST_BACKTRACE=full"
     "LD_LIBRARY_PATH=${libPath}"
+    "SSL_CERT_FILE=${caBundlePath}"
+    "SSL_CERT_DIR=${caCertsDir}"
   ]
   ++ env;
   ExposedPorts = extraPorts;
