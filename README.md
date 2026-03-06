@@ -70,30 +70,22 @@ Unless stated otherwise, the following sections only apply to `hoprd`.
 
 ## Install
 
-For production purposes always run the latest stable release.
-
 Multiple options for installation exist, the preferred choice for any production system should be to use the container image (e.g. using `docker`).
 
 All releases and associated changelogs are located in the [official releases](https://github.com/hoprnet/hoprnet/releases) section of the [`hoprnet`](https://github.com/hoprnet/hoprnet) repository.
 
 ### Install via Docker
 
-The following instructions show how any `$RELEASE` may be installed, to select the release, override the `$RELEASE` variable, e.g.:
+Checkout [DockerHub](https://hub.docker.com/r/hoprnet/hoprd/tags) for specific version tag or use a custom tag:
 
-- `export RELEASE=latest` to track the latest changes on the repository's `master` branch
-- `export RELEASE=kaunas` to track the latest changes on the repository's `release/kaunas` branch (3.0.X)
-- `export RELEASE=<version>` to get a specific `<version>`
-
-Container image has the format
-`europe-west3-docker.pkg.dev/hoprassociation/docker-images/$PROJECT:$RELEASE`.
-where:
-
-- `$PROJECT` can be: `hoprd`
-
-Pull the container image with `docker`:
+- I want the latest code from active development → `latest` or `latest-main`
+- I want the latest stable release from active development → `release-main`
+- I want the latest code from the LTS branch → `latest-lts`
+- I want the latest stable release from the LTS branch → `release-lts`
+- I want what is currently running in production → `stable`
 
 ```bash
-docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:kaunas
+docker pull hoprnet/hoprd:stable
 ```
 
 It is recommended to setup an alias `hoprd` for the docker command invocation.
@@ -365,31 +357,11 @@ For usage examples of the generated SDK, refer to the generated README.md file i
 
 ### Building a Docker image
 
-Docker images can be built using the respective nix flake outputs.
-The available images can be listed with:
+Docker images can be built using the respective nix flake outputs. The following command builds the `hoprd` image for `x86_64-linux` platform:
 
 ```bash
-just list-docker-images
+nix build .#docker-hoprd-x86_64-linux
 ```
-
-The following command builds the `hoprd` image for the host platform:
-
-```bash
-nix build .#hoprd-docker
-```
-
-If needed images for other platforms can be built by specifying the target
-platform. For example, to build the `hoprd` image for the `x86_64-linux`
-platform, while being on a Darwin host system, use the following command:
-
-```bash
-nix build .#packages.x86_64-linux.hoprd-docker
-```
-
-NOTE: Building for different platforms requires nix distributed builds to be
-set up properly.
-See [Nix documentation](https://nix.dev/manual/nix/2.28/advanced-topics/distributed-builds.html)
-for more information.
 
 ## Local cluster
 
@@ -403,17 +375,7 @@ Run only unit tests: `cargo test --lib`
 
 ### Github Actions CI
 
-We run a fair amount of automation using Github Actions. To ease development
-of these workflows one can use [act][2] to run workflows locally in a
-Docker environment.
-
-E.g. running the build workflow:
-
-```bash
-act -j build
-```
-
-For more information please refer to [act][2]'s documentation.
+We run a fair amount of automation using Github Actions. Too see the full list of workflows checkout [workflow docs](./.github/workflows/README.md)
 
 ### End-to-End Testing
 
@@ -499,10 +461,10 @@ However, for that to work the `hoprd` binary has to be built with the feature `c
 For ease of use we provide different nix flake outputs that build the `hoprd`
 with the `capture` feature enabled:
 
-- `nix build .#hoprd-x86_64-linux-profile`
-- `nix build .#hoprd-aarch64-linux-profile`
-- `nix build .#hoprd-x86_64-darwin-profile`
-- `nix build .#hoprd-aarch64-darwin-profile`
+- `nix build .#binary-hoprd-profile-x86_64-linux`
+- `nix build .#binary-hoprd-profile-aarch64-linux`
+- `nix build .#binary-hoprd-profile-x86_64-darwin`
+- `nix build .#binary-hoprd-profile-aarch64-darwin`
 
 ## Contact
 
