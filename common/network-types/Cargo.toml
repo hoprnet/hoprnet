@@ -16,7 +16,7 @@ serde = [
   "dep:serde",
   "dep:serde_bytes",
   "libp2p-identity/serde",
-  "hopr-api/serde",
+  "hopr-types/serde",
 ]
 runtime-tokio = [
   "dep:tokio",
@@ -48,7 +48,7 @@ tokio = { workspace = true, optional = true }
 tokio-util = { workspace = true, optional = true, features = ["net", "io"] }
 tracing = { workspace = true }
 
-hopr-api = { workspace = true, features = ["types-random"] }
+hopr-types = { workspace = true, features = ["random", "crypto"] }
 hopr-async-runtime = { workspace = true, optional = true }
 hopr-metrics = { workspace = true, optional = true }
 

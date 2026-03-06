@@ -11,7 +11,7 @@ license = "GPL-3.0-only"
 
 [features]
 default = ["rayon"]
-rayon = ["hopr-crypto-packet/rayon"]
+rayon = ["hopr-crypto-packet/rayon", "hopr-parallelize/rayon"]
 serde = [
   "dep:cfg_eval",
   "dep:humantime-serde",
@@ -19,7 +19,7 @@ serde = [
   "dep:serde_with",
   "hopr-api/serde",
 ]
-prometheus = ["dep:hopr-metrics"]
+prometheus = ["dep:hopr-metrics", "hopr-parallelize/prometheus"]
 trace-timing = ["hopr-platform/trace-timing"]
 
 [dependencies]

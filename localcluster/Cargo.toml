@@ -13,8 +13,8 @@ anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 futures = { workspace = true }
 hoprd = { workspace = true }
-hoprd-api = { workspace = true }
 hopr-chain-connector = { workspace = true }
+hopr-types = { workspace = true, features = ["primitive"] }
 hopr-lib = { workspace = true }
 hopr-builder = { workspace = true }
 hoprd-api-client = { workspace = true }

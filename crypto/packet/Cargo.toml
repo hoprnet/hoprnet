@@ -20,8 +20,8 @@ serde = [
   "dep:serde",
   "dep:serde_bytes",
   "flagset/serde",
-  "hopr-api/serde",
   "hopr-crypto-sphinx/serde",
+  "hopr-types/serde",
 ]
 allocator-mimalloc = [
   "dep:mimalloc",
@@ -41,7 +41,12 @@ tracing = { workspace = true }
 
 hopr-crypto-sphinx = { workspace = true }
 hopr-parallelize = { workspace = true }
-hopr-api = { workspace = true, features = ["types-random"] }
+hopr-types = { workspace = true, features = [
+  "crypto",
+  "random",
+  "internal",
+  "primitive",
+] }
 
 [dev-dependencies]
 anyhow = { workspace = true }

@@ -24,8 +24,8 @@ smart-default = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
-hopr-api = { workspace = true, features = ["types-random"] }
 hopr-metrics = { workspace = true, optional = true }
+hopr-types = { workspace = true, features = ["random"] }
 
 [dev-dependencies]
 anyhow = { workspace = true }

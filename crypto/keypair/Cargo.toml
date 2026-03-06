@@ -22,7 +22,7 @@ tracing = { workspace = true }
 typenum = { workspace = true }
 uuid = { workspace = true, features = ["serde", "v4"] }
 
-hopr-api = { workspace = true, features = ["types-random"] }
+hopr-types = { workspace = true, features = ["random", "crypto", "primitive"] }
 hopr-platform = { workspace = true }
 
 [dev-dependencies]
