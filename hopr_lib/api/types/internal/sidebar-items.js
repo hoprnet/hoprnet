@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["NodeId"],"mod":["account","announcement","channels","errors","path","protocol","routing","tickets"],"struct":["Multiaddr"]};

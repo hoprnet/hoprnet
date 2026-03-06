@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ChainEvent"],"struct":["BasicPayloadGenerator","ContractAddresses","GasEstimation","SafePayloadGenerator","TransactionRequest"],"trait":["PayloadGenerator","SignableTransaction"]};

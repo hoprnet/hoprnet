@@ -1,0 +1,81 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Calculate all simple paths from a source node to any of several target nodes."><title>all_simple_paths_multi in hopr_network_graph::petgraph::algorithm - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-b7b9f40b.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="hopr_network_graph" data-themes="" data-resource-suffix="" data-rustdoc-version="1.95.0-nightly (7057231bd 2026-02-11)" data-channel="nightly" data-search-js="search-fb33671b.js" data-stringdex-js="stringdex-b897f86f.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-f9617a14.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../../static.files/main-12f88f4f.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc fn"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">all_simple_paths_multi</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../hopr_network_graph/index.html">hopr_<wbr>network_<wbr>graph</a><span class="version">0.1.1</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">all_<wbr>simple_<wbr>paths_<wbr>multi</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#performance-considerations" title="Performance Considerations">Performance Considerations</a></li><li><a href="#arguments" title="Arguments">Arguments</a></li><li><a href="#returns" title="Returns">Returns</a></li><li><a href="#complexity" title="Complexity">Complexity</a></li><li><a href="#example" title="Example">Example</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="index.html">In hopr_<wbr>network_<wbr>graph::<wbr>petgraph::<wbr>algorithm</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">hopr_network_graph</a>::<wbr><a href="../index.html">petgraph</a>::<wbr><a href="index.html">algorithm</a></div><h1>Function <span class="fn">all_<wbr>simple_<wbr>paths_<wbr>multi</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/hopr_network_graph/petgraph/algorithm.rs.html#90-175">Source</a> </span></div><pre class="rust item-decl"><code>pub fn all_simple_paths_multi&lt;'a, TargetColl, G, S, F, C&gt;(
+    graph: G,
+    from: G::<a class="associatedtype" href="https://docs.rs/petgraph/0.4/petgraph/visit/trait.GraphBase.html#associatedtype.NodeId" title="type petgraph::visit::GraphBase::NodeId">NodeId</a>,
+    to: &amp;'a <a class="struct" href="https://doc.rust-lang.org/nightly/std/collections/hash/set/struct.HashSet.html" title="struct std::collections::hash::set::HashSet">HashSet</a>&lt;G::<a class="associatedtype" href="https://docs.rs/petgraph/0.4/petgraph/visit/trait.GraphBase.html#associatedtype.NodeId" title="type petgraph::visit::GraphBase::NodeId">NodeId</a>, S&gt;,
+    min_intermediate_nodes: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a>,
+    max_intermediate_nodes: <a class="enum" href="https://doc.rust-lang.org/nightly/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a>&gt;,
+    initial_cost: C,
+    min_cost: <a class="enum" href="https://doc.rust-lang.org/nightly/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;C&gt;,
+    cost_fn: F,
+) -&gt; impl <a class="trait" href="https://doc.rust-lang.org/nightly/core/iter/traits/iterator/trait.Iterator.html" title="trait core::iter::traits::iterator::Iterator">Iterator</a>&lt;Item = <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.tuple.html">(TargetColl, C)</a>&gt; + 'a<div class="where">where
+    G: <a class="trait" href="https://docs.rs/petgraph/0.4/petgraph/visit/trait.NodeCount.html" title="trait petgraph::visit::NodeCount">NodeCount</a> + <a class="trait" href="https://docs.rs/petgraph/0.4/petgraph/visit/trait.IntoEdgesDirected.html" title="trait petgraph::visit::IntoEdgesDirected">IntoEdgesDirected</a> + 'a,
+    &lt;G as <a class="trait" href="https://docs.rs/petgraph/0.4/petgraph/visit/trait.IntoEdgesDirected.html" title="trait petgraph::visit::IntoEdgesDirected">IntoEdgesDirected</a>&gt;::<a class="associatedtype" href="https://docs.rs/petgraph/0.4/petgraph/visit/trait.IntoEdgesDirected.html#associatedtype.EdgesDirected" title="type petgraph::visit::IntoEdgesDirected::EdgesDirected">EdgesDirected</a>: 'a,
+    G::<a class="associatedtype" href="https://docs.rs/petgraph/0.4/petgraph/visit/trait.GraphBase.html#associatedtype.NodeId" title="type petgraph::visit::GraphBase::NodeId">NodeId</a>: <a class="trait" href="https://doc.rust-lang.org/nightly/core/cmp/trait.Eq.html" title="trait core::cmp::Eq">Eq</a> + <a class="trait" href="https://doc.rust-lang.org/nightly/core/hash/trait.Hash.html" title="trait core::hash::Hash">Hash</a>,
+    TargetColl: <a class="trait" href="https://doc.rust-lang.org/nightly/core/iter/traits/collect/trait.FromIterator.html" title="trait core::iter::traits::collect::FromIterator">FromIterator</a>&lt;G::<a class="associatedtype" href="https://docs.rs/petgraph/0.4/petgraph/visit/trait.GraphBase.html#associatedtype.NodeId" title="type petgraph::visit::GraphBase::NodeId">NodeId</a>&gt;,
+    S: <a class="trait" href="https://doc.rust-lang.org/nightly/core/hash/trait.BuildHasher.html" title="trait core::hash::BuildHasher">BuildHasher</a> + <a class="trait" href="https://doc.rust-lang.org/nightly/core/default/trait.Default.html" title="trait core::default::Default">Default</a>,
+    C: <a class="trait" href="https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html" title="trait core::clone::Clone">Clone</a> + <a class="trait" href="https://doc.rust-lang.org/nightly/core/cmp/trait.PartialOrd.html" title="trait core::cmp::PartialOrd">PartialOrd</a> + 'a,
+    F: <a class="trait" href="https://doc.rust-lang.org/nightly/core/ops/function/trait.Fn.html" title="trait core::ops::function::Fn">Fn</a>(C, &amp;&lt;&lt;G as <a class="trait" href="https://docs.rs/petgraph/0.4/petgraph/visit/trait.IntoEdgeReferences.html" title="trait petgraph::visit::IntoEdgeReferences">IntoEdgeReferences</a>&gt;::<a class="associatedtype" href="https://docs.rs/petgraph/0.4/petgraph/visit/trait.IntoEdgeReferences.html#associatedtype.EdgeRef" title="type petgraph::visit::IntoEdgeReferences::EdgeRef">EdgeRef</a> as <a class="trait" href="https://docs.rs/petgraph/0.4/petgraph/visit/trait.EdgeRef.html" title="trait petgraph::visit::EdgeRef">EdgeRef</a>&gt;::<a class="associatedtype" href="https://docs.rs/petgraph/0.4/petgraph/visit/trait.EdgeRef.html#associatedtype.Weight" title="type petgraph::visit::EdgeRef::Weight">Weight</a>, <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a>) -&gt; C + 'a,</div></code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Calculate all simple paths from a source node to any of several target nodes.</p>
+<p>This function is a variant of [<code>all_simple_paths</code>] that accepts a <code>HashSet</code> of
+target nodes instead of a single one. A path is yielded as soon as it reaches any
+node in the <code>to</code> set.</p>
+<h2 id="performance-considerations"><a class="doc-anchor" href="#performance-considerations">§</a>Performance Considerations</h2>
+<p>The efficiency of this function hinges on the graph’s structure. It provides significant
+performance gains on graphs where paths share long initial segments (e.g., trees and DAGs),
+as the benefit of a single traversal outweighs the <code>HashSet</code> lookup overhead.</p>
+<p>Conversely, in dense graphs where paths diverge quickly or for targets very close
+to the source, the lookup overhead could make repeated calls to [<code>all_simple_paths</code>]
+a faster alternative.</p>
+<p><strong>Note</strong>: If security is not a concern, a faster hasher (e.g., <code>FxBuildHasher</code>)
+can be specified to minimize the <code>HashSet</code> lookup overhead.</p>
+<h2 id="arguments"><a class="doc-anchor" href="#arguments">§</a>Arguments</h2>
+<ul>
+<li><code>graph</code>: an input graph.</li>
+<li><code>from</code>: an initial node of desired paths.</li>
+<li><code>to</code>: a <code>HashSet</code> of target nodes. A path is yielded as soon as it reaches any node in this set.</li>
+<li><code>min_intermediate_nodes</code>: the minimum number of nodes in the desired paths.</li>
+<li><code>max_intermediate_nodes</code>: the maximum number of nodes in the desired paths (optional).</li>
+<li><code>initial_cost</code>: the starting cost value before any edges are traversed.</li>
+<li><code>min_cost</code>: an optional threshold. If the accumulated cost drops below this value (via <code>PartialOrd</code>), the branch
+is pruned — it is neither yielded nor explored further.</li>
+<li><code>cost_fn</code>: an accumulator function <code>(accumulated_cost, &amp;edge_weight, edge_count) -&gt; new_cost</code> applied at each
+edge. The <code>edge_count</code> is the 0-based hop number from the source (i.e., 0 for the first edge, 1 for the second,
+etc.).</li>
+</ul>
+<h2 id="returns"><a class="doc-anchor" href="#returns">§</a>Returns</h2>
+<p>Returns an iterator that produces <code>(path, cost)</code> tuples for all simple paths from <code>from</code> node to any node in the
+<code>to</code> set, which contains at least <code>min_intermediate_nodes</code> and at most <code>max_intermediate_nodes</code> intermediate nodes,
+if given, or limited by the graph’s order otherwise. The cost is the result of folding <code>cost_fn</code> over the edge
+weights along the path. Paths whose accumulated cost falls below <code>min_cost</code> at any point are excluded.</p>
+<h2 id="complexity"><a class="doc-anchor" href="#complexity">§</a>Complexity</h2>
+<ul>
+<li>Time complexity: for computing the first <strong>k</strong> paths, the running time will be <strong>O(k|V| + k|E|)</strong>.</li>
+<li>Auxiliary space: <strong>O(|V|)</strong>.</li>
+</ul>
+<p>where <strong>|V|</strong> is the number of nodes and <strong>|E|</strong> is the number of edges.</p>
+<h2 id="example"><a class="doc-anchor" href="#example">§</a>Example</h2>
+<div class="example-wrap ignore"><a href="#" class="tooltip" title="This example is not tested">ⓘ</a><pre class="rust rust-example-rendered"><code><span class="kw">use </span>petgraph::prelude::<span class="kw-2">*</span>;
+<span class="kw">use </span>std::collections::HashSet;
+<span class="kw">use </span>std::collections::hash_map::RandomState;
+
+<span class="kw">let </span><span class="kw-2">mut </span>graph = DiGraph::&lt;<span class="kw-2">&amp;</span>str, i32&gt;::new();
+
+<span class="kw">let </span>a = graph.add_node(<span class="string">"a"</span>);
+<span class="kw">let </span>b = graph.add_node(<span class="string">"b"</span>);
+<span class="kw">let </span>c = graph.add_node(<span class="string">"c"</span>);
+<span class="kw">let </span>d = graph.add_node(<span class="string">"d"</span>);
+graph.extend_with_edges(<span class="kw-2">&amp;</span>[(a, b, <span class="number">1</span>), (b, c, <span class="number">1</span>), (b, d, <span class="number">1</span>)]);
+
+<span class="comment">// Find paths from "a" to either "c" or "d", accumulating edge costs.
+</span><span class="kw">let </span>targets = HashSet::from_iter([c, d]);
+<span class="kw">let </span><span class="kw-2">mut </span>paths = all_simple_paths_multi::&lt;Vec&lt;<span class="kw">_</span>&gt;, <span class="kw">_</span>, RandomState, <span class="kw">_</span>, <span class="kw">_</span>&gt;(
+    <span class="kw-2">&amp;</span>graph, a, <span class="kw-2">&amp;</span>targets, <span class="number">0</span>, <span class="prelude-val">None</span>, <span class="number">0i32</span>, <span class="prelude-val">None</span>, |cost, weight, <span class="kw">_</span>| cost + weight,
+)
+    .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+
+paths.sort_by_key(|(p, <span class="kw">_</span>)| p.clone());
+<span class="kw">let </span>expected_paths = <span class="macro">vec!</span>[
+    (<span class="macro">vec!</span>[a, b, c], <span class="number">2</span>),
+    (<span class="macro">vec!</span>[a, b, d], <span class="number">2</span>),
+];
+
+<span class="macro">assert_eq!</span>(paths, expected_paths);</code></pre></div></div></details></section></div></main></body></html>

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["ExpandMsgXmd","ExpandMsgXof","ExpanderXmd","IsogenyCoefficients","OsswuMapParams"],"trait":["ExpandMsg","Expander","FromOkm","GroupDigest","Isogeny","MapToCurve","OsswuMap","Sgn0"]};

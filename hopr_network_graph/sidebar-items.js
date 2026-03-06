@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["costs","errors","petgraph","weight"],"struct":["GraphNode"],"type":["SharedChannelGraph"]};
