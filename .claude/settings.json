@@ -3,8 +3,13 @@
     "allow": [
       "Bash(cargo check:*)",
       "Bash(cargo test:*)",
+      "Bash(cargo build:*)",
+      "Bash(cargo metadata:*)",
+      "Bash(cargo tree:*)",
       "Bash(find:*)",
-      "Bash(cargo build:*)"
+      "Bash(git diff:*)",
+      "Bash(grep:*)",
+      "Bash(echo:*)"
     ]
   }
 }
