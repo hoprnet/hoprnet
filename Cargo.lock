@@ -5382,7 +5382,6 @@ dependencies = [
  "anyhow",
  "clap",
  "futures",
- "hopr-api",
  "hopr-builder",
  "hopr-chain-connector",
  "hopr-lib",

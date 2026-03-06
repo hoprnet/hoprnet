@@ -18,7 +18,6 @@ hopr-types = { workspace = true, features = ["primitive"] }
 hopr-lib = { workspace = true }
 hopr-builder = { workspace = true }
 hoprd-api-client = { workspace = true }
-hopr-api = { workspace = true }
 hoprd-api = { workspace = true }
 lazy_static = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }

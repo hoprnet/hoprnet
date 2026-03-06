@@ -1,7 +1,7 @@
 use std::{path::PathBuf, str::FromStr};
 
 use clap::Parser;
-use hopr_api::types::primitive::prelude::HoprBalance;
+use hopr_types::primitive::prelude::HoprBalance;
 
 use crate::identity::{DEFAULT_CONFIG_HOME, DEFAULT_IDENTITY_PASSWORD, DEFAULT_NUM_NODES};
 
