@@ -10,8 +10,8 @@
 }:
 let
   libPath = pkgs.lib.makeLibraryPath [ pkgs.openssl ];
-  caBundlePath = "/etc/ssl/certs/ca-bundle.crt";
-  caCertsDir = "/etc/ssl/certs";
+  caBundlePath = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+  caCertsDir = "${pkgs.cacert}/etc/ssl/certs";
   contents =
     with pkgs;
     [
