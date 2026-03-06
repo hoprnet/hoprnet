@@ -1,3 +1,4 @@
+---
 name: Close release
 on:
   workflow_dispatch:
