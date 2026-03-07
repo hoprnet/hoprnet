@@ -1,44 +1,23 @@
 ---
-################################################################################
-# Main pipeline to build hoprnet artifacts
-################################################################################
+#################################################################################
+##                      Pipeline to build on pull requests                     ##
+#################################################################################
 name: Build
-
 on:
-  merge_group:
-    types: [checks_requested]
-  pull_request_target:
+  pull_request:
     types:
       - opened
-      - ready_for_review
-      - reopened
-      - review_requested
       - synchronize
-
-permissions:
-  contents: write
-  actions: write
-  security-events: write
-
+      - reopened
+      - ready_for_review
 concurrency:
   group: ${{ github.event.pull_request.head.ref || github.ref_name }}-build
   cancel-in-progress: true
-
+permissions:
+  contents: write
+env:
+  CARGO_TERM_COLOR: always
 jobs:
-  build-docker:
-    strategy:
-      matrix:
-        package:
-          - hoprd
-    name: ${{ matrix.package }}
-    uses: ./.github/workflows/build-docker.yaml
-    with:
-      source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
-      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-      package: ${{ matrix.package }}
-      production: false
-    secrets: inherit
-
   build-dappnode:
     strategy:
       fail-fast: false
@@ -56,62 +35,72 @@ jobs:
       dappnode_repository: ${{ matrix.dappnode_repository }}
       labels: ${{ format('{0},', join(github.event.pull_request.labels.*.name, ',')) }}
     secrets: inherit
-
   build-binaries:
+    name: Binary ${{ matrix.architecture }}
     strategy:
       fail-fast: false
       matrix:
-        binary:
-          - hoprd
-        target:
-          - name: x86_64-linux
+        include:
+          - architecture: x86_64-linux
             runner: self-hosted-hoprnet-bigger
-          - name: aarch64-linux
+            build_command: nix build -L .#binary-hoprd-x86_64-linux
+            required_label: ""
+          - architecture: aarch64-linux
             runner: self-hosted-hoprnet-bigger
-          - name: aarch64-darwin
-            runner: macos-15-xlarge # Uses Apple Silicon M2 hardware 5vCPU, 14GB RAM and 14GB SSD. 8-core GPU
-          - name: x86_64-darwin
-            runner: macos-15-intel # Uses Intel hardware 4vCPU, 14GB RAM and 14GB SSD
-    name: ${{ matrix.binary }}-${{ matrix.target.name }}
-    uses: ./.github/workflows/build-binaries.yaml
+            build_command: nix build -L .#binary-hoprd-aarch64-linux
+            required_label: "binary:aarch64-linux"
+          - architecture: aarch64-darwin
+            runner: macos-15-xlarge
+            build_command: nix build -L .#binary-hoprd-aarch64-darwin
+            required_label: binary:aarch64-darwin
+          - architecture: x86_64-darwin
+            runner: macos-15-intel
+            build_command: nix build -L .#binary-hoprd-x86_64-darwin
+            required_label: binary:x86_64-darwin
+    uses: hoprnet/hopr-workflows/.github/workflows/build-binaries.yaml@build-binaries-v2
+    permissions:
+      contents: read
     with:
-      source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-      binary: ${{ matrix.binary }}
-      runner: ${{ matrix.target.runner }}
-      target: ${{ matrix.target.name }}
-    secrets: inherit
-
-  # package:
-  #   name: ${{ matrix.target.arch }}-${{ matrix.packager.package }}
-  #   needs: build-binaries
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       target:
-  #         - arch: x86_64-linux
-  #           runner: ubuntu-latest
-  #         - arch: aarch64-linux
-  #           runner: ubuntu-24.04-arm
-  #       packager:
-  #         - package: deb
-  #           extension: deb
-  #         - package: rpm
-  #           extension: rpm
-  #         - package: archlinux
-  #           extension: pkg.tar.zst
-
-
-  #   uses: ./.github/workflows/package.yaml
-  #   with:
-  #     runner: ${{ matrix.target.runner }}
-  #     branch: ${{ github.event.pull_request.head.ref }}
-  #     target: ${{ matrix.target.arch }}
-  #     packager: ${{ matrix.packager.package }}
-  #     extension: ${{ matrix.packager.extension }}
-  #     workflow_run_id: ${{ github.run_id }}
-  #   secrets: inherit
-
+      version_type: commit
+      architecture: ${{ matrix.architecture }}
+      cachix_cache_name: hoprnet
+      build_file: hopr/hopr-lib/Cargo.toml
+      build_command: ${{ matrix.build_command }}
+      binary: hoprd
+      runner: ${{ matrix.runner }}
+      enabled: ${{ matrix.required_label == '' || contains(github.event.pull_request.labels.*.name, matrix.required_label) }}
+    secrets:
+      gcp_service_account: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      gpg_private_key: ${{ secrets.GPG_HOPRNET_PRIVATE_KEY }}
+  build-docker:
+    name: Docker
+    uses: hoprnet/hopr-workflows/.github/workflows/build-docker.yaml@build-docker-v1
+    needs: build-binaries
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    with:
+      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+      version_type: commit
+      build_matrix: >-
+        [
+          {
+            "runner": "self-hosted-hoprnet-bigger",
+            "architecture": "x86_64-linux",
+            "build_command": "nix build -L .#docker-hoprd-x86_64-linux",
+            "build_debug_command": "nix build -L .#docker-hoprd-dev-x86_64-linux"
+          }
+        ]
+      cachix_cache_name: hoprnet
+      build_file: hopr/hopr-lib/Cargo.toml
+      docker_image_name: hoprd
+      docker_image_format: skopeo
+    secrets:
+      gcp_service_account: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
   docs:
     name: Docs
     uses: ./.github/workflows/build-docs.yaml

@@ -1,22 +1,140 @@
 ---
 name: Merge
-
 on:
-  # pull_request:
-  #   types:
-  #     - synchronize
-  pull_request_target:
+  pull_request:
     types:
       - closed
-
+      # - synchronize
 concurrency:
   group: merge-${{ github.event.pull_request.base.ref }}
   cancel-in-progress: false
-
 permissions:
   contents: write
-
+  pull-requests: write
+  id-token: write
+  security-events: write
 jobs:
+  build-binaries:
+    name: Binary ${{ matrix.architecture }}
+    if: github.event.pull_request.merged == true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: x86_64-linux
+            runner: self-hosted-hoprnet-bigger
+            build_command: nix build -L .#binary-hoprd-x86_64-linux
+          - architecture: aarch64-linux
+            runner: self-hosted-hoprnet-bigger
+            build_command: nix build -L .#binary-hoprd-aarch64-linux
+          - architecture: x86_64-darwin
+            runner: macos-15-intel
+            build_command: nix build -L .#binary-hoprd-x86_64-darwin
+          - architecture: aarch64-darwin
+            runner: macos-15-xlarge
+            build_command: nix build -L .#binary-hoprd-aarch64-darwin
+    uses: hoprnet/hopr-workflows/.github/workflows/build-binaries.yaml@build-binaries-v2
+    permissions:
+      contents: read
+    with:
+      source_branch: ${{ github.event.pull_request.base.ref }}
+      version_type: pr
+      architecture: ${{ matrix.architecture }}
+      cachix_cache_name: hoprnet
+      build_file: ./hopr/hopr-lib/Cargo.toml
+      build_command: ${{ matrix.build_command }}
+      binary: hoprd
+      runner: ${{ matrix.runner }}
+    secrets:
+      gcp_service_account: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      gpg_private_key: ${{ secrets.GPG_HOPRNET_PRIVATE_KEY }}
+  build-docker:
+    name: Docker
+    needs: build-binaries
+    if: github.event.pull_request.merged == true
+    uses: hoprnet/hopr-workflows/.github/workflows/build-docker.yaml@build-docker-v1
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    with:
+      source_branch: ${{ github.event.pull_request.base.ref }}
+      version_type: pr
+      build_matrix: >-
+        [
+          {
+            "runner": "self-hosted-hoprnet-bigger",
+            "architecture": "x86_64-linux",
+            "build_command": "nix build -L .#docker-hoprd-x86_64-linux"
+          },
+          {
+            "runner": "self-hosted-hoprnet-bigger",
+            "architecture": "aarch64-linux",
+            "build_command": "nix build -L .#docker-hoprd-aarch64-linux"
+          }
+        ]
+      cachix_cache_name: hoprnet
+      docker_image_name: hoprd
+      docker_image_format: skopeo
+      fail_on_scan_vulnerabilities: ${{ vars.FAIL_ON_SCAN_VULNERABILITIES }}
+      deployment_namespace: core-team
+      deployment_label_selector: app.kubernetes.io/component=node
+    secrets:
+      gcp_service_account: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      docker_hub_username: ${{ secrets.DOCKER_HUB_USERNAME }}
+      docker_hub_token: ${{ secrets.DOCKER_HUB_TOKEN }}
+  cache_deps:
+    name: Cache deps
+    if: github.event.pull_request.merged == true
+    uses: ./.github/workflows/cache-deps.yaml
+    with:
+      source_repo: ${{ github.event.pull_request.base.repo.full_name }}
+      source_branch: ${{ github.event.pull_request.base.ref }}
+    secrets: inherit
+  docs:
+    name: Docs
+    needs:
+      - build-docker
+    uses: ./.github/workflows/build-docs.yaml
+    secrets: inherit
+    permissions:
+      contents: write
+    with:
+      source_repo: ${{ github.event.pull_request.base.repo.full_name }}
+      source_branch: ${{ github.event.pull_request.base.ref }}
+      publish: true
+  zizmor:
+    name: Zizmor
+    uses: ./.github/workflows/checks-zizmor.yaml
+    permissions:
+      contents: read
+      security-events: write
+    with:
+      source_repo: ${{ github.event.pull_request.base.repo.full_name || github.repository }}
+      source_branch: ${{ github.event.pull_request.base.ref || github.ref }}
+    secrets: inherit
+  notify:
+    name: Notify failure
+    needs:
+      - build-binaries
+      - build-docker
+      - docs
+    if: ${{ failure() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify failed merge pipeline
+        uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
+        with:
+          api-key: ${{ secrets.ZULIP_API_KEY }}
+          email: ${{ secrets.ZULIP_EMAIL }}
+          organization-url: "https://hopr.zulipchat.com"
+          type: "stream"
+          to: "HOPRd"
+          topic: "Core"
+          content: |
+            The merge pipeline has failed for pull request [#${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
   cleanup_actions:
     name: Cleanup Actions
     runs-on: self-hosted-hoprnet-small
@@ -26,13 +144,11 @@ jobs:
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
-
       - name: Checkout hoprnet repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
           ref: ${{ github.event.pull_request.base.ref }}
-
       - name: Cleanup
         run: |
           gh extension install actions/gh-actions-cache
@@ -53,177 +169,3 @@ jobs:
           echo "Done"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: "Undeploy PR deployment"
-        if: contains(github.event.pull_request.labels.*.name, 'deploy_nodes')
-        # Remove the deploy_nodes label to indicate that the PR deployment has been cleaned up
-        run: |
-          gh pr edit ${{ github.event.pull_request.number }} --remove-label "deploy_nodes"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  build_docker:
-    strategy:
-      matrix:
-        package:
-          - hoprd
-    name: Build ${{ matrix.package }}
-    # only run build and tag if the PR is merged, not if its closed
-    if: github.event.pull_request.merged == true
-    uses: ./.github/workflows/build-docker.yaml
-    with:
-      source_repo: ${{ github.event.pull_request.base.repo.full_name }}
-      source_branch: ${{ github.event.pull_request.base.ref }}
-      package: ${{ matrix.package }}
-      production: true
-    secrets: inherit
-
-  cache_deps:
-    name: Cache deps
-    if: github.event.pull_request.merged == true
-    uses: ./.github/workflows/cache-deps.yaml
-    with:
-      source_repo: ${{ github.event.pull_request.base.repo.full_name }}
-      source_branch: ${{ github.event.pull_request.base.ref }}
-    secrets: inherit
-
-  load_test:
-    name: Load tests
-    if: contains(github.event.pull_request.labels.*.name, 'load_tests') && contains(github.event.pull_request.base.ref, 'master')
-    needs:
-      - build_docker
-    uses: ./.github/workflows/load-tests.yaml
-    with:
-      test_id: pr-${{ github.event.pull_request.number }}
-      cluster_nodes: core-rotsee
-      topology: receiver
-      workload: constant
-      duration: ${{ fromJson(vars.K6_TEST_DURATION) || 60 }}
-      echo_service_replicas: ${{ fromJson(vars.K6_ECHO_SERVERS_REPLICAS) || 1 }}
-      payload_size: ${{ fromJson(vars.K6_PAYLOAD_SIZE)  || 10485760  }} # 10MB
-      download_throughput: ${{ fromJson(vars.K6_DOWNLOAD_THROUGHPUT) || 1048576 }} # 1MB/s
-      upload_throughput: ${{ fromJson(vars.K6_UPLOAD_THROUGHPUT) || 524288 }} # 512KB/s
-    secrets: inherit
-
-  create_release:
-    name: Create Release
-    if: contains(github.event.pull_request.labels.*.name, 'release')
-    uses: ./.github/workflows/create-release.yaml
-    needs:
-      - build_docker
-    with:
-      head_branch: ${{ github.event.pull_request.head.ref }}
-      base_branch: ${{ github.event.pull_request.base.ref }}
-    secrets: inherit
-
-  new_release:
-    name: Open new release
-    if: contains(github.event.pull_request.labels.*.name, 'release')
-    needs:
-      - create_release
-    uses: ./.github/workflows/open-release.yaml
-    with:
-      release_type: ${{ vars.NEXT_RELEASE_TYPE }}
-      source_branch: ${{ github.event.pull_request.base.ref }}
-    secrets: inherit
-
-  build_dappnode:
-    name: Build dappNode
-    if: contains(github.event.pull_request.labels.*.name, 'release')
-    needs:
-      - create_release
-    uses: ./.github/workflows/generate-dappnode-pr.yaml
-    with:
-      source_repo: ${{ github.event.pull_request.base.repo.full_name }}
-      source_branch: ${{ github.event.pull_request.base.ref }}
-      network: dufour
-    secrets: inherit
-  docs:
-    name: Docs
-    needs:
-      - build_docker
-    uses: ./.github/workflows/build-docs.yaml
-    secrets: inherit
-    with:
-      source_repo: ${{ github.event.pull_request.base.repo.full_name }}
-      source_branch: ${{ github.event.pull_request.base.ref }}
-      publish: true
-
-  bencher:
-    name: Benchmarks
-    uses: ./.github/workflows/bencher.yaml
-    if: vars.TEST_BENCHMARK_ENABLED == 'true'
-    secrets: inherit
-    with:
-      source_repo: ${{ github.event.pull_request.base.repo.full_name }}
-      source_branch: ${{ github.event.pull_request.base.ref }}
-      type: merge
-
-  notify_failure:
-    name: Notify in Zulip on merge pipeline failure
-    needs:
-      - cleanup_actions
-      - build_docker
-      - cache_deps
-      - load_test
-      - build_dappnode
-      - docs
-      - bencher
-    if: ${{ failure() }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Notify failed merge pipeline
-        uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
-        with:
-          api-key: ${{ secrets.ZULIP_API_KEY }}
-          email: ${{ secrets.ZULIP_EMAIL }}
-          organization-url: "https://hopr.zulipchat.com"
-          type: "stream"
-          to: "HOPRd"
-          topic: "Core"
-          content: |
-            The merge pipeline failed for pull request [#${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}](https://github.com/${{ github.repository }}/actions/workflows/merge.yaml?query=is%3Afailure)
-
-  notify:
-    name: Notify Changes
-    runs-on: self-hosted-hoprnet-small
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
-        with:
-          disable-sudo: true
-          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
-
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-          ref: ${{ github.event.pull_request.base.ref }}
-
-      - name: Check for changes in specific folder
-        id: folder_changes
-        run: |
-          # Fetch the base branch
-          git fetch origin ${{ github.event.pull_request.base.ref }}
-
-          # Check if any file in the folder 'deploy' has changed
-          if git diff --name-only origin/${{ github.event.pull_request.base.ref }} ${{ github.sha }} | grep -q '^deploy/'; then
-            echo "folder_changed=true" >> $GITHUB_OUTPUT
-          else
-            echo "folder_changed=false" >> $GITHUB_OUTPUT
-          fi
-
-      # Conditional step to notify if the folder has changed
-      - name: Notify deployment changes
-        if: steps.folder_changes.outputs.folder_changed == 'true'
-        uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
-        with:
-          api-key: ${{ secrets.ZULIP_API_KEY }}
-          email: ${{ secrets.ZULIP_EMAIL }}
-          organization-url: "https://hopr.zulipchat.com"
-          type: "stream"
-          to: "GnosisVPN"
-          topic: "gnosisvpn-js"
-          content: |
-            The PR ${{ github.event.pull_request.number }} has changed the folder `deploy/` which contains the deployment files for hoprnet.
-            Review the changes manually and update the `uhttp-docker` repository accordingly.

@@ -1,6 +1,6 @@
 ---
 #################################################################################
-# Child pipeline to cache hoprnet dependencies
+# Child pipeline to cache hoprnet dependencies                                  #
 #################################################################################
 name: Cache dependencies
 
