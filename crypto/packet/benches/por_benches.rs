@@ -7,12 +7,12 @@ mod errors;
 mod por;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use hopr_api::types::{
+use hopr_crypto_packet::HoprSphinxSuite;
+use hopr_crypto_sphinx::prelude::{SharedSecret, SphinxSuite};
+use hopr_types::{
     crypto::{keypairs::Keypair, prelude::OffchainKeypair},
     crypto_random::Randomizable,
 };
-use hopr_crypto_packet::HoprSphinxSuite;
-use hopr_crypto_sphinx::prelude::{SharedSecret, SphinxSuite};
 use por::{generate_proof_of_relay, pre_verify};
 
 // Avoid musl's default allocator due to degraded performance
