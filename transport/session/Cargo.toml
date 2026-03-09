@@ -68,6 +68,7 @@ hopr-network-types = { workspace = true, features = ["serde"] }
 hopr-protocol-app = { workspace = true, features = ["serde"] }
 hopr-protocol-session = { workspace = true, features = ["serde"] }
 hopr-protocol-start = { workspace = true }
+hopr-transport-tag-allocator = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }

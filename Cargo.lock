@@ -5021,6 +5021,7 @@ dependencies = [
  "hopr-transport-probe",
  "hopr-transport-protocol",
  "hopr-transport-session",
+ "hopr-transport-tag-allocator",
  "humantime-serde",
  "insta",
  "lazy_static",
@@ -5223,6 +5224,7 @@ dependencies = [
  "hopr-protocol-app",
  "hopr-protocol-session",
  "hopr-protocol-start",
+ "hopr-transport-tag-allocator",
  "hopr-types",
  "lazy_static",
  "mimalloc",
@@ -5244,6 +5246,10 @@ dependencies = [
  "tokio",
  "tracing",
 ]
+
+[[package]]
+name = "hopr-transport-tag-allocator"
+version = "0.1.0"
 
 [[package]]
 name = "hopr-types"

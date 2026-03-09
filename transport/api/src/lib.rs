@@ -88,6 +88,7 @@ pub use hopr_transport_session::{
     SessionMetricSample, SessionMetricValue, SessionStatsSnapshot, session_snapshot_metric_definitions,
     session_snapshot_metric_samples, session_snapshot_metric_value, session_telemetry_snapshots,
 };
+pub use hopr_transport_tag_allocator;
 #[cfg(feature = "telemetry")]
 pub use stats::PeerPacketStats;
 use tracing::{Instrument, debug, error, trace, warn};
@@ -209,6 +210,34 @@ where
         let me_offchain = *identity.1.public();
         let planner_config = cfg.path_planner;
         let selector = HoprGraphPathSelector::new(me_offchain, graph.clone(), planner_config.max_cached_paths);
+
+        let session_capacity = cfg.session.maximum_sessions as u64;
+        let probing_capacity = std::env::var("HOPR_PROBING_TAG_CAPACITY")
+            .ok()
+            .and_then(|s| s.trim().parse::<u64>().ok())
+            .filter(|&c| c > 0)
+            .unwrap_or(1000);
+        // Allocate remaining capacity to session terminal telemetry
+        let total_range: u64 = 65536 - 16;
+        let session_telemetry_capacity = total_range.saturating_sub(session_capacity + probing_capacity).max(1);
+
+        let tag_allocators = hopr_transport_tag_allocator::create_allocators(
+            16..65536,
+            [
+                hopr_transport_tag_allocator::Usage::Session(session_capacity),
+                hopr_transport_tag_allocator::Usage::SessionTerminalTelemetry(session_telemetry_capacity),
+                hopr_transport_tag_allocator::Usage::ProvingTelemetry(probing_capacity),
+            ],
+        )
+        .expect("tag allocator partition sizes must fit within the tag range");
+
+        let session_tag_allocator = tag_allocators
+            .iter()
+            .find(|(u, _)| matches!(u, hopr_transport_tag_allocator::Usage::Session(_)))
+            .expect("session tag allocator must exist")
+            .1
+            .clone();
+
         Self {
             packet_key: identity.1.clone(),
             chain_key: identity.0.clone(),
@@ -223,29 +252,31 @@ where
                 planner_config,
             ),
             my_multiaddresses,
-            smgr: SessionManager::new(SessionManagerConfig {
-                // TODO(v4.0): Use the entire range of tags properly
-                session_tag_range: (16..65535),
-                maximum_sessions: cfg.session.maximum_sessions as usize,
-                frame_mtu: std::env::var("HOPR_SESSION_FRAME_SIZE")
-                    .ok()
-                    .and_then(|s| s.parse::<usize>().ok())
-                    .unwrap_or_else(|| SessionManagerConfig::default().frame_mtu)
-                    .max(ApplicationData::PAYLOAD_SIZE),
-                max_frame_timeout: std::env::var("HOPR_SESSION_FRAME_TIMEOUT_MS")
-                    .ok()
-                    .and_then(|s| s.parse::<u64>().ok().map(Duration::from_millis))
-                    .unwrap_or_else(|| SessionManagerConfig::default().max_frame_timeout)
-                    .max(Duration::from_millis(100)),
-                initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
-                idle_timeout: cfg.session.idle_timeout,
-                balancer_sampling_interval: cfg.session.balancer_sampling_interval,
-                initial_return_session_egress_rate: 10,
-                minimum_surb_buffer_duration: Duration::from_secs(5),
-                maximum_surb_buffer_size: cfg.packet.surb_store.rb_capacity,
-                surb_balance_notify_period: None,
-                surb_target_notify: true,
-            }),
+            smgr: SessionManager::new(
+                SessionManagerConfig {
+                    session_tag_range: (16..65536),
+                    maximum_sessions: cfg.session.maximum_sessions as usize,
+                    frame_mtu: std::env::var("HOPR_SESSION_FRAME_SIZE")
+                        .ok()
+                        .and_then(|s| s.parse::<usize>().ok())
+                        .unwrap_or_else(|| SessionManagerConfig::default().frame_mtu)
+                        .max(ApplicationData::PAYLOAD_SIZE),
+                    max_frame_timeout: std::env::var("HOPR_SESSION_FRAME_TIMEOUT_MS")
+                        .ok()
+                        .and_then(|s| s.parse::<u64>().ok().map(Duration::from_millis))
+                        .unwrap_or_else(|| SessionManagerConfig::default().max_frame_timeout)
+                        .max(Duration::from_millis(100)),
+                    initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
+                    idle_timeout: cfg.session.idle_timeout,
+                    balancer_sampling_interval: cfg.session.balancer_sampling_interval,
+                    initial_return_session_egress_rate: 10,
+                    minimum_surb_buffer_duration: Duration::from_secs(5),
+                    maximum_surb_buffer_size: cfg.packet.surb_store.rb_capacity,
+                    surb_balance_notify_period: None,
+                    surb_target_notify: true,
+                },
+                session_tag_allocator,
+            ),
             db,
             chain_api: resolver,
             cfg,

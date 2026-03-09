@@ -19,6 +19,7 @@ use hopr_protocol_start::{
     KeepAliveFlag, KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished,
     StartInitiation,
 };
+use hopr_transport_tag_allocator::{AllocatedTag, TagAllocator};
 use hopr_types::{
     crypto_random::Randomizable,
     internal::{
@@ -150,6 +151,9 @@ struct SessionSlot {
     // SURB flow updates happening outside of Session protocol
     // (e.g., due to Start protocol messages).
     surb_estimator: AtomicSurbFlowEstimator,
+    // Holds the allocated tag so it is returned to the pool when the session is evicted.
+    // `None` for outgoing sessions where the tag was assigned by the remote peer.
+    _allocated_tag: Option<Arc<AllocatedTag>>,
 }
 
 /// Indicates the result of processing a message.
@@ -417,6 +421,7 @@ pub struct SessionManager<S, T> {
     session_notifiers: Arc<OnceLock<(T, Sender<(SessionId, ClosureReason)>)>>,
     sessions: moka::future::Cache<SessionId, SessionSlot>,
     msg_sender: Arc<OnceLock<S>>,
+    tag_allocator: Arc<dyn TagAllocator>,
     cfg: SessionManagerConfig,
 }
 
@@ -428,6 +433,7 @@ impl<S, T> Clone for SessionManager<S, T> {
             sessions: self.sessions.clone(),
             cfg: self.cfg.clone(),
             msg_sender: self.msg_sender.clone(),
+            tag_allocator: self.tag_allocator.clone(),
         }
     }
 }
@@ -441,8 +447,9 @@ where
     S::Error: std::error::Error + Send + Sync + Clone + 'static,
     T::Error: std::error::Error + Send + Sync + Clone + 'static,
 {
-    /// Creates a new instance given the [`config`](SessionManagerConfig).
-    pub fn new(mut cfg: SessionManagerConfig) -> Self {
+    /// Creates a new instance given the [`config`](SessionManagerConfig) and a [`TagAllocator`]
+    /// for allocating session tags on the Exit (incoming) side.
+    pub fn new(mut cfg: SessionManagerConfig, tag_allocator: Arc<dyn TagAllocator>) -> Self {
         let min_session_tag_range_reservation = ReservedTag::range().end;
         debug_assert!(
             min_session_tag_range_reservation > HoprStartProtocol::START_PROTOCOL_MESSAGE_TAG.as_u64(),
@@ -493,6 +500,7 @@ where
                 })
                 .build(),
             session_notifiers: Arc::new(OnceLock::new()),
+            tag_allocator,
             cfg,
         }
     }
@@ -803,6 +811,7 @@ where
                             surb_estimator: surb_estimator.clone(),
                             #[cfg(feature = "telemetry")]
                             telemetry: telemetry.clone(),
+                            _allocated_tag: None,
                         },
                     )
                     .await?;
@@ -875,6 +884,7 @@ where
                             surb_estimator: Default::default(), // No SURB estimator needed
                             #[cfg(feature = "telemetry")]
                             telemetry: telemetry.clone(),
+                            _allocated_tag: None,
                         },
                     )
                     .await?;
@@ -1110,52 +1120,39 @@ where
 
         let (tx_session_data, rx_session_data) = futures::channel::mpsc::unbounded::<ApplicationDataIn>();
 
-        // Search for a free Session ID slot
+        // Allocate a unique tag for this incoming session
         self.sessions.run_pending_tasks().await; // Needed so that entry_count is updated
-        let allocated_slot = if self.cfg.maximum_sessions > self.sessions.entry_count() as usize {
-            insert_into_next_slot(
-                &self.sessions,
-                |sid| {
-                    // NOTE: It is allowed to insert sessions using the same tag
-                    // but different pseudonyms because the SessionId is different.
-                    let next_tag: Tag = match sid {
-                        Some(session_id) => ((session_id.tag().as_u64() + 1) % self.cfg.session_tag_range.end)
-                            .max(self.cfg.session_tag_range.start)
-                            .into(),
-                        None => hopr_types::crypto_random::random_integer(
-                            self.cfg.session_tag_range.start,
-                            Some(self.cfg.session_tag_range.end),
-                        )
-                        .into(),
-                    };
-                    SessionId::new(next_tag, pseudonym)
-                },
-                |_sid| SessionSlot {
-                    session_tx: Arc::new(tx_session_data),
-                    routing_opts: reply_routing.clone(),
-                    abort_handles: Default::default(),
-                    surb_mgmt: Default::default(),
-                    surb_estimator: Default::default(),
-                    #[cfg(feature = "telemetry")]
-                    telemetry: Arc::new(SessionTelemetry::new(
-                        _sid,
-                        HoprSessionConfig {
-                            capabilities: session_req.capabilities.0,
-                            frame_mtu: self.cfg.frame_mtu,
-                            frame_timeout: self.cfg.max_frame_timeout,
-                        },
-                    )),
-                },
-            )
-            .await
+        let allocated_tag = if self.cfg.maximum_sessions > self.sessions.entry_count() as usize {
+            self.tag_allocator.allocate()
         } else {
             error!(%pseudonym, "cannot accept incoming session, the maximum number of sessions has been reached");
             None
         };
 
-        // If some of the following code throws an error, the allocated slot will be kept
-        // but will be later re-claimed when it expires.
-        if let Some((session_id, slot)) = allocated_slot {
+        if let Some(allocated_tag) = allocated_tag {
+            let tag: Tag = allocated_tag.value().into();
+            let session_id = SessionId::new(tag, pseudonym);
+            let allocated_tag = Arc::new(allocated_tag);
+
+            let slot = SessionSlot {
+                session_tx: Arc::new(tx_session_data),
+                routing_opts: reply_routing.clone(),
+                abort_handles: Default::default(),
+                surb_mgmt: Default::default(),
+                surb_estimator: Default::default(),
+                #[cfg(feature = "telemetry")]
+                telemetry: Arc::new(SessionTelemetry::new(
+                    session_id,
+                    HoprSessionConfig {
+                        capabilities: session_req.capabilities.0,
+                        frame_mtu: self.cfg.frame_mtu,
+                        frame_timeout: self.cfg.max_frame_timeout,
+                    },
+                )),
+                _allocated_tag: Some(allocated_tag),
+            };
+            self.sessions.insert(session_id, slot.clone()).await;
+
             debug!(%session_id, ?session_req, "assigned a new session");
 
             let closure_notifier = Box::new(move |session_id: SessionId, reason: ClosureReason| {
@@ -1529,6 +1526,23 @@ mod tests {
     use super::*;
     use crate::{Capabilities, Capability, balancer::SurbBalancerConfig, types::SessionTarget};
 
+    /// Create a test tag allocator with a large partition.
+    fn test_tag_allocator() -> Arc<dyn TagAllocator> {
+        hopr_transport_tag_allocator::create_allocators(
+            16..65536,
+            [
+                hopr_transport_tag_allocator::Usage::Session(10000),
+                hopr_transport_tag_allocator::Usage::SessionTerminalTelemetry(10000),
+                hopr_transport_tag_allocator::Usage::ProvingTelemetry(10000),
+            ],
+        )
+        .expect("test allocator creation must not fail")
+        .into_iter()
+        .find(|(u, _)| matches!(u, hopr_transport_tag_allocator::Usage::Session(_)))
+        .expect("session allocator must exist")
+        .1
+    }
+
     #[async_trait::async_trait]
     trait SendMsg {
         async fn send_message(
@@ -1578,8 +1592,8 @@ mod tests {
         let alice_pseudonym = HoprPseudonym::random();
         let bob_peer: Address = (&ChainKeypair::random()).into();
 
-        let alice_mgr = SessionManager::new(Default::default());
-        let bob_mgr = SessionManager::new(Default::default());
+        let alice_mgr = SessionManager::new(Default::default(), test_tag_allocator());
+        let bob_mgr = SessionManager::new(Default::default(), test_tag_allocator());
 
         let mut sequence = mockall::Sequence::new();
         let mut alice_transport = MockMsgSender::new();
@@ -1761,8 +1775,8 @@ mod tests {
             ..Default::default()
         };
 
-        let alice_mgr = SessionManager::new(cfg);
-        let bob_mgr = SessionManager::new(Default::default());
+        let alice_mgr = SessionManager::new(cfg, test_tag_allocator());
+        let bob_mgr = SessionManager::new(Default::default(), test_tag_allocator());
 
         let mut sequence = mockall::Sequence::new();
         let mut alice_transport = MockMsgSender::new();
@@ -1893,7 +1907,7 @@ mod tests {
         let alice_mgr = SessionManager::<
             UnboundedSender<(DestinationRouting, ApplicationDataOut)>,
             futures::channel::mpsc::Sender<IncomingSession>,
-        >::new(Default::default());
+        >::new(Default::default(), test_tag_allocator());
 
         let (dummy_tx, _) = futures::channel::mpsc::unbounded();
         alice_mgr
@@ -1908,6 +1922,7 @@ mod tests {
                     surb_estimator: Default::default(),
                     #[cfg(feature = "telemetry")]
                     telemetry: Arc::new(SessionTelemetry::new(session_id, Default::default())),
+                    _allocated_tag: None,
                 },
             )
             .await;
@@ -1944,8 +1959,8 @@ mod tests {
             ..Default::default()
         };
 
-        let alice_mgr = SessionManager::new(Default::default());
-        let bob_mgr = SessionManager::new(cfg);
+        let alice_mgr = SessionManager::new(Default::default(), test_tag_allocator());
+        let bob_mgr = SessionManager::new(cfg, test_tag_allocator());
 
         // Occupy the only free slot with tag 16
         let (dummy_tx, _) = futures::channel::mpsc::unbounded();
@@ -1964,6 +1979,7 @@ mod tests {
                     )),
                     surb_mgmt: Default::default(),
                     surb_estimator: Default::default(),
+                    _allocated_tag: None,
                 },
             )
             .await;
@@ -2065,8 +2081,8 @@ mod tests {
             ..Default::default()
         };
 
-        let alice_mgr = SessionManager::new(Default::default());
-        let bob_mgr = SessionManager::new(cfg);
+        let alice_mgr = SessionManager::new(Default::default(), test_tag_allocator());
+        let bob_mgr = SessionManager::new(cfg, test_tag_allocator());
 
         // Occupy the only free slot with tag 16
         let (dummy_tx, _) = futures::channel::mpsc::unbounded();
@@ -2085,6 +2101,7 @@ mod tests {
                         SessionId::new(16u64, alice_pseudonym),
                         Default::default(),
                     )),
+                    _allocated_tag: None,
                 },
             )
             .await;
@@ -2180,7 +2197,7 @@ mod tests {
         let alice_pseudonym = HoprPseudonym::random();
         let bob_peer: Address = (&ChainKeypair::random()).into();
 
-        let alice_mgr = SessionManager::new(Default::default());
+        let alice_mgr = SessionManager::new(Default::default(), test_tag_allocator());
 
         let mut sequence = mockall::Sequence::new();
         let mut alice_transport = MockMsgSender::new();
@@ -2275,8 +2292,8 @@ mod tests {
             ..Default::default()
         };
 
-        let alice_mgr = SessionManager::new(cfg);
-        let bob_mgr = SessionManager::new(Default::default());
+        let alice_mgr = SessionManager::new(cfg, test_tag_allocator());
+        let bob_mgr = SessionManager::new(Default::default(), test_tag_allocator());
 
         let mut sequence = mockall::Sequence::new();
         let mut alice_transport = MockMsgSender::new();
@@ -2322,7 +2339,7 @@ mod tests {
     #[cfg(feature = "telemetry")]
     #[test_log::test(tokio::test)]
     async fn failed_incoming_session_establishment_does_not_register_telemetry() -> anyhow::Result<()> {
-        let mgr = SessionManager::new(Default::default());
+        let mgr = SessionManager::new(Default::default(), test_tag_allocator());
 
         let transport = MockMsgSender::new();
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
@@ -2366,8 +2383,8 @@ mod tests {
             surb_balance_notify_period: Some(Duration::from_millis(500)),
             ..Default::default()
         };
-        let alice_mgr = SessionManager::new(Default::default());
-        let bob_mgr = SessionManager::new(bob_cfg.clone());
+        let alice_mgr = SessionManager::new(Default::default(), test_tag_allocator());
+        let bob_mgr = SessionManager::new(bob_cfg.clone(), test_tag_allocator());
 
         let mut alice_transport = MockMsgSender::new();
         let mut bob_transport = MockMsgSender::new();
