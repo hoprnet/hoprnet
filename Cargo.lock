@@ -4362,8 +4362,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "1.0.2"
-source = "git+https://github.com/hoprnet/hopr-api?branch=kauki%2Ffix%2Fcosts-ignoring-the-intermediate#a4cb97628e894d459be220f51396e7d8254d32e8"
+version = "1.0.3"
+source = "git+https://github.com/hoprnet/hopr-api?rev=c1285542ab73fea31a796a4da71160c0587373f3#c1285542ab73fea31a796a4da71160c0587373f3"
 dependencies = [
  "async-trait",
  "atomic_enum",
