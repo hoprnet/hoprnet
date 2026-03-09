@@ -4362,8 +4362,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "1.0.0"
-source = "git+https://github.com/hoprnet/hopr-api?rev=0403f9d9470bf7e60234f8d4725260106f0fe2c7#0403f9d9470bf7e60234f8d4725260106f0fe2c7"
+version = "1.1.0"
+source = "git+https://github.com/hoprnet/hopr-api?branch=lukas%2Fchain-api-sync#7d4e4ac28357ba7c5284f6663f21cfee76f6d3c1"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -4861,7 +4861,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-hopr"
-version = "4.4.1"
+version = "4.5.0"
 dependencies = [
  "anyhow",
  "async-trait",

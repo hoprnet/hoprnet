@@ -30,6 +30,15 @@ pub enum IncomingPacketError<E: std::error::Error> {
     InvalidTicket(OffchainPublicKey, TicketValidationError),
 }
 
+impl<E: std::error::Error> IncomingPacketError<E> {
+    pub fn undecodable<Err: Into<E>>(error: Err) -> Self {
+        Self::Undecodable(error.into())
+    }
+    pub fn overloaded<Err: Into<E>>(error: Err) -> Self {
+        Self::Overloaded(error.into())
+    }
+}
+
 /// Error that can occur when creating a ticket.
 #[derive(Debug, strum::EnumIs, strum::EnumTryAs, Error)]
 pub enum TicketCreationError<E: std::error::Error> {

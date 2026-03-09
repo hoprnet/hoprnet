@@ -274,8 +274,8 @@ where
                 "packet_decode",
             )
             .await
-            .map_err(|e| IncomingPacketError::Overloaded(e.into()))?
-            .map_err(|e| IncomingPacketError::Undecodable(e.into()))?
+            .map_err(IncomingPacketError::overloaded)?
+            .map_err(IncomingPacketError::undecodable)?
         });
 
         let packet_type = match &packet {

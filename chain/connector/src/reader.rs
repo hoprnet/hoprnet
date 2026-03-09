@@ -88,6 +88,14 @@ where
         let chain_info = self.0.query_chain_info().await?;
         Ok(model_to_chain_info(chain_info)?.info)
     }
+
+    fn outgoing_ticket_values(&self, cfg_out_wp: Option<WinningProbability>, cfg_out_price: Option<HoprBalance>) -> Result<(WinningProbability, HoprBalance), Self::Error> {
+        todo!()
+    }
+
+    fn incoming_ticket_values(&self) -> Result<(WinningProbability, HoprBalance), Self::Error> {
+        todo!()
+    }
 }
 
 #[async_trait::async_trait]

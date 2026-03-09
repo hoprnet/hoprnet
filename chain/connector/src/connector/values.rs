@@ -80,6 +80,14 @@ where
     async fn chain_info(&self) -> Result<ChainInfo, Self::Error> {
         Ok(self.query_cached_chain_info().await?.info)
     }
+
+    fn outgoing_ticket_values(&self, cfg_out_wp: Option<WinningProbability>, cfg_out_price: Option<HoprBalance>) -> Result<(WinningProbability, HoprBalance), Self::Error> {
+        todo!()
+    }
+
+    fn incoming_ticket_values(&self) -> Result<(WinningProbability, HoprBalance), Self::Error> {
+        todo!()
+    }
 }
 
 #[cfg(test)]

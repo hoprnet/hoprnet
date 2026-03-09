@@ -55,6 +55,20 @@ where
     }
 }
 
+async fn channel_by_id_no_block<B: Backend + Send + Sync + 'static>(
+    channel_by_id: moka::sync::Cache<ChannelId, Option<ChannelEntry>, ahash::RandomState>,
+    backend: std::sync::Arc<B>,
+    channel_id: ChannelId
+) -> Result<Option<ChannelEntry>, ConnectorError> {
+    Ok(hopr_async_runtime::prelude::spawn_blocking(move || {
+        channel_by_id
+            .try_get_with_by_ref(&channel_id, || {
+                tracing::warn!(%channel_id, "cache miss on channel_by_id");
+                backend.get_channel_by_id(&channel_id).map_err(ConnectorError::backend)
+            })
+    }).await.map_err(ConnectorError::backend)??)
+}
+
 #[async_trait::async_trait]
 impl<B, C, P, R> hopr_api::chain::ChainReadChannelOperations for HoprBlockchainConnector<C, B, P, R>
 where
@@ -69,53 +83,35 @@ where
         self.chain_key.public().as_ref()
     }
 
-    async fn channel_by_parties(&self, src: &Address, dst: &Address) -> Result<Option<ChannelEntry>, Self::Error> {
+    fn channel_by_parties(&self, src: &Address, dst: &Address) -> Result<Option<ChannelEntry>, Self::Error> {
         self.check_connection_state()?;
-
-        let backend = self.backend.clone();
+        
         let src = *src;
         let dst = *dst;
         Ok(self
             .channel_by_parties
-            .try_get_with(ChannelParties::new(src, dst), async move {
+            .try_get_with(ChannelParties::new(src, dst), || {
                 tracing::warn!(%src, %dst, "cache miss on channel_by_parties");
-                match hopr_async_runtime::prelude::spawn_blocking(move || {
-                    let channel_id = generate_channel_id(&src, &dst);
-                    backend.get_channel_by_id(&channel_id)
-                })
-                .await
-                {
-                    Ok(Ok(value)) => Ok(value),
-                    Ok(Err(e)) => Err(ConnectorError::backend(e)),
-                    Err(e) => Err(ConnectorError::backend(e)),
-                }
-            })
-            .await?)
+                let channel_id = generate_channel_id(&src, &dst);
+                self.backend.get_channel_by_id(&channel_id).map_err(ConnectorError::backend)
+            })?)
     }
 
-    async fn channel_by_id(&self, channel_id: &ChannelId) -> Result<Option<ChannelEntry>, Self::Error> {
+    fn channel_by_id(&self, channel_id: &ChannelId) -> Result<Option<ChannelEntry>, Self::Error> {
         self.check_connection_state()?;
-
-        let channel_id = *channel_id;
-        let backend = self.backend.clone();
+        
         Ok(self
             .channel_by_id
-            .try_get_with_by_ref(&channel_id, async move {
+            .try_get_with_by_ref(channel_id, || {
                 tracing::warn!(%channel_id, "cache miss on channel_by_id");
-                match hopr_async_runtime::prelude::spawn_blocking(move || backend.get_channel_by_id(&channel_id)).await
-                {
-                    Ok(Ok(value)) => Ok(value),
-                    Ok(Err(e)) => Err(ConnectorError::backend(e)),
-                    Err(e) => Err(ConnectorError::backend(e)),
-                }
-            })
-            .await?)
+                self.backend.get_channel_by_id(&channel_id).map_err(ConnectorError::backend)
+            })?)
     }
 
-    async fn stream_channels<'a>(
-        &'a self,
+    fn stream_channels(
+        &self,
         selector: ChannelSelector,
-    ) -> Result<BoxStream<'a, ChannelEntry>, Self::Error> {
+    ) -> Result<BoxStream<ChannelEntry>, Self::Error> {
         self.check_connection_state()?;
 
         Ok(self.build_channel_stream(selector)?.boxed())
@@ -151,13 +147,11 @@ where
         amount: HoprBalance,
     ) -> Result<BoxFuture<'a, Result<ChainReceipt, Self::Error>>, Self::Error> {
         self.check_connection_state()?;
-
-        use hopr_api::chain::ChainReadChannelOperations;
-
-        let channel = self
-            .channel_by_id(channel_id)
+        
+        let channel = channel_by_id_no_block(self.channel_by_id.clone(), self.backend.clone(), *channel_id)
             .await?
             .ok_or_else(|| ConnectorError::ChannelDoesNotExist(*channel_id))?;
+
         let tx_req = self.payload_generator.fund_channel(channel.destination, amount)?;
         tracing::debug!(%channel_id, %amount, "funding channel");
 
@@ -172,8 +166,7 @@ where
 
         use hopr_api::chain::ChainReadChannelOperations;
 
-        let channel = self
-            .channel_by_id(channel_id)
+        let channel = channel_by_id_no_block(self.channel_by_id.clone(), self.backend.clone(), *channel_id)
             .await?
             .ok_or_else(|| ConnectorError::ChannelDoesNotExist(*channel_id))?;
 
@@ -279,26 +272,23 @@ mod tests {
         let mut connector = create_connector(blokli_client)?;
         connector.connect().await?;
 
-        assert_eq!(Some(channel_1), connector.channel_by_id(channel_1.get_id()).await?);
+        assert_eq!(Some(channel_1), connector.channel_by_id(channel_1.get_id())?);
         assert_eq!(
             Some(channel_1),
             connector
-                .channel_by_parties(&channel_1.source, &channel_1.destination)
-                .await?
+                .channel_by_parties(&channel_1.source, &channel_1.destination)?
         );
-        assert_eq!(Some(channel_2), connector.channel_by_id(channel_2.get_id()).await?);
+        assert_eq!(Some(channel_2), connector.channel_by_id(channel_2.get_id())?);
         assert_eq!(
             Some(channel_2),
             connector
-                .channel_by_parties(&channel_2.source, &channel_2.destination)
-                .await?
+                .channel_by_parties(&channel_2.source, &channel_2.destination)?
         );
 
         assert_eq!(
             vec![channel_1, channel_2],
             connector
-                .stream_channels(ChannelSelector::default())
-                .await?
+                .stream_channels(ChannelSelector::default())?
                 .collect::<Vec<_>>()
                 .await
         );
@@ -306,8 +296,7 @@ mod tests {
         assert_eq!(
             vec![channel_1],
             connector
-                .stream_channels(ChannelSelector::default().with_allowed_states(&[ChannelStatusDiscriminants::Open]))
-                .await?
+                .stream_channels(ChannelSelector::default().with_allowed_states(&[ChannelStatusDiscriminants::Open]))?
                 .collect::<Vec<_>>()
                 .await
         );
@@ -316,8 +305,7 @@ mod tests {
             connector
                 .stream_channels(
                     ChannelSelector::default().with_allowed_states(&[ChannelStatusDiscriminants::PendingToClose])
-                )
-                .await?
+                )?
                 .collect::<Vec<_>>()
                 .await
         );
@@ -330,8 +318,7 @@ mod tests {
                         .with_closure_time_range(
                             DateTime::from(std::time::SystemTime::UNIX_EPOCH + Duration::from_mins(11))..
                         )
-                )
-                .await?
+                )?
                 .collect::<Vec<_>>()
                 .await
         );
