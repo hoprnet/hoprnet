@@ -206,11 +206,13 @@ where
         graph: Graph,
         my_multiaddresses: Vec<Multiaddr>,
         cfg: HoprProtocolConfig,
-    ) -> Self {
+    ) -> errors::Result<Self> {
         let me_offchain = *identity.1.public();
         let planner_config = cfg.path_planner;
         let selector = HoprGraphPathSelector::new(me_offchain, graph.clone(), planner_config.max_cached_paths);
 
+        let tag_range = ReservedTag::range().end..u16::MAX as u64 + 1;
+        let tag_range_size = tag_range.end - tag_range.start;
         let session_capacity = cfg.session.maximum_sessions as u64;
         let probing_capacity = std::env::var("HOPR_PROBING_TAG_CAPACITY")
             .ok()
@@ -218,27 +220,30 @@ where
             .filter(|&c| c > 0)
             .unwrap_or(1000);
         // Allocate remaining capacity to session terminal telemetry
-        let total_range: u64 = 65536 - 16;
-        let session_telemetry_capacity = total_range.saturating_sub(session_capacity + probing_capacity).max(1);
+        let session_telemetry_capacity = tag_range_size
+            .saturating_sub(session_capacity + probing_capacity)
+            .max(1);
 
         let tag_allocators = hopr_transport_tag_allocator::create_allocators(
-            16..65536,
+            tag_range.clone(),
             [
-                hopr_transport_tag_allocator::Usage::Session(session_capacity),
-                hopr_transport_tag_allocator::Usage::SessionTerminalTelemetry(session_telemetry_capacity),
-                hopr_transport_tag_allocator::Usage::ProvingTelemetry(probing_capacity),
+                (hopr_transport_tag_allocator::Usage::Session, session_capacity),
+                (
+                    hopr_transport_tag_allocator::Usage::SessionTerminalTelemetry,
+                    session_telemetry_capacity,
+                ),
+                (hopr_transport_tag_allocator::Usage::ProvingTelemetry, probing_capacity),
             ],
-        )
-        .expect("tag allocator partition sizes must fit within the tag range");
+        )?;
 
         let session_tag_allocator = tag_allocators
             .iter()
-            .find(|(u, _)| matches!(u, hopr_transport_tag_allocator::Usage::Session(_)))
-            .expect("session tag allocator must exist")
+            .find(|(u, _)| matches!(u, hopr_transport_tag_allocator::Usage::Session))
+            .expect("session allocator is always present in the partition list above")
             .1
             .clone();
 
-        Self {
+        Ok(Self {
             packet_key: identity.1.clone(),
             chain_key: identity.0.clone(),
             ping: Arc::new(OnceLock::new()),
@@ -254,7 +259,7 @@ where
             my_multiaddresses,
             smgr: SessionManager::new(
                 SessionManagerConfig {
-                    session_tag_range: (16..65536),
+                    session_tag_range: tag_range,
                     maximum_sessions: cfg.session.maximum_sessions as usize,
                     frame_mtu: std::env::var("HOPR_SESSION_FRAME_SIZE")
                         .ok()
@@ -280,7 +285,7 @@ where
             db,
             chain_api: resolver,
             cfg,
-        }
+        })
     }
 
     /// Execute all processes of the [`HoprTransport`] object.

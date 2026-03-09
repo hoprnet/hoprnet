@@ -6,24 +6,15 @@ use std::{fmt, ops::Range, sync::Arc};
 
 pub use allocated_tag::AllocatedTag;
 
-/// Identifies which component a partition belongs to and its capacity.
+/// Identifies which component a partition belongs to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Usage {
     /// Long-lived session tags (e.g. hundreds).
-    Session(u64),
+    Session,
     /// Session terminal telemetry tags (e.g. hundreds to low thousands).
-    SessionTerminalTelemetry(u64),
+    SessionTerminalTelemetry,
     /// Probing telemetry tags — high volume, short-lived (e.g. configurable via env, default ~1000).
-    ProvingTelemetry(u64),
-}
-
-impl Usage {
-    /// The requested partition capacity.
-    pub fn capacity(self) -> u64 {
-        match self {
-            Self::Session(n) | Self::SessionTerminalTelemetry(n) | Self::ProvingTelemetry(n) => n,
-        }
-    }
+    ProvingTelemetry,
 }
 
 /// Errors returned by [`create_allocators`].
@@ -74,19 +65,19 @@ pub type CreateAllocatorsResult = Result<Vec<(Usage, Arc<dyn TagAllocator>)>, Ta
 ///
 /// Returns [`TagAllocatorError`] if the range is empty, any partition has
 /// zero capacity, or the total requested capacity exceeds the range.
-pub fn create_allocators(range: Range<u64>, partitions: [Usage; 3]) -> CreateAllocatorsResult {
+pub fn create_allocators(range: Range<u64>, partitions: [(Usage, u64); 3]) -> CreateAllocatorsResult {
     let range_size = range.end.saturating_sub(range.start);
     if range_size == 0 {
         return Err(TagAllocatorError::EmptyRange);
     }
 
-    for usage in &partitions {
-        if usage.capacity() == 0 {
+    for (usage, capacity) in &partitions {
+        if *capacity == 0 {
             return Err(TagAllocatorError::ZeroCapacity(*usage));
         }
     }
 
-    let total_requested: u64 = partitions.iter().map(|u| u.capacity()).sum();
+    let total_requested: u64 = partitions.iter().map(|(_, cap)| cap).sum();
     if total_requested > range_size {
         return Err(TagAllocatorError::CapacityExceedsRange {
             total_requested,
@@ -97,10 +88,9 @@ pub fn create_allocators(range: Range<u64>, partitions: [Usage; 3]) -> CreateAll
     let mut base = range.start;
     Ok(partitions
         .iter()
-        .map(|usage| {
-            let cap = usage.capacity();
-            let alloc = Arc::new(allocator::PartitionAllocator::new(base, cap));
-            base += cap;
+        .map(|(usage, capacity)| {
+            let alloc = Arc::new(allocator::PartitionAllocator::new(base, *capacity));
+            base += capacity;
             (*usage, alloc as Arc<dyn TagAllocator>)
         })
         .collect())
@@ -119,9 +109,9 @@ mod tests {
         let allocators = create_allocators(
             ReservedTag::range().end..u16::MAX as u64 + 1,
             [
-                Usage::Session(100),
-                Usage::SessionTerminalTelemetry(200),
-                Usage::ProvingTelemetry(300),
+                (Usage::Session, 100),
+                (Usage::SessionTerminalTelemetry, 200),
+                (Usage::ProvingTelemetry, 300),
             ],
         )
         .unwrap();
@@ -160,9 +150,9 @@ mod tests {
         let result = create_allocators(
             ReservedTag::range().end..100,
             [
-                Usage::Session(50),
-                Usage::SessionTerminalTelemetry(50),
-                Usage::ProvingTelemetry(50),
+                (Usage::Session, 50),
+                (Usage::SessionTerminalTelemetry, 50),
+                (Usage::ProvingTelemetry, 50),
             ],
         );
         assert!(matches!(
@@ -179,9 +169,9 @@ mod tests {
         let result = create_allocators(
             0..0,
             [
-                Usage::Session(1),
-                Usage::SessionTerminalTelemetry(1),
-                Usage::ProvingTelemetry(1),
+                (Usage::Session, 1),
+                (Usage::SessionTerminalTelemetry, 1),
+                (Usage::ProvingTelemetry, 1),
             ],
         );
         assert!(matches!(result, Err(TagAllocatorError::EmptyRange)));
@@ -192,15 +182,12 @@ mod tests {
         let result = create_allocators(
             ReservedTag::range().end..u16::MAX as u64 + 1,
             [
-                Usage::Session(0),
-                Usage::SessionTerminalTelemetry(10),
-                Usage::ProvingTelemetry(10),
+                (Usage::Session, 0),
+                (Usage::SessionTerminalTelemetry, 10),
+                (Usage::ProvingTelemetry, 10),
             ],
         );
-        assert!(matches!(
-            result,
-            Err(TagAllocatorError::ZeroCapacity(Usage::Session(0)))
-        ));
+        assert!(matches!(result, Err(TagAllocatorError::ZeroCapacity(Usage::Session))));
     }
 
     #[test]
@@ -208,9 +195,9 @@ mod tests {
         let allocators = create_allocators(
             ReservedTag::range().end..u16::MAX as u64 + 1,
             [
-                Usage::Session(10),
-                Usage::SessionTerminalTelemetry(10),
-                Usage::ProvingTelemetry(10),
+                (Usage::Session, 10),
+                (Usage::SessionTerminalTelemetry, 10),
+                (Usage::ProvingTelemetry, 10),
             ],
         )
         .unwrap();
@@ -242,9 +229,9 @@ mod tests {
         let allocators = create_allocators(
             ReservedTag::range().end..u16::MAX as u64 + 1,
             [
-                Usage::Session(2),
-                Usage::SessionTerminalTelemetry(10),
-                Usage::ProvingTelemetry(10),
+                (Usage::Session, 2),
+                (Usage::SessionTerminalTelemetry, 10),
+                (Usage::ProvingTelemetry, 10),
             ],
         )
         .unwrap();

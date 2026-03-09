@@ -1130,8 +1130,7 @@ where
         };
 
         if let Some(allocated_tag) = allocated_tag {
-            let tag: Tag = allocated_tag.value().into();
-            let session_id = SessionId::new(tag, pseudonym);
+            let session_id = SessionId::new(allocated_tag.value(), pseudonym);
             let allocated_tag = Arc::new(allocated_tag);
 
             let slot = SessionSlot {
@@ -1531,14 +1530,14 @@ mod tests {
         hopr_transport_tag_allocator::create_allocators(
             ReservedTag::range().end..u16::MAX as u64 + 1,
             [
-                hopr_transport_tag_allocator::Usage::Session(10000),
-                hopr_transport_tag_allocator::Usage::SessionTerminalTelemetry(10000),
-                hopr_transport_tag_allocator::Usage::ProvingTelemetry(10000),
+                (hopr_transport_tag_allocator::Usage::Session, 10000),
+                (hopr_transport_tag_allocator::Usage::SessionTerminalTelemetry, 10000),
+                (hopr_transport_tag_allocator::Usage::ProvingTelemetry, 10000),
             ],
         )
         .expect("test allocator creation must not fail")
         .into_iter()
-        .find(|(u, _)| matches!(u, hopr_transport_tag_allocator::Usage::Session(_)))
+        .find(|(u, _)| matches!(u, hopr_transport_tag_allocator::Usage::Session))
         .expect("session allocator must exist")
         .1
     }

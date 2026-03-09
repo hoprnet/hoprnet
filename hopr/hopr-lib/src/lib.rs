@@ -357,7 +357,8 @@ where
             graph,
             vec![(&cfg.host).try_into().map_err(HoprLibError::TransportError)?],
             cfg.protocol,
-        );
+        )
+        .map_err(HoprLibError::TransportError)?;
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
