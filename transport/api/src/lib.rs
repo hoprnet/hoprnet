@@ -88,7 +88,6 @@ pub use hopr_transport_session::{
     SessionMetricSample, SessionMetricValue, SessionStatsSnapshot, session_snapshot_metric_definitions,
     session_snapshot_metric_samples, session_snapshot_metric_value, session_telemetry_snapshots,
 };
-
 #[cfg(feature = "telemetry")]
 pub use stats::PeerPacketStats;
 use tracing::{Instrument, debug, error, trace, warn};

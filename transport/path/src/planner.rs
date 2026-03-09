@@ -401,12 +401,15 @@ mod tests {
         fn map_key_to_id(&self, key: &OffchainPublicKey) -> Option<HoprKeyIdent> {
             self.map.get_by_left(key).copied()
         }
+
         fn map_id_to_public(&self, id: &HoprKeyIdent) -> Option<OffchainPublicKey> {
             self.map.get_by_right(id).copied()
         }
+
         fn map_keys_to_ids(&self, keys: &[OffchainPublicKey]) -> Vec<Option<HoprKeyIdent>> {
             keys.iter().map(|key| self.map_key_to_id(key)).collect()
         }
+
         fn map_ids_to_keys(&self, ids: &[HoprKeyIdent]) -> Vec<Option<OffchainPublicKey>> {
             ids.iter().map(|id| self.map_id_to_public(id)).collect()
         }
