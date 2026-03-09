@@ -6,7 +6,15 @@ use std::{str::FromStr, sync::Arc};
 use common::{CHAIN_DATA, PEERS, PEERS_CHAIN, random_packets_of_count, resolve_mock_path};
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use futures::{SinkExt, StreamExt};
-use hopr_api::chain::ChainValues;
+use hopr_api::{
+    chain::ChainValues,
+    types::{
+        crypto::keypairs::Keypair,
+        crypto_random::Randomizable,
+        internal::{prelude::*, routing::ResolvedTransportRouting},
+        primitive::prelude::HoprBalance,
+    },
+};
 use hopr_chain_connector::create_trustful_hopr_blokli_connector;
 use hopr_crypto_packet::{HoprSurb, prelude::HoprPacket};
 use hopr_db_node::HoprNodeDb;
@@ -16,12 +24,6 @@ use hopr_protocol_hopr::{
     SurbStoreConfig,
 };
 use hopr_transport_protocol::TicketEvent;
-use hopr_types::{
-    crypto::keypairs::Keypair,
-    crypto_random::Randomizable,
-    internal::{prelude::*, routing::ResolvedTransportRouting},
-    primitive::prelude::HoprBalance,
-};
 use libp2p::PeerId;
 
 const SAMPLE_SIZE: usize = 50;

@@ -1,7 +1,7 @@
 use std::hint::black_box;
 
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
-use hopr_types::crypto::types::PACKET_TAG_LENGTH;
+use hopr_api::types::crypto::types::PACKET_TAG_LENGTH;
 
 #[path = "../src/tbf.rs"]
 mod tbf;
@@ -10,12 +10,12 @@ fn tag_bloom_filter_bench(c: &mut Criterion) {
     // Fill up the Bloom filter first
     let mut bloom = tbf::TagBloomFilter::default();
     for _ in 1..bloom.capacity() {
-        let mut tag = hopr_types::crypto_random::random_bytes();
+        let mut tag = hopr_api::types::crypto_random::random_bytes();
         tag[0] = 0xaa;
         bloom.set(&tag);
     }
 
-    let mut existing_tag = hopr_types::crypto_random::random_bytes();
+    let mut existing_tag = hopr_api::types::crypto_random::random_bytes();
     existing_tag[0] = 0xaa;
     bloom.set(&existing_tag);
 

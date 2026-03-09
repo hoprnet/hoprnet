@@ -4,8 +4,13 @@
       "Bash(cargo check:*)",
       "Bash(cargo test:*)",
       "Bash(cargo build:*)",
+      "Bash(cargo metadata:*)",
       "Bash(cargo shear:*)",
-      "Bash(find:*)"
+      "Bash(cargo tree:*)",
+      "Bash(find:*)",
+      "Bash(git diff:*)",
+      "Bash(grep:*)",
+      "Bash(echo:*)"
     ]
   }
 }

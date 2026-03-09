@@ -1,7 +1,9 @@
 use blokli_client::api::{BlokliQueryClient, BlokliTransactionClient};
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
-use hopr_api::chain::{ChainReceipt, TicketRedeemError};
-use hopr_types::{chain::prelude::*, crypto::prelude::*, internal::prelude::*, primitive::prelude::HoprBalance};
+use hopr_api::{
+    chain::{ChainReceipt, TicketRedeemError},
+    types::{chain::prelude::*, crypto::prelude::*, internal::prelude::*, primitive::prelude::HoprBalance},
+};
 
 use crate::{backend::Backend, connector::HoprBlockchainConnector, errors::ConnectorError};
 
@@ -106,7 +108,7 @@ where
         match self.prepare_ticket_redeem_payload(ticket).await {
             Ok(tx_req) => {
                 Ok(self
-                    .send_tx(tx_req)
+                    .send_tx(tx_req, None)
                     .await
                     .map_err(|e| TicketRedeemError::ProcessingError(ticket.ticket, e))?
                     .map_err(move |tx_tracking_error|
@@ -135,8 +137,10 @@ mod tests {
 
     use blokli_client::BlokliTestClient;
     use hex_literal::hex;
-    use hopr_api::chain::{ChainWriteChannelOperations, ChainWriteTicketOperations};
-    use hopr_types::primitive::prelude::*;
+    use hopr_api::{
+        chain::{ChainWriteChannelOperations, ChainWriteTicketOperations},
+        types::primitive::prelude::*,
+    };
 
     use super::*;
     use crate::{

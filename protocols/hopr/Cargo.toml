@@ -1,6 +1,6 @@
 [package]
 name = "hopr-protocol-hopr"
-version = "4.4.0"
+version = "4.4.1"
 edition.workspace = true
 rust-version.workspace = true
 authors = ["HOPR Association <tech@hoprnet.org>"]
@@ -11,15 +11,15 @@ license = "GPL-3.0-only"
 
 [features]
 default = ["rayon"]
-rayon = ["hopr-crypto-packet/rayon", "hopr-types/rayon"]
+rayon = ["hopr-crypto-packet/rayon", "hopr-parallelize/rayon"]
 serde = [
   "dep:cfg_eval",
   "dep:humantime-serde",
   "dep:serde",
   "dep:serde_with",
-  "hopr-types/serde",
+  "hopr-api/serde",
 ]
-prometheus = ["dep:hopr-metrics", "hopr-types/telemetry"]
+prometheus = ["dep:hopr-metrics", "hopr-parallelize/prometheus"]
 trace-timing = ["hopr-platform/trace-timing"]
 
 [dependencies]
@@ -44,17 +44,9 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
-hopr-api = { workspace = true, features = ["db", "chain"] }
-hopr-types = { workspace = true, features = [
-  "crypto",
-  "internal",
-  "primitive",
-  "parallelize",
-  "random",
-] }
-
+hopr-api = { workspace = true, features = ["db", "chain", "types-random"] }
 hopr-crypto-packet = { workspace = true }
-
+hopr-parallelize = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-platform = { workspace = true }
 

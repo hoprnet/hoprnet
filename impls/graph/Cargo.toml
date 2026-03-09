@@ -27,7 +27,6 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 hopr-api = { workspace = true, features = ["ct", "graph", "network"] }
-hopr-types = { workspace = true, features = ["crypto", "internal"] }
 
 hopr-statistics = { workspace = true, features = ["moving"] }
 

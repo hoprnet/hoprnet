@@ -4,9 +4,11 @@ use blokli_client::api::{BlokliQueryClient, BlokliSubscriptionClient, BlokliTran
 use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use futures_concurrency::stream::Merge;
 use futures_time::future::FutureExt as FuturesTimeExt;
-use hopr_api::chain::{ChainPathResolver, ChainReceipt, HoprKeyIdent};
+use hopr_api::{
+    chain::{ChainPathResolver, ChainReceipt, HoprKeyIdent},
+    types::{chain::prelude::*, crypto::prelude::*, internal::prelude::*, primitive::prelude::*},
+};
 use hopr_async_runtime::AbortHandle;
-use hopr_types::{chain::prelude::*, crypto::prelude::*, internal::prelude::*, primitive::prelude::*};
 use petgraph::prelude::DiGraphMap;
 
 use crate::{
@@ -538,9 +540,12 @@ where
     async fn send_tx<'a>(
         &'a self,
         tx_req: P::TxRequest,
+        custom_tx_multiplier: Option<u32>,
     ) -> Result<impl Future<Output = Result<ChainReceipt, ConnectorError>> + Send + 'a, ConnectorError> {
         let chain_info = self.query_cached_chain_info().await?;
-        let tx_timeout = self.cfg.tx_timeout_multiplier.max(1) * chain_info.finality * chain_info.expected_block_time;
+        let tx_timeout = custom_tx_multiplier.unwrap_or(self.cfg.tx_timeout_multiplier).max(1)
+            * chain_info.finality
+            * chain_info.expected_block_time;
         Ok(self
             .sequencer
             .enqueue_transaction(tx_req, tx_timeout.max(MIN_TX_CONFIRM_TIMEOUT))
@@ -599,7 +604,7 @@ where
 pub(crate) mod tests {
     use blokli_client::BlokliTestState;
     use hex_literal::hex;
-    use hopr_types::chain::contract_addresses_for_network;
+    use hopr_api::types::chain::contract_addresses_for_network;
 
     use super::*;
     use crate::{InMemoryBackend, testing::BlokliTestStateBuilder};

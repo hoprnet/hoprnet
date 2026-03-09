@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-connector"
-version = "0.16.0"
+version = "0.17.0"
 edition.workspace = true
 rust-version.workspace = true
 authors = ["HOPR Association <tech@hoprnet.org>"]
@@ -35,16 +35,8 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 tempfile = { workspace = true }
 
-hopr-api = { workspace = true, features = ["chain"] }
+hopr-api = { workspace = true, features = ["chain", "types-random", "serde"] }
 hopr-async-runtime = { workspace = true }
-hopr-types = { workspace = true, features = [
-  "chain",
-  "crypto",
-  "random",
-  "internal",
-  "primitive",
-  "serde",
-] }
 
 [dev-dependencies]
 hex-literal = { workspace = true }

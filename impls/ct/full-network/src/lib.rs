@@ -1,13 +1,17 @@
 use futures::{StreamExt, stream::BoxStream};
 use futures_concurrency::stream::StreamExt as _;
 use hopr_api::{
-    ct::{CoverTrafficGeneration, DestinationRouting, ProbeRouting, ProbingTrafficGeneration},
+    ct::{CoverTrafficGeneration, ProbeRouting, ProbingTrafficGeneration},
     graph::{NetworkGraphTraverse, NetworkGraphView, costs::HoprForwardCostFn},
-};
-use hopr_types::{
-    crypto::types::OffchainPublicKey,
-    crypto_random::Randomizable,
-    internal::{NodeId, protocol::HoprPseudonym, routing::RoutingOptions},
+    types::{
+        crypto::types::OffchainPublicKey,
+        crypto_random::Randomizable,
+        internal::{
+            NodeId,
+            protocol::HoprPseudonym,
+            routing::{DestinationRouting, RoutingOptions},
+        },
+    },
 };
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -195,9 +199,9 @@ mod tests {
     use hopr_api::{
         OffchainKeypair,
         graph::{NetworkGraphUpdate, NetworkGraphWrite},
+        types::{crypto::keypairs::Keypair, internal::NodeId},
     };
     use hopr_network_graph::ChannelGraph;
-    use hopr_types::{crypto::keypairs::Keypair, internal::NodeId};
     use tokio::time::timeout;
 
     use super::*;
@@ -218,7 +222,7 @@ mod tests {
     lazy_static::lazy_static! {
         static ref RANDOM_PEERS: HashSet<Node> = (1..10).map(|_| {
             Node {
-                id: OffchainPublicKey::from_privkey(&hopr_types::crypto_random::random_bytes::<32>()).unwrap(),
+                id: OffchainPublicKey::from_privkey(&hopr_api::types::crypto_random::random_bytes::<32>()).unwrap(),
             }
         }).collect::<HashSet<_>>();
     }

@@ -392,25 +392,50 @@ mod tests {
         *OffchainKeypair::from_secret(secret).expect("valid secret").public()
     }
 
+    #[derive(Clone)]
+    struct Mapper {
+        map: Arc<BiMap<OffchainPublicKey, HoprKeyIdent>>,
+    }
+
+    impl KeyIdMapping<HoprKeyIdent, OffchainPublicKey> for Mapper {
+        fn map_key_to_id(&self, key: &OffchainPublicKey) -> Option<HoprKeyIdent> {
+            self.map.get_by_left(key).copied()
+        }
+        fn map_id_to_public(&self, id: &HoprKeyIdent) -> Option<OffchainPublicKey> {
+            self.map.get_by_right(id).copied()
+        }
+        fn map_keys_to_ids(&self, keys: &[OffchainPublicKey]) -> Vec<Option<HoprKeyIdent>> {
+            keys.iter().map(|key| self.map_key_to_id(key)).collect()
+        }
+        fn map_ids_to_keys(&self, ids: &[HoprKeyIdent]) -> Vec<Option<OffchainPublicKey>> {
+            ids.iter().map(|id| self.map_id_to_public(id)).collect()
+        }
+    }
+
     struct TestChainApi {
         me: Address,
         key_addr_map: BiMap<OffchainPublicKey, Address>,
         channels: Vec<ChannelEntry>,
-        id_mapper: bimap::BiHashMap<HoprKeyIdent, OffchainPublicKey>,
+        id_mapper: Mapper,
     }
 
     impl TestChainApi {
         fn new(me_key: OffchainPublicKey, me_addr: Address, peers: Vec<(OffchainPublicKey, Address)>) -> Self {
             let mut key_addr_map = BiMap::new();
+            let mut key_id_map: BiMap<OffchainPublicKey, HoprKeyIdent> = BiMap::new();
             key_addr_map.insert(me_key, me_addr);
-            for (k, a) in &peers {
+            key_id_map.insert(me_key, 0u32.into());
+            for (i, (k, a)) in peers.iter().enumerate() {
                 key_addr_map.insert(*k, *a);
+                key_id_map.insert(*k, ((i + 1) as u32).into());
             }
             Self {
                 me: me_addr,
                 key_addr_map,
                 channels: vec![],
-                id_mapper: bimap::BiHashMap::new(),
+                id_mapper: Mapper {
+                    map: Arc::new(key_id_map),
+                },
             }
         }
 
@@ -424,7 +449,7 @@ mod tests {
     #[async_trait]
     impl ChainKeyOperations for TestChainApi {
         type Error = TestError;
-        type Mapper = bimap::BiHashMap<HoprKeyIdent, OffchainPublicKey>;
+        type Mapper = Mapper;
 
         async fn chain_key_to_packet_key(
             &self,

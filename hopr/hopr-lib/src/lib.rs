@@ -33,12 +33,12 @@ pub use hopr_api as api;
 #[doc(hidden)]
 pub mod exports {
     pub mod types {
-        pub use hopr_types::{chain, internal, primitive};
+        pub use hopr_api::types::{chain, internal, primitive};
     }
 
     pub mod crypto {
+        pub use hopr_api::types::crypto as types;
         pub use hopr_crypto_keypair as keypair;
-        pub use hopr_types::crypto as types;
     }
 
     pub mod network {
@@ -90,6 +90,7 @@ pub use hopr_api::{
     graph::EdgeLinkObservable,
     network::{NetworkBuilder, NetworkStreamControl},
     node::{HoprNodeNetworkOperations, HoprNodeOperations, state::HoprState},
+    types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*},
 };
 use hopr_async_runtime::prelude::spawn;
 pub use hopr_async_runtime::{Abortable, AbortableList};
@@ -101,7 +102,6 @@ use hopr_transport::errors::HoprTransportError;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport::transfer_session;
 pub use hopr_transport::*;
-pub use hopr_types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*};
 use tracing::{debug, error, info, warn};
 use validator::Validate;
 
@@ -118,16 +118,16 @@ pub use crate::{
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, smart_default::SmartDefault)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct HopRouting(
-    #[default(hopr_types::primitive::bounded::BoundedSize::MIN)]
-    hopr_types::primitive::bounded::BoundedSize<
-        { hopr_types::internal::routing::RoutingOptions::MAX_INTERMEDIATE_HOPS },
+    #[default(hopr_api::types::primitive::bounded::BoundedSize::MIN)]
+    hopr_api::types::primitive::bounded::BoundedSize<
+        { hopr_api::types::internal::routing::RoutingOptions::MAX_INTERMEDIATE_HOPS },
     >,
 );
 
 #[cfg(feature = "session-client")]
 impl HopRouting {
     /// Maximum number of hops that can be configured.
-    pub const MAX_HOPS: usize = hopr_types::internal::routing::RoutingOptions::MAX_INTERMEDIATE_HOPS;
+    pub const MAX_HOPS: usize = hopr_api::types::internal::routing::RoutingOptions::MAX_INTERMEDIATE_HOPS;
 
     /// Returns the configured number of hops.
     pub fn hop_count(self) -> usize {
@@ -137,7 +137,7 @@ impl HopRouting {
 
 #[cfg(feature = "session-client")]
 impl TryFrom<usize> for HopRouting {
-    type Error = hopr_types::primitive::errors::GeneralError;
+    type Error = hopr_api::types::primitive::errors::GeneralError;
 
     fn try_from(value: usize) -> Result<Self, Self::Error> {
         Ok(Self(value.try_into()?))
@@ -145,7 +145,7 @@ impl TryFrom<usize> for HopRouting {
 }
 
 #[cfg(feature = "session-client")]
-impl From<HopRouting> for hopr_types::internal::routing::RoutingOptions {
+impl From<HopRouting> for hopr_api::types::internal::routing::RoutingOptions {
     fn from(value: HopRouting) -> Self {
         Self::Hops(value.0)
     }
@@ -167,7 +167,7 @@ pub struct HoprSessionClientConfig {
     pub capabilities: SessionCapabilities,
     /// Optional pseudonym used for the session. Mostly useful for testing only.
     #[default(None)]
-    pub pseudonym: Option<hopr_types::internal::protocol::HoprPseudonym>,
+    pub pseudonym: Option<hopr_api::types::internal::protocol::HoprPseudonym>,
     /// Enable automatic SURB management for the session.
     #[default(Some(SurbBalancerConfig::default()))]
     pub surb_management: Option<SurbBalancerConfig>,
@@ -235,7 +235,7 @@ pub fn prepare_tokio_runtime(
     use std::str::FromStr;
     let avail_parallelism = std::thread::available_parallelism().ok().map(|v| v.get() / 2);
 
-    hopr_types::parallelize::cpu::init_thread_pool(
+    hopr_parallelize::cpu::init_thread_pool(
         num_cpu_threads
             .map(|v| v.get())
             .or(avail_parallelism)
@@ -344,7 +344,7 @@ where
         graph: Graph,
         cfg: config::HoprLibConfig,
     ) -> errors::Result<Self> {
-        if hopr_types::crypto_random::is_rng_fixed() {
+        if hopr_api::types::crypto_random::is_rng_fixed() {
             warn!("!! FOR TESTING ONLY !! THIS BUILD IS USING AN INSECURE FIXED RNG !!")
         }
 

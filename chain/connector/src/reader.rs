@@ -3,8 +3,10 @@ use std::time::Duration;
 use blokli_client::api::{BlokliQueryClient, BlokliSubscriptionClient};
 use futures::{StreamExt, TryStreamExt};
 use futures_time::future::FutureExt as FuturesTimeExt;
-use hopr_api::chain::{ChainInfo, DeployedSafe, DomainSeparators, SafeSelector};
-use hopr_types::{internal::prelude::*, primitive::prelude::*};
+use hopr_api::{
+    chain::{ChainInfo, DeployedSafe, DomainSeparators, SafeSelector},
+    types::{internal::prelude::*, primitive::prelude::*},
+};
 
 use crate::{
     errors::ConnectorError,

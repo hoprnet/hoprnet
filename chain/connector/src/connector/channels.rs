@@ -1,7 +1,9 @@
 use blokli_client::api::{BlokliQueryClient, BlokliTransactionClient};
 use futures::{FutureExt, StreamExt, future::BoxFuture, stream::BoxStream};
-use hopr_api::chain::{ChainReceipt, ChannelSelector};
-use hopr_types::{chain::prelude::*, crypto::prelude::Keypair, internal::prelude::*, primitive::prelude::*};
+use hopr_api::{
+    chain::{ChainReceipt, ChannelSelector},
+    types::{chain::prelude::*, crypto::prelude::Keypair, internal::prelude::*, primitive::prelude::*},
+};
 
 use crate::{backend::Backend, connector::HoprBlockchainConnector, errors::ConnectorError};
 
@@ -140,7 +142,7 @@ where
         let tx_req = self.payload_generator.fund_channel(*dst, amount)?;
         tracing::debug!( %dst, %amount, "opening channel");
 
-        Ok(self.send_tx(tx_req).await?.boxed())
+        Ok(self.send_tx(tx_req, None).await?.boxed())
     }
 
     async fn fund_channel<'a>(
@@ -159,7 +161,7 @@ where
         let tx_req = self.payload_generator.fund_channel(channel.destination, amount)?;
         tracing::debug!(%channel_id, %amount, "funding channel");
 
-        Ok(self.send_tx(tx_req).await?.boxed())
+        Ok(self.send_tx(tx_req, None).await?.boxed())
     }
 
     async fn close_channel<'a>(
@@ -204,7 +206,7 @@ where
             _ => return Err(ConnectorError::InvalidState("channel closure time has not elapsed")),
         };
 
-        Ok(self.send_tx(tx_req).await?.boxed())
+        Ok(self.send_tx(tx_req, None).await?.boxed())
     }
 }
 
@@ -213,8 +215,10 @@ mod tests {
     use std::time::Duration;
 
     use hex_literal::hex;
-    use hopr_api::chain::{ChainReadChannelOperations, ChainWriteChannelOperations};
-    use hopr_types::crypto::keypairs::{ChainKeypair, OffchainKeypair};
+    use hopr_api::{
+        chain::{ChainReadChannelOperations, ChainWriteChannelOperations},
+        types::crypto::keypairs::{ChainKeypair, OffchainKeypair},
+    };
 
     use super::*;
     use crate::{

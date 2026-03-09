@@ -2,8 +2,10 @@ use std::time::Duration;
 
 use blokli_client::api::BlokliQueryClient;
 use futures::TryFutureExt;
-use hopr_api::chain::{ChainInfo, DomainSeparators};
-use hopr_types::{internal::prelude::WinningProbability, primitive::prelude::*};
+use hopr_api::{
+    chain::{ChainInfo, DomainSeparators},
+    types::{internal::prelude::WinningProbability, primitive::prelude::*},
+};
 
 use crate::{
     HoprBlockchainReader,
@@ -84,10 +86,12 @@ where
 mod tests {
     use std::str::FromStr;
 
-    use hopr_api::chain::ChainValues;
-    use hopr_types::{
-        crypto::prelude::*,
-        internal::account::{AccountEntry, AccountType},
+    use hopr_api::{
+        chain::ChainValues,
+        types::{
+            crypto::prelude::*,
+            internal::account::{AccountEntry, AccountType},
+        },
     };
 
     use super::*;

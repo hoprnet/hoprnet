@@ -1,11 +1,13 @@
-use hopr_api::chain::HoprKeyIdent;
-use hopr_types::{
-    crypto::prelude::OffchainPublicKey,
-    internal::{
-        account::AccountEntry,
-        channels::{ChannelEntry, ChannelId},
+use hopr_api::{
+    chain::HoprKeyIdent,
+    types::{
+        crypto::prelude::OffchainPublicKey,
+        internal::{
+            account::AccountEntry,
+            channels::{ChannelEntry, ChannelId},
+        },
+        primitive::prelude::{Address, BytesRepresentable},
     },
-    primitive::prelude::{Address, BytesRepresentable},
 };
 use redb::{ReadableDatabase, TableDefinition};
 
@@ -199,7 +201,7 @@ impl super::Backend for TempDbBackend {
 
 #[cfg(test)]
 mod tests {
-    use hopr_types::{
+    use hopr_api::types::{
         crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         internal::{
             account::AccountType,

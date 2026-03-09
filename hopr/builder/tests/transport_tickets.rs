@@ -37,7 +37,7 @@ async fn ticket_statistics_should_reset_when_cleaned(#[with(5)] cluster_fixture:
     let mut session = cluster_fixture.create_session(&[src, mid, dst]).await?;
 
     const BUF_LEN: usize = 5000;
-    let sent_data = hopr_types::crypto_random::random_bytes::<BUF_LEN>();
+    let sent_data = hopr_api::types::crypto_random::random_bytes::<BUF_LEN>();
 
     tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
         .await
@@ -126,7 +126,7 @@ async fn test_reject_relaying_a_message_when_the_channel_is_out_of_funding(
     let mut session = cluster_fixture.create_session(&[src, mid, dst]).await?;
 
     const BUF_LEN: usize = 500;
-    let sent_data = hopr_types::crypto_random::random_bytes::<BUF_LEN>();
+    let sent_data = hopr_api::types::crypto_random::random_bytes::<BUF_LEN>();
 
     tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
         .await
@@ -182,7 +182,7 @@ async fn test_redeem_ticket_on_request(#[with(5)] cluster_fixture: ClusterGuard)
     let mut session = cluster_fixture.create_session(&[src, mid, dst]).await?;
 
     const BUF_LEN: usize = 400;
-    let sent_data = hopr_types::crypto_random::random_bytes::<BUF_LEN>();
+    let sent_data = hopr_api::types::crypto_random::random_bytes::<BUF_LEN>();
 
     tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
         .await
@@ -257,7 +257,7 @@ async fn test_neglect_ticket_on_closing(#[with(5)] cluster_fixture: ClusterGuard
     let mut session = cluster_fixture.create_session(&[src, mid, dst]).await?;
 
     const BUF_LEN: usize = 400;
-    let sent_data = hopr_types::crypto_random::random_bytes::<BUF_LEN>();
+    let sent_data = hopr_api::types::crypto_random::random_bytes::<BUF_LEN>();
 
     tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
         .await
@@ -336,7 +336,7 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
     let mut session = cluster_fixture.create_session(&[src, mid, dst]).await?;
 
     const BUF_LEN: usize = 400;
-    let sent_data = hopr_types::crypto_random::random_bytes::<BUF_LEN>();
+    let sent_data = hopr_api::types::crypto_random::random_bytes::<BUF_LEN>();
 
     tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
         .await
@@ -440,7 +440,7 @@ async fn relay_with_win_prob_higher_than_min_win_prob_should_succeed(
     let mut session = cluster_fixture.create_session(&[src, mid, dst]).await?;
 
     const BUF_LEN: usize = 400;
-    let sent_data = hopr_types::crypto_random::random_bytes::<BUF_LEN>();
+    let sent_data = hopr_api::types::crypto_random::random_bytes::<BUF_LEN>();
 
     tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
         .await

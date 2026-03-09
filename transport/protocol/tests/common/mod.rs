@@ -5,7 +5,15 @@ use futures::{SinkExt, StreamExt};
 use futures_concurrency::stream::StreamGroup;
 use futures_time::future::FutureExt;
 use hex_literal::hex;
-use hopr_api::chain::*;
+use hopr_api::{
+    chain::*,
+    types::{
+        crypto::prelude::*,
+        crypto_random::{random_bytes, random_integer},
+        internal::{errors::PathError, prelude::*, routing::ResolvedTransportRouting},
+        primitive::prelude::*,
+    },
+};
 use hopr_async_runtime::AbortableList;
 use hopr_chain_connector::create_trustful_hopr_blokli_connector;
 use hopr_crypto_packet::HoprSurb;
@@ -17,12 +25,6 @@ use hopr_protocol_hopr::{
 };
 use hopr_transport_mixer::config::MixerConfig;
 use hopr_transport_protocol::TicketEvent;
-use hopr_types::{
-    crypto::prelude::*,
-    crypto_random::{random_bytes, random_integer},
-    internal::{errors::PathError, prelude::*, routing::ResolvedTransportRouting},
-    primitive::prelude::*,
-};
 use lazy_static::lazy_static;
 use libp2p::PeerId;
 use tracing::debug;

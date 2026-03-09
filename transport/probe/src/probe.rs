@@ -5,16 +5,16 @@ use futures_concurrency::stream::StreamExt as _;
 use hopr_api::{
     ct::{ProbeRouting, ProbingTrafficGeneration},
     graph::{EdgeTransportTelemetry, NetworkGraphError, NetworkGraphUpdate, NetworkGraphView},
+    types::{
+        crypto::types::OffchainPublicKey, crypto_random::Randomizable, internal::prelude::*,
+        primitive::traits::AsUnixTimestamp,
+    },
 };
 use hopr_async_runtime::AbortableList;
 use hopr_platform::time::native::current_time;
 use hopr_protocol_app::{
     prelude::{ApplicationDataIn, ApplicationDataOut, ReservedTag},
     v1::Tag,
-};
-use hopr_types::{
-    crypto::types::OffchainPublicKey, crypto_random::Randomizable, internal::prelude::*,
-    primitive::traits::AsUnixTimestamp,
 };
 
 use crate::{
@@ -213,7 +213,7 @@ impl Probe {
                                 ),
                                 ProbeRouting::Looping((routing, path_id)) => {
                                     let message = Message::Telemetry(PathTelemetry {
-                                        id: hopr_types::crypto_random::random_bytes(),
+                                        id: hopr_api::types::crypto_random::random_bytes(),
                                         path: std::array::from_fn(|i| path_id[i / 8].to_le_bytes()[i % 8]),
                                         timestamp: std::time::SystemTime::now()
                                             .duration_since(std::time::UNIX_EPOCH)
@@ -222,7 +222,7 @@ impl Probe {
                                     });
 
                                     let random_tag: u64 =
-                                        hopr_types::crypto_random::random_integer(minimum_allowed_tag, None);
+                                        hopr_api::types::crypto_random::random_integer(minimum_allowed_tag, None);
 
                                     if let Ok(packet) = hopr_protocol_app::prelude::ApplicationData::new(
                                         random_tag,
@@ -343,13 +343,15 @@ mod tests {
 
     use async_trait::async_trait;
     use futures::future::BoxFuture;
-    use hopr_api::graph::{
-        EdgeLinkObservable, MeasurableEdge, NetworkGraphError,
-        traits::{EdgeNetworkObservableRead, EdgeObservableRead, EdgeObservableWrite, EdgeProtocolObservable},
+    use hopr_api::{
+        graph::{
+            EdgeLinkObservable, MeasurableEdge, NetworkGraphError,
+            traits::{EdgeNetworkObservableRead, EdgeObservableRead, EdgeObservableWrite, EdgeProtocolObservable},
+        },
+        types::crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     };
     use hopr_ct_immediate::{ImmediateNeighborProber, ProberConfig};
     use hopr_protocol_app::prelude::{ApplicationData, Tag};
-    use hopr_types::crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
 
     use super::*;
     use crate::errors::ProbeError;
