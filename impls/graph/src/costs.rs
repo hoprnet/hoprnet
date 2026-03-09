@@ -358,6 +358,22 @@ mod tests {
     }
 
     #[test]
+    fn forward_intermediate_edge_positive_when_capacity_only_no_probes() -> anyhow::Result<()> {
+        let cost_fn =
+            HoprForwardCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
+        let f = cost_fn.into_cost_fn();
+
+        // Capacity exists on-chain but no probes have run yet (score 0).
+        // Should pass through initial_cost as baseline trust.
+        let cost = f(1.0, &obs_capacity_only(), 1);
+        assert_eq!(
+            cost, 1.0,
+            "intermediate edge with capacity-only should pass through initial_cost, got {cost}"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn forward_intermediate_edge_negative_when_empty() -> anyhow::Result<()> {
         let cost_fn =
             HoprForwardCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
@@ -591,6 +607,30 @@ mod tests {
     }
 
     #[test]
+    fn return_last_edge_positive_when_connected_with_empty_intermediate() -> anyhow::Result<()> {
+        let length = std::num::NonZeroUsize::new(2).context("should be non-zero")?;
+        let ret = HoprReturnCostFn::<_, Observations>::new(length);
+        let ret_fn = ret.into_cost_fn();
+
+        // Simulate relay → me edge: good immediate data, but intermediate_probe
+        // exists with no capacity and zero-score link data (as seen in production
+        // when an intermediate probe record is initialized but not yet populated).
+        let mut obs = Observations::default();
+        obs.record(EdgeWeightType::Connected(true));
+        obs.record(EdgeWeightType::Immediate(Ok(std::time::Duration::from_millis(13))));
+        // Create an empty intermediate_probe (capacity = None, zero link data)
+        obs.record(EdgeWeightType::Intermediate(Err(())));
+
+        let cost = ret_fn(1.0, &obs, 1);
+        assert!(
+            cost > 0.0,
+            "return last edge should be positive when connected even with empty intermediate probe, got {cost}"
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn forward_last_edge_differs_from_return_last_edge() -> anyhow::Result<()> {
         let length = std::num::NonZeroUsize::new(2).context("should be non-zero")?;
 
@@ -613,6 +653,22 @@ mod tests {
     }
 
     // ── Return intermediate edge ────────────────────────────────────────
+
+    #[test]
+    fn return_intermediate_edge_positive_when_capacity_only_no_probes() -> anyhow::Result<()> {
+        let cost_fn =
+            HoprReturnCostFn::<_, Observations>::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?);
+        let f = cost_fn.into_cost_fn();
+
+        // Capacity exists on-chain but no probes have run yet (score 0).
+        // Should pass through initial_cost as baseline trust.
+        let cost = f(1.0, &obs_capacity_only(), 1);
+        assert_eq!(
+            cost, 1.0,
+            "return intermediate edge with capacity-only should pass through initial_cost, got {cost}"
+        );
+        Ok(())
+    }
 
     #[test]
     fn return_intermediate_edge_same_as_forward() -> anyhow::Result<()> {
