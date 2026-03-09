@@ -147,7 +147,6 @@ where
                         ])
                         .with_closure_time_range(Utc::now()..),
                 )
-                .await
                 .map_err(|e| StrategyError::Other(e.into()))?
                 .map(|channel| {
                     Ok(TicketSelector::from(&channel)
@@ -166,10 +165,10 @@ where
 
     async fn on_acknowledged_winning_ticket(&self, ack: &VerifiedTicket) -> crate::errors::Result<()> {
         if self.cfg.redeem_on_winning && ack.verified_ticket().amount.ge(&self.cfg.minimum_redeem_ticket_value) {
+            // TODO: block
             if let Some(channel) = self
                 .hopr_chain_actions
                 .channel_by_id(ack.channel_id())
-                .await
                 .map_err(|e| StrategyError::Other(e.into()))?
             {
                 info!(%ack, "redeeming");

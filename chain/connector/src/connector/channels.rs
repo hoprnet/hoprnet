@@ -58,15 +58,16 @@ where
 async fn channel_by_id_no_block<B: Backend + Send + Sync + 'static>(
     channel_by_id: moka::sync::Cache<ChannelId, Option<ChannelEntry>, ahash::RandomState>,
     backend: std::sync::Arc<B>,
-    channel_id: ChannelId
+    channel_id: ChannelId,
 ) -> Result<Option<ChannelEntry>, ConnectorError> {
     Ok(hopr_async_runtime::prelude::spawn_blocking(move || {
-        channel_by_id
-            .try_get_with_by_ref(&channel_id, || {
-                tracing::warn!(%channel_id, "cache miss on channel_by_id");
-                backend.get_channel_by_id(&channel_id).map_err(ConnectorError::backend)
-            })
-    }).await.map_err(ConnectorError::backend)??)
+        channel_by_id.try_get_with_by_ref(&channel_id, || {
+            tracing::warn!(%channel_id, "cache miss on channel_by_id");
+            backend.get_channel_by_id(&channel_id).map_err(ConnectorError::backend)
+        })
+    })
+    .await
+    .map_err(ConnectorError::backend)??)
 }
 
 #[async_trait::async_trait]
@@ -85,7 +86,7 @@ where
 
     fn channel_by_parties(&self, src: &Address, dst: &Address) -> Result<Option<ChannelEntry>, Self::Error> {
         self.check_connection_state()?;
-        
+
         let src = *src;
         let dst = *dst;
         Ok(self
@@ -93,25 +94,24 @@ where
             .try_get_with(ChannelParties::new(src, dst), || {
                 tracing::warn!(%src, %dst, "cache miss on channel_by_parties");
                 let channel_id = generate_channel_id(&src, &dst);
-                self.backend.get_channel_by_id(&channel_id).map_err(ConnectorError::backend)
+                self.backend
+                    .get_channel_by_id(&channel_id)
+                    .map_err(ConnectorError::backend)
             })?)
     }
 
     fn channel_by_id(&self, channel_id: &ChannelId) -> Result<Option<ChannelEntry>, Self::Error> {
         self.check_connection_state()?;
-        
-        Ok(self
-            .channel_by_id
-            .try_get_with_by_ref(channel_id, || {
-                tracing::warn!(%channel_id, "cache miss on channel_by_id");
-                self.backend.get_channel_by_id(&channel_id).map_err(ConnectorError::backend)
-            })?)
+
+        Ok(self.channel_by_id.try_get_with_by_ref(channel_id, || {
+            tracing::warn!(%channel_id, "cache miss on channel_by_id");
+            self.backend
+                .get_channel_by_id(channel_id)
+                .map_err(ConnectorError::backend)
+        })?)
     }
 
-    fn stream_channels(
-        &self,
-        selector: ChannelSelector,
-    ) -> Result<BoxStream<ChannelEntry>, Self::Error> {
+    fn stream_channels(&self, selector: ChannelSelector) -> Result<BoxStream<'_, ChannelEntry>, Self::Error> {
         self.check_connection_state()?;
 
         Ok(self.build_channel_stream(selector)?.boxed())
@@ -147,7 +147,7 @@ where
         amount: HoprBalance,
     ) -> Result<BoxFuture<'a, Result<ChainReceipt, Self::Error>>, Self::Error> {
         self.check_connection_state()?;
-        
+
         let channel = channel_by_id_no_block(self.channel_by_id.clone(), self.backend.clone(), *channel_id)
             .await?
             .ok_or_else(|| ConnectorError::ChannelDoesNotExist(*channel_id))?;
@@ -275,14 +275,12 @@ mod tests {
         assert_eq!(Some(channel_1), connector.channel_by_id(channel_1.get_id())?);
         assert_eq!(
             Some(channel_1),
-            connector
-                .channel_by_parties(&channel_1.source, &channel_1.destination)?
+            connector.channel_by_parties(&channel_1.source, &channel_1.destination)?
         );
         assert_eq!(Some(channel_2), connector.channel_by_id(channel_2.get_id())?);
         assert_eq!(
             Some(channel_2),
-            connector
-                .channel_by_parties(&channel_2.source, &channel_2.destination)?
+            connector.channel_by_parties(&channel_2.source, &channel_2.destination)?
         );
 
         assert_eq!(

@@ -135,24 +135,20 @@ mod tests {
 
         let data = b"some random message to encode and decode";
 
-        let out_packet = encoder
-            .encode_packet(
-                data,
-                ResolvedTransportRouting::Forward {
-                    pseudonym: HoprPseudonym::random(),
-                    forward_path: ValidatedPath::direct(
-                        *receiver.offchain_key.public(),
-                        receiver.chain_key.public().to_address(),
-                    ),
-                    return_paths: vec![],
-                },
-                None,
-            )
-            .await?;
+        let out_packet = encoder.encode_packet(
+            data,
+            ResolvedTransportRouting::Forward {
+                pseudonym: HoprPseudonym::random(),
+                forward_path: ValidatedPath::direct(
+                    *receiver.offchain_key.public(),
+                    receiver.chain_key.public().to_address(),
+                ),
+                return_paths: vec![],
+            },
+            None,
+        )?;
 
-        let in_packet = decoder
-            .decode(sender.offchain_key.public().into(), out_packet.data)
-            .await?;
+        let in_packet = decoder.decode(sender.offchain_key.public().into(), out_packet.data)?;
         let in_packet = in_packet.try_as_final().ok_or(anyhow::anyhow!("packet is not final"))?;
 
         assert_eq!(data, in_packet.plain_text.as_ref());
@@ -183,7 +179,6 @@ mod tests {
                     },
                     None,
                 )
-                .await
                 .is_err()
         );
 
@@ -203,36 +198,30 @@ mod tests {
 
         let data = b"some random message to encode and decode";
 
-        let out_packet = sender_encoder
-            .encode_packet(
-                data,
-                ResolvedTransportRouting::Forward {
-                    pseudonym: HoprPseudonym::random(),
-                    forward_path: ValidatedPath::new(
-                        sender.chain_key.public().to_address(),
-                        vec![
-                            relay.chain_key.public().to_address(),
-                            receiver.chain_key.public().to_address(),
-                        ],
-                        &sender.chain_api.as_path_resolver(),
-                    )
-                    .await?,
-                    return_paths: vec![],
-                },
-                None,
-            )
-            .await?;
+        let out_packet = sender_encoder.encode_packet(
+            data,
+            ResolvedTransportRouting::Forward {
+                pseudonym: HoprPseudonym::random(),
+                forward_path: ValidatedPath::new(
+                    sender.chain_key.public().to_address(),
+                    vec![
+                        relay.chain_key.public().to_address(),
+                        receiver.chain_key.public().to_address(),
+                    ],
+                    &sender.chain_api.as_path_resolver(),
+                )
+                .await?,
+                return_paths: vec![],
+            },
+            None,
+        )?;
 
-        let fwd_packet = relay_decoder
-            .decode(sender.offchain_key.public().into(), out_packet.data)
-            .await?;
+        let fwd_packet = relay_decoder.decode(sender.offchain_key.public().into(), out_packet.data)?;
         let fwd_packet = fwd_packet
             .try_as_forwarded()
             .ok_or(anyhow::anyhow!("packet is not forwarded"))?;
 
-        let in_packet = receiver_decoder
-            .decode(relay.offchain_key.public().into(), fwd_packet.data)
-            .await?;
+        let in_packet = receiver_decoder.decode(relay.offchain_key.public().into(), fwd_packet.data)?;
         let in_packet = in_packet.try_as_final().ok_or(anyhow::anyhow!("packet is not final"))?;
 
         assert_eq!(data, in_packet.plain_text.as_ref());
@@ -251,11 +240,9 @@ mod tests {
         let acks = (0..MAX_ACKNOWLEDGEMENTS_BATCH_SIZE)
             .map(|_| VerifiedAcknowledgement::random(&PEERS[0].1))
             .collect::<Vec<_>>();
-        let out_packet = encoder.encode_acknowledgements(&acks, PEERS[1].1.public()).await?;
+        let out_packet = encoder.encode_acknowledgements(&acks, PEERS[1].1.public())?;
 
-        let in_packet = decoder
-            .decode(sender.offchain_key.public().into(), out_packet.data)
-            .await?;
+        let in_packet = decoder.decode(sender.offchain_key.public().into(), out_packet.data)?;
         let in_packet = in_packet
             .try_as_acknowledgement()
             .ok_or(anyhow::anyhow!("packet is not acknowledgement"))?;
@@ -280,12 +267,7 @@ mod tests {
             .map(|_| VerifiedAcknowledgement::random(&PEERS[0].1))
             .collect::<Vec<_>>();
 
-        assert!(
-            encoder
-                .encode_acknowledgements(&acks, PEERS[1].1.public())
-                .await
-                .is_err()
-        );
+        assert!(encoder.encode_acknowledgements(&acks, PEERS[1].1.public()).is_err());
 
         Ok(())
     }

@@ -199,8 +199,9 @@ where
                                 ChainEvent::ChannelClosed(channel) |
                                 ChainEvent::ChannelBalanceIncreased(channel, _) |
                                 ChainEvent::ChannelBalanceDecreased(channel, _) => {
-                                    let from = chain_reader.chain_key_to_packet_key(&channel.source).await;
-                                    let to = chain_reader.chain_key_to_packet_key(&channel.destination).await;
+                                    // TODO: block
+                                    let from = chain_reader.chain_key_to_packet_key(&channel.source);
+                                    let to = chain_reader.chain_key_to_packet_key(&channel.destination);
 
                                     match (from, to) {
                                         (Ok(Some(from)), Ok(Some(to))) => {

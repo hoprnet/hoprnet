@@ -44,10 +44,10 @@ where
     async fn resolve_node_id_to_addr(&self, node_id: &NodeId) -> crate::errors::Result<Address> {
         match node_id {
             NodeId::Chain(addr) => Ok(*addr),
+            // TODO: block
             NodeId::Offchain(key) => self
                 .resolver
                 .packet_key_to_chain_key(key)
-                .await
                 .map_err(|e| {
                     HoprTransportError::Other(anyhow::anyhow!("failed to resolve offchain key to chain key: {e}"))
                 })?
@@ -160,7 +160,6 @@ where
                 } = self
                     .surb_store
                     .find_surb(matcher)
-                    .await
                     .ok_or(HoprTransportError::Api(format!(
                         "no surb for pseudonym {}",
                         matcher.pseudonym()

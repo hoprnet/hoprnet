@@ -52,6 +52,7 @@ hopr-metrics = { optional = true, workspace = true }
 
 hopr-protocol-hopr = { workspace = true }
 hopr-protocol-app = { workspace = true }
+hopr-parallelize = { workspace = true, features = ["rayon"] }
 
 
 [dev-dependencies]

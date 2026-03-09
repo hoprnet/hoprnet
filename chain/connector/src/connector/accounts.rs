@@ -65,10 +65,7 @@ where
 {
     type Error = ConnectorError;
 
-    fn stream_accounts(
-        &self,
-        selector: AccountSelector,
-    ) -> Result<BoxStream<AccountEntry>, Self::Error> {
+    fn stream_accounts(&self, selector: AccountSelector) -> Result<BoxStream<'_, AccountEntry>, Self::Error> {
         self.check_connection_state()?;
 
         Ok(self.build_account_stream(selector)?.boxed())

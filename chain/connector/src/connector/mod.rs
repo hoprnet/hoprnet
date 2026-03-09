@@ -252,10 +252,8 @@ where
                     .and_then(move |res| {
                         if let Ok((upserted_account, _)) = &res {
                             // Rather update the cached entry than invalidating it
-                            chain_to_packet
-                                .insert(upserted_account.chain_addr, Some(upserted_account.public_key));
-                            packet_to_chain
-                                .insert(upserted_account.public_key, Some(upserted_account.chain_addr));
+                            chain_to_packet.insert(upserted_account.chain_addr, Some(upserted_account.public_key));
+                            packet_to_chain.insert(upserted_account.public_key, Some(upserted_account.chain_addr));
                         }
                         futures::future::ready(res.map(SubscribedEventType::Account).map_err(ConnectorError::backend))
                     })
@@ -284,10 +282,8 @@ where
                         let channel_by_parties = channel_by_parties.clone();
                         if let Ok((upserted_channel, _)) = &res {
                             // Rather update the cached entry than invalidating it
-                            channel_by_id
-                                .insert(*upserted_channel.get_id(), Some(*upserted_channel));
-                            channel_by_parties
-                                .insert(ChannelParties::from(upserted_channel), Some(*upserted_channel));
+                            channel_by_id.insert(*upserted_channel.get_id(), Some(*upserted_channel));
+                            channel_by_parties.insert(ChannelParties::from(upserted_channel), Some(*upserted_channel));
                         }
                         futures::future::ready(res.map(SubscribedEventType::Channel).map_err(ConnectorError::backend))
                     })

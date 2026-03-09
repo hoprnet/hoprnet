@@ -87,30 +87,28 @@ where
     fn chain_key_to_packet_key(&self, chain: &Address) -> Result<Option<OffchainPublicKey>, Self::Error> {
         self.check_connection_state()?;
 
-        Ok(self
-            .chain_to_packet
-            .try_get_with_by_ref(chain, || {
-                tracing::warn!(%chain, "cache miss on chain_key_to_packet_key");
-                self.backend.get_account_by_address(chain)
-                    .map(|a| a.map(|ac| ac.public_key))
-                    .map_err(ConnectorError::backend)
-            })?)
+        Ok(self.chain_to_packet.try_get_with_by_ref(chain, || {
+            tracing::warn!(%chain, "cache miss on chain_key_to_packet_key");
+            self.backend
+                .get_account_by_address(chain)
+                .map(|a| a.map(|ac| ac.public_key))
+                .map_err(ConnectorError::backend)
+        })?)
     }
 
     fn packet_key_to_chain_key(&self, packet: &OffchainPublicKey) -> Result<Option<Address>, Self::Error> {
         self.check_connection_state()?;
 
-        Ok(self
-            .packet_to_chain
-            .try_get_with_by_ref(packet, || {
-                tracing::warn!(
-                    peer_id = packet.to_peerid_str(),
-                    "cache miss on packet_key_to_chain_key"
-                );
-                self.backend.get_account_by_key(&packet)
-                    .map(|a| a.map(|ac| ac.chain_addr))
-                    .map_err(ConnectorError::backend)
-            })?)
+        Ok(self.packet_to_chain.try_get_with_by_ref(packet, || {
+            tracing::warn!(
+                peer_id = packet.to_peerid_str(),
+                "cache miss on packet_key_to_chain_key"
+            );
+            self.backend
+                .get_account_by_key(packet)
+                .map(|a| a.map(|ac| ac.chain_addr))
+                .map_err(ConnectorError::backend)
+        })?)
     }
 
     fn key_id_mapper_ref(&self) -> &Self::Mapper {

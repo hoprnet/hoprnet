@@ -14,14 +14,13 @@ pub use crate::{
 ///
 /// The sending side stores the reply openers, whereas the SURBs are stored by the replying side
 /// of the communication.
-#[async_trait::async_trait]
 #[auto_impl::auto_impl(&, Box, Arc)]
 pub trait SurbStore {
     /// Tries to find SURB using the given [`matcher`](SurbMatcher).
     ///
     /// This is used by the replying side when it is about to send a reply packet back
     /// to the sender.
-    async fn find_surb(&self, matcher: SurbMatcher) -> Option<FoundSurb>;
+    fn find_surb(&self, matcher: SurbMatcher) -> Option<FoundSurb>;
 
     /// Stores the `surbs` and associates them with the given [`pseudonym`](HoprPseudonym).
     ///
@@ -30,7 +29,7 @@ pub trait SurbStore {
     ///
     /// Returns the total number of SURBs available for that `pseudonym`, including the newly inserted
     /// ones.
-    async fn insert_surbs(&self, pseudonym: HoprPseudonym, surbs: Vec<(HoprSurbId, HoprSurb)>) -> usize;
+    fn insert_surbs(&self, pseudonym: HoprPseudonym, surbs: Vec<(HoprSurbId, HoprSurb)>) -> usize;
 
     /// Stores the given [`opener`](ReplyOpener) for the given [`sender_id`](HoprSenderId).
     ///
@@ -53,7 +52,6 @@ pub trait SurbStore {
 ///
 /// These operations are done directly by the packet processing pipeline before
 /// the outgoing packet is handled to the underlying p2p transport.
-#[async_trait::async_trait]
 #[auto_impl::auto_impl(&, Box, Arc)]
 pub trait PacketEncoder {
     type Error: std::error::Error + Send + Sync + 'static;
@@ -62,7 +60,7 @@ pub trait PacketEncoder {
     ///
     /// The `data` MUST be already correctly sized for HOPR packets, otherwise the operation
     /// must fail.
-    async fn encode_packet<T: AsRef<[u8]> + Send + 'static, S: Into<PacketSignals> + Send + 'static>(
+    fn encode_packet<T: AsRef<[u8]> + Send + 'static, S: Into<PacketSignals> + Send + 'static>(
         &self,
         data: T,
         routing: ResolvedTransportRouting<HoprSurb>,
@@ -71,7 +69,7 @@ pub trait PacketEncoder {
 
     /// Encodes the given vector of [`VerifiedAcknowledgements`](VerifiedAcknowledgement) as an outgoing packet to be
     /// sent to the given [`destination`](OffchainPublicKey).
-    async fn encode_acknowledgements(
+    fn encode_acknowledgements(
         &self,
         acks: &[VerifiedAcknowledgement],
         destination: &OffchainPublicKey,
@@ -82,15 +80,13 @@ pub trait PacketEncoder {
 ///
 /// This operation is done directly by the packet processing pipeline after
 /// the underlying p2p transport hands over incoming data packets.
-#[async_trait::async_trait]
 #[auto_impl::auto_impl(&, Box, Arc)]
 pub trait PacketDecoder {
     type Error: std::error::Error + Send + Sync + 'static;
 
     /// Decodes the `data` received from the given [`sender`](PeerId)
     /// returns the corresponding [`IncomingPacket`] if the decoding into a HOPR packet was successful.
-    async fn decode(&self, sender: PeerId, data: Box<[u8]>)
-    -> Result<IncomingPacket, IncomingPacketError<Self::Error>>;
+    fn decode(&self, sender: PeerId, data: Box<[u8]>) -> Result<IncomingPacket, IncomingPacketError<Self::Error>>;
 }
 
 /// Defines errors returned by [`UnacknowledgedTicketProcessor::acknowledge_ticket`].
@@ -111,7 +107,6 @@ impl<E> TicketAcknowledgementError<E> {
 }
 
 /// Performs necessary processing of unacknowledged tickets in the HOPR packet processing pipeline.
-#[async_trait::async_trait]
 #[auto_impl::auto_impl(&, Box, Arc)]
 pub trait UnacknowledgedTicketProcessor {
     type Error: std::error::Error + Send + Sync + 'static;
@@ -121,7 +116,7 @@ pub trait UnacknowledgedTicketProcessor {
     /// The [`ticket`](UnacknowledgedTicket) corresponds to the given [`challenge`](HalfKeyChallenge)
     /// and awaits to be [acknowledged](UnacknowledgedTicketProcessor::acknowledge_tickets)
     /// once an [`Acknowledgement`] is received from the `next_hop`.
-    async fn insert_unacknowledged_ticket(
+    fn insert_unacknowledged_ticket(
         &self,
         next_hop: &OffchainPublicKey,
         challenge: HalfKeyChallenge,
@@ -143,7 +138,7 @@ pub trait UnacknowledgedTicketProcessor {
     ///
     /// Must return [`TicketAcknowledgementError::UnexpectedAcknowledgement`] if no `Acknowledgements` from the given
     /// `peer` was expected.
-    async fn acknowledge_tickets(
+    fn acknowledge_tickets(
         &self,
         peer: OffchainPublicKey,
         acks: Vec<Acknowledgement>,
@@ -152,19 +147,18 @@ pub trait UnacknowledgedTicketProcessor {
 
 /// Allows tracking ticket indices of outgoing channels and
 /// unrealized balances of incoming channels.
-#[async_trait::async_trait]
 #[auto_impl::auto_impl(&, Box, Arc)]
 pub trait TicketTracker {
     type Error: std::error::Error + Send + Sync + 'static;
 
     /// Gets the next ticket index for an outgoing ticket for the given channel.
-    async fn next_outgoing_ticket_index(&self, channel: &ChannelEntry) -> Result<u64, Self::Error>;
+    fn next_outgoing_ticket_index(&self, channel: &ChannelEntry) -> Result<u64, Self::Error>;
 
     /// Retrieves the unrealized balance of the given channel.
     ///
     /// This allows guarding from situations where the ticket issuer issues more tickets
     /// than there's balance in the given channel.
-    async fn incoming_channel_unrealized_balance(
+    fn incoming_channel_unrealized_balance(
         &self,
         channel_id: &ChannelId,
         epoch: u32,
@@ -172,7 +166,7 @@ pub trait TicketTracker {
     ) -> Result<HoprBalance, Self::Error>;
 
     /// Convenience function that allows creating multi-hop tickets.
-    async fn create_multihop_ticket(
+    fn create_multihop_ticket(
         &self,
         channel: &ChannelEntry,
         current_path_pos: u8,
@@ -197,7 +191,6 @@ pub trait TicketTracker {
             .balance(amount)
             .index(
                 self.next_outgoing_ticket_index(channel)
-                    .await
                     .map_err(TicketCreationError::Other)?,
             )
             .win_prob(winning_prob)
