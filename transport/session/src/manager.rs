@@ -174,9 +174,9 @@ pub struct SessionManagerConfig {
     /// it will be automatically transformed to start at this value.
     /// This is due to the reserved range by the Start sub-protocol.
     ///
-    /// Default is 16..1024.
+    /// Default is `ReservedTag::range().end..1024`.
     #[doc(hidden)]
-    #[default(_code = "16u64..1024u64")]
+    #[default(_code = "ReservedTag::range().end..1024u64")]
     pub session_tag_range: Range<u64>,
 
     /// The maximum number of sessions (incoming and outgoing) that is allowed
@@ -1529,7 +1529,7 @@ mod tests {
     /// Create a test tag allocator with a large partition.
     fn test_tag_allocator() -> Arc<dyn TagAllocator> {
         hopr_transport_tag_allocator::create_allocators(
-            16..65536,
+            ReservedTag::range().end..u16::MAX as u64 + 1,
             [
                 hopr_transport_tag_allocator::Usage::Session(10000),
                 hopr_transport_tag_allocator::Usage::SessionTerminalTelemetry(10000),

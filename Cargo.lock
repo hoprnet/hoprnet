@@ -5250,6 +5250,9 @@ dependencies = [
 [[package]]
 name = "hopr-transport-tag-allocator"
 version = "0.1.0"
+dependencies = [
+ "hopr-protocol-app",
+]
 
 [[package]]
 name = "hopr-types"

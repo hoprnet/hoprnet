@@ -18,3 +18,4 @@ default = []
 [dependencies]
 
 [dev-dependencies]
+hopr-protocol-app = { workspace = true }

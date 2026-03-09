@@ -110,12 +110,14 @@ pub fn create_allocators(range: Range<u64>, partitions: [Usage; 3]) -> CreateAll
 mod tests {
     use std::collections::HashSet;
 
+    use hopr_protocol_app::prelude::ReservedTag;
+
     use super::*;
 
     #[test]
     fn partitions_are_non_overlapping() {
         let allocators = create_allocators(
-            16..65536,
+            ReservedTag::range().end..u16::MAX as u64 + 1,
             [
                 Usage::Session(100),
                 Usage::SessionTerminalTelemetry(200),
@@ -137,9 +139,10 @@ mod tests {
         assert_eq!(all_values.len(), 600);
 
         // Verify ranges
-        let session_tags: Vec<u64> = (16..116).collect();
-        let telemetry_tags: Vec<u64> = (116..316).collect();
-        let probing_tags: Vec<u64> = (316..616).collect();
+        let base = ReservedTag::range().end;
+        let session_tags: Vec<u64> = (base..base + 100).collect();
+        let telemetry_tags: Vec<u64> = (base + 100..base + 300).collect();
+        let probing_tags: Vec<u64> = (base + 300..base + 600).collect();
 
         for t in &session_tags {
             assert!(all_values.contains(t));
@@ -155,7 +158,7 @@ mod tests {
     #[test]
     fn error_if_sizes_exceed_range() {
         let result = create_allocators(
-            16..100,
+            ReservedTag::range().end..100,
             [
                 Usage::Session(50),
                 Usage::SessionTerminalTelemetry(50),
@@ -187,7 +190,7 @@ mod tests {
     #[test]
     fn error_if_zero_capacity() {
         let result = create_allocators(
-            16..65536,
+            ReservedTag::range().end..u16::MAX as u64 + 1,
             [
                 Usage::Session(0),
                 Usage::SessionTerminalTelemetry(10),
@@ -203,7 +206,7 @@ mod tests {
     #[test]
     fn allocated_tag_traits() {
         let allocators = create_allocators(
-            16..65536,
+            ReservedTag::range().end..u16::MAX as u64 + 1,
             [
                 Usage::Session(10),
                 Usage::SessionTerminalTelemetry(10),
@@ -214,18 +217,20 @@ mod tests {
         let (_, alloc) = &allocators[0];
         let tag = alloc.allocate().unwrap();
 
+        let expected = ReservedTag::range().end;
+
         // From<&AllocatedTag> for u64
         let val: u64 = (&tag).into();
-        assert_eq!(val, 16);
+        assert_eq!(val, expected);
 
         // PartialEq<u64>
-        assert_eq!(tag, 16u64);
+        assert_eq!(tag, expected);
 
         // Display
-        assert_eq!(format!("{tag}"), "16");
+        assert_eq!(format!("{tag}"), expected.to_string());
 
         // Debug
-        assert_eq!(format!("{tag:?}"), "AllocatedTag(16)");
+        assert_eq!(format!("{tag:?}"), format!("AllocatedTag({expected})"));
 
         // Hash + Eq (usable as HashMap key)
         let mut map = std::collections::HashMap::new();
@@ -235,7 +240,7 @@ mod tests {
     #[test]
     fn drop_recycles_tag() {
         let allocators = create_allocators(
-            16..65536,
+            ReservedTag::range().end..u16::MAX as u64 + 1,
             [
                 Usage::Session(2),
                 Usage::SessionTerminalTelemetry(10),
