@@ -1,5 +1,7 @@
 use std::str::FromStr;
 
+#[cfg(feature = "session-client")]
+use futures::future::try_join_all;
 use hopr_builder::testing::{
     fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_5_cluster_fixture as cluster},
     hopr::ChannelGuard,
@@ -97,9 +99,12 @@ async fn test_create_n_hop_session(cluster: &ClusterGuard, #[case] hops: usize) 
 
     // TODO: check here that the destination sees the new session created
 
-    for guard in &all_channels {
-        guard.try_close_channels_all_channels().await?;
-    }
+    try_join_all(
+        all_channels
+            .into_iter()
+            .map(move |guard| async move { guard.try_close_channels_all_channels().await }),
+    )
+    .await?;
 
     Ok(())
 }
