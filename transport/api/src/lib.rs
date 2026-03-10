@@ -214,7 +214,7 @@ where
         let tag_range = ReservedTag::range().end..u16::MAX as u64 + 1;
         let tag_range_size = tag_range.end - tag_range.start;
         let session_capacity = cfg.session.maximum_sessions as u64;
-        let probing_capacity = std::env::var("HOPR_PROBING_TAG_CAPACITY")
+        let probing_capacity = std::env::var("HOPR_PROBING_TELEMETRY_TAG_CAPACITY")
             .ok()
             .and_then(|s| s.trim().parse::<u64>().ok())
             .filter(|&c| c > 0)
