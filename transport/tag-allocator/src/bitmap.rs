@@ -17,11 +17,10 @@ impl TagBitmap {
 
         // Clear excess bits in the last word so only valid tags are available.
         let remainder = capacity % 64;
-        if remainder != 0 {
-            if let Some(last) = words.last_mut() {
+        if remainder != 0
+            && let Some(last) = words.last_mut() {
                 *last = AtomicU64::new((1u64 << remainder) - 1);
             }
-        }
 
         Self {
             words: words.into_boxed_slice(),
