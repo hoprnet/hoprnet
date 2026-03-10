@@ -104,7 +104,7 @@ use crate::{
 pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RANGE;
 
 pub use hopr_api as api;
-use hopr_api::types::internal::routing::DestinationRouting;
+use hopr_api::{chain::ChainReadTicketOperations, types::internal::routing::DestinationRouting};
 
 // Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
 lazy_static::lazy_static! {
@@ -183,6 +183,7 @@ where
     Chain: ChainReadChannelOperations
         + ChainReadAccountOperations
         + ChainKeyOperations
+        + ChainReadTicketOperations
         + ChainValues
         + Clone
         + Send

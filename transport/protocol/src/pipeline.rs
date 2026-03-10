@@ -18,6 +18,7 @@ const ACK_OUT_BUFFER_SIZE: usize = 1_000_000;
 const NUM_CONCURRENT_ACK_OUT_PROCESSING: usize = 10;
 const QUEUE_SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(50);
 const PACKET_DECODING_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(150);
+const PACKET_ENCODING_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(150);
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -72,7 +73,7 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
     concurrency: usize,
 ) where
     AppOut: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
-    E: PacketEncoder + Send + 'static,
+    E: PacketEncoder + Send + Sync + 'static,
     WOut: futures::Sink<(PeerId, Box<[u8]>), Error = SinkTimeoutError<WOutErr>> + Clone + Unpin + Send + 'static,
     WOutErr: std::error::Error,
 {
@@ -81,25 +82,38 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
             |(routing, data)| {
                 let encoder = encoder.clone();
                 async move {
-                    match encoder
-                        .encode_packet(
-                            data.data.to_bytes(),
-                            routing,
-                            data.packet_info
-                                .map(|data| data.signals_to_destination)
-                                .unwrap_or_default(),
-                        )
-                        .await
+                    match hopr_parallelize::cpu::spawn_fifo_blocking(
+                        move || {
+                            encoder.encode_packet(
+                                data.data.to_bytes(),
+                                routing,
+                                data.packet_info
+                                    .map(|data| data.signals_to_destination)
+                                    .unwrap_or_default(),
+                            )
+                        },
+                        "packet_encode",
+                    )
+                    .timeout(futures_time::time::Duration::from(PACKET_ENCODING_TIMEOUT))
+                    .await
                     {
-                        Ok(packet) => {
+                        Ok(Ok(Ok(packet))) => {
                             #[cfg(all(feature = "prometheus", not(test)))]
                             METRIC_PACKET_COUNT.increment(&["sent"]);
 
                             tracing::trace!(peer = packet.next_hop.to_peerid_str(), "protocol message out");
                             Some((packet.next_hop.into(), packet.data))
                         }
+                        Ok(Ok(Err(error))) => {
+                            tracing::error!(%error, "outgoing packet could not be encoded");
+                            None
+                        }
+                        Ok(Err(error)) => {
+                            tracing::error!(%error, "parallel processing of the outgoing packet failed");
+                            None
+                        }
                         Err(error) => {
-                            tracing::error!(%error, "packet could not be wrapped for sending");
+                            tracing::error!(%error, "timeout while processing the outgoing packet");
                             None
                         }
                     }
@@ -145,7 +159,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
     WIn: futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + 'static,
     WOut: futures::Sink<(PeerId, Box<[u8]>)> + Clone + Unpin + Send + 'static,
     WOut::Error: std::error::Error,
-    D: PacketDecoder + Send + 'static,
+    D: PacketDecoder + Sync + Send + 'static,
     T: UnacknowledgedTicketProcessor + Send + 'static,
     TEvt: futures::Sink<TicketEvent> + Clone + Unpin + Send + 'static,
     TEvt::Error: std::error::Error,
@@ -169,36 +183,32 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
             tracing::trace!(%peer, "protocol message in");
 
             async move {
-                match decoder.decode(peer, data)
+                match hopr_parallelize::cpu::spawn_fifo_blocking(move || decoder.decode(peer, data), "packet_decode")
                     .timeout(futures_time::time::Duration::from(PACKET_DECODING_TIMEOUT))
                     .await {
-                    Ok(Ok(packet)) => {
+                    Ok(Ok(Ok(packet))) => {
                         tracing::trace!(%peer, ?packet, "successfully decoded incoming packet");
                         Some(packet)
                     },
-                    Ok(Err(IncomingPacketError::Overloaded(error))) => {
-                        tracing::warn!(%peer, %error, "dropping packet due to local CPU overload");
-                        None
-                    },
-                    Ok(Err(IncomingPacketError::Undecodable(error))) => {
+                    Ok(Ok(Err(IncomingPacketError::Undecodable(error)))) => {
                         // Do not send an ack back if the packet could not be decoded at all
                         //
                         // Potentially adversarial behavior
                         tracing::trace!(%peer, %error, "not sending ack back on undecodable packet - possible adversarial behavior");
                         None
                     },
-                    Ok(Err(IncomingPacketError::ProcessingError(sender, error))) => {
+                    Ok(Ok(Err(IncomingPacketError::ProcessingError(sender, error)))) => {
                         tracing::error!(%peer, %error, "failed to process the decoded packet");
                         // On this failure, we send back a random acknowledgement
                         ack_outgoing_failure
-                            .send((sender, None))
+                            .send((*sender, None))
                             .await
                             .unwrap_or_else(|error| {
                                 tracing::error!(%error, "failed to send ack to the egress queue");
                             });
                         None
                     },
-                    Ok(Err(IncomingPacketError::InvalidTicket(sender, error))) => {
+                    Ok(Ok(Err(IncomingPacketError::InvalidTicket(sender, error)))) => {
                         tracing::error!(%peer, %error, "failed to validate ticket on the received packet");
                         if let Err(error) = ticket_events_reject
                             .send(TicketEvent::RejectedTicket(error.ticket, error.issuer))
@@ -207,7 +217,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                         }
                         // On this failure, we send back a random acknowledgement
                         ack_outgoing_failure
-                            .send((sender, None))
+                            .send((*sender, None))
                             .await
                             .unwrap_or_else(|error| {
                                 tracing::error!(%error, "failed to send ack to the egress queue");
@@ -218,6 +228,10 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
 
                         None
                     }
+                    Ok(Err(error)) => {
+                        tracing::error!(%error, "parallel processing of the incoming packet failed");
+                        None
+                    },
                     Err(_) => {
                         // If we cannot decode the packet within the time limit, just drop it
                         tracing::error!(
@@ -288,7 +302,8 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             received_ticket,
                             ..
                         } = *fwd_packet;
-                        if let Err(error) = ticket_proc.insert_unacknowledged_ticket(&next_hop, ack_challenge, received_ticket).await {
+                        // Per requirements, this call is not blocking
+                        if let Err(error) = ticket_proc.insert_unacknowledged_ticket(&next_hop, ack_challenge, received_ticket) {
                             tracing::error!(
                                 previous_hop = previous_hop.to_peerid_str(),
                                 next_hop = next_hop.to_peerid_str(),
@@ -369,7 +384,7 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
     wire_outgoing: WOut,
 ) where
     AckOut: futures::Stream<Item = (OffchainPublicKey, Option<HalfKey>)> + Send + 'static,
-    E: PacketEncoder + Send + 'static,
+    E: PacketEncoder + Sync + Send + 'static,
     WOut: futures::Sink<(PeerId, Box<[u8]>)> + Clone + Unpin + Send + 'static,
     WOut::Error: std::error::Error,
 {
@@ -412,9 +427,12 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
                 let mut wire_outgoing = wire_outgoing.clone();
                 async move {
                     // Make sure that the acknowledgements are sent in batches of at most MAX_ACKNOWLEDGEMENTS_BATCH_SIZE
-                    for ack_chunk in acks.chunks(MAX_ACKNOWLEDGEMENTS_BATCH_SIZE) {
-                        match encoder.encode_acknowledgements(ack_chunk, &destination).await {
-                            Ok(ack_packet) => {
+                    // TODO: find better strategy to avoid reallocations
+                    let c = acks.chunks(MAX_ACKNOWLEDGEMENTS_BATCH_SIZE).map(|c| c.to_vec()).collect::<Vec<_>>();
+                    for ack_chunk in c {
+                        let encoder = encoder.clone();
+                        match hopr_parallelize::cpu::spawn_fifo_blocking(move || encoder.encode_acknowledgements(&ack_chunk, &destination), "ack_encode").await {
+                            Ok(Ok(ack_packet)) => {
                                 wire_outgoing
                                     .feed((ack_packet.next_hop.into(), ack_packet.data))
                                     .await
@@ -422,7 +440,8 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
                                         tracing::error!(%error, "failed to forward an acknowledgement to the transport layer");
                                     });
                             }
-                            Err(error) => tracing::error!(%error, "failed to create ack packet"),
+                            Ok(Err(error)) => tracing::error!(%error, "failed to encode acknowledgements"),
+                            Err(error) => tracing::error!(%error, "parallel processing of the outgoing acknowledgements failed"),
                         }
                     }
                     if let Err(error) = wire_outgoing.flush().await {
@@ -457,8 +476,13 @@ async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
             let mut ticket_evt = ticket_events.clone();
             async move {
                 tracing::trace!(num = acks.len(), "received acknowledgements");
-                match ticket_proc.acknowledge_tickets(peer, acks).await {
-                    Ok(resolutions) if !resolutions.is_empty() => {
+                match hopr_parallelize::cpu::spawn_fifo_blocking(
+                    move || ticket_proc.acknowledge_tickets(peer, acks),
+                    "ack_decode",
+                )
+                .await
+                {
+                    Ok(Ok(resolutions)) if !resolutions.is_empty() => {
                         let resolutions_iter = resolutions.into_iter().filter_map(|resolution| match resolution {
                             ResolvedAcknowledgement::RelayingWin(redeemable_ticket) => {
                                 tracing::trace!("received ack for a winning ticket");
@@ -476,16 +500,19 @@ async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
                             tracing::error!(%error, "failed to notify ticket resolutions");
                         }
                     }
-                    Ok(_) => {
+                    Ok(Ok(_)) => {
                         tracing::debug!("acknowledgement batch could not acknowledge any ticket");
                     }
-                    Err(TicketAcknowledgementError::UnexpectedAcknowledgement) => {
+                    Ok(Err(TicketAcknowledgementError::UnexpectedAcknowledgement)) => {
                         // Unexpected acknowledgements naturally happen
                         // as acknowledgements of 0-hop packets
                         tracing::trace!("received unexpected acknowledgement");
                     }
-                    Err(error) => {
+                    Ok(Err(error)) => {
                         tracing::error!(%error, "failed to acknowledge ticket");
+                    }
+                    Err(error) => {
+                        tracing::error!(%error, "parallel processing of the incoming acknowledgements failed")
                     }
                 }
             }

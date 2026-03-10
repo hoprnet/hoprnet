@@ -705,8 +705,7 @@ where
                 destination: self.me_onchain().into(),
                 ..Default::default()
             })
-            .map_err(HoprLibError::chain)
-            .await?;
+            .map_err(HoprLibError::chain)?;
 
         while let Some(channel) = channels.next().await {
             // Set the state of all unredeemed tickets with a higher index than the current
@@ -945,8 +944,7 @@ where
                 public_only: true,
                 ..Default::default()
             })
-            .map_err(HoprLibError::chain)
-            .await?
+            .map_err(HoprLibError::chain)?
             .map(|entry| {
                 (
                     PeerId::from(entry.public_key),
@@ -1020,8 +1018,7 @@ where
                 offchain_key: Some(pubkey),
                 ..Default::default()
             })
-            .map_err(HoprLibError::chain)
-            .await?
+            .map_err(HoprLibError::chain)?
             .next()
             .await
         {
@@ -1117,8 +1114,7 @@ where
                 public_only: true,
                 ..Default::default()
             })
-            .map_err(HoprLibError::chain)
-            .await?
+            .map_err(HoprLibError::chain)?
             .collect()
             .await)
     }
@@ -1128,31 +1124,29 @@ where
             .await
             .map_err(HoprLibError::TransportError)?;
 
+        // TODO: block
         self.chain_api
             .packet_key_to_chain_key(&pubkey)
-            .await
             .map_err(HoprLibError::chain)
     }
 
     pub async fn chain_key_to_peerid(&self, address: &Address) -> Result<Option<PeerId>, HoprLibError> {
+        // TODO: block
         self.chain_api
             .chain_key_to_packet_key(address)
-            .await
             .map(|pk| pk.map(|v| v.into()))
             .map_err(HoprLibError::chain)
     }
 
     pub async fn channel_from_hash(&self, channel_id: &Hash) -> Result<Option<ChannelEntry>, HoprLibError> {
-        self.chain_api
-            .channel_by_id(channel_id)
-            .await
-            .map_err(HoprLibError::chain)
+        // TODO: block
+        self.chain_api.channel_by_id(channel_id).map_err(HoprLibError::chain)
     }
 
     pub async fn channel(&self, src: &Address, dest: &Address) -> Result<Option<ChannelEntry>, HoprLibError> {
+        // TODO: block
         self.chain_api
             .channel_by_parties(src, dest)
-            .await
             .map_err(HoprLibError::chain)
     }
 
@@ -1164,8 +1158,7 @@ where
                 ChannelStatusDiscriminants::Open,
                 ChannelStatusDiscriminants::PendingToClose,
             ]))
-            .map_err(HoprLibError::chain)
-            .await?
+            .map_err(HoprLibError::chain)?
             .collect()
             .await)
     }
@@ -1182,8 +1175,7 @@ where
                         ChannelStatusDiscriminants::PendingToClose,
                     ]),
             )
-            .map_err(HoprLibError::chain)
-            .await?
+            .map_err(HoprLibError::chain)?
             .collect()
             .await)
     }
@@ -1196,8 +1188,7 @@ where
                 ChannelStatusDiscriminants::Open,
                 ChannelStatusDiscriminants::PendingToClose,
             ]))
-            .map_err(HoprLibError::chain)
-            .await?
+            .map_err(HoprLibError::chain)?
             .collect()
             .await)
     }
@@ -1297,10 +1288,10 @@ where
         &self,
         channel_id: &ChannelId,
     ) -> Result<Option<Vec<RedeemableTicket>>, HoprLibError> {
+        // TODO: block
         if let Some(channel) = self
             .chain_api
             .channel_by_id(channel_id)
-            .await
             .map_err(|e| HoprTransportError::Other(e.into()))?
         {
             if &channel.destination == self.chain_api.me() {
@@ -1356,8 +1347,7 @@ where
                         ChannelStatusDiscriminants::PendingToClose,
                     ]),
             )
-            .map_err(HoprLibError::chain)
-            .await?
+            .map_err(HoprLibError::chain)?
             .map(|channel| {
                 Ok(TicketSelector::from(&channel)
                     .with_amount(min_value..)
@@ -1386,10 +1376,10 @@ where
     ) -> Result<(), HoprLibError> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
+        // TODO: block
         let channel = self
             .chain_api
             .channel_by_id(channel_id)
-            .await
             .map_err(HoprLibError::chain)?
             .ok_or(HoprLibError::GeneralError("Channel not found".into()))?;
 

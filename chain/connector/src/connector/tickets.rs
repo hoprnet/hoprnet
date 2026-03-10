@@ -7,6 +7,22 @@ use hopr_api::{
 
 use crate::{backend::Backend, connector::HoprBlockchainConnector, errors::ConnectorError};
 
+impl<B, C, P, R> hopr_api::chain::ChainReadTicketOperations for HoprBlockchainConnector<C, B, P, R> {
+    type Error = ConnectorError;
+
+    fn outgoing_ticket_values(
+        &self,
+        configured_wp: Option<WinningProbability>,
+        configured_price: Option<HoprBalance>,
+    ) -> Result<(WinningProbability, HoprBalance), Self::Error> {
+        todo!()
+    }
+
+    fn incoming_ticket_values(&self) -> Result<(WinningProbability, HoprBalance), Self::Error> {
+        todo!()
+    }
+}
+
 impl<B, C, P> HoprBlockchainConnector<C, B, P, P::TxRequest>
 where
     B: Backend + Send + Sync + 'static,

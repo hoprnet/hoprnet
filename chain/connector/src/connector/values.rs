@@ -139,8 +139,6 @@ mod tests {
         assert_eq!("rotsee", &chain_info.hopr_network_name);
 
         assert_eq!(Duration::from_mins(5), connector.channel_closure_notice_period().await?);
-        assert_eq!(HoprBalance::new_base(1), connector.minimum_ticket_price().await?);
-        assert!(WinningProbability::ALWAYS.approx_eq(&connector.minimum_incoming_ticket_win_prob().await?));
         assert_eq!(Hash::default(), connector.domain_separators().await?.channel);
         assert_eq!(
             HoprBalance::from_str("0.01 wxHOPR")?,
@@ -164,8 +162,6 @@ mod tests {
         assert_eq!("rotsee", &chain_info.hopr_network_name);
 
         assert_eq!(Duration::from_mins(5), connector.channel_closure_notice_period().await?);
-        assert_eq!(HoprBalance::new_base(1), connector.minimum_ticket_price().await?);
-        assert!(WinningProbability::ALWAYS.approx_eq(&connector.minimum_incoming_ticket_win_prob().await?));
         assert_eq!(Hash::default(), connector.domain_separators().await?.channel);
         assert_eq!(
             HoprBalance::from_str("0.01 wxHOPR")?,

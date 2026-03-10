@@ -17,17 +17,21 @@ pub enum IncomingPacketError<E: std::error::Error> {
     /// Such errors are fatal and therefore the packet cannot be acknowledged.
     #[error("packet is not decodable: {0}")]
     Undecodable(E),
-    /// Packet dropped due to local resource exhaustion (not sender's fault).
-    #[error("local overload: {0}")]
-    Overloaded(E),
     /// Packet is decodable but cannot be processed due to other reasons.
     ///
     /// Such errors are protocol-related and packets must be acknowledged.
     #[error("packet from {0} decodable, but cannot be processed: {1}")]
-    ProcessingError(OffchainPublicKey, E),
+    ProcessingError(Box<OffchainPublicKey>, E),
     /// Packet is decodable, but the ticket is invalid.
     #[error("packet from {0} is decodable, but the ticket is invalid: {1}")]
-    InvalidTicket(OffchainPublicKey, TicketValidationError),
+    InvalidTicket(Box<OffchainPublicKey>, TicketValidationError),
+}
+
+impl<E: std::error::Error> IncomingPacketError<E> {
+    /// Packet is undecodable and should NOT be acknowledged.
+    pub fn undecodable<Err: Into<E>>(error: Err) -> Self {
+        Self::Undecodable(error.into())
+    }
 }
 
 /// Error that can occur when creating a ticket.
@@ -82,4 +86,14 @@ pub enum HoprProtocolError {
 
     #[error("rayon thread pool queue full: {0}")]
     SpawnError(#[from] hopr_parallelize::cpu::SpawnError),
+}
+
+impl HoprProtocolError {
+    pub fn resolver<E: Into<anyhow::Error>>(e: E) -> Self {
+        Self::ResolverError(e.into())
+    }
+
+    pub fn ticket_tracker<E: Into<anyhow::Error>>(e: E) -> Self {
+        Self::TicketTrackerError(e.into())
+    }
 }

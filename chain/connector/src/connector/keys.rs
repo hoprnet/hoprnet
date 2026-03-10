@@ -84,46 +84,31 @@ where
     type Error = ConnectorError;
     type Mapper = HoprKeyMapper<B>;
 
-    async fn chain_key_to_packet_key(&self, chain: &Address) -> Result<Option<OffchainPublicKey>, Self::Error> {
+    fn chain_key_to_packet_key(&self, chain: &Address) -> Result<Option<OffchainPublicKey>, Self::Error> {
         self.check_connection_state()?;
 
-        let backend = self.backend.clone();
-        let chain_key = *chain;
-        Ok(self
-            .chain_to_packet
-            .try_get_with_by_ref(&chain_key, async move {
-                tracing::warn!(%chain_key, "cache miss on chain_key_to_packet_key");
-                match hopr_async_runtime::prelude::spawn_blocking(move || backend.get_account_by_address(&chain_key))
-                    .await
-                {
-                    Ok(Ok(value)) => Ok(value.map(|account| account.public_key)),
-                    Ok(Err(e)) => Err(ConnectorError::backend(e)),
-                    Err(e) => Err(ConnectorError::backend(e)),
-                }
-            })
-            .await?)
+        Ok(self.chain_to_packet.try_get_with_by_ref(chain, || {
+            tracing::warn!(%chain, "cache miss on chain_key_to_packet_key");
+            self.backend
+                .get_account_by_address(chain)
+                .map(|a| a.map(|ac| ac.public_key))
+                .map_err(ConnectorError::backend)
+        })?)
     }
 
-    async fn packet_key_to_chain_key(&self, packet: &OffchainPublicKey) -> Result<Option<Address>, Self::Error> {
+    fn packet_key_to_chain_key(&self, packet: &OffchainPublicKey) -> Result<Option<Address>, Self::Error> {
         self.check_connection_state()?;
 
-        let backend = self.backend.clone();
-        let packet_key = *packet;
-        Ok(self
-            .packet_to_chain
-            .try_get_with_by_ref(&packet_key, async move {
-                tracing::warn!(
-                    peer_id = packet.to_peerid_str(),
-                    "cache miss on packet_key_to_chain_key"
-                );
-                match hopr_async_runtime::prelude::spawn_blocking(move || backend.get_account_by_key(&packet_key)).await
-                {
-                    Ok(Ok(value)) => Ok(value.map(|account| account.chain_addr)),
-                    Ok(Err(e)) => Err(ConnectorError::backend(e)),
-                    Err(e) => Err(ConnectorError::backend(e)),
-                }
-            })
-            .await?)
+        Ok(self.packet_to_chain.try_get_with_by_ref(packet, || {
+            tracing::warn!(
+                peer_id = packet.to_peerid_str(),
+                "cache miss on packet_key_to_chain_key"
+            );
+            self.backend
+                .get_account_by_key(packet)
+                .map(|a| a.map(|ac| ac.chain_addr))
+                .map_err(ConnectorError::backend)
+        })?)
     }
 
     fn key_id_mapper_ref(&self) -> &Self::Mapper {
@@ -164,11 +149,11 @@ mod tests {
 
         assert_eq!(
             Some(chain_addr),
-            connector.packet_key_to_chain_key(offchain_key.public()).await?
+            connector.packet_key_to_chain_key(offchain_key.public())?
         );
         assert_eq!(
             Some(*offchain_key.public()),
-            connector.chain_key_to_packet_key(&chain_addr).await?
+            connector.chain_key_to_packet_key(&chain_addr)?
         );
 
         let mapper = connector.key_id_mapper_ref();

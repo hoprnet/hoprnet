@@ -81,13 +81,13 @@ pub struct HoprBlockchainConnector<C, B, P, R> {
     // KeyId <-> OffchainPublicKey mapping
     mapper: HoprKeyMapper<B>,
     // Fast retrieval of chain keys by address
-    chain_to_packet: moka::future::Cache<Address, Option<OffchainPublicKey>, ahash::RandomState>,
+    chain_to_packet: moka::sync::Cache<Address, Option<OffchainPublicKey>, ahash::RandomState>,
     // Fast retrieval of packet keys by chain key
-    packet_to_chain: moka::future::Cache<OffchainPublicKey, Option<Address>, ahash::RandomState>,
+    packet_to_chain: moka::sync::Cache<OffchainPublicKey, Option<Address>, ahash::RandomState>,
     // Fast retrieval of channel entries by id
-    channel_by_id: moka::future::Cache<ChannelId, Option<ChannelEntry>, ahash::RandomState>,
+    channel_by_id: moka::sync::Cache<ChannelId, Option<ChannelEntry>, ahash::RandomState>,
     // Fast retrieval of channel entries by parties
-    channel_by_parties: moka::future::Cache<ChannelParties, Option<ChannelEntry>, ahash::RandomState>,
+    channel_by_parties: moka::sync::Cache<ChannelParties, Option<ChannelEntry>, ahash::RandomState>,
     // Contains chain info (no TTL - kept fresh by subscription handler)
     values: moka::future::Cache<u32, ParsedChainInfo>,
 }
@@ -141,16 +141,16 @@ where
                     .build_with_hasher(ahash::RandomState::default()),
                 backend,
             },
-            chain_to_packet: moka::future::CacheBuilder::new(EXPECTED_NUM_NODES as u64)
+            chain_to_packet: moka::sync::CacheBuilder::new(EXPECTED_NUM_NODES as u64)
                 .time_to_idle(DEFAULT_CACHE_TIMEOUT)
                 .build_with_hasher(ahash::RandomState::default()),
-            packet_to_chain: moka::future::CacheBuilder::new(EXPECTED_NUM_NODES as u64)
+            packet_to_chain: moka::sync::CacheBuilder::new(EXPECTED_NUM_NODES as u64)
                 .time_to_idle(DEFAULT_CACHE_TIMEOUT)
                 .build_with_hasher(ahash::RandomState::default()),
-            channel_by_id: moka::future::CacheBuilder::new(EXPECTED_NUM_CHANNELS as u64)
+            channel_by_id: moka::sync::CacheBuilder::new(EXPECTED_NUM_CHANNELS as u64)
                 .time_to_idle(DEFAULT_CACHE_TIMEOUT)
                 .build_with_hasher(ahash::RandomState::default()),
-            channel_by_parties: moka::future::CacheBuilder::new(EXPECTED_NUM_CHANNELS as u64)
+            channel_by_parties: moka::sync::CacheBuilder::new(EXPECTED_NUM_CHANNELS as u64)
                 .time_to_idle(DEFAULT_CACHE_TIMEOUT)
                 .build_with_hasher(ahash::RandomState::default()),
             // No TTL: kept fresh by the Blokli subscription handler
@@ -250,20 +250,12 @@ where
                     })
                     .map_err(ConnectorError::backend)
                     .and_then(move |res| {
-                        let chain_to_packet = chain_to_packet.clone();
-                        let packet_to_chain = packet_to_chain.clone();
-                        async move {
-                            if let Ok((upserted_account, _)) = &res {
-                                // Rather update the cached entry than invalidating it
-                                chain_to_packet
-                                    .insert(upserted_account.chain_addr, Some(upserted_account.public_key))
-                                    .await;
-                                packet_to_chain
-                                    .insert(upserted_account.public_key, Some(upserted_account.chain_addr))
-                                    .await;
-                            }
-                            res.map(SubscribedEventType::Account).map_err(ConnectorError::backend)
+                        if let Ok((upserted_account, _)) = &res {
+                            // Rather update the cached entry than invalidating it
+                            chain_to_packet.insert(upserted_account.chain_addr, Some(upserted_account.public_key));
+                            packet_to_chain.insert(upserted_account.public_key, Some(upserted_account.chain_addr));
                         }
+                        futures::future::ready(res.map(SubscribedEventType::Account).map_err(ConnectorError::backend))
                     })
                 })
                 .fuse();
@@ -288,18 +280,12 @@ where
                     .and_then(move |res| {
                         let channel_by_id = channel_by_id.clone();
                         let channel_by_parties = channel_by_parties.clone();
-                        async move {
-                            if let Ok((upserted_channel, _)) = &res {
-                                // Rather update the cached entry than invalidating it
-                                channel_by_id
-                                    .insert(*upserted_channel.get_id(), Some(*upserted_channel))
-                                    .await;
-                                channel_by_parties
-                                    .insert(ChannelParties::from(upserted_channel), Some(*upserted_channel))
-                                    .await;
-                            }
-                            res.map(SubscribedEventType::Channel).map_err(ConnectorError::backend)
+                        if let Ok((upserted_channel, _)) = &res {
+                            // Rather update the cached entry than invalidating it
+                            channel_by_id.insert(*upserted_channel.get_id(), Some(*upserted_channel));
+                            channel_by_parties.insert(ChannelParties::from(upserted_channel), Some(*upserted_channel));
                         }
+                        futures::future::ready(res.map(SubscribedEventType::Channel).map_err(ConnectorError::backend))
                     })
                 })
                 .fuse();
