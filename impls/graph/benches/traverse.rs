@@ -5,11 +5,11 @@ use hopr_api::{
     OffchainKeypair, OffchainPublicKey,
     graph::{
         NetworkGraphTraverse, NetworkGraphWrite,
+        costs::HoprForwardCostFn,
         traits::{EdgeObservableWrite, EdgeWeightType},
     },
     types::crypto::prelude::Keypair,
 };
-use hopr_api::graph::costs::HoprForwardCostFn;
 use hopr_network_graph::ChannelGraph;
 
 // ── Graph construction helpers ───────────────────────────────────────────────
