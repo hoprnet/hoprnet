@@ -7,7 +7,7 @@ use std::{
 };
 
 use opentelemetry::{
-    KeyValue,
+    Key, KeyValue,
     logs::{AnyValue, LogRecord as _, Logger as _, LoggerProvider as _, Severity},
     metrics::{MeterProvider as _, ObservableCounter, ObservableGauge},
     trace::TracerProvider,
@@ -119,6 +119,26 @@ impl OtlpConfig {
     }
 }
 
+#[derive(Clone, Debug)]
+pub(super) struct NodeTelemetryIdentity {
+    pub(super) node_address: String,
+    pub(super) node_peer_id: String,
+    pub(super) extra_labels: Vec<(String, String)>,
+}
+
+impl NodeTelemetryIdentity {
+    fn resource_attributes(&self) -> Vec<KeyValue> {
+        let mut attrs = vec![
+            KeyValue::new("node_address", self.node_address.clone()),
+            KeyValue::new("node_peer_id", self.node_peer_id.clone()),
+        ];
+        for (k, v) in &self.extra_labels {
+            attrs.push(KeyValue::new(k.clone(), v.clone()));
+        }
+        attrs
+    }
+}
+
 #[derive(Clone)]
 struct OtelLogsLayer {
     logger: SdkLogger,
@@ -156,11 +176,10 @@ where
         record.set_severity_number(severity_number);
         record.set_severity_text(severity_text);
 
-        if let Some(body) = visitor.body.take() {
-            record.set_body(body.into());
+        if let Some(message) = visitor.body.take() {
+            let body = HashMap::from([(Key::new("message"), AnyValue::String(message.into()))]);
+            record.set_body(AnyValue::Map(Box::new(body)));
         }
-
-        record.add_attribute("target", metadata.target().to_string());
         if let Some(module_path) = metadata.module_path() {
             record.add_attribute("module_path", module_path.to_string());
         }
@@ -170,6 +189,8 @@ where
         if let Some(line) = metadata.line() {
             record.add_attribute("line", i64::from(line));
         }
+
+        record.add_attribute("target", metadata.target().to_string());
         if !visitor.attributes.is_empty() {
             record.add_attributes(visitor.attributes);
         }
@@ -253,8 +274,16 @@ struct SessionMetricCallbackCache {
 
 const SESSION_METRIC_CACHE_TTL: Duration = Duration::from_millis(100);
 
-fn session_metric_attributes(session_id: hopr_lib::SessionId) -> [KeyValue; 1] {
-    [KeyValue::new("session_id", session_id.to_string())]
+fn session_metric_attributes(session_id: hopr_lib::SessionId, node_identity: &NodeTelemetryIdentity) -> Vec<KeyValue> {
+    let mut attrs = vec![
+        KeyValue::new("session_id", session_id.to_string()),
+        KeyValue::new("node_address", node_identity.node_address.clone()),
+        KeyValue::new("node_peer_id", node_identity.node_peer_id.clone()),
+    ];
+    for (k, v) in &node_identity.extra_labels {
+        attrs.push(KeyValue::new(k.clone(), v.clone()));
+    }
+    attrs
 }
 
 fn refresh_session_metric_callback_cache(cache: &mut SessionMetricCallbackCache) {
@@ -297,6 +326,7 @@ fn build_session_u64_observable_gauge(
     meter: &opentelemetry::metrics::Meter,
     metric_name: String,
     cache: Arc<Mutex<SessionMetricCallbackCache>>,
+    node_identity: NodeTelemetryIdentity,
 ) -> ObservableGauge<u64> {
     let callback_metric_name = metric_name.clone();
     meter
@@ -304,7 +334,7 @@ fn build_session_u64_observable_gauge(
         .with_callback(move |observer| {
             for (session_id, metric_value) in get_cached_session_metric_values(&cache, &callback_metric_name) {
                 if let hopr_lib::SessionMetricValue::U64(value) = metric_value {
-                    let attributes = session_metric_attributes(session_id);
+                    let attributes = session_metric_attributes(session_id, &node_identity);
                     observer.observe(value, &attributes);
                 }
             }
@@ -316,6 +346,7 @@ fn build_session_u64_observable_counter(
     meter: &opentelemetry::metrics::Meter,
     metric_name: String,
     cache: Arc<Mutex<SessionMetricCallbackCache>>,
+    node_identity: NodeTelemetryIdentity,
 ) -> ObservableCounter<u64> {
     let callback_metric_name = metric_name.clone();
     meter
@@ -323,7 +354,7 @@ fn build_session_u64_observable_counter(
         .with_callback(move |observer| {
             for (session_id, metric_value) in get_cached_session_metric_values(&cache, &callback_metric_name) {
                 if let hopr_lib::SessionMetricValue::U64(value) = metric_value {
-                    let attributes = session_metric_attributes(session_id);
+                    let attributes = session_metric_attributes(session_id, &node_identity);
                     observer.observe(value, &attributes);
                 }
             }
@@ -335,6 +366,7 @@ fn build_session_f64_observable_gauge(
     meter: &opentelemetry::metrics::Meter,
     metric_name: String,
     cache: Arc<Mutex<SessionMetricCallbackCache>>,
+    node_identity: NodeTelemetryIdentity,
 ) -> ObservableGauge<f64> {
     let callback_metric_name = metric_name.clone();
     meter
@@ -342,7 +374,7 @@ fn build_session_f64_observable_gauge(
         .with_callback(move |observer| {
             for (session_id, metric_value) in get_cached_session_metric_values(&cache, &callback_metric_name) {
                 if let hopr_lib::SessionMetricValue::F64(value) = metric_value {
-                    let attributes = session_metric_attributes(session_id);
+                    let attributes = session_metric_attributes(session_id, &node_identity);
                     observer.observe(value, &attributes);
                 }
             }
@@ -350,22 +382,40 @@ fn build_session_f64_observable_gauge(
         .build()
 }
 
-fn build_session_metric_bridge(meter_provider: &SdkMeterProvider) -> OtelSessionMetricBridge {
+fn build_session_metric_bridge(
+    meter_provider: &SdkMeterProvider,
+    node_identity: NodeTelemetryIdentity,
+) -> OtelSessionMetricBridge {
     let meter = meter_provider.meter("hoprd_session_snapshot_bridge");
     let mut session_metrics = OtelSessionMetricBridge::default();
     let cache = Arc::new(Mutex::new(SessionMetricCallbackCache::default()));
 
     for metric_definition in hopr_lib::session_snapshot_metric_definitions() {
         match metric_definition.kind {
-            hopr_lib::SessionMetricKind::U64Gauge => session_metrics.u64_gauges.push(
-                build_session_u64_observable_gauge(&meter, metric_definition.name, Arc::clone(&cache)),
-            ),
-            hopr_lib::SessionMetricKind::U64Counter => session_metrics.u64_counters.push(
-                build_session_u64_observable_counter(&meter, metric_definition.name, Arc::clone(&cache)),
-            ),
-            hopr_lib::SessionMetricKind::F64Gauge => session_metrics.f64_gauges.push(
-                build_session_f64_observable_gauge(&meter, metric_definition.name, Arc::clone(&cache)),
-            ),
+            hopr_lib::SessionMetricKind::U64Gauge => {
+                session_metrics.u64_gauges.push(build_session_u64_observable_gauge(
+                    &meter,
+                    metric_definition.name,
+                    Arc::clone(&cache),
+                    node_identity.clone(),
+                ))
+            }
+            hopr_lib::SessionMetricKind::U64Counter => {
+                session_metrics.u64_counters.push(build_session_u64_observable_counter(
+                    &meter,
+                    metric_definition.name,
+                    Arc::clone(&cache),
+                    node_identity.clone(),
+                ))
+            }
+            hopr_lib::SessionMetricKind::F64Gauge => {
+                session_metrics.f64_gauges.push(build_session_f64_observable_gauge(
+                    &meter,
+                    metric_definition.name,
+                    Arc::clone(&cache),
+                    node_identity.clone(),
+                ))
+            }
         }
     }
 
@@ -401,17 +451,21 @@ impl Drop for OtelPrometheusMetricBridge {
 }
 
 #[cfg(feature = "prometheus")]
-fn build_prometheus_metric_bridge(meter_provider: &SdkMeterProvider) -> OtelPrometheusMetricBridge {
+fn build_prometheus_metric_bridge(
+    meter_provider: &SdkMeterProvider,
+    node_identity: NodeTelemetryIdentity,
+) -> OtelPrometheusMetricBridge {
     let meter = meter_provider.meter("hoprd_prometheus_bridge");
     let state = Arc::new(Mutex::new(OtelPrometheusMetricBridgeState::default()));
 
     if let Ok(mut state_guard) = state.lock() {
-        sync_prometheus_metric_families(&meter, &mut state_guard);
+        sync_prometheus_metric_families(&meter, &mut state_guard, &node_identity);
     }
 
     let (refresh_stop_sender, refresh_stop_receiver) = mpsc::channel();
     let refresh_state = Arc::clone(&state);
     let refresh_meter = meter.clone();
+    let refresh_node_identity = node_identity.clone();
     let refresh_thread = match thread::Builder::new()
         .name("hoprd-otel-metrics-bridge".to_string())
         .spawn(move || {
@@ -420,7 +474,7 @@ fn build_prometheus_metric_bridge(meter_provider: &SdkMeterProvider) -> OtelProm
                     Ok(()) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
                     Err(mpsc::RecvTimeoutError::Timeout) => {
                         if let Ok(mut state_guard) = refresh_state.lock() {
-                            sync_prometheus_metric_families(&refresh_meter, &mut state_guard);
+                            sync_prometheus_metric_families(&refresh_meter, &mut state_guard, &refresh_node_identity);
                         }
                     }
                 }
@@ -441,13 +495,17 @@ fn build_prometheus_metric_bridge(meter_provider: &SdkMeterProvider) -> OtelProm
 }
 
 #[cfg(feature = "prometheus")]
-fn sync_prometheus_metric_families(meter: &opentelemetry::metrics::Meter, state: &mut OtelPrometheusMetricBridgeState) {
+fn sync_prometheus_metric_families(
+    meter: &opentelemetry::metrics::Meter,
+    state: &mut OtelPrometheusMetricBridgeState,
+    node_identity: &NodeTelemetryIdentity,
+) {
     for family in gather_metric_families() {
         let family_key = format!("{:?}:{}", family.get_field_type(), family.name());
         if !state.registered_families.insert(family_key) {
             continue;
         }
-        register_prometheus_metric_family(meter, &family, state);
+        register_prometheus_metric_family(meter, &family, state, node_identity);
     }
 }
 
@@ -456,19 +514,21 @@ fn register_prometheus_metric_family(
     meter: &opentelemetry::metrics::Meter,
     family: &PrometheusMetricFamily,
     state: &mut OtelPrometheusMetricBridgeState,
+    node_identity: &NodeTelemetryIdentity,
 ) {
     let metric_name = family.name().to_string();
 
     match family.get_field_type() {
         PrometheusMetricType::COUNTER => {
             let family_name = metric_name.clone();
+            let metric_node_identity = node_identity.clone();
             let counter = meter
                 .f64_observable_counter(metric_name)
                 .with_callback(move |observer| {
                     if let Some(family) = find_prometheus_family(&family_name, PrometheusMetricType::COUNTER) {
                         for metric in family.get_metric() {
                             if let Some(counter) = metric.get_counter().as_ref() {
-                                let attributes = prometheus_metric_attributes(metric, None);
+                                let attributes = prometheus_metric_attributes(metric, None, &metric_node_identity);
                                 observer.observe(counter.value(), &attributes);
                             }
                         }
@@ -479,13 +539,14 @@ fn register_prometheus_metric_family(
         }
         PrometheusMetricType::GAUGE => {
             let family_name = metric_name.clone();
+            let metric_node_identity = node_identity.clone();
             let gauge = meter
                 .f64_observable_gauge(metric_name)
                 .with_callback(move |observer| {
                     if let Some(family) = find_prometheus_family(&family_name, PrometheusMetricType::GAUGE) {
                         for metric in family.get_metric() {
                             if let Some(gauge) = metric.get_gauge().as_ref() {
-                                let attributes = prometheus_metric_attributes(metric, None);
+                                let attributes = prometheus_metric_attributes(metric, None, &metric_node_identity);
                                 observer.observe(gauge.value(), &attributes);
                             }
                         }
@@ -496,6 +557,7 @@ fn register_prometheus_metric_family(
         }
         PrometheusMetricType::HISTOGRAM => {
             let family_name_for_count = metric_name.clone();
+            let metric_node_identity_for_count = node_identity.clone();
             let histogram_count = meter
                 .u64_observable_counter(format!("{metric_name}_count"))
                 .with_callback(move |observer| {
@@ -504,7 +566,8 @@ fn register_prometheus_metric_family(
                     {
                         for metric in family.get_metric() {
                             if let Some(histogram) = metric.get_histogram().as_ref() {
-                                let attributes = prometheus_metric_attributes(metric, None);
+                                let attributes =
+                                    prometheus_metric_attributes(metric, None, &metric_node_identity_for_count);
                                 observer.observe(histogram.get_sample_count(), &attributes);
                             }
                         }
@@ -514,6 +577,7 @@ fn register_prometheus_metric_family(
             state.u64_counters.push(histogram_count);
 
             let family_name_for_sum = metric_name.clone();
+            let metric_node_identity_for_sum = node_identity.clone();
             let histogram_sum = meter
                 .f64_observable_counter(format!("{metric_name}_sum"))
                 .with_callback(move |observer| {
@@ -521,7 +585,8 @@ fn register_prometheus_metric_family(
                     {
                         for metric in family.get_metric() {
                             if let Some(histogram) = metric.get_histogram().as_ref() {
-                                let attributes = prometheus_metric_attributes(metric, None);
+                                let attributes =
+                                    prometheus_metric_attributes(metric, None, &metric_node_identity_for_sum);
                                 observer.observe(histogram.get_sample_sum(), &attributes);
                             }
                         }
@@ -531,6 +596,7 @@ fn register_prometheus_metric_family(
             state.f64_counters.push(histogram_sum);
 
             let family_name_for_bucket = metric_name.clone();
+            let metric_node_identity_for_bucket = node_identity.clone();
             let histogram_bucket = meter
                 .u64_observable_counter(format!("{metric_name}_bucket"))
                 .with_callback(move |observer| {
@@ -543,6 +609,7 @@ fn register_prometheus_metric_family(
                                     let attributes = prometheus_metric_attributes(
                                         metric,
                                         Some(("le", bucket.upper_bound().to_string())),
+                                        &metric_node_identity_for_bucket,
                                     );
                                     observer.observe(bucket.cumulative_count(), &attributes);
                                 }
@@ -555,6 +622,7 @@ fn register_prometheus_metric_family(
         }
         PrometheusMetricType::SUMMARY => {
             let family_name_for_count = metric_name.clone();
+            let metric_node_identity_for_count = node_identity.clone();
             let summary_count = meter
                 .u64_observable_counter(format!("{metric_name}_count"))
                 .with_callback(move |observer| {
@@ -562,7 +630,8 @@ fn register_prometheus_metric_family(
                     {
                         for metric in family.get_metric() {
                             if let Some(summary) = metric.get_summary().as_ref() {
-                                let attributes = prometheus_metric_attributes(metric, None);
+                                let attributes =
+                                    prometheus_metric_attributes(metric, None, &metric_node_identity_for_count);
                                 observer.observe(summary.sample_count(), &attributes);
                             }
                         }
@@ -572,13 +641,15 @@ fn register_prometheus_metric_family(
             state.u64_counters.push(summary_count);
 
             let family_name_for_sum = metric_name.clone();
+            let metric_node_identity_for_sum = node_identity.clone();
             let summary_sum = meter
                 .f64_observable_counter(format!("{metric_name}_sum"))
                 .with_callback(move |observer| {
                     if let Some(family) = find_prometheus_family(&family_name_for_sum, PrometheusMetricType::SUMMARY) {
                         for metric in family.get_metric() {
                             if let Some(summary) = metric.get_summary().as_ref() {
-                                let attributes = prometheus_metric_attributes(metric, None);
+                                let attributes =
+                                    prometheus_metric_attributes(metric, None, &metric_node_identity_for_sum);
                                 observer.observe(summary.sample_sum(), &attributes);
                             }
                         }
@@ -588,6 +659,7 @@ fn register_prometheus_metric_family(
             state.f64_counters.push(summary_sum);
 
             let family_name_for_quantile = metric_name.clone();
+            let metric_node_identity_for_quantile = node_identity.clone();
             let summary_quantile = meter
                 .f64_observable_gauge(metric_name)
                 .with_callback(move |observer| {
@@ -600,6 +672,7 @@ fn register_prometheus_metric_family(
                                     let attributes = prometheus_metric_attributes(
                                         metric,
                                         Some(("quantile", quantile.quantile().to_string())),
+                                        &metric_node_identity_for_quantile,
                                     );
                                     observer.observe(quantile.value(), &attributes);
                                 }
@@ -622,13 +695,24 @@ fn find_prometheus_family(metric_name: &str, metric_type: PrometheusMetricType) 
 }
 
 #[cfg(feature = "prometheus")]
-fn prometheus_metric_attributes(metric: &PrometheusMetric, extra: Option<(&str, String)>) -> Vec<KeyValue> {
-    let mut attributes = Vec::with_capacity(metric.get_label().len() + usize::from(extra.is_some()));
+fn prometheus_metric_attributes(
+    metric: &PrometheusMetric,
+    extra: Option<(&str, String)>,
+    node_identity: &NodeTelemetryIdentity,
+) -> Vec<KeyValue> {
+    let mut attributes = Vec::with_capacity(
+        metric.get_label().len() + usize::from(extra.is_some()) + 2 + node_identity.extra_labels.len(),
+    );
     for label in metric.get_label() {
         attributes.push(KeyValue::new(label.name().to_string(), label.value().to_string()));
     }
     if let Some((key, value)) = extra {
         attributes.push(KeyValue::new(key.to_string(), value));
+    }
+    attributes.push(KeyValue::new("node_address", node_identity.node_address.clone()));
+    attributes.push(KeyValue::new("node_peer_id", node_identity.node_peer_id.clone()));
+    for (k, v) in &node_identity.extra_labels {
+        attributes.push(KeyValue::new(k.clone(), v.clone()));
     }
     attributes
 }
@@ -657,15 +741,30 @@ impl Drop for TelemetryHandles {
     }
 }
 
-pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
+fn build_otel_resource(config: &OtlpConfig, node_identity: &NodeTelemetryIdentity) -> opentelemetry_sdk::Resource {
+    opentelemetry_sdk::Resource::builder()
+        .with_service_name(config.service_name.clone())
+        .with_attributes(node_identity.resource_attributes())
+        .build()
+}
+
+fn enabled_signal_names(config: &OtlpConfig, signals: &[OtlpSignal]) -> String {
+    signals
+        .iter()
+        .copied()
+        .filter(|signal| config.signals.contains(*signal))
+        .map(|signal| signal.to_string())
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+pub(super) fn init_logging(node_identity: NodeTelemetryIdentity) -> anyhow::Result<TelemetryHandles> {
     let mut telemetry_handles = TelemetryHandles::default();
     let registry = crate::telemetry_common::build_base_subscriber()?;
     let config = OtlpConfig::from_env();
 
     if config.enabled {
-        let resource = opentelemetry_sdk::Resource::builder()
-            .with_service_name(config.service_name.clone())
-            .build();
+        let resource = build_otel_resource(&config, &node_identity);
 
         let trace_layer = if config.has_signal(OtlpSignal::Traces) {
             let exporter = match config.transport {
@@ -710,7 +809,7 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
                     .build()?,
                 OtlpTransport::Http => opentelemetry_otlp::LogExporter::builder()
                     .with_http()
-                    .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
+                    .with_protocol(opentelemetry_otlp::Protocol::HttpJson)
                     .with_timeout(Duration::from_secs(5))
                     .build()?,
             };
@@ -731,45 +830,8 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
         } else {
             None
         };
-
-        if config.has_signal(OtlpSignal::Metrics) {
-            let exporter = match config.transport {
-                OtlpTransport::Grpc => opentelemetry_otlp::MetricExporter::builder()
-                    .with_tonic()
-                    .with_protocol(opentelemetry_otlp::Protocol::Grpc)
-                    .with_timeout(Duration::from_secs(5))
-                    .build()?,
-                OtlpTransport::Http => opentelemetry_otlp::MetricExporter::builder()
-                    .with_http()
-                    .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
-                    .with_timeout(Duration::from_secs(5))
-                    .build()?,
-            };
-
-            let reader = opentelemetry_sdk::metrics::periodic_reader_with_async_runtime::PeriodicReader::builder(
-                exporter,
-                opentelemetry_sdk::runtime::Tokio,
-            )
-            .build();
-            let meter_provider = SdkMeterProvider::builder()
-                .with_reader(reader)
-                .with_resource(resource.clone())
-                .build();
-            opentelemetry::global::set_meter_provider(meter_provider.clone());
-            telemetry_handles.session_metric_bridge = Some(build_session_metric_bridge(&meter_provider));
-            #[cfg(feature = "prometheus")]
-            {
-                telemetry_handles.metric_bridge = Some(build_prometheus_metric_bridge(&meter_provider));
-            }
-            telemetry_handles.meter_provider = Some(meter_provider);
-        }
-
-        let enabled_signals = [OtlpSignal::Traces, OtlpSignal::Logs, OtlpSignal::Metrics]
-            .into_iter()
-            .filter(|signal| config.signals.contains(*signal))
-            .map(|signal| signal.to_string())
-            .collect::<Vec<_>>()
-            .join(",");
+        let enabled_signals = enabled_signal_names(&config, &[OtlpSignal::Traces, OtlpSignal::Logs]);
+        let metrics_requested = config.has_signal(OtlpSignal::Metrics);
 
         match (trace_layer, logs_layer) {
             (Some(trace_layer), Some(logs_layer)) => {
@@ -783,12 +845,78 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
         tracing::info!(
             otel_service_name = %config.service_name,
             otel_signals = %enabled_signals,
+            otel_metrics_deferred = metrics_requested,
             otel_protocol = %config.transport.to_string(),
-            "OpenTelemetry enabled"
+            node_address = %node_identity.node_address,
+            node_peer_id = %node_identity.node_peer_id,
+            "OpenTelemetry initialized"
         );
     } else {
         tracing::subscriber::set_global_default(registry)?;
     }
 
+    Ok(telemetry_handles)
+}
+
+pub(super) fn init_metrics(
+    telemetry_handles: &mut TelemetryHandles,
+    node_identity: NodeTelemetryIdentity,
+) -> anyhow::Result<()> {
+    if telemetry_handles.meter_provider.is_some() {
+        return Ok(());
+    }
+
+    let config = OtlpConfig::from_env();
+    if !config.enabled || !config.has_signal(OtlpSignal::Metrics) {
+        return Ok(());
+    }
+
+    let resource = build_otel_resource(&config, &node_identity);
+    let exporter = match config.transport {
+        OtlpTransport::Grpc => opentelemetry_otlp::MetricExporter::builder()
+            .with_tonic()
+            .with_protocol(opentelemetry_otlp::Protocol::Grpc)
+            .with_timeout(Duration::from_secs(5))
+            .build()?,
+        OtlpTransport::Http => opentelemetry_otlp::MetricExporter::builder()
+            .with_http()
+            .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
+            .with_timeout(Duration::from_secs(5))
+            .build()?,
+    };
+
+    let reader = opentelemetry_sdk::metrics::periodic_reader_with_async_runtime::PeriodicReader::builder(
+        exporter,
+        opentelemetry_sdk::runtime::Tokio,
+    )
+    .build();
+    let meter_provider = SdkMeterProvider::builder()
+        .with_reader(reader)
+        .with_resource(resource)
+        .build();
+    opentelemetry::global::set_meter_provider(meter_provider.clone());
+    telemetry_handles.session_metric_bridge = Some(build_session_metric_bridge(&meter_provider, node_identity.clone()));
+    #[cfg(feature = "prometheus")]
+    {
+        telemetry_handles.metric_bridge = Some(build_prometheus_metric_bridge(&meter_provider, node_identity.clone()));
+    }
+    telemetry_handles.meter_provider = Some(meter_provider);
+
+    let enabled_signals = enabled_signal_names(&config, &[OtlpSignal::Metrics]);
+    tracing::info!(
+        otel_service_name = %config.service_name,
+        otel_signals = %enabled_signals,
+        otel_protocol = %config.transport.to_string(),
+        node_address = %node_identity.node_address,
+        node_peer_id = %node_identity.node_peer_id,
+        "OpenTelemetry metrics initialized"
+    );
+
+    Ok(())
+}
+
+pub(super) fn init_telemetry(node_identity: NodeTelemetryIdentity) -> anyhow::Result<TelemetryHandles> {
+    let mut telemetry_handles = init_logging(node_identity.clone())?;
+    init_metrics(&mut telemetry_handles, node_identity)?;
     Ok(telemetry_handles)
 }
