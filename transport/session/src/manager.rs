@@ -404,19 +404,19 @@ pub struct SessionManagerConfig {
 /// This can be set using the `surb_target_notify` field of the [`SessionManagerConfig`] of each new Session.
 ///
 /// Both mechanisms leverage the Keep Alive message to report the respective values.
-pub struct SessionManager<S, T> {
+pub struct SessionManager<S, T, A: TagAllocator + ?Sized + 'static = dyn TagAllocator> {
     session_initiations: SessionInitiationCache,
     #[allow(clippy::type_complexity)]
     session_notifiers: Arc<OnceLock<(T, Sender<(SessionId, ClosureReason)>)>>,
     sessions: moka::future::Cache<SessionId, SessionSlot>,
     msg_sender: Arc<OnceLock<S>>,
-    tag_allocator: Arc<dyn TagAllocator>,
+    tag_allocator: Arc<A>,
     /// Maximum number of concurrent sessions, derived from `session_tag_range` size.
     maximum_sessions: usize,
     cfg: SessionManagerConfig,
 }
 
-impl<S, T> Clone for SessionManager<S, T> {
+impl<S, T, A: TagAllocator + ?Sized + 'static> Clone for SessionManager<S, T, A> {
     fn clone(&self) -> Self {
         Self {
             session_initiations: self.session_initiations.clone(),
@@ -432,7 +432,7 @@ impl<S, T> Clone for SessionManager<S, T> {
 
 const EXTERNAL_SEND_TIMEOUT: Duration = Duration::from_millis(200);
 
-impl<S, T> SessionManager<S, T>
+impl<S, T, A: TagAllocator + ?Sized + 'static> SessionManager<S, T, A>
 where
     S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
     T: futures::Sink<IncomingSession> + Clone + Send + Sync + Unpin + 'static,
@@ -441,7 +441,7 @@ where
 {
     /// Creates a new instance given the [`config`](SessionManagerConfig) and a [`TagAllocator`]
     /// for allocating session tags on the Exit (incoming) side.
-    pub fn new(mut cfg: SessionManagerConfig, tag_allocator: Arc<dyn TagAllocator>) -> Self {
+    pub fn new(mut cfg: SessionManagerConfig, tag_allocator: Arc<A>) -> Self {
         let min_session_tag_range_reservation = ReservedTag::range().end;
         debug_assert!(
             min_session_tag_range_reservation > HoprStartProtocol::START_PROTOCOL_MESSAGE_TAG.as_u64(),
