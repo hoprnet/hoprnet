@@ -216,7 +216,7 @@ where
         let session_tag_allocator = tag_allocators
             .iter()
             .find(|(u, _)| matches!(u, hopr_transport_tag_allocator::Usage::Session))
-            .expect("session allocator is always present in the partition list above")
+            .ok_or_else(|| errors::HoprTransportError::Api("session tag allocator missing".into()))?
             .1
             .clone();
 
