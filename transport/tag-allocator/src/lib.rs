@@ -27,6 +27,13 @@ pub const TAG_RANGE_END: u64 = u16::MAX as u64 + 1;
 /// Total number of available application tags.
 pub const TAG_RANGE_SIZE: u64 = TAG_RANGE_END - TAG_RANGE_START;
 
+// Compile-time assert: the tag range must fit within u16. A bitmap for a
+// larger range would require a different allocation strategy.
+const _: () = assert!(
+    TAG_RANGE_END <= u16::MAX as u64 + 1,
+    "tag range exceeds u16 — a different allocation strategy is needed"
+);
+
 /// Default number of tags reserved for sessions.
 pub const DEFAULT_SESSION_CAPACITY: u64 = 2048;
 /// Default number of tags reserved for session terminal telemetry.
