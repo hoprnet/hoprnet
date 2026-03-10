@@ -1547,6 +1547,20 @@ and indexer state.*/
     ///    {
     ///      "type": "object",
     ///      "required": [
+    ///        "IntermediatePath"
+    ///      ],
+    ///      "properties": {
+    ///        "IntermediatePath": {
+    ///          "type": "array",
+    ///          "items": {
+    ///            "type": "string"
+    ///          }
+    ///        }
+    ///      }
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
     ///        "Hops"
     ///      ],
     ///      "properties": {
@@ -1562,7 +1576,14 @@ and indexer state.*/
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     pub enum RoutingOptions {
+        IntermediatePath(::std::vec::Vec<::std::string::String>),
         Hops(u64),
+    }
+    impl ::std::convert::From<::std::vec::Vec<::std::string::String>>
+    for RoutingOptions {
+        fn from(value: ::std::vec::Vec<::std::string::String>) -> Self {
+            Self::IntermediatePath(value)
+        }
     }
     impl ::std::convert::From<u64> for RoutingOptions {
         fn from(value: u64) -> Self {
