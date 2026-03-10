@@ -61,7 +61,27 @@ pub struct TagAllocatorConfig {
 }
 
 impl TagAllocatorConfig {
-    /// The tag range covered by this configuration.
+    /// Returns the tag range for the given [`Usage`] partition.
+    ///
+    /// Partitions are laid out contiguously starting at
+    /// [`ReservedTag::UPPER_BOUND`] in the order: Session,
+    /// SessionTerminalTelemetry, ProvingTelemetry.
+    pub fn range_for(&self, usage: Usage) -> Range<u64> {
+        let base = ReservedTag::UPPER_BOUND;
+        match usage {
+            Usage::Session => base..base + self.session,
+            Usage::SessionTerminalTelemetry => {
+                let start = base + self.session;
+                start..start + self.session_probing
+            }
+            Usage::ProvingTelemetry => {
+                let start = base + self.session + self.session_probing;
+                start..start + self.probing_telemetry
+            }
+        }
+    }
+
+    /// The full tag range covered by this configuration.
     ///
     /// Starts at [`ReservedTag::UPPER_BOUND`] and spans the sum of all
     /// configured partition capacities.
