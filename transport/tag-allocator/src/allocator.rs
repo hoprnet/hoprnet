@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{ops::Range, sync::Arc};
 
 use crate::{TagAllocator, allocated_tag::AllocatedTag, bitmap::TagBitmap};
 
@@ -26,6 +26,14 @@ impl TagAllocator for PartitionAllocator {
         self.bitmap
             .allocate()
             .map(|index| AllocatedTag::new(self.base + index, index, self.bitmap.clone()))
+    }
+
+    fn capacity(&self) -> u64 {
+        self.bitmap.capacity()
+    }
+
+    fn tag_range(&self) -> Range<u64> {
+        self.base..self.base + self.bitmap.capacity()
     }
 }
 

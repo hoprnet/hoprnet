@@ -168,17 +168,6 @@ pub enum DispatchResult {
 /// Configuration for the [`SessionManager`].
 #[derive(Clone, Debug, PartialEq, smart_default::SmartDefault)]
 pub struct SessionManagerConfig {
-    /// Ranges of tags available for Sessions.
-    ///
-    /// **NOTE**: If the range starts lower than [`ReservedTag`]'s range end,
-    /// it will be automatically transformed to start at this value.
-    /// This is due to the reserved range by the Start sub-protocol.
-    ///
-    /// The size of this range determines the maximum number of concurrent sessions.
-    #[doc(hidden)]
-    #[default(_code = "ReservedTag::range().end..1024u64")]
-    pub session_tag_range: Range<u64>,
-
     /// The maximum chunk of data that can be written to the Session's input buffer.
     ///
     /// Default is 1500.
@@ -411,7 +400,9 @@ pub struct SessionManager<S, T, A: TagAllocator + ?Sized + 'static = dyn TagAllo
     sessions: moka::future::Cache<SessionId, SessionSlot>,
     msg_sender: Arc<OnceLock<S>>,
     tag_allocator: Arc<A>,
-    /// Maximum number of concurrent sessions, derived from `session_tag_range` size.
+    /// Tag value range for sessions, derived from the [`TagAllocator`].
+    session_tag_range: Range<u64>,
+    /// Maximum number of concurrent sessions, derived from the [`TagAllocator`] capacity.
     maximum_sessions: usize,
     cfg: SessionManagerConfig,
 }
@@ -425,6 +416,7 @@ impl<S, T, A: TagAllocator + ?Sized + 'static> Clone for SessionManager<S, T, A>
             cfg: self.cfg.clone(),
             msg_sender: self.msg_sender.clone(),
             tag_allocator: self.tag_allocator.clone(),
+            session_tag_range: self.session_tag_range.clone(),
             maximum_sessions: self.maximum_sessions,
         }
     }
@@ -442,18 +434,13 @@ where
     /// Creates a new instance given the [`config`](SessionManagerConfig) and a [`TagAllocator`]
     /// for allocating session tags on the Exit (incoming) side.
     pub fn new(mut cfg: SessionManagerConfig, tag_allocator: Arc<A>) -> Self {
-        let min_session_tag_range_reservation = ReservedTag::range().end;
-        debug_assert!(
-            min_session_tag_range_reservation > HoprStartProtocol::START_PROTOCOL_MESSAGE_TAG.as_u64(),
-            "invalid tag reservation range"
-        );
+        let session_tag_range = tag_allocator.tag_range();
+        let maximum_sessions = tag_allocator.capacity().max(1) as usize;
 
-        // Accommodate the lower bound if too low.
-        if cfg.session_tag_range.start < min_session_tag_range_reservation {
-            let diff = min_session_tag_range_reservation - cfg.session_tag_range.start;
-            cfg.session_tag_range = min_session_tag_range_reservation..cfg.session_tag_range.end + diff;
-        }
-        let maximum_sessions = (cfg.session_tag_range.end - cfg.session_tag_range.start).max(1) as usize;
+        debug_assert!(
+            session_tag_range.start >= ReservedTag::range().end,
+            "session tag range must not overlap with reserved tags"
+        );
         cfg.surb_balance_notify_period = cfg
             .surb_balance_notify_period
             .map(|p| p.max(MIN_SURB_BUFFER_NOTIFICATION_PERIOD));
@@ -491,6 +478,7 @@ where
                 .build(),
             session_notifiers: Arc::new(OnceLock::new()),
             tag_allocator,
+            session_tag_range,
             maximum_sessions,
             cfg,
         }
@@ -1065,7 +1053,6 @@ where
                 .await
                 .map(|_| DispatchResult::Processed);
         } else if self
-            .cfg
             .session_tag_range
             .contains(&in_data.data.application_tag.as_u64())
         {
@@ -1518,10 +1505,15 @@ mod tests {
 
     /// Create a test tag allocator with a large partition.
     fn test_tag_allocator() -> Arc<dyn TagAllocator> {
+        test_tag_allocator_with_session_capacity(10000)
+    }
+
+    /// Create a test tag allocator with a specific session partition capacity.
+    fn test_tag_allocator_with_session_capacity(session_capacity: u64) -> Arc<dyn TagAllocator> {
         hopr_transport_tag_allocator::create_allocators(
             ReservedTag::range().end..u16::MAX as u64 + 1,
             [
-                (hopr_transport_tag_allocator::Usage::Session, 10000),
+                (hopr_transport_tag_allocator::Usage::Session, session_capacity),
                 (hopr_transport_tag_allocator::Usage::SessionTerminalTelemetry, 10000),
                 (hopr_transport_tag_allocator::Usage::ProvingTelemetry, 10000),
             ],
@@ -1944,13 +1936,8 @@ mod tests {
         let alice_pseudonym = HoprPseudonym::random();
         let bob_peer: Address = (&ChainKeypair::random()).into();
 
-        let cfg = SessionManagerConfig {
-            session_tag_range: 16u64..17u64, // Slot for exactly one session
-            ..Default::default()
-        };
-
         let alice_mgr = SessionManager::new(Default::default(), test_tag_allocator());
-        let bob_mgr = SessionManager::new(cfg, test_tag_allocator());
+        let bob_mgr = SessionManager::new(Default::default(), test_tag_allocator_with_session_capacity(1));
 
         // Occupy the only free slot with tag 16
         let (dummy_tx, _) = futures::channel::mpsc::unbounded();
@@ -2066,13 +2053,8 @@ mod tests {
         let alice_pseudonym = HoprPseudonym::random();
         let bob_peer: Address = (&ChainKeypair::random()).into();
 
-        let cfg = SessionManagerConfig {
-            session_tag_range: ReservedTag::range().end..ReservedTag::range().end + 1,
-            ..Default::default()
-        };
-
         let alice_mgr = SessionManager::new(Default::default(), test_tag_allocator());
-        let bob_mgr = SessionManager::new(cfg, test_tag_allocator());
+        let bob_mgr = SessionManager::new(Default::default(), test_tag_allocator_with_session_capacity(1));
 
         // Occupy the only free slot with tag 16
         let (dummy_tx, _) = futures::channel::mpsc::unbounded();

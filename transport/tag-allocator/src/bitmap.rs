@@ -54,6 +54,11 @@ impl TagBitmap {
         None
     }
 
+    /// The total number of tags this bitmap can track.
+    pub fn capacity(&self) -> u64 {
+        self.capacity
+    }
+
     /// Return a previously allocated tag, making it available again.
     pub fn deallocate(&self, index: u64) {
         debug_assert!(index < self.capacity, "index {index} out of range");

@@ -236,10 +236,6 @@ where
             my_multiaddresses,
             smgr: SessionManager::new(
                 SessionManagerConfig {
-                    session_tag_range: cfg
-                        .session
-                        .tag_allocator
-                        .range_for(hopr_transport_tag_allocator::Usage::Session),
                     frame_mtu: std::env::var("HOPR_SESSION_FRAME_SIZE")
                         .ok()
                         .and_then(|s| s.parse::<usize>().ok())

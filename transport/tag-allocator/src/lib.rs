@@ -104,6 +104,12 @@ impl TagAllocatorConfig {
 pub trait TagAllocator: Send + Sync {
     /// Obtain the next available tag, or `None` if the partition is exhausted.
     fn allocate(&self) -> Option<AllocatedTag>;
+
+    /// The total number of tags managed by this allocator.
+    fn capacity(&self) -> u64;
+
+    /// The tag value range `[base, base + capacity)` managed by this allocator.
+    fn tag_range(&self) -> Range<u64>;
 }
 
 /// Result type returned by [`create_allocators`].
