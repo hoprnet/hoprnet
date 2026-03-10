@@ -1052,10 +1052,7 @@ where
                 .handle_start_protocol_message(pseudonym, in_data)
                 .await
                 .map(|_| DispatchResult::Processed);
-        } else if self
-            .session_tag_range
-            .contains(&in_data.data.application_tag.as_u64())
-        {
+        } else if self.session_tag_range.contains(&in_data.data.application_tag.as_u64()) {
             let session_id = SessionId::new(in_data.data.application_tag, pseudonym);
 
             return if let Some(session_slot) = self.sessions.get(&session_id).await {

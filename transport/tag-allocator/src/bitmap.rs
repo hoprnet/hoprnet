@@ -71,8 +71,9 @@ impl TagBitmap {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::{collections::HashSet, sync::Arc, thread};
+
+    use super::*;
 
     // ── Capacity edge cases ─────────────────────────────────────────
 

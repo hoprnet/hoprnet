@@ -2,13 +2,15 @@ use std::{collections::HashSet, hash::RandomState};
 
 use hopr_api::{
     OffchainPublicKey,
-    graph::traits::{CostFn, EdgeNetworkObservableRead, EdgeObservableRead},
+    graph::{
+        costs::ForwardPathCostFn,
+        traits::{CostFn, EdgeNetworkObservableRead, EdgeObservableRead},
+    },
     types::internal::routing::PathId,
 };
 use petgraph::graph::NodeIndex;
 
 use crate::{ChannelGraph, algorithm::all_simple_paths_multi, graph::InnerGraph};
-use hopr_api::graph::costs::ForwardPathCostFn;
 
 /// Core path-finding routine that runs `all_simple_paths_multi` on the
 /// inner petgraph.
@@ -191,6 +193,7 @@ mod tests {
     use hopr_api::{
         graph::{
             NetworkGraphTraverse, NetworkGraphWrite,
+            costs::{HoprForwardCostFn, HoprReturnCostFn},
             traits::{EdgeObservableWrite, EdgeWeightType},
         },
         types::{
@@ -200,7 +203,6 @@ mod tests {
     };
 
     use super::*;
-    use hopr_api::graph::costs::{HoprForwardCostFn, HoprReturnCostFn};
 
     /// Fixed test secret keys (reused from the broader codebase).
     const SECRET_0: [u8; 32] = hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d");
@@ -802,7 +804,10 @@ mod tests {
             HoprReturnCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
         );
 
-        assert!(routes.is_empty(), "return path should be pruned when last edge lacks connectivity");
+        assert!(
+            routes.is_empty(),
+            "return path should be pruned when last edge lacks connectivity"
+        );
         Ok(())
     }
 
@@ -831,7 +836,10 @@ mod tests {
             HoprReturnCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
         );
 
-        assert!(routes.is_empty(), "return path should be pruned when first edge lacks capacity");
+        assert!(
+            routes.is_empty(),
+            "return path should be pruned when first edge lacks capacity"
+        );
         Ok(())
     }
 
@@ -865,7 +873,11 @@ mod tests {
             None,
             HoprReturnCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
         );
-        assert_eq!(routes.len(), 2, "diamond topology should yield two 2-edge return routes");
+        assert_eq!(
+            routes.len(),
+            2,
+            "diamond topology should yield two 2-edge return routes"
+        );
         Ok(())
     }
 

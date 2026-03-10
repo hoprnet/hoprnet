@@ -17,11 +17,7 @@ pub struct AllocatedTag {
 
 impl AllocatedTag {
     pub(crate) fn new(value: u64, index: u64, bitmap: Arc<TagBitmap>) -> Self {
-        Self {
-            value,
-            index,
-            bitmap,
-        }
+        Self { value, index, bitmap }
     }
 
     pub fn value(&self) -> u64 {
