@@ -1,4 +1,4 @@
-use std::fmt::{Display, Formatter};
+use std::fmt::Formatter;
 
 use hopr_crypto_sphinx::prelude::*;
 #[cfg(feature = "rayon")]
@@ -353,13 +353,16 @@ impl std::fmt::Debug for HoprForwardedPacket {
 /// See [`HoprIncomingPacket`], [`HoprForwardedPacket`] and [`HoprOutgoingPacket`] for details.
 ///
 /// The members are intentionally boxed to equalize the variant sizes.
-#[derive(Clone, Debug, strum::EnumTryAs, strum::EnumIs)]
+#[derive(Clone, Debug, strum::EnumTryAs, strum::EnumIs, strum::IntoStaticStr, strum::Display)]
 pub enum HoprPacket {
     /// The packet is intended for us
+    #[strum(to_string = "Final")]
     Final(Box<HoprIncomingPacket>),
     /// The packet must be forwarded
+    #[strum(to_string = "Forwarded")]
     Forwarded(Box<HoprForwardedPacket>),
     /// The packet that is being sent out by us
+    #[strum(to_string = "Outgoing")]
     Outgoing(Box<HoprOutgoingPacket>),
 }
 
@@ -370,16 +373,6 @@ impl HoprPacket {
             HoprPacket::Final(packet) => Some(&packet.packet_tag),
             HoprPacket::Forwarded(packet) => Some(&packet.packet_tag),
             HoprPacket::Outgoing(_) => None,
-        }
-    }
-}
-
-impl Display for HoprPacket {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match &self {
-            Self::Final(_) => write!(f, "Final"),
-            Self::Forwarded(_) => write!(f, "Forwarded"),
-            Self::Outgoing(_) => write!(f, "Outgoing"),
         }
     }
 }

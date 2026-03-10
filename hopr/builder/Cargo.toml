@@ -18,6 +18,7 @@ prometheus = ["hopr-lib/prometheus"]
 runtime-tokio = [
   "dep:tokio",
   "hopr-lib/runtime-tokio",
+  "hopr-async-runtime/runtime-tokio",
   "hopr-db-node/runtime-tokio",
   "hopr-transport-p2p/runtime-tokio",
   "hopr-chain-connector/runtime-tokio",
@@ -73,6 +74,7 @@ hopr-chain-connector = { workspace = true }
 hopr-ct-immediate = { workspace = true }
 hopr-network-graph = { workspace = true }
 hopr-transport-p2p = { workspace = true }
+hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true, features = ["yaml", "redactions"] }

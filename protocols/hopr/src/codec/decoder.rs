@@ -227,12 +227,6 @@ where
         })
         .map_err(IncomingPacketError::undecodable)?;
 
-        let packet_type = match &packet {
-            HoprPacket::Final(_) => "final",
-            HoprPacket::Forwarded(_) => "forwarded",
-            HoprPacket::Outgoing(_) => "outgoing",
-        };
-
         // This is checked on both Final and Forwarded packets,
         // Outgoing packets are not allowed to pass and are later reported as invalid state.
         if let Some(tag) = packet.packet_tag() {
@@ -257,7 +251,7 @@ where
                 // Store all incoming SURBs if any
                 if !incoming.surbs.is_empty() {
                     self.surb_store.insert_surbs(incoming.sender, incoming.surbs);
-                    tracing::trace!(pseudonym = %incoming.sender, num_surbs = info.num_surbs, packet_type, "stored incoming surbs for pseudonym");
+                    tracing::trace!(pseudonym = %incoming.sender, num_surbs = info.num_surbs, packet_type = "final", "stored incoming surbs for pseudonym");
                 }
 
                 let result = match incoming.ack_key {
@@ -280,7 +274,7 @@ where
                                 GeneralError::ParseError("invalid number of acknowledgements in packet".into()).into(),
                             ));
                         }
-                        tracing::trace!(num_acks, packet_type, "received acknowledgement packet");
+                        tracing::trace!(num_acks, packet_type = "final", "received acknowledgement packet");
 
                         // The contained payload represents an Acknowledgement
                         IncomingPacket::Acknowledgement(
@@ -312,7 +306,7 @@ where
                 #[cfg(feature = "trace-timing")]
                 tracing::trace!(
                     total_ms = decode_start.elapsed().as_millis() as u64,
-                    packet_type,
+                    packet_type = "final",
                     "decode complete"
                 );
                 Ok(result)
@@ -337,7 +331,7 @@ where
                 #[cfg(feature = "trace-timing")]
                 tracing::trace!(
                     total_ms = decode_start.elapsed().as_millis() as u64,
-                    packet_type,
+                    packet_type = "forwarded",
                     "decode complete"
                 );
                 Ok(IncomingPacket::Forwarded(
@@ -357,7 +351,7 @@ where
                 #[cfg(feature = "trace-timing")]
                 tracing::trace!(
                     total_ms = decode_start.elapsed().as_millis() as u64,
-                    packet_type,
+                    packet_type = "outgoing",
                     "decode complete"
                 );
                 Err(IncomingPacketError::ProcessingError(

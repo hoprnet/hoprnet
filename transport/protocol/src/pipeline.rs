@@ -302,7 +302,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             received_ticket,
                             ..
                         } = *fwd_packet;
-                        // TODO: block
+                        // Per requirements, this call is not blocking
                         if let Err(error) = ticket_proc.insert_unacknowledged_ticket(&next_hop, ack_challenge, received_ticket) {
                             tracing::error!(
                                 previous_hop = previous_hop.to_peerid_str(),

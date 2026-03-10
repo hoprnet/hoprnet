@@ -116,6 +116,8 @@ pub trait UnacknowledgedTicketProcessor {
     /// The [`ticket`](UnacknowledgedTicket) corresponds to the given [`challenge`](HalfKeyChallenge)
     /// and awaits to be [acknowledged](UnacknowledgedTicketProcessor::acknowledge_tickets)
     /// once an [`Acknowledgement`] is received from the `next_hop`.
+    ///
+    /// This operation should be reasonably fast and should not block the main processing pipeline.
     fn insert_unacknowledged_ticket(
         &self,
         next_hop: &OffchainPublicKey,
@@ -138,6 +140,8 @@ pub trait UnacknowledgedTicketProcessor {
     ///
     /// Must return [`TicketAcknowledgementError::UnexpectedAcknowledgement`] if no `Acknowledgements` from the given
     /// `peer` was expected.
+    ///
+    /// This operation is expected to be somewhat long-running and significantly blocking.
     fn acknowledge_tickets(
         &self,
         peer: OffchainPublicKey,
@@ -152,12 +156,16 @@ pub trait TicketTracker {
     type Error: std::error::Error + Send + Sync + 'static;
 
     /// Gets the next ticket index for an outgoing ticket for the given channel.
+    ///
+    /// This operation should be fast and non-blocking.
     fn next_outgoing_ticket_index(&self, channel: &ChannelEntry) -> Result<u64, Self::Error>;
 
     /// Retrieves the unrealized balance of the given channel.
     ///
     /// This allows guarding from situations where the ticket issuer issues more tickets
     /// than there's balance in the given channel.
+    ///
+    /// This operation should be fast and non-blocking.
     fn incoming_channel_unrealized_balance(
         &self,
         channel_id: &ChannelId,

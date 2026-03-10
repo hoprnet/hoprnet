@@ -415,28 +415,28 @@ where
         tracing::trace!(%ticket, "received unacknowledged ticket");
 
         let peer_id = next_hop.to_peerid_str();
-        let inner_cache = self.unacknowledged_tickets.get_with_by_ref(next_hop, || {
-            let peer_id_for_eviction = peer_id.clone();
-            metrics::inc_unack_peers();
-            moka::sync::Cache::builder()
-                .time_to_live(self.cfg.unack_ticket_timeout)
-                .max_capacity(self.cfg.max_unack_tickets as u64)
-                .eviction_listener(move |_key, _value, cause| {
-                    metrics::dec_unack_tickets();
-                    metrics::dec_unack_tickets_for_peer(&peer_id_for_eviction);
+        self.unacknowledged_tickets
+            .get_with_by_ref(next_hop, || {
+                let peer_id_for_eviction = peer_id.clone();
+                metrics::inc_unack_peers();
+                moka::sync::Cache::builder()
+                    .time_to_live(self.cfg.unack_ticket_timeout)
+                    .max_capacity(self.cfg.max_unack_tickets as u64)
+                    .eviction_listener(move |_, _, cause| {
+                        metrics::dec_unack_tickets();
+                        metrics::dec_unack_tickets_for_peer(&peer_id_for_eviction);
 
-                    // Only count Expired/Size removals as evictions (not Explicit or Replaced)
-                    if matches!(
-                        cause,
-                        moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size
-                    ) {
-                        metrics::inc_evictions();
-                    }
-                })
-                .build()
-        });
-
-        inner_cache.insert(challenge, ticket);
+                        // Only count Expired/Size removals as evictions (not Explicit or Replaced)
+                        if matches!(
+                            cause,
+                            moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size
+                        ) {
+                            metrics::inc_evictions();
+                        }
+                    })
+                    .build()
+            })
+            .insert(challenge, ticket);
 
         metrics::inc_insertions();
         metrics::inc_unack_tickets();
