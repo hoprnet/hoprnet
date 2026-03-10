@@ -67,7 +67,7 @@ jobs:
           persist-credentials: false
 
       - name: Run integration tests
-        run: nix develop -c cargo test --test '*' -- --test-threads=1
+        run: nix develop -c RUST_LOG=info,hopr_network_graph=trace,hopr_transport_path=trace cargo test --test '*' -- --test-threads=1
 
   tests-unit-nightly:
     name: Unit Tests Nightly
