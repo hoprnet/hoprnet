@@ -1,7 +1,9 @@
 use blokli_client::api::{BlokliQueryClient, BlokliTransactionClient};
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
-use hopr_api::chain::{ChainReceipt, TicketRedeemError};
-use hopr_types::{chain::prelude::*, crypto::prelude::*, internal::prelude::*, primitive::prelude::HoprBalance};
+use hopr_api::{
+    chain::{ChainReceipt, TicketRedeemError},
+    types::{chain::prelude::*, crypto::prelude::*, internal::prelude::*, primitive::prelude::HoprBalance},
+};
 
 use crate::{backend::Backend, connector::HoprBlockchainConnector, errors::ConnectorError};
 
@@ -135,8 +137,10 @@ mod tests {
 
     use blokli_client::BlokliTestClient;
     use hex_literal::hex;
-    use hopr_api::chain::{ChainWriteChannelOperations, ChainWriteTicketOperations};
-    use hopr_types::primitive::prelude::*;
+    use hopr_api::{
+        chain::{ChainWriteChannelOperations, ChainWriteTicketOperations},
+        types::primitive::prelude::*,
+    };
 
     use super::*;
     use crate::{

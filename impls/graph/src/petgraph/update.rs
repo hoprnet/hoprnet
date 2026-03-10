@@ -210,8 +210,8 @@ mod tests {
             NetworkGraphUpdate, NetworkGraphView, NetworkGraphWrite,
             traits::{EdgeObservableRead, EdgeProtocolObservable},
         },
+        types::crypto::prelude::{Keypair, OffchainKeypair},
     };
-    use hopr_types::crypto::prelude::{Keypair, OffchainKeypair};
 
     use super::*;
 

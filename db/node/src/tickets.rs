@@ -3,9 +3,11 @@ use std::{collections::HashMap, ops::Bound};
 use async_stream::stream;
 use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt, stream::BoxStream};
-use hopr_api::db::*;
+use hopr_api::{
+    db::*,
+    types::{internal::prelude::*, primitive::prelude::*},
+};
 use hopr_db_entity::{outgoing_ticket_index, ticket, ticket_statistics};
-use hopr_types::{internal::prelude::*, primitive::prelude::*};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, QuerySelect, Set,
     TransactionTrait,
@@ -793,8 +795,10 @@ mod tests {
     use anyhow::Context;
     use futures::StreamExt;
     use hex_literal::hex;
-    use hopr_api::db::{ChannelTicketStatistics, TicketMarker};
-    use hopr_types::{crypto::prelude::*, crypto_random::Randomizable, internal::prelude::*, primitive::prelude::*};
+    use hopr_api::{
+        db::{ChannelTicketStatistics, TicketMarker},
+        types::{crypto::prelude::*, crypto_random::Randomizable, internal::prelude::*, primitive::prelude::*},
+    };
 
     use crate::{
         db::HoprNodeDb,

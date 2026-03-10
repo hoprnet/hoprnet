@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
 use hex_literal::hex;
+use hopr_api::types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*};
 use hopr_chain_connector::{
     HoprBlockchainSafeConnector, create_trustful_hopr_blokli_connector,
     testing::{BlokliTestClient, BlokliTestStateBuilder, StaticState},
 };
 use hopr_db_node::HoprNodeDb;
-use hopr_types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*};
 
 lazy_static::lazy_static! {
     pub static ref PEERS: [(ChainKeypair, OffchainKeypair); 5] = [

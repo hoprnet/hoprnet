@@ -2174,8 +2174,6 @@ dependencies = [
  "num-traits",
  "oorandom",
  "page_size",
- "plotters",
- "rayon",
  "regex",
  "serde",
  "serde_json",
@@ -2919,9 +2917,6 @@ name = "fastrand"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
-dependencies = [
- "getrandom 0.2.17",
-]
 
 [[package]]
 name = "fastrlp"
@@ -3042,7 +3037,6 @@ version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e139bc46ca777eb5efaf62df0ab8cc5fd400866427e56c68b22e414e53bd3be"
 dependencies = [
- "fastrand",
  "futures-core",
  "futures-sink",
  "spin",
@@ -4368,7 +4362,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "0.13.0"
+version = "1.0.0"
+source = "git+https://github.com/hoprnet/hopr-api?rev=0403f9d9470bf7e60234f8d4725260106f0fe2c7#0403f9d9470bf7e60234f8d4725260106f0fe2c7"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -4376,7 +4371,6 @@ dependencies = [
  "chrono",
  "futures",
  "hopr-types",
- "insta",
  "libp2p-identity",
  "multiaddr",
  "strum 0.28.0",
@@ -4413,7 +4407,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-builder"
-version = "4.0.0"
+version = "4.0.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4421,6 +4415,7 @@ dependencies = [
  "futures-concurrency",
  "futures-time",
  "hex-literal",
+ "hopr-api",
  "hopr-builder",
  "hopr-chain-connector",
  "hopr-ct-immediate",
@@ -4428,7 +4423,6 @@ dependencies = [
  "hopr-lib",
  "hopr-network-graph",
  "hopr-transport-p2p",
- "hopr-types",
  "insta",
  "lazy_static",
  "parking_lot",
@@ -4463,7 +4457,6 @@ dependencies = [
  "hex-literal",
  "hopr-api",
  "hopr-async-runtime",
- "hopr-types",
  "insta",
  "lazy_static",
  "moka",
@@ -4617,7 +4610,6 @@ dependencies = [
  "hopr-api",
  "hopr-async-runtime",
  "hopr-network-graph",
- "hopr-types",
  "humantime-serde",
  "lazy_static",
  "moka",
@@ -4636,7 +4628,6 @@ dependencies = [
  "hopr-api",
  "hopr-async-runtime",
  "hopr-network-graph",
- "hopr-types",
  "humantime-serde",
  "lazy_static",
  "moka",
@@ -4686,7 +4677,6 @@ dependencies = [
  "hopr-db-entity",
  "hopr-db-migration",
  "hopr-metrics",
- "hopr-types",
  "lazy_static",
  "moka",
  "sea-orm",
@@ -4744,7 +4734,6 @@ dependencies = [
  "hopr-parallelize",
  "hopr-platform",
  "hopr-transport",
- "hopr-types",
  "lazy_static",
  "serde",
  "serde-saphyr",
@@ -4777,7 +4766,6 @@ dependencies = [
  "hex-literal",
  "hopr-api",
  "hopr-statistics",
- "hopr-types",
  "indexmap 2.13.0",
  "parking_lot",
  "petgraph",
@@ -4892,7 +4880,6 @@ dependencies = [
  "hopr-metrics",
  "hopr-parallelize",
  "hopr-platform",
- "hopr-types",
  "humantime-serde",
  "lazy_static",
  "moka",
@@ -4990,11 +4977,11 @@ dependencies = [
  "futures-concurrency",
  "futures-time",
  "hex-literal",
+ "hopr-api",
  "hopr-async-runtime",
  "hopr-chain-connector",
  "hopr-lib",
  "hopr-metrics",
- "hopr-types",
  "humantime-serde",
  "insta",
  "lazy_static",
@@ -5012,7 +4999,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.20.0"
+version = "0.20.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5034,7 +5021,6 @@ dependencies = [
  "hopr-transport-probe",
  "hopr-transport-protocol",
  "hopr-transport-session",
- "hopr-types",
  "humantime-serde",
  "insta",
  "lazy_static",
@@ -5113,7 +5099,6 @@ dependencies = [
  "hopr-transport-network",
  "hopr-transport-probe",
  "hopr-transport-protocol",
- "hopr-types",
  "lazy_static",
  "libp2p",
  "libp2p-stream",
@@ -5140,7 +5125,6 @@ dependencies = [
  "hopr-ct-immediate",
  "hopr-platform",
  "hopr-protocol-app",
- "hopr-types",
  "humantime-serde",
  "lazy_static",
  "moka",
@@ -5180,7 +5164,6 @@ dependencies = [
  "hopr-protocol-app",
  "hopr-protocol-hopr",
  "hopr-transport-mixer",
- "hopr-types",
  "humantime-serde",
  "lazy_static",
  "libp2p",
@@ -5266,7 +5249,6 @@ dependencies = [
  "hopr-metrics",
  "hopr-network-types",
  "hopr-transport",
- "hopr-types",
  "human-bandwidth",
  "lazy_static",
  "parking_lot",
@@ -7623,34 +7605,6 @@ name = "plain"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
-
-[[package]]
-name = "plotters"
-version = "0.3.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5aeb6f403d7a4911efb1e33402027fc44f29b5bf6def3effcc22d7bb75f2b747"
-dependencies = [
- "num-traits",
- "plotters-backend",
- "plotters-svg",
- "wasm-bindgen",
- "web-sys",
-]
-
-[[package]]
-name = "plotters-backend"
-version = "0.3.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df42e13c12958a16b3f7f4386b9ab1f3e7933914ecea48da7139435263a4172a"
-
-[[package]]
-name = "plotters-svg"
-version = "0.3.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51bae2ac328883f7acdfea3d66a7c35751187f870bc81f94563733a154d7a670"
-dependencies = [
- "plotters-backend",
-]
 
 [[package]]
 name = "polling"

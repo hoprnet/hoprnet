@@ -14,13 +14,14 @@ crate-type = ["rlib"]
 
 [features]
 default = ["rayon"]
+
 rayon = ["hopr-parallelize/rayon"]
 serde = [
   "dep:serde",
   "dep:serde_bytes",
   "flagset/serde",
-  "hopr-types/serde",
   "hopr-crypto-sphinx/serde",
+  "hopr-types/serde",
 ]
 allocator-mimalloc = [
   "dep:mimalloc",

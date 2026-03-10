@@ -34,7 +34,7 @@ pub enum HoprLibError {
     TransportError(#[from] HoprTransportError),
 
     #[error(transparent)]
-    TypeError(#[from] hopr_types::primitive::errors::GeneralError),
+    TypeError(#[from] hopr_api::types::primitive::errors::GeneralError),
 
     #[error(transparent)]
     NetworkTypeError(#[from] hopr_network_types::errors::NetworkTypeError),

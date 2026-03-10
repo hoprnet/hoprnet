@@ -22,7 +22,7 @@ pub struct HoprCodecConfig {
         serde(default),
         serde_as(as = "Option<serde_with::DisplayFromStr>")
     )]
-    pub outgoing_ticket_price: Option<hopr_types::primitive::balance::HoprBalance>,
+    pub outgoing_ticket_price: Option<hopr_api::types::primitive::balance::HoprBalance>,
     /// Optional minimum price of incoming tickets.
     ///
     /// The value cannot be lower than the default outgoing ticket price times the node's path position.
@@ -34,7 +34,7 @@ pub struct HoprCodecConfig {
         serde(default),
         serde_as(as = "Option<serde_with::DisplayFromStr>")
     )]
-    pub min_incoming_ticket_price: Option<hopr_types::primitive::balance::HoprBalance>,
+    pub min_incoming_ticket_price: Option<hopr_api::types::primitive::balance::HoprBalance>,
     /// Optional probability of winning an outgoing ticket.
     ///
     /// If not set (default), the network default will be used, which is the minimum allowed winning probability in the
@@ -44,7 +44,7 @@ pub struct HoprCodecConfig {
         serde(default),
         serde_as(as = "Option<serde_with::DisplayFromStr>")
     )]
-    pub outgoing_win_prob: Option<hopr_types::internal::prelude::WinningProbability>,
+    pub outgoing_win_prob: Option<hopr_api::types::internal::prelude::WinningProbability>,
 }
 
 impl PartialEq for HoprCodecConfig {
@@ -62,16 +62,16 @@ impl PartialEq for HoprCodecConfig {
 mod tests {
     use std::sync::Arc;
 
+    use hopr_api::types::{
+        crypto::prelude::*,
+        crypto_random::Randomizable,
+        internal::{prelude::*, routing::ResolvedTransportRouting},
+    };
     use hopr_chain_connector::{
         HoprBlockchainSafeConnector,
         testing::{BlokliTestClient, StaticState},
     };
     use hopr_db_node::HoprNodeDb;
-    use hopr_types::{
-        crypto::prelude::*,
-        crypto_random::Randomizable,
-        internal::{prelude::*, routing::ResolvedTransportRouting},
-    };
 
     use crate::{
         HoprCodecConfig, HoprDecoder, HoprEncoder, HoprTicketProcessor, HoprTicketProcessorConfig, MemorySurbStore,
@@ -167,7 +167,7 @@ mod tests {
 
         let encoder = create_encoder(&sender);
 
-        let data = hopr_types::crypto_random::random_bytes::<2048>();
+        let data = hopr_api::types::crypto_random::random_bytes::<2048>();
 
         assert!(
             encoder

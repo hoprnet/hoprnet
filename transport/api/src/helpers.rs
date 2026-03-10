@@ -1,8 +1,10 @@
 use futures::{TryStreamExt, stream::FuturesUnordered};
-use hopr_api::chain::{ChainKeyOperations, ChainPathResolver, ChainReadChannelOperations};
+use hopr_api::{
+    chain::{ChainKeyOperations, ChainPathResolver, ChainReadChannelOperations},
+    types::{crypto::crypto_traits::Randomizable, internal::prelude::*, primitive::prelude::*},
+};
 use hopr_crypto_packet::prelude::*;
 use hopr_protocol_hopr::{FoundSurb, SurbStore};
-use hopr_types::{crypto::crypto_traits::Randomizable, internal::prelude::*, primitive::prelude::*};
 use tracing::trace;
 
 use crate::errors::HoprTransportError;
@@ -100,7 +102,7 @@ where
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
-            use hopr_types::internal::path::Path;
+            use hopr_api::types::internal::path::Path;
             hopr_metrics::SimpleHistogram::observe(&METRIC_PATH_LENGTH, (path.num_hops() - 1) as f64);
         }
 

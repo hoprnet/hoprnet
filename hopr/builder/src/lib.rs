@@ -20,7 +20,6 @@ use hopr_chain_connector::{
 use hopr_db_node::{HoprNodeDb, HoprNodeDbApi, init_hopr_node_db};
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_lib;
-use hopr_lib::Keypair;
 #[cfg(feature = "session-server")]
 use hopr_lib::traits::HoprSessionServer;
 #[cfg(feature = "runtime-tokio")]
@@ -28,6 +27,7 @@ use hopr_lib::{
     ChainKeypair, Hopr, HoprLibError, HoprTransportIO, OffchainKeypair, api::network::NetworkEvent,
     config::HoprLibConfig,
 };
+use hopr_lib::{Keypair, UnitaryFloatOps};
 use hopr_network_graph::{ChannelGraph, SharedChannelGraph};
 use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork, PeerDiscovery};
 #[cfg(feature = "runtime-tokio")]
@@ -206,14 +206,16 @@ where
                                         (Ok(Some(from)), Ok(Some(to))) => {
                                             let capacity =  if matches!(channel.status, ChannelStatus::Closed) {
                                                 None
-                                            } else {
+                                            } else if let Ok(ticket_value) = ticket_price.read().div_f64(win_probability.read().as_f64()) {
                                                 Some(
-                                                    if let Some(division) = channel.balance.amount().low_u128().checked_div(ticket_price.read().amount().low_u128()) {
-                                                        division.saturating_mul(win_probability.read().as_luck() as u128)
-                                                    } else {
-                                                        u128::MAX
-                                                    }
+                                                    channel.balance
+                                                        .amount()
+                                                        .checked_div(ticket_value.amount())
+                                                        .map(|v| v.low_u128())
+                                                        .unwrap_or(u128::MAX)
                                                 )
+                                            } else {
+                                                None
                                             };
 
                                             graph_updater.record_edge(hopr_lib::api::graph::MeasurableEdge::<NeighborTelemetry, PathTelemetry>::Capacity(Box::new(EdgeCapacityUpdate{

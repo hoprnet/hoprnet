@@ -49,8 +49,8 @@ tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 
 hopr-async-runtime = { workspace = true }
-hopr-types = { workspace = true, features = ["primitive", "random"] }
 hopr-crypto-packet = { workspace = true }
+hopr-types = { workspace = true, features = ["primitive", "random"] }
 
 hopr-metrics = { workspace = true, optional = true }
 

@@ -49,7 +49,7 @@ mod tests {
         let mut buf = tokio_util::bytes::BytesMut::new();
 
         let random_data_of_expected_packet_size: Box<[u8]> =
-            Box::from(hopr_types::crypto_random::random_bytes::<TEST_SIZE>());
+            Box::from(hopr_api::types::crypto_random::random_bytes::<TEST_SIZE>());
 
         codec.encode(random_data_of_expected_packet_size.clone(), &mut buf)?;
 
@@ -70,7 +70,7 @@ mod tests {
 
         const LESS_THAN_PAYLOAD_SIZE: usize = TEST_SIZE - 1;
         let random_data_too_few_bytes: Box<[u8]> =
-            Box::from(hopr_types::crypto_random::random_bytes::<LESS_THAN_PAYLOAD_SIZE>());
+            Box::from(hopr_api::types::crypto_random::random_bytes::<LESS_THAN_PAYLOAD_SIZE>());
 
         codec.encode(random_data_too_few_bytes, &mut buf)?;
 
@@ -91,7 +91,7 @@ mod tests {
 
         const MORE_THAN_PAYLOAD_SIZE: usize = TEST_SIZE + 1;
         let random_data_more_bytes_than_needed: Box<[u8]> =
-            Box::from(hopr_types::crypto_random::random_bytes::<MORE_THAN_PAYLOAD_SIZE>());
+            Box::from(hopr_api::types::crypto_random::random_bytes::<MORE_THAN_PAYLOAD_SIZE>());
 
         codec.encode(random_data_more_bytes_than_needed.clone(), &mut buf)?;
 

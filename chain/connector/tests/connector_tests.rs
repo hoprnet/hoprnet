@@ -1,16 +1,18 @@
-use hopr_api::chain::ChainValues;
-use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
-use hopr_types::{
-    crypto::prelude::{ChainKeypair, Keypair, OffchainKeypair},
-    internal::{
-        channels::ChannelStatus,
-        prelude::{AccountEntry, AccountType, ChannelEntry},
-    },
-    primitive::{
-        balance::WxHOPR,
-        prelude::{Address, BytesRepresentable, HoprBalance, XDai, XDaiBalance},
+use hopr_api::{
+    chain::ChainValues,
+    types::{
+        crypto::prelude::{ChainKeypair, Keypair, OffchainKeypair},
+        internal::{
+            channels::ChannelStatus,
+            prelude::{AccountEntry, AccountType, ChannelEntry},
+        },
+        primitive::{
+            balance::WxHOPR,
+            prelude::{Address, BytesRepresentable, HoprBalance, XDai, XDaiBalance},
+        },
     },
 };
+use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
 
 lazy_static::lazy_static! {
     static ref CHAIN_KEYS: Vec<ChainKeypair> = (0..3).map(|_| ChainKeypair::random()).collect();

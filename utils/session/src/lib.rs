@@ -700,12 +700,12 @@ mod tests {
         channel::mpsc::{UnboundedReceiver, UnboundedSender},
     };
     use futures_time::future::FutureExt as TimeFutureExt;
+    use hopr_api::types::crypto::crypto_traits::Randomizable;
     use hopr_lib::{
         Address, ApplicationData, ApplicationDataIn, ApplicationDataOut, HoprPseudonym, HoprSession, SessionId,
         exports::types::internal::routing::{DestinationRouting, RoutingOptions},
     };
     use hopr_transport::session::{HoprSessionConfig, SessionTelemetry};
-    use hopr_types::crypto::crypto_traits::Randomizable;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     use super::*;

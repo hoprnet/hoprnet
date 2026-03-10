@@ -29,13 +29,13 @@ pub enum NodeDbError {
     PacketError(#[from] hopr_crypto_packet::errors::PacketError),
 
     #[error(transparent)]
-    TypeError(#[from] hopr_types::primitive::errors::GeneralError),
+    TypeError(#[from] hopr_api::types::primitive::errors::GeneralError),
 
     #[error(transparent)]
-    CoreTypeError(#[from] hopr_types::internal::errors::CoreTypesError),
+    CoreTypeError(#[from] hopr_api::types::internal::errors::CoreTypesError),
 
     #[error(transparent)]
-    CryptoError(#[from] hopr_types::crypto::errors::CryptoError),
+    CryptoError(#[from] hopr_api::types::crypto::errors::CryptoError),
 }
 
 impl<E: std::error::Error + Send + Sync + 'static> From<TransactionError<E>> for NodeDbError {

@@ -1,6 +1,6 @@
 [package]
 name = "hopr-builder"
-version = "4.0.0"
+version = "4.0.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -81,6 +81,6 @@ serial_test = { workspace = true }
 test-log = { workspace = true }
 
 hopr-builder = { workspace = true, features = ["testing"] }
-hopr-types = { workspace = true, features = ["random"] }
+hopr-api = { workspace = true, features = ["types-random"] }
 
 hopr-lib = { workspace = true, features = ["telemetry"] }

@@ -11,7 +11,6 @@ members = [
   "crypto/keypair",
   "crypto/packet",
   "crypto/sphinx",
-  "hopr/api",
   "hopr/hopr-lib",
   "hoprd/hoprd",
   "hoprd/rest-api",
@@ -60,7 +59,6 @@ async-signal = "0.2.13"
 async-stream = "0.3.6"
 async-trait = "0.1.89"
 asynchronous-codec = { version = "0.7.0" }
-atomic_enum = "0.3.0"
 auto_impl = "1.3.0"
 axum = { version = "0.8.8", features = ["http2"] }
 backon = { version = "1.6.0", default-features = false }
@@ -80,12 +78,18 @@ chrono = { version = "0.4.44", default-features = false, features = [
 clap = { version = "4.5.60", features = ["derive", "env", "string"] }
 const_format = "0.2.35"
 console-subscriber = "0.5.0"
-criterion = { version = "0.8.2", features = ["async_tokio", "html_reports"] }
+criterion = { version = "0.8.2", default-features = false, features = [
+  "cargo_bench_support",
+  "async_tokio",
+] }
 curve25519-dalek = { version = "4.1.3", features = ["rand_core"] }
 dashmap = "6.1.0"
 flagset = "0.4.7"
-flume = "0.12.0"
-futures = "0.3.32"
+flume = { version = "0.12.0", default-features = false, features = ["async"] }
+futures = { version = "0.3.32", default-features = false, features = [
+  "std",
+  "async-await",
+] }
 futures-core = "0.3.32"
 futures-concurrency = "7.7.1"
 futures-timer = "3.0.3"
@@ -95,13 +99,15 @@ halfbrown = "0.4.0"
 hashbrown = "0.16.1"
 hex = "0.4.3"
 hex-literal = "1.1.0"
-hickory-resolver = "0.25.2"
+hickory-resolver = { version = "0.25.2", default-features = false, features = [
+  "system-config",
+] }
 http = "1.4.0"
 human-bandwidth = { version = "0.1.4", features = ["serde"] }
 humansize = "2.1.3"
 humantime-serde = "1.1.1"
-insta = { version = "1.46.3", features = ["json", "yaml", "redactions"] }
-indexmap = { version = "2.13.0", features = ["serde", "rayon"] }
+insta = { version = "1.46.3", features = ["yaml", "redactions"] }
+indexmap = { version = "2.13.0", features = ["serde"] }
 k256 = { version = "0.13.4", features = [
   "arithmetic",
   "ecdh",
@@ -110,7 +116,7 @@ k256 = { version = "0.13.4", features = [
 ] }
 lazy_static = "1.5.0"
 libc = "0.2" # intentionally unpinned
-libp2p = { version = "0.56.0" }
+libp2p = { version = "0.56.0", default-features = false }
 libp2p-identity = { version = "0.2.13", features = [
   "peerid",
   "ed25519",
@@ -131,7 +137,10 @@ temp-env = "0.3.6"
 parameterized = "2.0.0" # ignored in renovate, kept back to 2.0.0 due to conflict with indexmap
 parking_lot = "0.12.5"
 pcap-file = "2.0.0"
-petgraph = { version = "0.8.3", features = ["serde-1"] }
+petgraph = { version = "0.8.3", default-features = false, features = [
+  "std",
+  "serde-1",
+] }
 pid = "4.0.0"
 pin-project = "1.1.11"
 percent-encoding = "2.3.2"
@@ -235,7 +244,8 @@ mimalloc = { version = "0.1.48", default-features = false, features = [
   "secure",
 ] }
 
-hopr-api = { path = "hopr/api" }
+hopr-api = { git = "https://github.com/hoprnet/hopr-api", rev = "0403f9d9470bf7e60234f8d4725260106f0fe2c7" }
+hopr-types = { git = "https://github.com/hoprnet/hopr-types", branch = "main" }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-crypto-keypair = { path = "crypto/keypair", default-features = false }
 hopr-crypto-packet = { path = "crypto/packet", default-features = false }
@@ -260,7 +270,6 @@ hopr-transport-mixer = { path = "transport/mixer" }
 hopr-transport-probe = { path = "transport/probe" }
 hopr-transport-protocol = { path = "transport/protocol" }
 hopr-transport-session = { path = "transport/session" }
-hopr-types = { git = "https://github.com/hoprnet/hopr-types", branch = "main" }
 hoprd = { path = "hoprd/hoprd" }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
 hoprd-api-client = { path = "hoprd/rest-api-client" }

@@ -17,7 +17,7 @@ serde = [
   "dep:humantime-serde",
   "dep:serde",
   "dep:serde_with",
-  "hopr-types/serde",
+  "hopr-api/serde",
 ]
 prometheus = ["dep:hopr-metrics", "hopr-parallelize/prometheus"]
 trace-timing = ["hopr-platform/trace-timing"]
@@ -44,17 +44,9 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
-hopr-api = { workspace = true, features = ["db", "chain"] }
-hopr-parallelize = { workspace = true }
-hopr-types = { workspace = true, features = [
-  "crypto",
-  "internal",
-  "primitive",
-  "random",
-] }
-
+hopr-api = { workspace = true, features = ["db", "chain", "types-random"] }
 hopr-crypto-packet = { workspace = true }
-
+hopr-parallelize = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-platform = { workspace = true }
 

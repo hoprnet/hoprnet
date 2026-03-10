@@ -16,7 +16,7 @@ crate-type = ["rlib"]
 capture = ["hopr-transport/capture"]
 default = []
 telemetry = ["hopr-transport/telemetry"]
-fixed-rng = ["hopr-types/fixed-rng"]
+fixed-rng = ["hopr-api/types-fixed-rng"]
 prometheus = [
   "dep:hopr-metrics",
   "hopr-transport/prometheus",
@@ -34,7 +34,7 @@ serde = [
   "dep:cfg_eval",
   "dep:serde",
   "dep:serde_with",
-  "hopr-types/serde",
+  "hopr-api/serde",
   "hopr-network-types/serde",
   "hopr-transport/serde",
 ]
@@ -72,14 +72,7 @@ tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
-hopr-api = { workspace = true, features = ["full"] }
-hopr-types = { workspace = true, features = [
-  "chain",
-  "crypto",
-  "internal",
-  "primitive",
-  "random",
-] }
+hopr-api = { workspace = true, features = ["full", "types-random"] }
 
 hopr-async-runtime = { workspace = true }
 hopr-crypto-keypair = { workspace = true }
