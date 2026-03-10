@@ -4363,7 +4363,7 @@ dependencies = [
 [[package]]
 name = "hopr-api"
 version = "1.0.3"
-source = "git+https://github.com/hoprnet/hopr-api?rev=c1285542ab73fea31a796a4da71160c0587373f3#c1285542ab73fea31a796a4da71160c0587373f3"
+source = "git+https://github.com/hoprnet/hopr-api?branch=kauki%2Fapi%2Ftests%2Fcost-functions#1a30eb3b2202369f5a335718b3b3bce7fb6f4d42"
 dependencies = [
  "async-trait",
  "atomic_enum",

@@ -22,7 +22,6 @@
 #[cfg(feature = "petgraph")]
 pub mod petgraph;
 
-pub mod costs;
 pub mod errors;
 pub mod weight;
 
