@@ -211,30 +211,8 @@ where
         let planner_config = cfg.path_planner;
         let selector = HoprGraphPathSelector::new(me_offchain, graph.clone(), planner_config.max_cached_paths);
 
-        let tag_range = ReservedTag::range().end..u16::MAX as u64 + 1;
-        let tag_range_size = tag_range.end - tag_range.start;
-        let session_capacity = cfg.session.maximum_sessions as u64;
-        let probing_capacity = std::env::var("HOPR_PROBING_TELEMETRY_TAG_CAPACITY")
-            .ok()
-            .and_then(|s| s.trim().parse::<u64>().ok())
-            .filter(|&c| c > 0)
-            .unwrap_or(1000);
-        // Allocate remaining capacity to session terminal telemetry
-        let session_telemetry_capacity = tag_range_size
-            .saturating_sub(session_capacity + probing_capacity)
-            .max(1);
-
-        let tag_allocators = hopr_transport_tag_allocator::create_allocators(
-            tag_range.clone(),
-            [
-                (hopr_transport_tag_allocator::Usage::Session, session_capacity),
-                (
-                    hopr_transport_tag_allocator::Usage::SessionTerminalTelemetry,
-                    session_telemetry_capacity,
-                ),
-                (hopr_transport_tag_allocator::Usage::ProvingTelemetry, probing_capacity),
-            ],
-        )?;
+        let tag_range = hopr_transport_tag_allocator::TagAllocatorConfig::tag_range();
+        let tag_allocators = hopr_transport_tag_allocator::create_allocators_from_config(&cfg.session.tag_allocator)?;
 
         let session_tag_allocator = tag_allocators
             .iter()
@@ -260,7 +238,6 @@ where
             smgr: SessionManager::new(
                 SessionManagerConfig {
                     session_tag_range: tag_range,
-                    maximum_sessions: cfg.session.maximum_sessions as usize,
                     frame_mtu: std::env::var("HOPR_SESSION_FRAME_SIZE")
                         .ok()
                         .and_then(|s| s.parse::<usize>().ok())

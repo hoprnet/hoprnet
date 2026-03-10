@@ -174,21 +174,10 @@ pub struct SessionManagerConfig {
     /// it will be automatically transformed to start at this value.
     /// This is due to the reserved range by the Start sub-protocol.
     ///
-    /// Default is `ReservedTag::range().end..1024`.
+    /// The size of this range determines the maximum number of concurrent sessions.
     #[doc(hidden)]
     #[default(_code = "ReservedTag::range().end..1024u64")]
     pub session_tag_range: Range<u64>,
-
-    /// The maximum number of sessions (incoming and outgoing) that is allowed
-    /// to be managed by the manager.
-    ///
-    /// When reached, creating [new sessions](SessionManager::new_session) will return
-    /// the [`SessionManagerError::TooManySessions`] error, and incoming sessions will be rejected
-    /// with [`StartErrorReason::NoSlotsAvailable`] Start protocol error.
-    ///
-    /// Default is 128, minimum is 1; maximum is given by the `session_tag_range`.
-    #[default(128)]
-    pub maximum_sessions: usize,
 
     /// The maximum chunk of data that can be written to the Session's input buffer.
     ///
@@ -422,6 +411,8 @@ pub struct SessionManager<S, T> {
     sessions: moka::future::Cache<SessionId, SessionSlot>,
     msg_sender: Arc<OnceLock<S>>,
     tag_allocator: Arc<dyn TagAllocator>,
+    /// Maximum number of concurrent sessions, derived from `session_tag_range` size.
+    maximum_sessions: usize,
     cfg: SessionManagerConfig,
 }
 
@@ -434,6 +425,7 @@ impl<S, T> Clone for SessionManager<S, T> {
             cfg: self.cfg.clone(),
             msg_sender: self.msg_sender.clone(),
             tag_allocator: self.tag_allocator.clone(),
+            maximum_sessions: self.maximum_sessions,
         }
     }
 }
@@ -461,9 +453,7 @@ where
             let diff = min_session_tag_range_reservation - cfg.session_tag_range.start;
             cfg.session_tag_range = min_session_tag_range_reservation..cfg.session_tag_range.end + diff;
         }
-        cfg.maximum_sessions = cfg
-            .maximum_sessions
-            .clamp(1, (cfg.session_tag_range.end - cfg.session_tag_range.start) as usize);
+        let maximum_sessions = (cfg.session_tag_range.end - cfg.session_tag_range.start).max(1) as usize;
         cfg.surb_balance_notify_period = cfg
             .surb_balance_notify_period
             .map(|p| p.max(MIN_SURB_BUFFER_NOTIFICATION_PERIOD));
@@ -480,7 +470,7 @@ where
         Self {
             msg_sender: msg_sender.clone(),
             session_initiations: moka::future::Cache::builder()
-                .max_capacity(cfg.maximum_sessions as u64)
+                .max_capacity(maximum_sessions as u64)
                 .time_to_live(
                     2 * initiation_timeout_max_one_way(
                         cfg.initiation_timeout_base,
@@ -489,7 +479,7 @@ where
                 )
                 .build(),
             sessions: moka::future::Cache::builder()
-                .max_capacity(cfg.maximum_sessions as u64)
+                .max_capacity(maximum_sessions as u64)
                 .time_to_idle(cfg.idle_timeout)
                 .eviction_listener(|session_id: Arc<SessionId>, entry, reason| match &reason {
                     moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size => {
@@ -501,6 +491,7 @@ where
                 .build(),
             session_notifiers: Arc::new(OnceLock::new()),
             tag_allocator,
+            maximum_sessions,
             cfg,
         }
     }
@@ -515,7 +506,7 @@ where
             .set(msg_sender)
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
 
-        let (session_close_tx, session_close_rx) = futures::channel::mpsc::channel(self.cfg.maximum_sessions + 10);
+        let (session_close_tx, session_close_rx) = futures::channel::mpsc::channel(self.maximum_sessions + 10);
         self.session_notifiers
             .set((new_session_notifier, session_close_tx))
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
@@ -619,7 +610,7 @@ where
         cfg: SessionClientConfig,
     ) -> crate::errors::Result<HoprSession> {
         self.sessions.run_pending_tasks().await;
-        if self.cfg.maximum_sessions <= self.sessions.entry_count() as usize {
+        if self.maximum_sessions <= self.sessions.entry_count() as usize {
             return Err(SessionManagerError::TooManySessions.into());
         }
 
@@ -1122,7 +1113,7 @@ where
 
         // Allocate a unique tag for this incoming session
         self.sessions.run_pending_tasks().await; // Needed so that entry_count is updated
-        let allocated_tag = if self.cfg.maximum_sessions > self.sessions.entry_count() as usize {
+        let allocated_tag = if self.maximum_sessions > self.sessions.entry_count() as usize {
             self.tag_allocator.allocate()
         } else {
             error!(%pseudonym, "cannot accept incoming session, the maximum number of sessions has been reached");
@@ -2076,7 +2067,7 @@ mod tests {
         let bob_peer: Address = (&ChainKeypair::random()).into();
 
         let cfg = SessionManagerConfig {
-            maximum_sessions: 1,
+            session_tag_range: ReservedTag::range().end..ReservedTag::range().end + 1,
             ..Default::default()
         };
 

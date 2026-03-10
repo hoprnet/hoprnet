@@ -14,8 +14,11 @@ crate-type = ["rlib"]
 
 [features]
 default = []
+serde = ["dep:serde"]
 
 [dependencies]
+hopr-protocol-app = { workspace = true }
+serde = { workspace = true, optional = true }
+smart-default = { workspace = true }
 
 [dev-dependencies]
-hopr-protocol-app = { workspace = true }

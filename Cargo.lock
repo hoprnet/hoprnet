@@ -5252,6 +5252,8 @@ name = "hopr-transport-tag-allocator"
 version = "0.1.0"
 dependencies = [
  "hopr-protocol-app",
+ "serde",
+ "smart-default",
 ]
 
 [[package]]

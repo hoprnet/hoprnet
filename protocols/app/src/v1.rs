@@ -21,9 +21,14 @@ pub enum ReservedTag {
 }
 
 impl ReservedTag {
+    /// The exclusive upper bound of the reserved tag range.
+    ///
+    /// Must be kept in sync with the highest variant discriminant.
+    pub const UPPER_BOUND: u64 = Self::Undefined as u64 + 1;
+
     /// The range of reserved tags
     pub fn range() -> Range<u64> {
-        0..(Self::iter().max().unwrap_or(Self::Undefined) as u64 + 1)
+        0..Self::UPPER_BOUND
     }
 }
 

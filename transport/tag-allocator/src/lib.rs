@@ -5,6 +5,7 @@ mod stack;
 use std::{fmt, ops::Range, sync::Arc};
 
 pub use allocated_tag::AllocatedTag;
+use hopr_protocol_app::prelude::ReservedTag;
 
 /// Identifies which component a partition belongs to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -15,6 +16,55 @@ pub enum Usage {
     SessionTerminalTelemetry,
     /// Probing telemetry tags — high volume, short-lived (e.g. configurable via env, default ~1000).
     ProvingTelemetry,
+}
+
+/// Lower bound of the application tag range (exclusive end of [`ReservedTag`] range).
+pub const TAG_RANGE_START: u64 = ReservedTag::UPPER_BOUND;
+/// Upper bound of the application tag range (exclusive).
+pub const TAG_RANGE_END: u64 = u16::MAX as u64 + 1;
+/// Total number of available application tags.
+pub const TAG_RANGE_SIZE: u64 = TAG_RANGE_END - TAG_RANGE_START;
+
+/// Default number of tags reserved for sessions.
+pub const DEFAULT_SESSION_CAPACITY: u64 = 2048;
+/// Default number of tags reserved for session terminal telemetry.
+pub const DEFAULT_SESSION_PROBING_CAPACITY: u64 = 4000;
+/// Default number of tags reserved for probing telemetry (remainder of range).
+pub const DEFAULT_PROBING_TELEMETRY_CAPACITY: u64 =
+    TAG_RANGE_SIZE - DEFAULT_SESSION_CAPACITY - DEFAULT_SESSION_PROBING_CAPACITY;
+
+/// Configuration for the tag allocator partitions.
+///
+/// Each field specifies the number of tags reserved for that usage category.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(deny_unknown_fields)
+)]
+pub struct TagAllocatorConfig {
+    /// Number of tags reserved for long-lived sessions.
+    ///
+    /// This also determines the maximum number of concurrent sessions.
+    #[default(DEFAULT_SESSION_CAPACITY)]
+    pub session: u64,
+
+    /// Number of tags reserved for session terminal telemetry.
+    #[default(DEFAULT_SESSION_PROBING_CAPACITY)]
+    pub session_probing: u64,
+
+    /// Number of tags reserved for probing telemetry.
+    ///
+    /// Defaults to the remainder of the available tag range.
+    #[default(DEFAULT_PROBING_TELEMETRY_CAPACITY)]
+    pub probing_telemetry: u64,
+}
+
+impl TagAllocatorConfig {
+    /// The full tag range available for application use.
+    pub fn tag_range() -> Range<u64> {
+        ReservedTag::range().end..TAG_RANGE_END
+    }
 }
 
 /// Errors returned by [`create_allocators`].
@@ -54,6 +104,26 @@ pub trait TagAllocator: Send + Sync {
 
 /// Result type returned by [`create_allocators`].
 pub type CreateAllocatorsResult = Result<Vec<(Usage, Arc<dyn TagAllocator>)>, TagAllocatorError>;
+
+/// Create allocators from a [`TagAllocatorConfig`].
+///
+/// Uses [`TagAllocatorConfig::tag_range`] as the available range and
+/// partitions it according to the configured capacities.
+///
+/// # Errors
+///
+/// Returns [`TagAllocatorError`] if any partition has zero capacity or the
+/// total requested capacity exceeds the range.
+pub fn create_allocators_from_config(cfg: &TagAllocatorConfig) -> CreateAllocatorsResult {
+    create_allocators(
+        TagAllocatorConfig::tag_range(),
+        [
+            (Usage::Session, cfg.session),
+            (Usage::SessionTerminalTelemetry, cfg.session_probing),
+            (Usage::ProvingTelemetry, cfg.probing_telemetry),
+        ],
+    )
+}
 
 /// Create one [`TagAllocator`] per partition from a contiguous tag range.
 ///
@@ -99,8 +169,6 @@ pub fn create_allocators(range: Range<u64>, partitions: [(Usage, u64); 3]) -> Cr
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
-
-    use hopr_protocol_app::prelude::ReservedTag;
 
     use super::*;
 

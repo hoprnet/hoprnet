@@ -36,6 +36,7 @@ serde = [
   "hopr-protocol-app/serde",
   "hopr-protocol-hopr/serde",
   "hopr-transport-protocol/serde",
+  "hopr-transport-tag-allocator/serde",
 ]
 
 
