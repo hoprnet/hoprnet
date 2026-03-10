@@ -114,7 +114,7 @@ mod tests {
 
         // 10 threads push 100 values each
         for t in 0..10 {
-            let s = Arc::clone(&stack);
+            let s = stack.clone();
             handles.push(thread::spawn(move || {
                 for i in 0..100 {
                     let val = (t * 100 + i + 1) as u64; // +1 to avoid 0

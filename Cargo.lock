@@ -5254,6 +5254,7 @@ dependencies = [
  "hopr-protocol-app",
  "serde",
  "smart-default",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

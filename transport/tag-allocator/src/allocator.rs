@@ -32,7 +32,7 @@ impl TagAllocator for PartitionAllocator {
     fn allocate(&self) -> Option<AllocatedTag> {
         // Try the reuse pool first.
         if let Some(value) = self.pool.pop() {
-            return Some(AllocatedTag::new(value, Arc::clone(&self.pool)));
+            return Some(AllocatedTag::new(value, self.pool.clone()));
         }
 
         // Advance the counter.
@@ -41,14 +41,14 @@ impl TagAllocator for PartitionAllocator {
             if current >= self.size {
                 // Exhausted — one more try from the pool in case a tag was
                 // returned between the first check and now.
-                return self.pool.pop().map(|v| AllocatedTag::new(v, Arc::clone(&self.pool)));
+                return self.pool.pop().map(|v| AllocatedTag::new(v, self.pool.clone()));
             }
             if self
                 .counter
                 .compare_exchange_weak(current, current + 1, Ordering::AcqRel, Ordering::Acquire)
                 .is_ok()
             {
-                return Some(AllocatedTag::new(self.base + current, Arc::clone(&self.pool)));
+                return Some(AllocatedTag::new(self.base + current, self.pool.clone()));
             }
         }
     }
@@ -99,7 +99,7 @@ mod tests {
         let mut handles = Vec::new();
 
         for _ in 0..10 {
-            let a = Arc::clone(&alloc);
+            let a = alloc.clone();
             handles.push(thread::spawn(move || {
                 let mut tags = Vec::new();
                 for _ in 0..100 {

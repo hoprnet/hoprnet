@@ -20,5 +20,6 @@ serde = ["dep:serde"]
 hopr-protocol-app = { workspace = true }
 serde = { workspace = true, optional = true }
 smart-default = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]

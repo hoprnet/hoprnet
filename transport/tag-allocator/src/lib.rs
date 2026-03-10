@@ -1,10 +1,12 @@
 mod allocated_tag;
 mod allocator;
+pub mod errors;
 mod stack;
 
-use std::{fmt, ops::Range, sync::Arc};
+use std::{ops::Range, sync::Arc};
 
 pub use allocated_tag::AllocatedTag;
+pub use errors::TagAllocatorError;
 use hopr_protocol_app::prelude::ReservedTag;
 
 /// Identifies which component a partition belongs to.
@@ -91,35 +93,6 @@ impl TagAllocatorConfig {
     }
 }
 
-/// Errors returned by [`create_allocators`].
-#[derive(Debug, PartialEq, Eq)]
-pub enum TagAllocatorError {
-    /// The sum of requested partition capacities exceeds the available range.
-    CapacityExceedsRange { total_requested: u64, range_size: u64 },
-    /// The supplied range is empty.
-    EmptyRange,
-    /// A partition was requested with zero capacity.
-    ZeroCapacity(Usage),
-}
-
-impl fmt::Display for TagAllocatorError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::CapacityExceedsRange {
-                total_requested,
-                range_size,
-            } => write!(
-                f,
-                "partition capacities ({total_requested}) exceed range length ({range_size})"
-            ),
-            Self::EmptyRange => write!(f, "tag range is empty"),
-            Self::ZeroCapacity(usage) => write!(f, "partition {usage:?} has zero capacity"),
-        }
-    }
-}
-
-impl std::error::Error for TagAllocatorError {}
-
 /// Allocates unique tags from a fixed partition of the tag range.
 pub trait TagAllocator: Send + Sync {
     /// Obtain the next available tag, or `None` if the partition is exhausted.
@@ -139,14 +112,26 @@ pub type CreateAllocatorsResult = Result<Vec<(Usage, Arc<dyn TagAllocator>)>, Ta
 /// Returns [`TagAllocatorError`] if any partition has zero capacity or the
 /// total requested capacity exceeds the range.
 pub fn create_allocators_from_config(cfg: &TagAllocatorConfig) -> CreateAllocatorsResult {
-    create_allocators(
-        cfg.tag_range(),
-        [
-            (Usage::Session, cfg.session),
-            (Usage::SessionTerminalTelemetry, cfg.session_probing),
-            (Usage::ProvingTelemetry, cfg.probing_telemetry),
-        ],
-    )
+    let partitions = [
+        (Usage::Session, cfg.session),
+        (Usage::SessionTerminalTelemetry, cfg.session_probing),
+        (Usage::ProvingTelemetry, cfg.probing_telemetry),
+    ];
+
+    for (usage, capacity) in &partitions {
+        if *capacity == 0 {
+            return Err(TagAllocatorError::ZeroCapacity(*usage));
+        }
+    }
+
+    Ok(partitions
+        .iter()
+        .map(|(usage, capacity)| {
+            let range = cfg.range_for(*usage);
+            let alloc = Arc::new(allocator::PartitionAllocator::new(range.start, *capacity));
+            (*usage, alloc as Arc<dyn TagAllocator>)
+        })
+        .collect())
 }
 
 /// Create one [`TagAllocator`] per partition from a contiguous tag range.
