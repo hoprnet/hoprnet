@@ -175,6 +175,14 @@ fn main() -> ExitCode {
     let node_identity = telemetry::NodeTelemetryIdentity {
         node_address: hopr_lib::Keypair::public(&hopr_keys.chain_key).to_address().to_hex(),
         node_peer_id: hopr_lib::Keypair::public(&hopr_keys.packet_key).to_peerid_str(),
+        extra_labels: std::env::var("HOPRD_OTEL_EXPORT_LABELS")
+            .unwrap_or_default()
+            .split(',')
+            .filter_map(|pair| {
+                let (k, v) = pair.trim().split_once('=')?;
+                Some((k.trim().to_string(), v.trim().to_string()))
+            })
+            .collect(),
     };
 
     hopr_lib::prepare_tokio_runtime(num_cpu_threads, num_io_threads)

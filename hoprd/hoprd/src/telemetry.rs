@@ -123,14 +123,19 @@ impl OtlpConfig {
 pub(super) struct NodeTelemetryIdentity {
     pub(super) node_address: String,
     pub(super) node_peer_id: String,
+    pub(super) extra_labels: Vec<(String, String)>,
 }
 
 impl NodeTelemetryIdentity {
-    fn resource_attributes(&self) -> [KeyValue; 2] {
-        [
+    fn resource_attributes(&self) -> Vec<KeyValue> {
+        let mut attrs = vec![
             KeyValue::new("node_address", self.node_address.clone()),
             KeyValue::new("node_peer_id", self.node_peer_id.clone()),
-        ]
+        ];
+        for (k, v) in &self.extra_labels {
+            attrs.push(KeyValue::new(k.clone(), v.clone()));
+        }
+        attrs
     }
 }
 
@@ -269,12 +274,16 @@ struct SessionMetricCallbackCache {
 
 const SESSION_METRIC_CACHE_TTL: Duration = Duration::from_millis(100);
 
-fn session_metric_attributes(session_id: hopr_lib::SessionId, node_identity: &NodeTelemetryIdentity) -> [KeyValue; 3] {
-    [
+fn session_metric_attributes(session_id: hopr_lib::SessionId, node_identity: &NodeTelemetryIdentity) -> Vec<KeyValue> {
+    let mut attrs = vec![
         KeyValue::new("session_id", session_id.to_string()),
         KeyValue::new("node_address", node_identity.node_address.clone()),
         KeyValue::new("node_peer_id", node_identity.node_peer_id.clone()),
-    ]
+    ];
+    for (k, v) in &node_identity.extra_labels {
+        attrs.push(KeyValue::new(k.clone(), v.clone()));
+    }
+    attrs
 }
 
 fn refresh_session_metric_callback_cache(cache: &mut SessionMetricCallbackCache) {
@@ -691,7 +700,9 @@ fn prometheus_metric_attributes(
     extra: Option<(&str, String)>,
     node_identity: &NodeTelemetryIdentity,
 ) -> Vec<KeyValue> {
-    let mut attributes = Vec::with_capacity(metric.get_label().len() + usize::from(extra.is_some()) + 2);
+    let mut attributes = Vec::with_capacity(
+        metric.get_label().len() + usize::from(extra.is_some()) + 2 + node_identity.extra_labels.len(),
+    );
     for label in metric.get_label() {
         attributes.push(KeyValue::new(label.name().to_string(), label.value().to_string()));
     }
@@ -700,6 +711,9 @@ fn prometheus_metric_attributes(
     }
     attributes.push(KeyValue::new("node_address", node_identity.node_address.clone()));
     attributes.push(KeyValue::new("node_peer_id", node_identity.node_peer_id.clone()));
+    for (k, v) in &node_identity.extra_labels {
+        attributes.push(KeyValue::new(k.clone(), v.clone()));
+    }
     attributes
 }
 
