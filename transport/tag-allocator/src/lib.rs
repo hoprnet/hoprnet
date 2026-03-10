@@ -61,9 +61,13 @@ pub struct TagAllocatorConfig {
 }
 
 impl TagAllocatorConfig {
-    /// The full tag range available for application use.
-    pub fn tag_range() -> Range<u64> {
-        ReservedTag::range().end..TAG_RANGE_END
+    /// The tag range covered by this configuration.
+    ///
+    /// Starts at [`ReservedTag::UPPER_BOUND`] and spans the sum of all
+    /// configured partition capacities.
+    pub fn tag_range(&self) -> Range<u64> {
+        let start = ReservedTag::UPPER_BOUND;
+        start..start + self.session + self.session_probing + self.probing_telemetry
     }
 }
 
@@ -116,7 +120,7 @@ pub type CreateAllocatorsResult = Result<Vec<(Usage, Arc<dyn TagAllocator>)>, Ta
 /// total requested capacity exceeds the range.
 pub fn create_allocators_from_config(cfg: &TagAllocatorConfig) -> CreateAllocatorsResult {
     create_allocators(
-        TagAllocatorConfig::tag_range(),
+        cfg.tag_range(),
         [
             (Usage::Session, cfg.session),
             (Usage::SessionTerminalTelemetry, cfg.session_probing),
