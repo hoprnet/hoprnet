@@ -4,19 +4,24 @@ use std::{
     sync::Arc,
 };
 
-use crate::stack::ArrayStack;
+use crate::bitmap::TagBitmap;
 
 /// A tag value that is automatically returned to its allocator on drop.
 ///
 /// Not `Copy` or `Clone` — each tag has exactly one owner.
 pub struct AllocatedTag {
     value: u64,
-    pool: Arc<ArrayStack>,
+    index: u64,
+    bitmap: Arc<TagBitmap>,
 }
 
 impl AllocatedTag {
-    pub(crate) fn new(value: u64, pool: Arc<ArrayStack>) -> Self {
-        Self { value, pool }
+    pub(crate) fn new(value: u64, index: u64, bitmap: Arc<TagBitmap>) -> Self {
+        Self {
+            value,
+            index,
+            bitmap,
+        }
     }
 
     pub fn value(&self) -> u64 {
@@ -26,8 +31,7 @@ impl AllocatedTag {
 
 impl Drop for AllocatedTag {
     fn drop(&mut self) {
-        // Best-effort return; if the pool is full the tag is simply lost.
-        let _ = self.pool.push(self.value);
+        self.bitmap.deallocate(self.index);
     }
 }
 

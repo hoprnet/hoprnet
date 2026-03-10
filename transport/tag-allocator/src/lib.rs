@@ -1,7 +1,7 @@
 mod allocated_tag;
 mod allocator;
+mod bitmap;
 pub mod errors;
-mod stack;
 
 use std::{ops::Range, sync::Arc};
 

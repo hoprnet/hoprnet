@@ -1,56 +1,31 @@
-use std::sync::{
-    Arc,
-    atomic::{AtomicU64, Ordering},
-};
+use std::sync::Arc;
 
-use crate::{TagAllocator, allocated_tag::AllocatedTag, stack::ArrayStack};
+use crate::{TagAllocator, allocated_tag::AllocatedTag, bitmap::TagBitmap};
 
 /// A partition allocator that yields unique tags from a contiguous sub-range.
 ///
-/// Tags are drawn sequentially via an atomic counter. When tags are returned
-/// (via [`AllocatedTag::drop`]), they are placed on a lock-free stack and
-/// re-issued on subsequent allocations before advancing the counter.
+/// Tags are tracked via a lock-free bitmap — one bit per tag. Allocation
+/// scans for the first available bit; deallocation (via [`AllocatedTag::drop`])
+/// sets the bit back.
 pub(crate) struct PartitionAllocator {
     base: u64,
-    size: u64,
-    counter: AtomicU64,
-    pool: Arc<ArrayStack>,
+    bitmap: Arc<TagBitmap>,
 }
 
 impl PartitionAllocator {
     pub fn new(base: u64, size: u64) -> Self {
         Self {
             base,
-            size,
-            counter: AtomicU64::new(0),
-            pool: Arc::new(ArrayStack::new(size)),
+            bitmap: Arc::new(TagBitmap::new(size)),
         }
     }
 }
 
 impl TagAllocator for PartitionAllocator {
     fn allocate(&self) -> Option<AllocatedTag> {
-        // Try the reuse pool first.
-        if let Some(value) = self.pool.pop() {
-            return Some(AllocatedTag::new(value, self.pool.clone()));
-        }
-
-        // Advance the counter.
-        loop {
-            let current = self.counter.load(Ordering::Acquire);
-            if current >= self.size {
-                // Exhausted — one more try from the pool in case a tag was
-                // returned between the first check and now.
-                return self.pool.pop().map(|v| AllocatedTag::new(v, self.pool.clone()));
-            }
-            if self
-                .counter
-                .compare_exchange_weak(current, current + 1, Ordering::AcqRel, Ordering::Acquire)
-                .is_ok()
-            {
-                return Some(AllocatedTag::new(self.base + current, self.pool.clone()));
-            }
-        }
+        self.bitmap
+            .allocate()
+            .map(|index| AllocatedTag::new(self.base + index, index, self.bitmap.clone()))
     }
 }
 
