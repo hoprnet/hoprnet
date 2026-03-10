@@ -9,7 +9,8 @@ use hopr_api::{
     },
     types::crypto::prelude::Keypair,
 };
-use hopr_network_graph::{ChannelGraph, costs::SimpleHoprCostFn};
+use hopr_api::graph::costs::SimpleHoprCostFn;
+use hopr_network_graph::ChannelGraph;
 
 // ── Graph construction helpers ───────────────────────────────────────────────
 

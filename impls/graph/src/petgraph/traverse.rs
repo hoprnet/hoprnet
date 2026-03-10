@@ -7,7 +7,8 @@ use hopr_api::{
 };
 use petgraph::graph::NodeIndex;
 
-use crate::{ChannelGraph, algorithm::all_simple_paths_multi, costs::ForwardPathCostFn, graph::InnerGraph};
+use crate::{ChannelGraph, algorithm::all_simple_paths_multi, graph::InnerGraph};
+use hopr_api::graph::costs::ForwardPathCostFn;
 
 /// Core path-finding routine that runs `all_simple_paths_multi` on the
 /// inner petgraph.
