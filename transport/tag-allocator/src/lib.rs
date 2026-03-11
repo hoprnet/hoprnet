@@ -125,26 +125,14 @@ pub type CreateAllocatorsResult = Result<Vec<(Usage, Arc<dyn TagAllocator + Send
 /// Returns [`TagAllocatorError`] if any partition has zero capacity or the
 /// total requested capacity exceeds the range.
 pub fn create_allocators_from_config(cfg: &TagAllocatorConfig) -> CreateAllocatorsResult {
-    let partitions = [
-        (Usage::Session, cfg.session),
-        (Usage::SessionTerminalTelemetry, cfg.session_probing),
-        (Usage::ProvingTelemetry, cfg.probing_telemetry),
-    ];
-
-    for (usage, capacity) in &partitions {
-        if *capacity == 0 {
-            return Err(TagAllocatorError::ZeroCapacity(*usage));
-        }
-    }
-
-    Ok(partitions
-        .iter()
-        .map(|(usage, capacity)| {
-            let range = cfg.range_for(*usage);
-            let alloc = Arc::new(allocator::PartitionAllocator::new(range.start, *capacity));
-            (*usage, alloc as Arc<dyn TagAllocator + Send + Sync>)
-        })
-        .collect())
+    create_allocators(
+        TAG_RANGE_START..TAG_RANGE_END,
+        [
+            (Usage::Session, cfg.session),
+            (Usage::SessionTerminalTelemetry, cfg.session_probing),
+            (Usage::ProvingTelemetry, cfg.probing_telemetry),
+        ],
+    )
 }
 
 /// Create one [`TagAllocator`] per partition from a contiguous tag range.

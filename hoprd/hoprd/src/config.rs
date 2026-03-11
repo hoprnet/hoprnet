@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use hopr_builder::config::SessionIpForwardingConfig;
 use hopr_lib::{
-    HoprBalance, HoprProtocolConfig, SafeModule, WinningProbability,
+    HoprBalance, HoprProtocolConfig, SafeModule, TagAllocatorConfig, WinningProbability,
     config::{
         HoprLibConfig, HoprPacketPipelineConfig, HostConfig, HostType, ProbeConfig, SessionGlobalConfig,
         TransportConfig,
@@ -102,7 +102,7 @@ fn default_session_idle_timeout() -> Duration {
 }
 
 fn default_max_sessions() -> usize {
-    HoprLibConfig::default().protocol.session.maximum_sessions as usize
+    HoprLibConfig::default().protocol.session.tag_allocator.session as usize
 }
 
 fn default_session_establish_max_retries() -> usize {
@@ -227,8 +227,11 @@ impl From<UserHoprLibConfig> for HoprLibConfig {
                 },
                 session: SessionGlobalConfig {
                     idle_timeout: value.network.session_idle_timeout,
-                    maximum_sessions: value.network.maximum_sessions as u32,
                     establish_max_retries: value.network.session_establish_max_retries as u32,
+                    tag_allocator: TagAllocatorConfig {
+                        session: value.network.maximum_sessions as u64,
+                        ..Default::default()
+                    },
                     ..Default::default()
                 },
                 path_planner: Default::default(),

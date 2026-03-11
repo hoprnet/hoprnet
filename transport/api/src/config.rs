@@ -256,8 +256,6 @@ pub struct TransportConfig {
     pub prefer_local_addresses: bool,
 }
 
-const DEFAULT_SESSION_MAX_SESSIONS: u32 = 2048;
-
 const DEFAULT_SESSION_IDLE_TIMEOUT: Duration = Duration::from_mins(3);
 
 const SESSION_IDLE_MIN_TIMEOUT: Duration = Duration::from_secs(2);
@@ -269,10 +267,6 @@ const DEFAULT_SESSION_ESTABLISH_MAX_RETRIES: u32 = 3;
 const DEFAULT_SESSION_BALANCER_SAMPLING: Duration = Duration::from_millis(100);
 
 const DEFAULT_SESSION_BALANCER_BUFFER_DURATION: Duration = Duration::from_secs(5);
-
-fn default_session_max_sessions() -> u32 {
-    DEFAULT_SESSION_MAX_SESSIONS
-}
 
 fn default_session_balancer_buffer_duration() -> Duration {
     DEFAULT_SESSION_BALANCER_BUFFER_DURATION
@@ -336,16 +330,6 @@ pub struct SessionGlobalConfig {
         serde(default = "default_session_idle_timeout", with = "humantime_serde")
     )]
     pub idle_timeout: Duration,
-
-    /// The maximum number of outgoing or incoming Sessions that
-    /// are allowed by the Session manager.
-    ///
-    /// Minimum is 1, the maximum is given by the Session tag range.
-    /// Default is 2048.
-    #[default(default_session_max_sessions())]
-    #[cfg_attr(feature = "serde", serde(default = "default_session_max_sessions"))]
-    #[validate(range(min = 1))]
-    pub maximum_sessions: u32,
 
     /// Maximum retries to attempt to establish the Session
     /// Set 0 for no retries.

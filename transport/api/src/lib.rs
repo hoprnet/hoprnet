@@ -248,7 +248,7 @@ where
                     idle_timeout: cfg.session.idle_timeout,
                     balancer_sampling_interval: cfg.session.balancer_sampling_interval,
                     initial_return_session_egress_rate: 10,
-                    minimum_surb_buffer_duration: Duration::from_secs(5),
+                    minimum_surb_buffer_duration: cfg.session.balancer_minimum_surb_buffer_duration,
                     maximum_surb_buffer_size: cfg.packet.surb_store.rb_capacity,
                     surb_balance_notify_period: None,
                     surb_target_notify: true,
