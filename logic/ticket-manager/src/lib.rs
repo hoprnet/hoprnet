@@ -1,4 +1,5 @@
 mod errors;
+pub mod queue;
 
 use hopr_api::{
     chain::TicketRedeemError,
@@ -7,38 +8,7 @@ use hopr_api::{
 use parking_lot::RwLockUpgradableReadGuard;
 
 use crate::errors::TicketManagerError;
-
-pub trait TicketQueue {
-    type Error: std::error::Error + Send + 'static;
-    fn push(&mut self, ticket: RedeemableTicket) -> Result<(), Self::Error>;
-    fn pop(&mut self) -> Result<Option<RedeemableTicket>, Self::Error>;
-    fn peek(&self) -> Result<Option<RedeemableTicket>, Self::Error>;
-    /// Iterate over all tickets in the queue in **arbitrary** order.
-    fn iter_unordered(&self) -> impl Iterator<Item = Result<RedeemableTicket, Self::Error>>;
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct MemoryTicketQueue(std::collections::BinaryHeap<RedeemableTicket>);
-
-impl TicketQueue for MemoryTicketQueue {
-    type Error = std::convert::Infallible;
-
-    fn push(&mut self, ticket: RedeemableTicket) -> Result<(), Self::Error> {
-        Ok(self.0.push(ticket))
-    }
-
-    fn pop(&mut self) -> Result<Option<RedeemableTicket>, Self::Error> {
-        Ok(self.0.pop())
-    }
-
-    fn peek(&self) -> Result<Option<RedeemableTicket>, Self::Error> {
-        Ok(self.0.peek().cloned())
-    }
-
-    fn iter_unordered(&self) -> impl Iterator<Item = Result<RedeemableTicket, Self::Error>> {
-        self.0.iter().cloned().map(Ok)
-    }
-}
+use crate::queue::TicketQueue;
 
 struct ChannelTicketQueue<Q> {
     queue: std::sync::Arc<parking_lot::RwLock<Q>>,
