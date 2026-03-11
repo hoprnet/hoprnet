@@ -1,6 +1,9 @@
 mod errors;
 
-use hopr_api::types::{internal::prelude::*, primitive::prelude::*};
+use hopr_api::{
+    chain::TicketRedeemError,
+    types::{internal::prelude::*, primitive::prelude::*},
+};
 use parking_lot::RwLockUpgradableReadGuard;
 
 use crate::errors::TicketManagerError;
@@ -10,7 +13,8 @@ pub trait TicketQueue {
     fn push(&mut self, ticket: RedeemableTicket) -> Result<(), Self::Error>;
     fn pop(&mut self) -> Result<Option<RedeemableTicket>, Self::Error>;
     fn peek(&self) -> Result<Option<RedeemableTicket>, Self::Error>;
-    fn iter(&self) -> impl Iterator<Item = Result<RedeemableTicket, Self::Error>>;
+    /// Iterate over all tickets in the queue in **arbitrary** order.
+    fn iter_unordered(&self) -> impl Iterator<Item = Result<RedeemableTicket, Self::Error>>;
 }
 
 #[derive(Clone, Debug, Default)]
@@ -31,7 +35,7 @@ impl TicketQueue for MemoryTicketQueue {
         Ok(self.0.peek().cloned())
     }
 
-    fn iter(&self) -> impl Iterator<Item = Result<RedeemableTicket, Self::Error>> {
+    fn iter_unordered(&self) -> impl Iterator<Item = Result<RedeemableTicket, Self::Error>> {
         self.0.iter().cloned().map(Ok)
     }
 }
@@ -59,7 +63,7 @@ where
             Ok(ticket_queue
                 .queue
                 .read()
-                .iter()
+                .iter_unordered()
                 .filter_map(|ticket| ticket.ok().map(|t| t.verified_ticket().amount))
                 .sum())
         } else {
@@ -107,9 +111,15 @@ where
                                 (redemption_result, true)
                             }
                             Err(error) => {
-                                // TODO: pop for specific unrecoverable errors + update stats
-                                // Redemption timeouts should also be passed up.
-                                (Err(TicketManagerError::RedeemError(error)), false)
+                                // See if we need to remove this ticket after the error
+                                let reject_ticket = match &error {
+                                    TicketRedeemError::Rejected(..) => {
+                                        // TODO: update stats + invalidate unrealized value cache?
+                                        true
+                                    },
+                                    TicketRedeemError::ProcessingError(..) => false,
+                                };
+                                (Err(TicketManagerError::RedeemError(error)), reject_ticket)
                             }
                         };
 
