@@ -394,13 +394,13 @@ pub struct SessionManagerConfig {
 /// This can be set using the `surb_target_notify` field of the [`SessionManagerConfig`] of each new Session.
 ///
 /// Both mechanisms leverage the Keep Alive message to report the respective values.
-pub struct SessionManager<S, T, A: ?Sized = dyn TagAllocator + Send + Sync> {
+pub struct SessionManager<S, T> {
     session_initiations: SessionInitiationCache,
     #[allow(clippy::type_complexity)]
     session_notifiers: Arc<OnceLock<(T, Sender<(SessionId, ClosureReason)>)>>,
     sessions: moka::future::Cache<SessionId, SessionSlot>,
     msg_sender: Arc<OnceLock<S>>,
-    tag_allocator: Arc<A>,
+    tag_allocator: Arc<dyn TagAllocator + Send + Sync>,
     /// Tag value range for sessions, derived from the [`TagAllocator`].
     session_tag_range: Range<u64>,
     /// Maximum number of concurrent sessions, derived from the [`TagAllocator`] capacity.
@@ -408,7 +408,7 @@ pub struct SessionManager<S, T, A: ?Sized = dyn TagAllocator + Send + Sync> {
     cfg: SessionManagerConfig,
 }
 
-impl<S, T, A: ?Sized> Clone for SessionManager<S, T, A> {
+impl<S, T> Clone for SessionManager<S, T> {
     fn clone(&self) -> Self {
         Self {
             session_initiations: self.session_initiations.clone(),
@@ -425,9 +425,8 @@ impl<S, T, A: ?Sized> Clone for SessionManager<S, T, A> {
 
 const EXTERNAL_SEND_TIMEOUT: Duration = Duration::from_millis(200);
 
-impl<S, T, A> SessionManager<S, T, A>
+impl<S, T> SessionManager<S, T>
 where
-    A: TagAllocator + Send + Sync + ?Sized + 'static,
     S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
     T: futures::Sink<IncomingSession> + Clone + Send + Sync + Unpin + 'static,
     S::Error: std::error::Error + Send + Sync + Clone + 'static,
@@ -435,7 +434,7 @@ where
 {
     /// Creates a new instance given the [`config`](SessionManagerConfig) and a [`TagAllocator`]
     /// for allocating session tags on the Exit (incoming) side.
-    pub fn new(mut cfg: SessionManagerConfig, tag_allocator: Arc<A>) -> Self {
+    pub fn new(mut cfg: SessionManagerConfig, tag_allocator: Arc<dyn TagAllocator + Send + Sync>) -> Self {
         let session_tag_range = tag_allocator.tag_range();
         let maximum_sessions = tag_allocator.capacity().max(1) as usize;
 
