@@ -94,11 +94,15 @@ impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
                 });
             }
             MeasurableEdge::Probe(Ok(hopr_api::graph::EdgeTransportTelemetry::Loopback(telemetry))) => {
+                tracing::trace!("loopback probe successful");
+
                 let mut inner = self.inner.write();
                 let Some(me_idx) = inner.indices.get_by_left(&self.me).copied() else {
+                    tracing::debug!("failed to resolve index of myself for loopback probe attribution");
                     return;
                 };
                 let Some(edges) = resolve_loopback_edges(&inner, me_idx, telemetry.path()) else {
+                    tracing::debug!("failed to resolve loopback path for probe attribution");
                     return;
                 };
 
@@ -120,6 +124,8 @@ impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
                         if let Some(lat) = lat {
                             known_latency += lat;
                         }
+                    } else {
+                        tracing::debug!("failed to find edge for loopback probe attribution");
                     }
                 }
 
@@ -135,6 +141,8 @@ impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
 
                 if let Some(weight) = inner.graph.edge_weight_mut(edges[target_idx]) {
                     weight.record(EdgeWeightType::Intermediate(Ok(attributed_duration)));
+                } else {
+                    tracing::debug!("failed to find target edge for loopback probe attribution");
                 }
             }
             MeasurableEdge::Probe(Err(hopr_api::graph::NetworkGraphError::ProbeNeighborTimeout(ref peer))) => {
@@ -154,11 +162,15 @@ impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
                 });
             }
             MeasurableEdge::Probe(Err(hopr_api::graph::NetworkGraphError::ProbeLoopbackTimeout(telemetry))) => {
+                tracing::trace!("loopback probe failed");
+
                 let mut inner = self.inner.write();
                 let Some(me_idx) = inner.indices.get_by_left(&self.me).copied() else {
+                    tracing::debug!("failed to resolve index of myself");
                     return;
                 };
                 let Some(edges) = resolve_loopback_edges(&inner, me_idx, telemetry.path()) else {
+                    tracing::debug!("failed to resolve loopback path for probe timeout, cannot attribute");
                     return;
                 };
 
@@ -180,6 +192,12 @@ impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
                 });
             }
             MeasurableEdge::ConnectionStatus { peer, connected } => {
+                tracing::trace!(
+                    peer = %peer,
+                    connected = connected,
+                    "recording connection status update"
+                );
+
                 self.upsert_edge(&self.me, &peer, |obs| {
                     obs.record(EdgeWeightType::Connected(connected));
                 });

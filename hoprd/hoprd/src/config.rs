@@ -231,6 +231,7 @@ impl From<UserHoprLibConfig> for HoprLibConfig {
                     establish_max_retries: value.network.session_establish_max_retries as u32,
                     ..Default::default()
                 },
+                path_planner: Default::default(),
             },
         }
     }

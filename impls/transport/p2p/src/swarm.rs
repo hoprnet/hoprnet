@@ -244,6 +244,8 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
             protocol: libp2p::StreamProtocol::new(protocol),
         };
 
+        let notifier = self.subscribtions.0.clone();
+
         #[cfg(all(feature = "prometheus", not(test)))]
         let network_inner = network.clone();
         let mut swarm = swarm;
@@ -294,6 +296,9 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
                                         debug!(transport="libp2p", peer = %peer_id, multiaddress = %address, "Private/local peer address encountered")
                                     }
                                     tracker.insert(peer_id);
+                                    if let Err(error) = notifier.try_broadcast(hopr_api::network::NetworkEvent::PeerConnected(peer_id)) {
+                                        error!(peer = %peer_id, %error, "failed to broadcast peer connected event");
+                                    }
                                 },
                                 libp2p::core::ConnectedPoint::Listener { send_back_addr, .. } => {
                                     if allow_private_addresses || is_public_address(&send_back_addr) {
@@ -304,6 +309,9 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
                                         debug!(transport="libp2p", peer = %peer_id, multiaddress = %send_back_addr, "Private/local peer address ignored")
                                     }
                                     tracker.insert(peer_id);
+                                    if let Err(error) = notifier.try_broadcast(hopr_api::network::NetworkEvent::PeerConnected(peer_id)) {
+                                        error!(peer = %peer_id, %error, "failed to broadcast peer connected event");
+                                    }
                                 }
                             }
                         } else {
@@ -330,6 +338,9 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
 
                         if num_established == 0 {
                             tracker.remove(&peer_id);
+                            if let Err(error) = notifier.try_broadcast(hopr_api::network::NetworkEvent::PeerDisconnected(peer_id)) {
+                                error!(peer = %peer_id, %error, "failed to broadcast peer disconnected event");
+                            }
                         }
 
                         print_network_info(swarm.network_info(), "connection closed");
@@ -369,6 +380,9 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
                                     error!(peer = %peer_id, %error, "failed to remove undialable peer from the peer store");
                                 }
                                 tracker.remove(&peer_id);
+                                if let Err(error) = notifier.try_broadcast(hopr_api::network::NetworkEvent::PeerDisconnected(peer_id)) {
+                                    error!(peer = %peer_id, %error, "failed to broadcast peer disconnected event");
+                                }
                             }
 
                         #[cfg(all(feature = "prometheus", not(test)))]

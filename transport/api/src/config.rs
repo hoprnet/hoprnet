@@ -40,6 +40,9 @@ pub struct HoprProtocolConfig {
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
     pub session: SessionGlobalConfig,
+    /// Path planner configuration
+    #[cfg_attr(feature = "serde", serde(skip))]
+    pub path_planner: hopr_transport_path::PathPlannerConfig,
 }
 
 /// Configuration of the HOPR packet pipeline.

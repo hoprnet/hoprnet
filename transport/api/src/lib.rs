@@ -18,7 +18,6 @@ pub mod config;
 pub mod constants;
 /// Errors used by the crate.
 pub mod errors;
-mod helpers;
 
 #[cfg(feature = "telemetry")]
 pub mod stats;
@@ -39,14 +38,13 @@ use futures::{
     channel::mpsc::{Sender, channel},
     stream::select_with_strategy,
 };
-use helpers::PathPlanner;
 use hopr_api::{
     chain::{ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
     ct::{CoverTrafficGeneration, ProbingTrafficGeneration},
     db::HoprDbTicketOperations,
     graph::{NetworkGraphUpdate, NetworkGraphView, traits::EdgeObservableRead},
     network::{NetworkBuilder, NetworkStreamControl},
-    types::{internal::prelude::*, primitive::prelude::*},
+    types::primitive::prelude::*,
 };
 pub use hopr_api::{
     db::ChannelTicketStatistics,
@@ -68,6 +66,7 @@ use hopr_protocol_hopr::MemorySurbStore;
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId, Protocol};
 use hopr_transport_mixer::MixerConfig;
+use hopr_transport_path::{BackgroundPathCacheRefreshable, HoprGraphPathSelector, PathPlanner};
 pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
 use hopr_transport_probe::{
     Probe,
@@ -146,16 +145,15 @@ pub enum HoprTransportProcess {
     SessionsManagement(usize),
     #[strum(to_string = "network probing sub-process: {0}")]
     Probing(hopr_transport_probe::HoprProbeProcess),
+    #[cfg(feature = "runtime-tokio")]
+    #[strum(to_string = "path cache refresh")]
+    PathRefresh,
     #[strum(to_string = "sync of outgoing ticket indices")]
     OutgoingIndexSync,
     #[cfg(feature = "capture")]
     #[strum(to_string = "packet capture")]
     Capture,
 }
-
-// TODO (4.1): implement path selector based on probing
-/// Currently used implementation of [`PathSelector`](hopr_path::selectors::PathSelector).
-type CurrentPathSelector = NoPathSelector;
 
 /// Interface into the physical transport mechanism allowing all off-chain HOPR-related tasks on
 /// the transport.
@@ -171,7 +169,7 @@ where
     ping: Arc<OnceLock<Pinger>>,
     network: Arc<OnceLock<Net>>,
     graph: Graph,
-    path_planner: PathPlanner<MemorySurbStore, Chain, CurrentPathSelector>,
+    path_planner: PathPlanner<MemorySurbStore, Chain, HoprGraphPathSelector<Graph>>,
     my_multiaddresses: Vec<Multiaddr>,
     smgr: SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>, Sender<IncomingSession>>,
     cfg: HoprProtocolConfig,
@@ -188,7 +186,16 @@ where
         + Send
         + Sync
         + 'static,
-    Graph: NetworkGraphView<NodeId = OffchainPublicKey> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Graph: NetworkGraphView<NodeId = OffchainPublicKey>
+        + NetworkGraphUpdate
+        + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+    <Graph as NetworkGraphView>::Observed: hopr_api::graph::traits::EdgeObservableRead + Send,
+    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
+        hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
     Net: NetworkView + NetworkStreamControl + Clone + Send + Sync + 'static,
 {
     pub fn new(
@@ -199,6 +206,9 @@ where
         my_multiaddresses: Vec<Multiaddr>,
         cfg: HoprProtocolConfig,
     ) -> Self {
+        let me_offchain = *identity.1.public();
+        let planner_config = cfg.path_planner;
+        let selector = HoprGraphPathSelector::new(me_offchain, graph.clone(), planner_config.max_cached_paths);
         Self {
             packet_key: identity.1.clone(),
             chain_key: identity.0.clone(),
@@ -206,10 +216,11 @@ where
             network: Arc::new(OnceLock::new()),
             graph,
             path_planner: PathPlanner::new(
-                *identity.0.as_ref(),
+                me_offchain,
                 MemorySurbStore::new(cfg.packet.surb_store),
                 resolver.clone(),
-                CurrentPathSelector::default(),
+                selector,
+                planner_config,
             ),
             my_multiaddresses,
             smgr: SessionManager::new(SessionManagerConfig {
@@ -311,6 +322,13 @@ where
                         "long-running background task finished"
                     )
                 }),
+        );
+
+        // -- path cache background refresh (only when tokio runtime is available)
+        #[cfg(feature = "runtime-tokio")]
+        processes.insert(
+            HoprTransportProcess::PathRefresh,
+            spawn_as_abortable!(self.path_planner.run_background_refresh()),
         );
 
         processes.insert(
@@ -531,7 +549,10 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn ping(&self, peer: &OffchainPublicKey) -> errors::Result<(std::time::Duration, Graph::Observed)> {
+    pub async fn ping(
+        &self,
+        peer: &OffchainPublicKey,
+    ) -> errors::Result<(std::time::Duration, <Graph as NetworkGraphView>::Observed)> {
         let me: &OffchainPublicKey = self.packet_key.public();
         if peer == me {
             return Err(HoprTransportError::Api("ping to self does not make sense".into()));
@@ -686,7 +707,7 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    pub fn network_peer_observations(&self, peer: &OffchainPublicKey) -> Option<Graph::Observed> {
+    pub fn network_peer_observations(&self, peer: &OffchainPublicKey) -> Option<<Graph as NetworkGraphView>::Observed> {
         self.graph.edge(self.packet_key.public(), peer)
     }
 
@@ -695,7 +716,7 @@ where
     pub async fn all_network_peers(
         &self,
         minimum_score: f64,
-    ) -> errors::Result<Vec<(OffchainPublicKey, Graph::Observed)>> {
+    ) -> errors::Result<Vec<(OffchainPublicKey, <Graph as NetworkGraphView>::Observed)>> {
         let me = self.packet_key.public();
         Ok(self
             .network_connected_peers()

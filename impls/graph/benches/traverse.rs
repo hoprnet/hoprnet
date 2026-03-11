@@ -1,15 +1,16 @@
-use std::{hint::black_box, num::NonZeroUsize, time::Duration};
+use std::{hint::black_box, time::Duration};
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use hopr_api::{
     OffchainKeypair, OffchainPublicKey,
     graph::{
         NetworkGraphTraverse, NetworkGraphWrite,
+        costs::HoprForwardCostFn,
         traits::{EdgeObservableWrite, EdgeWeightType},
     },
     types::crypto::prelude::Keypair,
 };
-use hopr_network_graph::{ChannelGraph, costs::SimpleHoprCostFn};
+use hopr_network_graph::ChannelGraph;
 
 // ── Graph construction helpers ───────────────────────────────────────────────
 
@@ -86,18 +87,18 @@ fn build_graph(node_count: usize, density: usize) -> (ChannelGraph, Vec<Offchain
 
 // ── Benchmark: NetworkGraphTraverse::simple_paths ────────────────────────────
 
-/// Benchmarks [`NetworkGraphTraverse::simple_paths`] for 2-hop, 3-hop, and
-/// 4-hop routes across all combinations of three node counts (10 / 100 / 1 000)
+/// Benchmarks [`NetworkGraphTraverse::simple_paths`] for 2-edge, 3-edge, and
+/// 4-edge routes across all combinations of three node counts (10 / 100 / 1 000)
 /// and three edge densities (10× / 100× / 1 000×).
 ///
-/// The benchmark ID encodes both dimensions, e.g. `2-hop/100nodes/100x`.
+/// The benchmark ID encodes both dimensions, e.g. `2-edge/100nodes/100x`.
 ///
 /// Destination nodes are chosen to sit at the "apex" of the ring where the
 /// maximum number of simple paths converge from `me`:
 ///
-/// * **2-hop apex** — node `(epn + 1)`: up to `epn` distinct 2-hop paths, where `epn = min(node_count − 1, density)`.
-/// * **3-hop apex** — node `(2 × epn + 1)`: up to `epn²` 3-hop paths.
-/// * **4-hop apex** — node `(3 × epn + 1)`: up to `epn³` 4-hop paths.
+/// * **2-edge apex** — node `(epn + 1)`: up to `epn` distinct 2-edge paths, where `epn = min(node_count − 1, density)`.
+/// * **3-edge apex** — node `(2 × epn + 1)`: up to `epn²` 3-edge paths.
+/// * **4-edge apex** — node `(3 × epn + 1)`: up to `epn³` 4-edge paths.
 ///
 /// `take_count` is capped at 10 to reflect realistic production usage and to
 /// keep the benchmark runtime bounded at high densities.
@@ -110,44 +111,44 @@ fn bench_simple_paths(c: &mut Criterion) {
             let me = &keys[0];
             let epn = (size - 1).min(density); // effective edges per node
 
-            let dst_2hop = &keys[(epn + 1).min(size - 1)];
-            let dst_3hop = &keys[(2 * epn + 1).min(size - 1)];
-            let dst_4hop = &keys[(3 * epn + 1).min(size - 1)];
+            let dst_2edge = &keys[(epn + 1).min(size - 1)];
+            let dst_3edge = &keys[(2 * epn + 1).min(size - 1)];
+            let dst_4edge = &keys[(3 * epn + 1).min(size - 1)];
 
             let param = format!("{size}nodes/{density}x");
 
-            group.bench_with_input(BenchmarkId::new("2-hop", &param), &size, |b, _| {
+            group.bench_with_input(BenchmarkId::new("2-edge", &param), &size, |b, _| {
                 b.iter(|| {
                     black_box(graph.simple_paths(
                         me,
-                        black_box(dst_2hop),
+                        black_box(dst_2edge),
                         2,
                         Some(10),
-                        SimpleHoprCostFn::new(NonZeroUsize::new(2).unwrap()),
+                        HoprForwardCostFn::new(std::num::NonZeroUsize::new(2).expect("is greater than 1")),
                     ))
                 });
             });
 
-            group.bench_with_input(BenchmarkId::new("3-hop", &param), &size, |b, _| {
+            group.bench_with_input(BenchmarkId::new("3-edge", &param), &size, |b, _| {
                 b.iter(|| {
                     black_box(graph.simple_paths(
                         me,
-                        black_box(dst_3hop),
+                        black_box(dst_3edge),
                         3,
                         Some(10),
-                        SimpleHoprCostFn::new(NonZeroUsize::new(3).unwrap()),
+                        HoprForwardCostFn::new(std::num::NonZeroUsize::new(3).expect("is greater than 1")),
                     ))
                 });
             });
 
-            group.bench_with_input(BenchmarkId::new("4-hop", &param), &size, |b, _| {
+            group.bench_with_input(BenchmarkId::new("4-edge", &param), &size, |b, _| {
                 b.iter(|| {
                     black_box(graph.simple_paths(
                         me,
-                        black_box(dst_4hop),
+                        black_box(dst_4edge),
                         4,
                         Some(10),
-                        SimpleHoprCostFn::new(NonZeroUsize::new(4).unwrap()),
+                        HoprForwardCostFn::new(std::num::NonZeroUsize::new(4).expect("is greater than 1")),
                     ))
                 });
             });
@@ -159,11 +160,11 @@ fn bench_simple_paths(c: &mut Criterion) {
 
 // ── Benchmark: NetworkGraphTraverse::simple_loopback_to_self ─────────────────
 
-/// Benchmarks [`NetworkGraphTraverse::simple_loopback_to_self`] for 2-hop,
-/// 3-hop, and 4-hop loopback routes across all combinations of three node
+/// Benchmarks [`NetworkGraphTraverse::simple_loopback_to_self`] for 2-edge,
+/// 3-edge, and 4-edge loopback routes across all combinations of three node
 /// counts (10 / 100 / 1 000) and three edge densities (10× / 100× / 1 000×).
 ///
-/// The benchmark ID encodes both dimensions, e.g. `3-hop/1000nodes/100x`.
+/// The benchmark ID encodes both dimensions, e.g. `3-edge/1000nodes/100x`.
 ///
 /// In the ring topology, `me`'s directly connected neighbours — the destination
 /// set for the internal path search — grow with the density (up to
@@ -179,15 +180,15 @@ fn bench_simple_loopback(c: &mut Criterion) {
             let (graph, _keys) = build_graph(size, density);
             let param = format!("{size}nodes/{density}x");
 
-            group.bench_with_input(BenchmarkId::new("2-hop", &param), &size, |b, _| {
+            group.bench_with_input(BenchmarkId::new("2-edge", &param), &size, |b, _| {
                 b.iter(|| black_box(graph.simple_loopback_to_self(2, Some(10))));
             });
 
-            group.bench_with_input(BenchmarkId::new("3-hop", &param), &size, |b, _| {
+            group.bench_with_input(BenchmarkId::new("3-edge", &param), &size, |b, _| {
                 b.iter(|| black_box(graph.simple_loopback_to_self(3, Some(10))));
             });
 
-            group.bench_with_input(BenchmarkId::new("4-hop", &param), &size, |b, _| {
+            group.bench_with_input(BenchmarkId::new("4-edge", &param), &size, |b, _| {
                 b.iter(|| black_box(graph.simple_loopback_to_self(4, Some(10))));
             });
         }

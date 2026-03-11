@@ -26,6 +26,7 @@ members = [
   "transport/identity",
   "transport/mixer",
   "transport/network",
+  "transport/path",
   "transport/probe",
   "transport/protocol",
   "transport/session",
@@ -124,7 +125,7 @@ libp2p-identity = { version = "0.2.13", features = [
 ] }
 libp2p-stream = { version = "0.4.0-alpha" }
 mockall = "0.14.0"
-moka = { version = "0.12.14", features = ["future"] }
+moka = { version = "0.12.14", features = ["future", "sync"] }
 more-asserts = "0.3.1"
 multiaddr = "0.18.2"
 oas3 = "0.20.1"
@@ -244,7 +245,7 @@ mimalloc = { version = "0.1.48", default-features = false, features = [
   "secure",
 ] }
 
-hopr-api = { git = "https://github.com/hoprnet/hopr-api", rev = "0403f9d9470bf7e60234f8d4725260106f0fe2c7" }
+hopr-api = { git = "https://github.com/hoprnet/hopr-api", rev = "b350c5bbb56871291c8f220979949db816b2de8d" }
 hopr-types = { git = "https://github.com/hoprnet/hopr-types", branch = "main" }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-crypto-keypair = { path = "crypto/keypair", default-features = false }
@@ -267,6 +268,7 @@ hopr-transport = { path = "transport/api" }
 hopr-transport-identity = { path = "transport/identity" }
 hopr-transport-network = { path = "transport/network" }
 hopr-transport-mixer = { path = "transport/mixer" }
+hopr-transport-path = { path = "transport/path" }
 hopr-transport-probe = { path = "transport/probe" }
 hopr-transport-protocol = { path = "transport/protocol" }
 hopr-transport-session = { path = "transport/session" }
@@ -323,4 +325,4 @@ insta.opt-level = 3
 similar.opt-level = 3
 
 [workspace.metadata.cargo-shear]
-ignored = ["oas3", "serde_bytes", "humantime-serde", "hopr-ct-full-network"]
+ignored = ["oas3", "serde_bytes", "humantime-serde"]

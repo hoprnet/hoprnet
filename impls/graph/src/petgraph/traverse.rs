@@ -2,12 +2,15 @@ use std::{collections::HashSet, hash::RandomState};
 
 use hopr_api::{
     OffchainPublicKey,
-    graph::traits::{CostFn, EdgeNetworkObservableRead, EdgeObservableRead},
+    graph::{
+        costs::ForwardPathCostFn,
+        traits::{CostFn, EdgeNetworkObservableRead, EdgeObservableRead},
+    },
     types::internal::routing::PathId,
 };
 use petgraph::graph::NodeIndex;
 
-use crate::{ChannelGraph, algorithm::all_simple_paths_multi, costs::LoopbackPathCostFn, graph::InnerGraph};
+use crate::{ChannelGraph, algorithm::all_simple_paths_multi, graph::InnerGraph};
 
 /// Core path-finding routine that runs `all_simple_paths_multi` on the
 /// inner petgraph.
@@ -105,6 +108,36 @@ impl hopr_api::graph::NetworkGraphTraverse for ChannelGraph {
         )
     }
 
+    fn simple_paths_from<C: CostFn<Weight = Self::Observed>>(
+        &self,
+        source: &Self::NodeId,
+        length: usize,
+        take_count: Option<usize>,
+        cost_fn: C,
+    ) -> Vec<(Vec<Self::NodeId>, PathId, C::Cost)> {
+        if length == 0 {
+            return Default::default();
+        }
+
+        let inner = self.inner.read();
+        let Some(start) = inner.indices.get_by_left(source) else {
+            return Default::default();
+        };
+
+        let destinations: HashSet<NodeIndex> = inner.graph.node_indices().filter(|idx| idx != start).collect();
+
+        find_paths(
+            &inner,
+            *start,
+            &destinations,
+            length,
+            take_count,
+            cost_fn.initial_cost(),
+            cost_fn.min_cost(),
+            cost_fn.into_cost_fn(),
+        )
+    }
+
     fn simple_loopback_to_self(&self, length: usize, take_count: Option<usize>) -> Vec<(Vec<Self::NodeId>, PathId)> {
         if length > 1 {
             let inner = self.inner.read();
@@ -123,7 +156,7 @@ impl hopr_api::graph::NetworkGraphTraverse for ChannelGraph {
                     })
                     .collect::<HashSet<_>>();
 
-                let cost_fn = LoopbackPathCostFn::new();
+                let cost_fn = ForwardPathCostFn::new();
 
                 return find_paths(
                     &inner,
@@ -160,6 +193,7 @@ mod tests {
     use hopr_api::{
         graph::{
             NetworkGraphTraverse, NetworkGraphWrite,
+            costs::{HoprForwardCostFn, HoprReturnCostFn},
             traits::{EdgeObservableWrite, EdgeWeightType},
         },
         types::{
@@ -169,7 +203,6 @@ mod tests {
     };
 
     use super::*;
-    use crate::costs::SimpleHoprCostFn;
 
     /// Fixed test secret keys (reused from the broader codebase).
     const SECRET_0: [u8; 32] = hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d");
@@ -195,7 +228,7 @@ mod tests {
     }
 
     #[test]
-    fn one_hop_path_should_return_direct_route() -> anyhow::Result<()> {
+    fn one_edge_path_should_return_direct_route() -> anyhow::Result<()> {
         let me = pubkey_from(&SECRET_0);
         let dest = pubkey_from(&SECRET_1);
 
@@ -209,16 +242,16 @@ mod tests {
             &dest,
             1,
             None,
-            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?),
+            HoprForwardCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?),
         );
 
-        assert_eq!(routes.len(), 1, "should find exactly one 1-hop route");
+        assert_eq!(routes.len(), 1, "should find exactly one 1-edge route");
 
         Ok(())
     }
 
     #[test]
-    fn two_hop_path_should_route_through_intermediate() -> anyhow::Result<()> {
+    fn two_edge_path_should_route_through_intermediate() -> anyhow::Result<()> {
         let me = pubkey_from(&SECRET_0);
         let hop = pubkey_from(&SECRET_1);
         let dest = pubkey_from(&SECRET_2);
@@ -236,10 +269,10 @@ mod tests {
             &dest,
             2,
             None,
-            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
+            HoprForwardCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
         );
 
-        assert!(!routes.is_empty(), "should find at least one 2-hop route");
+        assert!(!routes.is_empty(), "should find at least one 2-edge route");
 
         Ok(())
     }
@@ -258,7 +291,7 @@ mod tests {
             &dest,
             1,
             None,
-            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?),
+            HoprForwardCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?),
         );
 
         assert!(routes.is_empty(), "should return no routes when unreachable");
@@ -277,7 +310,7 @@ mod tests {
             &unknown,
             1,
             None,
-            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?),
+            HoprForwardCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?),
         );
 
         assert!(routes.is_empty());
@@ -312,14 +345,14 @@ mod tests {
             &dest,
             2,
             None,
-            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
+            HoprForwardCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
         );
-        assert_eq!(routes.len(), 2, "diamond topology should yield two 2-hop routes");
+        assert_eq!(routes.len(), 2, "diamond topology should yield two 2-edge routes");
         Ok(())
     }
 
     #[test]
-    fn three_hop_chain_should_find_single_path() -> anyhow::Result<()> {
+    fn three_edge_chain_should_find_single_path() -> anyhow::Result<()> {
         // me -> a -> b -> dest
         let me = pubkey_from(&SECRET_0);
         let a = pubkey_from(&SECRET_1);
@@ -334,16 +367,16 @@ mod tests {
         graph.add_edge(&a, &b)?;
         graph.add_edge(&b, &dest)?;
         mark_edge_loopback_ready(&graph, &me, &a);
-        mark_edge_connected(&graph, &b, &dest);
+        mark_edge_with_capacity(&graph, &a, &b);
 
         let routes = graph.simple_paths(
             &me,
             &dest,
             3,
             None,
-            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?),
+            HoprForwardCostFn::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?),
         );
-        assert_eq!(routes.len(), 1, "should find exactly one 3-hop route");
+        assert_eq!(routes.len(), 1, "should find exactly one 3-edge route");
         Ok(())
     }
 
@@ -364,22 +397,22 @@ mod tests {
         graph.add_edge(&b, &dest)?;
         graph.add_edge(&a, &me)?; // back-edge
         mark_edge_loopback_ready(&graph, &me, &a);
-        mark_edge_connected(&graph, &b, &dest);
+        mark_edge_with_capacity(&graph, &a, &b);
 
         let routes = graph.simple_paths(
             &me,
             &dest,
             3,
             None,
-            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?),
+            HoprForwardCostFn::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?),
         );
         assert_eq!(routes.len(), 1, "cycle should not produce extra paths");
         Ok(())
     }
 
     #[test]
-    fn mismatched_hop_count_should_return_empty() -> anyhow::Result<()> {
-        // me -> dest (1 hop), but ask for 2 hops
+    fn mismatched_edge_count_should_return_empty() -> anyhow::Result<()> {
+        // me -> dest (1 edge), but ask for 2 edges
         let me = pubkey_from(&SECRET_0);
         let dest = pubkey_from(&SECRET_1);
         let graph = ChannelGraph::new(me);
@@ -391,14 +424,14 @@ mod tests {
             &dest,
             2,
             None,
-            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
+            HoprForwardCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
         );
-        assert!(routes.is_empty(), "no 2-hop route should exist for a direct edge");
+        assert!(routes.is_empty(), "no 2-edge route should exist for a single edge");
         Ok(())
     }
 
     #[test]
-    fn zero_hop_should_always_return_empty() -> anyhow::Result<()> {
+    fn zero_edge_should_always_return_empty() -> anyhow::Result<()> {
         let me = pubkey_from(&SECRET_0);
         let other = pubkey_from(&SECRET_1);
         let graph = ChannelGraph::new(me);
@@ -409,9 +442,9 @@ mod tests {
             &other,
             0,
             None,
-            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?),
+            HoprForwardCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?),
         );
-        assert!(routes.is_empty(), "zero-hop path should find no routes");
+        assert!(routes.is_empty(), "zero-edge path should find no routes");
         Ok(())
     }
 
@@ -433,7 +466,7 @@ mod tests {
             &dest,
             2,
             None,
-            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
+            HoprForwardCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
         );
         assert!(routes.is_empty(), "should not traverse edge in wrong direction");
         Ok(())
@@ -443,26 +476,18 @@ mod tests {
     fn non_trivial_graph_should_find_all_simple_paths() -> anyhow::Result<()> {
         // Topology (7 nodes):
         //
-        //         ┌─→ c ──→ f
-        //    me ──┤         ↑↑↑
-        //         └─→ a ──→ d ──→ f
-        //              │         ↑
-        //              └──→ e ──┘
-        //
         //   me(0) ──→ a(1)
         //   me(0) ──→ b(2)
-        //   a(1)  ──→ c(3)
-        //   a(1)  ──→ d(4)
-        //   a(1)  ──→ f(7)   [NOT connected — pruned by cost]
-        //   b(2)  ──→ c(3)
-        //   b(2)  ──→ d(4)
-        //   b(2)  ──→ e(5)
-        //   b(2)  ──→ f(7)   [NOT connected — pruned by cost]
-        //   c(3)  ──→ f(7)   [connected]
-        //   d(4)  ──→ f(7)   [connected]
-        //   e(5)  ──→ f(7)   [connected]
+        //   a(1)  ──→ c(3)   [capacity]
+        //   a(1)  ──→ d(4)   [capacity]
+        //   b(2)  ──→ c(3)   [capacity]
+        //   b(2)  ──→ d(4)   [capacity]
+        //   b(2)  ──→ e(5)   [capacity]
+        //   c(3)  ──→ f(7)
+        //   d(4)  ──→ f(7)
+        //   e(5)  ──→ f(7)
         //
-        // Valid 3-hop paths (me → ? → ? → f):
+        // Valid 3-edge paths (me → ? → ? → f):
         //   1. me → a → c → f
         //   2. me → a → d → f
         //   3. me → b → c → f
@@ -472,10 +497,6 @@ mod tests {
         // Blocked paths:
         //   - me → a → e → f : edge a→e missing
         //   - me → e → … → f : edge me→e missing
-        //
-        // Cost-pruned 2-hop paths:
-        //   - me → a → f : a→f not connected → cost goes negative
-        //   - me → b → f : b→f not connected → cost goes negative
 
         let me = pubkey_from(&SECRET_0);
         let a = pubkey_from(&SECRET_1);
@@ -497,66 +518,55 @@ mod tests {
         // Edges from a
         graph.add_edge(&a, &c)?;
         graph.add_edge(&a, &d)?;
-        graph.add_edge(&a, &f)?; // exists but NOT connected
 
         // Edges from b
         graph.add_edge(&b, &c)?;
         graph.add_edge(&b, &d)?;
         graph.add_edge(&b, &e)?;
-        graph.add_edge(&b, &f)?; // exists but NOT connected
 
         // Edges to f (last hop)
         graph.add_edge(&c, &f)?;
         graph.add_edge(&d, &f)?;
         graph.add_edge(&e, &f)?;
 
-        // Mark first-hop edges with full QoS (connected + intermediate capacity)
+        // Mark first edges with full QoS (connected + intermediate capacity)
         mark_edge_loopback_ready(&graph, &me, &a);
         mark_edge_loopback_ready(&graph, &me, &b);
 
-        // Only mark c→f, d→f, e→f as connected (satisfies cost function for last edge)
-        mark_edge_connected(&graph, &c, &f);
-        mark_edge_connected(&graph, &d, &f);
-        mark_edge_connected(&graph, &e, &f);
+        // Mark middle edges with capacity (required by HoprForwardCostFn)
+        mark_edge_with_capacity(&graph, &a, &c);
+        mark_edge_with_capacity(&graph, &a, &d);
+        mark_edge_with_capacity(&graph, &b, &c);
+        mark_edge_with_capacity(&graph, &b, &d);
+        mark_edge_with_capacity(&graph, &b, &e);
 
-        // --- 3-hop paths: should find exactly 5 ---
+        // Last edges (c→f, d→f, e→f) are lenient with HoprForwardCostFn
+
+        // --- 3-edge paths: should find exactly 5 ---
         let routes_3 = graph.simple_paths(
             &me,
             &f,
             3,
             None,
-            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?),
+            HoprForwardCostFn::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?),
         );
-        assert_eq!(routes_3.len(), 5, "should find exactly 5 three-hop paths");
+        assert_eq!(routes_3.len(), 5, "should find exactly 5 three-edge paths");
 
         // Verify all returned paths have positive cost
         for (path, _path_id, cost) in &routes_3 {
             assert!(*cost > 0.0, "path {path:?} should have positive cost, got {cost}");
-            assert_eq!(path.len(), 4, "3-hop path should contain 4 nodes");
+            assert_eq!(path.len(), 4, "3-edge path should contain 4 nodes");
             assert_eq!(path.first(), Some(&me), "path should start at me");
             assert_eq!(path.last(), Some(&f), "path should end at f");
         }
 
-        // --- 2-hop paths: a→f and b→f are NOT connected, so cost is pruned ---
-        let routes_2 = graph.simple_paths(
-            &me,
-            &f,
-            2,
-            None,
-            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
-        );
-        assert!(
-            routes_2.is_empty(),
-            "2-hop paths should be pruned (last edge not connected)"
-        );
-
-        // --- 1-hop path: no direct me→f edge ---
+        // --- 1-edge path: no direct me→f edge ---
         let routes_1 = graph.simple_paths(
             &me,
             &f,
             1,
             None,
-            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?),
+            HoprForwardCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?),
         );
         assert!(routes_1.is_empty(), "no direct edge from me to f");
 
@@ -590,7 +600,7 @@ mod tests {
             &me,
             3,
             None,
-            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?),
+            HoprForwardCostFn::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?),
         );
         assert!(
             routes.is_empty(),
@@ -601,7 +611,7 @@ mod tests {
     }
 
     #[test]
-    fn path_id_should_contain_node_indices_for_one_hop() -> anyhow::Result<()> {
+    fn path_id_should_contain_node_indices_for_one_edge() -> anyhow::Result<()> {
         // me = node 0, dest = node 1
         let me = pubkey_from(&SECRET_0);
         let dest = pubkey_from(&SECRET_1);
@@ -616,7 +626,7 @@ mod tests {
             &dest,
             1,
             None,
-            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?),
+            HoprForwardCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?),
         );
         assert_eq!(routes.len(), 1);
 
@@ -629,7 +639,7 @@ mod tests {
     }
 
     #[test]
-    fn path_id_should_contain_node_indices_for_three_hops() -> anyhow::Result<()> {
+    fn path_id_should_contain_node_indices_for_three_edges() -> anyhow::Result<()> {
         // me = node 0, a = node 1, b = node 2, dest = node 3
         let me = pubkey_from(&SECRET_0);
         let a = pubkey_from(&SECRET_1);
@@ -644,14 +654,14 @@ mod tests {
         graph.add_edge(&a, &b)?;
         graph.add_edge(&b, &dest)?;
         mark_edge_loopback_ready(&graph, &me, &a);
-        mark_edge_connected(&graph, &b, &dest);
+        mark_edge_with_capacity(&graph, &a, &b);
 
         let routes = graph.simple_paths(
             &me,
             &dest,
             3,
             None,
-            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?),
+            HoprForwardCostFn::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?),
         );
         assert_eq!(routes.len(), 1);
 
@@ -693,9 +703,9 @@ mod tests {
             &dest,
             2,
             None,
-            SimpleHoprCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
+            HoprForwardCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
         );
-        assert_eq!(routes.len(), 2, "diamond should yield two 2-hop routes");
+        assert_eq!(routes.len(), 2, "diamond should yield two 2-edge routes");
 
         let path_ids: Vec<PathId> = routes.iter().map(|(_, pid, _)| *pid).collect();
         assert_ne!(path_ids[0], path_ids[1], "distinct paths should have different PathIds");
@@ -711,10 +721,170 @@ mod tests {
         Ok(())
     }
 
+    // ── return-path tests (HoprReturnCostFn) ──────────────────────────
+
+    #[test]
+    fn return_path_one_edge_should_find_route() -> anyhow::Result<()> {
+        // Return path: dest -> me (1 edge)
+        // For length=1, path_index=0 matches the first-edge arm which requires capacity.
+        let me = pubkey_from(&SECRET_0);
+        let dest = pubkey_from(&SECRET_1);
+
+        let graph = ChannelGraph::new(me);
+        graph.add_node(dest);
+        graph.add_edge(&dest, &me)?;
+        // dest→me: needs capacity (first-edge arm of HoprReturnCostFn)
+        mark_edge_with_capacity(&graph, &dest, &me);
+
+        let routes = graph.simple_paths(
+            &dest,
+            &me,
+            1,
+            None,
+            HoprReturnCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?),
+        );
+
+        assert_eq!(routes.len(), 1, "should find exactly one 1-edge return route");
+        Ok(())
+    }
+
+    #[test]
+    fn return_path_two_edge_should_route_through_intermediate() -> anyhow::Result<()> {
+        // Return path: dest -> relay -> me (2 edges)
+        // Edge 0 (dest→relay): needs capacity only
+        // Edge 1 (relay→me): needs connectivity (last edge)
+        let me = pubkey_from(&SECRET_0);
+        let relay = pubkey_from(&SECRET_1);
+        let dest = pubkey_from(&SECRET_2);
+
+        let graph = ChannelGraph::new(me);
+        graph.add_node(relay);
+        graph.add_node(dest);
+        graph.add_edge(&dest, &relay)?;
+        graph.add_edge(&relay, &me)?;
+        // dest→relay: first edge needs capacity
+        mark_edge_with_capacity(&graph, &dest, &relay);
+        // relay→me: last edge needs connectivity
+        mark_edge_connected(&graph, &relay, &me);
+
+        let routes = graph.simple_paths(
+            &dest,
+            &me,
+            2,
+            None,
+            HoprReturnCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
+        );
+
+        assert!(!routes.is_empty(), "should find at least one 2-edge return route");
+        Ok(())
+    }
+
+    #[test]
+    fn return_path_last_edge_without_connectivity_should_be_pruned() -> anyhow::Result<()> {
+        // Return path: dest -> relay -> me (2 edges)
+        // relay→me lacks connectivity → last-edge cost goes negative
+        let me = pubkey_from(&SECRET_0);
+        let relay = pubkey_from(&SECRET_1);
+        let dest = pubkey_from(&SECRET_2);
+
+        let graph = ChannelGraph::new(me);
+        graph.add_node(relay);
+        graph.add_node(dest);
+        graph.add_edge(&dest, &relay)?;
+        graph.add_edge(&relay, &me)?;
+        // dest→relay: has capacity (passes edge-0)
+        mark_edge_with_capacity(&graph, &dest, &relay);
+        // relay→me: only capacity, NO connectivity → last edge fails
+
+        let routes = graph.simple_paths(
+            &dest,
+            &me,
+            2,
+            None,
+            HoprReturnCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
+        );
+
+        assert!(
+            routes.is_empty(),
+            "return path should be pruned when last edge lacks connectivity"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn return_path_first_edge_without_capacity_should_be_pruned() -> anyhow::Result<()> {
+        // Return path: dest -> relay -> me (2 edges)
+        // dest→relay has no capacity → first-edge cost goes negative
+        let me = pubkey_from(&SECRET_0);
+        let relay = pubkey_from(&SECRET_1);
+        let dest = pubkey_from(&SECRET_2);
+
+        let graph = ChannelGraph::new(me);
+        graph.add_node(relay);
+        graph.add_node(dest);
+        graph.add_edge(&dest, &relay)?;
+        graph.add_edge(&relay, &me)?;
+        // dest→relay: no capacity (default edge)
+        // relay→me: connected
+        mark_edge_connected(&graph, &relay, &me);
+
+        let routes = graph.simple_paths(
+            &dest,
+            &me,
+            2,
+            None,
+            HoprReturnCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
+        );
+
+        assert!(
+            routes.is_empty(),
+            "return path should be pruned when first edge lacks capacity"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn return_path_diamond_should_yield_multiple_paths() -> anyhow::Result<()> {
+        // Return paths: dest -> a -> me, dest -> b -> me
+        let me = pubkey_from(&SECRET_0);
+        let a = pubkey_from(&SECRET_1);
+        let b = pubkey_from(&SECRET_2);
+        let dest = pubkey_from(&SECRET_3);
+
+        let graph = ChannelGraph::new(me);
+        graph.add_node(a);
+        graph.add_node(b);
+        graph.add_node(dest);
+        graph.add_edge(&dest, &a)?;
+        graph.add_edge(&dest, &b)?;
+        graph.add_edge(&a, &me)?;
+        graph.add_edge(&b, &me)?;
+        // First edges (dest→a, dest→b): need capacity
+        mark_edge_with_capacity(&graph, &dest, &a);
+        mark_edge_with_capacity(&graph, &dest, &b);
+        // Last edges (a→me, b→me): need connectivity
+        mark_edge_connected(&graph, &a, &me);
+        mark_edge_connected(&graph, &b, &me);
+
+        let routes = graph.simple_paths(
+            &dest,
+            &me,
+            2,
+            None,
+            HoprReturnCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
+        );
+        assert_eq!(
+            routes.len(),
+            2,
+            "diamond topology should yield two 2-edge return routes"
+        );
+        Ok(())
+    }
+
     // ── simple_loopback_to_self tests ──────────────────────────────────
 
     /// Marks an edge as connected AND with intermediate capacity so that it
-    /// satisfies the `LoopbackPathCostFn` at edge index 0 (connected + capacity)
+    /// satisfies the `ForwardPathCostFn` at edge index 0 (connected + capacity)
     /// and at any other index (capacity).
     fn mark_edge_loopback_ready(graph: &ChannelGraph, src: &OffchainPublicKey, dest: &OffchainPublicKey) {
         graph.upsert_edge(src, dest, |obs| {
@@ -726,7 +896,7 @@ mod tests {
     }
 
     /// Marks an edge with intermediate capacity and probe data (no connected flag).
-    /// Satisfies `LoopbackPathCostFn` at index > 0 but NOT at index 0.
+    /// Satisfies `ForwardPathCostFn` at index > 0 but NOT at index 0.
     fn mark_edge_with_capacity(graph: &ChannelGraph, src: &OffchainPublicKey, dest: &OffchainPublicKey) {
         graph.upsert_edge(src, dest, |obs| {
             obs.record(EdgeWeightType::Intermediate(Ok(std::time::Duration::from_millis(50))));
@@ -814,7 +984,7 @@ mod tests {
 
         assert!(
             graph.simple_loopback_to_self(2, None).is_empty(),
-            "edge me→a lacks intermediate capacity, so LoopbackPathCostFn prunes it"
+            "edge me→a lacks intermediate capacity, so ForwardPathCostFn prunes it"
         );
 
         Ok(())
@@ -842,7 +1012,7 @@ mod tests {
 
         assert!(
             graph.simple_loopback_to_self(2, None).is_empty(),
-            "edge a→b lacks capacity, so LoopbackPathCostFn prunes the path"
+            "edge a→b lacks capacity, so ForwardPathCostFn prunes the path"
         );
 
         Ok(())

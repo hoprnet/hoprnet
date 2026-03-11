@@ -20,13 +20,13 @@ use futures::{
 use hopr_api::{
     chain::HoprChainApi,
     db::HoprNodeDbApi,
-    graph::{NetworkGraphUpdate, NetworkGraphView},
+    graph::{NetworkGraphTraverse, NetworkGraphUpdate, NetworkGraphView, traits::EdgeObservableRead},
     network::NetworkStreamControl,
 };
 use hopr_async_runtime::Abortable;
 use hopr_lib::{
-    Address, Hopr, HoprSession, NetworkView, OffchainPublicKey, SURB_SIZE, ServiceId, SessionClientConfig, SessionId,
-    SessionTarget, errors::HoprLibError, exports::types::internal::routing::RoutingOptions, transfer_session,
+    Address, Hopr, HoprSession, HoprSessionClientConfig, NetworkView, OffchainPublicKey, RoutingOptions, SURB_SIZE,
+    ServiceId, SessionId, SessionTarget, errors::HoprLibError, transfer_session,
 };
 use hopr_network_types::{
     prelude::{ConnectedUdpStream, IpOrHost, IpProtocol, SealedHost, UdpStreamParallelism},
@@ -214,13 +214,20 @@ impl SessionPool {
         size: usize,
         dst: Address,
         target: SessionTarget,
-        cfg: SessionClientConfig,
+        cfg: HoprSessionClientConfig,
         hopr: Arc<Hopr<Chain, Db, Graph, Net>>,
     ) -> Result<Self, anyhow::Error>
     where
         Chain: HoprChainApi + Clone + Send + Sync + 'static,
         Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
-        Graph: NetworkGraphView<NodeId = OffchainPublicKey> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
+        Graph: NetworkGraphView<NodeId = OffchainPublicKey>
+            + NetworkGraphUpdate
+            + NetworkGraphTraverse<NodeId = OffchainPublicKey>
+            + Clone
+            + Send
+            + Sync
+            + 'static,
+        <Graph as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
         Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
     {
         let pool = Arc::new(parking_lot::Mutex::new(VecDeque::with_capacity(size)));
@@ -308,14 +315,21 @@ pub async fn create_tcp_client_binding<Chain, Db, Graph, Net>(
     open_listeners: Arc<ListenerJoinHandles>,
     destination: Address,
     target_spec: SessionTargetSpec,
-    config: SessionClientConfig,
+    config: HoprSessionClientConfig,
     use_session_pool: Option<usize>,
     max_client_sessions: Option<usize>,
 ) -> Result<(std::net::SocketAddr, Option<SessionId>, usize), BindError>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
-    Graph: NetworkGraphView<NodeId = OffchainPublicKey> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Graph: NetworkGraphView<NodeId = OffchainPublicKey>
+        + NetworkGraphUpdate
+        + NetworkGraphTraverse<NodeId = OffchainPublicKey>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+    <Graph as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     // Bind the TCP socket first
@@ -450,8 +464,8 @@ where
         StoredSessionEntry {
             destination,
             target: target_spec,
-            forward_path: config.forward_path_options,
-            return_path: config.return_path_options,
+            forward_path: config.forward_path.into(),
+            return_path: config.return_path.into(),
             clients: active_sessions,
             max_client_sessions: max_clients,
             max_surb_upstream: config
@@ -483,12 +497,19 @@ pub async fn create_udp_client_binding<Chain, Db, Graph, Net>(
     open_listeners: Arc<ListenerJoinHandles>,
     destination: Address,
     target_spec: SessionTargetSpec,
-    config: SessionClientConfig,
+    config: HoprSessionClientConfig,
 ) -> Result<(std::net::SocketAddr, Option<SessionId>, usize), BindError>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
-    Graph: NetworkGraphView<NodeId = OffchainPublicKey> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Graph: NetworkGraphView<NodeId = OffchainPublicKey>
+        + NetworkGraphUpdate
+        + NetworkGraphTraverse<NodeId = OffchainPublicKey>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+    <Graph as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     // Bind the UDP socket first
@@ -551,8 +572,8 @@ where
         StoredSessionEntry {
             destination,
             target: target_spec,
-            forward_path: config.forward_path_options.clone(),
-            return_path: config.return_path_options.clone(),
+            forward_path: config.forward_path.into(),
+            return_path: config.return_path.into(),
             max_client_sessions: max_clients,
             max_surb_upstream: config
                 .surb_management

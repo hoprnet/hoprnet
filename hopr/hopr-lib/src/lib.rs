@@ -111,6 +111,85 @@ pub use crate::{
     errors::{HoprLibError, HoprStatusError},
 };
 
+/// Public routing configuration for session opening in `hopr-lib`.
+///
+/// This intentionally exposes only hop-count based routing.
+#[cfg(feature = "session-client")]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, smart_default::SmartDefault)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct HopRouting(
+    #[default(hopr_api::types::primitive::bounded::BoundedSize::MIN)]
+    hopr_api::types::primitive::bounded::BoundedSize<
+        { hopr_api::types::internal::routing::RoutingOptions::MAX_INTERMEDIATE_HOPS },
+    >,
+);
+
+#[cfg(feature = "session-client")]
+impl HopRouting {
+    /// Maximum number of hops that can be configured.
+    pub const MAX_HOPS: usize = hopr_api::types::internal::routing::RoutingOptions::MAX_INTERMEDIATE_HOPS;
+
+    /// Returns the configured number of hops.
+    pub fn hop_count(self) -> usize {
+        self.0.into()
+    }
+}
+
+#[cfg(feature = "session-client")]
+impl TryFrom<usize> for HopRouting {
+    type Error = hopr_api::types::primitive::errors::GeneralError;
+
+    fn try_from(value: usize) -> Result<Self, Self::Error> {
+        Ok(Self(value.try_into()?))
+    }
+}
+
+#[cfg(feature = "session-client")]
+impl From<HopRouting> for hopr_api::types::internal::routing::RoutingOptions {
+    fn from(value: HopRouting) -> Self {
+        Self::Hops(value.0)
+    }
+}
+
+/// Session client configuration for `hopr-lib`.
+///
+/// Unlike transport-level configuration, this API intentionally does not expose
+/// explicit intermediate paths.
+#[cfg(feature = "session-client")]
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault)]
+pub struct HoprSessionClientConfig {
+    /// Forward route selection policy.
+    pub forward_path: HopRouting,
+    /// Return route selection policy.
+    pub return_path: HopRouting,
+    /// Capabilities offered by the session.
+    #[default(_code = "SessionCapability::Segmentation.into()")]
+    pub capabilities: SessionCapabilities,
+    /// Optional pseudonym used for the session. Mostly useful for testing only.
+    #[default(None)]
+    pub pseudonym: Option<hopr_api::types::internal::protocol::HoprPseudonym>,
+    /// Enable automatic SURB management for the session.
+    #[default(Some(SurbBalancerConfig::default()))]
+    pub surb_management: Option<SurbBalancerConfig>,
+    /// If set, the maximum number of possible SURBs will always be sent with session data packets.
+    #[default(false)]
+    pub always_max_out_surbs: bool,
+}
+
+#[cfg(feature = "session-client")]
+impl From<HoprSessionClientConfig> for hopr_transport::SessionClientConfig {
+    fn from(value: HoprSessionClientConfig) -> Self {
+        Self {
+            forward_path_options: value.forward_path.into(),
+            return_path_options: value.return_path.into(),
+            capabilities: value.capabilities,
+            pseudonym: value.pseudonym,
+            surb_management: value.surb_management,
+            always_max_out_surbs: value.always_max_out_surbs,
+        }
+    }
+}
+
 /// Long-running tasks that are spawned by the HOPR node.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, strum::Display, strum::EnumCount)]
 pub enum HoprLibProcess {
@@ -223,10 +302,13 @@ pub struct Hopr<Chain, Db, Graph, Net>
 where
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
+        + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
         + Clone
         + Send
         + Sync
         + 'static,
+    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
+        hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     me: OffchainKeypair,
@@ -246,10 +328,13 @@ where
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
+        + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
         + Clone
         + Send
         + Sync
         + 'static,
+    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
+        hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     pub async fn new(
@@ -783,7 +868,7 @@ where
         &self,
         destination: Address,
         target: SessionTarget,
-        cfg: SessionClientConfig,
+        cfg: HoprSessionClientConfig,
     ) -> errors::Result<HoprSession> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
@@ -795,7 +880,7 @@ where
         use backon::Retryable;
 
         Ok((|| {
-            let cfg = cfg.clone();
+            let cfg = hopr_transport::SessionClientConfig::from(cfg.clone());
             let target = target.clone();
             async { self.transport_api.new_session(destination, target, cfg).await }
         })
@@ -880,10 +965,13 @@ impl<Chain, Db, Graph, Net> Hopr<Chain, Db, Graph, Net>
 where
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
+        + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
         + Clone
         + Send
         + Sync
         + 'static,
+    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
+        hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     // === telemetry
@@ -907,10 +995,13 @@ where
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
+        + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
         + Clone
         + Send
         + Sync
         + 'static,
+    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
+        hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     fn status(&self) -> HoprState {
@@ -925,14 +1016,17 @@ where
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
+        + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
         + Clone
         + Send
         + Sync
         + 'static,
+    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
+        hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     type Error = HoprLibError;
-    type TransportObservable = Graph::Observed;
+    type TransportObservable = <Graph as hopr_api::graph::NetworkGraphView>::Observed;
 
     fn me_peer_id(&self) -> PeerId {
         (*self.me.public()).into()
@@ -1050,10 +1144,13 @@ where
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
+        + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
         + Clone
         + Send
         + Sync
         + 'static,
+    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
+        hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     pub fn me_onchain(&self) -> Address {

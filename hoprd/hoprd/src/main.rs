@@ -256,6 +256,7 @@ async fn main_inner() -> anyhow::Result<()> {
         &hopr_keys.chain_key,
         &hopr_keys.packet_key,
         hopr_lib_cfg,
+        None,
         chain_connector.clone(),
         node_db,
         HoprServerIpForwardingReactor::new(hopr_keys.packet_key.clone(), cfg.session_ip_forwarding.clone()),

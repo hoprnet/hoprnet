@@ -5,6 +5,7 @@
       "Bash(cargo test:*)",
       "Bash(cargo build:*)",
       "Bash(cargo metadata:*)",
+      "Bash(cargo shear:*)",
       "Bash(cargo tree:*)",
       "Bash(find:*)",
       "Bash(git diff:*)",

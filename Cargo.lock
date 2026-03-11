@@ -4362,8 +4362,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "1.0.0"
-source = "git+https://github.com/hoprnet/hopr-api?rev=0403f9d9470bf7e60234f8d4725260106f0fe2c7#0403f9d9470bf7e60234f8d4725260106f0fe2c7"
+version = "1.1.0"
+source = "git+https://github.com/hoprnet/hopr-api?rev=b350c5bbb56871291c8f220979949db816b2de8d#b350c5bbb56871291c8f220979949db816b2de8d"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -4418,7 +4418,7 @@ dependencies = [
  "hopr-api",
  "hopr-builder",
  "hopr-chain-connector",
- "hopr-ct-immediate",
+ "hopr-ct-full-network",
  "hopr-db-node",
  "hopr-lib",
  "hopr-network-graph",
@@ -5009,7 +5009,6 @@ dependencies = [
  "hopr-api",
  "hopr-async-runtime",
  "hopr-crypto-packet",
- "hopr-metrics",
  "hopr-network-types",
  "hopr-protocol-app",
  "hopr-protocol-hopr",
@@ -5018,6 +5017,7 @@ dependencies = [
  "hopr-transport-identity",
  "hopr-transport-mixer",
  "hopr-transport-network",
+ "hopr-transport-path",
  "hopr-transport-probe",
  "hopr-transport-protocol",
  "hopr-transport-session",
@@ -5104,6 +5104,30 @@ dependencies = [
  "libp2p-stream",
  "more-asserts",
  "multiaddr",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "hopr-transport-path"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bimap",
+ "futures",
+ "futures-time",
+ "hex-literal",
+ "hopr-api",
+ "hopr-crypto-packet",
+ "hopr-metrics",
+ "hopr-network-graph",
+ "hopr-protocol-hopr",
+ "hopr-types",
+ "lazy_static",
+ "moka",
+ "smart-default",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
