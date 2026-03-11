@@ -1,14 +1,15 @@
 mod errors;
 pub mod queue;
 
+use std::collections::hash_map::Entry;
+
 use hopr_api::{
     chain::TicketRedeemError,
     types::{internal::prelude::*, primitive::prelude::*},
 };
 use parking_lot::RwLockUpgradableReadGuard;
 
-use crate::errors::TicketManagerError;
-use crate::queue::TicketQueue;
+use crate::{errors::TicketManagerError, queue::TicketQueue};
 
 struct ChannelTicketQueue<Q> {
     queue: std::sync::Arc<parking_lot::RwLock<Q>>,
@@ -16,6 +17,7 @@ struct ChannelTicketQueue<Q> {
 }
 
 pub struct HoprTicketManager<C, Q> {
+    // TODO: replace with dashmap?
     channel_tickets: std::collections::HashMap<ChannelId, ChannelTicketQueue<Q>>,
     chain: C,
 }
@@ -23,8 +25,29 @@ pub struct HoprTicketManager<C, Q> {
 impl<C, Q> HoprTicketManager<C, Q>
 where
     C: hopr_api::chain::ChainWriteTicketOperations + Clone + Send + Sync + 'static,
-    Q: TicketQueue + Send + Sync + 'static,
+    Q: TicketQueue + Default + Send + Sync + 'static,
 {
+    pub fn insert_ticket(&mut self, ticket: RedeemableTicket) -> Result<(), TicketManagerError<C::Error, Q::Error>> {
+        match self.channel_tickets.entry(ticket.ticket_id().id) {
+            Entry::Occupied(e) => {
+                e.get()
+                    .queue
+                    .write()
+                    .push(ticket)
+                    .map_err(TicketManagerError::QueueError)?;
+            }
+            Entry::Vacant(v) => {
+                let mut queue = Q::default();
+                queue.push(ticket).map_err(TicketManagerError::QueueError)?;
+                v.insert(ChannelTicketQueue {
+                    queue: std::sync::Arc::new(parking_lot::RwLock::new(queue)),
+                    redeem_lock: std::sync::Arc::new(parking_lot::Mutex::new(())),
+                });
+            }
+        }
+        Ok(())
+    }
+
     pub fn unrealized_value(
         &self,
         channel_id: &ChannelId,
@@ -86,7 +109,7 @@ where
                                     TicketRedeemError::Rejected(..) => {
                                         // TODO: update stats + invalidate unrealized value cache?
                                         true
-                                    },
+                                    }
                                     TicketRedeemError::ProcessingError(..) => false,
                                 };
                                 (Err(TicketManagerError::RedeemError(error)), reject_ticket)
