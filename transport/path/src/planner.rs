@@ -51,7 +51,7 @@ pub struct PathPlannerConfig {
 /// Only the `Hops` variant of [`RoutingOptions`] is cached (explicit intermediate
 /// paths bypass the cache), so the key stores the hop count as a plain `u32`.
 type PlannerCacheKey = (NodeId, NodeId, u32);
-type PlannerCacheValue = Arc<Vec<ValidatedPath>>;
+type PlannerCacheValue = Arc<Vec<(ValidatedPath, f64)>>;
 
 /// Path planner that resolves [`DestinationRouting`] to [`ResolvedTransportRouting`].
 ///
@@ -164,11 +164,11 @@ where
                         let candidates = selector.select_path(src_key, dest_key, hops_usize)?;
 
                         let chain_resolver = ChainPathResolver::from(&*resolver);
-                        let mut valid_paths: Vec<ValidatedPath> = Vec::new();
-                        for candidate in candidates {
+                        let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::new();
+                        for (candidate, cost) in candidates {
                             let node_ids: Vec<NodeId> = candidate.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
                             if let Ok(vp) = ValidatedPath::new(source, node_ids, &chain_resolver).await {
-                                valid_paths.push(vp);
+                                valid_paths.push((vp, cost));
                             }
                         }
 
@@ -185,14 +185,24 @@ where
                     .await
                     .map_err(PathPlannerError::CacheError)?;
 
-                let idx = if paths.len() > 1 {
-                    // Upper bound is exclusive; use len so the last path can be selected.
-                    hopr_types::crypto_random::random_integer(0, Some(paths.len() as u64)) as usize
+                if paths.len() > 1 {
+                    // Weighted random selection: higher cost = higher probability of selection.
+                    let total_weight: f64 = paths.iter().map(|(_, c)| *c).sum();
+                    let r = hopr_types::crypto_random::random_float_in_range(0.0..total_weight);
+                    let mut cumulative = 0.0;
+                    let mut idx = paths.len() - 1;
+                    for (i, (_, cost)) in paths.iter().enumerate() {
+                        cumulative += cost;
+                        if r < cumulative {
+                            idx = i;
+                            break;
+                        }
+                    }
+                    trace!(hops = hops_usize, idx, total_weight, "path selected by weighted random");
+                    paths[idx].0.clone()
                 } else {
-                    0
-                };
-                trace!(hops = hops_usize, idx, "path selected");
-                paths[idx].clone()
+                    paths[0].0.clone()
+                }
             }
         };
 
@@ -330,11 +340,11 @@ where
                         && let Ok(candidates) = selector.select_path(src_key, dest_key, hops_usize)
                     {
                         let chain_resolver = ChainPathResolver::from(&*resolver);
-                        let mut valid_paths: Vec<ValidatedPath> = Vec::new();
-                        for candidate in candidates {
+                        let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::new();
+                        for (candidate, cost) in candidates {
                             let node_ids: Vec<NodeId> = candidate.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
                             if let Ok(vp) = ValidatedPath::new(src, node_ids, &chain_resolver).await {
-                                valid_paths.push(vp);
+                                valid_paths.push((vp, cost));
                             }
                         }
 
@@ -725,7 +735,8 @@ mod tests {
         assert!(cached.is_some(), "cache should be populated after first call");
         let paths = cached.unwrap();
         assert!(!paths.is_empty(), "cached paths must be non-empty");
-        assert_eq!(paths[0].num_hops(), 2, "path should have 2 hops [a, dest]");
+        assert_eq!(paths[0].0.num_hops(), 2, "path should have 2 hops [a, dest]");
+        assert!(paths[0].1 > 0.0, "cost should be positive");
     }
 
     #[tokio::test]

@@ -11,13 +11,15 @@ use crate::{
 };
 
 type PathToDestination = Vec<OffchainPublicKey>;
+/// A candidate path paired with its accumulated traversal cost.
+type PathWithCost = (PathToDestination, f64);
 
 /// Compute candidate paths from `src` to `dest` through `graph`.
 ///
 /// `length` is the number of edges to traverse (= intermediate hops + 1).
 /// `take` caps the number of candidate paths returned.
 /// The source node is stripped from every returned path; callers receive
-/// `[intermediates..., dest]`.
+/// `([intermediates..., dest], cost)`.
 fn compute_paths<G, C>(
     graph: &G,
     src: &OffchainPublicKey,
@@ -25,7 +27,7 @@ fn compute_paths<G, C>(
     length: std::num::NonZeroUsize,
     take: usize,
     cost_fn: C,
-) -> Vec<PathToDestination>
+) -> Vec<PathWithCost>
 where
     G: NetworkGraphTraverse<NodeId = OffchainPublicKey> + NetworkGraphView<NodeId = OffchainPublicKey>,
     <G as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
@@ -38,7 +40,7 @@ where
             tracing::trace!(?path, ?cost, "evaluating candidate path");
             if cost > 0.0 {
                 // Drop the first element (src) — callers expect [intermediates..., dest].
-                Some(path.into_iter().skip(1).collect::<Vec<_>>())
+                Some((path.into_iter().skip(1).collect::<Vec<_>>(), cost))
             } else {
                 None
             }
@@ -52,14 +54,17 @@ where
 /// This handles the case where the last edge (relay -> dest) has no graph edge
 /// (e.g. no payment channel) but the path planner can still assume the last hop
 /// is reachable. Paths already found by Phase 1 are excluded via `existing`.
+///
+/// The cost from the shorter traversal is preserved as-is — the missing last
+/// edge contributes a neutral `1.0` multiplier (no quality data available).
 fn compute_extended_forward_paths<G>(
     graph: &G,
     src: &OffchainPublicKey,
     dest: &OffchainPublicKey,
     shorter_length: std::num::NonZeroUsize,
     take: usize,
-    existing: &[PathToDestination],
-) -> Vec<PathToDestination>
+    existing: &[PathWithCost],
+) -> Vec<PathWithCost>
 where
     G: NetworkGraphTraverse<NodeId = OffchainPublicKey> + NetworkGraphView<NodeId = OffchainPublicKey>,
     <G as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
@@ -82,13 +87,13 @@ where
 
             candidate.push(*dest);
 
-            // Skip paths already found by Phase 1.
-            if existing.contains(&candidate) {
+            // Skip paths already found by Phase 1 (compare path component only).
+            if existing.iter().any(|(p, _)| p == &candidate) {
                 return None;
             }
 
             tracing::trace!(?candidate, ?cost, "extended forward path candidate");
-            Some(candidate)
+            Some((candidate, cost))
         })
         .take(take)
         .collect()
@@ -144,8 +149,9 @@ where
 {
     /// Return all candidate paths from `src` to `dest` via `hops` relays.
     ///
-    /// Each returned `Vec<OffchainPublicKey>` has length `hops + 1` and contains
-    /// `[intermediates..., dest]`; `src` is excluded.
+    /// Each returned tuple contains a path `Vec<OffchainPublicKey>` of length
+    /// `hops + 1` (`[intermediates..., dest]`; `src` excluded) paired with its
+    /// accumulated traversal cost.
     ///
     /// Returns `Err(PathNotFound)` when the graph yields no positive-cost paths.
     ///
@@ -158,7 +164,7 @@ where
         src: OffchainPublicKey,
         dest: OffchainPublicKey,
         hops: usize,
-    ) -> Result<Vec<Vec<OffchainPublicKey>>> {
+    ) -> Result<Vec<(Vec<OffchainPublicKey>, f64)>> {
         tracing::trace!(%src, %dest, hops, "computing paths from graph");
         let length = std::num::NonZeroUsize::new(hops + 1)
             .expect("can never fail, it is physically at least 1 after the addition");
@@ -317,14 +323,16 @@ mod tests {
 
         let fwd = selector.select_path(me, dest, 1).context("forward path")?;
         assert!(!fwd.is_empty());
-        for path in &fwd {
+        for (path, cost) in &fwd {
             assert!(!path.contains(&me), "forward path must not contain the source");
+            assert!(*cost > 0.0, "cost must be positive");
         }
 
         let rev = selector.select_path(dest, me, 1).context("reverse path")?;
         assert!(!rev.is_empty());
-        for path in &rev {
+        for (path, cost) in &rev {
             assert!(!path.contains(&dest), "reverse path must not contain the source");
+            assert!(*cost > 0.0, "cost must be positive");
         }
 
         Ok(())
@@ -360,14 +368,14 @@ mod tests {
 
         let fwd = selector.select_path(me, dest, 2).context("forward 2-hop path")?;
         assert!(!fwd.is_empty());
-        for path in &fwd {
+        for (path, _) in &fwd {
             assert_eq!(path.len(), 3, "forward 2-hop path: [A, B, dest]");
             assert_eq!(path.last(), Some(&dest));
         }
 
         let rev = selector.select_path(dest, me, 2).context("reverse 2-hop path")?;
         assert!(!rev.is_empty());
-        for path in &rev {
+        for (path, _) in &rev {
             assert_eq!(path.len(), 3, "reverse 2-hop path: [B, A, me]");
             assert_eq!(path.last(), Some(&me));
         }
@@ -383,7 +391,7 @@ mod tests {
 
         let fwd = selector.select_path(me, dest, 1).context("forward 1-hop path")?;
         assert!(!fwd.is_empty());
-        for path in &fwd {
+        for (path, _) in &fwd {
             assert_eq!(path.len(), 2, "forward: [relay, dest]");
             assert_eq!(path.last(), Some(&dest));
             assert!(!path.contains(&me));
@@ -391,7 +399,7 @@ mod tests {
 
         let rev = selector.select_path(dest, me, 1).context("reverse 1-hop path")?;
         assert!(!rev.is_empty());
-        for path in &rev {
+        for (path, _) in &rev {
             assert_eq!(path.len(), 2, "reverse: [relay, me]");
             assert_eq!(path.last(), Some(&me));
             assert!(!path.contains(&dest));
@@ -435,13 +443,13 @@ mod tests {
 
         let fwd = selector.select_path(me, dest, 1).context("forward path")?;
         assert_eq!(fwd.len(), 2, "forward: both paths via a and b should be returned");
-        for path in &fwd {
+        for (path, _) in &fwd {
             assert_eq!(path.last(), Some(&dest));
         }
 
         let rev = selector.select_path(dest, me, 1).context("reverse path")?;
         assert_eq!(rev.len(), 2, "reverse: both paths via a and b should be returned");
-        for path in &rev {
+        for (path, _) in &rev {
             assert_eq!(path.last(), Some(&me));
         }
 
@@ -522,7 +530,7 @@ mod tests {
             .select_path(me, dest, 1)
             .context("forward path with virtual last hop")?;
         assert!(!fwd.is_empty(), "forward path should find at least one route");
-        for path in &fwd {
+        for (path, _) in &fwd {
             assert_eq!(path.len(), 2, "forward: [relay, dest]");
             assert_eq!(path[0], relay);
             assert_eq!(path[1], dest);
@@ -531,7 +539,7 @@ mod tests {
         // Return path should work normally (both edges exist)
         let rev = selector.select_path(dest, me, 1).context("return path")?;
         assert!(!rev.is_empty(), "return path should find at least one route");
-        for path in &rev {
+        for (path, _) in &rev {
             assert_eq!(path.len(), 2, "return: [relay, me]");
             assert_eq!(path.last(), Some(&me));
         }
@@ -576,7 +584,7 @@ mod tests {
             .select_path(me, dest, RoutingOptions::MAX_INTERMEDIATE_HOPS)
             .context("forward 3-hop path")?;
         assert!(!fwd.is_empty());
-        for path in &fwd {
+        for (path, _) in &fwd {
             assert_eq!(path.len(), 4, "forward: [a, b, c, dest]");
             assert_eq!(path.last(), Some(&dest));
             assert!(!path.contains(&me));
@@ -586,7 +594,7 @@ mod tests {
             .select_path(dest, me, RoutingOptions::MAX_INTERMEDIATE_HOPS)
             .context("reverse 3-hop path")?;
         assert!(!rev.is_empty());
-        for path in &rev {
+        for (path, _) in &rev {
             assert_eq!(path.len(), 4, "reverse: [c, b, a, me]");
             assert_eq!(path.last(), Some(&me));
             assert!(!path.contains(&dest));

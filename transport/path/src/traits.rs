@@ -19,7 +19,11 @@ use crate::errors::Result;
 pub trait PathSelector {
     /// Return **all** candidate paths from `src` to `dest` using `hops` relays.
     ///
-    /// Each inner `Vec<OffchainPublicKey>` has length `hops + 1` and contains
+    /// Each returned tuple pairs a path with its accumulated cost from graph
+    /// traversal.  The cost is a multiplicative product of per-edge quality
+    /// scores in `(0.0, 1.0]` — higher means better quality.
+    ///
+    /// Each path `Vec<OffchainPublicKey>` has length `hops + 1` and contains
     /// the intermediate relay nodes **and** `dest` (in that order); `src` is
     /// excluded from every path.
     ///
@@ -31,7 +35,7 @@ pub trait PathSelector {
         src: OffchainPublicKey,
         dest: OffchainPublicKey,
         hops: usize,
-    ) -> Result<Vec<Vec<OffchainPublicKey>>>;
+    ) -> Result<Vec<(Vec<OffchainPublicKey>, f64)>>;
 }
 
 /// A selector that can run a background path-cache refresh loop.

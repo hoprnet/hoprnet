@@ -4612,7 +4612,7 @@ dependencies = [
  "hopr-network-graph",
  "humantime-serde",
  "lazy_static",
- "moka",
+ "rand 0.10.0",
  "serde",
  "smart-default",
  "tokio",
