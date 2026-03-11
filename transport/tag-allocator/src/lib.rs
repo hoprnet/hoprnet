@@ -101,7 +101,7 @@ impl TagAllocatorConfig {
 }
 
 /// Allocates unique tags from a fixed partition of the tag range.
-pub trait TagAllocator: Send + Sync {
+pub trait TagAllocator {
     /// Obtain the next available tag, or `None` if the partition is exhausted.
     fn allocate(&self) -> Option<AllocatedTag>;
 
@@ -113,7 +113,7 @@ pub trait TagAllocator: Send + Sync {
 }
 
 /// Result type returned by [`create_allocators`].
-pub type CreateAllocatorsResult = Result<Vec<(Usage, Arc<dyn TagAllocator>)>, TagAllocatorError>;
+pub type CreateAllocatorsResult = Result<Vec<(Usage, Arc<dyn TagAllocator + Send + Sync>)>, TagAllocatorError>;
 
 /// Create allocators from a [`TagAllocatorConfig`].
 ///
@@ -142,7 +142,7 @@ pub fn create_allocators_from_config(cfg: &TagAllocatorConfig) -> CreateAllocato
         .map(|(usage, capacity)| {
             let range = cfg.range_for(*usage);
             let alloc = Arc::new(allocator::PartitionAllocator::new(range.start, *capacity));
-            (*usage, alloc as Arc<dyn TagAllocator>)
+            (*usage, alloc as Arc<dyn TagAllocator + Send + Sync>)
         })
         .collect())
 }
@@ -183,7 +183,7 @@ pub fn create_allocators(range: Range<u64>, partitions: [(Usage, u64); 3]) -> Cr
         .map(|(usage, capacity)| {
             let alloc = Arc::new(allocator::PartitionAllocator::new(base, *capacity));
             base += capacity;
-            (*usage, alloc as Arc<dyn TagAllocator>)
+            (*usage, alloc as Arc<dyn TagAllocator + Send + Sync>)
         })
         .collect())
 }
@@ -307,7 +307,11 @@ mod tests {
         assert_eq!(format!("{tag}"), expected.to_string());
 
         // Debug
-        assert_eq!(format!("{tag:?}"), format!("AllocatedTag({expected})"));
+        let debug_str = format!("{tag:?}");
+        assert!(
+            debug_str.contains("AllocatedTag") && debug_str.contains(&expected.to_string()),
+            "unexpected debug output: {debug_str}"
+        );
 
         // Hash + Eq (usable as HashMap key)
         let mut map = std::collections::HashMap::new();

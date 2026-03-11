@@ -65,6 +65,8 @@ impl fmt::Display for AllocatedTag {
 
 impl fmt::Debug for AllocatedTag {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "AllocatedTag({})", self.value)
+        f.debug_struct("AllocatedTag")
+            .field("value", &self.value)
+            .finish_non_exhaustive()
     }
 }

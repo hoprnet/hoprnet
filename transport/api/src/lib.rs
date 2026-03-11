@@ -214,11 +214,9 @@ where
         let tag_allocators = hopr_transport_tag_allocator::create_allocators_from_config(&cfg.session.tag_allocator)?;
 
         let session_tag_allocator = tag_allocators
-            .iter()
-            .find(|(u, _)| matches!(u, hopr_transport_tag_allocator::Usage::Session))
-            .ok_or_else(|| errors::HoprTransportError::Api("session tag allocator missing".into()))?
-            .1
-            .clone();
+            .into_iter()
+            .find_map(|(u, alloc)| matches!(u, hopr_transport_tag_allocator::Usage::Session).then_some(alloc))
+            .ok_or_else(|| errors::HoprTransportError::Api("session tag allocator missing".into()))?;
 
         Ok(Self {
             packet_key: identity.1.clone(),

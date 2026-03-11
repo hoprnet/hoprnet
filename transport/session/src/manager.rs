@@ -153,7 +153,8 @@ struct SessionSlot {
     surb_estimator: AtomicSurbFlowEstimator,
     // Holds the allocated tag so it is returned to the pool when the session is evicted.
     // `None` for outgoing sessions where the tag was assigned by the remote peer.
-    _allocated_tag: Option<Arc<AllocatedTag>>,
+    #[allow(dead_code, reason = "kept alive for Drop-based tag deallocation")]
+    allocated_tag: Option<Arc<AllocatedTag>>,
 }
 
 /// Indicates the result of processing a message.
@@ -393,7 +394,7 @@ pub struct SessionManagerConfig {
 /// This can be set using the `surb_target_notify` field of the [`SessionManagerConfig`] of each new Session.
 ///
 /// Both mechanisms leverage the Keep Alive message to report the respective values.
-pub struct SessionManager<S, T, A: TagAllocator + ?Sized + 'static = dyn TagAllocator> {
+pub struct SessionManager<S, T, A: ?Sized = dyn TagAllocator + Send + Sync> {
     session_initiations: SessionInitiationCache,
     #[allow(clippy::type_complexity)]
     session_notifiers: Arc<OnceLock<(T, Sender<(SessionId, ClosureReason)>)>>,
@@ -407,7 +408,7 @@ pub struct SessionManager<S, T, A: TagAllocator + ?Sized + 'static = dyn TagAllo
     cfg: SessionManagerConfig,
 }
 
-impl<S, T, A: TagAllocator + ?Sized + 'static> Clone for SessionManager<S, T, A> {
+impl<S, T, A: ?Sized> Clone for SessionManager<S, T, A> {
     fn clone(&self) -> Self {
         Self {
             session_initiations: self.session_initiations.clone(),
@@ -424,8 +425,9 @@ impl<S, T, A: TagAllocator + ?Sized + 'static> Clone for SessionManager<S, T, A>
 
 const EXTERNAL_SEND_TIMEOUT: Duration = Duration::from_millis(200);
 
-impl<S, T, A: TagAllocator + ?Sized + 'static> SessionManager<S, T, A>
+impl<S, T, A> SessionManager<S, T, A>
 where
+    A: TagAllocator + Send + Sync + ?Sized + 'static,
     S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
     T: futures::Sink<IncomingSession> + Clone + Send + Sync + Unpin + 'static,
     S::Error: std::error::Error + Send + Sync + Clone + 'static,
@@ -790,7 +792,7 @@ where
                             surb_estimator: surb_estimator.clone(),
                             #[cfg(feature = "telemetry")]
                             telemetry: telemetry.clone(),
-                            _allocated_tag: None,
+                            allocated_tag: None,
                         },
                     )
                     .await?;
@@ -863,7 +865,7 @@ where
                             surb_estimator: Default::default(), // No SURB estimator needed
                             #[cfg(feature = "telemetry")]
                             telemetry: telemetry.clone(),
-                            _allocated_tag: None,
+                            allocated_tag: None,
                         },
                     )
                     .await?;
@@ -1123,7 +1125,7 @@ where
                         frame_timeout: self.cfg.max_frame_timeout,
                     },
                 )),
-                _allocated_tag: Some(allocated_tag),
+                allocated_tag: Some(allocated_tag),
             };
             self.sessions.insert(session_id, slot.clone()).await;
 
@@ -1501,12 +1503,12 @@ mod tests {
     use crate::{Capabilities, Capability, balancer::SurbBalancerConfig, types::SessionTarget};
 
     /// Create a test tag allocator with a large partition.
-    fn test_tag_allocator() -> Arc<dyn TagAllocator> {
+    fn test_tag_allocator() -> Arc<dyn TagAllocator + Send + Sync> {
         test_tag_allocator_with_session_capacity(10000)
     }
 
     /// Create a test tag allocator with a specific session partition capacity.
-    fn test_tag_allocator_with_session_capacity(session_capacity: u64) -> Arc<dyn TagAllocator> {
+    fn test_tag_allocator_with_session_capacity(session_capacity: u64) -> Arc<dyn TagAllocator + Send + Sync> {
         hopr_transport_tag_allocator::create_allocators(
             ReservedTag::range().end..u16::MAX as u64 + 1,
             [
@@ -1901,7 +1903,7 @@ mod tests {
                     surb_estimator: Default::default(),
                     #[cfg(feature = "telemetry")]
                     telemetry: Arc::new(SessionTelemetry::new(session_id, Default::default())),
-                    _allocated_tag: None,
+                    allocated_tag: None,
                 },
             )
             .await;
@@ -1953,7 +1955,7 @@ mod tests {
                     )),
                     surb_mgmt: Default::default(),
                     surb_estimator: Default::default(),
-                    _allocated_tag: None,
+                    allocated_tag: None,
                 },
             )
             .await;
@@ -2070,7 +2072,7 @@ mod tests {
                         SessionId::new(16u64, alice_pseudonym),
                         Default::default(),
                     )),
-                    _allocated_tag: None,
+                    allocated_tag: None,
                 },
             )
             .await;

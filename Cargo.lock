@@ -4999,7 +4999,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.20.1"
+version = "0.21.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5208,7 +5208,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.19.0"
+version = "0.20.0"
 dependencies = [
  "anyhow",
  "arrayvec",
