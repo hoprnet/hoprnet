@@ -1,5 +1,6 @@
+mod backend;
 mod errors;
-pub mod queue;
+mod traits;
 
 use hopr_api::{
     chain::TicketRedeemError,
@@ -7,9 +8,10 @@ use hopr_api::{
 };
 use parking_lot::RwLockUpgradableReadGuard;
 
-use crate::{
+pub use crate::{
+    backend::{MemoryStore, MemoryTicketQueue, RedbStore, RedbTicketQueue},
     errors::TicketManagerError,
-    queue::{TicketQueue, TicketQueueStore},
+    traits::{OutgoingIndexStore, TicketQueue, TicketQueueStore, TicketStatsStore},
 };
 
 struct ChannelTicketQueue<Q> {
@@ -26,26 +28,26 @@ impl<Q> From<Q> for ChannelTicketQueue<Q> {
     }
 }
 
-pub struct HoprTicketManager<L, Q> {
+pub struct HoprTicketManager<S, Q> {
     channel_tickets: dashmap::DashMap<ChannelId, ChannelTicketQueue<Q>>,
-    store: L,
+    store: std::sync::Arc<S>,
 }
 
-impl<L> HoprTicketManager<L, L::Queue>
+impl<S> HoprTicketManager<S, S::Queue>
 where
-    L: TicketQueueStore + Send + Sync + 'static,
-    L::Queue: Send + Sync + 'static,
+    S: TicketQueueStore + TicketStatsStore + OutgoingIndexStore + Send + Sync + 'static,
+    S::Queue: Send + Sync + 'static,
 {
     /// Creates a new ticket manager backed by the given ticket queue store and attempts
     /// to open existing ticket queues.
-    pub fn new(store: L) -> Result<Self, TicketManagerError> {
+    pub fn new(store: S) -> Result<Self, TicketManagerError> {
         Ok(Self {
             channel_tickets: store
                 .iter_channels()
                 .map(|c| store.open_or_create(&c).map(|q| (c, q.into())))
                 .collect::<Result<dashmap::DashMap<_, _>, _>>()
                 .map_err(TicketManagerError::queue)?,
-            store,
+            store: store.into(),
         })
     }
 
@@ -66,7 +68,7 @@ where
                     .map_err(TicketManagerError::queue)?;
                 // Should not happen
                 if !queue.is_empty() {
-                    return Err(TicketManagerError::Other(anyhow::anyhow!("queue not empty")))
+                    return Err(TicketManagerError::Other(anyhow::anyhow!("queue not empty")));
                 }
 
                 queue.push(ticket).map_err(TicketManagerError::queue)?;

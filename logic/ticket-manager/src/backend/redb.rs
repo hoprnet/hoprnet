@@ -1,28 +1,28 @@
 use hopr_api::chain::{ChannelId, RedeemableTicket};
-use crate::queue::{TicketQueue, TicketQueueStore};
 
-pub struct RedbTicketStore {
-    db: std::sync::Arc<redb::Database>
+use crate::{TicketQueue, TicketQueueStore};
+
+pub struct RedbStore {
+    db: std::sync::Arc<redb::Database>,
 }
 
-impl RedbTicketStore {
+impl RedbStore {
     pub fn new(db: std::sync::Arc<redb::Database>) -> Self {
         Self { db }
     }
 }
 
-impl TicketQueueStore for RedbTicketStore {
+impl TicketQueueStore for RedbStore {
     type Queue = RedbTicketQueue;
 
     fn open_or_create(&self, channel_id: &ChannelId) -> Result<Self::Queue, <Self::Queue as TicketQueue>::Error> {
         todo!()
     }
 
-    fn iter_channels(&self) -> impl Iterator<Item=ChannelId> {
+    fn iter_channels(&self) -> impl Iterator<Item = ChannelId> {
         todo!()
     }
 }
-
 
 pub struct RedbTicketQueue {
     db: std::sync::Weak<redb::Database>,
@@ -47,7 +47,7 @@ impl TicketQueue for RedbTicketQueue {
         todo!()
     }
 
-    fn iter_unordered(&self) -> impl Iterator<Item=Result<RedeemableTicket, Self::Error>> {
+    fn iter_unordered(&self) -> impl Iterator<Item = Result<RedeemableTicket, Self::Error>> {
         todo!()
     }
 }
