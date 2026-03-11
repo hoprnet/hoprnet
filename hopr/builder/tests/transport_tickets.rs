@@ -99,6 +99,8 @@ async fn ticket_statistics_should_reset_when_cleaned(#[with(5)] cluster_fixture:
     Ok(())
 }
 
+#[ignore = "the test is no longer realizable, the background probing will always eat the tickets and will not allow \
+            opening a session, which is a precondition for this test"]
 #[rstest]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
