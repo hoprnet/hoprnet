@@ -1,7 +1,5 @@
-use hopr_api::chain::TicketRedeemError;
-
 #[derive(Debug, thiserror::Error)]
-pub enum TicketManagerError<Cerr, Qerr> {
+pub enum TicketManagerError {
     #[error("channel not found")]
     ChannelNotFound,
 
@@ -9,8 +7,21 @@ pub enum TicketManagerError<Cerr, Qerr> {
     AlreadyRedeeming,
 
     #[error("ticket redemption error: {0}")]
-    RedeemError(#[from] TicketRedeemError<Cerr>),
+    RedeemError(#[source] anyhow::Error),
 
     #[error("queue error: {0}")]
-    QueueError(Qerr),
+    QueueError(#[source] anyhow::Error),
+
+    #[error(transparent)]
+    Other(anyhow::Error),
+}
+
+impl TicketManagerError {
+    pub fn redeem<E: Into<anyhow::Error>>(error: E) -> Self {
+        Self::RedeemError(error.into())
+    }
+
+    pub fn queue<E: Into<anyhow::Error>>(error: E) -> Self {
+        Self::QueueError(error.into())
+    }
 }

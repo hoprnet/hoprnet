@@ -7,36 +7,69 @@ use hopr_api::{
 };
 use parking_lot::RwLockUpgradableReadGuard;
 
-use crate::{errors::TicketManagerError, queue::TicketQueue};
+use crate::{
+    errors::TicketManagerError,
+    queue::{TicketQueue, TicketQueueStore},
+};
 
 struct ChannelTicketQueue<Q> {
     queue: std::sync::Arc<parking_lot::RwLock<Q>>,
     redeem_lock: std::sync::Arc<parking_lot::Mutex<()>>,
 }
 
-pub struct HoprTicketManager<C, Q> {
-    channel_tickets: dashmap::DashMap<ChannelId, ChannelTicketQueue<Q>>,
-    chain: C,
+impl<Q> From<Q> for ChannelTicketQueue<Q> {
+    fn from(queue: Q) -> Self {
+        Self {
+            queue: std::sync::Arc::new(parking_lot::RwLock::new(queue)),
+            redeem_lock: std::sync::Arc::new(parking_lot::Mutex::new(())),
+        }
+    }
 }
 
-impl<C, Q> HoprTicketManager<C, Q>
+pub struct HoprTicketManager<L, Q> {
+    channel_tickets: dashmap::DashMap<ChannelId, ChannelTicketQueue<Q>>,
+    store: L,
+}
+
+impl<L> HoprTicketManager<L, L::Queue>
 where
-    C: hopr_api::chain::ChainWriteTicketOperations + Clone + Send + Sync + 'static,
-    Q: TicketQueue + Default + Send + Sync + 'static,
+    L: TicketQueueStore + Send + Sync + 'static,
+    L::Queue: Send + Sync + 'static,
 {
+    /// Creates a new ticket manager backed by the given ticket queue store and attempts
+    /// to open existing ticket queues.
+    pub fn new(store: L) -> Result<Self, TicketManagerError> {
+        Ok(Self {
+            channel_tickets: store
+                .iter_channels()
+                .map(|c| store.open_or_create(&c).map(|q| (c, q.into())))
+                .collect::<Result<dashmap::DashMap<_, _>, _>>()
+                .map_err(TicketManagerError::queue)?,
+            store,
+        })
+    }
+
+    pub fn next_outgoing_ticket_index(&self, channel_id: &ChannelId) -> Result<u64, TicketManagerError> {
+        todo!()
+    }
+
     /// Inserts a new winning redeemable ticket into the ticket manager.
-    pub fn insert_ticket(&self, ticket: RedeemableTicket) -> Result<(), TicketManagerError<C::Error, Q::Error>> {
+    pub fn insert_ticket(&self, ticket: RedeemableTicket) -> Result<(), TicketManagerError> {
         match self.channel_tickets.entry(ticket.ticket_id().id) {
             dashmap::Entry::Occupied(e) => {
-                e.get()
-                    .queue
-                    .write()
-                    .push(ticket)
-                    .map_err(TicketManagerError::QueueError)?;
+                e.get().queue.write().push(ticket).map_err(TicketManagerError::queue)?;
             }
             dashmap::Entry::Vacant(v) => {
-                let mut queue = Q::default();
-                queue.push(ticket).map_err(TicketManagerError::QueueError)?;
+                let mut queue = self
+                    .store
+                    .open_or_create(&ticket.ticket_id().id)
+                    .map_err(TicketManagerError::queue)?;
+                // Should not happen
+                if !queue.is_empty() {
+                    return Err(TicketManagerError::Other(anyhow::anyhow!("queue not empty")))
+                }
+
+                queue.push(ticket).map_err(TicketManagerError::queue)?;
                 v.insert(ChannelTicketQueue {
                     queue: std::sync::Arc::new(parking_lot::RwLock::new(queue)),
                     redeem_lock: std::sync::Arc::new(parking_lot::Mutex::new(())),
@@ -47,10 +80,8 @@ where
     }
 
     /// Returns the total value of unredeemed tickets in the given channel.
-    pub fn unrealized_value(
-        &self,
-        channel_id: &ChannelId,
-    ) -> Result<HoprBalance, TicketManagerError<C::Error, Q::Error>> {
+    pub fn unrealized_value(&self, channel_id: &ChannelId) -> Result<HoprBalance, TicketManagerError> {
+        // TODO: consider using a cache here
         if let Some(ticket_queue) = self.channel_tickets.get(channel_id) {
             Ok(ticket_queue
                 .queue
@@ -65,16 +96,18 @@ where
 
     /// Creates a stream that redeems tickets in-order one by one in the given channel.
     ///
-    /// If there's already an existing redeem stream for the channel, an error is returned without creating a new stream.
+    /// If there's already an existing redeem stream for the channel, an error is returned without creating a new
+    /// stream.
     ///
     /// Possible errors during redemption are passed up via the stream.
-    pub fn redeem_stream(
+    pub fn redeem_stream<C>(
         &self,
+        chain: C,
         channel_id: &ChannelId,
-    ) -> Result<
-        impl futures::Stream<Item = Result<VerifiedTicket, TicketManagerError<C::Error, Q::Error>>>,
-        TicketManagerError<C::Error, Q::Error>,
-    > {
+    ) -> Result<impl futures::Stream<Item = Result<VerifiedTicket, TicketManagerError>>, TicketManagerError>
+    where
+        C: hopr_api::chain::ChainWriteTicketOperations + Send + Sync + 'static,
+    {
         struct RedeemState<Cc, Qq> {
             _lock: parking_lot::ArcMutexGuard<parking_lot::RawMutex, ()>,
             queue: std::sync::Arc<parking_lot::RwLock<Qq>>,
@@ -88,7 +121,7 @@ where
                     .try_lock_arc()
                     .ok_or(TicketManagerError::AlreadyRedeeming)?,
                 queue: ticket_queue.queue.clone(),
-                chain: self.chain.clone(),
+                chain,
             },
             None => return Err(TicketManagerError::ChannelNotFound),
         };
@@ -104,7 +137,7 @@ where
                                 let redemption_result = redeem_fut
                                     .await
                                     .map(|(ticket, _)| Some(ticket))
-                                    .map_err(TicketManagerError::RedeemError);
+                                    .map_err(TicketManagerError::redeem);
                                 (redemption_result, true)
                             }
                             Err(error) => {
@@ -116,14 +149,13 @@ where
                                     }
                                     TicketRedeemError::ProcessingError(..) => false,
                                 };
-                                (Err(TicketManagerError::RedeemError(error)), reject_ticket)
+                                (Err(TicketManagerError::redeem(error)), reject_ticket)
                             }
                         };
 
                         // Check if we should remove the ticket from the queue
                         if remove_ticket {
-                            let mut queue_write = RwLockUpgradableReadGuard::upgrade(queue_read);
-                            let _ = queue_write.pop();
+                            let _ = RwLockUpgradableReadGuard::upgrade(queue_read).pop();
                         }
 
                         redeem_result
@@ -134,7 +166,7 @@ where
                     }
                     Err(error) => {
                         // Pass errors from the queue
-                        Err(TicketManagerError::QueueError(error))
+                        Err(TicketManagerError::queue(error))
                     }
                 }
             };

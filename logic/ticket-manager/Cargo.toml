@@ -6,6 +6,7 @@ authors.workspace = true
 edition.workspace = true
 
 [dependencies]
+anyhow = { workspace = true }
 dashmap = { workspace = true }
 futures = { workspace = true }
 parking_lot = { workspace = true, features = ["arc_lock"] }
