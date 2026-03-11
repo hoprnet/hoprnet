@@ -8,9 +8,32 @@ use crate::errors::TicketManagerError;
 pub trait TicketQueue {
     type Error: std::error::Error + Send + 'static;
     fn push(&mut self, ticket: RedeemableTicket) -> Result<(), Self::Error>;
-    fn pop(&mut self) -> Result<RedeemableTicket, Self::Error>;
+    fn pop(&mut self) -> Result<Option<RedeemableTicket>, Self::Error>;
     fn peek(&self) -> Result<Option<RedeemableTicket>, Self::Error>;
     fn iter(&self) -> impl Iterator<Item = Result<RedeemableTicket, Self::Error>>;
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct MemoryTicketQueue(std::collections::BinaryHeap<RedeemableTicket>);
+
+impl TicketQueue for MemoryTicketQueue {
+    type Error = std::convert::Infallible;
+
+    fn push(&mut self, ticket: RedeemableTicket) -> Result<(), Self::Error> {
+        Ok(self.0.push(ticket))
+    }
+
+    fn pop(&mut self) -> Result<Option<RedeemableTicket>, Self::Error> {
+        Ok(self.0.pop())
+    }
+
+    fn peek(&self) -> Result<Option<RedeemableTicket>, Self::Error> {
+        Ok(self.0.peek().cloned())
+    }
+
+    fn iter(&self) -> impl Iterator<Item = Result<RedeemableTicket, Self::Error>> {
+        self.0.iter().cloned().map(Ok)
+    }
 }
 
 struct ChannelTicketQueue<Q> {
