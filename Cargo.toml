@@ -30,6 +30,7 @@ members = [
   "transport/probe",
   "transport/protocol",
   "transport/session",
+  "transport/tag-allocator",
   "db/entity",
   "db/migration",
   "db/node",
@@ -272,6 +273,7 @@ hopr-transport-path = { path = "transport/path" }
 hopr-transport-probe = { path = "transport/probe" }
 hopr-transport-protocol = { path = "transport/protocol" }
 hopr-transport-session = { path = "transport/session" }
+hopr-transport-tag-allocator = { path = "transport/tag-allocator" }
 hoprd = { path = "hoprd/hoprd" }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
 hoprd-api-client = { path = "hoprd/rest-api-client" }

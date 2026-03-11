@@ -16,6 +16,7 @@ use hopr_protocol_app::{
     prelude::{ApplicationDataIn, ApplicationDataOut, ReservedTag},
     v1::Tag,
 };
+use hopr_transport_tag_allocator::{AllocatedTag, TagAllocator};
 
 use crate::{
     HoprProbeProcess,
@@ -35,11 +36,13 @@ type CacheNeighborValue = (Box<NodeId>, std::time::Duration, Option<PingQueryRep
 pub struct Probe {
     /// Probe configuration.
     cfg: ProbeConfig,
+    /// Tag allocator for probing telemetry tags.
+    tag_allocator: Arc<dyn TagAllocator + Send + Sync>,
 }
 
 impl Probe {
-    pub fn new(cfg: ProbeConfig) -> Self {
-        Self { cfg }
+    pub fn new(cfg: ProbeConfig, tag_allocator: Arc<dyn TagAllocator + Send + Sync>) -> Self {
+        Self { cfg, tag_allocator }
     }
 
     /// The main function that assembles and starts the probing process.
@@ -115,30 +118,37 @@ impl Probe {
                 )
                 .build();
 
-        let active_path_probes: moka::future::Cache<Tag, PathTelemetry> = moka::future::Cache::builder()
-            .time_to_live(timeout)
-            .max_capacity(100_000)
-            .async_eviction_listener(
-                move |tag: Arc<Tag>, path: PathTelemetry, cause| -> moka::notification::ListenerFuture {
-                    if matches!(cause, moka::notification::RemovalCause::Expired) {
-                        // If the eviction cause is expiration => record as a failed probe
-                        let store = network_graph_internal_path.clone();
+        let active_path_probes: moka::future::Cache<Tag, (PathTelemetry, Arc<AllocatedTag>)> =
+            moka::future::Cache::builder()
+                .time_to_live(timeout)
+                .max_capacity(100_000)
+                .async_eviction_listener(
+                    move |tag: Arc<Tag>,
+                          (path, _allocated_tag): (PathTelemetry, Arc<AllocatedTag>),
+                          cause|
+                          -> moka::notification::ListenerFuture {
+                        if matches!(cause, moka::notification::RemovalCause::Expired) {
+                            // If the eviction cause is expiration => record as a failed probe
+                            let store = network_graph_internal_path.clone();
 
-                        tracing::debug!(%tag, reason = "timeout", "loopback probe failed");
+                            tracing::debug!(%tag, reason = "timeout", "loopback probe failed");
 
-                        store.record_edge::<NeighborTelemetry, PathTelemetry>(hopr_api::graph::MeasurableEdge::Probe(
-                            Err(NetworkGraphError::ProbeLoopbackTimeout(path)),
-                        ));
-                        futures::FutureExt::boxed(futures::future::ready(()))
-                    } else {
-                        // If the eviction cause is not expiration, nothing needs to be done
-                        futures::FutureExt::boxed(futures::future::ready(()))
-                    }
-                },
-            )
-            .build();
+                            store.record_edge::<NeighborTelemetry, PathTelemetry>(
+                                hopr_api::graph::MeasurableEdge::Probe(Err(NetworkGraphError::ProbeLoopbackTimeout(
+                                    path,
+                                ))),
+                            );
+                            futures::FutureExt::boxed(futures::future::ready(()))
+                        } else {
+                            // If the eviction cause is not expiration, nothing needs to be done
+                            futures::FutureExt::boxed(futures::future::ready(()))
+                        }
+                    },
+                )
+                .build();
 
         let active_probes_rx = active_neighbor_probes.clone();
+        let active_path_probes_rx = active_path_probes.clone();
         let push_to_network = api.0.clone();
 
         let mut processes = AbortableList::default();
@@ -157,7 +167,7 @@ impl Probe {
                     Some((ProbeRouting::Neighbor(routing), Some(notifier)))
                 }));
 
-        let minimum_allowed_tag = ReservedTag::range().end;
+        let tag_allocator = self.tag_allocator.clone();
         processes.insert(
             HoprProbeProcess::Emit,
             hopr_async_runtime::spawn_as_abortable!(async move {
@@ -166,6 +176,7 @@ impl Probe {
                         let active_neighbor_probes = active_neighbor_probes.clone();
                         let active_path_probes = active_path_probes.clone();
                         let push_to_network = push_to_network.clone();
+                        let tag_allocator = tag_allocator.clone();
 
                         async move {
                             match peer {
@@ -221,28 +232,33 @@ impl Probe {
                                             .as_millis(),
                                     });
 
-                                    let random_tag: u64 =
-                                        hopr_api::types::crypto_random::random_integer(minimum_allowed_tag, None);
+                                    if let Some(allocated_tag) = tag_allocator.allocate() {
+                                        let tag_value = allocated_tag.value();
 
-                                    if let Ok(packet) = hopr_protocol_app::prelude::ApplicationData::new(
-                                        random_tag,
-                                        message.to_bytes().as_ref(),
-                                    ) {
-                                        pin_mut!(push_to_network);
+                                        if let Ok(packet) = hopr_protocol_app::prelude::ApplicationData::new(
+                                            tag_value,
+                                            message.to_bytes().as_ref(),
+                                        ) {
+                                            pin_mut!(push_to_network);
 
-                                        if let Err(_error) = push_to_network
-                                            .send((routing, ApplicationDataOut::with_no_packet_info(packet)))
-                                            .await
-                                        {
-                                            tracing::error!("failed to send out a ping");
-                                        } else {
-                                            // the object is constructed above, so will always match
-                                            if let Message::Telemetry(telemetry) = message {
-                                                active_path_probes.insert(random_tag.into(), telemetry).await;
+                                            if let Err(_error) = push_to_network
+                                                .send((routing, ApplicationDataOut::with_no_packet_info(packet)))
+                                                .await
+                                            {
+                                                tracing::error!("failed to send out a ping");
+                                            } else {
+                                                // the object is constructed above, so will always match
+                                                if let Message::Telemetry(telemetry) = message {
+                                                    active_path_probes
+                                                        .insert(tag_value.into(), (telemetry, Arc::new(allocated_tag)))
+                                                        .await;
+                                                }
                                             }
+                                        } else {
+                                            tracing::error!("failed to construct data for path telemetry")
                                         }
                                     } else {
-                                        tracing::error!("failed to construct data for path telemetry")
+                                        tracing::warn!("probing telemetry tag pool exhausted, skipping loopback probe");
                                     }
                                 }
                             }
@@ -263,19 +279,29 @@ impl Probe {
             HoprProbeProcess::Process,
             hopr_async_runtime::spawn_as_abortable!(api.1.for_each_concurrent(max_parallel_probes, move |(pseudonym, in_data)| {
                 let active_probes = active_probes_rx.clone();
+                let active_path_probes = active_path_probes_rx.clone();
                 let push_to_network = api.0.clone();
                 let move_up = move_up.clone();
                 let store = network_graph.clone();
 
                 async move {
-                    if in_data.data.application_tag == ReservedTag::Ping.into() {
+                    let tag: Tag = in_data.data.application_tag;
+
+                    // Check if this is a loopback path telemetry probe returning on its allocated tag.
+                    // Removing the entry drops the AllocatedTag, returning it to the pool.
+                    if let Some((path_telemetry, _allocated_tag)) = active_path_probes.remove(&tag).await {
+                        tracing::debug!(%tag, "loopback probe successfully received");
+                        store.record_edge::<NeighborTelemetry, PathTelemetry>(
+                            hopr_api::graph::MeasurableEdge::Probe(Ok(EdgeTransportTelemetry::Loopback(path_telemetry)))
+                        );
+                    } else if tag == ReservedTag::Ping.into() {
                         let message: anyhow::Result<Message> = in_data.data.try_into().map_err(|e| anyhow::anyhow!("failed to convert data into message: {e}"));
 
                         match message {
                             Ok(message) => {
                                 match message {
-                                    Message::Telemetry(path_telemetry) => {
-                                        store.record_edge::<NeighborTelemetry, PathTelemetry>(hopr_api::graph::MeasurableEdge::Probe(Ok(EdgeTransportTelemetry::Loopback(path_telemetry))))
+                                    Message::Telemetry(_) => {
+                                        tracing::warn!(%pseudonym, "received telemetry on reserved ping tag, ignoring");
                                     },
                                     Message::Probe(NeighborProbe::Ping(ping)) => {
                                         tracing::debug!(%pseudonym, nonce = hex::encode(ping), "received ping");
@@ -351,7 +377,7 @@ mod tests {
         types::crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     };
     use hopr_ct_immediate::{ImmediateNeighborProber, ProberConfig};
-    use hopr_protocol_app::prelude::{ApplicationData, Tag};
+    use hopr_protocol_app::prelude::{ApplicationData, ReservedTag, Tag};
 
     use super::*;
     use crate::errors::ProbeError;
@@ -505,7 +531,21 @@ mod tests {
         F: Fn(TestInterface) -> Fut + Send + Sync + 'static,
         St: NetworkGraphUpdate + NetworkGraphView<NodeId = OffchainPublicKey> + Clone + Send + Sync + 'static,
     {
-        let probe = Probe::new(cfg);
+        let tag_allocators = hopr_transport_tag_allocator::create_allocators(
+            ReservedTag::range().end..u16::MAX as u64 + 1,
+            [
+                (hopr_transport_tag_allocator::Usage::Session, 2048),
+                (hopr_transport_tag_allocator::Usage::SessionTerminalTelemetry, 4000),
+                (hopr_transport_tag_allocator::Usage::ProvingTelemetry, 10000),
+            ],
+        )
+        .expect("tag allocators should be created");
+        let probing_allocator = tag_allocators
+            .into_iter()
+            .find_map(|(u, alloc)| matches!(u, hopr_transport_tag_allocator::Usage::ProvingTelemetry).then_some(alloc))
+            .expect("probing allocator should exist");
+
+        let probe = Probe::new(cfg, probing_allocator);
 
         let (from_probing_up_tx, from_probing_up_rx) =
             futures::channel::mpsc::channel::<(HoprPseudonym, ApplicationDataIn)>(100);

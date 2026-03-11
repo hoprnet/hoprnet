@@ -38,6 +38,9 @@ pub enum HoprTransportError {
     #[error(transparent)]
     ApplicationLayerError(#[from] hopr_protocol_app::errors::ApplicationLayerError),
 
+    #[error("tag allocator error: {0}")]
+    TagAllocator(#[from] hopr_transport_tag_allocator::TagAllocatorError),
+
     #[error("chain error: {0}")]
     Chain(#[source] anyhow::Error),
 

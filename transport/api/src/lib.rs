@@ -61,7 +61,6 @@ use hopr_async_runtime::{AbortableList, prelude::spawn, spawn_as_abortable};
 use hopr_crypto_packet::prelude::PacketSignal;
 use hopr_network_types::prelude::*;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
-use hopr_protocol_app::v1::ReservedTag;
 use hopr_protocol_hopr::MemorySurbStore;
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId, Protocol};
@@ -88,6 +87,7 @@ pub use hopr_transport_session::{
     SessionMetricSample, SessionMetricValue, SessionStatsSnapshot, session_snapshot_metric_definitions,
     session_snapshot_metric_samples, session_snapshot_metric_value, session_telemetry_snapshots,
 };
+pub use hopr_transport_tag_allocator::TagAllocatorConfig;
 #[cfg(feature = "telemetry")]
 pub use stats::PeerPacketStats;
 use tracing::{Instrument, debug, error, trace, warn};
@@ -172,6 +172,8 @@ where
     path_planner: PathPlanner<MemorySurbStore, Chain, HoprGraphPathSelector<Graph>>,
     my_multiaddresses: Vec<Multiaddr>,
     smgr: SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>, Sender<IncomingSession>>,
+    session_telemetry_tag_allocator: Arc<dyn hopr_transport_tag_allocator::TagAllocator + Send + Sync>,
+    probing_tag_allocator: Arc<dyn hopr_transport_tag_allocator::TagAllocator + Send + Sync>,
     cfg: HoprProtocolConfig,
 }
 
@@ -205,11 +207,33 @@ where
         graph: Graph,
         my_multiaddresses: Vec<Multiaddr>,
         cfg: HoprProtocolConfig,
-    ) -> Self {
+    ) -> errors::Result<Self> {
         let me_offchain = *identity.1.public();
         let planner_config = cfg.path_planner;
         let selector = HoprGraphPathSelector::new(me_offchain, graph.clone(), planner_config.max_cached_paths);
-        Self {
+
+        let tag_allocators = hopr_transport_tag_allocator::create_allocators_from_config(&cfg.session.tag_allocator)?;
+
+        let mut session_tag_allocator = None;
+        let mut session_telemetry_tag_allocator = None;
+        let mut probing_tag_allocator = None;
+        for (usage, alloc) in tag_allocators {
+            match usage {
+                hopr_transport_tag_allocator::Usage::Session => session_tag_allocator = Some(alloc),
+                hopr_transport_tag_allocator::Usage::SessionTerminalTelemetry => {
+                    session_telemetry_tag_allocator = Some(alloc)
+                }
+                hopr_transport_tag_allocator::Usage::ProvingTelemetry => probing_tag_allocator = Some(alloc),
+            }
+        }
+        let session_tag_allocator = session_tag_allocator
+            .ok_or_else(|| errors::HoprTransportError::Api("session tag allocator missing".into()))?;
+        let session_telemetry_tag_allocator = session_telemetry_tag_allocator
+            .ok_or_else(|| errors::HoprTransportError::Api("session telemetry tag allocator missing".into()))?;
+        let probing_tag_allocator = probing_tag_allocator
+            .ok_or_else(|| errors::HoprTransportError::Api("probing tag allocator missing".into()))?;
+
+        Ok(Self {
             packet_key: identity.1.clone(),
             chain_key: identity.0.clone(),
             ping: Arc::new(OnceLock::new()),
@@ -223,33 +247,35 @@ where
                 planner_config,
             ),
             my_multiaddresses,
-            smgr: SessionManager::new(SessionManagerConfig {
-                // TODO(v4.0): Use the entire range of tags properly
-                session_tag_range: (16..65535),
-                maximum_sessions: cfg.session.maximum_sessions as usize,
-                frame_mtu: std::env::var("HOPR_SESSION_FRAME_SIZE")
-                    .ok()
-                    .and_then(|s| s.parse::<usize>().ok())
-                    .unwrap_or_else(|| SessionManagerConfig::default().frame_mtu)
-                    .max(ApplicationData::PAYLOAD_SIZE),
-                max_frame_timeout: std::env::var("HOPR_SESSION_FRAME_TIMEOUT_MS")
-                    .ok()
-                    .and_then(|s| s.parse::<u64>().ok().map(Duration::from_millis))
-                    .unwrap_or_else(|| SessionManagerConfig::default().max_frame_timeout)
-                    .max(Duration::from_millis(100)),
-                initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
-                idle_timeout: cfg.session.idle_timeout,
-                balancer_sampling_interval: cfg.session.balancer_sampling_interval,
-                initial_return_session_egress_rate: 10,
-                minimum_surb_buffer_duration: Duration::from_secs(5),
-                maximum_surb_buffer_size: cfg.packet.surb_store.rb_capacity,
-                surb_balance_notify_period: None,
-                surb_target_notify: true,
-            }),
+            smgr: SessionManager::new(
+                SessionManagerConfig {
+                    frame_mtu: std::env::var("HOPR_SESSION_FRAME_SIZE")
+                        .ok()
+                        .and_then(|s| s.parse::<usize>().ok())
+                        .unwrap_or_else(|| SessionManagerConfig::default().frame_mtu)
+                        .max(ApplicationData::PAYLOAD_SIZE),
+                    max_frame_timeout: std::env::var("HOPR_SESSION_FRAME_TIMEOUT_MS")
+                        .ok()
+                        .and_then(|s| s.parse::<u64>().ok().map(Duration::from_millis))
+                        .unwrap_or_else(|| SessionManagerConfig::default().max_frame_timeout)
+                        .max(Duration::from_millis(100)),
+                    initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
+                    idle_timeout: cfg.session.idle_timeout,
+                    balancer_sampling_interval: cfg.session.balancer_sampling_interval,
+                    initial_return_session_egress_rate: 10,
+                    minimum_surb_buffer_duration: cfg.session.balancer_minimum_surb_buffer_duration,
+                    maximum_surb_buffer_size: cfg.packet.surb_store.rb_capacity,
+                    surb_balance_notify_period: None,
+                    surb_target_notify: true,
+                },
+                session_tag_allocator,
+            ),
             db,
             chain_api: resolver,
+            session_telemetry_tag_allocator,
+            probing_tag_allocator,
             cfg,
-        }
+        })
     }
 
     /// Execute all processes of the [`HoprTransport`] object.
@@ -357,13 +383,19 @@ where
             channel::<(HoprPseudonym, ApplicationDataIn)>(msg_protocol_bidirectional_channel_capacity);
 
         // === START === cover traffic control
-        // generate a random looping cover traffic tag to fast drop on receive of the looping traffic
-        let cover_traffic_tag: Tag =
-            hopr_api::types::crypto_random::random_integer(ReservedTag::range().end, None).into();
+        // Allocate a cover traffic tag from the session telemetry partition to avoid
+        // collisions with session and probing tags.
+        let cover_traffic_allocated_tag = self
+            .session_telemetry_tag_allocator
+            .allocate()
+            .ok_or_else(|| HoprTransportError::Api("failed to allocate cover traffic tag".into()))?;
+        let cover_traffic_tag: Tag = cover_traffic_allocated_tag.value().into();
 
         // filter out the known cover traffic not to lose processing time with it
-        let rx_from_protocol = rx_from_protocol.filter_map(move |(pseudonym, data)| async move {
-            (data.data.application_tag != cover_traffic_tag).then_some((pseudonym, data))
+        // The allocated tag is moved into the closure to keep it alive for the transport lifetime.
+        let rx_from_protocol = rx_from_protocol.filter_map(move |(pseudonym, data)| {
+            let _keep_alive = &cover_traffic_allocated_tag;
+            async move { (data.data.application_tag != cover_traffic_tag).then_some((pseudonym, data)) }
         });
 
         // prepare a cover traffic stream
@@ -476,7 +508,7 @@ where
         let (manual_ping_tx, manual_ping_rx) =
             channel::<(OffchainPublicKey, PingQueryReplier)>(manual_ping_channel_capacity);
 
-        let probe = Probe::new(self.cfg.probe);
+        let probe = Probe::new(self.cfg.probe, self.probing_tag_allocator.clone());
 
         let probing_processes = probe
             .continuously_scan(

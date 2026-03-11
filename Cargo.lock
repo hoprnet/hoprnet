@@ -4848,7 +4848,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-app"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "anyhow",
  "hopr-crypto-packet",
@@ -4999,7 +4999,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.20.1"
+version = "0.21.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5021,6 +5021,7 @@ dependencies = [
  "hopr-transport-probe",
  "hopr-transport-protocol",
  "hopr-transport-session",
+ "hopr-transport-tag-allocator",
  "humantime-serde",
  "insta",
  "lazy_static",
@@ -5149,6 +5150,7 @@ dependencies = [
  "hopr-ct-immediate",
  "hopr-platform",
  "hopr-protocol-app",
+ "hopr-transport-tag-allocator",
  "humantime-serde",
  "lazy_static",
  "moka",
@@ -5207,7 +5209,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.19.0"
+version = "0.20.0"
 dependencies = [
  "anyhow",
  "arrayvec",
@@ -5223,6 +5225,7 @@ dependencies = [
  "hopr-protocol-app",
  "hopr-protocol-session",
  "hopr-protocol-start",
+ "hopr-transport-tag-allocator",
  "hopr-types",
  "lazy_static",
  "mimalloc",
@@ -5243,6 +5246,17 @@ dependencies = [
  "tikv-jemallocator",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "hopr-transport-tag-allocator"
+version = "0.1.0"
+dependencies = [
+ "hopr-protocol-app",
+ "serde",
+ "smart-default",
+ "thiserror 2.0.18",
+ "validator",
 ]
 
 [[package]]
