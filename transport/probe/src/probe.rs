@@ -148,6 +148,7 @@ impl Probe {
                 .build();
 
         let active_probes_rx = active_neighbor_probes.clone();
+        let active_path_probes_rx = active_path_probes.clone();
         let push_to_network = api.0.clone();
 
         let mut processes = AbortableList::default();
@@ -278,19 +279,29 @@ impl Probe {
             HoprProbeProcess::Process,
             hopr_async_runtime::spawn_as_abortable!(api.1.for_each_concurrent(max_parallel_probes, move |(pseudonym, in_data)| {
                 let active_probes = active_probes_rx.clone();
+                let active_path_probes = active_path_probes_rx.clone();
                 let push_to_network = api.0.clone();
                 let move_up = move_up.clone();
                 let store = network_graph.clone();
 
                 async move {
-                    if in_data.data.application_tag == ReservedTag::Ping.into() {
+                    let tag: Tag = in_data.data.application_tag;
+
+                    // Check if this is a loopback path telemetry probe returning on its allocated tag.
+                    // Removing the entry drops the AllocatedTag, returning it to the pool.
+                    if let Some((path_telemetry, _allocated_tag)) = active_path_probes.remove(&tag).await {
+                        tracing::debug!(%tag, "loopback probe successfully received");
+                        store.record_edge::<NeighborTelemetry, PathTelemetry>(
+                            hopr_api::graph::MeasurableEdge::Probe(Ok(EdgeTransportTelemetry::Loopback(path_telemetry)))
+                        );
+                    } else if tag == ReservedTag::Ping.into() {
                         let message: anyhow::Result<Message> = in_data.data.try_into().map_err(|e| anyhow::anyhow!("failed to convert data into message: {e}"));
 
                         match message {
                             Ok(message) => {
                                 match message {
-                                    Message::Telemetry(path_telemetry) => {
-                                        store.record_edge::<NeighborTelemetry, PathTelemetry>(hopr_api::graph::MeasurableEdge::Probe(Ok(EdgeTransportTelemetry::Loopback(path_telemetry))))
+                                    Message::Telemetry(_) => {
+                                        tracing::warn!(%pseudonym, "received telemetry on reserved ping tag, ignoring");
                                     },
                                     Message::Probe(NeighborProbe::Ping(ping)) => {
                                         tracing::debug!(%pseudonym, nonce = hex::encode(ping), "received ping");

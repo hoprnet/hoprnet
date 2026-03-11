@@ -61,7 +61,6 @@ use hopr_async_runtime::{AbortableList, prelude::spawn, spawn_as_abortable};
 use hopr_crypto_packet::prelude::PacketSignal;
 use hopr_network_types::prelude::*;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
-use hopr_protocol_app::v1::ReservedTag;
 use hopr_protocol_hopr::MemorySurbStore;
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId, Protocol};
@@ -173,6 +172,7 @@ where
     path_planner: PathPlanner<MemorySurbStore, Chain, HoprGraphPathSelector<Graph>>,
     my_multiaddresses: Vec<Multiaddr>,
     smgr: SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>, Sender<IncomingSession>>,
+    session_telemetry_tag_allocator: Arc<dyn hopr_transport_tag_allocator::TagAllocator + Send + Sync>,
     probing_tag_allocator: Arc<dyn hopr_transport_tag_allocator::TagAllocator + Send + Sync>,
     cfg: HoprProtocolConfig,
 }
@@ -215,16 +215,21 @@ where
         let tag_allocators = hopr_transport_tag_allocator::create_allocators_from_config(&cfg.session.tag_allocator)?;
 
         let mut session_tag_allocator = None;
+        let mut session_telemetry_tag_allocator = None;
         let mut probing_tag_allocator = None;
         for (usage, alloc) in tag_allocators {
             match usage {
                 hopr_transport_tag_allocator::Usage::Session => session_tag_allocator = Some(alloc),
+                hopr_transport_tag_allocator::Usage::SessionTerminalTelemetry => {
+                    session_telemetry_tag_allocator = Some(alloc)
+                }
                 hopr_transport_tag_allocator::Usage::ProvingTelemetry => probing_tag_allocator = Some(alloc),
-                _ => {}
             }
         }
         let session_tag_allocator = session_tag_allocator
             .ok_or_else(|| errors::HoprTransportError::Api("session tag allocator missing".into()))?;
+        let session_telemetry_tag_allocator = session_telemetry_tag_allocator
+            .ok_or_else(|| errors::HoprTransportError::Api("session telemetry tag allocator missing".into()))?;
         let probing_tag_allocator = probing_tag_allocator
             .ok_or_else(|| errors::HoprTransportError::Api("probing tag allocator missing".into()))?;
 
@@ -267,6 +272,7 @@ where
             ),
             db,
             chain_api: resolver,
+            session_telemetry_tag_allocator,
             probing_tag_allocator,
             cfg,
         })
@@ -377,13 +383,19 @@ where
             channel::<(HoprPseudonym, ApplicationDataIn)>(msg_protocol_bidirectional_channel_capacity);
 
         // === START === cover traffic control
-        // generate a random looping cover traffic tag to fast drop on receive of the looping traffic
-        let cover_traffic_tag: Tag =
-            hopr_api::types::crypto_random::random_integer(ReservedTag::range().end, None).into();
+        // Allocate a cover traffic tag from the session telemetry partition to avoid
+        // collisions with session and probing tags.
+        let cover_traffic_allocated_tag = self
+            .session_telemetry_tag_allocator
+            .allocate()
+            .ok_or_else(|| HoprTransportError::Api("failed to allocate cover traffic tag".into()))?;
+        let cover_traffic_tag: Tag = cover_traffic_allocated_tag.value().into();
 
         // filter out the known cover traffic not to lose processing time with it
-        let rx_from_protocol = rx_from_protocol.filter_map(move |(pseudonym, data)| async move {
-            (data.data.application_tag != cover_traffic_tag).then_some((pseudonym, data))
+        // The allocated tag is moved into the closure to keep it alive for the transport lifetime.
+        let rx_from_protocol = rx_from_protocol.filter_map(move |(pseudonym, data)| {
+            let _keep_alive = &cover_traffic_allocated_tag;
+            async move { (data.data.application_tag != cover_traffic_tag).then_some((pseudonym, data)) }
         });
 
         // prepare a cover traffic stream
