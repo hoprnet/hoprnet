@@ -1,8 +1,6 @@
 mod errors;
 pub mod queue;
 
-use std::collections::hash_map::Entry;
-
 use hopr_api::{
     chain::TicketRedeemError,
     types::{internal::prelude::*, primitive::prelude::*},
@@ -17,8 +15,7 @@ struct ChannelTicketQueue<Q> {
 }
 
 pub struct HoprTicketManager<C, Q> {
-    // TODO: replace with dashmap?
-    channel_tickets: std::collections::HashMap<ChannelId, ChannelTicketQueue<Q>>,
+    channel_tickets: dashmap::DashMap<ChannelId, ChannelTicketQueue<Q>>,
     chain: C,
 }
 
@@ -27,16 +24,17 @@ where
     C: hopr_api::chain::ChainWriteTicketOperations + Clone + Send + Sync + 'static,
     Q: TicketQueue + Default + Send + Sync + 'static,
 {
-    pub fn insert_ticket(&mut self, ticket: RedeemableTicket) -> Result<(), TicketManagerError<C::Error, Q::Error>> {
+    /// Inserts a new winning redeemable ticket into the ticket manager.
+    pub fn insert_ticket(&self, ticket: RedeemableTicket) -> Result<(), TicketManagerError<C::Error, Q::Error>> {
         match self.channel_tickets.entry(ticket.ticket_id().id) {
-            Entry::Occupied(e) => {
+            dashmap::Entry::Occupied(e) => {
                 e.get()
                     .queue
                     .write()
                     .push(ticket)
                     .map_err(TicketManagerError::QueueError)?;
             }
-            Entry::Vacant(v) => {
+            dashmap::Entry::Vacant(v) => {
                 let mut queue = Q::default();
                 queue.push(ticket).map_err(TicketManagerError::QueueError)?;
                 v.insert(ChannelTicketQueue {
@@ -48,6 +46,7 @@ where
         Ok(())
     }
 
+    /// Returns the total value of unredeemed tickets in the given channel.
     pub fn unrealized_value(
         &self,
         channel_id: &ChannelId,
@@ -64,6 +63,11 @@ where
         }
     }
 
+    /// Creates a stream that redeems tickets in-order one by one in the given channel.
+    ///
+    /// If there's already an existing redeem stream for the channel, an error is returned without creating a new stream.
+    ///
+    /// Possible errors during redemption are passed up via the stream.
     pub fn redeem_stream(
         &self,
         channel_id: &ChannelId,
