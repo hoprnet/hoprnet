@@ -64,7 +64,10 @@ pub struct TagAllocatorConfig {
 
     /// Number of tags reserved for probing telemetry.
     ///
-    /// Defaults to the remainder of the available tag range.
+    /// Defaults to the remainder of the available tag range when using the
+    /// default values for `session` and `session_probing`. When overriding
+    /// those fields, ensure the sum of all three capacities does not exceed
+    /// [`TAG_RANGE_SIZE`]; this is validated at allocator creation time.
     #[default(DEFAULT_PROBING_TELEMETRY_CAPACITY)]
     pub probing_telemetry: u64,
 }
