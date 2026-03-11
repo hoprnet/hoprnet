@@ -21,5 +21,6 @@ hopr-protocol-app = { workspace = true }
 serde = { workspace = true, optional = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
+validator = { workspace = true }
 
 [dev-dependencies]

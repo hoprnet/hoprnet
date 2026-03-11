@@ -377,6 +377,7 @@ pub struct SessionGlobalConfig {
     pub balancer_minimum_surb_buffer_duration: Duration,
 
     /// Tag allocator partition configuration.
+    #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
     pub tag_allocator: hopr_transport_tag_allocator::TagAllocatorConfig,
 }
