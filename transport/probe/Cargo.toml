@@ -37,6 +37,7 @@ hopr-api = { workspace = true, features = ["ct", "types-random"] }
 hopr-async-runtime = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-protocol-app = { workspace = true }
+hopr-transport-tag-allocator = { workspace = true }
 
 [dev-dependencies]
 hex-literal = { workspace = true }

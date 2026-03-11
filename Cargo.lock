@@ -5150,6 +5150,7 @@ dependencies = [
  "hopr-ct-immediate",
  "hopr-platform",
  "hopr-protocol-app",
+ "hopr-transport-tag-allocator",
  "humantime-serde",
  "lazy_static",
  "moka",

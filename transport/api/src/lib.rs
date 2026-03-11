@@ -173,6 +173,7 @@ where
     path_planner: PathPlanner<MemorySurbStore, Chain, HoprGraphPathSelector<Graph>>,
     my_multiaddresses: Vec<Multiaddr>,
     smgr: SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>, Sender<IncomingSession>>,
+    probing_tag_allocator: Arc<dyn hopr_transport_tag_allocator::TagAllocator + Send + Sync>,
     cfg: HoprProtocolConfig,
 }
 
@@ -213,10 +214,19 @@ where
 
         let tag_allocators = hopr_transport_tag_allocator::create_allocators_from_config(&cfg.session.tag_allocator)?;
 
-        let session_tag_allocator = tag_allocators
-            .into_iter()
-            .find_map(|(u, alloc)| matches!(u, hopr_transport_tag_allocator::Usage::Session).then_some(alloc))
+        let mut session_tag_allocator = None;
+        let mut probing_tag_allocator = None;
+        for (usage, alloc) in tag_allocators {
+            match usage {
+                hopr_transport_tag_allocator::Usage::Session => session_tag_allocator = Some(alloc),
+                hopr_transport_tag_allocator::Usage::ProvingTelemetry => probing_tag_allocator = Some(alloc),
+                _ => {}
+            }
+        }
+        let session_tag_allocator = session_tag_allocator
             .ok_or_else(|| errors::HoprTransportError::Api("session tag allocator missing".into()))?;
+        let probing_tag_allocator = probing_tag_allocator
+            .ok_or_else(|| errors::HoprTransportError::Api("probing tag allocator missing".into()))?;
 
         Ok(Self {
             packet_key: identity.1.clone(),
@@ -257,6 +267,7 @@ where
             ),
             db,
             chain_api: resolver,
+            probing_tag_allocator,
             cfg,
         })
     }
@@ -485,7 +496,7 @@ where
         let (manual_ping_tx, manual_ping_rx) =
             channel::<(OffchainPublicKey, PingQueryReplier)>(manual_ping_channel_capacity);
 
-        let probe = Probe::new(self.cfg.probe);
+        let probe = Probe::new(self.cfg.probe, self.probing_tag_allocator.clone());
 
         let probing_processes = probe
             .continuously_scan(
