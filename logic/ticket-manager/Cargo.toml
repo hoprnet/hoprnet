@@ -7,7 +7,6 @@ edition.workspace = true
 
 [dependencies]
 futures = { workspace = true }
-mmap-fifo = { version = "0.3.0", features = ["postcard"] }
 parking_lot = { workspace = true, features = ["arc_lock"] }
 redb = { workspace = true }
 serde = { workspace = true }

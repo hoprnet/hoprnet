@@ -1,7 +1,7 @@
 use hopr_api::chain::TicketRedeemError;
 
 #[derive(Debug, thiserror::Error)]
-pub enum TicketManagerError<E> {
+pub enum TicketManagerError<Cerr, Qerr> {
     #[error("channel not found")]
     ChannelNotFound,
 
@@ -9,8 +9,8 @@ pub enum TicketManagerError<E> {
     AlreadyRedeeming,
 
     #[error("ticket redemption error: {0}")]
-    RedeemError(#[from] TicketRedeemError<E>),
+    RedeemError(#[from] TicketRedeemError<Cerr>),
 
     #[error("queue error: {0}")]
-    QueueError(#[from] std::io::Error),
+    QueueError(Qerr),
 }
