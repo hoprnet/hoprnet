@@ -13,4 +13,4 @@ redb = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 
-hopr-api = { workspace = true, features = ["db", "types-internal", "serde"] }
+hopr-api = { workspace = true, features = ["db", "chain", "types-internal", "serde"] }

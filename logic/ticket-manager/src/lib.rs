@@ -10,7 +10,7 @@ pub struct HoprTicketManager {
 }
 
 impl HoprTicketManager {
-    pub fn unrealized_value(&self, channel_id: &ChannelId) -> Result<HoprBalance, errors::TicketManagerError> {
+    pub fn unrealized_value(&self, channel_id: &ChannelId) -> Result<HoprBalance, errors::TicketManagerError<u32>> {
         if let Some(ticket_queue) = self.channel_tickets.get(channel_id) {
             Ok(ticket_queue
                 .read()
@@ -22,14 +22,15 @@ impl HoprTicketManager {
         }
     }
 
-    pub fn redeem_stream<F, Fut>(
+    pub fn redeem_stream<F, Fut, Err>(
         &self,
         channel_id: &ChannelId,
         redeem_fut: F,
-    ) -> Result<impl futures::Stream<Item = Result<Ticket, errors::TicketManagerError>>, errors::TicketManagerError>
+    ) -> Result<impl futures::Stream<Item = Result<Ticket, errors::TicketManagerError<Err>>>, errors::TicketManagerError<Err>>
     where
         F: FnMut(RedeemableTicket) -> Fut + Send,
-        Fut: futures::Future<Output = Result<Ticket, errors::TicketManagerError>> + Send,
+        Fut: futures::Future<Output = Result<Ticket, errors::TicketManagerError<Err>>> + Send,
+        Err: std::error::Error + Send + 'static,
     {
         let Some(ticket_queue) = self.channel_tickets.get(channel_id).cloned() else {
             return Err(errors::TicketManagerError::ChannelNotFound);
@@ -38,36 +39,38 @@ impl HoprTicketManager {
             return Err(errors::TicketManagerError::AlreadyRedeeming);
         };
 
-        Ok(futures::stream::unfold(
+        Ok(futures::stream::try_unfold(
             (locked_queue, redeem_fut),
             |(queue, mut redeem_fut): (ArcRwLockUpgradableReadGuard<_, ChannelTickets>, F)| async move {
                 match queue.peek() {
                     Ok(Some(ticket)) => {
-                        let (res, remove_ticket) = match redeem_fut(ticket).await {
+                        let (redeem_result, remove_ticket) = match redeem_fut(ticket).await {
                             Ok(redeemed_ticket) => {
                                 // TODO: update stats + invalidate unrealized value cache?
-                                (Some(Ok(redeemed_ticket)), true)
+                                (Ok(Some(redeemed_ticket)), true)
                             }
                             Err(error) => {
                                 // TODO: pop for specific unrecoverable errors + update stats
-                                (Some(Err(error)), false)
+                                // Redemption timeouts should also be passed up.
+                                (Err(error), false)
                             }
                         };
-                        if remove_ticket {
+                        let next_state = if remove_ticket {
                             let mut queue = ArcRwLockUpgradableReadGuard::upgrade(queue);
                             let _ = queue.pop();
-                            res.map(|v| (v, (ArcRwLockWriteGuard::downgrade_to_upgradable(queue), redeem_fut)))
+                            (ArcRwLockWriteGuard::downgrade_to_upgradable(queue), redeem_fut)
                         } else {
-                            res.map(|v| (v, (queue, redeem_fut)))
-                        }
+                            (queue, redeem_fut)
+                        };
+                        redeem_result.map(|s| s.map(|v| (v, next_state)))
                     }
                     Ok(None) => {
                         // No more tickets to redeem in this channel
-                        None
+                        Ok(None)
                     }
                     Err(error) => {
-                        // Pass error from the queue
-                        Some((Err(error.into()), (queue, redeem_fut)))
+                        // Pass errors from the queue
+                        Err(error.into())
                     },
                 }
             },
