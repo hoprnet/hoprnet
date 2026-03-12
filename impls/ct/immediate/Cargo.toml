@@ -1,6 +1,6 @@
 [package]
 name = "hopr-ct-immediate"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Basic implementation of the CT Telemetry functionality as specified in the HOPR RFCs describing the 0-hop probing."
 edition.workspace = true

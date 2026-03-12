@@ -1,6 +1,6 @@
 [package]
 name = "hopr-db-node"
-version = "0.5.1"
+version = "0.5.2"
 edition.workspace = true
 rust-version.workspace = true
 description = "Contains SQL Node DB functionality implementing the DB API traits"

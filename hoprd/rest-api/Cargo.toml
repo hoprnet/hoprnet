@@ -1,6 +1,6 @@
 [package]
 name = "hoprd-api"
-version = "4.6.1"
+version = "4.6.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
