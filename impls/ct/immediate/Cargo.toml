@@ -36,7 +36,7 @@ hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 [dev-dependencies]
 tokio = { workspace = true }
 lazy_static = { workspace = true }
-hopr-network-graph = { workspace = true }
+hopr-network-graph = { workspace = true, features = ["petgraph"] }
 
 [package.metadata.cargo-machete]
 ignored = ["humantime-serde"]

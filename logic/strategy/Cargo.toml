@@ -35,7 +35,7 @@ validator = { workspace = true }
 
 hopr-lib = { workspace = true }
 hopr-async-runtime = { workspace = true }
-hopr-metrics = { workspace = true, optional = true, default-features = false }
+hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }

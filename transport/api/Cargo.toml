@@ -64,7 +64,7 @@ hopr-crypto-packet = { workspace = true }
 
 hopr-network-types = { workspace = true }
 hopr-protocol-app = { workspace = true }
-hopr-protocol-hopr = { workspace = true }
+hopr-protocol-hopr = { workspace = true, features = ["rayon"] }
 hopr-transport-identity = { workspace = true }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-network = { workspace = true }
@@ -82,6 +82,7 @@ hopr-protocol-start = { workspace = true }
 hopr-protocol-session = { workspace = true, features = [
   "session-types",
   "runtime-tokio",
+  "hashbrown",
 ] }
 hopr-transport-network = { workspace = true }
 hopr-transport-mixer = { workspace = true }

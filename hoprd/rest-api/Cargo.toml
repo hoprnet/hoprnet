@@ -53,9 +53,9 @@ hopr-lib = { workspace = true, features = [
   "utils_futures",
 ] }
 
-hopr-db-node = { workspace = true }
+hopr-db-node = { workspace = true, features = ["traits", "sqlite"] }
 hopr-chain-connector = { workspace = true }
-hopr-network-graph = { workspace = true }
+hopr-network-graph = { workspace = true, features = ["petgraph"] }
 hopr-transport-p2p = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-utils-session = { workspace = true }

@@ -66,7 +66,7 @@ hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true, features = ["serde"] }
 
 hopr-protocol-app = { workspace = true, features = ["serde"] }
-hopr-protocol-session = { workspace = true, features = ["serde"] }
+hopr-protocol-session = { workspace = true, features = ["serde", "hashbrown"] }
 hopr-protocol-start = { workspace = true }
 hopr-transport-tag-allocator = { workspace = true }
 
@@ -77,6 +77,7 @@ hopr-protocol-session = { workspace = true, features = [
   "session-types",
   "serde",
   "runtime-tokio",
+  "hashbrown",
 ] }
 mockall = { workspace = true }
 rand = { workspace = true }

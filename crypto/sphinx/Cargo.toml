@@ -23,6 +23,7 @@ serde = [
   "generic-array/serde",
   "elliptic-curve/serde",
   "curve25519-dalek/serde",
+  "k256/serde",
   "hopr-types/serde",
 ]
 

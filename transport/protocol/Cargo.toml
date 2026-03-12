@@ -36,10 +36,7 @@ serde = { workspace = true, features = ["derive"], optional = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
-tokio-util = { workspace = true, default-features = false, features = [
-  "codec",
-  "compat",
-] }
+tokio-util = { workspace = true, features = ["codec", "compat"] }
 tracing = { workspace = true }
 validator = { workspace = true }
 
@@ -50,7 +47,7 @@ hopr-crypto-packet = { workspace = true }
 hopr-network-types = { workspace = true }
 hopr-metrics = { optional = true, workspace = true }
 
-hopr-protocol-hopr = { workspace = true }
+hopr-protocol-hopr = { workspace = true, features = ["rayon"] }
 hopr-protocol-app = { workspace = true }
 
 
@@ -66,7 +63,11 @@ test-log = { workspace = true }
 tokio = { workspace = true }
 
 hopr-api = { workspace = true }
-hopr-db-node = { workspace = true, features = ["runtime-tokio"] }
+hopr-db-node = { workspace = true, features = [
+  "runtime-tokio",
+  "traits",
+  "sqlite",
+] }
 hopr-chain-connector = { workspace = true, features = [
   "testing",
   "runtime-tokio",
