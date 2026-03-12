@@ -20,7 +20,7 @@ runtime-tokio = [
   "sqlx/runtime-tokio",
 ]
 prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
-sqlite = ["sea-query/backend-sqlite"]
+sqlite = ["sea-query/backend-sqlite", "hopr-db-entity/sqlite"]
 serde = ["hopr-api/serde"]
 
 [dependencies]
@@ -43,7 +43,7 @@ validator = { workspace = true }
 hopr-api = { workspace = true, features = ["chain", "db", "types-random"] }
 
 hopr-crypto-packet = { workspace = true }
-hopr-db-entity = { workspace = true, features = ["sqlite"] }
+hopr-db-entity = { workspace = true }
 hopr-db-migration = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 
