@@ -74,12 +74,22 @@ impl<T> WeightedCollection<T> {
     }
 }
 
+impl<T> WeightedCollection<T> {
+    /// Pick a reference to one item at random, with probability proportional
+    /// to its weight.
+    ///
+    /// Returns `None` if the collection is empty or all weights are non-positive.
+    pub fn pick_ref(&self) -> Option<&T> {
+        self.pick_index().map(|i| &self.items[i].0)
+    }
+}
+
 impl<T: Clone> WeightedCollection<T> {
     /// Pick one item at random, with probability proportional to its weight.
     ///
     /// Returns `None` if the collection is empty or all weights are non-positive.
     pub fn pick_one(&self) -> Option<T> {
-        self.pick_index().map(|i| self.items[i].0.clone())
+        self.pick_ref().cloned()
     }
 }
 
