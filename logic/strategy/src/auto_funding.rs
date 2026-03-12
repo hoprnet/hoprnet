@@ -195,7 +195,7 @@ impl<
 
         let safe_balance: HoprBalance = self
             .hopr_chain_actions
-            .balance::<WxHOPR, _>(safe.address)
+            .balance(safe.address)
             .await
             .map_err(|e| StrategyError::Other(e.into()))?;
 
