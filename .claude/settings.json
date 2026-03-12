@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cargo:*)",
+      "Bash(cargo check:*)",
+      "Bash(cargo test:*)",
+      "Bash(cargo build:*)",
+      "Bash(cargo clippy:*)",
+      "Bash(cargo shear:*)",
+      "Bash(cargo doc:*)",
+      "Bash(cargo update:*)",
       "Bash(find:*)",
       "Bash(git diff:*)",
       "Bash(grep:*)",

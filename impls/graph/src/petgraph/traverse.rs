@@ -209,7 +209,9 @@ mod tests {
 
     use super::*;
 
-    const TEST_EDGE_PENALTY: f64 = 0.5;
+    /// Deliberately different from the production default (0.5) so tests
+    /// verify that the configured penalty is actually propagated.
+    const TEST_EDGE_PENALTY: f64 = 0.73;
 
     /// Fixed test secret keys (reused from the broader codebase).
     const SECRET_0: [u8; 32] = hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d");
@@ -274,18 +276,45 @@ mod tests {
         mark_edge_loopback_ready(&graph, &me, &hop);
         mark_edge_connected(&graph, &hop, &dest);
 
-        let routes = graph.simple_paths(
-            &me,
-            &dest,
-            2,
-            None,
-            EdgeCostFn::forward(
-                std::num::NonZeroUsize::new(2).context("should be non-zero")?,
-                TEST_EDGE_PENALTY,
-            ),
-        );
+        let length = std::num::NonZeroUsize::new(2).context("should be non-zero")?;
+        let routes = graph.simple_paths(&me, &dest, 2, None, EdgeCostFn::forward(length, TEST_EDGE_PENALTY));
 
         assert!(!routes.is_empty(), "should find at least one 2-edge route");
+
+        Ok(())
+    }
+
+    #[test]
+    fn penalty_should_affect_cost_of_unprobed_edges() -> anyhow::Result<()> {
+        let me = pubkey_from(&SECRET_0);
+        let hop = pubkey_from(&SECRET_1);
+        let dest = pubkey_from(&SECRET_2);
+
+        let graph = ChannelGraph::new(me);
+        graph.add_node(hop);
+        graph.add_node(dest);
+        graph.add_edge(&me, &hop)?;
+        graph.add_edge(&hop, &dest)?;
+
+        // First edge: fully probed — produces score ~1.0.
+        mark_edge_loopback_ready(&graph, &me, &hop);
+        // Last edge: no observations at all — penalty must kick in.
+
+        let length = std::num::NonZeroUsize::new(2).context("should be non-zero")?;
+
+        let routes_test = graph.simple_paths(&me, &dest, 2, None, EdgeCostFn::forward(length, TEST_EDGE_PENALTY));
+        let routes_other = graph.simple_paths(&me, &dest, 2, None, EdgeCostFn::forward(length, 0.99));
+
+        assert_eq!(routes_test.len(), 1);
+        assert_eq!(routes_other.len(), 1);
+
+        let (_, _, cost_test) = &routes_test[0];
+        let (_, _, cost_other) = &routes_other[0];
+        assert!(
+            (cost_test - cost_other).abs() > f64::EPSILON,
+            "different penalties ({TEST_EDGE_PENALTY} vs 0.99) should produce different costs for unprobed edges, got \
+             {cost_test} vs {cost_other}"
+        );
 
         Ok(())
     }

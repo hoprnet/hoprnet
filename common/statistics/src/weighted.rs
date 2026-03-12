@@ -3,12 +3,13 @@ use rand::RngExt;
 /// A collection of items with associated weights for probabilistic selection.
 ///
 /// Weights must be positive (`> 0.0`); items with non-positive weights are
-/// treated as having zero probability for [`pick_one`](Self::pick_one) and
-/// are placed at the end of the shuffled output in [`into_shuffled`](Self::into_shuffled).
+/// treated as having zero probability for [`pick_one`](Self::pick_one) /
+/// [`pick_index`](Self::pick_index) and are placed at the end of the shuffled
+/// output in [`into_shuffled`](Self::into_shuffled).
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust
 /// use hopr_statistics::WeightedCollection;
 ///
 /// let wc = WeightedCollection::new(vec![("rare", 0.1), ("common", 10.0)]);
@@ -34,6 +35,38 @@ impl<T> WeightedCollection<T> {
     pub fn len(&self) -> usize {
         self.items.len()
     }
+
+    /// Returns the index of a randomly selected item, weighted by probability
+    /// proportional to its weight.
+    ///
+    /// Returns `None` if the collection is empty or all weights are non-positive.
+    pub fn pick_index(&self) -> Option<usize> {
+        if self.items.is_empty() {
+            return None;
+        }
+
+        let total_weight: f64 = self.items.iter().map(|(_, w)| w.max(0.0)).sum();
+        if total_weight <= 0.0 {
+            return None;
+        }
+
+        if self.items.len() == 1 {
+            return Some(0);
+        }
+
+        let mut rng = rand::rng();
+        let r = rng.random_range(0.0..total_weight);
+        let mut cumulative = 0.0;
+        for (i, (_, weight)) in self.items.iter().enumerate() {
+            cumulative += weight.max(0.0);
+            if r < cumulative {
+                return Some(i);
+            }
+        }
+
+        // Floating-point edge case: return the last positive-weight item.
+        self.items.iter().rposition(|(_, weight)| *weight > 0.0)
+    }
 }
 
 impl<T: Clone> WeightedCollection<T> {
@@ -41,32 +74,7 @@ impl<T: Clone> WeightedCollection<T> {
     ///
     /// Returns `None` if the collection is empty or all weights are non-positive.
     pub fn pick_one(&self) -> Option<T> {
-        if self.items.is_empty() {
-            return None;
-        }
-        if self.items.len() == 1 {
-            return Some(self.items[0].0.clone());
-        }
-
-        let mut rng = rand::rng();
-        let total_weight: f64 = self.items.iter().map(|(_, w)| w.max(0.0)).sum();
-        if total_weight <= 0.0 {
-            // All weights are non-positive: fall back to uniform random selection.
-            let idx = rng.random_range(0..self.items.len());
-            return Some(self.items[idx].0.clone());
-        }
-
-        let r = rng.random_range(0.0..total_weight);
-        let mut cumulative = 0.0;
-        for (item, weight) in &self.items {
-            cumulative += weight.max(0.0);
-            if r < cumulative {
-                return Some(item.clone());
-            }
-        }
-
-        // Floating-point edge case: return the last positive-weight item.
-        self.items.last().map(|(item, _)| item.clone())
+        self.pick_index().map(|i| self.items[i].0.clone())
     }
 }
 
@@ -110,9 +118,17 @@ mod tests {
     }
 
     #[test]
-    fn pick_one_returns_sole_item() {
+    fn pick_one_returns_sole_item_with_positive_weight() {
         let wc = WeightedCollection::new(vec![("only", 1.0)]);
         assert_eq!(wc.pick_one(), Some("only"));
+    }
+
+    #[test]
+    fn pick_one_returns_none_for_sole_item_with_non_positive_weight() {
+        let wc = WeightedCollection::new(vec![("only", 0.0)]);
+        assert!(wc.pick_one().is_none());
+        let wc = WeightedCollection::new(vec![("only", -1.0)]);
+        assert!(wc.pick_one().is_none());
     }
 
     #[test]
@@ -132,10 +148,24 @@ mod tests {
     }
 
     #[test]
-    fn pick_one_falls_back_to_uniform_for_zero_weights() {
+    fn pick_one_returns_none_for_all_non_positive_weights() {
         let wc = WeightedCollection::new(vec![("a", 0.0), ("b", -1.0)]);
-        let picked = wc.pick_one();
-        assert!(picked == Some("a") || picked == Some("b"));
+        assert!(wc.pick_one().is_none());
+    }
+
+    #[test]
+    fn pick_index_returns_valid_index() {
+        let wc = WeightedCollection::new(vec![("a", 1.0), ("b", 2.0), ("c", 3.0)]);
+        for _ in 0..100 {
+            let idx = wc.pick_index().expect("should pick an index");
+            assert!(idx < 3);
+        }
+    }
+
+    #[test]
+    fn pick_index_returns_none_for_non_positive_weights() {
+        let wc = WeightedCollection::new(vec![("a", 0.0), ("b", -5.0)]);
+        assert!(wc.pick_index().is_none());
     }
 
     #[test]

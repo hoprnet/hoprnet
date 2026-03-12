@@ -56,12 +56,13 @@ type PlannerCacheValue = Arc<Vec<(ValidatedPath, f64)>>;
 /// Path planner that resolves [`DestinationRouting`] to [`ResolvedTransportRouting`].
 ///
 /// The planner delegates path *discovery* to any [`PathSelector`] implementation and
-/// owns the `moka` cache of fully-validated [`ValidatedPath`] objects, keyed by
-/// `(source: NodeId, destination: NodeId, hops: u32)`.
+/// owns the `moka` cache of fully-validated [`ValidatedPath`] objects paired with
+/// their traversal cost, keyed by `(source: NodeId, destination: NodeId, hops: u32)`.
 ///
 /// On a cache miss the planner calls the selector, validates every candidate against
-/// the chain resolver, and stores `Arc<Vec<ValidatedPath>>` in the cache.
-/// On a cache hit a random candidate is picked for routing diversity.
+/// the chain resolver, and stores `Arc<Vec<(ValidatedPath, f64)>>` in the cache.
+/// On a cache hit a candidate is picked via weighted random selection (higher cost
+/// = higher quality = higher probability).
 ///
 /// A background sweep ([`PathPlanner::background_refresh`]) can be spawned to
 /// proactively re-warm the cache for all previously-seen keys.
@@ -185,11 +186,20 @@ where
                     .await
                     .map_err(PathPlannerError::CacheError)?;
 
-                hopr_statistics::WeightedCollection::new(paths.to_vec())
-                    .pick_one()
-                    .ok_or_else(|| {
-                        PathPlannerError::Path(PathError::PathNotFound(hops_usize, src_key.to_hex(), dest_key.to_hex()))
-                    })?
+                {
+                    let indexed: Vec<(usize, f64)> =
+                        paths.iter().enumerate().map(|(i, (_, cost))| (i, *cost)).collect();
+                    let idx = hopr_statistics::WeightedCollection::new(indexed)
+                        .pick_one()
+                        .ok_or_else(|| {
+                            PathPlannerError::Path(PathError::PathNotFound(
+                                hops_usize,
+                                src_key.to_hex(),
+                                dest_key.to_hex(),
+                            ))
+                        })?;
+                    paths[idx].0.clone()
+                }
             }
         };
 

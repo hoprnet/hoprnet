@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use futures::{StreamExt, stream::BoxStream};
 use futures_concurrency::stream::StreamExt as _;
 use hopr_api::{
@@ -132,11 +134,14 @@ where
 
 /// Owned state for the immediate-probe stream (no lock needed — consumed sequentially).
 struct ImmediateProbeCache {
-    items: Vec<ProbeRouting>,
+    items: VecDeque<ProbeRouting>,
     created_at: std::time::Instant,
 }
 
 /// Stream of neighbor probes with a TTL-guarded weighted shuffle cache.
+///
+/// The current batch is always fully drained before a new shuffle is computed,
+/// ensuring no queued probes are discarded when the TTL expires.
 fn immediate_probe_stream<U>(
     me: OffchainPublicKey,
     cfg: ProberConfig,
@@ -150,7 +155,7 @@ where
         + 'static,
 {
     let initial = ImmediateProbeCache {
-        items: Vec::new(),
+        items: VecDeque::new(),
         created_at: std::time::Instant::now(),
     };
 
@@ -160,11 +165,12 @@ where
         async move {
             hopr_async_runtime::prelude::sleep(cfg.interval).await;
 
-            if !state.items.is_empty() && state.created_at.elapsed() < cfg.shuffle_ttl {
-                return Some((state.items.remove(0), state));
+            // Drain the current batch before rebuilding — never discard queued probes.
+            if let Some(item) = state.items.pop_front() {
+                return Some((item, state));
             }
 
-            // Re-traverse the graph and compute a new weighted shuffle
+            // Batch exhausted — re-traverse the graph and compute a new weighted shuffle.
             let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default();
@@ -201,11 +207,7 @@ where
                 .collect();
             state.created_at = std::time::Instant::now();
 
-            if state.items.is_empty() {
-                None
-            } else {
-                Some((state.items.remove(0), state))
-            }
+            state.items.pop_front().map(|item| (item, state))
         }
     })
 }
@@ -277,30 +279,41 @@ mod tests {
             graph.record_node(node.clone());
         }
 
+        let peer_count = RANDOM_PEERS.len();
         let prober = FullNetworkDiscovery::new(me, fast_cfg(), graph);
         let stream = ProbingTrafficGeneration::build(&prober);
         pin_mut!(stream);
 
-        let actual = timeout(
-            TINY_TIMEOUT * 20,
-            stream
-                .take(RANDOM_PEERS.len())
-                .map(|routing| match routing {
-                    ProbeRouting::Neighbor(DestinationRouting::Forward { destination, .. }) => {
-                        if let NodeId::Offchain(peer_key) = destination.as_ref() {
-                            *peer_key
-                        } else {
-                            panic!("expected offchain destination");
-                        }
+        let extract_peer = |routing: ProbeRouting| -> OffchainPublicKey {
+            match routing {
+                ProbeRouting::Neighbor(DestinationRouting::Forward { destination, .. }) => {
+                    if let NodeId::Offchain(peer_key) = destination.as_ref() {
+                        *peer_key
+                    } else {
+                        panic!("expected offchain destination");
                     }
-                    _ => panic!("expected Neighbor Forward routing"),
-                })
-                .collect::<Vec<_>>(),
+                }
+                _ => panic!("expected Neighbor Forward routing"),
+            }
+        };
+
+        // Collect two full rounds from the stream.
+        let both_rounds: Vec<OffchainPublicKey> = timeout(
+            TINY_TIMEOUT * 40,
+            stream.take(peer_count * 2).map(extract_peer).collect::<Vec<_>>(),
         )
         .await?;
 
-        assert_eq!(actual.len(), RANDOM_PEERS.len());
-        assert!(!actual.iter().zip(RANDOM_PEERS.iter()).all(|(a, b)| a == &b.id));
+        let round_1 = &both_rounds[..peer_count];
+        let round_2 = &both_rounds[peer_count..];
+
+        // Both rounds should cover the same set of peers.
+        let set_1: HashSet<_> = round_1.iter().collect();
+        let set_2: HashSet<_> = round_2.iter().collect();
+        assert_eq!(set_1, set_2, "both rounds should cover the same peers");
+
+        // The two rounds should (almost certainly) differ in order.
+        assert_ne!(round_1, round_2, "two rounds should differ in order (probabilistic)");
         Ok(())
     }
 
