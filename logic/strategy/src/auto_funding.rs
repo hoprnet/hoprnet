@@ -30,7 +30,6 @@ use dashmap::DashSet;
 use futures::StreamExt;
 use hopr_lib::{
     ChannelChange, ChannelDirection, ChannelEntry, ChannelId, ChannelStatus, ChannelStatusDiscriminants, HoprBalance,
-    WxHOPR,
     api::chain::{
         ChainReadChannelOperations, ChainReadSafeOperations, ChainValues, ChainWriteChannelOperations, ChannelSelector,
         SafeSelector,
