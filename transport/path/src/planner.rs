@@ -188,11 +188,7 @@ where
                 hopr_statistics::WeightedCollection::new(paths.to_vec())
                     .pick_one()
                     .ok_or_else(|| {
-                        PathPlannerError::Path(PathError::PathNotFound(
-                            hops_usize,
-                            src_key.to_hex(),
-                            dest_key.to_hex(),
-                        ))
+                        PathPlannerError::Path(PathError::PathNotFound(hops_usize, src_key.to_hex(), dest_key.to_hex()))
                     })?
             }
         };
