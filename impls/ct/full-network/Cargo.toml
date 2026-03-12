@@ -26,7 +26,6 @@ smart-default = { workspace = true }
 serde = { workspace = true, optional = true, features = ["derive"] }
 humantime-serde = { workspace = true, optional = true }
 validator = { workspace = true }
-rand = { workspace = true }
 
 hopr-api = { workspace = true, features = [
   "ct",
@@ -36,6 +35,7 @@ hopr-api = { workspace = true, features = [
 ] }
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 hopr-network-graph = { workspace = true }
+hopr-statistics = { workspace = true, features = ["weighted"] }
 
 [dev-dependencies]
 tokio = { workspace = true }

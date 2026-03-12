@@ -13,7 +13,7 @@ use hopr_api::{
         },
     },
 };
-use rand::RngExt;
+use hopr_statistics::WeightedCollection;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use validator::Validate;
@@ -113,33 +113,6 @@ fn immediate_probe_priority(
     cfg.staleness_weight * normalized_staleness + cfg.quality_weight * inverse_quality + cfg.base_priority
 }
 
-/// Performs a weighted random shuffle using the Efraimidis-Spirakis algorithm.
-///
-/// Each item is assigned a key `random()^(1/weight)` and the items are sorted
-/// by descending key. Items with higher weights appear earlier with higher
-/// probability. All items retain a nonzero chance of appearing in any position.
-///
-/// Items with weight ≤ 0 are placed at the end.
-fn weighted_shuffle<T>(items: Vec<(T, f64)>) -> Vec<T> {
-    let mut rng = rand::rng();
-
-    let mut keyed: Vec<(T, f64)> = items
-        .into_iter()
-        .map(|(item, weight)| {
-            let key = if weight > 0.0 {
-                let u: f64 = rng.random_range(f64::EPSILON..1.0);
-                u.powf(1.0 / weight)
-            } else {
-                0.0
-            };
-            (item, key)
-        })
-        .collect();
-
-    keyed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-    keyed.into_iter().map(|(item, _)| item).collect()
-}
-
 pub struct FullNetworkDiscovery<U> {
     me: OffchainPublicKey,
     cfg: ProberConfig,
@@ -187,7 +160,7 @@ where
                             })
                             .collect();
 
-                        futures::stream::iter(weighted_shuffle(weighted))
+                        futures::stream::iter(WeightedCollection::new(weighted).into_shuffled())
                     })
                     .filter_map(move |path| {
                         let me_node: NodeId = me.into();
@@ -273,7 +246,8 @@ where
                     })
                     .collect();
 
-                let shuffled: Vec<ProbeRouting> = weighted_shuffle(weighted)
+                let shuffled: Vec<ProbeRouting> = WeightedCollection::new(weighted)
+                    .into_shuffled()
                     .into_iter()
                     .map(|peer| {
                         ProbeRouting::Neighbor(DestinationRouting::Forward {
@@ -323,7 +297,7 @@ where
                     })
                     .collect();
 
-                futures::stream::iter(weighted_shuffle(weighted))
+                futures::stream::iter(WeightedCollection::new(weighted).into_shuffled())
             })
             .filter_map(move |(path, path_id)| {
                 let me_node: NodeId = me.into();
@@ -567,44 +541,6 @@ mod tests {
             4,
             "should have collected probes across multiple rounds"
         );
-
-        Ok(())
-    }
-
-    #[test]
-    fn weighted_shuffle_favors_higher_weight_items() -> anyhow::Result<()> {
-        let items = vec![("low", 0.1), ("high", 10.0)];
-        let mut high_first_count = 0;
-        let trials = 1000;
-
-        for _ in 0..trials {
-            let shuffled = weighted_shuffle(items.clone());
-            if shuffled[0] == "high" {
-                high_first_count += 1;
-            }
-        }
-
-        // With weights 0.1 vs 10.0, "high" should appear first the vast majority of the time
-        assert!(
-            high_first_count > trials * 8 / 10,
-            "high-weight item should appear first in >{} of {} trials, but appeared first {} times",
-            trials * 8 / 10,
-            trials,
-            high_first_count
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn weighted_shuffle_preserves_all_items() -> anyhow::Result<()> {
-        let items: Vec<(u32, f64)> = (0..10).map(|i| (i, (i as f64 + 1.0) * 0.1)).collect();
-        let shuffled = weighted_shuffle(items);
-        assert_eq!(shuffled.len(), 10);
-
-        let mut sorted = shuffled.clone();
-        sorted.sort();
-        assert_eq!(sorted, (0..10).collect::<Vec<_>>());
 
         Ok(())
     }

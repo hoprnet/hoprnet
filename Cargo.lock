@@ -4610,9 +4610,9 @@ dependencies = [
  "hopr-api",
  "hopr-async-runtime",
  "hopr-network-graph",
+ "hopr-statistics",
  "humantime-serde",
  "lazy_static",
- "rand 0.10.0",
  "serde",
  "smart-default",
  "tokio",
@@ -4962,6 +4962,7 @@ name = "hopr-statistics"
 version = "0.1.0"
 dependencies = [
  "assertables",
+ "rand 0.10.0",
  "serde",
 ]
 
@@ -5125,6 +5126,7 @@ dependencies = [
  "hopr-metrics",
  "hopr-network-graph",
  "hopr-protocol-hopr",
+ "hopr-statistics",
  "hopr-types",
  "lazy_static",
  "moka",

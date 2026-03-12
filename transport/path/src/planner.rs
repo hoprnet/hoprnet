@@ -185,24 +185,9 @@ where
                     .await
                     .map_err(PathPlannerError::CacheError)?;
 
-                if paths.len() > 1 {
-                    // Weighted random selection: higher cost = higher probability of selection.
-                    let total_weight: f64 = paths.iter().map(|(_, c)| *c).sum();
-                    let r = hopr_types::crypto_random::random_float_in_range(0.0..total_weight);
-                    let mut cumulative = 0.0;
-                    let mut idx = paths.len() - 1;
-                    for (i, (_, cost)) in paths.iter().enumerate() {
-                        cumulative += cost;
-                        if r < cumulative {
-                            idx = i;
-                            break;
-                        }
-                    }
-                    trace!(hops = hops_usize, idx, total_weight, "path selected by weighted random");
-                    paths[idx].0.clone()
-                } else {
-                    paths[0].0.clone()
-                }
+                hopr_statistics::WeightedCollection::new(paths.to_vec())
+                    .pick_one()
+                    .expect("cache always contains at least one path")
             }
         };
 

@@ -24,6 +24,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 hopr-api = { workspace = true, features = ["chain", "graph"] }
+hopr-statistics = { workspace = true, features = ["weighted"] }
 hopr-crypto-packet = { workspace = true }
 hopr-protocol-hopr = { workspace = true }
 hopr-types = { workspace = true, features = [
