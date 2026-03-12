@@ -2,10 +2,15 @@ use hopr_api::chain::{ChannelId, RedeemableTicket};
 
 use crate::errors::TicketManagerError;
 
+/// Allows loading and saving outgoing ticket indices.
 pub trait OutgoingIndexStore {
     type Error: std::error::Error + Send + Sync + 'static;
-    fn load_outgoing_index(&self, channel_id: &ChannelId) -> Result<u64, TicketManagerError>;
-    fn save_outgoing_index(&mut self, channel_id: &ChannelId, index: u64) -> Result<(), TicketManagerError>;
+    /// Loads the last used outgoing ticket index for the given channel and epoch.
+    ///
+    /// If the index is not found, returns `Ok(None)`.
+    fn load_outgoing_index(&self, channel_id: &ChannelId, epoch: u32) -> Result<Option<u64>, TicketManagerError>;
+    /// Saves the last used outgoing ticket index for the given channel and epoch.
+    fn save_outgoing_index(&mut self, channel_id: &ChannelId, epoch: u32, index: u64) -> Result<(), TicketManagerError>;
 }
 
 /// Allows loading ticket queues from a storage.

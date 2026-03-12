@@ -38,7 +38,7 @@ where
     S: OutgoingIndexStore + Send + Sync + 'static,
     Q: Send + Sync + 'static,
 {
-    pub fn next_outgoing_ticket_index(&self, channel_id: &ChannelId) -> Result<u64, TicketManagerError> {
+    pub fn next_outgoing_ticket_index(&self, channel_id: &ChannelId, epoch: u32) -> Result<u64, TicketManagerError> {
         todo!()
     }
 
@@ -113,13 +113,12 @@ where
     /// If the `max_index` is given and lower than the lowest index of an unredeemed ticket in the queue,
     /// the function does nothing.
     ///
-    /// If there's ticket redemption ongoing in the same channel, the operation will block
-    /// until the redemption is done.
+    /// If there's ticket redemption ongoing in the same channel, the operation will fail with [`TicketManagerError::AlreadyRedeeming`].
     pub fn neglect_tickets(&self, channel_id: &ChannelId, max_index: Option<u64>) -> Result<Vec<Ticket>, TicketManagerError> {
         let (_lock, queue) = match self.channel_tickets.get(channel_id) {
             None => return Err(TicketManagerError::ChannelNotFound),
             Some(queue) => {
-                let lock = queue.redeem_lock.lock_arc();
+                let lock = queue.redeem_lock.try_lock_arc().ok_or(TicketManagerError::AlreadyRedeeming)?;
                 (lock, queue.queue.clone())
             }
         };
@@ -149,7 +148,8 @@ where
     /// If there's already an existing redeem stream for the channel, an error is returned without creating a new
     /// stream.
     ///
-    /// Possible errors during redemption are passed up via the stream.
+    /// Possible errors during redemption are passed up via the stream, so the caller may choose if
+    /// they wish to continue redeeming tickets if an error is encountered.
     pub fn redeem_stream<C>(
         &self,
         chain: C,

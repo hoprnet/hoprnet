@@ -36,11 +36,11 @@ impl TicketQueueStore for MemoryStore {
 impl OutgoingIndexStore for MemoryStore {
     type Error = std::convert::Infallible;
 
-    fn load_outgoing_index(&self, channel_id: &ChannelId) -> Result<u64, TicketManagerError> {
+    fn load_outgoing_index(&self, channel_id: &ChannelId, epoch: u32) -> Result<Option<u64>, TicketManagerError> {
         self.out_indices.get(channel_id).copied().ok_or(TicketManagerError::ChannelNotFound)
     }
 
-    fn save_outgoing_index(&mut self, channel_id: &ChannelId, index: u64) -> Result<(), TicketManagerError> {
+    fn save_outgoing_index(&mut self, channel_id: &ChannelId, epoch: u32, index: u64) -> Result<(), TicketManagerError> {
         self.out_indices.insert(*channel_id, index);
         Ok(())
     }
