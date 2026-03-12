@@ -51,7 +51,7 @@ pub struct PathPlannerConfig {
 /// Only the `Hops` variant of [`RoutingOptions`] is cached (explicit intermediate
 /// paths bypass the cache), so the key stores the hop count as a plain `u32`.
 type PlannerCacheKey = (NodeId, NodeId, u32);
-type PlannerCacheValue = Arc<Vec<(ValidatedPath, f64)>>;
+type PlannerCacheValue = Arc<hopr_statistics::WeightedCollection<ValidatedPath>>;
 
 /// Path planner that resolves [`DestinationRouting`] to [`ResolvedTransportRouting`].
 ///
@@ -60,9 +60,9 @@ type PlannerCacheValue = Arc<Vec<(ValidatedPath, f64)>>;
 /// their traversal cost, keyed by `(source: NodeId, destination: NodeId, hops: u32)`.
 ///
 /// On a cache miss the planner calls the selector, validates every candidate against
-/// the chain resolver, and stores `Arc<Vec<(ValidatedPath, f64)>>` in the cache.
-/// On a cache hit a candidate is picked via weighted random selection (higher cost
-/// = higher quality = higher probability).
+/// the chain resolver, and stores an `Arc<WeightedCollection<ValidatedPath>>` in the
+/// cache. On a cache hit a candidate is picked via weighted random selection (higher
+/// cost = higher quality = higher probability).
 ///
 /// A background sweep ([`PathPlanner::background_refresh`]) can be spawned to
 /// proactively re-warm the cache for all previously-seen keys.
@@ -181,25 +181,14 @@ where
                             )));
                         }
 
-                        Ok(Arc::new(valid_paths))
+                        Ok(Arc::new(hopr_statistics::WeightedCollection::new(valid_paths)))
                     })
                     .await
                     .map_err(PathPlannerError::CacheError)?;
 
-                {
-                    let indexed: Vec<(usize, f64)> =
-                        paths.iter().enumerate().map(|(i, (_, cost))| (i, *cost)).collect();
-                    let idx = hopr_statistics::WeightedCollection::new(indexed)
-                        .pick_one()
-                        .ok_or_else(|| {
-                            PathPlannerError::Path(PathError::PathNotFound(
-                                hops_usize,
-                                src_key.to_hex(),
-                                dest_key.to_hex(),
-                            ))
-                        })?;
-                    paths[idx].0.clone()
-                }
+                paths.pick_one().ok_or_else(|| {
+                    PathPlannerError::Path(PathError::PathNotFound(hops_usize, src_key.to_hex(), dest_key.to_hex()))
+                })?
             }
         };
 
@@ -346,7 +335,12 @@ where
                         }
 
                         if !valid_paths.is_empty() {
-                            cache.insert((src, dest, hops_u32), Arc::new(valid_paths)).await;
+                            cache
+                                .insert(
+                                    (src, dest, hops_u32),
+                                    Arc::new(hopr_statistics::WeightedCollection::new(valid_paths)),
+                                )
+                                .await;
                         }
                     }
                 }
@@ -732,8 +726,9 @@ mod tests {
         assert!(cached.is_some(), "cache should be populated after first call");
         let paths = cached.unwrap();
         assert!(!paths.is_empty(), "cached paths must be non-empty");
-        assert_eq!(paths[0].0.num_hops(), 2, "path should have 2 hops [a, dest]");
-        assert!(paths[0].1 > 0.0, "cost should be positive");
+        let (first_path, first_cost) = paths.iter().next().expect("at least one cached path");
+        assert_eq!(first_path.num_hops(), 2, "path should have 2 hops [a, dest]");
+        assert!(*first_cost > 0.0, "cost should be positive");
     }
 
     #[tokio::test]

@@ -36,6 +36,11 @@ impl<T> WeightedCollection<T> {
         self.items.len()
     }
 
+    /// Iterates over `(item, weight)` pairs.
+    pub fn iter(&self) -> impl Iterator<Item = &(T, f64)> {
+        self.items.iter()
+    }
+
     /// Returns the index of a randomly selected item, weighted by probability
     /// proportional to its weight.
     ///
