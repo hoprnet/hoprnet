@@ -1,8 +1,7 @@
-use hopr_api::graph::{
-    CostFn, NetworkGraphTraverse, NetworkGraphView,
-    costs::{ForwardPathCostFn, HoprForwardCostFn, HoprReturnCostFn},
-    traits::EdgeObservableRead,
-};
+use hopr_api::graph::{CostFn, NetworkGraphTraverse, NetworkGraphView, costs::EdgeCostFn, traits::EdgeObservableRead};
+
+/// Default penalty factor applied to edge cost functions.
+const DEFAULT_EDGE_PENALTY: f64 = 0.5;
 use hopr_types::{crypto::types::OffchainPublicKey, internal::errors::PathError};
 
 use crate::{
@@ -48,7 +47,7 @@ where
         .collect::<Vec<_>>()
 }
 
-/// Extended forward path search: find shorter paths using [`ForwardPathCostFn`]
+/// Extended forward path search: find shorter paths using [`EdgeCostFn::forward_without_self_loopback`]
 /// and append `dest` to each one.
 ///
 /// This handles the case where the last edge (relay -> dest) has no graph edge
@@ -69,7 +68,12 @@ where
     G: NetworkGraphTraverse<NodeId = OffchainPublicKey> + NetworkGraphView<NodeId = OffchainPublicKey>,
     <G as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
 {
-    let raw = graph.simple_paths_from(src, shorter_length.get(), Some(take), ForwardPathCostFn::new());
+    let raw = graph.simple_paths_from(
+        src,
+        shorter_length.get(),
+        Some(take),
+        EdgeCostFn::forward_without_self_loopback(DEFAULT_EDGE_PENALTY),
+    );
 
     raw.into_iter()
         .filter_map(|(path, _, cost)| {
@@ -108,8 +112,8 @@ where
 ///
 /// Stores the planner's own identity (`me`) so that it can choose the
 /// appropriate cost function:
-/// - forward path (`src == me`): [`HoprForwardCostFn`]
-/// - return path (`dest == me`): [`HoprReturnCostFn`]
+/// - forward path (`src == me`): [`EdgeCostFn::forward`]
+/// - return path (`dest == me`): [`EdgeCostFn::returning`]
 #[derive(Clone)]
 pub struct HoprGraphPathSelector<G> {
     me: OffchainPublicKey,
@@ -177,10 +181,10 @@ where
                 &dest,
                 length,
                 self.max_paths,
-                HoprForwardCostFn::new(length),
+                EdgeCostFn::forward(length, DEFAULT_EDGE_PENALTY),
             );
 
-            // Phase 2: if not enough paths, do an extended search with ForwardPathCostFn
+            // Phase 2: if not enough paths, do an extended search with EdgeCostFn::forward_without_self_loopback
             // for (length - 1) edges and assume the last hop can be done by anybody.
             if found.len() < self.max_paths
                 && let Some(shorter) = std::num::NonZeroUsize::new(length.get() - 1)
@@ -198,7 +202,7 @@ where
                 &dest,
                 length,
                 self.max_paths,
-                HoprReturnCostFn::new(length),
+                EdgeCostFn::returning(length, DEFAULT_EDGE_PENALTY),
             )
         };
 

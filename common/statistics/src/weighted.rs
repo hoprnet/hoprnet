@@ -48,12 +48,14 @@ impl<T: Clone> WeightedCollection<T> {
             return Some(self.items[0].0.clone());
         }
 
+        let mut rng = rand::rng();
         let total_weight: f64 = self.items.iter().map(|(_, w)| w.max(0.0)).sum();
         if total_weight <= 0.0 {
-            return None;
+            // All weights are non-positive: fall back to uniform random selection.
+            let idx = rng.random_range(0..self.items.len());
+            return Some(self.items[idx].0.clone());
         }
 
-        let mut rng = rand::rng();
         let r = rng.random_range(0.0..total_weight);
         let mut cumulative = 0.0;
         for (item, weight) in &self.items {
@@ -130,9 +132,10 @@ mod tests {
     }
 
     #[test]
-    fn pick_one_returns_none_for_all_zero_weights() {
+    fn pick_one_falls_back_to_uniform_for_zero_weights() {
         let wc = WeightedCollection::new(vec![("a", 0.0), ("b", -1.0)]);
-        assert!(wc.pick_one().is_none());
+        let picked = wc.pick_one();
+        assert!(picked == Some("a") || picked == Some("b"));
     }
 
     #[test]

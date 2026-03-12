@@ -4,7 +4,7 @@ use futures::{StreamExt, stream::BoxStream};
 use futures_concurrency::stream::StreamExt as _;
 use hopr_api::{
     ct::{CoverTrafficGeneration, ProbeRouting, ProbingTrafficGeneration},
-    graph::{NetworkGraphTraverse, NetworkGraphView, costs::HoprForwardCostFn, traits::EdgeObservableRead},
+    graph::{NetworkGraphTraverse, NetworkGraphView, costs::EdgeCostFn, traits::EdgeObservableRead},
     types::{
         crypto::types::OffchainPublicKey,
         crypto_random::Randomizable,
@@ -18,6 +18,9 @@ use hopr_api::{
 use hopr_statistics::WeightedCollection;
 
 use crate::{ProberConfig, priority::immediate_probe_priority};
+
+/// Default penalty factor applied to edge cost functions.
+const DEFAULT_EDGE_PENALTY: f64 = 0.5;
 
 pub struct FullNetworkDiscovery<U> {
     me: OffchainPublicKey,
@@ -69,7 +72,7 @@ where
                 &me,
                 edge_count.get(),
                 Some(100),
-                HoprForwardCostFn::new(edge_count),
+                EdgeCostFn::forward(edge_count, DEFAULT_EDGE_PENALTY),
             );
 
             let weighted: Vec<_> = paths
