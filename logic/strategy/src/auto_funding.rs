@@ -258,7 +258,7 @@ impl<
         while let Some(channel) = channels.next().await {
             if channel.balance.le(&self.cfg.min_stake_threshold) {
                 if safe_balance_budget < self.cfg.funding_amount {
-                    continue;
+                    break;
                 }
 
                 match self.try_fund_channel(&channel).await {
