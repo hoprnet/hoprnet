@@ -125,16 +125,17 @@ impl<
     }
 
     /// Attempt to fund a channel if it is not already in-flight.
-    /// Returns `Ok(())` if the channel was skipped (already in-flight)
-    /// or if a funding task was spawned. The actual `fund_channel` call
-    /// happens inside the spawned task so the confirmation future is `'static`.
-    async fn try_fund_channel(&self, channel: &ChannelEntry) -> crate::errors::Result<()> {
+    /// Returns `Ok(true)` if funding task was spawned and `Ok(false)` if the
+    /// channel was skipped because funding is already in-flight.
+    /// The actual `fund_channel` call happens inside the spawned task so the
+    /// confirmation future is `'static`.
+    async fn try_fund_channel(&self, channel: &ChannelEntry) -> crate::errors::Result<bool> {
         let channel_id = *channel.get_id();
 
         // Atomically check and mark as in-flight
         if !self.in_flight.insert(channel_id) {
             debug!(%channel, "skipping channel with in-flight funding");
-            return Ok(());
+            return Ok(false);
         }
 
         info!(
@@ -176,10 +177,10 @@ impl<
             }
         });
 
-        Ok(())
+        Ok(true)
     }
 
-    async fn should_skip_tick_due_to_safe_balance(&self) -> crate::errors::Result<bool> {
+    async fn safe_balance_budget(&self) -> crate::errors::Result<HoprBalance> {
         let me = *self.hopr_chain_actions.me();
         let safe = self
             .hopr_chain_actions
@@ -189,7 +190,7 @@ impl<
 
         let Some(safe) = safe else {
             warn!(%me, "auto-funding on_tick skipped: safe is not registered. Should never happen.");
-            return Ok(true);
+            return Ok(HoprBalance::zero());
         };
 
         let safe_balance: HoprBalance = self
@@ -198,17 +199,7 @@ impl<
             .await
             .map_err(|e| StrategyError::Other(e.into()))?;
 
-        if safe_balance < self.cfg.funding_amount {
-            debug!(
-                safe = %safe.address,
-                %safe_balance,
-                funding_amount = %self.cfg.funding_amount,
-                "auto-funding on_tick skipped: safe balance below funding amount"
-            );
-            return Ok(true);
-        }
-
-        Ok(false)
+        Ok(safe_balance)
     }
 }
 
@@ -244,7 +235,13 @@ impl<
     /// - Channels that were underfunded when the node started or restarted (no events are replayed to the strategy at
     ///   startup)
     async fn on_tick(&self) -> crate::errors::Result<()> {
-        if self.should_skip_tick_due_to_safe_balance().await? {
+        let mut safe_balance_budget = self.safe_balance_budget().await?;
+        if safe_balance_budget < self.cfg.funding_amount {
+            debug!(
+                %safe_balance_budget,
+                funding_amount = %self.cfg.funding_amount,
+                "auto-funding on_tick skipped: safe balance below funding amount"
+            );
             return Ok(());
         }
 
@@ -260,8 +257,14 @@ impl<
 
         while let Some(channel) = channels.next().await {
             if channel.balance.le(&self.cfg.min_stake_threshold) {
-                if let Err(e) = self.try_fund_channel(&channel).await {
-                    warn!(%channel, error = %e, "on_tick: failed to fund channel");
+                if safe_balance_budget < self.cfg.funding_amount {
+                    continue;
+                }
+
+                match self.try_fund_channel(&channel).await {
+                    Ok(true) => safe_balance_budget -= self.cfg.funding_amount,
+                    Ok(false) => {}
+                    Err(e) => warn!(%channel, error = %e, "on_tick: failed to fund channel"),
                 }
             } else {
                 // Channel is above threshold; clear any stale in-flight entry
@@ -542,6 +545,74 @@ mod tests {
         assert!(
             no_funding_event.is_err(),
             "on_tick should skip funding when safe balance is below funding_amount"
+        );
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn test_on_tick_funds_only_channels_affordable_by_safe_balance() -> anyhow::Result<()> {
+        let stake_limit = HoprBalance::from(7_u32);
+        let fund_amount = HoprBalance::from(5_u32);
+
+        let c1 = ChannelEntry::new(*BOB, *CHRIS, 3_u32.into(), 0_u32.into(), ChannelStatus::Open, 0_u32);
+        let c2 = ChannelEntry::new(*BOB, *DAVE, 2_u32.into(), 0_u32.into(), ChannelStatus::Open, 0_u32);
+        let c3 = ChannelEntry::new(*BOB, *ALICE, 1_u32.into(), 0_u32.into(), ChannelStatus::Open, 0_u32);
+
+        let tracked_channels = [*c1.get_id(), *c2.get_id(), *c3.get_id()];
+
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_generated_accounts(
+                &[&*ALICE, &*BOB, &*CHRIS, &*DAVE],
+                false,
+                XDaiBalance::new_base(1),
+                HoprBalance::from(11_u32),
+            )
+            .with_channels([c1, c2, c3])
+            .build_dynamic_client([1; Address::SIZE].into());
+
+        let mut chain_connector =
+            create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
+        chain_connector.connect().await?;
+        let events = chain_connector.subscribe()?;
+
+        let cfg = AutoFundingStrategyConfig {
+            min_stake_threshold: stake_limit,
+            funding_amount: fund_amount,
+        };
+
+        let afs = AutoFundingStrategy::new(cfg, chain_connector);
+
+        afs.on_tick().await?;
+
+        let mut funding_events = events.filter(|event| {
+            futures::future::ready(matches!(
+                event,
+                ChainEvent::ChannelBalanceIncreased(c, amount)
+                    if tracked_channels.contains(c.get_id()) && amount == &fund_amount
+            ))
+        });
+
+        let first_two = funding_events
+            .by_ref()
+            .take(2)
+            .collect::<Vec<_>>()
+            .timeout(futures_time::time::Duration::from_secs(2))
+            .await?;
+        assert_eq!(
+            first_two.len(),
+            2,
+            "on_tick should fund exactly two channels with safe balance budget of 11 and funding amount 5"
+        );
+
+        let third = funding_events
+            .next()
+            .timeout(futures_time::time::Duration::from_secs(1))
+            .await;
+        assert!(
+            third.is_err(),
+            "on_tick should not fund a third channel once safe budget is depleted"
         );
 
         Ok(())
