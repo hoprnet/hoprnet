@@ -142,6 +142,7 @@ pcap-file = "2.0.0"
 petgraph = { version = "0.8.3", default-features = false, features = [
   "std",
   "serde-1",
+  "rayon",
 ] }
 pid = "4.0.0"
 pin-project = "1.1.11"
