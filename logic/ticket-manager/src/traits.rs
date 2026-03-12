@@ -5,13 +5,7 @@ use crate::errors::TicketManagerError;
 pub trait OutgoingIndexStore {
     type Error: std::error::Error + Send + Sync + 'static;
     fn load_outgoing_index(&self, channel_id: &ChannelId) -> Result<u64, TicketManagerError>;
-    fn save_outgoing_index(&self, channel_id: &ChannelId, index: u64) -> Result<(), TicketManagerError>;
-}
-
-pub trait TicketStatsStore {
-    type Error: std::error::Error + Send + Sync + 'static;
-    fn load_stats(&self) -> Result<hopr_api::db::ChannelTicketStatistics, TicketManagerError>;
-    fn save_stats(&self, stats: hopr_api::db::ChannelTicketStatistics) -> Result<(), TicketManagerError>;
+    fn save_outgoing_index(&mut self, channel_id: &ChannelId, index: u64) -> Result<(), TicketManagerError>;
 }
 
 /// Allows loading ticket queues from a storage.
@@ -19,7 +13,7 @@ pub trait TicketQueueStore {
     /// Type of queues.
     type Queue: TicketQueue;
     /// Opens or creates a new queue in storage for the given channel.
-    fn open_or_create(&self, channel_id: &ChannelId) -> Result<Self::Queue, <Self::Queue as TicketQueue>::Error>;
+    fn open_or_create(&mut self, channel_id: &ChannelId) -> Result<Self::Queue, <Self::Queue as TicketQueue>::Error>;
     /// Iterate over all channel IDs of ticket queues in the storage.
     fn iter_channels(&self) -> impl Iterator<Item = ChannelId>;
 }

@@ -4,41 +4,32 @@ use hopr_api::{
 };
 
 use crate::{
-    OutgoingIndexStore, TicketManagerError, TicketStatsStore,
+    OutgoingIndexStore, TicketManagerError,
     traits::{TicketQueue, TicketQueueStore},
 };
 
-/// Simple non-persistent ticket queue store backed by a `dashmap::DashMap` and [`MemoryTicketQueue`].
+/// Simple non-persistent ticket queue store backed by a `HashMap` and [`MemoryTicketQueue`].
 ///
 /// Useful for non-persistent and testing scenarios.
 #[derive(Clone, Debug, Default)]
-pub struct MemoryStore(dashmap::DashMap<ChannelId, MemoryTicketQueue>);
+pub struct MemoryStore {
+    tickets: std::collections::HashMap<ChannelId, MemoryTicketQueue>,
+    out_indices: std::collections::HashMap<ChannelId, u64>,
+}
 
 impl TicketQueueStore for MemoryStore {
     type Queue = MemoryTicketQueue;
 
-    fn open_or_create(&self, channel_id: &ChannelId) -> Result<Self::Queue, <Self::Queue as TicketQueue>::Error> {
+    fn open_or_create(&mut self, channel_id: &ChannelId) -> Result<Self::Queue, <Self::Queue as TicketQueue>::Error> {
         Ok(self
-            .0
+            .tickets
             .entry(*channel_id)
             .or_insert_with(MemoryTicketQueue::default)
             .clone())
     }
 
     fn iter_channels(&self) -> impl Iterator<Item = ChannelId> {
-        self.0.iter().map(|e| e.key().clone())
-    }
-}
-
-impl TicketStatsStore for MemoryStore {
-    type Error = std::convert::Infallible;
-
-    fn load_stats(&self) -> Result<ChannelTicketStatistics, TicketManagerError> {
-        todo!()
-    }
-
-    fn save_stats(&self, stats: ChannelTicketStatistics) -> Result<(), TicketManagerError> {
-        todo!()
+        self.tickets.iter().map(|(k, _)| *k)
     }
 }
 
@@ -46,11 +37,12 @@ impl OutgoingIndexStore for MemoryStore {
     type Error = std::convert::Infallible;
 
     fn load_outgoing_index(&self, channel_id: &ChannelId) -> Result<u64, TicketManagerError> {
-        todo!()
+        self.out_indices.get(channel_id).copied().ok_or(TicketManagerError::ChannelNotFound)
     }
 
-    fn save_outgoing_index(&self, channel_id: &ChannelId, index: u64) -> Result<(), TicketManagerError> {
-        todo!()
+    fn save_outgoing_index(&mut self, channel_id: &ChannelId, index: u64) -> Result<(), TicketManagerError> {
+        self.out_indices.insert(*channel_id, index);
+        Ok(())
     }
 }
 

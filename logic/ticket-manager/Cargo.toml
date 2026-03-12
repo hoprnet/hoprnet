@@ -5,6 +5,10 @@ rust-version.workspace = true
 authors.workspace = true
 edition.workspace = true
 
+[features]
+runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
+prometheus = ["dep:hopr-metrics"]
+
 [dependencies]
 anyhow = { workspace = true }
 dashmap = { workspace = true }
@@ -13,6 +17,7 @@ parking_lot = { workspace = true, features = ["arc_lock"] }
 redb = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
 
 hopr-api = { workspace = true, features = [
   "db",
@@ -20,3 +25,5 @@ hopr-api = { workspace = true, features = [
   "types-internal",
   "serde",
 ] }
+hopr-async-runtime = { workspace = true}
+hopr-metrics = { workspace = true, optional = true }

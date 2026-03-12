@@ -15,7 +15,7 @@ impl RedbStore {
 impl TicketQueueStore for RedbStore {
     type Queue = RedbTicketQueue;
 
-    fn open_or_create(&self, channel_id: &ChannelId) -> Result<Self::Queue, <Self::Queue as TicketQueue>::Error> {
+    fn open_or_create(&mut self, channel_id: &ChannelId) -> Result<Self::Queue, <Self::Queue as TicketQueue>::Error> {
         todo!()
     }
 

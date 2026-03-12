@@ -5004,10 +5004,13 @@ dependencies = [
  "dashmap",
  "futures",
  "hopr-api",
+ "hopr-async-runtime",
+ "hopr-metrics",
  "parking_lot",
  "redb",
  "serde",
  "thiserror 2.0.18",
+ "tracing",
 ]
 
 [[package]]
