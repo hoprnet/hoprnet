@@ -179,14 +179,10 @@ where
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default();
 
-            let nodes: Vec<OffchainPublicKey> = graph
+            // Fuse node collection and priority computation into a single stream pass.
+            let weighted: Vec<_> = graph
                 .nodes()
                 .filter(|peer| futures::future::ready(peer != &me))
-                .collect()
-                .await;
-
-            let weighted: Vec<_> = nodes
-                .into_iter()
                 .map(|peer| {
                     let priority = match graph.edge(&me, &peer) {
                         Some(obs) => immediate_probe_priority(obs.score(), obs.last_update(), now, &cfg),
@@ -194,7 +190,8 @@ where
                     };
                     (peer, priority)
                 })
-                .collect();
+                .collect()
+                .await;
 
             let zero_hop = RoutingOptions::Hops(0.try_into().expect("0 is a valid u8"));
             state.items = WeightedCollection::new(weighted)

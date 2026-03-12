@@ -18,12 +18,15 @@ use rand::RngExt;
 /// ```
 pub struct WeightedCollection<T> {
     items: Vec<(T, f64)>,
+    /// Pre-computed sum of positive weights (cached to avoid recomputing on every pick).
+    total_weight: f64,
 }
 
 impl<T> WeightedCollection<T> {
     /// Create a new weighted collection from items paired with their weights.
     pub fn new(items: Vec<(T, f64)>) -> Self {
-        Self { items }
+        let total_weight: f64 = items.iter().map(|(_, w)| w.max(0.0)).sum();
+        Self { items, total_weight }
     }
 
     /// Returns `true` if the collection contains no items.
@@ -46,12 +49,7 @@ impl<T> WeightedCollection<T> {
     ///
     /// Returns `None` if the collection is empty or all weights are non-positive.
     pub fn pick_index(&self) -> Option<usize> {
-        if self.items.is_empty() {
-            return None;
-        }
-
-        let total_weight: f64 = self.items.iter().map(|(_, w)| w.max(0.0)).sum();
-        if total_weight <= 0.0 {
+        if self.total_weight <= 0.0 {
             return None;
         }
 
@@ -60,7 +58,7 @@ impl<T> WeightedCollection<T> {
         }
 
         let mut rng = rand::rng();
-        let r = rng.random_range(0.0..total_weight);
+        let r = rng.random_range(0.0..self.total_weight);
         let mut cumulative = 0.0;
         for (i, (_, weight)) in self.items.iter().enumerate() {
             cumulative += weight.max(0.0);
@@ -103,19 +101,16 @@ impl<T> WeightedCollection<T> {
     pub fn into_shuffled(self) -> Vec<T> {
         let mut rng = rand::rng();
 
-        let mut keyed: Vec<(T, f64)> = self
-            .items
-            .into_iter()
-            .map(|(item, weight)| {
-                let key = if weight > 0.0 {
-                    let u: f64 = rng.random_range(f64::EPSILON..1.0);
-                    u.powf(1.0 / weight)
-                } else {
-                    0.0
-                };
-                (item, key)
-            })
-            .collect();
+        // Reuse the existing Vec — replace weights with Efraimidis–Spirakis keys in-place.
+        let mut keyed = self.items;
+        for (_, weight) in keyed.iter_mut() {
+            *weight = if *weight > 0.0 {
+                let u: f64 = rng.random_range(f64::EPSILON..1.0);
+                u.powf(1.0 / *weight)
+            } else {
+                0.0
+            };
+        }
 
         keyed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         keyed.into_iter().map(|(item, _)| item).collect()
