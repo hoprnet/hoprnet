@@ -187,7 +187,13 @@ where
 
                 hopr_statistics::WeightedCollection::new(paths.to_vec())
                     .pick_one()
-                    .expect("cache always contains at least one path")
+                    .ok_or_else(|| {
+                        PathPlannerError::Path(PathError::PathNotFound(
+                            hops_usize,
+                            src_key.to_hex(),
+                            dest_key.to_hex(),
+                        ))
+                    })?
             }
         };
 
