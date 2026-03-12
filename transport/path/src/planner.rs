@@ -166,10 +166,10 @@ where
 
                         let chain_resolver = ChainPathResolver::from(&*resolver);
                         let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::new();
-                        for (candidate, cost) in candidates {
-                            let node_ids: Vec<NodeId> = candidate.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
+                        for pwc in candidates {
+                            let node_ids: Vec<NodeId> = pwc.path.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
                             if let Ok(vp) = ValidatedPath::new(source, node_ids, &chain_resolver).await {
-                                valid_paths.push((vp, cost));
+                                valid_paths.push((vp, pwc.cost));
                             }
                         }
 
@@ -327,10 +327,10 @@ where
                     {
                         let chain_resolver = ChainPathResolver::from(&*resolver);
                         let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::new();
-                        for (candidate, cost) in candidates {
-                            let node_ids: Vec<NodeId> = candidate.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
+                        for pwc in candidates {
+                            let node_ids: Vec<NodeId> = pwc.path.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
                             if let Ok(vp) = ValidatedPath::new(src, node_ids, &chain_resolver).await {
-                                valid_paths.push((vp, cost));
+                                valid_paths.push((vp, pwc.cost));
                             }
                         }
 

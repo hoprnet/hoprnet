@@ -165,12 +165,16 @@ where
         async move {
             hopr_async_runtime::prelude::sleep(cfg.interval).await;
 
-            // Drain the current batch before rebuilding — never discard queued probes.
-            if let Some(item) = state.items.pop_front() {
+            // Serve from the current batch unless the shuffle TTL has expired.
+            if !state.items.is_empty()
+                && state.created_at.elapsed() < cfg.shuffle_ttl
+                && let Some(item) = state.items.pop_front()
+            {
                 return Some((item, state));
             }
 
-            // Batch exhausted — re-traverse the graph and compute a new weighted shuffle.
+            // Batch exhausted or TTL expired — re-traverse the graph and compute a new weighted shuffle.
+            state.items.clear();
             let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default();

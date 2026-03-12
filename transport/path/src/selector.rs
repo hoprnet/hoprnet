@@ -6,12 +6,8 @@ use hopr_types::{crypto::types::OffchainPublicKey, internal::errors::PathError};
 
 use crate::{
     errors::{PathPlannerError, Result},
-    traits::PathSelector,
+    traits::{PathSelector, PathWithCost},
 };
-
-type PathToDestination = Vec<OffchainPublicKey>;
-/// A candidate path paired with its accumulated traversal cost.
-type PathWithCost = (PathToDestination, f64);
 
 /// Compute candidate paths from `src` to `dest` through `graph`.
 ///
@@ -39,7 +35,10 @@ where
             tracing::trace!(?path, ?cost, "evaluating candidate path");
             if cost > 0.0 {
                 // Drop the first element (src) — callers expect [intermediates..., dest].
-                Some((path.into_iter().skip(1).collect::<Vec<_>>(), cost))
+                Some(PathWithCost {
+                    path: path.into_iter().skip(1).collect::<Vec<_>>(),
+                    cost,
+                })
             } else {
                 None
             }
@@ -92,12 +91,12 @@ where
             candidate.push(*dest);
 
             // Skip paths already found by Phase 1 (compare path component only).
-            if existing.iter().any(|(p, _)| p == &candidate) {
+            if existing.iter().any(|pwc| pwc.path == candidate) {
                 return None;
             }
 
             tracing::trace!(?candidate, ?cost, "extended forward path candidate");
-            Some((candidate, cost))
+            Some(PathWithCost { path: candidate, cost })
         })
         .take(take)
         .collect()
@@ -163,12 +162,7 @@ where
     /// in a production environment and possibly guarded (e.g. by offloading the long execution
     /// in an async executor to avoid blocking the caller).
     #[tracing::instrument(level = "trace", skip(self), fields(src = %src, dest = %dest, hops), ret, err)]
-    fn select_path(
-        &self,
-        src: OffchainPublicKey,
-        dest: OffchainPublicKey,
-        hops: usize,
-    ) -> Result<Vec<(Vec<OffchainPublicKey>, f64)>> {
+    fn select_path(&self, src: OffchainPublicKey, dest: OffchainPublicKey, hops: usize) -> Result<Vec<PathWithCost>> {
         tracing::trace!(%src, %dest, hops, "computing paths from graph");
         let length = std::num::NonZeroUsize::new(hops + 1)
             .expect("can never fail, it is physically at least 1 after the addition");
@@ -327,16 +321,16 @@ mod tests {
 
         let fwd = selector.select_path(me, dest, 1).context("forward path")?;
         assert!(!fwd.is_empty());
-        for (path, cost) in &fwd {
-            assert!(!path.contains(&me), "forward path must not contain the source");
-            assert!(*cost > 0.0, "cost must be positive");
+        for pwc in &fwd {
+            assert!(!pwc.path.contains(&me), "forward path must not contain the source");
+            assert!(pwc.cost > 0.0, "cost must be positive");
         }
 
         let rev = selector.select_path(dest, me, 1).context("reverse path")?;
         assert!(!rev.is_empty());
-        for (path, cost) in &rev {
-            assert!(!path.contains(&dest), "reverse path must not contain the source");
-            assert!(*cost > 0.0, "cost must be positive");
+        for pwc in &rev {
+            assert!(!pwc.path.contains(&dest), "reverse path must not contain the source");
+            assert!(pwc.cost > 0.0, "cost must be positive");
         }
 
         Ok(())
@@ -372,16 +366,16 @@ mod tests {
 
         let fwd = selector.select_path(me, dest, 2).context("forward 2-hop path")?;
         assert!(!fwd.is_empty());
-        for (path, _) in &fwd {
-            assert_eq!(path.len(), 3, "forward 2-hop path: [A, B, dest]");
-            assert_eq!(path.last(), Some(&dest));
+        for pwc in &fwd {
+            assert_eq!(pwc.path.len(), 3, "forward 2-hop path: [A, B, dest]");
+            assert_eq!(pwc.path.last(), Some(&dest));
         }
 
         let rev = selector.select_path(dest, me, 2).context("reverse 2-hop path")?;
         assert!(!rev.is_empty());
-        for (path, _) in &rev {
-            assert_eq!(path.len(), 3, "reverse 2-hop path: [B, A, me]");
-            assert_eq!(path.last(), Some(&me));
+        for pwc in &rev {
+            assert_eq!(pwc.path.len(), 3, "reverse 2-hop path: [B, A, me]");
+            assert_eq!(pwc.path.last(), Some(&me));
         }
 
         Ok(())
@@ -395,18 +389,18 @@ mod tests {
 
         let fwd = selector.select_path(me, dest, 1).context("forward 1-hop path")?;
         assert!(!fwd.is_empty());
-        for (path, _) in &fwd {
-            assert_eq!(path.len(), 2, "forward: [relay, dest]");
-            assert_eq!(path.last(), Some(&dest));
-            assert!(!path.contains(&me));
+        for pwc in &fwd {
+            assert_eq!(pwc.path.len(), 2, "forward: [relay, dest]");
+            assert_eq!(pwc.path.last(), Some(&dest));
+            assert!(!pwc.path.contains(&me));
         }
 
         let rev = selector.select_path(dest, me, 1).context("reverse 1-hop path")?;
         assert!(!rev.is_empty());
-        for (path, _) in &rev {
-            assert_eq!(path.len(), 2, "reverse: [relay, me]");
-            assert_eq!(path.last(), Some(&me));
-            assert!(!path.contains(&dest));
+        for pwc in &rev {
+            assert_eq!(pwc.path.len(), 2, "reverse: [relay, me]");
+            assert_eq!(pwc.path.last(), Some(&me));
+            assert!(!pwc.path.contains(&dest));
         }
 
         let _ = relay;
@@ -447,14 +441,14 @@ mod tests {
 
         let fwd = selector.select_path(me, dest, 1).context("forward path")?;
         assert_eq!(fwd.len(), 2, "forward: both paths via a and b should be returned");
-        for (path, _) in &fwd {
-            assert_eq!(path.last(), Some(&dest));
+        for pwc in &fwd {
+            assert_eq!(pwc.path.last(), Some(&dest));
         }
 
         let rev = selector.select_path(dest, me, 1).context("reverse path")?;
         assert_eq!(rev.len(), 2, "reverse: both paths via a and b should be returned");
-        for (path, _) in &rev {
-            assert_eq!(path.last(), Some(&me));
+        for pwc in &rev {
+            assert_eq!(pwc.path.last(), Some(&me));
         }
 
         Ok(())
@@ -534,18 +528,18 @@ mod tests {
             .select_path(me, dest, 1)
             .context("forward path with virtual last hop")?;
         assert!(!fwd.is_empty(), "forward path should find at least one route");
-        for (path, _) in &fwd {
-            assert_eq!(path.len(), 2, "forward: [relay, dest]");
-            assert_eq!(path[0], relay);
-            assert_eq!(path[1], dest);
+        for pwc in &fwd {
+            assert_eq!(pwc.path.len(), 2, "forward: [relay, dest]");
+            assert_eq!(pwc.path[0], relay);
+            assert_eq!(pwc.path[1], dest);
         }
 
         // Return path should work normally (both edges exist)
         let rev = selector.select_path(dest, me, 1).context("return path")?;
         assert!(!rev.is_empty(), "return path should find at least one route");
-        for (path, _) in &rev {
-            assert_eq!(path.len(), 2, "return: [relay, me]");
-            assert_eq!(path.last(), Some(&me));
+        for pwc in &rev {
+            assert_eq!(pwc.path.len(), 2, "return: [relay, me]");
+            assert_eq!(pwc.path.last(), Some(&me));
         }
 
         Ok(())
@@ -588,20 +582,20 @@ mod tests {
             .select_path(me, dest, RoutingOptions::MAX_INTERMEDIATE_HOPS)
             .context("forward 3-hop path")?;
         assert!(!fwd.is_empty());
-        for (path, _) in &fwd {
-            assert_eq!(path.len(), 4, "forward: [a, b, c, dest]");
-            assert_eq!(path.last(), Some(&dest));
-            assert!(!path.contains(&me));
+        for pwc in &fwd {
+            assert_eq!(pwc.path.len(), 4, "forward: [a, b, c, dest]");
+            assert_eq!(pwc.path.last(), Some(&dest));
+            assert!(!pwc.path.contains(&me));
         }
 
         let rev = selector
             .select_path(dest, me, RoutingOptions::MAX_INTERMEDIATE_HOPS)
             .context("reverse 3-hop path")?;
         assert!(!rev.is_empty());
-        for (path, _) in &rev {
-            assert_eq!(path.len(), 4, "reverse: [c, b, a, me]");
-            assert_eq!(path.last(), Some(&me));
-            assert!(!path.contains(&dest));
+        for pwc in &rev {
+            assert_eq!(pwc.path.len(), 4, "reverse: [c, b, a, me]");
+            assert_eq!(pwc.path.last(), Some(&me));
+            assert!(!pwc.path.contains(&dest));
         }
 
         Ok(())
