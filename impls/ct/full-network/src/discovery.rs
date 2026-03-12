@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use futures::{StreamExt, stream::BoxStream};
 use futures_concurrency::stream::StreamExt as _;
 use hopr_api::{
@@ -132,6 +130,12 @@ where
     }
 }
 
+/// Owned state for the immediate-probe stream (no lock needed — consumed sequentially).
+struct ImmediateProbeCache {
+    items: Vec<ProbeRouting>,
+    created_at: std::time::Instant,
+}
+
 /// Stream of neighbor probes with a TTL-guarded weighted shuffle cache.
 fn immediate_probe_stream<U>(
     me: OffchainPublicKey,
@@ -145,21 +149,19 @@ where
         + Sync
         + 'static,
 {
-    let cache: Arc<futures::lock::Mutex<(Vec<ProbeRouting>, std::time::Instant)>> =
-        Arc::new(futures::lock::Mutex::new((Vec::new(), std::time::Instant::now())));
+    let initial = ImmediateProbeCache {
+        items: Vec::new(),
+        created_at: std::time::Instant::now(),
+    };
 
-    futures::stream::repeat(()).filter_map(move |_| {
+    futures::stream::unfold(initial, move |mut state| {
         let graph = graph.clone();
-        let cache = cache.clone();
 
         async move {
             hopr_async_runtime::prelude::sleep(cfg.interval).await;
 
-            let mut guard = cache.lock().await;
-            let (ref mut items, ref mut created_at) = *guard;
-
-            if !items.is_empty() && created_at.elapsed() < cfg.shuffle_ttl {
-                return Some(items.remove(0));
+            if !state.items.is_empty() && state.created_at.elapsed() < cfg.shuffle_ttl {
+                return Some((state.items.remove(0), state));
             }
 
             // Re-traverse the graph and compute a new weighted shuffle
@@ -185,7 +187,7 @@ where
                 .collect();
 
             let zero_hop = RoutingOptions::Hops(0.try_into().expect("0 is a valid u8"));
-            *items = WeightedCollection::new(weighted)
+            state.items = WeightedCollection::new(weighted)
                 .into_shuffled()
                 .into_iter()
                 .map(|peer| {
@@ -197,9 +199,13 @@ where
                     })
                 })
                 .collect();
-            *created_at = std::time::Instant::now();
+            state.created_at = std::time::Instant::now();
 
-            if items.is_empty() { None } else { Some(items.remove(0)) }
+            if state.items.is_empty() {
+                None
+            } else {
+                Some((state.items.remove(0), state))
+            }
         }
     })
 }
