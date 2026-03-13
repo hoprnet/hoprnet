@@ -1,6 +1,6 @@
 [package]
 name = "hoprd-localcluster"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -12,11 +12,16 @@ description = "Local HOPR cluster runner using external hoprd processes"
 anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 futures = { workspace = true }
-hoprd = { workspace = true }
+hoprd = { workspace = true, features = [
+  "runtime-tokio",
+  "prometheus",
+  "telemetry",
+  "transport-quic",
+] }
 hopr-chain-connector = { workspace = true }
 hopr-types = { workspace = true, features = ["primitive"] }
 hopr-lib = { workspace = true }
-hopr-builder = { workspace = true }
+hopr-builder = { workspace = true, features = ["runtime-tokio"] }
 hoprd-api-client = { workspace = true }
 hoprd-api = { workspace = true }
 lazy_static = { workspace = true }

@@ -25,10 +25,6 @@ macro_rules! spawn_as_abortable {
     }}
 }
 
-// If no runtime is enabled, fail compilation
-#[cfg(not(feature = "runtime-tokio"))]
-compile_error!("No runtime enabled");
-
 /// Abstraction over tasks that can be aborted (such as join or abort handles).
 #[auto_impl::auto_impl(&, Box, Arc)]
 pub trait Abortable {

@@ -79,9 +79,10 @@ hopr-crypto-keypair = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true }
 hopr-platform = { workspace = true }
-hopr-parallelize = { workspace = true }
+hopr-parallelize = { workspace = true, features = ["rayon"] }
 hopr-transport = { workspace = true }
 
 [dev-dependencies]
+hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 serde-saphyr = { workspace = true }
 tokio = { workspace = true }

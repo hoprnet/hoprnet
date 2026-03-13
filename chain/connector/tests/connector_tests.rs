@@ -1,3 +1,6 @@
+// This integration test requires the `testing` feature.
+#![cfg(feature = "testing")]
+
 use hopr_api::{
     chain::ChainValues,
     types::{
