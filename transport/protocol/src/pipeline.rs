@@ -318,6 +318,8 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                                 tracing::error!(%error, "failed to forward a packet to the transport layer");
                             });
 
+                        counters.get_or_create(&next_hop).record_message_sent();
+
                         #[cfg(all(feature = "telemetry", not(test)))]
                         METRIC_PACKET_COUNT.increment(&["forwarded"]);
 
