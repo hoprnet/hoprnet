@@ -86,7 +86,7 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["fmt", "json"] }
 validator = { workspace = true }
 opentelemetry = { workspace = true, optional = true }
-opentelemetry-otlp = { workspace = true, default-features = false, features = [
+opentelemetry-otlp = { workspace = true, features = [
   "trace",
   "metrics",
   "logs",
@@ -115,9 +115,9 @@ hopr-builder = { workspace = true, features = [
   "session-client",
   "session-server",
 ] }
-hopr-db-node = { workspace = true }
+hopr-db-node = { workspace = true, features = ["traits", "sqlite"] }
 hopr-chain-connector = { workspace = true }
-hopr-network-graph = { workspace = true }
+hopr-network-graph = { workspace = true, features = ["petgraph"] }
 hopr-metrics = { workspace = true }
 hopr-transport-p2p = { workspace = true }
 

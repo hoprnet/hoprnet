@@ -1,6 +1,6 @@
 [package]
 name = "hopr-ct-full-network"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Full implementation of the Telemetry functionality as specified in the HOPR RFCs along with optional noise (cover traffic) generation."
 edition.workspace = true
@@ -35,7 +35,7 @@ hopr-api = { workspace = true, features = [
   "types-random",
 ] }
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
-hopr-network-graph = { workspace = true }
+hopr-network-graph = { workspace = true, features = ["petgraph"] }
 
 [dev-dependencies]
 tokio = { workspace = true }

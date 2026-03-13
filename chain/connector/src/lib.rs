@@ -2,12 +2,12 @@ mod backend;
 mod connector;
 pub mod errors;
 mod reader;
-#[cfg(feature = "testing")]
+#[cfg(any(test, feature = "testing"))]
 pub mod testing;
 
 pub(crate) mod utils;
 
-#[cfg(feature = "testing")]
+#[cfg(any(test, feature = "testing"))]
 pub use backend::InMemoryBackend;
 pub use backend::{Backend, TempDbBackend, TempDbError};
 pub use connector::{BlockchainConnectorConfig, HoprBlockchainConnector};
