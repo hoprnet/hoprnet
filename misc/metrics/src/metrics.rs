@@ -81,6 +81,13 @@ pub fn gather_all_metrics() -> MetricResult<String> {
 // ---------------------------------------------------------------------------
 
 fn labels_to_attributes(keys: &[String], values: &[&str]) -> Vec<KeyValue> {
+    debug_assert_eq!(
+        keys.len(),
+        values.len(),
+        "label key count ({}) must match value count ({})",
+        keys.len(),
+        values.len()
+    );
     keys.iter()
         .zip(values.iter())
         .map(|(k, v)| KeyValue::new(k.clone(), v.to_string()))
@@ -101,6 +108,11 @@ impl AtomicF64 {
 
     fn store(&self, val: f64) {
         self.0.store(val.to_bits(), Ordering::Relaxed);
+    }
+
+    /// Atomically swaps the value and returns the previous one.
+    fn swap(&self, new: f64) -> f64 {
+        f64::from_bits(self.0.swap(new.to_bits(), Ordering::Relaxed))
     }
 
     fn fetch_add(&self, delta: f64) -> f64 {
@@ -255,10 +267,8 @@ impl SimpleGauge {
 
     /// Sets the gauge to the given value.
     pub fn set(&self, value: f64) {
-        let current = self.shadow.load();
-        let delta = value - current;
-        self.gauge.add(delta, &[]);
-        self.shadow.store(value);
+        let previous = self.shadow.swap(value);
+        self.gauge.add(value - previous, &[]);
     }
 
     /// Retrieves the value of the gauge.
@@ -345,16 +355,11 @@ impl MultiGauge {
     pub fn set(&self, label_values: &[&str], value: f64) {
         let key = self.shadow_entry(label_values);
         self.ensure_shadow(&key);
-        let current = {
-            let read = self.shadow.read().unwrap();
-            read.get(&key).map(|v| v.load()).unwrap_or(0.0)
-        };
-        let delta = value - current;
         let attrs = labels_to_attributes(&self.labels, label_values);
-        self.gauge.add(delta, &attrs);
         let read = self.shadow.read().unwrap();
         if let Some(v) = read.get(&key) {
-            v.store(value);
+            let previous = v.swap(value);
+            self.gauge.add(value - previous, &attrs);
         }
     }
 
@@ -540,6 +545,12 @@ mod tests {
         counter.increment_by(9);
         assert_eq!(10, counter.get());
 
+        let metrics = gather_all_metrics().context("gather_all_metrics")?;
+        assert!(
+            metrics.contains("otel_my_ctr"),
+            "Prometheus text must contain counter name"
+        );
+
         Ok(())
     }
 
@@ -554,8 +565,15 @@ mod tests {
         counter.increment_by(&["1.89.20"], 1);
         counter.increment_by(&["1.90.1"], 15);
 
-        // MultiCounter does not track shadow state per label
-        // so we only verify it doesn't panic
+        let metrics = gather_all_metrics().context("gather_all_metrics")?;
+        assert!(
+            metrics.contains("otel_my_mctr"),
+            "Prometheus text must contain multi counter name"
+        );
+        assert!(
+            metrics.contains("version=\"1.90.1\""),
+            "Prometheus text must contain label value"
+        );
 
         Ok(())
     }
@@ -575,6 +593,12 @@ mod tests {
         gauge.set(100.0);
         assert_eq!(100.0, gauge.get());
 
+        let metrics = gather_all_metrics().context("gather_all_metrics")?;
+        assert!(
+            metrics.contains("otel_my_gauge"),
+            "Prometheus text must contain gauge name"
+        );
+
         Ok(())
     }
 
@@ -593,6 +617,12 @@ mod tests {
         assert_eq!(25.0, gauge.get(&["1.90.1"]).context("should be present")?);
         assert_eq!(3.0, gauge.get(&["1.89.20"]).context("should be present")?);
 
+        let metrics = gather_all_metrics().context("gather_all_metrics")?;
+        assert!(
+            metrics.contains("otel_my_mgauge"),
+            "Prometheus text must contain multi gauge name"
+        );
+
         Ok(())
     }
 
@@ -609,6 +639,12 @@ mod tests {
 
         let timer = histogram_start_measure!(histogram);
         histogram.cancel_measure(timer);
+
+        let metrics = gather_all_metrics().context("gather_all_metrics")?;
+        assert!(
+            metrics.contains("otel_my_histogram"),
+            "Prometheus text must contain histogram name"
+        );
 
         Ok(())
     }
@@ -633,6 +669,12 @@ mod tests {
 
         let timer = histogram_start_measure!(histogram, &["1.90.0"])?;
         histogram.cancel_measure(timer);
+
+        let metrics = gather_all_metrics().context("gather_all_metrics")?;
+        assert!(
+            metrics.contains("otel_my_mhistogram"),
+            "Prometheus text must contain multi histogram name"
+        );
 
         Ok(())
     }

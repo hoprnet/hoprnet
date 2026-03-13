@@ -500,7 +500,9 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
 
             // Initialize hopr-metrics with this unified provider so all instruments
             // feed into both OTLP and the Prometheus text endpoint
-            hopr_metrics::init_with_provider(prometheus_exporter, meter_provider.clone());
+            if !hopr_metrics::init_with_provider(prometheus_exporter, meter_provider.clone()) {
+                tracing::warn!("hopr-metrics global state was already initialized; custom provider not applied");
+            }
 
             telemetry_handles.session_metric_bridge = Some(build_session_metric_bridge(&meter_provider));
             telemetry_handles.meter_provider = Some(meter_provider);
@@ -510,7 +512,9 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
                 .with_reader(prometheus_exporter.clone())
                 .with_resource(resource.clone())
                 .build();
-            hopr_metrics::init_with_provider(prometheus_exporter, meter_provider.clone());
+            if !hopr_metrics::init_with_provider(prometheus_exporter, meter_provider.clone()) {
+                tracing::warn!("hopr-metrics global state was already initialized; custom provider not applied");
+            }
             telemetry_handles.meter_provider = Some(meter_provider);
         }
 
@@ -541,7 +545,9 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
         let meter_provider = SdkMeterProvider::builder()
             .with_reader(prometheus_exporter.clone())
             .build();
-        hopr_metrics::init_with_provider(prometheus_exporter, meter_provider.clone());
+        if !hopr_metrics::init_with_provider(prometheus_exporter, meter_provider.clone()) {
+            tracing::warn!("hopr-metrics global state was already initialized; custom provider not applied");
+        }
         telemetry_handles.meter_provider = Some(meter_provider);
 
         tracing::subscriber::set_global_default(registry)?;
