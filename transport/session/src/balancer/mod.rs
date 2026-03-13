@@ -131,7 +131,7 @@ impl SurbFlowEstimator for SimpleSurbFlowEstimator {
     }
 }
 
-/// An implementation of [`SurbFlowEstimator`] that tracks the number of produced
+/// An implementation of `SurbFlowEstimator` that tracks the number of produced
 /// and consumed SURBs via two `AtomicU64`s.
 #[derive(Clone, Debug, Default)]
 pub struct AtomicSurbFlowEstimator {

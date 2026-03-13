@@ -51,6 +51,7 @@ fn normalize_nullable_types(value: &mut Value) {
             }
         }
         Value::Object(map) => {
+            // Handle OpenAPI 3.1 "type": ["string", "null"] array form
             if let Some(Value::Array(types)) = map.get_mut("type") {
                 let mut nullable = false;
                 let mut collected = Vec::new();
@@ -80,6 +81,36 @@ fn normalize_nullable_types(value: &mut Value) {
 
                 if nullable {
                     map.entry("nullable".to_string()).or_insert(Value::Bool(true));
+                }
+            }
+
+            // Handle OpenAPI 3.1 oneOf/anyOf containing {"type": "null"} entries
+            for key in ["oneOf", "anyOf"] {
+                if let Some(Value::Array(variants)) = map.remove(key) {
+                    let has_null = variants.iter().any(is_null_schema);
+
+                    if has_null {
+                        let non_null: Vec<Value> = variants.into_iter().filter(|v| !is_null_schema(v)).collect();
+
+                        match non_null.len() {
+                            0 => {}
+                            1 => {
+                                // Inline the single remaining variant's properties
+                                if let Value::Object(inner) = &non_null[0] {
+                                    for (k, v) in inner {
+                                        map.insert(k.clone(), v.clone());
+                                    }
+                                }
+                            }
+                            _ => {
+                                map.insert(key.to_string(), Value::Array(non_null));
+                            }
+                        }
+
+                        map.insert("nullable".to_string(), Value::Bool(true));
+                    } else {
+                        map.insert(key.to_string(), Value::Array(variants));
+                    }
                 }
             }
 
@@ -147,6 +178,10 @@ fn normalize_response_content(value: &mut Value) {
         }
         _ => {}
     }
+}
+
+fn is_null_schema(value: &Value) -> bool {
+    matches!(value, Value::Object(o) if o.len() == 1 && matches!(o.get("type"), Some(Value::String(s)) if s == "null"))
 }
 
 fn response_has_content(response: Option<&Value>) -> bool {

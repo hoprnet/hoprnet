@@ -26,8 +26,8 @@
 /// ## Queue Depth Limiting
 ///
 /// To prevent unbounded queue growth, the module tracks outstanding tasks (queued +
-/// running). Use [`spawn_blocking`] or [`spawn_fifo_blocking`] which return
-/// [`SpawnError::QueueFull`] when the configured limit is reached.
+/// running). Use [`cpu::spawn_blocking`] or [`cpu::spawn_fifo_blocking`] which return
+/// [`cpu::SpawnError::QueueFull`] when the configured limit is reached.
 ///
 /// Set `HOPR_CPU_TASK_QUEUE_LIMIT` environment variable to enable limiting.
 ///

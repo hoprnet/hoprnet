@@ -1,9 +1,9 @@
 //! # `Session` protocol messages
 //!
 //! The protocol components are built via low-level types of the `frame` module, such as
-//! [`Segment`] and [`Frame`](crate::session::Frame).
+//! [`Segment`] and [`Frame`].
 //! Most importantly, the `Session` protocol fixes the maximum number of segments per frame
-//! to 8 (see [`MAX_SEGMENTS_PER_FRAME`](SessionMessage::MAX_SEGMENTS_PER_FRAME)).
+//! to 8 (see `SessionMessage::MAX_SEGMENTS_PER_FRAME`).
 //! Since each segment must fit within a maximum transmission unit (MTU),
 //! a frame can be at most *eight* times the size of the MTU.
 //!
@@ -22,7 +22,7 @@
 //!
 //! ## Segment message ([`Segment`](SessionMessage::Segment))
 //!
-//! The Segment message contains the payload [`Segment`] of some [`Frame`](crate::session::Frame).
+//! The Segment message contains the payload [`Segment`] of some [`Frame`].
 //! The size of this message can range from [`the minimum message size`](SessionMessage::minimum_message_size)
 //! up to `C`.
 //!

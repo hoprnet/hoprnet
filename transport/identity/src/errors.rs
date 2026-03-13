@@ -7,5 +7,5 @@ pub enum TransportIdentityError {
     Multiaddress(String),
 }
 
-/// Result utilizing the [P2PError] as the error type.
+/// Result utilizing the [`TransportIdentityError`] as the error type.
 pub type Result<T> = core::result::Result<T, TransportIdentityError>;
