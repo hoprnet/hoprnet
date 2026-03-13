@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["EdgeWeightType","NodeObservation"],"trait":["CostFn","EdgeLinkObservable","EdgeNetworkObservableRead","EdgeObservable","EdgeObservableRead","EdgeObservableWrite","EdgeProtocolObservable","NetworkGraphTraverse","NetworkGraphUpdate","NetworkGraphView","NetworkGraphWrite","NodeObservable"],"type":["Capacity","EdgeTransportMeasurement"]};

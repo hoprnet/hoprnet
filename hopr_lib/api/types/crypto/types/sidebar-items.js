@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["PACKET_TAG_LENGTH"],"struct":["Challenge","HalfKey","HalfKeyChallenge","HashBase","OffchainPublicKey","PublicKey","Response","SimplePseudonym"],"trait":["Pseudonym"],"type":["Hash","HashFast","PacketTag"]};

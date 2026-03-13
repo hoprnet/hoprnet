@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["TAG_RANGE_END","TAG_RANGE_SIZE","TAG_RANGE_START"],"enum":["Usage"],"fn":["create_allocators","create_allocators_from_config"],"mod":["config","errors"],"struct":["AllocatedTag"],"trait":["TagAllocator"],"type":["CreateAllocatorsResult"]};

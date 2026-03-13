@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["BasicPayloadGenerator","GasEstimation","SafePayloadGenerator","TransactionRequest"],"trait":["PayloadGenerator","SignableTransaction"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["ForwardPathCostFn","HoprForwardCostFn","HoprReturnCostFn"],"type":["BasicCostFn"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["serve_api"],"mod":["config"],"struct":["ApiDoc","RestApiParameters","SecurityAddon"],"type":["MessageEncoder"]};
