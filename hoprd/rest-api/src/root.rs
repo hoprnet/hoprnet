@@ -2,12 +2,12 @@ use axum::{http::StatusCode, response::IntoResponse};
 
 use crate::{ApiError, ApiErrorStatus};
 
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 fn collect_hopr_metrics() -> Result<String, ApiErrorStatus> {
     hopr_metrics::gather_all_metrics().map_err(|_| ApiErrorStatus::UnknownFailure("Failed to gather metrics".into()))
 }
 
-#[cfg(any(not(feature = "prometheus"), test))]
+#[cfg(any(not(feature = "telemetry"), test))]
 fn collect_hopr_metrics() -> Result<String, ApiErrorStatus> {
     Err(ApiErrorStatus::UnknownFailure("BUILT WITHOUT METRICS SUPPORT".into()))
 }

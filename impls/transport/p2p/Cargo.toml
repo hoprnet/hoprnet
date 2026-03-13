@@ -12,10 +12,10 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-prometheus = [
+telemetry = [
   "dep:lazy_static",
   "dep:hopr-metrics",
-  "hopr-transport-network/prometheus",
+  "hopr-transport-network/telemetry",
 ]
 runtime-tokio = ["libp2p/tokio", "hopr-transport-probe/runtime-tokio"]
 transport-quic = ["libp2p/quic"]

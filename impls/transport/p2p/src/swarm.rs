@@ -19,7 +19,7 @@ use crate::{
     utils::{replace_transport_with_unspecified, resolve_dns_if_any},
 };
 
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_TRANSPORT_P2P_OPEN_CONNECTION_COUNT:  hopr_metrics::SimpleGauge =  hopr_metrics::SimpleGauge::new(
         "hopr_transport_p2p_active_connection_count",
@@ -218,7 +218,7 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
         protocol: &'static str,
         allow_private_addresses: bool,
     ) -> std::result::Result<(Self::Network, hopr_api::network::BoxedProcessFn), impl std::error::Error> {
-        #[cfg(all(feature = "prometheus", not(test)))]
+        #[cfg(all(feature = "telemetry", not(test)))]
         {
             METRIC_NETWORK_HEALTH.set(0.0);
         }
@@ -246,7 +246,7 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
 
         let notifier = self.subscribtions.0.clone();
 
-        #[cfg(all(feature = "prometheus", not(test)))]
+        #[cfg(all(feature = "telemetry", not(test)))]
         let network_inner = network.clone();
         let mut swarm = swarm;
         let process = async move {
@@ -259,7 +259,7 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
                         match event {
                             autonat::Event::StatusChanged { old, new } => {
                                 info!(?old, ?new, "AutoNAT status changed");
-                                #[cfg(all(feature = "prometheus", not(test)))]
+                                #[cfg(all(feature = "telemetry", not(test)))]
                                 {
                                     let value = match new {
                                         autonat::NatStatus::Unknown => 0.0,
@@ -320,7 +320,7 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
 
                         print_network_info(swarm.network_info(), "connection established");
 
-                        #[cfg(all(feature = "prometheus", not(test)))]
+                        #[cfg(all(feature = "telemetry", not(test)))]
                         {
                             METRIC_NETWORK_HEALTH.set((hopr_api::network::NetworkView::health(&network_inner) as i32).into());
                             METRIC_TRANSPORT_P2P_OPEN_CONNECTION_COUNT.increment(1.0);
@@ -345,7 +345,7 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
 
                         print_network_info(swarm.network_info(), "connection closed");
 
-                        #[cfg(all(feature = "prometheus", not(test)))]
+                        #[cfg(all(feature = "telemetry", not(test)))]
                         {
                             METRIC_NETWORK_HEALTH.set((hopr_api::network::NetworkView::health(&network_inner) as i32).into());
                             METRIC_TRANSPORT_P2P_OPEN_CONNECTION_COUNT.decrement(1.0);
@@ -385,7 +385,7 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
                                 }
                             }
 
-                        #[cfg(all(feature = "prometheus", not(test)))]
+                        #[cfg(all(feature = "telemetry", not(test)))]
                         {
                             METRIC_NETWORK_HEALTH.set((hopr_api::network::NetworkView::health(&network_inner) as i32).into());
                         }

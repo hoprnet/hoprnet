@@ -11,7 +11,7 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-prometheus = ["dep:hopr-metrics", "hopr-protocol-hopr/prometheus"]
+telemetry = ["dep:hopr-metrics", "hopr-protocol-hopr/telemetry"]
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 serde = [
   "dep:serde",

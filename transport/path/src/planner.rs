@@ -4,7 +4,7 @@ use futures::{StreamExt as _, TryStreamExt, stream::FuturesUnordered};
 use hopr_api::chain::{ChainKeyOperations, ChainPathResolver, ChainReadChannelOperations};
 use hopr_crypto_packet::prelude::*;
 use hopr_protocol_hopr::{FoundSurb, SurbStore};
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 use hopr_types::internal::path::Path;
 use hopr_types::{
     crypto::{crypto_traits::Randomizable, types::OffchainPublicKey},
@@ -18,7 +18,7 @@ use crate::{
     traits::{BackgroundPathCacheRefreshable, PathSelector},
 };
 
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_PATH_LENGTH: hopr_metrics::SimpleHistogram = hopr_metrics::SimpleHistogram::new(
         "hopr_path_length",
@@ -193,7 +193,7 @@ where
             }
         };
 
-        #[cfg(all(feature = "prometheus", not(test)))]
+        #[cfg(all(feature = "telemetry", not(test)))]
         {
             hopr_metrics::SimpleHistogram::observe(&METRIC_PATH_LENGTH, (path.num_hops() - 1) as f64);
         }

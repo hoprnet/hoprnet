@@ -4,7 +4,7 @@ use hopr_api::{Multiaddr, PeerId};
 
 use crate::errors::{NetworkError, Result};
 
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_PEER_COUNT:  hopr_metrics::SimpleGauge =
          hopr_metrics::SimpleGauge::new("hopr_peer_count", "Number of all peers").unwrap();
@@ -59,7 +59,7 @@ impl NetworkPeerStore {
         } else {
             self.addresses.insert(peer, addresses);
 
-            #[cfg(all(feature = "prometheus", not(test)))]
+            #[cfg(all(feature = "telemetry", not(test)))]
             METRIC_PEER_COUNT.increment(1.0);
         }
 
@@ -84,7 +84,7 @@ impl NetworkPeerStore {
         }
 
         if self.addresses.remove(peer).is_some() {
-            #[cfg(all(feature = "prometheus", not(test)))]
+            #[cfg(all(feature = "telemetry", not(test)))]
             METRIC_PEER_COUNT.decrement(1.0);
         }
 

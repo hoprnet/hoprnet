@@ -46,7 +46,7 @@ use crate::{
     strategy::SingularStrategy,
 };
 
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_COUNT_AUTO_FUNDINGS: hopr_metrics::SimpleCounter =
         hopr_metrics::SimpleCounter::new("hopr_strategy_auto_funding_funding_count", "Count of initiated automatic fundings").unwrap();
@@ -151,7 +151,7 @@ impl<
         hopr_async_runtime::prelude::spawn(async move {
             match chain_actions.fund_channel(&channel_id, funding_amount).await {
                 Ok(confirmation) => {
-                    #[cfg(all(feature = "prometheus", not(test)))]
+                    #[cfg(all(feature = "telemetry", not(test)))]
                     METRIC_COUNT_AUTO_FUNDINGS.increment();
 
                     info!(%channel_id, %funding_amount, "issued re-staking of channel");
@@ -160,7 +160,7 @@ impl<
                         warn!(%channel_id, error = %e, "funding transaction failed");
                         in_flight.remove(&channel_id);
 
-                        #[cfg(all(feature = "prometheus", not(test)))]
+                        #[cfg(all(feature = "telemetry", not(test)))]
                         METRIC_COUNT_AUTO_FUNDING_FAILURES.increment();
                     }
                     // On success: the ChannelBalanceIncreased event will clear the
@@ -170,7 +170,7 @@ impl<
                     warn!(%channel_id, error = %e, "failed to enqueue funding transaction");
                     in_flight.remove(&channel_id);
 
-                    #[cfg(all(feature = "prometheus", not(test)))]
+                    #[cfg(all(feature = "telemetry", not(test)))]
                     METRIC_COUNT_AUTO_FUNDING_FAILURES.increment();
                 }
             }

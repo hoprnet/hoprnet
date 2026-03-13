@@ -29,7 +29,7 @@ use hopr_lib::{
     },
 };
 use serde::{Deserialize, Serialize};
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 use strum::VariantNames;
 use tracing::{error, warn};
 use validator::{Validate, ValidationError};
@@ -42,7 +42,7 @@ use crate::{
     errors::{Result, StrategyError},
 };
 
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_ENABLED_STRATEGIES: hopr_metrics::MultiGauge =
         hopr_metrics::MultiGauge::new("hopr_strategy_enabled_strategies", "List of enabled strategies", &["strategy"]).unwrap();
@@ -164,7 +164,7 @@ impl MultiStrategy {
     {
         let mut strategies = Vec::<Box<dyn SingularStrategy + Send + Sync>>::new();
 
-        #[cfg(all(feature = "prometheus", not(test)))]
+        #[cfg(all(feature = "telemetry", not(test)))]
         Strategy::VARIANTS
             .iter()
             .for_each(|s| METRIC_ENABLED_STRATEGIES.set(&[*s], 0_f64));
@@ -205,7 +205,7 @@ impl MultiStrategy {
                 })),
             }
 
-            #[cfg(all(feature = "prometheus", not(test)))]
+            #[cfg(all(feature = "telemetry", not(test)))]
             METRIC_ENABLED_STRATEGIES.set(&[&strategy.to_string()], 1_f64);
         }
 
