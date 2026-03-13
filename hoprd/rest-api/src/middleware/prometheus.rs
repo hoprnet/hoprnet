@@ -1,8 +1,8 @@
 use axum::{extract::Request, middleware::Next, response::Response};
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 use hopr_lib::AsUnixTimestamp;
 
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_COUNT_API_CALLS:  hopr_metrics::MultiCounter =  hopr_metrics::MultiCounter::new(
         "hopr_http_api_call_count",
@@ -30,7 +30,7 @@ lazy_static::lazy_static! {
 }
 
 /// Custom prometheus recording middleware
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 pub(crate) async fn record(
     uri: axum::extract::OriginalUri,
     method: axum::http::Method,
@@ -58,7 +58,7 @@ pub(crate) async fn record(
     response
 }
 
-#[cfg(any(not(feature = "prometheus"), test))]
+#[cfg(any(not(feature = "telemetry"), test))]
 pub(crate) async fn record(request: Request, next: Next) -> Response {
     next.run(request).await
 }

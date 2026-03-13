@@ -97,7 +97,7 @@ use hopr_async_runtime::prelude::spawn;
 pub use hopr_async_runtime::{Abortable, AbortableList};
 pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 pub use hopr_network_types::prelude::*;
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 use hopr_platform::time::native::current_time;
 use hopr_transport::errors::HoprTransportError;
 #[cfg(feature = "runtime-tokio")]
@@ -206,7 +206,7 @@ pub enum HoprLibProcess {
     TicketEvents,
 }
 
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_PROCESS_START_TIME:  hopr_metrics::SimpleGauge =  hopr_metrics::SimpleGauge::new(
         "hopr_start_time",
@@ -365,7 +365,7 @@ where
         )
         .map_err(HoprLibError::TransportError)?;
 
-        #[cfg(all(feature = "prometheus", not(test)))]
+        #[cfg(all(feature = "telemetry", not(test)))]
         {
             METRIC_PROCESS_START_TIME.set(current_time().as_unix_timestamp().as_secs_f64());
             METRIC_HOPR_LIB_VERSION.set(
@@ -821,7 +821,7 @@ where
             "NODE STARTED AND RUNNING"
         );
 
-        #[cfg(all(feature = "prometheus", not(test)))]
+        #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_HOPR_NODE_INFO.set(
             &[
                 &self.me.public().to_peerid_str(),
@@ -972,7 +972,7 @@ where
     /// Prometheus formatted metrics collected by the hopr-lib components.
     pub fn collect_hopr_metrics() -> errors::Result<String> {
         cfg_if::cfg_if! {
-            if #[cfg(all(feature = "prometheus", not(test)))] {
+            if #[cfg(all(feature = "telemetry", not(test)))] {
                 hopr_metrics::gather_all_metrics().map_err(HoprLibError::other)
             } else {
                 Err(HoprLibError::GeneralError("BUILT WITHOUT METRICS SUPPORT".into()))

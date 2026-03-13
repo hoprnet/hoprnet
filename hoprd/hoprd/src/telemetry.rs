@@ -20,15 +20,6 @@ use opentelemetry_sdk::{
 };
 use tracing::field::{Field, Visit};
 use tracing_subscriber::prelude::*;
-#[cfg(feature = "prometheus")]
-use {
-    hopr_metrics::{PrometheusMetric, PrometheusMetricFamily, PrometheusMetricType, gather_metric_families},
-    std::{
-        collections::HashSet,
-        sync::mpsc::{self, Sender},
-        thread::{self, JoinHandle},
-    },
-};
 
 flagset::flags! {
     #[repr(u8)]
@@ -372,275 +363,12 @@ fn build_session_metric_bridge(meter_provider: &SdkMeterProvider) -> OtelSession
     session_metrics
 }
 
-#[cfg(feature = "prometheus")]
-struct OtelPrometheusMetricBridge {
-    _state: Arc<Mutex<OtelPrometheusMetricBridgeState>>,
-    refresh_stop_sender: Option<Sender<()>>,
-    refresh_thread: Option<JoinHandle<()>>,
-}
-
-#[cfg(feature = "prometheus")]
-#[derive(Default)]
-struct OtelPrometheusMetricBridgeState {
-    registered_families: HashSet<String>,
-    f64_counters: Vec<ObservableCounter<f64>>,
-    f64_gauges: Vec<ObservableGauge<f64>>,
-    u64_counters: Vec<ObservableCounter<u64>>,
-}
-
-#[cfg(feature = "prometheus")]
-impl Drop for OtelPrometheusMetricBridge {
-    fn drop(&mut self) {
-        if let Some(sender) = self.refresh_stop_sender.take() {
-            let _ = sender.send(());
-        }
-        if let Some(join_handle) = self.refresh_thread.take() {
-            let _ = join_handle.join();
-        }
-    }
-}
-
-#[cfg(feature = "prometheus")]
-fn build_prometheus_metric_bridge(meter_provider: &SdkMeterProvider) -> OtelPrometheusMetricBridge {
-    let meter = meter_provider.meter("hoprd_prometheus_bridge");
-    let state = Arc::new(Mutex::new(OtelPrometheusMetricBridgeState::default()));
-
-    if let Ok(mut state_guard) = state.lock() {
-        sync_prometheus_metric_families(&meter, &mut state_guard);
-    }
-
-    let (refresh_stop_sender, refresh_stop_receiver) = mpsc::channel();
-    let refresh_state = Arc::clone(&state);
-    let refresh_meter = meter.clone();
-    let refresh_thread = match thread::Builder::new()
-        .name("hoprd-otel-metrics-bridge".to_string())
-        .spawn(move || {
-            loop {
-                match refresh_stop_receiver.recv_timeout(Duration::from_secs(2)) {
-                    Ok(()) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
-                    Err(mpsc::RecvTimeoutError::Timeout) => {
-                        if let Ok(mut state_guard) = refresh_state.lock() {
-                            sync_prometheus_metric_families(&refresh_meter, &mut state_guard);
-                        }
-                    }
-                }
-            }
-        }) {
-        Ok(thread) => Some(thread),
-        Err(error) => {
-            tracing::warn!(error = %error, "Failed to spawn Prometheus OTEL bridge refresh thread");
-            None
-        }
-    };
-
-    OtelPrometheusMetricBridge {
-        _state: state,
-        refresh_stop_sender: Some(refresh_stop_sender),
-        refresh_thread,
-    }
-}
-
-#[cfg(feature = "prometheus")]
-fn sync_prometheus_metric_families(meter: &opentelemetry::metrics::Meter, state: &mut OtelPrometheusMetricBridgeState) {
-    for family in gather_metric_families() {
-        let family_key = format!("{:?}:{}", family.get_field_type(), family.name());
-        if !state.registered_families.insert(family_key) {
-            continue;
-        }
-        register_prometheus_metric_family(meter, &family, state);
-    }
-}
-
-#[cfg(feature = "prometheus")]
-fn register_prometheus_metric_family(
-    meter: &opentelemetry::metrics::Meter,
-    family: &PrometheusMetricFamily,
-    state: &mut OtelPrometheusMetricBridgeState,
-) {
-    let metric_name = family.name().to_string();
-
-    match family.get_field_type() {
-        PrometheusMetricType::COUNTER => {
-            let family_name = metric_name.clone();
-            let counter = meter
-                .f64_observable_counter(metric_name)
-                .with_callback(move |observer| {
-                    if let Some(family) = find_prometheus_family(&family_name, PrometheusMetricType::COUNTER) {
-                        for metric in family.get_metric() {
-                            if let Some(counter) = metric.get_counter().as_ref() {
-                                let attributes = prometheus_metric_attributes(metric, None);
-                                observer.observe(counter.value(), &attributes);
-                            }
-                        }
-                    }
-                })
-                .build();
-            state.f64_counters.push(counter);
-        }
-        PrometheusMetricType::GAUGE => {
-            let family_name = metric_name.clone();
-            let gauge = meter
-                .f64_observable_gauge(metric_name)
-                .with_callback(move |observer| {
-                    if let Some(family) = find_prometheus_family(&family_name, PrometheusMetricType::GAUGE) {
-                        for metric in family.get_metric() {
-                            if let Some(gauge) = metric.get_gauge().as_ref() {
-                                let attributes = prometheus_metric_attributes(metric, None);
-                                observer.observe(gauge.value(), &attributes);
-                            }
-                        }
-                    }
-                })
-                .build();
-            state.f64_gauges.push(gauge);
-        }
-        PrometheusMetricType::HISTOGRAM => {
-            let family_name_for_count = metric_name.clone();
-            let histogram_count = meter
-                .u64_observable_counter(format!("{metric_name}_count"))
-                .with_callback(move |observer| {
-                    if let Some(family) =
-                        find_prometheus_family(&family_name_for_count, PrometheusMetricType::HISTOGRAM)
-                    {
-                        for metric in family.get_metric() {
-                            if let Some(histogram) = metric.get_histogram().as_ref() {
-                                let attributes = prometheus_metric_attributes(metric, None);
-                                observer.observe(histogram.get_sample_count(), &attributes);
-                            }
-                        }
-                    }
-                })
-                .build();
-            state.u64_counters.push(histogram_count);
-
-            let family_name_for_sum = metric_name.clone();
-            let histogram_sum = meter
-                .f64_observable_counter(format!("{metric_name}_sum"))
-                .with_callback(move |observer| {
-                    if let Some(family) = find_prometheus_family(&family_name_for_sum, PrometheusMetricType::HISTOGRAM)
-                    {
-                        for metric in family.get_metric() {
-                            if let Some(histogram) = metric.get_histogram().as_ref() {
-                                let attributes = prometheus_metric_attributes(metric, None);
-                                observer.observe(histogram.get_sample_sum(), &attributes);
-                            }
-                        }
-                    }
-                })
-                .build();
-            state.f64_counters.push(histogram_sum);
-
-            let family_name_for_bucket = metric_name.clone();
-            let histogram_bucket = meter
-                .u64_observable_counter(format!("{metric_name}_bucket"))
-                .with_callback(move |observer| {
-                    if let Some(family) =
-                        find_prometheus_family(&family_name_for_bucket, PrometheusMetricType::HISTOGRAM)
-                    {
-                        for metric in family.get_metric() {
-                            if let Some(histogram) = metric.get_histogram().as_ref() {
-                                for bucket in histogram.get_bucket() {
-                                    let attributes = prometheus_metric_attributes(
-                                        metric,
-                                        Some(("le", bucket.upper_bound().to_string())),
-                                    );
-                                    observer.observe(bucket.cumulative_count(), &attributes);
-                                }
-                            }
-                        }
-                    }
-                })
-                .build();
-            state.u64_counters.push(histogram_bucket);
-        }
-        PrometheusMetricType::SUMMARY => {
-            let family_name_for_count = metric_name.clone();
-            let summary_count = meter
-                .u64_observable_counter(format!("{metric_name}_count"))
-                .with_callback(move |observer| {
-                    if let Some(family) = find_prometheus_family(&family_name_for_count, PrometheusMetricType::SUMMARY)
-                    {
-                        for metric in family.get_metric() {
-                            if let Some(summary) = metric.get_summary().as_ref() {
-                                let attributes = prometheus_metric_attributes(metric, None);
-                                observer.observe(summary.sample_count(), &attributes);
-                            }
-                        }
-                    }
-                })
-                .build();
-            state.u64_counters.push(summary_count);
-
-            let family_name_for_sum = metric_name.clone();
-            let summary_sum = meter
-                .f64_observable_counter(format!("{metric_name}_sum"))
-                .with_callback(move |observer| {
-                    if let Some(family) = find_prometheus_family(&family_name_for_sum, PrometheusMetricType::SUMMARY) {
-                        for metric in family.get_metric() {
-                            if let Some(summary) = metric.get_summary().as_ref() {
-                                let attributes = prometheus_metric_attributes(metric, None);
-                                observer.observe(summary.sample_sum(), &attributes);
-                            }
-                        }
-                    }
-                })
-                .build();
-            state.f64_counters.push(summary_sum);
-
-            let family_name_for_quantile = metric_name.clone();
-            let summary_quantile = meter
-                .f64_observable_gauge(metric_name)
-                .with_callback(move |observer| {
-                    if let Some(family) =
-                        find_prometheus_family(&family_name_for_quantile, PrometheusMetricType::SUMMARY)
-                    {
-                        for metric in family.get_metric() {
-                            if let Some(summary) = metric.get_summary().as_ref() {
-                                for quantile in summary.get_quantile() {
-                                    let attributes = prometheus_metric_attributes(
-                                        metric,
-                                        Some(("quantile", quantile.quantile().to_string())),
-                                    );
-                                    observer.observe(quantile.value(), &attributes);
-                                }
-                            }
-                        }
-                    }
-                })
-                .build();
-            state.f64_gauges.push(summary_quantile);
-        }
-        _ => {}
-    }
-}
-
-#[cfg(feature = "prometheus")]
-fn find_prometheus_family(metric_name: &str, metric_type: PrometheusMetricType) -> Option<PrometheusMetricFamily> {
-    gather_metric_families()
-        .into_iter()
-        .find(|family| family.name() == metric_name && family.get_field_type() == metric_type)
-}
-
-#[cfg(feature = "prometheus")]
-fn prometheus_metric_attributes(metric: &PrometheusMetric, extra: Option<(&str, String)>) -> Vec<KeyValue> {
-    let mut attributes = Vec::with_capacity(metric.get_label().len() + usize::from(extra.is_some()));
-    for label in metric.get_label() {
-        attributes.push(KeyValue::new(label.name().to_string(), label.value().to_string()));
-    }
-    if let Some((key, value)) = extra {
-        attributes.push(KeyValue::new(key.to_string(), value));
-    }
-    attributes
-}
-
 #[derive(Default)]
 pub(super) struct TelemetryHandles {
     tracer_provider: Option<SdkTracerProvider>,
     logger_provider: Option<SdkLoggerProvider>,
     meter_provider: Option<SdkMeterProvider>,
     session_metric_bridge: Option<OtelSessionMetricBridge>,
-    #[cfg(feature = "prometheus")]
-    metric_bridge: Option<OtelPrometheusMetricBridge>,
 }
 
 impl Drop for TelemetryHandles {
@@ -661,6 +389,16 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
     let mut telemetry_handles = TelemetryHandles::default();
     let registry = crate::telemetry_common::build_base_subscriber()?;
     let config = OtlpConfig::from_env();
+
+    // Build the Prometheus text exporter for the /metrics endpoint.
+    // This is always created so that hopr-metrics instruments are collected
+    // regardless of whether OTLP export is enabled.
+    let prometheus_exporter = opentelemetry_prometheus_text_exporter::PrometheusExporter::builder()
+        .without_counter_suffixes()
+        .without_units()
+        .without_target_info()
+        .without_scope_info()
+        .build();
 
     if config.enabled {
         let resource = opentelemetry_sdk::Resource::builder()
@@ -733,7 +471,7 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
         };
 
         if config.has_signal(OtlpSignal::Metrics) {
-            let exporter = match config.transport {
+            let otlp_exporter = match config.transport {
                 OtlpTransport::Grpc => opentelemetry_otlp::MetricExporter::builder()
                     .with_tonic()
                     .with_protocol(opentelemetry_otlp::Protocol::Grpc)
@@ -746,21 +484,38 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
                     .build()?,
             };
 
-            let reader = opentelemetry_sdk::metrics::periodic_reader_with_async_runtime::PeriodicReader::builder(
-                exporter,
+            let otlp_reader = opentelemetry_sdk::metrics::periodic_reader_with_async_runtime::PeriodicReader::builder(
+                otlp_exporter,
                 opentelemetry_sdk::runtime::Tokio,
             )
             .build();
+
+            // Build unified meter provider with both OTLP and Prometheus text readers
             let meter_provider = SdkMeterProvider::builder()
-                .with_reader(reader)
+                .with_reader(otlp_reader)
+                .with_reader(prometheus_exporter.clone())
                 .with_resource(resource.clone())
                 .build();
             opentelemetry::global::set_meter_provider(meter_provider.clone());
-            telemetry_handles.session_metric_bridge = Some(build_session_metric_bridge(&meter_provider));
-            #[cfg(feature = "prometheus")]
-            {
-                telemetry_handles.metric_bridge = Some(build_prometheus_metric_bridge(&meter_provider));
+
+            // Initialize hopr-metrics with this unified provider so all instruments
+            // feed into both OTLP and the Prometheus text endpoint
+            if !hopr_metrics::init_with_provider(prometheus_exporter, meter_provider.clone()) {
+                tracing::warn!("hopr-metrics global state was already initialized; custom provider not applied");
             }
+
+            telemetry_handles.session_metric_bridge = Some(build_session_metric_bridge(&meter_provider));
+            telemetry_handles.meter_provider = Some(meter_provider);
+        } else {
+            // OTLP metrics not requested, but still set up the Prometheus text exporter
+            let meter_provider = SdkMeterProvider::builder()
+                .with_reader(prometheus_exporter.clone())
+                .with_resource(resource.clone())
+                .build();
+            if !hopr_metrics::init_with_provider(prometheus_exporter, meter_provider.clone()) {
+                tracing::warn!("hopr-metrics global state was already initialized; custom provider not applied");
+            }
+            telemetry_handles.session_metric_bridge = Some(build_session_metric_bridge(&meter_provider));
             telemetry_handles.meter_provider = Some(meter_provider);
         }
 
@@ -787,6 +542,16 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
             "OpenTelemetry enabled"
         );
     } else {
+        // OTEL disabled — still set up Prometheus text exporter for /metrics
+        let meter_provider = SdkMeterProvider::builder()
+            .with_reader(prometheus_exporter.clone())
+            .build();
+        if !hopr_metrics::init_with_provider(prometheus_exporter, meter_provider.clone()) {
+            tracing::warn!("hopr-metrics global state was already initialized; custom provider not applied");
+        }
+        telemetry_handles.session_metric_bridge = Some(build_session_metric_bridge(&meter_provider));
+        telemetry_handles.meter_provider = Some(meter_provider);
+
         tracing::subscriber::set_global_default(registry)?;
     }
 

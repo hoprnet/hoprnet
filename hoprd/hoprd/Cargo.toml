@@ -13,17 +13,9 @@ build = "build.rs"
 [features]
 default = [
   "runtime-tokio",
-  "prometheus",
   "telemetry",
   "transport-quic",
 ] # uses tokio by default because of axum
-prometheus = [
-  "hopr-lib/prometheus",
-  "hoprd-api/prometheus",
-  "hopr-db-node/prometheus",
-  "hopr-strategy/prometheus",
-  "hopr-transport-p2p/prometheus",
-]
 runtime-tokio = [
   "dep:tokio",
   "hopr-lib/runtime-tokio",
@@ -39,8 +31,15 @@ telemetry = [
   "dep:opentelemetry",
   "dep:opentelemetry-otlp",
   "dep:opentelemetry_sdk",
+  "dep:opentelemetry-prometheus-text-exporter",
   "dep:flagset",
   "dep:tracing-opentelemetry",
+  "dep:hopr-metrics",
+  "hopr-lib/telemetry",
+  "hoprd-api/telemetry",
+  "hopr-db-node/telemetry",
+  "hopr-strategy/telemetry",
+  "hopr-transport-p2p/telemetry",
 ]
 transport-quic = ["hopr-transport-p2p/transport-quic"]
 capture = ["hopr-lib/capture"]
@@ -85,7 +84,7 @@ tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["fmt", "json"] }
 validator = { workspace = true }
-opentelemetry = { workspace = true, optional = true }
+opentelemetry = { workspace = true, optional = true, features = ["metrics"] }
 opentelemetry-otlp = { workspace = true, features = [
   "trace",
   "metrics",
@@ -95,7 +94,11 @@ opentelemetry-otlp = { workspace = true, features = [
   "http-proto",
   "grpc-tonic",
 ], optional = true }
-opentelemetry_sdk = { workspace = true, optional = true }
+opentelemetry_sdk = { workspace = true, optional = true, features = [
+  "metrics",
+  "experimental_metrics_custom_reader",
+] }
+opentelemetry-prometheus-text-exporter = { workspace = true, optional = true }
 tracing-opentelemetry = { workspace = true, optional = true }
 
 hopr-strategy = { workspace = true }
@@ -117,8 +120,8 @@ hopr-builder = { workspace = true, features = [
 ] }
 hopr-db-node = { workspace = true, features = ["traits", "sqlite"] }
 hopr-chain-connector = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
 hopr-network-graph = { workspace = true, features = ["petgraph"] }
-hopr-metrics = { workspace = true }
 hopr-transport-p2p = { workspace = true }
 
 # Target-specific dependencies for memory allocators

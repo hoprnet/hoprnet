@@ -16,7 +16,7 @@ use validator::Validate;
 
 use crate::{Strategy, errors, strategy::SingularStrategy};
 
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_COUNT_CLOSURE_FINALIZATIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
         "hopr_strategy_closure_auto_finalization_count",
@@ -89,7 +89,7 @@ where
                 Ok(_) => {
                     // Currently, we're not interested in awaiting the Close transactions to confirmation
                     debug!(%channel, "channel closure finalizer: finalizing closure");
-                    #[cfg(all(feature = "prometheus", not(test)))]
+                    #[cfg(all(feature = "telemetry", not(test)))]
                     METRIC_COUNT_CLOSURE_FINALIZATIONS.increment();
                 }
                 Err(e) => error!(%channel, error = %e, "channel closure finalizer: failed to finalize closure"),

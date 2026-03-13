@@ -19,7 +19,7 @@ serde = [
   "dep:serde_with",
   "hopr-api/serde",
 ]
-prometheus = ["dep:hopr-metrics", "hopr-parallelize/prometheus"]
+telemetry = ["dep:hopr-metrics", "hopr-parallelize/telemetry"]
 trace-timing = ["hopr-platform/trace-timing"]
 
 [dependencies]

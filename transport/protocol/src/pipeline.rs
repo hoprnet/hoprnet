@@ -19,7 +19,7 @@ const NUM_CONCURRENT_ACK_OUT_PROCESSING: usize = 10;
 const QUEUE_SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(50);
 const PACKET_DECODING_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(150);
 
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_PACKET_COUNT:  hopr_metrics::MultiCounter =  hopr_metrics::MultiCounter::new(
         "hopr_packets_count",
@@ -94,7 +94,7 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
                         .await
                     {
                         Ok(packet) => {
-                            #[cfg(all(feature = "prometheus", not(test)))]
+                            #[cfg(all(feature = "telemetry", not(test)))]
                             METRIC_PACKET_COUNT.increment(&["sent"]);
 
                             counters.get_or_create(&packet.next_hop).record_message_sent();
@@ -218,7 +218,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                                 tracing::error!(%error, "failed to send ack to the egress queue");
                             });
 
-                        #[cfg(all(feature = "prometheus", not(test)))]
+                        #[cfg(all(feature = "telemetry", not(test)))]
                         METRIC_VALIDATION_ERRORS.increment(&[error.kind.as_ref()]);
 
                         None
@@ -230,7 +230,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             timeout_ms = PACKET_DECODING_TIMEOUT.as_millis() as u64,
                             "dropped incoming packet: decode timeout - check the 'hopr_rayon_queue_wait_seconds' metric for pool saturation"
                         );
-                        #[cfg(all(feature = "prometheus", not(test)))]
+                        #[cfg(all(feature = "telemetry", not(test)))]
                         METRIC_PACKET_DECODE_TIMEOUTS.increment();
 
                         None
@@ -279,7 +279,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                                 tracing::error!(%error, "failed to send ack to the egress queue");
                             });
 
-                        #[cfg(all(feature = "prometheus", not(test)))]
+                        #[cfg(all(feature = "telemetry", not(test)))]
                         METRIC_PACKET_COUNT.increment(&["received"]);
 
                         Some((sender, plain_text, info))
@@ -318,9 +318,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                                 tracing::error!(%error, "failed to forward a packet to the transport layer");
                             });
 
-                        counters.get_or_create(&next_hop).record_message_sent();
-
-                        #[cfg(all(feature = "prometheus", not(test)))]
+                        #[cfg(all(feature = "telemetry", not(test)))]
                         METRIC_PACKET_COUNT.increment(&["forwarded"]);
 
                         // Send acknowledgement back
@@ -609,7 +607,7 @@ where
 {
     let mut processes = AbortableList::default();
 
-    #[cfg(all(feature = "prometheus", not(test)))]
+    #[cfg(all(feature = "telemetry", not(test)))]
     {
         // Initialize the lazy statics here
         lazy_static::initialize(&METRIC_PACKET_COUNT);
