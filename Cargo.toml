@@ -16,6 +16,7 @@ members = [
   "hoprd/rest-api",
   "hoprd/rest-api-client",
   "logic/strategy",
+  "logic/ticket-manager",
   "misc/metrics",
   "misc/platform",
   "protocols/app",
@@ -265,6 +266,7 @@ hopr-protocol-hopr = { path = "protocols/hopr" }
 hopr-protocol-session = { path = "protocols/session" }
 hopr-protocol-start = { path = "protocols/start" }
 hopr-strategy = { path = "logic/strategy", default-features = false }
+hopr-ticket-manager = { path = "logic/ticket-manager" }
 hopr-transport = { path = "transport/api" }
 hopr-transport-identity = { path = "transport/identity" }
 hopr-transport-network = { path = "transport/network" }
