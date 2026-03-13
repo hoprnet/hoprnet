@@ -75,12 +75,21 @@ hopr-network-graph = { workspace = true, features = ["petgraph"] }
 hopr-transport-p2p = { workspace = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 insta = { workspace = true, features = ["yaml", "redactions"] }
 rstest = { workspace = true }
 serial_test = { workspace = true }
 test-log = { workspace = true }
+tokio = { workspace = true }
 
 hopr-builder = { workspace = true, features = ["testing"] }
 hopr-api = { workspace = true, features = ["types-random"] }
+hopr-metrics = { workspace = true }
+opentelemetry_sdk = { workspace = true, features = [
+  "metrics",
+  "experimental_metrics_custom_reader",
+  "testing",
+] }
+opentelemetry-prometheus-text-exporter = { workspace = true }
 
 hopr-lib = { workspace = true, features = ["telemetry"] }

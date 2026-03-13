@@ -4426,6 +4426,8 @@ dependencies = [
  "hopr-transport-p2p",
  "insta",
  "lazy_static",
+ "opentelemetry-prometheus-text-exporter",
+ "opentelemetry_sdk",
  "parking_lot",
  "rand 0.10.0",
  "rstest",
