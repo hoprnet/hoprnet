@@ -24,7 +24,7 @@ use async_trait::async_trait;
 use hopr_lib::{
     ChannelChange, ChannelDirection, ChannelEntry, VerifiedTicket,
     api::{
-        chain::{ChainReadChannelOperations, ChainWriteChannelOperations},
+        chain::{ChainReadChannelOperations, ChainReadSafeOperations, ChainValues, ChainWriteChannelOperations},
         db::TicketSelector,
     },
 };
@@ -151,7 +151,14 @@ impl MultiStrategy {
     /// The strategy can contain another `MultiStrategy` if `allow_recursive` is set.
     pub fn new<A, R>(cfg: MultiStrategyConfig, hopr_chain_actions: A, redeem_sink: R) -> Self
     where
-        A: ChainReadChannelOperations + ChainWriteChannelOperations + Clone + Send + Sync + 'static,
+        A: ChainReadChannelOperations
+            + ChainReadSafeOperations
+            + ChainValues
+            + ChainWriteChannelOperations
+            + Clone
+            + Send
+            + Sync
+            + 'static,
         R: futures::Sink<TicketSelector> + Sync + Send + Clone + 'static,
         StrategyError: From<R::Error>,
     {
