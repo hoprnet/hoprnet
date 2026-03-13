@@ -63,7 +63,7 @@ type PlannerCacheValue = Arc<Vec<ValidatedPath>>;
 /// the chain resolver, and stores `Arc<Vec<ValidatedPath>>` in the cache.
 /// On a cache hit a random candidate is picked for routing diversity.
 ///
-/// A background sweep ([`PathPlanner::background_refresh`]) can be spawned to
+/// A background sweep (`background_refresh`) can be spawned to
 /// proactively re-warm the cache for all previously-seen keys.
 #[derive(Clone)]
 pub struct PathPlanner<Surb, R, S> {

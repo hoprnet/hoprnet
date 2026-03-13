@@ -27,7 +27,7 @@ pub const HOPR_UDP_BUFFER_SIZE: usize = 16384;
 /// Size of the queue (back-pressure) for data incoming from a UDP stream.
 pub const HOPR_UDP_QUEUE_SIZE: usize = 8192;
 
-/// Implementation of [`hopr_lib::HoprSessionServer`] that facilitates
+/// Implementation of `HoprSessionServer` that facilitates
 /// bridging of TCP or UDP sockets from the Session Exit node to a destination.
 #[derive(Debug, Clone)]
 pub struct HoprServerIpForwardingReactor {

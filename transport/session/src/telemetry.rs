@@ -345,7 +345,7 @@ impl SessionTelemetry {
     /// This method atomically reads all metric counters and creates an immutable snapshot
     /// that includes lifetime, frame buffer, acknowledgement, SURB, and transport metrics.
     /// SURB metrics are loaded automatically from the stored estimator if one was set via
-    /// [`set_surb_estimator`].
+    /// `set_surb_estimator`.
     pub fn snapshot(&self) -> SessionStatsSnapshot {
         self.record_incomplete_frames();
 
