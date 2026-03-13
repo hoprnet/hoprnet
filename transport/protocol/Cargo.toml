@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-protocol"
-version = "1.4.0"
+version = "1.4.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -36,10 +36,7 @@ serde = { workspace = true, features = ["derive"], optional = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
-tokio-util = { workspace = true, default-features = false, features = [
-  "codec",
-  "compat",
-] }
+tokio-util = { workspace = true, features = ["codec", "compat"] }
 tracing = { workspace = true }
 validator = { workspace = true }
 
@@ -50,13 +47,14 @@ hopr-crypto-packet = { workspace = true }
 hopr-network-types = { workspace = true }
 hopr-metrics = { optional = true, workspace = true }
 
-hopr-protocol-hopr = { workspace = true }
+hopr-protocol-hopr = { workspace = true, features = ["rayon"] }
 hopr-protocol-app = { workspace = true }
 
 
 [dev-dependencies]
 async-trait = { workspace = true }
 async_channel_io = { version = "0.3.0" }
+hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 bytesize = { workspace = true }
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 futures-concurrency = { workspace = true }
@@ -66,7 +64,11 @@ test-log = { workspace = true }
 tokio = { workspace = true }
 
 hopr-api = { workspace = true }
-hopr-db-node = { workspace = true, features = ["runtime-tokio"] }
+hopr-db-node = { workspace = true, features = [
+  "runtime-tokio",
+  "traits",
+  "sqlite",
+] }
 hopr-chain-connector = { workspace = true, features = [
   "testing",
   "runtime-tokio",

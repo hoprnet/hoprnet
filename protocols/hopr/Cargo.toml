@@ -1,6 +1,6 @@
 [package]
 name = "hopr-protocol-hopr"
-version = "4.4.1"
+version = "4.4.2"
 edition.workspace = true
 rust-version.workspace = true
 authors = ["HOPR Association <tech@hoprnet.org>"]
@@ -56,7 +56,11 @@ hex-literal = { workspace = true }
 lazy_static = { workspace = true }
 tokio = { workspace = true }
 
-hopr-db-node = { workspace = true, features = ["runtime-tokio"] }
+hopr-db-node = { workspace = true, features = [
+  "runtime-tokio",
+  "traits",
+  "sqlite",
+] }
 hopr-chain-connector = { workspace = true, features = [
   "testing",
   "runtime-tokio",

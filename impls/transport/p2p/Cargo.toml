@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-p2p"
-version = "0.8.2"
+version = "0.8.3"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "rust-libp2p based p2p transport implementation"
 edition.workspace = true
@@ -53,7 +53,7 @@ lazy_static = { workspace = true }
 more-asserts = { workspace = true }
 tokio = { workspace = true }
 
-hopr-api = { workspace = true, features = ["network", "types-random"] }
+hopr-api = { workspace = true, features = ["network", "graph", "types-random"] }
 
 hopr-crypto-packet = { workspace = true }
 

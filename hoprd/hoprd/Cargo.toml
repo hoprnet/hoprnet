@@ -85,7 +85,7 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["fmt", "json"] }
 validator = { workspace = true }
 opentelemetry = { workspace = true, optional = true, features = ["metrics"] }
-opentelemetry-otlp = { workspace = true, default-features = false, features = [
+opentelemetry-otlp = { workspace = true, features = [
   "trace",
   "metrics",
   "logs",
@@ -118,10 +118,10 @@ hopr-builder = { workspace = true, features = [
   "session-client",
   "session-server",
 ] }
-hopr-db-node = { workspace = true }
+hopr-db-node = { workspace = true, features = ["traits", "sqlite"] }
 hopr-chain-connector = { workspace = true }
-hopr-network-graph = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
+hopr-network-graph = { workspace = true, features = ["petgraph"] }
 hopr-transport-p2p = { workspace = true }
 
 # Target-specific dependencies for memory allocators

@@ -1,4 +1,6 @@
-use std::{num::NonZeroU8, sync::Arc};
+#[cfg(feature = "runtime-tokio")]
+use std::num::NonZeroU8;
+use std::sync::Arc;
 
 use dashmap::DashSet;
 use futures::{FutureExt, Stream, StreamExt, stream::BoxStream};
@@ -11,10 +13,8 @@ use libp2p::{
 };
 use tracing::{debug, error, info, trace, warn};
 
-#[cfg(feature = "runtime-tokio")]
-use crate::PeerDiscovery;
 use crate::{
-    HoprNetwork, HoprNetworkBehavior, HoprNetworkBehaviorEvent, constants,
+    HoprNetwork, HoprNetworkBehavior, HoprNetworkBehaviorEvent, PeerDiscovery, constants,
     errors::Result,
     utils::{replace_transport_with_unspecified, resolve_dns_if_any},
 };

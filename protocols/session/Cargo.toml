@@ -59,7 +59,7 @@ clap = { workspace = true }
 criterion = { workspace = true }
 hex-literal = { workspace = true }
 insta = { workspace = true }
-indexmap = { workspace = true }
+indexmap = { workspace = true, features = ["serde"] }
 mockall = { workspace = true }
 parameterized = { workspace = true }
 serde = { workspace = true }
@@ -73,6 +73,7 @@ hopr-network-types = { workspace = true, features = [
   "capture",
   "runtime-tokio",
 ] }
+hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 hopr-protocol-app = { workspace = true }
 
 [[example]]

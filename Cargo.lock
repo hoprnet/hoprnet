@@ -4380,7 +4380,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-async-runtime"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "auto_impl",
  "futures",
@@ -4407,7 +4407,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-builder"
-version = "4.0.1"
+version = "4.0.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4443,7 +4443,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.17.0"
+version = "0.17.1"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4496,7 +4496,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-keypair"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "anyhow",
  "hex",
@@ -4549,7 +4549,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-sphinx"
-version = "0.12.0"
+version = "0.12.1"
 dependencies = [
  "anyhow",
  "bimap",
@@ -4602,7 +4602,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-ct-full-network"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -4622,7 +4622,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-ct-immediate"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "futures",
@@ -4664,7 +4664,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-node"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "anyhow",
  "async-lock",
@@ -4864,7 +4864,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-hopr"
-version = "4.4.1"
+version = "4.4.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4970,7 +4970,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-strategy"
-version = "0.17.1"
+version = "0.17.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5002,7 +5002,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5087,7 +5087,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-p2p"
-version = "0.8.2"
+version = "0.8.3"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -5115,7 +5115,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-path"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5170,7 +5170,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "1.4.0"
+version = "1.4.1"
 dependencies = [
  "ahash",
  "anyhow",
@@ -5212,7 +5212,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.20.0"
+version = "0.20.1"
 dependencies = [
  "anyhow",
  "arrayvec",
@@ -5276,7 +5276,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-utils-session"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -5353,7 +5353,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "4.6.1"
+version = "4.6.2"
 dependencies = [
  "anyhow",
  "axum",
@@ -5413,7 +5413,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-localcluster"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "clap",
@@ -9596,9 +9596,6 @@ name = "siphasher"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b2aa850e253778c88a04c3d7323b043aeda9d3e30d5971937c1855769763678e"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "slab"

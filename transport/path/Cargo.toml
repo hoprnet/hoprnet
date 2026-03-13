@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-path"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Graph-based path planning and selection for the HOPR transport layer"
 edition = "2024"
@@ -25,7 +25,7 @@ tracing = { workspace = true }
 
 hopr-api = { workspace = true, features = ["chain", "graph"] }
 hopr-crypto-packet = { workspace = true }
-hopr-protocol-hopr = { workspace = true }
+hopr-protocol-hopr = { workspace = true, features = ["rayon"] }
 hopr-types = { workspace = true, features = [
   "crypto",
   "random",
@@ -43,5 +43,5 @@ futures = { workspace = true }
 hex-literal = { workspace = true }
 tokio = { workspace = true }
 
-hopr-network-graph = { workspace = true }
+hopr-network-graph = { workspace = true, features = ["petgraph"] }
 hopr-protocol-hopr = { workspace = true }
