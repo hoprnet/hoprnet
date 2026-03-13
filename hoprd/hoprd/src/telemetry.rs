@@ -515,6 +515,7 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
             if !hopr_metrics::init_with_provider(prometheus_exporter, meter_provider.clone()) {
                 tracing::warn!("hopr-metrics global state was already initialized; custom provider not applied");
             }
+            telemetry_handles.session_metric_bridge = Some(build_session_metric_bridge(&meter_provider));
             telemetry_handles.meter_provider = Some(meter_provider);
         }
 
@@ -548,6 +549,7 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
         if !hopr_metrics::init_with_provider(prometheus_exporter, meter_provider.clone()) {
             tracing::warn!("hopr-metrics global state was already initialized; custom provider not applied");
         }
+        telemetry_handles.session_metric_bridge = Some(build_session_metric_bridge(&meter_provider));
         telemetry_handles.meter_provider = Some(meter_provider);
 
         tracing::subscriber::set_global_default(registry)?;
