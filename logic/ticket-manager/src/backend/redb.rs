@@ -15,12 +15,19 @@ impl RedbStore {
 impl TicketQueueStore for RedbStore {
     type Queue = RedbTicketQueue;
 
-    fn open_or_create(&mut self, channel_id: &ChannelId) -> Result<Self::Queue, <Self::Queue as TicketQueue>::Error> {
+    fn open_or_create_queue(
+        &mut self,
+        channel_id: &ChannelId,
+    ) -> Result<Self::Queue, <Self::Queue as TicketQueue>::Error> {
         todo!()
     }
 
-    fn iter_channels(&self) -> impl Iterator<Item = ChannelId> {
+    fn delete_queue(&mut self, channel_id: &ChannelId) -> Result<(), <Self::Queue as TicketQueue>::Error> {
         todo!()
+    }
+
+    fn iter_queues(&self) -> impl Iterator<Item = ChannelId> {
+        std::iter::empty()
     }
 }
 
@@ -48,6 +55,6 @@ impl TicketQueue for RedbTicketQueue {
     }
 
     fn iter_unordered(&self) -> impl Iterator<Item = Result<RedeemableTicket, Self::Error>> {
-        todo!()
+        std::iter::empty()
     }
 }

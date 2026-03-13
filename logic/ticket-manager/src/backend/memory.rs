@@ -14,13 +14,16 @@ use crate::{
 #[derive(Clone, Debug, Default)]
 pub struct MemoryStore {
     tickets: std::collections::HashMap<ChannelId, MemoryTicketQueue>,
-    out_indices: std::collections::HashMap<ChannelId, u64>,
+    out_indices: std::collections::HashMap<(ChannelId, u32), u64>,
 }
 
 impl TicketQueueStore for MemoryStore {
     type Queue = MemoryTicketQueue;
 
-    fn open_or_create(&mut self, channel_id: &ChannelId) -> Result<Self::Queue, <Self::Queue as TicketQueue>::Error> {
+    fn open_or_create_queue(
+        &mut self,
+        channel_id: &ChannelId,
+    ) -> Result<Self::Queue, <Self::Queue as TicketQueue>::Error> {
         Ok(self
             .tickets
             .entry(*channel_id)
@@ -28,7 +31,12 @@ impl TicketQueueStore for MemoryStore {
             .clone())
     }
 
-    fn iter_channels(&self) -> impl Iterator<Item = ChannelId> {
+    fn delete_queue(&mut self, channel_id: &ChannelId) -> Result<(), <Self::Queue as TicketQueue>::Error> {
+        self.tickets.remove(channel_id);
+        Ok(())
+    }
+
+    fn iter_queues(&self) -> impl Iterator<Item = ChannelId> {
         self.tickets.iter().map(|(k, _)| *k)
     }
 }
@@ -36,13 +44,22 @@ impl TicketQueueStore for MemoryStore {
 impl OutgoingIndexStore for MemoryStore {
     type Error = std::convert::Infallible;
 
-    fn load_outgoing_index(&self, channel_id: &ChannelId, epoch: u32) -> Result<Option<u64>, TicketManagerError> {
-        self.out_indices.get(channel_id).copied().ok_or(TicketManagerError::ChannelNotFound)
+    fn load_outgoing_index(&self, channel_id: &ChannelId, epoch: u32) -> Result<Option<u64>, Self::Error> {
+        Ok(self.out_indices.get(&(*channel_id, epoch)).copied())
     }
 
-    fn save_outgoing_index(&mut self, channel_id: &ChannelId, epoch: u32, index: u64) -> Result<(), TicketManagerError> {
-        self.out_indices.insert(*channel_id, index);
+    fn save_outgoing_index(&mut self, channel_id: &ChannelId, epoch: u32, index: u64) -> Result<(), Self::Error> {
+        self.out_indices.insert((*channel_id, epoch), index);
         Ok(())
+    }
+
+    fn delete_outgoing_index(&mut self, channel_id: &ChannelId, epoch: u32) -> Result<(), Self::Error> {
+        self.out_indices.remove(&(*channel_id, epoch));
+        Ok(())
+    }
+
+    fn iter_outgoing_indices(&self) -> impl Iterator<Item = (ChannelId, u32)> {
+        self.out_indices.iter().map(|(k, _)| *k)
     }
 }
 

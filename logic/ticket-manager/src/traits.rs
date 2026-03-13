@@ -8,9 +8,13 @@ pub trait OutgoingIndexStore {
     /// Loads the last used outgoing ticket index for the given channel and epoch.
     ///
     /// If the index is not found, returns `Ok(None)`.
-    fn load_outgoing_index(&self, channel_id: &ChannelId, epoch: u32) -> Result<Option<u64>, TicketManagerError>;
+    fn load_outgoing_index(&self, channel_id: &ChannelId, epoch: u32) -> Result<Option<u64>, Self::Error>;
     /// Saves the last used outgoing ticket index for the given channel and epoch.
-    fn save_outgoing_index(&mut self, channel_id: &ChannelId, epoch: u32, index: u64) -> Result<(), TicketManagerError>;
+    fn save_outgoing_index(&mut self, channel_id: &ChannelId, epoch: u32, index: u64) -> Result<(), Self::Error>;
+    /// Deletes the outgoing ticket index for the given channel and epoch.
+    fn delete_outgoing_index(&mut self, channel_id: &ChannelId, epoch: u32) -> Result<(), Self::Error>;
+    /// Iterate over all channel IDs and epochs of outgoing ticket indices in the storage.
+    fn iter_outgoing_indices(&self) -> impl Iterator<Item = (ChannelId, u32)>;
 }
 
 /// Allows loading ticket queues from a storage.
@@ -18,9 +22,14 @@ pub trait TicketQueueStore {
     /// Type of queues.
     type Queue: TicketQueue;
     /// Opens or creates a new queue in storage for the given channel.
-    fn open_or_create(&mut self, channel_id: &ChannelId) -> Result<Self::Queue, <Self::Queue as TicketQueue>::Error>;
+    fn open_or_create_queue(
+        &mut self,
+        channel_id: &ChannelId,
+    ) -> Result<Self::Queue, <Self::Queue as TicketQueue>::Error>;
+    /// Deletes the queue for the given channel.
+    fn delete_queue(&mut self, channel_id: &ChannelId) -> Result<(), <Self::Queue as TicketQueue>::Error>;
     /// Iterate over all channel IDs of ticket queues in the storage.
-    fn iter_channels(&self) -> impl Iterator<Item = ChannelId>;
+    fn iter_queues(&self) -> impl Iterator<Item = ChannelId>;
 }
 
 /// Backend for ticket storage queue.

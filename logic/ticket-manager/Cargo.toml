@@ -1,18 +1,19 @@
 [package]
 name = "hopr-ticket-manager"
 version = "0.1.0"
+description = "Manages outgoing ticket indices and incoming redeemable tickets"
 rust-version.workspace = true
 authors.workspace = true
 edition.workspace = true
 
 [features]
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
-prometheus = ["dep:hopr-metrics"]
 
 [dependencies]
 anyhow = { workspace = true }
-dashmap = { workspace = true }
+dashmap = { workspace = true, features = ["inline"] }
 futures = { workspace = true }
+futures-time = { workspace = true }
 parking_lot = { workspace = true, features = ["arc_lock"] }
 redb = { workspace = true }
 serde = { workspace = true }
@@ -25,5 +26,4 @@ hopr-api = { workspace = true, features = [
   "types-internal",
   "serde",
 ] }
-hopr-async-runtime = { workspace = true}
-hopr-metrics = { workspace = true, optional = true }
+hopr-async-runtime = { workspace = true }
