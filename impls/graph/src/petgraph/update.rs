@@ -5,7 +5,7 @@ use crate::{ChannelGraph, Observations, graph::InnerGraph};
 
 /// Resolves a loopback path from serialized node-index bytes into a validated chain of edge indices.
 ///
-/// The `path_bytes` encode a [`PathId`] where each `u64` is a [`NodeIndex`].
+/// The `path_bytes` encode a `PathId` where each `u64` is a [`NodeIndex`].
 /// The path is expected to start and end at `me_idx` (a closed loop).
 ///
 /// Walks consecutive node pairs, finding the connecting edge for each.

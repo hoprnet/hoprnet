@@ -1,6 +1,6 @@
 [package]
 name = "hopr-crypto-keypair"
-version = "0.5.1"
+version = "0.5.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -16,7 +16,7 @@ crate-type = ["rlib"]
 hex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-scrypt = { workspace = true, default-features = false }
+scrypt = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 typenum = { workspace = true }

@@ -58,9 +58,9 @@ pub struct SurbBalancerConfig {
     /// The `SurbBalancer` will try to maintain approximately this number of SURBs
     /// locally or remotely (at the counterparty) at all times.
     ///
-    /// The local buffer is maintained by [regulating](SurbFlowController) the egress from the Session.
+    /// The local buffer is maintained by regulating (`SurbFlowController`) the egress from the Session.
     /// The remote buffer (at session counterparty) is maintained by regulating the flow of non-organic SURBs via
-    /// [keep-alive messages](crate::initiation::StartProtocol::KeepAlive).
+    /// keep-alive messages.
     ///
     /// It does not make sense to set this value higher than the [`max_surb_buffer_size`](crate::SessionManagerConfig)
     /// configuration at the counterparty.
@@ -81,7 +81,7 @@ pub struct SurbBalancerConfig {
 
     /// Sets what percentage of the target buffer size should be discarded at each window.
     ///
-    /// The [`SurbBalancer`] will discard the given percentage of `target_surb_buffer_size` at each
+    /// The `SurbBalancer` will discard the given percentage of `target_surb_buffer_size` at each
     /// window with the given `Duration`.
     ///
     /// The default is `(60, 0.05)` (5% of the target buffer size is discarded every 60 seconds).
@@ -90,14 +90,14 @@ pub struct SurbBalancerConfig {
 }
 
 impl SurbBalancerConfig {
-    /// Convenience function to convert the [`SurbBalancerConfig`] into [`BalancerControllerBounds`].
+    /// Convenience function to convert the [`SurbBalancerConfig`] into `BalancerControllerBounds`.
     #[inline]
     pub fn as_controller_bounds(&self) -> BalancerControllerBounds {
         BalancerControllerBounds::new(self.target_surb_buffer_size, self.max_surbs_per_sec)
     }
 }
 
-/// Runtime state of the [`SurbBalancer`].
+/// Runtime state of the `SurbBalancer`.
 #[derive(Debug, Default)]
 pub struct BalancerStateValues {
     pub target_surb_buffer_size: AtomicU64,
@@ -166,7 +166,7 @@ impl BalancerStateValues {
         self.buffer_level.load(std::sync::atomic::Ordering::Relaxed)
     }
 
-    /// Returns the current [`BalancerControllerBounds`] from the [`BalancerStateValues`].
+    /// Returns the current `BalancerControllerBounds` from the [`BalancerStateValues`].
     #[inline]
     pub fn controller_bounds(&self) -> BalancerControllerBounds {
         BalancerControllerBounds::new(
@@ -198,7 +198,7 @@ impl From<SurbBalancerConfig> for BalancerStateValues {
 /// Session, slowing it down to avoid fast SURB drainage.
 ///
 /// In the remote context, the `SurbFlowController` might regulate the flow of non-organic SURBs via
-/// Start protocol's [`KeepAlive`](crate::initiation::StartProtocol::KeepAlive) messages to deliver additional
+/// Start protocol's `KeepAlive` messages to deliver additional
 /// SURBs to the counterparty.
 pub struct SurbBalancer<C, E, F> {
     session_id: SessionId,

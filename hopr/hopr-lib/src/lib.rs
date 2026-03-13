@@ -51,14 +51,15 @@ pub mod exports {
 /// Export of relevant types for easier integration.
 #[doc(hidden)]
 pub mod prelude {
+    #[cfg(feature = "runtime-tokio")]
+    pub use super::exports::network::types::{
+        prelude::ForeignDataMode,
+        udp::{ConnectedUdpStream, UdpStreamParallelism},
+    };
     pub use super::exports::{
         crypto::{
             keypair::key_pair::HoprKeys,
             types::prelude::{ChainKeypair, Hash, OffchainKeypair},
-        },
-        network::types::{
-            prelude::ForeignDataMode,
-            udp::{ConnectedUdpStream, UdpStreamParallelism},
         },
         transport::{OffchainPublicKey, socket::HoprSocket},
         types::primitive::prelude::Address,
@@ -851,7 +852,7 @@ where
     /// active operations will stop and new will be impossible to perform.
     /// Such operations will return [`HoprStatusError::NotThereYet`].
     ///
-    /// This is the final state and cannot be reversed by calling [`HoprLib::run`] again.
+    /// This is the final state and cannot be reversed by calling `run` again.
     pub fn shutdown(&self) -> Result<(), HoprLibError> {
         self.error_if_not_in_state(HoprState::Running, "node is not running".into())?;
         if let Some(processes) = self.processes.get() {
@@ -890,7 +891,7 @@ where
         .await?)
     }
 
-    /// Sends keep-alive to the given [`HoprSessionId`], making sure the session is not
+    /// Sends keep-alive to the given [`SessionId`], making sure the session is not
     /// closed due to inactivity.
     #[cfg(feature = "session-client")]
     pub async fn keep_alive_session(&self, id: &SessionId) -> errors::Result<()> {
