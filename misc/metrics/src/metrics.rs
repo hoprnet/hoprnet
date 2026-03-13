@@ -106,10 +106,6 @@ impl AtomicF64 {
         f64::from_bits(self.0.load(Ordering::Relaxed))
     }
 
-    fn store(&self, val: f64) {
-        self.0.store(val.to_bits(), Ordering::Relaxed);
-    }
-
     /// Atomically swaps the value and returns the previous one.
     fn swap(&self, new: f64) -> f64 {
         f64::from_bits(self.0.swap(new.to_bits(), Ordering::Relaxed))
