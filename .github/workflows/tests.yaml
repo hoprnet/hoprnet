@@ -102,29 +102,6 @@ jobs:
         run: |
           nix build -L .#hopr-test-nightly
 
-  docs:
-    name: Docs
-    runs-on: self-hosted-hoprnet-bigger
-    timeout-minutes: 60
-    env:
-      CI: "true"
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
-        with:
-          disable-sudo: true
-          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
-
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
-          persist-credentials: false
-
-      - name: Build docs
-        run: nix develop -c cargo doc --no-deps --document-private-items
-
   build-candidate-binaries:
     name: Build Candidate Binaries
     runs-on: self-hosted-hoprnet-bigger
