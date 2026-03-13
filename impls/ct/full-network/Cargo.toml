@@ -34,8 +34,8 @@ hopr-api = { workspace = true, features = [
   "graph",
   "types-random",
 ] }
-hopr-network-graph = { workspace = true }
 hopr-statistics = { workspace = true, features = ["weighted"] }
+hopr-network-graph = { workspace = true, features = ["petgraph"] }
 
 [dev-dependencies]
 tokio = { workspace = true }

@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport"
-version = "0.21.0"
+version = "0.21.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR transport interface for the core library"
 edition.workspace = true
@@ -64,7 +64,7 @@ hopr-crypto-packet = { workspace = true }
 
 hopr-network-types = { workspace = true }
 hopr-protocol-app = { workspace = true }
-hopr-protocol-hopr = { workspace = true }
+hopr-protocol-hopr = { workspace = true, features = ["rayon"] }
 hopr-transport-identity = { workspace = true }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-network = { workspace = true }
@@ -76,12 +76,14 @@ hopr-transport-tag-allocator = { workspace = true }
 
 [dev-dependencies]
 hex-literal = { workspace = true }
+hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 insta = { workspace = true, features = ["yaml"] }
 
 hopr-protocol-start = { workspace = true }
 hopr-protocol-session = { workspace = true, features = [
   "session-types",
   "runtime-tokio",
+  "hashbrown",
 ] }
 hopr-transport-network = { workspace = true }
 hopr-transport-mixer = { workspace = true }
