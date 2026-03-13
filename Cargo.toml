@@ -133,6 +133,7 @@ oas3 = "0.20.1"
 openapiv3 = "2.2.0"
 opentelemetry = { version = "0.31.0" }
 opentelemetry-otlp = { version = "0.31.0", default-features = false }
+opentelemetry-prometheus-text-exporter = { version = "0.2.1" }
 opentelemetry_sdk = { version = "0.31.0" }
 tracing-opentelemetry = { version = "0.32.1" }
 temp-env = "0.3.6"
@@ -149,7 +150,6 @@ percent-encoding = "2.3.2"
 prettyplease = "0.2.37"
 postcard = { version = "1.1.3", default-features = false, features = ["alloc"] }
 proc-macro-regex = "~1.1.0"
-prometheus = "0.14.0"
 progenitor = "0.13.0"
 progenitor-client = "0.13.0"
 rayon = "1.11.0"

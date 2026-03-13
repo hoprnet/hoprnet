@@ -49,7 +49,7 @@ use crate::{
     utils::{SurbNotificationMode, insert_into_next_slot},
 };
 
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_ACTIVE_SESSIONS: hopr_metrics::SimpleGauge = hopr_metrics::SimpleGauge::new(
         "hopr_session_num_active_sessions",
@@ -100,7 +100,7 @@ fn close_session(session_id: SessionId, session_data: SessionSlot, reason: Closu
         session_data.telemetry.touch_activity();
     }
 
-    #[cfg(all(feature = "prometheus", not(test)))]
+    #[cfg(all(feature = "telemetry", not(test)))]
     METRIC_ACTIVE_SESSIONS.decrement(1.0);
 }
 
@@ -451,7 +451,7 @@ where
         cfg.frame_mtu = cfg.frame_mtu.max(SESSION_MTU);
         cfg.max_frame_timeout = cfg.max_frame_timeout.max(MIN_FRAME_TIMEOUT);
 
-        #[cfg(all(feature = "prometheus", not(test)))]
+        #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_ACTIVE_SESSIONS.set(0.0);
 
         let msg_sender = Arc::new(OnceLock::new());
@@ -571,7 +571,7 @@ where
             })
             .await
         {
-            #[cfg(all(feature = "prometheus", not(test)))]
+            #[cfg(all(feature = "telemetry", not(test)))]
             {
                 METRIC_NUM_INITIATED_SESSIONS.increment();
                 METRIC_ACTIVE_SESSIONS.increment(1.0);
@@ -924,7 +924,7 @@ where
                 // Timeout waiting for a session establishment
                 error!(challenge, "session initiation attempt timed out");
 
-                #[cfg(all(feature = "prometheus", not(test)))]
+                #[cfg(all(feature = "telemetry", not(test)))]
                 METRIC_RECEIVED_SESSION_ERRS.increment(&["timeout"]);
 
                 Err(TransportSessionError::Timeout)
@@ -1328,7 +1328,7 @@ where
             #[cfg(feature = "telemetry")]
             register_session_telemetry(&slot.telemetry);
 
-            #[cfg(all(feature = "prometheus", not(test)))]
+            #[cfg(all(feature = "telemetry", not(test)))]
             {
                 METRIC_NUM_ESTABLISHED_SESSIONS.increment();
                 METRIC_ACTIVE_SESSIONS.increment(1.0);
@@ -1358,7 +1358,7 @@ where
 
             trace!(%pseudonym, "session establishment failure message sent");
 
-            #[cfg(all(feature = "prometheus", not(test)))]
+            #[cfg(all(feature = "telemetry", not(test)))]
             METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()])
         }
 
@@ -1417,7 +1417,7 @@ where
                     );
                 }
 
-                #[cfg(all(feature = "prometheus", not(test)))]
+                #[cfg(all(feature = "telemetry", not(test)))]
                 METRIC_RECEIVED_SESSION_ERRS.increment(&[&error_type.reason.to_string()])
             }
             HoprStartProtocol::KeepAlive(msg) => {

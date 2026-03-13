@@ -14,7 +14,7 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-prometheus = ["dep:hopr-metrics", "dep:lazy_static"]
+telemetry = ["dep:hopr-metrics", "dep:lazy_static"]
 
 [dependencies]
 futures = { workspace = true }

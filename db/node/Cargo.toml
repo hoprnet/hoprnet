@@ -19,7 +19,7 @@ runtime-tokio = [
   "sqlx/runtime-tokio-native-tls",
   "sqlx/runtime-tokio",
 ]
-prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
+telemetry = ["dep:lazy_static", "dep:hopr-metrics"]
 sqlite = ["sea-query/backend-sqlite"]
 serde = ["hopr-api/serde"]
 

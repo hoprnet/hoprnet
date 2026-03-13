@@ -15,14 +15,13 @@ crate-type = ["rlib"]
 [features]
 capture = ["hopr-transport/capture"]
 default = []
-telemetry = ["hopr-transport/telemetry"]
-fixed-rng = ["hopr-api/types-fixed-rng"]
-prometheus = [
+telemetry = [
+  "hopr-transport/telemetry",
   "dep:hopr-metrics",
-  "hopr-transport/prometheus",
-  "hopr-network-types/prometheus",
-  "hopr-parallelize/prometheus",
+  "hopr-network-types/telemetry",
+  "hopr-parallelize/telemetry",
 ]
+fixed-rng = ["hopr-api/types-fixed-rng"]
 runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hopr-network-types/runtime-tokio",

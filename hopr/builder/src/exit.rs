@@ -9,7 +9,7 @@ use hopr_lib::{
 
 use crate::config::SessionIpForwardingConfig;
 
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_ACTIVE_TARGETS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
         "hopr_session_hoprd_target_connections",
@@ -132,7 +132,7 @@ impl hopr_lib::traits::session::HoprSessionServer for HoprServerIpForwardingReac
                 );
 
                 tokio::task::spawn(async move {
-                    #[cfg(all(feature = "prometheus", not(test)))]
+                    #[cfg(all(feature = "telemetry", not(test)))]
                     let _g = hopr_metrics::MultiGaugeGuard::new(&METRIC_ACTIVE_TARGETS, &["udp"], 1.0);
 
                     // The Session forwards the termination to the udp_bridge, terminating
@@ -211,7 +211,7 @@ impl hopr_lib::traits::session::HoprSessionServer for HoprServerIpForwardingReac
                 );
 
                 tokio::task::spawn(async move {
-                    #[cfg(all(feature = "prometheus", not(test)))]
+                    #[cfg(all(feature = "telemetry", not(test)))]
                     let _g = hopr_metrics::MultiGaugeGuard::new(&METRIC_ACTIVE_TARGETS, &["tcp"], 1.0);
 
                     match transfer_session(&mut session.session, &mut tcp_bridge, HOPR_TCP_BUFFER_SIZE, None).await {
@@ -237,7 +237,7 @@ impl hopr_lib::traits::session::HoprSessionServer for HoprServerIpForwardingReac
                 tracing::debug!(?session_id, "bridging the session to the loopback service");
                 let (mut reader, mut writer) = tokio::io::split(session.session);
 
-                #[cfg(all(feature = "prometheus", not(test)))]
+                #[cfg(all(feature = "telemetry", not(test)))]
                 let _g = hopr_metrics::MultiGaugeGuard::new(&METRIC_ACTIVE_TARGETS, &["loopback"], 1.0);
 
                 // Uses 4 kB buffer for copying

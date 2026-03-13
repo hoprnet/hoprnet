@@ -16,7 +16,7 @@ use super::{
 };
 use crate::SessionId;
 
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_TARGET_ERROR_ESTIMATE: hopr_metrics::MultiGauge =
         hopr_metrics::MultiGauge::new(
@@ -225,7 +225,7 @@ where
         flow_control: F,
         state: Arc<BalancerStateValues>,
     ) -> Self {
-        #[cfg(all(feature = "prometheus", not(test)))]
+        #[cfg(all(feature = "telemetry", not(test)))]
         {
             let sid = session_id.to_string();
             METRIC_TARGET_ERROR_ESTIMATE.set(&[&sid], 0.0);
@@ -314,7 +314,7 @@ where
 
         self.flow_control.adjust_surb_flow(output as usize);
 
-        #[cfg(all(feature = "prometheus", not(test)))]
+        #[cfg(all(feature = "telemetry", not(test)))]
         {
             let sid = self.session_id.to_string();
             METRIC_CURRENT_BUFFER.set(&[&sid], current as f64);

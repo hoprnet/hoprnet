@@ -16,7 +16,7 @@ use tracing::{error, trace};
 
 use crate::{config::MixerConfig, data::DelayedData};
 
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
     pub static ref METRIC_QUEUE_SIZE: hopr_metrics::SimpleGauge =
         hopr_metrics::SimpleGauge::new("hopr_mixer_queue_size", "Current mixer queue size").unwrap();
@@ -146,7 +146,7 @@ impl<T> futures::sink::Sink<T> for Sender<T> {
                 waker.wake_by_ref();
             }
 
-            #[cfg(all(feature = "prometheus", not(test)))]
+            #[cfg(all(feature = "telemetry", not(test)))]
             {
                 METRIC_QUEUE_SIZE.increment(1.0f64);
 
@@ -214,7 +214,7 @@ impl<T> Stream for Receiver<T> {
 
                 trace!(from = "direct", "yield item");
 
-                #[cfg(all(feature = "prometheus", not(test)))]
+                #[cfg(all(feature = "telemetry", not(test)))]
                 METRIC_QUEUE_SIZE.decrement(1.0f64);
 
                 return Poll::Ready(Some(data));
@@ -237,7 +237,7 @@ impl<T> Stream for Receiver<T> {
 
                 trace!(from = "timer", "yield item");
 
-                #[cfg(all(feature = "prometheus", not(test)))]
+                #[cfg(all(feature = "telemetry", not(test)))]
                 METRIC_QUEUE_SIZE.decrement(1.0f64);
 
                 return Poll::Ready(Some(
@@ -268,7 +268,7 @@ impl<T> Receiver<T> {
 
 /// Instantiate a mixing channel and return the sender and receiver end of the channel.
 pub fn channel<T>(cfg: crate::config::MixerConfig) -> (Sender<T>, Receiver<T>) {
-    #[cfg(all(feature = "prometheus", not(test)))]
+    #[cfg(all(feature = "telemetry", not(test)))]
     {
         // Initialize the lazy statics here
         lazy_static::initialize(&METRIC_QUEUE_SIZE);

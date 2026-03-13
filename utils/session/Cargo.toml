@@ -19,10 +19,10 @@ runtime-tokio = [
   "hopr-network-types/runtime-tokio",
   "hopr-transport/runtime-tokio",
 ]
-prometheus = [
+telemetry = [
   "dep:hopr-metrics",
-  "hopr-transport/prometheus",
-  "hopr-network-types/prometheus",
+  "hopr-transport/telemetry",
+  "hopr-network-types/telemetry",
 ]
 
 [dependencies]

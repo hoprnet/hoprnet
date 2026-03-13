@@ -13,11 +13,10 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = ["prometheus", "runtime-tokio"]
-telemetry = ["hopr-lib/telemetry"]
-prometheus = [
-  "hopr-lib/prometheus",
-  "hopr-transport-p2p/prometheus",
+default = ["telemetry", "runtime-tokio"]
+telemetry = [
+  "hopr-lib/telemetry",
+  "hopr-transport-p2p/telemetry",
   "dep:hopr-metrics",
   "dep:lazy_static",
   "dep:regex",

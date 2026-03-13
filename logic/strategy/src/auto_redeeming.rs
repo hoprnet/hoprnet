@@ -29,7 +29,7 @@ use crate::{
     strategy::SingularStrategy,
 };
 
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_COUNT_AUTO_REDEEMS:  hopr_metrics::SimpleCounter =
          hopr_metrics::SimpleCounter::new("hopr_strategy_auto_redeem_redeem_count", "Count of initiated automatic redemptions").unwrap();

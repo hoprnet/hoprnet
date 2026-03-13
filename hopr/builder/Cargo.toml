@@ -14,7 +14,6 @@ crate-type = ["rlib"]
 
 [features]
 default = ["runtime-tokio"]
-prometheus = ["hopr-lib/prometheus"]
 runtime-tokio = [
   "dep:tokio",
   "hopr-lib/runtime-tokio",
@@ -44,7 +43,7 @@ testing = [
   "dep:rstest",
   "hopr-chain-connector/testing",
 ]
-telemetry = ["hopr-lib/telemetry"]
+telemetry = ["hopr-lib/telemetry", "dep:hopr-metrics", "dep:lazy_static"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -67,6 +66,7 @@ tracing = { workspace = true }
 validator = { workspace = true, optional = true }
 
 hopr-lib = { workspace = true, features = ["utils_parallel"] }
+hopr-metrics = { workspace = true, optional = true }
 # impls
 hopr-db-node = { workspace = true }
 hopr-chain-connector = { workspace = true }
