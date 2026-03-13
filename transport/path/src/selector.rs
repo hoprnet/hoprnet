@@ -11,7 +11,7 @@ const DEFAULT_PENALTY: f64 = 0.5;
 
 /// Default minimum acceptable message acknowledgment rate for immediate peers.
 /// Set to 0.0 to disable rejection until sufficient data is collected.
-const DEFAULT_MIN_ACK_RATE: f64 = 0.0;
+const DEFAULT_MIN_ACK_RATE: f64 = 0.5;
 
 type PathToDestination = Vec<OffchainPublicKey>;
 
