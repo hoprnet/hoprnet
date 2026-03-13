@@ -416,6 +416,7 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
                         config,
                         Some(hopr_ct_full_network::ProberConfig {
                             interval: std::time::Duration::from_secs(1),
+                            ..Default::default()
                         }), // aggressive setting to facilitate fast n-hop telemetry probing
                         connector.clone(),
                         node_db,

@@ -138,6 +138,7 @@ pcap-file = "2.0.0"
 petgraph = { version = "0.8.3", default-features = false, features = [
   "std",
   "serde-1",
+  "rayon",
 ] }
 pid = "4.0.0"
 pin-project = "1.1.11"
@@ -242,7 +243,7 @@ mimalloc = { version = "0.1.48", default-features = false, features = [
   "secure",
 ] }
 
-hopr-api = { git = "https://github.com/hoprnet/hopr-api", rev = "b350c5bbb56871291c8f220979949db816b2de8d" }
+hopr-api = { git = "https://github.com/hoprnet/hopr-api", rev = "a2d8c7b5499db2e97c0cc3fe6d1d8faaea192981" }
 hopr-types = { git = "https://github.com/hoprnet/hopr-types", branch = "main" }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-crypto-keypair = { path = "crypto/keypair", default-features = false }

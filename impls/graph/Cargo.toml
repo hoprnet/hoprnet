@@ -1,6 +1,6 @@
 [package]
 name = "hopr-network-graph"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implementation of the HOPR network graph."
 edition.workspace = true
@@ -20,9 +20,9 @@ petgraph = ["dep:petgraph", "dep:indexmap"]
 anyhow = { workspace = true }
 bimap = { workspace = true }
 futures = { workspace = true }
-indexmap = { workspace = true, optional = true }
+indexmap = { workspace = true, optional = true, features = ["rayon"] }
 parking_lot = { workspace = true }
-petgraph = { workspace = true, optional = true }
+petgraph = { workspace = true, optional = true, features = ["rayon"] }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 

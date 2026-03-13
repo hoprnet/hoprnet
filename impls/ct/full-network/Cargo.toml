@@ -1,6 +1,6 @@
 [package]
 name = "hopr-ct-full-network"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Full implementation of the Telemetry functionality as specified in the HOPR RFCs along with optional noise (cover traffic) generation."
 edition.workspace = true
@@ -22,11 +22,11 @@ anyhow = { workspace = true }
 cfg-if = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
+futures-time = { workspace = true }
 smart-default = { workspace = true }
 serde = { workspace = true, optional = true, features = ["derive"] }
 humantime-serde = { workspace = true, optional = true }
 validator = { workspace = true }
-moka = { workspace = true }
 
 hopr-api = { workspace = true, features = [
   "ct",
@@ -34,11 +34,11 @@ hopr-api = { workspace = true, features = [
   "graph",
   "types-random",
 ] }
-hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
+hopr-statistics = { workspace = true, features = ["weighted"] }
 hopr-network-graph = { workspace = true, features = ["petgraph"] }
 
 [dev-dependencies]
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["time"] }
 lazy_static = { workspace = true }
 
 [package.metadata.cargo-machete]

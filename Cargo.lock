@@ -2844,7 +2844,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -4362,8 +4362,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "1.1.0"
-source = "git+https://github.com/hoprnet/hopr-api?rev=b350c5bbb56871291c8f220979949db816b2de8d#b350c5bbb56871291c8f220979949db816b2de8d"
+version = "1.1.1"
+source = "git+https://github.com/hoprnet/hopr-api?rev=a2d8c7b5499db2e97c0cc3fe6d1d8faaea192981#a2d8c7b5499db2e97c0cc3fe6d1d8faaea192981"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -4604,18 +4604,18 @@ dependencies = [
 
 [[package]]
 name = "hopr-ct-full-network"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "cfg-if",
  "futures",
  "futures-concurrency",
+ "futures-time",
  "hopr-api",
- "hopr-async-runtime",
  "hopr-network-graph",
+ "hopr-statistics",
  "humantime-serde",
  "lazy_static",
- "moka",
  "serde",
  "smart-default",
  "tokio",
@@ -4761,7 +4761,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-network-graph"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "assertables",
@@ -4964,9 +4964,10 @@ dependencies = [
 
 [[package]]
 name = "hopr-statistics"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "assertables",
+ "rand 0.10.0",
  "serde",
 ]
 
@@ -5117,7 +5118,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-path"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5130,6 +5131,7 @@ dependencies = [
  "hopr-metrics",
  "hopr-network-graph",
  "hopr-protocol-hopr",
+ "hopr-statistics",
  "hopr-types",
  "lazy_static",
  "moka",
@@ -5674,7 +5676,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.6.2",
+ "socket2 0.5.10",
  "system-configuration",
  "tokio",
  "tower-service",
@@ -6078,7 +6080,7 @@ dependencies = [
  "portable-atomic",
  "portable-atomic-util",
  "serde_core",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -7027,7 +7029,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -8065,7 +8067,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash",
  "rustls 0.23.37",
- "socket2 0.6.2",
+ "socket2 0.5.10",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -8102,9 +8104,9 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.6.2",
+ "socket2 0.5.10",
  "tracing",
- "windows-sys 0.60.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -8698,7 +8700,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -9266,7 +9268,7 @@ checksum = "4a6fc4aa0da972ba0f51cf5c1bb16e9dba35334adc6831b09b3ffb0ec20bb264"
 dependencies = [
  "ahash",
  "annotate-snippets",
- "base64 0.22.1",
+ "base64 0.21.7",
  "encoding_rs_io",
  "getrandom 0.3.4",
  "nohash-hasher",
@@ -10080,7 +10082,7 @@ dependencies = [
  "getrandom 0.4.2",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -11198,7 +11200,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
