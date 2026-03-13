@@ -2,7 +2,7 @@ use futures::{StreamExt, stream::BoxStream};
 use futures_concurrency::stream::StreamExt as _;
 use hopr_api::{
     ct::{CoverTrafficGeneration, ProbeRouting, ProbingTrafficGeneration},
-    graph::{NetworkGraphTraverse, NetworkGraphView, costs::HoprForwardCostFn},
+    graph::{NetworkGraphTraverse, NetworkGraphView, costs::EdgeCostFn},
     types::{
         crypto::types::OffchainPublicKey,
         crypto_random::Randomizable,
@@ -61,7 +61,7 @@ where
                 let me = self.me;
                 let graph_intermediates = self.graph.clone();
 
-                let junk = futures::stream::repeat(futures::stream::iter([2, 3, 4]))
+                let junk = futures::stream::repeat(futures::stream::iter([2usize, 3, 4]))
                     .flatten()
                     .filter_map(move |edge_count| async move {
                         hopr_async_runtime::prelude::sleep(cfg.interval).await;
@@ -69,10 +69,10 @@ where
                     })
                     .flat_map(move |edge_count| {
                         let simple_paths =
-                            graph_intermediates.simple_paths(&me, &me, edge_count, Some(100), HoprForwardCostFn::new(edge_count));
+                            graph_intermediates.simple_paths(&me, &me, edge_count, Some(100), EdgeCostFn::forward(std::num::NonZeroUsize::new(edge_count).expect("edge_count is always > 0"), 0.5, 0.0));
                         futures::stream::iter(simple_paths)
                     })
-                    .filter_map(move |(path, _path_id, _cost)| {
+                    .filter_map(move |(path, _path_id, _cost): (_, _, f64)| {
                         let me_node: NodeId = me.into();
                         let path: Vec<NodeId> = path.into_iter().map(NodeId::from).collect();
 
@@ -164,11 +164,11 @@ where
                     &me,
                     edge_count.get(),
                     Some(100),
-                    HoprForwardCostFn::new(edge_count),
+                    EdgeCostFn::forward(edge_count, 0.5, 0.0),
                 );
                 futures::stream::iter(simple_paths)
             })
-            .filter_map(move |(path, path_id, _cost)| {
+            .filter_map(move |(path, path_id, _cost): (_, _, f64)| {
                 let me_node: NodeId = me.into();
                 let path: Vec<NodeId> = path.into_iter().map(NodeId::from).collect();
 

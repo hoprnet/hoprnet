@@ -1,5 +1,5 @@
 use hopr_api::graph::{
-    EdgeLinkObservable,
+    EdgeImmediateProtocolObservable, EdgeLinkObservable,
     traits::{
         EdgeNetworkObservableRead, EdgeObservableRead, EdgeObservableWrite, EdgeProtocolObservable,
         EdgeTransportMeasurement, EdgeWeightType,
@@ -80,6 +80,11 @@ impl EdgeObservableWrite for Observations {
             EdgeWeightType::Connected(is_connected) => {
                 self.immediate_probe.get_or_insert_default().is_connected = is_connected
             }
+            EdgeWeightType::ImmediateProtocolConformance { num_packets, num_acks } => {
+                let imm = self.immediate_probe.get_or_insert_default();
+                imm.messages_sent += num_packets;
+                imm.acks_received += num_acks;
+            }
         }
     }
 }
@@ -88,11 +93,23 @@ impl EdgeObservableWrite for Observations {
 pub struct TransportImmediates {
     link: TransportLinkMeasurement,
     is_connected: bool,
+    messages_sent: u64,
+    acks_received: u64,
 }
 
 impl EdgeNetworkObservableRead for TransportImmediates {
     fn is_connected(&self) -> bool {
         self.is_connected
+    }
+}
+
+impl EdgeImmediateProtocolObservable for TransportImmediates {
+    fn ack_rate(&self) -> Option<f64> {
+        if self.messages_sent == 0 {
+            None
+        } else {
+            Some(self.acks_received as f64 / self.messages_sent as f64)
+        }
     }
 }
 
@@ -243,6 +260,55 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn ack_rate_should_be_none_when_no_messages_sent() {
+        let mut observation = Observations::default();
+        observation.record(EdgeWeightType::Connected(true));
+
+        let imm = observation.immediate_qos().expect("should have immediate QoS");
+        assert_eq!(imm.ack_rate(), None);
+    }
+
+    #[test]
+    fn ack_rate_should_be_one_when_all_messages_acked() {
+        let mut observation = Observations::default();
+        observation.record(EdgeWeightType::ImmediateProtocolConformance {
+            num_packets: 10,
+            num_acks: 10,
+        });
+
+        let imm = observation.immediate_qos().expect("should have immediate QoS");
+        assert_eq!(imm.ack_rate(), Some(1.0));
+    }
+
+    #[test]
+    fn ack_rate_should_reflect_partial_acknowledgment() {
+        let mut observation = Observations::default();
+        observation.record(EdgeWeightType::ImmediateProtocolConformance {
+            num_packets: 10,
+            num_acks: 7,
+        });
+
+        let imm = observation.immediate_qos().expect("should have immediate QoS");
+        assert_in_delta!(imm.ack_rate().expect("should have ack rate"), 0.7, 0.001);
+    }
+
+    #[test]
+    fn ack_rate_should_accumulate_across_multiple_records() {
+        let mut observation = Observations::default();
+        observation.record(EdgeWeightType::ImmediateProtocolConformance {
+            num_packets: 5,
+            num_acks: 5,
+        });
+        observation.record(EdgeWeightType::ImmediateProtocolConformance {
+            num_packets: 5,
+            num_acks: 0,
+        });
+
+        let imm = observation.immediate_qos().expect("should have immediate QoS");
+        assert_in_delta!(imm.ack_rate().expect("should have ack rate"), 0.5, 0.001);
     }
 
     #[test]

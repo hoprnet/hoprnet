@@ -5,7 +5,7 @@ use hopr_api::{
     OffchainKeypair, OffchainPublicKey,
     graph::{
         NetworkGraphTraverse, NetworkGraphWrite,
-        costs::HoprForwardCostFn,
+        costs::EdgeCostFn,
         traits::{EdgeObservableWrite, EdgeWeightType},
     },
     types::crypto::prelude::Keypair,
@@ -124,7 +124,7 @@ fn bench_simple_paths(c: &mut Criterion) {
                         black_box(dst_2edge),
                         2,
                         Some(10),
-                        HoprForwardCostFn::new(std::num::NonZeroUsize::new(2).expect("is greater than 1")),
+                        EdgeCostFn::forward(std::num::NonZeroUsize::new(2).expect("is greater than 1"), 0.5, 0.0),
                     ))
                 });
             });
@@ -136,7 +136,7 @@ fn bench_simple_paths(c: &mut Criterion) {
                         black_box(dst_3edge),
                         3,
                         Some(10),
-                        HoprForwardCostFn::new(std::num::NonZeroUsize::new(3).expect("is greater than 1")),
+                        EdgeCostFn::forward(std::num::NonZeroUsize::new(3).expect("is greater than 1"), 0.5, 0.0),
                     ))
                 });
             });
@@ -148,7 +148,7 @@ fn bench_simple_paths(c: &mut Criterion) {
                         black_box(dst_4edge),
                         4,
                         Some(10),
-                        HoprForwardCostFn::new(std::num::NonZeroUsize::new(4).expect("is greater than 1")),
+                        EdgeCostFn::forward(std::num::NonZeroUsize::new(4).expect("is greater than 1"), 0.5, 0.0),
                     ))
                 });
             });

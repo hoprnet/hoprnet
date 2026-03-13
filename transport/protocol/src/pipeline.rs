@@ -69,6 +69,7 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
     app_outgoing: AppOut,
     encoder: std::sync::Arc<E>,
     wire_outgoing: WOut,
+    counters: crate::counters::PeerProtocolCounterRegistry,
     concurrency: usize,
 ) where
     AppOut: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
@@ -80,6 +81,7 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
         .then_concurrent(
             |(routing, data)| {
                 let encoder = encoder.clone();
+                let counters = counters.clone();
                 async move {
                     match encoder
                         .encode_packet(
@@ -95,6 +97,7 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
                             #[cfg(all(feature = "prometheus", not(test)))]
                             METRIC_PACKET_COUNT.increment(&["sent"]);
 
+                            counters.get_or_create(&packet.next_hop).record_message_sent();
                             tracing::trace!(peer = packet.next_hop.to_peerid_str(), "protocol message out");
                             Some((packet.next_hop.into(), packet.data))
                         }
@@ -445,6 +448,7 @@ async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
     ack_incoming: AckIn,
     ticket_events: TEvt,
     ticket_proc: std::sync::Arc<T>,
+    counters: crate::counters::PeerProtocolCounterRegistry,
 ) where
     AckIn: futures::Stream<Item = (OffchainPublicKey, Vec<Acknowledgement>)> + Send + 'static,
     T: UnacknowledgedTicketProcessor + Sync + Send + 'static,
@@ -455,7 +459,9 @@ async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
         .for_each_concurrent(NUM_CONCURRENT_TICKET_ACK_PROCESSING, move |(peer, acks)| {
             let ticket_proc = ticket_proc.clone();
             let mut ticket_evt = ticket_events.clone();
+            let counters = counters.clone();
             async move {
+                counters.get_or_create(&peer).record_ack_received();
                 tracing::trace!(num = acks.len(), "received acknowledgements");
                 match ticket_proc.acknowledge_tickets(peer, acks).await {
                     Ok(resolutions) if !resolutions.is_empty() => {
@@ -580,6 +586,7 @@ pub fn run_packet_pipeline<WIn, WOut, C, D, T, TEvt, AppOut, AppIn>(
     ticket_events: TEvt,
     cfg: PacketPipelineConfig,
     api: (AppOut, AppIn),
+    counters: crate::counters::PeerProtocolCounterRegistry,
 ) -> AbortableList<PacketPipelineProcesses>
 where
     WOut: futures::Sink<(PeerId, Box<[u8]>)> + Clone + Unpin + Send + 'static,
@@ -637,8 +644,14 @@ where
     processes.insert(
         PacketPipelineProcesses::MsgOut,
         spawn_as_abortable!(
-            start_outgoing_packet_pipeline(app_in, encoder.clone(), wire_out.clone(), output_concurrency)
-                .in_current_span()
+            start_outgoing_packet_pipeline(
+                app_in,
+                encoder.clone(),
+                wire_out.clone(),
+                counters.clone(),
+                output_concurrency
+            )
+            .in_current_span()
         ),
     );
 
@@ -668,7 +681,9 @@ where
 
     processes.insert(
         PacketPipelineProcesses::AckIn,
-        spawn_as_abortable!(start_incoming_ack_pipeline(incoming_ack_rx, ticket_events, ticket_proc).in_current_span()),
+        spawn_as_abortable!(
+            start_incoming_ack_pipeline(incoming_ack_rx, ticket_events, ticket_proc, counters).in_current_span()
+        ),
     );
 
     processes

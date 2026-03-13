@@ -1,14 +1,17 @@
-use hopr_api::graph::{
-    CostFn, NetworkGraphTraverse, NetworkGraphView,
-    costs::{ForwardPathCostFn, HoprForwardCostFn, HoprReturnCostFn},
-    traits::EdgeObservableRead,
-};
+use hopr_api::graph::{CostFn, NetworkGraphTraverse, NetworkGraphView, costs::EdgeCostFn, traits::EdgeObservableRead};
 use hopr_types::{crypto::types::OffchainPublicKey, internal::errors::PathError};
 
 use crate::{
     errors::{PathPlannerError, Result},
     traits::PathSelector,
 };
+
+/// Penalizing multiplier for edges that lack probe-based observations.
+const DEFAULT_PENALTY: f64 = 0.5;
+
+/// Minimum acceptable message acknowledgment rate for immediate peers.
+/// Set to 0.0 to disable rejection until sufficient data is collected.
+const DEFAULT_MIN_ACK_RATE: f64 = 0.0;
 
 type PathToDestination = Vec<OffchainPublicKey>;
 
@@ -64,7 +67,12 @@ where
     G: NetworkGraphTraverse<NodeId = OffchainPublicKey> + NetworkGraphView<NodeId = OffchainPublicKey>,
     <G as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
 {
-    let raw = graph.simple_paths_from(src, shorter_length.get(), Some(take), ForwardPathCostFn::new());
+    let raw = graph.simple_paths_from(
+        src,
+        shorter_length.get(),
+        Some(take),
+        EdgeCostFn::forward_without_self_loopback(DEFAULT_PENALTY, DEFAULT_MIN_ACK_RATE),
+    );
 
     raw.into_iter()
         .filter_map(|(path, _, cost)| {
@@ -171,7 +179,7 @@ where
                 &dest,
                 length,
                 self.max_paths,
-                HoprForwardCostFn::new(length),
+                EdgeCostFn::forward(length, DEFAULT_PENALTY, DEFAULT_MIN_ACK_RATE),
             );
 
             // Phase 2: if not enough paths, do an extended search with ForwardPathCostFn
@@ -192,7 +200,7 @@ where
                 &dest,
                 length,
                 self.max_paths,
-                HoprReturnCostFn::new(length),
+                EdgeCostFn::returning(length, DEFAULT_PENALTY, DEFAULT_MIN_ACK_RATE),
             )
         };
 
