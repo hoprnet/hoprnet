@@ -54,6 +54,7 @@ hopr-protocol-app = { workspace = true }
 [dev-dependencies]
 async-trait = { workspace = true }
 async_channel_io = { version = "0.3.0" }
+hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 bytesize = { workspace = true }
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 futures-concurrency = { workspace = true }

@@ -79,6 +79,7 @@ hopr-protocol-session = { workspace = true, features = [
   "runtime-tokio",
   "hashbrown",
 ] }
+hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 mockall = { workspace = true }
 rand = { workspace = true }
 serde_cbor_2 = { workspace = true }

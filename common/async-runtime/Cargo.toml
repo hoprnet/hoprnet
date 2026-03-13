@@ -13,7 +13,7 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = ["runtime-tokio"]
+default = []
 runtime-tokio = ["dep:tokio"]
 
 [dependencies]

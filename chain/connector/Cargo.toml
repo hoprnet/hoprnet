@@ -41,6 +41,7 @@ hopr-async-runtime = { workspace = true }
 [dev-dependencies]
 blokli-client = { workspace = true, features = ["testing"] }
 hex = { workspace = true }
+hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 hex-literal = { workspace = true }
 insta = { workspace = true }
 lazy_static = { workspace = true }

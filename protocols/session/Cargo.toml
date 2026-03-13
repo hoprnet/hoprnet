@@ -74,6 +74,7 @@ hopr-network-types = { workspace = true, features = [
   "capture",
   "runtime-tokio",
 ] }
+hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 hopr-protocol-app = { workspace = true }
 
 [[example]]

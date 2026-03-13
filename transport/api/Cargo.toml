@@ -76,6 +76,7 @@ hopr-transport-tag-allocator = { workspace = true }
 
 [dev-dependencies]
 hex-literal = { workspace = true }
+hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 insta = { workspace = true, features = ["yaml"] }
 
 hopr-protocol-start = { workspace = true }
