@@ -4601,14 +4601,14 @@ dependencies = [
 
 [[package]]
 name = "hopr-ct-full-network"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "cfg-if",
  "futures",
  "futures-concurrency",
+ "futures-time",
  "hopr-api",
- "hopr-async-runtime",
  "hopr-network-graph",
  "hopr-statistics",
  "humantime-serde",
@@ -4959,7 +4959,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-statistics"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "assertables",
  "rand 0.10.0",
@@ -5113,7 +5113,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-path"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",

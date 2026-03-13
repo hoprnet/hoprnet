@@ -168,8 +168,9 @@ where
                         let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::new();
                         for pwc in candidates {
                             let node_ids: Vec<NodeId> = pwc.path.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
-                            if let Ok(vp) = ValidatedPath::new(source, node_ids, &chain_resolver).await {
-                                valid_paths.push((vp, pwc.cost));
+                            match ValidatedPath::new(source, node_ids, &chain_resolver).await {
+                                Ok(vp) => valid_paths.push((vp, pwc.cost)),
+                                Err(e) => trace!(error = %e, "path candidate failed validation"),
                             }
                         }
 
@@ -329,8 +330,9 @@ where
                         let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::new();
                         for pwc in candidates {
                             let node_ids: Vec<NodeId> = pwc.path.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
-                            if let Ok(vp) = ValidatedPath::new(src, node_ids, &chain_resolver).await {
-                                valid_paths.push((vp, pwc.cost));
+                            match ValidatedPath::new(src, node_ids, &chain_resolver).await {
+                                Ok(vp) => valid_paths.push((vp, pwc.cost)),
+                                Err(e) => trace!(error = %e, "background refresh: path candidate failed validation"),
                             }
                         }
 

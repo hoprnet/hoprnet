@@ -60,31 +60,30 @@ where
     U: NetworkGraphTraverse<NodeId = OffchainPublicKey> + Clone + Send + Sync + 'static,
 {
     // 2, 3, 4 edges → 1-, 2-, 3-hops in the HOPR protocol
-    futures::stream::repeat(futures::stream::iter([2usize, 3, 4]))
-        .flatten()
-        .filter_map(move |edge_count| async move {
-            hopr_async_runtime::prelude::sleep(cfg.interval).await;
-            std::num::NonZeroUsize::new(edge_count)
-        })
-        .flat_map(move |edge_count| {
-            let paths = graph.simple_paths(
-                &me,
-                &me,
-                edge_count.get(),
-                Some(100),
-                EdgeCostFn::forward(edge_count, DEFAULT_EDGE_PENALTY),
-            );
+    futures::StreamExt::zip(
+        futures_time::stream::interval(futures_time::time::Duration::from(cfg.interval)),
+        futures::stream::repeat(futures::stream::iter([2usize, 3, 4])).flatten(),
+    )
+    .filter_map(move |(_, edge_count)| futures::future::ready(std::num::NonZeroUsize::new(edge_count)))
+    .flat_map(move |edge_count: std::num::NonZeroUsize| {
+        let paths = graph.simple_paths(
+            &me,
+            &me,
+            edge_count.get(),
+            Some(100),
+            EdgeCostFn::forward(edge_count, DEFAULT_EDGE_PENALTY),
+        );
 
-            let weighted: Vec<_> = paths
-                .into_iter()
-                .map(|(path, path_id, cost)| {
-                    let priority = (1.0 - cost).max(0.0) + cfg.base_priority;
-                    ((path, path_id), priority)
-                })
-                .collect();
+        let weighted: Vec<_> = paths
+            .into_iter()
+            .map(|(path, path_id, cost)| {
+                let priority = (1.0 - cost).max(0.0) + cfg.base_priority;
+                ((path, path_id), priority)
+            })
+            .collect();
 
-            futures::stream::iter(WeightedCollection::new(weighted).into_shuffled())
-        })
+        futures::stream::iter(WeightedCollection::new(weighted).into_shuffled())
+    })
 }
 
 impl<U> CoverTrafficGeneration for FullNetworkDiscovery<U>
@@ -138,6 +137,12 @@ struct ImmediateProbeCache {
     created_at: std::time::Instant,
 }
 
+/// Combined state for the immediate-probe `unfold`: cache + interval ticker.
+struct ImmediateProbeTick {
+    cache: ImmediateProbeCache,
+    ticker: futures_time::stream::Interval,
+}
+
 /// Stream of neighbor probes with a TTL-guarded weighted shuffle cache.
 ///
 /// The current batch is always fully drained before a new shuffle is computed,
@@ -154,27 +159,33 @@ where
         + Sync
         + 'static,
 {
-    let initial = ImmediateProbeCache {
-        items: VecDeque::new(),
-        created_at: std::time::Instant::now(),
+    let ticker = futures_time::stream::interval(futures_time::time::Duration::from(cfg.interval));
+
+    let initial = ImmediateProbeTick {
+        cache: ImmediateProbeCache {
+            items: VecDeque::new(),
+            created_at: std::time::Instant::now(),
+        },
+        ticker,
     };
 
     futures::stream::unfold(initial, move |mut state| {
         let graph = graph.clone();
 
         async move {
-            hopr_async_runtime::prelude::sleep(cfg.interval).await;
+            use futures::StreamExt as _;
+            state.ticker.next().await?;
 
             // Serve from the current batch unless the shuffle TTL has expired.
-            if !state.items.is_empty()
-                && state.created_at.elapsed() < cfg.shuffle_ttl
-                && let Some(item) = state.items.pop_front()
+            if !state.cache.items.is_empty()
+                && state.cache.created_at.elapsed() < cfg.shuffle_ttl
+                && let Some(item) = state.cache.items.pop_front()
             {
                 return Some((item, state));
             }
 
             // Batch exhausted or TTL expired — re-traverse the graph and compute a new weighted shuffle.
-            state.items.clear();
+            state.cache.items.clear();
             let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default();
@@ -194,7 +205,7 @@ where
                 .await;
 
             let zero_hop = RoutingOptions::Hops(0.try_into().expect("0 is a valid u8"));
-            state.items = WeightedCollection::new(weighted)
+            state.cache.items = WeightedCollection::new(weighted)
                 .into_shuffled()
                 .into_iter()
                 .map(|peer| {
@@ -206,9 +217,9 @@ where
                     })
                 })
                 .collect();
-            state.created_at = std::time::Instant::now();
+            state.cache.created_at = std::time::Instant::now();
 
-            state.items.pop_front().map(|item| (item, state))
+            state.cache.items.pop_front().map(|item| (item, state))
         }
     })
 }

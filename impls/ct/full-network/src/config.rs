@@ -19,6 +19,7 @@ pub struct ProberConfig {
     /// Higher values prioritize probing edges that haven't been measured recently.
     #[cfg_attr(feature = "serde", serde(default = "default_staleness_weight"))]
     #[default(default_staleness_weight())]
+    #[validate(range(min = 0.0, max = 1.0))]
     pub staleness_weight: f64,
 
     /// Weight for inverse quality factor in probe priority (0.0–1.0).
@@ -26,11 +27,13 @@ pub struct ProberConfig {
     /// Higher values prioritize probing edges with poor quality scores.
     #[cfg_attr(feature = "serde", serde(default = "default_quality_weight"))]
     #[default(default_quality_weight())]
+    #[validate(range(min = 0.0, max = 1.0))]
     pub quality_weight: f64,
 
     /// Base priority ensuring all peers have a nonzero chance of being probed (0.0–1.0).
     #[cfg_attr(feature = "serde", serde(default = "default_base_priority"))]
     #[default(default_base_priority())]
+    #[validate(range(min = 0.0, max = 1.0))]
     pub base_priority: f64,
 
     /// TTL for the cached weighted shuffle order.
