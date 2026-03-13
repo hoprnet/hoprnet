@@ -13,7 +13,7 @@ use crate::errors::{ProbeError, Result};
 /// Heartbeat send ping TX type
 pub type HeartbeatSendPingTx = Sender<(OffchainPublicKey, PingQueryReplier)>;
 
-/// Configuration for the [`Ping`] mechanism
+/// Configuration for the `Ping` mechanism
 #[derive(Debug, Clone, PartialEq, Eq, smart_default::SmartDefault)]
 pub struct PingConfig {
     /// The timeout duration for an indiviual ping
@@ -38,7 +38,7 @@ impl PingQueryReplier {
         Self { notifier }
     }
 
-    /// Mechanism to finalize the ping operation by providing a [`ControlMessage`] received by the
+    /// Mechanism to finalize the ping operation by providing a `ControlMessage` received by the
     /// transport layer.
     ///
     /// The resulting timing information about the RTT is halved to provide a unidirectional latency.
