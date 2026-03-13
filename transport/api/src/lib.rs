@@ -280,8 +280,8 @@ where
 
     /// Execute all processes of the [`HoprTransport`] object.
     ///
-    /// This method will spawn the [`crate::HoprTransportProcess::Heartbeat`],
-    /// [`crate::HoprTransportProcess::BloomFilterSave`], [`crate::HoprTransportProcess::Swarm`] and session-related
+    /// This method will spawn the `HoprTransportProcess::Heartbeat`,
+    /// `HoprTransportProcess::BloomFilterSave`, `HoprTransportProcess::Swarm` and session-related
     /// processes and return join handles to the calling function. These processes are not started immediately but
     /// are waiting for a trigger from this piece of code.
     pub async fn run<T, Ct, NetBuilder>(

@@ -56,7 +56,7 @@ pub type HoprBlockchainBasicConnector<C> = HoprBlockchainConnector<
 /// Convenience function to create [`HoprBlockchainConnector`] with own contract addresses.
 ///
 /// The returned instance uses [`TempDbBackend`] and
-/// [`hopr_api::types::chain::payload::bindings_based::SafePayloadGenerator`]
+/// `SafePayloadGenerator`
 pub fn create_trustless_hopr_blokli_connector<C>(
     chain_key: &ChainKeypair,
     cfg: BlockchainConnectorConfig,

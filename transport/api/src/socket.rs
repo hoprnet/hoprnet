@@ -2,7 +2,7 @@ use futures::{Sink, Stream};
 use hopr_api::types::internal::routing::DestinationRouting;
 use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut};
 
-/// Represents the socket behavior of the hopr-lib spawned [`Hopr`] object.
+/// Represents the socket behavior of the hopr-lib spawned `Hopr` object.
 ///
 /// HOPR socket aims to mimic a simple socket like write and read behavior for unstructured
 /// communication without the advanced session properties.

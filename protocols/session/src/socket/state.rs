@@ -6,7 +6,7 @@ use crate::{
     protocol::{FrameAcknowledgements, FrameId, Segment, SegmentId, SegmentRequest, SeqIndicator, SessionMessage},
 };
 
-/// Components the [`SessionSocket`] exposes to a [`SocketState`].
+/// Components the `SessionSocket` exposes to a [`SocketState`].
 ///
 /// This is the primary communication interface between the state and the socket.
 pub struct SocketComponents<const C: usize> {
@@ -17,11 +17,11 @@ pub struct SocketComponents<const C: usize> {
     pub inspector: Option<FrameInspector>,
     /// Allows emitting control messages to the socket.
     ///
-    /// It is a regular [`SessionMessage`] injected into the downstream.
+    /// It is a regular `SessionMessage` injected into the downstream.
     pub ctl_tx: Sender<SessionMessage<C>>,
 }
 
-/// Abstraction of the [`SessionSocket`](super::SessionSocket) state.
+/// Abstraction of the `SessionSocket` state.
 pub trait SocketState<const C: usize>: Send {
     /// Gets ID of this Session.
     fn session_id(&self) -> &str;
@@ -55,7 +55,7 @@ pub trait SocketState<const C: usize>: Send {
     /// Called when a segment of a Frame was sent to the Downstream.
     fn segment_sent(&mut self, segment: &Segment) -> Result<(), SessionError>;
 
-    /// Convenience method to dispatch a [`message`](SessionMessage) to one of the available handlers.
+    /// Convenience method to dispatch a `SessionMessage` to one of the available handlers.
     fn incoming_message(&mut self, message: &SessionMessage<C>) -> Result<(), SessionError> {
         match &message {
             SessionMessage::Segment(s) => self.incoming_segment(&s.id(), s.seq_flags),

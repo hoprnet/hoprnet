@@ -64,7 +64,7 @@ type PlannerCacheValue = Arc<hopr_statistics::WeightedCollection<ValidatedPath>>
 /// cache. On a cache hit a candidate is picked via weighted random selection (higher
 /// cost = higher quality = higher probability).
 ///
-/// A background sweep ([`PathPlanner::background_refresh`]) can be spawned to
+/// A background sweep (`background_refresh`) can be spawned to
 /// proactively re-warm the cache for all previously-seen keys.
 #[derive(Clone)]
 pub struct PathPlanner<Surb, R, S> {
