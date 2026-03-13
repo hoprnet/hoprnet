@@ -12,6 +12,9 @@ use petgraph::graph::NodeIndex;
 
 use crate::{ChannelGraph, algorithm::all_simple_paths_multi, graph::InnerGraph};
 
+/// A shared, thread-safe edge cost function over [`crate::Observations`].
+type EdgeCostFunction<C> = Arc<dyn Fn(C, &crate::Observations, usize) -> C + Send + Sync>;
+
 /// Core path-finding routine that runs `all_simple_paths_multi` on the
 /// inner petgraph.
 #[allow(clippy::too_many_arguments)]
@@ -23,7 +26,7 @@ pub(crate) fn find_paths<C>(
     take_count: Option<usize>,
     initial_cost: C,
     min_cost: Option<C>,
-    cost_fn: Arc<dyn Fn(C, &crate::Observations, usize) -> C + Send + Sync>,
+    cost_fn: EdgeCostFunction<C>,
 ) -> Vec<(Vec<OffchainPublicKey>, PathId, C)>
 where
     C: Clone + PartialOrd,
