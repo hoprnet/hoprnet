@@ -18,7 +18,6 @@ prometheus = ["hopr-lib/prometheus"]
 runtime-tokio = [
   "dep:tokio",
   "hopr-lib/runtime-tokio",
-  "hopr-db-node/runtime-tokio",
   "hopr-transport-p2p/runtime-tokio",
   "hopr-chain-connector/runtime-tokio",
 ]
@@ -68,7 +67,6 @@ validator = { workspace = true, optional = true }
 
 hopr-lib = { workspace = true, features = ["utils_parallel"] }
 # impls
-hopr-db-node = { workspace = true }
 hopr-chain-connector = { workspace = true }
 hopr-ct-immediate = { workspace = true }
 hopr-network-graph = { workspace = true }

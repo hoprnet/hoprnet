@@ -30,9 +30,6 @@ members = [
   "transport/probe",
   "transport/protocol",
   "transport/session",
-  "db/entity",
-  "db/migration",
-  "db/node",
   "utils/session",
   "localcluster",
   # implementations
@@ -275,10 +272,7 @@ hopr-transport-session = { path = "transport/session" }
 hoprd = { path = "hoprd/hoprd" }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
 hoprd-api-client = { path = "hoprd/rest-api-client" }
-hopr-db-entity = { path = "db/entity" }
-hopr-db-migration = { path = "db/migration" }
 hopr-utils-session = { path = "utils/session" }
-hopr-db-node = { path = "db/node" }
 hopr-chain-connector = { path = "chain/connector" }
 hopr-statistics = { path = "common/statistics" }
 

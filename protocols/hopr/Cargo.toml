@@ -56,7 +56,6 @@ hex-literal = { workspace = true }
 lazy_static = { workspace = true }
 tokio = { workspace = true }
 
-hopr-db-node = { workspace = true, features = ["runtime-tokio"] }
 hopr-chain-connector = { workspace = true, features = [
   "testing",
   "runtime-tokio",
