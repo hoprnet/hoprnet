@@ -51,14 +51,15 @@ pub mod exports {
 /// Export of relevant types for easier integration.
 #[doc(hidden)]
 pub mod prelude {
+    #[cfg(feature = "runtime-tokio")]
+    pub use super::exports::network::types::{
+        prelude::ForeignDataMode,
+        udp::{ConnectedUdpStream, UdpStreamParallelism},
+    };
     pub use super::exports::{
         crypto::{
             keypair::key_pair::HoprKeys,
             types::prelude::{ChainKeypair, Hash, OffchainKeypair},
-        },
-        network::types::{
-            prelude::ForeignDataMode,
-            udp::{ConnectedUdpStream, UdpStreamParallelism},
         },
         transport::{OffchainPublicKey, socket::HoprSocket},
         types::primitive::prelude::Address,

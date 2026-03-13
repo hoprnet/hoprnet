@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-connector"
-version = "0.17.0"
+version = "0.17.1"
 edition.workspace = true
 rust-version.workspace = true
 authors = ["HOPR Association <tech@hoprnet.org>"]
@@ -39,6 +39,9 @@ hopr-api = { workspace = true, features = ["chain", "types-random", "serde"] }
 hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
+blokli-client = { workspace = true, features = ["testing"] }
+hex = { workspace = true }
+hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 hex-literal = { workspace = true }
 insta = { workspace = true }
 lazy_static = { workspace = true }

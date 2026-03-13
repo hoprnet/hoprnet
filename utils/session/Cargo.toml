@@ -1,6 +1,6 @@
 [package]
 name = "hopr-utils-session"
-version = "1.1.0"
+version = "1.1.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -13,9 +13,10 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = []
+default = ["runtime-tokio"]
 runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
+  "hopr-lib/runtime-tokio",
   "hopr-network-types/runtime-tokio",
   "hopr-transport/runtime-tokio",
 ]
@@ -53,3 +54,5 @@ hopr-transport = { workspace = true }
 [dev-dependencies]
 tokio = { workspace = true }
 test-log = { workspace = true }
+
+hopr-transport = { workspace = true, features = ["telemetry"] }
