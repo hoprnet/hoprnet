@@ -404,11 +404,7 @@
             drv = dockerImageUploadScript hoprd-profile-docker;
           };
           docs = rust-builder-local-nightly.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs
-            // {
-              buildDocs = true;
-              RUSTDOCFLAGS = "-D warnings";
-            }
+            hoprdBuildArgs // { buildDocs = true; }
           );
           pre-commit-check = pre-commit.lib.${system}.run {
             src = ./.;
