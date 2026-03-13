@@ -13,16 +13,16 @@ crate-type = ["rlib"]
 [features]
 default = []
 capture = ["dep:pcap-file"]
-telemetry = ["serde", "hopr-transport-session/telemetry"]
-p2p-announce-quic = []
-prometheus = [
-  "hopr-network-types/prometheus",
-  "hopr-transport-mixer/prometheus",
-  "hopr-transport-network/prometheus",
-  "hopr-transport-path/prometheus",
-  "hopr-transport-protocol/prometheus",
-  "hopr-transport-session/prometheus",
+telemetry = [
+  "serde",
+  "hopr-transport-session/telemetry",
+  "hopr-network-types/telemetry",
+  "hopr-transport-mixer/telemetry",
+  "hopr-transport-network/telemetry",
+  "hopr-transport-path/telemetry",
+  "hopr-transport-protocol/telemetry",
 ]
+p2p-announce-quic = []
 runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hopr-network-types/runtime-tokio",

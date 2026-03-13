@@ -47,7 +47,7 @@ pub const HOPR_UDP_BUFFER_SIZE: usize = 16384;
 /// Size of the queue (back-pressure) for data incoming from a UDP stream.
 pub const HOPR_UDP_QUEUE_SIZE: usize = 8192;
 
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_ACTIVE_CLIENTS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
         "hopr_session_hoprd_clients",
@@ -425,7 +425,7 @@ where
                             let (abort_handle, abort_reg) = AbortHandle::new_pair();
                             active_sessions.insert(session_id, (sock_addr, abort_handle));
 
-                            #[cfg(all(feature = "prometheus", not(test)))]
+                            #[cfg(all(feature = "telemetry", not(test)))]
                             METRIC_ACTIVE_CLIENTS.increment(&["tcp"], 1.0);
 
                             hopr_async_runtime::prelude::spawn(
@@ -439,7 +439,7 @@ where
 
                                         debug!(%session_id, "tcp session has ended");
 
-                                        #[cfg(all(feature = "prometheus", not(test)))]
+                                        #[cfg(all(feature = "telemetry", not(test)))]
                                         METRIC_ACTIVE_CLIENTS.decrement(&["tcp"], 1.0);
                                     },
                                 ),
@@ -555,12 +555,12 @@ where
     let session_id = *session.id();
     clients.insert(session_id, (bind_host, abort_handle.clone()));
     hopr_async_runtime::prelude::spawn(async move {
-        #[cfg(all(feature = "prometheus", not(test)))]
+        #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_ACTIVE_CLIENTS.increment(&["udp"], 1.0);
 
         bind_session_to_stream(session, udp_socket, HOPR_UDP_BUFFER_SIZE, Some(abort_reg)).await;
 
-        #[cfg(all(feature = "prometheus", not(test)))]
+        #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_ACTIVE_CLIENTS.decrement(&["udp"], 1.0);
 
         // Once the Session closes, remove it from the list

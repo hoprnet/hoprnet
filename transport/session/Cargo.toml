@@ -19,12 +19,12 @@ runtime-tokio = [
   "hopr-protocol-session/runtime-tokio",
   "dep:tokio",
 ]
-telemetry = ["hopr-protocol-session/telemetry", "dep:serde_json"]
-prometheus = [
-  "hopr-network-types/prometheus",
-  "hopr-protocol-session/prometheus",
+telemetry = [
+  "hopr-network-types/telemetry",
+  "hopr-protocol-session/telemetry",
   "dep:hopr-metrics",
   "dep:lazy_static",
+  "dep:serde_json",
 ]
 allocator-mimalloc = [
   "dep:mimalloc",

@@ -10,9 +10,8 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-telemetry = []
 default = []
-prometheus = ["dep:hopr-metrics"]
+telemetry = ["dep:hopr-metrics"]
 
 [dependencies]
 dashmap = { workspace = true }

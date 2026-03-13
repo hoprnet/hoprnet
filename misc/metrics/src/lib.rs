@@ -1,10 +1,9 @@
 //! # HOPR Metrics Collection
 //!
 //! The purpose of the `hopr_metrics` Rust crate is to create a thin wrapper
-//! over the [Prometheus Metrics Rust API](https://docs.rs/prometheus/latest/prometheus/) or
-//! a similar metrics library, should it change in the future.
+//! over the [OpenTelemetry Metrics API](https://docs.rs/opentelemetry/latest/opentelemetry/metrics/index.html).
 //!
-//! This wrapper merely simplifies the 3 basic Metric Types:
+//! This wrapper simplifies the 3 basic Metric Types:
 //!
 //! - Counter (integer only)
 //! - Gauge (floating point only)
@@ -26,13 +25,12 @@
 //! entity. This makes it possible to have categorized metric values within a single metric, e.g.
 //! counter of successful HTTP requests categorized by HTTP method.
 //!
-//! The metrics are registered within the global metrics registry (singleton).
-//! Currently, the crate does not support additional individual registries apart from the global one.
+//! The metrics are registered within the global metrics provider.
 //!
 //! ### Usage in Rust code
 //!
 //! When writing pure Rust code that uses this crate, one can use the above structs by directly instantiating them.
-//! During their construction, the metric registers itself in the global metrics registry.
+//! During their construction, the metric registers itself in the global metrics provider.
 //!
 //! #### Example use in Rust
 //!
@@ -71,7 +69,7 @@
 //! // All metrics live in a global state and can be serialized at any time
 //! let gathered_metrics = gather_all_metrics();
 //!
-//! // Metrics are in text format and can be exposed using an HTTP API endpoint
+//! // Metrics are in Prometheus text format and can be exposed using an HTTP API endpoint
 //! println!("{:?}", gathered_metrics);
 //! ```
 

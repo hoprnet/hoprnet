@@ -1,10 +1,10 @@
 [package]
 name = "hopr-metrics"
-version = "1.3.2"
+version = "2.0.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
-description = "Rust module containing support for general hopr-metrics collection"
+description = "Rust module containing support for general hopr-metrics collection backed by OpenTelemetry"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
@@ -13,11 +13,15 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [dependencies]
-prometheus = { workspace = true }
+opentelemetry = { workspace = true, features = ["metrics"] }
+opentelemetry_sdk = { workspace = true, features = [
+  "metrics",
+  "experimental_metrics_custom_reader",
+] }
+opentelemetry-prometheus-text-exporter = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
 
 [features]
 default = []
-js = []

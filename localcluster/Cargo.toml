@@ -14,7 +14,6 @@ clap = { workspace = true, features = ["derive"] }
 futures = { workspace = true }
 hoprd = { workspace = true, features = [
   "runtime-tokio",
-  "prometheus",
   "telemetry",
   "transport-quic",
 ] }
