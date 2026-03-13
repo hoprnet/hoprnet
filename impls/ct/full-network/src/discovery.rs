@@ -60,30 +60,28 @@ where
     U: NetworkGraphTraverse<NodeId = OffchainPublicKey> + Clone + Send + Sync + 'static,
 {
     // 2, 3, 4 edges → 1-, 2-, 3-hops in the HOPR protocol
-    futures::StreamExt::zip(
-        futures_time::stream::interval(futures_time::time::Duration::from(cfg.interval)),
-        futures::stream::repeat(futures::stream::iter([2usize, 3, 4])).flatten(),
-    )
-    .filter_map(move |(_, edge_count)| futures::future::ready(std::num::NonZeroUsize::new(edge_count)))
-    .flat_map(move |edge_count: std::num::NonZeroUsize| {
-        let paths = graph.simple_paths(
-            &me,
-            &me,
-            edge_count.get(),
-            Some(100),
-            EdgeCostFn::forward(edge_count, DEFAULT_EDGE_PENALTY),
-        );
+    futures_time::stream::interval(futures_time::time::Duration::from(cfg.interval))
+        .flat_map(|_| futures::stream::iter([2usize, 3, 4]))
+        .filter_map(move |edge_count| futures::future::ready(std::num::NonZeroUsize::new(edge_count)))
+        .flat_map(move |edge_count| {
+            let paths = graph.simple_paths(
+                &me,
+                &me,
+                edge_count.get(),
+                Some(100),
+                EdgeCostFn::forward(edge_count, DEFAULT_EDGE_PENALTY),
+            );
 
-        let weighted: Vec<_> = paths
-            .into_iter()
-            .map(|(path, path_id, cost)| {
-                let priority = (1.0 - cost).max(0.0) + cfg.base_priority;
-                ((path, path_id), priority)
-            })
-            .collect();
+            let weighted: Vec<_> = paths
+                .into_iter()
+                .map(|(path, path_id, cost)| {
+                    let priority = (1.0 - cost).max(0.0) + cfg.base_priority;
+                    ((path, path_id), priority)
+                })
+                .collect();
 
-        futures::stream::iter(WeightedCollection::new(weighted).into_shuffled())
-    })
+            futures::stream::iter(WeightedCollection::new(weighted).into_shuffled())
+        })
 }
 
 impl<U> CoverTrafficGeneration for FullNetworkDiscovery<U>
