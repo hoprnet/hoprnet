@@ -263,40 +263,44 @@ mod tests {
     }
 
     #[test]
-    fn ack_rate_should_be_none_when_no_messages_sent() {
+    fn ack_rate_should_be_none_when_no_messages_sent() -> anyhow::Result<()> {
         let mut observation = Observations::default();
         observation.record(EdgeWeightType::Connected(true));
 
-        let imm = observation.immediate_qos().expect("should have immediate QoS");
+        let imm = observation.immediate_qos().context("should have immediate QoS")?;
         assert_eq!(imm.ack_rate(), None);
+        Ok(())
     }
 
     #[test]
-    fn ack_rate_should_be_one_when_all_messages_acked() {
+    fn ack_rate_should_be_one_when_all_messages_acked() -> anyhow::Result<()> {
         let mut observation = Observations::default();
         observation.record(EdgeWeightType::ImmediateProtocolConformance {
             num_packets: 10,
             num_acks: 10,
         });
 
-        let imm = observation.immediate_qos().expect("should have immediate QoS");
+        let imm = observation.immediate_qos().context("should have immediate QoS")?;
         assert_eq!(imm.ack_rate(), Some(1.0));
+        Ok(())
     }
 
     #[test]
-    fn ack_rate_should_reflect_partial_acknowledgment() {
+    fn ack_rate_should_reflect_partial_acknowledgment() -> anyhow::Result<()> {
         let mut observation = Observations::default();
         observation.record(EdgeWeightType::ImmediateProtocolConformance {
             num_packets: 10,
             num_acks: 7,
         });
 
-        let imm = observation.immediate_qos().expect("should have immediate QoS");
-        assert_in_delta!(imm.ack_rate().expect("should have ack rate"), 0.7, 0.001);
+        let imm = observation.immediate_qos().context("should have immediate QoS")?;
+        let rate = imm.ack_rate().context("should have ack rate")?;
+        assert_in_delta!(rate, 0.7, 0.001);
+        Ok(())
     }
 
     #[test]
-    fn ack_rate_should_accumulate_across_multiple_records() {
+    fn ack_rate_should_accumulate_across_multiple_records() -> anyhow::Result<()> {
         let mut observation = Observations::default();
         observation.record(EdgeWeightType::ImmediateProtocolConformance {
             num_packets: 5,
@@ -307,8 +311,10 @@ mod tests {
             num_acks: 0,
         });
 
-        let imm = observation.immediate_qos().expect("should have immediate QoS");
-        assert_in_delta!(imm.ack_rate().expect("should have ack rate"), 0.5, 0.001);
+        let imm = observation.immediate_qos().context("should have immediate QoS")?;
+        let rate = imm.ack_rate().context("should have ack rate")?;
+        assert_in_delta!(rate, 0.5, 0.001);
+        Ok(())
     }
 
     #[test]

@@ -69,7 +69,7 @@ where
                     })
                     .flat_map(move |edge_count| {
                         let simple_paths =
-                            graph_intermediates.simple_paths(&me, &me, edge_count, Some(100), EdgeCostFn::forward(std::num::NonZeroUsize::new(edge_count).expect("edge_count is always > 0"), 0.5, 0.0));
+                            graph_intermediates.simple_paths(&me, &me, edge_count, Some(100), EdgeCostFn::forward(std::num::NonZeroUsize::new(edge_count).expect("edge_count is always > 0"), 0.5, 0.5));
                         futures::stream::iter(simple_paths)
                     })
                     .filter_map(move |(path, _path_id, _cost): (_, _, f64)| {

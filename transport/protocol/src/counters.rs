@@ -29,6 +29,12 @@ impl PeerProtocolCounters {
         self.acks_received.fetch_add(1, Ordering::Relaxed);
     }
 
+    /// Record that `count` acknowledgments were received from this peer in a batch.
+    #[inline]
+    pub fn record_acks_received(&self, count: u64) {
+        self.acks_received.fetch_add(count, Ordering::Relaxed);
+    }
+
     /// Atomically swap both counters to 0, returning accumulated values.
     pub fn take(&self) -> (u64, u64) {
         (

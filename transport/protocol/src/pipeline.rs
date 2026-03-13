@@ -136,6 +136,7 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
 ///                             | --> `wire_outgoing` (forwarded)
 ///                             | --> `ack_incoming` (forwarded)
 ///                             | --> `app_incoming` (final)
+#[allow(clippy::too_many_arguments)]
 async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, AppIn, AppInErr>(
     (wire_outgoing, wire_incoming): (WOut, WIn),
     decoder: std::sync::Arc<D>,
@@ -143,6 +144,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
     ticket_events: TEvt,
     (ack_outgoing, ack_incoming): (AckOut, AckIn),
     app_incoming: AppIn,
+    counters: crate::counters::PeerProtocolCounterRegistry,
     concurrency: usize,
 ) where
     WIn: futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + 'static,
@@ -242,6 +244,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
             let mut wire_outgoing = wire_outgoing.clone();
             let mut ack_incoming = ack_incoming.clone();
             let mut ack_outgoing_success = ack_outgoing_success.clone();
+            let counters = counters.clone();
             async move {
                 match packet {
                     IncomingPacket::Acknowledgement(ack) => {
@@ -314,6 +317,8 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             .unwrap_or_else(|error| {
                                 tracing::error!(%error, "failed to forward a packet to the transport layer");
                             });
+
+                        counters.get_or_create(&next_hop).record_message_sent();
 
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_PACKET_COUNT.increment(&["forwarded"]);
@@ -461,7 +466,7 @@ async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
             let mut ticket_evt = ticket_events.clone();
             let counters = counters.clone();
             async move {
-                counters.get_or_create(&peer).record_ack_received();
+                counters.get_or_create(&peer).record_acks_received(acks.len() as u64);
                 tracing::trace!(num = acks.len(), "received acknowledgements");
                 match ticket_proc.acknowledge_tickets(peer, acks).await {
                     Ok(resolutions) if !resolutions.is_empty() => {
@@ -578,6 +583,7 @@ pub struct PacketPipelineConfig {
 /// The pipeline does not handle the mixing itself, that needs to be injected as a separate process
 /// overlay on top of the `wire_msg` Stream or Sink.
 #[tracing::instrument(skip_all, level = "trace", fields(me = packet_key.public().to_peerid_str()))]
+#[allow(clippy::too_many_arguments)]
 pub fn run_packet_pipeline<WIn, WOut, C, D, T, TEvt, AppOut, AppIn>(
     packet_key: OffchainKeypair,
     wire_msg: (WOut, WIn),
@@ -665,6 +671,7 @@ where
                 ticket_events.clone(),
                 (outgoing_ack_tx, incoming_ack_tx),
                 app_out,
+                counters.clone(),
                 input_concurrency,
             )
             .in_current_span()
