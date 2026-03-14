@@ -58,3 +58,39 @@ impl TicketQueue for RedbTicketQueue {
         std::iter::empty()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use super::super::tests::*;
+
+    #[test]
+    fn redb_queue_maintains_natural_ticket_order() -> anyhow::Result<()> {
+        queue_maintains_natural_ticket_order(RedbTicketQueue { db: std::sync::Weak::new() })
+    }
+
+    #[test]
+    fn redb_queue_returns_all_tickets() -> anyhow::Result<()> {
+        queue_returns_all_tickets(RedbTicketQueue { db: std::sync::Weak::new() })
+    }
+
+    #[test]
+    fn redb_queue_is_empty_when_drained() -> anyhow::Result<()> {
+        queue_is_empty_when_drained(RedbTicketQueue { db: std::sync::Weak::new() })
+    }
+
+    #[test]
+    fn redb_queue_returns_empty_iterator_when_drained() -> anyhow::Result<()> {
+        queue_returns_empty_iterator_when_drained(RedbTicketQueue { db: std::sync::Weak::new() })
+    }
+
+    #[test]
+    fn redb_queue_returns_correct_total_ticket_value() -> anyhow::Result<()> {
+        queue_returns_correct_total_ticket_value(RedbTicketQueue { db: std::sync::Weak::new() })
+    }
+
+    #[test]
+    fn redb_queue_returns_correct_total_ticket_value_with_min_index() -> anyhow::Result<()> {
+        queue_returns_correct_total_ticket_value_with_min_index(RedbTicketQueue { db: std::sync::Weak::new() })
+    }
+}

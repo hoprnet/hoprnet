@@ -7,16 +7,19 @@ authors.workspace = true
 edition.workspace = true
 
 [features]
+default = ["redb"]
+redb = ["dep:redb", "dep:serde"]
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 
 [dependencies]
 anyhow = { workspace = true }
 dashmap = { workspace = true, features = ["inline"] }
+hashbrown = { workspace = true, features = ["inline-more"] }
 futures = { workspace = true }
 futures-time = { workspace = true }
 parking_lot = { workspace = true, features = ["arc_lock"] }
-redb = { workspace = true }
-serde = { workspace = true }
+redb = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
@@ -24,6 +27,11 @@ hopr-api = { workspace = true, features = [
   "db",
   "chain",
   "types-internal",
+  "types-random",
   "serde",
 ] }
 hopr-async-runtime = { workspace = true }
+
+[dev-dependencies]
+hopr-async-runtime = { workspace = true, features = ["runtime-tokio"]}
+rand = { workspace = true }

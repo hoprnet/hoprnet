@@ -1,10 +1,8 @@
 use hopr_api::{
     chain::{ChannelId, RedeemableTicket},
-    db::ChannelTicketStatistics,
 };
-
 use crate::{
-    OutgoingIndexStore, TicketManagerError,
+    OutgoingIndexStore,
     traits::{TicketQueue, TicketQueueStore},
 };
 
@@ -67,7 +65,7 @@ impl OutgoingIndexStore for MemoryStore {
 ///
 /// This is suitable for testing where ticket persistence is not required.
 #[derive(Clone, Debug, Default)]
-pub struct MemoryTicketQueue(std::collections::BinaryHeap<RedeemableTicket>);
+pub struct MemoryTicketQueue(std::collections::BinaryHeap<std::cmp::Reverse<RedeemableTicket>>);
 
 impl TicketQueue for MemoryTicketQueue {
     type Error = std::convert::Infallible;
@@ -76,19 +74,57 @@ impl TicketQueue for MemoryTicketQueue {
         self.0.len()
     }
 
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     fn push(&mut self, ticket: RedeemableTicket) -> Result<(), Self::Error> {
-        Ok(self.0.push(ticket))
+        Ok(self.0.push(std::cmp::Reverse(ticket)))
     }
 
     fn pop(&mut self) -> Result<Option<RedeemableTicket>, Self::Error> {
-        Ok(self.0.pop())
+        Ok(self.0.pop().map(|ticket| ticket.0))
     }
 
     fn peek(&self) -> Result<Option<RedeemableTicket>, Self::Error> {
-        Ok(self.0.peek().cloned())
+        Ok(self.0.peek().cloned().map(|ticket| ticket.0))
     }
 
     fn iter_unordered(&self) -> impl Iterator<Item = Result<RedeemableTicket, Self::Error>> {
-        self.0.iter().cloned().map(Ok)
+        self.0.iter().cloned().map(|t| Ok(t.0))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use super::super::tests::*;
+
+    #[test]
+    fn memory_queue_maintains_natural_ticket_order() -> anyhow::Result<()> {
+        queue_maintains_natural_ticket_order(MemoryTicketQueue::default())
+    }
+
+    #[test]
+    fn memory_queue_returns_all_tickets() -> anyhow::Result<()> {
+        queue_returns_all_tickets(MemoryTicketQueue::default())
+    }
+    #[test]
+    fn memory_queue_is_empty_when_drained() -> anyhow::Result<()> {
+        queue_is_empty_when_drained(MemoryTicketQueue::default())
+    }
+
+    #[test]
+    fn memory_queue_returns_empty_iterator_when_drained() -> anyhow::Result<()> {
+        queue_returns_empty_iterator_when_drained(MemoryTicketQueue::default())
+    }
+    #[test]
+    fn memory_queue_returns_correct_total_ticket_value() -> anyhow::Result<()> {
+        queue_returns_correct_total_ticket_value(MemoryTicketQueue::default())
+    }
+
+    #[test]
+    fn memory_queue_returns_correct_total_ticket_value_with_min_index() -> anyhow::Result<()> {
+        queue_returns_correct_total_ticket_value_with_min_index(MemoryTicketQueue::default())
     }
 }

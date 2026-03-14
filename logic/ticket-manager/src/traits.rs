@@ -1,6 +1,4 @@
-use hopr_api::chain::{ChannelId, RedeemableTicket};
-
-use crate::errors::TicketManagerError;
+use hopr_api::chain::{ChannelId, HoprBalance, RedeemableTicket};
 
 /// Allows loading and saving outgoing ticket indices.
 pub trait OutgoingIndexStore {
@@ -51,4 +49,26 @@ pub trait TicketQueue {
     fn peek(&self) -> Result<Option<RedeemableTicket>, Self::Error>;
     /// Iterate over all tickets in the queue in **arbitrary** order.
     fn iter_unordered(&self) -> impl Iterator<Item = Result<RedeemableTicket, Self::Error>>;
+    /// Computes the total value of tickets of the given epoch (and optionally minimum given index)
+    /// in this queue.
+    ///
+    /// The default implementation simply [iterates](TicketQueue::iter_unordered) the queue
+    /// and sums the total value of matching tickets.
+    fn total_value(&self, epoch: u32, min_index: Option<u64>) -> Result<HoprBalance, Self::Error> {
+        default_total_value(self, epoch, min_index)
+    }
+}
+
+pub(crate) fn default_total_value<Q: TicketQueue + ?Sized>(queue: &Q, epoch: u32, min_index: Option<u64>) -> Result<HoprBalance, Q::Error>
+{
+    let min_index = min_index.unwrap_or(0);
+    Ok(queue
+        .iter_unordered()
+        .filter_map(|res|
+            res
+                .ok()
+                .filter(|t| t.verified_ticket().channel_epoch == epoch && t.verified_ticket().index >= min_index)
+                .map(|t| t.verified_ticket().amount)
+        )
+        .sum())
 }
