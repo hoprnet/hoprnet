@@ -8,7 +8,7 @@ edition.workspace = true
 
 [features]
 default = ["redb"]
-redb = ["dep:redb", "dep:serde"]
+redb = ["dep:postcard", "dep:redb", "dep:serde"]
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 
 [dependencies]
@@ -20,6 +20,7 @@ futures-time = { workspace = true }
 parking_lot = { workspace = true, features = ["arc_lock"] }
 redb = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
+postcard = { workspace = true, optional = true, features = ["alloc"] }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
@@ -28,10 +29,9 @@ hopr-api = { workspace = true, features = [
   "chain",
   "types-internal",
   "types-random",
-  "serde",
 ] }
 hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
-hopr-async-runtime = { workspace = true, features = ["runtime-tokio"]}
+hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 rand = { workspace = true }

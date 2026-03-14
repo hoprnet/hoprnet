@@ -4,13 +4,13 @@ mod memory;
 mod redb;
 
 use std::ops::{AddAssign, SubAssign};
+
 use hopr_api::chain::{HoprBalance, RedeemableTicket};
 pub use memory::*;
-
 #[cfg(feature = "redb")]
 pub use redb::*;
-use crate::TicketQueue;
-use crate::traits::default_total_value;
+
+use crate::{TicketQueue, traits::default_total_value};
 
 /// Adapter for [`TicketQueue`] that caches the total ticket value per channel epoch.
 ///
@@ -33,16 +33,14 @@ impl<Q: TicketQueue> From<Q> for ValueCachedQueue<Q> {
     fn from(queue: Q) -> Self {
         let mut value_cache = hashbrown::HashMap::<u32, HoprBalance>::new();
         // Load all pre-existing ticket values into the cache
-        queue.iter_unordered()
-            .filter_map(|res| res.ok())
-            .for_each(|ticket| {
-                value_cache.entry(ticket.verified_ticket().channel_epoch).or_default().add_assign(ticket.verified_ticket().amount);
-            });
-
-        Self {
-            queue,
+        queue.iter_unordered().filter_map(|res| res.ok()).for_each(|ticket| {
             value_cache
-        }
+                .entry(ticket.verified_ticket().channel_epoch)
+                .or_default()
+                .add_assign(ticket.verified_ticket().amount);
+        });
+
+        Self { queue, value_cache }
     }
 }
 
@@ -58,7 +56,10 @@ impl<Q: TicketQueue> TicketQueue for ValueCachedQueue<Q> {
     }
 
     fn push(&mut self, ticket: RedeemableTicket) -> Result<(), Self::Error> {
-        self.value_cache.entry(ticket.verified_ticket().channel_epoch).or_default().add_assign(ticket.verified_ticket().amount);
+        self.value_cache
+            .entry(ticket.verified_ticket().channel_epoch)
+            .or_default()
+            .add_assign(ticket.verified_ticket().amount);
         self.queue.push(ticket)
     }
 
@@ -66,7 +67,10 @@ impl<Q: TicketQueue> TicketQueue for ValueCachedQueue<Q> {
         let ticket = self.queue.pop()?;
         if let Some(ticket) = &ticket {
             // NOTE: that all the arithmetic operations on the `HoprBalance` type are naturally saturating.
-            self.value_cache.entry(ticket.verified_ticket().channel_epoch).or_default().sub_assign(ticket.verified_ticket().amount);
+            self.value_cache
+                .entry(ticket.verified_ticket().channel_epoch)
+                .or_default()
+                .sub_assign(ticket.verified_ticket().amount);
         }
         Ok(ticket)
     }
@@ -75,12 +79,14 @@ impl<Q: TicketQueue> TicketQueue for ValueCachedQueue<Q> {
         self.queue.peek()
     }
 
-    fn iter_unordered(&self) -> impl Iterator<Item=Result<RedeemableTicket, Self::Error>> {
+    fn iter_unordered(&self) -> impl Iterator<Item = Result<RedeemableTicket, Self::Error>> {
         self.queue.iter_unordered()
     }
 
     fn total_value(&self, epoch: u32, min_index: Option<u64>) -> Result<HoprBalance, Self::Error> {
-        if min_index.is_none() && let Some(value) = self.value_cache.get(&epoch) {
+        if min_index.is_none()
+            && let Some(value) = self.value_cache.get(&epoch)
+        {
             return Ok(*value);
         }
 
@@ -91,14 +97,14 @@ impl<Q: TicketQueue> TicketQueue for ValueCachedQueue<Q> {
 #[cfg(test)]
 pub mod tests {
     use std::ops::AddAssign;
-    use hopr_api::chain::{HoprBalance, RedeemableTicket, WinningProbability};
-    use hopr_api::types::crypto::prelude::*;
-    use hopr_api::types::crypto_random::Randomizable;
-    use hopr_api::types::internal::prelude::TicketBuilder;
+
+    use hopr_api::{
+        chain::{HoprBalance, RedeemableTicket, WinningProbability},
+        types::{crypto::prelude::*, crypto_random::Randomizable, internal::prelude::TicketBuilder},
+    };
     use rand::prelude::SliceRandom;
 
-    use crate::{TicketQueue, ValueCachedQueue};
-    use crate::backend::memory;
+    use crate::{TicketQueue, ValueCachedQueue, backend::memory};
 
     const TICKET_VALUE: u64 = 10;
 
@@ -118,7 +124,10 @@ pub mod tests {
                     .channel_epoch(epoch)
                     .win_prob(WinningProbability::ALWAYS)
                     .amount(TICKET_VALUE)
-                    .challenge(Challenge::from_hint_and_share(&hk1.to_challenge()?, &hk2.to_challenge()?)?)
+                    .challenge(Challenge::from_hint_and_share(
+                        &hk1.to_challenge()?,
+                        &hk2.to_challenge()?,
+                    )?)
                     .build_signed(&src, &Default::default())?
                     .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?)
                     .into_redeemable(&dst, &Default::default())?;
@@ -209,9 +218,11 @@ pub mod tests {
         let tickets = generate_tickets()?;
         fill_queue(&mut queue, tickets.iter().copied())?;
 
-        let expected_total_value: HoprBalance = tickets.into_iter()
+        let expected_total_value: HoprBalance = tickets
+            .into_iter()
             .filter(|ticket| ticket.verified_ticket().channel_epoch == 2)
-            .map(|ticket| ticket.verified_ticket().amount).sum();
+            .map(|ticket| ticket.verified_ticket().amount)
+            .sum();
         let actual_total_value = queue.total_value(2, None)?;
 
         assert_eq!(expected_total_value, actual_total_value);
@@ -227,9 +238,11 @@ pub mod tests {
         let tickets = generate_tickets()?;
         fill_queue(&mut queue, tickets.iter().copied())?;
 
-        let expected_total_value: HoprBalance = tickets.into_iter()
+        let expected_total_value: HoprBalance = tickets
+            .into_iter()
             .filter(|ticket| ticket.verified_ticket().channel_epoch == 2 && ticket.verified_ticket().index >= 2)
-            .map(|ticket| ticket.verified_ticket().amount).sum();
+            .map(|ticket| ticket.verified_ticket().amount)
+            .sum();
         let actual_total_value = queue.total_value(2, Some(2))?;
 
         assert_eq!(expected_total_value, actual_total_value);
@@ -238,7 +251,9 @@ pub mod tests {
 
     #[test]
     fn value_cached_queue_returns_correct_total_ticket_value_with_min_index() -> anyhow::Result<()> {
-        queue_returns_correct_total_ticket_value_with_min_index(ValueCachedQueue::from(memory::MemoryTicketQueue::default()))
+        queue_returns_correct_total_ticket_value_with_min_index(ValueCachedQueue::from(
+            memory::MemoryTicketQueue::default(),
+        ))
     }
 
     #[test]
@@ -249,7 +264,10 @@ pub mod tests {
 
         let mut total_value_per_epoch = hashbrown::HashMap::<u32, HoprBalance>::new();
         tickets.into_iter().for_each(|ticket| {
-            total_value_per_epoch.entry(ticket.verified_ticket().channel_epoch).or_default().add_assign(ticket.verified_ticket().amount);
+            total_value_per_epoch
+                .entry(ticket.verified_ticket().channel_epoch)
+                .or_default()
+                .add_assign(ticket.verified_ticket().amount);
         });
 
         let queue_2 = ValueCachedQueue::from(queue_1);

@@ -59,16 +59,18 @@ pub trait TicketQueue {
     }
 }
 
-pub(crate) fn default_total_value<Q: TicketQueue + ?Sized>(queue: &Q, epoch: u32, min_index: Option<u64>) -> Result<HoprBalance, Q::Error>
-{
+pub(crate) fn default_total_value<Q: TicketQueue + ?Sized>(
+    queue: &Q,
+    epoch: u32,
+    min_index: Option<u64>,
+) -> Result<HoprBalance, Q::Error> {
     let min_index = min_index.unwrap_or(0);
     Ok(queue
         .iter_unordered()
-        .filter_map(|res|
-            res
-                .ok()
+        .filter_map(|res| {
+            res.ok()
                 .filter(|t| t.verified_ticket().channel_epoch == epoch && t.verified_ticket().index >= min_index)
                 .map(|t| t.verified_ticket().amount)
-        )
+        })
         .sum())
 }

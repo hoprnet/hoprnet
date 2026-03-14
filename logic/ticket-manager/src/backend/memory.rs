@@ -1,6 +1,5 @@
-use hopr_api::{
-    chain::{ChannelId, RedeemableTicket},
-};
+use hopr_api::chain::{ChannelId, RedeemableTicket};
+
 use crate::{
     OutgoingIndexStore,
     traits::{TicketQueue, TicketQueueStore},
@@ -97,8 +96,7 @@ impl TicketQueue for MemoryTicketQueue {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use super::super::tests::*;
+    use super::{super::tests::*, *};
 
     #[test]
     fn memory_queue_maintains_natural_ticket_order() -> anyhow::Result<()> {

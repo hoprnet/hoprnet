@@ -11,14 +11,13 @@ use hopr_api::{
 };
 use utils::{ChannelTicketQueue, OutgoingIndexTracker};
 
+#[cfg(feature = "redb")]
+pub use crate::backend::{RedbStore, RedbTicketQueue};
 pub use crate::{
     backend::{MemoryStore, MemoryTicketQueue, ValueCachedQueue},
     errors::TicketManagerError,
     traits::{OutgoingIndexStore, TicketQueue, TicketQueueStore},
 };
-
-#[cfg(feature = "redb")]
-pub use crate::backend::{RedbStore, RedbTicketQueue};
 
 pub struct HoprTicketManager<S, Q> {
     out_idx_tracker: OutgoingIndexTracker,
@@ -77,11 +76,11 @@ where
             // remove it from the store
             if channels
                 .iter()
-                .find(|channel|
-                    channel.status == ChannelStatus::Open &&
-                    channel.get_id() == &channel_id &&
-                    channel.channel_epoch == epoch
-                )
+                .find(|channel| {
+                    channel.status == ChannelStatus::Open
+                        && channel.get_id() == &channel_id
+                        && channel.channel_epoch == epoch
+                })
                 .is_none()
             {
                 store
@@ -99,10 +98,7 @@ where
             // is not closed or not effectively closed), remove the queue from the store.
             if channels
                 .iter()
-                .find(|channel|
-                    !channel.closure_time_passed(now) &&
-                    channel.get_id() == &channel_id
-                )
+                .find(|channel| !channel.closure_time_passed(now) && channel.get_id() == &channel_id)
                 .is_none()
             {
                 store.delete_queue(&channel_id).map_err(TicketManagerError::store)?;
@@ -118,7 +114,7 @@ where
                 Some(ChannelDirection::Incoming) => {
                     if !channel.closure_time_passed(now) {
                         // Either open an existing queue for that channel or create a new one
-                        let queue =  store.open_or_create_queue(id).map_err(TicketManagerError::store)?;
+                        let queue = store.open_or_create_queue(id).map_err(TicketManagerError::store)?;
                         tracing::debug!(%id, num_tickets = queue.len(), "redeemable ticket queue for channel");
                         channel_tickets.insert(*id, ChannelTicketQueue::from(queue));
                     }
@@ -200,7 +196,7 @@ where
             Ok(ticket_queue
                 .queue
                 .read()
-                .total_value(epoch ,min_index)
+                .total_value(epoch, min_index)
                 .map_err(TicketManagerError::store)?)
         } else {
             Err(TicketManagerError::ChannelNotFound)

@@ -1,6 +1,8 @@
 use std::sync::atomic::{AtomicBool, AtomicU64};
-use hopr_api::chain::ChannelId;
+
 use futures::{FutureExt, StreamExt};
+use hopr_api::chain::ChannelId;
+
 use crate::OutgoingIndexStore;
 
 const OUT_INDEX_SYNC_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
@@ -17,10 +19,12 @@ pub struct OutgoingIndexTracker {
 
 impl OutgoingIndexTracker {
     pub fn new<T>(store: std::sync::Arc<parking_lot::RwLock<T>>) -> Self
-    where T: OutgoingIndexStore + Send + Sync + 'static {
+    where
+        T: OutgoingIndexStore + Send + Sync + 'static,
+    {
         let out_indices = std::sync::Arc::new((
             dashmap::DashMap::<(ChannelId, u32), AtomicU64>::new(),
-             AtomicBool::new(false)
+            AtomicBool::new(false),
         ));
 
         let out_indices_1 = out_indices.clone();
