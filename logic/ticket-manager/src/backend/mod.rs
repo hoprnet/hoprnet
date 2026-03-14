@@ -102,9 +102,11 @@ pub mod tests {
         chain::{HoprBalance, RedeemableTicket, WinningProbability},
         types::{crypto::prelude::*, crypto_random::Randomizable, internal::prelude::TicketBuilder},
     };
+    use hopr_api::chain::ChannelId;
+    use hopr_api::types::chain::exports::alloy::serde::JsonStorageKey::Hash;
     use rand::prelude::SliceRandom;
 
-    use crate::{TicketQueue, ValueCachedQueue, backend::memory};
+    use crate::{TicketQueue, ValueCachedQueue, backend::memory, OutgoingIndexStore, TicketQueueStore};
 
     const TICKET_VALUE: u64 = 10;
 
@@ -273,6 +275,133 @@ pub mod tests {
         let queue_2 = ValueCachedQueue::from(queue_1);
         assert_eq!(total_value_per_epoch, queue_2.value_cache);
 
+        Ok(())
+    }
+
+    pub fn ticket_store_should_create_new_queue_for_channel<S: TicketQueueStore>(mut store: S) -> anyhow::Result<()> {
+        assert_eq!(0, store.iter_queues().count());
+
+        let _ = store.open_or_create_queue(&Default::default())?;
+        let queues = store.iter_queues().collect::<Vec<_>>();
+        assert_eq!(1, queues.len());
+        assert!(queues.contains(&Default::default()));
+
+        Ok(())
+    }
+
+    pub fn ticket_store_should_open_existing_queue_for_channel<S: TicketQueueStore>(mut store: S) -> anyhow::Result<()> {
+        assert_eq!(0, store.iter_queues().count());
+
+        let mut tickets = generate_tickets()?;
+        let mut queue = store.open_or_create_queue(&Default::default())?;
+        fill_queue(&mut queue, tickets.iter().copied())?;
+        tickets.sort();
+
+        let queue = store.open_or_create_queue(&Default::default())?;
+        let opened_tickets = queue.iter_unordered().filter_map(|r| r.ok()).collect::<Vec<_>>();
+
+        assert_eq!(tickets, opened_tickets);
+
+        Ok(())
+    }
+
+    pub fn ticket_store_should_delete_existing_queue_for_channel<S: TicketQueueStore>(mut store: S) -> anyhow::Result<()> {
+        assert_eq!(0, store.iter_queues().count());
+
+        let _ = store.open_or_create_queue(&Default::default())?;
+        let queues = store.iter_queues().collect::<Vec<_>>();
+        assert_eq!(1, queues.len());
+        assert!(queues.contains(&Default::default()));
+
+        let _ = store.delete_queue(&Default::default())?;
+        let queues = store.iter_queues().collect::<Vec<_>>();
+        assert_eq!(0, queues.len());
+
+        Ok(())
+    }
+
+    pub fn ticket_store_should_iterate_existing_queues_for_channel<S: TicketQueueStore>(mut store: S) -> anyhow::Result<()> {
+        assert_eq!(0, store.iter_queues().count());
+
+        let c1 = ChannelId::create(&[b"beef"]);
+        let _ = store.open_or_create_queue(&c1)?;
+        let queues = store.iter_queues().collect::<Vec<_>>();
+        assert_eq!(1, queues.len());
+        assert!(queues.contains(&c1));
+
+        let c2 = ChannelId::create(&[b"feed"]);
+        let _ = store.open_or_create_queue(&c2)?;
+        let queues = store.iter_queues().collect::<Vec<_>>();
+
+        assert_eq!(2, queues.len());
+        assert!(queues.contains(&c1));
+        assert!(queues.contains(&c2));
+
+        Ok(())
+    }
+
+    pub fn ticket_store_should_not_fail_to_delete_non_existing_queue_for_channel<S: TicketQueueStore>(mut store: S) -> anyhow::Result<()> {
+        assert_eq!(0, store.iter_queues().count());
+        assert!(store.delete_queue(&Default::default()).is_ok());
+
+        Ok(())
+    }
+
+    pub fn out_index_store_should_load_existing_index_for_channel_epoch<S: OutgoingIndexStore>(mut store: S) -> anyhow::Result<()> {
+        store.save_outgoing_index(&Default::default(), 1, 1)?;
+        let loaded = store.load_outgoing_index(&Default::default(), 1)?;
+        assert_eq!(Some(1), loaded);
+        Ok(())
+    }
+
+    pub fn out_index_store_should_not_load_non_existing_index_for_channel_epoch<S: OutgoingIndexStore>(mut store: S) -> anyhow::Result<()> {
+        let loaded = store.load_outgoing_index(&Default::default(), 1)?;
+        assert_eq!(None, loaded);
+        Ok(())
+    }
+
+    pub fn out_index_store_should_delete_existing_index_for_channel_epoch<S: OutgoingIndexStore>(mut store: S) -> anyhow::Result<()> {
+        store.save_outgoing_index(&Default::default(), 1, 1)?;
+        let loaded = store.load_outgoing_index(&Default::default(), 1)?;
+        assert_eq!(Some(1), loaded);
+        store.delete_outgoing_index(&Default::default(), 1)?;
+        let loaded = store.load_outgoing_index(&Default::default(), 1)?;
+        assert_eq!(None, loaded);
+        Ok(())
+    }
+
+    pub fn out_index_store_should_store_new_index_for_channel_epoch<S: OutgoingIndexStore>(mut store: S) -> anyhow::Result<()> {
+        store.save_outgoing_index(&Default::default(), 1, 1)?;
+        store.save_outgoing_index(&Default::default(), 2, 1)?;
+
+        let loaded = store.load_outgoing_index(&Default::default(), 1)?;
+        assert_eq!(Some(1), loaded);
+
+        let loaded = store.load_outgoing_index(&Default::default(), 2)?;
+        assert_eq!(Some(1), loaded);
+        Ok(())
+    }
+
+    pub fn out_index_should_update_existing_index_for_channel_epoch<S: OutgoingIndexStore>(mut store: S) -> anyhow::Result<()> {
+        store.save_outgoing_index(&Default::default(), 1, 1)?;
+        let loaded = store.load_outgoing_index(&Default::default(), 1)?;
+        assert_eq!(Some(1), loaded);
+
+        store.save_outgoing_index(&Default::default(), 1, 2)?;
+
+        let loaded = store.load_outgoing_index(&Default::default(), 1)?;
+        assert_eq!(Some(2), loaded);
+        Ok(())
+    }
+
+    pub fn out_index_store_should_iterate_existing_indices_for_channel_epoch<S: OutgoingIndexStore>(mut store: S) -> anyhow::Result<()> {
+        store.save_outgoing_index(&Default::default(), 1, 1)?;
+        store.save_outgoing_index(&Default::default(), 2, 1)?;
+        let loaded = store.load_outgoing_index(&Default::default(), 1)?;
+        assert_eq!(Some(1), loaded);
+
+        let loaded = store.load_outgoing_index(&Default::default(), 2)?;
+        assert_eq!(Some(1), loaded);
         Ok(())
     }
 }

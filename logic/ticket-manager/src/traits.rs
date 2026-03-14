@@ -33,6 +33,7 @@ pub trait TicketQueueStore {
 /// Backend for ticket storage queue.
 ///
 /// The implementations must honor the natural ordering of tickets.
+#[auto_impl::auto_impl(&mut, Box)]
 pub trait TicketQueue {
     type Error: std::error::Error + Send + Sync + 'static;
     /// Number of tickets in the queue.

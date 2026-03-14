@@ -4882,6 +4882,7 @@ name = "hopr-ticket-manager"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "auto_impl",
  "dashmap",
  "futures",
  "futures-time",
@@ -4889,6 +4890,7 @@ dependencies = [
  "hopr-api",
  "hopr-async-runtime",
  "parking_lot",
+ "postcard",
  "rand 0.10.0",
  "redb",
  "serde",

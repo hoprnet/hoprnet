@@ -64,33 +64,33 @@ impl OutgoingIndexStore for MemoryStore {
 ///
 /// This is suitable for testing where ticket persistence is not required.
 #[derive(Clone, Debug, Default)]
-pub struct MemoryTicketQueue(std::collections::BinaryHeap<std::cmp::Reverse<RedeemableTicket>>);
+pub struct MemoryTicketQueue(std::sync::Arc<parking_lot::RwLock<std::collections::BinaryHeap<std::cmp::Reverse<RedeemableTicket>>>>);
 
 impl TicketQueue for MemoryTicketQueue {
     type Error = std::convert::Infallible;
 
     fn len(&self) -> usize {
-        self.0.len()
+        self.0.read().len()
     }
 
     fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.0.read().is_empty()
     }
 
     fn push(&mut self, ticket: RedeemableTicket) -> Result<(), Self::Error> {
-        Ok(self.0.push(std::cmp::Reverse(ticket)))
+        Ok(self.0.write().push(std::cmp::Reverse(ticket)))
     }
 
     fn pop(&mut self) -> Result<Option<RedeemableTicket>, Self::Error> {
-        Ok(self.0.pop().map(|ticket| ticket.0))
+        Ok(self.0.write().pop().map(|ticket| ticket.0))
     }
 
     fn peek(&self) -> Result<Option<RedeemableTicket>, Self::Error> {
-        Ok(self.0.peek().cloned().map(|ticket| ticket.0))
+        Ok(self.0.read().peek().cloned().map(|ticket| ticket.0))
     }
 
     fn iter_unordered(&self) -> impl Iterator<Item = Result<RedeemableTicket, Self::Error>> {
-        self.0.iter().cloned().map(|t| Ok(t.0))
+        self.0.read().iter().cloned().map(|t| Ok(t.0)).collect::<Vec<_>>().into_iter()
     }
 }
 
@@ -124,5 +124,60 @@ mod tests {
     #[test]
     fn memory_queue_returns_correct_total_ticket_value_with_min_index() -> anyhow::Result<()> {
         queue_returns_correct_total_ticket_value_with_min_index(MemoryTicketQueue::default())
+    }
+
+    #[test]
+    fn memory_out_index_store_should_load_existing_index_for_channel_epoch() -> anyhow::Result<()> {
+        out_index_store_should_load_existing_index_for_channel_epoch(MemoryStore::default())
+    }
+
+    #[test]
+    fn memory_out_index_store_should_not_load_non_existing_index_for_channel_epoch() -> anyhow::Result<()> {
+        out_index_store_should_not_load_non_existing_index_for_channel_epoch(MemoryStore::default())
+    }
+
+    #[test]
+    fn memory_out_index_store_should_store_new_index_for_channel_epoch() -> anyhow::Result<()> {
+        out_index_store_should_store_new_index_for_channel_epoch(MemoryStore::default())
+    }
+
+    #[test]
+    fn memory_out_index_store_should_delete_existing_index_for_channel_epoch() -> anyhow::Result<()> {
+        out_index_store_should_delete_existing_index_for_channel_epoch(MemoryStore::default())
+    }
+
+    #[test]
+    fn memory_out_index_should_update_existing_index_for_channel_epoch() -> anyhow::Result<()> {
+        out_index_should_update_existing_index_for_channel_epoch(MemoryStore::default())
+    }
+
+    #[test]
+    fn memory_out_index_store_should_iterate_existing_indices_for_channel_epoch() -> anyhow::Result<()> {
+        out_index_store_should_iterate_existing_indices_for_channel_epoch(MemoryStore::default())
+    }
+
+    #[test]
+    fn memory_ticket_store_should_create_new_queue_for_channel() -> anyhow::Result<()> {
+        ticket_store_should_create_new_queue_for_channel(MemoryStore::default())
+    }
+
+    #[test]
+    fn memory_ticket_store_should_open_existing_queue_for_channel() -> anyhow::Result<()> {
+        ticket_store_should_open_existing_queue_for_channel(MemoryStore::default())
+    }
+
+    #[test]
+    fn memory_ticket_store_should_delete_existing_queue_for_channel() -> anyhow::Result<()> {
+        ticket_store_should_delete_existing_queue_for_channel(MemoryStore::default())
+    }
+
+    #[test]
+    fn memory_ticket_store_should_iterate_existing_queues_for_channel() -> anyhow::Result<()> {
+        ticket_store_should_iterate_existing_queues_for_channel(MemoryStore::default())
+    }
+
+    #[test]
+    fn memory_ticket_store_should_not_fail_to_delete_non_existing_queue_for_channel() -> anyhow::Result<()> {
+        ticket_store_should_not_fail_to_delete_non_existing_queue_for_channel(MemoryStore::default())
     }
 }

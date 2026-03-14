@@ -31,7 +31,7 @@ impl OutgoingIndexStore for RedbStore {
     }
 
     fn iter_outgoing_indices(&self) -> impl Iterator<Item = (ChannelId, u32)> {
-        todo!()
+        std::iter::empty()
     }
 }
 
@@ -167,4 +167,12 @@ mod tests {
             db: std::sync::Weak::new(),
         })
     }
+
+    #[test]
+    fn redb_out_index_store_should_load_existing_index_for_channel_epoch() -> anyhow::Result<()> {
+        out_index_store_should_load_existing_index_for_channel_epoch(RedbStore {
+            db: std::sync::Arc::new(redb::Database::create("test.db")?),
+        })
+    }
+
 }

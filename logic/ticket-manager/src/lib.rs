@@ -54,7 +54,7 @@ where
     }
 }
 
-impl<S> HoprTicketManager<S, S::Queue>
+impl<'a, S> HoprTicketManager<S, S::Queue>
 where
     S: TicketQueueStore + OutgoingIndexStore + Send + Sync + 'static,
     S::Queue: Send + Sync + 'static,
@@ -111,17 +111,14 @@ where
             let id = channel.get_id();
             match channel.direction(me) {
                 // We are only interested in tickets on incoming channels that are still open or not overdue
-                Some(ChannelDirection::Incoming) => {
-                    if !channel.closure_time_passed(now) {
+                Some(ChannelDirection::Incoming) => if !channel.closure_time_passed(now) {
                         // Either open an existing queue for that channel or create a new one
                         let queue = store.open_or_create_queue(id).map_err(TicketManagerError::store)?;
                         tracing::debug!(%id, num_tickets = queue.len(), "redeemable ticket queue for channel");
                         channel_tickets.insert(*id, ChannelTicketQueue::from(queue));
-                    }
                 }
                 // We are only interested in tickets on outgoing channels that are still open
-                Some(ChannelDirection::Outgoing) => {
-                    if channel.status == ChannelStatus::Open {
+                Some(ChannelDirection::Outgoing) => if channel.status == ChannelStatus::Open {
                         // Either load a previously stored outgoing index or use the channel's ticket index as a
                         // fallback
                         let epoch = channel.channel_epoch;
@@ -138,7 +135,6 @@ where
                         let out_index = index.max(channel.ticket_index);
                         out_indices.insert((*id, epoch), AtomicU64::new(out_index));
                         tracing::debug!(%id, epoch, out_index, "outgoing ticket index for channel");
-                    }
                 }
                 _ => {} // Foreign, closed or an "overdue" channel
             }
