@@ -21,11 +21,7 @@ impl TicketQueueStore for MemoryStore {
         &mut self,
         channel_id: &ChannelId,
     ) -> Result<Self::Queue, <Self::Queue as TicketQueue>::Error> {
-        Ok(self
-            .tickets
-            .entry(*channel_id)
-            .or_insert_with(MemoryTicketQueue::default)
-            .clone())
+        Ok(self.tickets.entry(*channel_id).or_default().clone())
     }
 
     fn delete_queue(&mut self, channel_id: &ChannelId) -> Result<(), <Self::Queue as TicketQueue>::Error> {
@@ -33,8 +29,8 @@ impl TicketQueueStore for MemoryStore {
         Ok(())
     }
 
-    fn iter_queues(&self) -> impl Iterator<Item = ChannelId> {
-        self.tickets.iter().map(|(k, _)| *k)
+    fn iter_queues(&self) -> Result<impl Iterator<Item = ChannelId>, <Self::Queue as TicketQueue>::Error> {
+        Ok(self.tickets.keys().copied())
     }
 }
 
@@ -55,8 +51,8 @@ impl OutgoingIndexStore for MemoryStore {
         Ok(())
     }
 
-    fn iter_outgoing_indices(&self) -> impl Iterator<Item = (ChannelId, u32)> {
-        self.out_indices.iter().map(|(k, _)| *k)
+    fn iter_outgoing_indices(&self) -> Result<impl Iterator<Item = (ChannelId, u32)>, Self::Error> {
+        Ok(self.out_indices.keys().copied())
     }
 }
 
@@ -64,21 +60,24 @@ impl OutgoingIndexStore for MemoryStore {
 ///
 /// This is suitable for testing where ticket persistence is not required.
 #[derive(Clone, Debug, Default)]
-pub struct MemoryTicketQueue(std::sync::Arc<parking_lot::RwLock<std::collections::BinaryHeap<std::cmp::Reverse<RedeemableTicket>>>>);
+pub struct MemoryTicketQueue(
+    std::sync::Arc<parking_lot::RwLock<std::collections::BinaryHeap<std::cmp::Reverse<RedeemableTicket>>>>,
+);
 
 impl TicketQueue for MemoryTicketQueue {
     type Error = std::convert::Infallible;
 
-    fn len(&self) -> usize {
-        self.0.read().len()
+    fn len(&self) -> Result<usize, Self::Error> {
+        Ok(self.0.read().len())
     }
 
-    fn is_empty(&self) -> bool {
-        self.0.read().is_empty()
+    fn is_empty(&self) -> Result<bool, Self::Error> {
+        Ok(self.0.read().is_empty())
     }
 
     fn push(&mut self, ticket: RedeemableTicket) -> Result<(), Self::Error> {
-        Ok(self.0.write().push(std::cmp::Reverse(ticket)))
+        self.0.write().push(std::cmp::Reverse(ticket));
+        Ok(())
     }
 
     fn pop(&mut self) -> Result<Option<RedeemableTicket>, Self::Error> {
@@ -89,14 +88,22 @@ impl TicketQueue for MemoryTicketQueue {
         Ok(self.0.read().peek().cloned().map(|ticket| ticket.0))
     }
 
-    fn iter_unordered(&self) -> impl Iterator<Item = Result<RedeemableTicket, Self::Error>> {
-        self.0.read().iter().cloned().map(|t| Ok(t.0)).collect::<Vec<_>>().into_iter()
+    fn iter_unordered(&self) -> Result<impl Iterator<Item = Result<RedeemableTicket, Self::Error>>, Self::Error> {
+        Ok(self
+            .0
+            .read()
+            .iter()
+            .cloned()
+            .map(|t| Ok(t.0))
+            .collect::<Vec<_>>()
+            .into_iter())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{super::tests::*, *};
+    use super::*;
+    use crate::traits::tests::*;
 
     #[test]
     fn memory_queue_maintains_natural_ticket_order() -> anyhow::Result<()> {

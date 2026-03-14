@@ -54,7 +54,7 @@ where
     }
 }
 
-impl<'a, S> HoprTicketManager<S, S::Queue>
+impl<S> HoprTicketManager<S, S::Queue>
 where
     S: TicketQueueStore + OutgoingIndexStore + Send + Sync + 'static,
     S::Queue: Send + Sync + 'static,
@@ -70,19 +70,18 @@ where
         let now = std::time::SystemTime::now();
 
         // Purge outdated outgoing indices
-        let stored_indices = store.iter_outgoing_indices().collect::<Vec<_>>();
+        let stored_indices = store
+            .iter_outgoing_indices()
+            .map_err(TicketManagerError::store)?
+            .collect::<Vec<_>>();
         for (channel_id, epoch) in stored_indices {
             // If any stored outgoing index does not match any currently existing opened channel,
             // remove it from the store
-            if channels
-                .iter()
-                .find(|channel| {
-                    channel.status == ChannelStatus::Open
-                        && channel.get_id() == &channel_id
-                        && channel.channel_epoch == epoch
-                })
-                .is_none()
-            {
+            if !channels.iter().any(|channel| {
+                channel.status == ChannelStatus::Open
+                    && channel.get_id() == &channel_id
+                    && channel.channel_epoch == epoch
+            }) {
                 store
                     .delete_outgoing_index(&channel_id, epoch)
                     .map_err(TicketManagerError::store)?;
@@ -91,15 +90,17 @@ where
         }
 
         // Purge outdated channel queues
-        let stored_queues = store.iter_queues().collect::<Vec<_>>();
+        let stored_queues = store
+            .iter_queues()
+            .map_err(TicketManagerError::store)?
+            .collect::<Vec<_>>();
         for channel_id in stored_queues {
             // If any existing redeemable ticket queue does not match any currently existing
             // channel that's either open or its closure period did not yet elapse (i.e. the channel
             // is not closed or not effectively closed), remove the queue from the store.
-            if channels
+            if !channels
                 .iter()
-                .find(|channel| !channel.closure_time_passed(now) && channel.get_id() == &channel_id)
-                .is_none()
+                .any(|channel| !channel.closure_time_passed(now) && channel.get_id() == &channel_id)
             {
                 store.delete_queue(&channel_id).map_err(TicketManagerError::store)?;
                 tracing::debug!(%channel_id, "purging outdated incoming tickets queue")
@@ -111,14 +112,17 @@ where
             let id = channel.get_id();
             match channel.direction(me) {
                 // We are only interested in tickets on incoming channels that are still open or not overdue
-                Some(ChannelDirection::Incoming) => if !channel.closure_time_passed(now) {
+                Some(ChannelDirection::Incoming) => {
+                    if !channel.closure_time_passed(now) {
                         // Either open an existing queue for that channel or create a new one
                         let queue = store.open_or_create_queue(id).map_err(TicketManagerError::store)?;
-                        tracing::debug!(%id, num_tickets = queue.len(), "redeemable ticket queue for channel");
+                        tracing::debug!(%id, num_tickets = queue.len().map_err(TicketManagerError::store)?, "redeemable ticket queue for channel");
                         channel_tickets.insert(*id, ChannelTicketQueue::from(queue));
+                    }
                 }
                 // We are only interested in tickets on outgoing channels that are still open
-                Some(ChannelDirection::Outgoing) => if channel.status == ChannelStatus::Open {
+                Some(ChannelDirection::Outgoing) => {
+                    if channel.status == ChannelStatus::Open {
                         // Either load a previously stored outgoing index or use the channel's ticket index as a
                         // fallback
                         let epoch = channel.channel_epoch;
@@ -135,6 +139,7 @@ where
                         let out_index = index.max(channel.ticket_index);
                         out_indices.insert((*id, epoch), AtomicU64::new(out_index));
                         tracing::debug!(%id, epoch, out_index, "outgoing ticket index for channel");
+                    }
                 }
                 _ => {} // Foreign, closed or an "overdue" channel
             }
@@ -161,7 +166,7 @@ where
                     .open_or_create_queue(&ticket.ticket_id().id)
                     .map_err(TicketManagerError::store)?;
                 // Should not happen
-                if !queue.is_empty() {
+                if !queue.is_empty().map_err(TicketManagerError::store)? {
                     return Err(TicketManagerError::Other(anyhow::anyhow!("queue not empty")));
                 }
 
@@ -228,9 +233,14 @@ where
         let mut queue_read = queue.upgradable_read();
         let max_index = max_index.unwrap_or(u64::MAX);
 
-        while let Some(_) = queue_read.peek().map_err(TicketManagerError::store)?.filter(|ticket| {
-            epoch == ticket.verified_ticket().channel_epoch && max_index <= ticket.verified_ticket().index
-        }) {
+        while queue_read
+            .peek()
+            .map_err(TicketManagerError::store)?
+            .filter(|ticket| {
+                epoch == ticket.verified_ticket().channel_epoch && max_index <= ticket.verified_ticket().index
+            })
+            .is_some()
+        {
             // Quickly perform pop and downgrade to lock not to block any readers
             let mut queue_write = parking_lot::RwLockUpgradableReadGuard::upgrade(queue_read);
             let maybe_ticket = queue_write.pop().map_err(TicketManagerError::store)?;
