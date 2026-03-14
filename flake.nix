@@ -8,7 +8,7 @@
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/master";
     rust-overlay.url = "github:oxalica/rust-overlay/master";
     crane.url = "github:ipetkov/crane/v0.23.0";
-    nix-lib.url = "github:hoprnet/nix-lib";
+    nix-lib.url = "github:hoprnet/nix-lib/ausias/export-docker-image";
     # pin it to a version which we are compatible with
     foundry.url = "github:hoprnet/foundry.nix/tb/202505-add-xz";
     pre-commit.url = "github:cachix/git-hooks.nix";
@@ -158,68 +158,67 @@
             cargoToml = ./localcluster/Cargo.toml;
           };
 
-          hoprd = rust-builder-local.callPackage nixLib.mkRustPackage hoprdBuildArgs;
-          hoprd-localcluster = rust-builder-local.callPackage nixLib.mkRustPackage localclusterBuildArgs;
-          # also used for Docker image
-          hoprd-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage hoprdBuildArgs;
-          # also used for Docker image
-          hoprd-localcluster-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage localclusterBuildArgs;
-          # also used for Docker image
-          hoprd-x86_64-linux-profile = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
-          );
-          # also used for Docker image
-          hoprd-x86_64-linux-dev = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs
-            // {
-              CARGO_PROFILE = "dev";
-              cargoExtraArgs = "-F capture";
-            }
-          );
-          hoprd-aarch64-linux = rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage hoprdBuildArgs;
-          hoprd-aarch64-linux-profile = rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
-          );
+          hoprdPackages = {
+            binary-hoprd = rust-builder-local.callPackage nixLib.mkRustPackage hoprdBuildArgs;
+            binary-hoprd-localcluster = rust-builder-local.callPackage nixLib.mkRustPackage localclusterBuildArgs;
+            # also used for Docker image
+            binary-hoprd-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage hoprdBuildArgs;
+            # also used for Docker image
+            binary-hoprd-localcluster-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage localclusterBuildArgs;
+            # also used for Docker image
+            hoprd-profile-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage (
+              hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
+            );
+            # also used for Docker image
+            binary-hoprd-dev-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage (
+              hoprdBuildArgs
+              // {
+                CARGO_PROFILE = "dev";
+                cargoExtraArgs = "-F capture";
+              }
+            );
+            binary-hoprd-aarch64-linux = rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage hoprdBuildArgs;
+            binary-hoprd-profile-aarch64-linux = rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage (
+              hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
+            );
+            # CAVEAT: must be built from a darwin system
+            binary-hoprd-x86_64-darwin = rust-builder-x86_64-darwin.callPackage nixLib.mkRustPackage hoprdBuildArgs;
+            binary-hoprd-profile-x86_64-darwin = rust-builder-x86_64-darwin.callPackage nixLib.mkRustPackage (
+              hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
+            );
+            # CAVEAT: must be built from a darwin system
+            binary-hoprd-aarch64-darwin = rust-builder-aarch64-darwin.callPackage nixLib.mkRustPackage hoprdBuildArgs;
+            binary-hoprd-profile-aarch64-darwin = rust-builder-aarch64-darwin.callPackage nixLib.mkRustPackage (
+              hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
+            );
+            hopr-test-unit = rust-builder-local.callPackage nixLib.mkRustPackage (
+              hoprdBuildArgs
+              // {
+                src = testSrc;
+                runTests = true;
+                cargoExtraArgs = "--lib";
+              }
+            );
+            hopr-test-nightly = rust-builder-local-nightly.callPackage nixLib.mkRustPackage (
+              hoprdBuildArgs
+              // {
+                src = testSrc;
+                runTests = true;
+                cargoExtraArgs = "-Z panic-abort-tests --lib";
+              }
+            );
+            hoprd-clippy = rust-builder-local.callPackage nixLib.mkRustPackage (
+              hoprdBuildArgs // { runClippy = true; }
+            );
+            binary-hoprd-dev = rust-builder-local.callPackage nixLib.mkRustPackage (
+              hoprdBuildArgs
+              // {
+                CARGO_PROFILE = "dev";
+                cargoExtraArgs = "-F capture";
+              }
+            );
+          };
 
-          # CAVEAT: must be built from a darwin system
-          hoprd-x86_64-darwin = rust-builder-x86_64-darwin.callPackage nixLib.mkRustPackage hoprdBuildArgs;
-          hoprd-x86_64-darwin-profile = rust-builder-x86_64-darwin.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
-          );
-          # CAVEAT: must be built from a darwin system
-          hoprd-aarch64-darwin = rust-builder-aarch64-darwin.callPackage nixLib.mkRustPackage hoprdBuildArgs;
-          hoprd-aarch64-darwin-profile = rust-builder-aarch64-darwin.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
-          );
-
-          hopr-test-unit = rust-builder-local.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs
-            // {
-              src = testSrc;
-              runTests = true;
-              cargoExtraArgs = "--lib";
-            }
-          );
-
-          hopr-test-nightly = rust-builder-local-nightly.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs
-            // {
-              src = testSrc;
-              runTests = true;
-              cargoExtraArgs = "-Z panic-abort-tests --lib";
-            }
-          );
-
-          hoprd-clippy = rust-builder-local.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs // { runClippy = true; }
-          );
-          hoprd-dev = rust-builder-local.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs
-            // {
-              CARGO_PROFILE = "dev";
-              cargoExtraArgs = "-F capture";
-            }
-          );
           # build candidate binary as static on Linux amd64 to get more test exposure specifically via smoke tests
           mkHoprdCandidate =
             cargoExtraArgs:
@@ -317,92 +316,54 @@
           # Man pages using nix-lib
           hoprd-man = nixLib.mkManPage {
             pname = "hoprd";
-            binary = hoprd-dev;
+            binary = hoprdPackages.binary-hoprd-dev;
             description = "HOPR node executable";
           };
 
-          # FIXME: the docker image built is not working on macOS arm platforms
-          # and will simply lead to a non-working image. Likely, some form of
-          # cross-compilation or distributed build is required.
-          # Docker images using nix-lib
-          hoprd-docker = nixLib.mkDockerImage {
-            name = "hoprd";
-            extraContents = [
-              dockerHoprdEntrypoint
-              hoprd-x86_64-linux
-              pkgs.cacert
-              pkgs.curl # Required by docker-compose healthcheck
-            ];
-            Entrypoint = [ "/bin/docker-entrypoint.sh" ];
-            Cmd = [ "hoprd" ];
-            env = [ "TMPDIR=/app/.tmp" ];
-          };
-          hoprd-dev-docker = nixLib.mkDockerImage {
-            name = "hoprd";
-            extraContents = [
-              dockerHoprdEntrypoint
-              hoprd-x86_64-linux-dev
-              pkgs.cacert
-              pkgs.curl # Required by docker-compose healthcheck
-            ];
-            Entrypoint = [ "/bin/docker-entrypoint.sh" ];
-            Cmd = [ "hoprd" ];
-            env = [ "TMPDIR=/app/.tmp" ];
-          };
-          hoprd-profile-docker = nixLib.mkDockerImage {
-            name = "hoprd";
-            extraContents = [
-              dockerHoprdEntrypoint
-              hoprd-x86_64-linux-profile
-              pkgs.cacert
-              pkgs.curl # Required by docker-compose healthcheck
-            ]
-            ++ profileDeps;
-            Entrypoint = [ "/bin/docker-entrypoint.sh" ];
-            Cmd = [ "hoprd" ];
-            env = [ "TMPDIR=/app/.tmp" ];
-          };
-
-          # Docker security scanning and SBOM generation using nix-lib
-          hoprd-docker-trivy = nixLib.mkTrivyScan {
-            image = hoprd-docker;
-            imageName = "hoprd";
-          };
-          hoprd-docker-sbom = nixLib.mkSBOM {
-            image = hoprd-docker;
-            imageName = "hoprd";
+          hoprdDocker = {
+            # FIXME: the docker image built is not working on macOS arm platforms
+            # and will simply lead to a non-working image. Likely, some form of
+            # cross-compilation or distributed build is required.
+            # Docker images using nix-lib
+            docker-hoprd-x86_64-linux = nixLib.mkDockerImage {
+              name = "hoprd";
+              extraContents = [
+                dockerHoprdEntrypoint
+                hoprdPackages.binary-hoprd-x86_64-linux
+                pkgs.cacert
+                pkgs.curl # Required by docker-compose healthcheck
+              ];
+              Entrypoint = [ "/bin/docker-entrypoint.sh" ];
+              Cmd = [ "hoprd" ];
+              env = [ "TMPDIR=/app/.tmp" ];
+            };
+            docker-hoprd-dev-x86_64-linux = nixLib.mkDockerImage {
+              name = "hoprd";
+              extraContents = [
+                dockerHoprdEntrypoint
+                hoprdPackages.binary-hoprd-dev-x86_64-linux
+                pkgs.cacert
+                pkgs.curl # Required by docker-compose healthcheck
+              ];
+              Entrypoint = [ "/bin/docker-entrypoint.sh" ];
+              Cmd = [ "hoprd" ];
+              env = [ "TMPDIR=/app/.tmp" ];
+            };
+            docker-hoprd-profile-x86_64-linux = nixLib.mkDockerImage {
+              name = "hoprd";
+              extraContents = [
+                dockerHoprdEntrypoint
+                hoprdPackages.binary-hoprd-profile-x86_64-linux
+                pkgs.cacert
+                pkgs.curl # Required by docker-compose healthcheck
+              ]
+              ++ profileDeps;
+              Entrypoint = [ "/bin/docker-entrypoint.sh" ];
+              Cmd = [ "hoprd" ];
+              env = [ "TMPDIR=/app/.tmp" ];
+            };
           };
 
-          # Multi-arch Docker manifests using nix-lib
-          # NOTE: These require images for both amd64 and arm64 to be pushed to a registry first
-          # hoprd-docker-multiarch = nixLib.mkMultiArchManifest {
-          #   name = "hoprd";
-          #   tag = "latest";
-          #   images = [
-          #     { arch = "amd64"; digest = "sha256:..."; }
-          #     { arch = "arm64"; digest = "sha256:..."; }
-          #   ];
-          # };
-
-          dockerImageUploadScript =
-            image:
-            pkgs.writeShellScriptBin "docker-image-upload" ''
-              set -eu
-              OCI_ARCHIVE="$(nix build --no-link --print-out-paths ${image})"
-              ${pkgs.skopeo}/bin/skopeo copy --insecure-policy \
-                --dest-registry-token="$GOOGLE_ACCESS_TOKEN" \
-                "docker-archive:$OCI_ARCHIVE" "docker://$IMAGE_TARGET"
-              echo "Uploaded image to $IMAGE_TARGET"
-            '';
-          hoprd-docker-build-and-upload = flake-utils.lib.mkApp {
-            drv = dockerImageUploadScript hoprd-docker;
-          };
-          hoprd-dev-docker-build-and-upload = flake-utils.lib.mkApp {
-            drv = dockerImageUploadScript hoprd-dev-docker;
-          };
-          hoprd-profile-docker-build-and-upload = flake-utils.lib.mkApp {
-            drv = dockerImageUploadScript hoprd-profile-docker;
-          };
           docs = rust-builder-local-nightly.callPackage nixLib.mkRustPackage (
             hoprdBuildArgs // { buildDocs = true; }
           );
@@ -679,45 +640,25 @@
             };
           };
 
-          checks = { inherit hoprd-clippy; };
+          checks = { inherit (hoprdPackages) hoprd-clippy; };
 
           apps = {
-            inherit hoprd-docker-build-and-upload;
-            inherit hoprd-dev-docker-build-and-upload;
-            inherit hoprd-profile-docker-build-and-upload;
             inherit update-github-labels find-port-ci;
             check = run-check;
             audit = run-audit;
           };
 
-          packages = {
-            inherit
-              hoprd
-              hoprd-dev
-              hoprd-docker
-              hoprd-dev-docker
-              hoprd-profile-docker
-              hoprd-localcluster
-              ;
-            inherit hopr-test-unit hopr-test-nightly;
-            inherit docs;
-            inherit pre-commit-check;
-            inherit hoprd-bench;
-            inherit hoprd-man;
-            # binary packages
-            inherit
-              hoprd-x86_64-linux
-              hoprd-x86_64-linux-dev
-              hoprd-x86_64-linux-profile
-              ;
-            inherit hoprd-aarch64-linux hoprd-aarch64-linux-profile;
-            # FIXME: Darwin cross-builds are currently broken.
-            # Follow https://github.com/nixos/nixpkgs/pull/256590
-            inherit hoprd-x86_64-darwin hoprd-x86_64-darwin-profile;
-            inherit hoprd-aarch64-darwin hoprd-aarch64-darwin-profile;
-            default = hoprd;
-            hoprd-candidate = (mkHoprdCandidate "");
-          };
+          packages =
+            hoprdPackages
+            // hoprdDocker
+            // {
+              inherit docs;
+              inherit pre-commit-check;
+              inherit hoprd-bench;
+              inherit hoprd-man;
+              default = hoprdPackages.binary-hoprd;
+              hoprd-candidate = (mkHoprdCandidate "");
+            };
 
           devShells.default = devShell;
           devShells.nightly = devShellNightly;
