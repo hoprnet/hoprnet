@@ -311,12 +311,10 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             "forwarding packet to the next hop"
                         );
 
-                        wire_outgoing
-                            .send((next_hop.into(), data))
-                            .await
-                            .unwrap_or_else(|error| {
-                                tracing::error!(%error, "failed to forward a packet to the transport layer");
-                            });
+                        if let Err(error) = wire_outgoing.send((next_hop.into(), data)).await {
+                            tracing::error!(%error, "failed to forward a packet to the transport layer");
+                            return None;
+                        }
 
                         counters.get_or_create(&next_hop).record_message_sent();
 
