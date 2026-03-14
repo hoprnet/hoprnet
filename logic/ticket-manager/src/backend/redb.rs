@@ -18,6 +18,9 @@ pub struct RedbStore {
 impl RedbStore {
     pub fn new(path: impl AsRef<std::path::Path>) -> Result<Self, RedbStoreError> {
         let db = std::sync::Arc::new(redb::Database::create(path)?);
+        let tx = db.begin_write()?;
+        tx.open_table(OUT_IDX_TABLE)?;
+        tx.commit()?;
         Ok(Self { db })
     }
 }
@@ -164,7 +167,7 @@ impl TicketQueue for RedbTicketQueue {
     fn pop(&mut self) -> Result<Option<RedeemableTicket>, Self::Error> {
         if let Some(db) = self.db.upgrade() {
             let tx = db.begin_write()?;
-            let ticket_bytes = {
+            let maybe_ticket = {
                 let mut table = tx.open_table(TableDefinition::<u64, Vec<u8>>::new(&format!(
                     "{TABLE_QUEUE_NAME_PREFIX}{}",
                     self.channel_id
@@ -172,8 +175,8 @@ impl TicketQueue for RedbTicketQueue {
                 table.pop_first()?.map(|(_, v)| v.value())
             };
             tx.commit()?;
-            if let Some(ticket_bytes) = ticket_bytes {
-                Ok(postcard::from_bytes(&ticket_bytes)?)
+            if let Some(ticket_bytes) = maybe_ticket {
+                Ok(Some(postcard::from_bytes(&ticket_bytes)?))
             } else {
                 Ok(None)
             }
@@ -266,88 +269,106 @@ impl From<redb::CommitError> for RedbStoreError {
 
 #[cfg(test)]
 mod tests {
-    use crate::{MemoryStore, MemoryTicketQueue, traits::tests::*};
+    use super::*;
+    use crate::traits::tests::*;
 
     #[test]
     fn redb_queue_maintains_natural_ticket_order() -> anyhow::Result<()> {
-        queue_maintains_natural_ticket_order(MemoryTicketQueue::default())
+        let file = tempfile::NamedTempFile::new()?;
+        queue_maintains_natural_ticket_order(RedbStore::new(file)?.open_or_create_queue(&Default::default())?)
     }
 
     #[test]
     fn redb_queue_returns_all_tickets() -> anyhow::Result<()> {
-        queue_returns_all_tickets(MemoryTicketQueue::default())
+        let file = tempfile::NamedTempFile::new()?;
+        queue_returns_all_tickets(RedbStore::new(file)?.open_or_create_queue(&Default::default())?)
     }
     #[test]
     fn redb_queue_is_empty_when_drained() -> anyhow::Result<()> {
-        queue_is_empty_when_drained(MemoryTicketQueue::default())
+        let file = tempfile::NamedTempFile::new()?;
+        queue_is_empty_when_drained(RedbStore::new(file)?.open_or_create_queue(&Default::default())?)
     }
 
     #[test]
     fn redb_queue_returns_empty_iterator_when_drained() -> anyhow::Result<()> {
-        queue_returns_empty_iterator_when_drained(MemoryTicketQueue::default())
+        let file = tempfile::NamedTempFile::new()?;
+        queue_returns_empty_iterator_when_drained(RedbStore::new(file)?.open_or_create_queue(&Default::default())?)
     }
     #[test]
     fn redb_queue_returns_correct_total_ticket_value() -> anyhow::Result<()> {
-        queue_returns_correct_total_ticket_value(MemoryTicketQueue::default())
+        let file = tempfile::NamedTempFile::new()?;
+        queue_returns_correct_total_ticket_value(RedbStore::new(file)?.open_or_create_queue(&Default::default())?)
     }
 
     #[test]
     fn redb_queue_returns_correct_total_ticket_value_with_min_index() -> anyhow::Result<()> {
-        queue_returns_correct_total_ticket_value_with_min_index(MemoryTicketQueue::default())
+        let file = tempfile::NamedTempFile::new()?;
+        queue_returns_correct_total_ticket_value_with_min_index(RedbStore::new(file)?.open_or_create_queue(&Default::default())?)
     }
 
     #[test]
     fn redb_out_index_store_should_load_existing_index_for_channel_epoch() -> anyhow::Result<()> {
-        out_index_store_should_load_existing_index_for_channel_epoch(MemoryStore::default())
+        let file = tempfile::NamedTempFile::new()?;
+        out_index_store_should_load_existing_index_for_channel_epoch(RedbStore::new(file)?)
     }
 
     #[test]
     fn redb_out_index_store_should_not_load_non_existing_index_for_channel_epoch() -> anyhow::Result<()> {
-        out_index_store_should_not_load_non_existing_index_for_channel_epoch(MemoryStore::default())
+        let file = tempfile::NamedTempFile::new()?;
+        out_index_store_should_not_load_non_existing_index_for_channel_epoch(RedbStore::new(file)?)
     }
 
     #[test]
     fn redb_out_index_store_should_store_new_index_for_channel_epoch() -> anyhow::Result<()> {
-        out_index_store_should_store_new_index_for_channel_epoch(MemoryStore::default())
+        let file = tempfile::NamedTempFile::new()?;
+        out_index_store_should_store_new_index_for_channel_epoch(RedbStore::new(file)?)
     }
 
     #[test]
     fn redb_out_index_store_should_delete_existing_index_for_channel_epoch() -> anyhow::Result<()> {
-        out_index_store_should_delete_existing_index_for_channel_epoch(MemoryStore::default())
+        let file = tempfile::NamedTempFile::new()?;
+        out_index_store_should_delete_existing_index_for_channel_epoch(RedbStore::new(file)?)
     }
 
     #[test]
     fn redb_out_index_should_update_existing_index_for_channel_epoch() -> anyhow::Result<()> {
-        out_index_should_update_existing_index_for_channel_epoch(MemoryStore::default())
+        let file = tempfile::NamedTempFile::new()?;
+        out_index_should_update_existing_index_for_channel_epoch(RedbStore::new(file)?)
     }
 
     #[test]
     fn redb_out_index_store_should_iterate_existing_indices_for_channel_epoch() -> anyhow::Result<()> {
-        out_index_store_should_iterate_existing_indices_for_channel_epoch(MemoryStore::default())
+        let file = tempfile::NamedTempFile::new()?;
+        out_index_store_should_iterate_existing_indices_for_channel_epoch(RedbStore::new(file)?)
     }
 
     #[test]
     fn redb_ticket_store_should_create_new_queue_for_channel() -> anyhow::Result<()> {
-        ticket_store_should_create_new_queue_for_channel(MemoryStore::default())
+        let file = tempfile::NamedTempFile::new()?;
+        ticket_store_should_create_new_queue_for_channel(RedbStore::new(file)?)
     }
 
     #[test]
     fn redb_ticket_store_should_open_existing_queue_for_channel() -> anyhow::Result<()> {
-        ticket_store_should_open_existing_queue_for_channel(MemoryStore::default())
+        let file = tempfile::NamedTempFile::new()?;
+        ticket_store_should_open_existing_queue_for_channel(RedbStore::new(file)?)
     }
 
     #[test]
     fn redb_ticket_store_should_delete_existing_queue_for_channel() -> anyhow::Result<()> {
-        ticket_store_should_delete_existing_queue_for_channel(MemoryStore::default())
+        let file = tempfile::NamedTempFile::new()?;
+        ticket_store_should_delete_existing_queue_for_channel(RedbStore::new(file)?)
     }
 
     #[test]
     fn redb_ticket_store_should_iterate_existing_queues_for_channel() -> anyhow::Result<()> {
-        ticket_store_should_iterate_existing_queues_for_channel(MemoryStore::default())
+        let file = tempfile::NamedTempFile::new()?;
+        ticket_store_should_iterate_existing_queues_for_channel(RedbStore::new(file)?)
     }
 
     #[test]
     fn redb_ticket_store_should_not_fail_to_delete_non_existing_queue_for_channel() -> anyhow::Result<()> {
-        ticket_store_should_not_fail_to_delete_non_existing_queue_for_channel(MemoryStore::default())
+        let file = tempfile::NamedTempFile::new()?;
+        ticket_store_should_not_fail_to_delete_non_existing_queue_for_channel(RedbStore::new(file)?)
     }
 }

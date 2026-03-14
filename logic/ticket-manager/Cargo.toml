@@ -36,3 +36,4 @@ hopr-async-runtime = { workspace = true }
 [dev-dependencies]
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 rand = { workspace = true }
+tempfile = { workspace = true }
