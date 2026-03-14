@@ -19,9 +19,6 @@ pub mod constants;
 /// Errors used by the crate.
 pub mod errors;
 
-#[cfg(feature = "telemetry")]
-pub mod stats;
-
 #[cfg(feature = "capture")]
 mod capture;
 mod pipeline;
@@ -71,7 +68,7 @@ use hopr_transport_probe::{
     Probe,
     ping::{PingConfig, Pinger},
 };
-pub use hopr_transport_protocol::TicketEvent;
+pub use hopr_transport_protocol::{PeerProtocolCounterRegistry, TicketEvent};
 pub use hopr_transport_session as session;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::transfer_session;
@@ -88,13 +85,9 @@ pub use hopr_transport_session::{
     session_snapshot_metric_samples, session_snapshot_metric_value, session_telemetry_snapshots,
 };
 pub use hopr_transport_tag_allocator::TagAllocatorConfig;
-#[cfg(feature = "telemetry")]
-pub use stats::PeerPacketStats;
 use tracing::{Instrument, debug, error, trace, warn};
 
 pub use crate::config::HoprProtocolConfig;
-#[cfg(feature = "telemetry")]
-pub use crate::stats::PeerPacketStatsSnapshot;
 use crate::{
     constants::SESSION_INITIATION_TIMEOUT_BASE, errors::HoprTransportError, pipeline::HoprPipelineComponents,
     socket::HoprSocket,
@@ -150,6 +143,8 @@ pub enum HoprTransportProcess {
     PathRefresh,
     #[strum(to_string = "sync of outgoing ticket indices")]
     OutgoingIndexSync,
+    #[strum(to_string = "periodic protocol counter flush")]
+    CounterFlush,
     #[cfg(feature = "capture")]
     #[strum(to_string = "packet capture")]
     Capture,
@@ -174,6 +169,7 @@ where
     smgr: SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>, Sender<IncomingSession>>,
     session_telemetry_tag_allocator: Arc<dyn hopr_transport_tag_allocator::TagAllocator + Send + Sync>,
     probing_tag_allocator: Arc<dyn hopr_transport_tag_allocator::TagAllocator + Send + Sync>,
+    counters: PeerProtocolCounterRegistry,
     cfg: HoprProtocolConfig,
 }
 
@@ -190,6 +186,7 @@ where
         + 'static,
     Graph: NetworkGraphView<NodeId = OffchainPublicKey>
         + NetworkGraphUpdate
+        + hopr_api::graph::NetworkGraphWrite<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
         + Clone
         + Send
@@ -198,6 +195,7 @@ where
     <Graph as NetworkGraphView>::Observed: hopr_api::graph::traits::EdgeObservableRead + Send,
     <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
         hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
+    <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
     Net: NetworkView + NetworkStreamControl + Clone + Send + Sync + 'static,
 {
     pub fn new(
@@ -274,6 +272,7 @@ where
             chain_api: resolver,
             session_telemetry_tag_allocator,
             probing_tag_allocator,
+            counters: PeerProtocolCounterRegistry::default(),
             cfg,
         })
     }
@@ -484,10 +483,38 @@ where
                 surb_store: self.path_planner.surb_store.clone(),
                 chain_api: self.chain_api.clone(),
                 db: self.db.clone(),
+                counters: self.counters.clone(),
             },
             channels_dst,
             self.cfg.packet,
         ));
+
+        // -- periodic counter flush
+        let flush_counters = self.counters.clone();
+        let flush_graph = self.graph.clone();
+        let flush_me = *self.packet_key.public();
+        processes.insert(
+            HoprTransportProcess::CounterFlush,
+            spawn_as_abortable!(async move {
+                use hopr_api::graph::traits::{EdgeObservableWrite, EdgeWeightType};
+
+                let interval = std::time::Duration::from_secs(15);
+                loop {
+                    hopr_async_runtime::prelude::sleep(interval).await;
+                    for (peer, num_packets, num_acks) in flush_counters.drain() {
+                        tracing::trace!(
+                            %peer,
+                            num_packets,
+                            num_acks,
+                            "flushing protocol conformance counters"
+                        );
+                        flush_graph.upsert_edge(&flush_me, &peer, |obs| {
+                            obs.record(EdgeWeightType::ImmediateProtocolConformance { num_packets, num_acks });
+                        });
+                    }
+                }
+            }),
+        );
 
         // -- network probing
         debug!(
@@ -767,20 +794,6 @@ where
                 }
             })
             .collect::<Vec<_>>())
-    }
-
-    /// Get packet stats snapshot for a specific peer.
-    #[cfg(feature = "telemetry")]
-    #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn network_peer_packet_stats(&self, peer: &PeerId) -> errors::Result<Option<PeerPacketStatsSnapshot>> {
-        Err(HoprTransportError::Api("not implemented yet".into()))
-    }
-
-    /// Get packet stats for all connected peers.
-    #[cfg(feature = "telemetry")]
-    #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn network_all_packet_stats(&self) -> errors::Result<Vec<(PeerId, PeerPacketStatsSnapshot)>> {
-        Err(HoprTransportError::Api("not implemented yet".into()))
     }
 }
 

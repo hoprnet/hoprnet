@@ -25,6 +25,8 @@ pub struct HoprPipelineComponents<TEvt, S, Chain, Db> {
     pub chain_api: Chain,
     /// Database for storing tickets and other data.
     pub db: Db,
+    /// Per-peer protocol conformance counters.
+    pub counters: hopr_transport_protocol::PeerProtocolCounterRegistry,
 }
 
 pub fn run_hopr_packet_pipeline<WIn, WOut, Chain, S, Db, TEvt, AppOut, AppIn>(
@@ -53,6 +55,7 @@ where
         surb_store,
         chain_api,
         db,
+        counters,
     } = components;
 
     let ticket_proc = HoprTicketProcessor::new(
@@ -120,6 +123,7 @@ where
             ticket_events,
             cfg.pipeline,
             api,
+            counters,
         ),
         HoprTransportProcess::Pipeline,
     );

@@ -1,14 +1,17 @@
-use hopr_api::graph::{
-    CostFn, NetworkGraphTraverse, NetworkGraphView,
-    costs::{ForwardPathCostFn, HoprForwardCostFn, HoprReturnCostFn},
-    traits::EdgeObservableRead,
-};
+use hopr_api::graph::{CostFn, NetworkGraphTraverse, NetworkGraphView, costs::EdgeCostFn, traits::EdgeObservableRead};
 use hopr_types::{crypto::types::OffchainPublicKey, internal::errors::PathError};
 
 use crate::{
     errors::{PathPlannerError, Result},
     traits::PathSelector,
 };
+
+/// Default penalizing multiplier for edges that lack probe-based observations.
+const DEFAULT_PENALTY: f64 = 0.5;
+
+/// Default minimum acceptable message acknowledgment rate for immediate peers.
+/// Set to 0.0 to disable rejection until sufficient data is collected.
+const DEFAULT_MIN_ACK_RATE: f64 = 0.5;
 
 type PathToDestination = Vec<OffchainPublicKey>;
 
@@ -46,12 +49,13 @@ where
         .collect::<Vec<_>>()
 }
 
-/// Extended forward path search: find shorter paths using [`ForwardPathCostFn`]
+/// Extended forward path search: find shorter paths using [`EdgeCostFn::forward_without_self_loopback`]
 /// and append `dest` to each one.
 ///
 /// This handles the case where the last edge (relay -> dest) has no graph edge
 /// (e.g. no payment channel) but the path planner can still assume the last hop
 /// is reachable. Paths already found by Phase 1 are excluded via `existing`.
+#[allow(clippy::too_many_arguments)]
 fn compute_extended_forward_paths<G>(
     graph: &G,
     src: &OffchainPublicKey,
@@ -59,12 +63,19 @@ fn compute_extended_forward_paths<G>(
     shorter_length: std::num::NonZeroUsize,
     take: usize,
     existing: &[PathToDestination],
+    penalty: f64,
+    min_ack_rate: f64,
 ) -> Vec<PathToDestination>
 where
     G: NetworkGraphTraverse<NodeId = OffchainPublicKey> + NetworkGraphView<NodeId = OffchainPublicKey>,
     <G as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
 {
-    let raw = graph.simple_paths_from(src, shorter_length.get(), Some(take), ForwardPathCostFn::new());
+    let raw = graph.simple_paths_from(
+        src,
+        shorter_length.get(),
+        Some(take),
+        EdgeCostFn::forward_without_self_loopback(penalty, min_ack_rate),
+    );
 
     raw.into_iter()
         .filter_map(|(path, _, cost)| {
@@ -103,13 +114,15 @@ where
 ///
 /// Stores the planner's own identity (`me`) so that it can choose the
 /// appropriate cost function:
-/// - forward path (`src == me`): [`HoprForwardCostFn`]
-/// - return path (`dest == me`): [`HoprReturnCostFn`]
+/// - forward path (`src == me`): [`EdgeCostFn::forward`]
+/// - return path (`dest == me`): [`EdgeCostFn::returning`]
 #[derive(Clone)]
 pub struct HoprGraphPathSelector<G> {
     me: OffchainPublicKey,
     graph: G,
     max_paths: usize,
+    penalty: f64,
+    min_ack_rate: f64,
 }
 
 impl<G> HoprGraphPathSelector<G>
@@ -122,13 +135,42 @@ where
         + 'static,
     <G as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
 {
-    /// Create a new selector.
+    /// Create a new selector with default penalty and min_ack_rate values.
     ///
     /// * `me` – the planner's own offchain public key, used to determine path direction.
     /// * `graph` – the network graph to query.
     /// * `max_paths` – maximum number of candidate paths to return per query.
     pub fn new(me: OffchainPublicKey, graph: G, max_paths: usize) -> Self {
-        Self { me, graph, max_paths }
+        Self {
+            me,
+            graph,
+            max_paths,
+            penalty: DEFAULT_PENALTY,
+            min_ack_rate: DEFAULT_MIN_ACK_RATE,
+        }
+    }
+
+    /// Create a new selector with custom cost function parameters.
+    ///
+    /// * `me` – the planner's own offchain public key, used to determine path direction.
+    /// * `graph` – the network graph to query.
+    /// * `max_paths` – maximum number of candidate paths to return per query.
+    /// * `penalty` – penalizing multiplier for edges lacking probe observations.
+    /// * `min_ack_rate` – minimum acceptable ack rate for immediate peers (0.0 disables).
+    pub fn with_cost_params(
+        me: OffchainPublicKey,
+        graph: G,
+        max_paths: usize,
+        penalty: f64,
+        min_ack_rate: f64,
+    ) -> Self {
+        Self {
+            me,
+            graph,
+            max_paths,
+            penalty,
+            min_ack_rate,
+        }
     }
 }
 
@@ -171,7 +213,7 @@ where
                 &dest,
                 length,
                 self.max_paths,
-                HoprForwardCostFn::new(length),
+                EdgeCostFn::forward(length, self.penalty, self.min_ack_rate),
             );
 
             // Phase 2: if not enough paths, do an extended search with ForwardPathCostFn
@@ -180,7 +222,16 @@ where
                 && let Some(shorter) = std::num::NonZeroUsize::new(length.get() - 1)
             {
                 let remaining = self.max_paths - found.len();
-                let extended = compute_extended_forward_paths(&self.graph, &src, &dest, shorter, remaining, &found);
+                let extended = compute_extended_forward_paths(
+                    &self.graph,
+                    &src,
+                    &dest,
+                    shorter,
+                    remaining,
+                    &found,
+                    self.penalty,
+                    self.min_ack_rate,
+                );
                 found.extend(extended);
             }
 
@@ -192,7 +243,7 @@ where
                 &dest,
                 length,
                 self.max_paths,
-                HoprReturnCostFn::new(length),
+                EdgeCostFn::returning(length, self.penalty, self.min_ack_rate),
             )
         };
 

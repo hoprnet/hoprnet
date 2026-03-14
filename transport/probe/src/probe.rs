@@ -425,6 +425,12 @@ mod tests {
         }
     }
 
+    impl hopr_api::graph::EdgeImmediateProtocolObservable for TestEdgeTransportObservations {
+        fn ack_rate(&self) -> Option<f64> {
+            None
+        }
+    }
+
     #[derive(Debug, Clone, Copy, Default)]
     pub struct TestEdgeObservations;
 

@@ -12,6 +12,9 @@
 /// Coder and decoder for the transport binary protocol layer
 mod codec;
 
+/// Per-peer protocol conformance counters.
+pub mod counters;
+
 /// Errors produced by the crate.
 pub mod errors;
 
@@ -24,6 +27,7 @@ mod pipeline;
 /// Stream processing utilities
 pub mod stream;
 
+pub use counters::{PeerProtocolCounterRegistry, PeerProtocolCounters};
 use hopr_api::PeerId;
 pub use pipeline::{
     AcknowledgementPipelineConfig, PacketPipelineConfig, PacketPipelineProcesses, TicketEvent, run_packet_pipeline,

@@ -24,6 +24,7 @@ serde = [
 [dependencies]
 anyhow = { workspace = true }
 ahash = { workspace = true }
+dashmap = { workspace = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
 halfbrown = { workspace = true }

@@ -1,9 +1,9 @@
-use std::{collections::HashSet, hash::RandomState};
+use std::{collections::HashSet, hash::RandomState, sync::Arc};
 
 use hopr_api::{
     OffchainPublicKey,
     graph::{
-        costs::ForwardPathCostFn,
+        costs::EdgeCostFn,
         traits::{CostFn, EdgeNetworkObservableRead, EdgeObservableRead},
     },
     types::internal::routing::PathId,
@@ -12,10 +12,13 @@ use petgraph::graph::NodeIndex;
 
 use crate::{ChannelGraph, algorithm::all_simple_paths_multi, graph::InnerGraph};
 
+/// A shared, thread-safe edge cost function over [`crate::Observations`].
+type EdgeCostFunction<C> = Arc<dyn Fn(C, &crate::Observations, usize) -> C + Send + Sync>;
+
 /// Core path-finding routine that runs `all_simple_paths_multi` on the
 /// inner petgraph.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn find_paths<C, F>(
+pub(crate) fn find_paths<C>(
     inner: &InnerGraph,
     source: NodeIndex,
     destinations: &HashSet<NodeIndex>,
@@ -23,11 +26,10 @@ pub(crate) fn find_paths<C, F>(
     take_count: Option<usize>,
     initial_cost: C,
     min_cost: Option<C>,
-    cost_fn: F,
+    cost_fn: EdgeCostFunction<C>,
 ) -> Vec<(Vec<OffchainPublicKey>, PathId, C)>
 where
     C: Clone + PartialOrd,
-    F: Fn(C, &crate::Observations, usize) -> C,
 {
     if length == 0 {
         return Default::default();
@@ -43,7 +45,7 @@ where
         Some(intermediates),
         initial_cost,
         min_cost,
-        cost_fn,
+        move |c, obs, i| cost_fn(c, obs, i),
     )
     .filter_map(|(node_indices, final_cost)| {
         // Build PathId from node indices along the path
@@ -156,7 +158,7 @@ impl hopr_api::graph::NetworkGraphTraverse for ChannelGraph {
                     })
                     .collect::<HashSet<_>>();
 
-                let cost_fn = ForwardPathCostFn::new();
+                let cost_fn = EdgeCostFn::forward_without_self_loopback(0.5, 0.0);
 
                 return find_paths(
                     &inner,
@@ -193,7 +195,7 @@ mod tests {
     use hopr_api::{
         graph::{
             NetworkGraphTraverse, NetworkGraphWrite,
-            costs::{HoprForwardCostFn, HoprReturnCostFn},
+            costs::EdgeCostFn,
             traits::{EdgeObservableWrite, EdgeWeightType},
         },
         types::{
@@ -242,7 +244,7 @@ mod tests {
             &dest,
             1,
             None,
-            HoprForwardCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?),
+            EdgeCostFn::forward(std::num::NonZeroUsize::new(1).context("should be non-zero")?, 0.5, 0.0),
         );
 
         assert_eq!(routes.len(), 1, "should find exactly one 1-edge route");
@@ -269,7 +271,7 @@ mod tests {
             &dest,
             2,
             None,
-            HoprForwardCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
+            EdgeCostFn::forward(std::num::NonZeroUsize::new(2).context("should be non-zero")?, 0.5, 0.0),
         );
 
         assert!(!routes.is_empty(), "should find at least one 2-edge route");
@@ -291,7 +293,7 @@ mod tests {
             &dest,
             1,
             None,
-            HoprForwardCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?),
+            EdgeCostFn::forward(std::num::NonZeroUsize::new(1).context("should be non-zero")?, 0.5, 0.0),
         );
 
         assert!(routes.is_empty(), "should return no routes when unreachable");
@@ -310,7 +312,7 @@ mod tests {
             &unknown,
             1,
             None,
-            HoprForwardCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?),
+            EdgeCostFn::forward(std::num::NonZeroUsize::new(1).context("should be non-zero")?, 0.5, 0.0),
         );
 
         assert!(routes.is_empty());
@@ -345,7 +347,7 @@ mod tests {
             &dest,
             2,
             None,
-            HoprForwardCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
+            EdgeCostFn::forward(std::num::NonZeroUsize::new(2).context("should be non-zero")?, 0.5, 0.0),
         );
         assert_eq!(routes.len(), 2, "diamond topology should yield two 2-edge routes");
         Ok(())
@@ -374,7 +376,7 @@ mod tests {
             &dest,
             3,
             None,
-            HoprForwardCostFn::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?),
+            EdgeCostFn::forward(std::num::NonZeroUsize::new(3).context("should be non-zero")?, 0.5, 0.0),
         );
         assert_eq!(routes.len(), 1, "should find exactly one 3-edge route");
         Ok(())
@@ -404,7 +406,7 @@ mod tests {
             &dest,
             3,
             None,
-            HoprForwardCostFn::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?),
+            EdgeCostFn::forward(std::num::NonZeroUsize::new(3).context("should be non-zero")?, 0.5, 0.0),
         );
         assert_eq!(routes.len(), 1, "cycle should not produce extra paths");
         Ok(())
@@ -424,7 +426,7 @@ mod tests {
             &dest,
             2,
             None,
-            HoprForwardCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
+            EdgeCostFn::forward(std::num::NonZeroUsize::new(2).context("should be non-zero")?, 0.5, 0.0),
         );
         assert!(routes.is_empty(), "no 2-edge route should exist for a single edge");
         Ok(())
@@ -442,7 +444,7 @@ mod tests {
             &other,
             0,
             None,
-            HoprForwardCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?),
+            EdgeCostFn::forward(std::num::NonZeroUsize::new(1).context("should be non-zero")?, 0.5, 0.0),
         );
         assert!(routes.is_empty(), "zero-edge path should find no routes");
         Ok(())
@@ -466,7 +468,7 @@ mod tests {
             &dest,
             2,
             None,
-            HoprForwardCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
+            EdgeCostFn::forward(std::num::NonZeroUsize::new(2).context("should be non-zero")?, 0.5, 0.0),
         );
         assert!(routes.is_empty(), "should not traverse edge in wrong direction");
         Ok(())
@@ -548,7 +550,7 @@ mod tests {
             &f,
             3,
             None,
-            HoprForwardCostFn::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?),
+            EdgeCostFn::forward(std::num::NonZeroUsize::new(3).context("should be non-zero")?, 0.5, 0.0),
         );
         assert_eq!(routes_3.len(), 5, "should find exactly 5 three-edge paths");
 
@@ -566,7 +568,7 @@ mod tests {
             &f,
             1,
             None,
-            HoprForwardCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?),
+            EdgeCostFn::forward(std::num::NonZeroUsize::new(1).context("should be non-zero")?, 0.5, 0.0),
         );
         assert!(routes_1.is_empty(), "no direct edge from me to f");
 
@@ -600,7 +602,7 @@ mod tests {
             &me,
             3,
             None,
-            HoprForwardCostFn::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?),
+            EdgeCostFn::forward(std::num::NonZeroUsize::new(3).context("should be non-zero")?, 0.5, 0.0),
         );
         assert!(
             routes.is_empty(),
@@ -626,7 +628,7 @@ mod tests {
             &dest,
             1,
             None,
-            HoprForwardCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?),
+            EdgeCostFn::forward(std::num::NonZeroUsize::new(1).context("should be non-zero")?, 0.5, 0.0),
         );
         assert_eq!(routes.len(), 1);
 
@@ -661,7 +663,7 @@ mod tests {
             &dest,
             3,
             None,
-            HoprForwardCostFn::new(std::num::NonZeroUsize::new(3).context("should be non-zero")?),
+            EdgeCostFn::forward(std::num::NonZeroUsize::new(3).context("should be non-zero")?, 0.5, 0.0),
         );
         assert_eq!(routes.len(), 1);
 
@@ -703,7 +705,7 @@ mod tests {
             &dest,
             2,
             None,
-            HoprForwardCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
+            EdgeCostFn::forward(std::num::NonZeroUsize::new(2).context("should be non-zero")?, 0.5, 0.0),
         );
         assert_eq!(routes.len(), 2, "diamond should yield two 2-edge routes");
 
@@ -726,22 +728,23 @@ mod tests {
     #[test]
     fn return_path_one_edge_should_find_route() -> anyhow::Result<()> {
         // Return path: dest -> me (1 edge)
-        // For length=1, path_index=0 matches the first-edge arm which requires capacity.
+        // For length=1, the single edge is both first and last; the last-edge arm
+        // of EdgeCostFn::returning requires immediate connectivity.
         let me = pubkey_from(&SECRET_0);
         let dest = pubkey_from(&SECRET_1);
 
         let graph = ChannelGraph::new(me);
         graph.add_node(dest);
         graph.add_edge(&dest, &me)?;
-        // dest→me: needs capacity (first-edge arm of HoprReturnCostFn)
-        mark_edge_with_capacity(&graph, &dest, &me);
+        // dest→me: needs connectivity (last-edge arm for length=1 return path)
+        mark_edge_connected(&graph, &dest, &me);
 
         let routes = graph.simple_paths(
             &dest,
             &me,
             1,
             None,
-            HoprReturnCostFn::new(std::num::NonZeroUsize::new(1).context("should be non-zero")?),
+            EdgeCostFn::returning(std::num::NonZeroUsize::new(1).context("should be non-zero")?, 0.5, 0.0),
         );
 
         assert_eq!(routes.len(), 1, "should find exactly one 1-edge return route");
@@ -772,7 +775,7 @@ mod tests {
             &me,
             2,
             None,
-            HoprReturnCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
+            EdgeCostFn::returning(std::num::NonZeroUsize::new(2).context("should be non-zero")?, 0.5, 0.0),
         );
 
         assert!(!routes.is_empty(), "should find at least one 2-edge return route");
@@ -801,7 +804,7 @@ mod tests {
             &me,
             2,
             None,
-            HoprReturnCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
+            EdgeCostFn::returning(std::num::NonZeroUsize::new(2).context("should be non-zero")?, 0.5, 0.0),
         );
 
         assert!(
@@ -833,7 +836,7 @@ mod tests {
             &me,
             2,
             None,
-            HoprReturnCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
+            EdgeCostFn::returning(std::num::NonZeroUsize::new(2).context("should be non-zero")?, 0.5, 0.0),
         );
 
         assert!(
@@ -871,7 +874,7 @@ mod tests {
             &me,
             2,
             None,
-            HoprReturnCostFn::new(std::num::NonZeroUsize::new(2).context("should be non-zero")?),
+            EdgeCostFn::returning(std::num::NonZeroUsize::new(2).context("should be non-zero")?, 0.5, 0.0),
         );
         assert_eq!(
             routes.len(),
