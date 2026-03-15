@@ -20,7 +20,7 @@ pub trait OutgoingIndexStore {
 
 /// Allows loading ticket queues from a storage.
 pub trait TicketQueueStore {
-    /// Type of queues.
+    /// Type of per-channel incoming ticket queues.
     type Queue: TicketQueue;
     /// Opens or creates a new queue in storage for the given channel.
     fn open_or_create_queue(
@@ -36,7 +36,10 @@ pub trait TicketQueueStore {
     fn iter_queues(&self) -> Result<impl Iterator<Item = ChannelId>, <Self::Queue as TicketQueue>::Error>;
 }
 
-/// Backend for ticket storage queue.
+/// Backend for the incoming ticket storage queue.
+///
+/// This trait defines the operations that an incoming ticket queue for a specific channel must support.
+/// A queue can only store redeemable tickets.
 ///
 /// The implementations must honor the natural ordering of tickets.
 pub trait TicketQueue {
@@ -189,6 +192,22 @@ pub(crate) mod tests {
 
         while let Some(_) = queue.pop()? {}
         assert_eq!(queue.iter_unordered()?.count(), 0);
+        assert!(queue.is_empty()?);
+
+        let mut pushed_tickets = generate_tickets()?;
+        fill_queue(&mut queue, pushed_tickets.iter().copied())?;
+        assert!(!queue.is_empty()?);
+        let dropped_tickets = queue.drain()?;
+        assert!(queue.is_empty()?);
+        assert_eq!(queue.iter_unordered()?.count(), 0);
+
+        pushed_tickets.sort();
+        let pushed_tickets = pushed_tickets
+            .into_iter()
+            .map(|t| *t.verified_ticket())
+            .collect::<Vec<_>>();
+        assert_eq!(pushed_tickets, dropped_tickets);
+
         Ok(())
     }
 

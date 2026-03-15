@@ -103,8 +103,8 @@ impl TicketQueueStore for RedbStore {
                 let ticket: RedeemableTicket = postcard::from_bytes(&ticket.value())?;
                 ret.push(*ticket.verified_ticket()); // Make it unredeemable
             }
-            tx.delete_table(TicketTableDef::new(&format!("{TABLE_QUEUE_NAME_PREFIX}{channel_id}")))?;
         }
+        tx.delete_table(TicketTableDef::new(&format!("{TABLE_QUEUE_NAME_PREFIX}{channel_id}")))?;
         tx.commit()?;
 
         Ok(ret)

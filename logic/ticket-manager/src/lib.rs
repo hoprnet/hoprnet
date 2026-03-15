@@ -125,7 +125,8 @@ where
     /// Creates a new ticket manager instance given the desired `store`.
     ///
     /// It is advised to call [`HoprTicketManager::sync_outgoing_channels`] and
-    /// [`HoprTicketManager::sync_incoming_channels`] before the manager is used further.
+    /// [`HoprTicketManager::sync_incoming_channels`] at least once before the manager
+    /// is used any further.
     pub fn new(store: S) -> Result<Self, TicketManagerError> {
         let store = std::sync::Arc::new(parking_lot::RwLock::new(store));
         let out_idx_tracker = OutgoingIndexTracker::new(store.clone());
@@ -151,6 +152,7 @@ where
         // remove the previous epoch from the map if any
         if res == 1 && epoch > 0 {
             self.out_idx_tracker.index_cache().remove(&(*channel_id, epoch - 1));
+            tracing::trace!(%channel_id, epoch = epoch - 1, "removing previous epoch from outgoing index cache");
         }
 
         // Mark the index store as dirty so that it could be synced to the persistent
@@ -317,7 +319,7 @@ where
                         .delete_queue(&channel_id)
                         .map_err(TicketManagerError::store)?,
                 );
-                tracing::debug!(%channel_id, "purging outdated incoming tickets queue");
+                tracing::debug!(%channel_id, "purged outdated incoming tickets queue");
                 store_read = parking_lot::RwLockWriteGuard::downgrade_to_upgradable(store_write);
             }
         }
@@ -334,7 +336,7 @@ where
                 .map_err(TicketManagerError::store)?;
             store_read = parking_lot::RwLockWriteGuard::downgrade_to_upgradable(store_write);
 
-            tracing::debug!(%id, num_tickets = queue.len().map_err(TicketManagerError::store)?, "redeemable ticket queue for channel");
+            tracing::debug!(%id, num_tickets = queue.len().map_err(TicketManagerError::store)?, "loaded redeemable ticket queue for channel");
             self.channel_tickets.insert(*id, ChannelTicketQueue::from(queue));
         }
 
@@ -343,13 +345,15 @@ where
 
     /// Inserts a new incoming winning redeemable ticket into the ticket manager.
     pub fn insert_incoming_ticket(&self, ticket: RedeemableTicket) -> Result<(), TicketManagerError> {
-        match self.channel_tickets.entry(ticket.ticket_id().id) {
+        let ticket_id = ticket.ticket_id();
+        match self.channel_tickets.entry(ticket_id.id) {
             dashmap::Entry::Occupied(e) => {
                 // High contention on this write lock is possible only when massive numbers of winning tickets
                 // on the same channel are received, or if tickets on the same channel are being
                 // rapidly redeemed or neglected.
                 // Such a scenario is likely not realistic.
                 e.get().queue.write().push(ticket).map_err(TicketManagerError::store)?;
+                tracing::debug!(%ticket_id, "winning ticket on channel");
             }
             dashmap::Entry::Vacant(v) => {
                 // A hypothetical chance of high contention on this write lock is
@@ -373,6 +377,7 @@ where
                     queue: std::sync::Arc::new(parking_lot::RwLock::new(queue)),
                     redeem_lock: std::sync::Arc::new(parking_lot::Mutex::new(())),
                 });
+                tracing::debug!(%ticket_id, "first winning ticket on channel");
             }
         }
 
@@ -391,7 +396,7 @@ where
     ) -> Result<HoprBalance, TicketManagerError> {
         if let Some(ticket_queue) = self.channel_tickets.get(channel_id) {
             // There is low contention on this read lock, because write locks are acquired only
-            // when a ticket has been redeemed or neglected, both of which are fairly rare operations.
+            // when a new winning ticket has been added, redeemed or neglected, all of which are fairly rare operations.
             Ok(ticket_queue
                 .queue
                 .read()
@@ -445,10 +450,11 @@ where
             queue_read = parking_lot::RwLockWriteGuard::downgrade_to_upgradable(queue_write);
 
             neglected_tickets.extend(maybe_ticket.map(|t| *t.verified_ticket()));
+            tracing::debug!(%channel_id, %epoch, ?maybe_ticket, "neglected ticket in channel");
         }
 
         // Keep the queue in even if it is empty. The cleanup is done only on startup.
-
+        tracing::debug!(%channel_id, %epoch, num_tickets = neglected_tickets.len(), "ticket neglection done in channel");
         Ok(neglected_tickets)
     }
 
@@ -478,6 +484,7 @@ where
             queue: std::sync::Arc<parking_lot::RwLock<Qq>>,
             chain: Cc,
             min_redeem_value: HoprBalance,
+            channel_id: ChannelId,
         }
 
         let initial_state = match self.channel_tickets.get(channel_id) {
@@ -489,6 +496,7 @@ where
                 queue: ticket_queue.queue.clone(),
                 chain,
                 min_redeem_value: min_redeem_value.unwrap_or(ChannelEntry::MAX_CHANNEL_BALANCE.into()),
+                channel_id: *channel_id,
             },
             None => return Err(TicketManagerError::ChannelNotFound),
         };
@@ -498,6 +506,7 @@ where
                 let queue_read = state.queue.upgradable_read();
                 match queue_read.peek() {
                     Ok(Some(ticket)) => {
+                        let ticket_id = ticket.ticket_id();
                         let (redeem_result, remove_ticket) =
                             if ticket.verified_ticket().amount >= state.min_redeem_value {
                                 match state.chain.redeem_ticket(ticket).await {
@@ -505,7 +514,7 @@ where
                                         let redemption_result = redeem_fut.await;
 
                                         // See if we need to remove this ticket after the error
-                                        let reject_ticket = match &redemption_result {
+                                        let pop_ticket = match &redemption_result {
                                             Ok(_) | Err(TicketRedeemError::Rejected(..)) => true,
                                             Err(TicketRedeemError::ProcessingError(..)) => false,
                                         };
@@ -514,7 +523,7 @@ where
                                             redemption_result
                                                 .map(|(ticket, _)| Some(ticket))
                                                 .map_err(TicketManagerError::redeem),
-                                            reject_ticket,
+                                            pop_ticket,
                                         )
                                     }
                                     Err(error) => {
@@ -541,10 +550,15 @@ where
                         }
 
                         redeem_result
+                            .inspect(|_| tracing::debug!(%ticket_id, "ticket redemption succeeded"))
+                            .inspect_err(
+                                |error| tracing::error!(%error, %ticket_id, remove_ticket, "ticket redemption failed"),
+                            )
                     }
                     Ok(None) => {
                         // No more tickets to redeem in this channel
                         // Keep the queue in even if it is empty. The cleanup is done only on startup.
+                        tracing::debug!(channel_id = %state.channel_id, "no more tickets to redeem in channel");
                         Ok(None)
                     }
                     Err(error) => {
