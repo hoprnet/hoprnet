@@ -9,12 +9,13 @@ use hopr_api::{
     chain::TicketRedeemError,
     types::{internal::prelude::*, primitive::prelude::*},
 };
+use backend::ValueCachedQueue;
 use utils::{ChannelTicketQueue, OutgoingIndexTracker};
 
 #[cfg(feature = "redb")]
-pub use crate::backend::{RedbStore, RedbTicketQueue};
-pub use crate::{
-    backend::{MemoryStore, MemoryTicketQueue, ValueCachedQueue},
+pub use backend::{RedbStore, RedbTicketQueue};
+pub use {
+    backend::{MemoryStore, MemoryTicketQueue},
     errors::TicketManagerError,
     traits::{OutgoingIndexStore, TicketQueue, TicketQueueStore},
 };
@@ -576,4 +577,9 @@ where
             res.map(|s| s.map(|v| (v, state)))
         }))
     }
+}
+
+#[cfg(test)]
+mod tests {
+
 }
