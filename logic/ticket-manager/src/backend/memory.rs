@@ -185,6 +185,12 @@ mod tests {
     }
 
     #[test]
+    fn memory_ticket_store_should_delete_existing_queue_for_channel_and_return_neglected_tickets() -> anyhow::Result<()>
+    {
+        ticket_store_should_delete_existing_queue_for_channel_and_return_neglected_tickets(MemoryStore::default())
+    }
+
+    #[test]
     fn memory_ticket_store_should_iterate_existing_queues_for_channel() -> anyhow::Result<()> {
         ticket_store_should_iterate_existing_queues_for_channel(MemoryStore::default())
     }

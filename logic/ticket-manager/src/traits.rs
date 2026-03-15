@@ -280,9 +280,33 @@ pub(crate) mod tests {
         assert_eq!(1, queues.len());
         assert!(queues.contains(&Default::default()));
 
-        let _ = store.delete_queue(&Default::default())?;
+        let tickets = store.delete_queue(&Default::default())?;
         let queues = store.iter_queues()?.collect::<Vec<_>>();
         assert_eq!(0, queues.len());
+        assert!(tickets.is_empty());
+
+        Ok(())
+    }
+
+    pub fn ticket_store_should_delete_existing_queue_for_channel_and_return_neglected_tickets<S: TicketQueueStore>(
+        mut store: S,
+    ) -> anyhow::Result<()> {
+        assert_eq!(0, store.iter_queues()?.count());
+
+        let mut queue = store.open_or_create_queue(&Default::default())?;
+        let queues = store.iter_queues()?.collect::<Vec<_>>();
+        assert_eq!(1, queues.len());
+        assert!(queues.contains(&Default::default()));
+        let mut tickets = generate_tickets()?;
+        fill_queue(&mut queue, tickets.iter().copied())?;
+
+        let deleted_tickets = store.delete_queue(&Default::default())?;
+        let queues = store.iter_queues()?.collect::<Vec<_>>();
+        assert_eq!(0, queues.len());
+
+        tickets.sort();
+        let pushed_tickets = tickets.into_iter().map(|t| *t.verified_ticket()).collect::<Vec<_>>();
+        assert_eq!(pushed_tickets, deleted_tickets);
 
         Ok(())
     }
