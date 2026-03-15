@@ -1,3 +1,7 @@
+//! Implements complete logic of ticket management in the HOPR protocol.
+//!
+//! See the [`HoprTicketManager`] documentation for complete details.
+
 mod backend;
 mod errors;
 mod traits;
@@ -5,20 +9,17 @@ mod utils;
 
 use std::{ops::Mul, sync::atomic::AtomicU64};
 
+use backend::ValueCachedQueue;
+pub use backend::{MemoryStore, MemoryTicketQueue};
+#[cfg(feature = "redb")]
+pub use backend::{RedbStore, RedbTicketQueue};
+pub use errors::TicketManagerError;
 use hopr_api::{
     chain::TicketRedeemError,
     types::{internal::prelude::*, primitive::prelude::*},
 };
-use backend::ValueCachedQueue;
+pub use traits::{OutgoingIndexStore, TicketQueue, TicketQueueStore};
 use utils::{ChannelTicketQueue, OutgoingIndexTracker};
-
-#[cfg(feature = "redb")]
-pub use backend::{RedbStore, RedbTicketQueue};
-pub use {
-    backend::{MemoryStore, MemoryTicketQueue},
-    errors::TicketManagerError,
-    traits::{OutgoingIndexStore, TicketQueue, TicketQueueStore},
-};
 
 /// Keeps track of indices for outgoing tickets and (optionally) of incoming redeemable tickets.
 ///
@@ -27,19 +28,20 @@ pub use {
 /// - if the store implements [`TicketQueueStore`], the incoming redeemable ticket management is available.
 ///
 /// It is possible to have both implementations in the same store object. Some store implementations may offer
-/// persistence, others may not.
+/// persistence, others may not. The `HoprTicketManager` takes ownership of the store object, and other
+/// processes should not attempt to change the store externally. For this reason, stores should not be cloneable.
 ///
-/// The node type gives typical use-cases of the `HoprTicketManager`:
+/// The HOPR node type gives typical use-cases of the `HoprTicketManager`:
 ///
 /// - Entry/Exit nodes only need to provide an `OutgoingIndexStore`, since they are dealing with outgoing tickets only.
 /// - Relay nodes need to provide a store which implements both `OutgoingIndexStore + TicketQueueStore`, because they
 ///   need to deal with both outgoing tickets and incoming redeemable tickets.
 ///
 /// To synchronize the on-chain state with the store, it is advised to call
-/// [`sync_outgoing_channels`](HoprTicketManager::sync_outgoing_channels) (and
-/// [`sync_incoming_channels`](HoprTicketManager::sync_incoming_channels) if applicable to the chosen store) early after
-/// the construction of the manager, to make sure outdated data is discarded early. This is typically done only once
-/// after construction and not needed to be done during the life-time of the manager.
+/// [`sync_outgoing_channels`](HoprTicketManager::sync_from_outgoing_channels) (and
+/// [`sync_incoming_channels`](HoprTicketManager::sync_from_incoming_channels) if applicable to the chosen store) early
+/// after the construction of the manager, to make sure outdated data is discarded early. This is typically done only
+/// once after construction and not needed to be done during the life-time of the manager.
 ///
 /// The manager is safe to be shared via an `Arc`. It is typically shared between the packet processing pipelines
 /// (outgoing on Entry/Exit nodes, incoming on Relay nodes) and some higher level component
@@ -103,7 +105,7 @@ pub use {
 /// and to be called per each incoming packet **before** it is forwarded to a next hop.
 ///
 /// This operation acquires the read-part of an RW lock (per incoming channel). This may block the hot-path only if
-/// one of the following (write) operations is performed in the same moment:
+/// one of the following (write) operations is performed at the same moment:
 ///     1. A new incoming winning ticket is inserted into the same incoming channel queue.
 ///     2. Ticket redemption has just finished in that particular channel, and the redeemed ticket is dropped from the
 ///     same incoming channel queue.
@@ -125,8 +127,11 @@ where
 {
     /// Creates a new ticket manager instance given the desired `store`.
     ///
-    /// It is advised to call [`HoprTicketManager::sync_outgoing_channels`] and
-    /// [`HoprTicketManager::sync_incoming_channels`] at least once before the manager
+    /// The instance is supposed to take complete ownership of the `store` object. The store
+    /// implementations should not allow
+    ///
+    /// It is advised to call [`HoprTicketManager::sync_from_outgoing_channels`] and
+    /// [`HoprTicketManager::sync_from_incoming_channels`] at least once before the manager
     /// is used any further.
     pub fn new(store: S) -> Result<Self, TicketManagerError> {
         let store = std::sync::Arc::new(parking_lot::RwLock::new(store));
@@ -174,7 +179,7 @@ where
     ///
     /// It is advised to call this function early after the construction of the `HoprTicketManager`
     /// to ensure pruning of dangling or out-of-date values.
-    pub fn sync_outgoing_channels(&self, outgoing_channels: &[ChannelEntry]) -> Result<(), TicketManagerError> {
+    pub fn sync_from_outgoing_channels(&self, outgoing_channels: &[ChannelEntry]) -> Result<(), TicketManagerError> {
         // Purge outdated outgoing indices
         let mut store_read = self.store.upgradable_read();
         let stored_indices = store_read
@@ -294,7 +299,7 @@ where
     ///
     /// It is advised to call this function early after the construction of the `HoprTicketManager`
     /// to ensure pruning of dangling or out-of-date values.
-    pub fn sync_incoming_channels(
+    pub fn sync_from_incoming_channels(
         &self,
         incoming_channels: &[ChannelEntry],
     ) -> Result<Vec<Ticket>, TicketManagerError> {
@@ -324,6 +329,7 @@ where
                 store_read = parking_lot::RwLockWriteGuard::downgrade_to_upgradable(store_write);
             }
         }
+        // Create or open ticket queues for all incoming channels that are open or effectively open
         for channel in incoming_channels
             .iter()
             .filter(|channel| !channel.closure_time_passed(now))
@@ -348,7 +354,16 @@ where
     }
 
     /// Inserts a new incoming winning redeemable ticket into the ticket manager.
-    pub fn insert_incoming_ticket(&self, ticket: RedeemableTicket) -> Result<(), TicketManagerError> {
+    ///
+    /// On success, the method returns all tickets that have been neglected in the ticket queue of this channel,
+    /// in case the inserted ticket has a greater channel epoch than the [next extractable](TicketQueue::peek) ticket in
+    /// the queue. This situation can happen when unredeemed tickets are left in the queue, while the corresponding
+    /// channel restarts its lifecycle and a new winning ticket is received.
+    /// Otherwise, the returned vector is empty.
+    pub fn insert_incoming_ticket(&self, ticket: RedeemableTicket) -> Result<Vec<Ticket>, TicketManagerError> {
+        // Do not allocate, because neglecting tickets is a rare operation
+        let mut neglected_tickets = Vec::with_capacity(0);
+
         let ticket_id = ticket.ticket_id();
         match self.channel_tickets.entry(ticket_id.id) {
             dashmap::Entry::Occupied(e) => {
@@ -356,7 +371,22 @@ where
                 // on the same channel are received, or if tickets on the same channel are being
                 // rapidly redeemed or neglected.
                 // Such a scenario is likely not realistic.
-                e.get().queue.write().push(ticket).map_err(TicketManagerError::store)?;
+                let mut queue = e.get().queue.write();
+
+                // If the next ticket ready in this queue is from a previous epoch, we must
+                // drain and neglect all the tickets from the queue. The channel has
+                // apparently restarted its lifecycle, and all the tickets from previous epochs
+                // are unredeemable already
+                if queue
+                    .peek()
+                    .map_err(TicketManagerError::store)?
+                    .is_some_and(|last| last.verified_ticket().channel_epoch < ticket.verified_ticket().channel_epoch)
+                {
+                    // Ensures allocation according to the number of drained tickets
+                    neglected_tickets.append(&mut queue.drain().map_err(TicketManagerError::store)?);
+                    tracing::warn!(%ticket_id, num_neglected = neglected_tickets.len(), "winning ticket has neglected unredeemed tickets from previous epochs");
+                }
+                queue.push(ticket).map_err(TicketManagerError::store)?;
                 tracing::debug!(%ticket_id, "winning ticket on channel");
             }
             dashmap::Entry::Vacant(v) => {
@@ -372,7 +402,7 @@ where
                 // Wrap the queue with a ticket value cache adapter
                 let mut queue = ValueCachedQueue::new(queue).map_err(TicketManagerError::store)?;
 
-                // Should not happen
+                // Should not happen: it suggests the queue has been modified outside the manager
                 if !queue.is_empty().map_err(TicketManagerError::store)? {
                     return Err(TicketManagerError::Other(anyhow::anyhow!(
                         "fatal error: queue not empty"
@@ -388,7 +418,7 @@ where
             }
         }
 
-        Ok(())
+        Ok(neglected_tickets)
     }
 
     /// Returns the total value of unredeemed tickets in the given channel.
@@ -581,5 +611,104 @@ where
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::traits::tests::generate_tickets;
 
+    // Tests require `tokio::test`, because the outgoing index synchronization runs as a task
+    // and requires an async runtime.
+
+    #[tokio::test]
+    async fn ticket_manager_unrealized_value_should_increase_when_tickets_are_added() -> anyhow::Result<()> {
+        let mut tickets = generate_tickets()?;
+        let channel_id = tickets[0].ticket_id().id;
+        let epoch = tickets[0].ticket_id().epoch;
+        tickets.retain(|ticket| ticket.verified_ticket().channel_epoch == epoch);
+
+        assert!(!tickets.is_empty());
+
+        let mgr = HoprTicketManager::new(MemoryStore::default())?;
+        assert!(matches!(
+            mgr.unrealized_value(&channel_id, epoch, None),
+            Err(TicketManagerError::ChannelNotFound)
+        ));
+
+        let mut last_unrealized_value = HoprBalance::zero();
+        assert_eq!(HoprBalance::zero(), last_unrealized_value);
+
+        for ticket in tickets.iter() {
+            let neglected = mgr.insert_incoming_ticket(*ticket)?;
+            assert!(neglected.is_empty());
+
+            let new_unrealized_value = mgr.unrealized_value(&channel_id, epoch, None)?;
+            assert_eq!(
+                new_unrealized_value - last_unrealized_value,
+                ticket.verified_ticket().amount
+            );
+
+            last_unrealized_value = new_unrealized_value;
+        }
+
+        let expected_unrealized_value: HoprBalance = tickets.iter().map(|ticket| ticket.verified_ticket().amount).sum();
+        assert_eq!(expected_unrealized_value, last_unrealized_value);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn ticket_manager_ticket_insertion_should_neglect_tickets_from_previous_epochs() -> anyhow::Result<()> {
+        let tickets = generate_tickets()?;
+        assert!(!tickets.is_empty());
+        let channel_id = tickets[0].ticket_id().id;
+
+        let tickets_from_epoch_1 = tickets
+            .iter()
+            .filter(|ticket| ticket.verified_ticket().channel_epoch == 1)
+            .cloned()
+            .collect::<Vec<_>>();
+        assert!(!tickets_from_epoch_1.is_empty());
+
+        let tickets_from_epoch_2 = tickets
+            .iter()
+            .filter(|ticket| ticket.verified_ticket().channel_epoch == 2)
+            .cloned()
+            .collect::<Vec<_>>();
+        assert!(!tickets_from_epoch_2.is_empty());
+
+        let mgr = HoprTicketManager::new(MemoryStore::default())?;
+        assert!(matches!(
+            mgr.unrealized_value(&channel_id, 1, None),
+            Err(TicketManagerError::ChannelNotFound)
+        ));
+
+        for ticket in tickets_from_epoch_1.iter() {
+            let neglected = mgr.insert_incoming_ticket(*ticket)?;
+            assert!(neglected.is_empty());
+        }
+
+        let new_unrealized_value = mgr.unrealized_value(&channel_id, 1, None)?;
+        assert_eq!(
+            new_unrealized_value,
+            tickets_from_epoch_1
+                .iter()
+                .map(|ticket| ticket.verified_ticket().amount)
+                .sum()
+        );
+
+        let neglected = mgr.insert_incoming_ticket(tickets_from_epoch_2[0])?;
+        assert_eq!(
+            tickets_from_epoch_1
+                .iter()
+                .map(|t| *t.verified_ticket())
+                .collect::<Vec<_>>(),
+            neglected
+        );
+
+        let new_unrealized_value = mgr.unrealized_value(&channel_id, 1, None)?;
+        assert_eq!(HoprBalance::zero(), new_unrealized_value);
+
+        let new_unrealized_value = mgr.unrealized_value(&channel_id, 2, None)?;
+        assert_eq!(tickets_from_epoch_2[0].verified_ticket().amount, new_unrealized_value);
+
+        Ok(())
+    }
 }

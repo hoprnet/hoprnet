@@ -36,10 +36,11 @@ pub trait TicketQueueStore {
     fn iter_queues(&self) -> Result<impl Iterator<Item = ChannelId>, <Self::Queue as TicketQueue>::Error>;
 }
 
-/// Backend for the incoming ticket storage queue.
+/// Backend for the incoming ticket storage (double-ended) queue.
 ///
 /// This trait defines the operations that an incoming ticket queue for a specific channel must support.
-/// A queue can only store redeemable tickets.
+/// A queue can only store redeemable tickets from the same channel but can contain tickets from different channel
+/// epochs.
 ///
 /// The implementations must honor the natural ordering of tickets.
 pub trait TicketQueue {
@@ -53,16 +54,23 @@ pub trait TicketQueue {
     /// Add a ticket to the queue.
     fn push(&mut self, ticket: RedeemableTicket) -> Result<(), Self::Error>;
     /// Remove and return the next ticket in-order from the queue.
+    ///
+    /// This extracts the next ticket from the queue (after redeeming or neglecting it).
     fn pop(&mut self) -> Result<Option<RedeemableTicket>, Self::Error>;
     /// Return the next ticket in-order from the queue without removing it.
+    ///
+    /// This is the next ticket that can be extracted from the queue (redeemed or neglected).
     fn peek(&self) -> Result<Option<RedeemableTicket>, Self::Error>;
     /// Iterate over all tickets in the queue in **arbitrary** order.
+    ///
+    /// This is not the order in which tickets are redeemed or neglected (see [`TicketQueue::pop`] or
+    /// [`TicketQueue::peek`]).
     fn iter_unordered(&self) -> Result<impl Iterator<Item = Result<RedeemableTicket, Self::Error>>, Self::Error>;
     /// Computes the total value of tickets of the given epoch (and optionally minimum given index)
     /// in this queue.
     ///
     /// The default implementation simply [iterates](TicketQueue::iter_unordered) the queue
-    /// and sums the total value of matching tickets.
+    /// and sums the total value of matching tickets. Implementations can provide more effective methods.
     fn total_value(&self, epoch: u32, min_index: Option<u64>) -> Result<HoprBalance, Self::Error> {
         default_total_value(self, epoch, min_index)
     }
@@ -215,6 +223,7 @@ pub(crate) mod tests {
     pub fn queue_returns_correct_total_ticket_value<Q: TicketQueue>(mut queue: Q) -> anyhow::Result<()> {
         let tickets = generate_tickets()?;
         fill_queue(&mut queue, tickets.iter().copied())?;
+        let all_tickets_value: HoprBalance = tickets.iter().map(|ticket| ticket.verified_ticket().amount).sum();
 
         let expected_total_value: HoprBalance = tickets
             .into_iter()
@@ -222,8 +231,17 @@ pub(crate) mod tests {
             .map(|ticket| ticket.verified_ticket().amount)
             .sum();
         let actual_total_value = queue.total_value(2, None)?;
-
         assert_eq!(expected_total_value, actual_total_value);
+
+        let drained_tickets = queue.drain()?;
+        assert_eq!(
+            all_tickets_value,
+            drained_tickets.iter().map(|ticket| ticket.amount).sum()
+        );
+
+        let actual_total_value = queue.total_value(2, None)?;
+        assert_eq!(HoprBalance::zero(), actual_total_value);
+
         Ok(())
     }
 

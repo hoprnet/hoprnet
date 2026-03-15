@@ -11,6 +11,9 @@ use crate::{OutgoingIndexStore, TicketQueue, TicketQueueStore};
 const OUT_IDX_TABLE: TableDefinition<([u8; ChannelId::SIZE], u32), u64> = TableDefinition::new("channel_out_index");
 
 /// Implementation of [`OutgoingIndexStore`] and [`TicketQueueStore`] using `redb` database and `postcard` serializer.
+///
+/// The store is intentionally not cloneable to allow the owner to have complete ownership of the database.
+#[derive(Debug)]
 pub struct RedbStore {
     db: std::sync::Arc<redb::Database>,
 }
