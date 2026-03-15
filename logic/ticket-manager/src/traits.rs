@@ -1,4 +1,7 @@
-use hopr_api::chain::{ChannelId, HoprBalance, RedeemableTicket};
+use hopr_api::{
+    chain::{ChannelId, HoprBalance, RedeemableTicket},
+    types::internal::prelude::Ticket,
+};
 
 /// Allows loading and saving outgoing ticket indices.
 pub trait OutgoingIndexStore {
@@ -25,7 +28,10 @@ pub trait TicketQueueStore {
         channel_id: &ChannelId,
     ) -> Result<Self::Queue, <Self::Queue as TicketQueue>::Error>;
     /// Deletes the queue for the given channel.
-    fn delete_queue(&mut self, channel_id: &ChannelId) -> Result<(), <Self::Queue as TicketQueue>::Error>;
+    ///
+    /// Returns any tickets left-over in this queue if it existed.
+    /// Returned tickets are no longer redeemable.
+    fn delete_queue(&mut self, channel_id: &ChannelId) -> Result<Vec<Ticket>, <Self::Queue as TicketQueue>::Error>;
     /// Iterate over all channel IDs of ticket queues in the storage.
     fn iter_queues(&self) -> Result<impl Iterator<Item = ChannelId>, <Self::Queue as TicketQueue>::Error>;
 }
@@ -33,7 +39,6 @@ pub trait TicketQueueStore {
 /// Backend for ticket storage queue.
 ///
 /// The implementations must honor the natural ordering of tickets.
-#[auto_impl::auto_impl(&mut, Box)]
 pub trait TicketQueue {
     type Error: std::error::Error + Send + Sync + 'static;
     /// Number of tickets in the queue.
@@ -57,6 +62,16 @@ pub trait TicketQueue {
     /// and sums the total value of matching tickets.
     fn total_value(&self, epoch: u32, min_index: Option<u64>) -> Result<HoprBalance, Self::Error> {
         default_total_value(self, epoch, min_index)
+    }
+    /// Drains all the remaining tickets from the queue, rendering them no longer redeemable.
+    ///
+    /// The drained tickets are still ordered according to their natural ordering.
+    fn drain(&mut self) -> Result<Vec<Ticket>, Self::Error> {
+        let mut tickets = Vec::new();
+        while let Some(ticket) = self.pop()? {
+            tickets.push(*ticket.verified_ticket());
+        }
+        Ok(tickets)
     }
 }
 

@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use hopr_api::{
     chain::{ChannelId, RedeemableTicket},
-    types::primitive::prelude::BytesRepresentable,
+    types::{internal::prelude::Ticket, primitive::prelude::BytesRepresentable},
 };
 use redb::{ReadableDatabase, ReadableTable, ReadableTableMetadata, TableDefinition, TableHandle};
 
@@ -68,6 +68,7 @@ impl OutgoingIndexStore for RedbStore {
 const TABLE_QUEUE_NAME_PREFIX: &str = "ctq_";
 
 type TicketTableDef<'a> = TableDefinition<'a, u128, Vec<u8>>;
+
 #[inline]
 fn make_index(ticket: &RedeemableTicket) -> u128 {
     ((ticket.verified_ticket().channel_epoch as u128) << 64) | ticket.verified_ticket().index as u128
@@ -92,12 +93,21 @@ impl TicketQueueStore for RedbStore {
         })
     }
 
-    fn delete_queue(&mut self, channel_id: &ChannelId) -> Result<(), <Self::Queue as TicketQueue>::Error> {
+    fn delete_queue(&mut self, channel_id: &ChannelId) -> Result<Vec<Ticket>, <Self::Queue as TicketQueue>::Error> {
         let tx = self.db.begin_write()?;
-        tx.delete_table(TicketTableDef::new(&format!("{TABLE_QUEUE_NAME_PREFIX}{channel_id}")))?;
+        let mut ret = Vec::new();
+        {
+            // Drain all the tickets from the queue first
+            let mut table = tx.open_table(TicketTableDef::new(&format!("{TABLE_QUEUE_NAME_PREFIX}{channel_id}")))?;
+            while let Some((_, ticket)) = table.pop_first()? {
+                let ticket: RedeemableTicket = postcard::from_bytes(&ticket.value())?;
+                ret.push(*ticket.verified_ticket()); // Make it unredeemable
+            }
+            tx.delete_table(TicketTableDef::new(&format!("{TABLE_QUEUE_NAME_PREFIX}{channel_id}")))?;
+        }
         tx.commit()?;
 
-        Ok(())
+        Ok(ret)
     }
 
     fn iter_queues(&self) -> Result<impl Iterator<Item = ChannelId>, <Self::Queue as TicketQueue>::Error> {

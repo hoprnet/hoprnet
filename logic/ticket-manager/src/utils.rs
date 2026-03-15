@@ -7,11 +7,12 @@ use crate::OutgoingIndexStore;
 
 const OUT_INDEX_SYNC_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
 
-// Contains map of outgoing indices and indicator flag if the map is "dirty"
+// Contains a map of outgoing indices and indicator flag if the map is "dirty"
 // (not yet synced to the persistent storage).
 type OutIdxCache = (dashmap::DashMap<(ChannelId, u32), AtomicU64>, AtomicBool);
 
 /// Stores outgoing ticket indices in a cache and periodically syncs them to the persistent storage.
+#[derive(Debug)]
 pub struct OutgoingIndexTracker {
     out_indices: std::sync::Arc<OutIdxCache>,
     sync_handle: hopr_async_runtime::AbortHandle,
@@ -91,6 +92,7 @@ impl Drop for OutgoingIndexTracker {
     }
 }
 
+#[derive(Debug)]
 pub struct ChannelTicketQueue<Q> {
     pub(crate) queue: std::sync::Arc<parking_lot::RwLock<Q>>,
     pub(crate) redeem_lock: std::sync::Arc<parking_lot::Mutex<()>>,

@@ -13,7 +13,6 @@ runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 
 [dependencies]
 anyhow = { workspace = true }
-auto_impl = { workspace = true }
 dashmap = { workspace = true, features = ["inline"] }
 hashbrown = { workspace = true, features = ["inline-more"] }
 futures = { workspace = true }
@@ -32,6 +31,7 @@ hopr-api = { workspace = true, features = [
   "types-random",
 ] }
 hopr-async-runtime = { workspace = true }
+hopr-platform = { workspace = true }
 
 [dev-dependencies]
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }

@@ -4882,13 +4882,13 @@ name = "hopr-ticket-manager"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "auto_impl",
  "dashmap",
  "futures",
  "futures-time",
  "hashbrown 0.16.1",
  "hopr-api",
  "hopr-async-runtime",
+ "hopr-platform",
  "parking_lot",
  "postcard",
  "rand 0.10.0",
