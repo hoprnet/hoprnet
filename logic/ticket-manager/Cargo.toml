@@ -34,6 +34,11 @@ hopr-async-runtime = { workspace = true }
 hopr-platform = { workspace = true }
 
 [dev-dependencies]
+criterion = { workspace = true }
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 rand = { workspace = true }
 tempfile = { workspace = true }
+
+[[bench]]
+name = "ticket_manager"
+harness = false

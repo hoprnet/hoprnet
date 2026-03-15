@@ -109,12 +109,12 @@ pub use crate::{
 ///     3. Ticket neglection has just finished in that particular channel, and the neglected ticket is dropped from the
 ///     same incoming channel queue.
 ///
-/// All 3 of these operations are not expected to happen very often on a single channel, therefore high contention
+/// All 3 of these operations are not expected to happen very often on a single channel; therefore, high contention
 /// on the RW lock is not expected.
 #[derive(Debug)]
 pub struct HoprTicketManager<S, Q> {
     out_idx_tracker: OutgoingIndexTracker,
-    channel_tickets: dashmap::DashMap<ChannelId, ChannelTicketQueue<Q>>,
+    channel_tickets: dashmap::DashMap<ChannelId, ChannelTicketQueue<ValueCachedQueue<Q>>>,
     store: std::sync::Arc<parking_lot::RwLock<S>>,
 }
 
@@ -336,8 +336,11 @@ where
                 .map_err(TicketManagerError::store)?;
             store_read = parking_lot::RwLockWriteGuard::downgrade_to_upgradable(store_write);
 
+            // Wrap the queue with a ticket value cache adapter
+            let queue = ValueCachedQueue::new(queue).map_err(TicketManagerError::store)?;
+
             tracing::debug!(%id, num_tickets = queue.len().map_err(TicketManagerError::store)?, "loaded redeemable ticket queue for channel");
-            self.channel_tickets.insert(*id, ChannelTicketQueue::from(queue));
+            self.channel_tickets.insert(*id, queue.into());
         }
 
         Ok(ret)
@@ -359,11 +362,14 @@ where
                 // A hypothetical chance of high contention on this write lock is
                 // only possible when massive numbers of winning tickets on new unique channels are received.
                 // Such a scenario is likely not realistic.
-                let mut queue = self
+                let queue = self
                     .store
                     .write()
                     .open_or_create_queue(&ticket.ticket_id().id)
                     .map_err(TicketManagerError::store)?;
+
+                // Wrap the queue with a ticket value cache adapter
+                let mut queue = ValueCachedQueue::new(queue).map_err(TicketManagerError::store)?;
 
                 // Should not happen
                 if !queue.is_empty().map_err(TicketManagerError::store)? {

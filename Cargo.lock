@@ -4882,6 +4882,7 @@ name = "hopr-ticket-manager"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "criterion",
  "dashmap",
  "futures",
  "futures-time",

@@ -94,6 +94,7 @@ pub(crate) fn default_total_value<Q: TicketQueue + ?Sized>(
         .sum())
 }
 
+// Contains general utilities and test helpers for ticket queue implementations.
 #[cfg(test)]
 pub(crate) mod tests {
     use hopr_api::{
