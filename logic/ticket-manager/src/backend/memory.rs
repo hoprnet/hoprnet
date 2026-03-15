@@ -65,6 +65,8 @@ impl OutgoingIndexStore for MemoryStore {
 /// Simple in-memory ticket queue implementation using a binary heap.
 ///
 /// This is suitable for testing where ticket persistence is not required.
+///
+/// The implementation might not be particularly efficient for production use.
 #[derive(Clone, Debug, Default)]
 pub struct MemoryTicketQueue(
     std::sync::Arc<parking_lot::RwLock<std::collections::BinaryHeap<std::cmp::Reverse<RedeemableTicket>>>>,

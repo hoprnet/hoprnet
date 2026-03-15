@@ -10,11 +10,13 @@ use crate::{OutgoingIndexStore, TicketQueue, TicketQueueStore};
 
 const OUT_IDX_TABLE: TableDefinition<([u8; ChannelId::SIZE], u32), u64> = TableDefinition::new("channel_out_index");
 
+/// Implementation of [`OutgoingIndexStore`] and [`TicketQueueStore`] using `redb` database and `postcard` serializer.
 pub struct RedbStore {
     db: std::sync::Arc<redb::Database>,
 }
 
 impl RedbStore {
+    /// Creates a new instance on the given path.
     pub fn new(path: impl AsRef<std::path::Path>) -> Result<Self, RedbStoreError> {
         let db = std::sync::Arc::new(redb::Database::create(path)?);
         let tx = db.begin_write()?;
@@ -124,6 +126,8 @@ impl TicketQueueStore for RedbStore {
     }
 }
 
+/// Implementation of [`TicketQueue`] using `redb` database and `postcard` serializer,
+/// associated with the [`RedbStore`].
 pub struct RedbTicketQueue {
     db: std::sync::Weak<redb::Database>,
     channel_id: ChannelId,
@@ -236,6 +240,7 @@ impl TicketQueue for RedbTicketQueue {
     }
 }
 
+/// Errors returned by the [`RedbStore`].
 #[derive(Debug, thiserror::Error)]
 pub enum RedbStoreError {
     #[error("database error: {0}")]
