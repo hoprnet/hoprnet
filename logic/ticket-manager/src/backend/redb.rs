@@ -1,4 +1,4 @@
-use std::{str::FromStr, sync::Arc};
+use std::str::FromStr;
 
 use hopr_api::{
     chain::{ChannelId, RedeemableTicket},
@@ -8,8 +8,7 @@ use redb::{ReadableDatabase, ReadableTable, ReadableTableMetadata, TableDefiniti
 
 use crate::{OutgoingIndexStore, TicketQueue, TicketQueueStore};
 
-const OUT_IDX_TABLE: redb::TableDefinition<([u8; ChannelId::SIZE], u32), u64> =
-    redb::TableDefinition::new("channel_out_index");
+const OUT_IDX_TABLE: TableDefinition<([u8; ChannelId::SIZE], u32), u64> = TableDefinition::new("channel_out_index");
 
 pub struct RedbStore {
     db: std::sync::Arc<redb::Database>,
@@ -68,6 +67,12 @@ impl OutgoingIndexStore for RedbStore {
 
 const TABLE_QUEUE_NAME_PREFIX: &str = "ctq_";
 
+type TicketTableDef<'a> = TableDefinition<'a, u128, Vec<u8>>;
+#[inline]
+fn make_index(ticket: &RedeemableTicket) -> u128 {
+    ((ticket.verified_ticket().channel_epoch as u128) << 64) | ticket.verified_ticket().index as u128
+}
+
 impl TicketQueueStore for RedbStore {
     type Queue = RedbTicketQueue;
 
@@ -77,23 +82,19 @@ impl TicketQueueStore for RedbStore {
     ) -> Result<Self::Queue, <Self::Queue as TicketQueue>::Error> {
         {
             let tx = self.db.begin_write()?;
-            tx.open_table(TableDefinition::<u64, Vec<u8>>::new(&format!(
-                "{TABLE_QUEUE_NAME_PREFIX}{channel_id}"
-            )))?;
+            tx.open_table(TicketTableDef::new(&format!("{TABLE_QUEUE_NAME_PREFIX}{channel_id}")))?;
             tx.commit()?;
         }
 
         Ok(RedbTicketQueue {
-            db: Arc::downgrade(&self.db),
+            db: std::sync::Arc::downgrade(&self.db),
             channel_id: *channel_id,
         })
     }
 
     fn delete_queue(&mut self, channel_id: &ChannelId) -> Result<(), <Self::Queue as TicketQueue>::Error> {
         let tx = self.db.begin_write()?;
-        tx.delete_table(TableDefinition::<u64, Vec<u8>>::new(&format!(
-            "{TABLE_QUEUE_NAME_PREFIX}{channel_id}"
-        )))?;
+        tx.delete_table(TicketTableDef::new(&format!("{TABLE_QUEUE_NAME_PREFIX}{channel_id}")))?;
         tx.commit()?;
 
         Ok(())
@@ -124,7 +125,7 @@ impl TicketQueue for RedbTicketQueue {
     fn len(&self) -> Result<usize, Self::Error> {
         if let Some(db) = self.db.upgrade() {
             let tx = db.begin_read()?;
-            let table = tx.open_table(TableDefinition::<u64, Vec<u8>>::new(&format!(
+            let table = tx.open_table(TicketTableDef::new(&format!(
                 "{TABLE_QUEUE_NAME_PREFIX}{}",
                 self.channel_id
             )))?;
@@ -137,7 +138,7 @@ impl TicketQueue for RedbTicketQueue {
     fn is_empty(&self) -> Result<bool, Self::Error> {
         if let Some(db) = self.db.upgrade() {
             let tx = db.begin_read()?;
-            let table = tx.open_table(TableDefinition::<u64, Vec<u8>>::new(&format!(
+            let table = tx.open_table(TicketTableDef::new(&format!(
                 "{TABLE_QUEUE_NAME_PREFIX}{}",
                 self.channel_id
             )))?;
@@ -151,11 +152,11 @@ impl TicketQueue for RedbTicketQueue {
         if let Some(db) = self.db.upgrade() {
             let tx = db.begin_write()?;
             {
-                let mut table = tx.open_table(TableDefinition::<u64, Vec<u8>>::new(&format!(
+                let mut table = tx.open_table(TicketTableDef::new(&format!(
                     "{TABLE_QUEUE_NAME_PREFIX}{}",
                     self.channel_id
                 )))?;
-                table.insert(ticket.verified_ticket().index, postcard::to_stdvec(&ticket)?)?;
+                table.insert(make_index(&ticket), postcard::to_stdvec(&ticket)?)?;
             }
             tx.commit()?;
             Ok(())
@@ -168,7 +169,7 @@ impl TicketQueue for RedbTicketQueue {
         if let Some(db) = self.db.upgrade() {
             let tx = db.begin_write()?;
             let maybe_ticket = {
-                let mut table = tx.open_table(TableDefinition::<u64, Vec<u8>>::new(&format!(
+                let mut table = tx.open_table(TicketTableDef::new(&format!(
                     "{TABLE_QUEUE_NAME_PREFIX}{}",
                     self.channel_id
                 )))?;
@@ -188,7 +189,7 @@ impl TicketQueue for RedbTicketQueue {
     fn peek(&self) -> Result<Option<RedeemableTicket>, Self::Error> {
         if let Some(db) = self.db.upgrade() {
             let tx = db.begin_read()?;
-            let table = tx.open_table(TableDefinition::<u64, Vec<u8>>::new(&format!(
+            let table = tx.open_table(TicketTableDef::new(&format!(
                 "{TABLE_QUEUE_NAME_PREFIX}{}",
                 self.channel_id
             )))?;
@@ -206,7 +207,7 @@ impl TicketQueue for RedbTicketQueue {
     fn iter_unordered(&self) -> Result<impl Iterator<Item = Result<RedeemableTicket, Self::Error>>, Self::Error> {
         if let Some(db) = self.db.upgrade() {
             let tx = db.begin_read()?;
-            let table = tx.open_table(TableDefinition::<u64, Vec<u8>>::new(&format!(
+            let table = tx.open_table(TicketTableDef::new(&format!(
                 "{TABLE_QUEUE_NAME_PREFIX}{}",
                 self.channel_id
             )))?;
@@ -303,7 +304,9 @@ mod tests {
     #[test]
     fn redb_queue_returns_correct_total_ticket_value_with_min_index() -> anyhow::Result<()> {
         let file = tempfile::NamedTempFile::new()?;
-        queue_returns_correct_total_ticket_value_with_min_index(RedbStore::new(file)?.open_or_create_queue(&Default::default())?)
+        queue_returns_correct_total_ticket_value_with_min_index(
+            RedbStore::new(file)?.open_or_create_queue(&Default::default())?,
+        )
     }
 
     #[test]
