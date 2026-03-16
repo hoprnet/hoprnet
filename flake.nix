@@ -192,33 +192,65 @@
             hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
           );
 
-          hopr-test-unit = rust-builder-local.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs
-            // {
-              src = testSrc;
-              runTests = true;
-              cargoTestExtraArgs = "--lib";
-            }
-          );
+          hopr-test-unit =
+            (rust-builder-local.callPackage nixLib.mkRustPackage (
+              hoprdBuildArgs
+              // {
+                src = testSrc;
+                cargoExtraArgs = "-F allocator-jemalloc";
+                runTests = true;
+                rawCargoArgs = true;
+                cargoTestExtraArgs = "--lib";
+              }
+            )).overrideAttrs
+              (old: {
+                preBuild = ''
+                  # Fix stale sandbox paths in cached utoipa-swagger-ui build script outputs
+                  find target -name 'embed.rs' -path '*/utoipa-swagger-ui*/out/*' \
+                    -exec sed -i "s|/nix/var/nix/builds/[^/]*/source|$(pwd)|g" {} \;
+                ''
+                + (old.preBuild or "");
+              });
 
-          hopr-test-integration = rust-builder-local.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs
-            // {
-              src = testSrc;
-              runTests = true;
-              cargoTestExtraArgs = "--test '*' -- --test-threads=1";
-            }
-          );
+          hopr-test-integration =
+            (rust-builder-local.callPackage nixLib.mkRustPackage (
+              hoprdBuildArgs
+              // {
+                src = testSrc;
+                cargoExtraArgs = "-F allocator-jemalloc";
+                runTests = true;
+                rawCargoArgs = true;
+                cargoTestExtraArgs = "--test '*' -- --test-threads=1";
+              }
+            )).overrideAttrs
+              (old: {
+                preBuild = ''
+                  # Fix stale sandbox paths in cached utoipa-swagger-ui build script outputs
+                  find target -name 'embed.rs' -path '*/utoipa-swagger-ui*/out/*' \
+                    -exec sed -i "s|/nix/var/nix/builds/[^/]*/source|$(pwd)|g" {} \;
+                ''
+                + (old.preBuild or "");
+              });
 
-          hopr-test-nightly = rust-builder-local-nightly.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs
-            // {
-              src = testSrc;
-              runTests = true;
-              cargoExtraArgs = "-Z panic-abort-tests";
-              cargoTestExtraArgs = "--lib";
-            }
-          );
+          hopr-test-nightly =
+            (rust-builder-local-nightly.callPackage nixLib.mkRustPackage (
+              hoprdBuildArgs
+              // {
+                src = testSrc;
+                cargoExtraArgs = "-Z panic-abort-tests -F allocator-jemalloc";
+                runTests = true;
+                rawCargoArgs = true;
+                cargoTestExtraArgs = "--lib";
+              }
+            )).overrideAttrs
+              (old: {
+                preBuild = ''
+                  # Fix stale sandbox paths in cached utoipa-swagger-ui build script outputs
+                  find target -name 'embed.rs' -path '*/utoipa-swagger-ui*/out/*' \
+                    -exec sed -i "s|/nix/var/nix/builds/[^/]*/source|$(pwd)|g" {} \;
+                ''
+                + (old.preBuild or "");
+              });
 
           hoprd-clippy = rust-builder-local.callPackage nixLib.mkRustPackage (
             hoprdBuildArgs // { runClippy = true; }
