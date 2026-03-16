@@ -525,11 +525,7 @@ mod tests {
         metrics.record_write(20);
 
         let snapshot = metrics.snapshot();
-
-        assert_eq!(snapshot.transport.bytes_in, 10);
-        assert_eq!(snapshot.transport.bytes_out, 20);
-        assert_eq!(snapshot.transport.packets_in, 1);
-        assert_eq!(snapshot.transport.packets_out, 1);
+        insta::assert_yaml_snapshot!(snapshot.transport);
     }
 
     #[test]
@@ -542,10 +538,7 @@ mod tests {
         metrics.frame_discarded();
 
         let snapshot = metrics.snapshot();
-
-        assert_eq!(snapshot.frame_buffer.frames_completed, 1);
-        assert_eq!(snapshot.frame_buffer.frames_emitted, 1);
-        assert_eq!(snapshot.frame_buffer.frames_discarded, 1);
+        insta::assert_yaml_snapshot!(snapshot.frame_buffer);
     }
 
     #[test]
@@ -572,30 +565,11 @@ mod tests {
     #[test]
     fn inferred_session_metric_definitions_include_expected_metrics() {
         let definitions = session_snapshot_metric_definitions();
-        let has_state_metric = definitions
+        let names_and_kinds: Vec<_> = definitions
             .iter()
-            .any(|definition| definition.name == "hopr_session_lifetime_state");
-        let has_ack_counter_metric = definitions
-            .iter()
-            .any(|definition| definition.name == "hopr_session_ack_incoming_segments_total");
-        let has_f64_metric = definitions
-            .iter()
-            .any(|definition| definition.name == "hopr_session_surb_rate_per_sec");
-
-        assert!(has_state_metric);
-        assert!(has_ack_counter_metric);
-        assert!(has_f64_metric);
-
-        assert!(definitions.iter().any(
-            |definition| definition.name == "hopr_session_ack_incoming_segments_total"
-                && definition.kind == SessionMetricKind::U64Counter
-        ));
-        assert!(
-            definitions
-                .iter()
-                .any(|definition| definition.name == "hopr_session_lifetime_state"
-                    && definition.kind == SessionMetricKind::U64Gauge)
-        );
+            .map(|d| format!("{} ({:?})", d.name, d.kind))
+            .collect();
+        insta::assert_yaml_snapshot!(names_and_kinds);
     }
 
     #[test]
@@ -605,10 +579,9 @@ mod tests {
         metrics.record_read(10);
 
         let snapshot = metrics.snapshot();
-        let bytes_in_total = session_snapshot_metric_value(&snapshot, "hopr_session_transport_bytes_in_total");
-        let ack_mode = session_snapshot_metric_value(&snapshot, "hopr_session_ack_mode");
-
-        assert_eq!(Some(SessionMetricValue::U64(10)), bytes_in_total);
-        assert_eq!(Some(SessionMetricValue::U64(SessionAckMode::None as u64)), ack_mode);
+        insta::assert_debug_snapshot!((
+            session_snapshot_metric_value(&snapshot, "hopr_session_transport_bytes_in_total"),
+            session_snapshot_metric_value(&snapshot, "hopr_session_ack_mode"),
+        ));
     }
 }

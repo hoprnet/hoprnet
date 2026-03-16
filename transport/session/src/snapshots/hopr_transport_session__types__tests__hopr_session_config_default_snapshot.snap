@@ -1,0 +1,5 @@
+---
+source: transport/session/src/types.rs
+expression: "format!(\"{cfg:?}\")"
+---
+"HoprSessionConfig { capabilities: FlagSet(), frame_mtu: 1500, frame_timeout: 800ms }"

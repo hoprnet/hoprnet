@@ -1,0 +1,35 @@
+---
+source: transport/session/src/metric_bridge.rs
+expression: names
+---
+- hopr_session_ack_incoming_acknowledged_frames_total
+- hopr_session_ack_incoming_retransmission_requests_total
+- hopr_session_ack_incoming_segments_total
+- hopr_session_ack_mode
+- hopr_session_ack_outgoing_acknowledged_frames_total
+- hopr_session_ack_outgoing_retransmission_requests_total
+- hopr_session_ack_outgoing_segments_total
+- hopr_session_frame_being_assembled
+- hopr_session_frame_completed_total
+- hopr_session_frame_discarded_total
+- hopr_session_frame_emitted_total
+- hopr_session_frame_frame_capacity
+- hopr_session_frame_mtu_bytes
+- hopr_session_frame_timeout_ms
+- hopr_session_lifetime_created_at_ms
+- hopr_session_lifetime_idle_ms
+- hopr_session_lifetime_last_activity_at_ms
+- hopr_session_lifetime_pipeline_errors_total
+- hopr_session_lifetime_state
+- hopr_session_lifetime_uptime_ms
+- hopr_session_snapshot_at_ms
+- hopr_session_surb_buffer_estimate
+- hopr_session_surb_consumed_total
+- hopr_session_surb_produced_total
+- hopr_session_surb_rate_per_sec
+- hopr_session_surb_refill_in_flight
+- hopr_session_surb_target_buffer
+- hopr_session_transport_bytes_in_total
+- hopr_session_transport_bytes_out_total
+- hopr_session_transport_packets_in_total
+- hopr_session_transport_packets_out_total

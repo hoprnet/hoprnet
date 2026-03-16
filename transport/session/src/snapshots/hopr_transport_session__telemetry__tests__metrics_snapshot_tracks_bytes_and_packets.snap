@@ -1,0 +1,8 @@
+---
+source: transport/session/src/telemetry.rs
+expression: snapshot.transport
+---
+bytes_in_total: 10
+bytes_out_total: 20
+packets_in_total: 1
+packets_out_total: 1

@@ -1,0 +1,16 @@
+---
+source: transport/session/src/telemetry.rs
+expression: "(session_snapshot_metric_value(&snapshot,\n\"hopr_session_transport_bytes_in_total\"),\nsession_snapshot_metric_value(&snapshot, \"hopr_session_ack_mode\"),)"
+---
+(
+    Some(
+        U64(
+            10,
+        ),
+    ),
+    Some(
+        U64(
+            0,
+        ),
+    ),
+)

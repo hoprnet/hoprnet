@@ -1,0 +1,9 @@
+---
+source: transport/session/src/balancer/controller.rs
+expression: levels
+---
+- 5000
+- 4750
+- 4750
+- 4500
+- 4500

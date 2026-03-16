@@ -30,10 +30,11 @@ mod tests {
     fn test_simple_balancer() {
         let mut controller = SimpleBalancerController::default();
         controller.set_target_and_limit(BalancerControllerBounds::new(100, 100));
-        assert_eq!(100, controller.bounds.target());
-        assert_eq!(controller.next_control_output(10), 10);
-        assert_eq!(controller.next_control_output(100), 100);
-        assert_eq!(controller.next_control_output(101), 100);
-        assert_eq!(100, controller.bounds.target());
+
+        let outputs: Vec<u64> = [0, 10, 50, 100, 101, 200]
+            .into_iter()
+            .map(|level| controller.next_control_output(level))
+            .collect();
+        insta::assert_yaml_snapshot!(outputs);
     }
 }

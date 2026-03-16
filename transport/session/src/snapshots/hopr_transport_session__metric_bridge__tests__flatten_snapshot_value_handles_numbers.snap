@@ -1,0 +1,12 @@
+---
+source: transport/session/src/metric_bridge.rs
+expression: "collect_flat(serde_json::json!({ \"packets_in\": 42 }))"
+---
+[
+    SessionMetricSample {
+        name: "hopr_session_packets_in",
+        value: U64(
+            42,
+        ),
+    },
+]

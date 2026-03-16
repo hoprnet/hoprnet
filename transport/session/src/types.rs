@@ -587,6 +587,135 @@ mod tests {
     #[cfg(feature = "telemetry")]
     use crate::telemetry::SessionTelemetry;
 
+    // --- ByteCapabilities tests ---
+
+    #[test]
+    fn byte_capabilities_roundtrip_via_u8() -> anyhow::Result<()> {
+        let flags: Capabilities = Capability::Segmentation.into();
+        let caps = ByteCapabilities::from(flags);
+        let byte_val: u8 = caps.into();
+        let restored = ByteCapabilities::try_from(byte_val)?;
+        assert_eq!(caps, restored);
+        Ok(())
+    }
+
+    #[test]
+    fn byte_capabilities_invalid_bits_are_rejected() {
+        // 0xFF has bits set that don't correspond to any Capability
+        assert!(ByteCapabilities::try_from(0xFF_u8).is_err());
+    }
+
+    #[test]
+    fn byte_capabilities_empty_is_zero() {
+        let caps = ByteCapabilities::from(Capabilities::empty());
+        let byte_val: u8 = caps.into();
+        assert_eq!(byte_val, 0);
+    }
+
+    #[test]
+    fn byte_capabilities_combined_flags() -> anyhow::Result<()> {
+        let caps: Capabilities = Capability::Segmentation | Capability::NoRateControl;
+        let byte_caps = ByteCapabilities::from(caps);
+        let byte_val: u8 = byte_caps.into();
+        let restored = ByteCapabilities::try_from(byte_val)?;
+        assert_eq!(*restored.as_ref(), caps);
+        Ok(())
+    }
+
+    // --- caps_to_ack_mode tests ---
+
+    #[test]
+    fn caps_to_ack_mode_both_when_ack_and_nack() {
+        let caps: Capabilities = Capability::RetransmissionAck | Capability::RetransmissionNack;
+        assert_eq!(caps_to_ack_mode(caps), AcknowledgementMode::Both);
+    }
+
+    #[test]
+    fn caps_to_ack_mode_full_when_only_ack() {
+        let caps: Capabilities = Capability::RetransmissionAck.into();
+        assert_eq!(caps_to_ack_mode(caps), AcknowledgementMode::Full);
+    }
+
+    #[test]
+    fn caps_to_ack_mode_partial_when_no_retransmission() {
+        let caps: Capabilities = Capability::Segmentation.into();
+        assert_eq!(caps_to_ack_mode(caps), AcknowledgementMode::Partial);
+    }
+
+    #[test]
+    fn caps_to_ack_mode_partial_when_empty() {
+        assert_eq!(caps_to_ack_mode(Capabilities::empty()), AcknowledgementMode::Partial);
+    }
+
+    // --- ClosureReason tests ---
+
+    #[test]
+    fn closure_reason_display_values_are_stable() {
+        let reasons: Vec<String> = [
+            ClosureReason::WriteClosed,
+            ClosureReason::EmptyRead,
+            ClosureReason::Eviction,
+        ]
+        .iter()
+        .map(|r| r.to_string())
+        .collect();
+        insta::assert_yaml_snapshot!(reasons);
+    }
+
+    // --- HoprSessionConfig tests ---
+
+    #[test]
+    fn hopr_session_config_default_snapshot() {
+        let cfg = HoprSessionConfig::default();
+        insta::assert_yaml_snapshot!(format!("{cfg:?}"));
+    }
+
+    // --- SessionTarget tests ---
+
+    #[test]
+    fn session_target_variants_debug_snapshot() {
+        let targets = vec![
+            format!(
+                "{:?}",
+                SessionTarget::UdpStream(SealedHost::Plain("127.0.0.1:8080".parse().unwrap()))
+            ),
+            format!(
+                "{:?}",
+                SessionTarget::TcpStream(SealedHost::Plain("10.0.0.1:443".parse().unwrap()))
+            ),
+            format!("{:?}", SessionTarget::ExitNode(42)),
+        ];
+        insta::assert_yaml_snapshot!(targets);
+    }
+
+    // --- SessionId edge cases ---
+
+    #[test]
+    fn session_id_from_str_rejects_missing_delimiter() {
+        assert!(SessionId::from_str("nodelmiter").is_err());
+    }
+
+    #[test]
+    fn session_id_from_str_rejects_invalid_pseudonym() {
+        assert!(SessionId::from_str("notahexvalue:1234").is_err());
+    }
+
+    #[test]
+    fn session_id_hash_eq_consistency() {
+        use std::collections::HashSet;
+        let pseudonym = HoprPseudonym::random();
+        let id1 = SessionId::new(1234_u64, pseudonym);
+        let id2 = SessionId::new(1234_u64, pseudonym);
+        let id3 = SessionId::new(5678_u64, pseudonym);
+
+        let mut set = HashSet::new();
+        set.insert(id1);
+        assert!(set.contains(&id2));
+        assert!(!set.contains(&id3));
+    }
+
+    // --- Existing tests ---
+
     #[test]
     fn test_session_id_to_str_from_str() -> anyhow::Result<()> {
         let id = SessionId::new(1234_u64, HoprPseudonym::random());

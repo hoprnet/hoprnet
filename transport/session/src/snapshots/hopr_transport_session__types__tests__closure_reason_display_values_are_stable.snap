@@ -1,0 +1,7 @@
+---
+source: transport/session/src/types.rs
+expression: reasons
+---
+- WriteClosed
+- EmptyRead
+- Eviction

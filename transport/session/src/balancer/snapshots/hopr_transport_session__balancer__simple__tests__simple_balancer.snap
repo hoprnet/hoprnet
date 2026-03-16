@@ -1,0 +1,10 @@
+---
+source: transport/session/src/balancer/simple.rs
+expression: outputs
+---
+- 0
+- 10
+- 50
+- 100
+- 100
+- 100

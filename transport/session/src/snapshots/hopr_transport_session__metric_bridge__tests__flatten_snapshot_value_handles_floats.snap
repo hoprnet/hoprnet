@@ -1,0 +1,12 @@
+---
+source: transport/session/src/metric_bridge.rs
+expression: "collect_flat(serde_json::json!({ \"rate\": 3.14 }))"
+---
+[
+    SessionMetricSample {
+        name: "hopr_session_rate",
+        value: F64(
+            3.14,
+        ),
+    },
+]

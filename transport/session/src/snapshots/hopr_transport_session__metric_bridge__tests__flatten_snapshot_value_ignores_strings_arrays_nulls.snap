@@ -1,0 +1,12 @@
+---
+source: transport/session/src/metric_bridge.rs
+expression: "collect_flat(serde_json::json!({\n    \"name\": \"test\", \"items\": [1, 2, 3], \"empty\": null, \"count\": 5\n}))"
+---
+[
+    SessionMetricSample {
+        name: "hopr_session_count",
+        value: U64(
+            5,
+        ),
+    },
+]

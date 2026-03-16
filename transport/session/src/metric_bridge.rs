@@ -250,3 +250,107 @@ pub fn session_telemetry_snapshots() -> Vec<SessionStatsSnapshot> {
     snapshots.sort_by(|left, right| left.session_id.as_str().cmp(right.session_id.as_str()));
     snapshots
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn metric_kind_from_name_counter_for_total_suffix() {
+        assert_eq!(
+            SessionMetricKind::from_name("hopr_session_packets_out_total"),
+            SessionMetricKind::U64Counter
+        );
+    }
+
+    #[test]
+    fn metric_kind_from_name_gauge_for_other() {
+        assert_eq!(
+            SessionMetricKind::from_name("hopr_session_buffer_estimate"),
+            SessionMetricKind::U64Gauge
+        );
+    }
+
+    fn collect_flat(value: serde_json::Value) -> Vec<SessionMetricSample> {
+        let mut path = Vec::new();
+        let mut output = Vec::new();
+        flatten_snapshot_value(&value, &mut path, &mut output);
+        output
+    }
+
+    #[test]
+    fn flatten_snapshot_value_handles_numbers() {
+        insta::assert_debug_snapshot!(collect_flat(serde_json::json!({ "packets_in": 42 })));
+    }
+
+    #[test]
+    fn flatten_snapshot_value_handles_nested_objects() {
+        insta::assert_debug_snapshot!(collect_flat(serde_json::json!({ "transport": { "bytes_in": 100 } })));
+    }
+
+    #[test]
+    fn flatten_snapshot_value_handles_floats() {
+        insta::assert_debug_snapshot!(collect_flat(serde_json::json!({ "rate": 3.14 })));
+    }
+
+    #[test]
+    fn flatten_snapshot_value_handles_booleans() {
+        insta::assert_debug_snapshot!(collect_flat(serde_json::json!({ "active": true })));
+    }
+
+    #[test]
+    fn flatten_snapshot_value_skips_session_id_at_root() {
+        insta::assert_debug_snapshot!(collect_flat(serde_json::json!({ "session_id": "abc", "bytes_in": 10 })));
+    }
+
+    #[test]
+    fn flatten_snapshot_value_ignores_strings_arrays_nulls() {
+        insta::assert_debug_snapshot!(collect_flat(serde_json::json!({
+            "name": "test",
+            "items": [1, 2, 3],
+            "empty": null,
+            "count": 5
+        })));
+    }
+
+    #[test]
+    fn metric_schema_snapshot_produces_all_expected_fields() {
+        let schema = metric_schema_snapshot();
+        let value = serde_json::to_value(&schema).expect("schema should serialize");
+        let mut path = Vec::new();
+        let mut output = Vec::new();
+        flatten_snapshot_value(&value, &mut path, &mut output);
+
+        let names: Vec<&str> = output.iter().map(|s| s.name.as_str()).collect();
+        insta::assert_yaml_snapshot!(names);
+    }
+
+    #[test]
+    fn session_snapshot_metric_definitions_returns_nonempty_list() {
+        let definitions = session_snapshot_metric_definitions();
+        assert!(!definitions.is_empty());
+
+        // All definitions should have the hopr_session_ prefix
+        for def in &definitions {
+            assert!(
+                def.name.starts_with("hopr_session_"),
+                "metric name '{}' missing prefix",
+                def.name
+            );
+        }
+    }
+
+    #[test]
+    fn session_snapshot_metric_definitions_counters_end_with_total() {
+        let definitions = session_snapshot_metric_definitions();
+        for def in &definitions {
+            if def.kind == SessionMetricKind::U64Counter {
+                assert!(
+                    def.name.ends_with("_total"),
+                    "counter '{}' should end with _total",
+                    def.name
+                );
+            }
+        }
+    }
+}
