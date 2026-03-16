@@ -205,15 +205,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1773521899,
-        "narHash": "sha256-SnFybWxTZBXhywQEmIx62vJm5x03XlCeO1dU0ksGNiI=",
+        "lastModified": 1773660554,
+        "narHash": "sha256-78RI3b5i9lpnLJBsZt1MuXuWKjphcMBn/pP/LwJxAjQ=",
         "owner": "hoprnet",
         "repo": "nix-lib",
-        "rev": "dbe2bd7a96145f957d2240c9a8da41f84766bd4d",
+        "rev": "0d0fe51d510c39119991e502385e3bce48334486",
         "type": "github"
       },
       "original": {
         "owner": "hoprnet",
+        "ref": "kauki-nix-lib-split-test-logic",
         "repo": "nix-lib",
         "type": "github"
       }
