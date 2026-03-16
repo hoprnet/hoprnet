@@ -4945,7 +4945,6 @@ dependencies = [
  "futures",
  "hashbrown 0.16.1",
  "hopr-api",
- "hopr-async-runtime",
  "hopr-platform",
  "parking_lot",
  "postcard",
@@ -4953,6 +4952,7 @@ dependencies = [
  "redb",
  "serde",
  "tempfile",
+ "test-log",
  "thiserror 2.0.18",
  "tracing",
 ]

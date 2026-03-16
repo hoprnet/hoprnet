@@ -1,7 +1,7 @@
 [package]
 name = "hopr-ticket-manager"
-version = "0.1.0"
 description = "Manages outgoing ticket indices and incoming redeemable tickets"
+version = "0.1.0"
 rust-version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -9,7 +9,6 @@ edition.workspace = true
 [features]
 default = ["redb"]
 redb = ["dep:postcard", "dep:redb", "dep:serde", "hopr-api/serde"]
-runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -29,14 +28,13 @@ hopr-api = { workspace = true, features = [
   "types-internal",
   "types-random",
 ] }
-hopr-async-runtime = { workspace = true }
 hopr-platform = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
-hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 rand = { workspace = true }
 tempfile = { workspace = true }
+test-log = { workspace = true }
 
 [[bench]]
 name = "ticket_manager"

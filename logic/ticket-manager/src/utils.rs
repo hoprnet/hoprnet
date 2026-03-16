@@ -4,6 +4,7 @@ use hopr_api::{chain::ChannelId, types::internal::prelude::TicketBuilder};
 
 use crate::OutgoingIndexStore;
 
+/// Tracks outgoing ticket indices for a channel, starting from 0.
 #[derive(Debug)]
 struct OutgoingIndexEntry {
     index: AtomicU64,
@@ -68,9 +69,12 @@ impl OutgoingIndexCache {
             .insert((*channel_id, epoch), OutgoingIndexEntry::new(index).into());
     }
 
-    pub fn remove(&self, channel_id: &ChannelId, epoch: u32) {
+    pub fn remove(&self, channel_id: &ChannelId, epoch: u32) -> bool {
         if let Some(((id, ep), _)) = self.cache.remove(&(*channel_id, epoch)) {
             self.removed.insert((id, ep));
+            true
+        } else {
+            false
         }
     }
 

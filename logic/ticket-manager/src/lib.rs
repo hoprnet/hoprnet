@@ -160,8 +160,7 @@ where
 
         // If this is the first index in this epoch,
         // remove the previous epoch from the map if any
-        if next_index == 1 && epoch > 0 {
-            self.out_idx_tracker.remove(channel_id, epoch - 1);
+        if next_index == 1 && epoch > 0 && self.out_idx_tracker.remove(channel_id, epoch - 1) {
             tracing::trace!(%channel_id, prev_epoch = epoch - 1, "removing previous epoch from outgoing index cache");
         }
 
@@ -624,7 +623,132 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use hopr_api::types::crypto::prelude::{ChainKeypair, Keypair};
     use crate::traits::tests::generate_tickets;
+
+    #[test]
+    fn ticket_manager_should_create_multihop_tickets() -> anyhow::Result<()> {
+        let mgr: HoprTicketManager<_, MemoryTicketQueue> = HoprTicketManager::new(MemoryStore::default())?;
+
+        let src = ChainKeypair::random();
+        let dst = ChainKeypair::random();
+
+        let channel = ChannelEntry::new(
+            src.public().to_address(),
+            dst.public().to_address(),
+            10.into(),
+            1_u32.into(),
+            ChannelStatus::Open,
+            1_u32.into()
+        );
+
+        // Loads index 1 which is the next index for a ticket on this channel
+        mgr.sync_from_outgoing_channels(&[channel])?;
+
+        let ticket = mgr.create_multihop_ticket(&channel, 2, WinningProbability::ALWAYS, 10.into())?
+            .eth_challenge(Default::default())
+            .build_signed(&src, &Default::default())?;
+
+        assert_eq!(ticket.channel_id(), channel.get_id());
+        assert_eq!(channel.ticket_index, ticket.verified_ticket().index);
+        assert_eq!(channel.channel_epoch, ticket.verified_ticket().channel_epoch);
+
+        Ok(())
+    }
+
+    #[test]
+    fn ticket_manager_should_save_out_indices_to_the_store_on_demand() -> anyhow::Result<()> {
+        let mgr: HoprTicketManager<_, MemoryTicketQueue> = HoprTicketManager::new(MemoryStore::default())?;
+
+        let src = ChainKeypair::random();
+        let dst = ChainKeypair::random();
+
+        let channel = ChannelEntry::new(
+            src.public().to_address(),
+            dst.public().to_address(),
+            10.into(),
+            1_u32.into(),
+            ChannelStatus::Open,
+            1_u32.into()
+        );
+
+        // Loads index 1 which is the next index for a ticket on this channel
+        mgr.sync_from_outgoing_channels(&[channel])?;
+
+        mgr.create_multihop_ticket(&channel, 2, WinningProbability::ALWAYS, 10.into())?;
+
+        // Without saving, the store index should not be present in store
+        let saved_index = mgr.store.read().load_outgoing_index(channel.get_id(), 1)?;
+        assert_eq!(None, saved_index);
+
+        mgr.create_multihop_ticket(&channel, 2, WinningProbability::ALWAYS, 10.into())?;
+
+        mgr.save_outgoing_indices()?;
+        let saved_index = mgr.store.read().load_outgoing_index(channel.get_id(), 1)?;
+        assert_eq!(Some(3), saved_index);
+
+        mgr.create_multihop_ticket(&channel, 2, WinningProbability::ALWAYS, 10.into())?;
+
+        let saved_index = mgr.store.read().load_outgoing_index(channel.get_id(), 1)?;
+        assert_eq!(Some(3), saved_index);
+
+        mgr.save_outgoing_indices()?;
+        let saved_index = mgr.store.read().load_outgoing_index(channel.get_id(), 1)?;
+        assert_eq!(Some(4), saved_index);
+
+        Ok(())
+    }
+
+    #[test]
+    fn ticket_manager_should_sync_out_indices_from_chain_state() -> anyhow::Result<()> {
+        let mgr: HoprTicketManager<_, MemoryTicketQueue> = HoprTicketManager::new(MemoryStore::default())?;
+
+        let src = ChainKeypair::random();
+        let dst = ChainKeypair::random();
+
+        let channel = ChannelEntry::new(
+            src.public().to_address(),
+            dst.public().to_address(),
+            10.into(),
+            1_u32.into(),
+            ChannelStatus::Open,
+            1_u32.into()
+        );
+
+        mgr.sync_from_outgoing_channels(&[channel])?;
+        mgr.save_outgoing_indices()?;
+
+        let saved_index = mgr.store.read().load_outgoing_index(channel.get_id(), 1)?;
+        assert_eq!(Some(1), saved_index);
+
+        Ok(())
+    }
+
+    #[test]
+    fn ticket_manager_should_sync_incoming_channels_from_chain_state() -> anyhow::Result<()> {
+        let mgr: HoprTicketManager<_, MemoryTicketQueue> = HoprTicketManager::new(MemoryStore::default())?;
+
+        let src = ChainKeypair::random();
+        let dst = ChainKeypair::random();
+
+        let channel = ChannelEntry::new(
+            src.public().to_address(),
+            dst.public().to_address(),
+            10.into(),
+            1_u32.into(),
+            ChannelStatus::Open,
+            1_u32.into()
+        );
+
+        let neglected = mgr.sync_from_incoming_channels(&[channel])?;
+        assert!(neglected.is_empty());
+
+        let queues = mgr.store.read().iter_queues()?.collect::<Vec<_>>();
+        assert_eq!(vec![*channel.get_id()], queues);
+
+        Ok(())
+    }
 
     #[test]
     fn ticket_manager_unrealized_value_should_increase_when_tickets_are_added() -> anyhow::Result<()> {
