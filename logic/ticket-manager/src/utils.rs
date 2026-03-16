@@ -1,94 +1,108 @@
 use std::sync::atomic::{AtomicBool, AtomicU64};
 
-use futures::{FutureExt, StreamExt};
-use hopr_api::chain::ChannelId;
+use hopr_api::{chain::ChannelId, types::internal::prelude::TicketBuilder};
 
 use crate::OutgoingIndexStore;
 
-const OUT_INDEX_SYNC_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
-
-// Contains a map of outgoing indices and indicator flag if the map is "dirty"
-// (not yet synced to the persistent storage).
-type OutIdxCache = (dashmap::DashMap<(ChannelId, u32), AtomicU64>, AtomicBool);
-
-/// Stores outgoing ticket indices in a cache and periodically syncs them to the persistent storage.
 #[derive(Debug)]
-pub struct OutgoingIndexTracker {
-    out_indices: std::sync::Arc<OutIdxCache>,
-    sync_handle: hopr_async_runtime::AbortHandle,
+struct OutgoingIndexEntry {
+    index: AtomicU64,
+    is_dirty: AtomicBool,
 }
 
-impl OutgoingIndexTracker {
-    pub fn new<T>(store: std::sync::Arc<parking_lot::RwLock<T>>) -> Self
-    where
-        T: OutgoingIndexStore + Send + Sync + 'static,
-    {
-        let out_indices = std::sync::Arc::new((
-            dashmap::DashMap::<(ChannelId, u32), AtomicU64>::new(),
-            AtomicBool::new(false),
-        ));
+impl Default for OutgoingIndexEntry {
+    fn default() -> Self {
+        Self::new(0)
+    }
+}
 
-        let out_indices_1 = out_indices.clone();
-        let out_indices_2 = out_indices.clone();
-
-        // Start syncing of the outgoing ticket indices back to the storage
-        // This is needed, because the outgoing ticket indices change rapidly, and therefore
-        // the sync cannot be done per call to `next_outgoing_ticket_index`.
-        let (stream, sync_handle) =
-            futures::stream::abortable(futures_time::stream::interval(OUT_INDEX_SYNC_INTERVAL.into()));
-        hopr_async_runtime::prelude::spawn(stream
-            .filter(move |_| futures::future::ready(out_indices_1.1.load(std::sync::atomic::Ordering::Acquire)))
-            .for_each(move |_| {
-                let out_indices_2 = out_indices_2.clone();
-                let store = store.clone();
-                let all_items = out_indices_2
-                    .0
-                    .iter()
-                    .map(|e| {
-                        (
-                            e.key().0,
-                            e.key().1,
-                            e.value().load(std::sync::atomic::Ordering::Relaxed),
-                        )
-                    })
-                    .collect::<Vec<_>>();
-                out_indices_2.1.store(false, std::sync::atomic::Ordering::Release);
-
-                async move {
-                    let res = hopr_async_runtime::prelude::spawn_blocking(move || {
-                        let mut store = store.write();
-                        for (channel_id, channel_epoch, index) in all_items {
-                            if let Err(error) = store.save_outgoing_index(&channel_id, channel_epoch, index) {
-                                tracing::error!(%error, %channel_id, %channel_epoch, %index, "failed to save outgoing index");
-                            }
-                        }
-                    }).await;
-                    if let Err(error) = res {
-                        tracing::error!(%error, "failed to sync outgoing indices");
-                    }
-                }
-            }).inspect(|_| tracing::debug!("syncing outgoing indices done")));
-
-        Self {
-            out_indices,
-            sync_handle,
+impl OutgoingIndexEntry {
+    /// Creates a new index entry and marks it as dirty.
+    fn new(index: u64) -> Self {
+        OutgoingIndexEntry {
+            index: AtomicU64::new(index),
+            is_dirty: AtomicBool::new(true),
         }
     }
 
-    /// Get the cache of outgoing ticket indices.
-    pub fn index_cache(&self) -> &dashmap::DashMap<(ChannelId, u32), AtomicU64> {
-        &self.out_indices.0
+    /// Increments the index and marks it as dirty if within bounds.
+    fn increment(&self) -> u64 {
+        let v = self.index.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        if v <= TicketBuilder::MAX_TICKET_INDEX {
+            self.is_dirty.store(true, std::sync::atomic::Ordering::Release);
+        }
+        v.min(TicketBuilder::MAX_TICKET_INDEX)
     }
 
-    /// Indicate that the outgoing indices have been modified and need to be synced.
-    pub fn set_dirty(&self) {
-        self.out_indices.1.store(true, std::sync::atomic::Ordering::Release);
+    /// Checks if the index is marked as dirty.
+    fn is_dirty(&self) -> bool {
+        self.is_dirty.load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    /// Marks the index as clean.
+    fn mark_clean(&self) {
+        self.is_dirty.store(false, std::sync::atomic::Ordering::Release);
+    }
+
+    /// Gets the index.
+    fn get(&self) -> u64 {
+        self.index
+            .load(std::sync::atomic::Ordering::Relaxed)
+            .min(TicketBuilder::MAX_TICKET_INDEX)
     }
 }
 
-impl Drop for OutgoingIndexTracker {
-    fn drop(&mut self) {
-        self.sync_handle.abort();
+#[derive(Debug, Default)]
+pub struct OutgoingIndexCache {
+    cache: dashmap::DashMap<(ChannelId, u32), std::sync::Arc<OutgoingIndexEntry>>,
+    removed: dashmap::DashSet<(ChannelId, u32)>,
+}
+
+impl OutgoingIndexCache {
+    pub fn next(&self, channel_id: &ChannelId, epoch: u32) -> u64 {
+        self.cache.entry((*channel_id, epoch)).or_default().increment()
+    }
+
+    pub fn set(&self, channel_id: &ChannelId, epoch: u32, index: u64) {
+        self.cache
+            .insert((*channel_id, epoch), OutgoingIndexEntry::new(index).into());
+    }
+
+    pub fn remove(&self, channel_id: &ChannelId, epoch: u32) {
+        if let Some(((id, ep), _)) = self.cache.remove(&(*channel_id, epoch)) {
+            self.removed.insert((id, ep));
+        }
+    }
+
+    pub fn save<S: OutgoingIndexStore + Send + Sync + 'static>(
+        &self,
+        store: std::sync::Arc<parking_lot::RwLock<S>>,
+    ) -> Result<(), S::Error> {
+        // Clone entries so that we do not hold any locks
+        let cache = self.cache.clone();
+        let removed = self.removed.clone();
+
+        for entry in cache.iter().filter(|e| e.value().is_dirty()) {
+            let (channel_id, epoch) = entry.key();
+            if let Err(error) = store
+                .write()
+                .save_outgoing_index(channel_id, *epoch, entry.value().get())
+            {
+                tracing::error!(%error, %channel_id, epoch, "failed to save outgoing index");
+            } else {
+                entry.value().mark_clean();
+            }
+        }
+
+        for (channel_id, channel_epoch) in removed.iter().map(|e| (e.0, e.1)) {
+            if let Err(error) = store.write().delete_outgoing_index(&channel_id, channel_epoch) {
+                tracing::error!(%error, %channel_id, %channel_epoch, "failed to remove outgoing index");
+            } else {
+                self.removed.remove(&(channel_id, channel_epoch));
+            }
+        }
+
+        Ok(())
     }
 }
 

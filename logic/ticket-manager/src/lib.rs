@@ -7,19 +7,24 @@ mod errors;
 mod traits;
 mod utils;
 
-use std::{ops::Mul, sync::atomic::AtomicU64};
+use std::ops::Mul;
 
-use backend::ValueCachedQueue;
-pub use backend::{MemoryStore, MemoryTicketQueue};
-#[cfg(feature = "redb")]
-pub use backend::{RedbStore, RedbTicketQueue};
-pub use errors::TicketManagerError;
 use hopr_api::{
     chain::TicketRedeemError,
     types::{internal::prelude::*, primitive::prelude::*},
 };
-pub use traits::{OutgoingIndexStore, TicketQueue, TicketQueueStore};
-use utils::{ChannelTicketQueue, OutgoingIndexTracker};
+
+#[cfg(feature = "redb")]
+pub use crate::backend::{RedbStore, RedbTicketQueue};
+use crate::{
+    backend::ValueCachedQueue,
+    utils::{ChannelTicketQueue, OutgoingIndexCache},
+};
+pub use crate::{
+    backend::{MemoryStore, MemoryTicketQueue},
+    errors::TicketManagerError,
+    traits::{OutgoingIndexStore, TicketQueue, TicketQueueStore},
+};
 
 /// Keeps track of indices for outgoing tickets and (optionally) of incoming redeemable tickets.
 ///
@@ -53,6 +58,10 @@ use utils::{ChannelTicketQueue, OutgoingIndexTracker};
 /// multi-hop path. To create zero/last-hop tickets, the ticket manager is not needed as these tickets essentially
 /// contain bogus data and there's no channel required.
 ///
+/// The outgoing indices are **not** automatically synchronized back to the underlying store for performance reasons.
+/// The user is responsible for calling [`save_outgoing_indices`](HoprTicketManager::save_outgoing_indices) to save
+/// the outgoing indices to the store.
+///
 /// This usage is typical for all kinds of nodes (Entry/Relay/Exit).
 ///
 /// ### Usage in incoming packet pipeline
@@ -81,9 +90,9 @@ use utils::{ChannelTicketQueue, OutgoingIndexTracker};
 /// ### Outgoing ticket creation
 /// The [`create_multihop_ticket`](HoprTicketManager::create_multihop_ticket) method is designed to be
 /// high-performance and to be called per each outgoing packet. It is using only atomics to track the outgoing
-/// ticket index for a channel. The synchronization to the underlying storage is done periodically in the background,
-/// making snapshots of the current.
-/// No significant contention is expected.
+/// ticket index for a channel. The synchronization to the underlying storage is done on-demand by calling
+/// `save_outgoing_indices`, making quick snapshots of the current state of outgoing indices.
+/// No significant contention is expected unless `save_outgoing_indices` is called very frequently.`
 ///
 /// ### Incoming winning ticket retrieval
 /// The [`insert_incoming_ticket`](HoprTicketManager::insert_incoming_ticket) method is designed to be
@@ -116,7 +125,7 @@ use utils::{ChannelTicketQueue, OutgoingIndexTracker};
 /// on the RW lock is not expected.
 #[derive(Debug)]
 pub struct HoprTicketManager<S, Q> {
-    out_idx_tracker: OutgoingIndexTracker,
+    out_idx_tracker: OutgoingIndexCache,
     channel_tickets: dashmap::DashMap<ChannelId, ChannelTicketQueue<ValueCachedQueue<Q>>>,
     store: std::sync::Arc<parking_lot::RwLock<S>>,
 }
@@ -135,9 +144,8 @@ where
     /// is used any further.
     pub fn new(store: S) -> Result<Self, TicketManagerError> {
         let store = std::sync::Arc::new(parking_lot::RwLock::new(store));
-        let out_idx_tracker = OutgoingIndexTracker::new(store.clone());
         Ok(Self {
-            out_idx_tracker,
+            out_idx_tracker: OutgoingIndexCache::default(),
             channel_tickets: dashmap::DashMap::new(),
             store,
         })
@@ -147,24 +155,28 @@ where
     ///
     /// This operation is fast and does not immediately put the index into the [`OutgoingIndexStore`].
     fn next_outgoing_ticket_index(&self, channel_id: &ChannelId, epoch: u32) -> u64 {
-        let res = self
-            .out_idx_tracker
-            .index_cache()
-            .entry((*channel_id, epoch))
-            .or_default()
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let next_index = self.out_idx_tracker.next(channel_id, epoch);
+        tracing::trace!(%channel_id, epoch, next_index, "next outgoing ticket index");
 
         // If this is the first index in this epoch,
         // remove the previous epoch from the map if any
-        if res == 1 && epoch > 0 {
-            self.out_idx_tracker.index_cache().remove(&(*channel_id, epoch - 1));
-            tracing::trace!(%channel_id, epoch = epoch - 1, "removing previous epoch from outgoing index cache");
+        if next_index == 1 && epoch > 0 {
+            self.out_idx_tracker.remove(channel_id, epoch - 1);
+            tracing::trace!(%channel_id, prev_epoch = epoch - 1, "removing previous epoch from outgoing index cache");
         }
 
-        // Mark the index store as dirty so that it could be synced to the persistent
-        // store on the next tick
-        self.out_idx_tracker.set_dirty();
-        res
+        next_index
+    }
+
+    /// Saves outgoing ticket indices back to the store.
+    ///
+    /// The operation does nothing if there were no [new tickets created](HoprTicketManager::create_multihop_ticket)
+    /// on any tracked channel.
+    pub fn save_outgoing_indices(&self) -> Result<(), TicketManagerError> {
+        self.out_idx_tracker
+            .save(self.store.clone())
+            .map_err(TicketManagerError::store)?;
+        Ok(())
     }
 
     /// Synchronizes the outgoing index counters based on the current on-chain channel
@@ -223,12 +235,8 @@ where
 
             // Always use the maximum from the stored value and the current ticket index on the channel
             let out_index = index.max(channel.ticket_index);
-            self.out_idx_tracker
-                .index_cache()
-                .insert((*id, epoch), AtomicU64::new(out_index));
-            self.out_idx_tracker.set_dirty();
-
-            tracing::debug!(%id, epoch, out_index, "outgoing ticket index for channel");
+            self.out_idx_tracker.set(id, epoch, out_index);
+            tracing::debug!(%id, epoch, out_index, "loaded outgoing ticket index for channel");
         }
 
         Ok(())
@@ -393,9 +401,9 @@ where
                 // A hypothetical chance of high contention on this write lock is
                 // only possible when massive numbers of winning tickets on new unique channels are received.
                 // Such a scenario is likely not realistic.
-                let queue = self
-                    .store
-                    .write()
+                let mut store = self.store.write();
+
+                let queue = store
                     .open_or_create_queue(&ticket.ticket_id().id)
                     .map_err(TicketManagerError::store)?;
 
@@ -421,24 +429,31 @@ where
         Ok(neglected_tickets)
     }
 
-    /// Returns the total value of unredeemed tickets in the given channel.
+    /// Returns the total value of unredeemed tickets in the given channel and its latest epoch.
     ///
     /// NOTE: The function is less efficient when the `min_index` is specified, as
     /// a full scan of the queue is required to calculate the unrealized value.
     pub fn unrealized_value(
         &self,
         channel_id: &ChannelId,
-        epoch: u32,
         min_index: Option<u64>,
     ) -> Result<HoprBalance, TicketManagerError> {
         if let Some(ticket_queue) = self.channel_tickets.get(channel_id) {
             // There is low contention on this read lock, because write locks are acquired only
             // when a new winning ticket has been added, redeemed or neglected, all of which are fairly rare operations.
-            Ok(ticket_queue
-                .queue
-                .read()
-                .total_value(epoch, min_index)
-                .map_err(TicketManagerError::store)?)
+            let queue = ticket_queue.queue.read();
+
+            // Get the epoch of the first extractable ticket in the queue.
+            // The manager takes care that there are no tickets with epochs other than the current epoch.
+            if let Some(epoch) = queue
+                .peek()
+                .map_err(TicketManagerError::store)?
+                .map(|t| t.verified_ticket().channel_epoch)
+            {
+                Ok(queue.total_value(epoch, min_index).map_err(TicketManagerError::store)?)
+            } else {
+                Ok(HoprBalance::zero())
+            }
         } else {
             Err(TicketManagerError::ChannelNotFound)
         }
@@ -455,7 +470,6 @@ where
     pub fn neglect_tickets(
         &self,
         channel_id: &ChannelId,
-        epoch: u32,
         max_index: Option<u64>,
     ) -> Result<Vec<Ticket>, TicketManagerError> {
         let (_lock, queue) = match self.channel_tickets.get(channel_id) {
@@ -476,9 +490,7 @@ where
         while queue_read
             .peek()
             .map_err(TicketManagerError::store)?
-            .filter(|ticket| {
-                epoch == ticket.verified_ticket().channel_epoch && max_index <= ticket.verified_ticket().index
-            })
+            .filter(|ticket| max_index <= ticket.verified_ticket().index)
             .is_some()
         {
             // Quickly perform pop and downgrade to lock not to block any readers
@@ -487,11 +499,11 @@ where
             queue_read = parking_lot::RwLockWriteGuard::downgrade_to_upgradable(queue_write);
 
             neglected_tickets.extend(maybe_ticket.map(|t| *t.verified_ticket()));
-            tracing::debug!(%channel_id, %epoch, ?maybe_ticket, "neglected ticket in channel");
+            tracing::debug!(%channel_id, ?maybe_ticket, "neglected ticket in channel");
         }
 
         // Keep the queue in even if it is empty. The cleanup is done only on startup.
-        tracing::debug!(%channel_id, %epoch, num_tickets = neglected_tickets.len(), "ticket neglection done in channel");
+        tracing::debug!(%channel_id, num_tickets = neglected_tickets.len(), "ticket neglection done in channel");
         Ok(neglected_tickets)
     }
 
@@ -614,11 +626,8 @@ mod tests {
     use super::*;
     use crate::traits::tests::generate_tickets;
 
-    // Tests require `tokio::test`, because the outgoing index synchronization runs as a task
-    // and requires an async runtime.
-
-    #[tokio::test]
-    async fn ticket_manager_unrealized_value_should_increase_when_tickets_are_added() -> anyhow::Result<()> {
+    #[test]
+    fn ticket_manager_unrealized_value_should_increase_when_tickets_are_added() -> anyhow::Result<()> {
         let mut tickets = generate_tickets()?;
         let channel_id = tickets[0].ticket_id().id;
         let epoch = tickets[0].ticket_id().epoch;
@@ -628,7 +637,7 @@ mod tests {
 
         let mgr = HoprTicketManager::new(MemoryStore::default())?;
         assert!(matches!(
-            mgr.unrealized_value(&channel_id, epoch, None),
+            mgr.unrealized_value(&channel_id, None),
             Err(TicketManagerError::ChannelNotFound)
         ));
 
@@ -639,7 +648,7 @@ mod tests {
             let neglected = mgr.insert_incoming_ticket(*ticket)?;
             assert!(neglected.is_empty());
 
-            let new_unrealized_value = mgr.unrealized_value(&channel_id, epoch, None)?;
+            let new_unrealized_value = mgr.unrealized_value(&channel_id, None)?;
             assert_eq!(
                 new_unrealized_value - last_unrealized_value,
                 ticket.verified_ticket().amount
@@ -654,8 +663,8 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn ticket_manager_ticket_insertion_should_neglect_tickets_from_previous_epochs() -> anyhow::Result<()> {
+    #[test]
+    fn ticket_manager_ticket_insertion_should_neglect_tickets_from_previous_epochs() -> anyhow::Result<()> {
         let tickets = generate_tickets()?;
         assert!(!tickets.is_empty());
         let channel_id = tickets[0].ticket_id().id;
@@ -676,7 +685,7 @@ mod tests {
 
         let mgr = HoprTicketManager::new(MemoryStore::default())?;
         assert!(matches!(
-            mgr.unrealized_value(&channel_id, 1, None),
+            mgr.unrealized_value(&channel_id, None),
             Err(TicketManagerError::ChannelNotFound)
         ));
 
@@ -685,7 +694,7 @@ mod tests {
             assert!(neglected.is_empty());
         }
 
-        let new_unrealized_value = mgr.unrealized_value(&channel_id, 1, None)?;
+        let new_unrealized_value = mgr.unrealized_value(&channel_id, None)?;
         assert_eq!(
             new_unrealized_value,
             tickets_from_epoch_1
@@ -694,7 +703,7 @@ mod tests {
                 .sum()
         );
 
-        let neglected = mgr.insert_incoming_ticket(tickets_from_epoch_2[0])?;
+        let neglected = mgr.insert_incoming_ticket(tickets_from_epoch_2[0].clone())?;
         assert_eq!(
             tickets_from_epoch_1
                 .iter()
@@ -703,11 +712,21 @@ mod tests {
             neglected
         );
 
-        let new_unrealized_value = mgr.unrealized_value(&channel_id, 1, None)?;
-        assert_eq!(HoprBalance::zero(), new_unrealized_value);
-
-        let new_unrealized_value = mgr.unrealized_value(&channel_id, 2, None)?;
+        // There's now only 1 ticket from epoch 2
+        let new_unrealized_value = mgr.unrealized_value(&channel_id, None)?;
         assert_eq!(tickets_from_epoch_2[0].verified_ticket().amount, new_unrealized_value);
+
+        let queue_tickets = mgr
+            .store
+            .write()
+            .open_or_create_queue(&channel_id)?
+            .iter_unordered()?
+            .collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(1, queue_tickets.len());
+        assert_eq!(
+            tickets_from_epoch_2[0].verified_ticket(),
+            queue_tickets[0].verified_ticket()
+        );
 
         Ok(())
     }

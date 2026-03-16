@@ -16,7 +16,6 @@ anyhow = { workspace = true }
 dashmap = { workspace = true, features = ["inline"] }
 hashbrown = { workspace = true, features = ["inline-more"] }
 futures = { workspace = true }
-futures-time = { workspace = true }
 parking_lot = { workspace = true, features = ["arc_lock"] }
 redb = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
@@ -38,7 +37,6 @@ criterion = { workspace = true }
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 rand = { workspace = true }
 tempfile = { workspace = true }
-tokio = { workspace = true }
 
 [[bench]]
 name = "ticket_manager"
