@@ -8,7 +8,7 @@
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/master";
     rust-overlay.url = "github:oxalica/rust-overlay/master";
     crane.url = "github:ipetkov/crane/v0.23.0";
-    nix-lib.url = "github:hoprnet/nix-lib";
+    nix-lib.url = "github:hoprnet/nix-lib/kauki-nix-lib-introduce-codecov";
     # pin it to a version which we are compatible with
     foundry.url = "github:hoprnet/foundry.nix/tb/202505-add-xz";
     pre-commit.url = "github:cachix/git-hooks.nix";
@@ -140,6 +140,9 @@
           rust-builder-aarch64-linux = builders.aarch64-linux;
           rust-builder-aarch64-darwin = builders.aarch64-darwin;
 
+          # Coverage builder with llvm-tools for code coverage instrumentation
+          rust-builder-local-coverage = builders.localCoverage;
+
           # Nightly builder for docs and specific features
           # Uses a pinned nightly version to avoid ICE bugs in latest nightly
           rust-builder-local-nightly = nixLib.mkRustBuilder {
@@ -207,6 +210,16 @@
               src = testSrc;
               runTests = true;
               cargoExtraArgs = "-Z panic-abort-tests --lib";
+            }
+          );
+
+          # Code coverage (outputs LCOV report)
+          hopr-coverage = rust-builder-local-coverage.callPackage nixLib.mkRustPackage (
+            hoprdBuildArgs
+            // {
+              src = testSrc;
+              runCoverage = true;
+              cargoExtraArgs = "--lib";
             }
           );
 
@@ -699,7 +712,7 @@
               hoprd-profile-docker
               hoprd-localcluster
               ;
-            inherit hopr-test-unit hopr-test-nightly;
+            inherit hopr-test-unit hopr-test-nightly hopr-coverage;
             inherit docs;
             inherit pre-commit-check;
             inherit hoprd-bench;

@@ -14,6 +14,12 @@
   </p>
 </p>
 
+<p align="center">
+  <a href="https://codecov.io/gh/hoprnet/hoprnet">
+    <img src="https://codecov.io/gh/hoprnet/hoprnet/branch/master/graph/badge.svg" alt="codecov">
+  </a>
+</p>
+
 ## Table of Contents
 
 - [Table of Contents](#table-of-contents)

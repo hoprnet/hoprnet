@@ -35,6 +35,7 @@ cargo test --lib                        # Unit tests only
 cargo test --test '*' -- --test-threads=1   # Integration tests (MUST be single-threaded)
 cargo bench                             # Benchmarks (in benches/ dirs)
 just run-local-cluster                  # Local multi-node cluster
+nix build -L .#hopr-coverage            # Code coverage (LCOV report → result)
 ```
 
 ### Setup
