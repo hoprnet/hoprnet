@@ -1,0 +1,22 @@
+---
+source: protocols/hopr/src/surb_store.rs
+expression: drain_pops(&rb)
+---
+- - - 1
+    - 1
+    - 1
+    - 1
+    - 1
+    - 1
+    - 1
+    - 1
+  - 1
+- - - 2
+    - 2
+    - 2
+    - 2
+    - 2
+    - 2
+    - 2
+    - 2
+  - 0

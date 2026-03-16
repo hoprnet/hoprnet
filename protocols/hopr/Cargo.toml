@@ -53,6 +53,7 @@ hopr-platform = { workspace = true }
 [dev-dependencies]
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 hex-literal = { workspace = true }
+insta = { workspace = true, features = ["yaml"] }
 lazy_static = { workspace = true }
 tokio = { workspace = true }
 

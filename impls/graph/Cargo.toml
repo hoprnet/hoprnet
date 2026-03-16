@@ -34,6 +34,7 @@ hopr-statistics = { workspace = true, features = ["moving"] }
 assertables = { workspace = true }
 criterion = { workspace = true }
 hex-literal = { workspace = true }
+insta = { workspace = true, features = ["yaml"] }
 tokio = { workspace = true }
 
 [[bench]]

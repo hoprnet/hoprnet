@@ -248,7 +248,7 @@ mod tests {
         assert_eq!(acks.len(), 1);
 
         let ids = acks.remove(0).into_iter().collect::<Vec<_>>();
-        assert_eq!(ids, vec![1, 2, 3]);
+        insta::assert_yaml_snapshot!(ids);
     }
 
     #[test]
@@ -257,11 +257,9 @@ mod tests {
 
         let expected = (0..(2 * MAX + 2) as FrameId).collect::<Vec<_>>();
         let acks = FrameAcknowledgements::<1024>::new_multiple(expected.clone());
-        assert_eq!(3, acks.len());
 
-        assert_eq!(MAX, acks[0].len());
-        assert_eq!(MAX, acks[1].len());
-        assert_eq!(2, acks[2].len());
+        let chunk_lengths: Vec<usize> = acks.iter().map(|a| a.len()).collect();
+        insta::assert_yaml_snapshot!(chunk_lengths);
 
         let actual = acks.into_iter().flat_map(|a| a.into_iter()).collect::<Vec<_>>();
         assert_eq!(expected, actual);
@@ -283,22 +281,6 @@ mod tests {
 
         // Iterator of SegmentIds is guaranteed to be sorted
         let missing = req.into_iter().collect::<Vec<SegmentId>>();
-        let missing_seg_ids = [
-            SegmentId(2, 2),
-            SegmentId(3, 2),
-            SegmentId(3, 3),
-            SegmentId(3, 4),
-            SegmentId(3, 7),
-            SegmentId(4, 0),
-            SegmentId(4, 1),
-            SegmentId(4, 2),
-            SegmentId(4, 3),
-            SegmentId(4, 4),
-            SegmentId(4, 5),
-            SegmentId(4, 6),
-            SegmentId(4, 7),
-        ];
-
-        assert_eq!(missing, missing_seg_ids);
+        insta::assert_debug_snapshot!(missing);
     }
 }

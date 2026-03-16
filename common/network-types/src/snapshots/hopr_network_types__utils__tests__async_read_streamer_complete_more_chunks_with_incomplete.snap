@@ -1,0 +1,7 @@
+---
+source: common/network-types/src/utils.rs
+expression: chunks_as_strings(&results)
+---
+- "Hello, World a"
+- nd do it twice
+- ", ..."

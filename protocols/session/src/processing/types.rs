@@ -389,8 +389,7 @@ mod tests {
         assert_eq!(MissingSegmentsBitmap::ZERO, fb.as_missing());
 
         let reassembled: Frame = fb.try_into()?;
-        assert_eq!(1, reassembled.frame_id);
-        assert_eq!(b"hello new world", reassembled.data.as_ref());
+        insta::assert_debug_snapshot!(reassembled);
 
         Ok(())
     }
@@ -422,9 +421,7 @@ mod tests {
         assert_eq!(MissingSegmentsBitmap::ZERO, fb.as_missing());
 
         let reassembled: Frame = fb.try_into()?;
-        assert_eq!(1, reassembled.frame_id);
-        assert_eq!(b"hello new world", reassembled.data.as_ref());
-        assert!(reassembled.is_terminating);
+        insta::assert_debug_snapshot!(reassembled);
 
         Ok(())
     }
@@ -463,9 +460,7 @@ mod tests {
         assert_eq!(MissingSegmentsBitmap::ZERO, fb.as_missing());
 
         let reassembled: Frame = fb.try_into()?;
-        assert_eq!(1, reassembled.frame_id);
-        assert_eq!(b"hello new world", reassembled.data.as_ref());
-        assert!(reassembled.is_terminating);
+        insta::assert_debug_snapshot!(reassembled);
 
         Ok(())
     }

@@ -1,0 +1,5 @@
+---
+source: common/network-types/src/utils.rs
+expression: "result.map(|c| String::from_utf8_lossy(&c).into_owned())"
+---
+"Hello, W"

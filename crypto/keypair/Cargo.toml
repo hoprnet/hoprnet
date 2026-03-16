@@ -27,6 +27,7 @@ hopr-platform = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
+insta = { workspace = true, features = ["yaml"] }
 tempfile = { workspace = true }
 
 [features]

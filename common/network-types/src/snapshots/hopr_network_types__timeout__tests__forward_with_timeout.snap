@@ -1,0 +1,6 @@
+---
+source: common/network-types/src/timeout.rs
+expression: sink.0
+---
+- 1
+- 2
