@@ -290,6 +290,80 @@ pub fn random_packets_of_count(size: usize) -> Vec<ApplicationData> {
         .expect("data generation must not fail")
 }
 
+/// Creates a single packet with a payload of the given size (filled with random bytes).
+#[allow(dead_code)]
+pub fn random_packet_of_size(payload_size: usize) -> ApplicationData {
+    let data: Vec<u8> = random_bytes::<512>()[..payload_size.min(512)].to_vec();
+    // For sizes > 512, extend with more random bytes
+    let mut data = data;
+    while data.len() < payload_size {
+        let chunk = random_bytes::<512>();
+        let remaining = payload_size - data.len();
+        data.extend_from_slice(&chunk[..remaining.min(512)]);
+    }
+    ApplicationData::new(random_integer(16u64, Some(65535u64)), data).expect("data generation must not fail")
+}
+
+/// Sends packets from peer 0 to the last peer and returns the received packets
+/// along with the ticket channels for further inspection.
+///
+/// This is a lower-level helper than `send_relay_receive_channel_of_n_peers` that
+/// allows callers to inspect intermediate results.
+#[allow(dead_code)]
+pub async fn send_and_receive_packets(
+    peer_count: usize,
+    test_msgs: &[ApplicationData],
+) -> anyhow::Result<(Vec<(HoprPseudonym, ApplicationDataIn)>, Vec<TicketChannel>)> {
+    assert!(peer_count >= 3, "invalid peer count given");
+    assert!(!test_msgs.is_empty(), "at least one packet must be given");
+
+    const TIMEOUT_SECONDS: Duration = Duration::from_secs(10);
+
+    let (wire_apis, mut apis, ticket_channels, processes) = peer_setup_for(peer_count)
+        .await
+        .context("failed to setup peers for test")?;
+
+    let packet_path = resolve_mock_path(
+        PEERS_CHAIN[0].public().to_address(),
+        PEERS_CHAIN[1..peer_count]
+            .iter()
+            .map(|key| key.public().to_address())
+            .collect(),
+    )
+    .await
+    .context("failed to resolve path")?;
+
+    tokio::task::spawn(emulate_channel_communication(wire_apis));
+
+    let out_msgs = test_msgs
+        .iter()
+        .map(|msg| {
+            (
+                ResolvedTransportRouting::Forward {
+                    pseudonym: SimplePseudonym([0xde, 0xad, 0xbe, 0xef, 0xca, 0xfe, 0xba, 0xbe, 0x11, 0x22]),
+                    forward_path: packet_path.clone(),
+                    return_paths: vec![],
+                },
+                ApplicationDataOut::with_no_packet_info(msg.clone()),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    apis[0].0.send_all(&mut futures::stream::iter(out_msgs).map(Ok)).await?;
+
+    let (_apis_send, mut apis_recv): (Vec<_>, Vec<_>) = apis.into_iter().unzip();
+
+    let last_node_recv = apis_recv.remove(peer_count - 1);
+    let recv_packets = last_node_recv
+        .take(test_msgs.len())
+        .collect::<Vec<_>>()
+        .timeout(futures_time::time::Duration::from(TIMEOUT_SECONDS))
+        .await?;
+
+    processes.abort_all();
+    Ok((recv_packets, ticket_channels))
+}
+
 #[allow(dead_code)]
 pub async fn send_relay_receive_channel_of_n_peers(
     peer_count: usize,

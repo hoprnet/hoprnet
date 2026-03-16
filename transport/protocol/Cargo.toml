@@ -60,6 +60,7 @@ bytesize = { workspace = true }
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 futures-concurrency = { workspace = true }
 hex-literal = { workspace = true }
+insta = { workspace = true, features = ["yaml"] }
 serial_test = { workspace = true }
 test-log = { workspace = true }
 tokio = { workspace = true }

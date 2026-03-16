@@ -1,0 +1,5 @@
+---
+source: transport/protocol/src/pipeline.rs
+expression: "format!(\"{cfg:?}\")"
+---
+"AcknowledgementPipelineConfig { ack_buffer_interval: 200ms, ack_grouping_capacity: 5 }"
