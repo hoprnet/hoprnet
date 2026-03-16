@@ -74,7 +74,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: actions/labeler@77a4082b841706ac431479b7e2bb11216ffef250 # main on 20.02.2025
+      - uses: actions/labeler@e52e4fb63ed5cd0e07abaad9826b2a893ccb921f # main on 20.02.2025
         with:
           sync-labels: true
 

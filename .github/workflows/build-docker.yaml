@@ -58,7 +58,7 @@ jobs:
 
       - name: Setup GCP
         id: gcp
-        uses: hoprnet/hopr-workflows/actions/setup-gcp@644d936de4e1c8f5c50ba50f8526209455c28b4a # master
+        uses: hoprnet/hopr-workflows/actions/setup-gcp@d027d7b8da95ea172574e5ca59ade7eec8d67f5c # master
         with:
           google_credentials: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
           login_artifact_registry: 'true'
@@ -66,7 +66,7 @@ jobs:
 
       - name: Install Nix
         if: env.needs_nix_setup == true
-        uses: cachix/install-nix-action@4e002c8ec80594ecd40e759629461e26c8abed15 # v31
+        uses: cachix/install-nix-action@1ca7d21a94afc7c957383a2d217460d980de4934 # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
