@@ -199,7 +199,7 @@
                 src = testSrc;
                 cargoExtraArgs = "-F allocator-jemalloc";
                 runTests = true;
-                rawCargoArgs = true;
+                prependPackageName = false;
                 cargoTestExtraArgs = "--lib";
               }
             )).overrideAttrs
@@ -219,7 +219,7 @@
                 src = testSrc;
                 cargoExtraArgs = "-F allocator-jemalloc";
                 runTests = true;
-                rawCargoArgs = true;
+                prependPackageName = false;
                 cargoTestExtraArgs = "--test '*' -- --test-threads=1";
               }
             )).overrideAttrs
@@ -239,7 +239,7 @@
                 src = testSrc;
                 cargoExtraArgs = "-Z panic-abort-tests -F allocator-jemalloc";
                 runTests = true;
-                rawCargoArgs = true;
+                prependPackageName = false;
                 cargoTestExtraArgs = "--lib";
               }
             )).overrideAttrs
