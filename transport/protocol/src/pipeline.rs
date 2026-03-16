@@ -311,15 +311,18 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             "forwarding packet to the next hop"
                         );
 
-                        if let Err(error) = wire_outgoing.send((next_hop.into(), data)).await {
-                            tracing::error!(%error, "failed to forward a packet to the transport layer");
-                            return None;
+                        match wire_outgoing.send((next_hop.into(), data)).await {
+                            Ok(()) => {
+                                counters.get_or_create(&next_hop).record_message_sent();
+
+                                #[cfg(all(feature = "telemetry", not(test)))]
+                                METRIC_PACKET_COUNT.increment(&["forwarded"]);
+                            }
+                            Err(error) => {
+                                tracing::error!(%error, "failed to forward a packet to the transport layer");
+                                return None;
+                            }
                         }
-
-                        counters.get_or_create(&next_hop).record_message_sent();
-
-                        #[cfg(all(feature = "telemetry", not(test)))]
-                        METRIC_PACKET_COUNT.increment(&["forwarded"]);
 
                         // Send acknowledgement back
                         tracing::trace!(previous_hop = previous_hop.to_peerid_str(), "acknowledging forwarded packet back");

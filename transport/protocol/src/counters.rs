@@ -35,7 +35,10 @@ impl PeerProtocolCounters {
         self.acks_received.fetch_add(count, Ordering::Relaxed);
     }
 
-    /// Atomically swap both counters to 0, returning accumulated values.
+    /// Swap both counters to 0, returning accumulated values.
+    ///
+    /// Each counter is swapped independently via its own atomic operation;
+    /// there is no single atomic snapshot of the pair.
     pub fn take(&self) -> (u64, u64) {
         (
             self.messages_sent.swap(0, Ordering::Relaxed),

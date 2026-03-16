@@ -493,26 +493,28 @@ where
         let flush_counters = self.counters.clone();
         let flush_graph = self.graph.clone();
         let flush_me = *self.packet_key.public();
+        let flush_interval = self.cfg.counter_flush_interval;
         processes.insert(
             HoprTransportProcess::CounterFlush,
             spawn_as_abortable!(async move {
                 use hopr_api::graph::traits::{EdgeObservableWrite, EdgeWeightType};
 
-                let interval = std::time::Duration::from_secs(15);
-                loop {
-                    hopr_async_runtime::prelude::sleep(interval).await;
-                    for (peer, num_packets, num_acks) in flush_counters.drain() {
-                        tracing::trace!(
-                            %peer,
-                            num_packets,
-                            num_acks,
-                            "flushing protocol conformance counters"
-                        );
-                        flush_graph.upsert_edge(&flush_me, &peer, |obs| {
-                            obs.record(EdgeWeightType::ImmediateProtocolConformance { num_packets, num_acks });
-                        });
-                    }
-                }
+                futures_time::stream::interval(futures_time::time::Duration::from(flush_interval))
+                    .for_each(|_| {
+                        for (peer, num_packets, num_acks) in flush_counters.drain() {
+                            tracing::trace!(
+                                %peer,
+                                num_packets,
+                                num_acks,
+                                "flushing protocol conformance counters"
+                            );
+                            flush_graph.upsert_edge(&flush_me, &peer, |obs| {
+                                obs.record(EdgeWeightType::ImmediateProtocolConformance { num_packets, num_acks });
+                            });
+                        }
+                        futures::future::ready(())
+                    })
+                    .await;
             }),
         );
 
