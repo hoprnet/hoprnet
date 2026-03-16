@@ -1,0 +1,5 @@
+---
+source: transport/api/src/config.rs
+expression: cfg.to_string()
+---
+"IPv4(\"10.0.0.1\"):8080"

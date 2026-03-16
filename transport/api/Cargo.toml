@@ -76,9 +76,13 @@ hopr-transport-session = { workspace = true }
 hopr-transport-tag-allocator = { workspace = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
 hex-literal = { workspace = true }
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 
+hopr-api = { workspace = true }
+hopr-network-graph = { workspace = true, features = ["petgraph"] }
 hopr-protocol-start = { workspace = true }
 hopr-protocol-session = { workspace = true, features = [
   "session-types",

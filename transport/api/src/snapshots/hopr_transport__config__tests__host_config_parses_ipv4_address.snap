@@ -1,0 +1,10 @@
+---
+source: transport/api/src/config.rs
+expression: cfg
+---
+HostConfig {
+    address: IPv4(
+        "1.2.3.4",
+    ),
+    port: 9091,
+}
