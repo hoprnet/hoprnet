@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
         with:
           disable-sudo: false # sudo is needed for docker compose installation
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -97,9 +97,9 @@ jobs:
           install_sdk: 'true'
 
       - name: Setup Node.js
-        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
-          node-version: 20.20.0 # Revert to version 20, as the dappnode package is not yet compatible with Node 22
+          node-version: 20.20.1 # Revert to version 20, as the dappnode package is not yet compatible with Node 22
 
       - name: Checkout DAppNodePackage-Hopr
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2

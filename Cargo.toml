@@ -77,7 +77,7 @@ chrono = { version = "0.4.44", default-features = false, features = [
   "std",
   "clock",
 ] }
-clap = { version = "4.5.60", features = ["derive", "env", "string"] }
+clap = { version = "4.6.0", features = ["derive", "env", "string"] }
 const_format = "0.2.35"
 console-subscriber = "0.5.0"
 criterion = { version = "0.8.2", default-features = false, features = [
@@ -112,7 +112,7 @@ insta = { version = "1.46.3", features = ["yaml", "redactions"] }
 indexmap = { version = "2.13.0" }
 k256 = { version = "0.13.4", features = ["arithmetic", "ecdh", "hash2curve"] }
 lazy_static = "1.5.0"
-libc = "0.2" # intentionally unpinned
+libc = "0.2.183" # intentionally unpinned
 libp2p = { version = "0.56.0", default-features = false }
 libp2p-identity = { version = "0.2.13", features = [
   "peerid",
@@ -150,7 +150,7 @@ progenitor-client = "0.13.0"
 rayon = "1.11.0"
 rand = { version = "0.10.0", features = ["thread_rng"] }
 rand_distr = "0.6.0"
-redb = "3.1.0"
+redb = "3.1.1"
 regex = "1.12.3"
 reqwest = { version = "0.13.2", default-features = false, features = [
   "json",
@@ -181,13 +181,13 @@ serde_bytes = "0.11.19"
 serde_cbor_2 = "0.13.0"
 serde_json = "1.0.149"
 serde_repr = "0.1.20"
-serde_with = { version = "3.17.0", features = ["base64"] }
+serde_with = { version = "3.18.0", features = ["base64"] }
 serde_urlencoded = "0.7.1"
 serde-saphyr = "0.0.21"
 serial_test = "3.4.0"
 signal-hook = "0.4.3"
 smart-default = "0.7.1"
-socket2 = "0.6.2"
+socket2 = "0.6.3"
 sqlx = { version = "0.8.6", default-features = false, features = [
   "sqlite",
   "macros",
@@ -196,7 +196,7 @@ sqlx = { version = "0.8.6", default-features = false, features = [
 strum = { version = "0.28.0", features = ["derive"] }
 subtle = "2.6.1"
 syn = { version = "2.0.117", features = ["full"] }
-tempfile = "3.26.0"
+tempfile = "3.27.0"
 test-log = { version = "0.2.19", features = ["trace"] }
 thiserror = "2.0.18"
 tikv-jemallocator = "0.6.1"
@@ -228,14 +228,14 @@ utoipa-swagger-ui = { version = "9.0.2", features = [
   "debug-embed",
 ] }
 tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
-tracing-subscriber = { version = "0.3.22", features = [
+tracing-subscriber = { version = "0.3.23", features = [
   "env-filter",
   "fmt",
   "registry",
   "std",
 ] }
 typenum = "1.19.0"
-uuid = { version = "1.21.0" }
+uuid = { version = "1.22.0" }
 validator = { version = "0.20.0", features = ["derive"] }
 vergen-gix = { version = "9.1.0", features = ["build"] }
 mimalloc = { version = "0.1.48", default-features = false, features = [
