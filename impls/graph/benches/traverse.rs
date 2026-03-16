@@ -12,6 +12,11 @@ use hopr_api::{
 };
 use hopr_network_graph::ChannelGraph;
 
+/// Default penalty factor applied to edge cost functions.
+const DEFAULT_EDGE_PENALTY: f64 = 0.5;
+/// Default minimum acceptable message acknowledgment rate.
+const DEFAULT_MIN_ACK_RATE: f64 = 0.0;
+
 // ── Graph construction helpers ───────────────────────────────────────────────
 
 /// Deterministically derives an [`OffchainPublicKey`] from a 32-bit index.
@@ -124,7 +129,11 @@ fn bench_simple_paths(c: &mut Criterion) {
                         black_box(dst_2edge),
                         2,
                         Some(10),
-                        EdgeCostFn::forward(std::num::NonZeroUsize::new(2).expect("is greater than 1"), 0.5, 0.0),
+                        EdgeCostFn::forward(
+                            std::num::NonZeroUsize::new(2).expect("is greater than 1"),
+                            DEFAULT_EDGE_PENALTY,
+                            DEFAULT_MIN_ACK_RATE,
+                        ),
                     ))
                 });
             });
@@ -136,7 +145,11 @@ fn bench_simple_paths(c: &mut Criterion) {
                         black_box(dst_3edge),
                         3,
                         Some(10),
-                        EdgeCostFn::forward(std::num::NonZeroUsize::new(3).expect("is greater than 1"), 0.5, 0.0),
+                        EdgeCostFn::forward(
+                            std::num::NonZeroUsize::new(3).expect("is greater than 1"),
+                            DEFAULT_EDGE_PENALTY,
+                            DEFAULT_MIN_ACK_RATE,
+                        ),
                     ))
                 });
             });
@@ -148,7 +161,11 @@ fn bench_simple_paths(c: &mut Criterion) {
                         black_box(dst_4edge),
                         4,
                         Some(10),
-                        EdgeCostFn::forward(std::num::NonZeroUsize::new(4).expect("is greater than 1"), 0.5, 0.0),
+                        EdgeCostFn::forward(
+                            std::num::NonZeroUsize::new(4).expect("is greater than 1"),
+                            DEFAULT_EDGE_PENALTY,
+                            DEFAULT_MIN_ACK_RATE,
+                        ),
                     ))
                 });
             });

@@ -51,17 +51,18 @@ pub struct PathPlannerConfig {
 /// Only the `Hops` variant of [`RoutingOptions`] is cached (explicit intermediate
 /// paths bypass the cache), so the key stores the hop count as a plain `u32`.
 type PlannerCacheKey = (NodeId, NodeId, u32);
-type PlannerCacheValue = Arc<Vec<ValidatedPath>>;
+type PlannerCacheValue = Arc<hopr_statistics::WeightedCollection<ValidatedPath>>;
 
 /// Path planner that resolves [`DestinationRouting`] to [`ResolvedTransportRouting`].
 ///
 /// The planner delegates path *discovery* to any [`PathSelector`] implementation and
-/// owns the `moka` cache of fully-validated [`ValidatedPath`] objects, keyed by
-/// `(source: NodeId, destination: NodeId, hops: u32)`.
+/// owns the `moka` cache of fully-validated [`ValidatedPath`] objects paired with
+/// their traversal cost, keyed by `(source: NodeId, destination: NodeId, hops: u32)`.
 ///
 /// On a cache miss the planner calls the selector, validates every candidate against
-/// the chain resolver, and stores `Arc<Vec<ValidatedPath>>` in the cache.
-/// On a cache hit a random candidate is picked for routing diversity.
+/// the chain resolver, and stores an `Arc<WeightedCollection<ValidatedPath>>` in the
+/// cache. On a cache hit a candidate is picked via weighted random selection (higher
+/// cost = higher quality = higher probability).
 ///
 /// A background sweep (`background_refresh`) can be spawned to
 /// proactively re-warm the cache for all previously-seen keys.
@@ -164,11 +165,12 @@ where
                         let candidates = selector.select_path(src_key, dest_key, hops_usize)?;
 
                         let chain_resolver = ChainPathResolver::from(&*resolver);
-                        let mut valid_paths: Vec<ValidatedPath> = Vec::new();
-                        for candidate in candidates {
-                            let node_ids: Vec<NodeId> = candidate.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
-                            if let Ok(vp) = ValidatedPath::new(source, node_ids, &chain_resolver).await {
-                                valid_paths.push(vp);
+                        let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::new();
+                        for pwc in candidates {
+                            let node_ids: Vec<NodeId> = pwc.path.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
+                            match ValidatedPath::new(source, node_ids, &chain_resolver).await {
+                                Ok(vp) => valid_paths.push((vp, pwc.cost)),
+                                Err(e) => trace!(error = %e, "path candidate failed validation"),
                             }
                         }
 
@@ -180,19 +182,14 @@ where
                             )));
                         }
 
-                        Ok(Arc::new(valid_paths))
+                        Ok(Arc::new(hopr_statistics::WeightedCollection::new(valid_paths)))
                     })
                     .await
                     .map_err(PathPlannerError::CacheError)?;
 
-                let idx = if paths.len() > 1 {
-                    // Upper bound is exclusive; use len so the last path can be selected.
-                    hopr_types::crypto_random::random_integer(0, Some(paths.len() as u64)) as usize
-                } else {
-                    0
-                };
-                trace!(hops = hops_usize, idx, "path selected");
-                paths[idx].clone()
+                paths.pick_one().ok_or_else(|| {
+                    PathPlannerError::Path(PathError::PathNotFound(hops_usize, src_key.to_hex(), dest_key.to_hex()))
+                })?
             }
         };
 
@@ -330,16 +327,22 @@ where
                         && let Ok(candidates) = selector.select_path(src_key, dest_key, hops_usize)
                     {
                         let chain_resolver = ChainPathResolver::from(&*resolver);
-                        let mut valid_paths: Vec<ValidatedPath> = Vec::new();
-                        for candidate in candidates {
-                            let node_ids: Vec<NodeId> = candidate.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
-                            if let Ok(vp) = ValidatedPath::new(src, node_ids, &chain_resolver).await {
-                                valid_paths.push(vp);
+                        let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::new();
+                        for pwc in candidates {
+                            let node_ids: Vec<NodeId> = pwc.path.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
+                            match ValidatedPath::new(src, node_ids, &chain_resolver).await {
+                                Ok(vp) => valid_paths.push((vp, pwc.cost)),
+                                Err(e) => trace!(error = %e, "background refresh: path candidate failed validation"),
                             }
                         }
 
                         if !valid_paths.is_empty() {
-                            cache.insert((src, dest, hops_u32), Arc::new(valid_paths)).await;
+                            cache
+                                .insert(
+                                    (src, dest, hops_u32),
+                                    Arc::new(hopr_statistics::WeightedCollection::new(valid_paths)),
+                                )
+                                .await;
                         }
                     }
                 }
@@ -725,7 +728,9 @@ mod tests {
         assert!(cached.is_some(), "cache should be populated after first call");
         let paths = cached.unwrap();
         assert!(!paths.is_empty(), "cached paths must be non-empty");
-        assert_eq!(paths[0].num_hops(), 2, "path should have 2 hops [a, dest]");
+        let (first_path, first_cost) = paths.iter().next().expect("at least one cached path");
+        assert_eq!(first_path.num_hops(), 2, "path should have 2 hops [a, dest]");
+        assert!(*first_cost > 0.0, "cost should be positive");
     }
 
     #[tokio::test]

@@ -4658,18 +4658,18 @@ dependencies = [
 
 [[package]]
 name = "hopr-ct-full-network"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "cfg-if",
  "futures",
  "futures-concurrency",
+ "futures-time",
  "hopr-api",
- "hopr-async-runtime",
  "hopr-network-graph",
+ "hopr-statistics",
  "humantime-serde",
  "lazy_static",
- "moka",
  "serde",
  "smart-default",
  "tokio",
@@ -4815,7 +4815,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-network-graph"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "assertables",
@@ -5018,9 +5018,10 @@ dependencies = [
 
 [[package]]
 name = "hopr-statistics"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "assertables",
+ "rand 0.10.0",
  "serde",
 ]
 
@@ -5171,7 +5172,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-path"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5184,6 +5185,7 @@ dependencies = [
  "hopr-metrics",
  "hopr-network-graph",
  "hopr-protocol-hopr",
+ "hopr-statistics",
  "hopr-types",
  "lazy_static",
  "moka",

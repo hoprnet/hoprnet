@@ -2,6 +2,18 @@ use hopr_types::crypto::types::OffchainPublicKey;
 
 use crate::errors::Result;
 
+/// A candidate path paired with its accumulated traversal cost.
+///
+/// The cost is a multiplicative product of per-edge quality scores in
+/// `(0.0, 1.0]` — higher means better quality.
+#[derive(Debug, Clone)]
+pub struct PathWithCost {
+    /// The path nodes (excluding source): `[intermediates..., dest]`.
+    pub path: Vec<OffchainPublicKey>,
+    /// Accumulated traversal cost.
+    pub cost: f64,
+}
+
 /// Selects multi-hop paths through the network.
 ///
 /// Implementors are responsible for determining how paths are found.
@@ -19,19 +31,14 @@ use crate::errors::Result;
 pub trait PathSelector {
     /// Return **all** candidate paths from `src` to `dest` using `hops` relays.
     ///
-    /// Each inner `Vec<OffchainPublicKey>` has length `hops + 1` and contains
-    /// the intermediate relay nodes **and** `dest` (in that order); `src` is
-    /// excluded from every path.
+    /// Each returned [`PathWithCost`] contains a path `Vec<OffchainPublicKey>`
+    /// of length `hops + 1` (`[intermediates..., dest]`; `src` excluded) paired
+    /// with its accumulated traversal cost.
     ///
     /// Every returned path must be cycle-free (see trait-level docs).
     ///
     /// Returns `Err` when no paths can be found.
-    fn select_path(
-        &self,
-        src: OffchainPublicKey,
-        dest: OffchainPublicKey,
-        hops: usize,
-    ) -> Result<Vec<Vec<OffchainPublicKey>>>;
+    fn select_path(&self, src: OffchainPublicKey, dest: OffchainPublicKey, hops: usize) -> Result<Vec<PathWithCost>>;
 }
 
 /// A selector that can run a background path-cache refresh loop.
