@@ -182,4 +182,51 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn message_from_empty_bytes_fails() {
+        assert!(Message::try_from([].as_slice()).is_err());
+    }
+
+    #[test]
+    fn message_from_wrong_version_fails() {
+        // Version 0xFF instead of Message::VERSION (1)
+        let data = [0xFF, 0x00];
+        assert!(Message::try_from(data.as_slice()).is_err());
+    }
+
+    #[test]
+    fn message_from_invalid_discriminant_fails() {
+        // Valid version but invalid discriminant
+        let data = [Message::VERSION, 0xFF];
+        assert!(Message::try_from(data.as_slice()).is_err());
+    }
+
+    #[test]
+    fn message_from_wrong_probe_size_fails() {
+        // Valid version + probe discriminant but truncated data
+        let data = [Message::VERSION, MessageDiscriminants::Probe as u8, 0x00];
+        assert!(Message::try_from(data.as_slice()).is_err());
+    }
+
+    #[test]
+    fn message_application_data_roundtrip() -> anyhow::Result<()> {
+        let probe = Message::Probe(NeighborProbe::random_nonce());
+        let app_data: ApplicationData = probe.try_into()?;
+        let restored: Message = app_data.try_into()?;
+
+        if let Message::Probe(p) = restored {
+            assert!(matches!(p, NeighborProbe::Ping(_)));
+        } else {
+            panic!("expected Probe variant");
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn message_application_data_wrong_tag_fails() {
+        let app_data = ApplicationData::new(Tag::MAX, b"not a probe").unwrap();
+        assert!(Message::try_from(app_data).is_err());
+    }
 }

@@ -58,3 +58,35 @@ const fn default_probing_interval() -> std::time::Duration {
 const fn default_recheck_threshold() -> std::time::Duration {
     DEFAULT_PROBE_RECHECK_THRESHOLD
 }
+
+#[cfg(test)]
+mod tests {
+    use validator::Validate;
+
+    use super::*;
+
+    #[test]
+    fn probe_config_default_is_valid() {
+        let cfg = ProbeConfig::default();
+        assert!(cfg.validate().is_ok());
+        insta::assert_yaml_snapshot!(format!("{cfg:?}"));
+    }
+
+    #[test]
+    fn probe_config_zero_parallel_probes_is_rejected() {
+        let cfg = ProbeConfig {
+            max_parallel_probes: 0,
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn probe_config_one_parallel_probe_is_valid() {
+        let cfg = ProbeConfig {
+            max_parallel_probes: 1,
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_ok());
+    }
+}

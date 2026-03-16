@@ -37,3 +37,101 @@ impl<T> From<(std::time::Instant, T)> for DelayedData<T> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::{Duration, Instant};
+
+    use super::*;
+
+    #[test]
+    fn equal_timestamps_are_equal() {
+        let now = Instant::now();
+        let a = DelayedData {
+            release_at: now,
+            item: "a",
+        };
+        let b = DelayedData {
+            release_at: now,
+            item: "b",
+        };
+        assert!(a == b);
+        assert_eq!(a.cmp(&b), Ordering::Equal);
+    }
+
+    #[test]
+    fn earlier_timestamp_is_less() {
+        let now = Instant::now();
+        let earlier = DelayedData {
+            release_at: now,
+            item: 1,
+        };
+        let later = DelayedData {
+            release_at: now + Duration::from_secs(1),
+            item: 2,
+        };
+        assert!(earlier < later);
+        assert_eq!(earlier.cmp(&later), Ordering::Less);
+    }
+
+    #[test]
+    fn later_timestamp_is_greater() {
+        let now = Instant::now();
+        let earlier = DelayedData {
+            release_at: now,
+            item: 1,
+        };
+        let later = DelayedData {
+            release_at: now + Duration::from_secs(1),
+            item: 2,
+        };
+        assert!(later > earlier);
+        assert_eq!(later.cmp(&earlier), Ordering::Greater);
+    }
+
+    #[test]
+    fn ordering_ignores_item_value() {
+        let now = Instant::now();
+        let a = DelayedData {
+            release_at: now,
+            item: 999,
+        };
+        let b = DelayedData {
+            release_at: now,
+            item: 1,
+        };
+        // Items differ but timestamps are equal → they are equal
+        assert!(a == b);
+    }
+
+    #[test]
+    fn from_tuple_sets_fields() {
+        let now = Instant::now();
+        let data = DelayedData::from((now, "hello"));
+        assert_eq!(data.release_at, now);
+        assert_eq!(data.item, "hello");
+    }
+
+    #[test]
+    fn sorting_respects_release_time() {
+        let now = Instant::now();
+        let mut items = [
+            DelayedData {
+                release_at: now + Duration::from_secs(3),
+                item: "c",
+            },
+            DelayedData {
+                release_at: now + Duration::from_secs(1),
+                item: "a",
+            },
+            DelayedData {
+                release_at: now + Duration::from_secs(2),
+                item: "b",
+            },
+        ];
+        items.sort();
+        assert_eq!(items[0].item, "a");
+        assert_eq!(items[1].item, "b");
+        assert_eq!(items[2].item, "c");
+    }
+}
