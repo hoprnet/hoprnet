@@ -244,8 +244,6 @@ mod tests {
 
     #[test]
     fn create_allocators_from_config_should_produce_three_allocators() -> anyhow::Result<()> {
-        use anyhow::Context;
-
         let cfg = TagAllocatorConfig::default();
         let allocators = create_allocators_from_config(&cfg).map_err(|e| anyhow::anyhow!("{e}"))?;
 

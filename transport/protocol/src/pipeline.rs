@@ -1214,4 +1214,60 @@ mod tests {
         let result: usize = Some(42usize).filter(|&n| n > 0).unwrap_or(avail);
         assert_eq!(result, 42);
     }
+
+    #[tokio::test]
+    async fn outgoing_pipeline_should_encode_and_forward_packet_to_wire() -> anyhow::Result<()> {
+        let packet_key = PEERS[0].clone();
+        let next_hop = *PEERS[1].public();
+
+        let (wire_out_tx, mut wire_out_rx) = mpsc::unbounded::<(PeerId, Box<[u8]>)>();
+        let (_wire_in_tx, wire_in_rx) = mpsc::unbounded::<(PeerId, Box<[u8]>)>();
+        let (ticket_evt_tx, _ticket_evt_rx) = mpsc::unbounded::<TicketEvent>();
+        let (mut app_in_tx, app_in_rx) = mpsc::unbounded::<(ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)>();
+        let (app_out_tx, _app_out_rx) = mpsc::unbounded::<(HoprPseudonym, ApplicationDataIn)>();
+
+        let encoder = TestEncoder { next_hop };
+        let decoder = TestDecoder::returning_final(next_hop);
+
+        let processes = run_packet_pipeline(
+            packet_key,
+            (wire_out_tx, wire_in_rx),
+            (encoder, decoder),
+            NoOpTicketProcessor,
+            ticket_evt_tx,
+            PacketPipelineConfig {
+                output_concurrency: Some(1),
+                input_concurrency: Some(1),
+                ..Default::default()
+            },
+            (app_out_tx, app_in_rx),
+            Default::default(),
+        );
+
+        // Send an application packet through the outgoing pipeline
+        let app_data = ApplicationData::new(42u64, b"outgoing test payload").expect("valid app data");
+        let routing = ResolvedTransportRouting::Forward {
+            pseudonym: SimplePseudonym([0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE, 0x11, 0x22]),
+            forward_path: hopr_api::types::internal::prelude::ValidatedPath::direct(
+                next_hop,
+                hopr_api::types::primitive::prelude::Address::default(),
+            ),
+            return_paths: vec![],
+        };
+        app_in_tx
+            .send((routing, ApplicationDataOut::with_no_packet_info(app_data)))
+            .await
+            .context("sending app data to outgoing pipeline")?;
+        drop(app_in_tx);
+
+        // Verify the encoded packet arrives on the wire
+        let result = tokio::time::timeout(Duration::from_secs(2), wire_out_rx.next()).await;
+        let (peer_id, _data) = result
+            .context("should receive wire packet within timeout")?
+            .context("wire output should have data")?;
+        assert_eq!(peer_id, PeerId::from(next_hop));
+
+        processes.abort_all();
+        Ok(())
+    }
 }
