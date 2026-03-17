@@ -254,6 +254,27 @@
             else
               rust-builder-local.callPackage nixLib.mkRustPackage (hoprdBuildArgs // { runBench = true; });
 
+          # Compile benchmarks without running them, used for CI build verification.
+          hoprd-bench-build =
+            if buildPlatform.isLinux && buildPlatform.isx86_64 then
+              rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage (
+                hoprdBuildArgs // { buildBench = true; }
+              )
+            else if buildPlatform.isLinux && buildPlatform.isAarch64 then
+              rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage (
+                hoprdBuildArgs // { buildBench = true; }
+              )
+            else if buildPlatform.isDarwin && buildPlatform.isx86_64 then
+              rust-builder-x86_64-darwin.callPackage nixLib.mkRustPackage (
+                hoprdBuildArgs // { buildBench = true; }
+              )
+            else if buildPlatform.isDarwin && buildPlatform.isAarch64 then
+              rust-builder-aarch64-darwin.callPackage nixLib.mkRustPackage (
+                hoprdBuildArgs // { buildBench = true; }
+              )
+            else
+              rust-builder-local.callPackage nixLib.mkRustPackage (hoprdBuildArgs // { buildBench = true; });
+
           profileDeps = with pkgs; [
             gdb
             # FIXME: heaptrack would be useful, but it adds 700MB to the image size (unpacked)
@@ -702,7 +723,7 @@
             inherit hopr-test-unit hopr-test-nightly;
             inherit docs;
             inherit pre-commit-check;
-            inherit hoprd-bench;
+            inherit hoprd-bench hoprd-bench-build;
             inherit hoprd-man;
             # binary packages
             inherit
