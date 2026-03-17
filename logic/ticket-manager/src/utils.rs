@@ -27,12 +27,27 @@ impl OutgoingIndexEntry {
     }
 
     /// Increments the index and marks it as dirty if within bounds.
+    ///
+    /// The value returned is the value before the increment, saturating at [`TicketBuilder::MAX_TICKET_INDEX`].
     fn increment(&self) -> u64 {
         let v = self.index.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         if v <= TicketBuilder::MAX_TICKET_INDEX {
             self.is_dirty.store(true, std::sync::atomic::Ordering::Release);
         }
         v.min(TicketBuilder::MAX_TICKET_INDEX)
+    }
+
+    /// Sets the index to the maximum of `new_value` and the current index value.
+    ///
+    /// Marks the index as dirty if the value was increased.
+    ///
+    /// Returns the new value of the index, saturating at [`TicketBuilder::MAX_TICKET_INDEX`].
+    fn set(&self, new_value: u64) -> u64 {
+        let current = self.index.fetch_max(new_value, std::sync::atomic::Ordering::Relaxed);
+        if current < new_value {
+            self.is_dirty.store(true, std::sync::atomic::Ordering::Release);
+        }
+        new_value.max(current).min(TicketBuilder::MAX_TICKET_INDEX)
     }
 
     /// Checks if the index is marked as dirty.
@@ -46,6 +61,8 @@ impl OutgoingIndexEntry {
     }
 
     /// Gets the index.
+    ///
+    /// The returned value will always be less than [`TicketBuilder::MAX_TICKET_INDEX`].
     fn get(&self) -> u64 {
         self.index
             .load(std::sync::atomic::Ordering::Relaxed)
@@ -60,15 +77,25 @@ pub struct OutgoingIndexCache {
 }
 
 impl OutgoingIndexCache {
+    /// Returns the next outgoing index for the given channel and epoch.
     pub fn next(&self, channel_id: &ChannelId, epoch: u32) -> u64 {
         self.cache.entry((*channel_id, epoch)).or_default().increment()
     }
 
-    pub fn set(&self, channel_id: &ChannelId, epoch: u32, index: u64) {
+    /// Inserts the index for the given channel and `epoch`, or updates
+    /// the existing value if it is lower than the provided `index`.
+    ///
+    /// Returns the index value (potentially new if it was increased, or the same one if the existing value was greater than `index`).
+    pub fn set(&self, channel_id: &ChannelId, epoch: u32, index: u64) -> u64 {
         self.cache
-            .insert((*channel_id, epoch), OutgoingIndexEntry::new(index).into());
+            .entry((*channel_id, epoch))
+            .or_insert_with(|| std::sync::Arc::new(OutgoingIndexEntry::new(index)))
+            .set(index)
     }
 
+    /// Removes the index for the given channel and `epoch` if it exists.
+    ///
+    /// Returns `true` if the index was removed, `false` otherwise.
     pub fn remove(&self, channel_id: &ChannelId, epoch: u32) -> bool {
         if let Some(((id, ep), _)) = self.cache.remove(&(*channel_id, epoch)) {
             self.removed.insert((id, ep));
@@ -78,6 +105,9 @@ impl OutgoingIndexCache {
         }
     }
 
+    /// Synchronizes the current state with the provided store.
+    ///
+    /// Saves only those values that were changed since the last save operation.
     pub fn save<S: OutgoingIndexStore + Send + Sync + 'static>(
         &self,
         store: std::sync::Arc<parking_lot::RwLock<S>>,
@@ -88,12 +118,14 @@ impl OutgoingIndexCache {
 
         for entry in cache.iter().filter(|e| e.value().is_dirty()) {
             let (channel_id, epoch) = entry.key();
+            let index = entry.value().get();
             if let Err(error) = store
                 .write()
-                .save_outgoing_index(channel_id, *epoch, entry.value().get())
+                .save_outgoing_index(channel_id, *epoch, index)
             {
                 tracing::error!(%error, %channel_id, epoch, "failed to save outgoing index");
             } else {
+                tracing::trace!(%channel_id, epoch, index, "saved outgoing index");
                 entry.value().mark_clean();
             }
         }
@@ -102,6 +134,7 @@ impl OutgoingIndexCache {
             if let Err(error) = store.write().delete_outgoing_index(&channel_id, channel_epoch) {
                 tracing::error!(%error, %channel_id, %channel_epoch, "failed to remove outgoing index");
             } else {
+                tracing::trace!(%channel_id, %channel_epoch, "removed outgoing index");
                 self.removed.remove(&(channel_id, channel_epoch));
             }
         }
@@ -122,5 +155,262 @@ impl<Q> From<Q> for ChannelTicketQueue<Q> {
             queue: std::sync::Arc::new(parking_lot::RwLock::new(queue)),
             redeem_lock: std::sync::Arc::new(parking_lot::Mutex::new(())),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+    use std::thread;
+    use crate::MemoryStore;
+
+    const MAX: u64 = TicketBuilder::MAX_TICKET_INDEX;
+
+    fn store() -> Arc<parking_lot::RwLock<MemoryStore>> {
+        Arc::new(parking_lot::RwLock::new(MemoryStore::default()))
+    }
+
+
+    #[test]
+    fn default_initializes_to_zero_and_dirty() {
+        let e = OutgoingIndexEntry::default();
+        assert_eq!(e.get(), 0);
+        assert!(e.is_dirty());
+    }
+
+    #[test]
+    fn increment_saturates_return_value_at_max() {
+        let e = OutgoingIndexEntry::new(MAX);
+        assert_eq!(e.increment(), MAX);
+        assert_eq!(e.get(), MAX);
+    }
+
+    #[test]
+    fn set_does_not_decrease_value_when_new_value_is_lower() {
+        let e = OutgoingIndexEntry::new(20);
+        e.mark_clean();
+        assert_eq!(e.set(10), 20);
+        assert_eq!(e.get(), 20);
+        assert!(!e.is_dirty());
+    }
+
+    #[test]
+    fn concurrent_set_uses_max_semantics() {
+        let e = Arc::new(OutgoingIndexEntry::new(0));
+        e.mark_clean();
+
+        let vals = [1u64, 7, 3, 42, 9];
+        let mut handles = vec![];
+
+        for v in vals {
+            let e2 = Arc::clone(&e);
+            handles.push(thread::spawn(move || { e2.set(v); }));
+        }
+
+        for h in handles {
+            h.join().unwrap();
+        }
+
+        assert_eq!(e.get(), 42.min(MAX));
+        assert!(e.is_dirty());
+    }
+
+    #[test]
+    fn next_creates_entry_with_zero_and_increments_sequentially() {
+        let cache = OutgoingIndexCache::default();
+        let channel_id = Default::default();
+        let epoch = 1;
+
+        assert_eq!(cache.next(&channel_id, epoch), 0);
+        assert_eq!(cache.next(&channel_id, epoch), 1);
+        assert_eq!(cache.next(&channel_id, epoch), 2);
+    }
+
+    #[test]
+    fn next_is_scoped_by_channel_and_epoch() {
+        let cache = OutgoingIndexCache::default();
+        let channel_a = Default::default();
+        let channel_b = ChannelId::create(&[b"other"]);
+
+        assert_eq!(cache.next(&channel_a, 1), 0);
+        assert_eq!(cache.next(&channel_a, 2), 0);
+        assert_eq!(cache.next(&channel_b, 1), 0);
+        assert_eq!(cache.next(&channel_a, 1), 1);
+    }
+
+    #[test]
+    fn set_inserts_when_key_is_missing() {
+        let cache = OutgoingIndexCache::default();
+        let channel_id = Default::default();
+
+        assert_eq!(cache.set(&channel_id, 1, 17), 17);
+        assert_eq!(cache.next(&channel_id, 1), 17);
+        assert_eq!(cache.next(&channel_id, 1), 18);
+    }
+
+    #[test]
+    fn set_does_not_decrease_existing_value() {
+        let cache = OutgoingIndexCache::default();
+        let channel_id = Default::default();
+
+        assert_eq!(cache.set(&channel_id, 1, 10), 10);
+        assert_eq!(cache.set(&channel_id, 1, 7), 10);
+        assert_eq!(cache.next(&channel_id, 1), 10);
+        assert_eq!(cache.next(&channel_id, 1), 11);
+    }
+
+    #[test]
+    fn next_saturates_at_max() {
+        let cache = OutgoingIndexCache::default();
+        let channel_id = Default::default();
+
+        assert_eq!(cache.set(&channel_id, 1, MAX), MAX);
+        assert_eq!(cache.next(&channel_id, 1), MAX);
+        assert_eq!(cache.next(&channel_id, 1), MAX);
+    }
+
+    #[test]
+    fn remove_existing_entry_returns_true_and_persists_deletion_on_save() -> anyhow::Result<()> {
+        let cache = OutgoingIndexCache::default();
+        let channel_id = Default::default();
+        let epoch = 1;
+        let store = store();
+
+        assert_eq!(cache.set(&channel_id, epoch, 5), 5);
+        cache.save(store.clone())?;
+
+        assert_eq!(store.read().load_outgoing_index(&channel_id, epoch)?, Some(5));
+
+        assert!(cache.remove(&channel_id, epoch));
+        assert!(cache.save(store.clone()).is_ok());
+
+        assert_eq!(store.read().load_outgoing_index(&channel_id, epoch)?, None);
+        assert!(!cache.remove(&channel_id, epoch));
+
+        Ok(())
+    }
+
+    #[test]
+    fn remove_missing_entry_returns_false() {
+        let cache = OutgoingIndexCache::default();
+        let channel_id = Default::default();
+
+        assert!(!cache.remove(&channel_id, 1));
+    }
+
+    #[test]
+    fn save_persists_only_dirty_entries() -> anyhow::Result<()> {
+        let cache = OutgoingIndexCache::default();
+        let channel_a = Default::default();
+        let channel_b = ChannelId::create(&[b"other"]);
+        let store = store();
+
+        cache.set(&channel_a, 1, 10);
+        cache.set(&channel_b, 2, 20);
+
+        cache.save(store.clone())?;
+        assert_eq!(store.read().load_outgoing_index(&channel_a, 1)?, Some(10));
+        assert_eq!(store.read().load_outgoing_index(&channel_b, 2)?, Some(20));
+
+        cache.save(store.clone())?;
+        assert_eq!(store.read().load_outgoing_index(&channel_a, 1)?, Some(10));
+        assert_eq!(store.read().load_outgoing_index(&channel_b, 2)?, Some(20));
+
+        cache.next(&channel_a, 1);
+        cache.save(store.clone())?;
+        assert_eq!(store.read().load_outgoing_index(&channel_a, 1)?, Some(11));
+        assert_eq!(store.read().load_outgoing_index(&channel_b, 2)?, Some(20));
+
+        Ok(())
+    }
+
+    #[test]
+    fn save_persists_removed_entries_only_once() -> anyhow::Result<()> {
+        let cache = OutgoingIndexCache::default();
+        let channel_id = Default::default();
+        let store = store();
+
+        cache.set(&channel_id, 1, 3);
+        cache.save(store.clone())?;
+        assert_eq!(store.read().load_outgoing_index(&channel_id, 1)?, Some(3));
+
+        assert!(cache.remove(&channel_id, 1));
+        cache.save(store.clone())?;
+        assert_eq!(store.read().load_outgoing_index(&channel_id, 1)?, None);
+
+        cache.save(store.clone())?;
+        assert_eq!(store.read().load_outgoing_index(&channel_id, 1)?, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn save_is_idempotent_after_success() -> anyhow::Result<()> {
+        let cache = OutgoingIndexCache::default();
+        let channel_id = Default::default();
+        let store = store();
+
+        cache.set(&channel_id, 1, 9);
+        cache.save(store.clone())?;
+        assert_eq!(store.read().load_outgoing_index(&channel_id, 1)?, Some(9));
+
+        cache.save(store.clone())?;
+        assert_eq!(store.read().load_outgoing_index(&channel_id, 1)?, Some(9));
+
+        cache.next(&channel_id, 1);
+        cache.save(store.clone())?;
+        assert_eq!(store.read().load_outgoing_index(&channel_id, 1)?, Some(10));
+
+        Ok(())
+    }
+
+    #[test]
+    fn concurrent_next_on_same_key_is_monotonic() -> anyhow::Result<()> {
+        use std::thread;
+
+        let cache = Arc::new(OutgoingIndexCache::default());
+        let channel_id = Default::default();
+        let epoch = 1;
+
+        let mut handles = vec![];
+        for _ in 0..8 {
+            let cache = Arc::clone(&cache);
+            let channel_id = channel_id;
+            handles.push(thread::spawn(move || cache.next(&channel_id, epoch)));
+        }
+
+        let mut values = handles
+            .into_iter()
+            .map(|h| h.join())
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| anyhow::anyhow!("join error"))?;
+        values.sort_unstable();
+
+        assert_eq!(values, (0..8).collect::<Vec<_>>());
+        assert_eq!(cache.next(&channel_id, epoch), 8);
+
+        Ok(())
+    }
+
+    #[test]
+    fn save_handles_multiple_keys_and_removals_together() -> anyhow::Result<()> {
+        let cache = OutgoingIndexCache::default();
+        let channel_a = Default::default();
+        let channel_b = ChannelId::create(&[b"other"]);
+        let store = store();
+
+        cache.set(&channel_a, 1, 4);
+        cache.set(&channel_b, 2, 7);
+        cache.save(store.clone())?;
+
+        assert!(cache.remove(&channel_a, 1));
+        cache.next(&channel_b, 2);
+        cache.save(store.clone())?;
+
+        assert_eq!(store.read().load_outgoing_index(&channel_a, 1)?, None);
+        assert_eq!(store.read().load_outgoing_index(&channel_b, 2)?, Some(8));
+        
+        Ok(())
     }
 }

@@ -1,8 +1,6 @@
 use hopr_api::{
-    chain::{ChannelId, RedeemableTicket},
-    types::internal::prelude::Ticket,
+    chain::{ChannelId, RedeemableTicket, VerifiedTicket},
 };
-
 use crate::{
     OutgoingIndexStore,
     traits::{TicketQueue, TicketQueueStore},
@@ -27,7 +25,7 @@ impl TicketQueueStore for MemoryStore {
         Ok(self.tickets.entry(*channel_id).or_default().clone())
     }
 
-    fn delete_queue(&mut self, channel_id: &ChannelId) -> Result<Vec<Ticket>, <Self::Queue as TicketQueue>::Error> {
+    fn delete_queue(&mut self, channel_id: &ChannelId) -> Result<Vec<VerifiedTicket>, <Self::Queue as TicketQueue>::Error> {
         if let Some(mut queue) = self.tickets.remove(channel_id) {
             Ok(queue.drain()?)
         } else {

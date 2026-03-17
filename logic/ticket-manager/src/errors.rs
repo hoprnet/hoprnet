@@ -1,7 +1,4 @@
-use hopr_api::{
-    chain::{ChannelId, HoprBalance},
-    types::internal::tickets::Ticket,
-};
+use hopr_api::chain::{ChannelId, HoprBalance};
 
 /// Errors that can occur in the `HoprTicketManager`.
 #[derive(Debug, thiserror::Error)]
@@ -10,8 +7,6 @@ pub enum TicketManagerError {
     ChannelNotFound,
     #[error("already redeeming in this channel")]
     AlreadyRedeeming,
-    #[error("ticket value too low for redeeming: {0}")]
-    TicketValueLow(Box<Ticket>),
     #[error("balance of channel {0} is too low: {1}")]
     OutOfFunds(ChannelId, HoprBalance),
     #[error("ticket redemption error: {0}")]

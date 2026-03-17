@@ -1,7 +1,5 @@
-use hopr_api::{
-    chain::{ChannelId, HoprBalance, RedeemableTicket},
-    types::internal::prelude::Ticket,
-};
+use hopr_api::chain::{ChannelId, HoprBalance, RedeemableTicket,VerifiedTicket};
+
 
 /// Allows loading and saving outgoing ticket indices.
 pub trait OutgoingIndexStore {
@@ -15,6 +13,8 @@ pub trait OutgoingIndexStore {
     /// Deletes the outgoing ticket index for the given channel and epoch.
     fn delete_outgoing_index(&mut self, channel_id: &ChannelId, epoch: u32) -> Result<(), Self::Error>;
     /// Iterate over all channel IDs and epochs of outgoing ticket indices in the storage.
+    ///
+    /// The iterator may yield the values in arbitrary order.
     fn iter_outgoing_indices(&self) -> Result<impl Iterator<Item = (ChannelId, u32)>, Self::Error>;
 }
 
@@ -31,7 +31,7 @@ pub trait TicketQueueStore {
     ///
     /// Returns any tickets left-over in this queue if it existed.
     /// Returned tickets are no longer redeemable.
-    fn delete_queue(&mut self, channel_id: &ChannelId) -> Result<Vec<Ticket>, <Self::Queue as TicketQueue>::Error>;
+    fn delete_queue(&mut self, channel_id: &ChannelId) -> Result<Vec<VerifiedTicket>, <Self::Queue as TicketQueue>::Error>;
     /// Iterate over all channel IDs of ticket queues in the storage.
     fn iter_queues(&self) -> Result<impl Iterator<Item = ChannelId>, <Self::Queue as TicketQueue>::Error>;
 }
@@ -77,10 +77,10 @@ pub trait TicketQueue {
     /// Drains all the remaining tickets from the queue, rendering them no longer redeemable.
     ///
     /// The drained tickets are still ordered according to their natural ordering.
-    fn drain(&mut self) -> Result<Vec<Ticket>, Self::Error> {
+    fn drain(&mut self) -> Result<Vec<VerifiedTicket>, Self::Error> {
         let mut tickets = Vec::new();
         while let Some(ticket) = self.pop()? {
-            tickets.push(*ticket.verified_ticket());
+            tickets.push(ticket.ticket);
         }
         Ok(tickets)
     }
@@ -171,12 +171,17 @@ pub(crate) mod tests {
 
         fill_queue(&mut queue, tickets.iter().copied())?;
 
+        assert!(!queue.is_empty()?);
+        assert_eq!(tickets.len(), queue.len()?);
+
+        tickets.sort();
+        assert_eq!(Some(tickets[0]), queue.peek()?);
+
         let mut collected_tickets = Vec::new();
         while let Some(ticket) = queue.pop()? {
             collected_tickets.push(ticket);
         }
 
-        tickets.sort();
         assert_eq!(collected_tickets, tickets);
 
         Ok(())
@@ -201,6 +206,11 @@ pub(crate) mod tests {
 
         while let Some(_) = queue.pop()? {}
         assert!(queue.is_empty()?);
+        assert_eq!(0, queue.len()?);
+        assert_eq!(0, queue.iter_unordered()?.count());
+        assert_eq!(0, queue.drain()?.len());
+        assert_eq!(None, queue.peek()?);
+
         Ok(())
     }
 
@@ -222,7 +232,7 @@ pub(crate) mod tests {
         pushed_tickets.sort();
         let pushed_tickets = pushed_tickets
             .into_iter()
-            .map(|t| *t.verified_ticket())
+            .map(|t| t.ticket)
             .collect::<Vec<_>>();
         assert_eq!(pushed_tickets, dropped_tickets);
 
@@ -245,7 +255,7 @@ pub(crate) mod tests {
         let drained_tickets = queue.drain()?;
         assert_eq!(
             all_tickets_value,
-            drained_tickets.iter().map(|ticket| ticket.amount).sum()
+            drained_tickets.iter().map(|ticket| ticket.verified_ticket().amount).sum()
         );
 
         let actual_total_value = queue.total_value(2, None)?;
@@ -333,7 +343,7 @@ pub(crate) mod tests {
         assert_eq!(0, queues.len());
 
         tickets.sort();
-        let pushed_tickets = tickets.into_iter().map(|t| *t.verified_ticket()).collect::<Vec<_>>();
+        let pushed_tickets = tickets.into_iter().map(|t| t.ticket).collect::<Vec<_>>();
         assert_eq!(pushed_tickets, deleted_tickets);
 
         Ok(())
@@ -430,13 +440,17 @@ pub(crate) mod tests {
     pub fn out_index_store_should_iterate_existing_indices_for_channel_epoch<S: OutgoingIndexStore>(
         mut store: S,
     ) -> anyhow::Result<()> {
+        let other = Hash::create(&[b"other"]);
+
         store.save_outgoing_index(&Default::default(), 1, 1)?;
         store.save_outgoing_index(&Default::default(), 2, 1)?;
-        let loaded = store.load_outgoing_index(&Default::default(), 1)?;
-        assert_eq!(Some(1), loaded);
+        store.save_outgoing_index(&other, 3, 1)?;
 
-        let loaded = store.load_outgoing_index(&Default::default(), 2)?;
-        assert_eq!(Some(1), loaded);
+        let mut values = store.iter_outgoing_indices()?.collect::<Vec<_>>();
+        values.sort_unstable_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+
+        assert_eq!(vec![(ChannelId::default(), 1), (ChannelId::default(), 2), (other, 3)], values);
+
         Ok(())
     }
 }

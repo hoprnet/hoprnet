@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use hopr_api::{
-    chain::{ChannelId, RedeemableTicket},
-    types::{internal::prelude::Ticket, primitive::prelude::BytesRepresentable},
+    chain::{ChannelId, RedeemableTicket, VerifiedTicket},
+    types::primitive::prelude::BytesRepresentable,
 };
 use redb::{ReadableDatabase, ReadableTable, ReadableTableMetadata, TableDefinition, TableHandle};
 
@@ -98,7 +98,7 @@ impl TicketQueueStore for RedbStore {
         })
     }
 
-    fn delete_queue(&mut self, channel_id: &ChannelId) -> Result<Vec<Ticket>, <Self::Queue as TicketQueue>::Error> {
+    fn delete_queue(&mut self, channel_id: &ChannelId) -> Result<Vec<VerifiedTicket>, <Self::Queue as TicketQueue>::Error> {
         let tx = self.db.begin_write()?;
         let mut ret = Vec::new();
         {
@@ -106,7 +106,7 @@ impl TicketQueueStore for RedbStore {
             let mut table = tx.open_table(TicketTableDef::new(&format!("{TABLE_QUEUE_NAME_PREFIX}{channel_id}")))?;
             while let Some((_, ticket)) = table.pop_first()? {
                 let ticket: RedeemableTicket = postcard::from_bytes(&ticket.value())?;
-                ret.push(*ticket.verified_ticket()); // Make it unredeemable
+                ret.push(ticket.ticket); // Make it unredeemable
             }
         }
         tx.delete_table(TicketTableDef::new(&format!("{TABLE_QUEUE_NAME_PREFIX}{channel_id}")))?;
@@ -212,7 +212,7 @@ impl TicketQueue for RedbTicketQueue {
             )))?;
             let ticket_bytes = table.first()?.map(|(_, v)| v.value());
             if let Some(ticket_bytes) = ticket_bytes {
-                Ok(postcard::from_bytes(&ticket_bytes)?)
+                Ok(Some(postcard::from_bytes(&ticket_bytes)?))
             } else {
                 Ok(None)
             }
