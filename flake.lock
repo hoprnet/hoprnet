@@ -205,16 +205,15 @@
         ]
       },
       "locked": {
-        "lastModified": 1773754962,
+        "lastModified": 1773754658,
         "narHash": "sha256-i4AC7eKw5VzAQlUFtl+JcHO1rD/g4RX5pErv435Mpac=",
         "owner": "hoprnet",
         "repo": "nix-lib",
-        "rev": "0e37a09653e93220bb9e645ef0649fcaf1a0d8b7",
+        "rev": "5efeca2094e25eabfd1ce124dc397e196d1d7db0",
         "type": "github"
       },
       "original": {
         "owner": "hoprnet",
-        "ref": "kauki-nix-lib-add-cargo-bench-support",
         "repo": "nix-lib",
         "type": "github"
       }
