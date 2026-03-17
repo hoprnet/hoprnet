@@ -132,14 +132,15 @@ mod tests {
     async fn test_should_close_only_non_overdue_pending_to_close_channels_with_elapsed_closure() -> anyhow::Result<()> {
         let max_closure_overdue = Duration::from_secs(600);
 
-        let channel_to_be_closed = ChannelEntry::new(
-            *ALICE,
-            *DAVE,
-            10.into(),
-            0,
-            ChannelStatus::PendingToClose(SystemTime::now().sub(Duration::from_secs(60))),
-            1,
-        );
+        let channel_to_be_closed = ChannelEntry::builder()
+            .between(*ALICE, *DAVE)
+            .amount(10)
+            .ticket_index(0)
+            .status(ChannelStatus::PendingToClose(
+                SystemTime::now().sub(Duration::from_secs(60)),
+            ))
+            .epoch(1)
+            .build()?;
 
         let blokli_sim = BlokliTestStateBuilder::default()
             .with_generated_accounts(
@@ -150,27 +151,35 @@ mod tests {
             )
             .with_channels([
                 // Should leave this channel opened
-                ChannelEntry::new(*ALICE, *BOB, 10.into(), 0, ChannelStatus::Open, 0),
+                ChannelEntry::builder()
+                    .between(*ALICE, *BOB)
+                    .amount(10)
+                    .ticket_index(0)
+                    .status(ChannelStatus::Open)
+                    .epoch(0)
+                    .build()?,
                 // Should leave this unfinalized, because the channel closure period has not yet elapsed
-                ChannelEntry::new(
-                    *ALICE,
-                    *CHARLIE,
-                    10.into(),
-                    0,
-                    ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(60))),
-                    1,
-                ),
+                ChannelEntry::builder()
+                    .between(*ALICE, *CHARLIE)
+                    .amount(10)
+                    .ticket_index(0)
+                    .status(ChannelStatus::PendingToClose(
+                        SystemTime::now().add(Duration::from_secs(60)),
+                    ))
+                    .epoch(1)
+                    .build()?,
                 // Should finalize closure of this channel
                 channel_to_be_closed,
                 // Should leave this unfinalized, because the channel closure is long overdue
-                ChannelEntry::new(
-                    *ALICE,
-                    *EUGENE,
-                    10.into(),
-                    0,
-                    ChannelStatus::PendingToClose(SystemTime::now().sub(max_closure_overdue * 2)),
-                    1,
-                ),
+                ChannelEntry::builder()
+                    .between(*ALICE, *EUGENE)
+                    .amount(10)
+                    .ticket_index(0)
+                    .status(ChannelStatus::PendingToClose(
+                        SystemTime::now().sub(max_closure_overdue * 2),
+                    ))
+                    .epoch(1)
+                    .build()?,
             ])
             .build_dynamic_client([1; Address::SIZE].into());
 

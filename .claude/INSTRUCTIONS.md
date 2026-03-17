@@ -37,6 +37,53 @@ cargo bench                             # Benchmarks (in benches/ dirs)
 just run-local-cluster                  # Local multi-node cluster
 ```
 
+### Code Coverage
+
+**Workspace-wide (via Nix, used in CI):**
+
+```bash
+nix build -L .#hopr-coverage            # LCOV report written to ./result
+```
+
+**Single crate (local, from the dev shell):**
+
+```bash
+nix develop --command bash -c '
+  OUTDIR=/tmp/hopr-coverage
+  CRATE=hopr-transport-mixer            # ← change to target crate
+  CRATE_US=${CRATE//-/_}
+
+  rm -rf "$OUTDIR" && mkdir -p "$OUTDIR"
+
+  LLVM_PROFILE_FILE="$OUTDIR/%p_%m.profraw" \
+  RUSTFLAGS="-C instrument-coverage" \
+    cargo test -p "$CRATE" --lib
+
+  llvm-profdata merge -sparse "$OUTDIR"/*.profraw -o "$OUTDIR/coverage.profdata"
+
+  BINARY=$(find target/debug/deps -name "${CRATE_US}-*" -type f \
+    ! -name "*.d" ! -name "*.rmeta" ! -name "*.o" \
+    | while read f; do file "$f" | grep -q "Mach-O\|ELF" && echo "$f"; done | head -1)
+
+  llvm-cov report "$BINARY" \
+    --instr-profile="$OUTDIR/coverage.profdata" \
+    --ignore-filename-regex="\.cargo|rustc"
+
+  llvm-cov export "$BINARY" \
+    --instr-profile="$OUTDIR/coverage.profdata" \
+    --ignore-filename-regex="\.cargo|rustc" \
+    --format=lcov > "$OUTDIR/coverage.lcov"
+
+  genhtml "$OUTDIR/coverage.lcov" \
+    --output-directory "$OUTDIR/html" \
+    --title "$CRATE coverage"
+
+  echo "Report: $OUTDIR/html/index.html"
+'
+```
+
+Open the HTML report with `open /tmp/hopr-coverage/html/index.html`.
+
 ### Setup
 
 1. Install Nix with flakes: `~/.config/nix/nix.conf` → `experimental-features = nix-command flakes`

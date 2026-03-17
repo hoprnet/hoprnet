@@ -153,23 +153,29 @@ mod tests {
             key_id: 2.into(),
         };
 
-        let channel_1 = ChannelEntry::new(
-            ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
-            ChainKeypair::from_secret(&PRIVATE_KEY_2)?.public().to_address(),
-            10.into(),
-            1,
-            ChannelStatus::Open,
-            1,
-        );
+        let channel_1 = ChannelEntry::builder()
+            .between(
+                &ChainKeypair::from_secret(&PRIVATE_KEY_1)?,
+                &ChainKeypair::from_secret(&PRIVATE_KEY_2)?,
+            )
+            .amount(10)
+            .ticket_index(1)
+            .status(ChannelStatus::Open)
+            .epoch(1)
+            .build()?;
 
-        let channel_2 = ChannelEntry::new(
-            ChainKeypair::from_secret(&PRIVATE_KEY_2)?.public().to_address(),
-            ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
-            15.into(),
-            2,
-            ChannelStatus::PendingToClose(std::time::SystemTime::UNIX_EPOCH + Duration::from_mins(10)),
-            1,
-        );
+        let channel_2 = ChannelEntry::builder()
+            .between(
+                &ChainKeypair::from_secret(&PRIVATE_KEY_2)?,
+                &ChainKeypair::from_secret(&PRIVATE_KEY_1)?,
+            )
+            .amount(15)
+            .ticket_index(2)
+            .status(ChannelStatus::PendingToClose(
+                std::time::SystemTime::UNIX_EPOCH + Duration::from_mins(10),
+            ))
+            .epoch(1)
+            .build()?;
 
         let blokli_client = BlokliTestStateBuilder::default()
             .with_accounts([

@@ -47,17 +47,18 @@ pub(crate) fn model_to_graph_entry(
 ) -> Result<(AccountEntry, AccountEntry, ChannelEntry), ConnectorError> {
     let src = model_to_account_entry(model.source)?;
     let dst = model_to_account_entry(model.destination)?;
-    let channel = ChannelEntry::new(
-        src.chain_addr,
-        dst.chain_addr,
-        model.channel.balance.0.parse()?,
-        model
-            .channel
-            .ticket_index
-            .0
-            .parse()
-            .map_err(|e| ConnectorError::TypeConversion(format!("invalid ticket index: {e}")))?,
-        match model.channel.status {
+    let channel = ChannelBuilder::default()
+        .between(src.chain_addr, dst.chain_addr)
+        .balance(model.channel.balance.0.parse()?)
+        .ticket_index(
+            model
+                .channel
+                .ticket_index
+                .0
+                .parse()
+                .map_err(|e| ConnectorError::TypeConversion(format!("invalid ticket index: {e}")))?,
+        )
+        .status(match model.channel.status {
             blokli_client::api::types::ChannelStatus::Open => ChannelStatus::Open,
             blokli_client::api::types::ChannelStatus::PendingToClose => ChannelStatus::PendingToClose(
                 model
@@ -72,9 +73,9 @@ pub(crate) fn model_to_graph_entry(
                     .into(),
             ),
             blokli_client::api::types::ChannelStatus::Closed => ChannelStatus::Closed,
-        },
-        model.channel.epoch as u32,
-    );
+        })
+        .epoch(model.channel.epoch as u32)
+        .build()?;
 
     Ok((src, dst, channel))
 }
