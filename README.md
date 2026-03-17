@@ -437,6 +437,10 @@ With the environment activated, execute the tests locally:
 just run-smoke-test integration
 ```
 
+## Code Coverage
+
+Coverage reports are generated using LLVM source-based instrumentation and uploaded to [Codecov](https://codecov.io/gh/hoprnet/hoprnet). See [docs/coverage.md](docs/coverage.md) for workspace-wide and single-crate usage.
+
 ## Profiling & Instrumentation
 
 Multiple layers of profiling and instrumentation can be used to debug the `hoprd`:
