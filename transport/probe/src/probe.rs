@@ -831,6 +831,70 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn probe_should_reply_with_pong_when_receiving_ping() -> anyhow::Result<()> {
+        use anyhow::Context;
+
+        let cfg = ProbeConfig {
+            timeout: std::time::Duration::from_millis(100),
+            interval: std::time::Duration::from_secs(10),
+            ..Default::default()
+        };
+
+        let store = PeerStore {
+            get_peers: Arc::new(RwLock::new(VecDeque::new())),
+            on_finished: Arc::new(RwLock::new(Vec::new())),
+        };
+
+        test_with_probing(cfg, store, move |iface: TestInterface| async move {
+            let mut from_network_to_probing_tx = iface.from_network_to_probing_tx;
+            let mut from_probing_to_network_rx = iface.from_probing_to_network_rx;
+
+            // Build a Ping message with the reserved Ping tag
+            let ping = NeighborProbe::random_nonce();
+            let ping_nonce = match ping {
+                NeighborProbe::Ping(n) => n,
+                _ => unreachable!(),
+            };
+            let ping_msg = Message::Probe(ping);
+            let app_data: ApplicationData = ping_msg.try_into().context("converting ping to ApplicationData")?;
+
+            // Send the ping as if another node sent it to us
+            from_network_to_probing_tx
+                .send((
+                    HoprPseudonym::random(),
+                    ApplicationDataIn {
+                        data: app_data,
+                        packet_info: Default::default(),
+                    },
+                ))
+                .await
+                .context("sending ping to probe")?;
+
+            // The probe should reply with a Pong on the network channel
+            let (routing, data_out) = tokio::time::timeout(Duration::from_secs(2), from_probing_to_network_rx.next())
+                .await
+                .context("timeout waiting for pong")?
+                .context("probe should send pong reply")?;
+
+            // Verify it's a Return routing (SURB-based reply)
+            anyhow::ensure!(
+                matches!(routing, DestinationRouting::Return(_)),
+                "pong should use Return routing, got: {routing:?}"
+            );
+
+            // Verify the payload is a Pong with the same nonce
+            let response_msg: Message = data_out.data.try_into().context("converting response to Message")?;
+            anyhow::ensure!(
+                matches!(response_msg, Message::Probe(NeighborProbe::Pong(n)) if n == ping_nonce),
+                "response should be Pong with matching nonce"
+            );
+
+            Ok(())
+        })
+        .await
+    }
+
+    #[tokio::test]
     // #[tracing_test::traced_test]
     async fn probe_should_pass_through_non_associated_tags() -> anyhow::Result<()> {
         let cfg = ProbeConfig {
