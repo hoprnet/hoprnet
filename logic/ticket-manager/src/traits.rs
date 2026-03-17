@@ -105,6 +105,8 @@ pub(crate) fn default_total_value<Q: TicketQueue + ?Sized>(
 // Contains general utilities and test helpers for ticket queue implementations.
 #[cfg(test)]
 pub(crate) mod tests {
+    use std::ops::RangeBounds;
+
     use hopr_api::{
         chain::{ChannelId, HoprBalance, RedeemableTicket, WinningProbability},
         types::{crypto::prelude::*, crypto_random::Randomizable, internal::prelude::TicketBuilder},
@@ -115,19 +117,21 @@ pub(crate) mod tests {
 
     const TICKET_VALUE: u64 = 10;
 
-    pub fn generate_tickets() -> anyhow::Result<Vec<RedeemableTicket>> {
-        let src = ChainKeypair::random();
-        let dst = ChainKeypair::random();
+    pub fn generate_owned_tickets(
+        issuer: &ChainKeypair,
+        recipient: &ChainKeypair,
+        count: usize,
+        epochs: impl RangeBounds<u32> + Iterator<Item = u32>,
+    ) -> anyhow::Result<Vec<RedeemableTicket>> {
         let mut tickets = Vec::new();
-
-        for epoch in 1..=2 {
-            for i in 0..5_u64 {
+        for epoch in epochs {
+            for i in 0..count {
                 let hk1 = HalfKey::random();
                 let hk2 = HalfKey::random();
 
                 let ticket = TicketBuilder::default()
-                    .counterparty(&dst)
-                    .index(i)
+                    .counterparty(recipient)
+                    .index(i as u64)
                     .channel_epoch(epoch)
                     .win_prob(WinningProbability::ALWAYS)
                     .amount(TICKET_VALUE)
@@ -135,15 +139,20 @@ pub(crate) mod tests {
                         &hk1.to_challenge()?,
                         &hk2.to_challenge()?,
                     )?)
-                    .build_signed(&src, &Default::default())?
+                    .build_signed(issuer, &Default::default())?
                     .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?)
-                    .into_redeemable(&dst, &Default::default())?;
+                    .into_redeemable(recipient, &Default::default())?;
 
                 tickets.push(ticket);
             }
         }
 
+        tickets.sort();
         Ok(tickets)
+    }
+
+    pub fn generate_tickets() -> anyhow::Result<Vec<RedeemableTicket>> {
+        generate_owned_tickets(&ChainKeypair::random(), &ChainKeypair::random(), 5, 1..=2)
     }
 
     pub fn fill_queue<Q: TicketQueue, I: Iterator<Item = RedeemableTicket>>(

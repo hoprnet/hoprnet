@@ -35,6 +35,12 @@ criterion = { workspace = true }
 rand = { workspace = true }
 tempfile = { workspace = true }
 test-log = { workspace = true }
+tokio = { workspace = true }
+
+hopr-chain-connector = { workspace = true, features = [
+  "testing",
+  "runtime-tokio",
+] }
 
 [[bench]]
 name = "ticket_manager"

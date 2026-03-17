@@ -4946,6 +4946,7 @@ dependencies = [
  "futures",
  "hashbrown 0.16.1",
  "hopr-api",
+ "hopr-chain-connector",
  "hopr-platform",
  "parking_lot",
  "postcard",
@@ -4955,6 +4956,7 @@ dependencies = [
  "tempfile",
  "test-log",
  "thiserror 2.0.18",
+ "tokio",
  "tracing",
 ]
 
