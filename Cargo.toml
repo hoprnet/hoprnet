@@ -85,7 +85,7 @@ criterion = { version = "0.8.2", default-features = false, features = [
   "async_tokio",
 ] }
 curve25519-dalek = { version = "4.1.3", features = ["rand_core"] }
-dashmap = "6.1.0"
+dashmap = { version = "6.1.0", features = ["inline"] }
 flagset = "0.4.7"
 flume = { version = "0.12.0", default-features = false, features = ["async"] }
 futures = { version = "0.3.32", default-features = false, features = [
@@ -243,7 +243,7 @@ mimalloc = { version = "0.1.48", default-features = false, features = [
   "secure",
 ] }
 
-hopr-api = { git = "https://github.com/hoprnet/hopr-api", rev = "a2d8c7b5499db2e97c0cc3fe6d1d8faaea192981" }
+hopr-api = { git = "https://github.com/hoprnet/hopr-api", rev = "7dd18a62469666ddc9e5b1bee85e9a23d94119fb" }
 hopr-types = { git = "https://github.com/hoprnet/hopr-types", branch = "main" }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-crypto-keypair = { path = "crypto/keypair", default-features = false }

@@ -137,6 +137,7 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                             received_ack_tickets_tx,
                             Default::default(),
                             (api_recv_tx, api_send_rx),
+                            Default::default(),
                         );
 
                         let path = resolve_mock_path(

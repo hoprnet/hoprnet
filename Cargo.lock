@@ -4416,8 +4416,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "1.1.1"
-source = "git+https://github.com/hoprnet/hopr-api?rev=a2d8c7b5499db2e97c0cc3fe6d1d8faaea192981#a2d8c7b5499db2e97c0cc3fe6d1d8faaea192981"
+version = "1.2.0"
+source = "git+https://github.com/hoprnet/hopr-api?rev=7dd18a62469666ddc9e5b1bee85e9a23d94119fb#7dd18a62469666ddc9e5b1bee85e9a23d94119fb"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -5065,6 +5065,7 @@ dependencies = [
  "async-trait",
  "cfg-if",
  "futures",
+ "futures-time",
  "hex-literal",
  "hopr-api",
  "hopr-async-runtime",
@@ -5083,7 +5084,6 @@ dependencies = [
  "hopr-transport-session",
  "hopr-transport-tag-allocator",
  "humantime-serde",
- "insta",
  "lazy_static",
  "moka",
  "pcap-file",
@@ -5236,6 +5236,7 @@ dependencies = [
  "async_channel_io",
  "bytesize",
  "criterion",
+ "dashmap",
  "futures",
  "futures-concurrency",
  "futures-time",

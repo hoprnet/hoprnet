@@ -2,6 +2,9 @@ use hopr_api::graph::{CostFn, NetworkGraphTraverse, NetworkGraphView, costs::Edg
 
 /// Default penalty factor applied to edge cost functions.
 const DEFAULT_EDGE_PENALTY: f64 = 0.5;
+
+/// Default minimum acceptable message acknowledgment rate for immediate peers.
+const DEFAULT_MIN_ACK_RATE: f64 = 0.5;
 use hopr_types::{crypto::types::OffchainPublicKey, internal::errors::PathError};
 
 use crate::{
@@ -71,7 +74,7 @@ where
         src,
         shorter_length.get(),
         Some(take),
-        EdgeCostFn::forward_without_self_loopback(DEFAULT_EDGE_PENALTY),
+        EdgeCostFn::forward_without_self_loopback(DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE),
     );
 
     raw.into_iter()
@@ -175,7 +178,7 @@ where
                 &dest,
                 length,
                 self.max_paths,
-                EdgeCostFn::forward(length, DEFAULT_EDGE_PENALTY),
+                EdgeCostFn::forward(length, DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE),
             );
 
             // Phase 2: if not enough paths, do an extended search with EdgeCostFn::forward_without_self_loopback
@@ -196,7 +199,7 @@ where
                 &dest,
                 length,
                 self.max_paths,
-                EdgeCostFn::returning(length, DEFAULT_EDGE_PENALTY),
+                EdgeCostFn::returning(length, DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE),
             )
         };
 

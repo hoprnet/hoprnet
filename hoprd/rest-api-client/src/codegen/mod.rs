@@ -1350,12 +1350,6 @@ and indexer state.*/
     ///      "averageLatency": 100,
     ///      "lastSeen": 1690000000,
     ///      "multiaddr": "/ip4/178.12.1.9/tcp/19092",
-    ///      "packetStats": {
-    ///        "bytesIn": 51200,
-    ///        "bytesOut": 102400,
-    ///        "packetsIn": 50,
-    ///        "packetsOut": 100
-    ///      },
     ///      "probeRate": 0.476,
     ///      "score": 0.7
     ///    }
@@ -1428,76 +1422,6 @@ and indexer state.*/
         #[serde(rename = "probeRate")]
         pub probe_rate: f64,
         pub score: f64,
-    }
-    ///Packet statistics for a peer.
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "description": "Packet statistics for a peer.",
-    ///  "examples": [
-    ///    {
-    ///      "bytesIn": 51200,
-    ///      "bytesOut": 102400,
-    ///      "packetsIn": 50,
-    ///      "packetsOut": 100
-    ///    }
-    ///  ],
-    ///  "type": "object",
-    ///  "required": [
-    ///    "bytesIn",
-    ///    "bytesOut",
-    ///    "packetsIn",
-    ///    "packetsOut"
-    ///  ],
-    ///  "properties": {
-    ///    "bytesIn": {
-    ///      "examples": [
-    ///        51200
-    ///      ],
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "bytesOut": {
-    ///      "examples": [
-    ///        102400
-    ///      ],
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "packetsIn": {
-    ///      "examples": [
-    ///        50
-    ///      ],
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "packetsOut": {
-    ///      "examples": [
-    ///        100
-    ///      ],
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    }
-    ///  }
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct PeerPacketStatsResponse {
-        #[serde(rename = "bytesIn")]
-        pub bytes_in: i64,
-        #[serde(rename = "bytesOut")]
-        pub bytes_out: i64,
-        #[serde(rename = "packetsIn")]
-        pub packets_in: i64,
-        #[serde(rename = "packetsOut")]
-        pub packets_out: i64,
     }
     ///Contains the latency and the reported version of a peer that has been pinged.
     ///
@@ -3762,51 +3686,6 @@ Arguments:
             .build()?;
         let info = OperationInfo {
             operation_id: "ping_peer",
-        };
-        self.pre(&mut request, &info).await?;
-        let result = self.exec(request, &info).await;
-        self.post(&result, &info).await?;
-        let response = result?;
-        match response.status().as_u16() {
-            200u16 => ResponseValue::from_response(response).await,
-            _ => Err(Error::UnexpectedResponse(response)),
-        }
-    }
-    /**Get packet statistics for a specific connected peer
-
-Get packet statistics for a specific connected peer
-
-Sends a `GET` request to `/api/v4/peers/{destination}/stats`
-
-Arguments:
-- `destination`: Address of the requested peer
-*/
-    pub async fn peer_stats<'a>(
-        &'a self,
-        destination: &'a str,
-    ) -> Result<ResponseValue<types::PeerPacketStatsResponse>, Error<()>> {
-        let url = format!(
-            "{}/api/v4/peers/{}/stats", self.baseurl, encode_path(& destination
-            .to_string()),
-        );
-        let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
-        header_map
-            .append(
-                ::reqwest::header::HeaderName::from_static("api-version"),
-                ::reqwest::header::HeaderValue::from_static(Self::api_version()),
-            );
-        #[allow(unused_mut)]
-        let mut request = self
-            .client
-            .get(url)
-            .header(
-                ::reqwest::header::ACCEPT,
-                ::reqwest::header::HeaderValue::from_static("application/json"),
-            )
-            .headers(header_map)
-            .build()?;
-        let info = OperationInfo {
-            operation_id: "peer_stats",
         };
         self.pre(&mut request, &info).await?;
         let result = self.exec(request, &info).await;

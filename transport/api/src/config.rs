@@ -16,6 +16,12 @@ use validator::{Validate, ValidationError, ValidationErrors};
 
 use crate::errors::HoprTransportError;
 
+const DEFAULT_COUNTER_FLUSH_INTERVAL: Duration = Duration::from_secs(15);
+
+fn default_counter_flush_interval() -> Duration {
+    DEFAULT_COUNTER_FLUSH_INTERVAL
+}
+
 /// Complete configuration of the HOPR protocol stack.
 #[derive(Debug, smart_default::SmartDefault, Validate, Clone, Copy, PartialEq)]
 #[cfg_attr(
@@ -43,6 +49,16 @@ pub struct HoprProtocolConfig {
     /// Path planner configuration
     #[cfg_attr(feature = "serde", serde(skip))]
     pub path_planner: hopr_transport_path::PathPlannerConfig,
+    /// Interval at which per-peer protocol conformance counters are flushed
+    /// into the network graph.
+    ///
+    /// Default is 15 seconds.
+    #[default(default_counter_flush_interval())]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "default_counter_flush_interval", with = "humantime_serde")
+    )]
+    pub counter_flush_interval: Duration,
 }
 
 /// Configuration of the HOPR packet pipeline.

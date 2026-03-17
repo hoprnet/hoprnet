@@ -11,6 +11,8 @@ use hopr_api::{
 
 /// Default penalty factor applied to edge cost functions.
 const DEFAULT_EDGE_PENALTY: f64 = 0.5;
+/// Default minimum acceptable message acknowledgment rate.
+const DEFAULT_MIN_ACK_RATE: f64 = 0.5;
 use petgraph::graph::NodeIndex;
 
 use crate::{ChannelGraph, algorithm::all_simple_paths_multi, graph::InnerGraph};
@@ -161,7 +163,7 @@ impl hopr_api::graph::NetworkGraphTraverse for ChannelGraph {
                     })
                     .collect::<HashSet<_>>();
 
-                let cost_fn = EdgeCostFn::forward_without_self_loopback(DEFAULT_EDGE_PENALTY);
+                let cost_fn = EdgeCostFn::forward_without_self_loopback(DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE);
 
                 return find_paths(
                     &inner,
@@ -212,6 +214,8 @@ mod tests {
     /// Deliberately different from the production default (0.5) so tests
     /// verify that the configured penalty is actually propagated.
     const TEST_EDGE_PENALTY: f64 = 0.73;
+    /// Disabled in tests — no protocol conformance data is recorded.
+    const TEST_MIN_ACK_RATE: f64 = 0.0;
 
     /// Fixed test secret keys (reused from the broader codebase).
     const SECRET_0: [u8; 32] = hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d");
@@ -254,6 +258,7 @@ mod tests {
             EdgeCostFn::forward(
                 std::num::NonZeroUsize::new(1).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
+                TEST_MIN_ACK_RATE,
             ),
         );
 
@@ -277,7 +282,13 @@ mod tests {
         mark_edge_connected(&graph, &hop, &dest);
 
         let length = std::num::NonZeroUsize::new(2).context("should be non-zero")?;
-        let routes = graph.simple_paths(&me, &dest, 2, None, EdgeCostFn::forward(length, TEST_EDGE_PENALTY));
+        let routes = graph.simple_paths(
+            &me,
+            &dest,
+            2,
+            None,
+            EdgeCostFn::forward(length, TEST_EDGE_PENALTY, TEST_MIN_ACK_RATE),
+        );
 
         assert!(!routes.is_empty(), "should find at least one 2-edge route");
 
@@ -302,8 +313,20 @@ mod tests {
 
         let length = std::num::NonZeroUsize::new(2).context("should be non-zero")?;
 
-        let routes_test = graph.simple_paths(&me, &dest, 2, None, EdgeCostFn::forward(length, TEST_EDGE_PENALTY));
-        let routes_other = graph.simple_paths(&me, &dest, 2, None, EdgeCostFn::forward(length, 0.99));
+        let routes_test = graph.simple_paths(
+            &me,
+            &dest,
+            2,
+            None,
+            EdgeCostFn::forward(length, TEST_EDGE_PENALTY, TEST_MIN_ACK_RATE),
+        );
+        let routes_other = graph.simple_paths(
+            &me,
+            &dest,
+            2,
+            None,
+            EdgeCostFn::forward(length, 0.99, TEST_MIN_ACK_RATE),
+        );
 
         assert_eq!(routes_test.len(), 1);
         assert_eq!(routes_other.len(), 1);
@@ -336,6 +359,7 @@ mod tests {
             EdgeCostFn::forward(
                 std::num::NonZeroUsize::new(1).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
+                TEST_MIN_ACK_RATE,
             ),
         );
 
@@ -358,6 +382,7 @@ mod tests {
             EdgeCostFn::forward(
                 std::num::NonZeroUsize::new(1).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
+                TEST_MIN_ACK_RATE,
             ),
         );
 
@@ -396,6 +421,7 @@ mod tests {
             EdgeCostFn::forward(
                 std::num::NonZeroUsize::new(2).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
+                TEST_MIN_ACK_RATE,
             ),
         );
         assert_eq!(routes.len(), 2, "diamond topology should yield two 2-edge routes");
@@ -428,6 +454,7 @@ mod tests {
             EdgeCostFn::forward(
                 std::num::NonZeroUsize::new(3).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
+                TEST_MIN_ACK_RATE,
             ),
         );
         assert_eq!(routes.len(), 1, "should find exactly one 3-edge route");
@@ -461,6 +488,7 @@ mod tests {
             EdgeCostFn::forward(
                 std::num::NonZeroUsize::new(3).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
+                TEST_MIN_ACK_RATE,
             ),
         );
         assert_eq!(routes.len(), 1, "cycle should not produce extra paths");
@@ -484,6 +512,7 @@ mod tests {
             EdgeCostFn::forward(
                 std::num::NonZeroUsize::new(2).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
+                TEST_MIN_ACK_RATE,
             ),
         );
         assert!(routes.is_empty(), "no 2-edge route should exist for a single edge");
@@ -505,6 +534,7 @@ mod tests {
             EdgeCostFn::forward(
                 std::num::NonZeroUsize::new(1).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
+                TEST_MIN_ACK_RATE,
             ),
         );
         assert!(routes.is_empty(), "zero-edge path should find no routes");
@@ -532,6 +562,7 @@ mod tests {
             EdgeCostFn::forward(
                 std::num::NonZeroUsize::new(2).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
+                TEST_MIN_ACK_RATE,
             ),
         );
         assert!(routes.is_empty(), "should not traverse edge in wrong direction");
@@ -617,6 +648,7 @@ mod tests {
             EdgeCostFn::forward(
                 std::num::NonZeroUsize::new(3).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
+                TEST_MIN_ACK_RATE,
             ),
         );
         assert_eq!(routes_3.len(), 5, "should find exactly 5 three-edge paths");
@@ -638,6 +670,7 @@ mod tests {
             EdgeCostFn::forward(
                 std::num::NonZeroUsize::new(1).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
+                TEST_MIN_ACK_RATE,
             ),
         );
         assert!(routes_1.is_empty(), "no direct edge from me to f");
@@ -675,6 +708,7 @@ mod tests {
             EdgeCostFn::forward(
                 std::num::NonZeroUsize::new(3).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
+                TEST_MIN_ACK_RATE,
             ),
         );
         assert!(
@@ -704,6 +738,7 @@ mod tests {
             EdgeCostFn::forward(
                 std::num::NonZeroUsize::new(1).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
+                TEST_MIN_ACK_RATE,
             ),
         );
         assert_eq!(routes.len(), 1);
@@ -742,6 +777,7 @@ mod tests {
             EdgeCostFn::forward(
                 std::num::NonZeroUsize::new(3).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
+                TEST_MIN_ACK_RATE,
             ),
         );
         assert_eq!(routes.len(), 1);
@@ -787,6 +823,7 @@ mod tests {
             EdgeCostFn::forward(
                 std::num::NonZeroUsize::new(2).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
+                TEST_MIN_ACK_RATE,
             ),
         );
         assert_eq!(routes.len(), 2, "diamond should yield two 2-edge routes");
@@ -828,6 +865,7 @@ mod tests {
             EdgeCostFn::returning(
                 std::num::NonZeroUsize::new(1).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
+                TEST_MIN_ACK_RATE,
             ),
         );
 
@@ -862,6 +900,7 @@ mod tests {
             EdgeCostFn::returning(
                 std::num::NonZeroUsize::new(2).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
+                TEST_MIN_ACK_RATE,
             ),
         );
 
@@ -894,6 +933,7 @@ mod tests {
             EdgeCostFn::returning(
                 std::num::NonZeroUsize::new(2).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
+                TEST_MIN_ACK_RATE,
             ),
         );
 
@@ -929,6 +969,7 @@ mod tests {
             EdgeCostFn::returning(
                 std::num::NonZeroUsize::new(2).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
+                TEST_MIN_ACK_RATE,
             ),
         );
 
@@ -970,6 +1011,7 @@ mod tests {
             EdgeCostFn::returning(
                 std::num::NonZeroUsize::new(2).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
+                TEST_MIN_ACK_RATE,
             ),
         );
         assert_eq!(
