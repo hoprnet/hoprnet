@@ -5,12 +5,15 @@ use hopr_api::{
     OffchainKeypair, OffchainPublicKey,
     graph::{
         NetworkGraphTraverse, NetworkGraphWrite,
-        costs::HoprForwardCostFn,
+        costs::EdgeCostFn,
         traits::{EdgeObservableWrite, EdgeWeightType},
     },
     types::crypto::prelude::Keypair,
 };
 use hopr_network_graph::ChannelGraph;
+
+/// Default penalty factor applied to edge cost functions.
+const DEFAULT_EDGE_PENALTY: f64 = 0.5;
 
 // ── Graph construction helpers ───────────────────────────────────────────────
 
@@ -124,7 +127,10 @@ fn bench_simple_paths(c: &mut Criterion) {
                         black_box(dst_2edge),
                         2,
                         Some(10),
-                        HoprForwardCostFn::new(std::num::NonZeroUsize::new(2).expect("is greater than 1")),
+                        EdgeCostFn::forward(
+                            std::num::NonZeroUsize::new(2).expect("is greater than 1"),
+                            DEFAULT_EDGE_PENALTY,
+                        ),
                     ))
                 });
             });
@@ -136,7 +142,10 @@ fn bench_simple_paths(c: &mut Criterion) {
                         black_box(dst_3edge),
                         3,
                         Some(10),
-                        HoprForwardCostFn::new(std::num::NonZeroUsize::new(3).expect("is greater than 1")),
+                        EdgeCostFn::forward(
+                            std::num::NonZeroUsize::new(3).expect("is greater than 1"),
+                            DEFAULT_EDGE_PENALTY,
+                        ),
                     ))
                 });
             });
@@ -148,7 +157,10 @@ fn bench_simple_paths(c: &mut Criterion) {
                         black_box(dst_4edge),
                         4,
                         Some(10),
-                        HoprForwardCostFn::new(std::num::NonZeroUsize::new(4).expect("is greater than 1")),
+                        EdgeCostFn::forward(
+                            std::num::NonZeroUsize::new(4).expect("is greater than 1"),
+                            DEFAULT_EDGE_PENALTY,
+                        ),
                     ))
                 });
             });
