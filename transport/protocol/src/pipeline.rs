@@ -975,6 +975,7 @@ mod tests {
             ticket_evt_tx,
             PacketPipelineConfig::default(),
             (app_out_tx, app_in_rx),
+            Default::default(),
         );
 
         // The pipeline should create exactly 4 processes: MsgOut, MsgIn, AckOut, AckIn
@@ -1010,6 +1011,7 @@ mod tests {
                 ..Default::default()
             },
             (app_out_tx, app_in_rx),
+            Default::default(),
         );
 
         let sender_peer = PeerId::from(previous_hop);
@@ -1056,6 +1058,7 @@ mod tests {
                 ..Default::default()
             },
             (app_out_tx, app_in_rx),
+            Default::default(),
         );
 
         let sender_peer = PeerId::from(previous_hop);
@@ -1101,6 +1104,7 @@ mod tests {
                 ..Default::default()
             },
             (app_out_tx, app_in_rx),
+            Default::default(),
         );
 
         let sender_peer = PeerId::from(previous_hop);
@@ -1148,6 +1152,7 @@ mod tests {
                 },
             },
             (app_out_tx, app_in_rx),
+            Default::default(),
         );
 
         let sender_peer = PeerId::from(sender_key);

@@ -5089,6 +5089,7 @@ dependencies = [
  "hopr-transport-session",
  "hopr-transport-tag-allocator",
  "humantime-serde",
+ "insta",
  "lazy_static",
  "moka",
  "pcap-file",
