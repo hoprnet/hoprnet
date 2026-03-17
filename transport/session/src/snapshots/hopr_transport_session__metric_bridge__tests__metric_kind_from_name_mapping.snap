@@ -1,0 +1,14 @@
+---
+source: transport/session/src/metric_bridge.rs
+expression: cases
+---
+[
+    (
+        "hopr_session_packets_out_total",
+        U64Counter,
+    ),
+    (
+        "hopr_session_buffer_estimate",
+        U64Gauge,
+    ),
+]

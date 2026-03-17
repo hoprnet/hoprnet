@@ -746,23 +746,25 @@ mod tests {
     }
 
     #[test]
-    fn ack_pipeline_config_zero_grouping_capacity_is_rejected() {
+    fn ack_pipeline_config_zero_grouping_capacity_is_rejected() -> anyhow::Result<()> {
         let cfg = AcknowledgementPipelineConfig {
             ack_grouping_capacity: 0,
             ..Default::default()
         };
-        let err = cfg.validate().unwrap_err();
+        let err = cfg.validate().err().context("expected validation error")?;
         insta::assert_yaml_snapshot!(format!("{err}"));
+        Ok(())
     }
 
     #[test]
-    fn ack_pipeline_config_too_short_buffer_interval_is_rejected() {
+    fn ack_pipeline_config_too_short_buffer_interval_is_rejected() -> anyhow::Result<()> {
         let cfg = AcknowledgementPipelineConfig {
             ack_buffer_interval: Duration::from_millis(5),
             ..Default::default()
         };
-        let err = cfg.validate().unwrap_err();
+        let err = cfg.validate().err().context("expected validation error")?;
         insta::assert_yaml_snapshot!(format!("{err}"));
+        Ok(())
     }
 
     #[test]
@@ -1017,9 +1019,10 @@ mod tests {
             .context("sending wire packet")?;
         drop(wire_in_tx);
 
-        let result = tokio::time::timeout(Duration::from_secs(2), app_out_rx.next()).await;
-        assert!(result.is_ok(), "should receive app data within timeout");
-        let (_pseudonym, app_data_in) = result.unwrap().context("app output should have data")?;
+        let (_pseudonym, app_data_in) = tokio::time::timeout(Duration::from_secs(2), app_out_rx.next())
+            .await
+            .context("should receive app data within timeout")?
+            .context("app output should have data")?;
         assert_eq!(app_data_in.data.application_tag, 42u64.into());
         assert_eq!(&*app_data_in.data.plain_text, b"hello world");
 

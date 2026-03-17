@@ -14,46 +14,49 @@ use hopr_transport::{HoprProtocolConfig, HoprTransport, Multiaddr, PeerId, peer_
 use crate::stubs::StubNet;
 
 lazy_static::lazy_static! {
-    static ref PEERS: Vec<OffchainKeypair> = [
-        hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"),
-        hex!("5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca"),
-        hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"),
+    static ref PEER_KEYS: Vec<(OffchainKeypair, ChainKeypair)> = [
+        (hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"),
+         hex!("4db3ac225fdcc7e20bf887cd90bbd62dc6bd41ce8ba5c23cc9ae0bf56e20d056")),
+        (hex!("5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca"),
+         hex!("1d40c69c179528bbdf49c2254e93400b485f47d7d2fa84aae280af5a31c1918b")),
+        (hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"),
+         hex!("99facd2cd33664d65826ad220920a6b356e31d18c1ce1734303b70a962664d71")),
     ]
     .iter()
-    .map(|private| OffchainKeypair::from_secret(private).expect("keypair"))
-    .collect();
-
-    static ref PEERS_CHAIN: Vec<ChainKeypair> = [
-        hex!("4db3ac225fdcc7e20bf887cd90bbd62dc6bd41ce8ba5c23cc9ae0bf56e20d056"),
-        hex!("1d40c69c179528bbdf49c2254e93400b485f47d7d2fa84aae280af5a31c1918b"),
-        hex!("99facd2cd33664d65826ad220920a6b356e31d18c1ce1734303b70a962664d71"),
-    ]
-    .iter()
-    .map(|private| ChainKeypair::from_secret(private).expect("keypair"))
+    .map(|(off_priv, chain_priv)| {
+        (
+            OffchainKeypair::from_secret(off_priv).expect("keypair"),
+            ChainKeypair::from_secret(chain_priv).expect("keypair"),
+        )
+    })
     .collect();
 }
 
 type TestTransport = HoprTransport<stubs::StubChain, stubs::StubDb, ChannelGraph, StubNet>;
 
-fn create_transport(peer_index: usize) -> anyhow::Result<TestTransport> {
-    create_transport_with_addrs(peer_index, vec![])
+fn create_stubbed_transport(peer_index: usize) -> anyhow::Result<TestTransport> {
+    create_stubbed_transport_with_addrs(peer_index, vec![])
 }
 
-fn create_transport_with_addrs(peer_index: usize, my_multiaddresses: Vec<Multiaddr>) -> anyhow::Result<TestTransport> {
-    create_transport_with_cfg(peer_index, my_multiaddresses, HoprProtocolConfig::default())
+fn create_stubbed_transport_with_addrs(
+    peer_index: usize,
+    my_multiaddresses: Vec<Multiaddr>,
+) -> anyhow::Result<TestTransport> {
+    create_stubbed_transport_with_cfg(peer_index, my_multiaddresses, HoprProtocolConfig::default())
 }
 
-fn create_transport_with_cfg(
+fn create_stubbed_transport_with_cfg(
     peer_index: usize,
     my_multiaddresses: Vec<Multiaddr>,
     cfg: HoprProtocolConfig,
 ) -> anyhow::Result<TestTransport> {
-    let graph = ChannelGraph::new(*PEERS[peer_index].public());
-    let chain = stubs::StubChain::new(&PEERS[peer_index], &PEERS_CHAIN[peer_index]);
+    let (offchain, chain_kp) = &PEER_KEYS[peer_index];
+    let graph = ChannelGraph::new(*offchain.public());
+    let chain = stubs::StubChain::new(offchain, chain_kp);
     let db = stubs::StubDb;
 
     Ok(HoprTransport::new(
-        (&PEERS_CHAIN[peer_index], &PEERS[peer_index]),
+        (chain_kp, offchain),
         chain,
         db,
         graph,
@@ -66,14 +69,14 @@ fn create_transport_with_cfg(
 
 #[tokio::test]
 async fn transport_constructs_with_default_config() -> anyhow::Result<()> {
-    let _transport = create_transport(0)?;
+    let _transport = create_stubbed_transport(0)?;
     Ok(())
 }
 
 #[tokio::test]
 async fn transport_constructs_for_all_peers() -> anyhow::Result<()> {
-    for i in 0..PEERS.len() {
-        create_transport(i)?;
+    for i in 0..PEER_KEYS.len() {
+        create_stubbed_transport(i)?;
     }
     Ok(())
 }
@@ -84,7 +87,7 @@ async fn transport_constructs_with_multiaddresses() -> anyhow::Result<()> {
         Multiaddr::from_str("/ip4/1.2.3.4/tcp/9000")?,
         Multiaddr::from_str("/ip4/10.0.0.1/tcp/9001")?,
     ];
-    let _transport = create_transport_with_addrs(0, addrs)?;
+    let _transport = create_stubbed_transport_with_addrs(0, addrs)?;
     Ok(())
 }
 
@@ -93,7 +96,7 @@ async fn transport_constructs_with_multiaddresses() -> anyhow::Result<()> {
 #[tokio::test]
 async fn local_multiaddresses_returns_configured_before_run() -> anyhow::Result<()> {
     let addrs = vec![Multiaddr::from_str("/ip4/1.2.3.4/tcp/9000")?];
-    let transport = create_transport_with_addrs(0, addrs)?;
+    let transport = create_stubbed_transport_with_addrs(0, addrs)?;
 
     let local = transport.local_multiaddresses();
     assert_eq!(local.len(), 1);
@@ -103,7 +106,7 @@ async fn local_multiaddresses_returns_configured_before_run() -> anyhow::Result<
 
 #[tokio::test]
 async fn listening_multiaddresses_empty_before_run() -> anyhow::Result<()> {
-    let transport = create_transport(0)?;
+    let transport = create_stubbed_transport(0)?;
     let addrs = transport.listening_multiaddresses().await;
     assert!(addrs.is_empty());
     Ok(())
@@ -111,7 +114,7 @@ async fn listening_multiaddresses_empty_before_run() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn network_health_red_before_run() -> anyhow::Result<()> {
-    let transport = create_transport(0)?;
+    let transport = create_stubbed_transport(0)?;
     let health = transport.network_health().await;
     insta::assert_yaml_snapshot!(format!("{health:?}"));
     Ok(())
@@ -119,22 +122,22 @@ async fn network_health_red_before_run() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn network_connected_peers_errors_before_run() -> anyhow::Result<()> {
-    let transport = create_transport(0)?;
+    let transport = create_stubbed_transport(0)?;
     assert!(transport.network_connected_peers().await.is_err());
     Ok(())
 }
 
 #[tokio::test]
 async fn ping_errors_before_run() -> anyhow::Result<()> {
-    let transport = create_transport(0)?;
-    assert!(transport.ping(PEERS[1].public()).await.is_err());
+    let transport = create_stubbed_transport(0)?;
+    assert!(transport.ping(PEER_KEYS[1].0.public()).await.is_err());
     Ok(())
 }
 
 #[tokio::test]
 async fn ping_to_self_rejected() -> anyhow::Result<()> {
-    let transport = create_transport(0)?;
-    let err = transport.ping(PEERS[0].public()).await.unwrap_err();
+    let transport = create_stubbed_transport(0)?;
+    let err = transport.ping(PEER_KEYS[0].0.public()).await.unwrap_err();
     let msg = format!("{err}");
     assert!(msg.contains("self"), "error should mention self: {msg}");
     Ok(())
@@ -142,16 +145,16 @@ async fn ping_to_self_rejected() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn network_observed_multiaddresses_empty_before_run() -> anyhow::Result<()> {
-    let transport = create_transport(0)?;
-    let addrs = transport.network_observed_multiaddresses(PEERS[1].public()).await;
+    let transport = create_stubbed_transport(0)?;
+    let addrs = transport.network_observed_multiaddresses(PEER_KEYS[1].0.public()).await;
     assert!(addrs.is_empty());
     Ok(())
 }
 
 #[tokio::test]
 async fn network_peer_observations_none_for_unknown_peer() -> anyhow::Result<()> {
-    let transport = create_transport(0)?;
-    assert!(transport.network_peer_observations(PEERS[1].public()).is_none());
+    let transport = create_stubbed_transport(0)?;
+    assert!(transport.network_peer_observations(PEER_KEYS[1].0.public()).is_none());
     Ok(())
 }
 
@@ -163,7 +166,7 @@ async fn announceable_filters_out_private_addresses() -> anyhow::Result<()> {
         Multiaddr::from_str("/ip4/1.2.3.4/tcp/9000")?,
         Multiaddr::from_str("/ip4/192.168.1.1/tcp/9001")?,
     ];
-    let transport = create_transport_with_addrs(0, addrs)?;
+    let transport = create_stubbed_transport_with_addrs(0, addrs)?;
 
     let announceable = transport.announceable_multiaddresses();
     for addr in &announceable {
@@ -179,7 +182,7 @@ async fn announceable_includes_private_when_configured() -> anyhow::Result<()> {
     let mut cfg = HoprProtocolConfig::default();
     cfg.transport.announce_local_addresses = true;
 
-    let transport = create_transport_with_cfg(0, addrs, cfg)?;
+    let transport = create_stubbed_transport_with_cfg(0, addrs, cfg)?;
 
     let announceable = transport.announceable_multiaddresses();
     assert!(!announceable.is_empty(), "private should be included");
@@ -192,7 +195,7 @@ async fn announceable_multiaddresses_snapshot() -> anyhow::Result<()> {
         Multiaddr::from_str("/ip4/1.2.3.4/tcp/9000")?,
         Multiaddr::from_str("/dns4/example.com/tcp/443")?,
     ];
-    let transport = create_transport_with_addrs(0, addrs)?;
+    let transport = create_stubbed_transport_with_addrs(0, addrs)?;
 
     let announceable: Vec<String> = transport
         .announceable_multiaddresses()
@@ -207,15 +210,15 @@ async fn announceable_multiaddresses_snapshot() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn peer_id_converts_to_public_key() -> anyhow::Result<()> {
-    let peer_id = PeerId::from(*PEERS[0].public());
+    let peer_id = PeerId::from(*PEER_KEYS[0].0.public());
     let key = peer_id_to_public_key(&peer_id).await?;
-    assert_eq!(key, *PEERS[0].public());
+    assert_eq!(key, *PEER_KEYS[0].0.public());
     Ok(())
 }
 
 #[tokio::test]
 async fn peer_id_conversion_is_cached() -> anyhow::Result<()> {
-    let peer_id = PeerId::from(*PEERS[1].public());
+    let peer_id = PeerId::from(*PEER_KEYS[1].0.public());
     let k1 = peer_id_to_public_key(&peer_id).await?;
     let k2 = peer_id_to_public_key(&peer_id).await?;
     assert_eq!(k1, k2);

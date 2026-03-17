@@ -273,7 +273,6 @@ pub async fn resolve_mock_path(me: Address, peers_onchain: Vec<Address>) -> anyh
     Ok(path)
 }
 
-#[allow(dead_code)]
 pub fn random_packets_of_count(size: usize) -> Vec<ApplicationData> {
     (0..size)
         .map(|i| {
@@ -290,17 +289,16 @@ pub fn random_packets_of_count(size: usize) -> Vec<ApplicationData> {
         .expect("data generation must not fail")
 }
 
-/// Creates a single packet with a payload of the given size (filled with random bytes).
-#[allow(dead_code)]
+lazy_static! {
+    /// A large pool of random bytes used as a ring buffer for generating test payloads.
+    static ref RANDOM_BYTE_POOL: [u8; 4096] = random_bytes::<4096>();
+}
+
+/// Creates a single packet with a payload of the given size (filled from a static random byte pool).
 pub fn random_packet_of_size(payload_size: usize) -> ApplicationData {
-    let data: Vec<u8> = random_bytes::<512>()[..payload_size.min(512)].to_vec();
-    // For sizes > 512, extend with more random bytes
-    let mut data = data;
-    while data.len() < payload_size {
-        let chunk = random_bytes::<512>();
-        let remaining = payload_size - data.len();
-        data.extend_from_slice(&chunk[..remaining.min(512)]);
-    }
+    let pool = &*RANDOM_BYTE_POOL;
+    let start = random_integer(0u64, Some(pool.len() as u64)) as usize;
+    let data: Vec<u8> = (0..payload_size).map(|i| pool[(start + i) % pool.len()]).collect();
     ApplicationData::new(random_integer(16u64, Some(65535u64)), data).expect("data generation must not fail")
 }
 
@@ -309,7 +307,6 @@ pub fn random_packet_of_size(payload_size: usize) -> ApplicationData {
 ///
 /// This is a lower-level helper than `send_relay_receive_channel_of_n_peers` that
 /// allows callers to inspect intermediate results.
-#[allow(dead_code)]
 pub async fn send_and_receive_packets(
     peer_count: usize,
     test_msgs: &[ApplicationData],

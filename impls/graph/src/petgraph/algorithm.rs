@@ -183,7 +183,7 @@ mod test {
     use super::all_simple_paths_multi;
 
     /// Collect paths as sorted Vec<Vec<usize>> for deterministic snapshots.
-    fn sorted_paths<I: Iterator<Item = (Vec<petgraph::graph::NodeIndex>, impl Sized)>>(iter: I) -> Vec<Vec<usize>> {
+    fn sorted_paths<T, I: Iterator<Item = (Vec<petgraph::graph::NodeIndex>, T)>>(iter: I) -> Vec<Vec<usize>> {
         let mut paths: Vec<Vec<usize>> = iter.map(|(v, _)| v.into_iter().map(|i| i.index()).collect()).collect();
         paths.sort();
         paths

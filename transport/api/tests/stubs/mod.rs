@@ -37,6 +37,7 @@ pub struct StubError(pub String);
 pub struct StubChain {
     me_addr: Address,
     me_offchain: OffchainPublicKey,
+    mapper: StubKeyMapper,
 }
 
 impl StubChain {
@@ -44,6 +45,7 @@ impl StubChain {
         Self {
             me_addr: chain.public().to_address(),
             me_offchain: *offchain.public(),
+            mapper: StubKeyMapper,
         }
     }
 }
@@ -127,8 +129,7 @@ impl ChainKeyOperations for StubChain {
     }
 
     fn key_id_mapper_ref(&self) -> &Self::Mapper {
-        // Acceptable in tests — leaked once per test
-        Box::leak(Box::new(StubKeyMapper))
+        &self.mapper
     }
 }
 

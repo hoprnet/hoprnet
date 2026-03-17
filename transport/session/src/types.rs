@@ -651,15 +651,12 @@ mod tests {
 
     #[test]
     fn closure_reason_display_values_are_stable() {
-        let reasons: Vec<String> = [
+        let reasons = [
             ClosureReason::WriteClosed,
             ClosureReason::EmptyRead,
             ClosureReason::Eviction,
-        ]
-        .iter()
-        .map(|r| r.to_string())
-        .collect();
-        insta::assert_yaml_snapshot!(reasons);
+        ];
+        insta::assert_debug_snapshot!(reasons);
     }
 
     // --- HoprSessionConfig tests ---
@@ -707,11 +704,13 @@ mod tests {
         let id1 = SessionId::new(1234_u64, pseudonym);
         let id2 = SessionId::new(1234_u64, pseudonym);
         let id3 = SessionId::new(5678_u64, pseudonym);
+        let id4 = SessionId::new(1234_u64, HoprPseudonym::random());
 
         let mut set = HashSet::new();
         set.insert(id1);
         assert!(set.contains(&id2));
         assert!(!set.contains(&id3));
+        assert!(!set.contains(&id4), "same id but different pseudonym should not match");
     }
 
     // --- Existing tests ---

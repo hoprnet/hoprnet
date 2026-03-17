@@ -4,30 +4,18 @@ use common::{
     random_packet_of_size, random_packets_of_count, send_and_receive_packets, send_relay_receive_channel_of_n_peers,
 };
 use hopr_protocol_app::prelude::ApplicationData;
+use rstest::rstest;
 use serial_test::serial;
 
+#[rstest]
+#[case::three_peers(3, 5)]
+#[case::four_peers(4, 3)]
+#[case::five_peers(5, 5)]
 #[serial]
 #[test_log::test(tokio::test)]
-async fn test_packet_relayer_workflow_3_peers() -> anyhow::Result<()> {
-    let packets = random_packets_of_count(5);
-
-    send_relay_receive_channel_of_n_peers(3, packets).await
-}
-
-#[serial]
-#[test_log::test(tokio::test)]
-async fn test_packet_relayer_workflow_5_peers() -> anyhow::Result<()> {
-    let packets = random_packets_of_count(5);
-
-    send_relay_receive_channel_of_n_peers(5, packets).await
-}
-
-#[serial]
-#[test_log::test(tokio::test)]
-async fn test_packet_relayer_workflow_4_peers() -> anyhow::Result<()> {
-    let packets = random_packets_of_count(3);
-
-    send_relay_receive_channel_of_n_peers(4, packets).await
+async fn packet_relayer_workflow(#[case] peer_count: usize, #[case] packet_count: usize) -> anyhow::Result<()> {
+    let packets = random_packets_of_count(packet_count);
+    send_relay_receive_channel_of_n_peers(peer_count, packets).await
 }
 
 #[serial]
@@ -99,9 +87,11 @@ async fn identical_payloads_are_all_delivered() -> anyhow::Result<()> {
     let (received, _) = send_and_receive_packets(3, &packets).await?;
 
     assert_eq!(received.len(), 5);
-    for (_, data) in &received {
-        assert_eq!(&*data.data.plain_text, payload.as_slice());
-    }
+    assert!(
+        received
+            .iter()
+            .all(|(_, data)| data.data.plain_text.as_ref() == payload.as_slice())
+    );
 
     Ok(())
 }

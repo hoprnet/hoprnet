@@ -61,32 +61,40 @@ const fn default_recheck_threshold() -> std::time::Duration {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Context;
     use validator::Validate;
 
     use super::*;
 
     #[test]
-    fn probe_config_default_is_valid() {
+    fn probe_config_default_is_valid() -> anyhow::Result<()> {
         let cfg = ProbeConfig::default();
-        assert!(cfg.validate().is_ok());
+        cfg.validate().context("default ProbeConfig should be valid")?;
         insta::assert_yaml_snapshot!(format!("{cfg:?}"));
+        Ok(())
     }
 
     #[test]
-    fn probe_config_zero_parallel_probes_is_rejected() {
+    fn probe_config_zero_parallel_probes_is_rejected() -> anyhow::Result<()> {
         let cfg = ProbeConfig {
             max_parallel_probes: 0,
             ..Default::default()
         };
-        assert!(cfg.validate().is_err());
+        let err = cfg.validate().err().context("expected validation error")?;
+        assert!(
+            err.to_string().contains("max_parallel_probes"),
+            "expected max_parallel_probes in error: {err}"
+        );
+        Ok(())
     }
 
     #[test]
-    fn probe_config_one_parallel_probe_is_valid() {
+    fn probe_config_one_parallel_probe_is_valid() -> anyhow::Result<()> {
         let cfg = ProbeConfig {
             max_parallel_probes: 1,
             ..Default::default()
         };
-        assert!(cfg.validate().is_ok());
+        cfg.validate().context("single parallel probe should be valid")?;
+        Ok(())
     }
 }

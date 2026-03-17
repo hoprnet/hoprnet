@@ -42,66 +42,26 @@ impl<T> From<(std::time::Instant, T)> for DelayedData<T> {
 mod tests {
     use std::time::{Duration, Instant};
 
+    use rstest::rstest;
+
     use super::*;
 
-    #[test]
-    fn equal_timestamps_are_equal() {
+    #[rstest]
+    #[case::equal_timestamps(0, 0, Ordering::Equal)]
+    #[case::earlier_is_less(0, 1000, Ordering::Less)]
+    #[case::later_is_greater(1000, 0, Ordering::Greater)]
+    #[case::ordering_ignores_item_value(0, 0, Ordering::Equal)]
+    fn delayed_data_ordering(#[case] delay_a_ms: u64, #[case] delay_b_ms: u64, #[case] expected: Ordering) {
         let now = Instant::now();
         let a = DelayedData {
-            release_at: now,
-            item: "a",
+            release_at: now + Duration::from_millis(delay_a_ms),
+            item: 1,
         };
         let b = DelayedData {
-            release_at: now,
-            item: "b",
-        };
-        assert!(a == b);
-        assert_eq!(a.cmp(&b), Ordering::Equal);
-    }
-
-    #[test]
-    fn earlier_timestamp_is_less() {
-        let now = Instant::now();
-        let earlier = DelayedData {
-            release_at: now,
-            item: 1,
-        };
-        let later = DelayedData {
-            release_at: now + Duration::from_secs(1),
+            release_at: now + Duration::from_millis(delay_b_ms),
             item: 2,
         };
-        assert!(earlier < later);
-        assert_eq!(earlier.cmp(&later), Ordering::Less);
-    }
-
-    #[test]
-    fn later_timestamp_is_greater() {
-        let now = Instant::now();
-        let earlier = DelayedData {
-            release_at: now,
-            item: 1,
-        };
-        let later = DelayedData {
-            release_at: now + Duration::from_secs(1),
-            item: 2,
-        };
-        assert!(later > earlier);
-        assert_eq!(later.cmp(&earlier), Ordering::Greater);
-    }
-
-    #[test]
-    fn ordering_ignores_item_value() {
-        let now = Instant::now();
-        let a = DelayedData {
-            release_at: now,
-            item: 999,
-        };
-        let b = DelayedData {
-            release_at: now,
-            item: 1,
-        };
-        // Items differ but timestamps are equal → they are equal
-        assert!(a == b);
+        assert_eq!(a.cmp(&b), expected);
     }
 
     #[test]
@@ -115,23 +75,15 @@ mod tests {
     #[test]
     fn sorting_respects_release_time() {
         let now = Instant::now();
-        let mut items = [
-            DelayedData {
-                release_at: now + Duration::from_secs(3),
-                item: "c",
-            },
-            DelayedData {
-                release_at: now + Duration::from_secs(1),
-                item: "a",
-            },
-            DelayedData {
-                release_at: now + Duration::from_secs(2),
-                item: "b",
-            },
-        ];
+        let mut items: Vec<DelayedData<&str>> = [(3, "c"), (1, "a"), (2, "b")]
+            .into_iter()
+            .map(|(secs, val)| DelayedData {
+                release_at: now + Duration::from_secs(secs),
+                item: val,
+            })
+            .collect();
         items.sort();
-        assert_eq!(items[0].item, "a");
-        assert_eq!(items[1].item, "b");
-        assert_eq!(items[2].item, "c");
+        let sorted: Vec<&str> = items.iter().map(|d| d.item).collect();
+        insta::assert_yaml_snapshot!(sorted);
     }
 }

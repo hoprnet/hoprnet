@@ -1,6 +1,6 @@
 ---
 source: transport/session/src/metric_bridge.rs
-expression: "collect_flat(serde_json::json!({ \"active\": true }))"
+expression: collect_flat(input)
 ---
 [
     SessionMetricSample {
