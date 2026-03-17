@@ -717,6 +717,49 @@ mod tests {
     }
 
     #[test]
+    fn ticket_manager_create_multihop_ticket_should_fail_on_wrong_input() -> anyhow::Result<()> {
+        let mgr = create_mgr()?;
+
+        let src = ChainKeypair::random();
+        let dst = ChainKeypair::random();
+
+        let mut channel = ChannelEntry::builder()
+            .between(&src, &dst)
+            .amount(10)
+            .ticket_index(1)
+            .status(ChannelStatus::Closed)
+            .epoch(1)
+            .build()?;
+
+        assert!(
+            mgr.create_multihop_ticket(&channel, 2, WinningProbability::ALWAYS, 1.into())
+                .is_err()
+        );
+
+        channel.status =
+            ChannelStatus::PendingToClose(std::time::SystemTime::now() - std::time::Duration::from_secs(10));
+
+        assert!(
+            mgr.create_multihop_ticket(&channel, 2, WinningProbability::ALWAYS, 1.into())
+                .is_err()
+        );
+
+        channel.status = ChannelStatus::Open;
+
+        assert!(
+            mgr.create_multihop_ticket(&channel, 2, WinningProbability::ALWAYS, 11.into())
+                .is_err()
+        );
+
+        assert!(
+            mgr.create_multihop_ticket(&channel, 1, WinningProbability::ALWAYS, 1.into())
+                .is_err()
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn ticket_manager_test_next_outgoing_ticket_index() -> anyhow::Result<()> {
         let mgr = create_mgr()?;
 
@@ -744,6 +787,20 @@ mod tests {
         channel.ticket_index = 50;
         assert_eq!(102, mgr.next_outgoing_ticket_index(&channel));
         assert_eq!(103, mgr.next_outgoing_ticket_index(&channel));
+
+        mgr.save_outgoing_indices()?;
+        assert_eq!(Some(104), mgr.store.read().load_outgoing_index(channel.get_id(), 1)?);
+
+        channel.ticket_index = 0;
+        channel.channel_epoch = 2;
+
+        assert_eq!(0, mgr.next_outgoing_ticket_index(&channel));
+        mgr.save_outgoing_indices()?;
+
+        assert_eq!(None, mgr.store.read().load_outgoing_index(channel.get_id(), 1)?);
+        assert_eq!(Some(1), mgr.store.read().load_outgoing_index(channel.get_id(), 2)?);
+
+        assert_eq!(1, mgr.next_outgoing_ticket_index(&channel));
 
         Ok(())
     }
