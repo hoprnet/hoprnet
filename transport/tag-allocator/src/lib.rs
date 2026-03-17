@@ -247,19 +247,18 @@ mod tests {
         let cfg = TagAllocatorConfig::default();
         let allocators = create_allocators_from_config(&cfg).map_err(|e| anyhow::anyhow!("{e}"))?;
 
-        assert_eq!(allocators.len(), 3);
-
-        let (usage0, alloc0) = &allocators[0];
-        let (usage1, alloc1) = &allocators[1];
-        let (usage2, alloc2) = &allocators[2];
-
-        assert_eq!(*usage0, Usage::Session);
-        assert_eq!(*usage1, Usage::SessionTerminalTelemetry);
-        assert_eq!(*usage2, Usage::ProvingTelemetry);
-
-        assert_eq!(alloc0.capacity(), cfg.session);
-        assert_eq!(alloc1.capacity(), cfg.session_probing);
-        assert_eq!(alloc2.capacity(), cfg.probing_telemetry);
+        let summary: Vec<(&str, u64)> = allocators
+            .iter()
+            .map(|(usage, alloc)| {
+                let name = match usage {
+                    Usage::Session => "Session",
+                    Usage::SessionTerminalTelemetry => "SessionTerminalTelemetry",
+                    Usage::ProvingTelemetry => "ProvingTelemetry",
+                };
+                (name, alloc.capacity())
+            })
+            .collect();
+        insta::assert_debug_snapshot!(summary);
 
         Ok(())
     }

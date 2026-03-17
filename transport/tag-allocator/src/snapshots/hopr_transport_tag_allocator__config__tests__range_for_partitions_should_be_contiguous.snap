@@ -1,0 +1,18 @@
+---
+source: transport/tag-allocator/src/config.rs
+expression: ranges
+---
+[
+    (
+        "Session",
+        16..2064,
+    ),
+    (
+        "SessionTerminalTelemetry",
+        2064..6064,
+    ),
+    (
+        "ProvingTelemetry",
+        6064..65536,
+    ),
+]

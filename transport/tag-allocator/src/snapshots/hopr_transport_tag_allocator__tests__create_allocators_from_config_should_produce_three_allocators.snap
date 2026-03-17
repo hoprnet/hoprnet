@@ -1,0 +1,18 @@
+---
+source: transport/tag-allocator/src/lib.rs
+expression: summary
+---
+[
+    (
+        "Session",
+        2048,
+    ),
+    (
+        "SessionTerminalTelemetry",
+        4000,
+    ),
+    (
+        "ProvingTelemetry",
+        59472,
+    ),
+]

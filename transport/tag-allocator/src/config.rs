@@ -185,12 +185,15 @@ mod tests {
     #[test]
     fn range_for_partitions_should_be_contiguous() {
         let cfg = TagAllocatorConfig::default();
-        let session = cfg.range_for(Usage::Session);
-        let terminal = cfg.range_for(Usage::SessionTerminalTelemetry);
-        let proving = cfg.range_for(Usage::ProvingTelemetry);
-
-        assert_eq!(session.end, terminal.start, "session and terminal should be contiguous");
-        assert_eq!(terminal.end, proving.start, "terminal and proving should be contiguous");
+        let ranges: Vec<(&str, std::ops::Range<u64>)> = vec![
+            ("Session", cfg.range_for(Usage::Session)),
+            (
+                "SessionTerminalTelemetry",
+                cfg.range_for(Usage::SessionTerminalTelemetry),
+            ),
+            ("ProvingTelemetry", cfg.range_for(Usage::ProvingTelemetry)),
+        ];
+        insta::assert_debug_snapshot!(ranges);
     }
 
     #[test]
@@ -198,11 +201,6 @@ mod tests {
         let cfg = TagAllocatorConfig::default();
         let full = cfg.tag_range();
 
-        assert_eq!(full.start, ReservedTag::UPPER_BOUND);
-        assert_eq!(
-            full.end - full.start,
-            cfg.session + cfg.session_probing + cfg.probing_telemetry
-        );
         assert_eq!(full.start, cfg.range_for(Usage::Session).start);
         assert_eq!(full.end, cfg.range_for(Usage::ProvingTelemetry).end);
     }
