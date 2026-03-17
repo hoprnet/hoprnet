@@ -45,30 +45,30 @@ lazy_static::lazy_static! {
         }
     ];
     static ref CHANNELS: Vec<ChannelEntry> = vec![
-        ChannelEntry::new(
-            CHAIN_KEYS[0].public().to_address(),
-            CHAIN_KEYS[1].public().to_address(),
-            100_u32.into(),
-            1_u64,
-            ChannelStatus::Open,
-            1_u32,
-        ),
-        ChannelEntry::new(
-            CHAIN_KEYS[2].public().to_address(),
-            CHAIN_KEYS[0].public().to_address(),
-            200_u32.into(),
-            1_u64,
-            ChannelStatus::Open,
-            2_u32,
-        ),
-        ChannelEntry::new(
-            CHAIN_KEYS[1].public().to_address(),
-            CHAIN_KEYS[0].public().to_address(),
-            10_u32.into(),
-            3_u64,
-            ChannelStatus::Open,
-            1_u32,
-        )
+        ChannelEntry::builder()
+            .between(&CHAIN_KEYS[0], &CHAIN_KEYS[1])
+            .amount(100)
+            .ticket_index(1)
+            .status(ChannelStatus::Open)
+            .epoch(1)
+            .build()
+            .unwrap(),
+        ChannelEntry::builder()
+            .between(&CHAIN_KEYS[2], &CHAIN_KEYS[0])
+            .amount(200)
+            .ticket_index(1)
+            .status(ChannelStatus::Open)
+            .epoch(2)
+            .build()
+            .unwrap(),
+        ChannelEntry::builder()
+            .between(&CHAIN_KEYS[1], &CHAIN_KEYS[0])
+            .amount(10)
+            .ticket_index(3)
+            .status(ChannelStatus::Open)
+            .epoch(1)
+            .build()
+            .unwrap()
     ];
 }
 

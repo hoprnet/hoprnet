@@ -46,27 +46,26 @@ pub fn create_blokli_client() -> anyhow::Result<BlokliTestClient<StaticState>> {
                 .iter()
                 .enumerate()
                 .map(|(i, (chain_key, _))| {
-                    ChannelEntry::new(
-                        chain_key.public().to_address(),
-                        PEERS[(i + 1) % PEERS.len()].0.public().to_address(),
-                        HoprBalance::new_base(100),
-                        0,
-                        ChannelStatus::Open,
-                        1,
-                    )
+                    ChannelEntry::builder()
+                        .source(chain_key)
+                        .destination(&PEERS[(i + 1) % PEERS.len()].0)
+                        .balance(HoprBalance::new_base(100))
+                        .ticket_index(0)
+                        .status(ChannelStatus::Open)
+                        .epoch(1)
+                        .build()
+                        .unwrap()
                 })
                 .chain(PEERS.iter().enumerate().rev().map(|(i, (chain_key, _))| {
-                    ChannelEntry::new(
-                        chain_key.public().to_address(),
-                        PEERS[if i > 0 { i - 1 } else { PEERS.len() - 1 }]
-                            .0
-                            .public()
-                            .to_address(),
-                        HoprBalance::new_base(100),
-                        0,
-                        ChannelStatus::Open,
-                        1,
-                    )
+                    ChannelEntry::builder()
+                        .source(chain_key)
+                        .destination(&PEERS[if i > 0 { i - 1 } else { PEERS.len() - 1 }].0)
+                        .balance(HoprBalance::new_base(100))
+                        .ticket_index(0)
+                        .status(ChannelStatus::Open)
+                        .epoch(1)
+                        .build()
+                        .unwrap()
                 })),
         )
         .build_static_client())

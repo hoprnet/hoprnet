@@ -79,7 +79,14 @@ lazy_static! {
 }
 
 fn create_dummy_channel(from: Address, to: Address) -> ChannelEntry {
-    ChannelEntry::new(from, to, *DEFAULT_PRICE_PER_PACKET * 100, 0, ChannelStatus::Open, 0)
+    ChannelEntry::builder()
+        .between(from, to)
+        .balance(*DEFAULT_PRICE_PER_PACKET * 100)
+        .ticket_index(0)
+        .status(ChannelStatus::Open)
+        .epoch(0)
+        .build()
+        .unwrap()
 }
 
 #[allow(dead_code)]

@@ -131,14 +131,13 @@ pub(crate) mod tests {
         let src = Address::new(&[1u8; 20]);
         let dst = Address::new(&[2u8; 20]);
 
-        let channel = ChannelEntry::new(
-            src,
-            dst,
-            HoprBalance::new_base(1000),
-            10u32.into(),
-            ChannelStatus::PendingToClose(std::time::SystemTime::now()),
-            10u32,
-        );
+        let channel = ChannelEntry::builder()
+            .between(src, dst)
+            .balance(HoprBalance::new_base(1000))
+            .ticket_index(10u32.into())
+            .status(ChannelStatus::PendingToClose(std::time::SystemTime::now()))
+            .epoch(10u32)
+            .build()?;
 
         backend.insert_account(account.clone())?;
         backend.insert_channel(channel)?;
