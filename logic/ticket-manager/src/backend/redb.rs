@@ -98,7 +98,10 @@ impl TicketQueueStore for RedbStore {
         })
     }
 
-    fn delete_queue(&mut self, channel_id: &ChannelId) -> Result<Vec<VerifiedTicket>, <Self::Queue as TicketQueue>::Error> {
+    fn delete_queue(
+        &mut self,
+        channel_id: &ChannelId,
+    ) -> Result<Vec<VerifiedTicket>, <Self::Queue as TicketQueue>::Error> {
         let tx = self.db.begin_write()?;
         let mut ret = Vec::new();
         {

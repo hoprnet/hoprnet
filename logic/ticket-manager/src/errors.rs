@@ -3,8 +3,8 @@ use hopr_api::chain::{ChannelId, HoprBalance};
 /// Errors that can occur in the `HoprTicketManager`.
 #[derive(Debug, thiserror::Error)]
 pub enum TicketManagerError {
-    #[error("channel not found")]
-    ChannelNotFound,
+    #[error("channel does not exist or no tickets were found")]
+    ChannelQueueNotFound,
     #[error("already redeeming in this channel")]
     AlreadyRedeeming,
     #[error("balance of channel {0} is too low: {1}")]

@@ -83,10 +83,13 @@ impl OutgoingIndexCache {
     }
 
     /// Inserts the index for the given channel and `epoch`, or updates
-    /// the existing value if it is lower than the provided `index`.
+    /// the existing value if it is less than the provided `index`.
     ///
-    /// Returns the index value (potentially new if it was increased, or the same one if the existing value was greater than `index`).
-    pub fn set(&self, channel_id: &ChannelId, epoch: u32, index: u64) -> u64 {
+    /// Returns the index value that is either:
+    ///  - equal to `index` if no index for the given channel and epoch existed and the value was inserted, or
+    ///  - equal to the existing index value, if the provided `index` is less than the existing index value, or
+    ///  - equal to the provided `index` value if it is greater than the existing index value and the value is updated.
+    pub fn upsert(&self, channel_id: &ChannelId, epoch: u32, index: u64) -> u64 {
         self.cache
             .entry((*channel_id, epoch))
             .or_insert_with(|| std::sync::Arc::new(OutgoingIndexEntry::new(index)))
@@ -119,10 +122,7 @@ impl OutgoingIndexCache {
         for entry in cache.iter().filter(|e| e.value().is_dirty()) {
             let (channel_id, epoch) = entry.key();
             let index = entry.value().get();
-            if let Err(error) = store
-                .write()
-                .save_outgoing_index(channel_id, *epoch, index)
-            {
+            if let Err(error) = store.write().save_outgoing_index(channel_id, *epoch, index) {
                 tracing::error!(%error, %channel_id, epoch, "failed to save outgoing index");
             } else {
                 tracing::trace!(%channel_id, epoch, index, "saved outgoing index");
@@ -160,9 +160,9 @@ impl<Q> From<Q> for ChannelTicketQueue<Q> {
 
 #[cfg(test)]
 mod tests {
+    use std::{sync::Arc, thread};
+
     use super::*;
-    use std::sync::Arc;
-    use std::thread;
     use crate::MemoryStore;
 
     const MAX: u64 = TicketBuilder::MAX_TICKET_INDEX;
@@ -170,7 +170,6 @@ mod tests {
     fn store() -> Arc<parking_lot::RwLock<MemoryStore>> {
         Arc::new(parking_lot::RwLock::new(MemoryStore::default()))
     }
-
 
     #[test]
     fn default_initializes_to_zero_and_dirty() {
@@ -205,7 +204,9 @@ mod tests {
 
         for v in vals {
             let e2 = Arc::clone(&e);
-            handles.push(thread::spawn(move || { e2.set(v); }));
+            handles.push(thread::spawn(move || {
+                e2.set(v);
+            }));
         }
 
         for h in handles {
@@ -244,7 +245,7 @@ mod tests {
         let cache = OutgoingIndexCache::default();
         let channel_id = Default::default();
 
-        assert_eq!(cache.set(&channel_id, 1, 17), 17);
+        assert_eq!(cache.upsert(&channel_id, 1, 17), 17);
         assert_eq!(cache.next(&channel_id, 1), 17);
         assert_eq!(cache.next(&channel_id, 1), 18);
     }
@@ -254,8 +255,8 @@ mod tests {
         let cache = OutgoingIndexCache::default();
         let channel_id = Default::default();
 
-        assert_eq!(cache.set(&channel_id, 1, 10), 10);
-        assert_eq!(cache.set(&channel_id, 1, 7), 10);
+        assert_eq!(cache.upsert(&channel_id, 1, 10), 10);
+        assert_eq!(cache.upsert(&channel_id, 1, 7), 10);
         assert_eq!(cache.next(&channel_id, 1), 10);
         assert_eq!(cache.next(&channel_id, 1), 11);
     }
@@ -265,7 +266,7 @@ mod tests {
         let cache = OutgoingIndexCache::default();
         let channel_id = Default::default();
 
-        assert_eq!(cache.set(&channel_id, 1, MAX), MAX);
+        assert_eq!(cache.upsert(&channel_id, 1, MAX), MAX);
         assert_eq!(cache.next(&channel_id, 1), MAX);
         assert_eq!(cache.next(&channel_id, 1), MAX);
     }
@@ -277,7 +278,7 @@ mod tests {
         let epoch = 1;
         let store = store();
 
-        assert_eq!(cache.set(&channel_id, epoch, 5), 5);
+        assert_eq!(cache.upsert(&channel_id, epoch, 5), 5);
         cache.save(store.clone())?;
 
         assert_eq!(store.read().load_outgoing_index(&channel_id, epoch)?, Some(5));
@@ -306,8 +307,8 @@ mod tests {
         let channel_b = ChannelId::create(&[b"other"]);
         let store = store();
 
-        cache.set(&channel_a, 1, 10);
-        cache.set(&channel_b, 2, 20);
+        cache.upsert(&channel_a, 1, 10);
+        cache.upsert(&channel_b, 2, 20);
 
         cache.save(store.clone())?;
         assert_eq!(store.read().load_outgoing_index(&channel_a, 1)?, Some(10));
@@ -331,7 +332,7 @@ mod tests {
         let channel_id = Default::default();
         let store = store();
 
-        cache.set(&channel_id, 1, 3);
+        cache.upsert(&channel_id, 1, 3);
         cache.save(store.clone())?;
         assert_eq!(store.read().load_outgoing_index(&channel_id, 1)?, Some(3));
 
@@ -351,7 +352,7 @@ mod tests {
         let channel_id = Default::default();
         let store = store();
 
-        cache.set(&channel_id, 1, 9);
+        cache.upsert(&channel_id, 1, 9);
         cache.save(store.clone())?;
         assert_eq!(store.read().load_outgoing_index(&channel_id, 1)?, Some(9));
 
@@ -400,8 +401,8 @@ mod tests {
         let channel_b = ChannelId::create(&[b"other"]);
         let store = store();
 
-        cache.set(&channel_a, 1, 4);
-        cache.set(&channel_b, 2, 7);
+        cache.upsert(&channel_a, 1, 4);
+        cache.upsert(&channel_b, 2, 7);
         cache.save(store.clone())?;
 
         assert!(cache.remove(&channel_a, 1));
@@ -410,7 +411,7 @@ mod tests {
 
         assert_eq!(store.read().load_outgoing_index(&channel_a, 1)?, None);
         assert_eq!(store.read().load_outgoing_index(&channel_b, 2)?, Some(8));
-        
+
         Ok(())
     }
 }

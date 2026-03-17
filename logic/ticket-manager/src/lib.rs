@@ -7,8 +7,6 @@ mod errors;
 mod traits;
 mod utils;
 
-use std::ops::Mul;
-
 use hopr_api::{
     chain::TicketRedeemError,
     types::{internal::prelude::*, primitive::prelude::*},
@@ -171,14 +169,18 @@ where
 
         let epoch = channel.channel_epoch;
 
-        // Correct the value in the cache if it was
         if next_index < channel.ticket_index {
-            next_index = self.out_idx_tracker.set(channel.get_id(), epoch, channel.ticket_index);
+            // Correct the value in the cache if it was lower than the ticket index on the channel.
+            // This sets the value in the cache to the next index after the ticket index on the channel.
+            self.out_idx_tracker
+                .upsert(channel.get_id(), epoch, channel.ticket_index + 1);
+            next_index = channel.ticket_index; // Still, use the channel's ticket index as the next index.
         }
 
         // If this is the first index in this epoch,
-        // remove the previous epoch from the map if any
-        if next_index == 1 && epoch > 0 && self.out_idx_tracker.remove(channel.get_id(), epoch - 1) {
+        // remove the previous epoch from the map if any.
+        // Epochs always start at 1, ticket indices at 0.
+        if next_index == 0 && epoch > 1 && self.out_idx_tracker.remove(channel.get_id(), epoch - 1) {
             tracing::trace!(%channel, prev_epoch = epoch - 1, "removing previous epoch from outgoing index cache");
         }
 
@@ -210,7 +212,7 @@ where
     /// to ensure pruning of dangling or out-of-date values.
     pub fn sync_from_outgoing_channels(&self, outgoing_channels: &[ChannelEntry]) -> Result<(), TicketManagerError> {
         let outgoing_channels: std::collections::HashSet<_, std::hash::RandomState> =
-            outgoing_channels.into_iter().collect();
+            outgoing_channels.iter().collect();
 
         // Purge outdated outgoing indices
         let mut store_read = self.store.upgradable_read();
@@ -255,7 +257,7 @@ where
 
             // Always use the maximum from the stored value and the current ticket index on the channel
             let out_index = index.max(channel.ticket_index);
-            self.out_idx_tracker.set(id, epoch, out_index);
+            self.out_idx_tracker.upsert(id, epoch, out_index);
             tracing::debug!(%id, epoch, out_index, "loaded outgoing ticket index for channel");
         }
 
@@ -342,7 +344,7 @@ where
         incoming_channels: &[ChannelEntry],
     ) -> Result<Vec<VerifiedTicket>, TicketManagerError> {
         let incoming_channels: std::collections::HashSet<_, std::hash::RandomState> =
-            incoming_channels.into_iter().collect();
+            incoming_channels.iter().collect();
 
         // Purge outdated incoming channel queues
         let mut store_read = self.store.upgradable_read();
@@ -489,7 +491,7 @@ where
                 Ok(HoprBalance::zero())
             }
         } else {
-            Err(TicketManagerError::ChannelNotFound)
+            Err(TicketManagerError::ChannelQueueNotFound)
         }
     }
 
@@ -505,14 +507,16 @@ where
         channel_id: &ChannelId,
         up_to_index: Option<u64>,
     ) -> Result<Vec<VerifiedTicket>, TicketManagerError> {
-        let queue = self.channel_tickets.get(channel_id)
+        let queue = self
+            .channel_tickets
+            .get(channel_id)
             .map(|q| {
                 if q.redeem_lock.is_locked() {
                     tracing::warn!(%channel_id, "neglecting tickets in channel while redeeming is ongoing");
                 }
                 q.queue.clone()
             })
-            .ok_or(TicketManagerError::ChannelNotFound)?;
+            .ok_or(TicketManagerError::ChannelQueueNotFound)?;
 
         let mut neglected_tickets = Vec::new();
         let mut queue_read = queue.upgradable_read();
@@ -578,13 +582,14 @@ where
                 min_redeem_value: min_redeem_value.unwrap_or_default(), // default min is 0 wxHOPR
                 channel_id: *channel_id,
             },
-            None => return Err(TicketManagerError::ChannelNotFound),
+            None => return Err(TicketManagerError::ChannelQueueNotFound),
         };
 
-        Ok(futures::stream::try_unfold(initial_state, |state| async move {
-            let res = {
-                let queue_read = state.queue.upgradable_read();
-                match queue_read.peek() {
+        Ok(futures::stream::try_unfold(initial_state, |state| {
+            // Peek here and release the read lock to prevent holding it across an `await`
+            let next_ticket = state.queue.read().peek();
+            async move {
+                match next_ticket {
                     Ok(Some(ticket)) => {
                         let ticket_id = ticket.ticket_id();
                         let (redeem_result, remove_ticket) =
@@ -617,16 +622,13 @@ where
                                 }
                             } else {
                                 // Tickets with low value are treated as errors and discarded
-                                (
-                                    Ok(Some(RedemptionResult::ValueTooLow(ticket.ticket))),
-                                    true
-                                )
+                                (Ok(Some(RedemptionResult::ValueTooLow(ticket.ticket))), true)
                             };
 
                         // Check if we should remove the ticket from the queue
                         if remove_ticket {
                             // Quickly perform pop and drop the write lock not to block any readers
-                            let _ = parking_lot::RwLockUpgradableReadGuard::upgrade(queue_read).pop();
+                            let _ = state.queue.write().pop();
                         }
 
                         redeem_result
@@ -646,8 +648,8 @@ where
                         Err(TicketManagerError::store(error))
                     }
                 }
-            };
-            res.map(|s| s.map(|v| (v, state)))
+                .map(|s| s.map(|v| (v, state)))
+            }
         }))
     }
 }
@@ -710,6 +712,38 @@ mod tests {
         assert_eq!(ticket_2.channel_id(), channel.get_id());
         assert_eq!(channel.ticket_index + 1, ticket_2.verified_ticket().index);
         assert_eq!(channel.channel_epoch, ticket_2.verified_ticket().channel_epoch);
+
+        Ok(())
+    }
+
+    #[test]
+    fn ticket_manager_test_next_outgoing_ticket_index() -> anyhow::Result<()> {
+        let mgr = create_mgr()?;
+
+        let src = ChainKeypair::random();
+        let dst = ChainKeypair::random();
+
+        let mut channel = ChannelEntry::builder()
+            .between(&src, &dst)
+            .amount(10)
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(1)
+            .build()?;
+
+        assert_eq!(0, mgr.next_outgoing_ticket_index(&channel));
+
+        channel.ticket_index = 10;
+        assert_eq!(10, mgr.next_outgoing_ticket_index(&channel));
+        assert_eq!(11, mgr.next_outgoing_ticket_index(&channel));
+
+        channel.ticket_index = 100;
+        assert_eq!(100, mgr.next_outgoing_ticket_index(&channel));
+        assert_eq!(101, mgr.next_outgoing_ticket_index(&channel));
+
+        channel.ticket_index = 50;
+        assert_eq!(102, mgr.next_outgoing_ticket_index(&channel));
+        assert_eq!(103, mgr.next_outgoing_ticket_index(&channel));
 
         Ok(())
     }
@@ -781,7 +815,8 @@ mod tests {
     }
 
     #[test_log::test]
-    fn ticket_manager_should_sync_out_indices_should_remove_indices_for_non_opened_outgoing_channels() -> anyhow::Result<()> {
+    fn ticket_manager_should_sync_out_indices_should_remove_indices_for_non_opened_outgoing_channels()
+    -> anyhow::Result<()> {
         let mgr = create_mgr()?;
 
         let src = ChainKeypair::random();
@@ -803,10 +838,12 @@ mod tests {
             .epoch(1)
             .build()?;
 
-        let ticket_1 = mgr.create_multihop_ticket(&channel_1, 2, WinningProbability::ALWAYS, 10.into())?
+        let ticket_1 = mgr
+            .create_multihop_ticket(&channel_1, 2, WinningProbability::ALWAYS, 10.into())?
             .eth_challenge(Default::default())
             .build()?;
-        let ticket_2 = mgr.create_multihop_ticket(&channel_2, 2, WinningProbability::ALWAYS, 10.into())?
+        let ticket_2 = mgr
+            .create_multihop_ticket(&channel_2, 2, WinningProbability::ALWAYS, 10.into())?
             .eth_challenge(Default::default())
             .build()?;
         assert_eq!(0, ticket_1.index);
@@ -818,7 +855,8 @@ mod tests {
         assert_eq!(Some(1), mgr.store.read().load_outgoing_index(channel_2.get_id(), 1)?);
 
         channel_1.status = ChannelStatus::Closed;
-        channel_2.status = ChannelStatus::PendingToClose(std::time::SystemTime::now() - std::time::Duration::from_mins(10));
+        channel_2.status =
+            ChannelStatus::PendingToClose(std::time::SystemTime::now() - std::time::Duration::from_mins(10));
 
         mgr.sync_from_outgoing_channels(&[channel_1, channel_2])?;
 
@@ -960,15 +998,16 @@ mod tests {
         );
 
         let neglected = mgr.neglect_tickets(&channel.get_id(), None)?;
-        assert_eq!(
-            tickets.into_iter().map(|t| t.ticket).collect::<Vec<_>>(),
-            neglected
-        );
+        assert_eq!(tickets.into_iter().map(|t| t.ticket).collect::<Vec<_>>(), neglected);
 
         let unrealized_value_after = mgr.unrealized_value(channel.get_id(), None)?;
         assert_eq!(
             unrealized_value_after,
-            unrealized_value - neglected.into_iter().map(|t| t.verified_ticket().amount).sum::<HoprBalance>()
+            unrealized_value
+                - neglected
+                    .into_iter()
+                    .map(|t| t.verified_ticket().amount)
+                    .sum::<HoprBalance>()
         );
 
         Ok(())
@@ -1024,7 +1063,11 @@ mod tests {
         let unrealized_value_after = mgr.unrealized_value(channel.get_id(), None)?;
         assert_eq!(
             unrealized_value_after,
-            unrealized_value - neglected.into_iter().map(|t| t.verified_ticket().amount).sum::<HoprBalance>()
+            unrealized_value
+                - neglected
+                    .into_iter()
+                    .map(|t| t.verified_ticket().amount)
+                    .sum::<HoprBalance>()
         );
 
         Ok(())
@@ -1043,7 +1086,7 @@ mod tests {
 
         assert!(matches!(
             mgr.unrealized_value(&channel_id, None),
-            Err(TicketManagerError::ChannelNotFound)
+            Err(TicketManagerError::ChannelQueueNotFound)
         ));
 
         let mut last_unrealized_value = HoprBalance::zero();
@@ -1092,7 +1135,7 @@ mod tests {
 
         assert!(matches!(
             mgr.unrealized_value(&channel_id, None),
-            Err(TicketManagerError::ChannelNotFound)
+            Err(TicketManagerError::ChannelQueueNotFound)
         ));
 
         for ticket in tickets_from_epoch_1.iter() {
@@ -1111,10 +1154,7 @@ mod tests {
 
         let neglected = mgr.insert_incoming_ticket(tickets_from_epoch_2[0].clone())?;
         assert_eq!(
-            tickets_from_epoch_1
-                .iter()
-                .map(|t| t.ticket)
-                .collect::<Vec<_>>(),
+            tickets_from_epoch_1.iter().map(|t| t.ticket).collect::<Vec<_>>(),
             neglected
         );
 
@@ -1234,21 +1274,30 @@ mod tests {
 
         pin_mut!(stream);
 
-        assert_eq!(Some(RedemptionResult::Redeemed(tickets[0].ticket)), stream.try_next().await?);
+        assert_eq!(
+            Some(RedemptionResult::Redeemed(tickets[0].ticket)),
+            stream.try_next().await?
+        );
         assert_eq!(
             mgr.unrealized_value(channel.get_id(), None)?,
             unrealized_value - tickets[0].verified_ticket().amount
         );
         unrealized_value = mgr.unrealized_value(channel.get_id(), None)?;
 
-        assert_eq!(Some(RedemptionResult::Redeemed(tickets[1].ticket)), stream.try_next().await?);
+        assert_eq!(
+            Some(RedemptionResult::Redeemed(tickets[1].ticket)),
+            stream.try_next().await?
+        );
         assert_eq!(
             mgr.unrealized_value(channel.get_id(), None)?,
             unrealized_value - tickets[1].verified_ticket().amount
         );
         unrealized_value = mgr.unrealized_value(channel.get_id(), None)?;
 
-        assert_eq!(Some(RedemptionResult::Redeemed(tickets[2].ticket)), stream.try_next().await?);
+        assert_eq!(
+            Some(RedemptionResult::Redeemed(tickets[2].ticket)),
+            stream.try_next().await?
+        );
         assert_eq!(
             mgr.unrealized_value(channel.get_id(), None)?,
             unrealized_value - tickets[2].verified_ticket().amount
@@ -1329,14 +1378,20 @@ mod tests {
         let stream = mgr.redeem_stream(connector.clone(), channel.get_id(), None)?;
         pin_mut!(stream);
 
-        assert_eq!(Some(RedemptionResult::Redeemed(tickets[0].ticket)), stream.try_next().await?);
+        assert_eq!(
+            Some(RedemptionResult::Redeemed(tickets[0].ticket)),
+            stream.try_next().await?
+        );
         assert_eq!(
             mgr.unrealized_value(channel.get_id(), None)?,
             unrealized_value - tickets[0].verified_ticket().amount
         );
 
         let neglected = mgr.neglect_tickets(&channel.get_id(), None)?;
-        assert_eq!(tickets.into_iter().skip(1).map(|t| t.ticket).collect::<Vec<_>>(), neglected);
+        assert_eq!(
+            tickets.into_iter().skip(1).map(|t| t.ticket).collect::<Vec<_>>(),
+            neglected
+        );
         assert_eq!(HoprBalance::zero(), mgr.unrealized_value(channel.get_id(), None)?);
 
         assert_eq!(None, stream.try_next().await?);
@@ -1380,7 +1435,10 @@ mod tests {
         pin_mut!(stream);
 
         // Ticket with index 0 gets redeemed
-        assert_eq!(Some(RedemptionResult::Redeemed(tickets[0].ticket)), stream.try_next().await?);
+        assert_eq!(
+            Some(RedemptionResult::Redeemed(tickets[0].ticket)),
+            stream.try_next().await?
+        );
         assert_eq!(
             mgr.unrealized_value(channel.get_id(), None)?,
             unrealized_value - tickets[0].verified_ticket().amount
@@ -1389,11 +1447,24 @@ mod tests {
 
         // Tickets with index 1,2 and 3 get neglected
         let neglected = mgr.neglect_tickets(&channel.get_id(), Some(tickets[3].verified_ticket().index))?;
-        assert_eq!(tickets.iter().skip(1).take(3).map(|t| t.ticket).collect::<Vec<_>>(), neglected);
-        assert_eq!(unrealized_value - neglected.into_iter().map(|t| t.verified_ticket().amount).sum::<HoprBalance>(), mgr.unrealized_value(channel.get_id(), None)?);
+        assert_eq!(
+            tickets.iter().skip(1).take(3).map(|t| t.ticket).collect::<Vec<_>>(),
+            neglected
+        );
+        assert_eq!(
+            unrealized_value
+                - neglected
+                    .into_iter()
+                    .map(|t| t.verified_ticket().amount)
+                    .sum::<HoprBalance>(),
+            mgr.unrealized_value(channel.get_id(), None)?
+        );
 
         // The last ticket with index 4 gets redeemed again
-        assert_eq!(Some(RedemptionResult::Redeemed(tickets[4].ticket)), stream.try_next().await?);
+        assert_eq!(
+            Some(RedemptionResult::Redeemed(tickets[4].ticket)),
+            stream.try_next().await?
+        );
 
         assert_eq!(HoprBalance::zero(), mgr.unrealized_value(channel.get_id(), None)?);
 
@@ -1434,11 +1505,22 @@ mod tests {
 
         let connector = std::sync::Arc::new(create_test_connector(&dst, &channel).await?);
 
-        let results = mgr.redeem_stream(connector.clone(), channel.get_id(), Some(tickets[0].verified_ticket().amount + 1))?
+        let results = mgr
+            .redeem_stream(
+                connector.clone(),
+                channel.get_id(),
+                Some(tickets[0].verified_ticket().amount + 1),
+            )?
             .try_collect::<Vec<_>>()
             .await?;
 
-        assert_eq!(results, tickets.into_iter().map(|t| RedemptionResult::ValueTooLow(t.ticket)).collect::<Vec<_>>());
+        assert_eq!(
+            results,
+            tickets
+                .into_iter()
+                .map(|t| RedemptionResult::ValueTooLow(t.ticket))
+                .collect::<Vec<_>>()
+        );
 
         Ok(())
     }

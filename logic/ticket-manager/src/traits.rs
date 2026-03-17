@@ -1,5 +1,4 @@
-use hopr_api::chain::{ChannelId, HoprBalance, RedeemableTicket,VerifiedTicket};
-
+use hopr_api::chain::{ChannelId, HoprBalance, RedeemableTicket, VerifiedTicket};
 
 /// Allows loading and saving outgoing ticket indices.
 pub trait OutgoingIndexStore {
@@ -31,7 +30,10 @@ pub trait TicketQueueStore {
     ///
     /// Returns any tickets left-over in this queue if it existed.
     /// Returned tickets are no longer redeemable.
-    fn delete_queue(&mut self, channel_id: &ChannelId) -> Result<Vec<VerifiedTicket>, <Self::Queue as TicketQueue>::Error>;
+    fn delete_queue(
+        &mut self,
+        channel_id: &ChannelId,
+    ) -> Result<Vec<VerifiedTicket>, <Self::Queue as TicketQueue>::Error>;
     /// Iterate over all channel IDs of ticket queues in the storage.
     fn iter_queues(&self) -> Result<impl Iterator<Item = ChannelId>, <Self::Queue as TicketQueue>::Error>;
 }
@@ -230,10 +232,7 @@ pub(crate) mod tests {
         assert_eq!(queue.iter_unordered()?.count(), 0);
 
         pushed_tickets.sort();
-        let pushed_tickets = pushed_tickets
-            .into_iter()
-            .map(|t| t.ticket)
-            .collect::<Vec<_>>();
+        let pushed_tickets = pushed_tickets.into_iter().map(|t| t.ticket).collect::<Vec<_>>();
         assert_eq!(pushed_tickets, dropped_tickets);
 
         Ok(())
@@ -255,7 +254,10 @@ pub(crate) mod tests {
         let drained_tickets = queue.drain()?;
         assert_eq!(
             all_tickets_value,
-            drained_tickets.iter().map(|ticket| ticket.verified_ticket().amount).sum()
+            drained_tickets
+                .iter()
+                .map(|ticket| ticket.verified_ticket().amount)
+                .sum()
         );
 
         let actual_total_value = queue.total_value(2, None)?;
@@ -449,7 +451,10 @@ pub(crate) mod tests {
         let mut values = store.iter_outgoing_indices()?.collect::<Vec<_>>();
         values.sort_unstable_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
 
-        assert_eq!(vec![(ChannelId::default(), 1), (ChannelId::default(), 2), (other, 3)], values);
+        assert_eq!(
+            vec![(ChannelId::default(), 1), (ChannelId::default(), 2), (other, 3)],
+            values
+        );
 
         Ok(())
     }
