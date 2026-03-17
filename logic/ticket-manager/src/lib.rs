@@ -191,6 +191,11 @@ where
     /// It is advised to call this function early after the construction of the `HoprTicketManager`
     /// to ensure pruning of dangling or out-of-date values.
     pub fn sync_from_outgoing_channels(&self, outgoing_channels: &[ChannelEntry]) -> Result<(), TicketManagerError> {
+        // TODO: use HashSet once ChannelEntry implements Eq and Hash.
+        let mut outgoing_channels = outgoing_channels.to_vec();
+        outgoing_channels.sort_unstable_by_key(|channel| *channel.get_id());
+        outgoing_channels.dedup_by_key(|channel| *channel.get_id());
+
         // Purge outdated outgoing indices
         let mut store_read = self.store.upgradable_read();
         let stored_indices = store_read
@@ -310,6 +315,11 @@ where
         &self,
         incoming_channels: &[ChannelEntry],
     ) -> Result<Vec<Ticket>, TicketManagerError> {
+        // TODO: use HashSet once ChannelEntry implements Eq and Hash.
+        let mut outgoing_channels = incoming_channels.to_vec();
+        outgoing_channels.sort_unstable_by_key(|channel| *channel.get_id());
+        outgoing_channels.dedup_by_key(|channel| *channel.get_id());
+
         // Purge outdated incoming channel queues
         let mut store_read = self.store.upgradable_read();
         let stored_queues = store_read
@@ -320,7 +330,7 @@ where
         let now = hopr_platform::time::current_time();
         for channel_id in stored_queues {
             // If any existing redeemable ticket queue does not match any currently existing
-            // channel that's either open or its closure period did not yet elapse (i.e. the channel
+            // channel that's either open or its closure period did not yet elapse (i.e., the channel
             // is not closed or not effectively closed), remove the queue from the store.
             if !incoming_channels
                 .iter()
@@ -748,6 +758,11 @@ mod tests {
         assert_eq!(vec![*channel.get_id()], queues);
 
         Ok(())
+    }
+
+    #[test]
+    fn ticket_manager_should_neglect_tickets_from_closed_channels_on_sync() -> anyhow::Result<()> {
+        todo!()
     }
 
     #[test]
