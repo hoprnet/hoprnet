@@ -8,7 +8,7 @@
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/master";
     rust-overlay.url = "github:oxalica/rust-overlay/master";
     crane.url = "github:ipetkov/crane/v0.23.0";
-    nix-lib.url = "github:hoprnet/nix-lib";
+    nix-lib.url = "github:hoprnet/nix-lib/kauki-nix-lib-add-cargo-bench-support";
     # pin it to a version which we are compatible with
     foundry.url = "github:hoprnet/foundry.nix/tb/202505-add-xz";
     pre-commit.url = "github:cachix/git-hooks.nix";
@@ -271,47 +271,15 @@
                   CARGO_PROFILE = "candidate";
                 }
               );
-          # Use cross-compilation environment when possible to have the same setup as our production builds when benchmarking.
-          hoprd-bench =
-            if buildPlatform.isLinux && buildPlatform.isx86_64 then
-              rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage (
-                projectBuildArgs // { runBench = true; }
-              )
-            else if buildPlatform.isLinux && buildPlatform.isAarch64 then
-              rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage (
-                projectBuildArgs // { runBench = true; }
-              )
-            else if buildPlatform.isDarwin && buildPlatform.isx86_64 then
-              rust-builder-x86_64-darwin.callPackage nixLib.mkRustPackage (
-                projectBuildArgs // { runBench = true; }
-              )
-            else if buildPlatform.isDarwin && buildPlatform.isAarch64 then
-              rust-builder-aarch64-darwin.callPackage nixLib.mkRustPackage (
-                projectBuildArgs // { runBench = true; }
-              )
-            else
-              rust-builder-local.callPackage nixLib.mkRustPackage (projectBuildArgs // { runBench = true; });
+          # Benchmarks always run on the current platform.
+          hoprd-bench = rust-builder-local.callPackage nixLib.mkRustPackage (
+            projectBuildArgs // { runBench = true; }
+          );
 
           # Compile benchmarks without running them, used for CI build verification.
-          hoprd-bench-build =
-            if buildPlatform.isLinux && buildPlatform.isx86_64 then
-              rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage (
-                hoprdBuildArgs // { buildBench = true; }
-              )
-            else if buildPlatform.isLinux && buildPlatform.isAarch64 then
-              rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage (
-                hoprdBuildArgs // { buildBench = true; }
-              )
-            else if buildPlatform.isDarwin && buildPlatform.isx86_64 then
-              rust-builder-x86_64-darwin.callPackage nixLib.mkRustPackage (
-                hoprdBuildArgs // { buildBench = true; }
-              )
-            else if buildPlatform.isDarwin && buildPlatform.isAarch64 then
-              rust-builder-aarch64-darwin.callPackage nixLib.mkRustPackage (
-                hoprdBuildArgs // { buildBench = true; }
-              )
-            else
-              rust-builder-local.callPackage nixLib.mkRustPackage (hoprdBuildArgs // { buildBench = true; });
+          hoprd-bench-build = rust-builder-local.callPackage nixLib.mkRustPackage (
+            projectBuildArgs // { buildBench = true; }
+          );
 
           profileDeps = with pkgs; [
             gdb
