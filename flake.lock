@@ -205,16 +205,15 @@
         ]
       },
       "locked": {
-        "lastModified": 1773744662,
-        "narHash": "sha256-obVitFEAqJGb18D6NTnE4fiRwF45esN4UMsSAlHaOP8=",
+        "lastModified": 1773748079,
+        "narHash": "sha256-R6JNAuhD49bB2wDyQkF2GXtG9PrtcRwJXbx9sTVQ65o=",
         "owner": "hoprnet",
         "repo": "nix-lib",
-        "rev": "92051d44ad0561af0d68865036d2c2ce149d0ce5",
+        "rev": "fe41caa267834222988f96d3dfa7c21e7b21e60e",
         "type": "github"
       },
       "original": {
         "owner": "hoprnet",
-        "ref": "kauki-nix-lib-introduce-codecov",
         "repo": "nix-lib",
         "type": "github"
       }
