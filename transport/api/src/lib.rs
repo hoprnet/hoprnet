@@ -159,14 +159,13 @@ type CurrentPathSelector = NoPathSelector;
 
 /// Interface into the physical transport mechanism allowing all off-chain HOPR-related tasks on
 /// the transport.
-pub struct HoprTransport<Chain, Db, Graph, Net>
+pub struct HoprTransport<Chain, Graph, Net>
 where
     Graph: NetworkGraphView<NodeId = OffchainPublicKey> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
     Net: NetworkView + NetworkStreamControl + Clone + Send + Sync + 'static,
 {
     packet_key: OffchainKeypair,
     chain_key: ChainKeypair,
-    db: Db,
     chain_api: Chain,
     ping: Arc<OnceLock<Pinger>>,
     network: Arc<OnceLock<Net>>,
@@ -177,9 +176,8 @@ where
     cfg: HoprProtocolConfig,
 }
 
-impl<Chain, Db, Graph, Net> HoprTransport<Chain, Db, Graph, Net>
+impl<Chain, Graph, Net> HoprTransport<Chain, Graph, Net>
 where
-    Db: HoprDbTicketOperations + Clone + Send + Sync + 'static,
     Chain: ChainReadChannelOperations
         + ChainReadAccountOperations
         + ChainKeyOperations
@@ -194,7 +192,6 @@ where
     pub fn new(
         identity: (&ChainKeypair, &OffchainKeypair),
         resolver: Chain,
-        db: Db,
         graph: Graph,
         my_multiaddresses: Vec<Multiaddr>,
         cfg: HoprProtocolConfig,
@@ -235,7 +232,6 @@ where
                 surb_balance_notify_period: None,
                 surb_target_notify: true,
             }),
-            db,
             chain_api: resolver,
             cfg,
         }
@@ -433,7 +429,6 @@ where
                 ticket_events,
                 surb_store: self.path_planner.surb_store.clone(),
                 chain_api: self.chain_api.clone(),
-                db: self.db.clone(),
             },
             channels_dst,
             self.cfg.packet,

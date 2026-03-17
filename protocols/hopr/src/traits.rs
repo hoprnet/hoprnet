@@ -157,9 +157,6 @@ pub trait UnacknowledgedTicketProcessor {
 pub trait TicketTracker {
     type Error: std::error::Error + Send + Sync + 'static;
 
-    /// Gets the next ticket index for an outgoing ticket for the given channel.
-    async fn next_outgoing_ticket_index(&self, channel: &ChannelEntry) -> Result<u64, Self::Error>;
-
     /// Retrieves the unrealized balance of the given channel.
     ///
     /// This allows guarding from situations where the ticket issuer issues more tickets
@@ -178,31 +175,5 @@ pub trait TicketTracker {
         current_path_pos: u8,
         winning_prob: WinningProbability,
         ticket_price: HoprBalance,
-    ) -> Result<TicketBuilder, TicketCreationError<Self::Error>> {
-        // The next ticket is worth: price * remaining hop count / winning probability
-        let amount = HoprBalance::from(
-            ticket_price
-                .amount()
-                .mul(U256::from(current_path_pos - 1))
-                .div_f64(winning_prob.into())
-                .expect("winning probability is always less than or equal to 1"),
-        );
-
-        if channel.balance.lt(&amount) {
-            return Err(TicketCreationError::OutOfFunds(*channel.get_id(), amount));
-        }
-
-        let ticket_builder = TicketBuilder::default()
-            .counterparty(channel.destination)
-            .balance(amount)
-            .index(
-                self.next_outgoing_ticket_index(channel)
-                    .await
-                    .map_err(TicketCreationError::Other)?,
-            )
-            .win_prob(winning_prob)
-            .channel_epoch(channel.channel_epoch);
-
-        Ok(ticket_builder)
-    }
+    ) -> Result<TicketBuilder, TicketCreationError<Self::Error>>;
 }

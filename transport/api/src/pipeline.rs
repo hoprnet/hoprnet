@@ -16,22 +16,20 @@ use crate::{HoprTransportProcess, config::HoprPacketPipelineConfig};
 
 /// Contains all components required to run the HOPR packet pipeline.
 #[derive(Clone)]
-pub struct HoprPipelineComponents<TEvt, S, Chain, Db> {
+pub struct HoprPipelineComponents<TEvt, S, Chain> {
     /// Sink for [`TicketEvents`](TicketEvent).
     pub ticket_events: TEvt,
     /// Store for SURBs and Reply Openers.
     pub surb_store: S,
     /// Chain API for interacting with the blockchain.
     pub chain_api: Chain,
-    /// Database for storing tickets and other data.
-    pub db: Db,
 }
 
-pub fn run_hopr_packet_pipeline<WIn, WOut, Chain, S, Db, TEvt, AppOut, AppIn>(
+pub fn run_hopr_packet_pipeline<WIn, WOut, Chain, S, TEvt, AppOut, AppIn>(
     (packet_key, chain_key): (OffchainKeypair, ChainKeypair),
     wire_msg: (WOut, WIn),
     api: (AppOut, AppIn),
-    components: HoprPipelineComponents<TEvt, S, Chain, Db>,
+    components: HoprPipelineComponents<TEvt, S, Chain>,
     channels_dst: Hash,
     cfg: HoprPacketPipelineConfig,
 ) -> AbortableList<HoprTransportProcess>
@@ -39,7 +37,6 @@ where
     WOut: futures::Sink<(PeerId, Box<[u8]>)> + Clone + Unpin + Send + 'static,
     WOut::Error: std::error::Error,
     WIn: futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + 'static,
-    Db: HoprDbTicketOperations + Clone + Send + Sync + 'static,
     Chain: ChainKeyOperations + ChainReadChannelOperations + ChainValues + Clone + Send + Sync + 'static,
     S: SurbStore + Clone + Send + Sync + 'static,
     TEvt: futures::Sink<TicketEvent> + Clone + Unpin + Send + 'static,
@@ -52,12 +49,10 @@ where
         ticket_events,
         surb_store,
         chain_api,
-        db,
     } = components;
 
     let ticket_proc = HoprTicketProcessor::new(
         chain_api.clone(),
-        db.clone(),
         chain_key.clone(),
         channels_dst,
         cfg.ticket_processing,
