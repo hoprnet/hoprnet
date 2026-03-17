@@ -140,6 +140,9 @@
           rust-builder-aarch64-linux = builders.aarch64-linux;
           rust-builder-aarch64-darwin = builders.aarch64-darwin;
 
+          # Coverage builder with llvm-tools for code coverage instrumentation
+          rust-builder-local-coverage = builders.localCoverage;
+
           # Nightly builder for docs and specific features
           # Uses a pinned nightly version to avoid ICE bugs in latest nightly
           rust-builder-local-nightly = nixLib.mkRustBuilder {
@@ -238,6 +241,20 @@
                 runTests = true;
                 prependPackageName = false;
                 cargoTestExtraArgs = "--lib";
+              }
+            )
+          );
+
+          # Code coverage (outputs LCOV report)
+          hopr-coverage = fixUtoipaEmbedPaths (
+            rust-builder-local-coverage.callPackage nixLib.mkRustPackage (
+              projectBuildArgs
+              // {
+                src = testSrc;
+                cargoExtraArgs = "-F allocator-jemalloc";
+                runCoverage = true;
+                prependPackageName = false;
+                cargoLlvmCovExtraArgs = "--lcov --output-path $out --lib";
               }
             )
           );
@@ -737,7 +754,12 @@
               hoprd-profile-docker
               hoprd-localcluster
               ;
-            inherit hopr-test-unit hopr-test-integration hopr-test-nightly;
+            inherit
+              hopr-test-unit
+              hopr-test-integration
+              hopr-test-nightly
+              hopr-coverage
+              ;
             inherit docs;
             inherit pre-commit-check;
             inherit hoprd-bench;
