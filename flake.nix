@@ -147,7 +147,7 @@
             rustToolchainFile = ./rust-toolchain-nightly.toml;
           };
 
-          hoprdBuildArgs = {
+          projectBuildArgs = {
             inherit src depsSrc rev;
             cargoExtraArgs = "-p hoprd-api -F allocator-jemalloc";
             cargoToml = ./hoprd/hoprd/Cargo.toml;
@@ -158,38 +158,38 @@
             cargoToml = ./localcluster/Cargo.toml;
           };
 
-          hoprd = rust-builder-local.callPackage nixLib.mkRustPackage hoprdBuildArgs;
+          hoprd = rust-builder-local.callPackage nixLib.mkRustPackage projectBuildArgs;
           hoprd-localcluster = rust-builder-local.callPackage nixLib.mkRustPackage localclusterBuildArgs;
           # also used for Docker image
-          hoprd-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage hoprdBuildArgs;
+          hoprd-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage projectBuildArgs;
           # also used for Docker image
           hoprd-localcluster-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage localclusterBuildArgs;
           # also used for Docker image
           hoprd-x86_64-linux-profile = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
+            projectBuildArgs // { cargoExtraArgs = "-F capture"; }
           );
           # also used for Docker image
           hoprd-x86_64-linux-dev = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs
+            projectBuildArgs
             // {
               CARGO_PROFILE = "dev";
               cargoExtraArgs = "-F capture";
             }
           );
-          hoprd-aarch64-linux = rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage hoprdBuildArgs;
+          hoprd-aarch64-linux = rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage projectBuildArgs;
           hoprd-aarch64-linux-profile = rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
+            projectBuildArgs // { cargoExtraArgs = "-F capture"; }
           );
 
           # CAVEAT: must be built from a darwin system
-          hoprd-x86_64-darwin = rust-builder-x86_64-darwin.callPackage nixLib.mkRustPackage hoprdBuildArgs;
+          hoprd-x86_64-darwin = rust-builder-x86_64-darwin.callPackage nixLib.mkRustPackage projectBuildArgs;
           hoprd-x86_64-darwin-profile = rust-builder-x86_64-darwin.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
+            projectBuildArgs // { cargoExtraArgs = "-F capture"; }
           );
           # CAVEAT: must be built from a darwin system
-          hoprd-aarch64-darwin = rust-builder-aarch64-darwin.callPackage nixLib.mkRustPackage hoprdBuildArgs;
+          hoprd-aarch64-darwin = rust-builder-aarch64-darwin.callPackage nixLib.mkRustPackage projectBuildArgs;
           hoprd-aarch64-darwin-profile = rust-builder-aarch64-darwin.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
+            projectBuildArgs // { cargoExtraArgs = "-F capture"; }
           );
 
           # Shared preBuild hook to fix stale sandbox paths in cached utoipa-swagger-ui build script outputs
@@ -205,7 +205,7 @@
 
           hopr-test-unit = fixUtoipaEmbedPaths (
             rust-builder-local.callPackage nixLib.mkRustPackage (
-              hoprdBuildArgs
+              projectBuildArgs
               // {
                 src = testSrc;
                 cargoExtraArgs = "-F allocator-jemalloc";
@@ -218,7 +218,7 @@
 
           hopr-test-integration = fixUtoipaEmbedPaths (
             rust-builder-local.callPackage nixLib.mkRustPackage (
-              hoprdBuildArgs
+              projectBuildArgs
               // {
                 src = testSrc;
                 cargoExtraArgs = "-F allocator-jemalloc";
@@ -231,7 +231,7 @@
 
           hopr-test-nightly = fixUtoipaEmbedPaths (
             rust-builder-local-nightly.callPackage nixLib.mkRustPackage (
-              hoprdBuildArgs
+              projectBuildArgs
               // {
                 src = testSrc;
                 cargoExtraArgs = "-Z panic-abort-tests -F allocator-jemalloc";
@@ -243,10 +243,10 @@
           );
 
           hoprd-clippy = rust-builder-local.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs // { runClippy = true; }
+            projectBuildArgs // { runClippy = true; }
           );
           hoprd-dev = rust-builder-local.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs
+            projectBuildArgs
             // {
               CARGO_PROFILE = "dev";
               cargoExtraArgs = "-F capture";
@@ -257,7 +257,7 @@
             cargoExtraArgs:
             if buildPlatform.isLinux && buildPlatform.isx86_64 then
               rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage (
-                hoprdBuildArgs
+                projectBuildArgs
                 // {
                   inherit cargoExtraArgs;
                   CARGO_PROFILE = "candidate";
@@ -265,7 +265,7 @@
               )
             else
               rust-builder-local.callPackage nixLib.mkRustPackage (
-                hoprdBuildArgs
+                projectBuildArgs
                 // {
                   inherit cargoExtraArgs;
                   CARGO_PROFILE = "candidate";
@@ -274,17 +274,23 @@
           # Use cross-compilation environment when possible to have the same setup as our production builds when benchmarking.
           hoprd-bench =
             if buildPlatform.isLinux && buildPlatform.isx86_64 then
-              rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage (hoprdBuildArgs // { runBench = true; })
+              rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage (
+                projectBuildArgs // { runBench = true; }
+              )
             else if buildPlatform.isLinux && buildPlatform.isAarch64 then
-              rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage (hoprdBuildArgs // { runBench = true; })
+              rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage (
+                projectBuildArgs // { runBench = true; }
+              )
             else if buildPlatform.isDarwin && buildPlatform.isx86_64 then
-              rust-builder-x86_64-darwin.callPackage nixLib.mkRustPackage (hoprdBuildArgs // { runBench = true; })
+              rust-builder-x86_64-darwin.callPackage nixLib.mkRustPackage (
+                projectBuildArgs // { runBench = true; }
+              )
             else if buildPlatform.isDarwin && buildPlatform.isAarch64 then
               rust-builder-aarch64-darwin.callPackage nixLib.mkRustPackage (
-                hoprdBuildArgs // { runBench = true; }
+                projectBuildArgs // { runBench = true; }
               )
             else
-              rust-builder-local.callPackage nixLib.mkRustPackage (hoprdBuildArgs // { runBench = true; });
+              rust-builder-local.callPackage nixLib.mkRustPackage (projectBuildArgs // { runBench = true; });
 
           profileDeps = with pkgs; [
             gdb
@@ -436,7 +442,7 @@
             drv = dockerImageUploadScript hoprd-profile-docker;
           };
           docs = rust-builder-local-nightly.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs // { buildDocs = true; }
+            projectBuildArgs // { buildDocs = true; }
           );
           pre-commit-check = pre-commit.lib.${system}.run {
             src = ./.;
