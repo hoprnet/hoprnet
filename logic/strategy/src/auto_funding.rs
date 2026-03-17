@@ -795,6 +795,7 @@ mod tests {
         let funded_channel = ChannelEntry::builder()
             .between(*BOB, *CHRIS)
             .amount(3 + 5)
+            .ticket_index(0)
             .status(ChannelStatus::Open)
             .epoch(0)
             .build()?;

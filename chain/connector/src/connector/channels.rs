@@ -268,7 +268,7 @@ mod tests {
             .amount(15)
             .ticket_index(2)
             .status(ChannelStatus::PendingToClose(
-                std::time::SystemTime::UNIX_EPOCH + Duration::from_secs(10),
+                std::time::SystemTime::UNIX_EPOCH + Duration::from_mins(10),
             ))
             .epoch(1)
             .build()?;
