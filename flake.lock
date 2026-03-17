@@ -205,11 +205,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1773750983,
+        "lastModified": 1773754962,
         "narHash": "sha256-i4AC7eKw5VzAQlUFtl+JcHO1rD/g4RX5pErv435Mpac=",
         "owner": "hoprnet",
         "repo": "nix-lib",
-        "rev": "f747cb3c492d624118bc992752df59c57d79771b",
+        "rev": "0e37a09653e93220bb9e645ef0649fcaf1a0d8b7",
         "type": "github"
       },
       "original": {
