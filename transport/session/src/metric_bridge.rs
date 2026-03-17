@@ -253,6 +253,7 @@ pub fn session_telemetry_snapshots() -> Vec<SessionStatsSnapshot> {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Context;
     use rstest::rstest;
 
     use super::*;
@@ -291,15 +292,16 @@ mod tests {
     }
 
     #[test]
-    fn metric_schema_snapshot_produces_all_expected_fields() {
+    fn metric_schema_snapshot_produces_all_expected_fields() -> anyhow::Result<()> {
         let schema = metric_schema_snapshot();
-        let value = serde_json::to_value(&schema).expect("schema should serialize");
+        let value = serde_json::to_value(&schema).context("schema should serialize")?;
         let mut path = Vec::new();
         let mut output = Vec::new();
         flatten_snapshot_value(&value, &mut path, &mut output);
 
         let names: Vec<&str> = output.iter().map(|s| s.name.as_str()).collect();
         insta::assert_yaml_snapshot!(names);
+        Ok(())
     }
 
     #[test]
