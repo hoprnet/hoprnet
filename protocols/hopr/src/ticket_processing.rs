@@ -8,9 +8,13 @@ use hopr_api::{
 };
 #[cfg(feature = "rayon")]
 use hopr_parallelize::cpu::rayon::prelude::*;
-use validator::ValidationError;
 use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue, TicketManagerError};
-use crate::{HoprProtocolError, ResolvedAcknowledgement, TicketAcknowledgementError, TicketCreationError, TicketTracker, UnacknowledgedTicketProcessor};
+use validator::ValidationError;
+
+use crate::{
+    HoprProtocolError, ResolvedAcknowledgement, TicketAcknowledgementError, TicketCreationError, TicketTracker,
+    UnacknowledgedTicketProcessor,
+};
 
 /// Metrics for unacknowledged ticket cache diagnostics.
 ///
@@ -336,51 +340,6 @@ impl<Chain> HoprTicketProcessor<Chain> {
     }
 }
 
-impl<Chain> HoprTicketProcessor<Chain> {
-    /// Task that performs periodic synchronization of the outgoing ticket index cache
-    /// to the underlying database.
-    ///
-    /// If this task is not started, the outgoing ticket indices will not survive a node
-    /// restart and will result in invalid tickets received by the counterparty.
-    /*pub fn outgoing_index_sync_task(
-        &self,
-        reg: futures::future::AbortRegistration,
-    ) -> impl Future<Output = ()> + use<Chain> {
-        let index_save_stream = futures::stream::Abortable::new(
-            // TODO: make this configurable
-            futures_time::stream::interval(futures_time::time::Duration::from_secs(30)
-            ),
-            reg,
-        );
-
-        let db = self.db.clone();
-        let out_ticket_index = self.out_ticket_index.clone();
-
-        index_save_stream
-            .for_each(move |_| {
-                let db = db.clone();
-                let out_ticket_index = out_ticket_index.clone();
-                async move {
-                    // This iteration does not alter the popularity estimator of the cache
-                    // and therefore still allows the unused entries to expire
-                    for (channel_key, out_idx) in out_ticket_index.iter() {
-                        if let Err(error) = db
-                            .update_outgoing_ticket_index(
-                                &channel_key.0,
-                                channel_key.1,
-                                out_idx.load(std::sync::atomic::Ordering::SeqCst),
-                            )
-                            .await
-                        {
-                            tracing::error!(%error, channel_id = %channel_key.0, epoch = channel_key.1, "failed to sync outgoing ticket index to db");
-                        }
-                    }
-                    tracing::trace!("synced outgoing ticket indices to db");
-                }
-            })
-    }*/
-}
-
 #[async_trait::async_trait]
 impl<Chain> UnacknowledgedTicketProcessor for HoprTicketProcessor<Chain>
 where
@@ -592,20 +551,20 @@ where
 {
     type Error = TicketManagerError;
 
-    /*async fn next_outgoing_ticket_index(&self, channel: &ChannelEntry) -> Result<u64, Self::Error> {
-        let channel_id = *channel.get_id();
-        let epoch = channel.channel_epoch;
-        let current_idx = channel.ticket_index;
-        self.out_ticket_index
-            .try_get_with((channel_id, epoch), async {
-                self.db
-                    .get_or_create_outgoing_ticket_index(&channel_id, epoch, current_idx)
-                    .await
-                    .map(|maybe_idx| Arc::new(AtomicU64::new(maybe_idx.unwrap_or_default())))
-            })
-            .await
-            .map(|idx| idx.fetch_add(1, std::sync::atomic::Ordering::SeqCst))
-    }*/
+    // async fn next_outgoing_ticket_index(&self, channel: &ChannelEntry) -> Result<u64, Self::Error> {
+    // let channel_id = *channel.get_id();
+    // let epoch = channel.channel_epoch;
+    // let current_idx = channel.ticket_index;
+    // self.out_ticket_index
+    // .try_get_with((channel_id, epoch), async {
+    // self.db
+    // .get_or_create_outgoing_ticket_index(&channel_id, epoch, current_idx)
+    // .await
+    // .map(|maybe_idx| Arc::new(AtomicU64::new(maybe_idx.unwrap_or_default())))
+    // })
+    // .await
+    // .map(|idx| idx.fetch_add(1, std::sync::atomic::Ordering::SeqCst))
+    // }
 
     async fn incoming_channel_unrealized_balance(
         &self,
@@ -623,10 +582,13 @@ where
         winning_prob: WinningProbability,
         ticket_price: HoprBalance,
     ) -> Result<TicketBuilder, TicketCreationError<Self::Error>> {
-        match self.ticket_mgr.create_multihop_ticket(channel, current_path_pos, winning_prob, ticket_price) {
+        match self
+            .ticket_mgr
+            .create_multihop_ticket(channel, current_path_pos, winning_prob, ticket_price)
+        {
             Ok(ticket) => Ok(ticket),
-            Err(TicketManagerError::OutOfFunds(id,balance)) => Err(TicketCreationError::OutOfFunds(id, balance)),
-            Err(err) => Err(TicketCreationError::Other(err))
+            Err(TicketManagerError::OutOfFunds(id, balance)) => Err(TicketCreationError::OutOfFunds(id, balance)),
+            Err(err) => Err(TicketCreationError::Other(err)),
         }
     }
 }
