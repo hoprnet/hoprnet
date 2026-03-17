@@ -22,6 +22,9 @@ use crate::{ProberConfig, priority::immediate_probe_priority};
 /// Default penalty factor applied to edge cost functions.
 const DEFAULT_EDGE_PENALTY: f64 = 0.5;
 
+/// Default minimum acceptable message acknowledgment rate for cover traffic path search.
+const DEFAULT_MIN_ACK_RATE: f64 = 0.5;
+
 pub struct FullNetworkDiscovery<U> {
     me: OffchainPublicKey,
     cfg: ProberConfig,
@@ -69,7 +72,7 @@ where
                 &me,
                 edge_count.get(),
                 Some(100),
-                EdgeCostFn::forward(edge_count, DEFAULT_EDGE_PENALTY),
+                EdgeCostFn::forward(edge_count, DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE),
             );
 
             let weighted: Vec<_> = paths

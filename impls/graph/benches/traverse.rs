@@ -14,6 +14,8 @@ use hopr_network_graph::ChannelGraph;
 
 /// Default penalty factor applied to edge cost functions.
 const DEFAULT_EDGE_PENALTY: f64 = 0.5;
+/// Default minimum acceptable message acknowledgment rate.
+const DEFAULT_MIN_ACK_RATE: f64 = 0.0;
 
 // ── Graph construction helpers ───────────────────────────────────────────────
 
@@ -130,6 +132,7 @@ fn bench_simple_paths(c: &mut Criterion) {
                         EdgeCostFn::forward(
                             std::num::NonZeroUsize::new(2).expect("is greater than 1"),
                             DEFAULT_EDGE_PENALTY,
+                            DEFAULT_MIN_ACK_RATE,
                         ),
                     ))
                 });
@@ -145,6 +148,7 @@ fn bench_simple_paths(c: &mut Criterion) {
                         EdgeCostFn::forward(
                             std::num::NonZeroUsize::new(3).expect("is greater than 1"),
                             DEFAULT_EDGE_PENALTY,
+                            DEFAULT_MIN_ACK_RATE,
                         ),
                     ))
                 });
@@ -160,6 +164,7 @@ fn bench_simple_paths(c: &mut Criterion) {
                         EdgeCostFn::forward(
                             std::num::NonZeroUsize::new(4).expect("is greater than 1"),
                             DEFAULT_EDGE_PENALTY,
+                            DEFAULT_MIN_ACK_RATE,
                         ),
                     ))
                 });

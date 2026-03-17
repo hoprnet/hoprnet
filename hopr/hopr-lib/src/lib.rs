@@ -303,6 +303,7 @@ pub struct Hopr<Chain, Db, Graph, Net>
 where
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
+        + hopr_api::graph::NetworkGraphWrite<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
         + Clone
         + Send
@@ -310,6 +311,7 @@ where
         + 'static,
     <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
         hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
+    <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     me: OffchainKeypair,
@@ -329,6 +331,7 @@ where
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
+        + hopr_api::graph::NetworkGraphWrite<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
         + Clone
         + Send
@@ -336,6 +339,7 @@ where
         + 'static,
     <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
         hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
+    <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     pub async fn new(
@@ -413,20 +417,6 @@ where
     #[inline]
     fn is_public(&self) -> bool {
         self.cfg.publish
-    }
-
-    // TODO(20260218): @NumberFour8 abstract the telemetry objects properly and extract this API into a telemetry trait
-    /// Get packet stats for a specific peer.
-    #[cfg(feature = "telemetry")]
-    pub async fn network_peer_packet_stats(&self, peer: &PeerId) -> errors::Result<Option<PeerPacketStatsSnapshot>> {
-        Ok(self.transport_api.network_peer_packet_stats(peer).await?)
-    }
-
-    // TODO(20260218): @NumberFour8 abstract the telemetry objects properly and extract this API into a telemetry trait
-    /// Get packet stats for all connected peers.
-    #[cfg(feature = "telemetry")]
-    pub async fn network_all_packet_stats(&self) -> errors::Result<Vec<(PeerId, PeerPacketStatsSnapshot)>> {
-        Ok(self.transport_api.network_all_packet_stats().await?)
     }
 
     pub async fn run<
@@ -967,6 +957,7 @@ impl<Chain, Db, Graph, Net> Hopr<Chain, Db, Graph, Net>
 where
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
+        + hopr_api::graph::NetworkGraphWrite<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
         + Clone
         + Send
@@ -974,6 +965,7 @@ where
         + 'static,
     <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
         hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
+    <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     // === telemetry
@@ -997,6 +989,7 @@ where
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
+        + hopr_api::graph::NetworkGraphWrite<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
         + Clone
         + Send
@@ -1004,6 +997,7 @@ where
         + 'static,
     <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
         hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
+    <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     fn status(&self) -> HoprState {
@@ -1018,6 +1012,7 @@ where
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
+        + hopr_api::graph::NetworkGraphWrite<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
         + Clone
         + Send
@@ -1025,6 +1020,7 @@ where
         + 'static,
     <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
         hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
+    <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     type Error = HoprLibError;
@@ -1146,6 +1142,7 @@ where
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
+        + hopr_api::graph::NetworkGraphWrite<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
         + Clone
         + Send
@@ -1153,6 +1150,7 @@ where
         + 'static,
     <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
         hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
+    <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     pub fn me_onchain(&self) -> Address {

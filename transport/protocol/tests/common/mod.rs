@@ -201,6 +201,7 @@ pub async fn peer_setup_for(
             received_ack_tickets_tx,
             Default::default(),
             (api_recv_tx, api_send_rx),
+            Default::default(),
         );
 
         wire_channels.insert(PeerId::from(*PEERS[i].public()), (wire_msg_send_tx, mixer_channel_rx));
