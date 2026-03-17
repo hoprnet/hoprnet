@@ -87,7 +87,6 @@ jobs:
           nix develop .#coverage -c cargo llvm-cov \
             --workspace \
             --test '*' \
-            --ignore-run-fail \
             --lcov --output-path integration-coverage.lcov \
             -- --test-threads=1
 
