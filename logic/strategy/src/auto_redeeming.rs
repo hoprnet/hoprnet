@@ -246,23 +246,23 @@ mod tests {
         static ref CHARLIE: ChainKeypair = ChainKeypair::from_secret(&hex!("d39a926980d6fa96a9eba8f8058b2beb774bc11866a386e9ddf9dc1152557c26")).expect("lazy static keypair should be constructible");
         static ref PRICE_PER_PACKET: HoprBalance = 10000000000000000_u128.into(); // 0.01 HOPR
 
-        static ref CHANNEL_1: ChannelEntry = ChannelEntry::new(
-            ALICE.public().to_address(),
-            BOB.public().to_address(),
-            *PRICE_PER_PACKET * 10,
-            0,
-            ChannelStatus::Open,
-            4
-        );
+        static ref CHANNEL_1: ChannelEntry = ChannelEntry::builder()
+            .between(&*ALICE, &*BOB)
+            .balance(*PRICE_PER_PACKET * 10)
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(4)
+            .build()
+            .unwrap();
 
-        static ref CHANNEL_2: ChannelEntry = ChannelEntry::new(
-            CHARLIE.public().to_address(),
-            BOB.public().to_address(),
-            *PRICE_PER_PACKET * 11,
-            1,
-            ChannelStatus::Open,
-            4
-        );
+        static ref CHANNEL_2: ChannelEntry = ChannelEntry::builder()
+            .between(&*CHARLIE, &*BOB)
+            .balance(*PRICE_PER_PACKET * 11)
+            .ticket_index(1)
+            .status(ChannelStatus::Open)
+            .epoch(4)
+            .build()
+            .unwrap();
 
         static ref CHAIN_CLIENT: BlokliTestClient<StaticState> = BlokliTestStateBuilder::default()
             .with_generated_accounts(&[ALICE.public().as_ref(), BOB.public().as_ref(), CHARLIE.public().as_ref()], false, XDaiBalance::new_base(1), HoprBalance::new_base(1000))

@@ -119,14 +119,14 @@ mod tests {
     }
 
     fn create_channel_entry() -> ChannelEntry {
-        ChannelEntry::new(
-            SENDER_PRIV_KEY.public().to_address(),
-            TARGET_PRIV_KEY.public().to_address(),
-            100.into(),
-            0,
-            ChannelStatus::Open,
-            1,
-        )
+        ChannelEntry::builder()
+            .between(&*SENDER_PRIV_KEY, &*TARGET_PRIV_KEY)
+            .amount(100)
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(1)
+            .build()
+            .unwrap()
     }
 
     #[tokio::test]
