@@ -1,0 +1,9 @@
+---
+source: transport/protocol/src/errors.rs
+expression: variants
+---
+[
+    "timeout on protocol operation",
+    "Failed on a logical error: test logic error",
+    "General error failed to parse/deserialize the data: bad parse",
+]
