@@ -139,7 +139,6 @@ pub(crate) mod tests {
             .epoch(10u32)
             .build()?;
 
-
         backend.insert_account(account.clone())?;
         backend.insert_channel(channel)?;
 

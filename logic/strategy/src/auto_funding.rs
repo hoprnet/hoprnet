@@ -339,7 +339,7 @@ mod tests {
         let fund_amount = HoprBalance::from(5_u32);
 
         let c1 = ChannelEntry::builder()
-            .between(&*ALICE, &*BOB)
+            .between(*ALICE, *BOB)
             .amount(10_u32)
             .ticket_index(0)
             .status(ChannelStatus::Open)
@@ -347,7 +347,7 @@ mod tests {
             .build()?;
 
         let c2 = ChannelEntry::builder()
-            .between(&*BOB, &*CHRIS)
+            .between(*BOB, *CHRIS)
             .amount(5_u32)
             .ticket_index(0_u32.into())
             .status(ChannelStatus::Open)
@@ -355,7 +355,7 @@ mod tests {
             .build()?;
 
         let c3 = ChannelEntry::builder()
-            .between(&*CHRIS, &*DAVE)
+            .between(*CHRIS, *DAVE)
             .amount(5)
             .ticket_index(0)
             .status(ChannelStatus::PendingToClose(
@@ -466,7 +466,7 @@ mod tests {
 
         // BOB -> CHRIS channel with balance below threshold
         let c1 = ChannelEntry::builder()
-            .between(&*BOB, &*CHRIS)
+            .between(*BOB, *CHRIS)
             .amount(3)
             .ticket_index(0)
             .status(ChannelStatus::Open)
@@ -475,7 +475,7 @@ mod tests {
 
         // BOB -> DAVE channel with balance above threshold
         let c2 = ChannelEntry::builder()
-            .between(&*BOB, &*DAVE)
+            .between(*BOB, *DAVE)
             .amount(10)
             .ticket_index(0)
             .status(ChannelStatus::Open)
@@ -527,7 +527,7 @@ mod tests {
         let fund_amount = HoprBalance::from(5_u32);
 
         let c1 = ChannelEntry::builder()
-            .between(&*BOB, &*CHRIS)
+            .between(*BOB, *CHRIS)
             .amount(3)
             .ticket_index(0)
             .status(ChannelStatus::Open)
@@ -583,21 +583,21 @@ mod tests {
         let fund_amount = HoprBalance::from(5_u32);
 
         let c1 = ChannelEntry::builder()
-            .between(&*BOB, &*CHRIS)
+            .between(*BOB, *CHRIS)
             .amount(3)
             .ticket_index(0)
             .status(ChannelStatus::Open)
             .epoch(0_u32)
             .build()?;
         let c2 = ChannelEntry::builder()
-            .between(&*BOB, &*DAVE)
+            .between(*BOB, *DAVE)
             .amount(2)
             .ticket_index(0)
             .status(ChannelStatus::Open)
             .epoch(0_u32)
             .build()?;
         let c3 = ChannelEntry::builder()
-            .between(&*BOB, &*ALICE)
+            .between(*BOB, *ALICE)
             .amount(1)
             .ticket_index(0)
             .status(ChannelStatus::Open)
@@ -668,7 +668,7 @@ mod tests {
         let fund_amount = HoprBalance::from(5_u32);
 
         let c1 = ChannelEntry::builder()
-            .between(&*BOB, &*CHRIS)
+            .between(*BOB, *CHRIS)
             .amount(3)
             .ticket_index(0)
             .status(ChannelStatus::Open)
@@ -747,7 +747,7 @@ mod tests {
         let fund_amount = HoprBalance::from(5_u32);
 
         let c1 = ChannelEntry::builder()
-            .between(&*BOB, &*CHRIS)
+            .between(*BOB, *CHRIS)
             .amount(3)
             .ticket_index(0)
             .status(ChannelStatus::Open)
@@ -793,12 +793,12 @@ mod tests {
 
         // Simulate balance increase event (funding confirmed)
         let funded_channel = ChannelEntry::builder()
-            .between(&*BOB, &*CHRIS)
+            .between(*BOB, *CHRIS)
             .amount(3 + 5)
             .status(ChannelStatus::Open)
             .epoch(0)
             .build()?;
-        
+
         afs.on_own_channel_changed(
             &funded_channel,
             ChannelDirection::Outgoing,
@@ -825,7 +825,7 @@ mod tests {
 
         // BOB -> CHRIS channel with balance below threshold
         let c1 = ChannelEntry::builder()
-            .between(&*BOB, &*CHRIS)
+            .between(*BOB, *CHRIS)
             .amount(3)
             .ticket_index(0)
             .status(ChannelStatus::Open)

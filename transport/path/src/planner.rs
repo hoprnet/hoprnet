@@ -446,16 +446,16 @@ mod tests {
         }
 
         fn with_open_channel(mut self, src: Address, dst: Address) -> Self {
-            self.channels
-                .push(ChannelEntry::builder()
-                          .between(src, dst)
-                          .amount(100)
-                          .ticket_index(1)
-                          .status(ChannelStatus::Open)
-                          .epoch(1)
-                          .build()
-                    .unwrap()
-              );
+            self.channels.push(
+                ChannelEntry::builder()
+                    .between(src, dst)
+                    .amount(100)
+                    .ticket_index(1)
+                    .status(ChannelStatus::Open)
+                    .epoch(1)
+                    .build()
+                    .unwrap(),
+            );
             self
         }
     }

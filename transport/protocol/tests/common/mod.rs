@@ -85,7 +85,8 @@ fn create_dummy_channel(from: Address, to: Address) -> ChannelEntry {
         .ticket_index(0)
         .status(ChannelStatus::Open)
         .epoch(0)
-        .build().unwrap()
+        .build()
+        .unwrap()
 }
 
 #[allow(dead_code)]

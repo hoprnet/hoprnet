@@ -50,12 +50,14 @@ pub(crate) fn model_to_graph_entry(
     let channel = ChannelBuilder::default()
         .between(src.chain_addr, dst.chain_addr)
         .balance(model.channel.balance.0.parse()?)
-        .ticket_index(model
-            .channel
-            .ticket_index
-            .0
-            .parse()
-            .map_err(|e| ConnectorError::TypeConversion(format!("invalid ticket index: {e}")))?)
+        .ticket_index(
+            model
+                .channel
+                .ticket_index
+                .0
+                .parse()
+                .map_err(|e| ConnectorError::TypeConversion(format!("invalid ticket index: {e}")))?,
+        )
         .status(match model.channel.status {
             blokli_client::api::types::ChannelStatus::Open => ChannelStatus::Open,
             blokli_client::api::types::ChannelStatus::PendingToClose => ChannelStatus::PendingToClose(

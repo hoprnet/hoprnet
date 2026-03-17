@@ -250,7 +250,10 @@ mod tests {
         };
 
         let channel_1 = ChannelEntry::builder()
-            .between(&ChainKeypair::from_secret(&PRIVATE_KEY_1)?, &ChainKeypair::from_secret(&PRIVATE_KEY_2)?)
+            .between(
+                &ChainKeypair::from_secret(&PRIVATE_KEY_1)?,
+                &ChainKeypair::from_secret(&PRIVATE_KEY_2)?,
+            )
             .amount(10)
             .ticket_index(1)
             .status(ChannelStatus::Open)
@@ -258,10 +261,15 @@ mod tests {
             .build()?;
 
         let channel_2 = ChannelEntry::builder()
-            .between(&ChainKeypair::from_secret(&PRIVATE_KEY_2)?, &ChainKeypair::from_secret(&PRIVATE_KEY_1)?)
+            .between(
+                &ChainKeypair::from_secret(&PRIVATE_KEY_2)?,
+                &ChainKeypair::from_secret(&PRIVATE_KEY_1)?,
+            )
             .amount(15)
             .ticket_index(2)
-            .status(ChannelStatus::PendingToClose(std::time::SystemTime::UNIX_EPOCH + Duration::from_secs(10)))
+            .status(ChannelStatus::PendingToClose(
+                std::time::SystemTime::UNIX_EPOCH + Duration::from_secs(10),
+            ))
             .epoch(1)
             .build()?;
 
@@ -402,7 +410,10 @@ mod tests {
         };
 
         let channel_1 = ChannelEntry::builder()
-            .between(&ChainKeypair::from_secret(&PRIVATE_KEY_1)?, &ChainKeypair::from_secret(&PRIVATE_KEY_2)?)
+            .between(
+                &ChainKeypair::from_secret(&PRIVATE_KEY_1)?,
+                &ChainKeypair::from_secret(&PRIVATE_KEY_2)?,
+            )
             .amount(10)
             .ticket_index(1)
             .status(ChannelStatus::Open)
@@ -452,7 +463,10 @@ mod tests {
         };
 
         let channel_1 = ChannelEntry::builder()
-            .between(&ChainKeypair::from_secret(&PRIVATE_KEY_1)?, &ChainKeypair::from_secret(&PRIVATE_KEY_2)?)
+            .between(
+                &ChainKeypair::from_secret(&PRIVATE_KEY_1)?,
+                &ChainKeypair::from_secret(&PRIVATE_KEY_2)?,
+            )
             .amount(10)
             .ticket_index(1)
             .status(ChannelStatus::Open)
@@ -511,10 +525,15 @@ mod tests {
         };
 
         let channel_1 = ChannelEntry::builder()
-            .between(&ChainKeypair::from_secret(&PRIVATE_KEY_1)?, &ChainKeypair::from_secret(&PRIVATE_KEY_2)?)
+            .between(
+                &ChainKeypair::from_secret(&PRIVATE_KEY_1)?,
+                &ChainKeypair::from_secret(&PRIVATE_KEY_2)?,
+            )
             .amount(10)
             .ticket_index(1)
-            .status(ChannelStatus::PendingToClose(std::time::SystemTime::UNIX_EPOCH + Duration::from_mins(10)))
+            .status(ChannelStatus::PendingToClose(
+                std::time::SystemTime::UNIX_EPOCH + Duration::from_mins(10),
+            ))
             .epoch(1)
             .build()?;
 
@@ -561,7 +580,10 @@ mod tests {
         };
 
         let channel_1 = ChannelEntry::builder()
-            .between(&ChainKeypair::from_secret(&PRIVATE_KEY_2)?, &ChainKeypair::from_secret(&PRIVATE_KEY_1)?)
+            .between(
+                &ChainKeypair::from_secret(&PRIVATE_KEY_2)?,
+                &ChainKeypair::from_secret(&PRIVATE_KEY_1)?,
+            )
             .amount(10)
             .ticket_index(1)
             .status(ChannelStatus::Open)

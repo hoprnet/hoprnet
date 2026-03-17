@@ -47,7 +47,7 @@ pub fn create_blokli_client() -> anyhow::Result<BlokliTestClient<StaticState>> {
                 .enumerate()
                 .map(|(i, (chain_key, _))| {
                     ChannelEntry::builder()
-                        .source(&chain_key)
+                        .source(chain_key)
                         .destination(&PEERS[(i + 1) % PEERS.len()].0)
                         .balance(HoprBalance::new_base(100))
                         .ticket_index(0)
@@ -58,7 +58,7 @@ pub fn create_blokli_client() -> anyhow::Result<BlokliTestClient<StaticState>> {
                 })
                 .chain(PEERS.iter().enumerate().rev().map(|(i, (chain_key, _))| {
                     ChannelEntry::builder()
-                        .source(&chain_key)
+                        .source(chain_key)
                         .destination(&PEERS[if i > 0 { i - 1 } else { PEERS.len() - 1 }].0)
                         .balance(HoprBalance::new_base(100))
                         .ticket_index(0)

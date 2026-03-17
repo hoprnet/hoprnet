@@ -171,7 +171,10 @@ mod tests {
         };
 
         let channel_1 = ChannelEntry::builder()
-            .between(&ChainKeypair::from_secret(&PRIVATE_KEY_2)?, &ChainKeypair::from_secret(&PRIVATE_KEY_1)?)
+            .between(
+                &ChainKeypair::from_secret(&PRIVATE_KEY_2)?,
+                &ChainKeypair::from_secret(&PRIVATE_KEY_1)?,
+            )
             .amount(10)
             .ticket_index(1)
             .status(ChannelStatus::Open)

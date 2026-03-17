@@ -136,7 +136,9 @@ mod tests {
             .between(*ALICE, *DAVE)
             .amount(10)
             .ticket_index(0)
-            .status(ChannelStatus::PendingToClose(SystemTime::now().sub(Duration::from_secs(60))))
+            .status(ChannelStatus::PendingToClose(
+                SystemTime::now().sub(Duration::from_secs(60)),
+            ))
             .epoch(1)
             .build()?;
 
@@ -161,7 +163,9 @@ mod tests {
                     .between(*ALICE, *CHARLIE)
                     .amount(10)
                     .ticket_index(0)
-                    .status(ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(60))))
+                    .status(ChannelStatus::PendingToClose(
+                        SystemTime::now().add(Duration::from_secs(60)),
+                    ))
                     .epoch(1)
                     .build()?,
                 // Should finalize closure of this channel
@@ -171,9 +175,11 @@ mod tests {
                     .between(*ALICE, *EUGENE)
                     .amount(10)
                     .ticket_index(0)
-                    .status(ChannelStatus::PendingToClose(SystemTime::now().sub(max_closure_overdue * 2)))
+                    .status(ChannelStatus::PendingToClose(
+                        SystemTime::now().sub(max_closure_overdue * 2),
+                    ))
                     .epoch(1)
-                    .build()?
+                    .build()?,
             ])
             .build_dynamic_client([1; Address::SIZE].into());
 
