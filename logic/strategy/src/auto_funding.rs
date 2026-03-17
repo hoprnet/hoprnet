@@ -338,20 +338,31 @@ mod tests {
         let stake_limit = HoprBalance::from(7_u32);
         let fund_amount = HoprBalance::from(5_u32);
 
-        let c1 = ChannelEntry::new(*ALICE, *BOB, 10_u32.into(), 0_u32.into(), ChannelStatus::Open, 0);
+        let c1 = ChannelEntry::builder()
+            .between(*ALICE, *BOB)
+            .amount(10_u32)
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(0)
+            .build()?;
 
-        let c2 = ChannelEntry::new(*BOB, *CHRIS, 5_u32.into(), 0_u32.into(), ChannelStatus::Open, 0);
+        let c2 = ChannelEntry::builder()
+            .between(*BOB, *CHRIS)
+            .amount(5_u32)
+            .ticket_index(0_u32.into())
+            .status(ChannelStatus::Open)
+            .epoch(0)
+            .build()?;
 
-        let c3 = ChannelEntry::new(
-            *CHRIS,
-            *DAVE,
-            5_u32.into(),
-            0_u32.into(),
-            ChannelStatus::PendingToClose(
+        let c3 = ChannelEntry::builder()
+            .between(*CHRIS, *DAVE)
+            .amount(5)
+            .ticket_index(0)
+            .status(ChannelStatus::PendingToClose(
                 chrono::DateTime::<chrono::Utc>::from_str("2025-11-10T00:00:00+00:00")?.into(),
-            ),
-            0,
-        );
+            ))
+            .epoch(0)
+            .build()?;
 
         let blokli_sim = BlokliTestStateBuilder::default()
             .with_generated_accounts(
@@ -454,11 +465,22 @@ mod tests {
         let fund_amount = HoprBalance::from(5_u32);
 
         // BOB -> CHRIS channel with balance below threshold
-        let c1 = ChannelEntry::new(*BOB, *CHRIS, 3_u32.into(), 0_u32.into(), ChannelStatus::Open, 0_u32);
+        let c1 = ChannelEntry::builder()
+            .between(*BOB, *CHRIS)
+            .amount(3)
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(0_u32)
+            .build()?;
 
         // BOB -> DAVE channel with balance above threshold
-        let c2 = ChannelEntry::new(*BOB, *DAVE, 10_u32.into(), 0_u32.into(), ChannelStatus::Open, 0_u32);
-
+        let c2 = ChannelEntry::builder()
+            .between(*BOB, *DAVE)
+            .amount(10)
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(0_u32)
+            .build()?;
         let blokli_sim = BlokliTestStateBuilder::default()
             .with_generated_accounts(
                 &[&*ALICE, &*BOB, &*CHRIS, &*DAVE],
@@ -504,7 +526,13 @@ mod tests {
         let stake_limit = HoprBalance::from(7_u32);
         let fund_amount = HoprBalance::from(5_u32);
 
-        let c1 = ChannelEntry::new(*BOB, *CHRIS, 3_u32.into(), 0_u32.into(), ChannelStatus::Open, 0_u32);
+        let c1 = ChannelEntry::builder()
+            .between(*BOB, *CHRIS)
+            .amount(3)
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(0)
+            .build()?;
 
         let blokli_sim = BlokliTestStateBuilder::default()
             .with_generated_accounts(
@@ -554,10 +582,27 @@ mod tests {
         let stake_limit = HoprBalance::from(7_u32);
         let fund_amount = HoprBalance::from(5_u32);
 
-        let c1 = ChannelEntry::new(*BOB, *CHRIS, 3_u32.into(), 0_u32.into(), ChannelStatus::Open, 0_u32);
-        let c2 = ChannelEntry::new(*BOB, *DAVE, 2_u32.into(), 0_u32.into(), ChannelStatus::Open, 0_u32);
-        let c3 = ChannelEntry::new(*BOB, *ALICE, 1_u32.into(), 0_u32.into(), ChannelStatus::Open, 0_u32);
-
+        let c1 = ChannelEntry::builder()
+            .between(*BOB, *CHRIS)
+            .amount(3)
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(0_u32)
+            .build()?;
+        let c2 = ChannelEntry::builder()
+            .between(*BOB, *DAVE)
+            .amount(2)
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(0_u32)
+            .build()?;
+        let c3 = ChannelEntry::builder()
+            .between(*BOB, *ALICE)
+            .amount(1)
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(0_u32)
+            .build()?;
         let tracked_channels = [*c1.get_id(), *c2.get_id(), *c3.get_id()];
 
         let blokli_sim = BlokliTestStateBuilder::default()
@@ -622,7 +667,13 @@ mod tests {
         let stake_limit = HoprBalance::from(7_u32);
         let fund_amount = HoprBalance::from(5_u32);
 
-        let c1 = ChannelEntry::new(*BOB, *CHRIS, 3_u32.into(), 0_u32.into(), ChannelStatus::Open, 0_u32);
+        let c1 = ChannelEntry::builder()
+            .between(*BOB, *CHRIS)
+            .amount(3)
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(0_u32)
+            .build()?;
 
         let blokli_sim = BlokliTestStateBuilder::default()
             .with_generated_accounts(
@@ -695,7 +746,13 @@ mod tests {
         let stake_limit = HoprBalance::from(7_u32);
         let fund_amount = HoprBalance::from(5_u32);
 
-        let c1 = ChannelEntry::new(*BOB, *CHRIS, 3_u32.into(), 0_u32.into(), ChannelStatus::Open, 0_u32);
+        let c1 = ChannelEntry::builder()
+            .between(*BOB, *CHRIS)
+            .amount(3)
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(0_u32)
+            .build()?;
 
         let blokli_sim = BlokliTestStateBuilder::default()
             .with_generated_accounts(
@@ -720,7 +777,7 @@ mod tests {
 
         let afs = AutoFundingStrategy::new(cfg, chain_connector);
 
-        // Trigger funding (balance decrease below threshold)
+        // Trigger funding (balance decrease below the threshold)
         afs.on_own_channel_changed(
             &c1,
             ChannelDirection::Outgoing,
@@ -735,21 +792,20 @@ mod tests {
         assert!(afs.in_flight.contains(c1.get_id()));
 
         // Simulate balance increase event (funding confirmed)
-        let funded_channel = ChannelEntry::new(
-            *BOB,
-            *CHRIS,
-            (3_u32 + 5_u32).into(),
-            0_u32.into(),
-            ChannelStatus::Open,
-            0,
-        );
+        let funded_channel = ChannelEntry::builder()
+            .between(*BOB, *CHRIS)
+            .amount(3 + 5)
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(0)
+            .build()?;
 
         afs.on_own_channel_changed(
             &funded_channel,
             ChannelDirection::Outgoing,
             ChannelChange::Balance {
-                left: HoprBalance::from(3_u32),
-                right: HoprBalance::from(8_u32),
+                left: HoprBalance::from(3),
+                right: HoprBalance::from(8),
             },
         )
         .await?;
@@ -769,7 +825,13 @@ mod tests {
         let fund_amount = HoprBalance::from(5_u32);
 
         // BOB -> CHRIS channel with balance below threshold
-        let c1 = ChannelEntry::new(*BOB, *CHRIS, 3_u32.into(), 0_u32.into(), ChannelStatus::Open, 0);
+        let c1 = ChannelEntry::builder()
+            .between(*BOB, *CHRIS)
+            .amount(3)
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(0)
+            .build()?;
 
         let blokli_sim = BlokliTestStateBuilder::default()
             .with_generated_accounts(
