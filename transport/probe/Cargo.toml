@@ -44,6 +44,7 @@ hex-literal = { workspace = true }
 insta = { workspace = true, features = ["yaml"] }
 lazy_static = { workspace = true }
 more-asserts = { workspace = true }
+rstest = { workspace = true }
 tokio = { workspace = true }
 
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }

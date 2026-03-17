@@ -243,6 +243,30 @@ mod tests {
     }
 
     #[test]
+    fn create_allocators_from_config_should_produce_three_allocators() -> anyhow::Result<()> {
+        use anyhow::Context;
+
+        let cfg = TagAllocatorConfig::default();
+        let allocators = create_allocators_from_config(&cfg).map_err(|e| anyhow::anyhow!("{e}"))?;
+
+        assert_eq!(allocators.len(), 3);
+
+        let (usage0, alloc0) = &allocators[0];
+        let (usage1, alloc1) = &allocators[1];
+        let (usage2, alloc2) = &allocators[2];
+
+        assert_eq!(*usage0, Usage::Session);
+        assert_eq!(*usage1, Usage::SessionTerminalTelemetry);
+        assert_eq!(*usage2, Usage::ProvingTelemetry);
+
+        assert_eq!(alloc0.capacity(), cfg.session);
+        assert_eq!(alloc1.capacity(), cfg.session_probing);
+        assert_eq!(alloc2.capacity(), cfg.probing_telemetry);
+
+        Ok(())
+    }
+
+    #[test]
     fn drop_recycles_tag() {
         let allocators = create_allocators(
             ReservedTag::range().end..u16::MAX as u64 + 1,

@@ -46,21 +46,57 @@ pub fn is_supported(ma: &Multiaddr) -> bool {
 mod tests {
     use std::str::FromStr;
 
+    use rstest::rstest;
+
     use super::*;
 
-    #[test]
-    fn test_private_multiaddresses_are_shown_as_private() -> anyhow::Result<()> {
-        assert!(!is_private(&Multiaddr::from_str("/ip4/33.42.112.22/udp/9090/quic")?));
-
-        assert!(is_private(&Multiaddr::from_str("/ip4/192.168.1.23/udp/9090/quic")?));
-
+    #[rstest]
+    #[case::with_p2p(
+        "/ip4/1.2.3.4/tcp/9000/p2p/12D3KooWD3bkCaU1vQxKqFsfEUVFyGNqCbGsBGzqmrQasRL6qMpo",
+        "/ip4/1.2.3.4/tcp/9000"
+    )]
+    #[case::without_p2p("/ip4/1.2.3.4/tcp/9000", "/ip4/1.2.3.4/tcp/9000")]
+    fn strip_p2p_protocol_should_remove_p2p_when_present(
+        #[case] input: &str,
+        #[case] expected: &str,
+    ) -> anyhow::Result<()> {
+        let addr = Multiaddr::from_str(input)?;
+        let stripped = strip_p2p_protocol(&addr);
+        assert_eq!(stripped, Multiaddr::from_str(expected)?);
         Ok(())
     }
 
-    #[test]
-    fn test_domain_dns4_multiaddresses_should_be_supported() -> anyhow::Result<()> {
-        assert!(is_supported(&Multiaddr::from_str("/dns4/localhost/tcp/5543")?));
+    #[rstest]
+    #[case::dns_is_true("/dns/example.com/tcp/443", true)]
+    #[case::dns4_is_false("/dns4/example.com/tcp/443", false)]
+    #[case::ip4_is_false("/ip4/1.2.3.4/tcp/9000", false)]
+    fn is_dns_should_identify_dns_protocols(#[case] input: &str, #[case] expected: bool) -> anyhow::Result<()> {
+        let addr = Multiaddr::from_str(input)?;
+        assert_eq!(is_dns(&addr), expected);
+        Ok(())
+    }
 
+    #[rstest]
+    #[case::private_ip4("/ip4/192.168.1.23/udp/9090/quic", true)]
+    #[case::public_ip4("/ip4/33.42.112.22/udp/9090/quic", false)]
+    #[case::dns_localhost("/dns/localhost/tcp/443", true)]
+    #[case::dns4_external("/dns4/example.com/tcp/443", false)]
+    fn is_private_should_detect_private_addresses(#[case] input: &str, #[case] expected: bool) -> anyhow::Result<()> {
+        let addr = Multiaddr::from_str(input)?;
+        assert_eq!(is_private(&addr), expected);
+        Ok(())
+    }
+
+    #[rstest]
+    #[case::ip4("/ip4/1.2.3.4/tcp/9000", true)]
+    #[case::ip6("/ip6/::1/tcp/9000", true)]
+    #[case::dns("/dns/example.com/tcp/443", true)]
+    #[case::dns4("/dns4/localhost/tcp/5543", true)]
+    #[case::dns6("/dns6/example.com/tcp/443", true)]
+    #[case::p2p_unsupported("/p2p/12D3KooWD3bkCaU1vQxKqFsfEUVFyGNqCbGsBGzqmrQasRL6qMpo", false)]
+    fn is_supported_should_accept_known_protocols(#[case] input: &str, #[case] expected: bool) -> anyhow::Result<()> {
+        let addr = Multiaddr::from_str(input)?;
+        assert_eq!(is_supported(&addr), expected);
         Ok(())
     }
 }

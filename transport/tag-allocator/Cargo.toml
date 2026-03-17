@@ -24,3 +24,5 @@ thiserror = { workspace = true }
 validator = { workspace = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
+rstest = { workspace = true }

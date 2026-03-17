@@ -225,4 +225,21 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn peer_store_iter_keys_should_return_all_added_peers() -> anyhow::Result<()> {
+        let store = NetworkPeerStore::new(PeerId::random(), HashSet::new());
+
+        let peers: Vec<PeerId> = (0..3).map(|_| PeerId::random()).collect();
+        for &peer in &peers {
+            store.add(peer, HashSet::new())?;
+        }
+
+        let keys: HashSet<PeerId> = store.iter_keys().collect();
+        for peer in &peers {
+            assert!(keys.contains(peer), "iter_keys should contain {peer}");
+        }
+        assert_eq!(keys.len(), 3);
+        Ok(())
+    }
 }
