@@ -168,8 +168,8 @@ async fn start_hoprd_nodes(
             .arg(&args.identity_password)
             .env("HOPRD_USE_OPENTELEMETRY", "true")
             .env("HOPRD_OTEL_SIGNALS", "metrics")
-            .env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318")
-            .env("OTEL_SERVICE_NAME", format!("node-{id}"))
+            .env("HOPRD_OTLP_ENDPOINT", "http://localhost:4318")
+            .env("HOPRD_METRIC_EXPORT_INTERVAL", "15000,hopr_session=1000")
             .env("HOPR_TX_TIMEOUT_MULTIPLIER", DEFAULT_TX_TIMEOUT_MULTIPLIER.to_string())
             .stdout(Stdio::from(log_file))
             .stderr(Stdio::from(log_err));

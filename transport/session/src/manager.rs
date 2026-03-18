@@ -32,7 +32,8 @@ use tracing::{debug, error, info, trace, warn};
 
 #[cfg(feature = "telemetry")]
 use crate::telemetry::{
-    self, SessionLifecycleState, SessionStatsSnapshot, SessionTelemetry, register_session_telemetry,
+    SessionLifecycleState, initialize_session_metrics, remove_session_metrics_state, set_session_balancer_data,
+    set_session_state,
 };
 use crate::{
     Capability, HoprSession, IncomingSession, SESSION_MTU, SessionClientConfig, SessionId, SessionTarget,
@@ -80,9 +81,8 @@ fn close_session(session_id: SessionId, session_data: SessionSlot, reason: Closu
 
     #[cfg(feature = "telemetry")]
     {
-        session_data.telemetry.set_state(SessionLifecycleState::Closed);
-        session_data.telemetry.touch_activity();
-        telemetry::unregister_session_telemetry(&session_id);
+        set_session_state(&session_id, SessionLifecycleState::Closed);
+        remove_session_metrics_state(&session_id);
     }
 
     if reason != ClosureReason::EmptyRead {
@@ -93,12 +93,6 @@ fn close_session(session_id: SessionId, session_data: SessionSlot, reason: Closu
 
     // Terminate any additional tasks spawned by the Session
     session_data.abort_handles.lock().abort_all();
-
-    #[cfg(feature = "telemetry")]
-    {
-        session_data.telemetry.set_state(SessionLifecycleState::Closed);
-        session_data.telemetry.touch_activity();
-    }
 
     #[cfg(all(feature = "telemetry", not(test)))]
     METRIC_ACTIVE_SESSIONS.decrement(1.0);
@@ -142,9 +136,6 @@ struct SessionSlot {
     routing_opts: DestinationRouting,
     // Additional tasks spawned by the Session.
     abort_handles: Arc<parking_lot::Mutex<AbortableList<SessionTasks>>>,
-    // Additional per-session telemetry
-    #[cfg(feature = "telemetry")]
-    telemetry: Arc<SessionTelemetry>,
     // Allows reconfiguring of the SURB balancer on-the-fly
     // Set on both Entry and Exit sides.
     surb_mgmt: Arc<BalancerStateValues>,
@@ -697,16 +688,6 @@ where
                     })
                     .ok_or(SessionManagerError::NotStarted)?;
 
-                #[cfg(feature = "telemetry")]
-                let telemetry = Arc::new(SessionTelemetry::new(
-                    session_id,
-                    HoprSessionConfig {
-                        capabilities: cfg.capabilities,
-                        frame_mtu: self.cfg.frame_mtu,
-                        frame_timeout: self.cfg.max_frame_timeout,
-                    },
-                ));
-
                 // NOTE: the Exit node can have different `max_surb_buffer_size`
                 // setting on the Session manager, so it does not make sense to cap it here
                 // with our maximum value.
@@ -717,11 +698,13 @@ where
                     let surb_estimator_clone = surb_estimator.clone();
                     let full_surb_scoring_sender =
                         msg_sender.with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
+                            let produced = data.estimate_surbs_with_msg() as u64;
                             // Count how many SURBs we sent with each packet
-                            surb_estimator_clone.produced.fetch_add(
-                                data.estimate_surbs_with_msg() as u64,
-                                std::sync::atomic::Ordering::Relaxed,
-                            );
+                            surb_estimator_clone
+                                .produced
+                                .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
+                            #[cfg(feature = "telemetry")]
+                            crate::telemetry::record_session_surb_produced(&session_id, produced);
                             futures::future::ok::<_, S::Error>((routing, data))
                         });
 
@@ -789,18 +772,10 @@ where
                             abort_handles: Arc::new(parking_lot::Mutex::new(abort_handles)),
                             surb_mgmt: surb_mgmt.clone(),
                             surb_estimator: surb_estimator.clone(),
-                            #[cfg(feature = "telemetry")]
-                            telemetry: telemetry.clone(),
                             allocated_tag: None,
                         },
                     )
                     .await?;
-
-                    #[cfg(feature = "telemetry")]
-                    {
-                        telemetry.set_state(SessionLifecycleState::Active);
-                        telemetry.set_balancer_data(surb_estimator.clone(), surb_mgmt);
-                    }
 
                     // Wait for enough SURBs to be sent to the counterparty
                     // TODO: consider making this interactive = other party reports the exact level periodically
@@ -825,6 +800,7 @@ where
                         }
                     }
 
+                    let surb_estimator_for_rx = surb_estimator.clone();
                     let session = HoprSession::new(
                         session_id,
                         forward_routing,
@@ -838,18 +814,30 @@ where
                             rx.inspect(move |_| {
                                 // Received packets = SURB consumption estimate
                                 // The received packets always consume a single SURB.
-                                surb_estimator
+                                surb_estimator_for_rx
                                     .consumed
                                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                #[cfg(feature = "telemetry")]
+                                crate::telemetry::record_session_surb_consumed(&session_id, 1);
                             }),
                         ),
                         Some(notifier),
-                        #[cfg(feature = "telemetry")]
-                        telemetry.clone(),
                     )?;
 
                     #[cfg(feature = "telemetry")]
-                    register_session_telemetry(&telemetry);
+                    {
+                        initialize_session_metrics(
+                            session_id,
+                            HoprSessionConfig {
+                                capabilities: cfg.capabilities,
+                                frame_mtu: self.cfg.frame_mtu,
+                                frame_timeout: self.cfg.max_frame_timeout,
+                            },
+                        );
+                        set_session_state(&session_id, SessionLifecycleState::Active);
+                        set_session_balancer_data(&session_id, surb_estimator.clone(), surb_mgmt.clone());
+                    }
+
                     Ok(session)
                 } else {
                     warn!(%session_id, "session ready without SURB balancing");
@@ -862,14 +850,10 @@ where
                             abort_handles: Default::default(),
                             surb_mgmt: Default::default(),      // Disabled SURB management
                             surb_estimator: Default::default(), // No SURB estimator needed
-                            #[cfg(feature = "telemetry")]
-                            telemetry: telemetry.clone(),
                             allocated_tag: None,
                         },
                     )
                     .await?;
-                    #[cfg(feature = "telemetry")]
-                    telemetry.set_state(SessionLifecycleState::Active);
 
                     // For standard Session data we first reduce the number of SURBs we want to produce,
                     // unless requested to always max them out
@@ -897,12 +881,20 @@ where
                         },
                         (reduced_surb_sender, rx),
                         Some(notifier),
-                        #[cfg(feature = "telemetry")]
-                        telemetry.clone(),
                     )?;
 
                     #[cfg(feature = "telemetry")]
-                    register_session_telemetry(&telemetry);
+                    {
+                        initialize_session_metrics(
+                            session_id,
+                            HoprSessionConfig {
+                                capabilities: cfg.capabilities,
+                                frame_mtu: self.cfg.frame_mtu,
+                                frame_timeout: self.cfg.max_frame_timeout,
+                            },
+                        );
+                        set_session_state(&session_id, SessionLifecycleState::Active);
+                    }
 
                     Ok(session)
                 }
@@ -1024,17 +1016,6 @@ where
         }
     }
 
-    /// Retrieves useful statistics of the given [session](HoprSession).
-    ///
-    /// Returns an error if the Session with the given `id` does not exist.
-    #[cfg(feature = "telemetry")]
-    pub async fn get_session_telemetry(&self, id: &SessionId) -> crate::errors::Result<SessionStatsSnapshot> {
-        match self.sessions.get(id).await.map(|session| session.telemetry) {
-            Some(telemetry) => Ok(telemetry.snapshot()),
-            None => Err(SessionManagerError::NonExistingSession.into()),
-        }
-    }
-
     /// The main method to be called whenever data are received.
     ///
     /// It tries to recognize the message and correctly dispatches either
@@ -1115,15 +1096,6 @@ where
                 abort_handles: Default::default(),
                 surb_mgmt: Default::default(),
                 surb_estimator: Default::default(),
-                #[cfg(feature = "telemetry")]
-                telemetry: Arc::new(SessionTelemetry::new(
-                    session_id,
-                    HoprSessionConfig {
-                        capabilities: session_req.capabilities.0,
-                        frame_mtu: self.cfg.frame_mtu,
-                        frame_timeout: self.cfg.max_frame_timeout,
-                    },
-                )),
                 allocated_tag: Some(allocated_tag),
             };
             self.sessions.insert(session_id, slot.clone()).await;
@@ -1172,21 +1144,24 @@ where
                                 surb_estimator_clone
                                     .consumed
                                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                #[cfg(feature = "telemetry")]
+                                crate::telemetry::record_session_surb_consumed(&session_id, 1);
                                 futures::future::ok::<_, S::Error>((routing, data))
                             })
                             .rate_limit_with_controller(&egress_rate_control)
                             .buffer((2 * target_surb_buffer_size) as usize),
                         // Received packets = SURB retrieval estimate
                         rx_session_data.inspect(move |data| {
+                            let produced = data.num_surbs_with_msg() as u64;
                             // Count the number of SURBs delivered with each incoming packet
                             surb_estimator_clone
                                 .produced
-                                .fetch_add(data.num_surbs_with_msg() as u64, std::sync::atomic::Ordering::Relaxed);
+                                .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
+                            #[cfg(feature = "telemetry")]
+                            crate::telemetry::record_session_surb_produced(&session_id, produced);
                         }),
                     ),
                     Some(closure_notifier),
-                    #[cfg(feature = "telemetry")]
-                    slot.telemetry.clone(),
                 )?;
 
                 // The SURB balancer will start intervening by rate-limiting the
@@ -1202,13 +1177,6 @@ where
                 };
 
                 slot.surb_mgmt.update(&balancer_config);
-
-                #[cfg(feature = "telemetry")]
-                {
-                    slot.telemetry.set_state(SessionLifecycleState::Active);
-                    slot.telemetry
-                        .set_balancer_data(slot.surb_estimator.clone(), slot.surb_mgmt.clone());
-                }
 
                 // Spawn the SURB balancer only once we know we have registered the
                 // abort handle with the pre-allocated Session slot
@@ -1240,6 +1208,8 @@ where
                                 surb_estimator_clone
                                     .consumed
                                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                #[cfg(feature = "telemetry")]
+                                crate::telemetry::record_session_surb_consumed(&session_id, 1);
                                 futures::future::ok::<_, S::Error>((routing, data))
                             }),
                         slot.routing_opts.clone(),
@@ -1273,8 +1243,6 @@ where
                     },
                     (msg_sender.clone(), rx_session_data),
                     Some(closure_notifier),
-                    #[cfg(feature = "telemetry")]
-                    slot.telemetry.clone(),
                 )?
             };
 
@@ -1323,10 +1291,21 @@ where
                     SessionManagerError::other(error)
                 })?;
 
-            info!(%session_id, "new session established");
-
             #[cfg(feature = "telemetry")]
-            register_session_telemetry(&slot.telemetry);
+            {
+                initialize_session_metrics(
+                    session_id,
+                    HoprSessionConfig {
+                        capabilities: session_req.capabilities.0,
+                        frame_mtu: self.cfg.frame_mtu,
+                        frame_timeout: self.cfg.max_frame_timeout,
+                    },
+                );
+                set_session_state(&session_id, SessionLifecycleState::Active);
+                set_session_balancer_data(&session_id, slot.surb_estimator.clone(), slot.surb_mgmt.clone());
+            }
+
+            info!(%session_id, "new session established");
 
             #[cfg(all(feature = "telemetry", not(test)))]
             {
@@ -1444,6 +1423,8 @@ where
                                 .surb_estimator
                                 .consumed
                                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            #[cfg(feature = "telemetry")]
+                            crate::telemetry::record_session_surb_consumed(&session_id, 1);
                         }
                         // Session is incoming - keep-alive was received from the Entry
                         DestinationRouting::Return(_) => {
@@ -1468,10 +1449,13 @@ where
 
                             // Increase the number of received SURBs in the estimator.
                             // Typically, 2 SURBs per Keep-Alive message
-                            session_slot.surb_estimator.produced.fetch_add(
-                                KeepAliveMessage::<SessionId>::MIN_SURBS_PER_MESSAGE as u64,
-                                std::sync::atomic::Ordering::Relaxed,
-                            );
+                            let produced = KeepAliveMessage::<SessionId>::MIN_SURBS_PER_MESSAGE as u64;
+                            session_slot
+                                .surb_estimator
+                                .produced
+                                .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
+                            #[cfg(feature = "telemetry")]
+                            crate::telemetry::record_session_surb_produced(&session_id, produced);
                         }
                     }
                 } else {
@@ -1900,8 +1884,6 @@ mod tests {
                     abort_handles: Default::default(),
                     surb_mgmt: Arc::new(BalancerStateValues::from(balancer_cfg)),
                     surb_estimator: Default::default(),
-                    #[cfg(feature = "telemetry")]
-                    telemetry: Arc::new(SessionTelemetry::new(session_id, Default::default())),
                     allocated_tag: None,
                 },
             )
@@ -1947,11 +1929,6 @@ mod tests {
                     session_tx: Arc::new(dummy_tx),
                     routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
                     abort_handles: Default::default(),
-                    #[cfg(feature = "telemetry")]
-                    telemetry: Arc::new(SessionTelemetry::new(
-                        SessionId::new(16u64, alice_pseudonym),
-                        Default::default(),
-                    )),
                     surb_mgmt: Default::default(),
                     surb_estimator: Default::default(),
                     allocated_tag: None,
@@ -2066,11 +2043,6 @@ mod tests {
                     abort_handles: Default::default(),
                     surb_mgmt: Default::default(),
                     surb_estimator: Default::default(),
-                    #[cfg(feature = "telemetry")]
-                    telemetry: Arc::new(SessionTelemetry::new(
-                        SessionId::new(16u64, alice_pseudonym),
-                        Default::default(),
-                    )),
                     allocated_tag: None,
                 },
             )
@@ -2333,13 +2305,6 @@ mod tests {
 
         let allocated_session_ids = mgr.active_sessions().await;
         assert_eq!(1, allocated_session_ids.len());
-
-        let snapshots = crate::telemetry::session_telemetry_snapshots();
-        assert!(
-            allocated_session_ids
-                .iter()
-                .all(|session_id| snapshots.iter().all(|snapshot| snapshot.session_id != *session_id))
-        );
 
         Ok(())
     }

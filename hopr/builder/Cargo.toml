@@ -1,6 +1,6 @@
 [package]
 name = "hopr-builder"
-version = "4.0.2"
+version = "4.0.3"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -76,7 +76,6 @@ hopr-transport-p2p = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-insta = { workspace = true, features = ["yaml", "redactions"] }
 rstest = { workspace = true }
 serial_test = { workspace = true }
 test-log = { workspace = true }

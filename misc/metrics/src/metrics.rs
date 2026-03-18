@@ -1,5 +1,5 @@
 use std::sync::{
-    OnceLock,
+    OnceLock, RwLock,
     atomic::{AtomicU64, Ordering},
 };
 
@@ -31,9 +31,16 @@ pub type MetricResult<T> = Result<T, MetricError>;
 struct GlobalMetricState {
     exporter: opentelemetry_prometheus_text_exporter::PrometheusExporter,
     provider: SdkMeterProvider,
+    prefix_providers: RwLock<Vec<PrefixProvider>>,
 }
 
 static GLOBAL_STATE: OnceLock<GlobalMetricState> = OnceLock::new();
+
+#[derive(Clone)]
+struct PrefixProvider {
+    prefix: String,
+    provider: SdkMeterProvider,
+}
 
 fn global_state() -> &'static GlobalMetricState {
     GLOBAL_STATE.get_or_init(|| {
@@ -44,7 +51,11 @@ fn global_state() -> &'static GlobalMetricState {
             .without_scope_info()
             .build();
         let provider = SdkMeterProvider::builder().with_reader(exporter.clone()).build();
-        GlobalMetricState { exporter, provider }
+        GlobalMetricState {
+            exporter,
+            provider,
+            prefix_providers: RwLock::new(Vec::new()),
+        }
     })
 }
 
@@ -58,11 +69,60 @@ pub fn init_with_provider(
     exporter: opentelemetry_prometheus_text_exporter::PrometheusExporter,
     provider: SdkMeterProvider,
 ) -> bool {
-    GLOBAL_STATE.set(GlobalMetricState { exporter, provider }).is_ok()
+    GLOBAL_STATE
+        .set(GlobalMetricState {
+            exporter,
+            provider,
+            prefix_providers: RwLock::new(Vec::new()),
+        })
+        .is_ok()
 }
 
-fn meter() -> opentelemetry::metrics::Meter {
-    global_state().provider.meter("hopr")
+/// Registers a meter provider for metric names with the given `prefix`.
+///
+/// The longest matching prefix wins when multiple prefixes match a metric name.
+pub fn register_prefix_provider(prefix: &str, provider: SdkMeterProvider) -> bool {
+    if prefix.is_empty() {
+        return false;
+    }
+
+    let Some(state) = GLOBAL_STATE.get() else {
+        return false;
+    };
+
+    let mut prefix_providers = state
+        .prefix_providers
+        .write()
+        .expect("prefix provider lock must not be poisoned");
+
+    if let Some(existing) = prefix_providers.iter_mut().find(|entry| entry.prefix == prefix) {
+        existing.provider = provider;
+        return true;
+    }
+
+    prefix_providers.push(PrefixProvider {
+        prefix: prefix.to_string(),
+        provider,
+    });
+    prefix_providers.sort_by(|a, b| b.prefix.len().cmp(&a.prefix.len()));
+    true
+}
+
+fn meter_for_metric(metric_name: &str) -> opentelemetry::metrics::Meter {
+    let state = global_state();
+
+    if let Some(provider) = state
+        .prefix_providers
+        .read()
+        .expect("prefix provider lock must not be poisoned")
+        .iter()
+        .find(|entry| metric_name.starts_with(&entry.prefix))
+        .map(|entry| entry.provider.clone())
+    {
+        return provider.meter("hopr");
+    }
+
+    state.provider.meter("hopr")
 }
 
 /// Gathers all metrics in Prometheus text exposition format.
@@ -141,7 +201,7 @@ pub struct SimpleCounter {
 impl SimpleCounter {
     /// Creates a new integer counter with given name and description.
     pub fn new(name: &str, description: &str) -> MetricResult<Self> {
-        let ctr = meter()
+        let ctr = meter_for_metric(name)
             .u64_counter(name.to_string())
             .with_description(description.to_string())
             .build();
@@ -191,7 +251,7 @@ impl MultiCounter {
         if labels.is_empty() {
             return Err(MetricError("at least a single label must be specified".into()));
         }
-        let ctr = meter()
+        let ctr = meter_for_metric(name)
             .u64_counter(name.to_string())
             .with_description(description.to_string())
             .build();
@@ -238,7 +298,7 @@ pub struct SimpleGauge {
 impl SimpleGauge {
     /// Creates a new gauge with given name and description.
     pub fn new(name: &str, description: &str) -> MetricResult<Self> {
-        let gauge = meter()
+        let gauge = meter_for_metric(name)
             .f64_up_down_counter(name.to_string())
             .with_description(description.to_string())
             .build();
@@ -296,7 +356,7 @@ impl MultiGauge {
         if labels.is_empty() {
             return Err(MetricError("at least a single label must be specified".into()));
         }
-        let gauge = meter()
+        let gauge = meter_for_metric(name)
             .f64_up_down_counter(name.to_string())
             .with_description(description.to_string())
             .build();
@@ -415,7 +475,7 @@ impl SimpleHistogram {
     /// If no buckets are specified, they will be defined automatically.
     /// The +Inf bucket is always added automatically.
     pub fn new(name: &str, description: &str, buckets: Vec<f64>) -> MetricResult<Self> {
-        let hh = meter()
+        let hh = meter_for_metric(name)
             .f64_histogram(name.to_string())
             .with_description(description.to_string())
             .with_boundaries(buckets)
@@ -474,7 +534,7 @@ impl MultiHistogram {
         if labels.is_empty() {
             return Err(MetricError("at least a single label must be specified".into()));
         }
-        let hh = meter()
+        let hh = meter_for_metric(name)
             .f64_histogram(name.to_string())
             .with_description(description.to_string())
             .with_boundaries(buckets)

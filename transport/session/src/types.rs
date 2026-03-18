@@ -343,8 +343,6 @@ pub struct HoprSession {
     routing: DestinationRouting,
     cfg: HoprSessionConfig,
     on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
-    #[cfg(feature = "telemetry")]
-    metrics: std::sync::Arc<crate::telemetry::SessionTelemetry>,
 }
 
 pub(crate) const SESSION_SOCKET_CAPACITY: usize = 16384;
@@ -364,7 +362,6 @@ impl HoprSession {
         cfg: HoprSessionConfig,
         hopr: (Tx, Rx),
         on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
-        #[cfg(feature = "telemetry")] metrics: std::sync::Arc<crate::telemetry::SessionTelemetry>,
     ) -> Result<Self, TransportSessionError>
     where
         Tx: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Send + Sync + Unpin + 'static,
@@ -374,14 +371,14 @@ impl HoprSession {
         let routing_clone = routing.clone();
 
         #[cfg(feature = "telemetry")]
-        let (metrics_write, metrics_read) = (metrics.clone(), metrics.clone());
+        let (session_id_write, session_id_read) = (id, id);
 
         // Wrap the HOPR transport so that it appears as regular transport to the SessionSocket
         let transport = DuplexIO(
             AsyncWriteSink::<{ ApplicationData::PAYLOAD_SIZE }, _>(hopr.0.sink_map_err(std::io::Error::other).with(
                 move |buf: Box<[u8]>| {
                     #[cfg(feature = "telemetry")]
-                    metrics_write.record_write(buf.len());
+                    crate::telemetry::record_session_write(&session_id_write, buf.len());
                     // The Session protocol does not set any packet info on outgoing packets.
                     // However, the SessionManager on top usually overrides this.
                     futures::future::ready(
@@ -396,7 +393,7 @@ impl HoprSession {
             hopr.1
                 .map(move |data| {
                     #[cfg(feature = "telemetry")]
-                    metrics_read.record_read(data.data.plain_text.len());
+                    crate::telemetry::record_session_read(&session_id_read, data.data.plain_text.len());
                     Ok::<_, std::io::Error>(data.data.plain_text)
                 })
                 .into_async_read(),
@@ -438,7 +435,7 @@ impl HoprSession {
                     AcknowledgementState::<{ ApplicationData::PAYLOAD_SIZE }>::new(id, ack_cfg),
                     socket_cfg,
                     #[cfg(feature = "telemetry")]
-                    metrics.clone(),
+                    id,
                 )?)
             } else {
                 debug!(?socket_cfg, "opening new stateless session socket");
@@ -448,7 +445,7 @@ impl HoprSession {
                     transport,
                     socket_cfg,
                     #[cfg(feature = "telemetry")]
-                    metrics.clone(),
+                    id,
                 )?)
             }
         } else {
@@ -462,8 +459,6 @@ impl HoprSession {
             routing,
             cfg,
             on_close,
-            #[cfg(feature = "telemetry")]
-            metrics,
         })
     }
 
@@ -480,11 +475,6 @@ impl HoprSession {
     /// Configuration of this Session.
     pub fn config(&self) -> &HoprSessionConfig {
         &self.cfg
-    }
-
-    #[cfg(feature = "telemetry")]
-    pub fn metrics(&self) -> &std::sync::Arc<crate::telemetry::SessionTelemetry> {
-        &self.metrics
     }
 }
 
@@ -532,7 +522,7 @@ impl futures::AsyncWrite for HoprSession {
         tracing::trace!("hopr session closed");
 
         #[cfg(feature = "telemetry")]
-        this.metrics.set_state(crate::telemetry::SessionLifecycleState::Closing);
+        crate::telemetry::set_session_state(this.id, crate::telemetry::SessionLifecycleState::Closing);
 
         if let Some(notifier) = this.on_close.take() {
             tracing::trace!("notifying write half closure of session");
@@ -574,9 +564,6 @@ impl tokio::io::AsyncWrite for HoprSession {
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "telemetry")]
-    use std::sync::Arc;
-
     use anyhow::Context;
     use futures::{AsyncReadExt, AsyncWriteExt};
     use hopr_types::{
@@ -584,8 +571,6 @@ mod tests {
     };
 
     use super::*;
-    #[cfg(feature = "telemetry")]
-    use crate::telemetry::SessionTelemetry;
 
     #[test]
     fn test_session_id_to_str_from_str() -> anyhow::Result<()> {
@@ -634,11 +619,6 @@ mod tests {
         let id = SessionId::new(1234_u64, HoprPseudonym::random());
         const DATA_LEN: usize = 5000;
 
-        #[cfg(feature = "telemetry")]
-        let alice_metrics = Arc::new(SessionTelemetry::new(id, Default::default()));
-        #[cfg(feature = "telemetry")]
-        let bob_metrics = Arc::new(SessionTelemetry::new(id, Default::default()));
-
         let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
         let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
 
@@ -656,8 +636,6 @@ mod tests {
                     .inspect(|d| debug!("alice rcvd: {}", d.data.total_len())),
             ),
             None,
-            #[cfg(feature = "telemetry")]
-            alice_metrics,
         )?;
 
         let mut bob_session = HoprSession::new(
@@ -674,8 +652,6 @@ mod tests {
                     .inspect(|d| debug!("bob rcvd: {}", d.data.total_len())),
             ),
             None,
-            #[cfg(feature = "telemetry")]
-            bob_metrics,
         )?;
 
         let alice_sent = hopr_types::crypto_random::random_bytes::<DATA_LEN>();
@@ -718,11 +694,6 @@ mod tests {
         let id = SessionId::new(1234_u64, HoprPseudonym::random());
         const DATA_LEN: usize = 5000;
 
-        #[cfg(feature = "telemetry")]
-        let alice_metrics = Arc::new(SessionTelemetry::new(id, Default::default()));
-        #[cfg(feature = "telemetry")]
-        let bob_metrics = Arc::new(SessionTelemetry::new(id, Default::default()));
-
         let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
         let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
 
@@ -743,8 +714,6 @@ mod tests {
                     .inspect(|d| debug!("alice rcvd: {}", d.data.total_len())),
             ),
             None,
-            #[cfg(feature = "telemetry")]
-            alice_metrics,
         )?;
 
         let mut bob_session = HoprSession::new(
@@ -764,8 +733,6 @@ mod tests {
                     .inspect(|d| debug!("bob rcvd: {}", d.data.total_len())),
             ),
             None,
-            #[cfg(feature = "telemetry")]
-            bob_metrics,
         )?;
 
         let alice_sent = hopr_types::crypto_random::random_bytes::<DATA_LEN>();

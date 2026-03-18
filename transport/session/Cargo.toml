@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-session"
-version = "0.20.1"
+version = "0.20.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -24,7 +24,6 @@ telemetry = [
   "hopr-protocol-session/telemetry",
   "dep:hopr-metrics",
   "dep:lazy_static",
-  "dep:serde_json",
 ]
 allocator-mimalloc = [
   "dep:mimalloc",
@@ -46,7 +45,6 @@ parking_lot = { workspace = true }
 pid = { workspace = true }
 pin-project = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true, optional = true }
 serde_repr = { workspace = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
