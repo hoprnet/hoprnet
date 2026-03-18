@@ -8,7 +8,8 @@
       "Bash(cargo shear:*)",
       "Bash(cargo bench:*)",
       "Bash(cargo test:*)",
-      "Bash(cargo clippy:*)"
+      "Bash(cargo clippy:*)",
+      "Bash(gh api:*)"
     ]
   }
 }

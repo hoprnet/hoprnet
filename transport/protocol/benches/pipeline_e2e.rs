@@ -55,7 +55,7 @@ async fn network_stub(
 
         if hops > 0 && !ack_buffer.is_empty() {
             let ack = ack_buffer[ack_idx % ack_buffer.len()].clone();
-            let _ = wire_in_tx.try_send(ack);
+            let _ = wire_in_tx.send(ack).await;
             ack_idx += 1;
         }
 
@@ -64,6 +64,9 @@ async fn network_stub(
             return;
         }
     }
+
+    // Stream closed before reaching `expected` — signal completion to prevent hangs.
+    let _ = done_tx.send(());
 }
 
 fn build_channel(src_idx: usize, dst_idx: usize) -> ChannelEntry {
@@ -100,7 +103,7 @@ fn build_chain_api() -> StubChainApi {
         .build()
 }
 
-fn pipeline_e2e(c: &mut Criterion) {
+fn pipeline_e2e_forward(c: &mut Criterion) {
     let runtime = tokio::runtime::Runtime::new().expect("tokio runtime must be constructible");
 
     let chain_api = build_chain_api();
@@ -189,7 +192,7 @@ fn pipeline_e2e(c: &mut Criterion) {
         ..Default::default()
     };
 
-    let mut group = c.benchmark_group("pipeline_e2e");
+    let mut group = c.benchmark_group("pipeline_e2e_forward");
     group.sample_size(SAMPLE_SIZE);
     group.measurement_time(Duration::from_secs(MEASUREMENT_TIME_SECS));
 
@@ -303,5 +306,5 @@ fn pipeline_e2e(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, pipeline_e2e);
+criterion_group!(benches, pipeline_e2e_forward);
 criterion_main!(benches);
