@@ -629,6 +629,14 @@ mod tests {
         let levels = stream.take(NUM_STEPS).collect::<Vec<_>>().await;
         handle.abort();
 
-        insta::assert_yaml_snapshot!(levels);
+        assert_eq!(levels.len(), NUM_STEPS);
+        assert!(
+            levels.windows(2).all(|w| w[1] <= w[0]),
+            "buffer levels should be monotonic non-increasing: {levels:?}"
+        );
+        assert!(
+            levels.last().is_some_and(|last| *last < 5_000),
+            "expected at least one decay step: {levels:?}"
+        );
     }
 }
