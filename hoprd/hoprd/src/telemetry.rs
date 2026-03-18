@@ -1,15 +1,7 @@
-use std::{
-    collections::HashMap,
-    str::FromStr,
-    string::ToString,
-    sync::{Arc, Mutex},
-    time::{Duration, Instant},
-};
+use std::{str::FromStr, string::ToString, time::Duration};
 
 use opentelemetry::{
-    KeyValue,
     logs::{AnyValue, LogRecord as _, Logger as _, LoggerProvider as _, Severity},
-    metrics::{MeterProvider as _, ObservableCounter, ObservableGauge},
     trace::TracerProvider,
 };
 use opentelemetry_otlp::WithExportConfig as _;
@@ -20,6 +12,10 @@ use opentelemetry_sdk::{
 };
 use tracing::field::{Field, Visit};
 use tracing_subscriber::prelude::*;
+
+const HOPRD_OTLP_ENDPOINT_ENV_KEY: &str = "HOPRD_OTLP_ENDPOINT";
+const LEGACY_OTLP_ENDPOINT_ENV_KEY: &str = "OTEL_EXPORTER_OTLP_ENDPOINT";
+const HOPRD_METRIC_EXPORT_INTERVAL_ENV_KEY: &str = "HOPRD_METRIC_EXPORT_INTERVAL";
 
 flagset::flags! {
     #[repr(u8)]
@@ -47,7 +43,7 @@ enum OtlpTransport {
 
 impl OtlpTransport {
     fn from_env() -> Self {
-        match std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT") {
+        match std::env::var(LEGACY_OTLP_ENDPOINT_ENV_KEY) {
             Ok(raw_url) => Self::from_str(raw_url.trim().split_once("://").map(|(scheme, _)| scheme).unwrap_or(""))
                 .unwrap_or(Self::Grpc),
             Err(_) => Self::Grpc,
@@ -58,9 +54,36 @@ impl OtlpTransport {
 #[derive(Debug)]
 struct OtlpConfig {
     enabled: bool,
-    service_name: String,
     transport: OtlpTransport,
     signals: flagset::FlagSet<OtlpSignal>,
+}
+
+fn apply_hoprd_otlp_endpoint_override() {
+    let Ok(value) = std::env::var(HOPRD_OTLP_ENDPOINT_ENV_KEY) else {
+        return;
+    };
+
+    let endpoint = value.trim();
+    if endpoint.is_empty() {
+        tracing::warn!(
+            env_key = HOPRD_OTLP_ENDPOINT_ENV_KEY,
+            "empty OTLP endpoint value ignored"
+        );
+        return;
+    }
+
+    if let Ok(existing) = std::env::var(LEGACY_OTLP_ENDPOINT_ENV_KEY) {
+        let existing = existing.trim();
+        if !existing.is_empty() && existing != endpoint {
+            tracing::warn!(
+                env_key = HOPRD_OTLP_ENDPOINT_ENV_KEY,
+                overridden_env_key = LEGACY_OTLP_ENDPOINT_ENV_KEY,
+                "custom HOPRD OTLP endpoint overrides OTEL exporter endpoint"
+            );
+        }
+    }
+
+    unsafe { std::env::set_var(LEGACY_OTLP_ENDPOINT_ENV_KEY, endpoint) };
 }
 
 impl OtlpConfig {
@@ -72,7 +95,6 @@ impl OtlpConfig {
                 .as_deref(),
             Some("1" | "true" | "yes" | "on")
         );
-        let service_name = std::env::var("OTEL_SERVICE_NAME").unwrap_or_else(|_| env!("CARGO_PKG_NAME").into());
         let transport = OtlpTransport::from_env();
         let mut signals = flagset::FlagSet::empty();
 
@@ -99,7 +121,6 @@ impl OtlpConfig {
 
         Self {
             enabled,
-            service_name,
             transport,
             signals,
         }
@@ -108,6 +129,122 @@ impl OtlpConfig {
     fn has_signal(&self, signal: OtlpSignal) -> bool {
         self.signals.contains(signal)
     }
+}
+
+#[derive(Debug, Default)]
+struct MetricExportIntervalConfig {
+    default_interval: Option<Duration>,
+    prefix_intervals: Vec<(String, Duration)>,
+}
+
+fn parse_export_interval(value: &str) -> Option<Duration> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    if let Ok(ms) = trimmed.parse::<u64>() {
+        if ms == 0 {
+            return None;
+        }
+        return Some(Duration::from_millis(ms));
+    }
+
+    let normalized = trimmed.to_ascii_lowercase();
+    if let Some(ms) = normalized.strip_suffix("ms").and_then(|v| v.trim().parse::<u64>().ok()) {
+        if ms == 0 {
+            return None;
+        }
+        return Some(Duration::from_millis(ms));
+    }
+
+    if let Some(seconds) = normalized.strip_suffix('s').and_then(|v| v.trim().parse::<u64>().ok()) {
+        if seconds == 0 {
+            return None;
+        }
+        return Some(Duration::from_secs(seconds));
+    }
+
+    if let Some(minutes) = normalized.strip_suffix('m').and_then(|v| v.trim().parse::<u64>().ok()) {
+        if minutes == 0 {
+            return None;
+        }
+        return Some(Duration::from_secs(minutes.saturating_mul(60)));
+    }
+
+    None
+}
+
+fn parse_metric_export_interval_config_from_env() -> Option<MetricExportIntervalConfig> {
+    let Ok(raw_value) = std::env::var(HOPRD_METRIC_EXPORT_INTERVAL_ENV_KEY) else {
+        return None;
+    };
+
+    let mut config = MetricExportIntervalConfig::default();
+
+    for token in raw_value.split(',') {
+        let token = token.trim();
+        if token.is_empty() {
+            continue;
+        }
+
+        if let Some((prefix, interval_raw)) = token.split_once('=') {
+            let prefix = prefix.trim();
+            if prefix.is_empty() {
+                tracing::warn!(
+                    env_key = HOPRD_METRIC_EXPORT_INTERVAL_ENV_KEY,
+                    env_value = %raw_value,
+                    invalid_entry = token,
+                    "invalid metric export interval override; prefix must not be empty"
+                );
+                continue;
+            }
+
+            let Some(interval) = parse_export_interval(interval_raw) else {
+                tracing::warn!(
+                    env_key = HOPRD_METRIC_EXPORT_INTERVAL_ENV_KEY,
+                    env_value = %raw_value,
+                    invalid_entry = token,
+                    "invalid metric export interval override; expected <prefix>=<duration>"
+                );
+                continue;
+            };
+
+            if let Some(existing) = config
+                .prefix_intervals
+                .iter_mut()
+                .find(|(existing_prefix, _)| existing_prefix == prefix)
+            {
+                existing.1 = interval;
+            } else {
+                config.prefix_intervals.push((prefix.to_string(), interval));
+            }
+            continue;
+        }
+
+        let Some(interval) = parse_export_interval(token) else {
+            tracing::warn!(
+                env_key = HOPRD_METRIC_EXPORT_INTERVAL_ENV_KEY,
+                env_value = %raw_value,
+                invalid_entry = token,
+                "invalid default metric export interval; expected <duration>"
+            );
+            continue;
+        };
+
+        config.default_interval = Some(interval);
+    }
+
+    if config.default_interval.is_none() && config.prefix_intervals.is_empty() {
+        tracing::warn!(
+            env_key = HOPRD_METRIC_EXPORT_INTERVAL_ENV_KEY,
+            env_value = %raw_value,
+            "metric export interval configuration is set but contains no valid entries"
+        );
+        return None;
+    }
+
+    Some(config)
 }
 
 #[derive(Clone)]
@@ -230,145 +367,11 @@ impl Visit for TracingEventVisitor {
 }
 
 #[derive(Default)]
-struct OtelSessionMetricBridge {
-    u64_counters: Vec<ObservableCounter<u64>>,
-    u64_gauges: Vec<ObservableGauge<u64>>,
-    f64_gauges: Vec<ObservableGauge<f64>>,
-}
-
-#[derive(Default)]
-struct SessionMetricCallbackCache {
-    refreshed_at: Option<Instant>,
-    values_by_name: HashMap<String, Vec<(hopr_lib::SessionId, hopr_lib::SessionMetricValue)>>,
-}
-
-const SESSION_METRIC_CACHE_TTL: Duration = Duration::from_millis(100);
-
-fn session_metric_attributes(session_id: hopr_lib::SessionId) -> [KeyValue; 1] {
-    [KeyValue::new("session_id", session_id.to_string())]
-}
-
-fn refresh_session_metric_callback_cache(cache: &mut SessionMetricCallbackCache) {
-    let now = Instant::now();
-    if cache
-        .refreshed_at
-        .is_some_and(|refreshed_at| now.duration_since(refreshed_at) <= SESSION_METRIC_CACHE_TTL)
-    {
-        return;
-    }
-
-    let mut values_by_name: HashMap<String, Vec<(hopr_lib::SessionId, hopr_lib::SessionMetricValue)>> = HashMap::new();
-    for snapshot in hopr_lib::session_telemetry_snapshots() {
-        let session_id = snapshot.session_id;
-        for sample in hopr_lib::session_snapshot_metric_samples(&snapshot) {
-            values_by_name
-                .entry(sample.name)
-                .or_default()
-                .push((session_id, sample.value));
-        }
-    }
-
-    cache.values_by_name = values_by_name;
-    cache.refreshed_at = Some(now);
-}
-
-fn get_cached_session_metric_values(
-    cache: &Arc<Mutex<SessionMetricCallbackCache>>,
-    metric_name: &str,
-) -> Vec<(hopr_lib::SessionId, hopr_lib::SessionMetricValue)> {
-    let mut cache_guard = match cache.lock() {
-        Ok(guard) => guard,
-        Err(_) => return Vec::new(),
-    };
-    refresh_session_metric_callback_cache(&mut cache_guard);
-    cache_guard.values_by_name.get(metric_name).cloned().unwrap_or_default()
-}
-
-fn build_session_u64_observable_gauge(
-    meter: &opentelemetry::metrics::Meter,
-    metric_name: String,
-    cache: Arc<Mutex<SessionMetricCallbackCache>>,
-) -> ObservableGauge<u64> {
-    let callback_metric_name = metric_name.clone();
-    meter
-        .u64_observable_gauge(metric_name)
-        .with_callback(move |observer| {
-            for (session_id, metric_value) in get_cached_session_metric_values(&cache, &callback_metric_name) {
-                if let hopr_lib::SessionMetricValue::U64(value) = metric_value {
-                    let attributes = session_metric_attributes(session_id);
-                    observer.observe(value, &attributes);
-                }
-            }
-        })
-        .build()
-}
-
-fn build_session_u64_observable_counter(
-    meter: &opentelemetry::metrics::Meter,
-    metric_name: String,
-    cache: Arc<Mutex<SessionMetricCallbackCache>>,
-) -> ObservableCounter<u64> {
-    let callback_metric_name = metric_name.clone();
-    meter
-        .u64_observable_counter(metric_name)
-        .with_callback(move |observer| {
-            for (session_id, metric_value) in get_cached_session_metric_values(&cache, &callback_metric_name) {
-                if let hopr_lib::SessionMetricValue::U64(value) = metric_value {
-                    let attributes = session_metric_attributes(session_id);
-                    observer.observe(value, &attributes);
-                }
-            }
-        })
-        .build()
-}
-
-fn build_session_f64_observable_gauge(
-    meter: &opentelemetry::metrics::Meter,
-    metric_name: String,
-    cache: Arc<Mutex<SessionMetricCallbackCache>>,
-) -> ObservableGauge<f64> {
-    let callback_metric_name = metric_name.clone();
-    meter
-        .f64_observable_gauge(metric_name)
-        .with_callback(move |observer| {
-            for (session_id, metric_value) in get_cached_session_metric_values(&cache, &callback_metric_name) {
-                if let hopr_lib::SessionMetricValue::F64(value) = metric_value {
-                    let attributes = session_metric_attributes(session_id);
-                    observer.observe(value, &attributes);
-                }
-            }
-        })
-        .build()
-}
-
-fn build_session_metric_bridge(meter_provider: &SdkMeterProvider) -> OtelSessionMetricBridge {
-    let meter = meter_provider.meter("hoprd_session_snapshot_bridge");
-    let mut session_metrics = OtelSessionMetricBridge::default();
-    let cache = Arc::new(Mutex::new(SessionMetricCallbackCache::default()));
-
-    for metric_definition in hopr_lib::session_snapshot_metric_definitions() {
-        match metric_definition.kind {
-            hopr_lib::SessionMetricKind::U64Gauge => session_metrics.u64_gauges.push(
-                build_session_u64_observable_gauge(&meter, metric_definition.name, Arc::clone(&cache)),
-            ),
-            hopr_lib::SessionMetricKind::U64Counter => session_metrics.u64_counters.push(
-                build_session_u64_observable_counter(&meter, metric_definition.name, Arc::clone(&cache)),
-            ),
-            hopr_lib::SessionMetricKind::F64Gauge => session_metrics.f64_gauges.push(
-                build_session_f64_observable_gauge(&meter, metric_definition.name, Arc::clone(&cache)),
-            ),
-        }
-    }
-
-    session_metrics
-}
-
-#[derive(Default)]
 pub(super) struct TelemetryHandles {
     tracer_provider: Option<SdkTracerProvider>,
     logger_provider: Option<SdkLoggerProvider>,
     meter_provider: Option<SdkMeterProvider>,
-    session_metric_bridge: Option<OtelSessionMetricBridge>,
+    prefixed_meter_providers: Vec<SdkMeterProvider>,
 }
 
 impl Drop for TelemetryHandles {
@@ -382,12 +385,16 @@ impl Drop for TelemetryHandles {
         if let Some(meter_provider) = self.meter_provider.take() {
             let _ = meter_provider.shutdown();
         }
+        for prefixed_meter_provider in self.prefixed_meter_providers.drain(..) {
+            let _ = prefixed_meter_provider.shutdown();
+        }
     }
 }
 
 pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
     let mut telemetry_handles = TelemetryHandles::default();
     let registry = crate::telemetry_common::build_base_subscriber()?;
+    apply_hoprd_otlp_endpoint_override();
     let config = OtlpConfig::from_env();
 
     // Build the Prometheus text exporter for the /metrics endpoint.
@@ -401,8 +408,9 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
         .build();
 
     if config.enabled {
+        let service_name = env!("CARGO_PKG_NAME").to_string();
         let resource = opentelemetry_sdk::Resource::builder()
-            .with_service_name(config.service_name.clone())
+            .with_service_name(service_name)
             .build();
 
         let trace_layer = if config.has_signal(OtlpSignal::Traces) {
@@ -471,6 +479,8 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
         };
 
         if config.has_signal(OtlpSignal::Metrics) {
+            let metric_export_interval_config = parse_metric_export_interval_config_from_env();
+
             let otlp_exporter = match config.transport {
                 OtlpTransport::Grpc => opentelemetry_otlp::MetricExporter::builder()
                     .with_tonic()
@@ -484,11 +494,53 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
                     .build()?,
             };
 
-            let otlp_reader = opentelemetry_sdk::metrics::periodic_reader_with_async_runtime::PeriodicReader::builder(
-                otlp_exporter,
-                opentelemetry_sdk::runtime::Tokio,
-            )
-            .build();
+            let mut prefixed_meter_providers = Vec::new();
+            if let Some(configured_intervals) = metric_export_interval_config.as_ref() {
+                for (prefix, interval) in &configured_intervals.prefix_intervals {
+                    let prefixed_exporter = match config.transport {
+                        OtlpTransport::Grpc => opentelemetry_otlp::MetricExporter::builder()
+                            .with_tonic()
+                            .with_protocol(opentelemetry_otlp::Protocol::Grpc)
+                            .with_timeout(Duration::from_secs(5))
+                            .build()?,
+                        OtlpTransport::Http => opentelemetry_otlp::MetricExporter::builder()
+                            .with_http()
+                            .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
+                            .with_timeout(Duration::from_secs(5))
+                            .build()?,
+                    };
+
+                    let prefixed_reader =
+                        opentelemetry_sdk::metrics::periodic_reader_with_async_runtime::PeriodicReader::builder(
+                            prefixed_exporter,
+                            opentelemetry_sdk::runtime::Tokio,
+                        )
+                        .with_interval(*interval)
+                        .build();
+
+                    let is_session_prefix = prefix.starts_with("hopr_session");
+                    let mut prefixed_provider_builder = SdkMeterProvider::builder()
+                        .with_reader(prefixed_reader)
+                        .with_resource(resource.clone());
+                    if !is_session_prefix {
+                        prefixed_provider_builder = prefixed_provider_builder.with_reader(prometheus_exporter.clone());
+                    }
+
+                    prefixed_meter_providers.push((prefix.clone(), *interval, prefixed_provider_builder.build()));
+                }
+            }
+
+            let default_metric_export_interval = metric_export_interval_config
+                .as_ref()
+                .and_then(|configured_intervals| configured_intervals.default_interval)
+                .unwrap_or(Duration::from_secs(60));
+            let otlp_reader_builder =
+                opentelemetry_sdk::metrics::periodic_reader_with_async_runtime::PeriodicReader::builder(
+                    otlp_exporter,
+                    opentelemetry_sdk::runtime::Tokio,
+                )
+                .with_interval(default_metric_export_interval);
+            let otlp_reader = otlp_reader_builder.build();
 
             // Build unified meter provider with both OTLP and Prometheus text readers
             let meter_provider = SdkMeterProvider::builder()
@@ -504,9 +556,37 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
                 tracing::warn!("hopr-metrics global state was already initialized; custom provider not applied");
             }
 
-            telemetry_handles.session_metric_bridge = Some(build_session_metric_bridge(&meter_provider));
+            tracing::info!(
+                metric_export_interval_ms = default_metric_export_interval.as_millis() as u64,
+                "configured default OTLP metric export interval"
+            );
+
+            for (prefix, interval, prefixed_meter_provider) in prefixed_meter_providers {
+                if !hopr_metrics::register_prefix_provider(&prefix, prefixed_meter_provider.clone()) {
+                    tracing::warn!(
+                        metric_prefix = %prefix,
+                        "failed to register dedicated meter provider for metric prefix; falling back to default OTLP interval"
+                    );
+                } else {
+                    tracing::info!(
+                        metric_prefix = %prefix,
+                        metric_export_interval_ms = interval.as_millis() as u64,
+                        "configured dedicated OTLP metric export interval for prefix"
+                    );
+                }
+
+                telemetry_handles.prefixed_meter_providers.push(prefixed_meter_provider);
+            }
+
             telemetry_handles.meter_provider = Some(meter_provider);
         } else {
+            if std::env::var(HOPRD_METRIC_EXPORT_INTERVAL_ENV_KEY).is_ok() {
+                tracing::warn!(
+                    "HOPRD_METRIC_EXPORT_INTERVAL is set, but OpenTelemetry metrics export is disabled by \
+                     HOPRD_OTEL_SIGNALS"
+                );
+            }
+
             // OTLP metrics not requested, but still set up the Prometheus text exporter
             let meter_provider = SdkMeterProvider::builder()
                 .with_reader(prometheus_exporter.clone())
@@ -515,7 +595,6 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
             if !hopr_metrics::init_with_provider(prometheus_exporter, meter_provider.clone()) {
                 tracing::warn!("hopr-metrics global state was already initialized; custom provider not applied");
             }
-            telemetry_handles.session_metric_bridge = Some(build_session_metric_bridge(&meter_provider));
             telemetry_handles.meter_provider = Some(meter_provider);
         }
 
@@ -536,7 +615,6 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
         }
 
         tracing::info!(
-            otel_service_name = %config.service_name,
             otel_signals = %enabled_signals,
             otel_protocol = %config.transport.to_string(),
             "OpenTelemetry enabled"
@@ -549,7 +627,6 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
         if !hopr_metrics::init_with_provider(prometheus_exporter, meter_provider.clone()) {
             tracing::warn!("hopr-metrics global state was already initialized; custom provider not applied");
         }
-        telemetry_handles.session_metric_bridge = Some(build_session_metric_bridge(&meter_provider));
         telemetry_handles.meter_provider = Some(meter_provider);
 
         tracing::subscriber::set_global_default(registry)?;

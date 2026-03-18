@@ -104,7 +104,6 @@ pub(crate) struct InternalState {
         session::list_clients,
         session::adjust_session,
         session::session_config,
-        session::session_stats,
         session::close_client,
         tickets::redeem_all_tickets,
         tickets::redeem_tickets_in_channel,
@@ -125,7 +124,6 @@ pub(crate) struct InternalState {
             node::HeartbeatInfo, node::PeerObservations, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse,
             peers::NodePeerInfoResponse, peers::PingResponse,
             session::SessionClientRequest, session::SessionCapability, session::RoutingOptions, session::SessionTargetSpec, session::SessionClientResponse, session::IpProtocol, session::SessionConfig,
-            session::SessionStatsResponse, session::SessionStatsLifetime, session::SessionStatsFrameBuffer, session::SessionStatsAck, session::SessionStatsSurb, session::SessionStatsTransport, session::SessionStatsState, session::SessionStatsAckMode,
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
         )
     ),
@@ -300,7 +298,6 @@ async fn build_api(
                 .route("/peers/{destination}/ping", post(peers::ping_peer))
                 .route("/session/config/{id}", get(session::session_config))
                 .route("/session/config/{id}", post(session::adjust_session))
-                .route("/session/stats/{id}", get(session::session_stats))
                 .route("/session/{protocol}", post(session::create_client))
                 .route("/session/{protocol}", get(session::list_clients))
                 .route("/session/{protocol}/{ip}/{port}", delete(session::close_client))

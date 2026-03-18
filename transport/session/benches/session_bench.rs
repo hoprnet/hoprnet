@@ -10,8 +10,6 @@ use hopr_api::types::{
     primitive::prelude::Address,
 };
 use hopr_protocol_app::{prelude::ApplicationDataOut, v1::ApplicationDataIn};
-#[cfg(feature = "telemetry")]
-use hopr_transport_session::SessionTelemetry;
 use hopr_transport_session::{Capabilities, Capability, HoprSession, HoprSessionConfig, SessionId};
 
 // Avoid musl's default allocator due to degraded performance
@@ -52,8 +50,6 @@ pub async fn alice_send_data(
             }),
         ),
         None,
-        #[cfg(feature = "telemetry")]
-        SessionTelemetry::new(id, cfg).into(),
     )
     .unwrap();
 
@@ -84,8 +80,6 @@ pub async fn bob_receive_data(
         cfg,
         (bob_tx, futures::stream::iter(data).map(|data| data)),
         None,
-        #[cfg(feature = "telemetry")]
-        SessionTelemetry::new(id, cfg).into(),
     )
     .unwrap();
 
