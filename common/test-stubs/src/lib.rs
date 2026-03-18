@@ -51,7 +51,7 @@ impl KeyIdMapping<HoprKeyIdent, OffchainPublicKey> for StubKeyIdMapper {
 // ---------------------------------------------------------------------------
 
 /// Lightweight in-memory stub implementing the chain-API traits needed by
-/// [`HoprEncoder`] / [`HoprDecoder`] / [`HoprTicketProcessor`].
+/// `HoprEncoder` / `HoprDecoder` / `HoprTicketProcessor`.
 ///
 /// All lookups are simple BiMap or Vec scans — no async I/O, no database.
 #[derive(Clone)]
