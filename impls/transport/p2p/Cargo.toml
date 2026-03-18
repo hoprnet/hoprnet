@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-p2p"
-version = "0.8.3"
+version = "0.9.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "rust-libp2p based p2p transport implementation"
 edition.workspace = true
