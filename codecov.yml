@@ -24,6 +24,7 @@ comment:
 
 ignore:
   - "localcluster/**"
+  - "common/test-stubs/**"
   - "**/benches/**"
   - "**/build.rs"
 
