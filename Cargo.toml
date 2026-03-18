@@ -8,6 +8,7 @@ members = [
   "common/network-types",
   "common/parallelize",
   "common/statistics",
+  "common/test-stubs",
   "crypto/keypair",
   "crypto/packet",
   "crypto/sphinx",
@@ -280,6 +281,7 @@ hopr-utils-session = { path = "utils/session" }
 hopr-db-node = { path = "db/node", default-features = false }
 hopr-chain-connector = { path = "chain/connector", default-features = false }
 hopr-statistics = { path = "common/statistics", default-features = false }
+hopr-test-stubs = { path = "common/test-stubs" }
 
 # referential implementations
 hopr-builder = { path = "hopr/builder", default-features = false }

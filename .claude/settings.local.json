@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(direnv allow:*)",
+      "Bash(pwd:*)",
+      "Bash(find:*)",
+      "Bash(cargo check:*)",
+      "Bash(cargo shear:*)",
+      "Bash(cargo bench:*)",
+      "Bash(cargo test:*)",
+      "Bash(cargo clippy:*)"
+    ]
+  }
+}
