@@ -222,7 +222,7 @@ async fn peer_id_converts_to_public_key() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn peer_id_conversion_is_cached() -> anyhow::Result<()> {
+async fn peer_id_conversion_is_repeatable() -> anyhow::Result<()> {
     let peer_id = PeerId::from(*PEER_KEYS[1].0.public());
     let k1 = peer_id_to_public_key(&peer_id).await?;
     let k2 = peer_id_to_public_key(&peer_id).await?;
@@ -249,7 +249,7 @@ fn transport_process_display_names_are_stable() {
     insta::assert_yaml_snapshot!(names);
 }
 
-// --- build_mixer_cfg_from_env ---
+// --- MixerConfig defaults ---
 
 #[test]
 fn mixer_config_default_values_snapshot() {

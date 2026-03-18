@@ -656,13 +656,16 @@ mod tests {
     // --- SessionTarget tests ---
 
     #[test]
-    fn session_target_variants_debug_snapshot() {
+    fn session_target_variants_debug_snapshot() -> anyhow::Result<()> {
         let targets: Vec<SessionTarget> = vec![
-            SessionTarget::UdpStream(SealedHost::Plain("127.0.0.1:8080".parse().unwrap())),
-            SessionTarget::TcpStream(SealedHost::Plain("10.0.0.1:443".parse().unwrap())),
+            SessionTarget::UdpStream(SealedHost::Plain(
+                "127.0.0.1:8080".parse().context("parsing UDP target")?,
+            )),
+            SessionTarget::TcpStream(SealedHost::Plain("10.0.0.1:443".parse().context("parsing TCP target")?)),
             SessionTarget::ExitNode(42),
         ];
         insta::assert_debug_snapshot!(targets);
+        Ok(())
     }
 
     // --- SessionId edge cases ---
