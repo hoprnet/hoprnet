@@ -72,6 +72,7 @@ hopr-transport-tag-allocator = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
+hopr-api = { workspace = true, features = ["types-random"] }
 hopr-network-types = { workspace = true, features = ["runtime-tokio", "serde"] }
 hopr-protocol-session = { workspace = true, features = [
   "session-types",

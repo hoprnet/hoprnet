@@ -288,26 +288,15 @@
                   CARGO_PROFILE = "candidate";
                 }
               );
-          # Use cross-compilation environment when possible to have the same setup as our production builds when benchmarking.
-          hoprd-bench =
-            if buildPlatform.isLinux && buildPlatform.isx86_64 then
-              rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage (
-                projectBuildArgs // { runBench = true; }
-              )
-            else if buildPlatform.isLinux && buildPlatform.isAarch64 then
-              rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage (
-                projectBuildArgs // { runBench = true; }
-              )
-            else if buildPlatform.isDarwin && buildPlatform.isx86_64 then
-              rust-builder-x86_64-darwin.callPackage nixLib.mkRustPackage (
-                projectBuildArgs // { runBench = true; }
-              )
-            else if buildPlatform.isDarwin && buildPlatform.isAarch64 then
-              rust-builder-aarch64-darwin.callPackage nixLib.mkRustPackage (
-                projectBuildArgs // { runBench = true; }
-              )
-            else
-              rust-builder-local.callPackage nixLib.mkRustPackage (projectBuildArgs // { runBench = true; });
+          # Benchmarks always run on the current platform.
+          hoprd-bench = rust-builder-local.callPackage nixLib.mkRustPackage (
+            projectBuildArgs // { runBench = true; }
+          );
+
+          # Compile benchmarks without running them, used for CI build verification.
+          hoprd-bench-build = rust-builder-local.callPackage nixLib.mkRustPackage (
+            projectBuildArgs // { buildBench = true; }
+          );
 
           profileDeps = with pkgs; [
             gdb
@@ -762,7 +751,7 @@
               ;
             inherit docs;
             inherit pre-commit-check;
-            inherit hoprd-bench;
+            inherit hoprd-bench hoprd-bench-build;
             inherit hoprd-man;
             # binary packages
             inherit

@@ -101,3 +101,25 @@ jobs:
       - name: Run unit tests with nightly
         run: |
           nix build -L .#hopr-test-nightly
+
+  build-benchmarks:
+    name: Build Benchmarks
+    runs-on: self-hosted-hoprnet-bigger
+    timeout-minutes: 20
+    if: github.event_name == 'merge_group'
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        with:
+          disable-sudo: true
+          egress-policy: audit
+
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          persist-credentials: false
+
+      - name: Build benchmarks
+        run: nix build .#hoprd-bench-build

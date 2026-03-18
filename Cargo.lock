@@ -5293,6 +5293,7 @@ dependencies = [
  "flagset",
  "futures",
  "futures-time",
+ "hopr-api",
  "hopr-async-runtime",
  "hopr-crypto-packet",
  "hopr-metrics",
