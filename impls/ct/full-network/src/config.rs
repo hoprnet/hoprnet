@@ -75,7 +75,7 @@ impl Validate for ProberConfig {
 
         if self.staleness_weight + self.quality_weight + self.base_priority <= 0.0 {
             errors.add(
-                "base_priority",
+                "weights",
                 ValidationError::new("at least one priority weight must be positive"),
             );
         }
