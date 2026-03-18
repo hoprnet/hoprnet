@@ -242,6 +242,11 @@ mod test {
 
     #[test]
     fn max_intermediate_nodes_should_not_be_exceeded_when_target_connects_to_target() {
+        // Chain: 0->1->2->3, targets={2,3}, max_intermediate_nodes=1
+        // Only [0,1,2] is valid (1 intermediate node).
+        // Bug: the algorithm also yields [0,1,2,3] (2 intermediate nodes) because
+        // it expands through target 2 to reach target 3, pushing visited to max_nodes,
+        // then yields the grandchild path without checking the max length.
         let graph = DiGraph::<i32, ()>::from_edges([(0, 1), (1, 2), (2, 3)]);
         let targets = HashSet::from_iter([2.into(), 3.into()]);
         let paths = sorted_paths(all_simple_paths_multi::<_, _, RandomState, _, _>(

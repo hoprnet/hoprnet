@@ -22,18 +22,12 @@ use hopr_api::{
     },
 };
 
-// ---------------------------------------------------------------------------
-// Error type
-// ---------------------------------------------------------------------------
-
+/// Stub error type for test doubles.
 #[derive(Debug, Clone, thiserror::Error)]
 #[error("stub: {0}")]
 pub struct StubError(pub String);
 
-// ---------------------------------------------------------------------------
-// StubChain — satisfies Chain trait bounds
-// ---------------------------------------------------------------------------
-
+/// Stub chain connector satisfying `Chain` trait bounds.
 #[derive(Debug, Clone)]
 pub struct StubChain {
     me_addr: Address,
@@ -170,10 +164,7 @@ impl ChainValues for StubChain {
     }
 }
 
-// ---------------------------------------------------------------------------
-// StubDb — satisfies Db trait bounds
-// ---------------------------------------------------------------------------
-
+/// Stub database satisfying `Db` trait bounds.
 #[derive(Debug, Clone)]
 pub struct StubDb;
 
@@ -258,10 +249,7 @@ impl HoprDbTicketOperations for StubDb {
     }
 }
 
-// ---------------------------------------------------------------------------
-// StubNet — satisfies Net trait bounds (never used before run())
-// ---------------------------------------------------------------------------
-
+/// Stub network view satisfying `Net` trait bounds (never used before `run()`).
 #[derive(Debug, Clone)]
 pub struct StubNet;
 
