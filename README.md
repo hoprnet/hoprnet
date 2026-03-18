@@ -461,7 +461,8 @@ Once an instrumented tokio is built into hoprd, the application can be instrumen
 - `HOPRD_USE_OPENTELEMETRY` - `true` to enable the OpenTelemetry streaming, `false` to disable it
 - `HOPRD_OTEL_SIGNALS` - comma-separated signal list from `traces`, `logs`, `metrics` (default: `traces`)
 - `OTEL_SERVICE_NAME` - identifier used as `service.name` for this instance (for example `my_hoprd_instance`)
-- `OTEL_EXPORTER_OTLP_ENDPOINT` - base URL of an OTLP endpoint. Transport is inferred from URL scheme (`grpc://...`, `http://...`, or `https://...`)
+- `HOPRD_OTLP_ENDPOINT` - base URL of an OTLP endpoint. Transport is inferred from URL scheme (`grpc://...`, `http://...`, or `https://...`)
+- `HOPRD_METRIC_EXPORT_INTERVAL` - OTLP metric export interval config in `default,prefix=interval` form (for example `15000,hopr_session=1000`). Intervals support raw milliseconds (`15000`) or suffixes (`1s`, `250ms`, `1m`).
 
 Examples:
 
