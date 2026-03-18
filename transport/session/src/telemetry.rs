@@ -60,7 +60,7 @@ lazy_static::lazy_static! {
         "Configured frame buffer capacity",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_FRAME_BEING_ASSEMBLED: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+    static ref METRIC_SESSION_FRAME_BEING_ASSEMBLED: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
         "hopr_session_frame_being_assembled",
         "Number of frames currently being assembled",
         &["session_id"]
@@ -234,7 +234,6 @@ pub fn initialize_session_metrics(session_id: SessionId, cfg: HoprSessionConfig)
     METRIC_SESSION_FRAME_MTU_BYTES.set(&[session_id.as_str()], cfg.frame_mtu as f64);
     METRIC_SESSION_FRAME_TIMEOUT_MS.set(&[session_id.as_str()], cfg.frame_timeout.as_millis() as f64);
     METRIC_SESSION_FRAME_FRAME_CAPACITY.set(&[session_id.as_str()], SESSION_SOCKET_CAPACITY as f64);
-    METRIC_SESSION_FRAME_BEING_ASSEMBLED.set(&[session_id.as_str()], 0.0);
     METRIC_SESSION_SURB_BUFFER_ESTIMATE.set(&[session_id.as_str()], 0.0);
     METRIC_SESSION_SURB_TARGET_BUFFER.set(&[session_id.as_str()], 0.0);
     METRIC_SESSION_SURB_RATE_PER_SEC.set(&[session_id.as_str()], 0.0);
@@ -257,15 +256,23 @@ pub fn set_session_state(session_id: &SessionId, state: SessionLifecycleState) {
     touch_session_activity(session_id);
 }
 
+fn update_session_activity_locked(
+    session_id: &SessionId,
+    now: u64,
+    state: &mut HashMap<SessionId, SessionRuntimeState>,
+) {
+    if let Some(runtime) = state.get_mut(session_id) {
+        runtime.last_activity_us = now;
+        refresh_lifetime_metrics(session_id, now, runtime.created_at_us, runtime.last_activity_us);
+        refresh_surb_gauges(session_id, runtime, now);
+    }
+}
+
 pub fn touch_session_activity(session_id: &SessionId) {
     let now = now_us();
-    let mut state = SESSION_RUNTIME.lock();
-    let runtime = state
-        .entry(*session_id)
-        .or_insert_with(|| SessionRuntimeState::new(now));
-    runtime.last_activity_us = now;
-    refresh_lifetime_metrics(session_id, now, runtime.created_at_us, runtime.last_activity_us);
-    refresh_surb_gauges(session_id, runtime, now);
+    if let Some(mut state) = SESSION_RUNTIME.try_lock() {
+        update_session_activity_locked(session_id, now, &mut state);
+    }
 }
 
 pub fn record_session_read(session_id: &SessionId, bytes: usize) {
@@ -371,29 +378,31 @@ fn now_us() -> u64 {
 
 impl hopr_protocol_session::SessionTelemetryTracker for SessionId {
     fn frame_emitted(&self) {
-        METRIC_SESSION_FRAME_EMITTED_TOTAL.increment_by(&[self.as_str()], 1);
+        METRIC_SESSION_FRAME_EMITTED_TOTAL.increment(&[self.as_str()]);
     }
 
     fn frame_completed(&self) {
-        METRIC_SESSION_FRAME_COMPLETED_TOTAL.increment_by(&[self.as_str()], 1);
+        METRIC_SESSION_FRAME_COMPLETED_TOTAL.increment(&[self.as_str()]);
     }
 
     fn frame_discarded(&self) {
-        METRIC_SESSION_FRAME_DISCARDED_TOTAL.increment_by(&[self.as_str()], 1);
+        METRIC_SESSION_FRAME_DISCARDED_TOTAL.increment(&[self.as_str()]);
     }
 
-    fn incomplete_frame(&self) {}
+    fn incomplete_frame(&self) {
+        METRIC_SESSION_FRAME_BEING_ASSEMBLED.increment(&[self.as_str()]);
+    }
 
     fn incoming_message(&self, msg: SessionMessageDiscriminants) {
         match msg {
             SessionMessageDiscriminants::Segment => {
-                METRIC_SESSION_ACK_INCOMING_SEGMENTS_TOTAL.increment_by(&[self.as_str()], 1)
+                METRIC_SESSION_ACK_INCOMING_SEGMENTS_TOTAL.increment(&[self.as_str()])
             }
             SessionMessageDiscriminants::Request => {
-                METRIC_SESSION_ACK_INCOMING_RETRANSMISSION_REQUESTS_TOTAL.increment_by(&[self.as_str()], 1)
+                METRIC_SESSION_ACK_INCOMING_RETRANSMISSION_REQUESTS_TOTAL.increment(&[self.as_str()])
             }
             SessionMessageDiscriminants::Acknowledge => {
-                METRIC_SESSION_ACK_INCOMING_ACKNOWLEDGED_FRAMES_TOTAL.increment_by(&[self.as_str()], 1)
+                METRIC_SESSION_ACK_INCOMING_ACKNOWLEDGED_FRAMES_TOTAL.increment(&[self.as_str()])
             }
         }
     }
@@ -401,19 +410,19 @@ impl hopr_protocol_session::SessionTelemetryTracker for SessionId {
     fn outgoing_message(&self, msg: SessionMessageDiscriminants) {
         match msg {
             SessionMessageDiscriminants::Segment => {
-                METRIC_SESSION_ACK_OUTGOING_SEGMENTS_TOTAL.increment_by(&[self.as_str()], 1)
+                METRIC_SESSION_ACK_OUTGOING_SEGMENTS_TOTAL.increment(&[self.as_str()])
             }
             SessionMessageDiscriminants::Request => {
-                METRIC_SESSION_ACK_OUTGOING_RETRANSMISSION_REQUESTS_TOTAL.increment_by(&[self.as_str()], 1)
+                METRIC_SESSION_ACK_OUTGOING_RETRANSMISSION_REQUESTS_TOTAL.increment(&[self.as_str()])
             }
             SessionMessageDiscriminants::Acknowledge => {
-                METRIC_SESSION_ACK_OUTGOING_ACKNOWLEDGED_FRAMES_TOTAL.increment_by(&[self.as_str()], 1)
+                METRIC_SESSION_ACK_OUTGOING_ACKNOWLEDGED_FRAMES_TOTAL.increment(&[self.as_str()])
             }
         }
     }
 
     fn error(&self) {
-        METRIC_SESSION_LIFETIME_PIPELINE_ERRORS_TOTAL.increment_by(&[self.as_str()], 1);
+        METRIC_SESSION_LIFETIME_PIPELINE_ERRORS_TOTAL.increment(&[self.as_str()]);
     }
 }
 

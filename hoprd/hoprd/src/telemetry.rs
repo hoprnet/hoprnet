@@ -78,8 +78,6 @@ fn apply_hoprd_otlp_endpoint_override() {
             tracing::warn!(
                 env_key = HOPRD_OTLP_ENDPOINT_ENV_KEY,
                 overridden_env_key = LEGACY_OTLP_ENDPOINT_ENV_KEY,
-                env_value = %endpoint,
-                overridden_env_value = %existing,
                 "custom HOPRD OTLP endpoint overrides OTEL exporter endpoint"
             );
         }
@@ -146,19 +144,31 @@ fn parse_export_interval(value: &str) -> Option<Duration> {
     }
 
     if let Ok(ms) = trimmed.parse::<u64>() {
+        if ms == 0 {
+            return None;
+        }
         return Some(Duration::from_millis(ms));
     }
 
     let normalized = trimmed.to_ascii_lowercase();
     if let Some(ms) = normalized.strip_suffix("ms").and_then(|v| v.trim().parse::<u64>().ok()) {
+        if ms == 0 {
+            return None;
+        }
         return Some(Duration::from_millis(ms));
     }
 
     if let Some(seconds) = normalized.strip_suffix('s').and_then(|v| v.trim().parse::<u64>().ok()) {
+        if seconds == 0 {
+            return None;
+        }
         return Some(Duration::from_secs(seconds));
     }
 
     if let Some(minutes) = normalized.strip_suffix('m').and_then(|v| v.trim().parse::<u64>().ok()) {
+        if minutes == 0 {
+            return None;
+        }
         return Some(Duration::from_secs(minutes.saturating_mul(60)));
     }
 
@@ -398,7 +408,10 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
         .build();
 
     if config.enabled {
-        let resource = opentelemetry_sdk::Resource::builder().build();
+        let service_name = env!("CARGO_PKG_NAME").to_string();
+        let resource = opentelemetry_sdk::Resource::builder()
+            .with_service_name(service_name)
+            .build();
 
         let trace_layer = if config.has_signal(OtlpSignal::Traces) {
             let exporter = match config.transport {
@@ -505,14 +518,15 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
                         .with_interval(*interval)
                         .build();
 
-                    prefixed_meter_providers.push((
-                        prefix.clone(),
-                        *interval,
-                        SdkMeterProvider::builder()
-                            .with_reader(prefixed_reader)
-                            .with_resource(resource.clone())
-                            .build(),
-                    ));
+                    let is_session_prefix = prefix.starts_with("hopr_session");
+                    let mut prefixed_provider_builder = SdkMeterProvider::builder()
+                        .with_reader(prefixed_reader)
+                        .with_resource(resource.clone());
+                    if !is_session_prefix {
+                        prefixed_provider_builder = prefixed_provider_builder.with_reader(prometheus_exporter.clone());
+                    }
+
+                    prefixed_meter_providers.push((prefix.clone(), *interval, prefixed_provider_builder.build()));
                 }
             }
 

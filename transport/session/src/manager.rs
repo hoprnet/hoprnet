@@ -688,16 +688,6 @@ where
                     })
                     .ok_or(SessionManagerError::NotStarted)?;
 
-                #[cfg(feature = "telemetry")]
-                initialize_session_metrics(
-                    session_id,
-                    HoprSessionConfig {
-                        capabilities: cfg.capabilities,
-                        frame_mtu: self.cfg.frame_mtu,
-                        frame_timeout: self.cfg.max_frame_timeout,
-                    },
-                );
-
                 // NOTE: the Exit node can have different `max_surb_buffer_size`
                 // setting on the Session manager, so it does not make sense to cap it here
                 // with our maximum value.
@@ -787,12 +777,6 @@ where
                     )
                     .await?;
 
-                    #[cfg(feature = "telemetry")]
-                    {
-                        set_session_state(&session_id, SessionLifecycleState::Active);
-                        set_session_balancer_data(&session_id, surb_estimator.clone(), surb_mgmt);
-                    }
-
                     // Wait for enough SURBs to be sent to the counterparty
                     // TODO: consider making this interactive = other party reports the exact level periodically
                     match level_stream
@@ -816,6 +800,7 @@ where
                         }
                     }
 
+                    let surb_estimator_for_rx = surb_estimator.clone();
                     let session = HoprSession::new(
                         session_id,
                         forward_routing,
@@ -829,7 +814,7 @@ where
                             rx.inspect(move |_| {
                                 // Received packets = SURB consumption estimate
                                 // The received packets always consume a single SURB.
-                                surb_estimator
+                                surb_estimator_for_rx
                                     .consumed
                                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                                 #[cfg(feature = "telemetry")]
@@ -838,6 +823,20 @@ where
                         ),
                         Some(notifier),
                     )?;
+
+                    #[cfg(feature = "telemetry")]
+                    {
+                        initialize_session_metrics(
+                            session_id,
+                            HoprSessionConfig {
+                                capabilities: cfg.capabilities,
+                                frame_mtu: self.cfg.frame_mtu,
+                                frame_timeout: self.cfg.max_frame_timeout,
+                            },
+                        );
+                        set_session_state(&session_id, SessionLifecycleState::Active);
+                        set_session_balancer_data(&session_id, surb_estimator.clone(), surb_mgmt.clone());
+                    }
 
                     Ok(session)
                 } else {
@@ -855,8 +854,6 @@ where
                         },
                     )
                     .await?;
-                    #[cfg(feature = "telemetry")]
-                    set_session_state(&session_id, SessionLifecycleState::Active);
 
                     // For standard Session data we first reduce the number of SURBs we want to produce,
                     // unless requested to always max them out
@@ -885,6 +882,19 @@ where
                         (reduced_surb_sender, rx),
                         Some(notifier),
                     )?;
+
+                    #[cfg(feature = "telemetry")]
+                    {
+                        initialize_session_metrics(
+                            session_id,
+                            HoprSessionConfig {
+                                capabilities: cfg.capabilities,
+                                frame_mtu: self.cfg.frame_mtu,
+                                frame_timeout: self.cfg.max_frame_timeout,
+                            },
+                        );
+                        set_session_state(&session_id, SessionLifecycleState::Active);
+                    }
 
                     Ok(session)
                 }
@@ -1080,16 +1090,6 @@ where
             let session_id = SessionId::new(allocated_tag.value(), pseudonym);
             let allocated_tag = Arc::new(allocated_tag);
 
-            #[cfg(feature = "telemetry")]
-            initialize_session_metrics(
-                session_id,
-                HoprSessionConfig {
-                    capabilities: session_req.capabilities.0,
-                    frame_mtu: self.cfg.frame_mtu,
-                    frame_timeout: self.cfg.max_frame_timeout,
-                },
-            );
-
             let slot = SessionSlot {
                 session_tx: Arc::new(tx_session_data),
                 routing_opts: reply_routing.clone(),
@@ -1177,12 +1177,6 @@ where
                 };
 
                 slot.surb_mgmt.update(&balancer_config);
-
-                #[cfg(feature = "telemetry")]
-                {
-                    set_session_state(&session_id, SessionLifecycleState::Active);
-                    set_session_balancer_data(&session_id, slot.surb_estimator.clone(), slot.surb_mgmt.clone());
-                }
 
                 // Spawn the SURB balancer only once we know we have registered the
                 // abort handle with the pre-allocated Session slot
@@ -1296,6 +1290,20 @@ where
                     error!(%session_id, %error, "failed to send session establishment message");
                     SessionManagerError::other(error)
                 })?;
+
+            #[cfg(feature = "telemetry")]
+            {
+                initialize_session_metrics(
+                    session_id,
+                    HoprSessionConfig {
+                        capabilities: session_req.capabilities.0,
+                        frame_mtu: self.cfg.frame_mtu,
+                        frame_timeout: self.cfg.max_frame_timeout,
+                    },
+                );
+                set_session_state(&session_id, SessionLifecycleState::Active);
+                set_session_balancer_data(&session_id, slot.surb_estimator.clone(), slot.surb_mgmt.clone());
+            }
 
             info!(%session_id, "new session established");
 
@@ -1415,6 +1423,8 @@ where
                                 .surb_estimator
                                 .consumed
                                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            #[cfg(feature = "telemetry")]
+                            crate::telemetry::record_session_surb_consumed(&session_id, 1);
                         }
                         // Session is incoming - keep-alive was received from the Entry
                         DestinationRouting::Return(_) => {
@@ -1439,10 +1449,13 @@ where
 
                             // Increase the number of received SURBs in the estimator.
                             // Typically, 2 SURBs per Keep-Alive message
-                            session_slot.surb_estimator.produced.fetch_add(
-                                KeepAliveMessage::<SessionId>::MIN_SURBS_PER_MESSAGE as u64,
-                                std::sync::atomic::Ordering::Relaxed,
-                            );
+                            let produced = KeepAliveMessage::<SessionId>::MIN_SURBS_PER_MESSAGE as u64;
+                            session_slot
+                                .surb_estimator
+                                .produced
+                                .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
+                            #[cfg(feature = "telemetry")]
+                            crate::telemetry::record_session_surb_produced(&session_id, produced);
                         }
                     }
                 } else {
