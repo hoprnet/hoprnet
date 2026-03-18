@@ -602,6 +602,15 @@
             '';
             rustToolchain = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default);
           };
+          coverageShell = nixLib.mkDevShell {
+            rustToolchainFile = ./rust-toolchain.toml;
+            shellName = "HOPR Coverage";
+            withLlvmTools = true;
+            extraPackages = with pkgs; [
+              sqlite
+            ];
+          };
+
           run-check = flake-utils.lib.mkApp {
             drv = pkgs.writeShellScriptBin "run-check" ''
               set -e
@@ -774,6 +783,7 @@
           devShells.test = testShell;
           devShells.citest = ciTestShell;
           devShells.docs = docsShell;
+          devShells.coverage = coverageShell;
 
           formatter = config.treefmt.build.wrapper;
         };
