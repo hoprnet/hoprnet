@@ -100,7 +100,7 @@ crate:hopr-transport-mixer:
       - any-glob-to-any-file: transport/mixer/**
 crate:hopr-transport-p2p:
   - changed-files:
-      - any-glob-to-any-file: transport/p2p/**
+      - any-glob-to-any-file: impls/transport/p2p/**
 crate:hopr-transport-packet:
   - changed-files:
       - any-glob-to-any-file: transport/packet/**

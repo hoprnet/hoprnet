@@ -9,7 +9,7 @@ pub fn strip_p2p_protocol(ma: &Multiaddr) -> Multiaddr {
 pub fn is_dns(ma: &Multiaddr) -> bool {
     ma.iter()
         .next()
-        .map(|proto| matches!(proto, Protocol::Dns(_)))
+        .map(|proto| matches!(proto, Protocol::Dns(_) | Protocol::Dns4(_) | Protocol::Dns6(_)))
         .unwrap_or(false)
 }
 
