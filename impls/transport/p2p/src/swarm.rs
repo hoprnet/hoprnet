@@ -234,7 +234,7 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
             .expect("swarm must be configurable");
 
         let swarm = swarm.swarm;
-        let store = hopr_transport_network::store::NetworkPeerStore::new(me, my_multiaddresses.into_iter().collect());
+        let store = crate::peer_store::NetworkPeerStore::new(me, my_multiaddresses.into_iter().collect());
         let tracker: Arc<DashSet<libp2p::PeerId>> = Default::default();
 
         let network = HoprNetwork {

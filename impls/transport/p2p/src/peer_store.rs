@@ -1,8 +1,17 @@
 use std::{collections::HashSet, sync::Arc};
 
 use hopr_api::{Multiaddr, PeerId};
+use thiserror::Error;
 
-use crate::errors::{NetworkError, Result};
+/// Errors from the network peer store.
+#[derive(Error, Debug)]
+pub enum NetworkError {
+    #[error("performing an operation on own PeerId")]
+    DisallowedOperationOnOwnPeerIdError,
+}
+
+/// Result built on top of [`NetworkError`]
+pub type Result<T> = core::result::Result<T, NetworkError>;
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
