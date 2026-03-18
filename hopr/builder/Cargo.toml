@@ -76,7 +76,6 @@ hopr-transport-p2p = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-insta = { workspace = true, features = ["yaml", "redactions"] }
 rstest = { workspace = true }
 serial_test = { workspace = true }
 test-log = { workspace = true }
