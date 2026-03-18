@@ -5086,6 +5086,7 @@ dependencies = [
  "multiaddr",
  "pcap-file",
  "proc-macro-regex",
+ "rstest",
  "serde",
  "smart-default",
  "strum 0.28.0",

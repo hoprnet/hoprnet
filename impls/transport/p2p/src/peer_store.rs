@@ -234,4 +234,44 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn iter_keys_should_return_all_added_peers() -> anyhow::Result<()> {
+        let store = NetworkPeerStore::new(PeerId::random(), HashSet::new());
+
+        let peers: HashSet<PeerId> = (0..3).map(|_| PeerId::random()).collect();
+
+        for peer in &peers {
+            store.add(*peer, HashSet::new())?;
+        }
+
+        let keys: HashSet<PeerId> = store.iter_keys().collect();
+
+        assert_eq!(keys, peers);
+
+        Ok(())
+    }
+
+    #[test]
+    fn iter_keys_should_return_empty_when_no_peers_added() {
+        let store = NetworkPeerStore::new(PeerId::random(), HashSet::new());
+
+        assert_eq!(store.iter_keys().count(), 0);
+    }
+
+    #[test]
+    fn iter_keys_should_not_include_own_peer_id() -> anyhow::Result<()> {
+        let me = PeerId::random();
+        let store = NetworkPeerStore::new(me, HashSet::new());
+
+        let peer = PeerId::random();
+        store.add(peer, HashSet::new())?;
+
+        let keys: Vec<PeerId> = store.iter_keys().collect();
+
+        assert_eq!(keys, vec![peer]);
+        assert!(!keys.contains(&me));
+
+        Ok(())
+    }
 }
