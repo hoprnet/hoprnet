@@ -220,7 +220,6 @@ class Node:
             ),
             "RUST_BACKTRACE": "full",
             "HOPRD_USE_OPENTELEMETRY": trace_telemetry,
-            "OTEL_SERVICE_NAME": f"hoprd-{self.p2p_port}",
             "TOKIO_CONSOLE_BIND": f"localhost:{self.tokio_console_port}",
             "HOPRD_NAT": "true" if self.use_nat else "false",
             "HOPR_CAPTURE_PACKETS": self.dir.joinpath(f"capture_{self.id}.pcap"),

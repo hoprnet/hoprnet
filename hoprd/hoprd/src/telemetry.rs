@@ -54,7 +54,6 @@ impl OtlpTransport {
 #[derive(Debug)]
 struct OtlpConfig {
     enabled: bool,
-    service_name: String,
     transport: OtlpTransport,
     signals: flagset::FlagSet<OtlpSignal>,
 }
@@ -98,7 +97,6 @@ impl OtlpConfig {
                 .as_deref(),
             Some("1" | "true" | "yes" | "on")
         );
-        let service_name = std::env::var("OTEL_SERVICE_NAME").unwrap_or_else(|_| env!("CARGO_PKG_NAME").into());
         let transport = OtlpTransport::from_env();
         let mut signals = flagset::FlagSet::empty();
 
@@ -125,7 +123,6 @@ impl OtlpConfig {
 
         Self {
             enabled,
-            service_name,
             transport,
             signals,
         }
@@ -401,9 +398,7 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
         .build();
 
     if config.enabled {
-        let resource = opentelemetry_sdk::Resource::builder()
-            .with_service_name(config.service_name.clone())
-            .build();
+        let resource = opentelemetry_sdk::Resource::builder().build();
 
         let trace_layer = if config.has_signal(OtlpSignal::Traces) {
             let exporter = match config.transport {
@@ -606,7 +601,6 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
         }
 
         tracing::info!(
-            otel_service_name = %config.service_name,
             otel_signals = %enabled_signals,
             otel_protocol = %config.transport.to_string(),
             "OpenTelemetry enabled"
