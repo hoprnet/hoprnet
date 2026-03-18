@@ -4461,7 +4461,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-builder"
-version = "4.0.2"
+version = "4.0.3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5059,7 +5059,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.21.1"
+version = "0.21.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5271,7 +5271,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.20.1"
+version = "0.20.2"
 dependencies = [
  "anyhow",
  "arrayvec",
@@ -5335,7 +5335,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-utils-session"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -5412,7 +5412,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "4.6.2"
+version = "4.7.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -5448,7 +5448,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api-client"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "bytes",
  "chrono",
