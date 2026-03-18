@@ -128,15 +128,6 @@ pub struct HoprTicketManager<S, Q> {
     store: std::sync::Arc<parking_lot::RwLock<S>>,
 }
 
-/// Indicates a non-error result of [ticket redemption](HoprTicketManager::redeem_stream).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum RedemptionResult {
-    /// Ticket has been redeemed successfully.
-    Redeemed(VerifiedTicket),
-    /// Ticket has been neglected because its value was lower than the threshold.
-    ValueTooLow(VerifiedTicket),
-}
-
 impl<S, Q> HoprTicketManager<S, Q>
 where
     S: OutgoingIndexStore + Send + Sync + 'static,
@@ -320,6 +311,33 @@ where
     }
 }
 
+/// Indicates a non-error result of [ticket redemption](HoprTicketManager::redeem_stream).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RedemptionResult {
+    /// Ticket has been redeemed successfully.
+    Redeemed(VerifiedTicket),
+    /// Ticket has been neglected because its value was lower than the threshold.
+    ValueTooLow(VerifiedTicket),
+}
+
+/// Contains transient statistics about the tickets in a channel or channels.
+///
+/// The object intentionally does not contain the redeemed value
+/// as that should be determined by an on-chain query directly.
+///
+/// The object is not persistent.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub struct TicketStats {
+    /// The number of tickets in the channel or channels.
+    pub winning_tickets: u128,
+    /// The total unredeemed value of the tickets in the channel or channels.
+    pub unredeemed_value: HoprBalance,
+    /// The total value of the tickets in the channel or channels that have been rejected.
+    pub rejected_value: HoprBalance,
+    /// The total value of the tickets in the channel or channels that have been neglected.
+    pub neglected_value: HoprBalance,
+}
+
 impl<S> HoprTicketManager<S, S::Queue>
 where
     S: TicketQueueStore + Send + Sync + 'static,
@@ -352,7 +370,7 @@ where
             .iter_queues()
             .map_err(TicketManagerError::store)?
             .collect::<Vec<_>>();
-        let mut ret = Vec::new();
+        let mut neglected = Vec::new();
         let now = hopr_platform::time::current_time();
         for channel_id in stored_queues {
             // If any existing redeemable ticket queue does not match any currently existing
@@ -363,13 +381,16 @@ where
                 .any(|channel| !channel.closure_time_passed(now) && channel.get_id() == &channel_id)
             {
                 let mut store_write = parking_lot::RwLockUpgradableReadGuard::upgrade(store_read);
-                ret.extend(
+                neglected.extend(
                     store_write
                         .delete_queue(&channel_id)
                         .map_err(TicketManagerError::store)?,
                 );
                 tracing::debug!(%channel_id, "purged outdated incoming tickets queue");
                 store_read = parking_lot::RwLockWriteGuard::downgrade_to_upgradable(store_write);
+
+                // We cannot account the neglected tickets, because the channel has been closed.
+                self.channel_tickets.remove(&channel_id);
             }
         }
         // Create or open ticket queues for all incoming channels that are open or effectively open
@@ -393,7 +414,7 @@ where
             self.channel_tickets.insert(*id, queue.into());
         }
 
-        Ok(ret)
+        Ok(neglected)
     }
 
     /// Inserts a new incoming winning redeemable ticket into the ticket manager.
@@ -426,8 +447,12 @@ where
                     .map_err(TicketManagerError::store)?
                     .is_some_and(|last| last.verified_ticket().channel_epoch < ticket.verified_ticket().channel_epoch)
                 {
+                    // Count the neglected value and add it to stats
+                    let mut neg = queue.0.drain().map_err(TicketManagerError::store)?;
+                    queue.1.neglected_value += neg.iter().map(|t| t.verified_ticket().amount).sum::<HoprBalance>();
+
                     // Ensures allocation according to the number of drained tickets
-                    neglected_tickets.append(&mut queue.0.drain().map_err(TicketManagerError::store)?);
+                    neglected_tickets.append(&mut neg);
                     tracing::warn!(%ticket_id, num_neglected = neglected_tickets.len(), "winning ticket has neglected unredeemed tickets from previous epochs");
                 }
                 queue.0.push(ticket).map_err(TicketManagerError::store)?;
@@ -487,13 +512,44 @@ where
                 .map_err(TicketManagerError::store)?
                 .map(|t| t.verified_ticket().channel_epoch)
             {
-                Ok(queue.0.total_value(epoch, min_index).map_err(TicketManagerError::store)?)
+                Ok(queue
+                    .0
+                    .total_value(epoch, min_index)
+                    .map_err(TicketManagerError::store)?)
             } else {
                 Ok(HoprBalance::zero())
             }
         } else {
             Err(TicketManagerError::ChannelQueueNotFound)
         }
+    }
+
+    /// Computes [statistics](TicketStats) for the given `channel` or for all channels if `None` is given.
+    ///
+    /// If the given `channel` does not exist, it returns zero statistics instead of an error.
+    ///
+    /// Apart from [`unredeemed_value`](TicketStats), the statistics are not persistent.
+    pub fn get_stats(&self, channel: Option<&ChannelId>) -> Result<TicketStats, TicketManagerError> {
+        self.channel_tickets
+            .iter()
+            .filter(|e| channel.is_none_or(|c| c == e.key()))
+            .try_fold(TicketStats::default(), |stats, v| {
+                let queue = v.queue.read();
+                Ok::<_, TicketManagerError>(TicketStats {
+                    winning_tickets: queue.1.winning_tickets + stats.winning_tickets,
+                    unredeemed_value: queue
+                        .0
+                        .peek()
+                        .map_err(TicketManagerError::store)?
+                        .map(|t| queue.0.total_value(t.verified_ticket().channel_epoch, None))
+                        .transpose()
+                        .map_err(TicketManagerError::store)?
+                        .unwrap_or_default()
+                        + stats.unredeemed_value,
+                    rejected_value: queue.1.rejected_value + stats.rejected_value,
+                    neglected_value: queue.1.neglected_value + stats.neglected_value,
+                })
+            })
     }
 
     /// Removes all the tickets in the given [`ChannelId`], optionally only up to the given ticket index (inclusive).
@@ -630,17 +686,30 @@ where
 
                         // Check if we should remove the ticket from the queue
                         if remove_ticket {
-                            // Quickly perform pop and drop the write lock not to block any readers
+                            // Pop and drop the write lock not to block any readers
                             let mut queue_write = state.queue.write();
                             match queue_write.0.pop() {
                                 Ok(Some(ticket)) => {
-                                    if !matches!(&redeem_result, Ok(Some(RedemptionResult::Redeemed(_)))) {
-                                        queue_write.1.neglected_value += ticket.verified_ticket().amount;
+                                    match &redeem_result {
+                                        Ok(Some(RedemptionResult::Redeemed(_))) => {}, // no accounting here
+                                        Ok(Some(_)) => {
+                                            tracing::warn!(%ticket_id, "ticket has been neglected");
+                                            queue_write.1.neglected_value += ticket.verified_ticket().amount;
+                                        }
+                                        Err(_) => {
+                                            tracing::warn!(%ticket_id, "ticket has been rejected");
+                                            queue_write.1.rejected_value += ticket.verified_ticket().amount;
+                                        },
+                                        _ => {}
                                     }
                                 },
                                 Ok(None) => {
-                                    tracing::warn!(%ticket_id, "ticket has been neglected from the queue while it was being redeemed");
+                                    // This can only happen if `neglect_tickets` was called while redeeming,
+                                    // and it has neglected the ticket during this race-condition.
+                                    // In this case we need to correct the neglected value, because
+                                    // the ticket has been actually redeemed successfully.
                                     if matches!(&redeem_result, Ok(Some(RedemptionResult::Redeemed(_)))) {
+                                        tracing::warn!(%ticket_id, "ticket has been neglected from the queue while it was actually redeemed");
                                         queue_write.1.neglected_value -= ticket.verified_ticket().amount;
                                     }
                                 }
@@ -651,7 +720,7 @@ where
                         }
 
                         redeem_result
-                            .inspect(|_| tracing::debug!(%ticket_id, "ticket redemption succeeded"))
+                            .inspect(|_| tracing::debug!(%ticket_id, "ticket redemption done"))
                             .inspect_err(
                                 |error| tracing::error!(%error, %ticket_id, remove_ticket, "ticket redemption failed"),
                             )
@@ -697,6 +766,15 @@ mod tests {
     }
 
     #[test]
+    fn ticket_manager_non_existing_channel_should_return_empty_stats() -> anyhow::Result<()> {
+        let mgr = create_mgr()?;
+
+        assert_eq!(TicketStats::default(), mgr.get_stats(None)?);
+        assert_eq!(TicketStats::default(), mgr.get_stats(Some(&ChannelId::default()))?);
+        Ok(())
+    }
+
+    #[test]
     fn ticket_manager_should_create_multihop_tickets() -> anyhow::Result<()> {
         let mgr = create_mgr()?;
 
@@ -731,6 +809,50 @@ mod tests {
         assert_eq!(ticket_2.channel_id(), channel.get_id());
         assert_eq!(channel.ticket_index + 1, ticket_2.verified_ticket().index);
         assert_eq!(channel.channel_epoch, ticket_2.verified_ticket().channel_epoch);
+
+        Ok(())
+    }
+
+    #[test]
+    fn ticket_manager_should_update_state_when_winning_tickets_are_inserted() -> anyhow::Result<()> {
+        let mgr = create_mgr()?;
+
+        let src = ChainKeypair::random();
+        let dst = ChainKeypair::random();
+
+        let channel = ChannelEntry::builder()
+            .between(&src, &dst)
+            .amount(10)
+            .ticket_index(1)
+            .status(ChannelStatus::Open)
+            .epoch(1)
+            .build()?;
+
+        let tickets = generate_owned_tickets(&src, &dst, 2, 1..=1)?;
+
+        mgr.insert_incoming_ticket(tickets[0])?;
+
+        assert_eq!(
+            TicketStats {
+                winning_tickets: 1,
+                unredeemed_value: tickets[0].verified_ticket().amount,
+                rejected_value: HoprBalance::zero(),
+                neglected_value: HoprBalance::zero(),
+            },
+            mgr.get_stats(Some(&channel.get_id()))?
+        );
+
+        mgr.insert_incoming_ticket(tickets[1])?;
+
+        assert_eq!(
+            TicketStats {
+                winning_tickets: 2,
+                unredeemed_value: tickets[0].verified_ticket().amount + tickets[1].verified_ticket().amount,
+                rejected_value: HoprBalance::zero(),
+                neglected_value: HoprBalance::zero(),
+            },
+            mgr.get_stats(Some(&channel.get_id()))?
+        );
 
         Ok(())
     }
@@ -1074,16 +1196,26 @@ mod tests {
         );
 
         let neglected = mgr.neglect_tickets(&channel.get_id(), None)?;
-        assert_eq!(tickets.into_iter().map(|t| t.ticket).collect::<Vec<_>>(), neglected);
+        assert_eq!(tickets.iter().map(|t| t.ticket).collect::<Vec<_>>(), neglected);
 
         let unrealized_value_after = mgr.unrealized_value(channel.get_id(), None)?;
         assert_eq!(
             unrealized_value_after,
             unrealized_value
                 - neglected
-                    .into_iter()
+                    .iter()
                     .map(|t| t.verified_ticket().amount)
                     .sum::<HoprBalance>()
+        );
+
+        assert_eq!(
+            TicketStats {
+                winning_tickets: tickets.len() as u128,
+                unredeemed_value: unrealized_value_after,
+                rejected_value: HoprBalance::zero(),
+                neglected_value: neglected.iter().map(|t| t.verified_ticket().amount).sum(),
+            },
+            mgr.get_stats(Some(&channel.get_id()))?
         );
 
         Ok(())
@@ -1141,9 +1273,19 @@ mod tests {
             unrealized_value_after,
             unrealized_value
                 - neglected
-                    .into_iter()
+                    .iter()
                     .map(|t| t.verified_ticket().amount)
                     .sum::<HoprBalance>()
+        );
+
+        assert_eq!(
+            TicketStats {
+                winning_tickets: tickets.len() as u128,
+                unredeemed_value: unrealized_value_after,
+                rejected_value: HoprBalance::zero(),
+                neglected_value: neglected.iter().map(|t| t.verified_ticket().amount).sum(),
+            },
+            mgr.get_stats(Some(&channel.get_id()))?
         );
 
         Ok(())
@@ -1183,6 +1325,16 @@ mod tests {
 
         let expected_unrealized_value: HoprBalance = tickets.iter().map(|ticket| ticket.verified_ticket().amount).sum();
         assert_eq!(expected_unrealized_value, last_unrealized_value);
+
+        assert_eq!(
+            TicketStats {
+                winning_tickets: tickets.len() as u128,
+                unredeemed_value: expected_unrealized_value,
+                rejected_value: HoprBalance::zero(),
+                neglected_value: HoprBalance::zero(),
+            },
+            mgr.get_stats(Some(&tickets[0].ticket.channel_id()))?
+        );
 
         Ok(())
     }
@@ -1237,6 +1389,16 @@ mod tests {
         // There's now only 1 ticket from epoch 2
         let new_unrealized_value = mgr.unrealized_value(&channel_id, None)?;
         assert_eq!(tickets_from_epoch_2[0].verified_ticket().amount, new_unrealized_value);
+
+        assert_eq!(
+            TicketStats {
+                winning_tickets: tickets_from_epoch_1.len() as u128 + 1,
+                unredeemed_value: new_unrealized_value,
+                rejected_value: HoprBalance::zero(),
+                neglected_value: neglected.iter().map(|t| t.verified_ticket().amount).sum(),
+            },
+            mgr.get_stats(Some(&channel_id))?
+        );
 
         let queue_tickets = mgr
             .store

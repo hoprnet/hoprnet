@@ -1,7 +1,10 @@
 use std::sync::atomic::{AtomicBool, AtomicU64};
 
-use hopr_api::{chain::ChannelId, types::internal::prelude::TicketBuilder};
-use hopr_api::chain::HoprBalance;
+use hopr_api::{
+    chain::{ChannelId, HoprBalance},
+    types::internal::prelude::TicketBuilder,
+};
+
 use crate::{OutgoingIndexStore, TicketQueue};
 
 /// Tracks outgoing ticket indices for a channel, starting from 0.
@@ -151,7 +154,7 @@ pub struct ChannelTicketQueue<Q> {
 
 impl<Q: TicketQueue> From<Q> for ChannelTicketQueue<Q> {
     fn from(queue: Q) -> Self {
-        let stats  = ChannelTicketStats {
+        let stats = ChannelTicketStats {
             winning_tickets: queue.len().unwrap_or(0) as u128,
             ..Default::default()
         };
@@ -162,19 +165,10 @@ impl<Q: TicketQueue> From<Q> for ChannelTicketQueue<Q> {
     }
 }
 
-/// Contains transient statistics about the tickets in a channel.
-///
-/// The object intentionally does not contain the redeemed value
-/// as that should be determined by an on-chain query directly.
-///
-/// The object is not persistent.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub struct ChannelTicketStats {
-    /// Total number of winning tickets in the channel.
+pub(crate) struct ChannelTicketStats {
     pub winning_tickets: u128,
-    /// Total value of tickets that were neglected.
     pub neglected_value: HoprBalance,
-    /// Total value of tickets that were rejected.
     pub rejected_value: HoprBalance,
 }
 
