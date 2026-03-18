@@ -1,4 +1,9 @@
-use std::{collections::HashMap, str::FromStr, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    str::FromStr,
+    sync::{Arc, LazyLock},
+    time::Duration,
+};
 
 use anyhow::Context;
 use futures::{SinkExt, StreamExt};
@@ -296,10 +301,8 @@ pub fn random_packets_of_count(size: usize) -> Vec<ApplicationData> {
         .expect("data generation must not fail")
 }
 
-lazy_static! {
-    /// A large pool of random bytes used as a ring buffer for generating test payloads.
-    static ref RANDOM_BYTE_POOL: [u8; 4096] = random_bytes::<4096>();
-}
+/// A large pool of random bytes used as a ring buffer for generating test payloads.
+static RANDOM_BYTE_POOL: LazyLock<[u8; 4096]> = LazyLock::new(|| random_bytes::<4096>());
 
 /// Creates a single packet with a payload of the given size (filled from a static random byte pool).
 pub fn random_packet_of_size(payload_size: usize) -> ApplicationData {
@@ -368,7 +371,6 @@ pub async fn send_and_receive_packets(
     Ok((recv_packets, ticket_channels))
 }
 
-#[allow(dead_code)]
 pub async fn send_relay_receive_channel_of_n_peers(
     peer_count: usize,
     mut test_msgs: Vec<ApplicationData>,

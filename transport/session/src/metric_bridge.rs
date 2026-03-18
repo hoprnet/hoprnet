@@ -280,38 +280,30 @@ mod tests {
     }
 
     #[test]
-    fn flatten_snapshot_value_handles_numbers() {
-        insta::assert_debug_snapshot!(collect_flat(serde_json::json!({ "packets_in": 42 })));
-    }
-
-    #[test]
-    fn flatten_snapshot_value_handles_nested_objects() {
-        insta::assert_debug_snapshot!(collect_flat(serde_json::json!({ "transport": { "bytes_in": 100 } })));
-    }
-
-    #[test]
-    fn flatten_snapshot_value_handles_floats() {
-        insta::assert_debug_snapshot!(collect_flat(serde_json::json!({ "rate": 2.78 })));
-    }
-
-    #[test]
-    fn flatten_snapshot_value_handles_booleans() {
-        insta::assert_debug_snapshot!(collect_flat(serde_json::json!({ "active": true })));
-    }
-
-    #[test]
-    fn flatten_snapshot_value_skips_session_id_at_root() {
-        insta::assert_debug_snapshot!(collect_flat(serde_json::json!({ "session_id": "abc", "bytes_in": 10 })));
-    }
-
-    #[test]
-    fn flatten_snapshot_value_ignores_strings_arrays_nulls() {
-        insta::assert_debug_snapshot!(collect_flat(serde_json::json!({
-            "name": "test",
-            "items": [1, 2, 3],
-            "empty": null,
-            "count": 5
-        })));
+    fn flatten_snapshot_value_cases() {
+        let cases: Vec<(&str, Vec<SessionMetricSample>)> = vec![
+            ("numbers", collect_flat(serde_json::json!({ "packets_in": 42 }))),
+            (
+                "nested_objects",
+                collect_flat(serde_json::json!({ "transport": { "bytes_in": 100 } })),
+            ),
+            ("floats", collect_flat(serde_json::json!({ "rate": 2.78 }))),
+            ("booleans", collect_flat(serde_json::json!({ "active": true }))),
+            (
+                "skips_session_id",
+                collect_flat(serde_json::json!({ "session_id": "abc", "bytes_in": 10 })),
+            ),
+            (
+                "ignores_non_numeric",
+                collect_flat(serde_json::json!({
+                    "name": "test",
+                    "items": [1, 2, 3],
+                    "empty": null,
+                    "count": 5
+                })),
+            ),
+        ];
+        insta::assert_debug_snapshot!(cases);
     }
 
     #[test]

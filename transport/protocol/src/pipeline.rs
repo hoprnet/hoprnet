@@ -1121,7 +1121,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn incoming_processing_error_should_emit_ack_to_sender() -> anyhow::Result<()> {
+    async fn incoming_processing_error_emits_ack_to_sender() -> anyhow::Result<()> {
         let packet_key = PEERS[0].clone();
         let sender_key = *PEERS[1].public();
 
@@ -1158,13 +1158,13 @@ mod tests {
             .await?;
         drop(wire_in_tx);
 
-        // The processing error should trigger a random ack to be sent on the wire.
-        let result = tokio::time::timeout(Duration::from_secs(2), wire_out_rx.next()).await;
-        assert!(
-            result.is_ok(),
-            "should receive an ack packet on the wire after processing error"
-        );
-        let (peer_id, data) = result.unwrap().context("wire output should have an ack")?;
+        // The processing error should trigger an ack to be sent on the wire.
+        // Note: TestEncoder always returns a fixed payload, so this only verifies
+        // that *an* ack is emitted — not that it is specifically a random ack.
+        let (peer_id, data) = tokio::time::timeout(Duration::from_secs(2), wire_out_rx.next())
+            .await
+            .context("should receive an ack packet on the wire after processing error")?
+            .context("wire output should have an ack")?;
         assert_eq!(peer_id, sender_peer);
         // The TestEncoder returns [0xAC, 0x4B] for ack encoding
         assert_eq!(&*data, &[0xAC, 0x4B]);

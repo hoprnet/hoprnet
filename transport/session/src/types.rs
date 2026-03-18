@@ -671,18 +671,12 @@ mod tests {
 
     #[test]
     fn session_target_variants_debug_snapshot() {
-        let targets = vec![
-            format!(
-                "{:?}",
-                SessionTarget::UdpStream(SealedHost::Plain("127.0.0.1:8080".parse().unwrap()))
-            ),
-            format!(
-                "{:?}",
-                SessionTarget::TcpStream(SealedHost::Plain("10.0.0.1:443".parse().unwrap()))
-            ),
-            format!("{:?}", SessionTarget::ExitNode(42)),
+        let targets: Vec<SessionTarget> = vec![
+            SessionTarget::UdpStream(SealedHost::Plain("127.0.0.1:8080".parse().unwrap())),
+            SessionTarget::TcpStream(SealedHost::Plain("10.0.0.1:443".parse().unwrap())),
+            SessionTarget::ExitNode(42),
         ];
-        insta::assert_yaml_snapshot!(targets);
+        insta::assert_debug_snapshot!(targets);
     }
 
     // --- SessionId edge cases ---

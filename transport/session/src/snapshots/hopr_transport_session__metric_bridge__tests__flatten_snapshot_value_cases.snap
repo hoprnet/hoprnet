@@ -1,0 +1,72 @@
+---
+source: transport/session/src/metric_bridge.rs
+expression: cases
+---
+[
+    (
+        "numbers",
+        [
+            SessionMetricSample {
+                name: "hopr_session_packets_in",
+                value: U64(
+                    42,
+                ),
+            },
+        ],
+    ),
+    (
+        "nested_objects",
+        [
+            SessionMetricSample {
+                name: "hopr_session_transport_bytes_in",
+                value: U64(
+                    100,
+                ),
+            },
+        ],
+    ),
+    (
+        "floats",
+        [
+            SessionMetricSample {
+                name: "hopr_session_rate",
+                value: F64(
+                    2.78,
+                ),
+            },
+        ],
+    ),
+    (
+        "booleans",
+        [
+            SessionMetricSample {
+                name: "hopr_session_active",
+                value: U64(
+                    1,
+                ),
+            },
+        ],
+    ),
+    (
+        "skips_session_id",
+        [
+            SessionMetricSample {
+                name: "hopr_session_bytes_in",
+                value: U64(
+                    10,
+                ),
+            },
+        ],
+    ),
+    (
+        "ignores_non_numeric",
+        [
+            SessionMetricSample {
+                name: "hopr_session_count",
+                value: U64(
+                    5,
+                ),
+            },
+        ],
+    ),
+]

@@ -5067,6 +5067,7 @@ version = "0.21.2"
 dependencies = [
  "anyhow",
  "async-trait",
+ "bimap",
  "cfg-if",
  "futures",
  "futures-time",

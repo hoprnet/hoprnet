@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(INSTA_UPDATE=always cargo test -p hopr-transport-protocol --lib -- \"heartbeat\\\\|protocol_error\" 2>&1 | tail -15)",
-      "Bash(INSTA_UPDATE=always cargo test -p hopr-transport-protocol --lib 2>&1 | grep \"heartbeat\\\\|error_variants\" | head -5)"
-    ]
-  }
-}

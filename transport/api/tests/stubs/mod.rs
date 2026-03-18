@@ -5,6 +5,7 @@
 use std::{collections::HashSet, time::Duration};
 
 use async_trait::async_trait;
+use bimap::BiMap;
 use futures::stream::{self, BoxStream};
 use hopr_api::{
     Multiaddr, PeerId,
@@ -36,15 +37,18 @@ pub struct StubError(pub String);
 #[derive(Debug, Clone)]
 pub struct StubChain {
     me_addr: Address,
-    me_offchain: OffchainPublicKey,
+    keys: BiMap<Address, OffchainPublicKey>,
     mapper: StubKeyMapper,
 }
 
 impl StubChain {
     pub fn new(offchain: &OffchainKeypair, chain: &ChainKeypair) -> Self {
+        let addr = chain.public().to_address();
+        let mut keys = BiMap::new();
+        keys.insert(addr, *offchain.public());
         Self {
-            me_addr: chain.public().to_address(),
-            me_offchain: *offchain.public(),
+            me_addr: addr,
+            keys,
             mapper: StubKeyMapper,
         }
     }
@@ -113,19 +117,11 @@ impl ChainKeyOperations for StubChain {
     type Mapper = StubKeyMapper;
 
     async fn chain_key_to_packet_key(&self, chain: &Address) -> Result<Option<OffchainPublicKey>, Self::Error> {
-        Ok(if chain == &self.me_addr {
-            Some(self.me_offchain)
-        } else {
-            None
-        })
+        Ok(self.keys.get_by_left(chain).copied())
     }
 
     async fn packet_key_to_chain_key(&self, packet: &OffchainPublicKey) -> Result<Option<Address>, Self::Error> {
-        Ok(if packet == &self.me_offchain {
-            Some(self.me_addr)
-        } else {
-            None
-        })
+        Ok(self.keys.get_by_right(packet).copied())
     }
 
     fn key_id_mapper_ref(&self) -> &Self::Mapper {

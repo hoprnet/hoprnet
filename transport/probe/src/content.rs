@@ -95,6 +95,7 @@ impl TryFrom<ApplicationData> for Message {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Context;
     use hopr_api::types::primitive::traits::AsUnixTimestamp;
     use hopr_platform::time::native::current_time;
     use more_asserts::assert_lt;
@@ -125,9 +126,12 @@ mod tests {
     }
 
     #[test]
-    fn random_generation_of_a_neighbor_probe_produces_a_ping() {
+    fn random_generation_of_a_neighbor_probe_produces_a_ping() -> anyhow::Result<()> {
         let ping = NeighborProbe::random_nonce();
-        assert!(matches!(ping, NeighborProbe::Ping(_)));
+        matches!(ping, NeighborProbe::Ping(_))
+            .then_some(())
+            .context("expected Ping variant")?;
+        Ok(())
     }
 
     #[test]
@@ -184,45 +188,53 @@ mod tests {
     }
 
     #[test]
-    fn message_from_empty_bytes_fails() {
-        let err = Message::try_from([].as_slice()).unwrap_err();
-        assert!(
-            matches!(&err, GeneralError::ParseError(s) if s.contains("size")),
-            "expected ParseError about size, got: {err}"
-        );
+    fn message_from_empty_bytes_fails() -> anyhow::Result<()> {
+        let err = Message::try_from([].as_slice())
+            .err()
+            .context("expected error for empty bytes")?;
+        matches!(&err, GeneralError::ParseError(s) if s.contains("size"))
+            .then_some(())
+            .context(format!("expected ParseError about size, got: {err}"))?;
+        Ok(())
     }
 
     #[test]
-    fn message_from_wrong_version_fails() {
+    fn message_from_wrong_version_fails() -> anyhow::Result<()> {
         // Version 0xFF instead of Message::VERSION (1)
         let data = [0xFF, 0x00];
-        let err = Message::try_from(data.as_slice()).unwrap_err();
-        assert!(
-            matches!(&err, GeneralError::ParseError(s) if s.contains("version")),
-            "expected ParseError about version, got: {err}"
-        );
+        let err = Message::try_from(data.as_slice())
+            .err()
+            .context("expected error for wrong version")?;
+        matches!(&err, GeneralError::ParseError(s) if s.contains("version"))
+            .then_some(())
+            .context(format!("expected ParseError about version, got: {err}"))?;
+        Ok(())
     }
 
     #[test]
-    fn message_from_invalid_discriminant_fails() {
+    fn message_from_invalid_discriminant_fails() -> anyhow::Result<()> {
         // Valid version but invalid discriminant
         let data = [Message::VERSION, 0xFF];
-        let err = Message::try_from(data.as_slice()).unwrap_err();
-        assert!(
-            matches!(&err, GeneralError::ParseError(s) if s.contains("disc")),
-            "expected ParseError about discriminant, got: {err}"
-        );
+        let err = Message::try_from(data.as_slice())
+            .err()
+            .context("expected error for invalid discriminant")?;
+        matches!(&err, GeneralError::ParseError(s) if s.contains("disc"))
+            .then_some(())
+            .context(format!("expected ParseError about discriminant, got: {err}"))?;
+        Ok(())
     }
 
     #[test]
-    fn message_from_wrong_probe_size_fails() {
+    fn message_from_wrong_probe_size_fails() -> anyhow::Result<()> {
         // Valid version + probe discriminant but truncated data
         let data = [Message::VERSION, MessageDiscriminants::Probe as u8, 0x00];
-        let err = Message::try_from(data.as_slice()).unwrap_err();
-        assert!(
-            matches!(&err, GeneralError::ParseError(s) if s.contains("probe.size")),
-            "expected ParseError about probe size, got: {err}"
-        );
+        let err = Message::try_from(data.as_slice())
+            .err()
+            .context("expected error for wrong probe size")?;
+        matches!(&err, GeneralError::ParseError(s) if s.contains("probe.size"))
+            .then_some(())
+            .context(format!("expected ParseError about probe size, got: {err}"))?;
+        Ok(())
     }
 
     #[test]
