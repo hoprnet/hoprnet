@@ -1,489 +1,437 @@
-//! Session stats tracking and snapshotting.
-//!
-//! This module provides functionality to track various stats of a HOPR session,
-//! including data throughput, packet counts, frame events, and session lifecycle.
-//! It allows creating immutable snapshots of the stats state for monitoring and reporting.
-
 use std::{
-    sync::{
-        Arc, OnceLock,
-        atomic::{AtomicU8, AtomicU64, AtomicUsize, Ordering},
-    },
+    collections::HashMap,
+    sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use hopr_protocol_session::{FrameInspector, SessionMessageDiscriminants};
+use hopr_protocol_session::SessionMessageDiscriminants;
 
-pub(crate) use crate::metric_bridge::{register_session_telemetry, unregister_session_telemetry};
+pub use crate::balancer::{AtomicSurbFlowEstimator, BalancerStateValues};
 use crate::{Capability, HoprSessionConfig, SessionId, types::SESSION_SOCKET_CAPACITY};
-pub use crate::{
-    balancer::{AtomicSurbFlowEstimator, BalancerStateValues},
-    metric_bridge::{
-        SessionMetricDefinition, SessionMetricKind, SessionMetricSample, SessionMetricValue, serialize_duration_millis,
-        serialize_system_time_millis, session_snapshot_metric_definitions, session_snapshot_metric_samples,
-        session_snapshot_metric_value, session_telemetry_snapshots,
-    },
-};
 
-/// The lifecycle state of a session from the perspective of metrics.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, strum::FromRepr, serde_repr::Serialize_repr)]
+lazy_static::lazy_static! {
+    static ref METRIC_SESSION_SNAPSHOT_AT_MS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+        "hopr_session_snapshot_at_ms",
+        "Session telemetry sample time in unix milliseconds",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_LIFETIME_CREATED_AT_MS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+        "hopr_session_lifetime_created_at_ms",
+        "Session creation time in unix milliseconds",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_LIFETIME_LAST_ACTIVITY_AT_MS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+        "hopr_session_lifetime_last_activity_at_ms",
+        "Last session activity time in unix milliseconds",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_LIFETIME_UPTIME_MS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+        "hopr_session_lifetime_uptime_ms",
+        "Session uptime in milliseconds",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_LIFETIME_IDLE_MS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+        "hopr_session_lifetime_idle_ms",
+        "Session idle time in milliseconds",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_LIFETIME_STATE: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+        "hopr_session_lifetime_state",
+        "Session lifecycle state encoded as Active=0, Closing=1, Closed=2",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_LIFETIME_PIPELINE_ERRORS_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+        "hopr_session_lifetime_pipeline_errors_total",
+        "Session pipeline processing errors",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_FRAME_MTU_BYTES: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+        "hopr_session_frame_mtu_bytes",
+        "Configured frame MTU in bytes",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_FRAME_TIMEOUT_MS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+        "hopr_session_frame_timeout_ms",
+        "Configured frame timeout in milliseconds",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_FRAME_FRAME_CAPACITY: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+        "hopr_session_frame_frame_capacity",
+        "Configured frame buffer capacity",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_FRAME_BEING_ASSEMBLED: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+        "hopr_session_frame_being_assembled",
+        "Number of frames currently being assembled",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_FRAME_COMPLETED_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+        "hopr_session_frame_completed_total",
+        "Number of frames successfully completed",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_FRAME_EMITTED_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+        "hopr_session_frame_emitted_total",
+        "Number of frames emitted from the sequencer",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_FRAME_DISCARDED_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+        "hopr_session_frame_discarded_total",
+        "Number of frames discarded by the session protocol",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_ACK_MODE: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+        "hopr_session_ack_mode",
+        "Configured ack mode encoded as None=0, Partial=1, Full=2, Both=3",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_ACK_INCOMING_SEGMENTS_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+        "hopr_session_ack_incoming_segments_total",
+        "Incoming session segments",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_ACK_INCOMING_RETRANSMISSION_REQUESTS_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+        "hopr_session_ack_incoming_retransmission_requests_total",
+        "Incoming session retransmission requests",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_ACK_INCOMING_ACKNOWLEDGED_FRAMES_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+        "hopr_session_ack_incoming_acknowledged_frames_total",
+        "Incoming session acknowledgements",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_ACK_OUTGOING_SEGMENTS_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+        "hopr_session_ack_outgoing_segments_total",
+        "Outgoing session segments",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_ACK_OUTGOING_RETRANSMISSION_REQUESTS_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+        "hopr_session_ack_outgoing_retransmission_requests_total",
+        "Outgoing session retransmission requests",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_ACK_OUTGOING_ACKNOWLEDGED_FRAMES_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+        "hopr_session_ack_outgoing_acknowledged_frames_total",
+        "Outgoing session acknowledgements",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_SURB_PRODUCED_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+        "hopr_session_surb_produced_total",
+        "Produced SURBs per session",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_SURB_CONSUMED_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+        "hopr_session_surb_consumed_total",
+        "Consumed SURBs per session",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_SURB_BUFFER_ESTIMATE: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+        "hopr_session_surb_buffer_estimate",
+        "Estimated SURB buffer size",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_SURB_TARGET_BUFFER: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+        "hopr_session_surb_target_buffer",
+        "Configured SURB target buffer size",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_SURB_RATE_PER_SEC: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+        "hopr_session_surb_rate_per_sec",
+        "Estimated SURB buffer rate change per second",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_SURB_REFILL_IN_FLIGHT: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+        "hopr_session_surb_refill_in_flight",
+        "Whether SURB refill is currently configured for a session (1 or 0)",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_TRANSPORT_BYTES_IN_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+        "hopr_session_transport_bytes_in_total",
+        "Session ingress bytes",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_TRANSPORT_BYTES_OUT_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+        "hopr_session_transport_bytes_out_total",
+        "Session egress bytes",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_TRANSPORT_PACKETS_IN_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+        "hopr_session_transport_packets_in_total",
+        "Session ingress packets",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_TRANSPORT_PACKETS_OUT_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+        "hopr_session_transport_packets_out_total",
+        "Session egress packets",
+        &["session_id"]
+    ).unwrap();
+    static ref SESSION_RUNTIME: parking_lot::Mutex<HashMap<SessionId, SessionRuntimeState>> = parking_lot::Mutex::new(HashMap::new());
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde_repr::Serialize_repr)]
 #[repr(u8)]
 pub enum SessionLifecycleState {
-    /// Session is active and running.
     Active = 0,
-    /// Session is in the process of closing (e.g. sending/receiving close frames).
     Closing = 1,
-    /// Session has been fully closed.
     Closed = 2,
 }
 
-/// The acknowledgement mode configured for the session.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, strum::FromRepr, serde_repr::Serialize_repr)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde_repr::Serialize_repr)]
 #[repr(u8)]
 pub enum SessionAckMode {
-    /// No acknowledgements.
     None,
-    /// Partial acknowledgements (some frames/segments).
     Partial,
-    /// Full acknowledgements (all frames/segments).
     Full,
-    /// Both (if applicable, though typically maps to Full in some contexts).
     Both,
 }
 
-/// Snapshot of session lifetime metrics.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
-pub struct SessionLifetimeSnapshot {
-    /// Time when the session was created.
-    #[serde(rename = "created_at_ms")]
-    #[serde(serialize_with = "serialize_system_time_millis")]
-    pub created_at: SystemTime,
-    /// Time of the last read or write activity.
-    #[serde(rename = "last_activity_at_ms")]
-    #[serde(serialize_with = "serialize_system_time_millis")]
-    pub last_activity_at: SystemTime,
-    /// Total duration the session has been alive.
-    #[serde(rename = "uptime_ms")]
-    #[serde(serialize_with = "serialize_duration_millis")]
-    pub uptime: Duration,
-    /// Duration since the last activity.
-    #[serde(rename = "idle_ms")]
-    #[serde(serialize_with = "serialize_duration_millis")]
-    pub idle: Duration,
-    /// Current lifecycle state of the session.
-    pub state: SessionLifecycleState,
-    /// Errors during pipeline processing.
-    #[serde(rename = "pipeline_errors_total")]
-    pub pipeline_errors: u64,
-}
-
-/// Snapshot of frame buffer metrics.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
-pub struct FrameBufferSnapshot {
-    /// Maximum Transmission Unit for frames.
-    #[serde(rename = "mtu_bytes")]
-    pub frame_mtu: usize,
-    /// Configured timeout for frame reassembly/acknowledgement.
-    #[serde(rename = "timeout_ms")]
-    #[serde(serialize_with = "serialize_duration_millis")]
-    pub frame_timeout: Duration,
-    /// Configured capacity of the frame buffer.
-    pub frame_capacity: usize,
-    /// Number of frames currently being assembled (incomplete).
-    #[serde(rename = "being_assembled")]
-    pub frames_being_assembled: usize,
-    /// Total number of frames successfully completed/assembled.
-    #[serde(rename = "completed_total")]
-    pub frames_completed: u64,
-    /// Total number of frames emitted to the application.
-    #[serde(rename = "emitted_total")]
-    pub frames_emitted: u64,
-    /// Total number of frames discarded (e.g. due to timeout or errors).
-    #[serde(rename = "discarded_total")]
-    pub frames_discarded: u64,
-}
-
-/// Snapshot of acknowledgement metrics.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
-pub struct AckSnapshot {
-    /// Configured acknowledgement mode.
-    pub mode: SessionAckMode,
-    /// Total incoming segments received.
-    #[serde(rename = "incoming_segments_total")]
-    pub incoming_segments: u64,
-    /// Total retransmission requests received.
-    #[serde(rename = "incoming_retransmission_requests_total")]
-    pub incoming_retransmission_requests: u64,
-    /// Total frame acknowledgements received.
-    #[serde(rename = "incoming_acknowledged_frames_total")]
-    pub incoming_acknowledged_frames: u64,
-    /// Total outgoing segments sent.
-    #[serde(rename = "outgoing_segments_total")]
-    pub outgoing_segments: u64,
-    /// Total retransmission requests sent.
-    #[serde(rename = "outgoing_retransmission_requests_total")]
-    pub outgoing_retransmission_requests: u64,
-    /// Total frame acknowledgements sent.
-    #[serde(rename = "outgoing_acknowledged_frames_total")]
-    pub outgoing_acknowledged_frames: u64,
-}
-
-/// Snapshot of SURB (Single Use Reply Block) metrics.
-#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
-pub struct SurbSnapshot {
-    /// Total SURBs produced/minted.
-    pub produced_total: u64,
-    /// Total SURBs consumed/used.
-    pub consumed_total: u64,
-    /// Estimated number of SURBs currently available.
-    pub buffer_estimate: u64,
-    /// Target number of SURBs to maintain in buffer (if configured).
-    pub target_buffer: Option<u64>,
-    /// Rate of SURB consumption/production per second.
-    pub rate_per_sec: f64,
-    /// Whether a SURB refill request is currently in flight.
-    pub refill_in_flight: bool,
-}
-
-/// Snapshot of transport-level data metrics.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
-pub struct TransportSnapshot {
-    /// Total bytes received.
-    #[serde(rename = "bytes_in_total")]
-    pub bytes_in: u64,
-    /// Total bytes sent.
-    #[serde(rename = "bytes_out_total")]
-    pub bytes_out: u64,
-    /// Total packets received.
-    #[serde(rename = "packets_in_total")]
-    pub packets_in: u64,
-    /// Total packets sent.
-    #[serde(rename = "packets_out_total")]
-    pub packets_out: u64,
-}
-
-/// Complete snapshot of all session metrics at a point in time.
-#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
-pub struct SessionStatsSnapshot {
-    /// The ID of the session.
-    pub session_id: SessionId,
-    /// Time when this snapshot was taken.
-    #[serde(rename = "snapshot_at_ms")]
-    #[serde(serialize_with = "serialize_system_time_millis")]
-    pub snapshot_at: SystemTime,
-    /// Lifetime-related metrics.
-    pub lifetime: SessionLifetimeSnapshot,
-    /// Frame buffer-related metrics.
-    #[serde(rename = "frame")]
-    pub frame_buffer: FrameBufferSnapshot,
-    /// Acknowledgement-related metrics.
-    pub ack: AckSnapshot,
-    /// SURB management related metrics.
-    pub surb: SurbSnapshot,
-    /// Transport level metrics (bytes/packets).
-    pub transport: TransportSnapshot,
-}
-
-/// Internal metrics tracker for a session.
-///
-/// This struct uses atomic counters to allow lock-free updates from multiple threads/tasks.
 #[derive(Debug)]
-pub struct SessionTelemetry {
-    session_id: SessionId,
-    created_at_us: AtomicU64,
-    last_activity_us: AtomicU64,
-    state: AtomicU8,
-    ack_mode: SessionAckMode,
-    frame_mtu: usize,
-    frame_timeout: Duration,
-    frame_capacity: usize,
-    frames_being_reassembled: AtomicUsize,
-    frames_incomplete: AtomicU64,
-    frames_completed: AtomicU64,
-    frames_emitted: AtomicU64,
-    frames_discarded: AtomicU64,
-    incoming_segments: AtomicU64,
-    outgoing_segments: AtomicU64,
-    incoming_retransmission_requests: AtomicU64,
-    incoming_acknowledged_frames: AtomicU64,
-    outgoing_retransmission_requests: AtomicU64,
-    outgoing_acknowledged_frames: AtomicU64,
-    session_pipeline_errors: AtomicU64,
-    bytes_in: AtomicU64,
-    bytes_out: AtomicU64,
-    packets_in: AtomicU64,
-    packets_out: AtomicU64,
-    /// Previous (buffer_estimate, timestamp_us) for rate calculation, protected by mutex
-    /// to ensure atomic read/update of the pair.
-    last_rate_snapshot: parking_lot::Mutex<(u64, u64)>,
-    inspector: OnceLock<FrameInspector>,
-    balancer_data: OnceLock<(Arc<BalancerStateValues>, AtomicSurbFlowEstimator)>,
+struct SessionSurbRuntimeState {
+    state: Arc<BalancerStateValues>,
+    estimator: AtomicSurbFlowEstimator,
+    last_snapshot_total: u64,
+    last_snapshot_us: u64,
 }
 
-impl SessionTelemetry {
-    pub fn new(session_id: SessionId, cfg: HoprSessionConfig) -> Self {
-        let now = now_us();
-        let ack_mode = if cfg
-            .capabilities
-            .contains(Capability::RetransmissionAck | Capability::RetransmissionNack)
-        {
-            SessionAckMode::Both
-        } else if cfg.capabilities.contains(Capability::RetransmissionAck) {
-            SessionAckMode::Full
-        } else if cfg.capabilities.contains(Capability::RetransmissionNack) {
-            SessionAckMode::Partial
-        } else {
-            SessionAckMode::None
-        };
+#[derive(Debug)]
+struct SessionRuntimeState {
+    created_at_us: u64,
+    last_activity_us: u64,
+    frames_being_assembled: u64,
+    surb: Option<SessionSurbRuntimeState>,
+}
 
+impl SessionRuntimeState {
+    fn new(now_us: u64) -> Self {
         Self {
-            session_id,
-            created_at_us: AtomicU64::new(now),
-            last_activity_us: AtomicU64::new(now),
-            state: AtomicU8::new(SessionLifecycleState::Active as u8),
-            ack_mode,
-            frame_mtu: cfg.frame_mtu,
-            frame_timeout: cfg.frame_timeout,
-            frame_capacity: SESSION_SOCKET_CAPACITY,
-            frames_being_reassembled: AtomicUsize::new(0),
-            frames_incomplete: AtomicU64::new(0),
-            frames_completed: AtomicU64::new(0),
-            frames_emitted: AtomicU64::new(0),
-            frames_discarded: AtomicU64::new(0),
-            incoming_segments: AtomicU64::new(0),
-            incoming_retransmission_requests: AtomicU64::new(0),
-            incoming_acknowledged_frames: AtomicU64::new(0),
-            outgoing_segments: AtomicU64::new(0),
-            outgoing_retransmission_requests: AtomicU64::new(0),
-            outgoing_acknowledged_frames: AtomicU64::new(0),
-            session_pipeline_errors: AtomicU64::new(0),
-            bytes_in: AtomicU64::new(0),
-            bytes_out: AtomicU64::new(0),
-            packets_in: AtomicU64::new(0),
-            packets_out: AtomicU64::new(0),
-            last_rate_snapshot: parking_lot::Mutex::new((0, now)),
-            inspector: OnceLock::new(),
-            balancer_data: OnceLock::new(),
+            created_at_us: now_us,
+            last_activity_us: now_us,
+            frames_being_assembled: 0,
+            surb: None,
         }
-    }
-
-    pub fn new_shared(session_id: SessionId, cfg: HoprSessionConfig) -> Arc<Self> {
-        let session_telemetry = Arc::new(Self::new(session_id, cfg));
-        register_session_telemetry(&session_telemetry);
-        session_telemetry
-    }
-
-    /// Returns a reference to the session ID.
-    pub fn session_id(&self) -> &SessionId {
-        &self.session_id
-    }
-
-    /// Updates the session lifecycle state.
-    ///
-    /// This method atomically stores the new state, which affects the metrics snapshot
-    /// and indicates the session's current phase (Active, Closing, or Closed).
-    pub fn set_state(&self, state: SessionLifecycleState) {
-        self.state.store(state as u8, Ordering::Relaxed);
-    }
-
-    /// Records activity on the session by updating the last activity timestamp.
-    ///
-    /// This is called on read/write operations to track session idleness.
-    pub fn touch_activity(&self) {
-        self.last_activity_us.store(now_us(), Ordering::Relaxed);
-    }
-
-    /// Records an incoming read operation with the specified number of bytes.
-    ///
-    /// Increments byte and packet counters, and updates activity timestamp.
-    /// Zero-byte reads are ignored.
-    pub fn record_read(&self, bytes: usize) {
-        if bytes == 0 {
-            return;
-        }
-        self.touch_activity();
-        self.bytes_in.fetch_add(bytes as u64, Ordering::Relaxed);
-        self.packets_in.fetch_add(1, Ordering::Relaxed);
-    }
-
-    /// Records an outgoing write operation with the specified number of bytes.
-    ///
-    /// Increments byte and packet counters, and updates activity timestamp.
-    /// Zero-byte writes are ignored.
-    pub fn record_write(&self, bytes: usize) {
-        if bytes == 0 {
-            return;
-        }
-        self.touch_activity();
-        self.bytes_out.fetch_add(bytes as u64, Ordering::Relaxed);
-        self.packets_out.fetch_add(1, Ordering::Relaxed);
-    }
-
-    /// Sets the frame inspector for tracking incomplete frames.
-    ///
-    /// The inspector is initialized only once via `OnceLock`.
-    pub fn set_inspector(&self, inspector: FrameInspector) {
-        let _ = self.inspector.set(inspector);
-    }
-
-    /// Sets the SURB flow estimator for tracking produced/consumed SURBs.
-    ///
-    /// The estimator and target buffer are initialized only once via `OnceLock`.
-    pub fn set_balancer_data(&self, estimator: AtomicSurbFlowEstimator, state: Arc<BalancerStateValues>) {
-        let _ = self.balancer_data.set((state, estimator));
-    }
-
-    /// Updates the count of incomplete frames from the frame inspector.
-    fn record_incomplete_frames(&self) {
-        if let Some(inspector) = self.inspector.get() {
-            self.frames_being_reassembled.store(inspector.len(), Ordering::Relaxed);
-        }
-    }
-
-    /// Creates a snapshot of all current metrics.
-    ///
-    /// This method atomically reads all metric counters and creates an immutable snapshot
-    /// that includes lifetime, frame buffer, acknowledgement, SURB, and transport metrics.
-    /// SURB metrics are loaded automatically from the stored estimator if one was set via
-    /// `set_surb_estimator`.
-    pub fn snapshot(&self) -> SessionStatsSnapshot {
-        self.record_incomplete_frames();
-
-        let snapshot_at_us = now_us();
-        let created_at_us = self.created_at_us.load(Ordering::Relaxed);
-        let last_activity_us = self.last_activity_us.load(Ordering::Relaxed);
-        let state = SessionLifecycleState::from_repr(self.state.load(Ordering::Relaxed))
-            .unwrap_or(SessionLifecycleState::Active);
-        let uptime_us = snapshot_at_us.saturating_sub(created_at_us);
-        let idle_us = snapshot_at_us.saturating_sub(last_activity_us);
-
-        let (target, produced, consumed) = self
-            .balancer_data
-            .get()
-            .map(|(s, e)| {
-                (
-                    s.target_surb_buffer_size.load(Ordering::Relaxed),
-                    e.produced.load(Ordering::Relaxed),
-                    e.consumed.load(Ordering::Relaxed),
-                )
-            })
-            .unwrap_or((0, 0, 0));
-
-        let buffer_estimate = produced.saturating_sub(consumed);
-        let rate_per_sec = self.compute_rate_per_sec(produced, consumed, snapshot_at_us);
-
-        SessionStatsSnapshot {
-            session_id: self.session_id,
-            snapshot_at: UNIX_EPOCH + Duration::from_micros(snapshot_at_us),
-            lifetime: SessionLifetimeSnapshot {
-                created_at: UNIX_EPOCH + Duration::from_micros(created_at_us),
-                last_activity_at: UNIX_EPOCH + Duration::from_micros(last_activity_us),
-                uptime: Duration::from_micros(uptime_us),
-                idle: Duration::from_micros(idle_us),
-                state,
-                pipeline_errors: self.session_pipeline_errors.load(Ordering::Relaxed),
-            },
-            frame_buffer: FrameBufferSnapshot {
-                frame_mtu: self.frame_mtu,
-                frame_timeout: self.frame_timeout,
-                frame_capacity: self.frame_capacity,
-                frames_being_assembled: self.frames_being_reassembled.load(Ordering::Relaxed),
-                frames_completed: self.frames_completed.load(Ordering::Relaxed),
-                frames_emitted: self.frames_emitted.load(Ordering::Relaxed),
-                frames_discarded: self.frames_discarded.load(Ordering::Relaxed),
-            },
-            ack: AckSnapshot {
-                mode: self.ack_mode,
-                incoming_segments: self.incoming_segments.load(Ordering::Relaxed),
-                outgoing_segments: self.outgoing_segments.load(Ordering::Relaxed),
-                incoming_retransmission_requests: self.incoming_retransmission_requests.load(Ordering::Relaxed),
-                incoming_acknowledged_frames: self.incoming_acknowledged_frames.load(Ordering::Relaxed),
-                outgoing_retransmission_requests: self.outgoing_retransmission_requests.load(Ordering::Relaxed),
-                outgoing_acknowledged_frames: self.outgoing_acknowledged_frames.load(Ordering::Relaxed),
-            },
-            surb: SurbSnapshot {
-                produced_total: produced,
-                consumed_total: consumed,
-                buffer_estimate,
-                target_buffer: Some(target),
-                rate_per_sec,
-                refill_in_flight: self.balancer_data.get().is_some(),
-            },
-            transport: TransportSnapshot {
-                bytes_in: self.bytes_in.load(Ordering::Relaxed),
-                bytes_out: self.bytes_out.load(Ordering::Relaxed),
-                packets_in: self.packets_in.load(Ordering::Relaxed),
-                packets_out: self.packets_out.load(Ordering::Relaxed),
-            },
-        }
-    }
-
-    /// Computes the SURB buffer change rate in items per second.
-    ///
-    /// This uses a sliding window approach, tracking the delta since the last computation
-    /// and the elapsed time to calculate the current rate.
-    ///
-    /// Returns:
-    /// - Positive value: buffer is growing (production > consumption)
-    /// - Negative value: buffer is depleting (consumption > production)
-    /// - Zero: no change or no time has elapsed
-    fn compute_rate_per_sec(&self, produced: u64, consumed: u64, now_us: u64) -> f64 {
-        let total = produced.saturating_sub(consumed);
-
-        // Atomically read and update the previous snapshot
-        let (last_total, last_us) = {
-            let mut snapshot = self.last_rate_snapshot.lock();
-            let prev = *snapshot;
-            *snapshot = (total, now_us);
-            prev
-        };
-
-        let elapsed_us = now_us.saturating_sub(last_us);
-        if elapsed_us == 0 {
-            return 0.0;
-        }
-
-        // Use signed arithmetic to capture buffer depletion as negative rates
-        let delta = total as i64 - last_total as i64;
-        (delta as f64) / (elapsed_us as f64 / 1_000_000.0)
     }
 }
 
-/// Returns the current time as microseconds since the Unix epoch.
+fn session_ack_mode(capabilities: CapabilitySet) -> SessionAckMode {
+    if capabilities.contains(Capability::RetransmissionAck | Capability::RetransmissionNack) {
+        SessionAckMode::Both
+    } else if capabilities.contains(Capability::RetransmissionAck) {
+        SessionAckMode::Full
+    } else if capabilities.contains(Capability::RetransmissionNack) {
+        SessionAckMode::Partial
+    } else {
+        SessionAckMode::None
+    }
+}
+
+type CapabilitySet = flagset::FlagSet<Capability>;
+
+pub fn initialize_session_metrics(session_id: SessionId, cfg: HoprSessionConfig) {
+    let now = now_us();
+    let ack_mode = session_ack_mode(cfg.capabilities);
+
+    METRIC_SESSION_LIFETIME_CREATED_AT_MS.set(&[session_id.as_str()], now as f64 / 1_000.0);
+    METRIC_SESSION_LIFETIME_STATE.set(&[session_id.as_str()], SessionLifecycleState::Active as u8 as f64);
+    METRIC_SESSION_ACK_MODE.set(&[session_id.as_str()], ack_mode as u8 as f64);
+    METRIC_SESSION_FRAME_MTU_BYTES.set(&[session_id.as_str()], cfg.frame_mtu as f64);
+    METRIC_SESSION_FRAME_TIMEOUT_MS.set(&[session_id.as_str()], cfg.frame_timeout.as_millis() as f64);
+    METRIC_SESSION_FRAME_FRAME_CAPACITY.set(&[session_id.as_str()], SESSION_SOCKET_CAPACITY as f64);
+    METRIC_SESSION_FRAME_BEING_ASSEMBLED.set(&[session_id.as_str()], 0.0);
+    METRIC_SESSION_SURB_BUFFER_ESTIMATE.set(&[session_id.as_str()], 0.0);
+    METRIC_SESSION_SURB_TARGET_BUFFER.set(&[session_id.as_str()], 0.0);
+    METRIC_SESSION_SURB_RATE_PER_SEC.set(&[session_id.as_str()], 0.0);
+    METRIC_SESSION_SURB_REFILL_IN_FLIGHT.set(&[session_id.as_str()], 0.0);
+
+    {
+        let mut state = SESSION_RUNTIME.lock();
+        state.insert(session_id, SessionRuntimeState::new(now));
+    }
+
+    refresh_lifetime_metrics(&session_id, now, now, now);
+}
+
+pub fn remove_session_metrics_state(session_id: &SessionId) {
+    METRIC_SESSION_FRAME_BEING_ASSEMBLED.set(&[session_id.as_str()], 0.0);
+    SESSION_RUNTIME.lock().remove(session_id);
+}
+
+pub fn set_session_state(session_id: &SessionId, state: SessionLifecycleState) {
+    METRIC_SESSION_LIFETIME_STATE.set(&[session_id.as_str()], state as u8 as f64);
+    touch_session_activity(session_id);
+}
+
+fn update_session_activity_locked(
+    session_id: &SessionId,
+    now: u64,
+    state: &mut HashMap<SessionId, SessionRuntimeState>,
+) {
+    if let Some(runtime) = state.get_mut(session_id) {
+        runtime.last_activity_us = now;
+        refresh_lifetime_metrics(session_id, now, runtime.created_at_us, runtime.last_activity_us);
+        refresh_surb_gauges(session_id, runtime, now);
+    }
+}
+
+pub fn touch_session_activity(session_id: &SessionId) {
+    let now = now_us();
+    if let Some(mut state) = SESSION_RUNTIME.try_lock() {
+        update_session_activity_locked(session_id, now, &mut state);
+    }
+}
+
+pub fn record_session_read(session_id: &SessionId, bytes: usize) {
+    if bytes == 0 {
+        return;
+    }
+
+    touch_session_activity(session_id);
+    METRIC_SESSION_TRANSPORT_BYTES_IN_TOTAL.increment_by(&[session_id.as_str()], bytes as u64);
+    METRIC_SESSION_TRANSPORT_PACKETS_IN_TOTAL.increment_by(&[session_id.as_str()], 1);
+}
+
+pub fn record_session_write(session_id: &SessionId, bytes: usize) {
+    if bytes == 0 {
+        return;
+    }
+
+    touch_session_activity(session_id);
+    METRIC_SESSION_TRANSPORT_BYTES_OUT_TOTAL.increment_by(&[session_id.as_str()], bytes as u64);
+    METRIC_SESSION_TRANSPORT_PACKETS_OUT_TOTAL.increment_by(&[session_id.as_str()], 1);
+}
+
+pub fn set_session_balancer_data(
+    session_id: &SessionId,
+    estimator: AtomicSurbFlowEstimator,
+    state: Arc<BalancerStateValues>,
+) {
+    let now = now_us();
+    {
+        let mut all = SESSION_RUNTIME.lock();
+        let runtime = all.entry(*session_id).or_insert_with(|| SessionRuntimeState::new(now));
+        runtime.surb = Some(SessionSurbRuntimeState {
+            state,
+            estimator,
+            last_snapshot_total: 0,
+            last_snapshot_us: now,
+        });
+    }
+
+    METRIC_SESSION_SURB_REFILL_IN_FLIGHT.set(&[session_id.as_str()], 1.0);
+    touch_session_activity(session_id);
+}
+
+pub fn record_session_surb_produced(session_id: &SessionId, by: u64) {
+    METRIC_SESSION_SURB_PRODUCED_TOTAL.increment_by(&[session_id.as_str()], by);
+    touch_session_activity(session_id);
+}
+
+pub fn record_session_surb_consumed(session_id: &SessionId, by: u64) {
+    METRIC_SESSION_SURB_CONSUMED_TOTAL.increment_by(&[session_id.as_str()], by);
+    touch_session_activity(session_id);
+}
+
+fn refresh_lifetime_metrics(session_id: &SessionId, now_us: u64, created_at_us: u64, last_activity_us: u64) {
+    METRIC_SESSION_SNAPSHOT_AT_MS.set(&[session_id.as_str()], now_us as f64 / 1_000.0);
+    METRIC_SESSION_LIFETIME_LAST_ACTIVITY_AT_MS.set(&[session_id.as_str()], last_activity_us as f64 / 1_000.0);
+    METRIC_SESSION_LIFETIME_UPTIME_MS.set(
+        &[session_id.as_str()],
+        now_us.saturating_sub(created_at_us) as f64 / 1_000.0,
+    );
+    METRIC_SESSION_LIFETIME_IDLE_MS.set(
+        &[session_id.as_str()],
+        now_us.saturating_sub(last_activity_us) as f64 / 1_000.0,
+    );
+}
+
+fn refresh_surb_gauges(session_id: &SessionId, runtime: &mut SessionRuntimeState, now_us: u64) {
+    let Some(surb) = runtime.surb.as_mut() else {
+        return;
+    };
+
+    let produced = surb.estimator.produced.load(std::sync::atomic::Ordering::Relaxed);
+    let consumed = surb.estimator.consumed.load(std::sync::atomic::Ordering::Relaxed);
+    let total = produced.saturating_sub(consumed);
+
+    let elapsed_us = now_us.saturating_sub(surb.last_snapshot_us);
+    let rate_per_sec = if elapsed_us == 0 {
+        0.0
+    } else {
+        let delta = total as i64 - surb.last_snapshot_total as i64;
+        delta as f64 / (elapsed_us as f64 / 1_000_000.0)
+    };
+
+    surb.last_snapshot_total = total;
+    surb.last_snapshot_us = now_us;
+
+    METRIC_SESSION_SURB_TARGET_BUFFER.set(
+        &[session_id.as_str()],
+        surb.state
+            .target_surb_buffer_size
+            .load(std::sync::atomic::Ordering::Relaxed) as f64,
+    );
+    METRIC_SESSION_SURB_BUFFER_ESTIMATE.set(&[session_id.as_str()], total as f64);
+    METRIC_SESSION_SURB_RATE_PER_SEC.set(&[session_id.as_str()], rate_per_sec);
+}
+
 fn now_us() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
+        .unwrap_or(Duration::from_micros(0))
         .as_micros() as u64
 }
 
-impl hopr_protocol_session::SessionTelemetryTracker for SessionTelemetry {
+fn increment_frame_assembly_gauge(session_id: &SessionId) {
+    let mut state = SESSION_RUNTIME.lock();
+    let runtime = state
+        .entry(*session_id)
+        .or_insert_with(|| SessionRuntimeState::new(now_us()));
+    runtime.frames_being_assembled = runtime.frames_being_assembled.saturating_add(1);
+    METRIC_SESSION_FRAME_BEING_ASSEMBLED.increment(&[session_id.as_str()], 1.0);
+}
+
+fn decrement_frame_assembly_gauge(session_id: &SessionId) {
+    let mut state = SESSION_RUNTIME.lock();
+    let Some(runtime) = state.get_mut(session_id) else {
+        return;
+    };
+
+    if runtime.frames_being_assembled == 0 {
+        return;
+    }
+
+    runtime.frames_being_assembled -= 1;
+    METRIC_SESSION_FRAME_BEING_ASSEMBLED.decrement(&[session_id.as_str()], 1.0);
+}
+
+impl hopr_protocol_session::SessionTelemetryTracker for SessionId {
     fn frame_emitted(&self) {
-        self.frames_emitted.fetch_add(1, Ordering::Relaxed);
+        METRIC_SESSION_FRAME_EMITTED_TOTAL.increment(&[self.as_str()]);
     }
 
     fn frame_completed(&self) {
-        self.frames_completed.fetch_add(1, Ordering::Relaxed);
+        METRIC_SESSION_FRAME_COMPLETED_TOTAL.increment(&[self.as_str()]);
+        decrement_frame_assembly_gauge(self);
     }
 
     fn frame_discarded(&self) {
-        self.frames_discarded.fetch_add(1, Ordering::Relaxed);
+        METRIC_SESSION_FRAME_DISCARDED_TOTAL.increment(&[self.as_str()]);
+        decrement_frame_assembly_gauge(self);
     }
 
     fn incomplete_frame(&self) {
-        self.frames_incomplete.fetch_add(1, Ordering::Relaxed);
+        increment_frame_assembly_gauge(self);
     }
 
     fn incoming_message(&self, msg: SessionMessageDiscriminants) {
         match msg {
             SessionMessageDiscriminants::Segment => {
-                self.incoming_segments.fetch_add(1, Ordering::Relaxed);
+                METRIC_SESSION_ACK_INCOMING_SEGMENTS_TOTAL.increment(&[self.as_str()])
             }
             SessionMessageDiscriminants::Request => {
-                self.incoming_retransmission_requests.fetch_add(1, Ordering::Relaxed);
+                METRIC_SESSION_ACK_INCOMING_RETRANSMISSION_REQUESTS_TOTAL.increment(&[self.as_str()])
             }
             SessionMessageDiscriminants::Acknowledge => {
-                self.incoming_acknowledged_frames.fetch_add(1, Ordering::Relaxed);
+                METRIC_SESSION_ACK_INCOMING_ACKNOWLEDGED_FRAMES_TOTAL.increment(&[self.as_str()])
             }
         }
     }
@@ -491,19 +439,19 @@ impl hopr_protocol_session::SessionTelemetryTracker for SessionTelemetry {
     fn outgoing_message(&self, msg: SessionMessageDiscriminants) {
         match msg {
             SessionMessageDiscriminants::Segment => {
-                self.outgoing_segments.fetch_add(1, Ordering::Relaxed);
+                METRIC_SESSION_ACK_OUTGOING_SEGMENTS_TOTAL.increment(&[self.as_str()])
             }
             SessionMessageDiscriminants::Request => {
-                self.outgoing_retransmission_requests.fetch_add(1, Ordering::Relaxed);
+                METRIC_SESSION_ACK_OUTGOING_RETRANSMISSION_REQUESTS_TOTAL.increment(&[self.as_str()])
             }
             SessionMessageDiscriminants::Acknowledge => {
-                self.outgoing_acknowledged_frames.fetch_add(1, Ordering::Relaxed);
+                METRIC_SESSION_ACK_OUTGOING_ACKNOWLEDGED_FRAMES_TOTAL.increment(&[self.as_str()])
             }
         }
     }
 
     fn error(&self) {
-        self.session_pipeline_errors.fetch_add(1, Ordering::Relaxed);
+        METRIC_SESSION_LIFETIME_PIPELINE_ERRORS_TOTAL.increment(&[self.as_str()]);
     }
 }
 
@@ -513,102 +461,45 @@ mod tests {
     use hopr_types::{crypto_random::Randomizable, internal::prelude::HoprPseudonym};
 
     use super::*;
-    use crate::SessionId;
 
     #[test]
-    fn metrics_snapshot_tracks_bytes_and_packets() {
-        let id = SessionId::new(1_u64, HoprPseudonym::random());
-        let metrics = SessionTelemetry::new(id, HoprSessionConfig::default());
-
-        metrics.record_read(10);
-        metrics.record_read(0);
-        metrics.record_write(20);
-
-        let snapshot = metrics.snapshot();
-
-        assert_eq!(snapshot.transport.bytes_in, 10);
-        assert_eq!(snapshot.transport.bytes_out, 20);
-        assert_eq!(snapshot.transport.packets_in, 1);
-        assert_eq!(snapshot.transport.packets_out, 1);
-    }
-
-    #[test]
-    fn metrics_snapshot_tracks_frame_events() {
-        let id = SessionId::new(2_u64, HoprPseudonym::random());
-        let metrics = SessionTelemetry::new(id, HoprSessionConfig::default());
-
-        metrics.frame_completed();
-        metrics.frame_emitted();
-        metrics.frame_discarded();
-
-        let snapshot = metrics.snapshot();
-
-        assert_eq!(snapshot.frame_buffer.frames_completed, 1);
-        assert_eq!(snapshot.frame_buffer.frames_emitted, 1);
-        assert_eq!(snapshot.frame_buffer.frames_discarded, 1);
-    }
-
-    #[test]
-    fn shared_session_telemetry_is_discoverable_and_removed_after_drop() {
-        let id = SessionId::new(3_u64, HoprPseudonym::random());
-        let metrics = SessionTelemetry::new_shared(id, HoprSessionConfig::default());
-        metrics.record_write(7);
-
-        assert!(
-            session_telemetry_snapshots()
-                .into_iter()
-                .any(|snapshot| snapshot.session_id == id && snapshot.transport.bytes_out == 7)
-        );
-
-        drop(metrics);
-
-        assert!(
-            !session_telemetry_snapshots()
-                .into_iter()
-                .any(|snapshot| snapshot.session_id == id)
-        );
-    }
-
-    #[test]
-    fn inferred_session_metric_definitions_include_expected_metrics() {
-        let definitions = session_snapshot_metric_definitions();
-        let has_state_metric = definitions
-            .iter()
-            .any(|definition| definition.name == "hopr_session_lifetime_state");
-        let has_ack_counter_metric = definitions
-            .iter()
-            .any(|definition| definition.name == "hopr_session_ack_incoming_segments_total");
-        let has_f64_metric = definitions
-            .iter()
-            .any(|definition| definition.name == "hopr_session_surb_rate_per_sec");
-
-        assert!(has_state_metric);
-        assert!(has_ack_counter_metric);
-        assert!(has_f64_metric);
-
-        assert!(definitions.iter().any(
-            |definition| definition.name == "hopr_session_ack_incoming_segments_total"
-                && definition.kind == SessionMetricKind::U64Counter
-        ));
-        assert!(
-            definitions
-                .iter()
-                .any(|definition| definition.name == "hopr_session_lifetime_state"
-                    && definition.kind == SessionMetricKind::U64Gauge)
-        );
-    }
-
-    #[test]
-    fn inferred_session_metric_values_are_readable_by_metric_name() {
+    fn session_metrics_are_exported_through_hopr_metrics() {
         let id = SessionId::new(4_u64, HoprPseudonym::random());
-        let metrics = SessionTelemetry::new(id, HoprSessionConfig::default());
-        metrics.record_read(10);
+        initialize_session_metrics(id, HoprSessionConfig::default());
+        record_session_read(&id, 10);
+        id.frame_completed();
 
-        let snapshot = metrics.snapshot();
-        let bytes_in_total = session_snapshot_metric_value(&snapshot, "hopr_session_transport_bytes_in_total");
-        let ack_mode = session_snapshot_metric_value(&snapshot, "hopr_session_ack_mode");
+        let text = hopr_metrics::gather_all_metrics().expect("must gather metrics");
+        let session_id = id.to_string();
+        let ingress_metric = format!("hopr_session_transport_bytes_in_total{{session_id=\"{session_id}\"}} 10");
+        let frame_metric = format!("hopr_session_frame_completed_total{{session_id=\"{session_id}\"}} 1");
+        let mode_metric = format!(
+            "hopr_session_ack_mode{{session_id=\"{session_id}\"}} {}",
+            SessionAckMode::None as u8
+        );
 
-        assert_eq!(Some(SessionMetricValue::U64(10)), bytes_in_total);
-        assert_eq!(Some(SessionMetricValue::U64(SessionAckMode::None as u64)), ack_mode);
+        assert!(text.contains(&ingress_metric));
+        assert!(text.contains(&frame_metric));
+        assert!(text.contains(&mode_metric));
+    }
+
+    #[test]
+    fn surb_metrics_are_exported_through_hopr_metrics() {
+        let id = SessionId::new(5_u64, HoprPseudonym::random());
+        initialize_session_metrics(id, HoprSessionConfig::default());
+        let estimator = AtomicSurbFlowEstimator::default();
+        let state = Arc::new(BalancerStateValues::new(Default::default()));
+
+        set_session_balancer_data(&id, estimator, Arc::clone(&state));
+        record_session_surb_produced(&id, 8);
+        record_session_surb_consumed(&id, 3);
+
+        let text = hopr_metrics::gather_all_metrics().expect("must gather metrics");
+        let session_id = id.to_string();
+        let produced_metric = format!("hopr_session_surb_produced_total{{session_id=\"{session_id}\"}} 8");
+        let consumed_metric = format!("hopr_session_surb_consumed_total{{session_id=\"{session_id}\"}} 3");
+
+        assert!(text.contains(&produced_metric));
+        assert!(text.contains(&consumed_metric));
     }
 }

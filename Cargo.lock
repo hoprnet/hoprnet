@@ -4461,7 +4461,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-builder"
-version = "4.0.2"
+version = "4.0.3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4478,7 +4478,6 @@ dependencies = [
  "hopr-metrics",
  "hopr-network-graph",
  "hopr-transport-p2p",
- "insta",
  "lazy_static",
  "opentelemetry-prometheus-text-exporter",
  "opentelemetry_sdk",
@@ -5244,7 +5243,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.20.1"
+version = "0.20.2"
 dependencies = [
  "anyhow",
  "arrayvec",
@@ -5273,7 +5272,6 @@ dependencies = [
  "rand 0.10.0",
  "serde",
  "serde_cbor_2",
- "serde_json",
  "serde_repr",
  "smart-default",
  "strum 0.28.0",
@@ -5309,7 +5307,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-utils-session"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -5386,7 +5384,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "4.6.2"
+version = "4.7.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -5422,7 +5420,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api-client"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "bytes",
  "chrono",

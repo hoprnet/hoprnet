@@ -895,12 +895,6 @@ where
         Ok(self.transport_api.session_surb_balancing_cfg(id).await?)
     }
 
-    #[cfg(all(feature = "session-client", feature = "telemetry"))]
-    pub async fn get_session_stats(&self, id: &SessionId) -> errors::Result<SessionStatsSnapshot> {
-        self.error_if_not_in_state(HoprState::Running, "Node is not ready for session operations".into())?;
-        Ok(self.transport_api.session_stats(id).await?)
-    }
-
     #[cfg(feature = "session-client")]
     pub async fn update_session_surb_balancer_config(
         &self,
