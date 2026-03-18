@@ -5061,6 +5061,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-test-stubs"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bimap",
+ "dashmap",
+ "futures",
+ "hopr-api",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "hopr-transport"
 version = "0.21.2"
 dependencies = [
@@ -5265,6 +5277,7 @@ dependencies = [
  "hopr-network-types",
  "hopr-protocol-app",
  "hopr-protocol-hopr",
+ "hopr-test-stubs",
  "hopr-transport-mixer",
  "hopr-transport-protocol",
  "humantime-serde",

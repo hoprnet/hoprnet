@@ -12,7 +12,6 @@
       "Bash(head:*)",
       "Bash(ls:*)",
       "Bash(nix:*)",
-      "Bash(rm:*)",
       "Bash(tail:*)"
     ]
   }

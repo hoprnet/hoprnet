@@ -619,10 +619,12 @@ mod tests {
 
         let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS);
 
-        let result = selector.select_path(me, dest, 1);
-        assert!(
-            result.is_err(),
-            "zero-cost paths should be filtered out, yielding PathNotFound"
+        let err = selector
+            .select_path(me, dest, 1)
+            .expect_err("zero-cost paths should be filtered out");
+        anyhow::ensure!(
+            matches!(err, PathPlannerError::Path(PathError::PathNotFound(..))),
+            "expected PathNotFound, got: {err}"
         );
         Ok(())
     }

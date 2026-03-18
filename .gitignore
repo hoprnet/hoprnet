@@ -20,6 +20,9 @@ logs.txt
 # we need to specify the direct paths since act only supports strict git ignore checks
 /.direnv
 
+# claude code local settings
+.claude/settings.local.json
+
 *.env
 .identity-local
 
