@@ -254,7 +254,6 @@ pub fn session_telemetry_snapshots() -> Vec<SessionStatsSnapshot> {
 #[cfg(test)]
 mod tests {
     use anyhow::Context;
-    use rstest::rstest;
 
     use super::*;
 
@@ -280,15 +279,39 @@ mod tests {
         output
     }
 
-    #[rstest]
-    #[case::numbers(serde_json::json!({ "packets_in": 42 }))]
-    #[case::nested_objects(serde_json::json!({ "transport": { "bytes_in": 100 } }))]
-    #[case::floats(serde_json::json!({ "rate": 2.78 }))]
-    #[case::booleans(serde_json::json!({ "active": true }))]
-    #[case::skips_session_id(serde_json::json!({ "session_id": "abc", "bytes_in": 10 }))]
-    #[case::ignores_strings_arrays_nulls(serde_json::json!({ "name": "test", "items": [1, 2, 3], "empty": null, "count": 5 }))]
-    fn flatten_snapshot_value_cases(#[case] input: serde_json::Value) {
-        insta::assert_debug_snapshot!(collect_flat(input));
+    #[test]
+    fn flatten_snapshot_value_handles_numbers() {
+        insta::assert_debug_snapshot!(collect_flat(serde_json::json!({ "packets_in": 42 })));
+    }
+
+    #[test]
+    fn flatten_snapshot_value_handles_nested_objects() {
+        insta::assert_debug_snapshot!(collect_flat(serde_json::json!({ "transport": { "bytes_in": 100 } })));
+    }
+
+    #[test]
+    fn flatten_snapshot_value_handles_floats() {
+        insta::assert_debug_snapshot!(collect_flat(serde_json::json!({ "rate": 2.78 })));
+    }
+
+    #[test]
+    fn flatten_snapshot_value_handles_booleans() {
+        insta::assert_debug_snapshot!(collect_flat(serde_json::json!({ "active": true })));
+    }
+
+    #[test]
+    fn flatten_snapshot_value_skips_session_id_at_root() {
+        insta::assert_debug_snapshot!(collect_flat(serde_json::json!({ "session_id": "abc", "bytes_in": 10 })));
+    }
+
+    #[test]
+    fn flatten_snapshot_value_ignores_strings_arrays_nulls() {
+        insta::assert_debug_snapshot!(collect_flat(serde_json::json!({
+            "name": "test",
+            "items": [1, 2, 3],
+            "empty": null,
+            "count": 5
+        })));
     }
 
     #[test]

@@ -1067,12 +1067,10 @@ mod tests {
             .await?;
         drop(wire_in_tx);
 
-        let result = tokio::time::timeout(Duration::from_millis(500), app_out_rx.next()).await;
-        match result {
-            Err(_) => {}   // timeout — no data, as expected
-            Ok(None) => {} // stream closed
-            Ok(Some(_)) => panic!("undecodable packet should not produce app output"),
-        }
+        let next = tokio::time::timeout(Duration::from_secs(2), app_out_rx.next())
+            .await
+            .context("pipeline should drain and close app output")?;
+        assert!(next.is_none(), "undecodable packet should not produce app output");
 
         processes.abort_all();
         Ok(())
@@ -1113,18 +1111,17 @@ mod tests {
             .await?;
         drop(wire_in_tx);
 
-        let result = tokio::time::timeout(Duration::from_millis(500), app_out_rx.next()).await;
-        match result {
-            Err(_) | Ok(None) => {} // expected — packet dropped
-            Ok(Some(_)) => panic!("overloaded packet should not produce app output"),
-        }
+        let next = tokio::time::timeout(Duration::from_secs(2), app_out_rx.next())
+            .await
+            .context("pipeline should drain and close app output")?;
+        assert!(next.is_none(), "overloaded packet should not produce app output");
 
         processes.abort_all();
         Ok(())
     }
 
     #[tokio::test]
-    async fn incoming_processing_error_sends_random_ack() -> anyhow::Result<()> {
+    async fn incoming_processing_error_should_emit_ack_to_sender() -> anyhow::Result<()> {
         let packet_key = PEERS[0].clone();
         let sender_key = *PEERS[1].public();
 

@@ -613,8 +613,8 @@ mod tests {
         let graph = ChannelGraph::new(me);
         graph.add_node(hop);
         graph.add_node(dest);
-        graph.add_edge(&me, &hop).unwrap();
-        graph.add_edge(&hop, &dest).unwrap();
+        graph.add_edge(&me, &hop).context("adding edge me -> hop")?;
+        graph.add_edge(&hop, &dest).context("adding edge hop -> dest")?;
         // No mark_edge_full/mark_edge_last → observations are empty → cost = 0
 
         let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS);
@@ -638,7 +638,7 @@ mod tests {
         let dest = pubkey(&SECRET_1);
         let graph = ChannelGraph::new(me);
         graph.add_node(dest);
-        graph.add_edge(&me, &dest).unwrap();
+        graph.add_edge(&me, &dest).context("adding edge me -> dest")?;
         mark_edge_full(&graph, &me, &dest);
 
         let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS);
