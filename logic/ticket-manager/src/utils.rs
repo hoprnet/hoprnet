@@ -1,8 +1,8 @@
 use std::sync::atomic::{AtomicBool, AtomicU64};
 
 use hopr_api::{chain::ChannelId, types::internal::prelude::TicketBuilder};
-
-use crate::OutgoingIndexStore;
+use hopr_api::chain::HoprBalance;
+use crate::{OutgoingIndexStore, TicketQueue};
 
 /// Tracks outgoing ticket indices for a channel, starting from 0.
 #[derive(Debug)]
@@ -145,17 +145,37 @@ impl OutgoingIndexCache {
 
 #[derive(Debug)]
 pub struct ChannelTicketQueue<Q> {
-    pub(crate) queue: std::sync::Arc<parking_lot::RwLock<Q>>,
+    pub(crate) queue: std::sync::Arc<parking_lot::RwLock<(Q, ChannelTicketStats)>>,
     pub(crate) redeem_lock: std::sync::Arc<parking_lot::Mutex<()>>,
 }
 
-impl<Q> From<Q> for ChannelTicketQueue<Q> {
+impl<Q: TicketQueue> From<Q> for ChannelTicketQueue<Q> {
     fn from(queue: Q) -> Self {
+        let stats  = ChannelTicketStats {
+            winning_tickets: queue.len().unwrap_or(0) as u128,
+            ..Default::default()
+        };
         Self {
-            queue: std::sync::Arc::new(parking_lot::RwLock::new(queue)),
+            queue: std::sync::Arc::new(parking_lot::RwLock::new((queue, stats))),
             redeem_lock: std::sync::Arc::new(parking_lot::Mutex::new(())),
         }
     }
+}
+
+/// Contains transient statistics about the tickets in a channel.
+///
+/// The object intentionally does not contain the redeemed value
+/// as that should be determined by an on-chain query directly.
+///
+/// The object is not persistent.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub struct ChannelTicketStats {
+    /// Total number of winning tickets in the channel.
+    pub winning_tickets: u128,
+    /// Total value of tickets that were neglected.
+    pub neglected_value: HoprBalance,
+    /// Total value of tickets that were rejected.
+    pub rejected_value: HoprBalance,
 }
 
 #[cfg(test)]

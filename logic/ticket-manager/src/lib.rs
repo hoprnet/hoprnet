@@ -421,15 +421,18 @@ where
                 // apparently restarted its lifecycle, and all the tickets from previous epochs
                 // are unredeemable already
                 if queue
+                    .0
                     .peek()
                     .map_err(TicketManagerError::store)?
                     .is_some_and(|last| last.verified_ticket().channel_epoch < ticket.verified_ticket().channel_epoch)
                 {
                     // Ensures allocation according to the number of drained tickets
-                    neglected_tickets.append(&mut queue.drain().map_err(TicketManagerError::store)?);
+                    neglected_tickets.append(&mut queue.0.drain().map_err(TicketManagerError::store)?);
                     tracing::warn!(%ticket_id, num_neglected = neglected_tickets.len(), "winning ticket has neglected unredeemed tickets from previous epochs");
                 }
-                queue.push(ticket).map_err(TicketManagerError::store)?;
+                queue.0.push(ticket).map_err(TicketManagerError::store)?;
+                queue.1.winning_tickets += 1;
+
                 tracing::debug!(%ticket_id, "winning ticket on channel");
             }
             dashmap::Entry::Vacant(v) => {
@@ -453,10 +456,7 @@ where
                 }
 
                 queue.push(ticket).map_err(TicketManagerError::store)?;
-                v.insert(ChannelTicketQueue {
-                    queue: std::sync::Arc::new(parking_lot::RwLock::new(queue)),
-                    redeem_lock: std::sync::Arc::new(parking_lot::Mutex::new(())),
-                });
+                v.insert(queue.into()); // The ticket is accounted for in the stats automatically
                 tracing::debug!(%ticket_id, "first winning ticket on channel");
             }
         }
@@ -482,11 +482,12 @@ where
             // The ticket insertion takes care that there are no tickets
             // with epochs other than the current epoch.
             if let Some(epoch) = queue
+                .0
                 .peek()
                 .map_err(TicketManagerError::store)?
                 .map(|t| t.verified_ticket().channel_epoch)
             {
-                Ok(queue.total_value(epoch, min_index).map_err(TicketManagerError::store)?)
+                Ok(queue.0.total_value(epoch, min_index).map_err(TicketManagerError::store)?)
             } else {
                 Ok(HoprBalance::zero())
             }
@@ -523,6 +524,7 @@ where
         let max_index = up_to_index.unwrap_or(TicketBuilder::MAX_TICKET_INDEX);
 
         while queue_read
+            .0
             .peek()
             .map_err(TicketManagerError::store)?
             .filter(|ticket| ticket.verified_ticket().index <= max_index)
@@ -530,7 +532,8 @@ where
         {
             // Quickly perform pop and downgrade to lock not to block any readers
             let mut queue_write = parking_lot::RwLockUpgradableReadGuard::upgrade(queue_read);
-            let maybe_ticket = queue_write.pop().map_err(TicketManagerError::store)?;
+            let maybe_ticket = queue_write.0.pop().map_err(TicketManagerError::store)?;
+            queue_write.1.neglected_value += maybe_ticket.map(|t| t.verified_ticket().amount).unwrap_or_default();
             queue_read = parking_lot::RwLockWriteGuard::downgrade_to_upgradable(queue_write);
 
             neglected_tickets.extend(maybe_ticket.map(|t| t.ticket));
@@ -587,7 +590,7 @@ where
 
         Ok(futures::stream::try_unfold(initial_state, |state| {
             // Peek here and release the read lock to prevent holding it across an `await`
-            let next_ticket = state.queue.read().peek();
+            let next_ticket = state.queue.read().0.peek();
             async move {
                 match next_ticket {
                     Ok(Some(ticket)) => {
@@ -628,7 +631,23 @@ where
                         // Check if we should remove the ticket from the queue
                         if remove_ticket {
                             // Quickly perform pop and drop the write lock not to block any readers
-                            let _ = state.queue.write().pop();
+                            let mut queue_write = state.queue.write();
+                            match queue_write.0.pop() {
+                                Ok(Some(ticket)) => {
+                                    if !matches!(&redeem_result, Ok(Some(RedemptionResult::Redeemed(_)))) {
+                                        queue_write.1.neglected_value += ticket.verified_ticket().amount;
+                                    }
+                                },
+                                Ok(None) => {
+                                    tracing::warn!(%ticket_id, "ticket has been neglected from the queue while it was being redeemed");
+                                    if matches!(&redeem_result, Ok(Some(RedemptionResult::Redeemed(_)))) {
+                                        queue_write.1.neglected_value -= ticket.verified_ticket().amount;
+                                    }
+                                }
+                                Err(error) => {
+                                    tracing::error!(%error, %ticket_id, "failed to pop ticket from queue");
+                                }
+                            }
                         }
 
                         redeem_result
