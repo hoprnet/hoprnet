@@ -250,7 +250,7 @@ mod tests {
             matches!(&routing.return_options, Some(RoutingOptions::Hops(h)) if u8::from(*h) == 0),
             "neighbor return should be Some(Hops(0))"
         );
-        assert_eq!(*routing.destination, *dest);
+        anyhow::ensure!(*routing.destination == *dest, "destination mismatch");
         Ok(())
     }
 
@@ -266,8 +266,8 @@ mod tests {
             matches!(routing.forward_options, RoutingOptions::IntermediatePath(_)),
             "loopback forward should be IntermediatePath"
         );
-        assert!(routing.return_options.is_none(), "loopback should have no return");
-        assert_eq!(*routing.destination, *me);
+        anyhow::ensure!(routing.return_options.is_none(), "loopback should have no return");
+        anyhow::ensure!(*routing.destination == *me, "destination mismatch");
         Ok(())
     }
 

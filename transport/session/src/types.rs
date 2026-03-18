@@ -312,7 +312,7 @@ pub struct IncomingSession {
 }
 
 /// Configures the Session protocol socket over HOPR.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, smart_default::SmartDefault)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, smart_default::SmartDefault, serde::Serialize)]
 pub struct HoprSessionConfig {
     /// Capabilities of the Session protocol socket.
     ///
@@ -328,6 +328,7 @@ pub struct HoprSessionConfig {
     ///
     /// Default is 800 ms
     #[default(Duration::from_millis(800))]
+    #[serde(with = "humantime_serde")]
     pub frame_timeout: Duration,
 }
 
@@ -664,7 +665,7 @@ mod tests {
     #[test]
     fn hopr_session_config_default_snapshot() {
         let cfg = HoprSessionConfig::default();
-        insta::assert_yaml_snapshot!(format!("{cfg:?}"));
+        insta::assert_yaml_snapshot!(cfg);
     }
 
     // --- SessionTarget tests ---

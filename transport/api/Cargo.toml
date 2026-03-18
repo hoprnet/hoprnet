@@ -92,7 +92,7 @@ hopr-protocol-session = { workspace = true, features = [
   "hashbrown",
 ] }
 hopr-transport-network = { workspace = true }
-hopr-transport-mixer = { workspace = true }
+hopr-transport-mixer = { workspace = true, features = ["serde"] }
 hopr-transport-protocol = { workspace = true, features = ["runtime-tokio"] }
 temp-env = { workspace = true }
 tokio = { workspace = true }

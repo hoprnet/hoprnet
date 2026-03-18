@@ -35,7 +35,7 @@ impl<'a> TryFrom<&'a [u8]> for Message {
     type Error = GeneralError;
 
     fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
-        if value.is_empty() {
+        if value.len() < 2 {
             return Err(GeneralError::ParseError("Message.size".into()));
         }
 
@@ -192,6 +192,17 @@ mod tests {
         let err = Message::try_from([].as_slice())
             .err()
             .context("expected error for empty bytes")?;
+        matches!(&err, GeneralError::ParseError(s) if s.contains("size"))
+            .then_some(())
+            .context(format!("expected ParseError about size, got: {err}"))?;
+        Ok(())
+    }
+
+    #[test]
+    fn message_from_truncated_header_fails() -> anyhow::Result<()> {
+        let err = Message::try_from([Message::VERSION].as_slice())
+            .err()
+            .context("expected error for truncated header")?;
         matches!(&err, GeneralError::ParseError(s) if s.contains("size"))
             .then_some(())
             .context(format!("expected ParseError about size, got: {err}"))?;

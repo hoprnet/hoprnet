@@ -70,7 +70,7 @@ mod tests {
     fn probe_config_default_is_valid() -> anyhow::Result<()> {
         let cfg = ProbeConfig::default();
         cfg.validate().context("default ProbeConfig should be valid")?;
-        insta::assert_yaml_snapshot!(format!("{cfg:?}"));
+        insta::assert_yaml_snapshot!(cfg);
         Ok(())
     }
 

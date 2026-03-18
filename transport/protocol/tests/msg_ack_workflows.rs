@@ -31,7 +31,7 @@ async fn single_packet_through_3_peers() -> anyhow::Result<()> {
 async fn small_payload_packet_delivered_correctly() -> anyhow::Result<()> {
     let packet = ApplicationData::new(42u64, b"hi")?;
 
-    let (received, _ticket_channels) = send_and_receive_packets(3, std::slice::from_ref(&packet)).await?;
+    let (received, _ticket_channels, _processes) = send_and_receive_packets(3, std::slice::from_ref(&packet)).await?;
 
     assert_eq!(received.len(), 1);
     assert_eq!(received[0].1.data.plain_text, packet.plain_text);
@@ -46,7 +46,7 @@ async fn large_payload_near_max_size() -> anyhow::Result<()> {
     let max_payload = ApplicationData::PAYLOAD_SIZE;
     let packet = random_packet_of_size(max_payload - 1);
 
-    let (received, _ticket_channels) = send_and_receive_packets(3, std::slice::from_ref(&packet)).await?;
+    let (received, _ticket_channels, _processes) = send_and_receive_packets(3, std::slice::from_ref(&packet)).await?;
 
     assert_eq!(received.len(), 1);
     assert_eq!(received[0].1.data.plain_text, packet.plain_text);
@@ -60,7 +60,7 @@ async fn many_packets_delivered_in_order_independent_of_content() -> anyhow::Res
     let packet_count = 20;
     let packets = random_packets_of_count(packet_count);
 
-    let (received, _) = send_and_receive_packets(3, &packets).await?;
+    let (received, _, _processes) = send_and_receive_packets(3, &packets).await?;
 
     assert_eq!(received.len(), packet_count);
 
@@ -84,7 +84,7 @@ async fn identical_payloads_are_all_delivered() -> anyhow::Result<()> {
         .map(|_| ApplicationData::new(0u64, payload.as_slice()).expect("valid"))
         .collect();
 
-    let (received, _) = send_and_receive_packets(3, &packets).await?;
+    let (received, _, _processes) = send_and_receive_packets(3, &packets).await?;
 
     assert_eq!(received.len(), 5);
     assert!(

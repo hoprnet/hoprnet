@@ -1,5 +1,9 @@
 ---
 source: transport/protocol/src/pipeline.rs
-expression: "format!(\"{cfg:?}\")"
+expression: cfg
 ---
-"PacketPipelineConfig { output_concurrency: None, input_concurrency: None, ack_config: AcknowledgementPipelineConfig { ack_buffer_interval: 200ms, ack_grouping_capacity: 5 } }"
+output_concurrency: ~
+input_concurrency: ~
+ack_config:
+  ack_buffer_interval: 200ms
+  ack_grouping_capacity: 5

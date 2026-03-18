@@ -6,6 +6,7 @@ mod stubs;
 
 use std::str::FromStr;
 
+use anyhow::Context;
 use hex_literal::hex;
 use hopr_api::types::crypto::prelude::{ChainKeypair, Keypair, OffchainKeypair};
 use hopr_network_graph::ChannelGraph;
@@ -137,7 +138,11 @@ async fn ping_errors_before_run() -> anyhow::Result<()> {
 #[tokio::test]
 async fn ping_to_self_rejected() -> anyhow::Result<()> {
     let transport = create_stubbed_transport(0)?;
-    let err = transport.ping(PEER_KEYS[0].0.public()).await.unwrap_err();
+    let err = transport
+        .ping(PEER_KEYS[0].0.public())
+        .await
+        .err()
+        .context("pinging self should fail")?;
     let msg = format!("{err}");
     assert!(msg.contains("self"), "error should mention self: {msg}");
     Ok(())
@@ -249,5 +254,5 @@ fn transport_process_display_names_are_stable() {
 #[test]
 fn mixer_config_default_values_snapshot() {
     let cfg = hopr_transport_mixer::config::MixerConfig::default();
-    insta::assert_yaml_snapshot!(format!("{cfg:?}"));
+    insta::assert_yaml_snapshot!(cfg);
 }

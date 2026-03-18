@@ -409,7 +409,7 @@ mod tests {
     #[test]
     fn surb_balancer_config_default_snapshot() {
         let cfg = SurbBalancerConfig::default();
-        insta::assert_yaml_snapshot!(format!("{cfg:?}"));
+        insta::assert_debug_snapshot!(cfg);
     }
 
     #[test]

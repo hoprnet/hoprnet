@@ -742,7 +742,7 @@ mod tests {
     fn ack_pipeline_config_default_is_valid() {
         let cfg = AcknowledgementPipelineConfig::default();
         assert!(cfg.validate().is_ok());
-        insta::assert_yaml_snapshot!(format!("{cfg:?}"));
+        insta::assert_yaml_snapshot!(cfg);
     }
 
     #[test]
@@ -794,7 +794,7 @@ mod tests {
     fn packet_pipeline_config_default_is_valid() {
         let cfg = PacketPipelineConfig::default();
         assert!(cfg.validate().is_ok());
-        insta::assert_yaml_snapshot!(format!("{cfg:?}"));
+        insta::assert_yaml_snapshot!(cfg);
     }
 
     #[test]

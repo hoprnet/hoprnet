@@ -78,6 +78,7 @@ hopr-chain-connector = { workspace = true, features = [
 ] }
 hopr-network-types = { workspace = true }
 hopr-transport-mixer = { workspace = true }
+hopr-transport-protocol = { path = ".", features = ["serde"] }
 
 [[bench]]
 name = "protocol_throughput_emulated"

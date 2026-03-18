@@ -320,7 +320,11 @@ pub fn random_packet_of_size(payload_size: usize) -> ApplicationData {
 pub async fn send_and_receive_packets(
     peer_count: usize,
     test_msgs: &[ApplicationData],
-) -> anyhow::Result<(Vec<(HoprPseudonym, ApplicationDataIn)>, Vec<TicketChannel>)> {
+) -> anyhow::Result<(
+    Vec<(HoprPseudonym, ApplicationDataIn)>,
+    Vec<TicketChannel>,
+    AbortableList<usize>,
+)> {
     assert!(peer_count >= 3, "invalid peer count given");
     assert!(!test_msgs.is_empty(), "at least one packet must be given");
 
@@ -367,8 +371,7 @@ pub async fn send_and_receive_packets(
         .timeout(futures_time::time::Duration::from(TIMEOUT_SECONDS))
         .await?;
 
-    processes.abort_all();
-    Ok((recv_packets, ticket_channels))
+    Ok((recv_packets, ticket_channels, processes))
 }
 
 pub async fn send_relay_receive_channel_of_n_peers(
