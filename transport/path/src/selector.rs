@@ -646,8 +646,13 @@ mod tests {
         // Ask for 2-hop path. Phase 1 won't find any (no 2-hop path exists).
         // Phase 2 finds me → dest as a shorter_length=1 path, but candidate=[dest]
         // which contains dest → filtered by the self-loop guard.
-        let result = selector.select_path(me, dest, 2);
-        assert!(result.is_err(), "extended path ending at dest should be rejected");
+        let err = selector
+            .select_path(me, dest, 2)
+            .expect_err("extended path ending at dest should be rejected");
+        anyhow::ensure!(
+            matches!(err, PathPlannerError::Path(PathError::PathNotFound(..))),
+            "expected PathNotFound, got: {err}"
+        );
         Ok(())
     }
 }

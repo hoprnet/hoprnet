@@ -455,7 +455,7 @@ mod tests {
     }
 
     #[test]
-    fn balancer_state_values_surb_decay_none_when_disabled() {
+    fn balancer_state_values_surb_decay_none_maps_to_none() {
         let cfg = SurbBalancerConfig {
             target_surb_buffer_size: 1000,
             max_surbs_per_sec: 500,
