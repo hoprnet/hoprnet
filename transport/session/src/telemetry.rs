@@ -60,7 +60,7 @@ lazy_static::lazy_static! {
         "Configured frame buffer capacity",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_FRAME_BEING_ASSEMBLED: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+    static ref METRIC_SESSION_FRAME_BEING_ASSEMBLED: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
         "hopr_session_frame_being_assembled",
         "Number of frames currently being assembled",
         &["session_id"]
@@ -197,6 +197,7 @@ struct SessionSurbRuntimeState {
 struct SessionRuntimeState {
     created_at_us: u64,
     last_activity_us: u64,
+    frames_being_assembled: u64,
     surb: Option<SessionSurbRuntimeState>,
 }
 
@@ -205,6 +206,7 @@ impl SessionRuntimeState {
         Self {
             created_at_us: now_us,
             last_activity_us: now_us,
+            frames_being_assembled: 0,
             surb: None,
         }
     }
@@ -234,6 +236,7 @@ pub fn initialize_session_metrics(session_id: SessionId, cfg: HoprSessionConfig)
     METRIC_SESSION_FRAME_MTU_BYTES.set(&[session_id.as_str()], cfg.frame_mtu as f64);
     METRIC_SESSION_FRAME_TIMEOUT_MS.set(&[session_id.as_str()], cfg.frame_timeout.as_millis() as f64);
     METRIC_SESSION_FRAME_FRAME_CAPACITY.set(&[session_id.as_str()], SESSION_SOCKET_CAPACITY as f64);
+    METRIC_SESSION_FRAME_BEING_ASSEMBLED.set(&[session_id.as_str()], 0.0);
     METRIC_SESSION_SURB_BUFFER_ESTIMATE.set(&[session_id.as_str()], 0.0);
     METRIC_SESSION_SURB_TARGET_BUFFER.set(&[session_id.as_str()], 0.0);
     METRIC_SESSION_SURB_RATE_PER_SEC.set(&[session_id.as_str()], 0.0);
@@ -248,6 +251,7 @@ pub fn initialize_session_metrics(session_id: SessionId, cfg: HoprSessionConfig)
 }
 
 pub fn remove_session_metrics_state(session_id: &SessionId) {
+    METRIC_SESSION_FRAME_BEING_ASSEMBLED.set(&[session_id.as_str()], 0.0);
     SESSION_RUNTIME.lock().remove(session_id);
 }
 
@@ -376,6 +380,29 @@ fn now_us() -> u64 {
         .as_micros() as u64
 }
 
+fn increment_frame_assembly_gauge(session_id: &SessionId) {
+    let mut state = SESSION_RUNTIME.lock();
+    let runtime = state
+        .entry(*session_id)
+        .or_insert_with(|| SessionRuntimeState::new(now_us()));
+    runtime.frames_being_assembled = runtime.frames_being_assembled.saturating_add(1);
+    METRIC_SESSION_FRAME_BEING_ASSEMBLED.increment(&[session_id.as_str()], 1.0);
+}
+
+fn decrement_frame_assembly_gauge(session_id: &SessionId) {
+    let mut state = SESSION_RUNTIME.lock();
+    let Some(runtime) = state.get_mut(session_id) else {
+        return;
+    };
+
+    if runtime.frames_being_assembled == 0 {
+        return;
+    }
+
+    runtime.frames_being_assembled -= 1;
+    METRIC_SESSION_FRAME_BEING_ASSEMBLED.decrement(&[session_id.as_str()], 1.0);
+}
+
 impl hopr_protocol_session::SessionTelemetryTracker for SessionId {
     fn frame_emitted(&self) {
         METRIC_SESSION_FRAME_EMITTED_TOTAL.increment(&[self.as_str()]);
@@ -383,14 +410,16 @@ impl hopr_protocol_session::SessionTelemetryTracker for SessionId {
 
     fn frame_completed(&self) {
         METRIC_SESSION_FRAME_COMPLETED_TOTAL.increment(&[self.as_str()]);
+        decrement_frame_assembly_gauge(self);
     }
 
     fn frame_discarded(&self) {
         METRIC_SESSION_FRAME_DISCARDED_TOTAL.increment(&[self.as_str()]);
+        decrement_frame_assembly_gauge(self);
     }
 
     fn incomplete_frame(&self) {
-        METRIC_SESSION_FRAME_BEING_ASSEMBLED.increment(&[self.as_str()]);
+        increment_frame_assembly_gauge(self);
     }
 
     fn incoming_message(&self, msg: SessionMessageDiscriminants) {
