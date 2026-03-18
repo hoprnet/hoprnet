@@ -5300,7 +5300,6 @@ dependencies = [
  "rand 0.10.0",
  "serde",
  "serde_cbor_2",
- "serde_json",
  "serde_repr",
  "smart-default",
  "strum 0.28.0",

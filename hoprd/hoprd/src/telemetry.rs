@@ -1,15 +1,7 @@
-use std::{
-    collections::HashMap,
-    str::FromStr,
-    string::ToString,
-    sync::{Arc, Mutex},
-    time::{Duration, Instant},
-};
+use std::{str::FromStr, string::ToString, time::Duration};
 
 use opentelemetry::{
-    KeyValue,
     logs::{AnyValue, LogRecord as _, Logger as _, LoggerProvider as _, Severity},
-    metrics::{MeterProvider as _, ObservableCounter, ObservableGauge},
     trace::TracerProvider,
 };
 use opentelemetry_otlp::WithExportConfig as _;
@@ -230,145 +222,10 @@ impl Visit for TracingEventVisitor {
 }
 
 #[derive(Default)]
-struct OtelSessionMetricBridge {
-    u64_counters: Vec<ObservableCounter<u64>>,
-    u64_gauges: Vec<ObservableGauge<u64>>,
-    f64_gauges: Vec<ObservableGauge<f64>>,
-}
-
-#[derive(Default)]
-struct SessionMetricCallbackCache {
-    refreshed_at: Option<Instant>,
-    values_by_name: HashMap<String, Vec<(hopr_lib::SessionId, hopr_lib::SessionMetricValue)>>,
-}
-
-const SESSION_METRIC_CACHE_TTL: Duration = Duration::from_millis(100);
-
-fn session_metric_attributes(session_id: hopr_lib::SessionId) -> [KeyValue; 1] {
-    [KeyValue::new("session_id", session_id.to_string())]
-}
-
-fn refresh_session_metric_callback_cache(cache: &mut SessionMetricCallbackCache) {
-    let now = Instant::now();
-    if cache
-        .refreshed_at
-        .is_some_and(|refreshed_at| now.duration_since(refreshed_at) <= SESSION_METRIC_CACHE_TTL)
-    {
-        return;
-    }
-
-    let mut values_by_name: HashMap<String, Vec<(hopr_lib::SessionId, hopr_lib::SessionMetricValue)>> = HashMap::new();
-    for snapshot in hopr_lib::session_telemetry_snapshots() {
-        let session_id = snapshot.session_id;
-        for sample in hopr_lib::session_snapshot_metric_samples(&snapshot) {
-            values_by_name
-                .entry(sample.name)
-                .or_default()
-                .push((session_id, sample.value));
-        }
-    }
-
-    cache.values_by_name = values_by_name;
-    cache.refreshed_at = Some(now);
-}
-
-fn get_cached_session_metric_values(
-    cache: &Arc<Mutex<SessionMetricCallbackCache>>,
-    metric_name: &str,
-) -> Vec<(hopr_lib::SessionId, hopr_lib::SessionMetricValue)> {
-    let mut cache_guard = match cache.lock() {
-        Ok(guard) => guard,
-        Err(_) => return Vec::new(),
-    };
-    refresh_session_metric_callback_cache(&mut cache_guard);
-    cache_guard.values_by_name.get(metric_name).cloned().unwrap_or_default()
-}
-
-fn build_session_u64_observable_gauge(
-    meter: &opentelemetry::metrics::Meter,
-    metric_name: String,
-    cache: Arc<Mutex<SessionMetricCallbackCache>>,
-) -> ObservableGauge<u64> {
-    let callback_metric_name = metric_name.clone();
-    meter
-        .u64_observable_gauge(metric_name)
-        .with_callback(move |observer| {
-            for (session_id, metric_value) in get_cached_session_metric_values(&cache, &callback_metric_name) {
-                if let hopr_lib::SessionMetricValue::U64(value) = metric_value {
-                    let attributes = session_metric_attributes(session_id);
-                    observer.observe(value, &attributes);
-                }
-            }
-        })
-        .build()
-}
-
-fn build_session_u64_observable_counter(
-    meter: &opentelemetry::metrics::Meter,
-    metric_name: String,
-    cache: Arc<Mutex<SessionMetricCallbackCache>>,
-) -> ObservableCounter<u64> {
-    let callback_metric_name = metric_name.clone();
-    meter
-        .u64_observable_counter(metric_name)
-        .with_callback(move |observer| {
-            for (session_id, metric_value) in get_cached_session_metric_values(&cache, &callback_metric_name) {
-                if let hopr_lib::SessionMetricValue::U64(value) = metric_value {
-                    let attributes = session_metric_attributes(session_id);
-                    observer.observe(value, &attributes);
-                }
-            }
-        })
-        .build()
-}
-
-fn build_session_f64_observable_gauge(
-    meter: &opentelemetry::metrics::Meter,
-    metric_name: String,
-    cache: Arc<Mutex<SessionMetricCallbackCache>>,
-) -> ObservableGauge<f64> {
-    let callback_metric_name = metric_name.clone();
-    meter
-        .f64_observable_gauge(metric_name)
-        .with_callback(move |observer| {
-            for (session_id, metric_value) in get_cached_session_metric_values(&cache, &callback_metric_name) {
-                if let hopr_lib::SessionMetricValue::F64(value) = metric_value {
-                    let attributes = session_metric_attributes(session_id);
-                    observer.observe(value, &attributes);
-                }
-            }
-        })
-        .build()
-}
-
-fn build_session_metric_bridge(meter_provider: &SdkMeterProvider) -> OtelSessionMetricBridge {
-    let meter = meter_provider.meter("hoprd_session_snapshot_bridge");
-    let mut session_metrics = OtelSessionMetricBridge::default();
-    let cache = Arc::new(Mutex::new(SessionMetricCallbackCache::default()));
-
-    for metric_definition in hopr_lib::session_snapshot_metric_definitions() {
-        match metric_definition.kind {
-            hopr_lib::SessionMetricKind::U64Gauge => session_metrics.u64_gauges.push(
-                build_session_u64_observable_gauge(&meter, metric_definition.name, Arc::clone(&cache)),
-            ),
-            hopr_lib::SessionMetricKind::U64Counter => session_metrics.u64_counters.push(
-                build_session_u64_observable_counter(&meter, metric_definition.name, Arc::clone(&cache)),
-            ),
-            hopr_lib::SessionMetricKind::F64Gauge => session_metrics.f64_gauges.push(
-                build_session_f64_observable_gauge(&meter, metric_definition.name, Arc::clone(&cache)),
-            ),
-        }
-    }
-
-    session_metrics
-}
-
-#[derive(Default)]
 pub(super) struct TelemetryHandles {
     tracer_provider: Option<SdkTracerProvider>,
     logger_provider: Option<SdkLoggerProvider>,
     meter_provider: Option<SdkMeterProvider>,
-    session_metric_bridge: Option<OtelSessionMetricBridge>,
 }
 
 impl Drop for TelemetryHandles {
@@ -504,7 +361,6 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
                 tracing::warn!("hopr-metrics global state was already initialized; custom provider not applied");
             }
 
-            telemetry_handles.session_metric_bridge = Some(build_session_metric_bridge(&meter_provider));
             telemetry_handles.meter_provider = Some(meter_provider);
         } else {
             // OTLP metrics not requested, but still set up the Prometheus text exporter
@@ -515,7 +371,6 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
             if !hopr_metrics::init_with_provider(prometheus_exporter, meter_provider.clone()) {
                 tracing::warn!("hopr-metrics global state was already initialized; custom provider not applied");
             }
-            telemetry_handles.session_metric_bridge = Some(build_session_metric_bridge(&meter_provider));
             telemetry_handles.meter_provider = Some(meter_provider);
         }
 
@@ -549,7 +404,6 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
         if !hopr_metrics::init_with_provider(prometheus_exporter, meter_provider.clone()) {
             tracing::warn!("hopr-metrics global state was already initialized; custom provider not applied");
         }
-        telemetry_handles.session_metric_bridge = Some(build_session_metric_bridge(&meter_provider));
         telemetry_handles.meter_provider = Some(meter_provider);
 
         tracing::subscriber::set_global_default(registry)?;

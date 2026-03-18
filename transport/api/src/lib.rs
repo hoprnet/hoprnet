@@ -79,11 +79,7 @@ pub use hopr_transport_session::{
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
 #[cfg(feature = "telemetry")]
-pub use hopr_transport_session::{
-    SessionAckMode, SessionLifecycleState, SessionLifetimeSnapshot, SessionMetricDefinition, SessionMetricKind,
-    SessionMetricSample, SessionMetricValue, SessionStatsSnapshot, session_snapshot_metric_definitions,
-    session_snapshot_metric_samples, session_snapshot_metric_value, session_telemetry_snapshots,
-};
+pub use hopr_transport_session::{SessionAckMode, SessionLifecycleState};
 pub use hopr_transport_tag_allocator::TagAllocatorConfig;
 use tracing::{Instrument, debug, error, trace, warn};
 
@@ -652,11 +648,6 @@ where
 
     pub async fn session_surb_balancing_cfg(&self, id: &SessionId) -> errors::Result<Option<SurbBalancerConfig>> {
         Ok(self.smgr.get_surb_balancer_config(id).await?)
-    }
-
-    #[cfg(feature = "telemetry")]
-    pub async fn session_stats(&self, id: &SessionId) -> errors::Result<SessionStatsSnapshot> {
-        Ok(self.smgr.get_session_telemetry(id).await?)
     }
 
     pub async fn update_session_surb_balancing_cfg(

@@ -4,7 +4,19 @@ use crate::{ApiError, ApiErrorStatus};
 
 #[cfg(all(feature = "telemetry", not(test)))]
 fn collect_hopr_metrics() -> Result<String, ApiErrorStatus> {
-    hopr_metrics::gather_all_metrics().map_err(|_| ApiErrorStatus::UnknownFailure("Failed to gather metrics".into()))
+    hopr_metrics::gather_all_metrics()
+        .map(|metrics| {
+            metrics
+                .lines()
+                .filter(|line| {
+                    !(line.starts_with("hopr_session_")
+                        || line.starts_with("# HELP hopr_session_")
+                        || line.starts_with("# TYPE hopr_session_"))
+                })
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
+        .map_err(|_| ApiErrorStatus::UnknownFailure("Failed to gather metrics".into()))
 }
 
 #[cfg(any(not(feature = "telemetry"), test))]
