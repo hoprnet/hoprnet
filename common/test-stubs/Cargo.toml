@@ -1,0 +1,19 @@
+[package]
+name = "hopr-test-stubs"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+async-trait = { workspace = true }
+bimap = { workspace = true }
+dashmap = { workspace = true }
+futures = { workspace = true }
+thiserror = { workspace = true }
+
+hopr-api = { workspace = true, features = ["chain"] }

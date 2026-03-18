@@ -76,9 +76,14 @@ hopr-chain-connector = { workspace = true, features = [
 ] }
 hopr-network-types = { workspace = true }
 hopr-transport-mixer = { workspace = true }
+hopr-test-stubs = { workspace = true }
 
 [[bench]]
 name = "protocol_throughput_emulated"
+harness = false
+
+[[bench]]
+name = "pipeline_e2e"
 harness = false
 
 [package.metadata.cargo-machete]
