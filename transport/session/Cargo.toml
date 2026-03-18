@@ -88,7 +88,7 @@ test-log = { workspace = true }
 tokio = { workspace = true }
 
 [package.metadata.cargo-machete]
-ignored = ["serde_with"]
+ignored = ["serde_with", "humantime-serde"]
 
 [[bench]]
 name = "session_bench"
