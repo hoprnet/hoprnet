@@ -23,8 +23,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  code-coverage:
-    name: Code Coverage
+  unit-coverage:
+    name: Unit Coverage
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
     if: >-
@@ -45,16 +45,57 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
           persist-credentials: false
 
-      - name: Generate code coverage report
+      - name: Generate unit coverage report
         run: |
           nix build -L .#hopr-coverage
-          cp result coverage.lcov
+          cp result coverage-unit.lcov
 
-      - name: Upload coverage report
+      - name: Upload unit coverage report
         uses: codecov/codecov-action@18283e04ce6e62d37312384ff67231eb8fd56d24 # v5.4.3
         if: >-
           github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
         with:
-          files: coverage.lcov
+          files: coverage-unit.lcov
+          flags: unit
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  integration-coverage:
+    name: Integration Coverage
+    runs-on: self-hosted-hoprnet-bigger
+    timeout-minutes: 60
+    if: >-
+      github.event_name == 'push' || github.event.pull_request.draft == false
+    env:
+      CI: "true"
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          persist-credentials: false
+
+      - name: Generate integration coverage report
+        run: |
+          nix develop .#coverage -c cargo llvm-cov \
+            --workspace \
+            --test '*' \
+            --lcov --output-path integration-coverage.lcov \
+            -- --test-threads=1
+
+      - name: Upload integration coverage report
+        uses: codecov/codecov-action@18283e04ce6e62d37312384ff67231eb8fd56d24 # v5.4.3
+        if: >-
+          github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+        with:
+          files: integration-coverage.lcov
+          flags: integration
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
