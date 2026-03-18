@@ -1,9 +1,9 @@
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use validator::Validate;
+use validator::{Validate, ValidationError, ValidationErrors};
 
 /// Configuration for the probing mechanism
-#[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, Validate)]
+#[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(deny_unknown_fields))]
 pub struct ProberConfig {
     /// The delay between individual probing rounds for neighbor discovery
@@ -14,26 +14,32 @@ pub struct ProberConfig {
     #[default(default_probing_interval())]
     pub interval: std::time::Duration,
 
-    /// Weight for staleness factor in probe priority (0.0–1.0).
+    /// Weight for the staleness factor in probe priority (0.0–1.0).
     ///
     /// Higher values prioritize probing edges that haven't been measured recently.
+    /// Set to `0.0` to disable staleness-based probing (edges are not prioritized by age).
+    /// At least one of `staleness_weight`, `quality_weight`, or `base_priority` must be positive.
     #[cfg_attr(feature = "serde", serde(default = "default_staleness_weight"))]
     #[default(default_staleness_weight())]
-    #[validate(range(min = 0.0, max = 1.0))]
     pub staleness_weight: f64,
 
-    /// Weight for inverse quality factor in probe priority (0.0–1.0).
+    /// Weight for the inverse quality factor in probe priority (0.0–1.0).
     ///
     /// Higher values prioritize probing edges with poor quality scores.
+    /// Set to `0.0` to disable quality-based probing (edges are not prioritized by their score).
+    /// At least one of `staleness_weight`, `quality_weight`, or `base_priority` must be positive.
     #[cfg_attr(feature = "serde", serde(default = "default_quality_weight"))]
     #[default(default_quality_weight())]
-    #[validate(range(min = 0.0, max = 1.0))]
     pub quality_weight: f64,
 
-    /// Base priority ensuring all peers have a nonzero chance of being probed (0.0–1.0).
+    /// Minimum probe chance added for all peers regardless of measurements (0.0–1.0).
+    ///
+    /// Ensures that even well-measured, recently-probed peers retain some chance of re-probing.
+    /// Set to `0.0` only when `staleness_weight` and/or `quality_weight` are sufficient to
+    /// guarantee all peers receive probe opportunities.
+    /// At least one of `staleness_weight`, `quality_weight`, or `base_priority` must be positive.
     #[cfg_attr(feature = "serde", serde(default = "default_base_priority"))]
     #[default(default_base_priority())]
-    #[validate(range(min = 0.0, max = 1.0))]
     pub base_priority: f64,
 
     /// TTL for the cached weighted shuffle order.
@@ -42,6 +48,40 @@ pub struct ProberConfig {
     #[cfg_attr(feature = "serde", serde(default = "default_shuffle_ttl", with = "humantime_serde"))]
     #[default(default_shuffle_ttl())]
     pub shuffle_ttl: std::time::Duration,
+}
+
+impl Validate for ProberConfig {
+    fn validate(&self) -> Result<(), ValidationErrors> {
+        let mut errors = ValidationErrors::new();
+
+        if !(0.0..=1.0).contains(&self.staleness_weight) {
+            errors.add(
+                "staleness_weight",
+                ValidationError::new("staleness_weight must be between 0.0 and 1.0"),
+            );
+        }
+        if !(0.0..=1.0).contains(&self.quality_weight) {
+            errors.add(
+                "quality_weight",
+                ValidationError::new("quality_weight must be between 0.0 and 1.0"),
+            );
+        }
+        if !(0.0..=1.0).contains(&self.base_priority) {
+            errors.add(
+                "base_priority",
+                ValidationError::new("base_priority must be between 0.0 and 1.0"),
+            );
+        }
+
+        if self.staleness_weight + self.quality_weight + self.base_priority <= 0.0 {
+            errors.add(
+                "weights",
+                ValidationError::new("at least one priority weight must be positive"),
+            );
+        }
+
+        if errors.is_empty() { Ok(()) } else { Err(errors) }
+    }
 }
 
 #[inline]
@@ -67,4 +107,119 @@ const fn default_shuffle_ttl() -> std::time::Duration {
 #[inline]
 const fn default_probing_interval() -> std::time::Duration {
     std::time::Duration::from_secs(30)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_config_is_valid() {
+        assert!(ProberConfig::default().validate().is_ok());
+    }
+
+    #[test]
+    fn all_zero_weights_are_invalid() {
+        let cfg = ProberConfig {
+            staleness_weight: 0.0,
+            quality_weight: 0.0,
+            base_priority: 0.0,
+            ..Default::default()
+        };
+        let err = cfg.validate().unwrap_err();
+        assert!(err.field_errors().contains_key("weights"));
+    }
+
+    #[test]
+    fn zero_staleness_weight_alone_is_valid() {
+        let cfg = ProberConfig {
+            staleness_weight: 0.0,
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_ok());
+    }
+
+    #[test]
+    fn zero_quality_weight_alone_is_valid() {
+        let cfg = ProberConfig {
+            quality_weight: 0.0,
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_ok());
+    }
+
+    #[test]
+    fn zero_base_priority_alone_is_valid() {
+        let cfg = ProberConfig {
+            base_priority: 0.0,
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_ok());
+    }
+
+    #[test]
+    fn staleness_weight_above_one_is_invalid() {
+        let cfg = ProberConfig {
+            staleness_weight: 1.1,
+            ..Default::default()
+        };
+        let err = cfg.validate().unwrap_err();
+        assert!(err.field_errors().contains_key("staleness_weight"));
+    }
+
+    #[test]
+    fn quality_weight_above_one_is_invalid() {
+        let cfg = ProberConfig {
+            quality_weight: 1.1,
+            ..Default::default()
+        };
+        let err = cfg.validate().unwrap_err();
+        assert!(err.field_errors().contains_key("quality_weight"));
+    }
+
+    #[test]
+    fn base_priority_above_one_is_invalid() {
+        let cfg = ProberConfig {
+            base_priority: 1.1,
+            ..Default::default()
+        };
+        let err = cfg.validate().unwrap_err();
+        assert!(err.field_errors().contains_key("base_priority"));
+    }
+
+    #[test]
+    fn negative_staleness_weight_is_invalid() {
+        let cfg = ProberConfig {
+            staleness_weight: -0.1,
+            quality_weight: 0.5,
+            base_priority: 0.5,
+            ..Default::default()
+        };
+        let err = cfg.validate().unwrap_err();
+        assert!(err.field_errors().contains_key("staleness_weight"));
+    }
+
+    #[test]
+    fn negative_quality_weight_is_invalid() {
+        let cfg = ProberConfig {
+            staleness_weight: 0.5,
+            quality_weight: -0.1,
+            base_priority: 0.5,
+            ..Default::default()
+        };
+        let err = cfg.validate().unwrap_err();
+        assert!(err.field_errors().contains_key("quality_weight"));
+    }
+
+    #[test]
+    fn negative_base_priority_is_invalid() {
+        let cfg = ProberConfig {
+            staleness_weight: 0.5,
+            quality_weight: 0.5,
+            base_priority: -0.1,
+            ..Default::default()
+        };
+        let err = cfg.validate().unwrap_err();
+        assert!(err.field_errors().contains_key("base_priority"));
+    }
 }
