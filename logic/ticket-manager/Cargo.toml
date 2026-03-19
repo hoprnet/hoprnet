@@ -19,6 +19,7 @@ parking_lot = { workspace = true, features = ["arc_lock"] }
 redb = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 postcard = { workspace = true, optional = true, features = ["use-std"] }
+tempfile = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
@@ -33,7 +34,6 @@ hopr-platform = { workspace = true }
 [dev-dependencies]
 criterion = { workspace = true }
 rand = { workspace = true }
-tempfile = { workspace = true }
 test-log = { workspace = true }
 tokio = { workspace = true }
 

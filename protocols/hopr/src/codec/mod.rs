@@ -178,7 +178,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(tokio::test)]
+    #[tokio::test]
     async fn encode_decode_packet_on_relay() -> anyhow::Result<()> {
         let blokli_client = create_blokli_client()?;
         let sender = create_node(0, &blokli_client).await?;

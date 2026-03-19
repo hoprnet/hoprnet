@@ -16,6 +16,7 @@ const OUT_IDX_TABLE: TableDefinition<([u8; ChannelId::SIZE], u32), u64> = TableD
 #[derive(Debug)]
 pub struct RedbStore {
     db: std::sync::Arc<redb::Database>,
+    _tmp: Option<tempfile::NamedTempFile>,
 }
 
 impl RedbStore {
@@ -25,7 +26,21 @@ impl RedbStore {
         let tx = db.begin_write()?;
         tx.open_table(OUT_IDX_TABLE)?;
         tx.commit()?;
-        Ok(Self { db })
+        Ok(Self { db, _tmp: None })
+    }
+
+    /// Creates a new instance using a temporary file.
+    ///
+    /// The temporary file is automatically deleted when the store is dropped.
+    pub fn new_temp() -> Result<Self, RedbStoreError> {
+        let tempfile = tempfile::NamedTempFile::new()?;
+        let db = std::sync::Arc::new(redb::Database::open(tempfile.path())?);
+        let tx = db.begin_write()?;
+        tx.commit()?;
+        Ok(Self {
+            db,
+            _tmp: Some(tempfile),
+        })
     }
 }
 

@@ -56,7 +56,6 @@ criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 hex-literal = { workspace = true }
 lazy_static = { workspace = true }
 tokio = { workspace = true }
-test-log = { workspace = true }
 
 hopr-chain-connector = { workspace = true, features = [
   "testing",
