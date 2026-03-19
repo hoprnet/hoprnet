@@ -26,12 +26,16 @@ use crate::testing::{
     hopr::{ChannelGuard, NodeSafeConfig, TestedHopr, create_hopr_instance_config},
 };
 
-/// Estimated time for on-chain state to propagate across all nodes, derived from
-/// `finality * expected_block_time` with a 2-second buffer.
+/// Estimated time for on-chain state to propagate across all nodes.
+///
+/// In the Blokli test mock, `expected_block_time` is a nominal value (e.g. 5s)
+/// that doesn't reflect actual mock processing speed (controlled by `tx_simulation_delay`).
+/// We use `expected_block_time + 2s` as a reasonable upper bound that accounts for
+/// coverage instrumentation overhead without being tied to the unrealistic
+/// `finality * expected_block_time` product.
 pub fn chain_propagation_delay(chain_info: &hopr_chain_connector::blokli_client::types::ChainInfo) -> Duration {
     let block_time_secs = chain_info.expected_block_time.0.parse::<u64>().unwrap_or(5);
-    let finality = chain_info.finality.0.parse::<u64>().unwrap_or(8);
-    Duration::from_secs(finality * block_time_secs + 2)
+    Duration::from_secs(block_time_secs + 2)
 }
 
 /// A guard that holds a reference to the cluster and ensures exclusive access
