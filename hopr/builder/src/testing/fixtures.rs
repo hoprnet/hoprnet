@@ -103,9 +103,10 @@ impl ClusterGuard {
         debug_assert!(path.len() >= 2, "path must contain at least source and destination");
 
         let chain_info = self.chain_client.query_chain_info().await?;
-        // Session establishment involves multiple round-trips beyond just chain propagation,
-        // so use a generous multiplier over the base propagation delay.
-        let timeout = chain_propagation_delay(&chain_info) * 3;
+        // Session establishment retries internally with ~20s per attempt.
+        // Use 6x propagation delay (~42s) to allow at least 2 retry cycles,
+        // which is needed under coverage instrumentation overhead.
+        let timeout = chain_propagation_delay(&chain_info) * 6;
 
         let ip = IpOrHost::from_str(":0")?;
         let routing = HopRouting::try_from(path.len() - 2)?;
