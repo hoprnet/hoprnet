@@ -1,5 +1,3 @@
-use std::collections::VecDeque;
-
 use futures::{StreamExt, stream::BoxStream};
 use futures_concurrency::stream::StreamExt as _;
 use hopr_api::{
@@ -132,22 +130,11 @@ where
     }
 }
 
-/// Owned state for the immediate-probe stream (no lock needed — consumed sequentially).
-struct ImmediateProbeCache {
-    items: VecDeque<ProbeRouting>,
-    created_at: std::time::Instant,
-}
-
-/// Combined state for the immediate-probe `unfold`: cache + interval ticker.
-struct ImmediateProbeTick {
-    cache: ImmediateProbeCache,
-    ticker: futures_time::stream::Interval,
-}
-
-/// Stream of neighbor probes with a TTL-guarded weighted shuffle cache.
+/// Stream of neighbor probes emitted in bursts per tick.
 ///
-/// The current batch is always fully drained before a new shuffle is computed,
-/// ensuring no queued probes are discarded when the TTL expires.
+/// Each tick traverses the graph, computes a priority-weighted shuffle of all
+/// known peers, and emits the entire batch. The next tick waits for `cfg.interval`
+/// before producing the next burst.
 fn immediate_probe_stream<U>(
     me: OffchainPublicKey,
     cfg: ProberConfig,
@@ -160,69 +147,49 @@ where
         + Sync
         + 'static,
 {
-    let ticker = futures_time::stream::interval(futures_time::time::Duration::from(cfg.interval));
+    futures_time::stream::interval(futures_time::time::Duration::from(cfg.interval))
+        .then(move |_| {
+            let graph = graph.clone();
 
-    let initial = ImmediateProbeTick {
-        cache: ImmediateProbeCache {
-            items: VecDeque::new(),
-            created_at: std::time::Instant::now(),
-        },
-        ticker,
-    };
+            async move {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default();
 
-    futures::stream::unfold(initial, move |mut state| {
-        let graph = graph.clone();
-
-        async move {
-            use futures::StreamExt as _;
-            state.ticker.next().await?;
-
-            // Serve from the current batch unless the shuffle TTL has expired.
-            if !state.cache.items.is_empty()
-                && state.cache.created_at.elapsed() < cfg.shuffle_ttl
-                && let Some(item) = state.cache.items.pop_front()
-            {
-                return Some((item, state));
-            }
-
-            // Batch exhausted or TTL expired — re-traverse the graph and compute a new weighted shuffle.
-            state.cache.items.clear();
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default();
-
-            // Fuse node collection and priority computation into a single stream pass.
-            let weighted: Vec<_> = graph
-                .nodes()
-                .filter(|peer| futures::future::ready(peer != &me))
-                .map(|peer| {
-                    let priority = match graph.edge(&me, &peer) {
-                        Some(obs) => immediate_probe_priority(obs.score(), obs.last_update(), now, &cfg),
-                        None => immediate_probe_priority(0.0, std::time::Duration::ZERO, now, &cfg),
-                    };
-                    (peer, priority)
-                })
-                .collect()
-                .await;
-
-            let zero_hop = RoutingOptions::Hops(0.try_into().expect("0 is a valid u8"));
-            state.cache.items = WeightedCollection::new(weighted)
-                .into_shuffled()
-                .into_iter()
-                .map(|peer| {
-                    ProbeRouting::Neighbor(DestinationRouting::Forward {
-                        destination: Box::new(peer.into()),
-                        pseudonym: Some(HoprPseudonym::random()),
-                        forward_options: zero_hop.clone(),
-                        return_options: Some(zero_hop.clone()),
+                let weighted: Vec<_> = graph
+                    .nodes()
+                    .filter(|peer| futures::future::ready(peer != &me))
+                    .map(|peer| {
+                        let priority = match graph.edge(&me, &peer) {
+                            Some(obs) => immediate_probe_priority(obs.score(), obs.last_update(), now, &cfg),
+                            None => immediate_probe_priority(0.0, std::time::Duration::ZERO, now, &cfg),
+                        };
+                        (peer, priority)
                     })
-                })
-                .collect();
-            state.cache.created_at = std::time::Instant::now();
+                    .collect()
+                    .await;
 
-            state.cache.items.pop_front().map(|item| (item, state))
-        }
-    })
+                let peer_count = weighted.len();
+                let zero_hop = RoutingOptions::Hops(0.try_into().expect("0 is a valid u8"));
+                let probes: Vec<_> = WeightedCollection::new(weighted)
+                    .into_shuffled()
+                    .into_iter()
+                    .map(|peer| {
+                        ProbeRouting::Neighbor(DestinationRouting::Forward {
+                            destination: Box::new(peer.into()),
+                            pseudonym: Some(HoprPseudonym::random()),
+                            forward_options: zero_hop.clone(),
+                            return_options: Some(zero_hop.clone()),
+                        })
+                    })
+                    .collect();
+
+                tracing::debug!(peer_count, probes = probes.len(), "emitting neighbor probe batch");
+
+                futures::stream::iter(probes)
+            }
+        })
+        .flatten()
 }
 
 #[cfg(test)]
