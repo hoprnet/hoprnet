@@ -17,7 +17,6 @@ use hopr_api::{
 };
 use hopr_chain_connector::create_trustful_hopr_blokli_connector;
 use hopr_crypto_packet::{HoprSurb, prelude::HoprPacket};
-use hopr_db_node::HoprNodeDb;
 use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut};
 use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, HoprTicketProcessor, HoprTicketProcessorConfig, MemorySurbStore,
@@ -25,6 +24,7 @@ use hopr_protocol_hopr::{
 };
 use hopr_transport_protocol::TicketEvent;
 use libp2p::PeerId;
+use hopr_ticket_manager::{HoprTicketManager, RedbStore};
 
 const SAMPLE_SIZE: usize = 50;
 
@@ -52,9 +52,7 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                     let mut node_dbs = Vec::new();
                     let mut connectors = Vec::new();
                     for i in 0..PEER_COUNT {
-                        let node_db = HoprNodeDb::new_in_memory()
-                            .await
-                            .expect("node db must be constructible");
+                        let node_db = Arc::new(HoprTicketManager::new(RedbStore::new_temp().unwrap()).unwrap());
                         node_dbs.push(node_db);
 
                         let mut connector = create_trustful_hopr_blokli_connector(
@@ -102,10 +100,10 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                             outgoing_win_prob: Some(WinningProbability::ALWAYS),
                             ..Default::default()
                         };
-
+                        
+                        
                         let ticket_proc = HoprTicketProcessor::new(
                             connectors[TESTED_PEER_ID].clone(),
-                            node_dbs[TESTED_PEER_ID].clone(),
                             PEERS_CHAIN[TESTED_PEER_ID].clone(),
                             channels_dst,
                             HoprTicketProcessorConfig::default(),
@@ -115,7 +113,7 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                             PEERS_CHAIN[TESTED_PEER_ID].clone(),
                             connectors[TESTED_PEER_ID].clone(),
                             surb_store.clone(),
-                            ticket_proc.clone(),
+                            node_dbs[TESTED_PEER_ID].clone(),
                             channels_dst,
                             codec_config,
                         );
@@ -124,7 +122,7 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                             (PEERS[TESTED_PEER_ID].clone(), PEERS_CHAIN[TESTED_PEER_ID].clone()),
                             connectors[TESTED_PEER_ID].clone(),
                             surb_store,
-                            ticket_proc.clone(),
+                            node_dbs[TESTED_PEER_ID].clone(),
                             channels_dst,
                             codec_config,
                         );

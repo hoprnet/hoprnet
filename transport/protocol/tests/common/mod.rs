@@ -17,7 +17,6 @@ use hopr_api::{
 use hopr_async_runtime::AbortableList;
 use hopr_chain_connector::create_trustful_hopr_blokli_connector;
 use hopr_crypto_packet::HoprSurb;
-use hopr_db_node::HoprNodeDb;
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, HoprTicketProcessor, HoprTicketProcessorConfig, MemorySurbStore,
@@ -28,6 +27,7 @@ use hopr_transport_protocol::TicketEvent;
 use lazy_static::lazy_static;
 use libp2p::PeerId;
 use tracing::debug;
+use hopr_ticket_manager::{HoprTicketManager, RedbStore};
 
 lazy_static! {
     static ref DEFAULT_PRICE_PER_PACKET: HoprBalance = HoprBalance::from_str("0.1 wxHOPR").unwrap();
@@ -146,8 +146,6 @@ pub async fn peer_setup_for(
             futures::channel::mpsc::unbounded::<(ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)>();
         let (api_recv_tx, api_recv_rx) = futures::channel::mpsc::unbounded::<(HoprPseudonym, ApplicationDataIn)>();
 
-        let node_db = HoprNodeDb::new_in_memory().await?;
-
         let mut connector = create_trustful_hopr_blokli_connector(
             &PEERS_CHAIN[i],
             Default::default(),
@@ -169,17 +167,18 @@ pub async fn peer_setup_for(
 
         let ticket_proc = HoprTicketProcessor::new(
             connector.clone(),
-            node_db.clone(),
             PEERS_CHAIN[i].clone(),
             channels_dst,
             HoprTicketProcessorConfig::default(),
         );
 
+        let ticket_mgr = Arc::new(HoprTicketManager::new(RedbStore::new_temp()?)?);
+
         let encoder = HoprEncoder::new(
             PEERS_CHAIN[i].clone(),
             connector.clone(),
             surb_store.clone(),
-            ticket_proc.clone(),
+            ticket_mgr.clone(),
             channels_dst,
             codec_config,
         );
@@ -188,7 +187,7 @@ pub async fn peer_setup_for(
             (PEERS[i].clone(), PEERS_CHAIN[i].clone()),
             connector.clone(),
             surb_store,
-            ticket_proc.clone(),
+            ticket_mgr.clone(),
             channels_dst,
             codec_config,
         );

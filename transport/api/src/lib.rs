@@ -105,6 +105,7 @@ pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RAN
 
 pub use hopr_api as api;
 use hopr_api::types::internal::routing::DestinationRouting;
+use hopr_ticket_manager::{HoprTicketManager, OutgoingIndexStore, RedbStore, RedbTicketQueue, TicketQueueStore};
 
 // Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
 lazy_static::lazy_static! {
@@ -172,6 +173,8 @@ where
     graph: Graph,
     path_planner: PathPlanner<MemorySurbStore, Chain, CurrentPathSelector>,
     my_multiaddresses: Vec<Multiaddr>,
+    // TODO: should the Ticket store (RedbStore) be part of the external API of the transport?
+    tmgr: Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>,
     smgr: SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>, Sender<IncomingSession>>,
     cfg: HoprProtocolConfig,
 }
@@ -232,6 +235,7 @@ where
                 surb_balance_notify_period: None,
                 surb_target_notify: true,
             }),
+            tmgr: Arc::new(HoprTicketManager::new(RedbStore::new_temp().unwrap()).unwrap()), // TODO: propagate errors correctly
             chain_api: resolver,
             cfg,
         }
@@ -429,6 +433,7 @@ where
                 ticket_events,
                 surb_store: self.path_planner.surb_store.clone(),
                 chain_api: self.chain_api.clone(),
+                ticket_manager: self.tmgr.clone(),
             },
             channels_dst,
             self.cfg.packet,

@@ -8,193 +8,54 @@ use validator::ValidationError;
 
 use crate::{HoprProtocolError, ResolvedAcknowledgement, TicketAcknowledgementError, UnacknowledgedTicketProcessor};
 
-/// Metrics for unacknowledged ticket cache diagnostics.
-///
-/// These help investigate "unknown ticket" acknowledgement failures by tracking
-/// cache insertions, lookups, misses, and evictions.
-///
-/// Per-peer metrics are disabled by default due to Prometheus cardinality concerns.
-/// Set `HOPR_METRICS_UNACK_PER_PEER=1` to enable them for debugging.
-mod metrics {
-    #[cfg(any(not(feature = "prometheus"), test))]
-    pub use noop::*;
-    #[cfg(all(feature = "prometheus", not(test)))]
-    pub use real::*;
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+        /// Whether per-peer metrics are enabled (disabled by default to avoid cardinality explosion).
+        static ref PER_PEER_ENABLED: bool = std::env::var("HOPR_METRICS_UNACK_PER_PEER")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+            .unwrap_or(false);
 
-    #[cfg(all(feature = "prometheus", not(test)))]
-    mod real {
-        lazy_static::lazy_static! {
-            /// Whether per-peer metrics are enabled (disabled by default to avoid cardinality explosion).
-            static ref PER_PEER_ENABLED: bool = std::env::var("HOPR_METRICS_UNACK_PER_PEER")
-                .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
-                .unwrap_or(false);
-
-            static ref UNACK_PEERS: hopr_metrics::SimpleGauge = hopr_metrics::SimpleGauge::new(
-                "hopr_tickets_unack_peers_total",
-                "Number of peers with unacknowledged tickets in cache",
-            )
-            .unwrap();
-            static ref UNACK_TICKETS: hopr_metrics::SimpleGauge = hopr_metrics::SimpleGauge::new(
-                "hopr_tickets_unack_tickets_total",
-                "Total number of unacknowledged tickets across all peer caches",
-            )
-            .unwrap();
-            static ref UNACK_INSERTIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
-                "hopr_tickets_unack_insertions_total",
-                "Total number of unacknowledged tickets inserted into cache",
-            )
-            .unwrap();
-            static ref UNACK_LOOKUPS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
-                "hopr_tickets_unack_lookups_total",
-                "Total number of ticket acknowledgement lookups",
-            )
-            .unwrap();
-            static ref UNACK_LOOKUP_MISSES: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
-                "hopr_tickets_unack_lookup_misses_total",
-                "Total number of ticket lookup failures (unknown ticket)",
-            )
-            .unwrap();
-            static ref UNACK_EVICTIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
-                "hopr_tickets_unack_evictions_total",
-                "Total number of unacknowledged tickets evicted from cache due to TTL or capacity limits",
-            )
-            .unwrap();
-            static ref UNACK_PEER_EVICTIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
-                "hopr_tickets_unack_peer_evictions_total",
-                "Total number of peer caches evicted from the outer unacknowledged ticket cache",
-            )
-            .unwrap();
-            static ref UNACK_TICKETS_PER_PEER: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
-                "hopr_tickets_unack_tickets_per_peer",
-                "Number of unacknowledged tickets per peer in cache (enable with HOPR_METRICS_UNACK_PER_PEER=1)",
-                &["peer"],
-            )
-            .unwrap();
-        }
-
-        pub fn initialize() {
-            lazy_static::initialize(&PER_PEER_ENABLED);
-            lazy_static::initialize(&UNACK_PEERS);
-            lazy_static::initialize(&UNACK_TICKETS);
-            lazy_static::initialize(&UNACK_INSERTIONS);
-            lazy_static::initialize(&UNACK_LOOKUPS);
-            lazy_static::initialize(&UNACK_LOOKUP_MISSES);
-            lazy_static::initialize(&UNACK_EVICTIONS);
-            lazy_static::initialize(&UNACK_PEER_EVICTIONS);
-            if *PER_PEER_ENABLED {
-                lazy_static::initialize(&UNACK_TICKETS_PER_PEER);
-            }
-        }
-
-        #[inline]
-        #[allow(dead_code)]
-        pub fn per_peer_enabled() -> bool {
-            *PER_PEER_ENABLED
-        }
-
-        #[inline]
-        pub fn inc_unack_peers() {
-            UNACK_PEERS.increment(1.0);
-        }
-
-        #[inline]
-        pub fn dec_unack_peers() {
-            UNACK_PEERS.decrement(1.0);
-        }
-
-        #[inline]
-        pub fn inc_unack_tickets() {
-            UNACK_TICKETS.increment(1.0);
-        }
-
-        #[inline]
-        pub fn dec_unack_tickets() {
-            UNACK_TICKETS.decrement(1.0);
-        }
-
-        #[inline]
-        pub fn inc_insertions() {
-            UNACK_INSERTIONS.increment();
-        }
-
-        #[inline]
-        pub fn inc_lookups() {
-            UNACK_LOOKUPS.increment();
-        }
-
-        #[inline]
-        pub fn inc_lookup_misses() {
-            UNACK_LOOKUP_MISSES.increment();
-        }
-
-        #[inline]
-        pub fn inc_evictions() {
-            UNACK_EVICTIONS.increment();
-        }
-
-        #[inline]
-        pub fn inc_peer_evictions() {
-            UNACK_PEER_EVICTIONS.increment();
-        }
-
-        #[inline]
-        pub fn inc_unack_tickets_for_peer(peer: &str) {
-            if *PER_PEER_ENABLED {
-                UNACK_TICKETS_PER_PEER.increment(&[peer], 1.0);
-            }
-        }
-
-        #[inline]
-        pub fn dec_unack_tickets_for_peer(peer: &str) {
-            if *PER_PEER_ENABLED {
-                UNACK_TICKETS_PER_PEER.decrement(&[peer], 1.0);
-            }
-        }
-
-        #[inline]
-        #[allow(dead_code)]
-        pub fn reset_unack_tickets_for_peer(peer: &str) {
-            if *PER_PEER_ENABLED {
-                UNACK_TICKETS_PER_PEER.set(&[peer], 0.0);
-            }
-        }
-    }
-
-    #[cfg(any(not(feature = "prometheus"), test))]
-    mod noop {
-        #[inline]
-        pub fn initialize() {}
-        #[inline]
-        #[allow(dead_code)]
-        pub fn per_peer_enabled() -> bool {
-            false
-        }
-        #[inline]
-        pub fn inc_unack_peers() {}
-        #[inline]
-        pub fn dec_unack_peers() {}
-        #[inline]
-        pub fn inc_unack_tickets() {}
-        #[inline]
-        pub fn dec_unack_tickets() {}
-        #[inline]
-        pub fn inc_insertions() {}
-        #[inline]
-        pub fn inc_lookups() {}
-        #[inline]
-        pub fn inc_lookup_misses() {}
-        #[inline]
-        pub fn inc_evictions() {}
-        #[inline]
-        pub fn inc_peer_evictions() {}
-        #[inline]
-        pub fn inc_unack_tickets_for_peer(_: &str) {}
-        #[inline]
-        pub fn dec_unack_tickets_for_peer(_: &str) {}
-        #[inline]
-        #[allow(dead_code)]
-        pub fn reset_unack_tickets_for_peer(_: &str) {}
-    }
+        static ref UNACK_PEERS: hopr_metrics::SimpleGauge = hopr_metrics::SimpleGauge::new(
+            "hopr_tickets_unack_peers_total",
+            "Number of peers with unacknowledged tickets in cache",
+        )
+        .unwrap();
+        static ref UNACK_TICKETS: hopr_metrics::SimpleGauge = hopr_metrics::SimpleGauge::new(
+            "hopr_tickets_unack_tickets_total",
+            "Total number of unacknowledged tickets across all peer caches",
+        )
+        .unwrap();
+        static ref UNACK_INSERTIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+            "hopr_tickets_unack_insertions_total",
+            "Total number of unacknowledged tickets inserted into cache",
+        )
+        .unwrap();
+        static ref UNACK_LOOKUPS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+            "hopr_tickets_unack_lookups_total",
+            "Total number of ticket acknowledgement lookups",
+        )
+        .unwrap();
+        static ref UNACK_LOOKUP_MISSES: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+            "hopr_tickets_unack_lookup_misses_total",
+            "Total number of ticket lookup failures (unknown ticket)",
+        )
+        .unwrap();
+        static ref UNACK_EVICTIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+            "hopr_tickets_unack_evictions_total",
+            "Total number of unacknowledged tickets evicted from cache due to TTL or capacity limits",
+        )
+        .unwrap();
+        static ref UNACK_PEER_EVICTIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+            "hopr_tickets_unack_peer_evictions_total",
+            "Total number of peer caches evicted from the outer unacknowledged ticket cache",
+        )
+        .unwrap();
+        static ref UNACK_TICKETS_PER_PEER: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+            "hopr_tickets_unack_tickets_per_peer",
+            "Number of unacknowledged tickets per peer in cache (enable with HOPR_METRICS_UNACK_PER_PEER=1)",
+            &["peer"],
+        )
+        .unwrap();
 }
 
 const MIN_UNACK_TICKET_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
@@ -272,7 +133,20 @@ pub struct HoprTicketProcessor<Chain> {
 impl<Chain> HoprTicketProcessor<Chain> {
     /// Creates a new instance of the HOPR ticket processor.
     pub fn new(chain_api: Chain, chain_key: ChainKeypair, channels_dst: Hash, cfg: HoprTicketProcessorConfig) -> Self {
-        metrics::initialize();
+        #[cfg(all(feature = "prometheus", not(test)))]
+        {
+            lazy_static::initialize(&PER_PEER_ENABLED);
+            lazy_static::initialize(&UNACK_PEERS);
+            lazy_static::initialize(&UNACK_TICKETS);
+            lazy_static::initialize(&UNACK_INSERTIONS);
+            lazy_static::initialize(&UNACK_LOOKUPS);
+            lazy_static::initialize(&UNACK_LOOKUP_MISSES);
+            lazy_static::initialize(&UNACK_EVICTIONS);
+            lazy_static::initialize(&UNACK_PEER_EVICTIONS);
+            if *PER_PEER_ENABLED {
+                lazy_static::initialize(&UNACK_TICKETS_PER_PEER);
+            }
+        }
 
         Self {
             unacknowledged_tickets: moka::future::Cache::builder()
@@ -285,12 +159,15 @@ impl<Chain> HoprTicketProcessor<Chain> {
                      -> moka::notification::ListenerFuture {
                         Box::pin(async move {
                             if !matches!(cause, moka::notification::RemovalCause::Replaced) {
-                                metrics::dec_unack_peers();
+                                #[cfg(all(feature = "prometheus", not(test)))]
+                                UNACK_PEERS.decrement(1.0);
+
+                                #[cfg(all(feature = "prometheus", not(test)))]
                                 if matches!(
                                     cause,
                                     moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size
                                 ) {
-                                    metrics::inc_peer_evictions();
+                                    UNACK_PEER_EVICTIONS.increment();
                                 }
                             }
                             // Explicitly invalidate all inner cache entries so their eviction
@@ -326,25 +203,33 @@ where
     ) -> Result<(), Self::Error> {
         tracing::trace!(%ticket, "received unacknowledged ticket");
 
-        let peer_id = next_hop.to_peerid_str();
+        //let peer_id = next_hop.to_peerid_str();
         let inner_cache = self
             .unacknowledged_tickets
             .get_with_by_ref(next_hop, async {
-                let peer_id_for_eviction = peer_id.clone();
-                metrics::inc_unack_peers();
+                //let peer_id_for_eviction = peer_id.clone();
+                #[cfg(all(feature = "prometheus", not(test)))]
+                UNACK_PEERS.increment(1.0);
+
+                let next_hop = *next_hop;
                 moka::future::Cache::builder()
                     .time_to_live(self.cfg.unack_ticket_timeout)
                     .max_capacity(self.cfg.max_unack_tickets as u64)
                     .eviction_listener(move |_key, _value, cause| {
-                        metrics::dec_unack_tickets();
-                        metrics::dec_unack_tickets_for_peer(&peer_id_for_eviction);
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        {
+                            let peer_id_for_eviction = next_hop.to_peerid_str();
+                            UNACK_TICKETS.decrement(1.0);
+                            UNACK_TICKETS_PER_PEER.decrement(&[(*PER_PEER_ENABLED).then(|| peer_id_for_eviction.as_str()).unwrap_or("redacted")], 1.0);
+                        }
 
                         // Only count Expired/Size removals as evictions (not Explicit or Replaced)
                         if matches!(
                             cause,
                             moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size
                         ) {
-                            metrics::inc_evictions();
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            UNACK_EVICTIONS.increment();
                         }
                     })
                     .build()
@@ -353,9 +238,13 @@ where
 
         inner_cache.insert(challenge, ticket).await;
 
-        metrics::inc_insertions();
-        metrics::inc_unack_tickets();
-        metrics::inc_unack_tickets_for_peer(&peer_id);
+        #[cfg(all(feature = "prometheus", not(test)))]
+        {
+            let peer_id = next_hop.to_peerid_str();
+            UNACK_INSERTIONS.increment();
+            UNACK_TICKETS.increment(1.0);
+            UNACK_TICKETS_PER_PEER.increment(&[(*PER_PEER_ENABLED).then(|| peer_id.as_str()).unwrap_or("redacted")], 1.0);
+        }
 
         Ok(())
     }
@@ -431,11 +320,14 @@ where
         // Find all the tickets that we're awaiting acknowledgement for
         let mut unack_tickets = Vec::with_capacity(half_keys_challenges.len());
         for (half_key, challenge) in half_keys_challenges {
-            metrics::inc_lookups();
+            #[cfg(all(feature = "prometheus", not(test)))]
+            UNACK_LOOKUPS.increment();
 
             let Some(unack_ticket) = awaiting_ack_from_peer.remove(&challenge).await else {
+                #[cfg(all(feature = "prometheus", not(test)))]
+                UNACK_LOOKUP_MISSES.increment();
+
                 tracing::trace!(%challenge, "received acknowledgement for unknown ticket");
-                metrics::inc_lookup_misses();
                 continue;
             };
 

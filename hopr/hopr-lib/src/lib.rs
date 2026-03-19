@@ -219,7 +219,7 @@ const ON_CHAIN_RESOLUTION_EVENT_TIMEOUT: Duration = Duration::from_secs(90);
 /// that manual interaction is unnecessary.
 ///
 /// As such, the `hopr_lib` serves mainly as an integration point into Rust programs.
-pub struct Hopr<Chain, Db, Graph, Net>
+pub struct Hopr<Chain, Graph, Net>
 where
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
@@ -232,18 +232,16 @@ where
     me: OffchainKeypair,
     cfg: config::HoprLibConfig,
     state: Arc<api::node::state::AtomicHoprState>,
-    transport_api: HoprTransport<Chain, Db, Graph, Net>,
+    transport_api: HoprTransport<Chain, Graph, Net>,
     redeem_requests: OnceLock<futures::channel::mpsc::Sender<TicketSelector>>,
-    node_db: Db,
     chain_api: Chain,
     winning_ticket_subscribers: NewTicketEvents,
     processes: OnceLock<AbortableList<HoprLibProcess>>,
 }
 
-impl<Chain, Db, Graph, Net> Hopr<Chain, Db, Graph, Net>
+impl<Chain, Graph, Net> Hopr<Chain, Graph, Net>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
-    Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
         + Clone
@@ -255,7 +253,6 @@ where
     pub async fn new(
         identity: (&ChainKeypair, &OffchainKeypair),
         hopr_chain_api: Chain,
-        hopr_node_db: Db,
         graph: Graph,
         cfg: config::HoprLibConfig,
     ) -> errors::Result<Self> {
@@ -268,7 +265,6 @@ where
         let hopr_transport_api = HoprTransport::new(
             identity,
             hopr_chain_api.clone(),
-            hopr_node_db.clone(),
             graph,
             vec![(&cfg.host).try_into().map_err(HoprLibError::TransportError)?],
             cfg.protocol,
@@ -287,11 +283,6 @@ where
                 .parse()
                 .unwrap_or(0.0),
             );
-
-            // Calling get_ticket_statistics will initialize the respective metrics on tickets
-            if let Err(error) = hopr_node_db.get_ticket_statistics(None).await {
-                error!(%error, "failed to initialize ticket statistics metrics");
-            }
         }
 
         let (mut new_tickets_tx, new_tickets_rx) = async_broadcast::broadcast(2048);
@@ -304,7 +295,6 @@ where
             state: Arc::new(AtomicHoprState::new(HoprState::Uninitialized)),
             transport_api: hopr_transport_api,
             chain_api: hopr_chain_api,
-            node_db: hopr_node_db,
             redeem_requests: OnceLock::new(),
             processes: OnceLock::new(),
             winning_ticket_subscribers: (new_tickets_tx, new_tickets_rx.deactivate()),
@@ -876,7 +866,7 @@ where
     }
 }
 
-impl<Chain, Db, Graph, Net> Hopr<Chain, Db, Graph, Net>
+impl<Chain, Graph, Net> Hopr<Chain, Graph, Net>
 where
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
@@ -901,10 +891,9 @@ where
 
 // === Trait implementations for the high-level node API ===
 
-impl<Chain, Db, Graph, Net> HoprNodeOperations for Hopr<Chain, Db, Graph, Net>
+impl<Chain, Graph, Net> HoprNodeOperations for Hopr<Chain, Graph, Net>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
-    Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
         + Clone
@@ -919,10 +908,9 @@ where
 }
 
 #[async_trait::async_trait]
-impl<Chain, Db, Graph, Net> HoprNodeNetworkOperations for Hopr<Chain, Db, Graph, Net>
+impl<Chain, Graph, Net> HoprNodeNetworkOperations for Hopr<Chain, Graph, Net>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
-    Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
         + Clone
@@ -1044,10 +1032,9 @@ where
 
 pub type SinkMap = SinkMapErr<futures::channel::mpsc::Sender<TicketSelector>, fn(SendError) -> HoprLibError>;
 
-impl<Chain, Db, Graph, Net> Hopr<Chain, Db, Graph, Net>
+impl<Chain, Graph, Net> Hopr<Chain, Graph, Net>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
-    Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
         + Clone

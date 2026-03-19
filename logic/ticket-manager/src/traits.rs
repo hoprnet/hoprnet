@@ -18,6 +18,8 @@ pub trait OutgoingIndexStore {
 }
 
 /// Allows loading ticket queues from a storage.
+///
+/// This trait reflects the possibility of a node to relay packets for receiving tickets.
 pub trait TicketQueueStore {
     /// Type of per-channel incoming ticket queues.
     type Queue: TicketQueue;
