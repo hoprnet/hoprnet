@@ -340,35 +340,56 @@ impl<S> SurbRingBuffer<S> {
 mod tests {
     use super::*;
 
-    /// Drain all pops from the ring buffer as (id, remaining) tuples.
-    fn drain_pops(rb: &SurbRingBuffer<u32>) -> Vec<([u8; 8], usize)> {
-        std::iter::from_fn(|| rb.pop_one().map(|p| (p.id, p.remaining))).collect()
-    }
-
     #[test]
-    fn surb_ring_buffer_must_drop_items_when_capacity_is_reached() {
+    fn surb_ring_buffer_must_drop_items_when_capacity_is_reached() -> anyhow::Result<()> {
         let rb = SurbRingBuffer::new(3);
         rb.push([([1u8; 8], 0)]);
         rb.push([([2u8; 8], 0)]);
         rb.push([([3u8; 8], 0)]);
         rb.push([([4u8; 8], 0)]);
 
-        insta::assert_yaml_snapshot!(drain_pops(&rb));
+        let popped = rb.pop_one().ok_or(anyhow::anyhow!("expected pop"))?;
+        assert_eq!([2u8; 8], popped.id);
+        assert_eq!(2, popped.remaining);
+
+        let popped = rb.pop_one().ok_or(anyhow::anyhow!("expected pop"))?;
+        assert_eq!([3u8; 8], popped.id);
+        assert_eq!(1, popped.remaining);
+
+        let popped = rb.pop_one().ok_or(anyhow::anyhow!("expected pop"))?;
+        assert_eq!([4u8; 8], popped.id);
+        assert_eq!(0, popped.remaining);
+
+        assert!(rb.pop_one().is_none());
+
+        Ok(())
     }
 
     #[test]
-    fn surb_ring_buffer_must_be_fifo() {
+    fn surb_ring_buffer_must_be_fifo() -> anyhow::Result<()> {
         let rb = SurbRingBuffer::new(5);
 
-        assert_eq!(1, rb.push([([1u8; 8], 0)]));
-        assert_eq!(2, rb.push([([2u8; 8], 0)]));
+        let len = rb.push([([1u8; 8], 0)]);
+        assert_eq!(1, len);
 
-        insta::assert_yaml_snapshot!("first_two_pops", drain_pops(&rb));
+        let len = rb.push([([2u8; 8], 0)]);
+        assert_eq!(2, len);
 
-        assert_eq!(2, rb.push([([1u8; 8], 0), ([2u8; 8], 0)]));
+        let popped = rb.pop_one().ok_or(anyhow::anyhow!("expected pop"))?;
+        assert_eq!([1u8; 8], popped.id);
+        assert_eq!(1, popped.remaining);
 
-        let ids: Vec<_> = std::iter::from_fn(|| rb.pop_one().map(|p| p.id)).collect();
-        insta::assert_yaml_snapshot!("batch_push_pop_ids", ids);
+        let popped = rb.pop_one().ok_or(anyhow::anyhow!("expected pop"))?;
+        assert_eq!([2u8; 8], popped.id);
+        assert_eq!(0, popped.remaining);
+
+        let len = rb.push([([1u8; 8], 0), ([2u8; 8], 0)]);
+        assert_eq!(2, len);
+
+        assert_eq!([1u8; 8], rb.pop_one().ok_or(anyhow::anyhow!("expected pop"))?.id);
+        assert_eq!([2u8; 8], rb.pop_one().ok_or(anyhow::anyhow!("expected pop"))?.id);
+
+        Ok(())
     }
 
     #[test]

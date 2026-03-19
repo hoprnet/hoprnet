@@ -128,9 +128,7 @@ mod tests {
     #[test]
     fn random_generation_of_a_neighbor_probe_produces_a_ping() -> anyhow::Result<()> {
         let ping = NeighborProbe::random_nonce();
-        matches!(ping, NeighborProbe::Ping(_))
-            .then_some(())
-            .context("expected Ping variant")?;
+        anyhow::ensure!(matches!(ping, NeighborProbe::Ping(_)), "expected Ping variant");
         Ok(())
     }
 
@@ -192,9 +190,10 @@ mod tests {
         let err = Message::try_from([].as_slice())
             .err()
             .context("expected error for empty bytes")?;
-        matches!(&err, GeneralError::ParseError(s) if s.contains("size"))
-            .then_some(())
-            .context(format!("expected ParseError about size, got: {err}"))?;
+        anyhow::ensure!(
+            matches!(&err, GeneralError::ParseError(s) if s.contains("size")),
+            "expected ParseError about size, got: {err}"
+        );
         Ok(())
     }
 
@@ -203,9 +202,10 @@ mod tests {
         let err = Message::try_from([Message::VERSION].as_slice())
             .err()
             .context("expected error for truncated header")?;
-        matches!(&err, GeneralError::ParseError(s) if s.contains("size"))
-            .then_some(())
-            .context(format!("expected ParseError about size, got: {err}"))?;
+        anyhow::ensure!(
+            matches!(&err, GeneralError::ParseError(s) if s.contains("size")),
+            "expected ParseError about size, got: {err}"
+        );
         Ok(())
     }
 
@@ -216,9 +216,10 @@ mod tests {
         let err = Message::try_from(data.as_slice())
             .err()
             .context("expected error for wrong version")?;
-        matches!(&err, GeneralError::ParseError(s) if s.contains("version"))
-            .then_some(())
-            .context(format!("expected ParseError about version, got: {err}"))?;
+        anyhow::ensure!(
+            matches!(&err, GeneralError::ParseError(s) if s.contains("version")),
+            "expected ParseError about version, got: {err}"
+        );
         Ok(())
     }
 
@@ -229,9 +230,10 @@ mod tests {
         let err = Message::try_from(data.as_slice())
             .err()
             .context("expected error for invalid discriminant")?;
-        matches!(&err, GeneralError::ParseError(s) if s.contains("disc"))
-            .then_some(())
-            .context(format!("expected ParseError about discriminant, got: {err}"))?;
+        anyhow::ensure!(
+            matches!(&err, GeneralError::ParseError(s) if s.contains("disc")),
+            "expected ParseError about discriminant, got: {err}"
+        );
         Ok(())
     }
 
@@ -242,9 +244,10 @@ mod tests {
         let err = Message::try_from(data.as_slice())
             .err()
             .context("expected error for wrong probe size")?;
-        matches!(&err, GeneralError::ParseError(s) if s.contains("probe.size"))
-            .then_some(())
-            .context(format!("expected ParseError about probe size, got: {err}"))?;
+        anyhow::ensure!(
+            matches!(&err, GeneralError::ParseError(s) if s.contains("probe.size")),
+            "expected ParseError about probe size, got: {err}"
+        );
         Ok(())
     }
 
@@ -265,7 +268,13 @@ mod tests {
     #[test]
     fn message_application_data_wrong_tag_fails() -> anyhow::Result<()> {
         let app_data = ApplicationData::new(Tag::MAX, b"not a probe")?;
-        assert!(Message::try_from(app_data).is_err());
+        let err = Message::try_from(app_data)
+            .err()
+            .context("expected error for wrong tag")?;
+        anyhow::ensure!(
+            matches!(&err, GeneralError::ParseError(s) if s.contains("tag")),
+            "expected ParseError about tag, got: {err}"
+        );
         Ok(())
     }
 }

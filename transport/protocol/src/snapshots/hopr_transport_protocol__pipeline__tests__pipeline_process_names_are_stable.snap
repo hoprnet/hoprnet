@@ -1,9 +1,0 @@
----
-source: transport/protocol/src/pipeline.rs
-expression: names
----
-- "HOPR [msg] - ingress"
-- "HOPR [msg] - egress"
-- "HOPR [ack] - egress"
-- "HOPR [ack] - ingress"
-- "HOPR [msg] - mixer"

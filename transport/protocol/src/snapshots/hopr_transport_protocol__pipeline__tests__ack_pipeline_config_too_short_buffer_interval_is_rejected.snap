@@ -1,5 +1,0 @@
----
-source: transport/protocol/src/pipeline.rs
-expression: "format!(\"{err}\")"
----
-"ack_buffer_interval: Validation error: must be at least 10 ms [{}]"

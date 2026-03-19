@@ -1,7 +1,0 @@
----
-source: protocols/session/src/protocol/messages.rs
-expression: chunk_lengths
----
-- 255
-- 255
-- 2

@@ -1,9 +1,0 @@
----
-source: transport/protocol/src/pipeline.rs
-expression: cfg
----
-output_concurrency: ~
-input_concurrency: ~
-ack_config:
-  ack_buffer_interval: 200ms
-  ack_grouping_capacity: 5

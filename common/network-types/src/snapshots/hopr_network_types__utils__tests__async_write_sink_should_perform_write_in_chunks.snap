@@ -1,6 +1,0 @@
----
-source: common/network-types/src/utils.rs
-expression: chunks_as_strings(&rx_data)
----
-- "Hello, "
-- World!!

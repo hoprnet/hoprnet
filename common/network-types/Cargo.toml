@@ -54,7 +54,6 @@ hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-insta = { workspace = true, features = ["yaml"] }
 parameterized = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }

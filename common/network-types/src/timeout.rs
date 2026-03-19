@@ -289,7 +289,9 @@ mod tests {
             "should've taken at least 30ms"
         );
 
-        insta::assert_yaml_snapshot!(sink.0);
+        assert_eq!(2, sink.0.len());
+        assert_eq!(1, sink.0[0]);
+        assert_eq!(2, sink.0[1]);
 
         Ok(())
     }

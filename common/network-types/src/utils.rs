@@ -609,11 +609,6 @@ mod tests {
         Ok(())
     }
 
-    /// Helper to display `Box<[u8]>` chunks as strings for readable snapshots.
-    fn chunks_as_strings(chunks: &[Box<[u8]>]) -> Vec<String> {
-        chunks.iter().map(|c| String::from_utf8_lossy(c).into_owned()).collect()
-    }
-
     #[cfg(feature = "runtime-tokio")]
     #[tokio::test]
     async fn test_async_read_streamer_complete_chunk() {
@@ -625,7 +620,7 @@ mod tests {
             results.push(res);
         }
 
-        insta::assert_yaml_snapshot!(chunks_as_strings(&results));
+        assert_eq!(results, vec![Box::from(*data)]);
     }
 
     #[tokio::test]
@@ -638,7 +633,8 @@ mod tests {
             results.push(res);
         }
 
-        insta::assert_yaml_snapshot!(chunks_as_strings(&results));
+        let (data1, data2) = data.split_at(14);
+        assert_eq!(results, vec![Box::from(data1), Box::from(data2)]);
     }
 
     #[tokio::test]
@@ -648,7 +644,9 @@ mod tests {
 
         let results = streamer.try_collect::<Vec<_>>().await?;
 
-        insta::assert_yaml_snapshot!(chunks_as_strings(&results));
+        let (data1, rest) = data.split_at(14);
+        let (data2, data3) = rest.split_at(14);
+        assert_eq!(results, vec![Box::from(data1), Box::from(data2), Box::from(data3)]);
 
         Ok(())
     }
@@ -659,8 +657,7 @@ mod tests {
         let reader = &data[0..8]; // An incomplete chunk
         let mut streamer = AsyncReadStreamer::<14, _>(reader);
 
-        let result = streamer.try_next().await?;
-        insta::assert_yaml_snapshot!(result.map(|c| String::from_utf8_lossy(&c).into_owned()));
+        assert_eq!(Some(Box::from(reader)), streamer.try_next().await?);
 
         Ok(())
     }
@@ -679,7 +676,9 @@ mod tests {
         AsyncWriteExt::close(&mut writer).await?;
 
         let rx_data = rx.collect::<Vec<_>>().await;
-        insta::assert_yaml_snapshot!(chunks_as_strings(&rx_data));
+        assert_eq!(2, rx_data.len());
+        assert_eq!(rx_data[0], (&data[0..7]).into());
+        assert_eq!(rx_data[1], (&data[7..]).into());
 
         Ok(())
     }

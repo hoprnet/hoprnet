@@ -81,9 +81,9 @@ mod tests {
             ..Default::default()
         };
         let err = cfg.validate().err().context("expected validation error")?;
-        assert!(
-            err.to_string().contains("max_parallel_probes"),
-            "expected max_parallel_probes in error: {err}"
+        anyhow::ensure!(
+            err.field_errors().contains_key("max_parallel_probes"),
+            "expected max_parallel_probes field error, got: {err}"
         );
         Ok(())
     }

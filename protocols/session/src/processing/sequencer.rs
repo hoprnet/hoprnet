@@ -455,7 +455,7 @@ mod tests {
             .try_collect::<Vec<Vec<_>>>()
             .await?;
 
-        insta::assert_yaml_snapshot!(chunks);
+        assert_eq!(chunks, vec![vec![1, 2, 3, 4], vec![5, 6, 7]]);
         jh.await??;
 
         Ok(())

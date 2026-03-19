@@ -81,8 +81,8 @@ async fn identical_payloads_are_all_delivered() -> anyhow::Result<()> {
     // Send multiple packets with identical payloads — all should arrive
     let payload = b"identical payload data for dedup test";
     let packets: Vec<ApplicationData> = (0..5)
-        .map(|_| ApplicationData::new(0u64, payload.as_slice()).expect("valid"))
-        .collect();
+        .map(|_| ApplicationData::new(0u64, payload.as_slice()))
+        .collect::<Result<_, _>>()?;
 
     let (received, _, _processes) = send_and_receive_packets(3, &packets).await?;
 
