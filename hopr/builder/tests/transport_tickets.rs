@@ -114,7 +114,7 @@ async fn ticket_statistics_should_reset_when_cleaned(#[with(5)] cluster_fixture:
 /// Funds a channel with a small budget and verifies that the relay eventually
 /// rejects tickets once the channel is exhausted by a combination of test
 /// traffic and background probing.
-async fn test_reject_relaying_a_message_when_the_channel_is_out_of_funding(
+async fn relaying_message_rejected_when_channel_out_of_funding(
     #[with(5)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
     let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1::<3>();
@@ -190,7 +190,7 @@ async fn test_reject_relaying_a_message_when_the_channel_is_out_of_funding(
 #[cfg(feature = "session-client")]
 /// Sends a fixed number of messages so tickets accumulate, then calls
 /// `redeem_all_tickets` and asserts unredeemed value shrinks while redeemed grows.
-async fn test_redeem_ticket_on_request(#[with(5)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+async fn redeem_ticket_on_request(#[with(5)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1::<3>();
     let message_count = 10;
 
@@ -259,7 +259,7 @@ async fn test_redeem_ticket_on_request(#[with(5)] cluster_fixture: ClusterGuard)
 #[cfg(feature = "session-client")]
 /// Demonstrates that closing channels without redeeming moves ticket value into
 /// the neglected bucket by closing both paths after traffic has flowed.
-async fn test_neglect_ticket_on_closing(#[with(5)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+async fn neglect_ticket_on_closing(#[with(5)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1::<3>();
 
     let message_count = 3;
