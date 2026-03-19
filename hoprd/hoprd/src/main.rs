@@ -152,15 +152,15 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     }
 
-    let hopr_keys: HoprKeys = match (match &cfg.identity.private_key {
+    let maybe_keys = match &cfg.identity.private_key {
         Some(private_key) => IdentityRetrievalModes::FromPrivateKey { private_key },
         None => IdentityRetrievalModes::FromFile {
             password: &cfg.identity.password,
             id_path: &cfg.identity.file,
         },
-    })
-    .try_into()
-    {
+    };
+
+    let hopr_keys: HoprKeys = match maybe_keys.try_into() {
         Ok(hopr_keys) => hopr_keys,
         Err(error) => {
             tracing::error!(%error, "hoprd exited with an error");
