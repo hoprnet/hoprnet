@@ -252,11 +252,17 @@ async fn main_inner() -> anyhow::Result<()> {
     chain_connector.connect().await?;
     let chain_connector = Arc::new(chain_connector);
 
+    let prober_cfg = hopr_ct_full_network::ProberConfig {
+        interval: cfg.hopr.network.probe_interval,
+        shuffle_ttl: cfg.hopr.network.probe_interval * 2,
+        ..Default::default()
+    };
+
     let (node, hopr_process) = hopr_builder::build_from_chain_and_db(
         &hopr_keys.chain_key,
         &hopr_keys.packet_key,
         hopr_lib_cfg,
-        None,
+        Some(prober_cfg),
         chain_connector.clone(),
         node_db,
         HoprServerIpForwardingReactor::new(hopr_keys.packet_key.clone(), cfg.session_ip_forwarding.clone()),
