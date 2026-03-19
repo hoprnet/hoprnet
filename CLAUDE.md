@@ -11,7 +11,7 @@ Claude configuration and instructions live under `.claude/`.
 1. Before modifying code, understand the surrounding context and existing patterns.
 2. For multi-step features, plan before implementing.
 3. After changes, run `cargo check` (or the closest package check) to verify.
-4. For Rust changes, run `cargo shear --fix` followed by `cargo check` when a cycle is finished.
+4. For Rust changes, run `cargo shear --fix -p <crate>` (never `--fix` at workspace root without `-p`) followed by `cargo check` when a cycle is finished.
 5. Run `nix fmt` check.
 6. Run `cargo test --no-run` and `cargo clippy` to verify that everything builds correctly.
 7. Run tests as specified in the tests.yaml github workflow (unit tests and integration tests separately)
