@@ -3,9 +3,10 @@ use std::str::FromStr;
 #[cfg(feature = "session-client")]
 use futures::future::try_join_all;
 use hopr_builder::testing::{
-    fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_5_cluster_fixture as cluster},
+    fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, chain_propagation_delay, size_5_cluster_fixture as cluster},
     hopr::ChannelGuard,
 };
+use hopr_chain_connector::blokli_client::BlokliQueryClient;
 #[cfg(feature = "session-client")]
 use hopr_lib::{
     HopRouting, HoprBalance, HoprSessionClientConfig, SessionCapabilities, SessionTarget,
@@ -69,10 +70,11 @@ async fn create_n_hop_session(cluster: &ClusterGuard, #[case] hops: usize) -> an
         Vec::new()
     };
 
-    // wait for the probing to actually kick in and register opened channels in the graph,
-    // otherwise the planner might not find any paths and fail the test
+    // Wait for probing to register opened channels in the graph,
+    // using chain-derived propagation delay instead of a hardcoded sleep.
     if !all_channels.is_empty() {
-        sleep(std::time::Duration::from_secs(5)).await;
+        let chain_info = cluster.chain_client.query_chain_info().await?;
+        sleep(chain_propagation_delay(&chain_info)).await;
     }
 
     let (routing, capabilities) = if hops == 0 {

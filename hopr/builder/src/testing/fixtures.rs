@@ -26,6 +26,14 @@ use crate::testing::{
     hopr::{ChannelGuard, NodeSafeConfig, TestedHopr, create_hopr_instance_config},
 };
 
+/// Estimated time for on-chain state to propagate across all nodes, derived from
+/// `finality * expected_block_time` with a 2-second buffer.
+pub fn chain_propagation_delay(chain_info: &hopr_chain_connector::blokli_client::types::ChainInfo) -> Duration {
+    let block_time_secs = chain_info.expected_block_time.0.parse::<u64>().unwrap_or(5);
+    let finality = chain_info.finality.0.parse::<u64>().unwrap_or(8);
+    Duration::from_secs(finality * block_time_secs + 2)
+}
+
 /// A guard that holds a reference to the cluster and ensures exclusive access
 pub struct ClusterGuard {
     pub cluster: Vec<TestedHopr>,
@@ -78,7 +86,8 @@ impl ClusterGuard {
             );
         }
 
-        sleep(Duration::from_secs(3)).await;
+        let chain_info = self.chain_client.query_chain_info().await?;
+        sleep(chain_propagation_delay(&chain_info)).await;
 
         Ok(guards)
     }
@@ -88,6 +97,9 @@ impl ClusterGuard {
     /// Channels must already be open before calling this method.
     pub async fn create_session(&self, path: &[&TestedHopr]) -> anyhow::Result<HoprSession> {
         debug_assert!(path.len() >= 2, "path must contain at least source and destination");
+
+        let chain_info = self.chain_client.query_chain_info().await?;
+        let timeout = chain_propagation_delay(&chain_info);
 
         let ip = IpOrHost::from_str(":0")?;
         let routing = HopRouting::try_from(path.len() - 2)?;
@@ -105,13 +117,13 @@ impl ClusterGuard {
                     always_max_out_surbs: false,
                 },
             )
-            .timeout(futures_time::time::Duration::from_secs(5))
+            .timeout(futures_time::time::Duration::from(timeout))
             .await;
 
         match session_result {
             Ok(Ok(s)) => Ok(s),
             Ok(Err(e)) => Err(e.into()),
-            Err(_) => Err(anyhow::anyhow!("Session opening timed out after 5s")),
+            Err(_) => Err(anyhow::anyhow!("Session opening timed out after {timeout:?}")),
         }
     }
 
