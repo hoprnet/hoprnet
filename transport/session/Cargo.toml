@@ -80,7 +80,7 @@ hopr-protocol-session = { workspace = true, features = [
   "hashbrown",
 ] }
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
-insta = { workspace = true, features = ["yaml"] }
+insta = { workspace = true, features = ["json", "yaml"] }
 mockall = { workspace = true }
 rand = { workspace = true }
 serde_cbor_2 = { workspace = true }

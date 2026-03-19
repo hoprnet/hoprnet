@@ -248,11 +248,7 @@ mod tests {
         assert_eq!(acks.len(), 1);
 
         let ids = acks.remove(0).into_iter().collect::<Vec<_>>();
-        insta::assert_yaml_snapshot!(ids, @r"
-        - 1
-        - 2
-        - 3
-        ");
+        assert_eq!(ids, vec![1, 2, 3]);
     }
 
     #[test]
@@ -263,10 +259,12 @@ mod tests {
         let acks = FrameAcknowledgements::<1024>::new_multiple(expected.clone());
 
         let chunk_lengths: Vec<_> = acks.iter().map(|a| a.len()).collect();
-        insta::assert_yaml_snapshot!(chunk_lengths, @r"
-        - 255
-        - 255
-        - 2
+        insta::assert_json_snapshot!(chunk_lengths, @r"
+        [
+          255,
+          255,
+          2
+        ]
         ");
 
         let actual = acks.into_iter().flat_map(|a| a.into_iter()).collect::<Vec<_>>();

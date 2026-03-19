@@ -289,9 +289,11 @@ mod tests {
             "should've taken at least 30ms"
         );
 
-        insta::assert_yaml_snapshot!(sink.0, @r"
-        - 1
-        - 2
+        insta::assert_json_snapshot!(sink.0, @r"
+        [
+          1,
+          2
+        ]
         ");
 
         Ok(())
