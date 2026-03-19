@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport"
-version = "0.21.2"
+version = "0.22.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR transport interface for the core library"
 edition.workspace = true
@@ -18,7 +18,6 @@ telemetry = [
   "hopr-transport-session/telemetry",
   "hopr-network-types/telemetry",
   "hopr-transport-mixer/telemetry",
-  "hopr-transport-network/telemetry",
   "hopr-transport-path/telemetry",
   "hopr-transport-protocol/telemetry",
 ]
@@ -66,9 +65,8 @@ hopr-crypto-packet = { workspace = true }
 hopr-network-types = { workspace = true }
 hopr-protocol-app = { workspace = true }
 hopr-protocol-hopr = { workspace = true, features = ["rayon"] }
-hopr-transport-identity = { workspace = true }
+multiaddr = { workspace = true }
 hopr-transport-mixer = { workspace = true }
-hopr-transport-network = { workspace = true }
 hopr-transport-path = { workspace = true }
 hopr-transport-probe = { workspace = true }
 hopr-transport-protocol = { workspace = true }
@@ -78,6 +76,7 @@ hopr-transport-tag-allocator = { workspace = true }
 [dev-dependencies]
 hex-literal = { workspace = true }
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
+rstest = { workspace = true }
 
 hopr-protocol-start = { workspace = true }
 hopr-protocol-session = { workspace = true, features = [
@@ -85,7 +84,6 @@ hopr-protocol-session = { workspace = true, features = [
   "runtime-tokio",
   "hashbrown",
 ] }
-hopr-transport-network = { workspace = true }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-protocol = { workspace = true, features = ["runtime-tokio"] }
 temp-env = { workspace = true }

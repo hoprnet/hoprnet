@@ -5070,7 +5070,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.21.2"
+version = "0.22.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5086,9 +5086,7 @@ dependencies = [
  "hopr-protocol-hopr",
  "hopr-protocol-session",
  "hopr-protocol-start",
- "hopr-transport-identity",
  "hopr-transport-mixer",
- "hopr-transport-network",
  "hopr-transport-path",
  "hopr-transport-probe",
  "hopr-transport-protocol",
@@ -5097,8 +5095,10 @@ dependencies = [
  "humantime-serde",
  "lazy_static",
  "moka",
+ "multiaddr",
  "pcap-file",
  "proc-macro-regex",
+ "rstest",
  "serde",
  "smart-default",
  "strum 0.28.0",
@@ -5107,16 +5107,6 @@ dependencies = [
  "tokio",
  "tracing",
  "validator",
-]
-
-[[package]]
-name = "hopr-transport-identity"
-version = "0.2.0"
-dependencies = [
- "anyhow",
- "libp2p-identity",
- "multiaddr",
- "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -5139,23 +5129,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-transport-network"
-version = "0.10.0"
-dependencies = [
- "anyhow",
- "dashmap",
- "hopr-api",
- "hopr-metrics",
- "humantime-serde",
- "lazy_static",
- "libp2p-identity",
- "thiserror 2.0.18",
- "tracing",
-]
-
-[[package]]
 name = "hopr-transport-p2p"
-version = "0.8.3"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -5168,7 +5143,6 @@ dependencies = [
  "hopr-metrics",
  "hopr-network-types",
  "hopr-platform",
- "hopr-transport-network",
  "hopr-transport-probe",
  "hopr-transport-protocol",
  "lazy_static",
