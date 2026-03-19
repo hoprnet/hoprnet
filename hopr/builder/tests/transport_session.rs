@@ -70,11 +70,12 @@ async fn create_n_hop_session(cluster: &ClusterGuard, #[case] hops: usize) -> an
         Vec::new()
     };
 
-    // Wait for probing to register opened channels in the graph,
-    // using chain-derived propagation delay instead of a hardcoded sleep.
+    // Wait for probing to register opened channels in the graph.
+    // Scale the wait by hop count: larger meshes need more probing rounds.
     if !all_channels.is_empty() {
         let chain_info = cluster.chain_client.query_chain_info().await?;
-        sleep(chain_propagation_delay(&chain_info)).await;
+        let base_delay = chain_propagation_delay(&chain_info);
+        sleep(base_delay * hops as u32).await;
     }
 
     let (routing, capabilities) = if hops == 0 {
