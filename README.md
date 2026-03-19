@@ -463,12 +463,15 @@ Detailed reference: [`OTLP.md`](OTLP.md)
 - `HOPRD_OTEL_SIGNALS` - comma-separated signal list from `traces`, `logs`, `metrics` (default: `traces`)
 - `HOPRD_OTLP_ENDPOINT` - base URL of an OTLP endpoint. Transport is inferred from URL scheme (`grpc://...`, `http://...`, or `https://...`)
 - `HOPRD_METRIC_EXPORT_INTERVAL` - OTLP metric export interval config in `default,prefix=interval` form (for example `15000,hopr_session=1000`). Intervals support raw milliseconds (`15000`) or suffixes (`1s`, `250ms`, `1m`).
+- `HOPRD_OTEL_EXPORT_LABELS` - comma-separated `key=value` pairs added as extra attributes to all OTEL signals (for example `HOPRD_OTEL_EXPORT_LABELS="country=UK,city=london"`).
 
 Examples:
 
 - Traces only (backward-compatible default): `HOPRD_OTEL_SIGNALS=traces`
 - Metrics only: `HOPRD_OTEL_SIGNALS=metrics`
 - Full export: `HOPRD_OTEL_SIGNALS=traces,logs,metrics`
+- OTEL traces, logs, and metrics include `node_address` and `node_peer_id` attributes automatically.
+- OTLP logs are emitted as structured objects (typed fields/attributes), and use OTLP HTTP JSON protocol when `HOPRD_OTLP_ENDPOINT` is `http(s)://...`.
 - With metrics enabled, OTEL exports keep Prometheus family naming (`<metric>`, `<metric>_count`, `<metric>_sum`, `<metric>_bucket`) and labels (`le` for histogram buckets, `quantile` for summaries).
 - Session metrics are exported to OTEL (`hopr_session_*` series with `session_id` attribute) and are excluded from the Prometheus `/metrics` endpoint.
 
