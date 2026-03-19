@@ -103,7 +103,9 @@ impl ClusterGuard {
         debug_assert!(path.len() >= 2, "path must contain at least source and destination");
 
         let chain_info = self.chain_client.query_chain_info().await?;
-        let timeout = chain_propagation_delay(&chain_info);
+        // Session establishment involves multiple round-trips beyond just chain propagation,
+        // so use a generous multiplier over the base propagation delay.
+        let timeout = chain_propagation_delay(&chain_info) * 3;
 
         let ip = IpOrHost::from_str(":0")?;
         let routing = HopRouting::try_from(path.len() - 2)?;

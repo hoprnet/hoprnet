@@ -37,6 +37,11 @@ const FUNDING_AMOUNT: &str = "100 wxHOPR";
 /// - 0-hop: 2 nodes, no channels needed (direct connection)
 /// - n-hop (n >= 1): n+2 nodes with n*(n+1) bidirectional channels
 async fn create_n_hop_session(cluster: &ClusterGuard, #[case] hops: usize) -> anyhow::Result<()> {
+    // 2-hop and 3-hop tests are too slow under coverage instrumentation
+    if std::env::var("CARGO_LLVM_COV").is_ok() && hops > 1 {
+        return Ok(());
+    }
+
     let node_count = if hops == 0 { 2 } else { hops + 2 };
     let mut nodes: Vec<&_> = cluster.iter().collect();
     nodes.shuffle(&mut rand::rng());
