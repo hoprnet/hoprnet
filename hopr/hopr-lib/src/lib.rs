@@ -1310,10 +1310,11 @@ where
             ON_CHAIN_RESOLUTION_EVENT_TIMEOUT,
         )?;
 
-        let confirm_awaiter = self.chain_api.open_channel(destination, amount).await.map_err(|e| {
-            event_abort.abort();
-            HoprLibError::chain(e)
-        })?;
+        let confirm_awaiter = self
+            .chain_api
+            .open_channel(destination, amount)
+            .await
+            .map_err(HoprLibError::chain)?;
 
         let tx_hash = confirm_awaiter.await.map_err(|e| {
             event_abort.abort();
@@ -1339,10 +1340,11 @@ where
             ON_CHAIN_RESOLUTION_EVENT_TIMEOUT
         )?;
 
-        let confirm_awaiter = self.chain_api.fund_channel(&channel_id, amount).await.map_err(|e| {
-            event_abort.abort();
-            HoprLibError::chain(e)
-        })?;
+        let confirm_awaiter = self
+            .chain_api
+            .fund_channel(&channel_id, amount)
+            .await
+            .map_err(HoprLibError::chain)?;
 
         let res = confirm_awaiter.await.map_err(|e| {
             event_abort.abort();
@@ -1371,10 +1373,11 @@ where
             ON_CHAIN_RESOLUTION_EVENT_TIMEOUT,
         )?;
 
-        let confirm_awaiter = self.chain_api.close_channel(&channel_id).await.map_err(|e| {
-            event_abort.abort();
-            HoprLibError::chain(e)
-        })?;
+        let confirm_awaiter = self
+            .chain_api
+            .close_channel(&channel_id)
+            .await
+            .map_err(HoprLibError::chain)?;
 
         let tx_hash = confirm_awaiter.await.map_err(|e| {
             event_abort.abort();
