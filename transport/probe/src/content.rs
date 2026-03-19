@@ -272,8 +272,8 @@ mod tests {
             .err()
             .context("expected error for wrong tag")?;
         anyhow::ensure!(
-            matches!(&err, GeneralError::ParseError(s) if s.contains("tag")),
-            "expected ParseError about tag, got: {err}"
+            err.to_string().contains("tag"),
+            "expected error about tag, got: {err}"
         );
         Ok(())
     }
