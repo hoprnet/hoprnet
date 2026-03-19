@@ -115,9 +115,9 @@ async fn ticket_statistics_should_reset_when_cleaned(#[with(5)] cluster_fixture:
 /// rejects tickets once the channel is exhausted by a combination of test
 /// traffic and background probing.
 async fn relaying_message_rejected_when_channel_out_of_funding(
-    #[with(5)] cluster_fixture: ClusterGuard,
+    #[with(3)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
-    let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1::<3>();
+    let [src, mid, dst] = cluster_fixture.sample_nodes::<3>();
 
     let ticket_price = src
         .inner()
