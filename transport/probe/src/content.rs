@@ -271,10 +271,7 @@ mod tests {
         let err = Message::try_from(app_data)
             .err()
             .context("expected error for wrong tag")?;
-        anyhow::ensure!(
-            err.to_string().contains("tag"),
-            "expected error about tag, got: {err}"
-        );
+        anyhow::ensure!(err.to_string().contains("tag"), "expected error about tag, got: {err}");
         Ok(())
     }
 }
