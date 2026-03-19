@@ -19,6 +19,8 @@ pub mod constants;
 /// Errors used by the crate.
 pub mod errors;
 
+mod multiaddrs;
+
 #[cfg(feature = "capture")]
 mod capture;
 mod pipeline;
@@ -35,15 +37,8 @@ use futures::{
     channel::mpsc::{Sender, channel},
     stream::select_with_strategy,
 };
-use hopr_api::{
-    chain::{ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
-    ct::{CoverTrafficGeneration, ProbingTrafficGeneration},
-    db::HoprDbTicketOperations,
-    graph::{NetworkGraphUpdate, NetworkGraphView, traits::EdgeObservableRead},
-    network::{NetworkBuilder, NetworkStreamControl},
-    types::primitive::prelude::*,
-};
 pub use hopr_api::{
+    Multiaddr, PeerId,
     db::ChannelTicketStatistics,
     network::{Health, traits::NetworkView},
     types::{
@@ -54,13 +49,19 @@ pub use hopr_api::{
         internal::{prelude::HoprPseudonym, routing::RoutingOptions},
     },
 };
+use hopr_api::{
+    chain::{ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
+    ct::{CoverTrafficGeneration, ProbingTrafficGeneration},
+    db::HoprDbTicketOperations,
+    graph::{NetworkGraphUpdate, NetworkGraphView, traits::EdgeObservableRead},
+    network::{NetworkBuilder, NetworkStreamControl},
+    types::primitive::prelude::*,
+};
 use hopr_async_runtime::{AbortableList, prelude::spawn, spawn_as_abortable};
 use hopr_crypto_packet::prelude::PacketSignal;
 use hopr_network_types::prelude::*;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 use hopr_protocol_hopr::MemorySurbStore;
-use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
-pub use hopr_transport_identity::{Multiaddr, PeerId, Protocol};
 use hopr_transport_mixer::MixerConfig;
 use hopr_transport_path::{BackgroundPathCacheRefreshable, HoprGraphPathSelector, PathPlanner};
 pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
@@ -81,12 +82,13 @@ use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfi
 #[cfg(feature = "telemetry")]
 pub use hopr_transport_session::{SessionAckMode, SessionLifecycleState};
 pub use hopr_transport_tag_allocator::TagAllocatorConfig;
+pub use multiaddr::Protocol;
 use tracing::{Instrument, debug, error, trace, warn};
 
 pub use crate::config::HoprProtocolConfig;
 use crate::{
-    constants::SESSION_INITIATION_TIMEOUT_BASE, errors::HoprTransportError, pipeline::HoprPipelineComponents,
-    socket::HoprSocket,
+    constants::SESSION_INITIATION_TIMEOUT_BASE, errors::HoprTransportError, multiaddrs::strip_p2p_protocol,
+    pipeline::HoprPipelineComponents, socket::HoprSocket,
 };
 
 pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RANGE;
@@ -673,7 +675,7 @@ where
             .local_multiaddresses()
             .into_iter()
             .filter(|ma| {
-                hopr_transport_identity::multiaddrs::is_supported(ma)
+                crate::multiaddrs::is_supported(ma)
                     && (self.cfg.transport.announce_local_addresses || is_public_address(ma))
             })
             .map(|ma| strip_p2p_protocol(&ma))
@@ -681,8 +683,8 @@ where
             .collect::<Vec<_>>();
 
         mas.sort_by(|l, r| {
-            let is_left_dns = hopr_transport_identity::multiaddrs::is_dns(l);
-            let is_right_dns = hopr_transport_identity::multiaddrs::is_dns(r);
+            let is_left_dns = crate::multiaddrs::is_dns(l);
+            let is_right_dns = crate::multiaddrs::is_dns(r);
 
             if !(is_left_dns ^ is_right_dns) {
                 std::cmp::Ordering::Equal

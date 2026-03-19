@@ -24,9 +24,7 @@ members = [
   "protocols/session",
   "protocols/start",
   "transport/api",
-  "transport/identity",
   "transport/mixer",
-  "transport/network",
   "transport/path",
   "transport/probe",
   "transport/protocol",
@@ -264,8 +262,6 @@ hopr-protocol-session = { path = "protocols/session", default-features = false }
 hopr-protocol-start = { path = "protocols/start", default-features = false }
 hopr-strategy = { path = "logic/strategy", default-features = false }
 hopr-transport = { path = "transport/api", default-features = false }
-hopr-transport-identity = { path = "transport/identity", default-features = false }
-hopr-transport-network = { path = "transport/network", default-features = false }
 hopr-transport-mixer = { path = "transport/mixer", default-features = false }
 hopr-transport-path = { path = "transport/path", default-features = false }
 hopr-transport-probe = { path = "transport/probe", default-features = false }

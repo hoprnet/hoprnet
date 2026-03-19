@@ -1,6 +1,12 @@
 use hopr_crypto_packet::errors::PacketError;
-pub use hopr_transport_network::errors::NetworkError;
 pub use hopr_transport_probe::errors::ProbeError;
+
+/// Errors from the network peer store.
+#[derive(thiserror::Error, Debug)]
+pub enum NetworkError {
+    #[error("performing an operation on own PeerId")]
+    DisallowedOperationOnOwnPeerIdError,
+}
 pub use hopr_transport_protocol::errors::ProtocolError;
 use hopr_transport_session::errors::TransportSessionError;
 use thiserror::Error;
