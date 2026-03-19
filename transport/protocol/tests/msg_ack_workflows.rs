@@ -3,7 +3,7 @@ mod common;
 use common::{
     random_packet_of_size, random_packets_of_count, send_and_receive_packets, send_relay_receive_channel_of_n_peers,
 };
-use hopr_protocol_app::prelude::ApplicationData;
+use hopr_protocol_app::prelude::{ApplicationData, ReservedTag};
 use rstest::rstest;
 use serial_test::serial;
 
@@ -81,7 +81,7 @@ async fn identical_payloads_are_all_delivered() -> anyhow::Result<()> {
     // Send multiple packets with identical payloads — all should arrive
     let payload = b"identical payload data for dedup test";
     let packets: Vec<ApplicationData> = (0..5)
-        .map(|_| ApplicationData::new(0u64, payload.as_slice()))
+        .map(|_| ApplicationData::new(ReservedTag::UPPER_BOUND, payload.as_slice()))
         .collect::<Result<_, _>>()?;
 
     let (received, _, _processes) = send_and_receive_packets(3, &packets).await?;
