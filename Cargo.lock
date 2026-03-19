@@ -4672,6 +4672,7 @@ dependencies = [
  "serde",
  "smart-default",
  "tokio",
+ "tracing",
  "validator",
 ]
 
@@ -5361,6 +5362,7 @@ dependencies = [
  "hopr-api",
  "hopr-builder",
  "hopr-chain-connector",
+ "hopr-ct-full-network",
  "hopr-db-node",
  "hopr-lib",
  "hopr-metrics",

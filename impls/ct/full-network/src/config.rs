@@ -45,6 +45,7 @@ pub struct ProberConfig {
     /// TTL for the cached weighted shuffle order.
     ///
     /// When expired, the graph is re-traversed and a new priority-ordered shuffle is computed.
+    /// Defaults to `2 × interval`.
     #[cfg_attr(feature = "serde", serde(default = "default_shuffle_ttl", with = "humantime_serde"))]
     #[default(default_shuffle_ttl())]
     pub shuffle_ttl: std::time::Duration,
@@ -101,7 +102,7 @@ const fn default_base_priority() -> f64 {
 
 #[inline]
 const fn default_shuffle_ttl() -> std::time::Duration {
-    std::time::Duration::from_secs(600)
+    std::time::Duration::from_secs(default_probing_interval().as_secs() * 2)
 }
 
 #[inline]

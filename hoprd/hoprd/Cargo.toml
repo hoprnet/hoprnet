@@ -121,6 +121,7 @@ hopr-builder = { workspace = true, features = [
 hopr-db-node = { workspace = true, features = ["traits", "sqlite"] }
 hopr-chain-connector = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
+hopr-ct-full-network = { workspace = true }
 hopr-network-graph = { workspace = true, features = ["petgraph"] }
 hopr-transport-p2p = { workspace = true }
 
