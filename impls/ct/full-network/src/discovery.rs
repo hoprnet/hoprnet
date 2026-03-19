@@ -130,11 +130,18 @@ where
     }
 }
 
+/// Cached weighted-shuffle batch with a creation timestamp for TTL checks.
+struct ShuffleCache {
+    probes: Vec<ProbeRouting>,
+    created_at: std::time::Instant,
+}
+
 /// Stream of neighbor probes emitted in bursts per tick.
 ///
-/// Each tick traverses the graph, computes a priority-weighted shuffle of all
-/// known peers, and emits the entire batch. The next tick waits for `cfg.interval`
-/// before producing the next burst.
+/// Each tick emits the entire cached batch. The cache is recomputed when it is
+/// empty (all probes drained) or when `cfg.shuffle_ttl` has expired, whichever
+/// comes first. This avoids re-traversing the graph every tick while still
+/// emitting all peers in each burst.
 fn immediate_probe_stream<U>(
     me: OffchainPublicKey,
     cfg: ProberConfig,
@@ -147,49 +154,73 @@ where
         + Sync
         + 'static,
 {
-    futures_time::stream::interval(futures_time::time::Duration::from(cfg.interval))
-        .then(move |_| {
+    let cache: Option<ShuffleCache> = None;
+
+    futures::stream::unfold(
+        (
+            cache,
+            futures_time::stream::interval(futures_time::time::Duration::from(cfg.interval)),
+        ),
+        move |(mut cache, mut ticker)| {
             let graph = graph.clone();
 
             async move {
-                let now = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default();
+                use futures::StreamExt as _;
+                ticker.next().await?;
 
-                let weighted: Vec<_> = graph
-                    .nodes()
-                    .filter(|peer| futures::future::ready(peer != &me))
-                    .map(|peer| {
-                        let priority = match graph.edge(&me, &peer) {
-                            Some(obs) => immediate_probe_priority(obs.score(), obs.last_update(), now, &cfg),
-                            None => immediate_probe_priority(0.0, std::time::Duration::ZERO, now, &cfg),
-                        };
-                        (peer, priority)
-                    })
-                    .collect()
-                    .await;
+                // Reuse cached shuffle if still within TTL.
+                let needs_refresh = cache
+                    .as_ref()
+                    .is_none_or(|c| c.probes.is_empty() || c.created_at.elapsed() >= cfg.shuffle_ttl);
 
-                let peer_count = weighted.len();
-                let zero_hop = RoutingOptions::Hops(0.try_into().expect("0 is a valid u8"));
-                let probes: Vec<_> = WeightedCollection::new(weighted)
-                    .into_shuffled()
-                    .into_iter()
-                    .map(|peer| {
-                        ProbeRouting::Neighbor(DestinationRouting::Forward {
-                            destination: Box::new(peer.into()),
-                            pseudonym: Some(HoprPseudonym::random()),
-                            forward_options: zero_hop.clone(),
-                            return_options: Some(zero_hop.clone()),
+                if needs_refresh {
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default();
+
+                    let weighted: Vec<_> = graph
+                        .nodes()
+                        .filter(|peer| futures::future::ready(peer != &me))
+                        .map(|peer| {
+                            let priority = match graph.edge(&me, &peer) {
+                                Some(obs) => immediate_probe_priority(obs.score(), obs.last_update(), now, &cfg),
+                                None => immediate_probe_priority(0.0, std::time::Duration::ZERO, now, &cfg),
+                            };
+                            (peer, priority)
                         })
-                    })
-                    .collect();
+                        .collect()
+                        .await;
 
-                tracing::debug!(peer_count, probes = probes.len(), "emitting neighbor probe batch");
+                    let peer_count = weighted.len();
+                    let zero_hop = RoutingOptions::Hops(0.try_into().expect("0 is a valid u8"));
+                    let probes: Vec<_> = WeightedCollection::new(weighted)
+                        .into_shuffled()
+                        .into_iter()
+                        .map(|peer| {
+                            ProbeRouting::Neighbor(DestinationRouting::Forward {
+                                destination: Box::new(peer.into()),
+                                pseudonym: Some(HoprPseudonym::random()),
+                                forward_options: zero_hop.clone(),
+                                return_options: Some(zero_hop.clone()),
+                            })
+                        })
+                        .collect();
 
-                futures::stream::iter(probes)
+                    tracing::debug!(peer_count, probes = probes.len(), "computed new neighbor probe shuffle");
+                    cache = Some(ShuffleCache {
+                        probes,
+                        created_at: std::time::Instant::now(),
+                    });
+                }
+
+                let batch = cache.as_ref().map(|c| c.probes.clone()).unwrap_or_default();
+                tracing::debug!(probes = batch.len(), "emitting neighbor probe batch");
+
+                Some((futures::stream::iter(batch), (cache, ticker)))
             }
-        })
-        .flatten()
+        },
+    )
+    .flatten()
 }
 
 #[cfg(test)]
@@ -213,6 +244,7 @@ mod tests {
     fn fast_cfg() -> ProberConfig {
         ProberConfig {
             interval: std::time::Duration::from_millis(1),
+            shuffle_ttl: std::time::Duration::ZERO,
             ..Default::default()
         }
     }
@@ -383,6 +415,36 @@ mod tests {
 
         assert_eq!(unique, expected, "probes should cover all known graph peers");
         assert_eq!(destinations.len(), 4, "should have probes across multiple rounds");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn single_tick_should_emit_all_peers_in_burst() -> anyhow::Result<()> {
+        let me = random_key();
+        let graph = Arc::new(ChannelGraph::new(me));
+
+        let peer_count = RANDOM_PEERS.len();
+        for node in RANDOM_PEERS.iter() {
+            graph.record_node(node.clone());
+        }
+
+        let prober = FullNetworkDiscovery::new(me, fast_cfg(), graph);
+        let stream = ProbingTrafficGeneration::build(&prober);
+        pin_mut!(stream);
+
+        // Collect exactly peer_count items — should all arrive from a single tick burst.
+        let burst: Vec<ProbeRouting> = timeout(TINY_TIMEOUT * 20, stream.take(peer_count).collect::<Vec<_>>()).await?;
+
+        assert_eq!(
+            burst.len(),
+            peer_count,
+            "a single tick should emit all {peer_count} peers"
+        );
+        assert!(
+            burst.iter().all(|r| matches!(r, ProbeRouting::Neighbor(_))),
+            "all burst items should be Neighbor probes"
+        );
+
         Ok(())
     }
 }

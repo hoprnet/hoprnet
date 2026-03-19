@@ -254,6 +254,7 @@ async fn main_inner() -> anyhow::Result<()> {
 
     let prober_cfg = hopr_ct_full_network::ProberConfig {
         interval: cfg.hopr.network.probe_interval,
+        shuffle_ttl: cfg.hopr.network.probe_interval * 2,
         ..Default::default()
     };
 
