@@ -2,6 +2,7 @@ use std::{ops::Mul, time::Duration};
 
 use anyhow::Context;
 use futures::AsyncWriteExt;
+use futures_time::future::FutureExt as _;
 use hopr_builder::{
     hopr_lib::{ChannelId, HoprBalance, HoprLibError, UnitaryFloatOps},
     testing::{
@@ -154,9 +155,13 @@ async fn relaying_message_rejected_when_channel_out_of_funding(
     // Continuously send until rejected_value increases (channel funds exhausted).
     // Background probing accelerates fund depletion alongside our writes.
     let mut write_succeeded_at_least_once = false;
-    tokio::time::timeout(Duration::from_secs(120), async {
+    async {
         loop {
-            match tokio::time::timeout(Duration::from_millis(500), session.write_all(&sent_data)).await {
+            match session
+                .write_all(&sent_data)
+                .timeout(futures_time::time::Duration::from_millis(500))
+                .await
+            {
                 Ok(Ok(())) => write_succeeded_at_least_once = true,
                 Ok(Err(_)) | Err(_) => {} // write failed or timed out — channel may be drained
             }
@@ -171,9 +176,10 @@ async fn relaying_message_rejected_when_channel_out_of_funding(
                 return anyhow::Ok(());
             }
         }
-    })
+    }
+    .timeout(futures_time::time::Duration::from_secs(120))
     .await
-    .context("timed out waiting for ticket rejection after fund exhaustion")??;
+    .map_err(|_| anyhow::anyhow!("timed out waiting for ticket rejection after fund exhaustion"))??;
 
     assert!(
         write_succeeded_at_least_once,
