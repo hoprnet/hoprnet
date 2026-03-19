@@ -36,13 +36,7 @@ mod tests {
             .iter()
             .map(|&level| controller.next_control_output(level))
             .collect();
-        insta::assert_json_snapshot!(outputs, @r"
-        [
-          10,
-          100,
-          100
-        ]
-        ");
+        assert_eq!(outputs, [10, 100, 100]);
         assert_eq!(100, controller.bounds.target());
     }
 }

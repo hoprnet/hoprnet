@@ -289,12 +289,7 @@ mod tests {
             "should've taken at least 30ms"
         );
 
-        insta::assert_json_snapshot!(sink.0, @r"
-        [
-          1,
-          2
-        ]
-        ");
+        assert_eq!(sink.0, [1, 2]);
 
         Ok(())
     }
