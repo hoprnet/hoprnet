@@ -7,6 +7,9 @@ mod errors;
 mod traits;
 mod utils;
 
+use std::{convert::identity, sync::atomic::AtomicBool};
+
+use futures::TryFutureExt;
 use hopr_api::{
     chain::TicketRedeemError,
     types::{internal::prelude::*, primitive::prelude::*},
@@ -312,12 +315,24 @@ where
 }
 
 /// Indicates a non-error result of [ticket redemption](HoprTicketManager::redeem_stream).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RedemptionResult {
     /// Ticket has been redeemed successfully.
     Redeemed(VerifiedTicket),
     /// Ticket has been neglected because its value was lower than the threshold.
     ValueTooLow(VerifiedTicket),
+    /// Ticket has been rejected on-chain with for the given reason.
+    RejectedOnChain(VerifiedTicket, String),
+}
+
+impl AsRef<VerifiedTicket> for RedemptionResult {
+    fn as_ref(&self) -> &VerifiedTicket {
+        match self {
+            RedemptionResult::Redeemed(ticket) => ticket,
+            RedemptionResult::ValueTooLow(ticket) => ticket,
+            RedemptionResult::RejectedOnChain(ticket, _) => ticket,
+        }
+    }
 }
 
 /// Contains transient statistics about the tickets in a channel or channels.
@@ -336,6 +351,20 @@ pub struct TicketStats {
     pub rejected_value: HoprBalance,
     /// The total value of the tickets in the channel or channels that have been neglected.
     pub neglected_value: HoprBalance,
+}
+
+struct RedeemState<C, Q> {
+    lock: std::sync::Arc<AtomicBool>,
+    queue: std::sync::Arc<parking_lot::RwLock<Q>>,
+    chain: C,
+    min_redeem_value: HoprBalance,
+    channel_id: ChannelId,
+}
+
+impl<C, Q> Drop for RedeemState<C, Q> {
+    fn drop(&mut self) {
+        self.lock.store(false, std::sync::atomic::Ordering::Release);
+    }
 }
 
 impl<S> HoprTicketManager<S, S::Queue>
@@ -568,7 +597,7 @@ where
             .channel_tickets
             .get(channel_id)
             .map(|q| {
-                if q.redeem_lock.is_locked() {
+                if q.redeem_lock.load(std::sync::atomic::Ordering::Relaxed) {
                     tracing::warn!(%channel_id, "neglecting tickets in channel while redeeming is ongoing");
                 }
                 q.queue.clone()
@@ -611,36 +640,36 @@ where
     /// If there's already an existing redeem stream for the channel, an error is returned without creating a new
     /// stream.
     ///
-    /// Possible errors during redemption are passed up via the stream, so the caller may choose if
-    /// they wish to continue redeeming tickets based on the encountered error and/or to do any accounting.
+    /// The stream terminates when there are no more tickets to process in the queue, or an error is encountered.
     pub fn redeem_stream<C>(
         &self,
         chain: C,
         channel_id: &ChannelId,
         min_redeem_value: Option<HoprBalance>,
-    ) -> Result<impl futures::Stream<Item = Result<RedemptionResult, TicketManagerError>>, TicketManagerError>
+    ) -> Result<impl futures::Stream<Item = Result<RedemptionResult, TicketManagerError>> + Send, TicketManagerError>
     where
         C: hopr_api::chain::ChainWriteTicketOperations + Send + Sync + 'static,
     {
-        struct RedeemState<Cc, Qq> {
-            _lock: parking_lot::ArcMutexGuard<parking_lot::RawMutex, ()>,
-            queue: std::sync::Arc<parking_lot::RwLock<Qq>>,
-            chain: Cc,
-            min_redeem_value: HoprBalance,
-            channel_id: ChannelId,
-        }
-
         let initial_state = match self.channel_tickets.get(channel_id) {
-            Some(ticket_queue) => RedeemState {
-                _lock: ticket_queue
+            Some(ticket_queue) => {
+                ticket_queue
                     .redeem_lock
-                    .try_lock_arc()
-                    .ok_or(TicketManagerError::AlreadyRedeeming)?,
-                queue: ticket_queue.queue.clone(),
-                chain,
-                min_redeem_value: min_redeem_value.unwrap_or_default(), // default min is 0 wxHOPR
-                channel_id: *channel_id,
-            },
+                    .compare_exchange(
+                        false,
+                        true,
+                        std::sync::atomic::Ordering::Acquire,
+                        std::sync::atomic::Ordering::Relaxed,
+                    )
+                    .map_err(|_| TicketManagerError::AlreadyRedeeming)?;
+
+                RedeemState {
+                    lock: ticket_queue.redeem_lock.clone(),
+                    queue: ticket_queue.queue.clone(),
+                    chain,
+                    min_redeem_value: min_redeem_value.unwrap_or_default(), // default min is 0 wxHOPR
+                    channel_id: *channel_id,
+                }
+            }
             None => return Err(TicketManagerError::ChannelQueueNotFound),
         };
 
@@ -648,92 +677,71 @@ where
             // Peek here and release the read lock to prevent holding it across an `await`
             let next_ticket = state.queue.read().0.peek();
             async move {
-                match next_ticket {
-                    Ok(Some(ticket)) => {
-                        let ticket_id = ticket.ticket_id();
-                        let (redeem_result, remove_ticket) =
-                            if ticket.verified_ticket().amount >= state.min_redeem_value {
-                                match state.chain.redeem_ticket(ticket).await {
-                                    Ok(redeem_fut) => {
-                                        let redemption_result = redeem_fut.await;
-
-                                        // See if we need to remove this ticket after the error
-                                        let pop_ticket = match &redemption_result {
-                                            Ok(_) | Err(TicketRedeemError::Rejected(..)) => true,
-                                            Err(TicketRedeemError::ProcessingError(..)) => false,
-                                        };
-
-                                        (
-                                            redemption_result
-                                                .map(|(ticket, _)| Some(RedemptionResult::Redeemed(ticket)))
-                                                .map_err(TicketManagerError::redeem),
-                                            pop_ticket,
-                                        )
+                match next_ticket.map_err(TicketManagerError::store)? {
+                    Some(ticket_to_redeem) => {
+                        // Attempt to redeem the ticket if it is of sufficient value
+                        let redeem_attempt_result =
+                            if ticket_to_redeem.verified_ticket().amount >= state.min_redeem_value {
+                                match state.chain.redeem_ticket(ticket_to_redeem).and_then(identity).await {
+                                    Ok((redeemed_ticket, _)) => Ok(Some(RedemptionResult::Redeemed(redeemed_ticket))),
+                                    Err(TicketRedeemError::Rejected(ticket, reason)) => {
+                                        Ok(Some(RedemptionResult::RejectedOnChain(ticket, reason)))
                                     }
-                                    Err(error) => {
-                                        // See if we need to remove this ticket after the error
-                                        let reject_ticket = match &error {
-                                            TicketRedeemError::Rejected(..) => true,
-                                            TicketRedeemError::ProcessingError(..) => false,
-                                        };
-                                        (Err(TicketManagerError::redeem(error)), reject_ticket)
+                                    Err(TicketRedeemError::ProcessingError(_, err)) => {
+                                        Err(TicketManagerError::redeem(err))
                                     }
                                 }
                             } else {
-                                // Tickets with low value are treated as errors and discarded
-                                (Ok(Some(RedemptionResult::ValueTooLow(ticket.ticket))), true)
+                                // Tickets with low value are treated as neglected
+                                Ok(Some(RedemptionResult::ValueTooLow(ticket_to_redeem.ticket)))
                             };
 
-                        // Check if we should remove the ticket from the queue
-                        if remove_ticket {
-                            // Pop and drop the write lock not to block any readers
+                        // Once the redemption has been completed, no matter if successful or not,
+                        // check if we need to remove the ticket from the redemption queue.
+                        if let Ok(Some(redeem_complete_result)) =  &redeem_attempt_result {
+                            // In this case, no matter if the ticket has been redeemed,
+                            // neglected or rejected, we're still removing it from the queue.
+                            // Otherwise, the ticket stays in the queue due to a recoverable error
+
                             let mut queue_write = state.queue.write();
-                            match queue_write.0.pop() {
-                                Ok(Some(ticket)) => {
-                                    match &redeem_result {
-                                        Ok(Some(RedemptionResult::Redeemed(_))) => {}, // no accounting here
-                                        Ok(Some(_)) => {
-                                            tracing::warn!(%ticket_id, "ticket has been neglected");
-                                            queue_write.1.neglected_value += ticket.verified_ticket().amount;
-                                        }
-                                        Err(_) => {
-                                            tracing::warn!(%ticket_id, "ticket has been rejected");
-                                            queue_write.1.rejected_value += ticket.verified_ticket().amount;
-                                        },
-                                        _ => {}
-                                    }
+                            let pop_res = queue_write.0.pop().map_err(TicketManagerError::store)?;
+
+                            // Do accounting of the ticket into the stats
+                            match redeem_complete_result {
+                                RedemptionResult::Redeemed(ticket) => {
+                                    // No stats accounting here:
+                                    // the total redeemed value should be queried from the chain instead.
+                                    tracing::info!(%ticket, "ticket has been redeemed");
                                 },
-                                Ok(None) => {
-                                    // This can only happen if `neglect_tickets` was called while redeeming,
-                                    // and it has neglected the ticket during this race-condition.
-                                    // In this case we need to correct the neglected value, because
-                                    // the ticket has been actually redeemed successfully.
-                                    if matches!(&redeem_result, Ok(Some(RedemptionResult::Redeemed(_)))) {
-                                        tracing::warn!(%ticket_id, "ticket has been neglected from the queue while it was actually redeemed");
-                                        queue_write.1.neglected_value -= ticket.verified_ticket().amount;
-                                    }
-                                }
-                                Err(error) => {
-                                    tracing::error!(%error, %ticket_id, "failed to pop ticket from queue");
-                                }
+                                RedemptionResult::ValueTooLow(ticket) => {
+                                    queue_write.1.neglected_value += ticket.verified_ticket().amount;
+                                    tracing::warn!(%ticket, "ticket has been neglected");
+                                },
+                                RedemptionResult::RejectedOnChain(ticket, reason) => {
+                                    queue_write.1.rejected_value += ticket.verified_ticket().amount;
+                                    tracing::warn!(%ticket, reason, "ticket has been rejected on-chain");
+                                },
+                            }
+
+                            // This can only happen if `neglect_tickets` has been called while redeeming,
+                            // and it has neglected the ticket during this race-condition.
+                            // In this case we only need to correct the neglected value because
+                            // the ticket has been actually redeemed/rejected or was accounted
+                            // as neglected twice.
+                            if pop_res.is_none() {
+                                let ticket = redeem_complete_result.as_ref();
+                                tracing::warn!(%ticket, "ticket has been neglected from the queue while it actually completed the redemption process");
+                                queue_write.1.neglected_value -= ticket.verified_ticket().amount;
                             }
                         }
 
-                        redeem_result
-                            .inspect(|_| tracing::debug!(%ticket_id, "ticket redemption done"))
-                            .inspect_err(
-                                |error| tracing::error!(%error, %ticket_id, remove_ticket, "ticket redemption failed"),
-                            )
+                        redeem_attempt_result
                     }
-                    Ok(None) => {
+                    None => {
                         // No more tickets to redeem in this channel
                         // Keep the queue in even if it is empty. The cleanup is done only on startup.
                         tracing::debug!(channel_id = %state.channel_id, "no more tickets to redeem in channel");
                         Ok(None)
-                    }
-                    Err(error) => {
-                        // Pass errors from the queue
-                        Err(TicketManagerError::store(error))
                     }
                 }
                 .map(|s| s.map(|v| (v, state)))
@@ -1425,6 +1433,7 @@ mod tests {
     async fn create_test_connector(
         private_key: &ChainKeypair,
         channel: &ChannelEntry,
+        tx_sim_delay: Option<std::time::Duration>,
     ) -> anyhow::Result<TestConnector> {
         let module_addr: [u8; 20] = [1; 20];
         // We need to be channel destination because we'll be redeeming tickets
@@ -1458,7 +1467,8 @@ mod tests {
             ])
             .with_channels([*channel])
             .with_hopr_network_chain_info("rotsee")
-            .build_dynamic_client(module_addr.into());
+            .build_dynamic_client(module_addr.into())
+            .with_tx_simulation_delay(tx_sim_delay.unwrap_or(std::time::Duration::from_millis(500)));
 
         let mut connector = TestConnector::new(
             private_key.clone(),
@@ -1506,7 +1516,7 @@ mod tests {
             unrealized_value
         );
 
-        let connector = create_test_connector(&dst, &channel).await?;
+        let connector = create_test_connector(&dst, &channel, None).await?;
 
         let stream = mgr.redeem_stream(connector, channel.get_id(), None)?;
 
@@ -1568,7 +1578,7 @@ mod tests {
             assert!(mgr.insert_incoming_ticket(*ticket)?.is_empty());
         }
 
-        let connector = std::sync::Arc::new(create_test_connector(&dst, &channel).await?);
+        let connector = std::sync::Arc::new(create_test_connector(&dst, &channel, None).await?);
 
         let stream = mgr.redeem_stream(connector.clone(), channel.get_id(), None)?;
 
@@ -1611,7 +1621,7 @@ mod tests {
             unrealized_value
         );
 
-        let connector = std::sync::Arc::new(create_test_connector(&dst, &channel).await?);
+        let connector = std::sync::Arc::new(create_test_connector(&dst, &channel, None).await?);
 
         let stream = mgr.redeem_stream(connector.clone(), channel.get_id(), None)?;
         pin_mut!(stream);
@@ -1667,7 +1677,7 @@ mod tests {
             unrealized_value
         );
 
-        let connector = std::sync::Arc::new(create_test_connector(&dst, &channel).await?);
+        let connector = std::sync::Arc::new(create_test_connector(&dst, &channel, None).await?);
 
         let stream = mgr.redeem_stream(connector.clone(), channel.get_id(), None)?;
         pin_mut!(stream);
@@ -1712,6 +1722,62 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn ticket_manager_ticket_neglection_during_on_chain_redemption_should_be_detected() -> anyhow::Result<()> {
+        let mgr = std::sync::Arc::new(create_mgr()?);
+
+        let src = ChainKeypair::random();
+        let dst = ChainKeypair::random();
+
+        let channel = ChannelEntry::builder()
+            .between(&src, &dst)
+            .amount(10_000_000_000_u64)
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(1)
+            .build()?;
+
+        let mut tickets = generate_owned_tickets(&src, &dst, 5, 1..=1)?;
+        tickets.shuffle(&mut rand::rng());
+
+        for ticket in tickets.iter() {
+            assert!(mgr.insert_incoming_ticket(*ticket)?.is_empty());
+        }
+
+        tickets.sort();
+
+        let connector =
+            std::sync::Arc::new(create_test_connector(&dst, &channel, Some(std::time::Duration::from_secs(2))).await?);
+
+        let mgr_clone = mgr.clone();
+        let jh = tokio::task::spawn(async move {
+            let stream = mgr_clone.redeem_stream(connector.clone(), channel.get_id(), None)?;
+            pin_mut!(stream);
+            stream.try_next().await
+        });
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        // All the tickets will appear as neglected
+        let neglected = mgr.neglect_tickets(&channel.get_id(), None)?;
+        assert_eq!(neglected, tickets.iter().map(|t| t.ticket).collect::<Vec<_>>());
+
+        assert_eq!(
+            TicketStats {
+                winning_tickets: tickets.len() as u128,
+                unredeemed_value: HoprBalance::zero(),
+                rejected_value: HoprBalance::zero(),
+                neglected_value: neglected.iter().map(|t| t.verified_ticket().amount).sum(),
+            },
+            mgr.get_stats(Some(&channel.get_id()))?
+        );
+
+        // Once redemption completes we should see the tickets as redeemed
+        let res = jh.await??;
+        assert_eq!(Some(RedemptionResult::Redeemed(tickets[0].ticket)), res);
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn ticket_manager_ticket_redemption_should_skip_low_value_tickets() -> anyhow::Result<()> {
         let mgr = create_mgr()?;
 
@@ -1741,7 +1807,7 @@ mod tests {
             unrealized_value
         );
 
-        let connector = std::sync::Arc::new(create_test_connector(&dst, &channel).await?);
+        let connector = std::sync::Arc::new(create_test_connector(&dst, &channel, None).await?);
 
         let results = mgr
             .redeem_stream(

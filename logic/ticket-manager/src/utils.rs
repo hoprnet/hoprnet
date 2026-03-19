@@ -149,7 +149,7 @@ impl OutgoingIndexCache {
 #[derive(Debug)]
 pub struct ChannelTicketQueue<Q> {
     pub(crate) queue: std::sync::Arc<parking_lot::RwLock<(Q, ChannelTicketStats)>>,
-    pub(crate) redeem_lock: std::sync::Arc<parking_lot::Mutex<()>>,
+    pub(crate) redeem_lock: std::sync::Arc<AtomicBool>,
 }
 
 impl<Q: TicketQueue> From<Q> for ChannelTicketQueue<Q> {
@@ -160,7 +160,7 @@ impl<Q: TicketQueue> From<Q> for ChannelTicketQueue<Q> {
         };
         Self {
             queue: std::sync::Arc::new(parking_lot::RwLock::new((queue, stats))),
-            redeem_lock: std::sync::Arc::new(parking_lot::Mutex::new(())),
+            redeem_lock: std::sync::Arc::new(AtomicBool::new(false)),
         }
     }
 }
