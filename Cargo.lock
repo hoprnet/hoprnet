@@ -4849,6 +4849,7 @@ dependencies = [
  "hopr-async-runtime",
  "hopr-metrics",
  "hopr-types",
+ "insta",
  "lazy_static",
  "libp2p-identity",
  "multiaddr",
