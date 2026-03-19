@@ -7,7 +7,7 @@ use std::{
 };
 
 use hopr_api::Multiaddr;
-pub use hopr_protocol_hopr::{HoprCodecConfig, HoprTicketProcessorConfig, SurbStoreConfig};
+pub use hopr_protocol_hopr::{HoprCodecConfig, HoprUnacknowledgedTicketProcessorConfig, SurbStoreConfig};
 pub use hopr_transport_probe::config::ProbeConfig;
 use hopr_transport_protocol::PacketPipelineConfig;
 use hopr_transport_session::{MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION};
@@ -43,7 +43,7 @@ pub struct HoprProtocolConfig {
 }
 
 /// Configuration of the HOPR packet pipeline.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Validate)]
+#[derive(Clone, Copy, Debug, PartialEq, Validate, smart_default::SmartDefault)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize),
@@ -54,10 +54,10 @@ pub struct HoprPacketPipelineConfig {
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
     pub codec: HoprCodecConfig,
-    /// HOPR ticket processing configuration
+    /// Configuration of unacknowledged tickets processing.
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
-    pub ticket_processing: HoprTicketProcessorConfig,
+    pub ack_processor: HoprUnacknowledgedTicketProcessorConfig,
     /// Single Use Reply Block (SURB) handling configuration
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
@@ -66,6 +66,28 @@ pub struct HoprPacketPipelineConfig {
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
     pub pipeline: PacketPipelineConfig,
+    /// Defines how often should the packet pipeline synchronize the outgoing ticket
+    /// indices to the persistent storage.
+    ///
+    /// Default is 15 seconds, minimum is 1 second.
+    #[default(default_out_index_sync_period())]
+    #[validate(custom(function = "validate_out_index_sync_period"))]
+    #[cfg_attr(feature = "serde", serde(default, with = "humantime_serde"))]
+    pub out_index_sync_period: Duration,
+}
+
+const MINIMUM_OUT_SYNC_PERIOD: Duration = Duration::from_secs(1);
+
+fn validate_out_index_sync_period(lifetime: &Duration) -> Result<(), ValidationError> {
+    if lifetime < &MINIMUM_OUT_SYNC_PERIOD {
+        Err(ValidationError::new("out_index_sync_period is too low"))
+    } else {
+        Ok(())
+    }
+}
+
+fn default_out_index_sync_period() -> Duration {
+    Duration::from_secs(15)
 }
 
 regex!(is_dns_address_regex "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$");

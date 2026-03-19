@@ -79,7 +79,7 @@ fn just_true() -> bool {
     true
 }
 
-/// Configuration for the HOPR ticket processor within the packet pipeline.
+/// Configuration for the [`HoprUnacknowledgedTicketProcessor`].
 
 #[derive(Debug, Clone, Copy, smart_default::SmartDefault, PartialEq, validator::Validate)]
 #[cfg_attr(
@@ -87,7 +87,7 @@ fn just_true() -> bool {
     derive(serde::Deserialize, serde::Serialize),
     serde(deny_unknown_fields)
 )]
-pub struct HoprTicketProcessorConfig {
+pub struct HoprUnacknowledgedTicketProcessorConfig {
     /// Time after which an unacknowledged ticket is considered stale and is removed from the cache.
     ///
     /// If the counterparty does not send an acknowledgement within this period, the ticket is lost forever.
@@ -121,18 +121,18 @@ pub struct HoprTicketProcessorConfig {
 
 /// HOPR-specific implementation of [`UnacknowledgedTicketProcessor`].
 #[derive(Clone)]
-pub struct HoprTicketProcessor<Chain> {
+pub struct HoprUnacknowledgedTicketProcessor<Chain> {
     unacknowledged_tickets:
         moka::future::Cache<OffchainPublicKey, moka::future::Cache<HalfKeyChallenge, UnacknowledgedTicket>>,
     chain_api: Chain,
     chain_key: ChainKeypair,
     channels_dst: Hash,
-    cfg: HoprTicketProcessorConfig,
+    cfg: HoprUnacknowledgedTicketProcessorConfig,
 }
 
-impl<Chain> HoprTicketProcessor<Chain> {
-    /// Creates a new instance of the HOPR ticket processor.
-    pub fn new(chain_api: Chain, chain_key: ChainKeypair, channels_dst: Hash, cfg: HoprTicketProcessorConfig) -> Self {
+impl<Chain> HoprUnacknowledgedTicketProcessor<Chain> {
+    /// Creates a new instance of the HOPR unacknowledged ticket processor.
+    pub fn new(chain_api: Chain, chain_key: ChainKeypair, channels_dst: Hash, cfg: HoprUnacknowledgedTicketProcessorConfig) -> Self {
         #[cfg(all(feature = "prometheus", not(test)))]
         {
             lazy_static::initialize(&PER_PEER_ENABLED);
@@ -188,7 +188,7 @@ impl<Chain> HoprTicketProcessor<Chain> {
 }
 
 #[async_trait::async_trait]
-impl<Chain> UnacknowledgedTicketProcessor for HoprTicketProcessor<Chain>
+impl<Chain> UnacknowledgedTicketProcessor for HoprUnacknowledgedTicketProcessor<Chain>
 where
     Chain: ChainReadChannelOperations + Send + Sync,
 {
@@ -423,11 +423,11 @@ mod tests {
 
         let node = create_node(1, &blokli_client).await?;
 
-        let ticket_processor = HoprTicketProcessor::new(
+        let ticket_processor = HoprUnacknowledgedTicketProcessor::new(
             node.chain_api.clone(),
             node.chain_key.clone(),
             Hash::default(),
-            HoprTicketProcessorConfig::default(),
+            HoprUnacknowledgedTicketProcessorConfig::default(),
         );
 
         const NUM_TICKETS: usize = 5;
@@ -471,11 +471,11 @@ mod tests {
 
         let node = create_node(1, &blokli_client).await?;
 
-        let ticket_processor = HoprTicketProcessor::new(
+        let ticket_processor = HoprUnacknowledgedTicketProcessor::new(
             node.chain_api.clone(),
             node.chain_key.clone(),
             Hash::default(),
-            HoprTicketProcessorConfig::default(),
+            HoprUnacknowledgedTicketProcessorConfig::default(),
         );
 
         const NUM_ACKS: usize = 5;

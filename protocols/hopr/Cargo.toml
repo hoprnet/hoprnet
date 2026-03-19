@@ -62,6 +62,7 @@ hopr-chain-connector = { workspace = true, features = [
   "runtime-tokio",
 ] }
 
+
 [[bench]]
 name = "bloom_filter"
 harness = false

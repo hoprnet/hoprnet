@@ -56,7 +56,7 @@ pub(crate) const BASE_PATH: &str = const_format::formatcp!("/api/v{}", env!("CAR
 
 type HoprBlokliConnector = HoprBlockchainSafeConnector<hopr_chain_connector::blokli_client::BlokliClient>;
 
-pub(crate) type HoprNode = Hopr<Arc<HoprBlokliConnector>, HoprNodeDb, SharedChannelGraph, HoprNetwork>;
+pub(crate) type HoprNode = Hopr<Arc<HoprBlokliConnector>, SharedChannelGraph, HoprNetwork>;
 
 #[derive(Clone)]
 pub(crate) struct AppState {

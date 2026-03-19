@@ -17,7 +17,7 @@ use crate::{HoprTransportProcess, config::HoprPacketPipelineConfig};
 
 /// Contains all components required to run the HOPR packet pipeline.
 #[derive(Clone)]
-pub struct HoprPipelineComponents<TEvt, S, Chain, Backend, TktQueue> {
+pub struct HoprPipelineComponents<TEvt, S, Chain, TktBackend, TktQueue> {
     /// Sink for [`TicketEvents`](TicketEvent).
     pub ticket_events: TEvt,
     /// Store for SURBs and Reply Openers.
@@ -25,7 +25,7 @@ pub struct HoprPipelineComponents<TEvt, S, Chain, Backend, TktQueue> {
     /// Chain API for interacting with the blockchain.
     pub chain_api: Chain,
     /// Ticket manager for managing ticket queues and outgoing ticket indices.
-    pub ticket_manager: std::sync::Arc<HoprTicketManager<Backend, TktQueue>>,
+    pub ticket_manager: std::sync::Arc<HoprTicketManager<TktBackend, TktQueue>>,
 }
 
 pub fn run_hopr_packet_pipeline<WIn, WOut, Chain, S, TEvt, TktBackend, AppOut, AppIn>(
@@ -57,11 +57,11 @@ where
         ticket_manager,
     } = components;
 
-    let ticket_proc = HoprTicketProcessor::new(
+    let unack_ticket_proc = HoprUnacknowledgedTicketProcessor::new(
         chain_api.clone(),
         chain_key.clone(),
         channels_dst,
-        cfg.ticket_processing,
+        cfg.ack_processor,
     );
 
     let encoder = HoprEncoder::new(
@@ -110,28 +110,27 @@ where
         )
     };
 
+    // TODO: is the responsibility of the packet pipeline, or of some upper component?
+    // Make sure the outgoing ticket indices are synchronized to the persistent storage periodically.
     let (index_sync_handle, index_sync_reg) = futures::future::AbortHandle::new_pair();
-
-    // TODO: make this configurable
-    let sync_time = std::time::Duration::from_secs(15);
-
     hopr_async_runtime::prelude::spawn(futures::stream::Abortable::new(
-        futures_time::stream::interval(sync_time.into()).for_each(move |_| {
+        futures_time::stream::interval(cfg.out_index_sync_period.into()).for_each(move |_| {
             let ticket_manager = ticket_manager.clone();
             async move {
                 if let Err(error) =
                     hopr_async_runtime::prelude::spawn_blocking(move || ticket_manager.save_outgoing_indices())
-                        .map_err(|e| TicketManagerError::store(e))
+                        .map_err(TicketManagerError::store)
                         .and_then(futures::future::ready)
                         .await
                 {
-                    tracing::error!(%error, "failed to sync ticket index");
+                    tracing::error!(%error, "failed to sync ticket indices to persistent storage:");
+                } else {
+                    tracing::trace!("successfully synced ticket indices");
                 }
             }
         }),
         index_sync_reg,
     ));
-
     processes.insert(HoprTransportProcess::OutgoingIndexSync, index_sync_handle);
 
     processes.flat_map_extend_from(
@@ -139,7 +138,7 @@ where
             packet_key.clone(),
             wire_msg,
             (encoder, decoder),
-            ticket_proc,
+            unack_ticket_proc,
             ticket_events,
             cfg.pipeline,
             api,

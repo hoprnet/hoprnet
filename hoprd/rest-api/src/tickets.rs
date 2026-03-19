@@ -89,8 +89,8 @@ pub(super) async fn show_channel_tickets(
     State(state): State<Arc<InternalState>>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
-
-    match Hash::from_hex(channel_id.as_str()) {
+    (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response()
+    /*match Hash::from_hex(channel_id.as_str()) {
         Ok(channel_id) => match hopr.tickets_in_channel(&channel_id).await {
             Ok(Some(_tickets)) => {
                 let tickets: Vec<ChannelTicket> = vec![];
@@ -100,7 +100,7 @@ pub(super) async fn show_channel_tickets(
             Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
         },
         Err(_) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
-    }
+    }*/
 }
 
 /// Endpoint is deprecated and will be removed in the future. Returns an empty array.

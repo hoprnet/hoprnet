@@ -4,6 +4,7 @@ pub use hopr_transport_probe::errors::ProbeError;
 pub use hopr_transport_protocol::errors::ProtocolError;
 use hopr_transport_session::errors::TransportSessionError;
 use thiserror::Error;
+use hopr_ticket_manager::TicketManagerError;
 
 /// Errors produced by the crate.
 #[derive(Error, Debug)]
@@ -26,6 +27,9 @@ pub enum HoprTransportError {
     #[error("Transport session error: {0}")]
     Session(#[from] TransportSessionError),
 
+    #[error("Ticket manager error: {0}")]
+    TicketManager(#[from] TicketManagerError),
+    
     #[error("Packet error: {0}")]
     Packet(#[from] PacketError),
 

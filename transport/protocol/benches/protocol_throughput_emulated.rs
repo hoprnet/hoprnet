@@ -19,7 +19,7 @@ use hopr_chain_connector::create_trustful_hopr_blokli_connector;
 use hopr_crypto_packet::{HoprSurb, prelude::HoprPacket};
 use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut};
 use hopr_protocol_hopr::{
-    HoprCodecConfig, HoprDecoder, HoprEncoder, HoprTicketProcessor, HoprTicketProcessorConfig, MemorySurbStore,
+    HoprCodecConfig, HoprDecoder, HoprEncoder, HoprUnacknowledgedTicketProcessor, HoprUnacknowledgedTicketProcessorConfig, MemorySurbStore,
     SurbStoreConfig,
 };
 use hopr_ticket_manager::{HoprTicketManager, RedbStore};
@@ -101,11 +101,11 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                             ..Default::default()
                         };
 
-                        let ticket_proc = HoprTicketProcessor::new(
+                        let ticket_proc = HoprUnacknowledgedTicketProcessor::new(
                             connectors[TESTED_PEER_ID].clone(),
                             PEERS_CHAIN[TESTED_PEER_ID].clone(),
                             channels_dst,
-                            HoprTicketProcessorConfig::default(),
+                            HoprUnacknowledgedTicketProcessorConfig::default(),
                         );
 
                         let encoder = HoprEncoder::new(

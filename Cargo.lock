@@ -4953,6 +4953,7 @@ dependencies = [
  "rand 0.10.0",
  "redb",
  "serde",
+ "strum 0.28.0",
  "tempfile",
  "test-log",
  "thiserror 2.0.18",

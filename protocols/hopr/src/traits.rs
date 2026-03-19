@@ -1,7 +1,6 @@
 use hopr_api::types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*};
 use hopr_crypto_packet::prelude::*;
 use hopr_ticket_manager::{HoprTicketManager, OutgoingIndexStore, TicketManagerError, TicketQueueStore};
-
 pub use crate::{
     errors::IncomingPacketError,
     types::{FoundSurb, IncomingPacket, OutgoingPacket, ResolvedAcknowledgement},
@@ -12,6 +11,7 @@ pub use crate::{
 ///
 /// The sending side stores the reply openers, whereas the SURBs are stored by the replying side
 /// of the communication.
+// TODO: refactor this trait to be sync (see https://github.com/hoprnet/hoprnet/pull/7915)
 #[async_trait::async_trait]
 #[auto_impl::auto_impl(&, Box, Arc)]
 pub trait SurbStore {
@@ -51,6 +51,7 @@ pub trait SurbStore {
 ///
 /// These operations are done directly by the packet processing pipeline before
 /// the outgoing packet is handled to the underlying p2p transport.
+// TODO: refactor this trait to be sync (see https://github.com/hoprnet/hoprnet/pull/7915)
 #[async_trait::async_trait]
 #[auto_impl::auto_impl(&, Box, Arc)]
 pub trait PacketEncoder {
@@ -80,6 +81,7 @@ pub trait PacketEncoder {
 ///
 /// This operation is done directly by the packet processing pipeline after
 /// the underlying p2p transport hands over incoming data packets.
+// TODO: refactor this trait to be sync (see https://github.com/hoprnet/hoprnet/pull/7915)
 #[async_trait::async_trait]
 #[auto_impl::auto_impl(&, Box, Arc)]
 pub trait PacketDecoder {
@@ -109,6 +111,7 @@ impl<E> TicketAcknowledgementError<E> {
 }
 
 /// Performs necessary processing of unacknowledged tickets in the HOPR packet processing pipeline.
+// TODO: refactor this trait to be sync (see https://github.com/hoprnet/hoprnet/pull/7915)
 #[async_trait::async_trait]
 #[auto_impl::auto_impl(&, Box, Arc)]
 pub trait UnacknowledgedTicketProcessor {
@@ -150,6 +153,7 @@ pub trait UnacknowledgedTicketProcessor {
 
 /// Allows tracking ticket indices of outgoing channels and
 /// unrealized balances of incoming channels.
+// TODO: refactor this trait to be sync (see https://github.com/hoprnet/hoprnet/pull/7915)
 #[async_trait::async_trait]
 #[auto_impl::auto_impl(&, Box, Arc)]
 pub trait TicketTracker {
@@ -176,7 +180,7 @@ pub trait TicketTracker {
     ) -> Result<TicketBuilder, Self::Error>;
 }
 
-// TODO: refactor this trait to be sync (see https://github.com/hoprnet/hoprnet/pull/7915)
+// TODO: move this impl to a more suitable place in PR #7915
 #[async_trait::async_trait]
 impl<S> TicketTracker for HoprTicketManager<S, S::Queue>
 where

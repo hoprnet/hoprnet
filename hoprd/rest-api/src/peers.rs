@@ -230,22 +230,4 @@ pub(super) async fn peer_stats(
             "BUILT WITHOUT STATS SUPPORT".into(),
         ))
     }
-
-    #[cfg(feature = "telemetry")]
-    {
-        let hopr = _state.hopr.clone();
-
-        match hopr.chain_key_to_peerid(&_destination).await {
-            Ok(Some(peer)) => match hopr.network_peer_packet_stats(&peer).await {
-                Ok(Some(stats)) => {
-                    let resp = Json(PeerPacketStatsResponse::from(stats));
-                    Ok((StatusCode::OK, resp))
-                }
-                Ok(None) => Err(ApiErrorStatus::PeerNotFound),
-                Err(_) => Err(ApiErrorStatus::PeerNotFound),
-            },
-            Ok(None) => Err(ApiErrorStatus::PeerNotFound),
-            Err(_) => Err(ApiErrorStatus::PeerNotFound),
-        }
-    }
 }

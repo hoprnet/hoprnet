@@ -19,7 +19,7 @@ use hopr_chain_connector::create_trustful_hopr_blokli_connector;
 use hopr_crypto_packet::HoprSurb;
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::{
-    HoprCodecConfig, HoprDecoder, HoprEncoder, HoprTicketProcessor, HoprTicketProcessorConfig, MemorySurbStore,
+    HoprCodecConfig, HoprDecoder, HoprEncoder, HoprUnacknowledgedTicketProcessor, HoprUnacknowledgedTicketProcessorConfig, MemorySurbStore,
     SurbStoreConfig,
 };
 use hopr_ticket_manager::{HoprTicketManager, RedbStore};
@@ -165,11 +165,11 @@ pub async fn peer_setup_for(
             outgoing_win_prob: Some(WinningProbability::ALWAYS),
         };
 
-        let ticket_proc = HoprTicketProcessor::new(
+        let ticket_proc = HoprUnacknowledgedTicketProcessor::new(
             connector.clone(),
             PEERS_CHAIN[i].clone(),
             channels_dst,
-            HoprTicketProcessorConfig::default(),
+            HoprUnacknowledgedTicketProcessorConfig::default(),
         );
 
         let ticket_mgr = Arc::new(HoprTicketManager::new(RedbStore::new_temp()?)?);

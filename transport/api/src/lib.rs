@@ -34,11 +34,7 @@ use std::{
 };
 
 use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
-use futures::{
-    FutureExt, StreamExt,
-    channel::mpsc::{Sender, channel},
-    stream::select_with_strategy,
-};
+use futures::{FutureExt, StreamExt, channel::mpsc::{Sender, channel}, stream::select_with_strategy, SinkExt, Stream, TryStreamExt};
 use helpers::PathPlanner;
 use hopr_api::{
     chain::{ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
@@ -103,8 +99,9 @@ use crate::{
 pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RANGE;
 
 pub use hopr_api as api;
+use hopr_api::chain::{ChainWriteTicketOperations, ChannelSelector};
 use hopr_api::types::internal::routing::DestinationRouting;
-use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue};
+use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue, RedemptionResult};
 
 // Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
 lazy_static::lazy_static! {
@@ -182,6 +179,7 @@ impl<Chain, Graph, Net> HoprTransport<Chain, Graph, Net>
 where
     Chain: ChainReadChannelOperations
         + ChainReadAccountOperations
+        + ChainWriteTicketOperations
         + ChainKeyOperations
         + ChainValues
         + Clone
@@ -262,7 +260,7 @@ where
     )>
     where
         T: futures::Sink<TicketEvent> + Clone + Send + Unpin + 'static,
-        T::Error: std::error::Error,
+        T::Error: std::error::Error + Clone + Send,
         Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
         NetBuilder: NetworkBuilder<Network = Net> + Send + Sync + 'static,
     {
@@ -418,6 +416,27 @@ where
             .in_current_span()
         });
 
+        // Synchronize the ticket manager with the chain before starting the packet pipeline
+
+        self.tmgr.sync_from_incoming_channels(
+            &self.chain_api
+                .stream_channels(ChannelSelector::default().with_destination(&self.chain_key))
+                .await
+                .map_err(HoprTransportError::chain)?
+                .collect::<Vec<_>>()
+                .await
+        )?;
+
+        self.tmgr.sync_from_outgoing_channels(
+            &self.chain_api
+                .stream_channels(ChannelSelector::default().with_source(&self.chain_key))
+                .await
+                .map_err(HoprTransportError::chain)?
+                .collect::<Vec<_>>()
+                .await
+        )?;
+
+
         let channels_dst = self
             .chain_api
             .domain_separators()
@@ -425,12 +444,22 @@ where
             .map_err(HoprTransportError::chain)?
             .channel;
 
+        let tmgr_clone = self.tmgr.clone();
         processes.extend_from(pipeline::run_hopr_packet_pipeline(
             (self.packet_key.clone(), self.chain_key.clone()),
             (mixing_channel_tx, wire_msg_rx),
             (tx_from_protocol, all_resolved_external_msg_rx),
             HoprPipelineComponents {
-                ticket_events,
+                ticket_events: ticket_events
+                    .with(move |event| {
+                        // Make sure winning tickets are passed to the ticket manager
+                        if let TicketEvent::WinningTicket(ticket) = &event {
+                            if let Err(error) = tmgr_clone.insert_incoming_ticket(**ticket) {
+                                tracing::error!(%error, "failed to insert winning ticket into redemption queue");
+                            }
+                        }
+                        futures::future::ok::<_, T::Error>(event)
+                    }),
                 surb_store: self.path_planner.surb_store.clone(),
                 chain_api: self.chain_api.clone(),
                 ticket_manager: self.tmgr.clone(),
@@ -551,6 +580,17 @@ where
                 "no observations available for peer {peer}",
             )))
         }
+    }
+
+    pub fn redeem_tickets_in_channel(&self, channel_id: ChannelId, min_value: Option<HoprBalance>) -> errors::Result<impl Stream<Item = errors::Result<RedemptionResult>> + Send> {
+        Ok(self.tmgr.redeem_stream(self.chain_api.clone(), channel_id, min_value)?
+            .map_err(HoprTransportError::TicketManager))
+    }
+
+    pub fn neglect_tickets_in_channel(&self, channel_id: &ChannelId, max_index: Option<u64>) -> errors::Result<()> {
+        self.tmgr.neglect_tickets(channel_id, max_index)
+            .map(|_| ())
+            .map_err(HoprTransportError::TicketManager)
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
@@ -714,20 +754,6 @@ where
                 }
             })
             .collect::<Vec<_>>())
-    }
-
-    /// Get packet stats snapshot for a specific peer.
-    #[cfg(feature = "telemetry")]
-    #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn network_peer_packet_stats(&self, peer: &PeerId) -> errors::Result<Option<PeerPacketStatsSnapshot>> {
-        Err(HoprTransportError::Api("not implemented yet".into()))
-    }
-
-    /// Get packet stats for all connected peers.
-    #[cfg(feature = "telemetry")]
-    #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn network_all_packet_stats(&self) -> errors::Result<Vec<(PeerId, PeerPacketStatsSnapshot)>> {
-        Err(HoprTransportError::Api("not implemented yet".into()))
     }
 }
 

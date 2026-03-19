@@ -169,10 +169,6 @@ pub(crate) struct PeerObservations {
     average_latency: u128,
     #[schema(example = 0.7)]
     score: f64,
-    /// Packet statistics for this peer (if available).
-    #[cfg(feature = "telemetry")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    packet_stats: Option<PeerPacketStatsResponse>,
 }
 
 #[serde_as]
@@ -297,13 +293,6 @@ pub(super) async fn peers(
                         .map_or(0, |latency| latency.as_millis()),
                     probe_rate: info.immediate_qos().map_or(0.0, |qos| qos.average_probe_rate()),
                     score: info.score(),
-                    #[cfg(feature = "telemetry")]
-                    packet_stats: hopr
-                        .network_peer_packet_stats(&peer)
-                        .await
-                        .ok()
-                        .flatten()
-                        .map(PeerPacketStatsResponse::from),
                 })
             }
         })

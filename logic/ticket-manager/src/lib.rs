@@ -255,6 +255,7 @@ where
             tracing::debug!(%id, epoch, out_index, "loaded outgoing ticket index for channel");
         }
 
+        tracing::debug!(num_channels = outgoing_channels.len(), "synchronized with outgoing channels");
         Ok(())
     }
 
@@ -315,13 +316,16 @@ where
 }
 
 /// Indicates a non-error result of [ticket redemption](HoprTicketManager::redeem_stream).
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, strum::Display)]
 pub enum RedemptionResult {
     /// Ticket has been redeemed successfully.
+    #[strum(to_string = "redeemed {0}")]
     Redeemed(VerifiedTicket),
     /// Ticket has been neglected because its value was lower than the threshold.
+    #[strum(to_string = "neglected {0} due to low value")]
     ValueTooLow(VerifiedTicket),
     /// Ticket has been rejected on-chain with for the given reason.
+    #[strum(to_string = "rejected {0} on-chain: {1}")]
     RejectedOnChain(VerifiedTicket, String),
 }
 
@@ -443,6 +447,7 @@ where
             self.channel_tickets.insert(*id, queue.into());
         }
 
+        tracing::debug!(num_channels = incoming_channels.len(), num_neglected = neglected.len(), "synchronized with incoming channels");
         Ok(neglected)
     }
 
@@ -646,13 +651,13 @@ where
     pub fn redeem_stream<C>(
         &self,
         chain: C,
-        channel_id: &ChannelId,
+        channel_id: ChannelId,
         min_redeem_value: Option<HoprBalance>,
     ) -> Result<impl futures::Stream<Item = Result<RedemptionResult, TicketManagerError>> + Send, TicketManagerError>
     where
         C: hopr_api::chain::ChainWriteTicketOperations + Send + Sync + 'static,
     {
-        let initial_state = match self.channel_tickets.get(channel_id) {
+        let initial_state = match self.channel_tickets.get(&channel_id) {
             Some(ticket_queue) => {
                 ticket_queue
                     .redeem_lock
@@ -667,9 +672,9 @@ where
                 RedeemState {
                     lock: ticket_queue.redeem_lock.clone(),
                     queue: ticket_queue.queue.clone(),
-                    chain,
                     min_redeem_value: min_redeem_value.unwrap_or_default(), // default min is 0 wxHOPR
-                    channel_id: *channel_id,
+                    chain,
+                    channel_id,
                 }
             }
             None => return Err(TicketManagerError::ChannelQueueNotFound),
@@ -1530,7 +1535,7 @@ mod tests {
 
         let connector = create_test_connector(&dst, &channel, None).await?;
 
-        let stream = mgr.redeem_stream(connector, channel.get_id(), None)?;
+        let stream = mgr.redeem_stream(connector, *channel.get_id(), None)?;
 
         pin_mut!(stream);
 
@@ -1599,13 +1604,13 @@ mod tests {
 
         let connector = std::sync::Arc::new(create_test_connector(&dst, &channel, None).await?);
 
-        let stream = mgr.redeem_stream(connector.clone(), channel.get_id(), None)?;
+        let stream = mgr.redeem_stream(connector.clone(), *channel.get_id(), None)?;
 
-        assert!(mgr.redeem_stream(connector.clone(), channel.get_id(), None).is_err());
+        assert!(mgr.redeem_stream(connector.clone(), *channel.get_id(), None).is_err());
 
         drop(stream);
 
-        assert!(mgr.redeem_stream(connector.clone(), channel.get_id(), None).is_ok());
+        assert!(mgr.redeem_stream(connector.clone(), *channel.get_id(), None).is_ok());
 
         Ok(())
     }
@@ -1644,7 +1649,7 @@ mod tests {
 
         let connector = std::sync::Arc::new(create_test_connector(&dst, &channel, None).await?);
 
-        let stream = mgr.redeem_stream(connector.clone(), channel.get_id(), None)?;
+        let stream = mgr.redeem_stream(connector.clone(), *channel.get_id(), None)?;
         pin_mut!(stream);
 
         assert_eq!(
@@ -1707,7 +1712,7 @@ mod tests {
 
         let connector = std::sync::Arc::new(create_test_connector(&dst, &channel, None).await?);
 
-        let stream = mgr.redeem_stream(connector.clone(), channel.get_id(), None)?;
+        let stream = mgr.redeem_stream(connector.clone(), *channel.get_id(), None)?;
         pin_mut!(stream);
 
         // Ticket with index 0 gets redeemed
@@ -1786,7 +1791,7 @@ mod tests {
 
         let mgr_clone = mgr.clone();
         let jh = tokio::task::spawn(async move {
-            let stream = mgr_clone.redeem_stream(connector.clone(), channel.get_id(), None)?;
+            let stream = mgr_clone.redeem_stream(connector.clone(), *channel.get_id(), None)?;
             pin_mut!(stream);
             stream.try_next().await
         });
@@ -1850,7 +1855,7 @@ mod tests {
         let results = mgr
             .redeem_stream(
                 connector.clone(),
-                channel.get_id(),
+                *channel.get_id(),
                 Some(tickets[0].verified_ticket().amount + 1),
             )?
             .try_collect::<Vec<_>>()
