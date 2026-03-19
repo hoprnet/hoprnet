@@ -203,14 +203,13 @@ where
     ) -> Result<(), Self::Error> {
         tracing::trace!(%ticket, "received unacknowledged ticket");
 
-        //let peer_id = next_hop.to_peerid_str();
         let inner_cache = self
             .unacknowledged_tickets
             .get_with_by_ref(next_hop, async {
-                //let peer_id_for_eviction = peer_id.clone();
                 #[cfg(all(feature = "prometheus", not(test)))]
                 UNACK_PEERS.increment(1.0);
 
+                #[cfg(all(feature = "prometheus", not(test)))]
                 let next_hop = *next_hop;
                 moka::future::Cache::builder()
                     .time_to_live(self.cfg.unack_ticket_timeout)
@@ -220,7 +219,12 @@ where
                         {
                             let peer_id_for_eviction = next_hop.to_peerid_str();
                             UNACK_TICKETS.decrement(1.0);
-                            UNACK_TICKETS_PER_PEER.decrement(&[(*PER_PEER_ENABLED).then(|| peer_id_for_eviction.as_str()).unwrap_or("redacted")], 1.0);
+                            UNACK_TICKETS_PER_PEER.decrement(
+                                &[(*PER_PEER_ENABLED)
+                                    .then(|| peer_id_for_eviction.as_str())
+                                    .unwrap_or("redacted")],
+                                1.0,
+                            );
                         }
 
                         // Only count Expired/Size removals as evictions (not Explicit or Replaced)
@@ -243,7 +247,10 @@ where
             let peer_id = next_hop.to_peerid_str();
             UNACK_INSERTIONS.increment();
             UNACK_TICKETS.increment(1.0);
-            UNACK_TICKETS_PER_PEER.increment(&[(*PER_PEER_ENABLED).then(|| peer_id.as_str()).unwrap_or("redacted")], 1.0);
+            UNACK_TICKETS_PER_PEER.increment(
+                &[(*PER_PEER_ENABLED).then(|| peer_id.as_str()).unwrap_or("redacted")],
+                1.0,
+            );
         }
 
         Ok(())

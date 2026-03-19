@@ -43,7 +43,6 @@ use helpers::PathPlanner;
 use hopr_api::{
     chain::{ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
     ct::{CoverTrafficGeneration, ProbingTrafficGeneration},
-    db::HoprDbTicketOperations,
     graph::{NetworkGraphUpdate, NetworkGraphView, traits::EdgeObservableRead},
     network::{NetworkBuilder, NetworkStreamControl},
     types::{internal::prelude::*, primitive::prelude::*},
@@ -105,7 +104,7 @@ pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RAN
 
 pub use hopr_api as api;
 use hopr_api::types::internal::routing::DestinationRouting;
-use hopr_ticket_manager::{HoprTicketManager, OutgoingIndexStore, RedbStore, RedbTicketQueue, TicketQueueStore};
+use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue};
 
 // Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
 lazy_static::lazy_static! {
@@ -235,7 +234,8 @@ where
                 surb_balance_notify_period: None,
                 surb_target_notify: true,
             }),
-            tmgr: Arc::new(HoprTicketManager::new(RedbStore::new_temp().unwrap()).unwrap()), // TODO: propagate errors correctly
+            tmgr: Arc::new(HoprTicketManager::new(RedbStore::new_temp().unwrap()).unwrap()), /* TODO: propagate
+                                                                                              * errors correctly */
             chain_api: resolver,
             cfg,
         }

@@ -22,12 +22,12 @@ use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, HoprTicketProcessor, HoprTicketProcessorConfig, MemorySurbStore,
     SurbStoreConfig,
 };
+use hopr_ticket_manager::{HoprTicketManager, RedbStore};
 use hopr_transport_mixer::config::MixerConfig;
 use hopr_transport_protocol::TicketEvent;
 use lazy_static::lazy_static;
 use libp2p::PeerId;
 use tracing::debug;
-use hopr_ticket_manager::{HoprTicketManager, RedbStore};
 
 lazy_static! {
     static ref DEFAULT_PRICE_PER_PACKET: HoprBalance = HoprBalance::from_str("0.1 wxHOPR").unwrap();

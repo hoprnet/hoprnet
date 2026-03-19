@@ -22,9 +22,9 @@ use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, HoprTicketProcessor, HoprTicketProcessorConfig, MemorySurbStore,
     SurbStoreConfig,
 };
+use hopr_ticket_manager::{HoprTicketManager, RedbStore};
 use hopr_transport_protocol::TicketEvent;
 use libp2p::PeerId;
-use hopr_ticket_manager::{HoprTicketManager, RedbStore};
 
 const SAMPLE_SIZE: usize = 50;
 
@@ -100,8 +100,7 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                             outgoing_win_prob: Some(WinningProbability::ALWAYS),
                             ..Default::default()
                         };
-                        
-                        
+
                         let ticket_proc = HoprTicketProcessor::new(
                             connectors[TESTED_PEER_ID].clone(),
                             PEERS_CHAIN[TESTED_PEER_ID].clone(),

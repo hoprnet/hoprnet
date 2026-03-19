@@ -32,7 +32,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
-hopr-api = { workspace = true, features = ["ct", "types-random"] }
+hopr-api = { workspace = true, features = ["ct", "types-random", "graph"] }
 
 hopr-async-runtime = { workspace = true }
 hopr-platform = { workspace = true }

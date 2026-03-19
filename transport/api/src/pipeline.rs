@@ -1,7 +1,6 @@
 use futures::{StreamExt, TryFutureExt};
 use hopr_api::{
     chain::{ChainKeyOperations, ChainReadChannelOperations, ChainValues},
-    db::HoprDbTicketOperations,
     types::{
         crypto::prelude::*,
         internal::{prelude::*, routing::ResolvedTransportRouting},
@@ -11,7 +10,7 @@ use hopr_async_runtime::AbortableList;
 use hopr_crypto_packet::HoprSurb;
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
-use hopr_ticket_manager::{HoprTicketManager, MemoryStore, OutgoingIndexStore, TicketManagerError, TicketQueue, TicketQueueStore};
+use hopr_ticket_manager::{HoprTicketManager, OutgoingIndexStore, TicketManagerError, TicketQueue, TicketQueueStore};
 use hopr_transport_protocol::{TicketEvent, run_packet_pipeline};
 
 use crate::{HoprTransportProcess, config::HoprPacketPipelineConfig};
@@ -116,25 +115,22 @@ where
     // TODO: make this configurable
     let sync_time = std::time::Duration::from_secs(15);
 
-    hopr_async_runtime::prelude::spawn(
-        futures::stream::Abortable::new(
-        futures_time::stream::interval(sync_time.into())
-        .for_each(move |_| {
+    hopr_async_runtime::prelude::spawn(futures::stream::Abortable::new(
+        futures_time::stream::interval(sync_time.into()).for_each(move |_| {
             let ticket_manager = ticket_manager.clone();
             async move {
-                if let Err(error) = hopr_async_runtime::prelude::spawn_blocking(move || ticket_manager.save_outgoing_indices())
-                    .map_err(|e| TicketManagerError::store(e))
-                    .and_then(futures::future::ready)
-                    .await
+                if let Err(error) =
+                    hopr_async_runtime::prelude::spawn_blocking(move || ticket_manager.save_outgoing_indices())
+                        .map_err(|e| TicketManagerError::store(e))
+                        .and_then(futures::future::ready)
+                        .await
                 {
                     tracing::error!(%error, "failed to sync ticket index");
                 }
-
             }
-        }), index_sync_reg)
-    );
-
-
+        }),
+        index_sync_reg,
+    ));
 
     processes.insert(HoprTransportProcess::OutgoingIndexSync, index_sync_handle);
 

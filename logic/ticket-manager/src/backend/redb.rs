@@ -34,12 +34,9 @@ impl RedbStore {
     /// The temporary file is automatically deleted when the store is dropped.
     pub fn new_temp() -> Result<Self, RedbStoreError> {
         let tempfile = tempfile::NamedTempFile::new()?;
-        let db = std::sync::Arc::new(redb::Database::open(tempfile.path())?);
-        let tx = db.begin_write()?;
-        tx.commit()?;
-        Ok(Self {
-            db,
-            _tmp: Some(tempfile),
+        RedbStore::new(tempfile.path()).map(|mut store| {
+            store._tmp = Some(tempfile);
+            store
         })
     }
 }
