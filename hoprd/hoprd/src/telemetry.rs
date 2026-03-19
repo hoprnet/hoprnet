@@ -1,6 +1,7 @@
-use std::{str::FromStr, string::ToString, time::Duration};
+use std::{collections::HashMap, str::FromStr, string::ToString, time::Duration};
 
 use opentelemetry::{
+    Key, KeyValue,
     logs::{AnyValue, LogRecord as _, Logger as _, LoggerProvider as _, Severity},
     trace::TracerProvider,
 };
@@ -84,6 +85,26 @@ fn apply_hoprd_otlp_endpoint_override() {
     }
 
     unsafe { std::env::set_var(LEGACY_OTLP_ENDPOINT_ENV_KEY, endpoint) };
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct NodeTelemetryIdentity {
+    pub(super) node_address: String,
+    pub(super) node_peer_id: String,
+    pub(super) extra_labels: Vec<(String, String)>,
+}
+
+impl NodeTelemetryIdentity {
+    fn resource_attributes(&self) -> Vec<KeyValue> {
+        let mut attrs = vec![
+            KeyValue::new("node_address", self.node_address.clone()),
+            KeyValue::new("node_peer_id", self.node_peer_id.clone()),
+        ];
+        for (k, v) in &self.extra_labels {
+            attrs.push(KeyValue::new(k.clone(), v.clone()));
+        }
+        attrs
+    }
 }
 
 impl OtlpConfig {
@@ -284,11 +305,10 @@ where
         record.set_severity_number(severity_number);
         record.set_severity_text(severity_text);
 
-        if let Some(body) = visitor.body.take() {
-            record.set_body(body.into());
+        if let Some(message) = visitor.body.take() {
+            let body = HashMap::from([(Key::new("message"), AnyValue::String(message.into()))]);
+            record.set_body(AnyValue::Map(Box::new(body)));
         }
-
-        record.add_attribute("target", metadata.target().to_string());
         if let Some(module_path) = metadata.module_path() {
             record.add_attribute("module_path", module_path.to_string());
         }
@@ -298,6 +318,7 @@ where
         if let Some(line) = metadata.line() {
             record.add_attribute("line", i64::from(line));
         }
+        record.add_attribute("target", metadata.target().to_string());
         if !visitor.attributes.is_empty() {
             record.add_attributes(visitor.attributes);
         }
@@ -391,7 +412,7 @@ impl Drop for TelemetryHandles {
     }
 }
 
-pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
+pub(super) fn init_logger(node_identity: NodeTelemetryIdentity) -> anyhow::Result<TelemetryHandles> {
     let mut telemetry_handles = TelemetryHandles::default();
     let registry = crate::telemetry_common::build_base_subscriber()?;
     apply_hoprd_otlp_endpoint_override();
@@ -411,6 +432,7 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
         let service_name = env!("CARGO_PKG_NAME").to_string();
         let resource = opentelemetry_sdk::Resource::builder()
             .with_service_name(service_name)
+            .with_attributes(node_identity.resource_attributes())
             .build();
 
         let trace_layer = if config.has_signal(OtlpSignal::Traces) {
@@ -456,7 +478,7 @@ pub(super) fn init_logger() -> anyhow::Result<TelemetryHandles> {
                     .build()?,
                 OtlpTransport::Http => opentelemetry_otlp::LogExporter::builder()
                     .with_http()
-                    .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
+                    .with_protocol(opentelemetry_otlp::Protocol::HttpJson)
                     .with_timeout(Duration::from_secs(5))
                     .build()?,
             };

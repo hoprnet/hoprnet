@@ -38,7 +38,8 @@ const FUNDING_AMOUNT: &str = "100 wxHOPR";
 /// - n-hop (n >= 1): n+2 nodes with n*(n+1) bidirectional channels
 async fn create_n_hop_session(cluster: &ClusterGuard, #[case] hops: usize) -> anyhow::Result<()> {
     // 2-hop and 3-hop tests are too slow under coverage instrumentation
-    if std::env::var("CARGO_LLVM_COV").is_ok() && hops > 1 {
+    #[allow(unexpected_cfgs)]
+    if cfg!(coverage) && hops > 1 {
         return Ok(());
     }
 
