@@ -1,9 +1,7 @@
-use std::ops::Mul;
-
 use hopr_api::types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*};
 use hopr_crypto_packet::prelude::*;
+use hopr_ticket_manager::{HoprTicketManager, OutgoingIndexStore, TicketManagerError, TicketQueueStore};
 
-use crate::TicketCreationError;
 pub use crate::{
     errors::IncomingPacketError,
     types::{FoundSurb, IncomingPacket, OutgoingPacket, ResolvedAcknowledgement},
@@ -165,7 +163,7 @@ pub trait TicketTracker {
         &self,
         channel_id: &ChannelId,
         epoch: u32,
-        index: u64,
+        index: u64, // TODO: see if we can get rid of this parameter
     ) -> Result<HoprBalance, Self::Error>;
 
     /// Convenience function that allows creating multi-hop tickets.
@@ -175,5 +173,36 @@ pub trait TicketTracker {
         current_path_pos: u8,
         winning_prob: WinningProbability,
         ticket_price: HoprBalance,
-    ) -> Result<TicketBuilder, TicketCreationError<Self::Error>>;
+    ) -> Result<TicketBuilder, Self::Error>;
+}
+
+// TODO: refactor this trait to be sync (see https://github.com/hoprnet/hoprnet/pull/7915)
+#[async_trait::async_trait]
+impl<S> TicketTracker for HoprTicketManager<S, S::Queue>
+where
+    S: OutgoingIndexStore + TicketQueueStore + Send + Sync + 'static,
+    S::Queue: Send + Sync + 'static,
+{
+    type Error = TicketManagerError;
+
+    async fn incoming_channel_unrealized_balance(
+        &self,
+        channel_id: &ChannelId,
+        _: u32,
+        index: u64,
+    ) -> Result<HoprBalance, Self::Error> {
+        self.unrealized_value(channel_id, index.into())
+            .map(|v| v.unwrap_or_default())
+    }
+
+    /// Convenience function that allows creating multi-hop tickets.
+    async fn create_multihop_ticket(
+        &self,
+        channel: &ChannelEntry,
+        current_path_pos: u8,
+        winning_prob: WinningProbability,
+        ticket_price: HoprBalance,
+    ) -> Result<TicketBuilder, Self::Error> {
+        self.next_multihop_ticket(channel, current_path_pos, winning_prob, ticket_price)
+    }
 }

@@ -1,20 +1,12 @@
-use std::sync::{Arc, atomic::AtomicU64};
-
-use futures::StreamExt;
 use hopr_api::{
     chain::ChainReadChannelOperations,
-    db::{HoprDbTicketOperations, TicketSelector},
-    types::{crypto::prelude::*, internal::prelude::*, primitive::balance::HoprBalance},
+    types::{crypto::prelude::*, internal::prelude::*},
 };
 #[cfg(feature = "rayon")]
 use hopr_parallelize::cpu::rayon::prelude::*;
-use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue, TicketManagerError};
 use validator::ValidationError;
 
-use crate::{
-    HoprProtocolError, ResolvedAcknowledgement, TicketAcknowledgementError, TicketCreationError, TicketTracker,
-    UnacknowledgedTicketProcessor,
-};
+use crate::{HoprProtocolError, ResolvedAcknowledgement, TicketAcknowledgementError, UnacknowledgedTicketProcessor};
 
 /// Metrics for unacknowledged ticket cache diagnostics.
 ///
@@ -214,20 +206,6 @@ fn validate_unack_ticket_timeout(timeout: &std::time::Duration) -> Result<(), Va
     }
 }
 
-const MIN_OUTGOING_INDEX_RETENTION: std::time::Duration = std::time::Duration::from_secs(10);
-
-fn validate_outgoing_index_retention(retention: &std::time::Duration) -> Result<(), ValidationError> {
-    if retention < &MIN_OUTGOING_INDEX_RETENTION {
-        Err(ValidationError::new("outgoing_index_cache_retention too low"))
-    } else {
-        Ok(())
-    }
-}
-
-fn default_outgoing_index_retention() -> std::time::Duration {
-    std::time::Duration::from_secs(10)
-}
-
 fn default_unack_ticket_timeout() -> std::time::Duration {
     std::time::Duration::from_secs(30)
 }
@@ -280,12 +258,11 @@ pub struct HoprTicketProcessorConfig {
     pub use_batch_verification: bool,
 }
 
-/// HOPR-specific implementation of [`UnacknowledgedTicketProcessor`] and [`TicketTracker`].
+/// HOPR-specific implementation of [`UnacknowledgedTicketProcessor`].
 #[derive(Clone)]
 pub struct HoprTicketProcessor<Chain> {
     unacknowledged_tickets:
         moka::future::Cache<OffchainPublicKey, moka::future::Cache<HalfKeyChallenge, UnacknowledgedTicket>>,
-    ticket_mgr: Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>,
     chain_api: Chain,
     chain_key: ChainKeypair,
     channels_dst: Hash,
@@ -294,17 +271,10 @@ pub struct HoprTicketProcessor<Chain> {
 
 impl<Chain> HoprTicketProcessor<Chain> {
     /// Creates a new instance of the HOPR ticket processor.
-    pub fn new(
-        chain_api: Chain,
-        chain_key: ChainKeypair,
-        channels_dst: Hash,
-        ticket_mgr: Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>,
-        cfg: HoprTicketProcessorConfig,
-    ) -> Self {
+    pub fn new(chain_api: Chain, chain_key: ChainKeypair, channels_dst: Hash, cfg: HoprTicketProcessorConfig) -> Self {
         metrics::initialize();
 
         Self {
-            ticket_mgr,
             unacknowledged_tickets: moka::future::Cache::builder()
                 .time_to_idle(cfg.unack_ticket_timeout)
                 .max_capacity(100_000)
@@ -496,7 +466,6 @@ where
 
         let domain_separator = self.channels_dst;
         let chain_key = self.chain_key.clone();
-        let ticket_mgr = self.ticket_mgr.clone();
         Ok(hopr_parallelize::cpu::spawn_fifo_blocking(
             move || {
                 #[cfg(feature = "rayon")]
@@ -521,8 +490,6 @@ where
                     match ack_ticket.into_redeemable(&chain_key, &domain_separator) {
                         Ok(redeemable) => {
                             tracing::trace!(%channel, "found winning ticket");
-                            // TODO (ticket_mgr)
-                            ticket_mgr.insert_incoming_ticket(redeemable.clone());
                             Some(ResolvedAcknowledgement::RelayingWin(Box::new(redeemable)))
                         }
                         Err(CoreTypesError::TicketNotWinning) => {
@@ -544,55 +511,6 @@ where
     }
 }
 
-#[async_trait::async_trait]
-impl<Chain> TicketTracker for HoprTicketProcessor<Chain>
-where
-    Chain: Send + Sync,
-{
-    type Error = TicketManagerError;
-
-    // async fn next_outgoing_ticket_index(&self, channel: &ChannelEntry) -> Result<u64, Self::Error> {
-    // let channel_id = *channel.get_id();
-    // let epoch = channel.channel_epoch;
-    // let current_idx = channel.ticket_index;
-    // self.out_ticket_index
-    // .try_get_with((channel_id, epoch), async {
-    // self.db
-    // .get_or_create_outgoing_ticket_index(&channel_id, epoch, current_idx)
-    // .await
-    // .map(|maybe_idx| Arc::new(AtomicU64::new(maybe_idx.unwrap_or_default())))
-    // })
-    // .await
-    // .map(|idx| idx.fetch_add(1, std::sync::atomic::Ordering::SeqCst))
-    // }
-
-    async fn incoming_channel_unrealized_balance(
-        &self,
-        channel_id: &ChannelId,
-        _epoch: u32,
-        index: u64,
-    ) -> Result<HoprBalance, Self::Error> {
-        self.ticket_mgr.unrealized_value(channel_id, Some(index))
-    }
-
-    async fn create_multihop_ticket(
-        &self,
-        channel: &ChannelEntry,
-        current_path_pos: u8,
-        winning_prob: WinningProbability,
-        ticket_price: HoprBalance,
-    ) -> Result<TicketBuilder, TicketCreationError<Self::Error>> {
-        match self
-            .ticket_mgr
-            .create_multihop_ticket(channel, current_path_pos, winning_prob, ticket_price)
-        {
-            Ok(ticket) => Ok(ticket),
-            Err(TicketManagerError::OutOfFunds(id, balance)) => Err(TicketCreationError::OutOfFunds(id, balance)),
-            Err(err) => Err(TicketCreationError::Other(err)),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use hopr_api::types::crypto_random::Randomizable;
@@ -608,7 +526,6 @@ mod tests {
 
         let ticket_processor = HoprTicketProcessor::new(
             node.chain_api.clone(),
-            node.node_db.clone(),
             node.chain_key.clone(),
             Hash::default(),
             HoprTicketProcessorConfig::default(),
@@ -657,7 +574,6 @@ mod tests {
 
         let ticket_processor = HoprTicketProcessor::new(
             node.chain_api.clone(),
-            node.node_db.clone(),
             node.chain_key.clone(),
             Hash::default(),
             HoprTicketProcessorConfig::default(),

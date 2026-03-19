@@ -30,15 +30,6 @@ pub enum IncomingPacketError<E: std::error::Error> {
     InvalidTicket(OffchainPublicKey, TicketValidationError),
 }
 
-/// Error that can occur when creating a ticket.
-#[derive(Debug, strum::EnumIs, strum::EnumTryAs, Error)]
-pub enum TicketCreationError<E: std::error::Error> {
-    #[error("channel {0} does not have at least {1} to create a ticket")]
-    OutOfFunds(ChannelId, HoprBalance),
-    #[error("could not create ticket: {0}")]
-    Other(E),
-}
-
 #[derive(Error, Debug)]
 pub enum HoprProtocolError {
     #[error("packet is in invalid state: {0}")]

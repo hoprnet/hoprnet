@@ -55,7 +55,7 @@ pub use crate::{
 ///
 /// ### Usage in outgoing packet pipeline
 /// The outgoing packet pipeline usually just calls the
-/// [`create_multihop_ticket`](HoprTicketManager::create_multihop_ticket) to create a ticket for the next hop on a
+/// [`create_multihop_ticket`](HoprTicketManager::next_multihop_ticket) to create a ticket for the next hop on a
 /// multi-hop path. To create zero/last-hop tickets, the ticket manager is not needed as these tickets essentially
 /// contain bogus data and there's no channel required.
 ///
@@ -89,7 +89,7 @@ pub use crate::{
 /// in the highly performance-sensitive code, on a per-packet basis.
 ///
 /// ### Outgoing ticket creation
-/// The [`create_multihop_ticket`](HoprTicketManager::create_multihop_ticket) method is designed to be
+/// The [`create_multihop_ticket`](HoprTicketManager::next_multihop_ticket) method is designed to be
 /// high-performance and to be called per each outgoing packet. It is using only atomics to track the outgoing
 /// ticket index for a channel. The synchronization to the underlying storage is done on-demand by calling
 /// `save_outgoing_indices`, making quick snapshots of the current state of outgoing indices.
@@ -183,7 +183,7 @@ where
 
     /// Saves outgoing ticket indices back to the store.
     ///
-    /// The operation does nothing if there were no [new tickets created](HoprTicketManager::create_multihop_ticket)
+    /// The operation does nothing if there were no [new tickets created](HoprTicketManager::next_multihop_ticket)
     /// on any tracked channel.
     pub fn save_outgoing_indices(&self) -> Result<(), TicketManagerError> {
         self.out_idx_tracker
@@ -271,7 +271,7 @@ where
     /// The function will fail for channels that are not opened or do not have enough funds to cover the ticket value.
     /// The ticket index of the returned ticket is guaranteed to be greater or equal to the ticket index on the
     /// given `channel` argument.
-    pub fn create_multihop_ticket(
+    pub fn next_multihop_ticket(
         &self,
         channel: &ChannelEntry,
         current_path_pos: u8,
@@ -526,7 +526,7 @@ where
         &self,
         channel_id: &ChannelId,
         min_index: Option<u64>,
-    ) -> Result<HoprBalance, TicketManagerError> {
+    ) -> Result<Option<HoprBalance>, TicketManagerError> {
         if let Some(ticket_queue) = self.channel_tickets.get(channel_id) {
             // There is low contention on this read lock, because write locks are acquired only
             // when a new winning ticket has been added, redeemed or neglected, all of which are fairly rare operations.
@@ -541,15 +541,17 @@ where
                 .map_err(TicketManagerError::store)?
                 .map(|t| t.verified_ticket().channel_epoch)
             {
-                Ok(queue
-                    .0
-                    .total_value(epoch, min_index)
-                    .map_err(TicketManagerError::store)?)
+                Ok(Some(
+                    queue
+                        .0
+                        .total_value(epoch, min_index)
+                        .map_err(TicketManagerError::store)?,
+                ))
             } else {
-                Ok(HoprBalance::zero())
+                Ok(Some(HoprBalance::zero()))
             }
         } else {
-            Err(TicketManagerError::ChannelQueueNotFound)
+            Ok(None)
         }
     }
 
@@ -801,7 +803,7 @@ mod tests {
         mgr.sync_from_outgoing_channels(&[channel])?;
 
         let ticket_1 = mgr
-            .create_multihop_ticket(&channel, 2, WinningProbability::ALWAYS, 10.into())?
+            .next_multihop_ticket(&channel, 2, WinningProbability::ALWAYS, 10.into())?
             .eth_challenge(Default::default())
             .build_signed(&src, &Default::default())?;
 
@@ -810,7 +812,7 @@ mod tests {
         assert_eq!(channel.channel_epoch, ticket_1.verified_ticket().channel_epoch);
 
         let ticket_2 = mgr
-            .create_multihop_ticket(&channel, 2, WinningProbability::ALWAYS, 10.into())?
+            .next_multihop_ticket(&channel, 2, WinningProbability::ALWAYS, 10.into())?
             .eth_challenge(Default::default())
             .build_signed(&src, &Default::default())?;
 
@@ -881,7 +883,7 @@ mod tests {
             .build()?;
 
         assert!(
-            mgr.create_multihop_ticket(&channel, 2, WinningProbability::ALWAYS, 1.into())
+            mgr.next_multihop_ticket(&channel, 2, WinningProbability::ALWAYS, 1.into())
                 .is_err()
         );
 
@@ -889,19 +891,19 @@ mod tests {
             ChannelStatus::PendingToClose(std::time::SystemTime::now() - std::time::Duration::from_secs(10));
 
         assert!(
-            mgr.create_multihop_ticket(&channel, 2, WinningProbability::ALWAYS, 1.into())
+            mgr.next_multihop_ticket(&channel, 2, WinningProbability::ALWAYS, 1.into())
                 .is_err()
         );
 
         channel.status = ChannelStatus::Open;
 
         assert!(
-            mgr.create_multihop_ticket(&channel, 2, WinningProbability::ALWAYS, 11.into())
+            mgr.next_multihop_ticket(&channel, 2, WinningProbability::ALWAYS, 11.into())
                 .is_err()
         );
 
         assert!(
-            mgr.create_multihop_ticket(&channel, 1, WinningProbability::ALWAYS, 1.into())
+            mgr.next_multihop_ticket(&channel, 1, WinningProbability::ALWAYS, 1.into())
                 .is_err()
         );
 
@@ -972,19 +974,19 @@ mod tests {
         // Loads index 1 which is the next index for a ticket on this channel
         mgr.sync_from_outgoing_channels(&[channel])?;
 
-        mgr.create_multihop_ticket(&channel, 2, WinningProbability::ALWAYS, 10.into())?;
+        mgr.next_multihop_ticket(&channel, 2, WinningProbability::ALWAYS, 10.into())?;
 
         // Without saving, the store index should not be present in store
         let saved_index = mgr.store.read().load_outgoing_index(channel.get_id(), 1)?;
         assert_eq!(None, saved_index);
 
-        mgr.create_multihop_ticket(&channel, 2, WinningProbability::ALWAYS, 10.into())?;
+        mgr.next_multihop_ticket(&channel, 2, WinningProbability::ALWAYS, 10.into())?;
 
         mgr.save_outgoing_indices()?;
         let saved_index = mgr.store.read().load_outgoing_index(channel.get_id(), 1)?;
         assert_eq!(Some(3), saved_index);
 
-        mgr.create_multihop_ticket(&channel, 2, WinningProbability::ALWAYS, 10.into())?;
+        mgr.next_multihop_ticket(&channel, 2, WinningProbability::ALWAYS, 10.into())?;
 
         let saved_index = mgr.store.read().load_outgoing_index(channel.get_id(), 1)?;
         assert_eq!(Some(3), saved_index);
@@ -1045,11 +1047,11 @@ mod tests {
             .build()?;
 
         let ticket_1 = mgr
-            .create_multihop_ticket(&channel_1, 2, WinningProbability::ALWAYS, 10.into())?
+            .next_multihop_ticket(&channel_1, 2, WinningProbability::ALWAYS, 10.into())?
             .eth_challenge(Default::default())
             .build()?;
         let ticket_2 = mgr
-            .create_multihop_ticket(&channel_2, 2, WinningProbability::ALWAYS, 10.into())?
+            .next_multihop_ticket(&channel_2, 2, WinningProbability::ALWAYS, 10.into())?
             .eth_challenge(Default::default())
             .build()?;
         assert_eq!(0, ticket_1.index);
@@ -1197,7 +1199,9 @@ mod tests {
         let neglected = mgr.sync_from_incoming_channels(&[channel])?;
         assert!(neglected.is_empty());
 
-        let unrealized_value = mgr.unrealized_value(channel.get_id(), None)?;
+        let unrealized_value = mgr
+            .unrealized_value(channel.get_id(), None)?
+            .ok_or(anyhow::anyhow!("must have unrealized value"))?;
         assert_eq!(
             tickets.iter().map(|t| t.verified_ticket().amount).sum::<HoprBalance>(),
             unrealized_value
@@ -1206,7 +1210,9 @@ mod tests {
         let neglected = mgr.neglect_tickets(&channel.get_id(), None)?;
         assert_eq!(tickets.iter().map(|t| t.ticket).collect::<Vec<_>>(), neglected);
 
-        let unrealized_value_after = mgr.unrealized_value(channel.get_id(), None)?;
+        let unrealized_value_after = mgr
+            .unrealized_value(channel.get_id(), None)?
+            .ok_or(anyhow::anyhow!("must have unrealized value"))?;
         assert_eq!(
             unrealized_value_after,
             unrealized_value
@@ -1260,7 +1266,9 @@ mod tests {
         let neglected = mgr.sync_from_incoming_channels(&[channel])?;
         assert!(neglected.is_empty());
 
-        let unrealized_value = mgr.unrealized_value(channel.get_id(), None)?;
+        let unrealized_value = mgr
+            .unrealized_value(channel.get_id(), None)?
+            .ok_or(anyhow::anyhow!("must have unrealized value"))?;
         assert_eq!(
             tickets.iter().map(|t| t.verified_ticket().amount).sum::<HoprBalance>(),
             unrealized_value
@@ -1276,7 +1284,9 @@ mod tests {
             neglected
         );
 
-        let unrealized_value_after = mgr.unrealized_value(channel.get_id(), None)?;
+        let unrealized_value_after = mgr
+            .unrealized_value(channel.get_id(), None)?
+            .ok_or(anyhow::anyhow!("must have unrealized value"))?;
         assert_eq!(
             unrealized_value_after,
             unrealized_value
@@ -1310,10 +1320,7 @@ mod tests {
 
         assert!(!tickets.is_empty());
 
-        assert!(matches!(
-            mgr.unrealized_value(&channel_id, None),
-            Err(TicketManagerError::ChannelQueueNotFound)
-        ));
+        assert!(matches!(mgr.unrealized_value(&channel_id, None), Ok(None)));
 
         let mut last_unrealized_value = HoprBalance::zero();
         assert_eq!(HoprBalance::zero(), last_unrealized_value);
@@ -1322,7 +1329,9 @@ mod tests {
             let neglected = mgr.insert_incoming_ticket(*ticket)?;
             assert!(neglected.is_empty());
 
-            let new_unrealized_value = mgr.unrealized_value(&channel_id, None)?;
+            let new_unrealized_value = mgr
+                .unrealized_value(&channel_id, None)?
+                .ok_or(anyhow::anyhow!("must have unrealized value"))?;
             assert_eq!(
                 new_unrealized_value - last_unrealized_value,
                 ticket.verified_ticket().amount
@@ -1369,17 +1378,16 @@ mod tests {
             .collect::<Vec<_>>();
         assert!(!tickets_from_epoch_2.is_empty());
 
-        assert!(matches!(
-            mgr.unrealized_value(&channel_id, None),
-            Err(TicketManagerError::ChannelQueueNotFound)
-        ));
+        assert!(matches!(mgr.unrealized_value(&channel_id, None), Ok(None)));
 
         for ticket in tickets_from_epoch_1.iter() {
             let neglected = mgr.insert_incoming_ticket(*ticket)?;
             assert!(neglected.is_empty());
         }
 
-        let new_unrealized_value = mgr.unrealized_value(&channel_id, None)?;
+        let new_unrealized_value = mgr
+            .unrealized_value(&channel_id, None)?
+            .ok_or(anyhow::anyhow!("must have unrealized value"))?;
         assert_eq!(
             new_unrealized_value,
             tickets_from_epoch_1
@@ -1395,7 +1403,9 @@ mod tests {
         );
 
         // There's now only 1 ticket from epoch 2
-        let new_unrealized_value = mgr.unrealized_value(&channel_id, None)?;
+        let new_unrealized_value = mgr
+            .unrealized_value(&channel_id, None)?
+            .ok_or(anyhow::anyhow!("must have unrealized value"))?;
         assert_eq!(tickets_from_epoch_2[0].verified_ticket().amount, new_unrealized_value);
 
         assert_eq!(
@@ -1510,7 +1520,9 @@ mod tests {
 
         tickets.sort();
 
-        let mut unrealized_value = mgr.unrealized_value(channel.get_id(), None)?;
+        let mut unrealized_value = mgr
+            .unrealized_value(channel.get_id(), None)?
+            .ok_or(anyhow::anyhow!("must have unrealized value"))?;
         assert_eq!(
             tickets.iter().map(|t| t.verified_ticket().amount).sum::<HoprBalance>(),
             unrealized_value
@@ -1527,27 +1539,34 @@ mod tests {
             stream.try_next().await?
         );
         assert_eq!(
-            mgr.unrealized_value(channel.get_id(), None)?,
+            mgr.unrealized_value(channel.get_id(), None)?
+                .ok_or(anyhow::anyhow!("must have unrealized value"))?,
             unrealized_value - tickets[0].verified_ticket().amount
         );
-        unrealized_value = mgr.unrealized_value(channel.get_id(), None)?;
+        unrealized_value = mgr
+            .unrealized_value(channel.get_id(), None)?
+            .ok_or(anyhow::anyhow!("must have unrealized value"))?;
 
         assert_eq!(
             Some(RedemptionResult::Redeemed(tickets[1].ticket)),
             stream.try_next().await?
         );
         assert_eq!(
-            mgr.unrealized_value(channel.get_id(), None)?,
+            mgr.unrealized_value(channel.get_id(), None)?
+                .ok_or(anyhow::anyhow!("must have unrealized value"))?,
             unrealized_value - tickets[1].verified_ticket().amount
         );
-        unrealized_value = mgr.unrealized_value(channel.get_id(), None)?;
+        unrealized_value = mgr
+            .unrealized_value(channel.get_id(), None)?
+            .ok_or(anyhow::anyhow!("must have unrealized value"))?;
 
         assert_eq!(
             Some(RedemptionResult::Redeemed(tickets[2].ticket)),
             stream.try_next().await?
         );
         assert_eq!(
-            mgr.unrealized_value(channel.get_id(), None)?,
+            mgr.unrealized_value(channel.get_id(), None)?
+                .ok_or(anyhow::anyhow!("must have unrealized value"))?,
             unrealized_value - tickets[2].verified_ticket().amount
         );
 
@@ -1615,7 +1634,9 @@ mod tests {
 
         tickets.sort();
 
-        let unrealized_value = mgr.unrealized_value(channel.get_id(), None)?;
+        let unrealized_value = mgr
+            .unrealized_value(channel.get_id(), None)?
+            .ok_or(anyhow::anyhow!("must have unrealized value"))?;
         assert_eq!(
             tickets.iter().map(|t| t.verified_ticket().amount).sum::<HoprBalance>(),
             unrealized_value
@@ -1631,7 +1652,8 @@ mod tests {
             stream.try_next().await?
         );
         assert_eq!(
-            mgr.unrealized_value(channel.get_id(), None)?,
+            mgr.unrealized_value(channel.get_id(), None)?
+                .ok_or(anyhow::anyhow!("must have unrealized value"))?,
             unrealized_value - tickets[0].verified_ticket().amount
         );
 
@@ -1640,7 +1662,11 @@ mod tests {
             tickets.into_iter().skip(1).map(|t| t.ticket).collect::<Vec<_>>(),
             neglected
         );
-        assert_eq!(HoprBalance::zero(), mgr.unrealized_value(channel.get_id(), None)?);
+        assert_eq!(
+            HoprBalance::zero(),
+            mgr.unrealized_value(channel.get_id(), None)?
+                .ok_or(anyhow::anyhow!("must have unrealized value"))?
+        );
 
         assert_eq!(None, stream.try_next().await?);
 
@@ -1671,7 +1697,9 @@ mod tests {
 
         tickets.sort();
 
-        let mut unrealized_value = mgr.unrealized_value(channel.get_id(), None)?;
+        let mut unrealized_value = mgr
+            .unrealized_value(channel.get_id(), None)?
+            .ok_or(anyhow::anyhow!("must have unrealized value"))?;
         assert_eq!(
             tickets.iter().map(|t| t.verified_ticket().amount).sum::<HoprBalance>(),
             unrealized_value
@@ -1688,10 +1716,13 @@ mod tests {
             stream.try_next().await?
         );
         assert_eq!(
-            mgr.unrealized_value(channel.get_id(), None)?,
+            mgr.unrealized_value(channel.get_id(), None)?
+                .ok_or(anyhow::anyhow!("must have unrealized value"))?,
             unrealized_value - tickets[0].verified_ticket().amount
         );
-        unrealized_value = mgr.unrealized_value(channel.get_id(), None)?;
+        unrealized_value = mgr
+            .unrealized_value(channel.get_id(), None)?
+            .ok_or(anyhow::anyhow!("must have unrealized value"))?;
 
         // Tickets with index 1,2 and 3 get neglected
         let neglected = mgr.neglect_tickets(&channel.get_id(), Some(tickets[3].verified_ticket().index))?;
@@ -1706,6 +1737,7 @@ mod tests {
                     .map(|t| t.verified_ticket().amount)
                     .sum::<HoprBalance>(),
             mgr.unrealized_value(channel.get_id(), None)?
+                .ok_or(anyhow::anyhow!("must have unrealized value"))?
         );
 
         // The last ticket with index 4 gets redeemed again
@@ -1714,7 +1746,11 @@ mod tests {
             stream.try_next().await?
         );
 
-        assert_eq!(HoprBalance::zero(), mgr.unrealized_value(channel.get_id(), None)?);
+        assert_eq!(
+            HoprBalance::zero(),
+            mgr.unrealized_value(channel.get_id(), None)?
+                .ok_or(anyhow::anyhow!("must have unrealized value"))?
+        );
 
         assert_eq!(None, stream.try_next().await?);
 
@@ -1801,7 +1837,9 @@ mod tests {
 
         tickets.sort();
 
-        let unrealized_value = mgr.unrealized_value(channel.get_id(), None)?;
+        let unrealized_value = mgr
+            .unrealized_value(channel.get_id(), None)?
+            .ok_or(anyhow::anyhow!("must have unrealized value"))?;
         assert_eq!(
             tickets.iter().map(|t| t.verified_ticket().amount).sum::<HoprBalance>(),
             unrealized_value
