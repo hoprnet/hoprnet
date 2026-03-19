@@ -3,7 +3,7 @@ use std::{ops::Mul, time::Duration};
 use anyhow::Context;
 use futures::AsyncWriteExt;
 use hopr_builder::{
-    hopr_lib::{ChannelId, HoprLibError, UnitaryFloatOps},
+    hopr_lib::{ChannelId, HoprBalance, HoprLibError, UnitaryFloatOps},
     testing::{
         fixtures::{ClusterGuard, MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, cluster_fixture},
         hopr::ChannelGuard,
@@ -153,9 +153,13 @@ async fn test_reject_relaying_a_message_when_the_channel_is_out_of_funding(
 
     // Continuously send until rejected_value increases (channel funds exhausted).
     // Background probing accelerates fund depletion alongside our writes.
+    let mut write_succeeded_at_least_once = false;
     tokio::time::timeout(Duration::from_secs(120), async {
         loop {
-            let _ = tokio::time::timeout(Duration::from_millis(500), session.write_all(&sent_data)).await;
+            match tokio::time::timeout(Duration::from_millis(500), session.write_all(&sent_data)).await {
+                Ok(Ok(())) => write_succeeded_at_least_once = true,
+                Ok(Err(_)) | Err(_) => {} // write failed or timed out — channel may be drained
+            }
             sleep(Duration::from_millis(500)).await;
 
             let stats_after = mid
@@ -170,6 +174,11 @@ async fn test_reject_relaying_a_message_when_the_channel_is_out_of_funding(
     })
     .await
     .context("timed out waiting for ticket rejection after fund exhaustion")??;
+
+    assert!(
+        write_succeeded_at_least_once,
+        "at least one write should have succeeded before the channel was exhausted"
+    );
 
     Ok(())
 }
@@ -266,6 +275,13 @@ async fn test_neglect_ticket_on_closing(#[with(5)] cluster_fixture: ClusterGuard
         .await
         .context("failed to get ticket statistics")?;
 
+    // Snapshot stats right after reset to use as baseline for delta checks
+    let stats_after_reset = mid
+        .inner()
+        .ticket_statistics()
+        .await
+        .context("failed to get ticket statistics")?;
+
     let funding_amount = ticket_price.mul(message_count + PROBING_OVERHEAD);
     let [fw_channel, bw_channel, _telemetry_channels]: [ChannelGuard; 3] = cluster_fixture
         .open_channels(&[&[src, mid, dst], &[dst, mid, src], &[src, dst]], funding_amount)
@@ -288,15 +304,20 @@ async fn test_neglect_ticket_on_closing(#[with(5)] cluster_fixture: ClusterGuard
             .context("write failed")??;
     }
 
+    // Wait for unredeemed_value to increase by at least message_count relative
+    // to the post-reset snapshot, ensuring our test writes are counted (not just
+    // background probing).
     wait_until(
         || async {
             let stats = mid.inner().ticket_statistics().await?;
-            Ok::<_, HoprLibError>(stats.unredeemed_value >= message_count.into())
+            Ok::<_, HoprLibError>(
+                stats.unredeemed_value >= stats_after_reset.unredeemed_value + HoprBalance::from(message_count),
+            )
         },
         Duration::from_secs(5),
     )
     .await
-    .context("failed to wait for: `stats.unredeemed_value >= message_count.into()`")?;
+    .context("failed to wait for: `stats.unredeemed_value >= stats_after_reset.unredeemed_value + message_count`")?;
 
     // Snapshot stats right before closing so we can measure the delta
     let stats_before_close = mid
