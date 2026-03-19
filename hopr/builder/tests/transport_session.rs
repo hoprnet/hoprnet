@@ -17,14 +17,13 @@ use serial_test::serial;
 #[cfg(feature = "session-client")]
 use tokio::time::sleep;
 
-const FUNDING_AMOUNT: &str = "10 wxHOPR";
+const FUNDING_AMOUNT: &str = "100 wxHOPR";
 
 #[rstest]
 #[case(0)]
 #[case(1)]
-// TODO: re-enable once the CI can be debugged
-// #[case(2)]
-// #[case(3)]
+#[case(2)]
+#[case(3)]
 #[serial]
 #[test_log::test(tokio::test)]
 #[timeout(2*TEST_GLOBAL_TIMEOUT)]
