@@ -436,6 +436,8 @@
         return Math.max(MIN_PACKET_MS, BASE_PACKET_MS / speed);
       }
 
+      const MAX_GAP_MS = 300; // keep flow continuous — pacing comes from packet animation speed
+
       function getDelayToNext(idx) {
         if (speed === 0) return 30;
         const curr = PATH_EVENTS[idx];
@@ -443,7 +445,7 @@
         if (!next) return 100;
         const deltaMs = next.ts_ms - curr.ts_ms;
         if (deltaMs <= 0) return 30;
-        return Math.max(30, deltaMs / speed);
+        return Math.min(MAX_GAP_MS, Math.max(30, deltaMs / speed));
       }
 
       function startEvent(idx) {
