@@ -163,8 +163,12 @@ def resolve_node(key: str, index: dict[str, str]) -> Optional[str]:
     return None
 
 
-def path_to_edge_ids(nodes: list[str], index: dict[str, str], graph: GraphState) -> list[str]:
-    """Convert a path's nodes to a list of edge IDs (src->dst strings)."""
+def path_to_edge_ids(nodes: list[str], index: dict[str, str], graph: GraphState) -> tuple[list[str], list[str]]:
+    """Convert a path's nodes to edge IDs and resolved node sequence.
+
+    Returns (edge_ids, resolved_nodes). Edge IDs may be flipped to match
+    graph direction; resolved_nodes preserves the original traversal order.
+    """
     resolved = [r for n in nodes if (r := resolve_node(n, index))]
     edge_ids = []
     for i in range(len(resolved) - 1):
@@ -175,7 +179,7 @@ def path_to_edge_ids(nodes: list[str], index: dict[str, str], graph: GraphState)
             rev = (resolved[i + 1], resolved[i])
             if rev in graph.edges:
                 edge_ids.append(f"{rev[0]}->{rev[1]}")
-    return edge_ids
+    return edge_ids, resolved
 
 
 # ── Build event data for template ────────────────────────────────────────────
@@ -195,7 +199,7 @@ def build_path_events_json(
     first_ts: Optional[datetime] = None
 
     for event in events:
-        edge_ids = path_to_edge_ids(event.nodes, key_index, graph)
+        edge_ids, resolved_nodes = path_to_edge_ids(event.nodes, key_index, graph)
         if not edge_ids:
             continue
 
@@ -212,6 +216,7 @@ def build_path_events_json(
             {
                 "direction": event.direction,
                 "edges": edge_ids,
+                "nodes": resolved_nodes,
                 "time": time_str,
                 "ts_ms": ts_ms,
             }
@@ -228,7 +233,23 @@ def build_path_events_json(
             if dst_node is None:
                 dst_node = last_edge[1]
 
-    return result, src_node, dst_node
+    # Compute path distribution stats
+    fwd_counts: Counter[str] = Counter()
+    ret_counts: Counter[str] = Counter()
+    for evt in result:
+        key = " → ".join(evt["nodes"])
+        if evt["direction"] == "forward":
+            fwd_counts[key] += 1
+        else:
+            ret_counts[key] += 1
+
+    def dist_list(counts: Counter[str]) -> list[dict]:
+        total = sum(counts.values()) or 1
+        return [{"path": p, "count": c, "pct": round(c / total, 4)} for p, c in counts.most_common()]
+
+    path_stats = {"forward": dist_list(fwd_counts), "return": dist_list(ret_counts)}
+
+    return result, path_stats, src_node, dst_node
 
 
 # ── HTML generation ──────────────────────────────────────────────────────────
@@ -237,6 +258,7 @@ def build_path_events_json(
 def build_html(
     graph: GraphState,
     path_events: list[dict],
+    path_stats: dict,
     src_node: Optional[str],
     dst_node: Optional[str],
     interactive: bool = False,
@@ -251,6 +273,7 @@ def build_html(
 
     html = template.replace("__GRAPH_DATA__", json.dumps(graph_data))
     html = html.replace("__PATH_EVENTS__", json.dumps(path_events))
+    html = html.replace("__PATH_STATS__", json.dumps(path_stats))
     html = html.replace("__SRC_NODE__", json.dumps(src_node))
     html = html.replace("__DST_NODE__", json.dumps(dst_node))
     html = html.replace("__INTERACTIVE__", "true" if interactive else "false")
@@ -331,7 +354,7 @@ def main():
         sys.exit(1)
 
     key_index = build_key_index(graph)
-    path_events, src_node, dst_node = build_path_events_json(events, key_index, graph)
+    path_events, path_stats, src_node, dst_node = build_path_events_json(events, key_index, graph)
     print(f"  {len(path_events)} matched events")
     if src_node:
         short_src = src_node[:10] + "..." if len(src_node) > 13 else src_node
@@ -349,7 +372,7 @@ def main():
     # Save interactive HTML
     html_out = os.path.join(args.out_dir, "graph.html")
     with open(html_out, "w") as f:
-        f.write(build_html(graph, path_events, src_node, dst_node, interactive=True))
+        f.write(build_html(graph, path_events, path_stats, src_node, dst_node, interactive=True))
     print(f"Saved: {html_out}")
 
     # Auto-open browser
@@ -367,7 +390,9 @@ def main():
         max_gif_events = min(len(path_events), 30)
 
         with tempfile.TemporaryDirectory(prefix="hopr-graph-") as tmpdir:
-            headless_html = build_html(graph, path_events[:max_gif_events], src_node, dst_node, interactive=False)
+            headless_html = build_html(
+                graph, path_events[:max_gif_events], path_stats, src_node, dst_node, interactive=False
+            )
             print(f"Rendering {max_gif_events} events to GIF...")
             pngs = render_events_to_pngs(headless_html, max_gif_events, tmpdir)
 
