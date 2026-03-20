@@ -19,7 +19,6 @@ use futures::{
 };
 use hopr_api::{
     chain::HoprChainApi,
-    db::HoprNodeDbApi,
     graph::{
         NetworkGraphTraverse, NetworkGraphUpdate, NetworkGraphView, NetworkGraphWrite,
         traits::{EdgeObservableRead, EdgeObservableWrite},

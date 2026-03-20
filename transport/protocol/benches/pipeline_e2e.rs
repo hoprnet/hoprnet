@@ -17,14 +17,12 @@ use hopr_api::types::{
 };
 use hopr_crypto_packet::{HoprSurb, prelude::HoprPacket};
 use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut};
-use hopr_protocol_hopr::{
-    HoprCodecConfig, HoprDecoder, HoprEncoder, HoprTicketProcessor, HoprTicketProcessorConfig, MemorySurbStore,
-    PacketEncoder, SurbStoreConfig,
-};
+use hopr_protocol_hopr::{HoprCodecConfig, HoprDecoder, HoprEncoder, HoprUnacknowledgedTicketProcessor, MemorySurbStore, PacketEncoder, SurbStoreConfig};
 use hopr_test_stubs::{StubChainApi, StubPathResolver, StubTicketDb};
 use hopr_transport_mixer::config::MixerConfig;
 use hopr_transport_protocol::TicketEvent;
 use libp2p::PeerId;
+use hopr_ticket_manager::{HoprTicketManager, MemoryStore};
 
 const SAMPLE_SIZE: usize = 30;
 const MEASUREMENT_TIME_SECS: u64 = 30;
@@ -124,13 +122,7 @@ fn pipeline_e2e_forward(c: &mut Criterion) {
             PEERS_CHAIN[1].clone(),
             chain_api.clone(),
             MemorySurbStore::new(SurbStoreConfig::default()),
-            HoprTicketProcessor::new(
-                chain_api.clone(),
-                ticket_db.clone(),
-                PEERS_CHAIN[1].clone(),
-                Default::default(),
-                HoprTicketProcessorConfig::default(),
-            ),
+            HoprTicketManager::new(MemoryStore::default()).unwrap(),
             Default::default(),
             HoprCodecConfig::default(),
         );
@@ -226,21 +218,22 @@ fn pipeline_e2e_forward(c: &mut Criterion) {
 
                         let (ticket_events_tx, _ticket_events_rx) = mpsc::channel::<TicketEvent>(CHANNEL_CAPACITY);
 
-                        let surb_store = MemorySurbStore::new(SurbStoreConfig::default());
+                        let unack_proc = MemorySurbStore::new(SurbStoreConfig::default());
 
-                        let ticket_proc = HoprTicketProcessor::new(
+                        let ticket_proc = HoprUnacknowledgedTicketProcessor::new(
                             chain_api.clone(),
-                            ticket_db.clone(),
                             PEERS_CHAIN[SENDER_IDX].clone(),
                             Default::default(),
-                            HoprTicketProcessorConfig::default(),
+                            Default::default(),
                         );
+
+                        let ticket_mgr = std::sync::Arc::new(HoprTicketManager::new(MemoryStore::default()).unwrap());
 
                         let encoder = HoprEncoder::new(
                             PEERS_CHAIN[SENDER_IDX].clone(),
                             chain_api.clone(),
-                            surb_store.clone(),
-                            ticket_proc.clone(),
+                            unack_proc.clone(),
+                            ticket_mgr.clone(),
                             Default::default(),
                             codec_config,
                         );
@@ -248,8 +241,8 @@ fn pipeline_e2e_forward(c: &mut Criterion) {
                         let decoder = HoprDecoder::new(
                             (PEERS[SENDER_IDX].clone(), PEERS_CHAIN[SENDER_IDX].clone()),
                             chain_api.clone(),
-                            surb_store,
-                            ticket_proc.clone(),
+                            unack_proc,
+                            ticket_mgr.clone(),
                             Default::default(),
                             codec_config,
                         );

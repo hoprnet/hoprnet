@@ -36,7 +36,6 @@ telemetry = [
   "dep:hopr-metrics",
   "hopr-lib/telemetry",
   "hoprd-api/telemetry",
-  "hopr-db-node/telemetry",
   "hopr-strategy/telemetry",
   "hopr-transport-p2p/telemetry",
 ]

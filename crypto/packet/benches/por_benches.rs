@@ -7,7 +7,7 @@ mod errors;
 mod por;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use hopr_api::types::{
+use hopr_types::{
     crypto::{keypairs::Keypair, prelude::OffchainKeypair},
     crypto_random::Randomizable,
 };

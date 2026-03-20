@@ -128,9 +128,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-chains"
-version = "0.2.31"
+version = "0.2.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d9d22005bf31b018f31ef9ecadb5d2c39cf4f6acc8db0456f72c815f3d7f757"
+checksum = "9247f0a399ef71aeb68f497b2b8fb348014f742b50d3b83b1e00dfe1b7d64b3d"
 dependencies = [
  "alloy-primitives",
  "num_enum",
@@ -226,7 +226,7 @@ dependencies = [
  "itoa",
  "serde",
  "serde_json",
- "winnow",
+ "winnow 0.7.15",
 ]
 
 [[package]]
@@ -689,7 +689,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6df77fea9d6a2a75c0ef8d2acbdfd92286cc599983d3175ccdc170d3433d249"
 dependencies = [
  "serde",
- "winnow",
+ "winnow 0.7.15",
 ]
 
 [[package]]
@@ -1115,9 +1115,6 @@ name = "arrayvec"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "asn1-rs"
@@ -1636,19 +1633,20 @@ dependencies = [
 
 [[package]]
 name = "borsh"
-version = "1.6.0"
+version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d1da5ab77c1437701eeff7c88d968729e7766172279eab0676857b3d63af7a6f"
+checksum = "cfd1e3f8955a5d7de9fab72fc8373fade9fb8a703968cb200ae3dc6cf08e185a"
 dependencies = [
  "borsh-derive",
+ "bytes",
  "cfg_aliases",
 ]
 
 [[package]]
 name = "borsh-derive"
-version = "1.6.0"
+version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0686c856aa6aac0c4498f936d7d6a02df690f614c03e4d906d1018062b5c5e2c"
+checksum = "bfcfdc083699101d5a7965e49925975f2f55060f94f9a05e7187be95d530ca59"
 dependencies = [
  "once_cell",
  "proc-macro-crate",
@@ -3400,7 +3398,7 @@ dependencies = [
  "gix-utils",
  "itoa",
  "thiserror 2.0.18",
- "winnow",
+ "winnow 0.7.15",
 ]
 
 [[package]]
@@ -3481,7 +3479,7 @@ dependencies = [
  "smallvec",
  "thiserror 2.0.18",
  "unicode-bom",
- "winnow",
+ "winnow 0.7.15",
 ]
 
 [[package]]
@@ -3728,7 +3726,7 @@ dependencies = [
  "itoa",
  "smallvec",
  "thiserror 2.0.18",
- "winnow",
+ "winnow 0.7.15",
 ]
 
 [[package]]
@@ -3825,7 +3823,7 @@ dependencies = [
  "gix-utils",
  "maybe-async",
  "thiserror 2.0.18",
- "winnow",
+ "winnow 0.7.15",
 ]
 
 [[package]]
@@ -3857,7 +3855,7 @@ dependencies = [
  "gix-validate",
  "memmap2",
  "thiserror 2.0.18",
- "winnow",
+ "winnow 0.7.15",
 ]
 
 [[package]]
@@ -4355,17 +4353,19 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "1.0.0"
-source = "git+https://github.com/hoprnet/hopr-api?rev=0403f9d9470bf7e60234f8d4725260106f0fe2c7#0403f9d9470bf7e60234f8d4725260106f0fe2c7"
+version = "1.3.0"
+source = "git+https://github.com/hoprnet/hopr-api?branch=lukas%2Fremove-db#fd4b9884bb4a14d965d6e2ad817ef6f89e76e98e"
 dependencies = [
  "async-trait",
  "atomic_enum",
  "auto_impl",
  "chrono",
  "futures",
+ "futures-concurrency",
  "hopr-types",
  "libp2p-identity",
  "multiaddr",
+ "serde",
  "strum 0.28.0",
  "thiserror 2.0.18",
  "tracing",
@@ -4373,7 +4373,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-async-runtime"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "auto_impl",
  "futures",
@@ -4400,7 +4400,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-builder"
-version = "4.0.1"
+version = "4.0.3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4411,12 +4411,14 @@ dependencies = [
  "hopr-api",
  "hopr-builder",
  "hopr-chain-connector",
- "hopr-ct-immediate",
+ "hopr-ct-full-network",
  "hopr-lib",
+ "hopr-metrics",
  "hopr-network-graph",
  "hopr-transport-p2p",
- "insta",
  "lazy_static",
+ "opentelemetry-prometheus-text-exporter",
+ "opentelemetry_sdk",
  "parking_lot",
  "rand 0.10.0",
  "rstest",
@@ -4434,7 +4436,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.17.0"
+version = "0.17.2"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4487,7 +4489,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-keypair"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "anyhow",
  "hex",
@@ -4540,7 +4542,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-sphinx"
-version = "0.12.0"
+version = "0.12.1"
 dependencies = [
  "anyhow",
  "bimap",
@@ -4593,27 +4595,28 @@ dependencies = [
 
 [[package]]
 name = "hopr-ct-full-network"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "cfg-if",
  "futures",
  "futures-concurrency",
+ "futures-time",
  "hopr-api",
- "hopr-async-runtime",
  "hopr-network-graph",
+ "hopr-statistics",
  "humantime-serde",
  "lazy_static",
- "moka",
  "serde",
  "smart-default",
  "tokio",
+ "tracing",
  "validator",
 ]
 
 [[package]]
 name = "hopr-ct-immediate"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "futures",
@@ -4687,15 +4690,17 @@ dependencies = [
 
 [[package]]
 name = "hopr-metrics"
-version = "1.3.2"
+version = "2.0.0"
 dependencies = [
  "anyhow",
- "prometheus",
+ "opentelemetry",
+ "opentelemetry-prometheus-text-exporter",
+ "opentelemetry_sdk",
 ]
 
 [[package]]
 name = "hopr-network-graph"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "assertables",
@@ -4787,7 +4792,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-app"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "anyhow",
  "hopr-crypto-packet",
@@ -4800,7 +4805,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-hopr"
-version = "4.4.1"
+version = "4.4.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4898,15 +4903,16 @@ dependencies = [
 
 [[package]]
 name = "hopr-statistics"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "assertables",
+ "rand 0.10.0",
  "serde",
 ]
 
 [[package]]
 name = "hopr-strategy"
-version = "0.17.1"
+version = "0.17.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4937,6 +4943,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-test-stubs"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bimap",
+ "dashmap",
+ "futures",
+ "hopr-api",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "hopr-ticket-manager"
 version = "0.1.0"
 dependencies = [
@@ -4963,7 +4981,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.21.0"
+version = "0.23.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4974,25 +4992,25 @@ dependencies = [
  "hopr-api",
  "hopr-async-runtime",
  "hopr-crypto-packet",
- "hopr-metrics",
  "hopr-network-types",
  "hopr-protocol-app",
  "hopr-protocol-hopr",
  "hopr-protocol-session",
  "hopr-protocol-start",
  "hopr-ticket-manager",
- "hopr-transport-identity",
  "hopr-transport-mixer",
- "hopr-transport-network",
+ "hopr-transport-path",
  "hopr-transport-probe",
  "hopr-transport-protocol",
  "hopr-transport-session",
+ "hopr-transport-tag-allocator",
  "humantime-serde",
- "insta",
  "lazy_static",
  "moka",
+ "multiaddr",
  "pcap-file",
  "proc-macro-regex",
+ "rstest",
  "serde",
  "smart-default",
  "strum 0.28.0",
@@ -5001,16 +5019,6 @@ dependencies = [
  "tokio",
  "tracing",
  "validator",
-]
-
-[[package]]
-name = "hopr-transport-identity"
-version = "0.2.0"
-dependencies = [
- "anyhow",
- "libp2p-identity",
- "multiaddr",
- "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -5033,23 +5041,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-transport-network"
-version = "0.10.0"
-dependencies = [
- "anyhow",
- "dashmap",
- "hopr-api",
- "hopr-metrics",
- "humantime-serde",
- "lazy_static",
- "libp2p-identity",
- "thiserror 2.0.18",
- "tracing",
-]
-
-[[package]]
 name = "hopr-transport-p2p"
-version = "0.8.2"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -5062,7 +5055,6 @@ dependencies = [
  "hopr-metrics",
  "hopr-network-types",
  "hopr-platform",
- "hopr-transport-network",
  "hopr-transport-probe",
  "hopr-transport-protocol",
  "lazy_static",
@@ -5070,6 +5062,31 @@ dependencies = [
  "libp2p-stream",
  "more-asserts",
  "multiaddr",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "hopr-transport-path"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bimap",
+ "futures",
+ "futures-time",
+ "hex-literal",
+ "hopr-api",
+ "hopr-crypto-packet",
+ "hopr-metrics",
+ "hopr-network-graph",
+ "hopr-protocol-hopr",
+ "hopr-statistics",
+ "hopr-types",
+ "lazy_static",
+ "moka",
+ "smart-default",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -5091,6 +5108,7 @@ dependencies = [
  "hopr-ct-immediate",
  "hopr-platform",
  "hopr-protocol-app",
+ "hopr-transport-tag-allocator",
  "humantime-serde",
  "lazy_static",
  "moka",
@@ -5107,7 +5125,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "1.4.0"
+version = "1.4.1"
 dependencies = [
  "ahash",
  "anyhow",
@@ -5115,6 +5133,7 @@ dependencies = [
  "async_channel_io",
  "bytesize",
  "criterion",
+ "dashmap",
  "futures",
  "futures-concurrency",
  "futures-time",
@@ -5128,6 +5147,7 @@ dependencies = [
  "hopr-network-types",
  "hopr-protocol-app",
  "hopr-protocol-hopr",
+ "hopr-test-stubs",
  "hopr-ticket-manager",
  "hopr-transport-mixer",
  "humantime-serde",
@@ -5149,7 +5169,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.19.0"
+version = "0.20.2"
 dependencies = [
  "anyhow",
  "arrayvec",
@@ -5158,6 +5178,7 @@ dependencies = [
  "flagset",
  "futures",
  "futures-time",
+ "hopr-api",
  "hopr-async-runtime",
  "hopr-crypto-packet",
  "hopr-metrics",
@@ -5165,6 +5186,7 @@ dependencies = [
  "hopr-protocol-app",
  "hopr-protocol-session",
  "hopr-protocol-start",
+ "hopr-transport-tag-allocator",
  "hopr-types",
  "lazy_static",
  "mimalloc",
@@ -5176,7 +5198,6 @@ dependencies = [
  "rand 0.10.0",
  "serde",
  "serde_cbor_2",
- "serde_json",
  "serde_repr",
  "smart-default",
  "strum 0.28.0",
@@ -5185,6 +5206,17 @@ dependencies = [
  "tikv-jemallocator",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "hopr-transport-tag-allocator"
+version = "0.1.0"
+dependencies = [
+ "hopr-protocol-app",
+ "serde",
+ "smart-default",
+ "thiserror 2.0.18",
+ "validator",
 ]
 
 [[package]]
@@ -5201,7 +5233,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-utils-session"
-version = "1.1.0"
+version = "1.1.2"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -5241,6 +5273,7 @@ dependencies = [
  "hopr-api",
  "hopr-builder",
  "hopr-chain-connector",
+ "hopr-ct-full-network",
  "hopr-lib",
  "hopr-metrics",
  "hopr-network-graph",
@@ -5253,6 +5286,7 @@ dependencies = [
  "mimalloc",
  "opentelemetry",
  "opentelemetry-otlp",
+ "opentelemetry-prometheus-text-exporter",
  "opentelemetry_sdk",
  "proc-macro-regex",
  "serde",
@@ -5276,7 +5310,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "4.6.1"
+version = "4.7.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -5311,7 +5345,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api-client"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "bytes",
  "chrono",
@@ -5335,7 +5369,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-localcluster"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "clap",
@@ -5971,9 +6005,9 @@ dependencies = [
 
 [[package]]
 name = "itoa"
-version = "1.0.17"
+version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92ecc6618181def0457392ccd0ee51198e065e016d1d527a7ac1b6dc7c1f09d2"
+checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
 name = "jiff"
@@ -7149,9 +7183,9 @@ dependencies = [
 
 [[package]]
 name = "opentelemetry-otlp"
-version = "0.31.0"
+version = "0.31.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a2366db2dca4d2ad033cad11e6ee42844fd727007af5ad04a1730f4cb8163bf"
+checksum = "1f69cd6acbb9af919df949cd1ec9e5e7fdc2ef15d234b6b795aaa525cc02f71f"
 dependencies = [
  "http 1.4.0",
  "opentelemetry",
@@ -7163,6 +7197,17 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tonic",
+]
+
+[[package]]
+name = "opentelemetry-prometheus-text-exporter"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "897906366b17a89bec845f6051e0c3474049402a09a0711eea180941293bd013"
+dependencies = [
+ "opentelemetry",
+ "opentelemetry_sdk",
+ "smartstring",
 ]
 
 [[package]]
@@ -7759,21 +7804,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "prometheus"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ca5326d8d0b950a9acd87e6a3f94745394f62e4dae1b1ee22b2bc0c394af43a"
-dependencies = [
- "cfg-if",
- "fnv",
- "lazy_static",
- "memchr",
- "parking_lot",
- "protobuf",
- "thiserror 2.0.18",
-]
-
-[[package]]
 name = "prometheus-client"
 version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7845,26 +7875,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8991c4cbdb8bc5b11f0b074ffe286c30e523de90fee5ba8132f1399f23cb3dd7"
 dependencies = [
  "prost",
-]
-
-[[package]]
-name = "protobuf"
-version = "3.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d65a1d4ddae7d8b5de68153b48f6aa3bba8cb002b243dbdbc55a5afbc98f99f4"
-dependencies = [
- "once_cell",
- "protobuf-support",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "protobuf-support"
-version = "3.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e36c2f31e0a47f9280fb347ef5e461ffcd2c52dd520d8e216b52f93b0b0d7d6"
-dependencies = [
- "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -9240,9 +9250,6 @@ name = "siphasher"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b2aa850e253778c88a04c3d7323b043aeda9d3e30d5971937c1855769763678e"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "slab"
@@ -9268,6 +9275,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "smartstring"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3fb72c633efbaa2dd666986505016c32c3044395ceaf881518399d2f4127ee29"
+dependencies = [
+ "autocfg",
+ "static_assertions",
+ "version_check",
 ]
 
 [[package]]
@@ -9799,32 +9817,32 @@ dependencies = [
 
 [[package]]
 name = "toml_datetime"
-version = "1.0.0+spec-1.1.0"
+version = "1.0.1+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32c2555c699578a4f59f0cc68e5116c8d7cabbd45e1409b989d4be085b53f13e"
+checksum = "9b320e741db58cac564e26c607d3cc1fdc4a88fd36c879568c07856ed83ff3e9"
 dependencies = [
  "serde_core",
 ]
 
 [[package]]
 name = "toml_edit"
-version = "0.25.4+spec-1.1.0"
+version = "0.25.5+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7193cbd0ce53dc966037f54351dbbcf0d5a642c7f0038c382ef9e677ce8c13f2"
+checksum = "8ca1a40644a28bce036923f6a431df0b34236949d111cc07cb6dca830c9ef2e1"
 dependencies = [
  "indexmap 2.13.0",
  "toml_datetime",
  "toml_parser",
- "winnow",
+ "winnow 1.0.0",
 ]
 
 [[package]]
 name = "toml_parser"
-version = "1.0.9+spec-1.1.0"
+version = "1.0.10+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "702d4415e08923e7e1ef96cd5727c0dfed80b4d2fa25db9647fe5eb6f7c5a4c4"
+checksum = "7df25b4befd31c4816df190124375d5a20c6b6921e2cad937316de3fccd63420"
 dependencies = [
- "winnow",
+ "winnow 1.0.0",
 ]
 
 [[package]]
@@ -10965,6 +10983,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "winnow"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a90e88e4667264a994d34e6d1ab2d26d398dcdca8b7f52bec8668957517fc7d8"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "winreg"
 version = "0.50.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11192,18 +11219,18 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
-version = "0.8.42"
+version = "0.8.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2578b716f8a7a858b7f02d5bd870c14bf4ddbbcf3a4c05414ba6503640505e3"
+checksum = "efbb2a062be311f2ba113ce66f697a4dc589f85e78a4aea276200804cea0ed87"
 dependencies = [
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.42"
+version = "0.8.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e6cc098ea4d3bd6246687de65af3f920c430e236bee1e3bf2e441463f08a02f"
+checksum = "0e8bc7269b54418e7aeeef514aa68f8690b8c0489a06b0136e5f57c4c5ccab89"
 dependencies = [
  "proc-macro2",
  "quote",

@@ -8,7 +8,7 @@ use validator::ValidationError;
 
 use crate::{HoprProtocolError, ResolvedAcknowledgement, TicketAcknowledgementError, UnacknowledgedTicketProcessor};
 
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
         /// Whether per-peer metrics are enabled (disabled by default to avoid cardinality explosion).
         static ref PER_PEER_ENABLED: bool = std::env::var("HOPR_METRICS_UNACK_PER_PEER")
@@ -133,7 +133,7 @@ pub struct HoprUnacknowledgedTicketProcessor<Chain> {
 impl<Chain> HoprUnacknowledgedTicketProcessor<Chain> {
     /// Creates a new instance of the HOPR unacknowledged ticket processor.
     pub fn new(chain_api: Chain, chain_key: ChainKeypair, channels_dst: Hash, cfg: HoprUnacknowledgedTicketProcessorConfig) -> Self {
-        #[cfg(all(feature = "prometheus", not(test)))]
+        #[cfg(all(feature = "telemetry", not(test)))]
         {
             lazy_static::initialize(&PER_PEER_ENABLED);
             lazy_static::initialize(&UNACK_PEERS);
@@ -159,10 +159,10 @@ impl<Chain> HoprUnacknowledgedTicketProcessor<Chain> {
                      -> moka::notification::ListenerFuture {
                         Box::pin(async move {
                             if !matches!(cause, moka::notification::RemovalCause::Replaced) {
-                                #[cfg(all(feature = "prometheus", not(test)))]
+                                #[cfg(all(feature = "telemetry", not(test)))]
                                 UNACK_PEERS.decrement(1.0);
 
-                                #[cfg(all(feature = "prometheus", not(test)))]
+                                #[cfg(all(feature = "telemetry", not(test)))]
                                 if matches!(
                                     cause,
                                     moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size
@@ -206,16 +206,16 @@ where
         let inner_cache = self
             .unacknowledged_tickets
             .get_with_by_ref(next_hop, async {
-                #[cfg(all(feature = "prometheus", not(test)))]
+                #[cfg(all(feature = "telemetry", not(test)))]
                 UNACK_PEERS.increment(1.0);
 
-                #[cfg(all(feature = "prometheus", not(test)))]
+                #[cfg(all(feature = "telemetry", not(test)))]
                 let next_hop = *next_hop;
                 moka::future::Cache::builder()
                     .time_to_live(self.cfg.unack_ticket_timeout)
                     .max_capacity(self.cfg.max_unack_tickets as u64)
                     .eviction_listener(move |_key, _value, cause| {
-                        #[cfg(all(feature = "prometheus", not(test)))]
+                        #[cfg(all(feature = "telemetry", not(test)))]
                         {
                             let peer_id_for_eviction = next_hop.to_peerid_str();
                             UNACK_TICKETS.decrement(1.0);
@@ -232,7 +232,7 @@ where
                             cause,
                             moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size
                         ) {
-                            #[cfg(all(feature = "prometheus", not(test)))]
+                            #[cfg(all(feature = "telemetry", not(test)))]
                             UNACK_EVICTIONS.increment();
                         }
                     })
@@ -242,7 +242,7 @@ where
 
         inner_cache.insert(challenge, ticket).await;
 
-        #[cfg(all(feature = "prometheus", not(test)))]
+        #[cfg(all(feature = "telemetry", not(test)))]
         {
             let peer_id = next_hop.to_peerid_str();
             UNACK_INSERTIONS.increment();
@@ -327,11 +327,11 @@ where
         // Find all the tickets that we're awaiting acknowledgement for
         let mut unack_tickets = Vec::with_capacity(half_keys_challenges.len());
         for (half_key, challenge) in half_keys_challenges {
-            #[cfg(all(feature = "prometheus", not(test)))]
+            #[cfg(all(feature = "telemetry", not(test)))]
             UNACK_LOOKUPS.increment();
 
             let Some(unack_ticket) = awaiting_ack_from_peer.remove(&challenge).await else {
-                #[cfg(all(feature = "prometheus", not(test)))]
+                #[cfg(all(feature = "telemetry", not(test)))]
                 UNACK_LOOKUP_MISSES.increment();
 
                 tracing::trace!(%challenge, "received acknowledgement for unknown ticket");

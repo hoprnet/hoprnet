@@ -10,12 +10,12 @@ use std::{
 
 use async_trait::async_trait;
 use futures::{SinkExt, StreamExt, pin_mut};
+use hopr_api::tickets::TicketManagement;
 use hopr_lib::{
     AcknowledgedTicketStatus, ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus, ChannelStatusDiscriminants,
     HoprBalance, Utc, VerifiedTicket,
     api::{
         chain::{ChainReadChannelOperations, ChannelSelector},
-        db::TicketSelector,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -106,7 +106,7 @@ impl<A, R> Display for AutoRedeemingStrategy<A, R> {
 impl<A, R> AutoRedeemingStrategy<A, R>
 where
     A: ChainReadChannelOperations + Clone + Send + Sync + 'static,
-    R: futures::Sink<TicketSelector> + Clone,
+    R: TicketManagement + Clone,
     StrategyError: From<R::Error>,
 {
     pub fn new(cfg: AutoRedeemingStrategyConfig, hopr_chain_actions: A, redeem_sink: R) -> Self {
@@ -116,21 +116,13 @@ where
             redeem_sink,
         }
     }
-
-    async fn enqueue_redeem_request(&self, selector: TicketSelector) -> crate::errors::Result<()> {
-        let sink = self.redeem_sink.clone();
-        pin_mut!(sink);
-        Ok(sink
-            .send(selector.with_state(AcknowledgedTicketStatus::Untouched))
-            .await?)
-    }
 }
 
 #[async_trait]
 impl<A, R> SingularStrategy for AutoRedeemingStrategy<A, R>
 where
     A: ChainReadChannelOperations + Clone + Send + Sync + 'static,
-    R: futures::Sink<TicketSelector> + Sync + Send + Clone,
+    R: TicketManagement + Sync + Send + Clone,
     StrategyError: From<R::Error>,
 {
     async fn on_tick(&self) -> crate::errors::Result<()> {

@@ -6,13 +6,13 @@ use axum::{
     response::IntoResponse,
 };
 use hopr_lib::{
-    ChannelTicketStatistics, HoprBalance, ToHex,
+    HoprBalance, ToHex,
     errors::{HoprLibError, HoprStatusError},
     prelude::Hash,
 };
 use serde::Deserialize;
 use serde_with::{DisplayFromStr, serde_as};
-
+use hopr_lib::api::tickets::ChannelStats;
 use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState};
 
 #[serde_as]
@@ -162,14 +162,14 @@ pub(crate) struct NodeTicketStatisticsResponse {
     rejected_value: HoprBalance,
 }
 
-impl From<ChannelTicketStatistics> for NodeTicketStatisticsResponse {
-    fn from(value: ChannelTicketStatistics) -> Self {
+impl From<ChannelStats> for NodeTicketStatisticsResponse {
+    fn from(value: ChannelStats) -> Self {
         Self {
             winning_count: value.winning_tickets as u64,
             unredeemed_value: value.unredeemed_value,
-            redeemed_value: value.redeemed_value(),
-            neglected_value: value.neglected_value(),
-            rejected_value: value.rejected_value(),
+            redeemed_value: Default::default(), // TODO: calculate redeemed value
+            neglected_value: value.neglected_value,
+            rejected_value: value.rejected_value,
         }
     }
 }

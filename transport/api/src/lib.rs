@@ -32,14 +32,9 @@ use std::{
 };
 
 use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
-use futures::{
-    FutureExt, StreamExt,
-    channel::mpsc::{Sender, channel},
-    stream::select_with_strategy,
-};
+use futures::{FutureExt, StreamExt, channel::mpsc::{Sender, channel}, stream::select_with_strategy, SinkExt};
 pub use hopr_api::{
     Multiaddr, PeerId,
-    db::ChannelTicketStatistics,
     network::{Health, traits::NetworkView},
     types::{
         crypto::{
@@ -52,7 +47,6 @@ pub use hopr_api::{
 use hopr_api::{
     chain::{ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
     ct::{CoverTrafficGeneration, ProbingTrafficGeneration},
-    db::HoprDbTicketOperations,
     graph::{NetworkGraphUpdate, NetworkGraphView, traits::EdgeObservableRead},
     network::{NetworkBuilder, NetworkStreamControl},
     types::primitive::prelude::*,
@@ -96,11 +90,11 @@ pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RAN
 pub use hopr_api as api;
 use hopr_api::chain::{ChainWriteTicketOperations, ChannelSelector};
 use hopr_api::types::internal::routing::DestinationRouting;
-use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue, RedemptionResult};
+use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue};
 
 // Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
 lazy_static::lazy_static! {
-    static ref SESSION_INITIATION_TIMEOUT_MAX: std::time::Duration = 2 * constants::SESSION_INITIATION_TIMEOUT_BASE * RoutingOptions::MAX_INTERMEDIATE_HOPS as u32;
+    static ref SESSION_INITIATION_TIMEOUT_MAX: Duration = 2 * SESSION_INITIATION_TIMEOUT_BASE * RoutingOptions::MAX_INTERMEDIATE_HOPS as u32;
 
     static ref PEER_ID_CACHE: moka::future::Cache<PeerId, OffchainPublicKey> = moka::future::Cache::builder()
         .time_to_idle(Duration::from_mins(15))
@@ -667,15 +661,8 @@ where
         }
     }
 
-    pub fn redeem_tickets_in_channel(&self, channel_id: ChannelId, min_value: Option<HoprBalance>) -> errors::Result<impl Stream<Item = errors::Result<RedemptionResult>> + Send> {
-        Ok(self.tmgr.redeem_stream(self.chain_api.clone(), channel_id, min_value)?
-            .map_err(HoprTransportError::TicketManager))
-    }
-
-    pub fn neglect_tickets_in_channel(&self, channel_id: &ChannelId, max_index: Option<u64>) -> errors::Result<()> {
-        self.tmgr.neglect_tickets(channel_id, max_index)
-            .map(|_| ())
-            .map_err(HoprTransportError::TicketManager)
+    pub fn ticket_manager(&self) -> impl hopr_api::tickets::TicketManagement + Send + Clone + 'static {
+        self.tmgr.clone()
     }
 
     #[tracing::instrument(level = "debug", skip(self))]

@@ -25,7 +25,6 @@ use hopr_lib::{
     ChannelChange, ChannelDirection, ChannelEntry, VerifiedTicket,
     api::{
         chain::{ChainReadChannelOperations, ChainReadSafeOperations, ChainValues, ChainWriteChannelOperations},
-        db::TicketSelector,
     },
 };
 use serde::{Deserialize, Serialize};
