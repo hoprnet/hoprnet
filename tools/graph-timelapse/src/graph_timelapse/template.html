@@ -412,6 +412,10 @@
       }
 
       // ── Particle animation ──
+      // Uses setInterval instead of requestAnimationFrame so it keeps running
+      // even when the tab is backgrounded or the browser throttles RAF.
+      const ANIM_STEP_MS = 16; // ~60fps
+
       function animatePacket(edgeIds, color, duration) {
         if (!edgeIds.length) return Promise.resolve();
 
@@ -422,7 +426,6 @@
           .attr("filter", "url(#glow-md)")
           .attr("opacity", 0.9);
 
-        // Larger glow trail
         const trail = particleGroup
           .append("circle")
           .attr("r", 14)
@@ -430,56 +433,65 @@
           .attr("opacity", 0.2)
           .attr("filter", "url(#glow-lg)");
 
-        const edgeDuration = duration / edgeIds.length;
+        const edgeDuration = Math.max(duration / edgeIds.length, 30);
+
+        function animateOneEdge(eid) {
+          return new Promise((resolve) => {
+            const pathEl = pathElements[eid];
+            if (!pathEl) {
+              resolve();
+              return;
+            }
+            const len = pathEl.getTotalLength();
+
+            // Brighten edge while particle traverses
+            const linkSel = linkPaths.filter((d) => d.id === eid);
+            linkSel
+              .attr("stroke", color)
+              .attr("stroke-width", 2.5)
+              .attr("opacity", 1);
+
+            const startTime = performance.now();
+            const iv = setInterval(() => {
+              const elapsed = performance.now() - startTime;
+              const progress = Math.min(elapsed / edgeDuration, 1);
+              const eased =
+                progress < 0.5
+                  ? 2 * progress * progress
+                  : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+              const pt = pathEl.getPointAtLength(eased * len);
+              dot.attr("cx", pt.x).attr("cy", pt.y);
+              trail.attr("cx", pt.x).attr("cy", pt.y);
+
+              if (progress >= 1) {
+                clearInterval(iv);
+                linkSel
+                  .attr("stroke", COLORS.inactive)
+                  .attr("stroke-width", 0.8)
+                  .attr("opacity", 1);
+                resolve();
+              }
+            }, ANIM_STEP_MS);
+
+            // Safety: force resolve if stuck (2x expected duration)
+            setTimeout(
+              () => {
+                clearInterval(iv);
+                resolve();
+              },
+              edgeDuration * 2 + 500,
+            );
+          });
+        }
 
         let chain = Promise.resolve();
         for (const eid of edgeIds) {
-          chain = chain.then(
-            () =>
-              new Promise((resolve) => {
-                const pathEl = pathElements[eid];
-                if (!pathEl) {
-                  resolve();
-                  return;
-                }
-                const len = pathEl.getTotalLength();
-
-                // Briefly brighten the edge
-                const linkSel = linkPaths.filter((d) => d.id === eid);
-                linkSel
-                  .attr("stroke", color)
-                  .attr("stroke-width", 2.5)
-                  .attr("opacity", 1);
-                setTimeout(() => {
-                  linkSel
-                    .attr("stroke", COLORS.inactive)
-                    .attr("stroke-width", 0.8)
-                    .attr("opacity", 1);
-                }, edgeDuration * 0.8);
-
-                let start = null;
-                function step(ts) {
-                  if (!start) start = ts;
-                  const progress = Math.min((ts - start) / edgeDuration, 1);
-                  // Ease in-out
-                  const eased =
-                    progress < 0.5
-                      ? 2 * progress * progress
-                      : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-                  const pt = pathEl.getPointAtLength(eased * len);
-                  dot.attr("cx", pt.x).attr("cy", pt.y);
-                  trail.attr("cx", pt.x).attr("cy", pt.y);
-                  if (progress < 1) requestAnimationFrame(step);
-                  else resolve();
-                }
-                requestAnimationFrame(step);
-              }),
-          );
+          chain = chain.then(() => animateOneEdge(eid));
         }
 
         return chain.then(() => {
-          dot.transition().duration(200).attr("opacity", 0).remove();
-          trail.transition().duration(300).attr("opacity", 0).remove();
+          dot.transition().duration(150).attr("opacity", 0).remove();
+          trail.transition().duration(200).attr("opacity", 0).remove();
         });
       }
 
