@@ -43,6 +43,13 @@
       .link {
         fill: none;
         stroke-linecap: round;
+        stroke-dasharray: 6 4;
+        animation: dash-flow 1.2s linear infinite;
+      }
+      @keyframes dash-flow {
+        to {
+          stroke-dashoffset: -20;
+        }
       }
       .link-heat {
         fill: none;
@@ -520,7 +527,9 @@
           .filter((d) => d.id === activeEdges[0])
           .attr("stroke", activeColor)
           .attr("stroke-width", 2.5)
-          .attr("opacity", 1);
+          .attr("opacity", 1)
+          .style("stroke-dasharray", "12 6")
+          .style("animation-duration", "0.4s");
       }
 
       function tick() {
@@ -577,24 +586,28 @@
         activeTrail.attr("cx", pt.x).attr("cy", pt.y);
 
         if (progress >= 1) {
-          // Dim edge
+          // Dim edge — restore subtle dash
           linkPaths
             .filter((d) => d.id === eid)
             .attr("stroke", COLORS.inactive)
             .attr("stroke-width", 0.8)
-            .attr("opacity", 1);
+            .attr("opacity", 1)
+            .style("stroke-dasharray", "6 4")
+            .style("animation-duration", "1.2s");
 
           activeEdgeIdx++;
           edgeStartTime = now;
 
-          // Brighten next edge
+          // Brighten next edge — bold fast dash
           if (activeEdgeIdx < activeEdges.length) {
             const nextEid = activeEdges[activeEdgeIdx];
             linkPaths
               .filter((d) => d.id === nextEid)
               .attr("stroke", activeColor)
               .attr("stroke-width", 2.5)
-              .attr("opacity", 1);
+              .attr("opacity", 1)
+              .style("stroke-dasharray", "12 6")
+              .style("animation-duration", "0.4s");
           }
         }
       }
