@@ -9,7 +9,6 @@ use hopr_chain_connector::{
     create_trustful_hopr_blokli_connector,
     testing::{BlokliTestClient, BlokliTestStateBuilder, FullStateEmulator},
 };
-use hopr_db_node::HoprNodeDb;
 use hopr_lib::{
     Address, ChainKeypair, HopRouting, HoprBalance, HoprNodeNetworkOperations, HoprNodeOperations,
     HoprSessionClientConfig, HoprState, IpOrHost, Keypair, OffchainKeypair, SealedHost, WinningProbability,
@@ -384,10 +383,6 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
                     .expect("failed to build Tokio runtime");
 
                 let result = runtime.block_on(async {
-                    let node_db = HoprNodeDb::new_in_memory()
-                        .await
-                        .expect("failed to create HoprNodeDb for node");
-
                     let mut connector = create_trustful_hopr_blokli_connector(
                         &onchain_keys[i],
                         BlockchainConnectorConfig::default(),
@@ -419,7 +414,6 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
                             ..Default::default()
                         }), // aggressive setting to facilitate fast n-hop telemetry probing
                         connector.clone(),
-                        node_db,
                         EchoServer::new(),
                     )
                     .await?;

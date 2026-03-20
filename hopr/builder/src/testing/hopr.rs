@@ -178,16 +178,15 @@ impl ChannelGuard {
     }
 
     pub async fn try_to_get_all_ticket_counts(&self) -> anyhow::Result<Vec<usize>> {
-        let futures = self.channels.iter().map(|(hopr, channel_id)| async move {
-            hopr.tickets_in_channel(channel_id)
-                .await
-                .context("getting ticket statistics must succeed")
-                .into_iter()
-                .count()
+        todo!()
+        /*let futures = self.channels.iter().map(|(hopr, channel_id)| async move {
+            hopr.ticket_management()
+                .ticket_stats(channel_id.into()).context("getting ticket statistics must succeed")
+                .map(|stats| stats.winning_tickets)
         });
 
         let stats = join_all(futures).await;
-        Ok(stats)
+        Ok(stats)*/
     }
 
     pub async fn open_channel_between_nodes(

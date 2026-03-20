@@ -106,10 +106,7 @@ pub(crate) struct InternalState {
         session::close_client,
         tickets::redeem_all_tickets,
         tickets::redeem_tickets_in_channel,
-        tickets::show_all_tickets,
-        tickets::show_channel_tickets,
         tickets::show_ticket_statistics,
-        tickets::reset_ticket_statistics,
     ),
     components(
         schemas(
@@ -276,7 +273,6 @@ async fn build_api(
                 .route("/channels", get(channels::list_channels))
                 .route("/channels", post(channels::open_channel))
                 .route("/channels/{channelId}", get(channels::show_channel))
-                .route("/channels/{channelId}/tickets", get(tickets::show_channel_tickets))
                 .route("/channels/{channelId}", delete(channels::close_channel))
                 .route("/channels/{channelId}/fund", post(channels::fund_channel))
                 .route(
@@ -286,7 +282,6 @@ async fn build_api(
                 .route("/tickets", get(tickets::show_all_tickets))
                 .route("/tickets/redeem", post(tickets::redeem_all_tickets))
                 .route("/tickets/statistics", get(tickets::show_ticket_statistics))
-                .route("/tickets/statistics", delete(tickets::reset_ticket_statistics))
                 .route("/network/price", get(network::price))
                 .route("/network/probability", get(network::probability))
                 .route("/node/version", get(node::version))

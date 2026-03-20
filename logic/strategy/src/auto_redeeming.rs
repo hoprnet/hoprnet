@@ -9,13 +9,12 @@ use std::{
 };
 
 use async_trait::async_trait;
-use futures::{SinkExt, StreamExt, pin_mut};
-use hopr_api::tickets::TicketManagement;
 use hopr_lib::{
-    AcknowledgedTicketStatus, ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus, ChannelStatusDiscriminants,
-    HoprBalance, Utc, VerifiedTicket,
+    ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus,
+    HoprBalance, VerifiedTicket,
     api::{
         chain::{ChainReadChannelOperations, ChannelSelector},
+        tickets::TicketManagement,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -129,7 +128,7 @@ where
         if !self.cfg.redeem_on_winning {
             debug!("trying to redeem all tickets in all channels");
 
-            self.hopr_chain_actions
+            /*self.hopr_chain_actions
                 .stream_channels(
                     ChannelSelector::default()
                         .with_destination(*self.hopr_chain_actions.me())
@@ -148,7 +147,7 @@ where
                         .with_state(AcknowledgedTicketStatus::Untouched))
                 })
                 .forward(self.redeem_sink.clone())
-                .await?;
+                .await?;*/
 
             Ok(())
         } else {
@@ -171,12 +170,13 @@ where
                     return Err(CriteriaNotSatisfied);
                 }
 
-                let selector = TicketSelector::from(channel)
+                todo!()
+                /*let selector = TicketSelector::from(channel)
                     .with_amount(self.cfg.minimum_redeem_ticket_value..)
                     .with_index_range(channel.ticket_index..=ack.verified_ticket().index)
                     .with_state(AcknowledgedTicketStatus::Untouched);
 
-                self.enqueue_redeem_request(selector).await
+                self.enqueue_redeem_request(selector).await*/
             } else {
                 Err(CriteriaNotSatisfied)
             }
@@ -202,12 +202,13 @@ where
             }
             info!(%channel, "channel transitioned to PendingToClose, checking if it has tickets to redeem");
 
-            let selector = TicketSelector::from(channel)
+            todo!()
+            /*let selector = TicketSelector::from(channel)
                 .with_amount(self.cfg.minimum_redeem_ticket_value..)
                 .with_index_range(channel.ticket_index..)
                 .with_state(AcknowledgedTicketStatus::Untouched);
 
-            self.enqueue_redeem_request(selector).await
+            self.enqueue_redeem_request(selector).await*/
         } else {
             Err(CriteriaNotSatisfied)
         }

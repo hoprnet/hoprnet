@@ -25,6 +25,7 @@ use hopr_lib::{
     ChannelChange, ChannelDirection, ChannelEntry, VerifiedTicket,
     api::{
         chain::{ChainReadChannelOperations, ChainReadSafeOperations, ChainValues, ChainWriteChannelOperations},
+        tickets::TicketManagement,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -158,7 +159,7 @@ impl MultiStrategy {
             + Send
             + Sync
             + 'static,
-        R: futures::Sink<TicketSelector> + Sync + Send + Clone + 'static,
+        R: TicketManagement + Sync + Send + Clone + 'static,
         StrategyError: From<R::Error>,
     {
         let mut strategies = Vec::<Box<dyn SingularStrategy + Send + Sync>>::new();

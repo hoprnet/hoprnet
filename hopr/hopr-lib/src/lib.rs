@@ -12,8 +12,6 @@
 //!
 //! For most of the practical use cases, the `hoprd` application should be a preferable
 //! choice.
-
-use hopr_api::tickets::{RedemptionResult, TicketManagement};
 /// Helper functions.
 mod helpers;
 
@@ -86,8 +84,8 @@ pub use hopr_api::{
     network::{NetworkBuilder, NetworkStreamControl},
     node::{HoprNodeNetworkOperations, HoprNodeOperations, state::HoprState},
     types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*},
+    tickets::{TicketManagement, TicketManagementExt, ChannelStats, RedemptionResult},
 };
-use hopr_api::tickets::{ChannelStats, TicketManagementExt};
 use hopr_async_runtime::prelude::spawn;
 pub use hopr_async_runtime::{Abortable, AbortableList};
 pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
