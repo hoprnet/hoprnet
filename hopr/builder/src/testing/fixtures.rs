@@ -509,6 +509,33 @@ async fn wait_for_connectivity(instance: &TestedHopr, swarm_size: usize) {
         );
         sleep(Duration::from_secs(1)).await;
     }
+
+    // Wait for the probe subsystem to observe all peers, ensuring pings
+    // succeed immediately after the cluster reports full connectivity.
+    info!("Waiting for probe warmup");
+    loop {
+        let peers = instance
+            .inner()
+            .network_connected_peers()
+            .await
+            .expect("failed to get connected peers");
+
+        let observed = peers
+            .iter()
+            .filter(|p| instance.inner().network_peer_info(p).is_some())
+            .count();
+
+        if observed == swarm_size - 1 {
+            break;
+        }
+
+        tracing::trace!(
+            "{observed}/{} peers observed on {}, waiting for probe warmup",
+            swarm_size - 1,
+            instance.instance.me_onchain()
+        );
+        sleep(Duration::from_secs(1)).await;
+    }
 }
 
 async fn wait_for_status(instance: &TestedHopr, expected_status: &HoprState) {
