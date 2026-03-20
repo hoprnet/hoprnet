@@ -319,6 +319,31 @@
         pathElements[d.id] = this;
       });
 
+      // Place small directional chevrons along each edge
+      const chevronGroup = svg.insert("g", ".nodes").attr("class", "chevrons");
+      const CHEVRON_SPACING = 80; // px between chevrons
+      linkPaths.each(function (d) {
+        const pathEl = this;
+        const len = pathEl.getTotalLength();
+        if (len < 60) return; // too short
+        const start = len * 0.25;
+        const end = len * 0.75;
+        for (let dist = start; dist <= end; dist += CHEVRON_SPACING) {
+          const p1 = pathEl.getPointAtLength(dist - 4);
+          const p2 = pathEl.getPointAtLength(dist + 4);
+          const angle = (Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180) / Math.PI;
+          const pt = pathEl.getPointAtLength(dist);
+          chevronGroup
+            .append("path")
+            .attr("d", "M-3.5,-3L2,0L-3.5,3")
+            .attr("transform", `translate(${pt.x},${pt.y}) rotate(${angle})`)
+            .attr("fill", "none")
+            .attr("stroke", "rgba(255,255,255,0.2)")
+            .attr("stroke-width", 1.2)
+            .attr("stroke-linecap", "round");
+        }
+      });
+
       // Nodes
       const nodeGs = nodeGroup
         .selectAll("g")
