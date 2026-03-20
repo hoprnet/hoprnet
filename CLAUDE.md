@@ -36,6 +36,7 @@ cargo test -p <crate> --test <test_name> -- --test-threads=1  # Single test file
 ```
 
 For `hopr-builder` integration tests specifically:
+
 ```bash
 cargo test -p hopr-builder --test transport_tickets -- --test-threads=1
 cargo test -p hopr-builder --test transport_session -- --test-threads=1
