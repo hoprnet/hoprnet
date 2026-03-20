@@ -499,6 +499,8 @@
               foundry-bin
               nfpm
               envsubst
+              uv
+              graphviz
             ];
             shellHook = ''
               ${pre-commit-check.shellHook}

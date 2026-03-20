@@ -5,10 +5,17 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
-use hopr_lib::HoprBalance;
+use futures::{StreamExt, stream::FuturesUnordered};
+use hopr_lib::{
+    Address, HoprBalance, Multiaddr,
+    api::graph::{
+        EdgeLinkObservable,
+        traits::{EdgeNetworkObservableRead, EdgeObservableRead},
+    },
+};
 use serde_with::{DisplayFromStr, serde_as};
 
-use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState};
+use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState, checksum_address_serializer};
 
 #[serde_as]
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -88,4 +95,173 @@ pub(super) async fn probability(State(state): State<Arc<InternalState>>) -> impl
             .into_response(),
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
+}
+
+// ── Connected peers endpoint ────────────────────────────────────────────────
+
+#[serde_as]
+#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+#[schema(example = json!({
+    "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
+    "probeRate": 0.476,
+    "lastUpdate": 1690000000,
+    "averageLatency": 100,
+    "score": 0.7,
+    "isConnected": true
+}))]
+/// Immediate observation data for a connected peer.
+pub(crate) struct ConnectedPeerResponse {
+    #[serde(serialize_with = "checksum_address_serializer")]
+    #[schema(value_type = String, example = "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe")]
+    address: Address,
+    #[schema(example = 0.476)]
+    probe_rate: f64,
+    #[schema(example = 1690000000)]
+    last_update: u128,
+    #[schema(example = 100)]
+    average_latency: u128,
+    #[schema(example = 0.7)]
+    score: f64,
+    #[schema(example = true)]
+    is_connected: bool,
+}
+
+/// Lists peers with immediate observation data from the network graph.
+///
+/// Returns only peers that have at least one edge with immediate QoS data,
+/// representing nodes the current node has direct transport observations for.
+#[utoipa::path(
+    get,
+    path = const_format::formatcp!("{BASE_PATH}/network/connected"),
+    description = "List connected peers with immediate observation data from the network graph",
+    responses(
+        (status = 200, description = "Connected peers with immediate observations", body = Vec<ConnectedPeerResponse>),
+        (status = 401, description = "Invalid authorization token.", body = ApiError),
+        (status = 422, description = "Unknown failure", body = ApiError)
+    ),
+    security(
+        ("api_token" = []),
+        ("bearer_token" = [])
+    ),
+    tag = "Network"
+)]
+pub(super) async fn connected(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+    let hopr = state.hopr.clone();
+    let graph = hopr.graph();
+    let edges = graph.connected_edges();
+
+    let me_key = graph.me();
+
+    // Collect unique peers that have immediate QoS data on edges from `me`.
+    let mut peers = Vec::new();
+    for (src, dst, obs) in &edges {
+        if src != me_key {
+            continue;
+        }
+        let Some(imm) = obs.immediate_qos() else {
+            continue;
+        };
+
+        let address = match hopr.peerid_to_chain_key(&(*dst).into()).await {
+            Ok(Some(addr)) => addr,
+            _ => continue,
+        };
+
+        peers.push(ConnectedPeerResponse {
+            address,
+            probe_rate: imm.average_probe_rate(),
+            last_update: obs.last_update().as_millis(),
+            average_latency: imm.average_latency().map_or(0, |l| l.as_millis()),
+            score: obs.score(),
+            is_connected: imm.is_connected(),
+        });
+    }
+
+    (StatusCode::OK, Json(peers)).into_response()
+}
+
+// ── Announced peers endpoint ────────────────────────────────────────────────
+
+#[serde_as]
+#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
+    "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
+    "multiaddrs": ["/ip4/178.12.1.9/tcp/19092"]
+}))]
+#[serde(rename_all = "camelCase")]
+/// A peer that has been announced on-chain.
+pub(crate) struct AnnouncedPeerResponse {
+    #[serde(serialize_with = "checksum_address_serializer")]
+    #[schema(value_type = String, example = "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe")]
+    address: Address,
+    #[serde_as(as = "Vec<DisplayFromStr>")]
+    #[schema(value_type = Vec<String>, example = json!(["/ip4/178.12.1.9/tcp/19092"]))]
+    multiaddrs: Vec<Multiaddr>,
+}
+
+/// Lists all peers that have been announced on-chain.
+#[utoipa::path(
+    get,
+    path = const_format::formatcp!("{BASE_PATH}/network/announced"),
+    description = "List all peers announced on-chain",
+    responses(
+        (status = 200, description = "Announced peers", body = Vec<AnnouncedPeerResponse>),
+        (status = 401, description = "Invalid authorization token.", body = ApiError),
+        (status = 422, description = "Unknown failure", body = ApiError)
+    ),
+    security(
+        ("api_token" = []),
+        ("bearer_token" = [])
+    ),
+    tag = "Network"
+)]
+pub(super) async fn announced(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+    let hopr = state.hopr.clone();
+
+    match hopr.accounts_announced_on_chain().await {
+        Ok(accounts) => {
+            let peers: Vec<AnnouncedPeerResponse> = accounts
+                .into_iter()
+                .map(|entry| async move {
+                    AnnouncedPeerResponse {
+                        address: entry.chain_addr,
+                        multiaddrs: entry.get_multiaddrs().to_vec(),
+                    }
+                })
+                .collect::<FuturesUnordered<_>>()
+                .collect()
+                .await;
+            (StatusCode::OK, Json(peers)).into_response()
+        }
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+    }
+}
+
+// ── Graph DOT endpoint ──────────────────────────────────────────────────────
+
+/// Returns the network graph in DOT (Graphviz) format.
+///
+/// Only connected nodes (those with at least one edge) are included.
+/// Nodes are labeled by their offchain public key hex representation.
+/// Edges include quality annotations (score, latency, capacity).
+#[utoipa::path(
+    get,
+    path = const_format::formatcp!("{BASE_PATH}/network/graph"),
+    description = "Get the network graph in DOT (Graphviz) format",
+    responses(
+        (status = 200, description = "DOT representation of the network graph", body = String, content_type = "text/plain"),
+        (status = 401, description = "Invalid authorization token.", body = ApiError),
+    ),
+    security(
+        ("api_token" = []),
+        ("bearer_token" = [])
+    ),
+    tag = "Network"
+)]
+pub(super) async fn graph(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+    let graph = state.hopr.graph();
+    let dot = hopr_network_graph::render::render_dot(graph);
+
+    (StatusCode::OK, [(axum::http::header::CONTENT_TYPE, "text/plain")], dot).into_response()
 }

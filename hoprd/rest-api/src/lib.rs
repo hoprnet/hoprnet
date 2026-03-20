@@ -92,6 +92,9 @@ pub(crate) struct InternalState {
         checks::startedz,
         network::price,
         network::probability,
+        network::connected,
+        network::announced,
+        network::graph,
         node::configuration,
         node::entry_nodes,
         node::info,
@@ -120,6 +123,8 @@ pub(crate) struct InternalState {
             channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundBodyRequest,
             network::TicketPriceResponse,
             network::TicketProbabilityResponse,
+            network::ConnectedPeerResponse,
+            network::AnnouncedPeerResponse,
             node::EntryNode, node::NodeInfoResponse, node::NodePeersQueryRequest,
             node::HeartbeatInfo, node::PeerObservations, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse,
             peers::NodePeerInfoResponse, peers::PingResponse,
@@ -290,6 +295,9 @@ async fn build_api(
                 .route("/tickets/statistics", delete(tickets::reset_ticket_statistics))
                 .route("/network/price", get(network::price))
                 .route("/network/probability", get(network::probability))
+                .route("/network/connected", get(network::connected))
+                .route("/network/announced", get(network::announced))
+                .route("/network/graph", get(network::graph))
                 .route("/node/version", get(node::version))
                 .route("/node/configuration", get(node::configuration))
                 .route("/node/info", get(node::info))

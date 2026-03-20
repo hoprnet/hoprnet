@@ -15,6 +15,7 @@ crate-type = ["rlib"]
 [features]
 default = ["petgraph"]
 petgraph = ["dep:petgraph", "dep:indexmap"]
+graph-api = ["petgraph"]
 
 [dependencies]
 anyhow = { workspace = true }

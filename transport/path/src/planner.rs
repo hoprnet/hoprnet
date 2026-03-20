@@ -219,9 +219,12 @@ where
                 forward_options,
                 return_options,
             } => {
+                tracing::debug!(%destination, "[forward] resolving forward path");
+
                 let forward_path = self
                     .resolve_path(NodeId::Offchain(self.me), *destination, forward_options)
                     .await?;
+                tracing::debug!(%destination, path = %forward_path, "[forward] resolved path");
 
                 let return_paths = if let Some(return_options) = return_options {
                     let num_possible_surbs = HoprPacket::max_surbs_with_message(size_hint).min(max_surbs);
@@ -233,11 +236,15 @@ where
                         "resolving packet return paths"
                     );
 
-                    (0..num_possible_surbs)
+                    let paths = (0..num_possible_surbs)
                         .map(|_| self.resolve_path(*destination, NodeId::Offchain(self.me), return_options.clone()))
                         .collect::<FuturesUnordered<_>>()
                         .try_collect::<Vec<ValidatedPath>>()
-                        .await?
+                        .await?;
+                    for (i, rp) in paths.iter().enumerate() {
+                        tracing::debug!(%destination, index = i, path = %rp, "[return] resolved return path");
+                    }
+                    paths
                 } else {
                     vec![]
                 };

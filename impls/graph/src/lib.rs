@@ -23,6 +23,8 @@
 pub mod petgraph;
 
 pub mod errors;
+#[cfg(feature = "graph-api")]
+pub mod render;
 pub mod weight;
 
 use hopr_api::OffchainPublicKey;

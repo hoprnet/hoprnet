@@ -181,6 +181,53 @@ pub mod types {
         pub address: ::std::string::String,
         pub multiaddrs: ::std::vec::Vec<::std::string::String>,
     }
+    ///A peer that has been announced on-chain.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A peer that has been announced on-chain.",
+    ///  "examples": [
+    ///    {
+    ///      "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
+    ///      "multiaddrs": [
+    ///        "/ip4/178.12.1.9/tcp/19092"
+    ///      ]
+    ///    }
+    ///  ],
+    ///  "type": "object",
+    ///  "required": [
+    ///    "address",
+    ///    "multiaddrs"
+    ///  ],
+    ///  "properties": {
+    ///    "address": {
+    ///      "examples": [
+    ///        "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe"
+    ///      ],
+    ///      "type": "string"
+    ///    },
+    ///    "multiaddrs": {
+    ///      "examples": [
+    ///        [
+    ///          "/ip4/178.12.1.9/tcp/19092"
+    ///        ]
+    ///      ],
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "string"
+    ///      }
+    ///    }
+    ///  }
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    pub struct AnnouncedPeerResponse {
+        pub address: ::std::string::String,
+        pub multiaddrs: ::std::vec::Vec<::std::string::String>,
+    }
     ///Standardized error response for the API
     ///
     /// <details><summary>JSON schema</summary>
@@ -491,6 +538,90 @@ pub mod types {
     pub struct CloseChannelResponse {
         ///Receipt for the channel close transaction.
         pub receipt: ::std::string::String,
+    }
+    ///Immediate observation data for a connected peer.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "Immediate observation data for a connected peer.",
+    ///  "examples": [
+    ///    {
+    ///      "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
+    ///      "averageLatency": 100,
+    ///      "isConnected": true,
+    ///      "lastUpdate": 1690000000,
+    ///      "probeRate": 0.476,
+    ///      "score": 0.7
+    ///    }
+    ///  ],
+    ///  "type": "object",
+    ///  "required": [
+    ///    "address",
+    ///    "averageLatency",
+    ///    "isConnected",
+    ///    "lastUpdate",
+    ///    "probeRate",
+    ///    "score"
+    ///  ],
+    ///  "properties": {
+    ///    "address": {
+    ///      "examples": [
+    ///        "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe"
+    ///      ],
+    ///      "type": "string"
+    ///    },
+    ///    "averageLatency": {
+    ///      "examples": [
+    ///        100
+    ///      ],
+    ///      "type": "integer",
+    ///      "minimum": 0.0
+    ///    },
+    ///    "isConnected": {
+    ///      "examples": [
+    ///        true
+    ///      ],
+    ///      "type": "boolean"
+    ///    },
+    ///    "lastUpdate": {
+    ///      "examples": [
+    ///        1690000000
+    ///      ],
+    ///      "type": "integer",
+    ///      "minimum": 0.0
+    ///    },
+    ///    "probeRate": {
+    ///      "examples": [
+    ///        0.476
+    ///      ],
+    ///      "type": "number",
+    ///      "format": "double"
+    ///    },
+    ///    "score": {
+    ///      "examples": [
+    ///        0.7
+    ///      ],
+    ///      "type": "number",
+    ///      "format": "double"
+    ///    }
+    ///  }
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    pub struct ConnectedPeerResponse {
+        pub address: ::std::string::String,
+        #[serde(rename = "averageLatency")]
+        pub average_latency: u64,
+        #[serde(rename = "isConnected")]
+        pub is_connected: bool,
+        #[serde(rename = "lastUpdate")]
+        pub last_update: u64,
+        #[serde(rename = "probeRate")]
+        pub probe_rate: f64,
+        pub score: f64,
     }
     ///Reachable entry node information
     ///
@@ -2716,6 +2847,119 @@ Arguments:
             400u16 => {
                 Err(Error::ErrorResponse(ResponseValue::from_response(response).await?))
             }
+            _ => Err(Error::UnexpectedResponse(response)),
+        }
+    }
+    /**Lists all peers that have been announced on-chain
+
+List all peers announced on-chain
+
+Sends a `GET` request to `/api/v4/network/announced`
+
+*/
+    pub async fn announced<'a>(
+        &'a self,
+    ) -> Result<
+        ResponseValue<::std::vec::Vec<types::AnnouncedPeerResponse>>,
+        Error<()>,
+    > {
+        let url = format!("{}/api/v4/network/announced", self.baseurl,);
+        let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
+        header_map
+            .append(
+                ::reqwest::header::HeaderName::from_static("api-version"),
+                ::reqwest::header::HeaderValue::from_static(Self::api_version()),
+            );
+        #[allow(unused_mut)]
+        let mut request = self
+            .client
+            .get(url)
+            .header(
+                ::reqwest::header::ACCEPT,
+                ::reqwest::header::HeaderValue::from_static("application/json"),
+            )
+            .headers(header_map)
+            .build()?;
+        let info = OperationInfo {
+            operation_id: "announced",
+        };
+        self.pre(&mut request, &info).await?;
+        let result = self.exec(request, &info).await;
+        self.post(&result, &info).await?;
+        let response = result?;
+        match response.status().as_u16() {
+            200u16 => ResponseValue::from_response(response).await,
+            _ => Err(Error::UnexpectedResponse(response)),
+        }
+    }
+    /**Lists peers with immediate observation data from the network graph
+
+List connected peers with immediate observation data from the network graph
+
+Sends a `GET` request to `/api/v4/network/connected`
+
+*/
+    pub async fn connected<'a>(
+        &'a self,
+    ) -> Result<
+        ResponseValue<::std::vec::Vec<types::ConnectedPeerResponse>>,
+        Error<()>,
+    > {
+        let url = format!("{}/api/v4/network/connected", self.baseurl,);
+        let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
+        header_map
+            .append(
+                ::reqwest::header::HeaderName::from_static("api-version"),
+                ::reqwest::header::HeaderValue::from_static(Self::api_version()),
+            );
+        #[allow(unused_mut)]
+        let mut request = self
+            .client
+            .get(url)
+            .header(
+                ::reqwest::header::ACCEPT,
+                ::reqwest::header::HeaderValue::from_static("application/json"),
+            )
+            .headers(header_map)
+            .build()?;
+        let info = OperationInfo {
+            operation_id: "connected",
+        };
+        self.pre(&mut request, &info).await?;
+        let result = self.exec(request, &info).await;
+        self.post(&result, &info).await?;
+        let response = result?;
+        match response.status().as_u16() {
+            200u16 => ResponseValue::from_response(response).await,
+            _ => Err(Error::UnexpectedResponse(response)),
+        }
+    }
+    /**Returns the network graph in DOT (Graphviz) format
+
+Get the network graph in DOT (Graphviz) format
+
+Sends a `GET` request to `/api/v4/network/graph`
+
+*/
+    pub async fn graph<'a>(&'a self) -> Result<ResponseValue<ByteStream>, Error<()>> {
+        let url = format!("{}/api/v4/network/graph", self.baseurl,);
+        let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
+        header_map
+            .append(
+                ::reqwest::header::HeaderName::from_static("api-version"),
+                ::reqwest::header::HeaderValue::from_static(Self::api_version()),
+            );
+        #[allow(unused_mut)]
+        let mut request = self.client.get(url).headers(header_map).build()?;
+        let info = OperationInfo {
+            operation_id: "graph",
+        };
+        self.pre(&mut request, &info).await?;
+        let result = self.exec(request, &info).await;
+        self.post(&result, &info).await?;
+        let response = result?;
+        match response.status().as_u16() {
+            200u16 => Ok(ResponseValue::stream(response)),
             _ => Err(Error::UnexpectedResponse(response)),
         }
     }
