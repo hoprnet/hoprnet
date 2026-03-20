@@ -192,19 +192,28 @@ def build_path_events_json(
     result = []
     src_node = None
     dst_node = None
+    first_ts: Optional[datetime] = None
 
     for event in events:
         edge_ids = path_to_edge_ids(event.nodes, key_index, graph)
         if not edge_ids:
             continue
 
-        time_str = event.timestamp.strftime("%H:%M:%S") if event.timestamp != datetime.min else ""
+        time_str = event.timestamp.strftime("%H:%M:%S.%f")[:-3] if event.timestamp != datetime.min else ""
+
+        # Compute ms offset from first event for real-time scheduling
+        ts_ms = 0
+        if event.timestamp != datetime.min:
+            if first_ts is None:
+                first_ts = event.timestamp
+            ts_ms = int((event.timestamp - first_ts).total_seconds() * 1000)
 
         result.append(
             {
                 "direction": event.direction,
                 "edges": edge_ids,
                 "time": time_str,
+                "ts_ms": ts_ms,
             }
         )
 

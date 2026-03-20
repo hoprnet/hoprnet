@@ -97,14 +97,51 @@
           >0:00</span
         >
       </div>
-      <div style="margin-top: 6px; display: flex; gap: 16px; font-size: 11px">
-        <span style="color: #64b5f6">&#9679; forward packet</span>
-        <span style="color: #ffb74d">&#9679; return packet</span>
-        <span style="color: #66bb6a">&#9632; SRC (you)</span>
+      <div
+        style="
+          margin-top: 6px;
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          font-size: 11px;
+        "
+      >
+        <span style="color: #64b5f6">&#9679; forward</span>
+        <span style="color: #ffb74d">&#9679; return</span>
+        <span style="color: #66bb6a">&#9632; SRC</span>
         <span style="color: #ef5350">&#9632; DST</span>
-        <span style="color: #666; margin-left: auto"
-          >Space=play &nbsp; &#8592;&#8594;=step</span
+        <label
+          style="
+            margin-left: auto;
+            color: #888;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+          "
         >
+          Speed:
+          <select
+            id="speedSelect"
+            style="
+              background: #2a2a3e;
+              color: #ccc;
+              border: 1px solid #555;
+              border-radius: 3px;
+              padding: 1px 4px;
+              font-size: 11px;
+            "
+          >
+            <option value="0.25">0.25x</option>
+            <option value="0.5">0.5x</option>
+            <option value="1" selected>1x (real-time)</option>
+            <option value="2">2x</option>
+            <option value="4">4x</option>
+            <option value="10">10x</option>
+            <option value="50">50x</option>
+            <option value="0">max</option>
+          </select>
+        </label>
+        <span style="color: #555">Space=play &#8592;&#8594;=step</span>
       </div>
     </div>
     <script src="https://d3js.org/d3.v7.min.js"></script>
@@ -450,24 +487,42 @@
       let eventIndex = 0;
       let playing = false;
       let timeoutId = null;
-      const PACKET_DURATION = 800; // ms per packet traversal
+      let speed = 1; // multiplier: 1 = real-time, 2 = 2x faster, 0 = instant
 
-      function playNextEvent() {
-        if (eventIndex >= PATH_EVENTS.length) {
-          eventIndex = 0; // loop
-        }
-        const evt = PATH_EVENTS[eventIndex];
+      // Minimum packet animation duration (ms) — even at max speed, the dot takes this long
+      const MIN_PACKET_MS = 150;
+      // At 1x speed, packet animation takes this long
+      const BASE_PACKET_MS = 600;
+
+      function getPacketDuration() {
+        if (speed === 0) return MIN_PACKET_MS;
+        return Math.max(MIN_PACKET_MS, BASE_PACKET_MS / speed);
+      }
+
+      function getDelayToNext(currentIdx) {
+        // Use real timestamps to compute the gap between events
+        if (speed === 0) return 50; // max speed: minimal gap
+        const curr = PATH_EVENTS[currentIdx];
+        const next = PATH_EVENTS[currentIdx + 1];
+        if (!next) return 200;
+        const deltaMs = next.ts_ms - curr.ts_ms;
+        if (deltaMs <= 0) return 50; // simultaneous events: minimal gap
+        return Math.max(50, deltaMs / speed);
+      }
+
+      function dispatchEvent(idx) {
+        const evt = PATH_EVENTS[idx];
         const color =
           evt.direction === "forward" ? COLORS.forward : COLORS.return_;
         const label = evt.direction === "forward" ? "fwd" : "ret";
+        const speedLabel = speed === 0 ? "max" : speed + "x";
 
         titleText.text(
-          `${label} packet #${eventIndex + 1} / ${PATH_EVENTS.length}  (${evt.time || ""})`,
+          `${label} #${idx + 1}/${PATH_EVENTS.length}  ${evt.time || ""}  [${speedLabel}]`,
         );
 
         updateHeat(evt.edges);
 
-        // Highlight relay nodes briefly
         nodeGs.select("rect").attr("fill", (d) => {
           if (d.id === SRC_NODE) return COLORS.srcFill;
           if (d.id === DST_NODE) return COLORS.dstFill;
@@ -481,10 +536,23 @@
           return COLORS.idle;
         });
 
-        animatePacket(evt.edges, color, PACKET_DURATION).then(() => {
+        // Update slider position
+        const slider = document.getElementById("slider");
+        if (slider) slider.value = idx;
+
+        return animatePacket(evt.edges, color, getPacketDuration());
+      }
+
+      function playNextEvent() {
+        if (eventIndex >= PATH_EVENTS.length) {
+          eventIndex = 0; // loop
+        }
+
+        dispatchEvent(eventIndex).then(() => {
+          const delay = getDelayToNext(eventIndex);
           eventIndex++;
           if (playing) {
-            timeoutId = setTimeout(playNextEvent, 200); // gap between packets
+            timeoutId = setTimeout(playNextEvent, delay);
           }
         });
       }
@@ -492,8 +560,8 @@
       function startPlaying() {
         if (playing) return;
         playing = true;
-        if (document.getElementById("playBtn"))
-          document.getElementById("playBtn").textContent = "Pause";
+        const btn = document.getElementById("playBtn");
+        if (btn) btn.textContent = "Pause";
         playNextEvent();
       }
 
@@ -503,38 +571,18 @@
           clearTimeout(timeoutId);
           timeoutId = null;
         }
-        if (document.getElementById("playBtn"))
-          document.getElementById("playBtn").textContent = "Play";
+        const btn = document.getElementById("playBtn");
+        if (btn) btn.textContent = "Play";
       }
 
       // Expose for Playwright
       window.playEvent = function (idx) {
         return new Promise((resolve) => {
-          const evt = PATH_EVENTS[idx];
-          if (!evt) {
+          if (!PATH_EVENTS[idx]) {
             resolve();
             return;
           }
-          const color =
-            evt.direction === "forward" ? COLORS.forward : COLORS.return_;
-          const label = evt.direction === "forward" ? "fwd" : "ret";
-          titleText.text(
-            `${label} packet #${idx + 1} / ${PATH_EVENTS.length}  (${evt.time || ""})`,
-          );
-          updateHeat(evt.edges);
-          nodeGs.select("rect").attr("fill", (d) => {
-            if (d.id === SRC_NODE) return COLORS.srcFill;
-            if (d.id === DST_NODE) return COLORS.dstFill;
-            if (
-              evt.edges.some((eid) => {
-                const l = linkById.get(eid);
-                return l && (l.source.id === d.id || l.target.id === d.id);
-              })
-            )
-              return COLORS.relay;
-            return COLORS.idle;
-          });
-          animatePacket(evt.edges, color, PACKET_DURATION).then(resolve);
+          dispatchEvent(idx).then(resolve);
         });
       };
       window.eventCount = PATH_EVENTS.length;
@@ -548,6 +596,12 @@
         const timeLabel = document.getElementById("timeLabel");
 
         slider.max = PATH_EVENTS.length - 1;
+
+        // Speed selector
+        const speedSelect = document.getElementById("speedSelect");
+        speedSelect.addEventListener("change", () => {
+          speed = parseFloat(speedSelect.value);
+        });
 
         playBtn.addEventListener("click", () => {
           if (playing) stopPlaying();
@@ -576,9 +630,26 @@
             eventIndex = Math.max(eventIndex - 1, 0);
             window.playEvent(eventIndex);
           }
+          // Number keys for quick speed
+          if (e.code === "Digit1") {
+            speed = 1;
+            speedSelect.value = "1";
+          }
+          if (e.code === "Digit2") {
+            speed = 2;
+            speedSelect.value = "2";
+          }
+          if (e.code === "Digit4") {
+            speed = 4;
+            speedSelect.value = "4";
+          }
+          if (e.code === "Digit0") {
+            speed = 0;
+            speedSelect.value = "0";
+          }
         });
 
-        // Auto-start
+        // Auto-start at real-time
         startPlaying();
       }
     </script>
