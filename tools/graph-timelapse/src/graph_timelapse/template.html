@@ -411,124 +411,49 @@
           });
       }
 
-      // ── Particle animation ──
-      // Uses setInterval instead of requestAnimationFrame so it keeps running
-      // even when the tab is backgrounded or the browser throttles RAF.
-      const ANIM_STEP_MS = 16; // ~60fps
-
-      function animatePacket(edgeIds, color, duration) {
-        if (!edgeIds.length) return Promise.resolve();
-
-        const dot = particleGroup
-          .append("circle")
-          .attr("r", 6)
-          .attr("fill", color)
-          .attr("filter", "url(#glow-md)")
-          .attr("opacity", 0.9);
-
-        const trail = particleGroup
-          .append("circle")
-          .attr("r", 14)
-          .attr("fill", color)
-          .attr("opacity", 0.2)
-          .attr("filter", "url(#glow-lg)");
-
-        const edgeDuration = Math.max(duration / edgeIds.length, 30);
-
-        function animateOneEdge(eid) {
-          return new Promise((resolve) => {
-            const pathEl = pathElements[eid];
-            if (!pathEl) {
-              resolve();
-              return;
-            }
-            const len = pathEl.getTotalLength();
-
-            // Brighten edge while particle traverses
-            const linkSel = linkPaths.filter((d) => d.id === eid);
-            linkSel
-              .attr("stroke", color)
-              .attr("stroke-width", 2.5)
-              .attr("opacity", 1);
-
-            const startTime = performance.now();
-            const iv = setInterval(() => {
-              const elapsed = performance.now() - startTime;
-              const progress = Math.min(elapsed / edgeDuration, 1);
-              const eased =
-                progress < 0.5
-                  ? 2 * progress * progress
-                  : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-              const pt = pathEl.getPointAtLength(eased * len);
-              dot.attr("cx", pt.x).attr("cy", pt.y);
-              trail.attr("cx", pt.x).attr("cy", pt.y);
-
-              if (progress >= 1) {
-                clearInterval(iv);
-                linkSel
-                  .attr("stroke", COLORS.inactive)
-                  .attr("stroke-width", 0.8)
-                  .attr("opacity", 1);
-                resolve();
-              }
-            }, ANIM_STEP_MS);
-
-            // Safety: force resolve if stuck (2x expected duration)
-            setTimeout(
-              () => {
-                clearInterval(iv);
-                resolve();
-              },
-              edgeDuration * 2 + 500,
-            );
-          });
-        }
-
-        let chain = Promise.resolve();
-        for (const eid of edgeIds) {
-          chain = chain.then(() => animateOneEdge(eid));
-        }
-
-        return chain.then(() => {
-          dot.transition().duration(150).attr("opacity", 0).remove();
-          trail.transition().duration(200).attr("opacity", 0).remove();
-        });
-      }
-
       // ── Playback engine ──
+      // No Promises. A single tick loop drives everything.
       let eventIndex = 0;
       let playing = false;
-      let timeoutId = null;
-      let speed = 1; // multiplier: 1 = real-time, 2 = 2x faster, 0 = instant
+      let speed = 1;
+      let tickTimer = null;
 
-      // Minimum packet animation duration (ms) — even at max speed, the dot takes this long
-      const MIN_PACKET_MS = 150;
-      // At 1x speed, packet animation takes this long
       const BASE_PACKET_MS = 600;
+      const MIN_PACKET_MS = 120;
+
+      // Active particle state
+      let activeDot = null;
+      let activeTrail = null;
+      let activeEdges = []; // edge IDs to traverse
+      let activeEdgeIdx = 0; // which edge we're on
+      let activeColor = null;
+      let edgeStartTime = 0;
+      let edgeDuration = 0;
+      let waitUntil = 0; // timestamp: wait before starting next event
 
       function getPacketDuration() {
         if (speed === 0) return MIN_PACKET_MS;
         return Math.max(MIN_PACKET_MS, BASE_PACKET_MS / speed);
       }
 
-      function getDelayToNext(currentIdx) {
-        // Use real timestamps to compute the gap between events
-        if (speed === 0) return 50; // max speed: minimal gap
-        const curr = PATH_EVENTS[currentIdx];
-        const next = PATH_EVENTS[currentIdx + 1];
-        if (!next) return 200;
+      function getDelayToNext(idx) {
+        if (speed === 0) return 30;
+        const curr = PATH_EVENTS[idx];
+        const next = PATH_EVENTS[(idx + 1) % PATH_EVENTS.length];
+        if (!next) return 100;
         const deltaMs = next.ts_ms - curr.ts_ms;
-        if (deltaMs <= 0) return 50; // simultaneous events: minimal gap
-        return Math.max(50, deltaMs / speed);
+        if (deltaMs <= 0) return 30;
+        return Math.max(30, deltaMs / speed);
       }
 
-      function dispatchEvent(idx) {
+      function startEvent(idx) {
         const evt = PATH_EVENTS[idx];
-        const color =
+        if (!evt) return;
+
+        activeColor =
           evt.direction === "forward" ? COLORS.forward : COLORS.return_;
         const label = evt.direction === "forward" ? "fwd" : "ret";
         const speedLabel = speed === 0 ? "max" : speed + "x";
-
         titleText.text(
           `${label} #${idx + 1}/${PATH_EVENTS.length}  ${evt.time || ""}  [${speedLabel}]`,
         );
@@ -548,54 +473,167 @@
           return COLORS.idle;
         });
 
-        // Update slider position
         const slider = document.getElementById("slider");
         if (slider) slider.value = idx;
 
-        return animatePacket(evt.edges, color, getPacketDuration());
-      }
-
-      function playNextEvent() {
-        if (eventIndex >= PATH_EVENTS.length) {
-          eventIndex = 0; // loop
+        // Clean up previous particle
+        if (activeDot) {
+          activeDot.remove();
+          activeDot = null;
+        }
+        if (activeTrail) {
+          activeTrail.remove();
+          activeTrail = null;
         }
 
-        dispatchEvent(eventIndex).then(() => {
-          const delay = getDelayToNext(eventIndex);
-          eventIndex++;
-          if (playing) {
-            timeoutId = setTimeout(playNextEvent, delay);
+        activeEdges = evt.edges;
+        activeEdgeIdx = 0;
+
+        if (!activeEdges.length) {
+          // No edges matched — skip to next event immediately
+          waitUntil = performance.now() + 50;
+          return;
+        }
+
+        activeDot = particleGroup
+          .append("circle")
+          .attr("r", 6)
+          .attr("fill", activeColor)
+          .attr("filter", "url(#glow-md)")
+          .attr("opacity", 0.9);
+        activeTrail = particleGroup
+          .append("circle")
+          .attr("r", 14)
+          .attr("fill", activeColor)
+          .attr("opacity", 0.2)
+          .attr("filter", "url(#glow-lg)");
+
+        // Start first edge
+        const totalDur = getPacketDuration();
+        edgeDuration = Math.max(totalDur / activeEdges.length, 20);
+        edgeStartTime = performance.now();
+
+        // Brighten first edge
+        linkPaths
+          .filter((d) => d.id === activeEdges[0])
+          .attr("stroke", activeColor)
+          .attr("stroke-width", 2.5)
+          .attr("opacity", 1);
+      }
+
+      function tick() {
+        if (!playing) return;
+
+        const now = performance.now();
+
+        // Waiting between events?
+        if (waitUntil > now) return;
+
+        // No active animation? Start next event.
+        if (!activeDot || activeEdgeIdx >= activeEdges.length) {
+          // Clean up
+          if (activeDot) {
+            activeDot.remove();
+            activeDot = null;
           }
-        });
+          if (activeTrail) {
+            activeTrail.remove();
+            activeTrail = null;
+          }
+
+          // Schedule delay, then advance
+          if (waitUntil === 0) {
+            waitUntil = now + getDelayToNext(eventIndex);
+            eventIndex = (eventIndex + 1) % PATH_EVENTS.length;
+            return;
+          }
+          // Delay passed — start event
+          waitUntil = 0;
+          startEvent(eventIndex);
+          return;
+        }
+
+        // Animate current edge
+        const eid = activeEdges[activeEdgeIdx];
+        const pathEl = pathElements[eid];
+        if (!pathEl) {
+          // Skip missing edge
+          activeEdgeIdx++;
+          edgeStartTime = now;
+          return;
+        }
+
+        const elapsed = now - edgeStartTime;
+        const progress = Math.min(elapsed / edgeDuration, 1);
+        const eased =
+          progress < 0.5
+            ? 2 * progress * progress
+            : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+        const len = pathEl.getTotalLength();
+        const pt = pathEl.getPointAtLength(eased * len);
+        activeDot.attr("cx", pt.x).attr("cy", pt.y);
+        activeTrail.attr("cx", pt.x).attr("cy", pt.y);
+
+        if (progress >= 1) {
+          // Dim edge
+          linkPaths
+            .filter((d) => d.id === eid)
+            .attr("stroke", COLORS.inactive)
+            .attr("stroke-width", 0.8)
+            .attr("opacity", 1);
+
+          activeEdgeIdx++;
+          edgeStartTime = now;
+
+          // Brighten next edge
+          if (activeEdgeIdx < activeEdges.length) {
+            const nextEid = activeEdges[activeEdgeIdx];
+            linkPaths
+              .filter((d) => d.id === nextEid)
+              .attr("stroke", activeColor)
+              .attr("stroke-width", 2.5)
+              .attr("opacity", 1);
+          }
+        }
       }
 
       function startPlaying() {
         if (playing) return;
         playing = true;
+        waitUntil = 0;
         const btn = document.getElementById("playBtn");
         if (btn) btn.textContent = "Pause";
-        playNextEvent();
+        if (!tickTimer) tickTimer = setInterval(tick, 16);
+        startEvent(eventIndex);
       }
 
       function stopPlaying() {
         playing = false;
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-          timeoutId = null;
-        }
         const btn = document.getElementById("playBtn");
         if (btn) btn.textContent = "Play";
+        // Don't clear tickTimer — it's harmless and avoids re-creation issues
       }
 
-      // Expose for Playwright
+      // Expose for Playwright (synchronous snapshot: just render heat + title, no animation)
       window.playEvent = function (idx) {
-        return new Promise((resolve) => {
-          if (!PATH_EVENTS[idx]) {
-            resolve();
-            return;
-          }
-          dispatchEvent(idx).then(resolve);
-        });
+        const evt = PATH_EVENTS[idx];
+        if (!evt) return Promise.resolve();
+        const color =
+          evt.direction === "forward" ? COLORS.forward : COLORS.return_;
+        const label = evt.direction === "forward" ? "fwd" : "ret";
+        titleText.text(
+          `${label} #${idx + 1}/${PATH_EVENTS.length}  ${evt.time || ""}`,
+        );
+        updateHeat(evt.edges);
+        // Flash the edges
+        for (const eid of evt.edges) {
+          linkPaths
+            .filter((d) => d.id === eid)
+            .attr("stroke", color)
+            .attr("stroke-width", 3)
+            .attr("opacity", 1);
+        }
+        return new Promise((r) => setTimeout(r, 100));
       };
       window.eventCount = PATH_EVENTS.length;
 
