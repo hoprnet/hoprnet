@@ -324,3 +324,4 @@ similar.opt-level = 3
 [workspace.metadata.cargo-shear]
 ignored = ["oas3", "serde_bytes", "humantime-serde"]
 # version parsing edge case fix
+# edge case handling
