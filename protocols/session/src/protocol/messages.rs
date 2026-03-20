@@ -259,7 +259,7 @@ mod tests {
         let acks = FrameAcknowledgements::<1024>::new_multiple(expected.clone());
 
         let chunk_lengths: Vec<_> = acks.iter().map(|a| a.len()).collect();
-        assert_eq!(chunk_lengths, [255, 255, 2]);
+        assert_eq!(chunk_lengths, [MAX, MAX, 2]);
 
         let actual = acks.into_iter().flat_map(|a| a.into_iter()).collect::<Vec<_>>();
         assert_eq!(expected, actual);

@@ -183,21 +183,21 @@ mod tests {
     #[test]
     fn controller_default_has_zero_bounds() {
         let ctrl = PidBalancerController::default();
-        insta::assert_yaml_snapshot!(ctrl.bounds().unzip());
+        assert_eq!(ctrl.bounds().unzip(), (0, 0));
     }
 
     #[test]
     fn controller_new_stores_bounds() {
         let gains = PidControllerGains::default();
         let ctrl = PidBalancerController::new(100, 50, gains);
-        insta::assert_yaml_snapshot!(ctrl.bounds().unzip());
+        assert_eq!(ctrl.bounds().unzip(), (100, 50));
     }
 
     #[test]
     fn controller_set_target_and_limit_updates_bounds() {
         let mut ctrl = PidBalancerController::default();
         ctrl.set_target_and_limit(BalancerControllerBounds::new(200, 100));
-        insta::assert_yaml_snapshot!(ctrl.bounds().unzip());
+        assert_eq!(ctrl.bounds().unzip(), (200, 100));
     }
 
     #[test]
@@ -254,6 +254,6 @@ mod tests {
     fn controller_from_gains_uses_defaults_for_bounds() {
         let gains = PidControllerGains::default();
         let ctrl = PidBalancerController::from_gains(gains);
-        insta::assert_yaml_snapshot!(ctrl.bounds().unzip());
+        assert_eq!(ctrl.bounds().unzip(), (0, 0));
     }
 }
