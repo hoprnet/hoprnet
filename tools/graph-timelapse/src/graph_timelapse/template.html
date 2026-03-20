@@ -1,0 +1,586 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background: #1a1a2e;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      #graph {
+        width: 800px;
+        height: 600px;
+      }
+      .title {
+        text-anchor: middle;
+        font-size: 15px;
+        font-weight: 600;
+        fill: #aaa;
+      }
+      .node rect {
+        rx: 6;
+        ry: 6;
+        transition:
+          fill 0.6s ease,
+          stroke 0.6s ease;
+      }
+      .node text {
+        font-size: 11px;
+        pointer-events: none;
+      }
+      .node .role-label {
+        font-size: 9px;
+        font-weight: 700;
+      }
+      .node .id-label {
+        fill: #ddd;
+      }
+      .link {
+        fill: none;
+        stroke-linecap: round;
+      }
+      .link-heat {
+        fill: none;
+        stroke-linecap: round;
+        pointer-events: none;
+        transition:
+          stroke 1s ease,
+          stroke-width 1s ease,
+          opacity 1s ease;
+      }
+      marker {
+        overflow: visible;
+      }
+      #controls {
+        display: none;
+        width: 800px;
+        padding: 12px 0;
+        font-family: sans-serif;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <svg id="graph"></svg>
+    <div id="controls">
+      <div style="display: flex; align-items: center; gap: 10px">
+        <button
+          id="playBtn"
+          style="
+            width: 60px;
+            padding: 4px 0;
+            cursor: pointer;
+            border: 1px solid #555;
+            border-radius: 4px;
+            background: #2a2a3e;
+            color: #ccc;
+          "
+        >
+          Play
+        </button>
+        <input
+          id="slider"
+          type="range"
+          min="0"
+          max="100"
+          value="0"
+          style="flex: 1; cursor: pointer; accent-color: #2196f3"
+        />
+        <span
+          id="timeLabel"
+          style="min-width: 100px; text-align: right; color: #888"
+          >0:00</span
+        >
+      </div>
+      <div style="margin-top: 6px; display: flex; gap: 16px; font-size: 11px">
+        <span style="color: #64b5f6">&#9679; forward packet</span>
+        <span style="color: #ffb74d">&#9679; return packet</span>
+        <span style="color: #66bb6a">&#9632; SRC (you)</span>
+        <span style="color: #ef5350">&#9632; DST</span>
+        <span style="color: #666; margin-left: auto"
+          >Space=play &nbsp; &#8592;&#8594;=step</span
+        >
+      </div>
+    </div>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script>
+      const GRAPH_DATA = __GRAPH_DATA__;
+      const PATH_EVENTS = __PATH_EVENTS__;
+      const SRC_NODE = __SRC_NODE__;
+      const DST_NODE = __DST_NODE__;
+      const WIDTH = 800,
+        HEIGHT = 600,
+        MARGIN = 60;
+
+      const svg = d3
+        .select("#graph")
+        .attr("width", WIDTH)
+        .attr("height", HEIGHT)
+        .attr("viewBox", `0 0 ${WIDTH} ${HEIGHT}`);
+
+      const COLORS = {
+        forward: "#42A5F5",
+        return_: "#FFA726",
+        inactive: "rgba(255,255,255,0.06)",
+        srcFill: "#388E3C",
+        dstFill: "#B71C1C",
+        relay: "#1e3a5f",
+        idle: "#2a2a3e",
+      };
+
+      const nodes = GRAPH_DATA.nodes.map((id, i) => ({ id, index: i }));
+      const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+      const links = GRAPH_DATA.edges.map(([s, t, label]) => ({
+        source: nodeMap.get(s),
+        target: nodeMap.get(t),
+        label,
+        id: `${s}->${t}`,
+      }));
+      const linkById = new Map(links.map((l) => [l.id, l]));
+
+      // Force layout
+      const sim = d3
+        .forceSimulation(nodes)
+        .force(
+          "link",
+          d3
+            .forceLink(links)
+            .id((d) => d.id)
+            .distance(220),
+        )
+        .force("charge", d3.forceManyBody().strength(-1500))
+        .force("center", d3.forceCenter(WIDTH / 2, HEIGHT / 2 + 15))
+        .force("collision", d3.forceCollide().radius(80))
+        .stop();
+      for (let i = 0; i < 300; i++) sim.tick();
+      nodes.forEach((n) => {
+        n.x = Math.max(MARGIN + 40, Math.min(WIDTH - MARGIN - 40, n.x));
+        n.y = Math.max(MARGIN + 30, Math.min(HEIGHT - MARGIN - 20, n.y));
+        n.fx = n.x;
+        n.fy = n.y;
+      });
+
+      // SVG defs
+      const defs = svg.append("defs");
+
+      function makeGlow(id, radius) {
+        const f = defs
+          .append("filter")
+          .attr("id", id)
+          .attr("x", "-50%")
+          .attr("y", "-50%")
+          .attr("width", "200%")
+          .attr("height", "200%");
+        f.append("feGaussianBlur")
+          .attr("in", "SourceGraphic")
+          .attr("stdDeviation", radius)
+          .attr("result", "blur");
+        f.append("feColorMatrix")
+          .attr("in", "blur")
+          .attr("type", "saturate")
+          .attr("values", "3")
+          .attr("result", "sat");
+        const m = f.append("feMerge");
+        m.append("feMergeNode").attr("in", "sat");
+        m.append("feMergeNode").attr("in", "SourceGraphic");
+      }
+      makeGlow("glow-sm", 3);
+      makeGlow("glow-md", 6);
+      makeGlow("glow-lg", 10);
+
+      const nodeShadow = defs
+        .append("filter")
+        .attr("id", "node-shadow")
+        .attr("x", "-20%")
+        .attr("y", "-20%")
+        .attr("width", "140%")
+        .attr("height", "140%");
+      nodeShadow
+        .append("feDropShadow")
+        .attr("dx", 0)
+        .attr("dy", 2)
+        .attr("stdDeviation", 3)
+        .attr("flood-color", "rgba(0,0,0,0.5)");
+
+      function makeMarker(id, color) {
+        defs
+          .append("marker")
+          .attr("id", id)
+          .attr("viewBox", "0 -5 10 10")
+          .attr("refX", 20)
+          .attr("refY", 0)
+          .attr("markerWidth", 8)
+          .attr("markerHeight", 8)
+          .attr("orient", "auto")
+          .append("path")
+          .attr("d", "M0,-4L10,0L0,4Z")
+          .attr("fill", color);
+      }
+      makeMarker("arr-off", "rgba(255,255,255,0.08)");
+
+      // Title
+      const titleText = svg
+        .append("text")
+        .attr("class", "title")
+        .attr("x", WIDTH / 2)
+        .attr("y", 24);
+
+      // Heat layer (cumulative glow underneath)
+      const heatGroup = svg.append("g");
+      const linkGroup = svg.append("g");
+      const particleGroup = svg.append("g");
+      const nodeGroup = svg.append("g");
+
+      // Arc path
+      function linkArc(d) {
+        const hasRev = links.some(
+          (l) => l.source.id === d.target.id && l.target.id === d.source.id,
+        );
+        const dx = d.target.x - d.source.x,
+          dy = d.target.y - d.source.y;
+        const dr = hasRev ? Math.sqrt(dx * dx + dy * dy) * 1.5 : 0;
+        return `M${d.source.x},${d.source.y}A${dr},${dr} 0 0,1 ${d.target.x},${d.target.y}`;
+      }
+
+      // Heat paths (glow layer)
+      const heatPaths = heatGroup
+        .selectAll("path")
+        .data(links)
+        .join("path")
+        .attr("class", "link-heat")
+        .attr("d", linkArc)
+        .attr("stroke", "transparent")
+        .attr("stroke-width", 0)
+        .attr("opacity", 0);
+
+      // Base edge paths
+      const linkPaths = linkGroup
+        .selectAll("path")
+        .data(links)
+        .join("path")
+        .attr("class", "link")
+        .attr("d", linkArc)
+        .attr("marker-end", "url(#arr-off)")
+        .attr("stroke", COLORS.inactive)
+        .attr("stroke-width", 0.8);
+
+      // Store path elements for particle animation
+      const pathElements = {};
+      linkPaths.each(function (d) {
+        pathElements[d.id] = this;
+      });
+
+      // Nodes
+      const nodeGs = nodeGroup
+        .selectAll("g")
+        .data(nodes)
+        .join("g")
+        .attr("class", "node")
+        .attr("transform", (d) => `translate(${d.x},${d.y})`);
+
+      nodeGs
+        .append("rect")
+        .attr("x", -55)
+        .attr("y", -18)
+        .attr("width", 110)
+        .attr("height", 36)
+        .attr("fill", (d) => {
+          if (d.id === SRC_NODE) return COLORS.srcFill;
+          if (d.id === DST_NODE) return COLORS.dstFill;
+          return COLORS.idle;
+        })
+        .attr("stroke", (d) => {
+          if (d.id === SRC_NODE) return "#66BB6A";
+          if (d.id === DST_NODE) return "#ef5350";
+          return "#444";
+        })
+        .attr("stroke-width", (d) =>
+          d.id === SRC_NODE || d.id === DST_NODE ? 2.5 : 1.5,
+        )
+        .attr("filter", "url(#node-shadow)");
+
+      nodeGs
+        .append("text")
+        .attr("class", "role-label")
+        .attr("text-anchor", "middle")
+        .attr("dy", -6)
+        .attr("fill", (d) =>
+          d.id === SRC_NODE || d.id === DST_NODE ? "#fff" : "transparent",
+        )
+        .text((d) => {
+          if (d.id === SRC_NODE) return "SRC";
+          if (d.id === DST_NODE) return "DST";
+          return "";
+        });
+
+      nodeGs
+        .append("text")
+        .attr("class", "id-label")
+        .attr("text-anchor", "middle")
+        .attr("dy", 10)
+        .text((d) =>
+          d.id.length > 14 ? d.id.slice(0, 8) + "..." + d.id.slice(-4) : d.id,
+        );
+
+      // ── Edge heat tracking ──
+      const edgeHeat = new Map();
+      const HEAT_DECAY = 0.92;
+
+      function updateHeat(edgeIds) {
+        // Decay all
+        for (const [k, v] of edgeHeat) {
+          edgeHeat.set(k, v * HEAT_DECAY);
+          if (v * HEAT_DECAY < 0.05) edgeHeat.delete(k);
+        }
+        // Boost active
+        for (const eid of edgeIds) {
+          edgeHeat.set(eid, (edgeHeat.get(eid) || 0) + 1);
+        }
+        // Render heat
+        const maxH = Math.max(1, ...edgeHeat.values());
+        heatPaths
+          .attr("stroke", (d) => {
+            const h = edgeHeat.get(d.id);
+            if (!h) return "transparent";
+            const ratio = h / maxH;
+            // green -> yellow -> red
+            const r = ratio <= 0.5 ? Math.round(255 * ratio * 2) : 255;
+            const g =
+              ratio <= 0.5 ? 255 : Math.round(255 * (1 - (ratio - 0.5) * 2));
+            return `rgb(${r},${g},0)`;
+          })
+          .attr("stroke-width", (d) => {
+            const h = edgeHeat.get(d.id);
+            return h ? 2 + (h / maxH) * 12 : 0;
+          })
+          .attr("opacity", (d) => {
+            const h = edgeHeat.get(d.id);
+            return h ? 0.15 + (h / maxH) * 0.4 : 0;
+          })
+          .attr("filter", (d) => {
+            const h = edgeHeat.get(d.id);
+            if (!h) return null;
+            const ratio = h / maxH;
+            return ratio > 0.7
+              ? "url(#glow-lg)"
+              : ratio > 0.3
+                ? "url(#glow-md)"
+                : "url(#glow-sm)";
+          });
+      }
+
+      // ── Particle animation ──
+      function animatePacket(edgeIds, color, duration) {
+        if (!edgeIds.length) return Promise.resolve();
+
+        const dot = particleGroup
+          .append("circle")
+          .attr("r", 6)
+          .attr("fill", color)
+          .attr("filter", "url(#glow-md)")
+          .attr("opacity", 0.9);
+
+        // Larger glow trail
+        const trail = particleGroup
+          .append("circle")
+          .attr("r", 14)
+          .attr("fill", color)
+          .attr("opacity", 0.2)
+          .attr("filter", "url(#glow-lg)");
+
+        const edgeDuration = duration / edgeIds.length;
+
+        let chain = Promise.resolve();
+        for (const eid of edgeIds) {
+          chain = chain.then(
+            () =>
+              new Promise((resolve) => {
+                const pathEl = pathElements[eid];
+                if (!pathEl) {
+                  resolve();
+                  return;
+                }
+                const len = pathEl.getTotalLength();
+
+                // Briefly brighten the edge
+                const linkSel = linkPaths.filter((d) => d.id === eid);
+                linkSel
+                  .attr("stroke", color)
+                  .attr("stroke-width", 2.5)
+                  .attr("opacity", 1);
+                setTimeout(() => {
+                  linkSel
+                    .attr("stroke", COLORS.inactive)
+                    .attr("stroke-width", 0.8)
+                    .attr("opacity", 1);
+                }, edgeDuration * 0.8);
+
+                let start = null;
+                function step(ts) {
+                  if (!start) start = ts;
+                  const progress = Math.min((ts - start) / edgeDuration, 1);
+                  // Ease in-out
+                  const eased =
+                    progress < 0.5
+                      ? 2 * progress * progress
+                      : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+                  const pt = pathEl.getPointAtLength(eased * len);
+                  dot.attr("cx", pt.x).attr("cy", pt.y);
+                  trail.attr("cx", pt.x).attr("cy", pt.y);
+                  if (progress < 1) requestAnimationFrame(step);
+                  else resolve();
+                }
+                requestAnimationFrame(step);
+              }),
+          );
+        }
+
+        return chain.then(() => {
+          dot.transition().duration(200).attr("opacity", 0).remove();
+          trail.transition().duration(300).attr("opacity", 0).remove();
+        });
+      }
+
+      // ── Playback engine ──
+      let eventIndex = 0;
+      let playing = false;
+      let timeoutId = null;
+      const PACKET_DURATION = 800; // ms per packet traversal
+
+      function playNextEvent() {
+        if (eventIndex >= PATH_EVENTS.length) {
+          eventIndex = 0; // loop
+        }
+        const evt = PATH_EVENTS[eventIndex];
+        const color =
+          evt.direction === "forward" ? COLORS.forward : COLORS.return_;
+        const label = evt.direction === "forward" ? "fwd" : "ret";
+
+        titleText.text(
+          `${label} packet #${eventIndex + 1} / ${PATH_EVENTS.length}  (${evt.time || ""})`,
+        );
+
+        updateHeat(evt.edges);
+
+        // Highlight relay nodes briefly
+        nodeGs.select("rect").attr("fill", (d) => {
+          if (d.id === SRC_NODE) return COLORS.srcFill;
+          if (d.id === DST_NODE) return COLORS.dstFill;
+          if (
+            evt.edges.some((eid) => {
+              const l = linkById.get(eid);
+              return l && (l.source.id === d.id || l.target.id === d.id);
+            })
+          )
+            return COLORS.relay;
+          return COLORS.idle;
+        });
+
+        animatePacket(evt.edges, color, PACKET_DURATION).then(() => {
+          eventIndex++;
+          if (playing) {
+            timeoutId = setTimeout(playNextEvent, 200); // gap between packets
+          }
+        });
+      }
+
+      function startPlaying() {
+        if (playing) return;
+        playing = true;
+        if (document.getElementById("playBtn"))
+          document.getElementById("playBtn").textContent = "Pause";
+        playNextEvent();
+      }
+
+      function stopPlaying() {
+        playing = false;
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        if (document.getElementById("playBtn"))
+          document.getElementById("playBtn").textContent = "Play";
+      }
+
+      // Expose for Playwright
+      window.playEvent = function (idx) {
+        return new Promise((resolve) => {
+          const evt = PATH_EVENTS[idx];
+          if (!evt) {
+            resolve();
+            return;
+          }
+          const color =
+            evt.direction === "forward" ? COLORS.forward : COLORS.return_;
+          const label = evt.direction === "forward" ? "fwd" : "ret";
+          titleText.text(
+            `${label} packet #${idx + 1} / ${PATH_EVENTS.length}  (${evt.time || ""})`,
+          );
+          updateHeat(evt.edges);
+          nodeGs.select("rect").attr("fill", (d) => {
+            if (d.id === SRC_NODE) return COLORS.srcFill;
+            if (d.id === DST_NODE) return COLORS.dstFill;
+            if (
+              evt.edges.some((eid) => {
+                const l = linkById.get(eid);
+                return l && (l.source.id === d.id || l.target.id === d.id);
+              })
+            )
+              return COLORS.relay;
+            return COLORS.idle;
+          });
+          animatePacket(evt.edges, color, PACKET_DURATION).then(resolve);
+        });
+      };
+      window.eventCount = PATH_EVENTS.length;
+
+      // ── Interactive player ──
+      if (__INTERACTIVE__) {
+        const controls = document.getElementById("controls");
+        controls.style.display = "block";
+        const playBtn = document.getElementById("playBtn");
+        const slider = document.getElementById("slider");
+        const timeLabel = document.getElementById("timeLabel");
+
+        slider.max = PATH_EVENTS.length - 1;
+
+        playBtn.addEventListener("click", () => {
+          if (playing) stopPlaying();
+          else startPlaying();
+        });
+
+        slider.addEventListener("input", (e) => {
+          stopPlaying();
+          eventIndex = parseInt(e.target.value);
+          window.playEvent(eventIndex);
+        });
+
+        document.addEventListener("keydown", (e) => {
+          if (e.code === "Space") {
+            e.preventDefault();
+            if (playing) stopPlaying();
+            else startPlaying();
+          }
+          if (e.code === "ArrowRight") {
+            stopPlaying();
+            eventIndex = Math.min(eventIndex + 1, PATH_EVENTS.length - 1);
+            window.playEvent(eventIndex);
+          }
+          if (e.code === "ArrowLeft") {
+            stopPlaying();
+            eventIndex = Math.max(eventIndex - 1, 0);
+            window.playEvent(eventIndex);
+          }
+        });
+
+        // Auto-start
+        startPlaying();
+      }
+    </script>
+  </body>
+</html>
