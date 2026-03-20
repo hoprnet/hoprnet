@@ -140,6 +140,9 @@
           rust-builder-aarch64-linux = builders.aarch64-linux;
           rust-builder-aarch64-darwin = builders.aarch64-darwin;
 
+          # Coverage builder with llvm-tools for code coverage instrumentation
+          rust-builder-local-coverage = builders.localCoverage;
+
           # Nightly builder for docs and specific features
           # Uses a pinned nightly version to avoid ICE bugs in latest nightly
           rust-builder-local-nightly = nixLib.mkRustBuilder {
@@ -147,7 +150,7 @@
             rustToolchainFile = ./rust-toolchain-nightly.toml;
           };
 
-          hoprdBuildArgs = {
+          projectBuildArgs = {
             inherit src depsSrc rev;
             cargoExtraArgs = "-p hoprd-api -F allocator-jemalloc";
             cargoToml = ./hoprd/hoprd/Cargo.toml;
@@ -158,63 +161,109 @@
             cargoToml = ./localcluster/Cargo.toml;
           };
 
-          hoprd = rust-builder-local.callPackage nixLib.mkRustPackage hoprdBuildArgs;
+          hoprd = rust-builder-local.callPackage nixLib.mkRustPackage projectBuildArgs;
           hoprd-localcluster = rust-builder-local.callPackage nixLib.mkRustPackage localclusterBuildArgs;
           # also used for Docker image
-          hoprd-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage hoprdBuildArgs;
+          hoprd-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage projectBuildArgs;
           # also used for Docker image
           hoprd-localcluster-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage localclusterBuildArgs;
           # also used for Docker image
           hoprd-x86_64-linux-profile = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
+            projectBuildArgs // { cargoExtraArgs = "-F capture"; }
           );
           # also used for Docker image
           hoprd-x86_64-linux-dev = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs
+            projectBuildArgs
             // {
               CARGO_PROFILE = "dev";
               cargoExtraArgs = "-F capture";
             }
           );
-          hoprd-aarch64-linux = rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage hoprdBuildArgs;
+          hoprd-aarch64-linux = rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage projectBuildArgs;
           hoprd-aarch64-linux-profile = rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
+            projectBuildArgs // { cargoExtraArgs = "-F capture"; }
           );
 
           # CAVEAT: must be built from a darwin system
-          hoprd-x86_64-darwin = rust-builder-x86_64-darwin.callPackage nixLib.mkRustPackage hoprdBuildArgs;
+          hoprd-x86_64-darwin = rust-builder-x86_64-darwin.callPackage nixLib.mkRustPackage projectBuildArgs;
           hoprd-x86_64-darwin-profile = rust-builder-x86_64-darwin.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
+            projectBuildArgs // { cargoExtraArgs = "-F capture"; }
           );
           # CAVEAT: must be built from a darwin system
-          hoprd-aarch64-darwin = rust-builder-aarch64-darwin.callPackage nixLib.mkRustPackage hoprdBuildArgs;
+          hoprd-aarch64-darwin = rust-builder-aarch64-darwin.callPackage nixLib.mkRustPackage projectBuildArgs;
           hoprd-aarch64-darwin-profile = rust-builder-aarch64-darwin.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
+            projectBuildArgs // { cargoExtraArgs = "-F capture"; }
           );
 
-          hopr-test-unit = rust-builder-local.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs
-            // {
-              src = testSrc;
-              runTests = true;
-              cargoExtraArgs = "--lib";
-            }
+          # Shared preBuild hook to fix stale sandbox paths in cached utoipa-swagger-ui build script outputs
+          fixUtoipaEmbedPaths =
+            drv:
+            drv.overrideAttrs (old: {
+              preBuild = ''
+                find target -name 'embed.rs' -path '*/utoipa-swagger-ui*/out/*' \
+                  -exec sed -i "s|/nix/var/nix/builds/[^/]*/source|$(pwd)|g" {} \;
+              ''
+              + (old.preBuild or "");
+            });
+
+          hopr-test-unit = fixUtoipaEmbedPaths (
+            rust-builder-local.callPackage nixLib.mkRustPackage (
+              projectBuildArgs
+              // {
+                src = testSrc;
+                cargoExtraArgs = "-F allocator-jemalloc";
+                runTests = true;
+                prependPackageName = false;
+                cargoTestExtraArgs = "--lib";
+              }
+            )
           );
 
-          hopr-test-nightly = rust-builder-local-nightly.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs
-            // {
-              src = testSrc;
-              runTests = true;
-              cargoExtraArgs = "-Z panic-abort-tests --lib";
-            }
+          hopr-test-integration = fixUtoipaEmbedPaths (
+            rust-builder-local.callPackage nixLib.mkRustPackage (
+              projectBuildArgs
+              // {
+                src = testSrc;
+                cargoExtraArgs = "-F allocator-jemalloc";
+                runTests = true;
+                prependPackageName = false;
+                cargoTestExtraArgs = "--test '*' -- --test-threads=1";
+              }
+            )
+          );
+
+          hopr-test-nightly = fixUtoipaEmbedPaths (
+            rust-builder-local-nightly.callPackage nixLib.mkRustPackage (
+              projectBuildArgs
+              // {
+                src = testSrc;
+                cargoExtraArgs = "-Z panic-abort-tests -F allocator-jemalloc";
+                runTests = true;
+                prependPackageName = false;
+                cargoTestExtraArgs = "--lib";
+              }
+            )
+          );
+
+          # Code coverage (outputs LCOV report)
+          hopr-coverage = fixUtoipaEmbedPaths (
+            rust-builder-local-coverage.callPackage nixLib.mkRustPackage (
+              projectBuildArgs
+              // {
+                src = testSrc;
+                cargoExtraArgs = "-F allocator-jemalloc";
+                runCoverage = true;
+                prependPackageName = false;
+                cargoLlvmCovExtraArgs = "--lcov --output-path $out --lib";
+              }
+            )
           );
 
           hoprd-clippy = rust-builder-local.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs // { runClippy = true; }
+            projectBuildArgs // { runClippy = true; }
           );
           hoprd-dev = rust-builder-local.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs
+            projectBuildArgs
             // {
               CARGO_PROFILE = "dev";
               cargoExtraArgs = "-F capture";
@@ -225,7 +274,7 @@
             cargoExtraArgs:
             if buildPlatform.isLinux && buildPlatform.isx86_64 then
               rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage (
-                hoprdBuildArgs
+                projectBuildArgs
                 // {
                   inherit cargoExtraArgs;
                   CARGO_PROFILE = "candidate";
@@ -233,26 +282,21 @@
               )
             else
               rust-builder-local.callPackage nixLib.mkRustPackage (
-                hoprdBuildArgs
+                projectBuildArgs
                 // {
                   inherit cargoExtraArgs;
                   CARGO_PROFILE = "candidate";
                 }
               );
-          # Use cross-compilation environment when possible to have the same setup as our production builds when benchmarking.
-          hoprd-bench =
-            if buildPlatform.isLinux && buildPlatform.isx86_64 then
-              rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage (hoprdBuildArgs // { runBench = true; })
-            else if buildPlatform.isLinux && buildPlatform.isAarch64 then
-              rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage (hoprdBuildArgs // { runBench = true; })
-            else if buildPlatform.isDarwin && buildPlatform.isx86_64 then
-              rust-builder-x86_64-darwin.callPackage nixLib.mkRustPackage (hoprdBuildArgs // { runBench = true; })
-            else if buildPlatform.isDarwin && buildPlatform.isAarch64 then
-              rust-builder-aarch64-darwin.callPackage nixLib.mkRustPackage (
-                hoprdBuildArgs // { runBench = true; }
-              )
-            else
-              rust-builder-local.callPackage nixLib.mkRustPackage (hoprdBuildArgs // { runBench = true; });
+          # Benchmarks always run on the current platform.
+          hoprd-bench = rust-builder-local.callPackage nixLib.mkRustPackage (
+            projectBuildArgs // { runBench = true; }
+          );
+
+          # Compile benchmarks without running them, used for CI build verification.
+          hoprd-bench-build = rust-builder-local.callPackage nixLib.mkRustPackage (
+            projectBuildArgs // { buildBench = true; }
+          );
 
           profileDeps = with pkgs; [
             gdb
@@ -404,7 +448,7 @@
             drv = dockerImageUploadScript hoprd-profile-docker;
           };
           docs = rust-builder-local-nightly.callPackage nixLib.mkRustPackage (
-            hoprdBuildArgs // { buildDocs = true; }
+            projectBuildArgs // { buildDocs = true; }
           );
           pre-commit-check = pre-commit.lib.${system}.run {
             src = ./.;
@@ -558,6 +602,15 @@
             '';
             rustToolchain = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default);
           };
+          coverageShell = nixLib.mkDevShell {
+            rustToolchainFile = ./rust-toolchain.toml;
+            shellName = "HOPR Coverage";
+            withLlvmTools = true;
+            extraPackages = with pkgs; [
+              sqlite
+            ];
+          };
+
           run-check = flake-utils.lib.mkApp {
             drv = pkgs.writeShellScriptBin "run-check" ''
               set -e
@@ -699,10 +752,15 @@
               hoprd-profile-docker
               hoprd-localcluster
               ;
-            inherit hopr-test-unit hopr-test-nightly;
+            inherit
+              hopr-test-unit
+              hopr-test-integration
+              hopr-test-nightly
+              hopr-coverage
+              ;
             inherit docs;
             inherit pre-commit-check;
-            inherit hoprd-bench;
+            inherit hoprd-bench hoprd-bench-build;
             inherit hoprd-man;
             # binary packages
             inherit
@@ -725,6 +783,7 @@
           devShells.test = testShell;
           devShells.citest = ciTestShell;
           devShells.docs = docsShell;
+          devShells.coverage = coverageShell;
 
           formatter = config.treefmt.build.wrapper;
         };

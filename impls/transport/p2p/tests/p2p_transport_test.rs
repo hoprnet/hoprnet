@@ -1,3 +1,6 @@
+// This integration test requires the `runtime-tokio` and `transport-quic` features.
+#![cfg(all(feature = "runtime-tokio", feature = "transport-quic"))]
+
 use std::{
     net::{Ipv4Addr, SocketAddrV4, TcpListener},
     str::FromStr,

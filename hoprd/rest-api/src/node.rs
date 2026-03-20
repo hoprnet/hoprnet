@@ -6,8 +6,6 @@ use axum::{
     response::IntoResponse,
 };
 use futures::{StreamExt, stream::FuturesUnordered};
-#[cfg(feature = "telemetry")]
-use hopr_lib::PeerPacketStatsSnapshot;
 use hopr_lib::{
     Address, Multiaddr,
     api::{
@@ -104,38 +102,6 @@ pub(crate) struct HeartbeatInfo {
     success: u64,
 }
 
-#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
-#[schema(example = json!({
-    "packetsOut": 100,
-    "packetsIn": 50,
-    "bytesOut": 102400,
-    "bytesIn": 51200
-}))]
-#[serde(rename_all = "camelCase")]
-/// Packet statistics for a peer.
-pub(crate) struct PeerPacketStatsResponse {
-    #[schema(example = 100)]
-    pub packets_out: u64,
-    #[schema(example = 50)]
-    pub packets_in: u64,
-    #[schema(example = 102400)]
-    pub bytes_out: u64,
-    #[schema(example = 51200)]
-    pub bytes_in: u64,
-}
-
-#[cfg(feature = "telemetry")]
-impl From<PeerPacketStatsSnapshot> for PeerPacketStatsResponse {
-    fn from(snapshot: PeerPacketStatsSnapshot) -> Self {
-        Self {
-            packets_out: snapshot.packets_out,
-            packets_in: snapshot.packets_in,
-            bytes_out: snapshot.bytes_out,
-            bytes_in: snapshot.bytes_in,
-        }
-    }
-}
-
 #[serde_as]
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -145,13 +111,7 @@ impl From<PeerPacketStatsSnapshot> for PeerPacketStatsResponse {
     "probeRate": 0.476,
     "lastSeen": 1690000000,
     "averageLatency": 100,
-    "score": 0.7,
-    "packetStats": {
-        "packetsOut": 100,
-        "packetsIn": 50,
-        "bytesOut": 102400,
-        "bytesIn": 51200
-    }
+    "score": 0.7
 }))]
 /// All information about a known peer.
 pub(crate) struct PeerObservations {

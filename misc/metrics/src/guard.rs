@@ -1,4 +1,4 @@
-use crate::{SimpleGauge, metrics::MultiGauge};
+use crate::metrics::{MultiGauge, SimpleGauge};
 
 /// Creates a RAII guard for a simple gauge metric.
 ///

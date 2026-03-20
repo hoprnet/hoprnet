@@ -1,6 +1,6 @@
 [package]
 name = "hoprd-api"
-version = "4.6.1"
+version = "4.7.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -13,17 +13,14 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = ["prometheus", "runtime-tokio"]
-telemetry = ["hopr-lib/telemetry"]
-prometheus = [
-  "hopr-lib/prometheus",
-  "hopr-transport-p2p/prometheus",
+default = ["telemetry", "runtime-tokio"]
+telemetry = [
+  "hopr-lib/telemetry",
+  "hopr-transport-p2p/telemetry",
   "dep:hopr-metrics",
   "dep:lazy_static",
   "dep:regex",
 ]
-explicit-path = []
-# placeholder feature so we can enable it globally during tests
 runtime-tokio = ["hopr-transport-p2p/runtime-tokio", "hopr-lib/runtime-tokio"]
 
 [dependencies]
@@ -56,7 +53,7 @@ hopr-lib = { workspace = true, features = [
 ] }
 
 hopr-chain-connector = { workspace = true }
-hopr-network-graph = { workspace = true }
+hopr-network-graph = { workspace = true, features = ["petgraph"] }
 hopr-transport-p2p = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-utils-session = { workspace = true }

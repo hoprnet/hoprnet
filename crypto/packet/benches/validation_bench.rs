@@ -20,14 +20,14 @@ pub fn validate_ticket_bench(c: &mut Criterion) {
     let source = ChainKeypair::random();
     let dest = ChainKeypair::random();
 
-    let channel = ChannelEntry::new(
-        source.public().to_address(),
-        dest.public().to_address(),
-        HoprBalance::new_base(1000),
-        1,
-        ChannelStatus::Open,
-        1,
-    );
+    let channel = ChannelEntry::builder()
+        .between(&source, &dest)
+        .balance(HoprBalance::new_base(1000))
+        .ticket_index(1)
+        .status(ChannelStatus::Open)
+        .epoch(1)
+        .build()
+        .unwrap();
 
     let ticket = TicketBuilder::default()
         .counterparty(dest.public().to_address())

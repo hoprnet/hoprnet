@@ -63,6 +63,11 @@ jobs:
         env:
           USER: runner
 
+      - name: Validate docs (strict)
+        run: nix develop -c cargo doc --no-deps --document-private-items
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+
       - name: Build docs
         run: nix build -L .#docs
 

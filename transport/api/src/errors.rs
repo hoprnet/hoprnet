@@ -1,6 +1,12 @@
 use hopr_crypto_packet::errors::PacketError;
-pub use hopr_transport_network::errors::NetworkError;
 pub use hopr_transport_probe::errors::ProbeError;
+
+/// Errors from the network peer store.
+#[derive(thiserror::Error, Debug)]
+pub enum NetworkError {
+    #[error("performing an operation on own PeerId")]
+    DisallowedOperationOnOwnPeerIdError,
+}
 pub use hopr_transport_protocol::errors::ProtocolError;
 use hopr_transport_session::errors::TransportSessionError;
 use thiserror::Error;
@@ -41,6 +47,9 @@ pub enum HoprTransportError {
 
     #[error(transparent)]
     ApplicationLayerError(#[from] hopr_protocol_app::errors::ApplicationLayerError),
+
+    #[error("tag allocator error: {0}")]
+    TagAllocator(#[from] hopr_transport_tag_allocator::TagAllocatorError),
 
     #[error("chain error: {0}")]
     Chain(#[source] anyhow::Error),

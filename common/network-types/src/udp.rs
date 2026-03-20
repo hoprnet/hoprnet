@@ -16,7 +16,7 @@ use crate::utils::SocketAddrStr;
 
 type BoxIoSink<T> = Box<dyn Sink<T, Error = std::io::Error> + Send + Unpin>;
 
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_UDP_INGRESS_LEN: hopr_metrics::SimpleHistogram =
         hopr_metrics::SimpleHistogram::new(
@@ -439,7 +439,7 @@ impl ConnectedUdpStream {
 
                         let addr = counterparty_rx.get_or_init(|| read_addr.into());
 
-                        #[cfg(all(feature = "prometheus", not(test)))]
+                        #[cfg(all(feature = "telemetry", not(test)))]
                         METRIC_UDP_INGRESS_LEN.observe(read as f64);
 
                         // If the data is from a counterparty, or we accept anything, pass it
@@ -554,7 +554,7 @@ impl ConnectedUdpStream {
                             }
                             trace!(socket_id, bytes = data.len(), ?target, "sent bytes to");
 
-                            #[cfg(all(feature = "prometheus", not(test)))]
+                            #[cfg(all(feature = "telemetry", not(test)))]
                             METRIC_UDP_EGRESS_LEN.observe(data.len() as f64);
                         } else {
                             error!(

@@ -12,10 +12,9 @@ license = "GPL-3.0-only"
 [features]
 default = ["hashbrown"]
 serde = ["dep:serde", "dep:serde_bytes", "hopr-crypto-packet/serde"]
-telemetry = ["dep:auto_impl"]
+telemetry = ["dep:auto_impl", "dep:hopr-metrics", "dep:lazy_static"]
 runtime-tokio = ["dep:tokio", "hopr-async-runtime/runtime-tokio"]
 hashbrown = ["dep:hashbrown"]
-prometheus = ["dep:hopr-metrics", "dep:lazy_static"]
 session-types = []
 
 allocator-mimalloc = [
@@ -60,7 +59,7 @@ clap = { workspace = true }
 criterion = { workspace = true }
 hex-literal = { workspace = true }
 insta = { workspace = true }
-indexmap = { workspace = true }
+indexmap = { workspace = true, features = ["serde"] }
 mockall = { workspace = true }
 parameterized = { workspace = true }
 serde = { workspace = true }
@@ -74,6 +73,7 @@ hopr-network-types = { workspace = true, features = [
   "capture",
   "runtime-tokio",
 ] }
+hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 hopr-protocol-app = { workspace = true }
 
 [[example]]

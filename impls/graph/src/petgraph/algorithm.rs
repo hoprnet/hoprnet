@@ -1,4 +1,4 @@
-//! Adaptation of the algorithm for [`petgraph::algo::simple_path::all_simple_paths_multi`] to accept
+//! Adaptation of the algorithm for `petgraph::algo::simple_path::all_simple_paths_multi` to accept
 //! a cost function interacting with the edge weight.
 
 use std::{
@@ -15,7 +15,7 @@ use petgraph::{
 
 /// Calculate all simple paths from a source node to any of several target nodes.
 ///
-/// This function is a variant of [`all_simple_paths`] that accepts a `HashSet` of
+/// This function is a variant of `all_simple_paths` that accepts a `HashSet` of
 /// target nodes instead of a single one. A path is yielded as soon as it reaches any
 /// node in the `to` set.
 ///
@@ -26,7 +26,7 @@ use petgraph::{
 /// as the benefit of a single traversal outweighs the `HashSet` lookup overhead.
 ///
 /// Conversely, in dense graphs where paths diverge quickly or for targets very close
-/// to the source, the lookup overhead could make repeated calls to [`all_simple_paths`]
+/// to the source, the lookup overhead could make repeated calls to `all_simple_paths`
 /// a faster alternative.
 ///
 /// **Note**: If security is not a concern, a faster hasher (e.g., `FxBuildHasher`)

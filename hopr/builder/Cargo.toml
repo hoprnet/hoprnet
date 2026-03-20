@@ -1,6 +1,6 @@
 [package]
 name = "hopr-builder"
-version = "4.0.1"
+version = "4.0.3"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -14,7 +14,6 @@ crate-type = ["rlib"]
 
 [features]
 default = ["runtime-tokio"]
-prometheus = ["hopr-lib/prometheus"]
 runtime-tokio = [
   "dep:tokio",
   "hopr-lib/runtime-tokio",
@@ -43,7 +42,7 @@ testing = [
   "dep:rstest",
   "hopr-chain-connector/testing",
 ]
-telemetry = ["hopr-lib/telemetry"]
+telemetry = ["hopr-lib/telemetry", "dep:hopr-metrics", "dep:lazy_static"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -66,19 +65,28 @@ tracing = { workspace = true }
 validator = { workspace = true, optional = true }
 
 hopr-lib = { workspace = true, features = ["utils_parallel"] }
+hopr-metrics = { workspace = true, optional = true }
 # impls
 hopr-chain-connector = { workspace = true }
-hopr-ct-immediate = { workspace = true }
-hopr-network-graph = { workspace = true }
+hopr-ct-full-network = { workspace = true }
+hopr-network-graph = { workspace = true, features = ["petgraph"] }
 hopr-transport-p2p = { workspace = true }
 
 [dev-dependencies]
-insta = { workspace = true, features = ["yaml", "redactions"] }
+anyhow = { workspace = true }
 rstest = { workspace = true }
 serial_test = { workspace = true }
 test-log = { workspace = true }
+tokio = { workspace = true }
 
 hopr-builder = { workspace = true, features = ["testing"] }
 hopr-api = { workspace = true, features = ["types-random"] }
+hopr-metrics = { workspace = true }
+opentelemetry_sdk = { workspace = true, features = [
+  "metrics",
+  "experimental_metrics_custom_reader",
+  "testing",
+] }
+opentelemetry-prometheus-text-exporter = { workspace = true }
 
 hopr-lib = { workspace = true, features = ["telemetry"] }

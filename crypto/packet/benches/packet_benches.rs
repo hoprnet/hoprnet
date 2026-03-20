@@ -3,14 +3,13 @@ use std::ops::Deref;
 use anyhow::anyhow;
 use bimap::BiHashMap;
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use hopr_crypto_packet::prelude::*;
-use hopr_crypto_sphinx::prelude::SimpleBiMapper;
-use hopr_types::{
+use hopr_api::types::{
     crypto::prelude::*,
     crypto_random::Randomizable,
     internal::prelude::*,
     primitive::prelude::{BytesEncodable, KeyIdent},
 };
+use hopr_crypto_packet::prelude::*;
 
 // Avoid musl's default allocator due to degraded performance
 //
@@ -52,7 +51,7 @@ lazy_static::lazy_static! {
 
 pub fn packet_sending_bench(c: &mut Criterion) {
     assert!(
-        !hopr_types::crypto_random::is_rng_fixed(),
+        !hopr_api::types::crypto_random::is_rng_fixed(),
         "RNG must not be fixed for bench tests"
     );
 
@@ -81,7 +80,7 @@ pub fn packet_sending_bench(c: &mut Criterion) {
                             destination_chain.public().to_address(),
                         );
                         let mut payload = vec![0; HoprPacket::max_message_with_surbs(surb_count)];
-                        hopr_types::crypto_random::random_fill(&mut payload);
+                        hopr_api::types::crypto_random::random_fill(&mut payload);
                         (addrs, forward_path, return_paths, payload)
                     },
                     |((_sender_addr, destination_addr), forward_path, return_paths, payload)| {
@@ -114,7 +113,7 @@ pub fn packet_sending_bench(c: &mut Criterion) {
     group.measurement_time(std::time::Duration::from_secs(30));
     group.throughput(Throughput::Elements(1));
 
-    let msg = hopr_types::crypto_random::random_bytes::<{ HoprPacket::PAYLOAD_SIZE }>();
+    let msg = hopr_api::types::crypto_random::random_bytes::<{ HoprPacket::PAYLOAD_SIZE }>();
 
     // This benchmark does not depend on the number of SURBs, because they are created in the precomputation step
 
@@ -148,7 +147,7 @@ pub fn packet_sending_bench(c: &mut Criterion) {
 
 pub fn packet_precompute_bench(c: &mut Criterion) {
     assert!(
-        !hopr_types::crypto_random::is_rng_fixed(),
+        !hopr_api::types::crypto_random::is_rng_fixed(),
         "RNG must not be fixed for bench tests"
     );
 
@@ -204,7 +203,7 @@ pub fn packet_precompute_bench(c: &mut Criterion) {
 
 pub fn packet_forwarding_bench(c: &mut Criterion) {
     assert!(
-        !hopr_types::crypto_random::is_rng_fixed(),
+        !hopr_api::types::crypto_random::is_rng_fixed(),
         "RNG must not be fixed for bench tests"
     );
 
@@ -212,7 +211,7 @@ pub fn packet_forwarding_bench(c: &mut Criterion) {
     let destination_chain = &CHAIN_KEYS[4];
     let path = [*OFFCHAIN_KEYS[1].public(), *OFFCHAIN_KEYS[2].public()];
 
-    let msg = hopr_types::crypto_random::random_bytes::<{ HoprPacket::PAYLOAD_SIZE }>();
+    let msg = hopr_api::types::crypto_random::random_bytes::<{ HoprPacket::PAYLOAD_SIZE }>();
 
     // The number of hops for ticket creation does not matter for benchmark purposes
     let tb = TicketBuilder::zero_hop().counterparty(destination_chain.public().to_address());
@@ -263,7 +262,7 @@ pub fn packet_forwarding_bench(c: &mut Criterion) {
 
 pub fn packet_receiving_bench(c: &mut Criterion) {
     assert!(
-        !hopr_types::crypto_random::is_rng_fixed(),
+        !hopr_api::types::crypto_random::is_rng_fixed(),
         "RNG must not be fixed for bench tests"
     );
 
@@ -271,7 +270,7 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
     let destination_chain = &CHAIN_KEYS[4];
     let path = [*OFFCHAIN_KEYS[1].public(), *OFFCHAIN_KEYS[2].public()];
 
-    let msg = hopr_types::crypto_random::random_bytes::<{ HoprPacket::PAYLOAD_SIZE }>();
+    let msg = hopr_api::types::crypto_random::random_bytes::<{ HoprPacket::PAYLOAD_SIZE }>();
 
     // The number of hops for ticket creation does not matter for benchmark purposes
     let tb = TicketBuilder::zero_hop().counterparty(destination_chain.public().to_address());

@@ -16,6 +16,12 @@ use validator::{Validate, ValidationError, ValidationErrors};
 
 use crate::errors::HoprTransportError;
 
+const DEFAULT_COUNTER_FLUSH_INTERVAL: Duration = Duration::from_secs(15);
+
+fn default_counter_flush_interval() -> Duration {
+    DEFAULT_COUNTER_FLUSH_INTERVAL
+}
+
 /// Complete configuration of the HOPR protocol stack.
 #[derive(Debug, smart_default::SmartDefault, Validate, Clone, Copy, PartialEq)]
 #[cfg_attr(
@@ -40,6 +46,19 @@ pub struct HoprProtocolConfig {
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
     pub session: SessionGlobalConfig,
+    /// Path planner configuration
+    #[cfg_attr(feature = "serde", serde(skip))]
+    pub path_planner: hopr_transport_path::PathPlannerConfig,
+    /// Interval at which per-peer protocol conformance counters are flushed
+    /// into the network graph.
+    ///
+    /// Default is 15 seconds.
+    #[default(default_counter_flush_interval())]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "default_counter_flush_interval", with = "humantime_serde")
+    )]
+    pub counter_flush_interval: Duration,
 }
 
 /// Configuration of the HOPR packet pipeline.
@@ -275,8 +294,6 @@ pub struct TransportConfig {
     pub prefer_local_addresses: bool,
 }
 
-const DEFAULT_SESSION_MAX_SESSIONS: u32 = 2048;
-
 const DEFAULT_SESSION_IDLE_TIMEOUT: Duration = Duration::from_mins(3);
 
 const SESSION_IDLE_MIN_TIMEOUT: Duration = Duration::from_secs(2);
@@ -288,10 +305,6 @@ const DEFAULT_SESSION_ESTABLISH_MAX_RETRIES: u32 = 3;
 const DEFAULT_SESSION_BALANCER_SAMPLING: Duration = Duration::from_millis(100);
 
 const DEFAULT_SESSION_BALANCER_BUFFER_DURATION: Duration = Duration::from_secs(5);
-
-fn default_session_max_sessions() -> u32 {
-    DEFAULT_SESSION_MAX_SESSIONS
-}
 
 fn default_session_balancer_buffer_duration() -> Duration {
     DEFAULT_SESSION_BALANCER_BUFFER_DURATION
@@ -356,16 +369,6 @@ pub struct SessionGlobalConfig {
     )]
     pub idle_timeout: Duration,
 
-    /// The maximum number of outgoing or incoming Sessions that
-    /// are allowed by the Session manager.
-    ///
-    /// Minimum is 1, the maximum is given by the Session tag range.
-    /// Default is 2048.
-    #[default(default_session_max_sessions())]
-    #[cfg_attr(feature = "serde", serde(default = "default_session_max_sessions"))]
-    #[validate(range(min = 1))]
-    pub maximum_sessions: u32,
-
     /// Maximum retries to attempt to establish the Session
     /// Set 0 for no retries.
     ///
@@ -410,6 +413,11 @@ pub struct SessionGlobalConfig {
         serde(default = "default_session_balancer_buffer_duration", with = "humantime_serde")
     )]
     pub balancer_minimum_surb_buffer_duration: Duration,
+
+    /// Tag allocator partition configuration.
+    #[validate(nested)]
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub tag_allocator: hopr_transport_tag_allocator::TagAllocatorConfig,
 }
 
 #[cfg(test)]

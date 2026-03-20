@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-session"
-version = "0.19.0"
+version = "0.20.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -19,10 +19,9 @@ runtime-tokio = [
   "hopr-protocol-session/runtime-tokio",
   "dep:tokio",
 ]
-telemetry = ["hopr-protocol-session/telemetry", "dep:serde_json"]
-prometheus = [
-  "hopr-network-types/prometheus",
-  "hopr-protocol-session/prometheus",
+telemetry = [
+  "hopr-network-types/telemetry",
+  "hopr-protocol-session/telemetry",
   "dep:hopr-metrics",
   "dep:lazy_static",
 ]
@@ -46,7 +45,6 @@ parking_lot = { workspace = true }
 pid = { workspace = true }
 pin-project = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true, optional = true }
 serde_repr = { workspace = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
@@ -66,17 +64,21 @@ hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true, features = ["serde"] }
 
 hopr-protocol-app = { workspace = true, features = ["serde"] }
-hopr-protocol-session = { workspace = true, features = ["serde"] }
+hopr-protocol-session = { workspace = true, features = ["serde", "hashbrown"] }
 hopr-protocol-start = { workspace = true }
+hopr-transport-tag-allocator = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
+hopr-api = { workspace = true, features = ["types-random"] }
 hopr-network-types = { workspace = true, features = ["runtime-tokio", "serde"] }
 hopr-protocol-session = { workspace = true, features = [
   "session-types",
   "serde",
   "runtime-tokio",
+  "hashbrown",
 ] }
+hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 mockall = { workspace = true }
 rand = { workspace = true }
 serde_cbor_2 = { workspace = true }

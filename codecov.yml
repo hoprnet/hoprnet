@@ -1,0 +1,35 @@
+---
+coverage:
+  precision: 2
+  round: down
+  range: "60...100"
+
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 0.5%
+        if_not_found: success
+    patch:
+      default:
+        target: auto
+        threshold: 0%
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: true
+  require_base: yes
+  require_head: yes
+
+ignore:
+  - "localcluster/**"
+  - "common/test-stubs/**"
+  - "**/benches/**"
+  - "**/build.rs"
+
+flags:
+  unit:
+    carryforward: true
+  integration:
+    carryforward: true

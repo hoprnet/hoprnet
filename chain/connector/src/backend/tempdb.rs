@@ -299,26 +299,24 @@ mod tests {
         let src = Address::new(&[1u8; 20]);
         let dst = Address::new(&[2u8; 20]);
 
-        let channel_v1 = ChannelEntry::new(
-            src,
-            dst,
-            HoprBalance::new_base(100),
-            1u32.into(),
-            ChannelStatus::Open,
-            1u32,
-        );
+        let channel_v1 = ChannelEntry::builder()
+            .between(src, dst)
+            .balance(HoprBalance::new_base(100))
+            .ticket_index(1)
+            .epoch(1)
+            .status(ChannelStatus::Open)
+            .build()?;
 
         let first_insert = backend.insert_channel(channel_v1)?;
         assert!(first_insert.is_none(), "first insert should return None");
 
-        let channel_v2 = ChannelEntry::new(
-            src,
-            dst,
-            HoprBalance::new_base(200),
-            2u32.into(),
-            ChannelStatus::Open,
-            2u32,
-        );
+        let channel_v2 = ChannelEntry::builder()
+            .between(src, dst)
+            .balance(HoprBalance::new_base(200))
+            .ticket_index(2)
+            .status(ChannelStatus::Open)
+            .epoch(2)
+            .build()?;
 
         let second_insert = backend.insert_channel(channel_v2)?;
         assert_eq!(second_insert, Some(channel_v1), "second insert should return old value");

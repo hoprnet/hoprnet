@@ -26,6 +26,8 @@ pub struct HoprPipelineComponents<TEvt, S, Chain, TktBackend, TktQueue> {
     pub chain_api: Chain,
     /// Ticket manager for managing ticket queues and outgoing ticket indices.
     pub ticket_manager: std::sync::Arc<HoprTicketManager<TktBackend, TktQueue>>,
+    /// Per-peer protocol conformance counters.
+    pub counters: hopr_transport_protocol::PeerProtocolCounterRegistry,
 }
 
 pub fn run_hopr_packet_pipeline<WIn, WOut, Chain, S, TEvt, TktBackend, AppOut, AppIn>(
@@ -55,6 +57,7 @@ where
         surb_store,
         chain_api,
         ticket_manager,
+        counters,
     } = components;
 
     let unack_ticket_proc = HoprUnacknowledgedTicketProcessor::new(
@@ -142,6 +145,7 @@ where
             ticket_events,
             cfg.pipeline,
             api,
+            counters,
         ),
         HoprTransportProcess::Pipeline,
     );
