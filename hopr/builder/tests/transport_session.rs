@@ -3,9 +3,10 @@ use std::str::FromStr;
 #[cfg(feature = "session-client")]
 use futures::future::try_join_all;
 use hopr_builder::testing::{
-    fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_5_cluster_fixture as cluster},
+    fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, chain_propagation_delay, size_5_cluster_fixture as cluster},
     hopr::ChannelGuard,
 };
+use hopr_chain_connector::blokli_client::BlokliQueryClient;
 #[cfg(feature = "session-client")]
 use hopr_lib::{
     HopRouting, HoprBalance, HoprSessionClientConfig, SessionCapabilities, SessionTarget,
@@ -17,14 +18,13 @@ use serial_test::serial;
 #[cfg(feature = "session-client")]
 use tokio::time::sleep;
 
-const FUNDING_AMOUNT: &str = "10 wxHOPR";
+const FUNDING_AMOUNT: &str = "100 wxHOPR";
 
 #[rstest]
 #[case(0)]
 #[case(1)]
-// TODO: re-enable once the CI can be debugged
-// #[case(2)]
-// #[case(3)]
+#[case(2)]
+#[case(3)]
 #[serial]
 #[test_log::test(tokio::test)]
 #[timeout(2*TEST_GLOBAL_TIMEOUT)]
@@ -36,7 +36,13 @@ const FUNDING_AMOUNT: &str = "10 wxHOPR";
 ///
 /// - 0-hop: 2 nodes, no channels needed (direct connection)
 /// - n-hop (n >= 1): n+2 nodes with n*(n+1) bidirectional channels
-async fn test_create_n_hop_session(cluster: &ClusterGuard, #[case] hops: usize) -> anyhow::Result<()> {
+async fn create_n_hop_session(cluster: &ClusterGuard, #[case] hops: usize) -> anyhow::Result<()> {
+    // 2-hop and 3-hop tests are too slow under coverage instrumentation
+    #[allow(unexpected_cfgs)]
+    if cfg!(coverage) && hops > 1 {
+        return Ok(());
+    }
+
     let node_count = if hops == 0 { 2 } else { hops + 2 };
     let mut nodes: Vec<&_> = cluster.iter().collect();
     nodes.shuffle(&mut rand::rng());
@@ -70,10 +76,12 @@ async fn test_create_n_hop_session(cluster: &ClusterGuard, #[case] hops: usize) 
         Vec::new()
     };
 
-    // wait for the probing to actually kick in and register opened channels in the graph,
-    // otherwise the planner might not find any paths and fail the test
+    // Wait for probing to register opened channels in the graph.
+    // Scale the wait by hop count: larger meshes need more probing rounds.
     if !all_channels.is_empty() {
-        sleep(std::time::Duration::from_secs(5)).await;
+        let chain_info = cluster.chain_client.query_chain_info().await?;
+        let base_delay = chain_propagation_delay(&chain_info);
+        sleep(base_delay * hops as u32).await;
     }
 
     let (routing, capabilities) = if hops == 0 {

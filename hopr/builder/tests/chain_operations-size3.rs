@@ -1,8 +1,8 @@
-use std::{ops::Mul, time::Duration};
+use std::ops::Mul;
 
 use anyhow::Context;
 use hopr_builder::testing::{
-    fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster},
+    fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, chain_propagation_delay, size_3_cluster_fixture as cluster},
     hopr::ChannelGuard,
 };
 use hopr_chain_connector::blokli_client::BlokliQueryClient;
@@ -50,7 +50,8 @@ async fn test_open_close_channel(cluster: &ClusterGuard) -> anyhow::Result<()> {
         .await
         .context("failed to put channel in PendingToClose state")?;
 
-    sleep(Duration::from_secs(2)).await;
+    let chain_info = cluster.chain_client.query_chain_info().await?;
+    sleep(chain_propagation_delay(&chain_info)).await;
 
     match src
         .channel_from_hash(channel.channel_id(0))
