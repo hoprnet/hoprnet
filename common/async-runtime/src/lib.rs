@@ -92,6 +92,11 @@ impl<T: Hash + Eq> AbortableList<T> {
         self.0.insert(process, Box::new(task));
     }
 
+    /// Checks if the list contains a task with the given key.
+    pub fn contains(&self, process: &T) -> bool {
+        self.0.contains_key(process)
+    }
+    
     /// Looks up a task by its key, removes it and aborts it.
     ///
     /// Returns `true` if the task was aborted and removed.

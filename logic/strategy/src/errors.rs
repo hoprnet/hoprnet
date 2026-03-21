@@ -8,13 +8,19 @@ pub enum StrategyError {
     CriteriaNotSatisfied,
 
     #[error("non-specific strategy error: {0}")]
-    Other(Box<dyn std::error::Error + Send + Sync>),
+    Other(anyhow::Error),
 
     #[error(transparent)]
     HoprLib(#[from] hopr_lib::errors::HoprLibError),
 
     #[error("lower-level error: {0}")]
     GeneralError(#[from] GeneralError),
+}
+
+impl StrategyError {
+    pub fn other<E: Into<anyhow::Error>>(e: E) -> Self {
+        StrategyError::Other(e.into())
+    }
 }
 
 pub type Result<T> = std::result::Result<T, StrategyError>;

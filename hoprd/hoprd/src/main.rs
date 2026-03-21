@@ -300,11 +300,10 @@ async fn main_inner(cfg: HoprdConfig, hopr_keys: HoprKeys) -> anyhow::Result<()>
 
     let _hopr_socket = hopr_process.await?;
 
-    // TODO: reattach strategies
-    /*let multi_strategy = Arc::new(hopr_strategy::strategy::MultiStrategy::new(
+    let multi_strategy = Arc::new(hopr_strategy::strategy::MultiStrategy::new(
         cfg.strategy.clone(),
         chain_connector.clone(),
-        node.redemption_requests()?,
+        node.ticket_management(),
     ));
     tracing::debug!(strategies = ?multi_strategy, "initialized strategies");
 
@@ -318,7 +317,7 @@ async fn main_inner(cfg: HoprdConfig, hopr_keys: HoprKeys) -> anyhow::Result<()>
             cfg.strategy.execution_interval,
             hopr_keys.chain_key.public().to_address(),
         ),
-    );*/
+    );
 
     let mut signals =
         Signals::new([Signal::Hup, Signal::Int, Signal::Term]).map_err(|e| HoprdError::OsError(e.to_string()))?;

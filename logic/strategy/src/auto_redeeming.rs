@@ -7,21 +7,18 @@ use std::{
     fmt::{Debug, Display, Formatter},
     str::FromStr,
 };
-
+use std::time::Duration;
 use async_trait::async_trait;
-use hopr_lib::{
-    ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus,
-    HoprBalance, VerifiedTicket,
-    api::{
-        chain::{ChainReadChannelOperations, ChannelSelector},
-        tickets::TicketManagement,
-    },
-};
+use futures::{StreamExt, TryStreamExt};
+use parking_lot::lock_api::RwLockUpgradableReadGuard;
+use hopr_lib::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus, HoprBalance, VerifiedTicket, api::{
+    chain::{ChainReadChannelOperations, ChainWriteTicketOperations, ChannelSelector},
+    tickets::{TicketManagement},
+}, ChannelId};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
-use tracing::{debug, error, info};
 use validator::Validate;
-
+use hopr_async_runtime::{spawn_as_abortable, AbortableList};
 use crate::{
     Strategy,
     errors::{StrategyError, StrategyError::CriteriaNotSatisfied},
@@ -84,70 +81,97 @@ pub struct AutoRedeemingStrategyConfig {
 /// The `AutoRedeemingStrategy` automatically sends an acknowledged ticket
 /// for redemption once encountered.
 /// The strategy does not await the result of the redemption.
-pub struct AutoRedeemingStrategy<A, R> {
-    hopr_chain_actions: A,
-    redeem_sink: R,
+pub struct AutoRedeemingStrategy<A, T> {
     cfg: AutoRedeemingStrategyConfig,
+    hopr_chain_actions: A,
+    ticket_manager: T,
+    running_redemptions: std::sync::Arc<parking_lot::RwLock<AbortableList<ChannelId>>>
 }
 
-impl<A, R> Debug for AutoRedeemingStrategy<A, R> {
+impl<A, T> Debug for AutoRedeemingStrategy<A, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", Strategy::AutoRedeeming(self.cfg))
     }
 }
 
-impl<A, R> Display for AutoRedeemingStrategy<A, R> {
+impl<A, T> Display for AutoRedeemingStrategy<A, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", Strategy::AutoRedeeming(self.cfg))
     }
 }
 
-impl<A, R> AutoRedeemingStrategy<A, R>
+impl<A, T> AutoRedeemingStrategy<A, T>
 where
-    A: ChainReadChannelOperations + Clone + Send + Sync + 'static,
-    R: TicketManagement + Clone,
-    StrategyError: From<R::Error>,
+    A: ChainReadChannelOperations + ChainWriteTicketOperations + Clone + Send + Sync + 'static,
+    T: TicketManagement + Clone + Sync + Send + 'static
 {
-    pub fn new(cfg: AutoRedeemingStrategyConfig, hopr_chain_actions: A, redeem_sink: R) -> Self {
+    pub fn new(cfg: AutoRedeemingStrategyConfig, hopr_chain_actions: A, ticket_manager: T) -> Self {
         Self {
             cfg,
             hopr_chain_actions,
-            redeem_sink,
+            ticket_manager,
+            running_redemptions: std::sync::Arc::new(parking_lot::RwLock::new(AbortableList::default())),
+        }
+    }
+
+    fn enqueue_redemption(&self, channel_id: &ChannelId) -> Result<bool, StrategyError> {
+        let redemptions = self.running_redemptions.upgradable_read();
+        if !redemptions.contains(channel_id) {
+            let tmgr = self.ticket_manager.clone();
+            let client = self.hopr_chain_actions.clone();
+            let min_value = self.cfg.minimum_redeem_ticket_value;
+            let channel_id = *channel_id;
+            let redemptions_clone = self.running_redemptions.clone();
+
+            RwLockUpgradableReadGuard::upgrade(redemptions)
+                .insert(channel_id, spawn_as_abortable!(async move {
+                    hopr_async_runtime::prelude::sleep(Duration::from_millis(100)).await;
+                    let redeem_result = match tmgr.redeem_stream(client.clone(), channel_id, min_value.into()) {
+                        Ok(stream) => stream
+                            .map_err(StrategyError::other)
+                            .try_for_each(|res| {
+                                tracing::debug!(?res, %channel_id, "ticket redemption completed");
+                                futures::future::ok(())
+                            })
+                            .await,
+                        Err(error) => Err(StrategyError::other(error))
+                    };
+
+                    tracing::debug!(?redeem_result, %channel_id, "redemption in channel complete");
+                    redemptions_clone.write().abort_one(&channel_id);
+                }));
+            Ok(true)
+
+        } else {
+            tracing::debug!(%channel_id, "existing on-going redemption");
+            Ok(false)
         }
     }
 }
 
 #[async_trait]
-impl<A, R> SingularStrategy for AutoRedeemingStrategy<A, R>
+impl<A, T> SingularStrategy for AutoRedeemingStrategy<A, T>
 where
-    A: ChainReadChannelOperations + Clone + Send + Sync + 'static,
-    R: TicketManagement + Sync + Send + Clone,
-    StrategyError: From<R::Error>,
+    A: ChainReadChannelOperations + ChainWriteTicketOperations + Clone + Send + Sync + 'static,
+    T: TicketManagement + Clone + Sync + Send + 'static
 {
     async fn on_tick(&self) -> crate::errors::Result<()> {
         if !self.cfg.redeem_on_winning {
-            debug!("trying to redeem all tickets in all channels");
+            tracing::debug!("trying to redeem all tickets in all channels");
 
-            /*self.hopr_chain_actions
+            self.hopr_chain_actions
                 .stream_channels(
                     ChannelSelector::default()
                         .with_destination(*self.hopr_chain_actions.me())
-                        .with_allowed_states(&[
-                            ChannelStatusDiscriminants::Open,
-                            ChannelStatusDiscriminants::PendingToClose,
-                        ])
-                        .with_closure_time_range(Utc::now()..),
+                        .with_redeemable_channels(Duration::from_secs(30).into())
                 )
                 .await
-                .map_err(|e| StrategyError::Other(e.into()))?
-                .map(|channel| {
-                    Ok(TicketSelector::from(&channel)
-                        .with_amount(self.cfg.minimum_redeem_ticket_value..)
-                        .with_index_range(channel.ticket_index..)
-                        .with_state(AcknowledgedTicketStatus::Untouched))
+                .map_err(StrategyError::other)?
+                .for_each(|channel| {
+                    let _ = self.enqueue_redemption(channel.get_id());
+                    futures::future::ready(())
                 })
-                .forward(self.redeem_sink.clone())
-                .await?;*/
+                .await;
 
             Ok(())
         } else {
@@ -161,22 +185,18 @@ where
                 .hopr_chain_actions
                 .channel_by_id(ack.channel_id())
                 .await
-                .map_err(|e| StrategyError::Other(e.into()))?
+                .map_err(StrategyError::other)?
             {
-                info!(%ack, "redeeming");
+                tracing::info!(%ack, "redeeming");
 
                 if ack.verified_ticket().index < channel.ticket_index {
-                    error!(%ack, "acknowledged ticket is older than channel ticket index");
+                    tracing::error!(%ack, "acknowledged ticket is older than channel ticket index");
                     return Err(CriteriaNotSatisfied);
                 }
 
-                todo!()
-                /*let selector = TicketSelector::from(channel)
-                    .with_amount(self.cfg.minimum_redeem_ticket_value..)
-                    .with_index_range(channel.ticket_index..=ack.verified_ticket().index)
-                    .with_state(AcknowledgedTicketStatus::Untouched);
+                self.enqueue_redemption(channel.get_id())?;
 
-                self.enqueue_redeem_request(selector).await*/
+                Ok(())
             } else {
                 Err(CriteriaNotSatisfied)
             }
@@ -197,18 +217,14 @@ where
 
         if let ChannelChange::Status { left: old, right: new } = change {
             if old != ChannelStatus::Open || !matches!(new, ChannelStatus::PendingToClose(_)) {
-                debug!(?channel, "ignoring channel state change that's not in PendingToClose");
+                tracing::debug!(?channel, "ignoring channel state change that's not in PendingToClose");
                 return Ok(());
             }
-            info!(%channel, "channel transitioned to PendingToClose, checking if it has tickets to redeem");
+            tracing::info!(%channel, "channel transitioned to PendingToClose, checking if it has tickets to redeem");
 
-            todo!()
-            /*let selector = TicketSelector::from(channel)
-                .with_amount(self.cfg.minimum_redeem_ticket_value..)
-                .with_index_range(channel.ticket_index..)
-                .with_state(AcknowledgedTicketStatus::Untouched);
+            self.enqueue_redemption(channel.get_id())?;
 
-            self.enqueue_redeem_request(selector).await*/
+            Ok(())
         } else {
             Err(CriteriaNotSatisfied)
         }

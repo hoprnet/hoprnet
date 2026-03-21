@@ -1298,7 +1298,7 @@ where
         self.redeem_tickets_in_channel(&generate_channel_id(counterparty, &self.me_onchain()), min_value).await
     }
 
-    pub async fn redeem_tickets_in_channel<B: Into<HoprBalance> + Send>(
+    pub async fn  redeem_tickets_in_channel<B: Into<HoprBalance> + Send>(
         &self,
         channel_id: &ChannelId,
         min_value: B,

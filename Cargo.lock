@@ -4931,6 +4931,7 @@ dependencies = [
  "insta",
  "lazy_static",
  "mockall",
+ "parking_lot",
  "serde",
  "serde_with",
  "smart-default",
