@@ -26,6 +26,8 @@ concurrency:
 
 jobs:
   build-docker:
+    if: >-
+      github.event_name == 'merge_group' || github.event.pull_request.head.repo.full_name == github.repository
     strategy:
       matrix:
         package:
@@ -41,6 +43,8 @@ jobs:
     secrets: inherit
 
   build-dappnode:
+    if: >-
+      github.event_name == 'merge_group' || github.event.pull_request.head.repo.full_name == github.repository
     strategy:
       fail-fast: false
       matrix:
@@ -59,6 +63,8 @@ jobs:
     secrets: inherit
 
   build-binaries:
+    if: >-
+      github.event_name == 'merge_group' || github.event.pull_request.head.repo.full_name == github.repository
     strategy:
       fail-fast: false
       matrix:
@@ -116,6 +122,8 @@ jobs:
 
   docs:
     name: Docs
+    if: >-
+      github.event_name == 'merge_group' || github.event.pull_request.head.repo.full_name == github.repository
     uses: ./.github/workflows/build-docs.yaml
     secrets: inherit
     with:
