@@ -1,6 +1,6 @@
 [package]
 name = "hopr-async-runtime"
-version = "0.4.2"
+version = "0.5.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -15,9 +15,11 @@ crate-type = ["rlib"]
 [features]
 default = []
 runtime-tokio = ["dep:tokio"]
+async-lock = ["dep:async-lock"]
 
 [dependencies]
 auto_impl = { workspace = true }
+async-lock = { workspace = true, optional = true }
 indexmap = { workspace = true }
 futures = { workspace = true }
-tokio = { workspace = true, optional = true, features = ["time"] }
+tokio = { workspace = true, optional = true, features = ["time", "sync"] }

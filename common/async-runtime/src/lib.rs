@@ -7,9 +7,13 @@ pub use futures::future::AbortHandle;
 
 // Both features could be enabled during testing; therefore, we only use tokio when it's
 // exclusively enabled.
-#[cfg(feature = "runtime-tokio")]
 pub mod prelude {
+    #[cfg(feature = "async-lock")]
+    pub use async_lock::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
     pub use futures::future::{AbortHandle, abortable};
+    #[cfg(all(feature = "runtime-tokio", not(feature = "async-lock")))]
+    pub use tokio::sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
+    #[cfg(feature = "runtime-tokio")]
     pub use tokio::{
         task::{JoinError, JoinHandle, spawn, spawn_blocking, spawn_local},
         time::{sleep, timeout as timeout_fut},
@@ -90,6 +94,11 @@ impl<T: Hash + Eq> AbortableList<T> {
     /// Appends a new [`abortable task`](Abortable) to the end of this list.
     pub fn insert<A: Abortable + Send + Sync + 'static>(&mut self, process: T, task: A) {
         self.0.insert(process, Box::new(task));
+    }
+
+    /// Checks if the list contains a task with the given key.
+    pub fn contains(&self, process: &T) -> bool {
+        self.0.contains_key(process)
     }
 
     /// Looks up a task by its key, removes it and aborts it.
