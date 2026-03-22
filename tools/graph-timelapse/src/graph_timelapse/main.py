@@ -224,7 +224,8 @@ def path_to_edge_ids(nodes: list[str], index: dict[str, str], graph: GraphState)
 
 
 def build_path_events_json(
-    events: list[PathEvent], key_index: dict[str, str], graph: GraphState
+    events: list[PathEvent], key_index: dict[str, str], graph: GraphState,
+    me: Optional[str] = None,
 ) -> tuple[list[dict], Optional[str], Optional[str]]:
     """Convert parsed events to JSON-serializable dicts with edge IDs.
 
@@ -250,6 +251,9 @@ def build_path_events_json(
                 first_ts = event.timestamp
             ts_ms = int((event.timestamp - first_ts).total_seconds() * 1000)
 
+        # Detect multi-hop paths (loopback probes or multi-hop sessions)
+        is_loopback = event.direction == "forward" and len(edge_ids) >= 2
+
         result.append(
             {
                 "direction": event.direction,
@@ -258,6 +262,7 @@ def build_path_events_json(
                 "time": time_str,
                 "ts_ms": ts_ms,
                 "surb": event.surb,
+                "loopback": is_loopback,
             }
         )
 
@@ -281,23 +286,6 @@ def build_path_events_json(
             fwd_counts[key] += 1
         else:
             ret_counts[key] += 1
-
-    # Identify loopback destinations: have forward paths but no return paths
-    fwd_dests: set[str] = set()
-    ret_dests: set[str] = set()
-    for evt in result:
-        if evt["direction"] == "forward" and evt["nodes"]:
-            fwd_dests.add(evt["nodes"][-1])
-        elif evt["direction"] == "return" and evt["nodes"]:
-            ret_dests.add(evt["nodes"][0])
-    loopback_dests = fwd_dests - ret_dests
-
-    # Tag loopback events
-    for evt in result:
-        if evt["direction"] == "forward" and evt["nodes"] and evt["nodes"][-1] in loopback_dests:
-            evt["loopback"] = True
-        else:
-            evt["loopback"] = False
 
     def dist_list(counts: Counter[str]) -> list[dict]:
         total = sum(counts.values()) or 1
@@ -412,7 +400,7 @@ def main():
         sys.exit(1)
 
     key_index = build_key_index(graph)
-    path_events, path_stats, src_node, dst_node = build_path_events_json(events, key_index, graph)
+    path_events, path_stats, src_node, dst_node = build_path_events_json(events, key_index, graph, me=args.me)
     print(f"  {len(path_events)} matched events")
     if src_node:
         short_src = src_node[:10] + "..." if len(src_node) > 13 else src_node

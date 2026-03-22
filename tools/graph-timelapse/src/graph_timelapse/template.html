@@ -122,6 +122,7 @@
           >
             <span style="color: #64b5f6">&#9679; forward</span>
             <span style="color: #ffb74d">&#9679; return</span>
+            <span style="color: #E040FB">&#9679; loopback</span>
             <span style="color: #66bb6a">&#9632; SRC</span>
             <span style="color: #ef5350">&#9632; DST</span>
             <label style="color: #888; display: flex; align-items: center; gap: 3px; cursor: pointer">
@@ -227,10 +228,12 @@
       const COLORS = {
         forward: "#42A5F5",
         return_: "#FFA726",
+        loopback: "#E040FB",
         inactive: "rgba(255,255,255,0.06)",
         srcFill: "#388E3C",
         dstFill: "#B71C1C",
         relay: "#1e3a5f",
+        loopbackRelay: "#4A148C",
         idle: "#2a2a3e",
       };
 
@@ -702,17 +705,20 @@
         // Advance index past the entire burst
         eventIndex = endIdx % PATH_EVENTS.length;
 
-        activeColor =
-          evt.direction === "forward" ? COLORS.forward : COLORS.return_;
+        const hasLoopback = burst.some(e => e.loopback);
+        const loopbackCount = burst.filter(e => e.loopback).length;
+        activeColor = hasLoopback ? COLORS.loopback
+          : evt.direction === "forward" ? COLORS.forward : COLORS.return_;
         const fwdCount = burst.filter(e => e.direction === "forward").length;
         const retCount = burst.length - fwdCount;
         const speedLabel = speed === 0 ? "max" : speed + "x";
+        const loopLabel = loopbackCount > 0 ? ` ${loopbackCount}loop` : "";
         titleText.text(
-          `batch ${burst.length} (${fwdCount}fwd ${retCount}ret)  ${evt.time || ""}  [${speedLabel}]`,
+          `batch ${burst.length} (${fwdCount}fwd ${retCount}ret${loopLabel})  ${evt.time || ""}  [${speedLabel}]`,
         );
 
         nodeGs.select("rect").attr("fill", (d) => {
-          if (d.id === SRC_NODE) return COLORS.srcFill;
+          if (d.id === SRC_NODE) return hasLoopback ? COLORS.loopbackRelay : COLORS.srcFill;
           if (d.id === DST_NODE) return COLORS.dstFill;
           if (
             evt.edges.some((eid) => {
@@ -720,7 +726,7 @@
               return l && (l.source.id === d.id || l.target.id === d.id);
             })
           )
-            return COLORS.relay;
+            return hasLoopback ? COLORS.loopbackRelay : COLORS.relay;
           return COLORS.idle;
         });
 
@@ -746,15 +752,19 @@
           return;
         }
 
+        const dotR = hasLoopback ? 12 : 6;
+        const trailR = hasLoopback ? 28 : 14;
+        const dotFilter = hasLoopback ? "url(#glow-lg)" : "url(#glow-md)";
+
         activeDot = particleGroup
           .append("circle")
-          .attr("r", 6)
+          .attr("r", dotR)
           .attr("fill", activeColor)
-          .attr("filter", "url(#glow-md)")
+          .attr("filter", dotFilter)
           .attr("opacity", 0.9);
         activeTrail = particleGroup
           .append("circle")
-          .attr("r", 14)
+          .attr("r", trailR)
           .attr("fill", activeColor)
           .attr("opacity", 0.2)
           .attr("filter", "url(#glow-lg)");
