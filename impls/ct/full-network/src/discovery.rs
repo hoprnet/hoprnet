@@ -112,7 +112,13 @@ where
 
         let me_node: NodeId = me.into();
         let intermediates = loopback_path_stream(me, cfg, self.graph.clone()).filter_map(move |(path, path_id)| {
-            let routing = loopback_routing(me_node, path).map(|r| ProbeRouting::Looping((r, path_id)));
+            // simple_loopback_to_self returns [me, intermediates..., me].
+            // Strip the leading and trailing `me` — loopback_routing adds
+            // `me` as the destination, and the planner prepends `me` as source.
+            let intermediates_only: Vec<_> = path.into_iter()
+                .filter(|node| *node != me)
+                .collect();
+            let routing = loopback_routing(me_node, intermediates_only).map(|r| ProbeRouting::Looping((r, path_id)));
             futures::future::ready(routing)
         });
 
