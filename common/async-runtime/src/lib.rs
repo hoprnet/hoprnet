@@ -172,3 +172,245 @@ impl<T> Drop for AbortableList<T> {
         self.0.clear();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    };
+
+    use super::*;
+
+    #[derive(Default)]
+    struct MockTask {
+        aborted: AtomicBool,
+    }
+
+    impl Abortable for MockTask {
+        fn abort_task(&self) {
+            self.aborted.store(true, Ordering::SeqCst);
+        }
+
+        fn was_aborted(&self) -> bool {
+            self.aborted.load(Ordering::SeqCst)
+        }
+    }
+
+    #[test]
+    fn test_insert_and_contains() {
+        let mut list = AbortableList::default();
+        let task1 = Arc::new(MockTask::default());
+        let task2 = Arc::new(MockTask::default());
+
+        list.insert("task1", task1.clone());
+        list.insert("task2", task2.clone());
+
+        assert!(list.contains(&"task1"));
+        assert!(list.contains(&"task2"));
+        assert!(!list.contains(&"task3"));
+        assert_eq!(list.size(), 2);
+        assert!(!list.is_empty());
+    }
+
+    #[test]
+    fn test_abort_one() {
+        let mut list = AbortableList::default();
+        let task1 = Arc::new(MockTask::default());
+
+        list.insert("task1", task1.clone());
+        assert!(list.abort_one(&"task1"));
+        assert!(task1.was_aborted());
+        assert!(!list.contains(&"task1"));
+        assert_eq!(list.size(), 0);
+
+        // Aborting already removed task
+        assert!(!list.abort_one(&"task1"));
+    }
+
+    #[test]
+    fn test_abort_one_already_aborted() {
+        let mut list = AbortableList::default();
+        let task1 = Arc::new(MockTask::default());
+        task1.abort_task();
+
+        list.insert("task1", task1.clone());
+        // abort_one returns false if already aborted
+        assert!(!list.abort_one(&"task1"));
+        // Check that it was still removed from the list even if already aborted
+        assert!(!list.contains(&"task1"));
+    }
+
+    #[test]
+    fn test_debug_impl() {
+        let mut list = AbortableList::default();
+        list.insert("task1", MockTask::default());
+        list.insert("task2", MockTask::default());
+        let debug_str = format!("{:?}", list);
+        assert!(debug_str.contains("task1"));
+        assert!(debug_str.contains("task2"));
+    }
+
+    #[test]
+    fn test_abort_all() {
+        let mut list = AbortableList::default();
+        let task1 = Arc::new(MockTask::default());
+        let task2 = Arc::new(MockTask::default());
+
+        list.insert(1, task1.clone());
+        list.insert(2, task2.clone());
+
+        list.abort_all();
+
+        assert!(task1.was_aborted());
+        assert!(task2.was_aborted());
+        // abort_all doesn't remove from list
+        assert_eq!(list.size(), 2);
+    }
+
+    #[test]
+    fn test_drop_aborts_all() {
+        let task1 = Arc::new(MockTask::default());
+        let task2 = Arc::new(MockTask::default());
+
+        {
+            let mut list = AbortableList::default();
+            list.insert(1, task1.clone());
+            list.insert(2, task2.clone());
+        }
+
+        assert!(task1.was_aborted());
+        assert!(task2.was_aborted());
+    }
+
+    #[test]
+    fn test_extend_from() {
+        let mut list1 = AbortableList::default();
+        let mut list2 = AbortableList::default();
+
+        let task1 = Arc::new(MockTask::default());
+        let task2 = Arc::new(MockTask::default());
+
+        list1.insert(1, task1.clone());
+        list2.insert(2, task2.clone());
+
+        list1.extend_from(list2);
+
+        assert_eq!(list1.size(), 2);
+        assert!(list1.contains(&1));
+        assert!(list1.contains(&2));
+
+        // Ensure task2 was not aborted during extend
+        assert!(!task2.was_aborted());
+    }
+
+    #[test]
+    fn test_flat_map_extend_from() {
+        let mut list1 = AbortableList::default();
+        let mut list2 = AbortableList::default();
+
+        let task1 = Arc::new(MockTask::default());
+        let task2 = Arc::new(MockTask::default());
+
+        list1.insert("a", task1.clone());
+        list2.insert(1, task2.clone());
+
+        list1.flat_map_extend_from(list2, |k| if k == 1 { "b" } else { "c" });
+
+        assert_eq!(list1.size(), 2);
+        assert!(list1.contains(&"a"));
+        assert!(list1.contains(&"b"));
+    }
+
+    #[test]
+    fn test_nested_abortable_list() {
+        let mut outer = AbortableList::default();
+        let mut inner = AbortableList::default();
+
+        let task1 = Arc::new(MockTask::default());
+        inner.insert(1, task1.clone());
+
+        outer.insert("inner", inner);
+
+        outer.abort_all();
+        assert!(task1.was_aborted());
+    }
+
+    #[test]
+    fn test_was_aborted_all() {
+        let mut list = AbortableList::default();
+        let task1 = Arc::new(MockTask::default());
+        let task2 = Arc::new(MockTask::default());
+
+        list.insert(1, task1.clone());
+        list.insert(2, task2.clone());
+
+        assert!(!list.was_aborted());
+
+        task1.abort_task();
+        assert!(!list.was_aborted());
+
+        task2.abort_task();
+        assert!(list.was_aborted());
+    }
+
+    #[test]
+    fn test_iter_names() {
+        let mut list = AbortableList::default();
+        list.insert("a", MockTask::default());
+        list.insert("b", MockTask::default());
+        list.insert("c", MockTask::default());
+
+        let names: Vec<&&str> = list.iter_names().collect();
+        assert_eq!(names, vec![&"a", &"b", &"c"]);
+    }
+
+    #[test]
+    fn test_reverse_insertion_order_on_abort() {
+        use std::sync::Mutex;
+        let abort_order = Arc::new(Mutex::new(Vec::new()));
+
+        struct OrderedMockTask {
+            id: i32,
+            order: Arc<Mutex<Vec<i32>>>,
+        }
+
+        impl Abortable for OrderedMockTask {
+            fn abort_task(&self) {
+                self.order.lock().unwrap().push(self.id);
+            }
+
+            fn was_aborted(&self) -> bool {
+                self.order.lock().unwrap().contains(&self.id)
+            }
+        }
+
+        let mut list = AbortableList::default();
+        list.insert(
+            1,
+            OrderedMockTask {
+                id: 1,
+                order: abort_order.clone(),
+            },
+        );
+        list.insert(
+            2,
+            OrderedMockTask {
+                id: 2,
+                order: abort_order.clone(),
+            },
+        );
+        list.insert(
+            3,
+            OrderedMockTask {
+                id: 3,
+                order: abort_order.clone(),
+            },
+        );
+
+        list.abort_all();
+
+        let order = abort_order.lock().unwrap();
+        assert_eq!(*order, vec![3, 2, 1]);
+    }
+}
