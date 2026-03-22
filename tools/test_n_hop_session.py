@@ -60,8 +60,8 @@ def parse_args():
                    help="Seconds to wait for the node to become ready (default: 120)")
     p.add_argument("--timeout", type=int, default=120,
                    help="Socket/download timeout in seconds (default: 120)")
-    p.add_argument("--min-peer-score", type=float, default=0.01,
-                   help="Minimum quality score to consider a peer (default: 0.01)")
+    p.add_argument("--min-peer-score", type=float, default=0.0,
+                   help="Minimum quality score to consider a peer; 0 = any peer with probe data (default: 0.0)")
     p.add_argument("--min-channel-balance", type=float, default=0.1,
                    help="Minimum channel balance in wxHOPR (default: 0.1)")
     p.add_argument("--skip-graph-render", action="store_true",
@@ -185,7 +185,7 @@ def ensure_channels_to_best_peers(api, token, min_peer_score, min_channel_balanc
         peers = get_peers(api, token)
         scored_peers = [
             p for p in peers
-            if p.get("score", 0) >= min_peer_score
+            if p.get("score", 0) > 0 or p.get("probeRate", 0) > 0
         ]
         scored_peers.sort(key=lambda p: p.get("score", 0), reverse=True)
         if len(scored_peers) >= MIN_OUTGOING_CHANNELS:

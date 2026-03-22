@@ -1,11 +1,10 @@
 use hopr_api::graph::{CostFn, NetworkGraphTraverse, NetworkGraphView, costs::EdgeCostFn, traits::EdgeObservableRead};
-
-/// Default penalty factor applied to edge cost functions.
-const DEFAULT_EDGE_PENALTY: f64 = 0.5;
-
-/// Default minimum acceptable message acknowledgment rate for immediate peers.
-const DEFAULT_MIN_ACK_RATE: f64 = 0.5;
 use hopr_types::{crypto::types::OffchainPublicKey, internal::errors::PathError};
+
+// Duplicated from hopr_network_graph::{DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE}
+// — transport/path cannot depend on impls/graph to avoid circular deps.
+const DEFAULT_EDGE_PENALTY: f64 = 0.5;
+const DEFAULT_MIN_ACK_RATE: f64 = 0.1;
 
 use crate::{
     errors::{PathPlannerError, Result},

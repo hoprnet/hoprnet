@@ -17,11 +17,7 @@ use hopr_statistics::WeightedCollection;
 
 use crate::{ProberConfig, priority::immediate_probe_priority};
 
-/// Default penalty factor applied to edge cost functions.
-const DEFAULT_EDGE_PENALTY: f64 = 0.5;
-
-/// Default minimum acceptable message acknowledgment rate for cover traffic path search.
-const DEFAULT_MIN_ACK_RATE: f64 = 0.5;
+use hopr_network_graph::{DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE};
 
 pub struct FullNetworkDiscovery<U> {
     me: OffchainPublicKey,

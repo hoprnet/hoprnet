@@ -9,10 +9,7 @@ use hopr_api::{
     types::internal::routing::PathId,
 };
 
-/// Default penalty factor applied to edge cost functions.
-const DEFAULT_EDGE_PENALTY: f64 = 0.5;
-/// Default minimum acceptable message acknowledgment rate.
-const DEFAULT_MIN_ACK_RATE: f64 = 0.5;
+use crate::{DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE};
 use petgraph::graph::NodeIndex;
 
 use crate::{ChannelGraph, algorithm::all_simple_paths_multi, graph::InnerGraph};
