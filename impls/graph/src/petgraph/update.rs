@@ -87,9 +87,11 @@ impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
                 // Both directions are set for immediate connections, because the graph is directional
                 // and must be directionally complete for looping traffic.
                 self.upsert_edge(&self.me, telemetry.peer(), |obs| {
+                    obs.record(EdgeWeightType::Connected(true));
                     obs.record(EdgeWeightType::Immediate(Ok(telemetry.rtt() / 2)));
                 });
                 self.upsert_edge(telemetry.peer(), &self.me, |obs| {
+                    obs.record(EdgeWeightType::Connected(true));
                     obs.record(EdgeWeightType::Immediate(Ok(telemetry.rtt() / 2)));
                 });
             }
