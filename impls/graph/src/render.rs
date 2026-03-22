@@ -82,8 +82,16 @@ mod tests {
         types::crypto::prelude::{Keypair, OffchainKeypair},
     };
 
+    use std::collections::HashMap;
+
     use super::*;
     use crate::ChannelGraph;
+
+    fn label_from_map<'a>(
+        addr_map: &'a HashMap<hopr_api::OffchainPublicKey, String>,
+    ) -> impl Fn(&hopr_api::OffchainPublicKey) -> String + 'a {
+        |key| addr_map.get(key).cloned().unwrap_or_else(|| key.to_string())
+    }
 
     const SECRET_0: [u8; 32] = hex_literal::hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d");
     const SECRET_1: [u8; 32] = hex_literal::hex!("71bf1f42ebbfcd89c3e197a3fd7cda79b92499e509b6fefa0fe44d02821d146a");
@@ -155,22 +163,17 @@ mod tests {
 
     #[test]
     fn custom_labels_replace_offchain_keys() -> anyhow::Result<()> {
-        use std::collections::HashMap;
-
         let me = pubkey(&SECRET_0);
         let peer = pubkey(&SECRET_1);
         let graph = ChannelGraph::new(me);
         graph.add_node(peer);
         graph.add_edge(&me, &peer)?;
 
-        // Simulate an onchain address mapping
         let mut addr_map: HashMap<hopr_api::OffchainPublicKey, String> = HashMap::new();
         addr_map.insert(me, "0xaaaa000000000000000000000000000000000001".into());
         addr_map.insert(peer, "0xbbbb000000000000000000000000000000000002".into());
 
-        let dot = render_dot_with_labels(&graph, |key| {
-            addr_map.get(key).cloned().unwrap_or_else(|| format!("{key}"))
-        });
+        let dot = render_dot_with_labels(&graph, label_from_map(&addr_map));
 
         assert!(
             dot.contains("0xaaaa000000000000000000000000000000000001"),
@@ -194,21 +197,16 @@ mod tests {
 
     #[test]
     fn custom_labels_fall_back_to_offchain_key_when_unmapped() -> anyhow::Result<()> {
-        use std::collections::HashMap;
-
         let me = pubkey(&SECRET_0);
         let peer = pubkey(&SECRET_1);
         let graph = ChannelGraph::new(me);
         graph.add_node(peer);
         graph.add_edge(&me, &peer)?;
 
-        // Only map one node — the other should fall back to its offchain key
         let mut addr_map: HashMap<hopr_api::OffchainPublicKey, String> = HashMap::new();
         addr_map.insert(me, "0xcccc000000000000000000000000000000000003".into());
 
-        let dot = render_dot_with_labels(&graph, |key| {
-            addr_map.get(key).cloned().unwrap_or_else(|| format!("{key}"))
-        });
+        let dot = render_dot_with_labels(&graph, label_from_map(&addr_map));
 
         assert!(
             dot.contains("0xcccc000000000000000000000000000000000003"),
@@ -223,8 +221,6 @@ mod tests {
 
     #[test]
     fn custom_labels_preserve_edge_attributes() {
-        use std::collections::HashMap;
-
         let me = pubkey(&SECRET_0);
         let peer = pubkey(&SECRET_1);
         let graph = ChannelGraph::new(me);
@@ -239,9 +235,7 @@ mod tests {
         addr_map.insert(me, "0x1111111111111111111111111111111111111111".into());
         addr_map.insert(peer, "0x2222222222222222222222222222222222222222".into());
 
-        let dot = render_dot_with_labels(&graph, |key| {
-            addr_map.get(key).cloned().unwrap_or_else(|| format!("{key}"))
-        });
+        let dot = render_dot_with_labels(&graph, label_from_map(&addr_map));
 
         assert!(dot.contains("lat=120ms"), "latency should be preserved: {dot}");
         assert!(dot.contains("cap=500"), "capacity should be preserved: {dot}");

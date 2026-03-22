@@ -155,7 +155,7 @@ def parse_logs(log_path: str, me: Optional[str] = None) -> list[PathEvent]:
                 if not nodes:
                     continue
 
-                is_surb = direction == "return"
+                is_surb = direction == "return" and surb_index is not None and surb_index > 0
 
                 if me:
                     if direction == "forward":

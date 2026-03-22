@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use axum::{
     extract::{Json, Query, State},
@@ -280,9 +280,7 @@ pub(super) async fn graph(
     State(state): State<Arc<InternalState>>,
     Query(query): Query<GraphQueryRequest>,
 ) -> impl IntoResponse {
-    use std::collections::HashMap;
-
-    let hopr = state.hopr.clone();
+    let hopr = &state.hopr;
     let graph = hopr.graph();
 
     let edges = if query.reachable_only {
@@ -301,14 +299,14 @@ pub(super) async fn graph(
     let mut key_to_addr: HashMap<hopr_lib::OffchainPublicKey, String> = HashMap::new();
     for key in &unique_keys {
         let label = match hopr.peerid_to_chain_key(&(*key).into()).await {
-            Ok(Some(addr)) => format!("{addr}"),
-            _ => format!("{key}"),
+            Ok(Some(addr)) => addr.to_string(),
+            _ => key.to_string(),
         };
         key_to_addr.insert(*key, label);
     }
 
     let label_fn =
-        |key: &hopr_lib::OffchainPublicKey| key_to_addr.get(key).cloned().unwrap_or_else(|| format!("{key}"));
+        |key: &hopr_lib::OffchainPublicKey| key_to_addr.get(key).cloned().unwrap_or_else(|| key.to_string());
 
     let dot = hopr_network_graph::render::render_edges_as_dot(&edges, &label_fn);
 
