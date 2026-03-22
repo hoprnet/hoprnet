@@ -26,6 +26,8 @@ concurrency:
 jobs:
   pre-commit:
     name: Pre-commit
+    if: >-
+      github.event_name == 'merge_group' || github.event.pull_request.head.repo.full_name == github.repository
     uses: ./.github/workflows/checks-pre-commit.yaml
     with:
       source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
@@ -34,6 +36,8 @@ jobs:
 
   cargo-deps-redundancy:
     name: Cargo deps redundancy
+    if: >-
+      github.event_name == 'merge_group' || github.event.pull_request.head.repo.full_name == github.repository
     uses: ./.github/workflows/checks-cargo-deps.yaml
     with:
       source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
@@ -42,6 +46,8 @@ jobs:
 
   audit:
     name: Audit
+    if: >-
+      github.event_name == 'merge_group' || github.event.pull_request.head.repo.full_name == github.repository
     uses: ./.github/workflows/checks-audit.yaml
     with:
       source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
@@ -50,6 +56,8 @@ jobs:
 
   lint:
     name: Lint
+    if: >-
+      github.event_name == 'merge_group' || github.event.pull_request.head.repo.full_name == github.repository
     uses: ./.github/workflows/checks-lint.yaml
     with:
       source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
@@ -58,6 +66,8 @@ jobs:
 
   zizmor:
     name: Zizmor
+    if: >-
+      github.event_name == 'merge_group' || github.event.pull_request.head.repo.full_name == github.repository
     uses: ./.github/workflows/checks-zizmor.yaml
     with:
       source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
@@ -66,6 +76,8 @@ jobs:
 
   performance:
     name: Performance
+    if: >-
+      github.event_name == 'merge_group' || github.event.pull_request.head.repo.full_name == github.repository
     uses: ./.github/workflows/checks-performance.yaml
     with:
       source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}

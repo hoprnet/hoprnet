@@ -1302,17 +1302,19 @@ where
 
         let channel_id = generate_channel_id(&self.me_onchain(), destination);
 
-        let confirm_awaiter = self
-            .chain_api
-            .open_channel(destination, amount)
-            .await
-            .map_err(HoprLibError::chain)?;
-
+        // Subscribe to chain events BEFORE sending the transaction to avoid
+        // a race where the event is broadcast before the subscriber activates.
         let (event_awaiter, event_abort) = self.spawn_wait_for_on_chain_event(
             format!("open channel to {destination} ({channel_id})"),
             move |event| matches!(event, ChainEvent::ChannelOpened(c) if c.get_id() == &channel_id),
             ON_CHAIN_RESOLUTION_EVENT_TIMEOUT,
         )?;
+
+        let confirm_awaiter = self
+            .chain_api
+            .open_channel(destination, amount)
+            .await
+            .map_err(HoprLibError::chain)?;
 
         let tx_hash = confirm_awaiter.await.map_err(|e| {
             event_abort.abort();
@@ -1330,17 +1332,19 @@ where
 
         let channel_id = *channel_id;
 
-        let confirm_awaiter = self
-            .chain_api
-            .fund_channel(&channel_id, amount)
-            .await
-            .map_err(HoprLibError::chain)?;
-
+        // Subscribe to chain events BEFORE sending the transaction to avoid
+        // a race where the event is broadcast before the subscriber activates.
         let (event_awaiter, event_abort) = self.spawn_wait_for_on_chain_event(
             format!("fund channel {channel_id}"),
             move |event| matches!(event, ChainEvent::ChannelBalanceIncreased(c, a) if c.get_id() == &channel_id && a == &amount),
             ON_CHAIN_RESOLUTION_EVENT_TIMEOUT
         )?;
+
+        let confirm_awaiter = self
+            .chain_api
+            .fund_channel(&channel_id, amount)
+            .await
+            .map_err(HoprLibError::chain)?;
 
         let res = confirm_awaiter.await.map_err(|e| {
             event_abort.abort();
@@ -1358,12 +1362,8 @@ where
 
         let channel_id = *channel_id;
 
-        let confirm_awaiter = self
-            .chain_api
-            .close_channel(&channel_id)
-            .await
-            .map_err(HoprLibError::chain)?;
-
+        // Subscribe to chain events BEFORE sending the transaction to avoid
+        // a race where the event is broadcast before the subscriber activates.
         let (event_awaiter, event_abort) = self.spawn_wait_for_on_chain_event(
             format!("close channel {channel_id}"),
             move |event| {
@@ -1372,6 +1372,12 @@ where
             },
             ON_CHAIN_RESOLUTION_EVENT_TIMEOUT,
         )?;
+
+        let confirm_awaiter = self
+            .chain_api
+            .close_channel(&channel_id)
+            .await
+            .map_err(HoprLibError::chain)?;
 
         let tx_hash = confirm_awaiter.await.map_err(|e| {
             event_abort.abort();
