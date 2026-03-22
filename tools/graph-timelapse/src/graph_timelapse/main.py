@@ -75,13 +75,13 @@ TS_PATTERNS = [
 ]
 
 RESOLVED_PATH_RE = re.compile(
-    r"direction=(forward|return)\s+"
+    r"direction=\"?(forward|return)\"?\s+"
     r"destination=(\S+)\s*"
     r"(?:index=(\d+)\s*)?"
     r".*?path=validated path \[([^\]]+)\]"
 )
 LOOPBACK_PATH_RE = re.compile(
-    r"direction=loopback\s+"
+    r"direction=\"?loopback\"?\s+"
     r"source=(\S+)\s+"
     r"destination=(\S+)\s+"
     r"explicit_path=\[([^\]]*)\]"
