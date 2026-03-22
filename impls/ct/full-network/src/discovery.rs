@@ -116,7 +116,7 @@ where
             futures::future::ready(routing)
         });
 
-        immediates.merge(intermediates).boxed()
+        futures::stream::select(immediates, intermediates).boxed()
     }
 }
 
