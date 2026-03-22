@@ -4,7 +4,10 @@
 
 use std::fmt::Write;
 
-use hopr_api::{OffchainPublicKey, graph::traits::{EdgeLinkObservable, EdgeObservableRead, EdgeProtocolObservable}};
+use hopr_api::{
+    OffchainPublicKey,
+    graph::traits::{EdgeLinkObservable, EdgeObservableRead, EdgeProtocolObservable},
+};
 
 use crate::ChannelGraph;
 
@@ -22,10 +25,7 @@ pub fn render_dot(graph: &ChannelGraph) -> String {
 ///
 /// This allows callers to substitute onchain addresses or any other label format
 /// while keeping the rendering logic shared.
-pub fn render_dot_with_labels(
-    graph: &ChannelGraph,
-    label_fn: impl Fn(&OffchainPublicKey) -> String,
-) -> String {
+pub fn render_dot_with_labels(graph: &ChannelGraph, label_fn: impl Fn(&OffchainPublicKey) -> String) -> String {
     render_edges_as_dot(&graph.connected_edges(), &label_fn)
 }
 
@@ -246,8 +246,12 @@ mod tests {
         assert!(dot.contains("lat=120ms"), "latency should be preserved: {dot}");
         assert!(dot.contains("cap=500"), "capacity should be preserved: {dot}");
         assert!(dot.contains("score="), "score should be preserved: {dot}");
-        assert!(dot.contains("\"0x1111111111111111111111111111111111111111\" -> \"0x2222222222222222222222222222222222222222\""),
-            "edge should use mapped addresses: {dot}");
+        assert!(
+            dot.contains(
+                "\"0x1111111111111111111111111111111111111111\" -> \"0x2222222222222222222222222222222222222222\""
+            ),
+            "edge should use mapped addresses: {dot}"
+        );
     }
 
     #[test]
@@ -261,7 +265,10 @@ mod tests {
         let dot_original = render_dot(&graph);
         let dot_identity = render_dot_with_labels(&graph, |key| format!("{key}"));
 
-        assert_eq!(dot_original, dot_identity, "identity label_fn should produce identical output");
+        assert_eq!(
+            dot_original, dot_identity,
+            "identity label_fn should produce identical output"
+        );
         Ok(())
     }
 
@@ -285,13 +292,30 @@ mod tests {
         let reachable_dot = render_dot_reachable_with_labels(&graph, |key| format!("{key}"));
 
         // All edges should appear in the full graph
-        assert_eq!(all_dot.matches("->").count(), 2, "full graph should have 2 edges: {all_dot}");
+        assert_eq!(
+            all_dot.matches("->").count(),
+            2,
+            "full graph should have 2 edges: {all_dot}"
+        );
 
         // Only me -> a should appear in the reachable graph
-        assert_eq!(reachable_dot.matches("->").count(), 1, "reachable graph should have 1 edge: {reachable_dot}");
-        assert!(reachable_dot.contains(&format!("{a}")), "reachable peer 'a' should be present: {reachable_dot}");
-        assert!(!reachable_dot.contains(&format!("{b}")), "unreachable peer 'b' should be absent: {reachable_dot}");
-        assert!(!reachable_dot.contains(&format!("{c}")), "unreachable peer 'c' should be absent: {reachable_dot}");
+        assert_eq!(
+            reachable_dot.matches("->").count(),
+            1,
+            "reachable graph should have 1 edge: {reachable_dot}"
+        );
+        assert!(
+            reachable_dot.contains(&format!("{a}")),
+            "reachable peer 'a' should be present: {reachable_dot}"
+        );
+        assert!(
+            !reachable_dot.contains(&format!("{b}")),
+            "unreachable peer 'b' should be absent: {reachable_dot}"
+        );
+        assert!(
+            !reachable_dot.contains(&format!("{c}")),
+            "unreachable peer 'c' should be absent: {reachable_dot}"
+        );
         Ok(())
     }
 
@@ -311,8 +335,15 @@ mod tests {
 
         let reachable_dot = render_dot_reachable_with_labels(&graph, |key| format!("{key}"));
 
-        assert_eq!(reachable_dot.matches("->").count(), 2, "both edges should be reachable: {reachable_dot}");
-        assert!(reachable_dot.contains(&format!("{b}")), "transitively reachable peer should be present: {reachable_dot}");
+        assert_eq!(
+            reachable_dot.matches("->").count(),
+            2,
+            "both edges should be reachable: {reachable_dot}"
+        );
+        assert!(
+            reachable_dot.contains(&format!("{b}")),
+            "transitively reachable peer should be present: {reachable_dot}"
+        );
         Ok(())
     }
 
@@ -331,7 +362,11 @@ mod tests {
 
         let reachable_dot = render_dot_reachable_with_labels(&graph, |key| format!("{key}"));
 
-        assert_eq!(reachable_dot.matches("->").count(), 0, "no edges should be reachable from isolated 'me': {reachable_dot}");
+        assert_eq!(
+            reachable_dot.matches("->").count(),
+            0,
+            "no edges should be reachable from isolated 'me': {reachable_dot}"
+        );
         Ok(())
     }
 }

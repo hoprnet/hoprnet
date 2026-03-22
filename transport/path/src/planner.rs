@@ -127,7 +127,13 @@ where
     ) -> Result<ValidatedPath> {
         let path = match options {
             RoutingOptions::IntermediatePath(explicit_path) => {
-                tracing::debug!(direction = "loopback", ?source, ?destination, ?explicit_path, "resolving intermediate path");
+                tracing::debug!(
+                    direction = "loopback",
+                    ?source,
+                    ?destination,
+                    ?explicit_path,
+                    "resolving intermediate path"
+                );
                 let resolver = ChainPathResolver::from(&*self.resolver);
                 ValidatedPath::new(
                     source,

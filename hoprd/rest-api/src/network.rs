@@ -307,9 +307,8 @@ pub(super) async fn graph(
         key_to_addr.insert(*key, label);
     }
 
-    let label_fn = |key: &hopr_lib::OffchainPublicKey| {
-        key_to_addr.get(key).cloned().unwrap_or_else(|| format!("{key}"))
-    };
+    let label_fn =
+        |key: &hopr_lib::OffchainPublicKey| key_to_addr.get(key).cloned().unwrap_or_else(|| format!("{key}"));
 
     let dot = hopr_network_graph::render::render_edges_as_dot(&edges, &label_fn);
 

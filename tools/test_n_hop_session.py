@@ -40,36 +40,54 @@ MIN_OUTGOING_CHANNELS = 3
 def parse_args():
     p = argparse.ArgumentParser(description="HOPR demo: network inspection + file download through session")
 
-    p.add_argument("--api", default="http://127.0.0.1:3001/api/v4",
-                   help="Client node API base URL (default: http://127.0.0.1:3001/api/v4)")
-    p.add_argument("--token", default=None,
-                   help="API bearer token (omit if auth is disabled)")
-    p.add_argument("--hops", type=int, default=1, choices=[1, 2, 3],
-                   help="Number of hops for session routing (default: 1)")
-    p.add_argument("--destination", default=None,
-                   help="Destination peer address; if omitted, picks the best-scoring peer")
-    p.add_argument("--url", default=DEFAULT_URL,
-                   help=f"URL to download through the HOPR session (default: {DEFAULT_URL})")
-    p.add_argument("--output", default="downloaded_file",
-                   help="Output file path for the downloaded content (default: downloaded_file)")
-    p.add_argument("--graph-output", default="network_graph",
-                   help="Base name for graph output files (.dot and .png, default: network_graph)")
-    p.add_argument("--log", default="./rotsee.log",
-                   help="Path to the hoprd log file (default: ./rotsee.log)")
-    p.add_argument("--ready-timeout", type=int, default=120,
-                   help="Seconds to wait for the node to become ready (default: 120)")
-    p.add_argument("--timeout", type=int, default=120,
-                   help="Socket/download timeout in seconds (default: 120)")
-    p.add_argument("--min-peer-score", type=float, default=0.0,
-                   help="Minimum quality score to consider a peer; 0 = any peer with probe data (default: 0.0)")
-    p.add_argument("--min-channel-balance", type=float, default=0.1,
-                   help="Minimum channel balance in wxHOPR (default: 0.1)")
-    p.add_argument("--skip-graph-render", action="store_true",
-                   help="Skip rendering DOT to PNG (useful if graphviz is not installed)")
-    p.add_argument("--address-file", default=None,
-                   help="Write our node's onchain address to this file (for downstream scripts)")
-    p.add_argument("-v", "--verbose", action="store_true",
-                   help="Enable debug logging")
+    p.add_argument(
+        "--api",
+        default="http://127.0.0.1:3001/api/v4",
+        help="Client node API base URL (default: http://127.0.0.1:3001/api/v4)",
+    )
+    p.add_argument("--token", default=None, help="API bearer token (omit if auth is disabled)")
+    p.add_argument(
+        "--hops", type=int, default=1, choices=[1, 2, 3], help="Number of hops for session routing (default: 1)"
+    )
+    p.add_argument(
+        "--destination", default=None, help="Destination peer address; if omitted, picks the best-scoring peer"
+    )
+    p.add_argument(
+        "--url", default=DEFAULT_URL, help=f"URL to download through the HOPR session (default: {DEFAULT_URL})"
+    )
+    p.add_argument(
+        "--output",
+        default="downloaded_file",
+        help="Output file path for the downloaded content (default: downloaded_file)",
+    )
+    p.add_argument(
+        "--graph-output",
+        default="network_graph",
+        help="Base name for graph output files (.dot and .png, default: network_graph)",
+    )
+    p.add_argument("--log", default="./rotsee.log", help="Path to the hoprd log file (default: ./rotsee.log)")
+    p.add_argument(
+        "--ready-timeout", type=int, default=120, help="Seconds to wait for the node to become ready (default: 120)"
+    )
+    p.add_argument("--timeout", type=int, default=120, help="Socket/download timeout in seconds (default: 120)")
+    p.add_argument(
+        "--min-peer-score",
+        type=float,
+        default=0.0,
+        help="Minimum quality score to consider a peer; 0 = any peer with probe data (default: 0.0)",
+    )
+    p.add_argument(
+        "--min-channel-balance", type=float, default=0.1, help="Minimum channel balance in wxHOPR (default: 0.1)"
+    )
+    p.add_argument(
+        "--skip-graph-render",
+        action="store_true",
+        help="Skip rendering DOT to PNG (useful if graphviz is not installed)",
+    )
+    p.add_argument(
+        "--address-file", default=None, help="Write our node's onchain address to this file (for downstream scripts)"
+    )
+    p.add_argument("-v", "--verbose", action="store_true", help="Enable debug logging")
 
     return p.parse_args()
 
@@ -77,6 +95,7 @@ def parse_args():
 # ---------------------------------------------------------------------------
 # HTTP helpers
 # ---------------------------------------------------------------------------
+
 
 def api_request(base_url, method, path, body=None, token=None, timeout=30):
     url = f"{base_url}{path}"
@@ -122,6 +141,7 @@ def wait_for_ready(base_url, token, timeout=60):
 # ---------------------------------------------------------------------------
 # Node API wrappers
 # ---------------------------------------------------------------------------
+
 
 def get_address(base_url, token):
     data = api_request(base_url, "GET", "/account/addresses", token=token)
@@ -172,6 +192,7 @@ def get_node_info(base_url, token):
 # Step 1: Verify channels
 # ---------------------------------------------------------------------------
 
+
 def ensure_channels_to_best_peers(api, token, min_peer_score, min_channel_balance):
     """Ensure we have open, funded channels to the best-scoring peers.
 
@@ -183,16 +204,15 @@ def ensure_channels_to_best_peers(api, token, min_peer_score, min_channel_balanc
     scored_peers = []
     while time.time() < deadline:
         peers = get_peers(api, token)
-        scored_peers = [
-            p for p in peers
-            if p.get("score", 0) > 0 or p.get("probeRate", 0) > 0
-        ]
+        scored_peers = [p for p in peers if p.get("score", 0) > 0 or p.get("probeRate", 0) > 0]
         scored_peers.sort(key=lambda p: p.get("score", 0), reverse=True)
         if len(scored_peers) >= MIN_OUTGOING_CHANNELS:
             break
         remaining = int(deadline - time.time())
-        log.info(f"Waiting for scored peers... {len(scored_peers)} found "
-                 f"(need {MIN_OUTGOING_CHANNELS}, {remaining}s remaining)")
+        log.info(
+            f"Waiting for scored peers... {len(scored_peers)} found "
+            f"(need {MIN_OUTGOING_CHANNELS}, {remaining}s remaining)"
+        )
         time.sleep(5)
 
     log.info(f"Peers with score >= {min_peer_score}: {len(scored_peers)}")
@@ -202,8 +222,7 @@ def ensure_channels_to_best_peers(api, token, min_peer_score, min_channel_balanc
 
     if len(scored_peers) < MIN_OUTGOING_CHANNELS:
         raise RuntimeError(
-            f"Only {len(scored_peers)} peers with score >= {min_peer_score}, "
-            f"need at least {MIN_OUTGOING_CHANNELS}"
+            f"Only {len(scored_peers)} peers with score >= {min_peer_score}, need at least {MIN_OUTGOING_CHANNELS}"
         )
 
     # Get existing channels
@@ -211,7 +230,7 @@ def ensure_channels_to_best_peers(api, token, min_peer_score, min_channel_balanc
     open_channels = {ch["peerAddress"]: ch for ch in channels if ch["status"] == "Open"}
 
     # Ensure channels to the top peers
-    target_peers = scored_peers[:max(MIN_OUTGOING_CHANNELS, len(scored_peers))]
+    target_peers = scored_peers[: max(MIN_OUTGOING_CHANNELS, len(scored_peers))]
     funding_str = f"{min_channel_balance} wxHOPR"
     changed = False
 
@@ -243,13 +262,11 @@ def ensure_channels_to_best_peers(api, token, min_peer_score, min_channel_balanc
         addr = ch["peerAddress"]
         peer = next((p for p in scored_peers if p["address"] == addr), {})
         score = peer.get("score", 0)
-        log.info(f"  Channel {ch['id'][:16]}... -> {addr[:16]}... "
-                 f"balance={ch['balance']} peer_score={score:.4f}")
+        log.info(f"  Channel {ch['id'][:16]}... -> {addr[:16]}... balance={ch['balance']} peer_score={score:.4f}")
 
     if len(active_channels) < MIN_OUTGOING_CHANNELS:
         raise RuntimeError(
-            f"Need at least {MIN_OUTGOING_CHANNELS} open channels to scored peers, "
-            f"but only have {len(active_channels)}"
+            f"Need at least {MIN_OUTGOING_CHANNELS} open channels to scored peers, but only have {len(active_channels)}"
         )
 
     return active_channels
@@ -258,6 +275,7 @@ def ensure_channels_to_best_peers(api, token, min_peer_score, min_channel_balanc
 # ---------------------------------------------------------------------------
 # Step 2: Network graph
 # ---------------------------------------------------------------------------
+
 
 def fetch_and_render_graph(api, token, base_name, skip_render):
     """Download the DOT graph and optionally render to PNG."""
@@ -281,7 +299,9 @@ def fetch_and_render_graph(api, token, base_name, skip_render):
     try:
         result = subprocess.run(
             ["dot", "-Tpng", dot_path, "-o", png_path],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         if result.returncode != 0:
             log.warning(f"Graphviz rendering failed: {result.stderr}")
@@ -300,20 +320,17 @@ def fetch_and_render_graph(api, token, base_name, skip_render):
 # Step 3: Session + file download
 # ---------------------------------------------------------------------------
 
+
 def pick_destination(peers, open_channels, explicit_dest, min_peer_score):
     """Pick the destination peer: explicit if given, otherwise highest-scoring peer with an open channel."""
     if explicit_dest:
         return explicit_dest
 
     channel_peers = {ch["peerAddress"] for ch in open_channels}
-    candidates = [
-        p for p in peers
-        if p["address"] in channel_peers and p.get("score", 0) >= min_peer_score
-    ]
+    candidates = [p for p in peers if p["address"] in channel_peers and p.get("score", 0) >= min_peer_score]
     if not candidates:
         raise RuntimeError(
-            f"No peers with score >= {min_peer_score} and an open channel. "
-            f"Channel peers: {channel_peers}"
+            f"No peers with score >= {min_peer_score} and an open channel. Channel peers: {channel_peers}"
         )
 
     best = max(candidates, key=lambda p: p.get("score", 0))
@@ -358,13 +375,7 @@ def download_through_session(session, url, output_path, timeout):
     # that the exit node needs to handle TLS to the target.
     use_tls = parsed.scheme == "https"
 
-    http_request = (
-        f"GET {path} HTTP/1.1\r\n"
-        f"Host: {host}\r\n"
-        f"Connection: close\r\n"
-        f"Accept: */*\r\n"
-        f"\r\n"
-    ).encode()
+    http_request = (f"GET {path} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\nAccept: */*\r\n\r\n").encode()
 
     session_ip = session["ip"]
     session_port = session["port"]
@@ -378,6 +389,7 @@ def download_through_session(session, url, output_path, timeout):
 
         if use_tls:
             import ssl
+
             context = ssl.create_default_context()
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
@@ -406,7 +418,7 @@ def download_through_session(session, url, output_path, timeout):
         raise RuntimeError(f"No HTTP headers found in response ({len(response)} bytes)")
 
     headers_raw = response[:header_end].decode("utf-8", errors="replace")
-    body = response[header_end + 4:]
+    body = response[header_end + 4 :]
 
     # Check for chunked transfer encoding
     if b"Transfer-Encoding: chunked" in response[:header_end]:
@@ -485,6 +497,7 @@ def decode_chunked(data):
 # Step 4: Log parsing
 # ---------------------------------------------------------------------------
 
+
 def parse_log(log_path):
     """Parse the hoprd log file and extract session-related events."""
     if not os.path.exists(log_path):
@@ -534,8 +547,9 @@ def parse_log(log_path):
                 log.info(f"  L{lineno}: {text[:200]}")
 
     # Summary counts
-    log.info(f"\nSession lifecycle: {len(categorized['session_open'])} opens, "
-             f"{len(categorized['session_close'])} closes")
+    log.info(
+        f"\nSession lifecycle: {len(categorized['session_open'])} opens, {len(categorized['session_close'])} closes"
+    )
 
     probe_count = len(categorized.get("probe", []))
     if probe_count:
@@ -552,6 +566,7 @@ def parse_log(log_path):
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main():
     args = parse_args()
 
@@ -566,8 +581,7 @@ def main():
     wait_for_ready(api, token, args.ready_timeout)
 
     info = get_node_info(api, token)
-    log.info(f"Node info: network={info.get('hoprNetworkName')}, "
-             f"connectivity={info.get('connectivityStatus')}")
+    log.info(f"Node info: network={info.get('hoprNetworkName')}, connectivity={info.get('connectivityStatus')}")
 
     my_address = get_address(api, token)
     log.info(f"Client address: {my_address}")
@@ -578,15 +592,11 @@ def main():
 
     # --- Step 1: Ensure channels to best-scoring peers ---
     log.info("\n=== Step 1: Ensure Channels to Best Peers ===")
-    open_channels = ensure_channels_to_best_peers(
-        api, token, args.min_peer_score, args.min_channel_balance
-    )
+    open_channels = ensure_channels_to_best_peers(api, token, args.min_peer_score, args.min_channel_balance)
 
     # --- Step 2: Download and render network graph ---
     log.info("\n=== Step 2: Network Graph ===")
-    dot_path, png_path = fetch_and_render_graph(
-        api, token, args.graph_output, args.skip_graph_render
-    )
+    dot_path, png_path = fetch_and_render_graph(api, token, args.graph_output, args.skip_graph_render)
 
     # --- Step 3: Discover peers and open session ---
     log.info("\n=== Step 3: Open Session and Download File ===")
@@ -617,9 +627,7 @@ def main():
     else:
         log.info(f"Session endpoint: {session['ip']}:{session['port']}")
         try:
-            output_path, file_size = download_through_session(
-                session, args.url, args.output, args.timeout
-            )
+            output_path, file_size = download_through_session(session, args.url, args.output, args.timeout)
             log.info(f"File downloaded successfully: {output_path} ({file_size} bytes)")
         except Exception as e:
             download_error = str(e)

@@ -173,12 +173,14 @@ def parse_logs(log_path: str, me: Optional[str] = None) -> list[PathEvent]:
                             continue  # Can't resolve return source, skip
 
                 if len(nodes) >= 2:
-                    events.append(PathEvent(
-                        timestamp=ts or datetime.min,
-                        direction=direction,
-                        nodes=nodes,
-                        surb=is_surb,
-                    ))
+                    events.append(
+                        PathEvent(
+                            timestamp=ts or datetime.min,
+                            direction=direction,
+                            nodes=nodes,
+                            surb=is_surb,
+                        )
+                    )
     return events
 
 
@@ -246,7 +248,9 @@ def path_to_edge_ids(nodes: list[str], index: dict[str, str], graph: GraphState)
 
 
 def build_path_events_json(
-    events: list[PathEvent], key_index: dict[str, str], graph: GraphState,
+    events: list[PathEvent],
+    key_index: dict[str, str],
+    graph: GraphState,
     me: Optional[str] = None,
 ) -> tuple[list[dict], Optional[str], Optional[str]]:
     """Convert parsed events to JSON-serializable dicts with edge IDs.
@@ -400,8 +404,9 @@ def main():
     parser.add_argument("--out-dir", default=".", help="Output directory (default: current directory)")
     parser.add_argument("--no-open", action="store_true", help="Don't auto-open browser")
     parser.add_argument("--no-gif", action="store_true", help="Skip GIF generation (HTML only)")
-    parser.add_argument("--me", default=None,
-                        help="Our node's onchain address (prepended/appended to paths for edge matching)")
+    parser.add_argument(
+        "--me", default=None, help="Our node's onchain address (prepended/appended to paths for edge matching)"
+    )
     args = parser.parse_args()
 
     print(f"Parsing graph: {args.dot_file}")

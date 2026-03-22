@@ -80,8 +80,9 @@ const fn default_recheck_threshold() -> std::time::Duration {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use validator::Validate;
+
+    use super::*;
 
     #[test]
     fn default_config_is_valid() {

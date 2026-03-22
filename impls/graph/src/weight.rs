@@ -179,8 +179,8 @@ impl EdgeObservableRead for Observations {
     }
 
     /// The score combines immediate and intermediate observations:
-    /// - When both are present, average their scores (immediate neighbor probes
-    ///   prevent an empty intermediate from masking real measurements).
+    /// - When both are present, average their scores (immediate neighbor probes prevent an empty intermediate from
+    ///   masking real measurements).
     /// - When only intermediate is present, use it directly.
     /// - When only immediate is present, use it directly.
     fn score(&self) -> f64 {
@@ -346,7 +346,10 @@ mod tests {
         let inter_score = observation.intermediate_qos().unwrap().score();
 
         assert_gt!(imm_score, 0.0, "immediate score should be positive");
-        assert_eq!(inter_score, 0.0, "intermediate score should be zero (no loopback probes)");
+        assert_eq!(
+            inter_score, 0.0,
+            "intermediate score should be zero (no loopback probes)"
+        );
 
         // The combined score should be the average, not zero
         let combined = observation.score();

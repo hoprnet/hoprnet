@@ -8,11 +8,11 @@ use hopr_api::{
     },
     types::internal::routing::PathId,
 };
-
-use crate::{DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE};
 use petgraph::graph::NodeIndex;
 
-use crate::{ChannelGraph, algorithm::all_simple_paths_multi, graph::InnerGraph};
+use crate::{
+    ChannelGraph, DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE, algorithm::all_simple_paths_multi, graph::InnerGraph,
+};
 
 /// A shared cost function that computes a cumulative cost from edge observations.
 pub(crate) type SharedCostFn<C> = Arc<dyn Fn(C, &crate::Observations, usize) -> C + Send + Sync>;

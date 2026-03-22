@@ -1,5 +1,4 @@
 use futures::{StreamExt, stream::BoxStream};
-use futures_concurrency::stream::StreamExt as _;
 use hopr_api::{
     ct::{CoverTrafficGeneration, ProbeRouting, ProbingTrafficGeneration},
     graph::{NetworkGraphTraverse, NetworkGraphView, traits::EdgeObservableRead},
@@ -16,7 +15,6 @@ use hopr_api::{
 use hopr_statistics::WeightedCollection;
 
 use crate::{ProberConfig, priority::immediate_probe_priority};
-
 
 pub struct FullNetworkDiscovery<U> {
     me: OffchainPublicKey,
@@ -48,7 +46,6 @@ fn loopback_routing(me: NodeId, path: Vec<OffchainPublicKey>) -> Option<Destinat
 /// Shared by both cover traffic and intermediate probing — the caller wraps each
 /// emitted item into the appropriate outer type.
 fn loopback_path_stream<U>(
-    me: OffchainPublicKey,
     cfg: ProberConfig,
     graph: U,
 ) -> impl futures::Stream<Item = (Vec<OffchainPublicKey>, PathId)>
@@ -66,9 +63,7 @@ where
             tracing::debug!(edge_count = edge_count.get(), count, "loopback path candidates");
             let weighted: Vec<_> = paths
                 .into_iter()
-                .map(|(path, path_id)| {
-                    ((path, path_id), cfg.base_priority)
-                })
+                .map(|(path, path_id)| ((path, path_id), cfg.base_priority))
                 .collect();
 
             futures::stream::iter(WeightedCollection::new(weighted).into_shuffled())
@@ -85,7 +80,7 @@ where
                 let me = self.me;
                 let me_node: NodeId = me.into();
 
-                loopback_path_stream(me, self.cfg, self.graph.clone())
+                loopback_path_stream(self.cfg, self.graph.clone())
                     .filter_map(move |(path, _)| futures::future::ready(loopback_routing(me_node, path)))
                     .boxed()
             } else {
@@ -111,13 +106,11 @@ where
         let immediates = immediate_probe_stream(me, cfg, self.graph.clone());
 
         let me_node: NodeId = me.into();
-        let intermediates = loopback_path_stream(me, cfg, self.graph.clone()).filter_map(move |(path, path_id)| {
+        let intermediates = loopback_path_stream(cfg, self.graph.clone()).filter_map(move |(path, path_id)| {
             // simple_loopback_to_self returns [me, intermediates..., me].
             // Strip the leading and trailing `me` — loopback_routing adds
             // `me` as the destination, and the planner prepends `me` as source.
-            let intermediates_only: Vec<_> = path.into_iter()
-                .filter(|node| *node != me)
-                .collect();
+            let intermediates_only: Vec<_> = path.into_iter().filter(|node| *node != me).collect();
             let routing = loopback_routing(me_node, intermediates_only).map(|r| ProbeRouting::Looping((r, path_id)));
             futures::future::ready(routing)
         });
@@ -484,21 +477,29 @@ mod tests {
         pin_mut!(stream);
 
         // Collect enough items to get both neighbor and loopback probes
-        let items: Vec<ProbeRouting> = timeout(
-            TINY_TIMEOUT * 100,
-            stream.take(20).collect::<Vec<_>>(),
-        )
-        .await?;
+        let items: Vec<ProbeRouting> = timeout(TINY_TIMEOUT * 100, stream.take(20).collect::<Vec<_>>()).await?;
 
         let looping_count = items.iter().filter(|r| matches!(r, ProbeRouting::Looping(_))).count();
         let neighbor_count = items.iter().filter(|r| matches!(r, ProbeRouting::Neighbor(_))).count();
 
         assert!(neighbor_count > 0, "should have neighbor probes");
-        assert!(looping_count > 0, "should have loopback probes (was {looping_count} out of {} total)", items.len());
+        assert!(
+            looping_count > 0,
+            "should have loopback probes (was {looping_count} out of {} total)",
+            items.len()
+        );
 
         // Verify loopback routing has IntermediatePath
         for item in &items {
-            if let ProbeRouting::Looping((DestinationRouting::Forward { destination, forward_options, .. }, _)) = item {
+            if let ProbeRouting::Looping((
+                DestinationRouting::Forward {
+                    destination,
+                    forward_options,
+                    ..
+                },
+                _,
+            )) = item
+            {
                 assert_eq!(
                     destination.as_ref(),
                     &NodeId::Offchain(me),

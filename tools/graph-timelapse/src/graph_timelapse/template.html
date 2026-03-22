@@ -12,7 +12,8 @@
         background: #1a1a2e;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
-      html, body {
+      html,
+      body {
         width: 100%;
         height: 100%;
         overflow: hidden;
@@ -79,7 +80,10 @@
   </head>
   <body>
     <div id="layout" style="display: flex; width: 100%; height: 100vh">
-      <div id="left-col" style="flex: 1; display: flex; flex-direction: column; min-width: 0">
+      <div
+        id="left-col"
+        style="flex: 1; display: flex; flex-direction: column; min-width: 0"
+      >
         <svg id="graph"></svg>
         <div id="controls">
           <div style="display: flex; align-items: center; gap: 10px">
@@ -122,18 +126,45 @@
           >
             <span style="color: #64b5f6">&#9679; forward</span>
             <span style="color: #ffb74d">&#9679; return</span>
-            <span style="color: #E040FB">&#9679; loopback</span>
+            <span style="color: #e040fb">&#9679; loopback</span>
             <span style="color: #66bb6a">&#9632; SRC</span>
             <span style="color: #ef5350">&#9632; DST</span>
-            <label style="color: #888; display: flex; align-items: center; gap: 3px; cursor: pointer">
-              <input type="checkbox" id="hideLoopbacks" style="accent-color: #555; cursor: pointer" />
+            <label
+              style="
+                color: #888;
+                display: flex;
+                align-items: center;
+                gap: 3px;
+                cursor: pointer;
+              "
+            >
+              <input
+                type="checkbox"
+                id="hideLoopbacks"
+                style="accent-color: #555; cursor: pointer"
+              />
               Hide loopbacks
             </label>
-            <label style="color: #888; display: flex; align-items: center; gap: 3px; cursor: pointer">
-              <input type="checkbox" id="hideSurbs" checked style="accent-color: #555; cursor: pointer" />
+            <label
+              style="
+                color: #888;
+                display: flex;
+                align-items: center;
+                gap: 3px;
+                cursor: pointer;
+              "
+            >
+              <input
+                type="checkbox"
+                id="hideSurbs"
+                checked
+                style="accent-color: #555; cursor: pointer"
+              />
               Hide SURBs
             </label>
-            <label style="color: #888; display: flex; align-items: center; gap: 4px">
+            <label
+              style="color: #888; display: flex; align-items: center; gap: 4px"
+            >
               Batch:
               <select
                 id="batchSelect"
@@ -248,7 +279,8 @@
       const linkById = new Map(links.map((l) => [l.id, l]));
 
       // Pin our node to the center so the graph radiates outward from us
-      const centerX = WIDTH / 2, centerY = HEIGHT / 2;
+      const centerX = WIDTH / 2,
+        centerY = HEIGHT / 2;
       const srcNodeData = nodes.find((n) => n.id === SRC_NODE);
       if (srcNodeData) {
         srcNodeData.fx = centerX;
@@ -450,8 +482,10 @@
         )
         .attr("filter", "url(#node-shadow)");
 
-      const labelFontSize = nodeCount > 100 ? "6px" : nodeCount > 30 ? "8px" : "9px";
-      const idFontSize = nodeCount > 100 ? "5px" : nodeCount > 30 ? "9px" : "11px";
+      const labelFontSize =
+        nodeCount > 100 ? "6px" : nodeCount > 30 ? "8px" : "9px";
+      const idFontSize =
+        nodeCount > 100 ? "5px" : nodeCount > 30 ? "9px" : "11px";
 
       nodeGs
         .append("text")
@@ -480,7 +514,9 @@
             if (d.id === DST_NODE) return "DST";
             return d.id.slice(2, 6);
           }
-          return d.id.length > 14 ? d.id.slice(0, 8) + "..." + d.id.slice(-4) : d.id;
+          return d.id.length > 14
+            ? d.id.slice(0, 8) + "..." + d.id.slice(-4)
+            : d.id;
         });
 
       // ── Edge heat tracking ──
@@ -546,15 +582,19 @@
         : 1000;
 
       // Total time span of all events
-      const totalSpanMs = PATH_EVENTS.length > 1
-        ? PATH_EVENTS[PATH_EVENTS.length - 1].ts_ms - PATH_EVENTS[0].ts_ms
-        : 0;
+      const totalSpanMs =
+        PATH_EVENTS.length > 1
+          ? PATH_EVENTS[PATH_EVENTS.length - 1].ts_ms - PATH_EVENTS[0].ts_ms
+          : 0;
 
       // At speed S, one burst animation takes BASE_PACKET_MS/S ms,
       // and the gap between bursts takes medianGapMs/S ms.
       // The "time window per burst" the user sees = (BASE_PACKET_MS + medianGapMs) / S.
       // Real-time: S where the window equals the actual gap.
-      const realTimeSpeed = Math.max(1, Math.ceil(BASE_PACKET_MS / medianGapMs));
+      const realTimeSpeed = Math.max(
+        1,
+        Math.ceil(BASE_PACKET_MS / medianGapMs),
+      );
 
       function formatWindow(s) {
         if (s === 0) return "max";
@@ -580,7 +620,7 @@
       speedOptions.push({ value: 0, label: "max", selected: false });
 
       const speedSelect = document.getElementById("speedSelect");
-      speedOptions.forEach(opt => {
+      speedOptions.forEach((opt) => {
         const el = document.createElement("option");
         el.value = opt.value;
         el.textContent = opt.label;
@@ -597,7 +637,10 @@
       {
         let burstCount = 0;
         for (let i = 0; i < PATH_EVENTS.length; i++) {
-          if (i === 0 || PATH_EVENTS[i].ts_ms - PATH_EVENTS[i - 1].ts_ms > BURST_THRESHOLD_MS) {
+          if (
+            i === 0 ||
+            PATH_EVENTS[i].ts_ms - PATH_EVENTS[i - 1].ts_ms > BURST_THRESHOLD_MS
+          ) {
             if (burstCount > maxBurstSize) maxBurstSize = burstCount;
             burstCount = 1;
           } else {
@@ -617,7 +660,7 @@
         { value: 0, label: `full burst (~${maxBurstSize})`, selected: true },
       ];
       const batchSelect = document.getElementById("batchSelect");
-      batchOptions.forEach(opt => {
+      batchOptions.forEach((opt) => {
         const el = document.createElement("option");
         el.value = opt.value;
         el.textContent = opt.label;
@@ -659,11 +702,16 @@
         while (i < PATH_EVENTS.length) {
           const evt = PATH_EVENTS[i];
           // Stop at burst boundary only if we've collected at least something
-          if (batch.length > 0 && evt.ts_ms - start.ts_ms > BURST_THRESHOLD_MS) break;
-          const skip = (hideLoopbacks && evt.loopback) || (hideSurbs && evt.surb);
+          if (batch.length > 0 && evt.ts_ms - start.ts_ms > BURST_THRESHOLD_MS)
+            break;
+          const skip =
+            (hideLoopbacks && evt.loopback) || (hideSurbs && evt.surb);
           if (!skip) {
             batch.push(evt);
-            if (batch.length >= limit) { i++; break; }
+            if (batch.length >= limit) {
+              i++;
+              break;
+            }
           }
           i++;
         }
@@ -697,19 +745,22 @@
         }
 
         // Apply heat for ALL events in the burst
-        const allEdges = burst.flatMap(e => e.edges);
+        const allEdges = burst.flatMap((e) => e.edges);
         updateHeat(allEdges);
 
         // Pick a representative event for the particle animation (first forward, or first)
-        const evt = burst.find(e => e.direction === "forward") || burst[0];
+        const evt = burst.find((e) => e.direction === "forward") || burst[0];
         // Advance index past the entire burst
         eventIndex = endIdx % PATH_EVENTS.length;
 
-        const hasLoopback = burst.some(e => e.loopback);
-        const loopbackCount = burst.filter(e => e.loopback).length;
-        activeColor = hasLoopback ? COLORS.loopback
-          : evt.direction === "forward" ? COLORS.forward : COLORS.return_;
-        const fwdCount = burst.filter(e => e.direction === "forward").length;
+        const hasLoopback = burst.some((e) => e.loopback);
+        const loopbackCount = burst.filter((e) => e.loopback).length;
+        activeColor = hasLoopback
+          ? COLORS.loopback
+          : evt.direction === "forward"
+            ? COLORS.forward
+            : COLORS.return_;
+        const fwdCount = burst.filter((e) => e.direction === "forward").length;
         const retCount = burst.length - fwdCount;
         const speedLabel = speed === 0 ? "max" : speed + "x";
         const loopLabel = loopbackCount > 0 ? ` ${loopbackCount}loop` : "";
@@ -718,7 +769,8 @@
         );
 
         nodeGs.select("rect").attr("fill", (d) => {
-          if (d.id === SRC_NODE) return hasLoopback ? COLORS.loopbackRelay : COLORS.srcFill;
+          if (d.id === SRC_NODE)
+            return hasLoopback ? COLORS.loopbackRelay : COLORS.srcFill;
           if (d.id === DST_NODE) return COLORS.dstFill;
           if (
             evt.edges.some((eid) => {
