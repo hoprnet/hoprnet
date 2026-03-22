@@ -60,8 +60,10 @@ def parse_args():
                    help="Seconds to wait for the node to become ready (default: 120)")
     p.add_argument("--timeout", type=int, default=120,
                    help="Socket/download timeout in seconds (default: 120)")
-    p.add_argument("--min-peer-score", type=float, default=0.0,
-                   help="Minimum quality score to consider a peer (default: 0.0)")
+    p.add_argument("--min-peer-score", type=float, default=0.01,
+                   help="Minimum quality score to consider a peer (default: 0.01)")
+    p.add_argument("--min-channel-balance", type=float, default=0.1,
+                   help="Minimum channel balance in wxHOPR (default: 0.1)")
     p.add_argument("--skip-graph-render", action="store_true",
                    help="Skip rendering DOT to PNG (useful if graphviz is not installed)")
     p.add_argument("--address-file", default=None,
@@ -127,13 +129,34 @@ def get_address(base_url, token):
 
 
 def get_peers(base_url, token):
-    data = api_request(base_url, "GET", "/node/peers", token=token)
-    return data.get("connected", []) if data else []
+    """Returns connected peers from /network/connected with graph-based scores."""
+    data = api_request(base_url, "GET", "/network/connected", token=token)
+    return data if data else []
 
 
 def get_outgoing_channels(base_url, token):
     data = api_request(base_url, "GET", "/channels?fullTopology=false&includingClosed=false", token=token)
     return data.get("outgoing", []) if data else []
+
+
+def get_ticket_price(base_url, token):
+    data = api_request(base_url, "GET", "/network/price", token=token)
+    return data["price"]
+
+
+def parse_balance(balance_str):
+    parts = balance_str.strip().split()
+    return float(parts[0])
+
+
+def open_channel(base_url, token, destination, amount):
+    body = {"destination": destination, "amount": amount}
+    return api_request(base_url, "POST", "/channels", body=body, token=token)
+
+
+def fund_channel(base_url, token, channel_id, amount):
+    body = {"amount": amount}
+    return api_request(base_url, "POST", f"/channels/{channel_id}/fund", body=body, token=token)
 
 
 def get_network_graph(base_url, token):
@@ -149,38 +172,84 @@ def get_node_info(base_url, token):
 # Step 1: Verify channels
 # ---------------------------------------------------------------------------
 
-def verify_channels(api, token, min_peer_score):
-    """Verify at least MIN_OUTGOING_CHANNELS open outgoing channels to active peers."""
-    peers = get_peers(api, token)
-    active_addresses = {
-        p["address"] for p in peers
-        if p.get("quality", p.get("score", 0)) >= min_peer_score
-    }
-    log.info(f"Active peers (score >= {min_peer_score}): {len(active_addresses)}")
+def ensure_channels_to_best_peers(api, token, min_peer_score, min_channel_balance):
+    """Ensure we have open, funded channels to the best-scoring peers.
 
+    Waits up to 60s for peers with non-zero scores to appear, then opens
+    channels to them. Returns the list of open channels to active peers.
+    """
+    # Wait for peers with actual probe scores
+    deadline = time.time() + 180
+    scored_peers = []
+    while time.time() < deadline:
+        peers = get_peers(api, token)
+        scored_peers = [
+            p for p in peers
+            if p.get("score", 0) >= min_peer_score
+        ]
+        scored_peers.sort(key=lambda p: p.get("score", 0), reverse=True)
+        if len(scored_peers) >= MIN_OUTGOING_CHANNELS:
+            break
+        remaining = int(deadline - time.time())
+        log.info(f"Waiting for scored peers... {len(scored_peers)} found "
+                 f"(need {MIN_OUTGOING_CHANNELS}, {remaining}s remaining)")
+        time.sleep(5)
+
+    log.info(f"Peers with score >= {min_peer_score}: {len(scored_peers)}")
+    for p in scored_peers[:10]:
+        score = p.get("score", 0)
+        log.info(f"  {p['address'][:16]}... score={score:.4f} latency={p.get('averageLatency', 0)}ms")
+
+    if len(scored_peers) < MIN_OUTGOING_CHANNELS:
+        raise RuntimeError(
+            f"Only {len(scored_peers)} peers with score >= {min_peer_score}, "
+            f"need at least {MIN_OUTGOING_CHANNELS}"
+        )
+
+    # Get existing channels
     channels = get_outgoing_channels(api, token)
-    open_channels = [ch for ch in channels if ch["status"] == "Open"]
-    active_channels = [ch for ch in open_channels if ch["peerAddress"] in active_addresses]
+    open_channels = {ch["peerAddress"]: ch for ch in channels if ch["status"] == "Open"}
 
-    log.info(f"Outgoing channels: {len(open_channels)} open, "
-             f"{len(active_channels)} to active peers (need >= {MIN_OUTGOING_CHANNELS})")
+    # Ensure channels to the top peers
+    target_peers = scored_peers[:max(MIN_OUTGOING_CHANNELS, len(scored_peers))]
+    funding_str = f"{min_channel_balance} wxHOPR"
+    changed = False
+
+    for peer in target_peers:
+        addr = peer["address"]
+        score = peer.get("score", 0)
+
+        if addr in open_channels:
+            log.info(f"  {addr[:16]}... score={score:.4f}: channel OK (balance={open_channels[addr]['balance']})")
+        else:
+            log.info(f"  {addr[:16]}... score={score:.4f}: opening channel with {funding_str}")
+            try:
+                open_channel(api, token, addr, funding_str)
+                changed = True
+            except Exception as e:
+                log.warning(f"    Failed to open: {e}")
+
+    if changed:
+        log.info("Waiting 10s for channel state propagation...")
+        time.sleep(10)
+
+    # Re-fetch and return active channels
+    channels = get_outgoing_channels(api, token)
+    active_addresses = {p["address"] for p in scored_peers}
+    active_channels = [ch for ch in channels if ch["status"] == "Open" and ch["peerAddress"] in active_addresses]
+
+    log.info(f"Result: {len(active_channels)} open channels to scored peers (need >= {MIN_OUTGOING_CHANNELS})")
     for ch in active_channels:
         addr = ch["peerAddress"]
-        peer = next((p for p in peers if p["address"] == addr), {})
-        score = peer.get("quality", peer.get("score", 0))
+        peer = next((p for p in scored_peers if p["address"] == addr), {})
+        score = peer.get("score", 0)
         log.info(f"  Channel {ch['id'][:16]}... -> {addr[:16]}... "
-                 f"balance={ch['balance']} peer_score={score:.2f}")
+                 f"balance={ch['balance']} peer_score={score:.4f}")
 
     if len(active_channels) < MIN_OUTGOING_CHANNELS:
-        # Also log channels to inactive peers for diagnostics
-        inactive_channels = [ch for ch in open_channels if ch["peerAddress"] not in active_addresses]
-        if inactive_channels:
-            log.warning(f"  {len(inactive_channels)} channel(s) to inactive/low-score peers (ignored):")
-            for ch in inactive_channels:
-                log.warning(f"    {ch['id'][:16]}... -> {ch['peerAddress'][:16]}... balance={ch['balance']}")
         raise RuntimeError(
-            f"Need at least {MIN_OUTGOING_CHANNELS} open outgoing channels to active peers, "
-            f"but only found {len(active_channels)}"
+            f"Need at least {MIN_OUTGOING_CHANNELS} open channels to scored peers, "
+            f"but only have {len(active_channels)}"
         )
 
     return active_channels
@@ -239,7 +308,7 @@ def pick_destination(peers, open_channels, explicit_dest, min_peer_score):
     channel_peers = {ch["peerAddress"] for ch in open_channels}
     candidates = [
         p for p in peers
-        if p["address"] in channel_peers and p.get("quality", p.get("score", 0)) >= min_peer_score
+        if p["address"] in channel_peers and p.get("score", 0) >= min_peer_score
     ]
     if not candidates:
         raise RuntimeError(
@@ -247,7 +316,7 @@ def pick_destination(peers, open_channels, explicit_dest, min_peer_score):
             f"Channel peers: {channel_peers}"
         )
 
-    best = max(candidates, key=lambda p: p.get("quality", p.get("score", 0)))
+    best = max(candidates, key=lambda p: p.get("score", 0))
     return best["address"]
 
 
@@ -507,9 +576,11 @@ def main():
         with open(args.address_file, "w") as f:
             f.write(my_address.lower())
 
-    # --- Step 1: Verify channels ---
-    log.info("\n=== Step 1: Verify Outgoing Channels ===")
-    open_channels = verify_channels(api, token, args.min_peer_score)
+    # --- Step 1: Ensure channels to best-scoring peers ---
+    log.info("\n=== Step 1: Ensure Channels to Best Peers ===")
+    open_channels = ensure_channels_to_best_peers(
+        api, token, args.min_peer_score, args.min_channel_balance
+    )
 
     # --- Step 2: Download and render network graph ---
     log.info("\n=== Step 2: Network Graph ===")
@@ -522,7 +593,7 @@ def main():
     peers = get_peers(api, token)
     log.info(f"Connected peers: {len(peers)}")
     for p in sorted(peers, key=lambda x: x.get("quality", x.get("score", 0)), reverse=True):
-        score = p.get("quality", p.get("score", 0))
+        score = p.get("score", 0)
         log.info(f"  {p['address'][:16]}... score={score:.2f}")
 
     destination = pick_destination(peers, open_channels, args.destination, args.min_peer_score)
