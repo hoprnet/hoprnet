@@ -27,6 +27,8 @@ from datetime import datetime, timedelta
 from importlib import resources
 from typing import Optional
 
+ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
 from PIL import Image
 
 
@@ -38,6 +40,7 @@ class PathEvent:
     timestamp: datetime
     direction: str  # "forward" or "return"
     nodes: list[str]
+    surb: bool = False  # True for extra return paths (SURBs)
 
 
 @dataclass
@@ -71,7 +74,12 @@ TS_PATTERNS = [
     re.compile(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?)"),
 ]
 
-RESOLVED_PATH_RE = re.compile(r"\[(forward|return)\] resolved (?:return )?path.*?" r"path=validated path \[([^\]]+)\]")
+RESOLVED_PATH_RE = re.compile(
+    r"\[(forward|return)\] resolved (?:return )?path\s+"
+    r"destination=(\S+)\s*"
+    r"(?:index=(\d+)\s*)?"
+    r".*?path=validated path \[([^\]]+)\]"
+)
 CANDIDATE_PATH_RE = re.compile(r"\[(forward|return)\] candidate path.*?" r"path=\[([^\]]+)\]")
 
 
@@ -112,29 +120,59 @@ def _parse_json_line(line: str) -> tuple[Optional[datetime], Optional[str], Opti
     return ts, direction, pm.group(1) if pm else None
 
 
-def parse_logs(log_path: str) -> list[PathEvent]:
+def parse_logs(log_path: str, me: Optional[str] = None) -> list[PathEvent]:
     events: list[PathEvent] = []
-    with open(log_path) as f:
+    # Track offchain destination key → onchain address from forward paths
+    dest_key_to_onchain: dict[str, str] = {}
+
+    with open(log_path, errors="replace") as f:
         for line in f:
-            line = line.strip()
+            line = ANSI_RE.sub("", line.strip())
             if not line:
                 continue
-            ts, direction, nodes_raw = None, None, None
+            ts, direction, nodes_raw, dest_key, surb_index = None, None, None, None, None
             if line.startswith("{"):
                 ts, direction, nodes_raw = _parse_json_line(line)
             if direction is None:
                 ts = ts or parse_timestamp(line)
                 m = RESOLVED_PATH_RE.search(line)
                 if m:
-                    direction, nodes_raw = m.group(1), m.group(2)
+                    direction, dest_key = m.group(1), m.group(2)
+                    surb_index = int(m.group(3)) if m.group(3) else None
+                    nodes_raw = m.group(4)
                 else:
                     m = CANDIDATE_PATH_RE.search(line)
                     if m:
                         direction, nodes_raw = m.group(1), m.group(2)
             if direction and nodes_raw:
                 nodes = parse_path_nodes(nodes_raw)
+                if not nodes:
+                    continue
+
+                is_surb = direction == "return"
+
+                if me:
+                    if direction == "forward":
+                        # Forward: me -> intermediate... -> dest
+                        nodes = [me] + nodes
+                        # Learn the offchain→onchain mapping for the destination
+                        if dest_key:
+                            dest_key_to_onchain[dest_key] = nodes[-1]
+                    elif direction == "return":
+                        # Return: dest -> intermediate... -> me
+                        # The path already ends at us; prepend the remote peer
+                        if dest_key and dest_key in dest_key_to_onchain:
+                            nodes = [dest_key_to_onchain[dest_key]] + nodes
+                        else:
+                            continue  # Can't resolve return source, skip
+
                 if len(nodes) >= 2:
-                    events.append(PathEvent(timestamp=ts or datetime.min, direction=direction, nodes=nodes))
+                    events.append(PathEvent(
+                        timestamp=ts or datetime.min,
+                        direction=direction,
+                        nodes=nodes,
+                        surb=is_surb,
+                    ))
     return events
 
 
@@ -219,6 +257,7 @@ def build_path_events_json(
                 "nodes": resolved_nodes,
                 "time": time_str,
                 "ts_ms": ts_ms,
+                "surb": event.surb,
             }
         )
 
@@ -242,6 +281,23 @@ def build_path_events_json(
             fwd_counts[key] += 1
         else:
             ret_counts[key] += 1
+
+    # Identify loopback destinations: have forward paths but no return paths
+    fwd_dests: set[str] = set()
+    ret_dests: set[str] = set()
+    for evt in result:
+        if evt["direction"] == "forward" and evt["nodes"]:
+            fwd_dests.add(evt["nodes"][-1])
+        elif evt["direction"] == "return" and evt["nodes"]:
+            ret_dests.add(evt["nodes"][0])
+    loopback_dests = fwd_dests - ret_dests
+
+    # Tag loopback events
+    for evt in result:
+        if evt["direction"] == "forward" and evt["nodes"] and evt["nodes"][-1] in loopback_dests:
+            evt["loopback"] = True
+        else:
+            evt["loopback"] = False
 
     def dist_list(counts: Counter[str]) -> list[dict]:
         total = sum(counts.values()) or 1
@@ -334,6 +390,8 @@ def main():
     parser.add_argument("--out-dir", default=".", help="Output directory (default: current directory)")
     parser.add_argument("--no-open", action="store_true", help="Don't auto-open browser")
     parser.add_argument("--no-gif", action="store_true", help="Skip GIF generation (HTML only)")
+    parser.add_argument("--me", default=None,
+                        help="Our node's onchain address (prepended/appended to paths for edge matching)")
     args = parser.parse_args()
 
     print(f"Parsing graph: {args.dot_file}")
@@ -341,7 +399,7 @@ def main():
     print(f"  {len(graph.nodes)} nodes, {len(graph.edges)} edges")
 
     print(f"Parsing logs: {args.log_file}")
-    events = parse_logs(args.log_file)
+    events = parse_logs(args.log_file, me=args.me)
     fwd = sum(1 for e in events if e.direction == "forward")
     ret = sum(1 for e in events if e.direction == "return")
     print(f"  {len(events)} path events ({fwd} forward, {ret} return)")

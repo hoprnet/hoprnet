@@ -12,9 +12,14 @@
         background: #1a1a2e;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
+      html, body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
       #graph {
-        width: 800px;
-        height: 600px;
+        width: 100%;
+        height: 100%;
       }
       .title {
         text-anchor: middle;
@@ -65,16 +70,16 @@
       }
       #controls {
         display: none;
-        width: 800px;
-        padding: 12px 0;
+        width: 100%;
+        padding: 12px 16px;
         font-family: sans-serif;
         font-size: 13px;
       }
     </style>
   </head>
   <body>
-    <div id="layout" style="display: flex; gap: 16px">
-      <div id="left-col">
+    <div id="layout" style="display: flex; width: 100%; height: 100vh">
+      <div id="left-col" style="flex: 1; display: flex; flex-direction: column; min-width: 0">
         <svg id="graph"></svg>
         <div id="controls">
           <div style="display: flex; align-items: center; gap: 10px">
@@ -119,6 +124,30 @@
             <span style="color: #ffb74d">&#9679; return</span>
             <span style="color: #66bb6a">&#9632; SRC</span>
             <span style="color: #ef5350">&#9632; DST</span>
+            <label style="color: #888; display: flex; align-items: center; gap: 3px; cursor: pointer">
+              <input type="checkbox" id="hideLoopbacks" style="accent-color: #555; cursor: pointer" />
+              Hide loopbacks
+            </label>
+            <label style="color: #888; display: flex; align-items: center; gap: 3px; cursor: pointer">
+              <input type="checkbox" id="hideSurbs" checked style="accent-color: #555; cursor: pointer" />
+              Hide SURBs
+            </label>
+            <label style="color: #888; display: flex; align-items: center; gap: 4px">
+              Batch:
+              <select
+                id="batchSelect"
+                style="
+                  background: #2a2a3e;
+                  color: #ccc;
+                  border: 1px solid #555;
+                  border-radius: 3px;
+                  padding: 1px 4px;
+                  font-size: 11px;
+                "
+              >
+                <!-- populated dynamically -->
+              </select>
+            </label>
             <label
               style="
                 margin-left: auto;
@@ -140,14 +169,7 @@
                   font-size: 11px;
                 "
               >
-                <option value="0.25">0.25x</option>
-                <option value="0.5">0.5x</option>
-                <option value="1" selected>1x (real-time)</option>
-                <option value="2">2x</option>
-                <option value="4">4x</option>
-                <option value="10">10x</option>
-                <option value="50">50x</option>
-                <option value="0">max</option>
+                <!-- populated dynamically -->
               </select>
             </label>
             <span style="color: #555">Space=play &#8592;&#8594;=step</span>
@@ -159,13 +181,13 @@
         id="stats-panel"
         style="
           display: none;
-          min-width: 300px;
-          max-width: 380px;
-          max-height: 640px;
+          width: 320px;
+          flex-shrink: 0;
+          height: 100vh;
           overflow-y: auto;
           padding: 12px;
           background: #1e1e30;
-          border-radius: 8px;
+          border-left: 1px solid #333;
           font-family: monospace;
           font-size: 11px;
           color: #ccc;
@@ -181,15 +203,26 @@
       const PATH_STATS = __PATH_STATS__;
       const SRC_NODE = __SRC_NODE__;
       const DST_NODE = __DST_NODE__;
-      const WIDTH = 800,
-        HEIGHT = 600,
+
+      const graphEl = document.getElementById("graph");
+      const WIDTH = Math.max(window.innerWidth - 340, 800),
+        HEIGHT = Math.max(window.innerHeight - 80, 600),
         MARGIN = 60;
 
       const svg = d3
         .select("#graph")
         .attr("width", WIDTH)
         .attr("height", HEIGHT)
-        .attr("viewBox", `0 0 ${WIDTH} ${HEIGHT}`);
+        .attr("viewBox", `0 0 ${WIDTH} ${HEIGHT}`)
+        .attr("preserveAspectRatio", "xMidYMid meet");
+
+      // Dynamic resize: keep the SVG filling its container
+      window.addEventListener("resize", () => {
+        const r = graphEl.parentElement.getBoundingClientRect();
+        const w = Math.max(r.width, 400);
+        const h = Math.max(r.height || window.innerHeight - 80, 400);
+        svg.attr("width", w).attr("height", h);
+      });
 
       const COLORS = {
         forward: "#42A5F5",
@@ -211,6 +244,20 @@
       }));
       const linkById = new Map(links.map((l) => [l.id, l]));
 
+      // Pin our node to the center so the graph radiates outward from us
+      const centerX = WIDTH / 2, centerY = HEIGHT / 2;
+      const srcNodeData = nodes.find((n) => n.id === SRC_NODE);
+      if (srcNodeData) {
+        srcNodeData.fx = centerX;
+        srcNodeData.fy = centerY;
+      }
+
+      // Scale force layout parameters to the number of nodes
+      const nodeCount = nodes.length;
+      const linkDist = nodeCount > 100 ? 60 : nodeCount > 30 ? 120 : 220;
+      const chargeStr = nodeCount > 100 ? -200 : nodeCount > 30 ? -600 : -1500;
+      const collisionR = nodeCount > 100 ? 20 : nodeCount > 30 ? 40 : 80;
+
       // Force layout
       const sim = d3
         .forceSimulation(nodes)
@@ -219,16 +266,16 @@
           d3
             .forceLink(links)
             .id((d) => d.id)
-            .distance(220),
+            .distance(linkDist),
         )
-        .force("charge", d3.forceManyBody().strength(-1500))
-        .force("center", d3.forceCenter(WIDTH / 2, HEIGHT / 2 + 15))
-        .force("collision", d3.forceCollide().radius(80))
+        .force("charge", d3.forceManyBody().strength(chargeStr))
+        .force("center", d3.forceCenter(centerX, centerY + 15))
+        .force("collision", d3.forceCollide().radius(collisionR))
         .stop();
-      for (let i = 0; i < 300; i++) sim.tick();
+      for (let i = 0; i < 500; i++) sim.tick();
       nodes.forEach((n) => {
-        n.x = Math.max(MARGIN + 40, Math.min(WIDTH - MARGIN - 40, n.x));
-        n.y = Math.max(MARGIN + 30, Math.min(HEIGHT - MARGIN - 20, n.y));
+        n.x = Math.max(MARGIN, Math.min(WIDTH - MARGIN, n.x));
+        n.y = Math.max(MARGIN, Math.min(HEIGHT - MARGIN, n.y));
         n.fx = n.x;
         n.fy = n.y;
       });
@@ -376,12 +423,15 @@
         .attr("class", "node")
         .attr("transform", (d) => `translate(${d.x},${d.y})`);
 
+      const nodeW = nodeCount > 100 ? 30 : nodeCount > 30 ? 60 : 110;
+      const nodeH = nodeCount > 100 ? 14 : nodeCount > 30 ? 24 : 36;
+
       nodeGs
         .append("rect")
-        .attr("x", -55)
-        .attr("y", -18)
-        .attr("width", 110)
-        .attr("height", 36)
+        .attr("x", -nodeW / 2)
+        .attr("y", -nodeH / 2)
+        .attr("width", nodeW)
+        .attr("height", nodeH)
         .attr("fill", (d) => {
           if (d.id === SRC_NODE) return COLORS.srcFill;
           if (d.id === DST_NODE) return COLORS.dstFill;
@@ -397,14 +447,18 @@
         )
         .attr("filter", "url(#node-shadow)");
 
+      const labelFontSize = nodeCount > 100 ? "6px" : nodeCount > 30 ? "8px" : "9px";
+      const idFontSize = nodeCount > 100 ? "5px" : nodeCount > 30 ? "9px" : "11px";
+
       nodeGs
         .append("text")
         .attr("class", "role-label")
         .attr("text-anchor", "middle")
-        .attr("dy", -6)
+        .attr("dy", nodeCount > 100 ? -2 : -6)
         .attr("fill", (d) =>
           d.id === SRC_NODE || d.id === DST_NODE ? "#fff" : "transparent",
         )
+        .style("font-size", labelFontSize)
         .text((d) => {
           if (d.id === SRC_NODE) return "SRC";
           if (d.id === DST_NODE) return "DST";
@@ -415,21 +469,23 @@
         .append("text")
         .attr("class", "id-label")
         .attr("text-anchor", "middle")
-        .attr("dy", 10)
-        .text((d) =>
-          d.id.length > 14 ? d.id.slice(0, 8) + "..." + d.id.slice(-4) : d.id,
-        );
+        .attr("dy", nodeCount > 100 ? 3 : 10)
+        .style("font-size", idFontSize)
+        .text((d) => {
+          if (nodeCount > 100) {
+            if (d.id === SRC_NODE) return "SRC";
+            if (d.id === DST_NODE) return "DST";
+            return d.id.slice(2, 6);
+          }
+          return d.id.length > 14 ? d.id.slice(0, 8) + "..." + d.id.slice(-4) : d.id;
+        });
 
       // ── Edge heat tracking ──
       const edgeHeat = new Map();
-      const HEAT_DECAY = 0.92;
 
       function updateHeat(edgeIds) {
-        // Decay all
-        for (const [k, v] of edgeHeat) {
-          edgeHeat.set(k, v * HEAT_DECAY);
-          if (v * HEAT_DECAY < 0.05) edgeHeat.delete(k);
-        }
+        // Clear previous batch — only the current batch is active
+        edgeHeat.clear();
         // Boost active
         for (const eid of edgeIds) {
           edgeHeat.set(eid, (edgeHeat.get(eid) || 0) + 1);
@@ -471,11 +527,103 @@
       // No Promises. A single tick loop drives everything.
       let eventIndex = 0;
       let playing = false;
-      let speed = 1;
       let tickTimer = null;
 
       const BASE_PACKET_MS = 600;
       const MIN_PACKET_MS = 120;
+
+      // Compute the real-time burst interval from the data.
+      const gaps = [];
+      for (let i = 1; i < PATH_EVENTS.length; i++) {
+        const delta = PATH_EVENTS[i].ts_ms - PATH_EVENTS[i - 1].ts_ms;
+        if (delta > 50) gaps.push(delta); // only inter-burst gaps
+      }
+      const medianGapMs = gaps.length
+        ? gaps.sort((a, b) => a - b)[Math.floor(gaps.length / 2)]
+        : 1000;
+
+      // Total time span of all events
+      const totalSpanMs = PATH_EVENTS.length > 1
+        ? PATH_EVENTS[PATH_EVENTS.length - 1].ts_ms - PATH_EVENTS[0].ts_ms
+        : 0;
+
+      // At speed S, one burst animation takes BASE_PACKET_MS/S ms,
+      // and the gap between bursts takes medianGapMs/S ms.
+      // The "time window per burst" the user sees = (BASE_PACKET_MS + medianGapMs) / S.
+      // Real-time: S where the window equals the actual gap.
+      const realTimeSpeed = Math.max(1, Math.ceil(BASE_PACKET_MS / medianGapMs));
+
+      function formatWindow(s) {
+        if (s === 0) return "max";
+        const windowMs = (BASE_PACKET_MS + medianGapMs) / s;
+        if (windowMs >= 1000) return `${(windowMs / 1000).toFixed(1)}s/burst`;
+        return `${Math.round(windowMs)}ms/burst`;
+      }
+
+      function formatTotalTime(s) {
+        if (s === 0) return "";
+        const totalSec = totalSpanMs / s / 1000;
+        if (totalSec >= 60) return ` (${(totalSec / 60).toFixed(1)}min)`;
+        return ` (${Math.round(totalSec)}s)`;
+      }
+
+      // Build speed options
+      const speedMultipliers = [1, 5, 10, 20, 100];
+      const speedOptions = speedMultipliers.map((m, i) => ({
+        value: realTimeSpeed * m,
+        label: `${formatWindow(realTimeSpeed * m)}${formatTotalTime(realTimeSpeed * m)}`,
+        selected: i === 0,
+      }));
+      speedOptions.push({ value: 0, label: "max", selected: false });
+
+      const speedSelect = document.getElementById("speedSelect");
+      speedOptions.forEach(opt => {
+        const el = document.createElement("option");
+        el.value = opt.value;
+        el.textContent = opt.label;
+        if (opt.selected) el.selected = true;
+        speedSelect.appendChild(el);
+      });
+
+      let speed = realTimeSpeed;
+
+      const BURST_THRESHOLD_MS = 50; // events within this window are batched
+
+      // Compute typical burst size from the data
+      let maxBurstSize = 1;
+      {
+        let burstCount = 0;
+        for (let i = 0; i < PATH_EVENTS.length; i++) {
+          if (i === 0 || PATH_EVENTS[i].ts_ms - PATH_EVENTS[i - 1].ts_ms > BURST_THRESHOLD_MS) {
+            if (burstCount > maxBurstSize) maxBurstSize = burstCount;
+            burstCount = 1;
+          } else {
+            burstCount++;
+          }
+        }
+        if (burstCount > maxBurstSize) maxBurstSize = burstCount;
+      }
+
+      // Build batch size options: 1, 4, 10, 50, full burst
+      let batchLimit = 0; // 0 = unlimited (full burst)
+      const batchOptions = [
+        { value: 1, label: "1 at a time" },
+        { value: 4, label: "4 simultaneous" },
+        { value: 10, label: "10 simultaneous" },
+        { value: 50, label: "50 simultaneous" },
+        { value: 0, label: `full burst (~${maxBurstSize})`, selected: true },
+      ];
+      const batchSelect = document.getElementById("batchSelect");
+      batchOptions.forEach(opt => {
+        const el = document.createElement("option");
+        el.value = opt.value;
+        el.textContent = opt.label;
+        if (opt.selected) el.selected = true;
+        batchSelect.appendChild(el);
+      });
+      batchSelect.addEventListener("change", () => {
+        batchLimit = parseInt(batchSelect.value, 10);
+      });
 
       // Active particle state
       let activeDot = null;
@@ -494,29 +642,74 @@
 
       const MAX_GAP_MS = 300; // keep flow continuous — pacing comes from packet animation speed
 
+      // Collect a burst of events starting at idx that share the same timestamp.
+      // When batchLimit > 0, take at most that many events and stop —
+      // the next call continues from where we left off within the same burst.
+      function collectBurst(idx) {
+        const start = PATH_EVENTS[idx];
+        if (!start) return { events: [], endIdx: idx };
+        const hideLoopbacks = document.getElementById("hideLoopbacks")?.checked;
+        const hideSurbs = document.getElementById("hideSurbs")?.checked;
+        const limit = batchLimit || Infinity;
+        const batch = [];
+        let i = idx;
+        while (i < PATH_EVENTS.length) {
+          const evt = PATH_EVENTS[i];
+          // Stop at burst boundary only if we've collected at least something
+          if (batch.length > 0 && evt.ts_ms - start.ts_ms > BURST_THRESHOLD_MS) break;
+          const skip = (hideLoopbacks && evt.loopback) || (hideSurbs && evt.surb);
+          if (!skip) {
+            batch.push(evt);
+            if (batch.length >= limit) { i++; break; }
+          }
+          i++;
+        }
+        return { events: batch, endIdx: i };
+      }
+
       function getDelayToNext(idx) {
         if (speed === 0) return 30;
         const curr = PATH_EVENTS[idx];
-        const next = PATH_EVENTS[(idx + 1) % PATH_EVENTS.length];
+        if (!curr) return 100;
+        // Find next event outside current burst
+        let next = null;
+        for (let i = idx + 1; i < PATH_EVENTS.length; i++) {
+          if (PATH_EVENTS[i].ts_ms - curr.ts_ms > BURST_THRESHOLD_MS) {
+            next = PATH_EVENTS[i];
+            break;
+          }
+        }
         if (!next) return 100;
         const deltaMs = next.ts_ms - curr.ts_ms;
-        if (deltaMs <= 0) return 30;
         return Math.min(MAX_GAP_MS, Math.max(30, deltaMs / speed));
       }
 
       function startEvent(idx) {
-        const evt = PATH_EVENTS[idx];
-        if (!evt) return;
+        // Batch all same-timestamp events
+        const { events: burst, endIdx } = collectBurst(idx);
+        if (!burst.length) {
+          eventIndex = endIdx % PATH_EVENTS.length;
+          waitUntil = performance.now() + 30;
+          return;
+        }
+
+        // Apply heat for ALL events in the burst
+        const allEdges = burst.flatMap(e => e.edges);
+        updateHeat(allEdges);
+
+        // Pick a representative event for the particle animation (first forward, or first)
+        const evt = burst.find(e => e.direction === "forward") || burst[0];
+        // Advance index past the entire burst
+        eventIndex = endIdx % PATH_EVENTS.length;
 
         activeColor =
           evt.direction === "forward" ? COLORS.forward : COLORS.return_;
-        const label = evt.direction === "forward" ? "fwd" : "ret";
+        const fwdCount = burst.filter(e => e.direction === "forward").length;
+        const retCount = burst.length - fwdCount;
         const speedLabel = speed === 0 ? "max" : speed + "x";
         titleText.text(
-          `${label} #${idx + 1}/${PATH_EVENTS.length}  ${evt.time || ""}  [${speedLabel}]`,
+          `batch ${burst.length} (${fwdCount}fwd ${retCount}ret)  ${evt.time || ""}  [${speedLabel}]`,
         );
-
-        updateHeat(evt.edges);
 
         nodeGs.select("rect").attr("fill", (d) => {
           if (d.id === SRC_NODE) return COLORS.srcFill;
@@ -604,10 +797,9 @@
           // Schedule delay, then advance
           if (waitUntil === 0) {
             waitUntil = now + getDelayToNext(eventIndex);
-            eventIndex = (eventIndex + 1) % PATH_EVENTS.length;
             return;
           }
-          // Delay passed — start event
+          // Delay passed — start event (burst handles index advancement)
           waitUntil = 0;
           startEvent(eventIndex);
           return;

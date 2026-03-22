@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Json, State},
+    extract::{Json, Query, State},
     http::status::StatusCode,
     response::IntoResponse,
 };
@@ -240,15 +240,32 @@ pub(super) async fn announced(State(state): State<Arc<InternalState>>) -> impl I
 
 // ── Graph DOT endpoint ──────────────────────────────────────────────────────
 
+#[derive(Debug, Default, Copy, Clone, serde::Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
+#[into_params(parameter_in = Query)]
+#[serde(default, rename_all = "camelCase")]
+#[schema(example = json!({ "reachableOnly": false }))]
+/// Parameters for the network graph endpoint.
+pub(crate) struct GraphQueryRequest {
+    /// When true, only include edges reachable from this node via directed
+    /// traversal. Disconnected subgraphs that cannot be routed through are excluded.
+    #[schema(required = false)]
+    #[serde(default)]
+    reachable_only: bool,
+}
+
 /// Returns the network graph in DOT (Graphviz) format.
 ///
 /// Only connected nodes (those with at least one edge) are included.
-/// Nodes are labeled by their offchain public key hex representation.
-/// Edges include quality annotations (score, latency, capacity).
+/// Nodes are labeled by their on-chain (Ethereum) address when resolvable,
+/// falling back to the offchain public key hex representation.
+/// Edges carry quality annotations: score, latency (ms), and capacity when available.
+///
+/// Pass `?reachableOnly=true` to limit the output to edges reachable from this node.
 #[utoipa::path(
     get,
     path = const_format::formatcp!("{BASE_PATH}/network/graph"),
     description = "Get the network graph in DOT (Graphviz) format",
+    params(GraphQueryRequest),
     responses(
         (status = 200, description = "DOT representation of the network graph", body = String, content_type = "text/plain"),
         (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -259,9 +276,42 @@ pub(super) async fn announced(State(state): State<Arc<InternalState>>) -> impl I
     ),
     tag = "Network"
 )]
-pub(super) async fn graph(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
-    let graph = state.hopr.graph();
-    let dot = hopr_network_graph::render::render_dot(graph);
+pub(super) async fn graph(
+    State(state): State<Arc<InternalState>>,
+    Query(query): Query<GraphQueryRequest>,
+) -> impl IntoResponse {
+    use std::collections::HashMap;
+
+    let hopr = state.hopr.clone();
+    let graph = hopr.graph();
+
+    let edges = if query.reachable_only {
+        graph.reachable_edges()
+    } else {
+        graph.connected_edges()
+    };
+
+    // Build offchain key → onchain address mapping for all nodes in the graph.
+    let mut unique_keys = std::collections::HashSet::new();
+    for (src, dst, _) in &edges {
+        unique_keys.insert(*src);
+        unique_keys.insert(*dst);
+    }
+
+    let mut key_to_addr: HashMap<hopr_lib::OffchainPublicKey, String> = HashMap::new();
+    for key in &unique_keys {
+        let label = match hopr.peerid_to_chain_key(&(*key).into()).await {
+            Ok(Some(addr)) => format!("{addr}"),
+            _ => format!("{key}"),
+        };
+        key_to_addr.insert(*key, label);
+    }
+
+    let label_fn = |key: &hopr_lib::OffchainPublicKey| {
+        key_to_addr.get(key).cloned().unwrap_or_else(|| format!("{key}"))
+    };
+
+    let dot = hopr_network_graph::render::render_edges_as_dot(&edges, &label_fn);
 
     (StatusCode::OK, [(axum::http::header::CONTENT_TYPE, "text/plain")], dot).into_response()
 }
