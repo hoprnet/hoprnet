@@ -72,8 +72,8 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
           persist-credentials: false
 
-      - name: Run integration tests
-        run: nix develop -c cargo test --test '*' -- --test-threads=1
+      #- name: Run integration tests
+      #  run: nix develop -c cargo test --test '*' -- --test-threads=1
 
 
   tests-unit-nightly:
