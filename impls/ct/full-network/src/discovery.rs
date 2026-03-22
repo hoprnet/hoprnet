@@ -443,4 +443,100 @@ mod tests {
 
         Ok(())
     }
+
+    /// Helper: mark an edge as fully connected with capacity, so it passes all cost checks.
+    fn mark_edge_ready(graph: &ChannelGraph, src: &OffchainPublicKey, dst: &OffchainPublicKey) {
+        use hopr_api::graph::traits::{EdgeObservableWrite, EdgeWeightType};
+        graph.upsert_edge(src, dst, |obs| {
+            obs.record(EdgeWeightType::Connected(true));
+            obs.record(EdgeWeightType::Immediate(Ok(std::time::Duration::from_millis(50))));
+            obs.record(EdgeWeightType::Capacity(Some(1000)));
+        });
+    }
+
+    #[tokio::test]
+    async fn loopback_probes_emitted_for_two_edge_path() -> anyhow::Result<()> {
+        // Topology: me → a → b, b → me (connected neighbor)
+        // Loopback: me → a → b → me
+        let me = random_key();
+        let a = random_key();
+        let b = random_key();
+        let graph = Arc::new(ChannelGraph::new(me));
+        graph.add_node(a);
+        graph.add_node(b);
+
+        // Forward edges
+        graph.add_edge(&me, &a)?;
+        graph.add_edge(&a, &b)?;
+        mark_edge_ready(&graph, &me, &a);
+        mark_edge_ready(&graph, &a, &b);
+
+        // Return edge: b is a connected neighbor of me
+        graph.add_edge(&b, &me)?;
+        mark_edge_ready(&graph, &b, &me);
+
+        // Also need me → b edge so simple_loopback_to_self finds b as a connected neighbor
+        graph.add_edge(&me, &b)?;
+        mark_edge_ready(&graph, &me, &b);
+
+        let prober = FullNetworkDiscovery::new(me, fast_cfg(), graph);
+        let stream = ProbingTrafficGeneration::build(&prober);
+        pin_mut!(stream);
+
+        // Collect enough items to get both neighbor and loopback probes
+        let items: Vec<ProbeRouting> = timeout(
+            TINY_TIMEOUT * 100,
+            stream.take(20).collect::<Vec<_>>(),
+        )
+        .await?;
+
+        let looping_count = items.iter().filter(|r| matches!(r, ProbeRouting::Looping(_))).count();
+        let neighbor_count = items.iter().filter(|r| matches!(r, ProbeRouting::Neighbor(_))).count();
+
+        assert!(neighbor_count > 0, "should have neighbor probes");
+        assert!(looping_count > 0, "should have loopback probes (was {looping_count} out of {} total)", items.len());
+
+        // Verify loopback routing has IntermediatePath
+        for item in &items {
+            if let ProbeRouting::Looping((DestinationRouting::Forward { destination, forward_options, .. }, _)) = item {
+                assert_eq!(
+                    destination.as_ref(),
+                    &NodeId::Offchain(me),
+                    "loopback destination should be me"
+                );
+                assert!(
+                    matches!(forward_options, RoutingOptions::IntermediatePath(_)),
+                    "loopback should use IntermediatePath routing"
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn loopback_routing_rejects_full_path_with_me() -> anyhow::Result<()> {
+        // Verify that passing the full path [me, a, b, me] to loopback_routing
+        // exceeds BoundedVec capacity and returns None.
+        let me = random_key();
+        let a = random_key();
+        let b = random_key();
+        let me_node = NodeId::Offchain(me);
+
+        // Full path as returned by simple_loopback_to_self: [me, a, b, me]
+        let full_path = vec![me, a, b, me];
+        assert!(
+            loopback_routing(me_node, full_path).is_none(),
+            "full path [me, a, b, me] should exceed BoundedVec<3> and return None"
+        );
+
+        // Stripped path (intermediates only): [a, b]
+        let stripped_path = vec![a, b];
+        assert!(
+            loopback_routing(me_node, stripped_path).is_some(),
+            "stripped path [a, b] should fit BoundedVec<3> and return Some"
+        );
+
+        Ok(())
+    }
 }
