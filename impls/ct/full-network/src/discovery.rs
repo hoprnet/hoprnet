@@ -2,7 +2,7 @@ use futures::{StreamExt, stream::BoxStream};
 use futures_concurrency::stream::StreamExt as _;
 use hopr_api::{
     ct::{CoverTrafficGeneration, ProbeRouting, ProbingTrafficGeneration},
-    graph::{NetworkGraphTraverse, NetworkGraphView, costs::EdgeCostFn, traits::EdgeObservableRead},
+    graph::{NetworkGraphTraverse, NetworkGraphView, traits::EdgeObservableRead},
     types::{
         crypto::types::OffchainPublicKey,
         crypto_random::Randomizable,
@@ -17,7 +17,6 @@ use hopr_statistics::WeightedCollection;
 
 use crate::{ProberConfig, priority::immediate_probe_priority};
 
-use hopr_network_graph::{DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE};
 
 pub struct FullNetworkDiscovery<U> {
     me: OffchainPublicKey,
@@ -61,19 +60,14 @@ where
         .flat_map(|_| futures::stream::iter([2usize, 3, 4]))
         .filter_map(move |edge_count| futures::future::ready(std::num::NonZeroUsize::new(edge_count)))
         .flat_map(move |edge_count| {
-            let paths = graph.simple_paths(
-                &me,
-                &me,
-                edge_count.get(),
-                Some(100),
-                EdgeCostFn::forward(edge_count, DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE),
-            );
+            let paths = graph.simple_loopback_to_self(edge_count.get(), Some(100));
 
+            let count = paths.len();
+            tracing::debug!(edge_count = edge_count.get(), count, "loopback path candidates");
             let weighted: Vec<_> = paths
                 .into_iter()
-                .map(|(path, path_id, cost)| {
-                    let priority = (1.0 - cost).max(0.0) + cfg.base_priority;
-                    ((path, path_id), priority)
+                .map(|(path, path_id)| {
+                    ((path, path_id), cfg.base_priority)
                 })
                 .collect();
 
