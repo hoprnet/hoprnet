@@ -206,17 +206,33 @@ def path_to_edge_ids(nodes: list[str], index: dict[str, str], graph: GraphState)
 
     Returns (edge_ids, resolved_nodes). Edge IDs may be flipped to match
     graph direction; resolved_nodes preserves the original traversal order.
+    Edges and nodes not yet in the graph are added automatically so that
+    all log-observed paths can be visualized.
     """
     resolved = [r for n in nodes if (r := resolve_node(n, index))]
     edge_ids = []
     for i in range(len(resolved) - 1):
-        pair = (resolved[i], resolved[i + 1])
+        src, dst = resolved[i], resolved[i + 1]
+        pair = (src, dst)
         if pair in graph.edges:
-            edge_ids.append(f"{pair[0]}->{pair[1]}")
+            edge_ids.append(f"{src}->{dst}")
         else:
-            rev = (resolved[i + 1], resolved[i])
+            rev = (dst, src)
             if rev in graph.edges:
-                edge_ids.append(f"{rev[0]}->{rev[1]}")
+                edge_ids.append(f"{dst}->{src}")
+            else:
+                # Edge not in graph — add it from log evidence
+                graph.nodes.add(src)
+                graph.nodes.add(dst)
+                graph.edges[pair] = "from-log"
+                # Update key index for new nodes
+                for node in (src, dst):
+                    index[node] = node
+                    for n in (8, 12, 16, 20, 40):
+                        if len(node) > n:
+                            index[node[-n:]] = node
+                            index[node[:n]] = node
+                edge_ids.append(f"{src}->{dst}")
     return edge_ids, resolved
 
 
