@@ -80,6 +80,14 @@ RESOLVED_PATH_RE = re.compile(
     r"(?:index=(\d+)\s*)?"
     r".*?path=validated path \[([^\]]+)\]"
 )
+# Loopback intermediate path log: [loopback] resolving intermediate path
+# Contains offchain keys for source, destination, explicit_path
+LOOPBACK_PATH_RE = re.compile(
+    r"\[loopback\] resolving intermediate path\s+"
+    r"source=(\S+)\s+"
+    r"destination=(\S+)\s+"
+    r"explicit_path=\[([^\]]*)\]"
+)
 CANDIDATE_PATH_RE = re.compile(r"\[(forward|return)\] candidate path.*?" r"path=\[([^\]]+)\]")
 
 
