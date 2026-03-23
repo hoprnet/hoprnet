@@ -19,8 +19,6 @@ env:
   CARGO_TERM_COLOR: always
 jobs:
   build-dappnode:
-    if: >-
-      github.event_name == 'merge_group' || github.event.pull_request.head.repo.full_name == github.repository
     strategy:
       fail-fast: false
       matrix:
@@ -105,8 +103,6 @@ jobs:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
   docs:
     name: Docs
-    if: >-
-      github.event_name == 'merge_group' || github.event.pull_request.head.repo.full_name == github.repository
     uses: ./.github/workflows/build-docs.yaml
     secrets: inherit
     with:
