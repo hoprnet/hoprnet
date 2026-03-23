@@ -30,3 +30,5 @@ rm ${mydir}/../hopr/hopr-lib/Cargo.toml.original
 # Update hoprd Rust manifest
 sed -i'.original' 's/^version = ".*"$/version = "'${new_version}'"/' ${mydir}/../hoprd/hoprd/Cargo.toml
 rm ${mydir}/../hoprd/hoprd/Cargo.toml.original
+
+## Dummy change to force closing the PR automatically before run jobs
