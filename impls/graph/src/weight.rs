@@ -358,6 +358,19 @@ mod tests {
     }
 
     #[test]
+    fn score_uses_intermediate_only_when_no_immediate() {
+        let mut observation = Observations::default();
+        // Record a successful intermediate probe (no immediate probe recorded)
+        observation.record(EdgeWeightType::Intermediate(Ok(std::time::Duration::from_millis(80))));
+        observation.record(EdgeWeightType::Capacity(Some(500)));
+
+        assert!(observation.immediate_qos().is_none());
+        let inter_score = observation.intermediate_qos().unwrap().score();
+        assert_gt!(inter_score, 0.0, "intermediate score should be positive");
+        assert_in_delta!(observation.score(), inter_score, 0.001);
+    }
+
+    #[test]
     fn score_uses_immediate_only_when_no_intermediate() {
         let mut observation = Observations::default();
         observation.record(EdgeWeightType::Immediate(Ok(std::time::Duration::from_millis(50))));
