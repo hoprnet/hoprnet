@@ -123,7 +123,7 @@ jobs:
         id: gcp
         uses: hoprnet/hopr-workflows/actions/setup-gcp@644d936de4e1c8f5c50ba50f8526209455c28b4a # master
         with:
-          google_credentials: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
+          google_credentials: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
           login_artifact_registry: 'false'
           install_sdk: 'true'
           login_gke: 'true'

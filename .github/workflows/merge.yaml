@@ -9,10 +9,7 @@ concurrency:
   group: merge-${{ github.event.pull_request.base.ref }}
   cancel-in-progress: false
 permissions:
-  contents: write
-  pull-requests: write
-  id-token: write
-  security-events: write
+  contents: read
 jobs:
   build-binaries:
     name: Binary ${{ matrix.architecture }}
@@ -24,15 +21,15 @@ jobs:
           - architecture: x86_64-linux
             runner: self-hosted-hoprnet-bigger
             build_command: nix build -L .#binary-hoprd-x86_64-linux
-          - architecture: aarch64-linux
-            runner: self-hosted-hoprnet-bigger
-            build_command: nix build -L .#binary-hoprd-aarch64-linux
-          - architecture: x86_64-darwin
-            runner: macos-15-intel
-            build_command: nix build -L .#binary-hoprd-x86_64-darwin
-          - architecture: aarch64-darwin
-            runner: macos-15-xlarge
-            build_command: nix build -L .#binary-hoprd-aarch64-darwin
+          # - architecture: aarch64-linux
+          #   runner: self-hosted-hoprnet-bigger
+          #   build_command: nix build -L .#binary-hoprd-aarch64-linux
+          # - architecture: x86_64-darwin
+          #   runner: macos-15-intel
+          #   build_command: nix build -L .#binary-hoprd-x86_64-darwin
+          # - architecture: aarch64-darwin
+          #   runner: macos-15-xlarge
+          #   build_command: nix build -L .#binary-hoprd-aarch64-darwin
     uses: hoprnet/hopr-workflows/.github/workflows/build-binaries.yaml@build-binaries-v2
     permissions:
       contents: read
@@ -67,11 +64,6 @@ jobs:
             "runner": "self-hosted-hoprnet-bigger",
             "architecture": "x86_64-linux",
             "build_command": "nix build -L .#docker-hoprd-x86_64-linux"
-          },
-          {
-            "runner": "self-hosted-hoprnet-bigger",
-            "architecture": "aarch64-linux",
-            "build_command": "nix build -L .#docker-hoprd-aarch64-linux"
           }
         ]
       cachix_cache_name: hoprnet
@@ -138,6 +130,8 @@ jobs:
   cleanup_actions:
     name: Cleanup Actions
     runs-on: self-hosted-hoprnet-small
+    permissions:
+      actions: write
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2

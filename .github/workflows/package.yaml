@@ -144,7 +144,7 @@ jobs:
           HOPRD_SAFE_ADDRESS: ${{ secrets.TEST_OS_PACKAGE_HOPRD_SAFE_ADDRESS }}
           HOPRD_MODULE_ADDRESS: ${{ secrets.TEST_OS_PACKAGE_HOPRD_MODULE_ADDRESS }}
           HOPRD_PROVIDER: ${{ secrets.TEST_OS_PACKAGE_HOPRD_PROVIDER }}
-          GCP_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+          GCP_PROJECT: ${{ secrets.GCP_SA_PROJECT }}
 
       - name: Publish package
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0

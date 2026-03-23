@@ -16,6 +16,8 @@ on:
 concurrency:
   group: release
   cancel-in-progress: false
+permissions:
+  contents: read
 jobs:
   build-binaries:
     name: Binary ${{ matrix.architecture }}
@@ -98,6 +100,9 @@ jobs:
     name: Build dappNode
     needs:
       - release
+    permissions:
+      contents: write
+      pull-requests: write
     uses: ./.github/workflows/generate-dappnode-pr.yaml
     with:
       source_repo: ${{ github.repository }}
