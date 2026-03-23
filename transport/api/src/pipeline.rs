@@ -60,12 +60,8 @@ where
         counters,
     } = components;
 
-    let unack_ticket_proc = HoprUnacknowledgedTicketProcessor::new(
-        chain_api.clone(),
-        chain_key.clone(),
-        channels_dst,
-        cfg.ack_processor,
-    );
+    let unack_ticket_proc =
+        HoprUnacknowledgedTicketProcessor::new(chain_api.clone(), chain_key.clone(), channels_dst, cfg.ack_processor);
 
     let encoder = HoprEncoder::new(
         chain_key.clone(),

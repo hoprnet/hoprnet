@@ -1,6 +1,7 @@
 use hopr_api::types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*};
 use hopr_crypto_packet::prelude::*;
 use hopr_ticket_manager::{HoprTicketManager, OutgoingIndexStore, TicketManagerError, TicketQueueStore};
+
 pub use crate::{
     errors::IncomingPacketError,
     types::{FoundSurb, IncomingPacket, OutgoingPacket, ResolvedAcknowledgement},
@@ -167,7 +168,7 @@ pub trait TicketTracker {
         &self,
         channel_id: &ChannelId,
         epoch: u32,
-        index: u64, // TODO: see if we can get rid of this parameter
+        index: u64, // TODO: see if we can get rid of this parameter (in PR #7915)
     ) -> Result<HoprBalance, Self::Error>;
 
     /// Convenience function that allows creating multi-hop tickets.

@@ -19,8 +19,8 @@ use hopr_chain_connector::create_trustful_hopr_blokli_connector;
 use hopr_crypto_packet::HoprSurb;
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::{
-    HoprCodecConfig, HoprDecoder, HoprEncoder, HoprUnacknowledgedTicketProcessor, HoprUnacknowledgedTicketProcessorConfig, MemorySurbStore,
-    SurbStoreConfig,
+    HoprCodecConfig, HoprDecoder, HoprEncoder, HoprUnacknowledgedTicketProcessor,
+    HoprUnacknowledgedTicketProcessorConfig, MemorySurbStore, SurbStoreConfig,
 };
 use hopr_ticket_manager::{HoprTicketManager, RedbStore};
 use hopr_transport_mixer::config::MixerConfig;

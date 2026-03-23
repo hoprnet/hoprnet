@@ -283,7 +283,7 @@ async fn main_inner(cfg: HoprdConfig, hopr_keys: HoprKeys) -> anyhow::Result<()>
         ..Default::default()
     };
 
-    let (node, hopr_process) = hopr_builder::build_from_chain_and_db(
+    let (node, hopr_process) = hopr_builder::build_with_chain(
         &hopr_keys.chain_key,
         &hopr_keys.packet_key,
         hopr_lib_cfg,

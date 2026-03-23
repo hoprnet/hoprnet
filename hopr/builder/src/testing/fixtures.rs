@@ -424,7 +424,7 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
                         if i % 2 != 0 { MINIMUM_INCOMING_WIN_PROB } else { 1.0 },
                     );
 
-                    let (instance, hopr_process) = crate::build_from_chain_and_db(
+                    let (instance, hopr_process) = crate::build_with_chain(
                         &onchain_keys[i],
                         &offchain_keys[i],
                         config,

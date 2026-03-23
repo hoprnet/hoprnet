@@ -32,7 +32,11 @@ use std::{
 };
 
 use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
-use futures::{FutureExt, StreamExt, channel::mpsc::{Sender, channel}, stream::select_with_strategy, SinkExt};
+use futures::{
+    FutureExt, SinkExt, StreamExt,
+    channel::mpsc::{Sender, channel},
+    stream::select_with_strategy,
+};
 pub use hopr_api::{
     Multiaddr, PeerId,
     network::{Health, traits::NetworkView},
@@ -88,8 +92,10 @@ use crate::{
 pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RANGE;
 
 pub use hopr_api as api;
-use hopr_api::chain::{ChainWriteTicketOperations, ChannelSelector};
-use hopr_api::types::internal::routing::DestinationRouting;
+use hopr_api::{
+    chain::{ChainWriteTicketOperations, ChannelSelector},
+    types::internal::routing::DestinationRouting,
+};
 use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue};
 
 // Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
@@ -225,6 +231,11 @@ where
         let probing_tag_allocator = probing_tag_allocator
             .ok_or_else(|| errors::HoprTransportError::Api("probing tag allocator missing".into()))?;
 
+        let ticket_manager = HoprTicketManager::new(match &cfg.ticket_storage_path {
+            Some(path) => RedbStore::new(path)?,
+            None => RedbStore::new_temp()?,
+        })?;
+
         Ok(Self {
             packet_key: identity.1.clone(),
             chain_key: identity.0.clone(),
@@ -262,8 +273,7 @@ where
                 },
                 session_tag_allocator,
             ),
-            tmgr: Arc::new(HoprTicketManager::new(RedbStore::new_temp().unwrap()).unwrap()), /* TODO: propagate
-                                                                                              * errors correctly */
+            tmgr: Arc::new(ticket_manager),
             chain_api: resolver,
             session_telemetry_tag_allocator,
             probing_tag_allocator,
@@ -465,23 +475,24 @@ where
         // Synchronize the ticket manager with the chain before starting the packet pipeline
 
         self.tmgr.sync_from_incoming_channels(
-            &self.chain_api
+            &self
+                .chain_api
                 .stream_channels(ChannelSelector::default().with_destination(&self.chain_key))
                 .await
                 .map_err(HoprTransportError::chain)?
                 .collect::<Vec<_>>()
-                .await
+                .await,
         )?;
 
         self.tmgr.sync_from_outgoing_channels(
-            &self.chain_api
+            &self
+                .chain_api
                 .stream_channels(ChannelSelector::default().with_source(&self.chain_key))
                 .await
                 .map_err(HoprTransportError::chain)?
                 .collect::<Vec<_>>()
-                .await
+                .await,
         )?;
-
 
         let channels_dst = self
             .chain_api
@@ -496,16 +507,15 @@ where
             (mixing_channel_tx, wire_msg_rx),
             (tx_from_protocol, all_resolved_external_msg_rx),
             HoprPipelineComponents {
-                ticket_events: ticket_events
-                    .with(move |event| {
-                        // Make sure winning tickets are passed to the ticket manager
-                        if let TicketEvent::WinningTicket(ticket) = &event {
-                            if let Err(error) = tmgr_clone.insert_incoming_ticket(**ticket) {
-                                tracing::error!(%error, "failed to insert winning ticket into redemption queue");
-                            }
+                ticket_events: ticket_events.with(move |event| {
+                    // Make sure winning tickets are passed to the ticket manager
+                    if let TicketEvent::WinningTicket(ticket) = &event {
+                        if let Err(error) = tmgr_clone.insert_incoming_ticket(**ticket) {
+                            tracing::error!(%error, "failed to insert winning ticket into redemption queue");
                         }
-                        futures::future::ok::<_, T::Error>(event)
-                    }),
+                    }
+                    futures::future::ok::<_, T::Error>(event)
+                }),
                 surb_store: self.path_planner.surb_store.clone(),
                 chain_api: self.chain_api.clone(),
                 ticket_manager: self.tmgr.clone(),

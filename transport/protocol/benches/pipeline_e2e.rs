@@ -17,12 +17,15 @@ use hopr_api::types::{
 };
 use hopr_crypto_packet::{HoprSurb, prelude::HoprPacket};
 use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut};
-use hopr_protocol_hopr::{HoprCodecConfig, HoprDecoder, HoprEncoder, HoprUnacknowledgedTicketProcessor, MemorySurbStore, PacketEncoder, SurbStoreConfig};
+use hopr_protocol_hopr::{
+    HoprCodecConfig, HoprDecoder, HoprEncoder, HoprUnacknowledgedTicketProcessor, MemorySurbStore, PacketEncoder,
+    SurbStoreConfig,
+};
 use hopr_test_stubs::{StubChainApi, StubPathResolver, StubTicketDb};
+use hopr_ticket_manager::{HoprTicketManager, MemoryStore};
 use hopr_transport_mixer::config::MixerConfig;
 use hopr_transport_protocol::TicketEvent;
 use libp2p::PeerId;
-use hopr_ticket_manager::{HoprTicketManager, MemoryStore};
 
 const SAMPLE_SIZE: usize = 30;
 const MEASUREMENT_TIME_SECS: u64 = 30;

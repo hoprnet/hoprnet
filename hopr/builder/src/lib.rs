@@ -41,15 +41,13 @@ use {
 #[cfg(feature = "session-server")]
 use crate::{config::SessionIpForwardingConfig, exit::HoprServerIpForwardingReactor};
 
-pub type ReferenceHopr =
-    Hopr<Arc<HoprBlockchainSafeConnector<BlokliClient>>, SharedChannelGraph, HoprNetwork>;
+pub type ReferenceHopr = Hopr<Arc<HoprBlockchainSafeConnector<BlokliClient>>, SharedChannelGraph, HoprNetwork>;
 
 #[cfg(feature = "runtime-tokio")]
 pub async fn build_reference(
     identity: (&ChainKeypair, &OffchainKeypair),
     config: HoprLibConfig,
     blokli_url: String,
-    db_data_path: String,
     #[cfg(feature = "session-server")] server_config: SessionIpForwardingConfig,
 ) -> anyhow::Result<(
     Arc<ReferenceHopr>,
@@ -88,7 +86,7 @@ pub async fn build_reference(
     #[cfg(feature = "session-server")]
     let session_server = HoprServerIpForwardingReactor::new(packet_key.clone(), server_config);
 
-    build_from_chain_and_db(
+    build_with_chain(
         chain_key,
         packet_key,
         config,
@@ -101,7 +99,7 @@ pub async fn build_reference(
 }
 
 #[cfg(feature = "runtime-tokio")]
-pub async fn build_from_chain_and_db<
+pub async fn build_with_chain<
     Chain,
     #[cfg(feature = "session-server")] Srv: HoprSessionServer + Clone + Send + 'static,
 >(
@@ -275,15 +273,8 @@ where
     // END = process chain and network events into graph updates
 
     // create the node
-    let node = Arc::new(
-        hopr_lib::Hopr::new(
-            (chain_key, packet_key),
-            chain_connector.clone(),
-            graph.clone(),
-            config,
-        )
-        .await?,
-    );
+    let node =
+        Arc::new(hopr_lib::Hopr::new((chain_key, packet_key), chain_connector.clone(), graph.clone(), config).await?);
 
     let node_for_run = node.clone();
     let start = async move {

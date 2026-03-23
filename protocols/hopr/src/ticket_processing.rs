@@ -132,7 +132,12 @@ pub struct HoprUnacknowledgedTicketProcessor<Chain> {
 
 impl<Chain> HoprUnacknowledgedTicketProcessor<Chain> {
     /// Creates a new instance of the HOPR unacknowledged ticket processor.
-    pub fn new(chain_api: Chain, chain_key: ChainKeypair, channels_dst: Hash, cfg: HoprUnacknowledgedTicketProcessorConfig) -> Self {
+    pub fn new(
+        chain_api: Chain,
+        chain_key: ChainKeypair,
+        channels_dst: Hash,
+        cfg: HoprUnacknowledgedTicketProcessorConfig,
+    ) -> Self {
         #[cfg(all(feature = "telemetry", not(test)))]
         {
             lazy_static::initialize(&PER_PEER_ENABLED);

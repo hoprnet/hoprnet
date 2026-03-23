@@ -7,13 +7,13 @@ use axum::{
 };
 use hopr_lib::{
     HoprBalance, ToHex,
+    api::tickets::{ChannelStats, TicketManagement},
     errors::{HoprLibError, HoprStatusError},
     prelude::Hash,
-    api::tickets::TicketManagement
 };
 use serde::Deserialize;
 use serde_with::{DisplayFromStr, serde_as};
-use hopr_lib::api::tickets::ChannelStats;
+
 use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState};
 
 #[serde_as]
@@ -143,7 +143,11 @@ impl From<ChannelStats> for NodeTicketStatisticsResponse {
     )]
 pub(super) async fn show_ticket_statistics(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
     let hopr = state.hopr.clone();
-    match hopr.ticket_management().ticket_stats(None).map(NodeTicketStatisticsResponse::from) {
+    match hopr
+        .ticket_management()
+        .ticket_stats(None)
+        .map(NodeTicketStatisticsResponse::from)
+    {
         Ok(stats) => (StatusCode::OK, Json(stats)).into_response(),
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }

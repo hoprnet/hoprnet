@@ -9,13 +9,13 @@ mod utils;
 
 use std::{convert::identity, sync::atomic::AtomicBool};
 
-use futures::{TryFutureExt, Stream};
+use futures::{Stream, TryFutureExt};
 use hopr_api::{
-    chain::TicketRedeemError,
+    chain::{ChainWriteTicketOperations, TicketRedeemError},
+    tickets::{ChannelStats, RedemptionResult},
     types::{internal::prelude::*, primitive::prelude::*},
 };
-use hopr_api::chain::ChainWriteTicketOperations;
-use hopr_api::tickets::{ChannelStats, RedemptionResult};
+
 #[cfg(feature = "redb")]
 pub use crate::backend::{RedbStore, RedbTicketQueue};
 use crate::{
@@ -256,7 +256,10 @@ where
             tracing::debug!(%id, epoch, out_index, "loaded outgoing ticket index for channel");
         }
 
-        tracing::debug!(num_channels = outgoing_channels.len(), "synchronized with outgoing channels");
+        tracing::debug!(
+            num_channels = outgoing_channels.len(),
+            "synchronized with outgoing channels"
+        );
         Ok(())
     }
 
@@ -406,7 +409,11 @@ where
             self.channel_tickets.insert(*id, queue.into());
         }
 
-        tracing::debug!(num_channels = incoming_channels.len(), num_neglected = neglected.len(), "synchronized with incoming channels");
+        tracing::debug!(
+            num_channels = incoming_channels.len(),
+            num_neglected = neglected.len(),
+            "synchronized with incoming channels"
+        );
         Ok(neglected)
     }
 
@@ -522,7 +529,7 @@ where
 impl<S> hopr_api::tickets::TicketManagement for HoprTicketManager<S, S::Queue>
 where
     S: TicketQueueStore + Send + Sync + 'static,
-    S::Queue: Send + Sync + 'static
+    S::Queue: Send + Sync + 'static,
 {
     type Error = TicketManagerError;
 
@@ -727,9 +734,9 @@ mod tests {
     use futures::{TryStreamExt, pin_mut};
     use hopr_api::{
         OffchainKeypair,
+        tickets::TicketManagement,
         types::crypto::prelude::{ChainKeypair, Keypair},
     };
-    use hopr_api::tickets::TicketManagement;
     use hopr_chain_connector::{
         BlockchainConnectorConfig, HoprBlockchainConnector, InMemoryBackend, PayloadGenerator, SafePayloadGenerator,
         reexports::chain::contract_addresses_for_network,

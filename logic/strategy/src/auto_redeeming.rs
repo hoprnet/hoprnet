@@ -6,19 +6,24 @@
 use std::{
     fmt::{Debug, Display, Formatter},
     str::FromStr,
+    time::Duration,
 };
-use std::time::Duration;
+
 use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt};
+use hopr_async_runtime::{AbortableList, spawn_as_abortable};
+use hopr_lib::{
+    ChannelChange, ChannelDirection, ChannelEntry, ChannelId, ChannelStatus, HoprBalance, VerifiedTicket,
+    api::{
+        chain::{ChainReadChannelOperations, ChainWriteTicketOperations, ChannelSelector},
+        tickets::TicketManagement,
+    },
+};
 use parking_lot::lock_api::RwLockUpgradableReadGuard;
-use hopr_lib::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus, HoprBalance, VerifiedTicket, api::{
-    chain::{ChainReadChannelOperations, ChainWriteTicketOperations, ChannelSelector},
-    tickets::{TicketManagement},
-}, ChannelId};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use validator::Validate;
-use hopr_async_runtime::{spawn_as_abortable, AbortableList};
+
 use crate::{
     Strategy,
     errors::{StrategyError, StrategyError::CriteriaNotSatisfied},
@@ -85,7 +90,7 @@ pub struct AutoRedeemingStrategy<A, T> {
     cfg: AutoRedeemingStrategyConfig,
     hopr_chain_actions: A,
     ticket_manager: T,
-    running_redemptions: std::sync::Arc<parking_lot::RwLock<AbortableList<ChannelId>>>
+    running_redemptions: std::sync::Arc<parking_lot::RwLock<AbortableList<ChannelId>>>,
 }
 
 impl<A, T> Debug for AutoRedeemingStrategy<A, T> {
@@ -103,7 +108,7 @@ impl<A, T> Display for AutoRedeemingStrategy<A, T> {
 impl<A, T> AutoRedeemingStrategy<A, T>
 where
     A: ChainReadChannelOperations + ChainWriteTicketOperations + Clone + Send + Sync + 'static,
-    T: TicketManagement + Clone + Sync + Send + 'static
+    T: TicketManagement + Clone + Sync + Send + 'static,
 {
     pub fn new(cfg: AutoRedeemingStrategyConfig, hopr_chain_actions: A, ticket_manager: T) -> Self {
         Self {
@@ -123,25 +128,28 @@ where
             let channel_id = *channel_id;
             let redemptions_clone = self.running_redemptions.clone();
 
-            RwLockUpgradableReadGuard::upgrade(redemptions)
-                .insert(channel_id, spawn_as_abortable!(async move {
+            RwLockUpgradableReadGuard::upgrade(redemptions).insert(
+                channel_id,
+                spawn_as_abortable!(async move {
                     hopr_async_runtime::prelude::sleep(Duration::from_millis(100)).await;
                     let redeem_result = match tmgr.redeem_stream(client.clone(), channel_id, min_value.into()) {
-                        Ok(stream) => stream
-                            .map_err(StrategyError::other)
-                            .try_for_each(|res| {
-                                tracing::debug!(?res, %channel_id, "ticket redemption completed");
-                                futures::future::ok(())
-                            })
-                            .await,
-                        Err(error) => Err(StrategyError::other(error))
+                        Ok(stream) => {
+                            stream
+                                .map_err(StrategyError::other)
+                                .try_for_each(|res| {
+                                    tracing::debug!(?res, %channel_id, "ticket redemption completed");
+                                    futures::future::ok(())
+                                })
+                                .await
+                        }
+                        Err(error) => Err(StrategyError::other(error)),
                     };
 
                     tracing::debug!(?redeem_result, %channel_id, "redemption in channel complete");
                     redemptions_clone.write().abort_one(&channel_id);
-                }));
+                }),
+            );
             Ok(true)
-
         } else {
             tracing::debug!(%channel_id, "existing on-going redemption");
             Ok(false)
@@ -153,7 +161,7 @@ where
 impl<A, T> SingularStrategy for AutoRedeemingStrategy<A, T>
 where
     A: ChainReadChannelOperations + ChainWriteTicketOperations + Clone + Send + Sync + 'static,
-    T: TicketManagement + Clone + Sync + Send + 'static
+    T: TicketManagement + Clone + Sync + Send + 'static,
 {
     async fn on_tick(&self) -> crate::errors::Result<()> {
         if !self.cfg.redeem_on_winning {
@@ -163,7 +171,7 @@ where
                 .stream_channels(
                     ChannelSelector::default()
                         .with_destination(*self.hopr_chain_actions.me())
-                        .with_redeemable_channels(Duration::from_secs(30).into())
+                        .with_redeemable_channels(Duration::from_secs(30).into()),
                 )
                 .await
                 .map_err(StrategyError::other)?

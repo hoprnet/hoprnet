@@ -23,7 +23,7 @@ fn default_counter_flush_interval() -> Duration {
 }
 
 /// Complete configuration of the HOPR protocol stack.
-#[derive(Debug, smart_default::SmartDefault, Validate, Clone, Copy, PartialEq)]
+#[derive(Debug, smart_default::SmartDefault, Validate, Clone, PartialEq)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize),
@@ -49,6 +49,12 @@ pub struct HoprProtocolConfig {
     /// Path planner configuration
     #[cfg_attr(feature = "serde", serde(skip))]
     pub path_planner: hopr_transport_path::PathPlannerConfig,
+    /// Path where to store received winning tickets.
+    ///
+    /// If omitted, the ticket storage will be in temporary directory and
+    /// the tickets might be wiped on system restart.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    pub ticket_storage_path: Option<String>,
     /// Interval at which per-peer protocol conformance counters are flushed
     /// into the network graph.
     ///

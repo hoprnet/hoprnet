@@ -1,7 +1,4 @@
-use std::sync::{
-    Arc,
-    atomic::{AtomicU64},
-};
+use std::sync::{Arc, atomic::AtomicU64};
 
 use bimap::BiMap;
 use dashmap::DashMap;

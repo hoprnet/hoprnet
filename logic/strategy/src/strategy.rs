@@ -24,7 +24,10 @@ use async_trait::async_trait;
 use hopr_lib::{
     ChannelChange, ChannelDirection, ChannelEntry, VerifiedTicket,
     api::{
-        chain::{ChainReadChannelOperations, ChainReadSafeOperations, ChainValues, ChainWriteChannelOperations, ChainWriteTicketOperations},
+        chain::{
+            ChainReadChannelOperations, ChainReadSafeOperations, ChainValues, ChainWriteChannelOperations,
+            ChainWriteTicketOperations,
+        },
         tickets::TicketManagement,
     },
 };
@@ -35,11 +38,8 @@ use tracing::{error, warn};
 use validator::{Validate, ValidationError};
 
 use crate::{
-    Strategy,
-    auto_funding::AutoFundingStrategy,
-    auto_redeeming::AutoRedeemingStrategy,
-    channel_finalizer::ClosureFinalizerStrategy,
-    errors::Result,
+    Strategy, auto_funding::AutoFundingStrategy, auto_redeeming::AutoRedeemingStrategy,
+    channel_finalizer::ClosureFinalizerStrategy, errors::Result,
 };
 
 #[cfg(all(feature = "telemetry", not(test)))]

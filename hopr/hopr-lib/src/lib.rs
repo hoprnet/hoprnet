@@ -72,7 +72,7 @@ use std::{
     time::Duration,
 };
 
-use futures::{FutureExt, Stream, StreamExt, TryFutureExt, channel::mpsc::channel, pin_mut, TryStreamExt};
+use futures::{FutureExt, Stream, StreamExt, TryFutureExt, TryStreamExt, channel::mpsc::channel, pin_mut};
 use futures_time::future::FutureExt as FuturesTimeFutureExt;
 use hopr_api::{
     chain::{AccountSelector, AnnouncementError, ChannelSelector, *},
@@ -83,8 +83,8 @@ pub use hopr_api::{
     graph::EdgeLinkObservable,
     network::{NetworkBuilder, NetworkStreamControl},
     node::{HoprNodeNetworkOperations, HoprNodeOperations, state::HoprState},
+    tickets::{ChannelStats, RedemptionResult, TicketManagement, TicketManagementExt},
     types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*},
-    tickets::{TicketManagement, TicketManagementExt, ChannelStats, RedemptionResult},
 };
 use hopr_async_runtime::prelude::spawn;
 pub use hopr_async_runtime::{Abortable, AbortableList};
@@ -92,7 +92,6 @@ pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 pub use hopr_network_types::prelude::*;
 #[cfg(all(feature = "telemetry", not(test)))]
 use hopr_platform::time::native::current_time;
-
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport::transfer_session;
 pub use hopr_transport::*;
@@ -654,7 +653,6 @@ where
             .run(cover_traffic, network_builder, tickets_tx, session_tx)
             .await?;
         processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
-
 
         info!("subscribing to channel events");
         let (chain_events_sub_handle, chain_events_sub_reg) = hopr_async_runtime::AbortHandle::new_pair();
@@ -1278,22 +1276,26 @@ where
             .map_err(HoprLibError::ticket_manager)
     }
 
-    pub async fn redeem_all_tickets<B: Into<HoprBalance> + Send>(&self, min_value: B) -> Result<Vec<RedemptionResult>, HoprLibError> {
+    pub async fn redeem_all_tickets<B: Into<HoprBalance> + Send>(
+        &self,
+        min_value: B,
+    ) -> Result<Vec<RedemptionResult>, HoprLibError> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         let min_value = min_value.into();
 
         self.ticket_management()
-            .redeem_in_channels(self.chain_api.clone(),
-                                    None,
-                                    min_value.into(),
-                                    Some(Duration::from_mins(1))
+            .redeem_in_channels(
+                self.chain_api.clone(),
+                None,
+                min_value.into(),
+                Some(Duration::from_mins(1)),
             )
-                .await
-                .map_err(HoprLibError::ticket_manager)?
-                .try_collect::<Vec<_>>()
-                .map_err(HoprLibError::ticket_manager)
-                .await
+            .await
+            .map_err(HoprLibError::ticket_manager)?
+            .try_collect::<Vec<_>>()
+            .map_err(HoprLibError::ticket_manager)
+            .await
     }
 
     pub async fn redeem_tickets_with_counterparty<B: Into<HoprBalance> + Send>(
@@ -1301,10 +1303,11 @@ where
         counterparty: &Address,
         min_value: B,
     ) -> Result<Vec<RedemptionResult>, HoprLibError> {
-        self.redeem_tickets_in_channel(&generate_channel_id(counterparty, &self.me_onchain()), min_value).await
+        self.redeem_tickets_in_channel(&generate_channel_id(counterparty, &self.me_onchain()), min_value)
+            .await
     }
 
-    pub async fn  redeem_tickets_in_channel<B: Into<HoprBalance> + Send>(
+    pub async fn redeem_tickets_in_channel<B: Into<HoprBalance> + Send>(
         &self,
         channel_id: &ChannelId,
         min_value: B,
@@ -1313,24 +1316,29 @@ where
 
         let min_value = min_value.into();
 
-        let channel = self.chain_api
+        let channel = self
+            .chain_api
             .channel_by_id(channel_id)
             .await
             .map_err(HoprLibError::chain)?
             .ok_or(HoprLibError::GeneralError("channel not found".into()))?;
 
-        self.transport_api.ticket_manager().redeem_in_channels(self.chain_api.clone(), ChannelSelector::default()
-            .with_source(channel.source)
-            .with_destination(channel.destination)
-            .into(),
-            min_value.into(),
-            Some(Duration::from_mins(1))
-        )
-        .await
-        .map_err(HoprLibError::ticket_manager)?
-        .map_err(HoprLibError::ticket_manager)
-        .try_collect::<Vec<_>>()
-        .await
+        self.transport_api
+            .ticket_manager()
+            .redeem_in_channels(
+                self.chain_api.clone(),
+                ChannelSelector::default()
+                    .with_source(channel.source)
+                    .with_destination(channel.destination)
+                    .into(),
+                min_value.into(),
+                Some(Duration::from_mins(1)),
+            )
+            .await
+            .map_err(HoprLibError::ticket_manager)?
+            .map_err(HoprLibError::ticket_manager)
+            .try_collect::<Vec<_>>()
+            .await
     }
 
     pub fn ticket_management(&self) -> impl TicketManagement + Clone + Send + 'static {

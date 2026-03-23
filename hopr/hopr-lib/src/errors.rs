@@ -20,7 +20,7 @@ pub enum HoprLibError {
 
     #[error("configuration validation failed: {0}")]
     ConfigurationError(#[from] validator::ValidationErrors),
-    
+
     #[error("chain error: {0}")]
     ChainError(#[source] anyhow::Error),
 
@@ -32,7 +32,7 @@ pub enum HoprLibError {
 
     #[error(transparent)]
     TicketManagerError(#[from] anyhow::Error),
-    
+
     #[error(transparent)]
     TypeError(#[from] hopr_api::types::primitive::errors::GeneralError),
 
