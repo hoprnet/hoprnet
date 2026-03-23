@@ -32,3 +32,4 @@ sed -i'.original' 's/^version = ".*"$/version = "'${new_version}'"/' ${mydir}/..
 rm ${mydir}/../hoprd/hoprd/Cargo.toml.original
 
 ## Dummy change to force closing the PR automatically before run jobs
+#
