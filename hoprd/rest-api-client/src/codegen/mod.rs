@@ -2940,8 +2940,14 @@ Get the network graph in DOT (Graphviz) format
 
 Sends a `GET` request to `/api/v4/network/graph`
 
+Arguments:
+- `reachable_only`: When true, only include edges reachable from this node via directed
+traversal. Disconnected subgraphs that cannot be routed through are excluded.
 */
-    pub async fn graph<'a>(&'a self) -> Result<ResponseValue<ByteStream>, Error<()>> {
+    pub async fn graph<'a>(
+        &'a self,
+        reachable_only: Option<bool>,
+    ) -> Result<ResponseValue<ByteStream>, Error<()>> {
         let url = format!("{}/api/v4/network/graph", self.baseurl,);
         let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
         header_map
@@ -2950,7 +2956,12 @@ Sends a `GET` request to `/api/v4/network/graph`
                 ::reqwest::header::HeaderValue::from_static(Self::api_version()),
             );
         #[allow(unused_mut)]
-        let mut request = self.client.get(url).headers(header_map).build()?;
+        let mut request = self
+            .client
+            .get(url)
+            .query(&progenitor_client::QueryParam::new("reachableOnly", &reachable_only))
+            .headers(header_map)
+            .build()?;
         let info = OperationInfo {
             operation_id: "graph",
         };
