@@ -49,6 +49,17 @@ pub struct ProberConfig {
     #[cfg_attr(feature = "serde", serde(default = "default_shuffle_ttl", with = "humantime_serde"))]
     #[default(default_shuffle_ttl())]
     pub shuffle_ttl: std::time::Duration,
+
+    /// When `true`, neighbor probes are only sent to peers that have a
+    /// `Connected(true)` edge in the graph (i.e. the background discovery
+    /// process has already established a transport-level connection).
+    ///
+    /// When `false` (the default), all known peers are probed regardless of
+    /// connection state — useful during bootstrap or when discovery runs
+    /// out-of-band.
+    #[cfg_attr(feature = "serde", serde(default = "default_true"))]
+    #[default(default_true())]
+    pub probe_connected_only: bool,
 }
 
 impl Validate for ProberConfig {
@@ -108,6 +119,11 @@ const fn default_shuffle_ttl() -> std::time::Duration {
 #[inline]
 const fn default_probing_interval() -> std::time::Duration {
     std::time::Duration::from_secs(30)
+}
+
+#[inline]
+const fn default_true() -> bool {
+    true
 }
 
 #[cfg(test)]

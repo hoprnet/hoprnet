@@ -10,9 +10,7 @@ use hopr_api::{
     },
     types::crypto::prelude::Keypair,
 };
-use hopr_network_graph::ChannelGraph;
-
-use hopr_network_graph::DEFAULT_EDGE_PENALTY;
+use hopr_network_graph::{ChannelGraph, DEFAULT_EDGE_PENALTY};
 /// Intentionally 0.0 for benchmarks (no ack filtering).
 const DEFAULT_MIN_ACK_RATE: f64 = 0.0;
 

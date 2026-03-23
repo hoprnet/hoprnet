@@ -74,6 +74,8 @@ pub fn render_edges_as_dot(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use hopr_api::{
         graph::{
             NetworkGraphWrite,
@@ -81,8 +83,6 @@ mod tests {
         },
         types::crypto::prelude::{Keypair, OffchainKeypair},
     };
-
-    use std::collections::HashMap;
 
     use super::*;
     use crate::ChannelGraph;
