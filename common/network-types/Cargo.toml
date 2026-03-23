@@ -25,7 +25,7 @@ runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hickory-resolver/tokio",
 ]
-prometheus = ["dep:hopr-metrics"]
+telemetry = ["dep:hopr-metrics"]
 
 [dependencies]
 arrayvec = { workspace = true }

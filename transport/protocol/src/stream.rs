@@ -16,7 +16,7 @@ use tokio_util::{
 
 // TODO: see if these constants should be configurable instead
 
-/// Global timeout for the [`BidirectionalStreamControl::open`] operation.
+/// Global timeout for the `BidirectionalStreamControl::open` operation.
 const GLOBAL_STREAM_OPEN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
 const MAX_CONCURRENT_PACKETS: usize = 30;
 

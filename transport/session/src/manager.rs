@@ -19,6 +19,7 @@ use hopr_protocol_start::{
     KeepAliveFlag, KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished,
     StartInitiation,
 };
+use hopr_transport_tag_allocator::{AllocatedTag, TagAllocator};
 use hopr_types::{
     crypto_random::Randomizable,
     internal::{
@@ -31,7 +32,8 @@ use tracing::{debug, error, info, trace, warn};
 
 #[cfg(feature = "telemetry")]
 use crate::telemetry::{
-    self, SessionLifecycleState, SessionStatsSnapshot, SessionTelemetry, register_session_telemetry,
+    SessionLifecycleState, initialize_session_metrics, remove_session_metrics_state, set_session_balancer_data,
+    set_session_state,
 };
 use crate::{
     Capability, HoprSession, IncomingSession, SESSION_MTU, SessionClientConfig, SessionId, SessionTarget,
@@ -48,7 +50,7 @@ use crate::{
     utils::{SurbNotificationMode, insert_into_next_slot},
 };
 
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_ACTIVE_SESSIONS: hopr_metrics::SimpleGauge = hopr_metrics::SimpleGauge::new(
         "hopr_session_num_active_sessions",
@@ -79,9 +81,8 @@ fn close_session(session_id: SessionId, session_data: SessionSlot, reason: Closu
 
     #[cfg(feature = "telemetry")]
     {
-        session_data.telemetry.set_state(SessionLifecycleState::Closed);
-        session_data.telemetry.touch_activity();
-        telemetry::unregister_session_telemetry(&session_id);
+        set_session_state(&session_id, SessionLifecycleState::Closed);
+        remove_session_metrics_state(&session_id);
     }
 
     if reason != ClosureReason::EmptyRead {
@@ -93,13 +94,7 @@ fn close_session(session_id: SessionId, session_data: SessionSlot, reason: Closu
     // Terminate any additional tasks spawned by the Session
     session_data.abort_handles.lock().abort_all();
 
-    #[cfg(feature = "telemetry")]
-    {
-        session_data.telemetry.set_state(SessionLifecycleState::Closed);
-        session_data.telemetry.touch_activity();
-    }
-
-    #[cfg(all(feature = "prometheus", not(test)))]
+    #[cfg(all(feature = "telemetry", not(test)))]
     METRIC_ACTIVE_SESSIONS.decrement(1.0);
 }
 
@@ -141,15 +136,16 @@ struct SessionSlot {
     routing_opts: DestinationRouting,
     // Additional tasks spawned by the Session.
     abort_handles: Arc<parking_lot::Mutex<AbortableList<SessionTasks>>>,
-    // Additional per-session telemetry
-    #[cfg(feature = "telemetry")]
-    telemetry: Arc<SessionTelemetry>,
     // Allows reconfiguring of the SURB balancer on-the-fly
     // Set on both Entry and Exit sides.
     surb_mgmt: Arc<BalancerStateValues>,
     // SURB flow updates happening outside of Session protocol
     // (e.g., due to Start protocol messages).
     surb_estimator: AtomicSurbFlowEstimator,
+    // Holds the allocated tag so it is returned to the pool when the session is evicted.
+    // `None` for outgoing sessions where the tag was assigned by the remote peer.
+    #[allow(dead_code, reason = "kept alive for Drop-based tag deallocation")]
+    allocated_tag: Option<Arc<AllocatedTag>>,
 }
 
 /// Indicates the result of processing a message.
@@ -164,28 +160,6 @@ pub enum DispatchResult {
 /// Configuration for the [`SessionManager`].
 #[derive(Clone, Debug, PartialEq, smart_default::SmartDefault)]
 pub struct SessionManagerConfig {
-    /// Ranges of tags available for Sessions.
-    ///
-    /// **NOTE**: If the range starts lower than [`ReservedTag`]'s range end,
-    /// it will be automatically transformed to start at this value.
-    /// This is due to the reserved range by the Start sub-protocol.
-    ///
-    /// Default is 16..1024.
-    #[doc(hidden)]
-    #[default(_code = "16u64..1024u64")]
-    pub session_tag_range: Range<u64>,
-
-    /// The maximum number of sessions (incoming and outgoing) that is allowed
-    /// to be managed by the manager.
-    ///
-    /// When reached, creating [new sessions](SessionManager::new_session) will return
-    /// the [`SessionManagerError::TooManySessions`] error, and incoming sessions will be rejected
-    /// with [`StartErrorReason::NoSlotsAvailable`] Start protocol error.
-    ///
-    /// Default is 128, minimum is 1; maximum is given by the `session_tag_range`.
-    #[default(128)]
-    pub maximum_sessions: usize,
-
     /// The maximum chunk of data that can be written to the Session's input buffer.
     ///
     /// Default is 1500.
@@ -417,6 +391,11 @@ pub struct SessionManager<S, T> {
     session_notifiers: Arc<OnceLock<(T, Sender<(SessionId, ClosureReason)>)>>,
     sessions: moka::future::Cache<SessionId, SessionSlot>,
     msg_sender: Arc<OnceLock<S>>,
+    tag_allocator: Arc<dyn TagAllocator + Send + Sync>,
+    /// Tag value range for sessions, derived from the [`TagAllocator`].
+    session_tag_range: Range<u64>,
+    /// Maximum number of concurrent sessions, derived from the [`TagAllocator`] capacity.
+    maximum_sessions: usize,
     cfg: SessionManagerConfig,
 }
 
@@ -428,6 +407,9 @@ impl<S, T> Clone for SessionManager<S, T> {
             sessions: self.sessions.clone(),
             cfg: self.cfg.clone(),
             msg_sender: self.msg_sender.clone(),
+            tag_allocator: self.tag_allocator.clone(),
+            session_tag_range: self.session_tag_range.clone(),
+            maximum_sessions: self.maximum_sessions,
         }
     }
 }
@@ -441,22 +423,16 @@ where
     S::Error: std::error::Error + Send + Sync + Clone + 'static,
     T::Error: std::error::Error + Send + Sync + Clone + 'static,
 {
-    /// Creates a new instance given the [`config`](SessionManagerConfig).
-    pub fn new(mut cfg: SessionManagerConfig) -> Self {
-        let min_session_tag_range_reservation = ReservedTag::range().end;
-        debug_assert!(
-            min_session_tag_range_reservation > HoprStartProtocol::START_PROTOCOL_MESSAGE_TAG.as_u64(),
-            "invalid tag reservation range"
-        );
+    /// Creates a new instance given the [`config`](SessionManagerConfig) and a [`TagAllocator`]
+    /// for allocating session tags on the Exit (incoming) side.
+    pub fn new(mut cfg: SessionManagerConfig, tag_allocator: Arc<dyn TagAllocator + Send + Sync>) -> Self {
+        let session_tag_range = tag_allocator.tag_range();
+        let maximum_sessions = tag_allocator.capacity().max(1) as usize;
 
-        // Accommodate the lower bound if too low.
-        if cfg.session_tag_range.start < min_session_tag_range_reservation {
-            let diff = min_session_tag_range_reservation - cfg.session_tag_range.start;
-            cfg.session_tag_range = min_session_tag_range_reservation..cfg.session_tag_range.end + diff;
-        }
-        cfg.maximum_sessions = cfg
-            .maximum_sessions
-            .clamp(1, (cfg.session_tag_range.end - cfg.session_tag_range.start) as usize);
+        debug_assert!(
+            session_tag_range.start >= ReservedTag::range().end,
+            "session tag range must not overlap with reserved tags"
+        );
         cfg.surb_balance_notify_period = cfg
             .surb_balance_notify_period
             .map(|p| p.max(MIN_SURB_BUFFER_NOTIFICATION_PERIOD));
@@ -466,14 +442,14 @@ where
         cfg.frame_mtu = cfg.frame_mtu.max(SESSION_MTU);
         cfg.max_frame_timeout = cfg.max_frame_timeout.max(MIN_FRAME_TIMEOUT);
 
-        #[cfg(all(feature = "prometheus", not(test)))]
+        #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_ACTIVE_SESSIONS.set(0.0);
 
         let msg_sender = Arc::new(OnceLock::new());
         Self {
             msg_sender: msg_sender.clone(),
             session_initiations: moka::future::Cache::builder()
-                .max_capacity(cfg.maximum_sessions as u64)
+                .max_capacity(maximum_sessions as u64)
                 .time_to_live(
                     2 * initiation_timeout_max_one_way(
                         cfg.initiation_timeout_base,
@@ -482,7 +458,7 @@ where
                 )
                 .build(),
             sessions: moka::future::Cache::builder()
-                .max_capacity(cfg.maximum_sessions as u64)
+                .max_capacity(maximum_sessions as u64)
                 .time_to_idle(cfg.idle_timeout)
                 .eviction_listener(|session_id: Arc<SessionId>, entry, reason| match &reason {
                     moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size => {
@@ -493,6 +469,9 @@ where
                 })
                 .build(),
             session_notifiers: Arc::new(OnceLock::new()),
+            tag_allocator,
+            session_tag_range,
+            maximum_sessions,
             cfg,
         }
     }
@@ -507,7 +486,7 @@ where
             .set(msg_sender)
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
 
-        let (session_close_tx, session_close_rx) = futures::channel::mpsc::channel(self.cfg.maximum_sessions + 10);
+        let (session_close_tx, session_close_rx) = futures::channel::mpsc::channel(self.maximum_sessions + 10);
         self.session_notifiers
             .set((new_session_notifier, session_close_tx))
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
@@ -583,7 +562,7 @@ where
             })
             .await
         {
-            #[cfg(all(feature = "prometheus", not(test)))]
+            #[cfg(all(feature = "telemetry", not(test)))]
             {
                 METRIC_NUM_INITIATED_SESSIONS.increment();
                 METRIC_ACTIVE_SESSIONS.increment(1.0);
@@ -611,7 +590,7 @@ where
         cfg: SessionClientConfig,
     ) -> crate::errors::Result<HoprSession> {
         self.sessions.run_pending_tasks().await;
-        if self.cfg.maximum_sessions <= self.sessions.entry_count() as usize {
+        if self.maximum_sessions <= self.sessions.entry_count() as usize {
             return Err(SessionManagerError::TooManySessions.into());
         }
 
@@ -709,16 +688,6 @@ where
                     })
                     .ok_or(SessionManagerError::NotStarted)?;
 
-                #[cfg(feature = "telemetry")]
-                let telemetry = Arc::new(SessionTelemetry::new(
-                    session_id,
-                    HoprSessionConfig {
-                        capabilities: cfg.capabilities,
-                        frame_mtu: self.cfg.frame_mtu,
-                        frame_timeout: self.cfg.max_frame_timeout,
-                    },
-                ));
-
                 // NOTE: the Exit node can have different `max_surb_buffer_size`
                 // setting on the Session manager, so it does not make sense to cap it here
                 // with our maximum value.
@@ -729,11 +698,13 @@ where
                     let surb_estimator_clone = surb_estimator.clone();
                     let full_surb_scoring_sender =
                         msg_sender.with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
+                            let produced = data.estimate_surbs_with_msg() as u64;
                             // Count how many SURBs we sent with each packet
-                            surb_estimator_clone.produced.fetch_add(
-                                data.estimate_surbs_with_msg() as u64,
-                                std::sync::atomic::Ordering::Relaxed,
-                            );
+                            surb_estimator_clone
+                                .produced
+                                .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
+                            #[cfg(feature = "telemetry")]
+                            crate::telemetry::record_session_surb_produced(&session_id, produced);
                             futures::future::ok::<_, S::Error>((routing, data))
                         });
 
@@ -801,17 +772,10 @@ where
                             abort_handles: Arc::new(parking_lot::Mutex::new(abort_handles)),
                             surb_mgmt: surb_mgmt.clone(),
                             surb_estimator: surb_estimator.clone(),
-                            #[cfg(feature = "telemetry")]
-                            telemetry: telemetry.clone(),
+                            allocated_tag: None,
                         },
                     )
                     .await?;
-
-                    #[cfg(feature = "telemetry")]
-                    {
-                        telemetry.set_state(SessionLifecycleState::Active);
-                        telemetry.set_balancer_data(surb_estimator.clone(), surb_mgmt);
-                    }
 
                     // Wait for enough SURBs to be sent to the counterparty
                     // TODO: consider making this interactive = other party reports the exact level periodically
@@ -836,6 +800,7 @@ where
                         }
                     }
 
+                    let surb_estimator_for_rx = surb_estimator.clone();
                     let session = HoprSession::new(
                         session_id,
                         forward_routing,
@@ -849,18 +814,30 @@ where
                             rx.inspect(move |_| {
                                 // Received packets = SURB consumption estimate
                                 // The received packets always consume a single SURB.
-                                surb_estimator
+                                surb_estimator_for_rx
                                     .consumed
                                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                #[cfg(feature = "telemetry")]
+                                crate::telemetry::record_session_surb_consumed(&session_id, 1);
                             }),
                         ),
                         Some(notifier),
-                        #[cfg(feature = "telemetry")]
-                        telemetry.clone(),
                     )?;
 
                     #[cfg(feature = "telemetry")]
-                    register_session_telemetry(&telemetry);
+                    {
+                        initialize_session_metrics(
+                            session_id,
+                            HoprSessionConfig {
+                                capabilities: cfg.capabilities,
+                                frame_mtu: self.cfg.frame_mtu,
+                                frame_timeout: self.cfg.max_frame_timeout,
+                            },
+                        );
+                        set_session_state(&session_id, SessionLifecycleState::Active);
+                        set_session_balancer_data(&session_id, surb_estimator.clone(), surb_mgmt.clone());
+                    }
+
                     Ok(session)
                 } else {
                     warn!(%session_id, "session ready without SURB balancing");
@@ -873,13 +850,10 @@ where
                             abort_handles: Default::default(),
                             surb_mgmt: Default::default(),      // Disabled SURB management
                             surb_estimator: Default::default(), // No SURB estimator needed
-                            #[cfg(feature = "telemetry")]
-                            telemetry: telemetry.clone(),
+                            allocated_tag: None,
                         },
                     )
                     .await?;
-                    #[cfg(feature = "telemetry")]
-                    telemetry.set_state(SessionLifecycleState::Active);
 
                     // For standard Session data we first reduce the number of SURBs we want to produce,
                     // unless requested to always max them out
@@ -907,12 +881,20 @@ where
                         },
                         (reduced_surb_sender, rx),
                         Some(notifier),
-                        #[cfg(feature = "telemetry")]
-                        telemetry.clone(),
                     )?;
 
                     #[cfg(feature = "telemetry")]
-                    register_session_telemetry(&telemetry);
+                    {
+                        initialize_session_metrics(
+                            session_id,
+                            HoprSessionConfig {
+                                capabilities: cfg.capabilities,
+                                frame_mtu: self.cfg.frame_mtu,
+                                frame_timeout: self.cfg.max_frame_timeout,
+                            },
+                        );
+                        set_session_state(&session_id, SessionLifecycleState::Active);
+                    }
 
                     Ok(session)
                 }
@@ -934,7 +916,7 @@ where
                 // Timeout waiting for a session establishment
                 error!(challenge, "session initiation attempt timed out");
 
-                #[cfg(all(feature = "prometheus", not(test)))]
+                #[cfg(all(feature = "telemetry", not(test)))]
                 METRIC_RECEIVED_SESSION_ERRS.increment(&["timeout"]);
 
                 Err(TransportSessionError::Timeout)
@@ -1034,17 +1016,6 @@ where
         }
     }
 
-    /// Retrieves useful statistics of the given [session](HoprSession).
-    ///
-    /// Returns an error if the Session with the given `id` does not exist.
-    #[cfg(feature = "telemetry")]
-    pub async fn get_session_telemetry(&self, id: &SessionId) -> crate::errors::Result<SessionStatsSnapshot> {
-        match self.sessions.get(id).await.map(|session| session.telemetry) {
-            Some(telemetry) => Ok(telemetry.snapshot()),
-            None => Err(SessionManagerError::NonExistingSession.into()),
-        }
-    }
-
     /// The main method to be called whenever data are received.
     ///
     /// It tries to recognize the message and correctly dispatches either
@@ -1063,11 +1034,7 @@ where
                 .handle_start_protocol_message(pseudonym, in_data)
                 .await
                 .map(|_| DispatchResult::Processed);
-        } else if self
-            .cfg
-            .session_tag_range
-            .contains(&in_data.data.application_tag.as_u64())
-        {
+        } else if self.session_tag_range.contains(&in_data.data.application_tag.as_u64()) {
             let session_id = SessionId::new(in_data.data.application_tag, pseudonym);
 
             return if let Some(session_slot) = self.sessions.get(&session_id).await {
@@ -1110,52 +1077,29 @@ where
 
         let (tx_session_data, rx_session_data) = futures::channel::mpsc::unbounded::<ApplicationDataIn>();
 
-        // Search for a free Session ID slot
+        // Allocate a unique tag for this incoming session
         self.sessions.run_pending_tasks().await; // Needed so that entry_count is updated
-        let allocated_slot = if self.cfg.maximum_sessions > self.sessions.entry_count() as usize {
-            insert_into_next_slot(
-                &self.sessions,
-                |sid| {
-                    // NOTE: It is allowed to insert sessions using the same tag
-                    // but different pseudonyms because the SessionId is different.
-                    let next_tag: Tag = match sid {
-                        Some(session_id) => ((session_id.tag().as_u64() + 1) % self.cfg.session_tag_range.end)
-                            .max(self.cfg.session_tag_range.start)
-                            .into(),
-                        None => hopr_types::crypto_random::random_integer(
-                            self.cfg.session_tag_range.start,
-                            Some(self.cfg.session_tag_range.end),
-                        )
-                        .into(),
-                    };
-                    SessionId::new(next_tag, pseudonym)
-                },
-                |_sid| SessionSlot {
-                    session_tx: Arc::new(tx_session_data),
-                    routing_opts: reply_routing.clone(),
-                    abort_handles: Default::default(),
-                    surb_mgmt: Default::default(),
-                    surb_estimator: Default::default(),
-                    #[cfg(feature = "telemetry")]
-                    telemetry: Arc::new(SessionTelemetry::new(
-                        _sid,
-                        HoprSessionConfig {
-                            capabilities: session_req.capabilities.0,
-                            frame_mtu: self.cfg.frame_mtu,
-                            frame_timeout: self.cfg.max_frame_timeout,
-                        },
-                    )),
-                },
-            )
-            .await
+        let allocated_tag = if self.maximum_sessions > self.sessions.entry_count() as usize {
+            self.tag_allocator.allocate()
         } else {
             error!(%pseudonym, "cannot accept incoming session, the maximum number of sessions has been reached");
             None
         };
 
-        // If some of the following code throws an error, the allocated slot will be kept
-        // but will be later re-claimed when it expires.
-        if let Some((session_id, slot)) = allocated_slot {
+        if let Some(allocated_tag) = allocated_tag {
+            let session_id = SessionId::new(allocated_tag.value(), pseudonym);
+            let allocated_tag = Arc::new(allocated_tag);
+
+            let slot = SessionSlot {
+                session_tx: Arc::new(tx_session_data),
+                routing_opts: reply_routing.clone(),
+                abort_handles: Default::default(),
+                surb_mgmt: Default::default(),
+                surb_estimator: Default::default(),
+                allocated_tag: Some(allocated_tag),
+            };
+            self.sessions.insert(session_id, slot.clone()).await;
+
             debug!(%session_id, ?session_req, "assigned a new session");
 
             let closure_notifier = Box::new(move |session_id: SessionId, reason: ClosureReason| {
@@ -1200,21 +1144,24 @@ where
                                 surb_estimator_clone
                                     .consumed
                                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                #[cfg(feature = "telemetry")]
+                                crate::telemetry::record_session_surb_consumed(&session_id, 1);
                                 futures::future::ok::<_, S::Error>((routing, data))
                             })
                             .rate_limit_with_controller(&egress_rate_control)
                             .buffer((2 * target_surb_buffer_size) as usize),
                         // Received packets = SURB retrieval estimate
                         rx_session_data.inspect(move |data| {
+                            let produced = data.num_surbs_with_msg() as u64;
                             // Count the number of SURBs delivered with each incoming packet
                             surb_estimator_clone
                                 .produced
-                                .fetch_add(data.num_surbs_with_msg() as u64, std::sync::atomic::Ordering::Relaxed);
+                                .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
+                            #[cfg(feature = "telemetry")]
+                            crate::telemetry::record_session_surb_produced(&session_id, produced);
                         }),
                     ),
                     Some(closure_notifier),
-                    #[cfg(feature = "telemetry")]
-                    slot.telemetry.clone(),
                 )?;
 
                 // The SURB balancer will start intervening by rate-limiting the
@@ -1230,13 +1177,6 @@ where
                 };
 
                 slot.surb_mgmt.update(&balancer_config);
-
-                #[cfg(feature = "telemetry")]
-                {
-                    slot.telemetry.set_state(SessionLifecycleState::Active);
-                    slot.telemetry
-                        .set_balancer_data(slot.surb_estimator.clone(), slot.surb_mgmt.clone());
-                }
 
                 // Spawn the SURB balancer only once we know we have registered the
                 // abort handle with the pre-allocated Session slot
@@ -1268,6 +1208,8 @@ where
                                 surb_estimator_clone
                                     .consumed
                                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                #[cfg(feature = "telemetry")]
+                                crate::telemetry::record_session_surb_consumed(&session_id, 1);
                                 futures::future::ok::<_, S::Error>((routing, data))
                             }),
                         slot.routing_opts.clone(),
@@ -1301,8 +1243,6 @@ where
                     },
                     (msg_sender.clone(), rx_session_data),
                     Some(closure_notifier),
-                    #[cfg(feature = "telemetry")]
-                    slot.telemetry.clone(),
                 )?
             };
 
@@ -1351,12 +1291,23 @@ where
                     SessionManagerError::other(error)
                 })?;
 
+            #[cfg(feature = "telemetry")]
+            {
+                initialize_session_metrics(
+                    session_id,
+                    HoprSessionConfig {
+                        capabilities: session_req.capabilities.0,
+                        frame_mtu: self.cfg.frame_mtu,
+                        frame_timeout: self.cfg.max_frame_timeout,
+                    },
+                );
+                set_session_state(&session_id, SessionLifecycleState::Active);
+                set_session_balancer_data(&session_id, slot.surb_estimator.clone(), slot.surb_mgmt.clone());
+            }
+
             info!(%session_id, "new session established");
 
-            #[cfg(feature = "telemetry")]
-            register_session_telemetry(&slot.telemetry);
-
-            #[cfg(all(feature = "prometheus", not(test)))]
+            #[cfg(all(feature = "telemetry", not(test)))]
             {
                 METRIC_NUM_ESTABLISHED_SESSIONS.increment();
                 METRIC_ACTIVE_SESSIONS.increment(1.0);
@@ -1386,7 +1337,7 @@ where
 
             trace!(%pseudonym, "session establishment failure message sent");
 
-            #[cfg(all(feature = "prometheus", not(test)))]
+            #[cfg(all(feature = "telemetry", not(test)))]
             METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()])
         }
 
@@ -1445,7 +1396,7 @@ where
                     );
                 }
 
-                #[cfg(all(feature = "prometheus", not(test)))]
+                #[cfg(all(feature = "telemetry", not(test)))]
                 METRIC_RECEIVED_SESSION_ERRS.increment(&[&error_type.reason.to_string()])
             }
             HoprStartProtocol::KeepAlive(msg) => {
@@ -1472,6 +1423,8 @@ where
                                 .surb_estimator
                                 .consumed
                                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            #[cfg(feature = "telemetry")]
+                            crate::telemetry::record_session_surb_consumed(&session_id, 1);
                         }
                         // Session is incoming - keep-alive was received from the Entry
                         DestinationRouting::Return(_) => {
@@ -1496,10 +1449,13 @@ where
 
                             // Increase the number of received SURBs in the estimator.
                             // Typically, 2 SURBs per Keep-Alive message
-                            session_slot.surb_estimator.produced.fetch_add(
-                                KeepAliveMessage::<SessionId>::MIN_SURBS_PER_MESSAGE as u64,
-                                std::sync::atomic::Ordering::Relaxed,
-                            );
+                            let produced = KeepAliveMessage::<SessionId>::MIN_SURBS_PER_MESSAGE as u64;
+                            session_slot
+                                .surb_estimator
+                                .produced
+                                .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
+                            #[cfg(feature = "telemetry")]
+                            crate::telemetry::record_session_surb_produced(&session_id, produced);
                         }
                     }
                 } else {
@@ -1528,6 +1484,28 @@ mod tests {
 
     use super::*;
     use crate::{Capabilities, Capability, balancer::SurbBalancerConfig, types::SessionTarget};
+
+    /// Create a test tag allocator with a large partition.
+    fn test_tag_allocator() -> Arc<dyn TagAllocator + Send + Sync> {
+        test_tag_allocator_with_session_capacity(10000)
+    }
+
+    /// Create a test tag allocator with a specific session partition capacity.
+    fn test_tag_allocator_with_session_capacity(session_capacity: u64) -> Arc<dyn TagAllocator + Send + Sync> {
+        hopr_transport_tag_allocator::create_allocators(
+            ReservedTag::range().end..u16::MAX as u64 + 1,
+            [
+                (hopr_transport_tag_allocator::Usage::Session, session_capacity),
+                (hopr_transport_tag_allocator::Usage::SessionTerminalTelemetry, 10000),
+                (hopr_transport_tag_allocator::Usage::ProvingTelemetry, 10000),
+            ],
+        )
+        .expect("test allocator creation must not fail")
+        .into_iter()
+        .find(|(u, _)| matches!(u, hopr_transport_tag_allocator::Usage::Session))
+        .expect("session allocator must exist")
+        .1
+    }
 
     #[async_trait::async_trait]
     trait SendMsg {
@@ -1578,8 +1556,8 @@ mod tests {
         let alice_pseudonym = HoprPseudonym::random();
         let bob_peer: Address = (&ChainKeypair::random()).into();
 
-        let alice_mgr = SessionManager::new(Default::default());
-        let bob_mgr = SessionManager::new(Default::default());
+        let alice_mgr = SessionManager::new(Default::default(), test_tag_allocator());
+        let bob_mgr = SessionManager::new(Default::default(), test_tag_allocator());
 
         let mut sequence = mockall::Sequence::new();
         let mut alice_transport = MockMsgSender::new();
@@ -1761,8 +1739,8 @@ mod tests {
             ..Default::default()
         };
 
-        let alice_mgr = SessionManager::new(cfg);
-        let bob_mgr = SessionManager::new(Default::default());
+        let alice_mgr = SessionManager::new(cfg, test_tag_allocator());
+        let bob_mgr = SessionManager::new(Default::default(), test_tag_allocator());
 
         let mut sequence = mockall::Sequence::new();
         let mut alice_transport = MockMsgSender::new();
@@ -1893,7 +1871,7 @@ mod tests {
         let alice_mgr = SessionManager::<
             UnboundedSender<(DestinationRouting, ApplicationDataOut)>,
             futures::channel::mpsc::Sender<IncomingSession>,
-        >::new(Default::default());
+        >::new(Default::default(), test_tag_allocator());
 
         let (dummy_tx, _) = futures::channel::mpsc::unbounded();
         alice_mgr
@@ -1906,8 +1884,7 @@ mod tests {
                     abort_handles: Default::default(),
                     surb_mgmt: Arc::new(BalancerStateValues::from(balancer_cfg)),
                     surb_estimator: Default::default(),
-                    #[cfg(feature = "telemetry")]
-                    telemetry: Arc::new(SessionTelemetry::new(session_id, Default::default())),
+                    allocated_tag: None,
                 },
             )
             .await;
@@ -1939,13 +1916,8 @@ mod tests {
         let alice_pseudonym = HoprPseudonym::random();
         let bob_peer: Address = (&ChainKeypair::random()).into();
 
-        let cfg = SessionManagerConfig {
-            session_tag_range: 16u64..17u64, // Slot for exactly one session
-            ..Default::default()
-        };
-
-        let alice_mgr = SessionManager::new(Default::default());
-        let bob_mgr = SessionManager::new(cfg);
+        let alice_mgr = SessionManager::new(Default::default(), test_tag_allocator());
+        let bob_mgr = SessionManager::new(Default::default(), test_tag_allocator_with_session_capacity(1));
 
         // Occupy the only free slot with tag 16
         let (dummy_tx, _) = futures::channel::mpsc::unbounded();
@@ -1957,13 +1929,9 @@ mod tests {
                     session_tx: Arc::new(dummy_tx),
                     routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
                     abort_handles: Default::default(),
-                    #[cfg(feature = "telemetry")]
-                    telemetry: Arc::new(SessionTelemetry::new(
-                        SessionId::new(16u64, alice_pseudonym),
-                        Default::default(),
-                    )),
                     surb_mgmt: Default::default(),
                     surb_estimator: Default::default(),
+                    allocated_tag: None,
                 },
             )
             .await;
@@ -2060,13 +2028,8 @@ mod tests {
         let alice_pseudonym = HoprPseudonym::random();
         let bob_peer: Address = (&ChainKeypair::random()).into();
 
-        let cfg = SessionManagerConfig {
-            maximum_sessions: 1,
-            ..Default::default()
-        };
-
-        let alice_mgr = SessionManager::new(Default::default());
-        let bob_mgr = SessionManager::new(cfg);
+        let alice_mgr = SessionManager::new(Default::default(), test_tag_allocator());
+        let bob_mgr = SessionManager::new(Default::default(), test_tag_allocator_with_session_capacity(1));
 
         // Occupy the only free slot with tag 16
         let (dummy_tx, _) = futures::channel::mpsc::unbounded();
@@ -2080,11 +2043,7 @@ mod tests {
                     abort_handles: Default::default(),
                     surb_mgmt: Default::default(),
                     surb_estimator: Default::default(),
-                    #[cfg(feature = "telemetry")]
-                    telemetry: Arc::new(SessionTelemetry::new(
-                        SessionId::new(16u64, alice_pseudonym),
-                        Default::default(),
-                    )),
+                    allocated_tag: None,
                 },
             )
             .await;
@@ -2180,7 +2139,7 @@ mod tests {
         let alice_pseudonym = HoprPseudonym::random();
         let bob_peer: Address = (&ChainKeypair::random()).into();
 
-        let alice_mgr = SessionManager::new(Default::default());
+        let alice_mgr = SessionManager::new(Default::default(), test_tag_allocator());
 
         let mut sequence = mockall::Sequence::new();
         let mut alice_transport = MockMsgSender::new();
@@ -2275,8 +2234,8 @@ mod tests {
             ..Default::default()
         };
 
-        let alice_mgr = SessionManager::new(cfg);
-        let bob_mgr = SessionManager::new(Default::default());
+        let alice_mgr = SessionManager::new(cfg, test_tag_allocator());
+        let bob_mgr = SessionManager::new(Default::default(), test_tag_allocator());
 
         let mut sequence = mockall::Sequence::new();
         let mut alice_transport = MockMsgSender::new();
@@ -2322,7 +2281,7 @@ mod tests {
     #[cfg(feature = "telemetry")]
     #[test_log::test(tokio::test)]
     async fn failed_incoming_session_establishment_does_not_register_telemetry() -> anyhow::Result<()> {
-        let mgr = SessionManager::new(Default::default());
+        let mgr = SessionManager::new(Default::default(), test_tag_allocator());
 
         let transport = MockMsgSender::new();
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
@@ -2347,13 +2306,6 @@ mod tests {
         let allocated_session_ids = mgr.active_sessions().await;
         assert_eq!(1, allocated_session_ids.len());
 
-        let snapshots = crate::telemetry::session_telemetry_snapshots();
-        assert!(
-            allocated_session_ids
-                .iter()
-                .all(|session_id| snapshots.iter().all(|snapshot| snapshot.session_id != *session_id))
-        );
-
         Ok(())
     }
 
@@ -2366,8 +2318,8 @@ mod tests {
             surb_balance_notify_period: Some(Duration::from_millis(500)),
             ..Default::default()
         };
-        let alice_mgr = SessionManager::new(Default::default());
-        let bob_mgr = SessionManager::new(bob_cfg.clone());
+        let alice_mgr = SessionManager::new(Default::default(), test_tag_allocator());
+        let bob_mgr = SessionManager::new(bob_cfg.clone(), test_tag_allocator());
 
         let mut alice_transport = MockMsgSender::new();
         let mut bob_transport = MockMsgSender::new();

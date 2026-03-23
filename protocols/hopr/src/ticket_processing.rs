@@ -23,12 +23,12 @@ use crate::{
 /// Per-peer metrics are disabled by default due to Prometheus cardinality concerns.
 /// Set `HOPR_METRICS_UNACK_PER_PEER=1` to enable them for debugging.
 mod metrics {
-    #[cfg(any(not(feature = "prometheus"), test))]
+    #[cfg(any(not(feature = "telemetry"), test))]
     pub use noop::*;
-    #[cfg(all(feature = "prometheus", not(test)))]
+    #[cfg(all(feature = "telemetry", not(test)))]
     pub use real::*;
 
-    #[cfg(all(feature = "prometheus", not(test)))]
+    #[cfg(all(feature = "telemetry", not(test)))]
     mod real {
         lazy_static::lazy_static! {
             /// Whether per-peer metrics are enabled (disabled by default to avoid cardinality explosion).
@@ -167,7 +167,7 @@ mod metrics {
         }
     }
 
-    #[cfg(any(not(feature = "prometheus"), test))]
+    #[cfg(any(not(feature = "telemetry"), test))]
     mod noop {
         #[inline]
         pub fn initialize() {}

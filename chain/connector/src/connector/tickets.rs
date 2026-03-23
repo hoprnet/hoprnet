@@ -170,14 +170,16 @@ mod tests {
             key_id: 2.into(),
         };
 
-        let channel_1 = ChannelEntry::new(
-            ChainKeypair::from_secret(&PRIVATE_KEY_2)?.public().to_address(),
-            ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
-            10.into(),
-            1,
-            ChannelStatus::Open,
-            1,
-        );
+        let channel_1 = ChannelEntry::builder()
+            .between(
+                &ChainKeypair::from_secret(&PRIVATE_KEY_2)?,
+                &ChainKeypair::from_secret(&PRIVATE_KEY_1)?,
+            )
+            .amount(10)
+            .ticket_index(1)
+            .status(ChannelStatus::Open)
+            .epoch(1)
+            .build()?;
 
         Ok(BlokliTestStateBuilder::default()
             .with_accounts([

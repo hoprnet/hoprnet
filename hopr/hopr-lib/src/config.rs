@@ -1,7 +1,10 @@
 use hopr_api::types::primitive::prelude::*;
-pub use hopr_transport::config::{
-    HoprPacketPipelineConfig, HoprProtocolConfig, HostConfig, HostType, ProbeConfig, SessionGlobalConfig,
-    TransportConfig, looks_like_domain,
+pub use hopr_transport::{
+    TagAllocatorConfig,
+    config::{
+        HoprPacketPipelineConfig, HoprProtocolConfig, HostConfig, HostType, ProbeConfig, SessionGlobalConfig,
+        TransportConfig, looks_like_domain,
+    },
 };
 use validator::{Validate, ValidationError};
 

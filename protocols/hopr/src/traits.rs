@@ -93,7 +93,7 @@ pub trait PacketDecoder {
     -> Result<IncomingPacket, IncomingPacketError<Self::Error>>;
 }
 
-/// Defines errors returned by [`UnacknowledgedTicketProcessor::acknowledge_ticket`].
+/// Defines errors returned by `UnacknowledgedTicketProcessor::acknowledge_ticket`.
 #[derive(Debug, thiserror::Error)]
 pub enum TicketAcknowledgementError<E> {
     /// An acknowledgement from a peer was not expected.

@@ -9,10 +9,10 @@ use hopr_types::primitive::prelude::{GeneralError, to_hex_shortened};
 
 use crate::errors::SessionError;
 
-/// ID of a [Frame].
+/// ID of a `Frame`.
 pub type FrameId = u32;
 
-/// Type representing the sequence numbers in a [Frame].
+/// Type representing the sequence numbers in a `Frame`.
 pub type SeqNum = u8;
 
 /// Convenience type that identifies a segment within a frame.
@@ -29,7 +29,7 @@ impl Display for SegmentId {
 /// Data frame of arbitrary length.
 ///
 /// The frame can be segmented into [segments](Segment) and reassembled back
-/// via [`FrameBuilder`].
+/// via `FrameBuilder`.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Frame {
     /// Identifier of this frame.
@@ -183,12 +183,12 @@ impl TryFrom<SeqNum> for SeqIndicator {
 /// Represents a frame segment.
 ///
 /// Besides the data, a segment carries information about the total number of
-/// segments in the original frame ([`SeqIndicator`]), its index within the frame ([`SeqNum`]), and
+/// segments in the original frame ([`SeqIndicator`]), its index within the frame (`SeqNum`), and
 /// ID of that frame ([`FrameId`]).
 #[derive(Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize), derive(serde::Deserialize))]
 pub struct Segment {
-    /// ID of the [Frame] this segment belongs to.
+    /// ID of the `Frame` this segment belongs to.
     pub frame_id: FrameId,
     /// Index of this segment within the segment sequence.
     pub seq_idx: SeqNum,

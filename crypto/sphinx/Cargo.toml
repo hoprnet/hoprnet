@@ -1,6 +1,6 @@
 [package]
 name = "hopr-crypto-sphinx"
-version = "0.12.0"
+version = "0.12.1"
 description = "Implements Sphinx packet format for the HOPR protocol"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
@@ -23,6 +23,7 @@ serde = [
   "generic-array/serde",
   "elliptic-curve/serde",
   "curve25519-dalek/serde",
+  "k256/serde",
   "hopr-types/serde",
 ]
 

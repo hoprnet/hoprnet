@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport"
-version = "0.20.1"
+version = "0.22.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR transport interface for the core library"
 edition.workspace = true
@@ -13,16 +13,15 @@ crate-type = ["rlib"]
 [features]
 default = []
 capture = ["dep:pcap-file"]
-telemetry = ["serde", "hopr-transport-session/telemetry"]
-p2p-announce-quic = []
-prometheus = [
-  "dep:hopr-metrics",
-  "hopr-network-types/prometheus",
-  "hopr-transport-mixer/prometheus",
-  "hopr-transport-network/prometheus",
-  "hopr-transport-protocol/prometheus",
-  "hopr-transport-session/prometheus",
+telemetry = [
+  "serde",
+  "hopr-transport-session/telemetry",
+  "hopr-network-types/telemetry",
+  "hopr-transport-mixer/telemetry",
+  "hopr-transport-path/telemetry",
+  "hopr-transport-protocol/telemetry",
 ]
+p2p-announce-quic = []
 runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hopr-network-types/runtime-tokio",
@@ -36,6 +35,7 @@ serde = [
   "hopr-protocol-app/serde",
   "hopr-protocol-hopr/serde",
   "hopr-transport-protocol/serde",
+  "hopr-transport-tag-allocator/serde",
 ]
 
 
@@ -44,6 +44,7 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 cfg-if = { workspace = true }
 futures = { workspace = true }
+futures-time = { workspace = true }
 humantime-serde = { workspace = true, optional = true }
 lazy_static = { workspace = true }
 moka = { workspace = true }
@@ -60,28 +61,29 @@ hopr-api = { workspace = true, features = ["types-random"] }
 
 hopr-async-runtime = { workspace = true }
 hopr-crypto-packet = { workspace = true }
-hopr-metrics = { workspace = true, optional = true }
 
 hopr-network-types = { workspace = true }
 hopr-protocol-app = { workspace = true }
-hopr-protocol-hopr = { workspace = true }
-hopr-transport-identity = { workspace = true }
+hopr-protocol-hopr = { workspace = true, features = ["rayon"] }
+multiaddr = { workspace = true }
 hopr-transport-mixer = { workspace = true }
-hopr-transport-network = { workspace = true }
+hopr-transport-path = { workspace = true }
 hopr-transport-probe = { workspace = true }
 hopr-transport-protocol = { workspace = true }
 hopr-transport-session = { workspace = true }
+hopr-transport-tag-allocator = { workspace = true }
 
 [dev-dependencies]
 hex-literal = { workspace = true }
-insta = { workspace = true, features = ["yaml"] }
+hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
+rstest = { workspace = true }
 
 hopr-protocol-start = { workspace = true }
 hopr-protocol-session = { workspace = true, features = [
   "session-types",
   "runtime-tokio",
+  "hashbrown",
 ] }
-hopr-transport-network = { workspace = true }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-protocol = { workspace = true, features = ["runtime-tokio"] }
 temp-env = { workspace = true }

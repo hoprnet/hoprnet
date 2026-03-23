@@ -8,6 +8,7 @@ members = [
   "common/network-types",
   "common/parallelize",
   "common/statistics",
+  "common/test-stubs",
   "crypto/keypair",
   "crypto/packet",
   "crypto/sphinx",
@@ -23,12 +24,12 @@ members = [
   "protocols/session",
   "protocols/start",
   "transport/api",
-  "transport/identity",
   "transport/mixer",
-  "transport/network",
+  "transport/path",
   "transport/probe",
   "transport/protocol",
   "transport/session",
+  "transport/tag-allocator",
   "db/entity",
   "db/migration",
   "db/node",
@@ -51,7 +52,7 @@ edition = "2024"
 ahash = "0.8.12"
 anyhow = "1.0.102"
 aquamarine = "0.6.0"
-arrayvec = { version = "0.7.6", features = ["serde"] }
+arrayvec = { version = "0.7.6" }
 assertables = "9.8.6"
 async-broadcast = "0.7.2"
 async-lock = "3.4.2"
@@ -66,7 +67,7 @@ base64 = "0.22.1"
 bimap = "0.6.3"
 bitvec = "1.0.1"
 blokli-client = { git = "https://github.com/hoprnet/blokli" } # Always use the latest for now
-bloomfilter = { version = "3.0.1", features = ["serde"] }
+bloomfilter = { version = "3.0.1" }
 bytesize = { version = "2.3.1", features = ["serde"] }
 bytes = "1.11.1"
 cfg-if = "1.0.4"
@@ -75,7 +76,7 @@ chrono = { version = "0.4.44", default-features = false, features = [
   "std",
   "clock",
 ] }
-clap = { version = "4.5.60", features = ["derive", "env", "string"] }
+clap = { version = "4.6.0", features = ["derive", "env", "string"] }
 const_format = "0.2.35"
 console-subscriber = "0.5.0"
 criterion = { version = "0.8.2", default-features = false, features = [
@@ -83,7 +84,7 @@ criterion = { version = "0.8.2", default-features = false, features = [
   "async_tokio",
 ] }
 curve25519-dalek = { version = "4.1.3", features = ["rand_core"] }
-dashmap = "6.1.0"
+dashmap = { version = "6.1.0", features = ["inline"] }
 flagset = "0.4.7"
 flume = { version = "0.12.0", default-features = false, features = ["async"] }
 futures = { version = "0.3.32", default-features = false, features = [
@@ -107,13 +108,8 @@ human-bandwidth = { version = "0.1.4", features = ["serde"] }
 humansize = "2.1.3"
 humantime-serde = "1.1.1"
 insta = { version = "1.46.3", features = ["yaml", "redactions"] }
-indexmap = { version = "2.13.0", features = ["serde"] }
-k256 = { version = "0.13.4", features = [
-  "arithmetic",
-  "ecdh",
-  "hash2curve",
-  "serde",
-] }
+indexmap = { version = "2.13.0" }
+k256 = { version = "0.13.4", features = ["arithmetic", "ecdh", "hash2curve"] }
 lazy_static = "1.5.0"
 libc = "0.2" # intentionally unpinned
 libp2p = { version = "0.56.0", default-features = false }
@@ -124,13 +120,14 @@ libp2p-identity = { version = "0.2.13", features = [
 ] }
 libp2p-stream = { version = "0.4.0-alpha" }
 mockall = "0.14.0"
-moka = { version = "0.12.14", features = ["future"] }
+moka = { version = "0.12.14", features = ["future", "sync"] }
 more-asserts = "0.3.1"
 multiaddr = "0.18.2"
 oas3 = "0.20.1"
 openapiv3 = "2.2.0"
 opentelemetry = { version = "0.31.0" }
 opentelemetry-otlp = { version = "0.31.0", default-features = false }
+opentelemetry-prometheus-text-exporter = { version = "0.2.1" }
 opentelemetry_sdk = { version = "0.31.0" }
 tracing-opentelemetry = { version = "0.32.1" }
 temp-env = "0.3.6"
@@ -140,6 +137,7 @@ pcap-file = "2.0.0"
 petgraph = { version = "0.8.3", default-features = false, features = [
   "std",
   "serde-1",
+  "rayon",
 ] }
 pid = "4.0.0"
 pin-project = "1.1.11"
@@ -147,13 +145,12 @@ percent-encoding = "2.3.2"
 prettyplease = "0.2.37"
 postcard = { version = "1.1.3", default-features = false, features = ["alloc"] }
 proc-macro-regex = "~1.1.0"
-prometheus = "0.14.0"
 progenitor = "0.13.0"
 progenitor-client = "0.13.0"
 rayon = "1.11.0"
 rand = { version = "0.10.0", features = ["thread_rng"] }
 rand_distr = "0.6.0"
-redb = "3.1.0"
+redb = "3.1.1"
 regex = "1.12.3"
 reqwest = { version = "0.13.2", default-features = false, features = [
   "json",
@@ -164,6 +161,7 @@ rust-stream-ext-concurrent = "2.0.0"
 rstest = { version = "0.26.1" }
 scrypt = { version = "0.11.0", default-features = false }
 sea-orm = { version = "1.1.19", default-features = false, features = [
+  "macros",
   "sqlx-sqlite",
   "with-chrono",
   "with-json",
@@ -183,13 +181,13 @@ serde_bytes = "0.11.19"
 serde_cbor_2 = "0.13.0"
 serde_json = "1.0.149"
 serde_repr = "0.1.20"
-serde_with = { version = "3.17.0", features = ["base64"] }
+serde_with = { version = "3.18.0", features = ["base64"] }
 serde_urlencoded = "0.7.1"
 serde-saphyr = "0.0.21"
 serial_test = "3.4.0"
 signal-hook = "0.4.3"
 smart-default = "0.7.1"
-socket2 = "0.6.2"
+socket2 = "0.6.3"
 sqlx = { version = "0.8.6", default-features = false, features = [
   "sqlite",
   "macros",
@@ -198,7 +196,7 @@ sqlx = { version = "0.8.6", default-features = false, features = [
 strum = { version = "0.28.0", features = ["derive"] }
 subtle = "2.6.1"
 syn = { version = "2.0.117", features = ["full"] }
-tempfile = "3.26.0"
+tempfile = "3.27.0"
 test-log = { version = "0.2.19", features = ["trace"] }
 thiserror = "2.0.18"
 tikv-jemallocator = "0.6.1"
@@ -230,21 +228,21 @@ utoipa-swagger-ui = { version = "9.0.2", features = [
   "debug-embed",
 ] }
 tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
-tracing-subscriber = { version = "0.3.22", features = [
+tracing-subscriber = { version = "0.3.23", features = [
   "env-filter",
   "fmt",
   "registry",
   "std",
 ] }
 typenum = "1.19.0"
-uuid = { version = "1.21.0" }
+uuid = { version = "1.22.0" }
 validator = { version = "0.20.0", features = ["derive"] }
 vergen-gix = { version = "9.1.0", features = ["build"] }
 mimalloc = { version = "0.1.48", default-features = false, features = [
   "secure",
 ] }
 
-hopr-api = { git = "https://github.com/hoprnet/hopr-api", rev = "0403f9d9470bf7e60234f8d4725260106f0fe2c7" }
+hopr-api = { git = "https://github.com/hoprnet/hopr-api", rev = "7dd18a62469666ddc9e5b1bee85e9a23d94119fb" }
 hopr-types = { git = "https://github.com/hoprnet/hopr-types", branch = "main" }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-crypto-keypair = { path = "crypto/keypair", default-features = false }
@@ -256,36 +254,37 @@ hopr-crypto-sphinx = { path = "crypto/sphinx", default-features = false, feature
 hopr-lib = { path = "hopr/hopr-lib", default-features = false }
 hopr-metrics = { path = "misc/metrics", default-features = false }
 hopr-network-types = { path = "common/network-types", default-features = false }
-hopr-parallelize = { path = "common/parallelize" }
-hopr-platform = { path = "misc/platform" }
-hopr-protocol-app = { path = "protocols/app" }
-hopr-protocol-hopr = { path = "protocols/hopr" }
-hopr-protocol-session = { path = "protocols/session" }
-hopr-protocol-start = { path = "protocols/start" }
+hopr-parallelize = { path = "common/parallelize", default-features = false }
+hopr-platform = { path = "misc/platform", default-features = false }
+hopr-protocol-app = { path = "protocols/app", default-features = false }
+hopr-protocol-hopr = { path = "protocols/hopr", default-features = false }
+hopr-protocol-session = { path = "protocols/session", default-features = false }
+hopr-protocol-start = { path = "protocols/start", default-features = false }
 hopr-strategy = { path = "logic/strategy", default-features = false }
-hopr-transport = { path = "transport/api" }
-hopr-transport-identity = { path = "transport/identity" }
-hopr-transport-network = { path = "transport/network" }
-hopr-transport-mixer = { path = "transport/mixer" }
-hopr-transport-probe = { path = "transport/probe" }
-hopr-transport-protocol = { path = "transport/protocol" }
-hopr-transport-session = { path = "transport/session" }
-hoprd = { path = "hoprd/hoprd" }
+hopr-transport = { path = "transport/api", default-features = false }
+hopr-transport-mixer = { path = "transport/mixer", default-features = false }
+hopr-transport-path = { path = "transport/path", default-features = false }
+hopr-transport-probe = { path = "transport/probe", default-features = false }
+hopr-transport-protocol = { path = "transport/protocol", default-features = false }
+hopr-transport-session = { path = "transport/session", default-features = false }
+hopr-transport-tag-allocator = { path = "transport/tag-allocator", default-features = false }
+hoprd = { path = "hoprd/hoprd", default-features = false }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
-hoprd-api-client = { path = "hoprd/rest-api-client" }
-hopr-db-entity = { path = "db/entity" }
-hopr-db-migration = { path = "db/migration" }
+hoprd-api-client = { path = "hoprd/rest-api-client", default-features = false }
+hopr-db-entity = { path = "db/entity", default-features = false }
+hopr-db-migration = { path = "db/migration", default-features = false }
 hopr-utils-session = { path = "utils/session" }
-hopr-db-node = { path = "db/node" }
-hopr-chain-connector = { path = "chain/connector" }
-hopr-statistics = { path = "common/statistics" }
+hopr-db-node = { path = "db/node", default-features = false }
+hopr-chain-connector = { path = "chain/connector", default-features = false }
+hopr-statistics = { path = "common/statistics", default-features = false }
+hopr-test-stubs = { path = "common/test-stubs" }
 
 # referential implementations
-hopr-builder = { path = "hopr/builder" }
-hopr-transport-p2p = { path = "impls/transport/p2p" }
-hopr-ct-immediate = { path = "impls/ct/immediate" }
-hopr-ct-full-network = { path = "impls/ct/full-network" }
-hopr-network-graph = { path = "impls/graph" }
+hopr-builder = { path = "hopr/builder", default-features = false }
+hopr-transport-p2p = { path = "impls/transport/p2p", default-features = false }
+hopr-ct-immediate = { path = "impls/ct/immediate", default-features = false }
+hopr-ct-full-network = { path = "impls/ct/full-network", default-features = false }
+hopr-network-graph = { path = "impls/graph", default-features = false }
 
 [profile.dev]
 panic = "abort"
@@ -323,4 +322,4 @@ insta.opt-level = 3
 similar.opt-level = 3
 
 [workspace.metadata.cargo-shear]
-ignored = ["oas3", "serde_bytes", "humantime-serde", "hopr-ct-full-network"]
+ignored = ["oas3", "serde_bytes", "humantime-serde"]

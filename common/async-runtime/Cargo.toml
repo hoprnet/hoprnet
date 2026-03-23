@@ -1,6 +1,6 @@
 [package]
 name = "hopr-async-runtime"
-version = "0.4.1"
+version = "0.4.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true

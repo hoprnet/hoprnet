@@ -1,4 +1,6 @@
-use std::{num::NonZeroU8, sync::Arc};
+#[cfg(feature = "runtime-tokio")]
+use std::num::NonZeroU8;
+use std::sync::Arc;
 
 use dashmap::DashSet;
 use futures::{FutureExt, Stream, StreamExt, stream::BoxStream};
@@ -11,15 +13,13 @@ use libp2p::{
 };
 use tracing::{debug, error, info, trace, warn};
 
-#[cfg(feature = "runtime-tokio")]
-use crate::PeerDiscovery;
 use crate::{
-    HoprNetwork, HoprNetworkBehavior, HoprNetworkBehaviorEvent, constants,
+    HoprNetwork, HoprNetworkBehavior, HoprNetworkBehaviorEvent, PeerDiscovery, constants,
     errors::Result,
     utils::{replace_transport_with_unspecified, resolve_dns_if_any},
 };
 
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_TRANSPORT_P2P_OPEN_CONNECTION_COUNT:  hopr_metrics::SimpleGauge =  hopr_metrics::SimpleGauge::new(
         "hopr_transport_p2p_active_connection_count",
@@ -218,7 +218,7 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
         protocol: &'static str,
         allow_private_addresses: bool,
     ) -> std::result::Result<(Self::Network, hopr_api::network::BoxedProcessFn), impl std::error::Error> {
-        #[cfg(all(feature = "prometheus", not(test)))]
+        #[cfg(all(feature = "telemetry", not(test)))]
         {
             METRIC_NETWORK_HEALTH.set(0.0);
         }
@@ -234,7 +234,7 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
             .expect("swarm must be configurable");
 
         let swarm = swarm.swarm;
-        let store = hopr_transport_network::store::NetworkPeerStore::new(me, my_multiaddresses.into_iter().collect());
+        let store = crate::peer_store::NetworkPeerStore::new(me, my_multiaddresses.into_iter().collect());
         let tracker: Arc<DashSet<libp2p::PeerId>> = Default::default();
 
         let network = HoprNetwork {
@@ -244,7 +244,9 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
             protocol: libp2p::StreamProtocol::new(protocol),
         };
 
-        #[cfg(all(feature = "prometheus", not(test)))]
+        let notifier = self.subscribtions.0.clone();
+
+        #[cfg(all(feature = "telemetry", not(test)))]
         let network_inner = network.clone();
         let mut swarm = swarm;
         let process = async move {
@@ -257,7 +259,7 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
                         match event {
                             autonat::Event::StatusChanged { old, new } => {
                                 info!(?old, ?new, "AutoNAT status changed");
-                                #[cfg(all(feature = "prometheus", not(test)))]
+                                #[cfg(all(feature = "telemetry", not(test)))]
                                 {
                                     let value = match new {
                                         autonat::NatStatus::Unknown => 0.0,
@@ -294,6 +296,9 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
                                         debug!(transport="libp2p", peer = %peer_id, multiaddress = %address, "Private/local peer address encountered")
                                     }
                                     tracker.insert(peer_id);
+                                    if let Err(error) = notifier.try_broadcast(hopr_api::network::NetworkEvent::PeerConnected(peer_id)) {
+                                        error!(peer = %peer_id, %error, "failed to broadcast peer connected event");
+                                    }
                                 },
                                 libp2p::core::ConnectedPoint::Listener { send_back_addr, .. } => {
                                     if allow_private_addresses || is_public_address(&send_back_addr) {
@@ -304,6 +309,9 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
                                         debug!(transport="libp2p", peer = %peer_id, multiaddress = %send_back_addr, "Private/local peer address ignored")
                                     }
                                     tracker.insert(peer_id);
+                                    if let Err(error) = notifier.try_broadcast(hopr_api::network::NetworkEvent::PeerConnected(peer_id)) {
+                                        error!(peer = %peer_id, %error, "failed to broadcast peer connected event");
+                                    }
                                 }
                             }
                         } else {
@@ -312,7 +320,7 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
 
                         print_network_info(swarm.network_info(), "connection established");
 
-                        #[cfg(all(feature = "prometheus", not(test)))]
+                        #[cfg(all(feature = "telemetry", not(test)))]
                         {
                             METRIC_NETWORK_HEALTH.set((hopr_api::network::NetworkView::health(&network_inner) as i32).into());
                             METRIC_TRANSPORT_P2P_OPEN_CONNECTION_COUNT.increment(1.0);
@@ -330,11 +338,14 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
 
                         if num_established == 0 {
                             tracker.remove(&peer_id);
+                            if let Err(error) = notifier.try_broadcast(hopr_api::network::NetworkEvent::PeerDisconnected(peer_id)) {
+                                error!(peer = %peer_id, %error, "failed to broadcast peer disconnected event");
+                            }
                         }
 
                         print_network_info(swarm.network_info(), "connection closed");
 
-                        #[cfg(all(feature = "prometheus", not(test)))]
+                        #[cfg(all(feature = "telemetry", not(test)))]
                         {
                             METRIC_NETWORK_HEALTH.set((hopr_api::network::NetworkView::health(&network_inner) as i32).into());
                             METRIC_TRANSPORT_P2P_OPEN_CONNECTION_COUNT.decrement(1.0);
@@ -369,9 +380,12 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
                                     error!(peer = %peer_id, %error, "failed to remove undialable peer from the peer store");
                                 }
                                 tracker.remove(&peer_id);
+                                if let Err(error) = notifier.try_broadcast(hopr_api::network::NetworkEvent::PeerDisconnected(peer_id)) {
+                                    error!(peer = %peer_id, %error, "failed to broadcast peer disconnected event");
+                                }
                             }
 
-                        #[cfg(all(feature = "prometheus", not(test)))]
+                        #[cfg(all(feature = "telemetry", not(test)))]
                         {
                             METRIC_NETWORK_HEALTH.set((hopr_api::network::NetworkView::health(&network_inner) as i32).into());
                         }

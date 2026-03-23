@@ -104,7 +104,7 @@ The supported profiles are:
 - `metrics`: utilites exporting system, docker and node metrics
 - `metrics-push`: a utility cronjob to publish metrics to an external prometheus push gateway
 - `metrics-vis`: visualization tools for the metrics (containing the prometheus and grafana setup with default dashboards)
-- `tracing`: Enable Jaeger OTLP ingestion for hoprd telemetry. Set `HOPRD_USE_OPENTELEMETRY=true` and configure `HOPRD_OTEL_SIGNALS` (for example `traces` or `traces,logs,metrics`).
+- `tracing`: Enable Jaeger OTLP ingestion for hoprd telemetry. Set `HOPRD_USE_OPENTELEMETRY=true` and configure `HOPRD_OTEL_SIGNALS` (for example `traces` or `traces,logs,metrics`). Configure `HOPRD_METRIC_EXPORT_INTERVAL` as `default_ms,prefix=ms` (for example `15000,hopr_session=1000`).
 
 Profiles should be specified as a list of `,` separated values in the `COMPOSE_PROFILES` environment variable.
 

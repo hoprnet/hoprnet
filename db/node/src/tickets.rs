@@ -17,7 +17,7 @@ use tracing::{debug, error, info, trace};
 
 use crate::{db::HoprNodeDb, errors::NodeDbError};
 
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
     pub static ref METRIC_HOPR_TICKETS_INCOMING_STATISTICS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
         "hopr_tickets_incoming_statistics",
@@ -206,7 +206,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
                     active_model.winning_tickets = sea_orm::Set(winning_tickets);
                     active_model.save(tx).await?;
 
-                    #[cfg(all(feature = "prometheus", not(test)))]
+                    #[cfg(all(feature = "telemetry", not(test)))]
                     {
                         METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
                             &["unredeemed"],
@@ -296,7 +296,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
                                 };
                                 new_stats.save(tx).await?;
 
-                                #[cfg(all(feature = "prometheus", not(test)))]
+                                #[cfg(all(feature = "telemetry", not(test)))]
                                 {
                                     METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
                                         &[&mark_as.to_string()],
@@ -369,7 +369,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
                     active_stats.rejected_value = Set((current_rejected_value + amount.amount()).to_be_bytes().into());
                     active_stats.save(tx).await?;
 
-                    #[cfg(all(feature = "prometheus", not(test)))]
+                    #[cfg(all(feature = "telemetry", not(test)))]
                     {
                         METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
                             &["rejected"],
@@ -469,7 +469,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
                                 })
                                 .await?;
 
-                            #[cfg(all(feature = "prometheus", not(test)))]
+                            #[cfg(all(feature = "telemetry", not(test)))]
                             METRIC_HOPR_TICKETS_INCOMING_STATISTICS
                                 .set(&["unredeemed"], unredeemed_value.as_u128() as f64);
 
@@ -498,7 +498,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
 
                             all_stats.unredeemed_value = unredeemed_value.into();
 
-                            #[cfg(all(feature = "prometheus", not(test)))]
+                            #[cfg(all(feature = "telemetry", not(test)))]
                             {
                                 METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
                                     &["neglected"],
@@ -585,7 +585,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
                     // delete statistics for the found rows
                     let deleted = ticket_statistics::Entity::delete_many().exec(tx).await?;
 
-                    #[cfg(all(feature = "prometheus", not(test)))]
+                    #[cfg(all(feature = "telemetry", not(test)))]
                     {
                         if deleted.rows_affected > 0 {
                             METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(&["neglected"], 0.0_f64);

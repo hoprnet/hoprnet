@@ -1,0 +1,48 @@
+---
+#################################################################################
+# Build candidate binaries when explicitly requested via label
+#################################################################################
+name: Build Candidate
+
+env:
+  RUST_BACKTRACE: "1"
+
+on:
+  pull_request_target:
+    types:
+      - labeled
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.event.pull_request.head.ref || github.ref_name }}-build-candidate
+  cancel-in-progress: true
+
+jobs:
+  build-candidate-binaries:
+    name: Build Candidate Binaries
+    runs-on: self-hosted-hoprnet-bigger
+    timeout-minutes: 20
+    if: >-
+      (github.event_name == 'workflow_dispatch') || (github.event.action == 'labeled' && github.event.label.name == 'build:candidate'
+       && github.event.pull_request.head.repo.full_name == github.repository)
+    strategy:
+      fail-fast: false
+      matrix:
+        binary:
+          - hoprd
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          persist-credentials: false
+
+      - name: Build binary
+        run: nix build .#${{ matrix.binary }}-candidate

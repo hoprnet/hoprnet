@@ -11,12 +11,10 @@ use hopr_chain_connector::{
 };
 use hopr_db_node::HoprNodeDb;
 use hopr_lib::{
-    Address, ChainKeypair, HoprBalance, HoprNodeNetworkOperations, HoprNodeOperations, HoprState, IpOrHost, Keypair,
-    OffchainKeypair, SealedHost, WinningProbability, XDaiBalance,
-    exports::{
-        transport::{HoprSession, SessionClientConfig, SessionTarget},
-        types::internal::routing::RoutingOptions,
-    },
+    Address, ChainKeypair, HopRouting, HoprBalance, HoprNodeNetworkOperations, HoprNodeOperations,
+    HoprSessionClientConfig, HoprState, IpOrHost, Keypair, OffchainKeypair, SealedHost, WinningProbability,
+    XDaiBalance,
+    exports::transport::{HoprSession, SessionTarget},
 };
 use rand::seq::{IteratorRandom, SliceRandom};
 use rstest::fixture;
@@ -27,6 +25,18 @@ use crate::testing::{
     dummies::EchoServer,
     hopr::{ChannelGuard, NodeSafeConfig, TestedHopr, create_hopr_instance_config},
 };
+
+/// Estimated time for on-chain state to propagate across all nodes.
+///
+/// In the Blokli test mock, `expected_block_time` is a nominal value (e.g. 5s)
+/// that doesn't reflect actual mock processing speed (controlled by `tx_simulation_delay`).
+/// We use `expected_block_time + 2s` as a reasonable upper bound that accounts for
+/// coverage instrumentation overhead without being tied to the unrealistic
+/// `finality * expected_block_time` product.
+pub fn chain_propagation_delay(chain_info: &hopr_chain_connector::blokli_client::types::ChainInfo) -> Duration {
+    let block_time_secs = chain_info.expected_block_time.0.parse::<u64>().unwrap_or(5);
+    Duration::from_secs(block_time_secs + 2)
+}
 
 /// A guard that holds a reference to the cluster and ensures exclusive access
 pub struct ClusterGuard {
@@ -60,54 +70,67 @@ impl ClusterGuard {
         Ok(())
     }
 
-    /// Create a session between two nodes, ensuring channels are open and funded as needed
-    pub async fn create_session(
+    /// Open channels for a list of paths.
+    ///
+    /// Each entry in `paths` is a slice of nodes defining a channel path.
+    /// Returns a `ChannelGuard` per path, in the same order.
+    pub async fn open_channels(
         &self,
-        path: &[&TestedHopr],
+        paths: &[&[&TestedHopr]],
         funding_amount: HoprBalance,
-    ) -> anyhow::Result<(HoprSession, ChannelGuard, ChannelGuard)> {
-        let fw_channels = ChannelGuard::try_open_channels_for_path(
-            path.iter().map(|n| n.instance.clone()).collect::<Vec<_>>(),
-            funding_amount,
-        )
-        .await?;
-        let bw_channels = ChannelGuard::try_open_channels_for_path(
-            path.iter().rev().map(|n| n.instance.clone()).collect::<Vec<_>>(),
-            funding_amount,
-        )
-        .await?;
+    ) -> anyhow::Result<Vec<ChannelGuard>> {
+        let mut guards = Vec::with_capacity(paths.len());
+        for path in paths {
+            guards.push(
+                ChannelGuard::try_open_channels_for_path(
+                    path.iter().map(|n| n.instance.clone()).collect::<Vec<_>>(),
+                    funding_amount,
+                )
+                .await?,
+            );
+        }
 
-        sleep(Duration::from_secs(1)).await;
+        let chain_info = self.chain_client.query_chain_info().await?;
+        sleep(chain_propagation_delay(&chain_info)).await;
+
+        Ok(guards)
+    }
+
+    /// Create a session between the first and last nodes in the path.
+    ///
+    /// Channels must already be open before calling this method.
+    pub async fn create_session(&self, path: &[&TestedHopr]) -> anyhow::Result<HoprSession> {
+        debug_assert!(path.len() >= 2, "path must contain at least source and destination");
+
+        let chain_info = self.chain_client.query_chain_info().await?;
+        // Session establishment retries internally with ~20s per attempt.
+        // Use 6x propagation delay (~42s) to allow at least 2 retry cycles,
+        // which is needed under coverage instrumentation overhead.
+        let timeout = chain_propagation_delay(&chain_info) * 6;
 
         let ip = IpOrHost::from_str(":0")?;
-        let routing = RoutingOptions::IntermediatePath(
-            path.iter()
-                .skip(1)
-                .take(path.len() - 2)
-                .map(|n| n.address().into())
-                .collect(),
-        );
+        let routing = HopRouting::try_from(path.len() - 2)?;
         let session_result = path[0]
             .inner()
             .connect_to(
                 path[path.len() - 1].address(),
                 SessionTarget::UdpStream(SealedHost::Plain(ip)),
-                SessionClientConfig {
-                    forward_path_options: routing.clone(),
-                    return_path_options: routing.invert(),
+                HoprSessionClientConfig {
+                    forward_path: routing,
+                    return_path: routing,
                     capabilities: Default::default(),
                     pseudonym: None,
                     surb_management: None,
                     always_max_out_surbs: false,
                 },
             )
-            .timeout(futures_time::time::Duration::from_secs(5))
+            .timeout(futures_time::time::Duration::from(timeout))
             .await;
 
         match session_result {
-            Ok(Ok(s)) => Ok((s, fw_channels, bw_channels)),
+            Ok(Ok(s)) => Ok(s),
             Ok(Err(e)) => Err(e.into()),
-            Err(_) => Err(anyhow::anyhow!("Session opening timed out after 5s")),
+            Err(_) => Err(anyhow::anyhow!("Session opening timed out after {timeout:?}")),
         }
     }
 
@@ -322,10 +345,20 @@ pub fn size_3_cluster_fixture() -> ClusterGuard {
 }
 
 #[fixture]
+#[once]
+pub fn size_5_cluster_fixture() -> ClusterGuard {
+    cluster_fixture(5)
+}
+
+#[fixture]
 pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
     if !(1..=SWARM_N).contains(&size) {
         panic!("{size} must be between 1 and {SWARM_N}");
     }
+
+    // Reduce mixer delay range to 0–20 ms so tests don't stall on mixing latency.
+    // SAFETY: called once before any threads are spawned for this cluster.
+    unsafe { std::env::set_var("HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS", "20") };
 
     let chain_client = build_blokli_client();
 
@@ -400,6 +433,10 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
                         &onchain_keys[i],
                         &offchain_keys[i],
                         config,
+                        Some(hopr_ct_full_network::ProberConfig {
+                            interval: std::time::Duration::from_secs(1),
+                            ..Default::default()
+                        }), // aggressive setting to facilitate fast n-hop telemetry probing
                         connector.clone(),
                         node_db,
                         EchoServer::new(),
@@ -468,6 +505,33 @@ async fn wait_for_connectivity(instance: &TestedHopr, swarm_size: usize) {
         tracing::trace!(
             "{} peers connected on {}, waiting for full mesh",
             peers.len(),
+            instance.instance.me_onchain()
+        );
+        sleep(Duration::from_secs(1)).await;
+    }
+
+    // Wait for the probe subsystem to observe all peers, ensuring pings
+    // succeed immediately after the cluster reports full connectivity.
+    info!("Waiting for probe warmup");
+    loop {
+        let peers = instance
+            .inner()
+            .network_connected_peers()
+            .await
+            .expect("failed to get connected peers");
+
+        let observed = peers
+            .iter()
+            .filter(|p| instance.inner().network_peer_info(p).is_some())
+            .count();
+
+        if observed == swarm_size - 1 {
+            break;
+        }
+
+        tracing::trace!(
+            "{observed}/{} peers observed on {}, waiting for probe warmup",
+            swarm_size - 1,
             instance.instance.me_onchain()
         );
         sleep(Duration::from_secs(1)).await;

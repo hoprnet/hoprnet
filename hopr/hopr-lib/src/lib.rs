@@ -51,14 +51,15 @@ pub mod exports {
 /// Export of relevant types for easier integration.
 #[doc(hidden)]
 pub mod prelude {
+    #[cfg(feature = "runtime-tokio")]
+    pub use super::exports::network::types::{
+        prelude::ForeignDataMode,
+        udp::{ConnectedUdpStream, UdpStreamParallelism},
+    };
     pub use super::exports::{
         crypto::{
             keypair::key_pair::HoprKeys,
             types::prelude::{ChainKeypair, Hash, OffchainKeypair},
-        },
-        network::types::{
-            prelude::ForeignDataMode,
-            udp::{ConnectedUdpStream, UdpStreamParallelism},
         },
         transport::{OffchainPublicKey, socket::HoprSocket},
         types::primitive::prelude::Address,
@@ -96,7 +97,7 @@ use hopr_async_runtime::prelude::spawn;
 pub use hopr_async_runtime::{Abortable, AbortableList};
 pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 pub use hopr_network_types::prelude::*;
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 use hopr_platform::time::native::current_time;
 use hopr_transport::errors::HoprTransportError;
 #[cfg(feature = "runtime-tokio")]
@@ -110,6 +111,85 @@ pub use crate::{
     constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE},
     errors::{HoprLibError, HoprStatusError},
 };
+
+/// Public routing configuration for session opening in `hopr-lib`.
+///
+/// This intentionally exposes only hop-count based routing.
+#[cfg(feature = "session-client")]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, smart_default::SmartDefault)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct HopRouting(
+    #[default(hopr_api::types::primitive::bounded::BoundedSize::MIN)]
+    hopr_api::types::primitive::bounded::BoundedSize<
+        { hopr_api::types::internal::routing::RoutingOptions::MAX_INTERMEDIATE_HOPS },
+    >,
+);
+
+#[cfg(feature = "session-client")]
+impl HopRouting {
+    /// Maximum number of hops that can be configured.
+    pub const MAX_HOPS: usize = hopr_api::types::internal::routing::RoutingOptions::MAX_INTERMEDIATE_HOPS;
+
+    /// Returns the configured number of hops.
+    pub fn hop_count(self) -> usize {
+        self.0.into()
+    }
+}
+
+#[cfg(feature = "session-client")]
+impl TryFrom<usize> for HopRouting {
+    type Error = hopr_api::types::primitive::errors::GeneralError;
+
+    fn try_from(value: usize) -> Result<Self, Self::Error> {
+        Ok(Self(value.try_into()?))
+    }
+}
+
+#[cfg(feature = "session-client")]
+impl From<HopRouting> for hopr_api::types::internal::routing::RoutingOptions {
+    fn from(value: HopRouting) -> Self {
+        Self::Hops(value.0)
+    }
+}
+
+/// Session client configuration for `hopr-lib`.
+///
+/// Unlike transport-level configuration, this API intentionally does not expose
+/// explicit intermediate paths.
+#[cfg(feature = "session-client")]
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault)]
+pub struct HoprSessionClientConfig {
+    /// Forward route selection policy.
+    pub forward_path: HopRouting,
+    /// Return route selection policy.
+    pub return_path: HopRouting,
+    /// Capabilities offered by the session.
+    #[default(_code = "SessionCapability::Segmentation.into()")]
+    pub capabilities: SessionCapabilities,
+    /// Optional pseudonym used for the session. Mostly useful for testing only.
+    #[default(None)]
+    pub pseudonym: Option<hopr_api::types::internal::protocol::HoprPseudonym>,
+    /// Enable automatic SURB management for the session.
+    #[default(Some(SurbBalancerConfig::default()))]
+    pub surb_management: Option<SurbBalancerConfig>,
+    /// If set, the maximum number of possible SURBs will always be sent with session data packets.
+    #[default(false)]
+    pub always_max_out_surbs: bool,
+}
+
+#[cfg(feature = "session-client")]
+impl From<HoprSessionClientConfig> for hopr_transport::SessionClientConfig {
+    fn from(value: HoprSessionClientConfig) -> Self {
+        Self {
+            forward_path_options: value.forward_path.into(),
+            return_path_options: value.return_path.into(),
+            capabilities: value.capabilities,
+            pseudonym: value.pseudonym,
+            surb_management: value.surb_management,
+            always_max_out_surbs: value.always_max_out_surbs,
+        }
+    }
+}
 
 /// Long-running tasks that are spawned by the HOPR node.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, strum::Display, strum::EnumCount)]
@@ -126,7 +206,7 @@ pub enum HoprLibProcess {
     TicketEvents,
 }
 
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_PROCESS_START_TIME:  hopr_metrics::SimpleGauge =  hopr_metrics::SimpleGauge::new(
         "hopr_start_time",
@@ -223,10 +303,15 @@ pub struct Hopr<Chain, Db, Graph, Net>
 where
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
+        + hopr_api::graph::NetworkGraphWrite<NodeId = OffchainPublicKey>
+        + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
         + Clone
         + Send
         + Sync
         + 'static,
+    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
+        hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
+    <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     me: OffchainKeypair,
@@ -246,10 +331,15 @@ where
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
+        + hopr_api::graph::NetworkGraphWrite<NodeId = OffchainPublicKey>
+        + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
         + Clone
         + Send
         + Sync
         + 'static,
+    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
+        hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
+    <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     pub async fn new(
@@ -272,9 +362,10 @@ where
             graph,
             vec![(&cfg.host).try_into().map_err(HoprLibError::TransportError)?],
             cfg.protocol,
-        );
+        )
+        .map_err(HoprLibError::TransportError)?;
 
-        #[cfg(all(feature = "prometheus", not(test)))]
+        #[cfg(all(feature = "telemetry", not(test)))]
         {
             METRIC_PROCESS_START_TIME.set(current_time().as_unix_timestamp().as_secs_f64());
             METRIC_HOPR_LIB_VERSION.set(
@@ -326,20 +417,6 @@ where
     #[inline]
     fn is_public(&self) -> bool {
         self.cfg.publish
-    }
-
-    // TODO(20260218): @NumberFour8 abstract the telemetry objects properly and extract this API into a telemetry trait
-    /// Get packet stats for a specific peer.
-    #[cfg(feature = "telemetry")]
-    pub async fn network_peer_packet_stats(&self, peer: &PeerId) -> errors::Result<Option<PeerPacketStatsSnapshot>> {
-        Ok(self.transport_api.network_peer_packet_stats(peer).await?)
-    }
-
-    // TODO(20260218): @NumberFour8 abstract the telemetry objects properly and extract this API into a telemetry trait
-    /// Get packet stats for all connected peers.
-    #[cfg(feature = "telemetry")]
-    pub async fn network_all_packet_stats(&self) -> errors::Result<Vec<(PeerId, PeerPacketStatsSnapshot)>> {
-        Ok(self.transport_api.network_all_packet_stats().await?)
     }
 
     pub async fn run<
@@ -744,7 +821,7 @@ where
             "NODE STARTED AND RUNNING"
         );
 
-        #[cfg(all(feature = "prometheus", not(test)))]
+        #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_HOPR_NODE_INFO.set(
             &[
                 &self.me.public().to_peerid_str(),
@@ -765,7 +842,7 @@ where
     /// active operations will stop and new will be impossible to perform.
     /// Such operations will return [`HoprStatusError::NotThereYet`].
     ///
-    /// This is the final state and cannot be reversed by calling [`HoprLib::run`] again.
+    /// This is the final state and cannot be reversed by calling `run` again.
     pub fn shutdown(&self) -> Result<(), HoprLibError> {
         self.error_if_not_in_state(HoprState::Running, "node is not running".into())?;
         if let Some(processes) = self.processes.get() {
@@ -783,7 +860,7 @@ where
         &self,
         destination: Address,
         target: SessionTarget,
-        cfg: SessionClientConfig,
+        cfg: HoprSessionClientConfig,
     ) -> errors::Result<HoprSession> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
@@ -795,7 +872,7 @@ where
         use backon::Retryable;
 
         Ok((|| {
-            let cfg = cfg.clone();
+            let cfg = hopr_transport::SessionClientConfig::from(cfg.clone());
             let target = target.clone();
             async { self.transport_api.new_session(destination, target, cfg).await }
         })
@@ -804,7 +881,7 @@ where
         .await?)
     }
 
-    /// Sends keep-alive to the given [`HoprSessionId`], making sure the session is not
+    /// Sends keep-alive to the given [`SessionId`], making sure the session is not
     /// closed due to inactivity.
     #[cfg(feature = "session-client")]
     pub async fn keep_alive_session(&self, id: &SessionId) -> errors::Result<()> {
@@ -816,12 +893,6 @@ where
     pub async fn get_session_surb_balancer_config(&self, id: &SessionId) -> errors::Result<Option<SurbBalancerConfig>> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for session operations".into())?;
         Ok(self.transport_api.session_surb_balancing_cfg(id).await?)
-    }
-
-    #[cfg(all(feature = "session-client", feature = "telemetry"))]
-    pub async fn get_session_stats(&self, id: &SessionId) -> errors::Result<SessionStatsSnapshot> {
-        self.error_if_not_in_state(HoprState::Running, "Node is not ready for session operations".into())?;
-        Ok(self.transport_api.session_stats(id).await?)
     }
 
     #[cfg(feature = "session-client")]
@@ -880,17 +951,22 @@ impl<Chain, Db, Graph, Net> Hopr<Chain, Db, Graph, Net>
 where
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
+        + hopr_api::graph::NetworkGraphWrite<NodeId = OffchainPublicKey>
+        + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
         + Clone
         + Send
         + Sync
         + 'static,
+    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
+        hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
+    <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     // === telemetry
     /// Prometheus formatted metrics collected by the hopr-lib components.
     pub fn collect_hopr_metrics() -> errors::Result<String> {
         cfg_if::cfg_if! {
-            if #[cfg(all(feature = "prometheus", not(test)))] {
+            if #[cfg(all(feature = "telemetry", not(test)))] {
                 hopr_metrics::gather_all_metrics().map_err(HoprLibError::other)
             } else {
                 Err(HoprLibError::GeneralError("BUILT WITHOUT METRICS SUPPORT".into()))
@@ -907,10 +983,15 @@ where
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
+        + hopr_api::graph::NetworkGraphWrite<NodeId = OffchainPublicKey>
+        + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
         + Clone
         + Send
         + Sync
         + 'static,
+    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
+        hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
+    <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     fn status(&self) -> HoprState {
@@ -925,14 +1006,19 @@ where
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
+        + hopr_api::graph::NetworkGraphWrite<NodeId = OffchainPublicKey>
+        + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
         + Clone
         + Send
         + Sync
         + 'static,
+    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
+        hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
+    <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     type Error = HoprLibError;
-    type TransportObservable = Graph::Observed;
+    type TransportObservable = <Graph as hopr_api::graph::NetworkGraphView>::Observed;
 
     fn me_peer_id(&self) -> PeerId {
         (*self.me.public()).into()
@@ -1050,10 +1136,15 @@ where
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
     Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
         + hopr_api::graph::NetworkGraphUpdate
+        + hopr_api::graph::NetworkGraphWrite<NodeId = OffchainPublicKey>
+        + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
         + Clone
         + Send
         + Sync
         + 'static,
+    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
+        hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
+    <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     pub fn me_onchain(&self) -> Address {
@@ -1211,17 +1302,19 @@ where
 
         let channel_id = generate_channel_id(&self.me_onchain(), destination);
 
-        let confirm_awaiter = self
-            .chain_api
-            .open_channel(destination, amount)
-            .await
-            .map_err(HoprLibError::chain)?;
-
+        // Subscribe to chain events BEFORE sending the transaction to avoid
+        // a race where the event is broadcast before the subscriber activates.
         let (event_awaiter, event_abort) = self.spawn_wait_for_on_chain_event(
             format!("open channel to {destination} ({channel_id})"),
             move |event| matches!(event, ChainEvent::ChannelOpened(c) if c.get_id() == &channel_id),
             ON_CHAIN_RESOLUTION_EVENT_TIMEOUT,
         )?;
+
+        let confirm_awaiter = self
+            .chain_api
+            .open_channel(destination, amount)
+            .await
+            .map_err(HoprLibError::chain)?;
 
         let tx_hash = confirm_awaiter.await.map_err(|e| {
             event_abort.abort();
@@ -1239,17 +1332,19 @@ where
 
         let channel_id = *channel_id;
 
-        let confirm_awaiter = self
-            .chain_api
-            .fund_channel(&channel_id, amount)
-            .await
-            .map_err(HoprLibError::chain)?;
-
+        // Subscribe to chain events BEFORE sending the transaction to avoid
+        // a race where the event is broadcast before the subscriber activates.
         let (event_awaiter, event_abort) = self.spawn_wait_for_on_chain_event(
             format!("fund channel {channel_id}"),
             move |event| matches!(event, ChainEvent::ChannelBalanceIncreased(c, a) if c.get_id() == &channel_id && a == &amount),
             ON_CHAIN_RESOLUTION_EVENT_TIMEOUT
         )?;
+
+        let confirm_awaiter = self
+            .chain_api
+            .fund_channel(&channel_id, amount)
+            .await
+            .map_err(HoprLibError::chain)?;
 
         let res = confirm_awaiter.await.map_err(|e| {
             event_abort.abort();
@@ -1267,12 +1362,8 @@ where
 
         let channel_id = *channel_id;
 
-        let confirm_awaiter = self
-            .chain_api
-            .close_channel(&channel_id)
-            .await
-            .map_err(HoprLibError::chain)?;
-
+        // Subscribe to chain events BEFORE sending the transaction to avoid
+        // a race where the event is broadcast before the subscriber activates.
         let (event_awaiter, event_abort) = self.spawn_wait_for_on_chain_event(
             format!("close channel {channel_id}"),
             move |event| {
@@ -1281,6 +1372,12 @@ where
             },
             ON_CHAIN_RESOLUTION_EVENT_TIMEOUT,
         )?;
+
+        let confirm_awaiter = self
+            .chain_api
+            .close_channel(&channel_id)
+            .await
+            .map_err(HoprLibError::chain)?;
 
         let tx_hash = confirm_awaiter.await.map_err(|e| {
             event_abort.abort();

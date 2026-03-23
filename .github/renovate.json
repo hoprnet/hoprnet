@@ -15,7 +15,13 @@
     { "matchCategories": ["rust"], "enabled": true },
     { "matchCategories": ["docker"], "enabled": true, "pinDigests": true },
     {
-      "matchPackageNames": ["libp2p-stream", "parameterized"],
+      "matchPackageNames": [
+        "libp2p-stream",
+        "parameterized",
+        "cipher",
+        "chacha20",
+        "digest"
+      ],
       "enabled": false
     }
   ]
