@@ -205,16 +205,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1773994627,
+        "lastModified": 1774276825,
         "narHash": "sha256-IV3mmWG5VvrP823sn5MBprMOe3ONKdMr9mc6LzFgGYM=",
         "owner": "hoprnet",
         "repo": "nix-lib",
-        "rev": "78bc7ceca07c3ec9733dd15f9a91bd1364993888",
+        "rev": "42a9dba36c23f39301cc0d8b1c13be871e1964c6",
         "type": "github"
       },
       "original": {
         "owner": "hoprnet",
-        "ref": "ausias/export-docker-image",
+        "ref": "v1.1.0",
         "repo": "nix-lib",
         "type": "github"
       }
