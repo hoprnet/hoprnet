@@ -341,7 +341,7 @@ impl Probe {
                                                 replier.notify(Ok(latency))
                                             };
                                         } else {
-                                            tracing::debug!(%pseudonym, nonce = hex::encode(pong), possible_reasons = "[timeout, adversary]", "received pong for unknown probe");
+                                            tracing::warn!(%pseudonym, nonce = hex::encode(pong), possible_reasons = "[timeout, adversary]", "received pong for unknown probe");
                                         };
                                     },
                                 }
