@@ -72,6 +72,7 @@ jobs:
           }
         ]
       cachix_cache_name: hoprnet
+      build_file: ./hopr/hopr-lib/Cargo.toml
       docker_image_name: hoprd
       docker_image_format: skopeo
       fail_on_scan_vulnerabilities: ${{ vars.FAIL_ON_SCAN_VULNERABILITIES }}
