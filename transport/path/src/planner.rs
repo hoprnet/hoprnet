@@ -242,15 +242,18 @@ where
                         "resolving packet return paths"
                     );
 
-                    let paths = (0..num_possible_surbs)
+                    (0..num_possible_surbs)
                         .map(|_| self.resolve_path(*destination, NodeId::Offchain(self.me), return_options.clone()))
                         .collect::<FuturesUnordered<_>>()
                         .try_collect::<Vec<ValidatedPath>>()
-                        .await?;
-                    for (i, rp) in paths.iter().enumerate() {
-                        tracing::debug!(direction = "return", %destination, index = i, path = %rp, "resolved return path");
-                    }
-                    paths
+                        .await?
+                        .into_iter()
+                        .enumerate()
+                        .inspect(|(i, rp)| {
+                            tracing::debug!(direction = "return", %destination, index = i, path = %rp, "resolved return path");
+                        })
+                        .map(|(_, rp)| rp)
+                        .collect()
                 } else {
                     vec![]
                 };

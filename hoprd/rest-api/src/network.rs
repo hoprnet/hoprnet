@@ -117,7 +117,8 @@ pub(crate) struct ConnectedPeerResponse {
     address: Address,
     #[schema(example = 0.476)]
     probe_rate: f64,
-    #[schema(example = 1690000000)]
+    /// Epoch milliseconds of the last observation update.
+    #[schema(example = 1690000000000_u128)]
     last_update: u128,
     #[schema(example = 100)]
     average_latency: u128,
