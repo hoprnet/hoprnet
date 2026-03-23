@@ -105,7 +105,7 @@ pub(super) async fn probability(State(state): State<Arc<InternalState>>) -> impl
 #[schema(example = json!({
     "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
     "probeRate": 0.476,
-    "lastUpdate": 1690000000,
+    "lastUpdate": 1690000000000_u128,
     "averageLatency": 100,
     "score": 0.7,
     "isConnected": true
@@ -120,8 +120,9 @@ pub(crate) struct ConnectedPeerResponse {
     /// Epoch milliseconds of the last observation update.
     #[schema(example = 1690000000000_u128)]
     last_update: u128,
+    /// Average latency in milliseconds, if available.
     #[schema(example = 100)]
-    average_latency: u128,
+    average_latency: Option<u128>,
     #[schema(example = 0.7)]
     score: f64,
     #[schema(example = true)]
@@ -173,7 +174,7 @@ pub(super) async fn connected(State(state): State<Arc<InternalState>>) -> impl I
             address,
             probe_rate: imm.average_probe_rate(),
             last_update: obs.last_update().as_millis(),
-            average_latency: imm.average_latency().map_or(0, |l| l.as_millis()),
+            average_latency: imm.average_latency().map(|l| l.as_millis()),
             score: obs.score(),
             is_connected: imm.is_connected(),
         });
