@@ -181,7 +181,7 @@
             # also used for Docker image
             binary-hoprd-localcluster-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage localclusterBuildArgs;
             # also used for Docker image
-            hoprd-profile-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage (
+            binary-hoprd-profile-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage (
               projectBuildArgs // { cargoExtraArgs = "-F capture"; }
             );
             # also used for Docker image
