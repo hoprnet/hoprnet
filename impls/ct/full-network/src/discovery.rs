@@ -31,6 +31,21 @@ impl<U> FullNetworkDiscovery<U> {
     }
 }
 
+/// Strip the leading source and trailing destination from a loopback path.
+///
+/// `simple_loopback_to_self` returns `[me, intermediates..., me]`.  The caller
+/// adds `me` as the destination and the planner prepends `me` as source, so
+/// only the interior intermediate nodes are needed.
+fn strip_loopback_endpoints(mut path: Vec<OffchainPublicKey>, me: &OffchainPublicKey) -> Vec<OffchainPublicKey> {
+    if path.last() == Some(me) {
+        path.pop();
+    }
+    if path.first() == Some(me) {
+        path.remove(0);
+    }
+    path
+}
+
 /// Build a `DestinationRouting::Forward` with a random pseudonym and an explicit intermediate path.
 fn loopback_routing(me: NodeId, path: Vec<OffchainPublicKey>) -> Option<DestinationRouting> {
     let path: Vec<NodeId> = path.into_iter().map(NodeId::from).collect();
@@ -82,11 +97,8 @@ where
 
                 loopback_path_stream(self.cfg, self.graph.clone())
                     .filter_map(move |(path, _)| {
-                        // simple_loopback_to_self returns [me, intermediates..., me].
-                        // Strip the leading and trailing `me` — loopback_routing adds
-                        // `me` as the destination, and the planner prepends `me` as source.
-                        let intermediates_only: Vec<_> = path.into_iter().filter(|node| *node != me).collect();
-                        futures::future::ready(loopback_routing(me_node, intermediates_only))
+                        let intermediates = strip_loopback_endpoints(path, &me);
+                        futures::future::ready(loopback_routing(me_node, intermediates))
                     })
                     .boxed()
             } else {
@@ -113,11 +125,8 @@ where
 
         let me_node: NodeId = me.into();
         let intermediates = loopback_path_stream(cfg, self.graph.clone()).filter_map(move |(path, path_id)| {
-            // simple_loopback_to_self returns [me, intermediates..., me].
-            // Strip the leading and trailing `me` — loopback_routing adds
-            // `me` as the destination, and the planner prepends `me` as source.
-            let intermediates_only: Vec<_> = path.into_iter().filter(|node| *node != me).collect();
-            let routing = loopback_routing(me_node, intermediates_only).map(|r| ProbeRouting::Looping((r, path_id)));
+            let intermediates = strip_loopback_endpoints(path, &me);
+            let routing = loopback_routing(me_node, intermediates).map(|r| ProbeRouting::Looping((r, path_id)));
             futures::future::ready(routing)
         });
 
@@ -410,15 +419,7 @@ mod tests {
 
         let destinations: Vec<NodeId> = timeout(
             TINY_TIMEOUT * 50,
-            stream
-                .filter_map(|r| {
-                    futures::future::ready(match r {
-                        ProbeRouting::Neighbor(DestinationRouting::Forward { destination, .. }) => Some(*destination),
-                        _ => None,
-                    })
-                })
-                .take(4)
-                .collect::<Vec<_>>(),
+            neighbor_destinations(stream).take(4).collect::<Vec<_>>(),
         )
         .await?;
 
@@ -458,6 +459,16 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    /// Extract `NodeId` destinations from a `ProbeRouting::Neighbor` stream.
+    fn neighbor_destinations(stream: impl futures::Stream<Item = ProbeRouting>) -> impl futures::Stream<Item = NodeId> {
+        stream.filter_map(|r| {
+            futures::future::ready(match r {
+                ProbeRouting::Neighbor(DestinationRouting::Forward { destination, .. }) => Some(*destination),
+                _ => None,
+            })
+        })
     }
 
     /// Helper: mark an edge as fully connected with capacity, so it passes all cost checks.
@@ -561,15 +572,7 @@ mod tests {
 
         let destinations: Vec<NodeId> = timeout(
             TINY_TIMEOUT * 50,
-            stream
-                .filter_map(|r| {
-                    futures::future::ready(match r {
-                        ProbeRouting::Neighbor(DestinationRouting::Forward { destination, .. }) => Some(*destination),
-                        _ => None,
-                    })
-                })
-                .take(3)
-                .collect::<Vec<_>>(),
+            neighbor_destinations(stream).take(3).collect::<Vec<_>>(),
         )
         .await?;
 
@@ -601,15 +604,7 @@ mod tests {
 
         let destinations: Vec<NodeId> = timeout(
             TINY_TIMEOUT * 50,
-            stream
-                .filter_map(|r| {
-                    futures::future::ready(match r {
-                        ProbeRouting::Neighbor(DestinationRouting::Forward { destination, .. }) => Some(*destination),
-                        _ => None,
-                    })
-                })
-                .take(4)
-                .collect::<Vec<_>>(),
+            neighbor_destinations(stream).take(4).collect::<Vec<_>>(),
         )
         .await?;
 

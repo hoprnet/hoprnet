@@ -54,11 +54,10 @@ pub struct ProberConfig {
     /// `Connected(true)` edge in the graph (i.e. the background discovery
     /// process has already established a transport-level connection).
     ///
-    /// When `false` (the default), all known peers are probed regardless of
-    /// connection state — useful during bootstrap or when discovery runs
-    /// out-of-band.
-    #[cfg_attr(feature = "serde", serde(default = "default_true"))]
-    #[default(default_true())]
+    /// When `false`, all known peers are probed regardless of connection
+    /// state — useful during bootstrap or when discovery runs out-of-band.
+    #[cfg_attr(feature = "serde", serde(default = "just_true"))]
+    #[default(just_true())]
     pub probe_connected_only: bool,
 }
 
@@ -122,7 +121,7 @@ const fn default_probing_interval() -> std::time::Duration {
 }
 
 #[inline]
-const fn default_true() -> bool {
+const fn just_true() -> bool {
     true
 }
 
@@ -132,7 +131,9 @@ mod tests {
 
     #[test]
     fn default_config_is_valid() {
-        assert!(ProberConfig::default().validate().is_ok());
+        let cfg = ProberConfig::default();
+        assert!(cfg.validate().is_ok());
+        assert!(cfg.probe_connected_only, "probe_connected_only should default to true");
     }
 
     #[test]
