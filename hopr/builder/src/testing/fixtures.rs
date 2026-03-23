@@ -26,6 +26,18 @@ use crate::testing::{
     hopr::{ChannelGuard, NodeSafeConfig, TestedHopr, create_hopr_instance_config},
 };
 
+/// Estimated time for on-chain state to propagate across all nodes.
+///
+/// In the Blokli test mock, `expected_block_time` is a nominal value (e.g. 5s)
+/// that doesn't reflect actual mock processing speed (controlled by `tx_simulation_delay`).
+/// We use `expected_block_time + 2s` as a reasonable upper bound that accounts for
+/// coverage instrumentation overhead without being tied to the unrealistic
+/// `finality * expected_block_time` product.
+pub fn chain_propagation_delay(chain_info: &hopr_chain_connector::blokli_client::types::ChainInfo) -> Duration {
+    let block_time_secs = chain_info.expected_block_time.0.parse::<u64>().unwrap_or(5);
+    Duration::from_secs(block_time_secs + 2)
+}
+
 /// A guard that holds a reference to the cluster and ensures exclusive access
 pub struct ClusterGuard {
     pub cluster: Vec<TestedHopr>,
@@ -78,7 +90,8 @@ impl ClusterGuard {
             );
         }
 
-        sleep(Duration::from_secs(3)).await;
+        let chain_info = self.chain_client.query_chain_info().await?;
+        sleep(chain_propagation_delay(&chain_info)).await;
 
         Ok(guards)
     }
@@ -88,6 +101,12 @@ impl ClusterGuard {
     /// Channels must already be open before calling this method.
     pub async fn create_session(&self, path: &[&TestedHopr]) -> anyhow::Result<HoprSession> {
         debug_assert!(path.len() >= 2, "path must contain at least source and destination");
+
+        let chain_info = self.chain_client.query_chain_info().await?;
+        // Session establishment retries internally with ~20s per attempt.
+        // Use 6x propagation delay (~42s) to allow at least 2 retry cycles,
+        // which is needed under coverage instrumentation overhead.
+        let timeout = chain_propagation_delay(&chain_info) * 6;
 
         let ip = IpOrHost::from_str(":0")?;
         let routing = HopRouting::try_from(path.len() - 2)?;
@@ -105,13 +124,13 @@ impl ClusterGuard {
                     always_max_out_surbs: false,
                 },
             )
-            .timeout(futures_time::time::Duration::from_secs(5))
+            .timeout(futures_time::time::Duration::from(timeout))
             .await;
 
         match session_result {
             Ok(Ok(s)) => Ok(s),
             Ok(Err(e)) => Err(e.into()),
-            Err(_) => Err(anyhow::anyhow!("Session opening timed out after 5s")),
+            Err(_) => Err(anyhow::anyhow!("Session opening timed out after {timeout:?}")),
         }
     }
 
@@ -486,6 +505,33 @@ async fn wait_for_connectivity(instance: &TestedHopr, swarm_size: usize) {
         tracing::trace!(
             "{} peers connected on {}, waiting for full mesh",
             peers.len(),
+            instance.instance.me_onchain()
+        );
+        sleep(Duration::from_secs(1)).await;
+    }
+
+    // Wait for the probe subsystem to observe all peers, ensuring pings
+    // succeed immediately after the cluster reports full connectivity.
+    info!("Waiting for probe warmup");
+    loop {
+        let peers = instance
+            .inner()
+            .network_connected_peers()
+            .await
+            .expect("failed to get connected peers");
+
+        let observed = peers
+            .iter()
+            .filter(|p| instance.inner().network_peer_info(p).is_some())
+            .count();
+
+        if observed == swarm_size - 1 {
+            break;
+        }
+
+        tracing::trace!(
+            "{observed}/{} peers observed on {}, waiting for probe warmup",
+            swarm_size - 1,
             instance.instance.me_onchain()
         );
         sleep(Duration::from_secs(1)).await;
