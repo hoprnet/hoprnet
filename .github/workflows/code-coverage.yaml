@@ -28,7 +28,7 @@ jobs:
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
     if: >-
-      github.event_name == 'push' || github.event.pull_request.draft == false
+      github.event_name == 'push' || (github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository)
     env:
       CI: "true"
     steps:
@@ -65,7 +65,7 @@ jobs:
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
     if: >-
-      github.event_name == 'push' || github.event.pull_request.draft == false
+      github.event_name == 'push' || (github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository)
     env:
       CI: "true"
     steps:
