@@ -411,6 +411,18 @@
               Cmd = [ "hoprd" ];
               env = [ "TMPDIR=/app/.tmp" ];
             };
+            docker-hoprd-aarch64-linux = nixLib.mkDockerImage {
+              name = "hoprd";
+              extraContents = [
+                dockerHoprdEntrypoint
+                hoprdPackages.binary-hoprd-aarch64-linux
+                pkgs.cacert
+                pkgs.curl # Required by docker-compose healthcheck
+              ];
+              Entrypoint = [ "/bin/docker-entrypoint.sh" ];
+              Cmd = [ "hoprd" ];
+              env = [ "TMPDIR=/app/.tmp" ];
+            };
           };
 
           docs = rust-builder-local-nightly.callPackage nixLib.mkRustPackage (
