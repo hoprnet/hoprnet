@@ -71,7 +71,7 @@ jobs:
       runner: ${{ matrix.runner }}
       enabled: ${{ matrix.required_label == '' || contains(github.event.pull_request.labels.*.name, matrix.required_label) }}
     secrets:
-      gcp_service_account: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+      gcp_service_account: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
       gpg_private_key: ${{ secrets.GPG_HOPRNET_PRIVATE_KEY }}
   build-docker:
@@ -99,7 +99,7 @@ jobs:
       docker_image_name: hoprd
       docker_image_format: skopeo
     secrets:
-      gcp_service_account: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+      gcp_service_account: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
   docs:
     name: Docs

@@ -95,7 +95,7 @@ jobs:
         if: ${{ !env.ACT }}
         with:
           token_format: "access_token"
-          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+          credentials_json: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
 
       - name: Run unit tests with nightly
         run: |
