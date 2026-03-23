@@ -16,6 +16,10 @@ on:
 concurrency:
   group: release
   cancel-in-progress: false
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
 jobs:
   build-binaries:
     name: Binary ${{ matrix.architecture }}
@@ -30,7 +34,7 @@ jobs:
     permissions:
       contents: read
     with:
-      source_branch: ${{ github.ref }}
+      source_branch: ${{ github.ref_name }}
       version_type: release
       architecture: ${{ matrix.architecture }}
       cachix_cache_name: hoprnet
@@ -48,6 +52,7 @@ jobs:
     needs: build-binaries
     permissions:
       contents: read
+      pull-requests: write
       id-token: write
     with:
       source_branch: ${{ github.ref_name }}
