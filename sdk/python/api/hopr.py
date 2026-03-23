@@ -211,16 +211,13 @@ class HoprdAPI(ApiLib):
         """
         return await self.try_req(Method.POST, "/tickets/redeem", return_state=True)
 
-    async def peers(
-        self,
-        status: str = "connected",
-    ) -> list[ConnectedPeer]:
+    async def peers(self) -> list[ConnectedPeer]:
         """
-        Returns a list of peers.
+        Returns a list of connected peers with observation data.
         :return: peers: list
         """
-        if r := await self.try_req(Method.GET, f"/node/peers"):
-            return [ConnectedPeer(peer) for peer in r.get(status, [])]
+        if r := await self.try_req(Method.GET, "/network/connected"):
+            return [ConnectedPeer(peer) for peer in r]
         else:
             return []
 
