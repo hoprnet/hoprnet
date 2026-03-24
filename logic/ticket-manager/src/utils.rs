@@ -168,6 +168,7 @@ impl<Q: TicketQueue> From<Q> for ChannelTicketQueue<Q> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub(crate) struct ChannelTicketStats {
     pub winning_tickets: u128,
+    pub redeemed_value: HoprBalance,
     pub neglected_value: HoprBalance,
     pub rejected_value: HoprBalance,
 }

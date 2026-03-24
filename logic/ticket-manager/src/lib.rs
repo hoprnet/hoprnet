@@ -609,8 +609,7 @@ where
                             // Do accounting of the ticket into the stats
                             match redeem_complete_result {
                                 RedemptionResult::Redeemed(ticket) => {
-                                    // No stats accounting here:
-                                    // the total redeemed value should be queried from the chain instead.
+                                    queue_write.1.redeemed_value += ticket.verified_ticket().amount;
                                     tracing::info!(%ticket, "ticket has been redeemed");
                                 },
                                 RedemptionResult::ValueTooLow(ticket) => {
@@ -703,6 +702,7 @@ where
     /// If the given `channel` does not exist, it returns zero statistics instead of an error.
     ///
     /// Apart from [`unredeemed_value`](ChannelStats), the statistics are not persistent.
+    #[allow(deprecated)] // TODO: remove once blokli#237 is merged
     fn ticket_stats(&self, channel: Option<&ChannelId>) -> Result<ChannelStats, TicketManagerError> {
         self.channel_tickets
             .iter()
@@ -721,12 +721,14 @@ where
                         .unwrap_or_default()
                         + stats.unredeemed_value,
                     rejected_value: queue.1.rejected_value + stats.rejected_value,
+                    redeemed_value: queue.1.redeemed_value + stats.redeemed_value,
                     neglected_value: queue.1.neglected_value + stats.neglected_value,
                 })
             })
     }
 }
 
+#[allow(deprecated)] // TODO: remove once blokli#237 is merged
 #[cfg(test)]
 mod tests {
     use std::ops::Sub;
@@ -823,6 +825,7 @@ mod tests {
                 winning_tickets: 1,
                 unredeemed_value: tickets[0].verified_ticket().amount,
                 rejected_value: HoprBalance::zero(),
+                redeemed_value: HoprBalance::zero(),
                 neglected_value: HoprBalance::zero(),
             },
             mgr.ticket_stats(Some(&channel.get_id()))?
@@ -835,6 +838,7 @@ mod tests {
                 winning_tickets: 2,
                 unredeemed_value: tickets[0].verified_ticket().amount + tickets[1].verified_ticket().amount,
                 rejected_value: HoprBalance::zero(),
+                redeemed_value: HoprBalance::zero(),
                 neglected_value: HoprBalance::zero(),
             },
             mgr.ticket_stats(Some(&channel.get_id()))?
@@ -1203,6 +1207,7 @@ mod tests {
                 winning_tickets: tickets.len() as u128,
                 unredeemed_value: unrealized_value_after,
                 rejected_value: HoprBalance::zero(),
+                redeemed_value: HoprBalance::zero(),
                 neglected_value: neglected.iter().map(|t| t.verified_ticket().amount).sum(),
             },
             mgr.ticket_stats(Some(&channel.get_id()))?
@@ -1277,6 +1282,7 @@ mod tests {
                 winning_tickets: tickets.len() as u128,
                 unredeemed_value: unrealized_value_after,
                 rejected_value: HoprBalance::zero(),
+                redeemed_value: HoprBalance::zero(),
                 neglected_value: neglected.iter().map(|t| t.verified_ticket().amount).sum(),
             },
             mgr.ticket_stats(Some(&channel.get_id()))?
@@ -1324,6 +1330,7 @@ mod tests {
                 winning_tickets: tickets.len() as u128,
                 unredeemed_value: expected_unrealized_value,
                 rejected_value: HoprBalance::zero(),
+                redeemed_value: HoprBalance::zero(),
                 neglected_value: HoprBalance::zero(),
             },
             mgr.ticket_stats(Some(&tickets[0].ticket.channel_id()))?
@@ -1389,6 +1396,7 @@ mod tests {
                 winning_tickets: tickets_from_epoch_1.len() as u128 + 1,
                 unredeemed_value: new_unrealized_value,
                 rejected_value: HoprBalance::zero(),
+                redeemed_value: HoprBalance::zero(),
                 neglected_value: neglected.iter().map(|t| t.verified_ticket().amount).sum(),
             },
             mgr.ticket_stats(Some(&channel_id))?
@@ -1777,6 +1785,7 @@ mod tests {
                 winning_tickets: tickets.len() as u128,
                 unredeemed_value: HoprBalance::zero(),
                 rejected_value: HoprBalance::zero(),
+                redeemed_value: HoprBalance::zero(),
                 neglected_value: neglected.iter().map(|t| t.verified_ticket().amount).sum(),
             },
             mgr.ticket_stats(Some(&channel.get_id()))?
@@ -1785,6 +1794,17 @@ mod tests {
         // Once redemption completes we should see the tickets as redeemed
         let res = jh.await??;
         assert_eq!(Some(RedemptionResult::Redeemed(tickets[0].ticket)), res);
+
+        assert_eq!(
+            ChannelStats {
+                winning_tickets: tickets.len() as u128,
+                unredeemed_value: HoprBalance::zero(),
+                rejected_value: HoprBalance::zero(),
+                redeemed_value: tickets[0].verified_ticket().amount,
+                neglected_value: neglected.iter().map(|t| t.verified_ticket().amount).sum::<HoprBalance>() - tickets[0].verified_ticket().amount,
+            },
+            mgr.ticket_stats(Some(&channel.get_id()))?
+        );
 
         Ok(())
     }
