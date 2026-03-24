@@ -348,7 +348,7 @@ where
             hopr_chain_api.clone(),
             graph,
             vec![(&cfg.host).try_into().map_err(HoprLibError::TransportError)?],
-            cfg.protocol,
+            cfg.protocol.clone(),
         )
         .map_err(HoprLibError::TransportError)?;
 
@@ -1269,12 +1269,17 @@ where
         Ok(CloseChannelResult { tx_hash })
     }
 
-    pub fn ticket_statistics(&self) -> Result<ChannelStats, HoprLibError> {
+    // TODO: this method can be sync unless we allow querying of the redeemed value from Blokli
+    pub async fn ticket_statistics(&self) -> Result<ChannelStats, HoprLibError> {
         self.transport_api
             .ticket_manager()
             .ticket_stats(None)
             .map_err(HoprLibError::ticket_manager)
     }
+
+    // Minimum grace period left in PendingToClose channel, so
+    // that ticket redemption should still be attempted.
+    const PENDING_TO_CLOSE_TOLERANCE: Duration = Duration::from_secs(5);
 
     pub async fn redeem_all_tickets<B: Into<HoprBalance> + Send>(
         &self,
@@ -1289,7 +1294,7 @@ where
                 self.chain_api.clone(),
                 None,
                 min_value.into(),
-                Some(Duration::from_mins(1)),
+                Some(Self::PENDING_TO_CLOSE_TOLERANCE),
             )
             .await
             .map_err(HoprLibError::ticket_manager)?
@@ -1332,7 +1337,7 @@ where
                     .with_destination(channel.destination)
                     .into(),
                 min_value.into(),
-                Some(Duration::from_mins(1)),
+                Some(Self::PENDING_TO_CLOSE_TOLERANCE),
             )
             .await
             .map_err(HoprLibError::ticket_manager)?

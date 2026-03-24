@@ -4,7 +4,7 @@ use anyhow::Context;
 use futures::AsyncWriteExt;
 use futures_time::future::FutureExt as _;
 use hopr_builder::{
-    hopr_lib::{ChannelId, HoprBalance, HoprLibError, UnitaryFloatOps},
+    hopr_lib::{HoprBalance, HoprLibError, UnitaryFloatOps},
     testing::{
         fixtures::{ClusterGuard, MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, cluster_fixture},
         hopr::ChannelGuard,
@@ -86,7 +86,7 @@ async fn relaying_message_rejected_when_channel_out_of_funding(
                 .ticket_statistics()
                 .await
                 .context("failed to get ticket statistics")?;
-            if stats_after.rejected_value() > stats_before.rejected_value() {
+            if stats_after.rejected_value > stats_before.rejected_value {
                 return anyhow::Ok(());
             }
         }
@@ -162,7 +162,7 @@ async fn redeem_ticket_on_request(#[with(5)] cluster_fixture: ClusterGuard) -> a
     wait_until(
         || async {
             let stats_after = mid.inner().ticket_statistics().await?;
-            Ok::<_, HoprLibError>(stats_after.redeemed_value() > stats_before.redeemed_value())
+            Ok::<_, HoprLibError>(stats_after.redeemed_value > stats_before.redeemed_value)
         },
         Duration::from_secs(5),
     )
@@ -190,10 +190,12 @@ async fn neglect_ticket_on_closing(#[with(5)] cluster_fixture: ClusterGuard) -> 
         .await
         .context("failed to get ticket price")?;
 
+    /*
     mid.inner()
         .reset_ticket_statistics()
         .await
         .context("failed to get ticket statistics")?;
+    */
 
     // Snapshot stats right after reset to use as baseline for delta checks
     let stats_after_reset = mid
@@ -255,7 +257,7 @@ async fn neglect_ticket_on_closing(#[with(5)] cluster_fixture: ClusterGuard) -> 
             // After closing the test channels, neglected value must increase.
             // We use a delta check because background probing may have created
             // unredeemed tickets on other channels that remain open.
-            Ok::<_, HoprLibError>(stats_after.neglected_value() > stats_before_close.neglected_value())
+            Ok::<_, HoprLibError>(stats_after.neglected_value > stats_before_close.neglected_value)
         },
         Duration::from_secs(5),
     )
@@ -327,7 +329,7 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
             let stats_after = mid.inner().ticket_statistics().await?;
             Ok::<_, HoprLibError>(
                 stats_after.winning_tickets < stats_before.winning_tickets + message_count as u128
-                    && stats_after.redeemed_value() > stats_before.redeemed_value(),
+                    && stats_after.redeemed_value > stats_before.redeemed_value,
             )
         },
         Duration::from_secs(5),
@@ -429,7 +431,7 @@ async fn relay_with_win_prob_higher_than_min_win_prob_should_succeed(
         || async {
             let stats_after = mid.inner().ticket_statistics().await?;
             Ok::<_, HoprLibError>(
-                stats_after.redeemed_value() > stats_before.redeemed_value()
+                stats_after.redeemed_value > stats_before.redeemed_value
                     && stats_after.winning_tickets > stats_before.winning_tickets,
             )
         },

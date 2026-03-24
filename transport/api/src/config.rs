@@ -52,7 +52,7 @@ pub struct HoprProtocolConfig {
     /// Path where to store received winning tickets.
     ///
     /// If omitted, the ticket storage will be in temporary directory and
-    /// the tickets might be wiped on system restart.
+    /// the tickets might be wiped on application exit.
     #[cfg_attr(feature = "serde", serde(skip))]
     pub ticket_storage_path: Option<String>,
     /// Interval at which per-peer protocol conformance counters are flushed

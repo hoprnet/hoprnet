@@ -34,6 +34,7 @@ impl RedbStore {
     /// The temporary file is automatically deleted when the store is dropped.
     pub fn new_temp() -> Result<Self, RedbStoreError> {
         let tempfile = tempfile::NamedTempFile::new()?;
+        tracing::debug!(path = ?tempfile.path(), "redb store created");
         RedbStore::new(tempfile.path()).map(|mut store| {
             store._tmp = Some(tempfile);
             store

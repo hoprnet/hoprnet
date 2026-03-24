@@ -96,7 +96,7 @@ use hopr_api::{
     chain::{ChainWriteTicketOperations, ChannelSelector},
     types::internal::routing::DestinationRouting,
 };
-use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue};
+use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue, TicketManagerError};
 
 // Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
 lazy_static::lazy_static! {
@@ -166,6 +166,9 @@ where
     path_planner: PathPlanner<MemorySurbStore, Chain, HoprGraphPathSelector<Graph>>,
     my_multiaddresses: Vec<Multiaddr>,
     // TODO: should the Ticket store (RedbStore) be part of the external API of the transport?
+    // The answer is likely: should be external (see #7903) but only once the outgoing index
+    // management is separated from the Ticket Manager and the unrealized value is passed down
+    // via some Arc'd atomic counter.
     tmgr: Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>,
     smgr: SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>, Sender<IncomingSession>>,
     session_telemetry_tag_allocator: Arc<dyn hopr_transport_tag_allocator::TagAllocator + Send + Sync>,
@@ -232,8 +235,8 @@ where
             .ok_or_else(|| errors::HoprTransportError::Api("probing tag allocator missing".into()))?;
 
         let ticket_manager = HoprTicketManager::new(match &cfg.ticket_storage_path {
-            Some(path) => RedbStore::new(path)?,
-            None => RedbStore::new_temp()?,
+            Some(path) => RedbStore::new(path).map_err(TicketManagerError::store)?,
+            None => RedbStore::new_temp().map_err(TicketManagerError::store)?,
         })?;
 
         Ok(Self {
