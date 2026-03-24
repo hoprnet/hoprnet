@@ -35,7 +35,9 @@ jobs:
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
-          install_nix: "false"
+          use_cachix: "true"
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
           command: nix build -L .#hopr-test-unit
 
   tests-integration:
@@ -50,7 +52,9 @@ jobs:
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
-          install_nix: "false"
+          use_cachix: "true"
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
           command: nix develop -c cargo test --test '*' -- --test-threads=1
 
   tests-unit-nightly:
@@ -73,7 +77,9 @@ jobs:
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
-          install_nix: "false"
+          use_cachix: "true"
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
           command: nix build -L .#hopr-test-nightly
 
   build-benchmarks:
@@ -87,5 +93,7 @@ jobs:
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
-          install_nix: "false"
+          use_cachix: "true"
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
           command: nix build .#hoprd-bench-build

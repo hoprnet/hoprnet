@@ -27,5 +27,4 @@ jobs:
         with:
           repository: ${{ inputs.source_repo }}
           ref: ${{ inputs.source_branch }}
-          install_nix: "false"
           command: nix run .#audit

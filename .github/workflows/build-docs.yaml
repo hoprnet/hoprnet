@@ -38,8 +38,11 @@ jobs:
         with:
           repository: ${{ inputs.source_repo }}
           ref: ${{ inputs.source_branch }}
-          install_nix: "false"
+          use_cachix: "true"
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
           command: |
+            set -e
             RUSTDOCFLAGS="-D warnings" nix develop -c cargo doc --no-deps --document-private-items
             nix build -L .#docs
 

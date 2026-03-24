@@ -37,5 +37,7 @@ jobs:
         with:
           repository: ${{ inputs.source_repo }}
           ref: ${{ inputs.source_branch }}
-          install_nix: "false"
+          use_cachix: "true"
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
           command: nix run -L .#check
