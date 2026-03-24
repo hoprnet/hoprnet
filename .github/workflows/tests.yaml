@@ -30,21 +30,13 @@ jobs:
     env:
       CI: "true"
     steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
-        with:
-          disable-sudo: true
-          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
-
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Run unit tests
+        uses: hoprnet/hopr-workflows/actions/nix-action@nix-action-v1
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
-          persist-credentials: false
-
-      - name: Run unit tests
-        run: nix build -L .#hopr-test-unit
+          install_nix: "false"
+          command: nix build -L .#hopr-test-unit
 
   tests-integration:
     name: Integration Tests
@@ -53,21 +45,13 @@ jobs:
     env:
       CI: "true"
     steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
-        with:
-          disable-sudo: true
-          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
-
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Run integration tests
+        uses: hoprnet/hopr-workflows/actions/nix-action@nix-action-v1
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
-          persist-credentials: false
-
-      - name: Run integration tests
-        run: nix develop -c cargo test --test '*' -- --test-threads=1
+          install_nix: "false"
+          command: nix develop -c cargo test --test '*' -- --test-threads=1
 
   tests-unit-nightly:
     name: Unit Tests Nightly
@@ -76,19 +60,6 @@ jobs:
     env:
       CI: "true"
     steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
-        with:
-          disable-sudo: true
-          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
-
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
-          persist-credentials: false
-
       - name: Set up Google Cloud Credentials
         id: auth
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
@@ -98,8 +69,12 @@ jobs:
           credentials_json: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
 
       - name: Run unit tests with nightly
-        run: |
-          nix build -L .#hopr-test-nightly
+        uses: hoprnet/hopr-workflows/actions/nix-action@nix-action-v1
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          install_nix: "false"
+          command: nix build -L .#hopr-test-nightly
 
   build-benchmarks:
     name: Build Benchmarks
@@ -107,18 +82,10 @@ jobs:
     timeout-minutes: 20
     if: github.event_name == 'merge_group'
     steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
-        with:
-          disable-sudo: true
-          egress-policy: audit
-
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Build benchmarks
+        uses: hoprnet/hopr-workflows/actions/nix-action@nix-action-v1
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
-          persist-credentials: false
-
-      - name: Build benchmarks
-        run: nix build .#hoprd-bench-build
+          install_nix: "false"
+          command: nix build .#hoprd-bench-build

@@ -31,23 +31,15 @@ jobs:
     env:
       CI: "true"
     steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
-        with:
-          disable-sudo: true
-          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
-
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Generate unit coverage report
+        uses: hoprnet/hopr-workflows/actions/nix-action@nix-action-v1
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
-          persist-credentials: false
-
-      - name: Generate unit coverage report
-        run: |
-          nix build -L .#hopr-coverage
-          cp result coverage-unit.lcov
+          install_nix: "false"
+          command: |
+            nix build -L .#hopr-coverage
+            cp result coverage-unit.lcov
 
       - name: Upload unit coverage report
         uses: codecov/codecov-action@18283e04ce6e62d37312384ff67231eb8fd56d24 # v5.4.3
@@ -67,26 +59,18 @@ jobs:
     env:
       CI: "true"
     steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
-        with:
-          disable-sudo: true
-          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
-
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Generate integration coverage report
+        uses: hoprnet/hopr-workflows/actions/nix-action@nix-action-v1
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
-          persist-credentials: false
-
-      - name: Generate integration coverage report
-        run: |
-          nix develop .#coverage -c cargo llvm-cov \
-            --workspace \
-            --test '*' \
-            --lcov --output-path integration-coverage.lcov \
-            -- --test-threads=1
+          install_nix: "false"
+          command: |
+            nix develop .#coverage -c cargo llvm-cov \
+              --workspace \
+              --test '*' \
+              --lcov --output-path integration-coverage.lcov \
+              -- --test-threads=1
 
       - name: Upload integration coverage report
         uses: codecov/codecov-action@18283e04ce6e62d37312384ff67231eb8fd56d24 # v5.4.3
