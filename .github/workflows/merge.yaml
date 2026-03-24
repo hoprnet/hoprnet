@@ -119,7 +119,7 @@ jobs:
       - build-binaries
       - build-docker
       - docs
-    if: ${{ failure() }}
+    if: ${{ always() && failure() }}
     runs-on: ubuntu-latest
     steps:
       - name: Notify failed merge pipeline
