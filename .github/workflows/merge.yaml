@@ -24,12 +24,12 @@ jobs:
           - architecture: aarch64-linux
             runner: self-hosted-hoprnet-bigger
             build_command: nix build -L .#binary-hoprd-aarch64-linux
-          # - architecture: x86_64-darwin
-          #   runner: macos-15-intel
-          #   build_command: nix build -L .#binary-hoprd-x86_64-darwin
-          # - architecture: aarch64-darwin
-          #   runner: macos-15-xlarge
-          #   build_command: nix build -L .#binary-hoprd-aarch64-darwin
+            # - architecture: x86_64-darwin
+            #   runner: macos-15-intel
+            #   build_command: nix build -L .#binary-hoprd-x86_64-darwin
+            # - architecture: aarch64-darwin
+            #   runner: macos-15-xlarge
+            #   build_command: nix build -L .#binary-hoprd-aarch64-darwin
     uses: hoprnet/hopr-workflows/.github/workflows/build-binaries.yaml@build-binaries-v2
     permissions:
       contents: read
