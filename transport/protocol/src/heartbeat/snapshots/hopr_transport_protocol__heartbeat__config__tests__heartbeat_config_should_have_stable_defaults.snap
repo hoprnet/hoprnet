@@ -1,0 +1,7 @@
+---
+source: transport/protocol/src/heartbeat/config.rs
+expression: cfg
+---
+HeartbeatProtocolConfig {
+    timeout: 6s,
+}

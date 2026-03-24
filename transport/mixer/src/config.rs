@@ -7,12 +7,15 @@ pub const HOPR_MIXER_CAPACITY: usize = 20_000;
 
 /// Mixer configuration.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, smart_default::SmartDefault)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MixerConfig {
     /// The minimum delay introduced during mixing.
     #[default(Duration::from_millis(HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS))]
+    #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
     pub min_delay: Duration,
     /// The range from the minimum delay to the maximum possible delay.
     #[default(Duration::from_millis(HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS))]
+    #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
     pub delay_range: Duration,
     /// The capacity of the preallocated mixer buffer.
     ///

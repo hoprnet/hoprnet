@@ -1,6 +1,6 @@
 [package]
 name = "hopr-protocol-session"
-version = "1.1.0"
+version = "1.1.1"
 edition.workspace = true
 rust-version.workspace = true
 authors = ["HOPR Association <tech@hoprnet.org>"]
@@ -58,7 +58,7 @@ anyhow = { workspace = true }
 clap = { workspace = true }
 criterion = { workspace = true }
 hex-literal = { workspace = true }
-insta = { workspace = true }
+insta = { workspace = true, features = ["yaml"] }
 indexmap = { workspace = true, features = ["serde"] }
 mockall = { workspace = true }
 parameterized = { workspace = true }

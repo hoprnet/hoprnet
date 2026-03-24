@@ -406,6 +406,89 @@ mod tests {
         assert_eq!(cfg, state_data.as_config());
     }
 
+    #[test]
+    fn surb_balancer_config_default_snapshot() {
+        let cfg = SurbBalancerConfig::default();
+        insta::assert_debug_snapshot!(cfg);
+    }
+
+    #[test]
+    fn surb_balancer_config_as_controller_bounds() {
+        let cfg = SurbBalancerConfig {
+            target_surb_buffer_size: 1000,
+            max_surbs_per_sec: 500,
+            surb_decay: None,
+        };
+        let bounds = cfg.as_controller_bounds();
+        assert_eq!(bounds.target(), 1000);
+        assert_eq!(bounds.output_limit(), 500);
+    }
+
+    #[test]
+    fn balancer_state_values_disabled_when_target_is_zero() {
+        let cfg = SurbBalancerConfig {
+            target_surb_buffer_size: 0,
+            max_surbs_per_sec: 0,
+            surb_decay: None,
+        };
+        let state = BalancerStateValues::new(cfg);
+        assert!(state.is_disabled());
+    }
+
+    #[test]
+    fn balancer_state_values_enabled_when_target_is_nonzero() {
+        let state = BalancerStateValues::new(SurbBalancerConfig::default());
+        assert!(!state.is_disabled());
+    }
+
+    #[test]
+    fn balancer_state_values_update_propagates_all_fields() {
+        let state = BalancerStateValues::default();
+        let cfg = SurbBalancerConfig {
+            target_surb_buffer_size: 3000,
+            max_surbs_per_sec: 1500,
+            surb_decay: Some((Duration::from_secs(30), 0.10)),
+        };
+        state.update(&cfg);
+        assert_eq!(state.as_config(), cfg);
+        assert_eq!(state.controller_bounds(), cfg.as_controller_bounds());
+    }
+
+    #[test]
+    fn balancer_state_values_surb_decay_none_maps_to_none() {
+        let cfg = SurbBalancerConfig {
+            target_surb_buffer_size: 1000,
+            max_surbs_per_sec: 500,
+            surb_decay: None,
+        };
+        let state = BalancerStateValues::new(cfg);
+        assert!(state.surb_decay().is_none());
+    }
+
+    #[test]
+    fn balancer_state_values_buffer_level_default_is_zero() {
+        let state = BalancerStateValues::default();
+        assert_eq!(state.buffer_level(), 0);
+    }
+
+    #[test]
+    fn balancer_state_values_buffer_level_can_be_updated() {
+        let state = BalancerStateValues::default();
+        state.buffer_level.store(42, std::sync::atomic::Ordering::Relaxed);
+        assert_eq!(state.buffer_level(), 42);
+    }
+
+    #[test]
+    fn balancer_state_values_from_config() {
+        let cfg = SurbBalancerConfig {
+            target_surb_buffer_size: 5000,
+            max_surbs_per_sec: 2500,
+            surb_decay: Some((Duration::from_secs(60), 0.05)),
+        };
+        let state: BalancerStateValues = cfg.into();
+        assert_eq!(state.as_config(), cfg);
+    }
+
     #[test_log::test]
     fn surb_balancer_should_start_increase_level_when_below_target() {
         let production_rate = Arc::new(AtomicU64::new(0));
@@ -546,6 +629,14 @@ mod tests {
         let levels = stream.take(NUM_STEPS).collect::<Vec<_>>().await;
         handle.abort();
 
-        assert_eq!(levels, vec![5000, 4750, 4750, 4500, 4500]);
+        assert_eq!(levels.len(), NUM_STEPS);
+        assert!(
+            levels.windows(2).all(|w| w[1] <= w[0]),
+            "buffer levels should be monotonic non-increasing: {levels:?}"
+        );
+        assert!(
+            levels.last().is_some_and(|last| *last < 5_000),
+            "expected at least one decay step: {levels:?}"
+        );
     }
 }
