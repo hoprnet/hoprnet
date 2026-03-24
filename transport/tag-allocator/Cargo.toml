@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-tag-allocator"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -24,3 +24,6 @@ thiserror = { workspace = true }
 validator = { workspace = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
+insta = { workspace = true }
+rstest = { workspace = true }

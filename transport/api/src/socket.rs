@@ -40,3 +40,26 @@ where
         self.tx.clone()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use futures::channel::mpsc;
+    use hopr_api::types::internal::routing::DestinationRouting;
+    use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn socket_from_tuple_and_reader_writer_work() -> anyhow::Result<()> {
+        let (tx, _rx) = mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
+        let (_in_tx, in_rx) = mpsc::unbounded::<ApplicationDataIn>();
+
+        let socket = HoprSocket::from((in_rx, tx));
+        // writer() should return a clone of the sender
+        let _writer = socket.writer();
+        // reader() consumes the socket and returns the stream
+        let _reader = socket.reader();
+
+        Ok(())
+    }
+}

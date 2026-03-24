@@ -1,0 +1,9 @@
+---
+source: impls/graph/src/petgraph/algorithm.rs
+expression: paths
+---
+- - 0
+  - 1
+- - 0
+  - 1
+  - 2

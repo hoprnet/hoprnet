@@ -35,7 +35,7 @@ impl<'a> TryFrom<&'a [u8]> for Message {
     type Error = GeneralError;
 
     fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
-        if value.is_empty() {
+        if value.len() < 2 {
             return Err(GeneralError::ParseError("Message.size".into()));
         }
 
@@ -95,6 +95,7 @@ impl TryFrom<ApplicationData> for Message {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Context;
     use hopr_api::types::primitive::traits::AsUnixTimestamp;
     use hopr_platform::time::native::current_time;
     use more_asserts::assert_lt;
@@ -125,9 +126,10 @@ mod tests {
     }
 
     #[test]
-    fn random_generation_of_a_neighbor_probe_produces_a_ping() {
+    fn random_generation_of_a_neighbor_probe_produces_a_ping() -> anyhow::Result<()> {
         let ping = NeighborProbe::random_nonce();
-        assert!(matches!(ping, NeighborProbe::Ping(_)));
+        anyhow::ensure!(matches!(ping, NeighborProbe::Ping(_)), "expected Ping variant");
+        Ok(())
     }
 
     #[test]
@@ -180,6 +182,96 @@ mod tests {
             ApplicationData::PAYLOAD_SIZE - hopr_crypto_packet::HoprSurb::SIZE
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn message_from_empty_bytes_fails() -> anyhow::Result<()> {
+        let err = Message::try_from([].as_slice())
+            .err()
+            .context("expected error for empty bytes")?;
+        anyhow::ensure!(
+            matches!(&err, GeneralError::ParseError(s) if s.contains("size")),
+            "expected ParseError about size, got: {err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn message_from_truncated_header_fails() -> anyhow::Result<()> {
+        let err = Message::try_from([Message::VERSION].as_slice())
+            .err()
+            .context("expected error for truncated header")?;
+        anyhow::ensure!(
+            matches!(&err, GeneralError::ParseError(s) if s.contains("size")),
+            "expected ParseError about size, got: {err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn message_from_wrong_version_fails() -> anyhow::Result<()> {
+        // Version 0xFF instead of Message::VERSION (1)
+        let data = [0xFF, 0x00];
+        let err = Message::try_from(data.as_slice())
+            .err()
+            .context("expected error for wrong version")?;
+        anyhow::ensure!(
+            matches!(&err, GeneralError::ParseError(s) if s.contains("version")),
+            "expected ParseError about version, got: {err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn message_from_invalid_discriminant_fails() -> anyhow::Result<()> {
+        // Valid version but invalid discriminant
+        let data = [Message::VERSION, 0xFF];
+        let err = Message::try_from(data.as_slice())
+            .err()
+            .context("expected error for invalid discriminant")?;
+        anyhow::ensure!(
+            matches!(&err, GeneralError::ParseError(s) if s.contains("disc")),
+            "expected ParseError about discriminant, got: {err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn message_from_wrong_probe_size_fails() -> anyhow::Result<()> {
+        // Valid version + probe discriminant but truncated data
+        let data = [Message::VERSION, MessageDiscriminants::Probe as u8, 0x00];
+        let err = Message::try_from(data.as_slice())
+            .err()
+            .context("expected error for wrong probe size")?;
+        anyhow::ensure!(
+            matches!(&err, GeneralError::ParseError(s) if s.contains("probe.size")),
+            "expected ParseError about probe size, got: {err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn message_application_data_roundtrip() -> anyhow::Result<()> {
+        let probe = Message::Probe(NeighborProbe::random_nonce());
+        let app_data: ApplicationData = probe.try_into()?;
+        let restored: Message = app_data.try_into()?;
+
+        anyhow::ensure!(
+            matches!(restored, Message::Probe(NeighborProbe::Ping(_))),
+            "expected Probe(Ping) variant"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn message_application_data_wrong_tag_fails() -> anyhow::Result<()> {
+        let app_data = ApplicationData::new(Tag::MAX, b"not a probe")?;
+        let err = Message::try_from(app_data)
+            .err()
+            .context("expected error for wrong tag")?;
+        anyhow::ensure!(err.to_string().contains("tag"), "expected error about tag, got: {err}");
         Ok(())
     }
 }

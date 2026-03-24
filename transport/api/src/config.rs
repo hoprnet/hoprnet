@@ -510,4 +510,90 @@ mod tests {
             assert_eq!(default_multiaddr_transport(1234), "tcp/1234");
         });
     }
+
+    // --- HostConfig::FromStr tests ---
+
+    #[test]
+    fn host_config_parses_ipv4_address() {
+        let cfg = HostConfig::from_str("1.2.3.4:9091").unwrap();
+        insta::assert_debug_snapshot!(cfg);
+    }
+
+    #[test]
+    fn host_config_parses_domain() {
+        let cfg = HostConfig::from_str("example.com:443").unwrap();
+        insta::assert_debug_snapshot!(cfg);
+    }
+
+    #[test]
+    fn host_config_rejects_missing_port() {
+        assert!(HostConfig::from_str("1.2.3.4").is_err());
+    }
+
+    #[test]
+    fn host_config_rejects_invalid_port() {
+        assert!(HostConfig::from_str("1.2.3.4:abc").is_err());
+    }
+
+    #[test]
+    fn host_config_rejects_invalid_host() {
+        assert!(HostConfig::from_str("-invalid-.com:80").is_err());
+    }
+
+    #[test]
+    fn host_config_display_roundtrip() {
+        let cfg = HostConfig {
+            address: HostType::IPv4("10.0.0.1".into()),
+            port: 8080,
+        };
+        insta::assert_yaml_snapshot!(cfg.to_string());
+    }
+
+    // --- TryFrom<&HostConfig> for Multiaddr tests ---
+
+    #[test]
+    fn multiaddr_from_ipv4_host_config() {
+        let cfg = HostConfig {
+            address: HostType::IPv4("1.2.3.4".into()),
+            port: 9091,
+        };
+        let addr = Multiaddr::try_from(&cfg).unwrap();
+        insta::assert_yaml_snapshot!(addr.to_string());
+    }
+
+    #[test]
+    fn multiaddr_from_domain_host_config() {
+        let cfg = HostConfig {
+            address: HostType::Domain("example.com".into()),
+            port: 443,
+        };
+        let addr = Multiaddr::try_from(&cfg).unwrap();
+        insta::assert_yaml_snapshot!(addr.to_string());
+    }
+
+    // --- SessionGlobalConfig validation tests ---
+
+    #[test]
+    fn session_global_config_default_is_valid() {
+        let cfg = SessionGlobalConfig::default();
+        assert!(cfg.validate().is_ok());
+    }
+
+    #[test]
+    fn session_global_config_too_low_idle_timeout_is_rejected() {
+        let cfg = SessionGlobalConfig {
+            idle_timeout: Duration::from_millis(100),
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn session_global_config_too_many_retries_is_rejected() {
+        let cfg = SessionGlobalConfig {
+            establish_max_retries: 21,
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_err());
+    }
 }

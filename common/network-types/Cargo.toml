@@ -1,6 +1,6 @@
 [package]
 name = "hopr-network-types"
-version = "1.2.0"
+version = "1.2.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains types used for networking over the HOPR protocol"
 edition.workspace = true

@@ -1,0 +1,23 @@
+---
+source: transport/session/src/types.rs
+expression: targets
+---
+[
+    UdpStream(
+        Plain(
+            Ip(
+                127.0.0.1:8080,
+            ),
+        ),
+    ),
+    TcpStream(
+        Plain(
+            Ip(
+                10.0.0.1:443,
+            ),
+        ),
+    ),
+    ExitNode(
+        42,
+    ),
+]
