@@ -165,12 +165,11 @@
           fixUtoipaEmbedPaths =
             drv:
             drv.overrideAttrs (old: {
-              preBuild =
-                ''
-                  find target -name 'embed.rs' -path '*/utoipa-swagger-ui*/out/*' \
-                    -exec sed -i "s|/nix/var/nix/builds/[^/]*/source|$(pwd)|g" {} \;
-                ''
-                + (old.preBuild or "");
+              preBuild = ''
+                find target -name 'embed.rs' -path '*/utoipa-swagger-ui*/out/*' \
+                  -exec sed -i "s|/nix/var/nix/builds/[^/]*/source|$(pwd)|g" {} \;
+              ''
+              + (old.preBuild or "");
             });
 
           hoprdPackages = {
@@ -259,7 +258,6 @@
                 }
               )
             );
-
 
             hoprd-clippy = rust-builder-local.callPackage nixLib.mkRustPackage (
               projectBuildArgs // { runClippy = true; }
