@@ -289,9 +289,7 @@ mod tests {
             "should've taken at least 30ms"
         );
 
-        assert_eq!(2, sink.0.len());
-        assert_eq!(1, sink.0[0]);
-        assert_eq!(2, sink.0[1]);
+        assert_eq!(sink.0, [1, 2]);
 
         Ok(())
     }

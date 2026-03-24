@@ -74,17 +74,23 @@ hopr-transport-session = { workspace = true }
 hopr-transport-tag-allocator = { workspace = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+bimap = { workspace = true }
 hex-literal = { workspace = true }
+insta = { workspace = true, features = ["yaml"] }
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 rstest = { workspace = true }
 
+hopr-api = { workspace = true }
+hopr-network-graph = { workspace = true, features = ["petgraph"] }
 hopr-protocol-start = { workspace = true }
 hopr-protocol-session = { workspace = true, features = [
   "session-types",
   "runtime-tokio",
   "hashbrown",
 ] }
-hopr-transport-mixer = { workspace = true }
+hopr-transport-mixer = { workspace = true, features = ["serde"] }
 hopr-transport-protocol = { workspace = true, features = ["runtime-tokio"] }
 temp-env = { workspace = true }
 tokio = { workspace = true }

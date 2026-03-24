@@ -1,0 +1,8 @@
+---
+source: transport/api/tests/not_running.rs
+expression: cfg
+---
+min_delay: 0s
+delay_range: 200ms
+capacity: 20000
+metric_delay_window: 100

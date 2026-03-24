@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-mixer"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -15,11 +15,14 @@ crate-type = ["rlib"]
 [features]
 default = []
 telemetry = ["dep:hopr-metrics", "dep:lazy_static"]
+serde = ["dep:serde", "dep:humantime-serde"]
 
 [dependencies]
 futures = { workspace = true }
 futures-timer = { workspace = true }
+humantime-serde = { workspace = true, optional = true }
 lazy_static = { workspace = true, optional = true }
+serde = { workspace = true, features = ["derive"], optional = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
@@ -30,10 +33,16 @@ hopr-types = { workspace = true, features = ["random"] }
 [dev-dependencies]
 anyhow = { workspace = true }
 bytesize = { workspace = true }
+hopr-transport-mixer = { path = ".", features = ["serde"] }
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 futures = { workspace = true }
+insta = { workspace = true, features = ["yaml"] }
+rstest = { workspace = true }
 tokio = { workspace = true, features = ["time"] }
 rust-stream-ext-concurrent = { workspace = true }
+
+[package.metadata.cargo-machete]
+ignored = ["humantime-serde"]
 
 [[bench]]
 name = "mixer_throughput"

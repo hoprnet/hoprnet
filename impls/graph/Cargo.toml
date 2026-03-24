@@ -1,6 +1,6 @@
 [package]
 name = "hopr-network-graph"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implementation of the HOPR network graph."
 edition.workspace = true
@@ -34,6 +34,7 @@ hopr-statistics = { workspace = true, features = ["moving"] }
 assertables = { workspace = true }
 criterion = { workspace = true }
 hex-literal = { workspace = true }
+insta = { workspace = true, features = ["yaml"] }
 tokio = { workspace = true }
 
 [[bench]]

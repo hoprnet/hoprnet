@@ -603,4 +603,58 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn selector_should_skip_zero_cost_paths() -> anyhow::Result<()> {
+        // Build graph with edges but NO observations → cost function returns 0.
+        let me = pubkey(&SECRET_0);
+        let hop = pubkey(&SECRET_1);
+        let dest = pubkey(&SECRET_2);
+        let graph = ChannelGraph::new(me);
+        graph.add_node(hop);
+        graph.add_node(dest);
+        graph.add_edge(&me, &hop).context("adding edge me -> hop")?;
+        graph.add_edge(&hop, &dest).context("adding edge hop -> dest")?;
+        // No mark_edge_full/mark_edge_last → observations are empty → cost = 0
+
+        let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS);
+
+        let err = selector
+            .select_path(me, dest, 1)
+            .expect_err("zero-cost paths should be filtered out");
+        anyhow::ensure!(
+            matches!(err, PathPlannerError::Path(PathError::PathNotFound(..))),
+            "expected PathNotFound, got: {err}"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn selector_should_reject_extended_path_containing_destination() -> anyhow::Result<()> {
+        // Build: me → dest (1-hop, with observations).
+        // When Phase 2 does extended search with shorter_length=1, it finds me → dest.
+        // After stripping src, candidate is [dest]. Since candidate.contains(dest), it should be filtered.
+        // Meanwhile Phase 1 for 2-hop finds nothing (no 2-hop path exists).
+        // So overall: no valid paths.
+        let me = pubkey(&SECRET_0);
+        let dest = pubkey(&SECRET_1);
+        let graph = ChannelGraph::new(me);
+        graph.add_node(dest);
+        graph.add_edge(&me, &dest).context("adding edge me -> dest")?;
+        mark_edge_full(&graph, &me, &dest);
+
+        let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS);
+
+        // Ask for 2-hop path. Phase 1 won't find any (no 2-hop path exists).
+        // Phase 2 finds me → dest as a shorter_length=1 path, but candidate=[dest]
+        // which contains dest → filtered by the self-loop guard.
+        let err = selector
+            .select_path(me, dest, 2)
+            .expect_err("extended path ending at dest should be rejected");
+        anyhow::ensure!(
+            matches!(err, PathPlannerError::Path(PathError::PathNotFound(..))),
+            "expected PathNotFound, got: {err}"
+        );
+        Ok(())
+    }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-protocol"
-version = "1.4.1"
+version = "1.4.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -60,6 +60,8 @@ bytesize = { workspace = true }
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 futures-concurrency = { workspace = true }
 hex-literal = { workspace = true }
+insta = { workspace = true, features = ["yaml"] }
+rstest = { workspace = true }
 serial_test = { workspace = true }
 test-log = { workspace = true }
 tokio = { workspace = true }
@@ -77,6 +79,7 @@ hopr-chain-connector = { workspace = true, features = [
 hopr-network-types = { workspace = true }
 hopr-transport-mixer = { workspace = true }
 hopr-test-stubs = { workspace = true }
+hopr-transport-protocol = { path = ".", features = ["serde"] }
 
 [[bench]]
 name = "protocol_throughput_emulated"

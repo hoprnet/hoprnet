@@ -38,6 +38,7 @@ arrayvec = { workspace = true }
 async-trait = { workspace = true }
 flagset = { workspace = true, features = ["serde"] }
 futures = { workspace = true }
+humantime-serde = { workspace = true }
 futures-time = { workspace = true }
 lazy_static = { workspace = true, optional = true }
 moka = { workspace = true }
@@ -79,6 +80,7 @@ hopr-protocol-session = { workspace = true, features = [
   "hashbrown",
 ] }
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
+insta = { workspace = true, features = ["yaml"] }
 mockall = { workspace = true }
 rand = { workspace = true }
 serde_cbor_2 = { workspace = true }
@@ -86,7 +88,7 @@ test-log = { workspace = true }
 tokio = { workspace = true }
 
 [package.metadata.cargo-machete]
-ignored = ["serde_with"]
+ignored = ["serde_with", "humantime-serde"]
 
 [[bench]]
 name = "session_bench"

@@ -1,0 +1,10 @@
+---
+source: transport/api/src/config.rs
+expression: cfg
+---
+HostConfig {
+    address: Domain(
+        "example.com",
+    ),
+    port: 443,
+}

@@ -3,7 +3,9 @@ use std::str::FromStr;
 #[cfg(feature = "session-client")]
 use futures::future::try_join_all;
 use hopr_builder::testing::{
-    fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, chain_propagation_delay, size_5_cluster_fixture as cluster},
+    fixtures::{
+        MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, TestNodeConfig, chain_propagation_delay, cluster_fixture,
+    },
     hopr::ChannelGuard,
 };
 use hopr_chain_connector::blokli_client::BlokliQueryClient;
@@ -31,12 +33,13 @@ const FUNDING_AMOUNT: &str = "100 wxHOPR";
 #[cfg(feature = "session-client")]
 /// Tests n-hop session establishment over a fully connected channel network.
 ///
-/// Selects `hops + 2` nodes from a 5-node cluster and opens bidirectional channels
-/// between every pair, so the path planner has the full graph available.
+/// Creates a cluster sized exactly to `hops + 2` nodes (0-hop: 2, 1-hop: 3, etc.)
+/// and opens bidirectional channels between every pair, so the path planner has
+/// the full graph available.
 ///
 /// - 0-hop: 2 nodes, no channels needed (direct connection)
 /// - n-hop (n >= 1): n+2 nodes with n*(n+1) bidirectional channels
-async fn create_n_hop_session(cluster: &ClusterGuard, #[case] hops: usize) -> anyhow::Result<()> {
+async fn create_n_hop_session(#[case] hops: usize) -> anyhow::Result<()> {
     // 2-hop and 3-hop tests are too slow under coverage instrumentation
     #[allow(unexpected_cfgs)]
     if cfg!(coverage) && hops > 1 {
@@ -44,9 +47,12 @@ async fn create_n_hop_session(cluster: &ClusterGuard, #[case] hops: usize) -> an
     }
 
     let node_count = if hops == 0 { 2 } else { hops + 2 };
+    let cluster = cluster_fixture(vec![
+        TestNodeConfig::with_probability(MINIMUM_INCOMING_WIN_PROB);
+        node_count
+    ]);
     let mut nodes: Vec<&_> = cluster.iter().collect();
     nodes.shuffle(&mut rand::rng());
-    nodes.truncate(node_count);
 
     let src = nodes[0];
     let dst = nodes[nodes.len() - 1];

@@ -58,3 +58,43 @@ const fn default_probing_interval() -> std::time::Duration {
 const fn default_recheck_threshold() -> std::time::Duration {
     DEFAULT_PROBE_RECHECK_THRESHOLD
 }
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Context;
+    use validator::Validate;
+
+    use super::*;
+
+    #[test]
+    fn probe_config_default_is_valid() -> anyhow::Result<()> {
+        let cfg = ProbeConfig::default();
+        cfg.validate().context("default ProbeConfig should be valid")?;
+        insta::assert_yaml_snapshot!(cfg);
+        Ok(())
+    }
+
+    #[test]
+    fn probe_config_zero_parallel_probes_is_rejected() -> anyhow::Result<()> {
+        let cfg = ProbeConfig {
+            max_parallel_probes: 0,
+            ..Default::default()
+        };
+        let err = cfg.validate().err().context("expected validation error")?;
+        anyhow::ensure!(
+            err.field_errors().contains_key("max_parallel_probes"),
+            "expected max_parallel_probes field error, got: {err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn probe_config_one_parallel_probe_is_valid() -> anyhow::Result<()> {
+        let cfg = ProbeConfig {
+            max_parallel_probes: 1,
+            ..Default::default()
+        };
+        cfg.validate().context("single parallel probe should be valid")?;
+        Ok(())
+    }
+}
