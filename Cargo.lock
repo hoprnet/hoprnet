@@ -4461,7 +4461,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-builder"
-version = "4.0.3"
+version = "4.0.4"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5349,7 +5349,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd"
-version = "4.0.0-rc.3"
+version = "4.0.1-rc.1"
 dependencies = [
  "anyhow",
  "async-signal",

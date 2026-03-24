@@ -11,7 +11,7 @@ on:
   push:
     branches:
       - master
-  pull_request_target:
+  pull_request:
     types:
       - opened
       - synchronize
@@ -27,8 +27,7 @@ jobs:
     name: Unit Coverage
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
-    if: >-
-      github.event_name == 'push' || (github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository)
+    if: github.event_name == 'push' || (github.event.pull_request.draft == false)
     env:
       CI: "true"
     steps:
@@ -64,8 +63,7 @@ jobs:
     name: Integration Coverage
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
-    if: >-
-      github.event_name == 'push' || (github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository)
+    if: github.event_name == 'push' || (github.event.pull_request.draft == false)
     env:
       CI: "true"
     steps:
