@@ -44,36 +44,27 @@ jobs:
           ref: master
 
       - name: Promote release
-        id: promote_release
         run: |
           set -x
           echo "Checkout to tag revision"
-          if ! git tag -l ${{ github.event.inputs.tag_name }} | grep ${{ github.event.inputs.tag_name }}; then
+          if ! git tag -l "${{ github.event.inputs.tag_name }}" | grep -xF "${{ github.event.inputs.tag_name }}"; then
             echo "Git tag ${{ github.event.inputs.tag_name }} does not exists"
             exit 1
           fi
           echo "Create new branch or reuse an existing branch"
-          release_name="${{ vars.BRANCH_MASTER_RELEASE_NAME }}"
-          echo "release_name=${release_name}" | tee -a $GITHUB_OUTPUT
-          if git branch -al release/${release_name} | grep ${release_name}; then
-            echo "Branch release/${release_name} already exists. Skipping promotion..."
+          current_version=$(grep -E '^version\s*=' hopr/hopr-lib/Cargo.toml | awk -F\" '{print $2}')
+          IFS='-' read -a current_version_splitted <<<"${current_version}"
+          current_version_without_rc="${current_version_splitted[0]}"
+          IFS='.' read -r major_version minor_version patch_version <<< "${current_version_without_rc}"
+
+          release_branch_name="release/${major_version}.${minor_version}"
+          if git branch -al "${release_branch_name}" | grep -F "${release_branch_name}"; then
+            echo "Branch ${release_branch_name} already exists. Skipping promotion..."
             exit 0
           else
-            git checkout ${{ github.event.inputs.tag_name }}
-            git checkout -b release/${release_name}
-            git push --set-upstream origin release/${release_name}
+            git checkout "${{ github.event.inputs.tag_name }}"
+            git checkout -b "${release_branch_name}"
+            git push --set-upstream origin "${release_branch_name}"
           fi
-          gh variable set BRANCH_RELEASE_RELEASE_NAME --body "${release_name}"
-          gh variable set BRANCH_MASTER_RELEASE_NAME --body "${{ github.event.inputs.new_release_name }}"
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
-
-  new_release:
-    name: Open new release
-    needs:
-      - promote_release
-    uses: ./.github/workflows/open-release.yaml
-    with:
-      release_type: Patch
-      source_branch: "release/${{ github.event.inputs.tag_release_name }}"
-    secrets: inherit

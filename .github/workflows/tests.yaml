@@ -11,7 +11,7 @@ env:
 on:
   merge_group:
     types: [checks_requested]
-  pull_request_target:
+  pull_request:
     types:
       - opened
       - synchronize
@@ -25,8 +25,6 @@ concurrency:
 jobs:
   tests-unit:
     name: Unit Tests
-    if: >-
-      github.event_name == 'merge_group' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
     env:
@@ -50,8 +48,6 @@ jobs:
 
   tests-integration:
     name: Integration Tests
-    if: >-
-      github.event_name == 'merge_group' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
     env:
@@ -77,8 +73,6 @@ jobs:
     name: Unit Tests Nightly
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
-    if: >-
-      github.event_name == 'merge_group' || (github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository)
     env:
       CI: "true"
     steps:
@@ -101,7 +95,7 @@ jobs:
         if: ${{ !env.ACT }}
         with:
           token_format: "access_token"
-          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+          credentials_json: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
 
       - name: Run unit tests with nightly
         run: |

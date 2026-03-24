@@ -20,7 +20,9 @@ concurrency:
   group: ${{ inputs.source_branch || github.ref_name }}-zizmor
   cancel-in-progress: true
 
-permissions: {}
+permissions:
+  contents: read
+  security-events: write
 
 jobs:
   zizmor:
