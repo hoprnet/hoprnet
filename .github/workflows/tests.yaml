@@ -31,7 +31,7 @@ jobs:
       CI: "true"
     steps:
       - name: Run unit tests
-        uses: hoprnet/hopr-workflows/actions/nix-action@nix-action-v1
+        uses: hoprnet/hopr-workflows/actions/nix-action@04bef49c02b8d5407a49dc1de42d08e727086180 # nix-action-v1
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
@@ -48,7 +48,7 @@ jobs:
       CI: "true"
     steps:
       - name: Run integration tests
-        uses: hoprnet/hopr-workflows/actions/nix-action@nix-action-v1
+        uses: hoprnet/hopr-workflows/actions/nix-action@04bef49c02b8d5407a49dc1de42d08e727086180 # nix-action-v1
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
@@ -73,7 +73,7 @@ jobs:
           credentials_json: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
 
       - name: Run unit tests with nightly
-        uses: hoprnet/hopr-workflows/actions/nix-action@nix-action-v1
+        uses: hoprnet/hopr-workflows/actions/nix-action@04bef49c02b8d5407a49dc1de42d08e727086180 # nix-action-v1
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
@@ -89,7 +89,7 @@ jobs:
     if: github.event_name == 'merge_group'
     steps:
       - name: Build benchmarks
-        uses: hoprnet/hopr-workflows/actions/nix-action@nix-action-v1
+        uses: hoprnet/hopr-workflows/actions/nix-action@04bef49c02b8d5407a49dc1de42d08e727086180 # nix-action-v1
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
