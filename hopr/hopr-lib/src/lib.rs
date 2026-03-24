@@ -675,7 +675,7 @@ where
                     match closed_channel.direction(chain.me()) {
                         Some(ChannelDirection::Incoming) => {
                             match tmgr.neglect_tickets(closed_channel.get_id(), None) {
-                                Ok(neglected) if neglected.len() > 0 => {
+                                Ok(neglected) if !neglected.is_empty() => {
                                     warn!(num_neglected = neglected.len(), %closed_channel, "tickets on incoming closed channel were neglected");
                                 },
                                 Ok(_) => {
@@ -1026,6 +1026,10 @@ where
     <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
+    // Minimum grace period left in PendingToClose channel, so
+    // that ticket redemption should still be attempted.
+    const PENDING_TO_CLOSE_TOLERANCE: Duration = Duration::from_secs(5);
+
     pub fn me_onchain(&self) -> Address {
         *self.chain_api.me()
     }
@@ -1276,10 +1280,6 @@ where
             .ticket_stats(None)
             .map_err(HoprLibError::ticket_manager)
     }
-
-    // Minimum grace period left in PendingToClose channel, so
-    // that ticket redemption should still be attempted.
-    const PENDING_TO_CLOSE_TOLERANCE: Duration = Duration::from_secs(5);
 
     pub async fn redeem_all_tickets<B: Into<HoprBalance> + Send>(
         &self,

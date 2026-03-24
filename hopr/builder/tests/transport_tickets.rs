@@ -159,6 +159,7 @@ async fn redeem_ticket_on_request(#[with(5)] cluster_fixture: ClusterGuard) -> a
         .await
         .context("failed to redeem tickets")?;
 
+    #[allow(deprecated)] // TODO: remove once blokli#237 is merged
     wait_until(
         || async {
             let stats_after = mid.inner().ticket_statistics().await?;
@@ -190,12 +191,10 @@ async fn neglect_ticket_on_closing(#[with(5)] cluster_fixture: ClusterGuard) -> 
         .await
         .context("failed to get ticket price")?;
 
-    /*
-    mid.inner()
-        .reset_ticket_statistics()
-        .await
-        .context("failed to get ticket statistics")?;
-    */
+    // mid.inner()
+    // .reset_ticket_statistics()
+    // .await
+    // .context("failed to get ticket statistics")?;
 
     // Snapshot stats right after reset to use as baseline for delta checks
     let stats_after_reset = mid
@@ -324,6 +323,7 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
         .await
         .context("failed to redeem tickets")?;
 
+    #[allow(deprecated)] // TODO: remove once blokli#237 is merged
     wait_until(
         || async {
             let stats_after = mid.inner().ticket_statistics().await?;
@@ -427,6 +427,7 @@ async fn relay_with_win_prob_higher_than_min_win_prob_should_succeed(
         .await
         .context("failed to redeem tickets")?;
 
+    #[allow(deprecated)] // TODO: remove once blokli#237 is merged
     wait_until(
         || async {
             let stats_after = mid.inner().ticket_statistics().await?;

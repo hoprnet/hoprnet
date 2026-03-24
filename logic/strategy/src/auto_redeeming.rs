@@ -150,7 +150,7 @@ where
                             // still being held.
                             hopr_async_runtime::prelude::sleep(Duration::from_millis(100)).await;
                             err.map(|_| ())
-                        },
+                        }
                     };
 
                     tracing::debug!(?redeem_result, %channel_id, "redemption in channel complete");
@@ -266,9 +266,11 @@ mod tests {
     use futures::stream::BoxStream;
     use futures_time::future::FutureExt as TimeExt;
     use hex_literal::hex;
-    use hopr_api::tickets::{ChannelStats, RedemptionResult};
-    use hopr_api::types::crypto_random::Randomizable;
-    use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::*, HoprBlockchainSafeConnector};
+    use hopr_api::{
+        tickets::{ChannelStats, RedemptionResult},
+        types::crypto_random::Randomizable,
+    };
+    use hopr_chain_connector::{HoprBlockchainSafeConnector, create_trustful_hopr_blokli_connector, testing::*};
     use hopr_lib::{
         Address, BytesRepresentable, ChainKeypair, HalfKey, Hash, Keypair, RedeemableTicket, Response, TicketBuilder,
         UnitaryFloatOps, WinningProbability, XDaiBalance,
@@ -368,21 +370,20 @@ mod tests {
         };
 
         let mut mock_tmgr = MockTicketMgmt::new();
-        mock_tmgr.expect_redeem_stream()
+        mock_tmgr
+            .expect_redeem_stream()
             .once()
             .with(
                 mockall::predicate::always(),
                 mockall::predicate::eq(*CHANNEL_1.get_id()),
-                mockall::predicate::eq(Some(cfg.minimum_redeem_ticket_value))
+                mockall::predicate::eq(Some(cfg.minimum_redeem_ticket_value)),
             )
-            .return_once(move |_: TestConnector, _, _| Ok(futures::stream::once(futures::future::ok(RedemptionResult::Redeemed(ack_ticket.ticket))).boxed()));
+            .return_once(move |_: TestConnector, _, _| {
+                Ok(futures::stream::once(futures::future::ok(RedemptionResult::Redeemed(ack_ticket.ticket))).boxed())
+            });
 
         {
-            let ars = AutoRedeemingStrategy::new(
-                cfg,
-                Arc::new(connector),
-                Arc::new(mock_tmgr)
-            );
+            let ars = AutoRedeemingStrategy::new(cfg, Arc::new(connector), Arc::new(mock_tmgr));
 
             ars.on_acknowledged_winning_ticket(&ack_ticket.ticket).await?;
             assert!(ars.on_tick().await.is_err());
@@ -409,21 +410,18 @@ mod tests {
         };
 
         let mut mock_tmgr = MockTicketMgmt::new();
-        mock_tmgr.expect_redeem_stream()
+        mock_tmgr
+            .expect_redeem_stream()
             .once()
             .with(
                 mockall::predicate::always(),
                 mockall::predicate::eq(*CHANNEL_1.get_id()),
-                mockall::predicate::eq(Some(cfg.minimum_redeem_ticket_value))
+                mockall::predicate::eq(Some(cfg.minimum_redeem_ticket_value)),
             )
             .return_once(|_: TestConnector, _, _| Ok(futures::stream::empty().boxed()));
 
         {
-            let ars = AutoRedeemingStrategy::new(
-                cfg,
-                Arc::new(connector),
-                Arc::new(mock_tmgr)
-            );
+            let ars = AutoRedeemingStrategy::new(cfg, Arc::new(connector), Arc::new(mock_tmgr));
             ars.on_tick().await?;
         }
 
@@ -457,16 +455,12 @@ mod tests {
             .with(
                 mockall::predicate::always(),
                 mockall::predicate::eq(*CHANNEL_1.get_id()),
-                mockall::predicate::eq(Some(cfg.minimum_redeem_ticket_value))
+                mockall::predicate::eq(Some(cfg.minimum_redeem_ticket_value)),
             )
             .return_once(move |_: TestConnector, _, _| Ok(futures::stream::empty().boxed()));
 
         {
-            let ars = AutoRedeemingStrategy::new(
-                cfg,
-                Arc::new(connector),
-                Arc::new(mock_tmgr)
-            );
+            let ars = AutoRedeemingStrategy::new(cfg, Arc::new(connector), Arc::new(mock_tmgr));
             ars.on_own_channel_changed(
                 &channel,
                 ChannelDirection::Incoming,
@@ -502,24 +496,23 @@ mod tests {
             };
 
             let mut mock_tmgr = MockTicketMgmt::new();
-            mock_tmgr.expect_redeem_stream()
+            mock_tmgr
+                .expect_redeem_stream()
                 .once()
                 .with(
                     mockall::predicate::always(),
                     mockall::predicate::eq(*CHANNEL_1.get_id()),
-                    mockall::predicate::eq(Some(cfg.minimum_redeem_ticket_value))
+                    mockall::predicate::eq(Some(cfg.minimum_redeem_ticket_value)),
                 )
-                .return_once(move |_: TestConnector, _, _| Ok(futures::stream::once(
-                    futures::future::ok(RedemptionResult::Redeemed(ack_ticket_1.ticket))
-                        .delay(futures_time::time::Duration::from_millis(500))
-                ).boxed()));
+                .return_once(move |_: TestConnector, _, _| {
+                    Ok(futures::stream::once(
+                        futures::future::ok(RedemptionResult::Redeemed(ack_ticket_1.ticket))
+                            .delay(futures_time::time::Duration::from_millis(500)),
+                    )
+                    .boxed())
+                });
 
-
-            let ars = AutoRedeemingStrategy::new(
-                cfg,
-                Arc::new(connector),
-                Arc::new(mock_tmgr),
-            );
+            let ars = AutoRedeemingStrategy::new(cfg, Arc::new(connector), Arc::new(mock_tmgr));
             ars.on_acknowledged_winning_ticket(&ack_ticket_1.ticket).await?;
             assert!(matches!(
                 ars.on_acknowledged_winning_ticket(&ack_ticket_1.ticket).await,
@@ -530,13 +523,15 @@ mod tests {
             channel.status = ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100)));
 
             assert!(matches!(
-                ars.on_own_channel_changed(&channel,
+                ars.on_own_channel_changed(
+                    &channel,
                     ChannelDirection::Incoming,
                     ChannelChange::Status {
                         left: ChannelStatus::Open,
                         right: channel.status,
                     }
-                ).await,
+                )
+                .await,
                 Err(StrategyError::InProgress)
             ));
             assert!(ars.on_tick().await.is_err());

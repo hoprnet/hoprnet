@@ -225,9 +225,11 @@ where
                             let peer_id_for_eviction = next_hop.to_peerid_str();
                             UNACK_TICKETS.decrement(1.0);
                             UNACK_TICKETS_PER_PEER.decrement(
-                                &[(*PER_PEER_ENABLED)
-                                    .then(|| peer_id_for_eviction.as_str())
-                                    .unwrap_or("redacted")],
+                                &[if *PER_PEER_ENABLED {
+                                    peer_id_for_eviction.as_str()
+                                } else {
+                                    "redacted"
+                                }],
                                 1.0,
                             );
                         }
@@ -253,7 +255,11 @@ where
             UNACK_INSERTIONS.increment();
             UNACK_TICKETS.increment(1.0);
             UNACK_TICKETS_PER_PEER.increment(
-                &[(*PER_PEER_ENABLED).then(|| peer_id.as_str()).unwrap_or("redacted")],
+                &[if *PER_PEER_ENABLED {
+                    peer_id.as_str()
+                } else {
+                    "redacted"
+                }],
                 1.0,
             );
         }

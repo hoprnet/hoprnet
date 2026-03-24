@@ -1801,7 +1801,11 @@ mod tests {
                 unredeemed_value: HoprBalance::zero(),
                 rejected_value: HoprBalance::zero(),
                 redeemed_value: tickets[0].verified_ticket().amount,
-                neglected_value: neglected.iter().map(|t| t.verified_ticket().amount).sum::<HoprBalance>() - tickets[0].verified_ticket().amount,
+                neglected_value: neglected
+                    .iter()
+                    .map(|t| t.verified_ticket().amount)
+                    .sum::<HoprBalance>()
+                    - tickets[0].verified_ticket().amount,
             },
             mgr.ticket_stats(Some(&channel.get_id()))?
         );

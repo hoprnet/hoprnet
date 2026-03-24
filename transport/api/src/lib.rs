@@ -512,10 +512,10 @@ where
             HoprPipelineComponents {
                 ticket_events: ticket_events.with(move |event| {
                     // Make sure winning tickets are passed to the ticket manager
-                    if let TicketEvent::WinningTicket(ticket) = &event {
-                        if let Err(error) = tmgr_clone.insert_incoming_ticket(**ticket) {
-                            tracing::error!(%error, "failed to insert winning ticket into redemption queue");
-                        }
+                    if let TicketEvent::WinningTicket(ticket) = &event
+                        && let Err(error) = tmgr_clone.insert_incoming_ticket(**ticket)
+                    {
+                        tracing::error!(%error, "failed to insert winning ticket into redemption queue");
                     }
                     futures::future::ok::<_, T::Error>(event)
                 }),

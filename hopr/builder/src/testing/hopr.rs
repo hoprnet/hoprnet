@@ -176,7 +176,7 @@ impl ChannelGuard {
 
         Ok(Self { channels })
     }
-    
+
     pub async fn open_channel_between_nodes(
         src: Arc<TestingHopr>,
         dst: Arc<TestingHopr>,
