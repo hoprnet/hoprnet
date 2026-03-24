@@ -32,7 +32,7 @@ jobs:
       CI: "true"
     steps:
       - name: Generate unit coverage report
-        uses: hoprnet/hopr-workflows/actions/nix-action@04bef49c02b8d5407a49dc1de42d08e727086180
+        uses: hoprnet/hopr-workflows/actions/nix-action@nix-action-v1
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
@@ -62,7 +62,7 @@ jobs:
       CI: "true"
     steps:
       - name: Generate integration coverage report
-        uses: hoprnet/hopr-workflows/actions/nix-action@04bef49c02b8d5407a49dc1de42d08e727086180
+        uses: hoprnet/hopr-workflows/actions/nix-action@nix-action-v1
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.ref || github.ref }}

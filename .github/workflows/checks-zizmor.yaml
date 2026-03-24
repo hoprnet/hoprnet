@@ -32,7 +32,7 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Run zizmor
-        uses: hoprnet/hopr-workflows/actions/nix-action@04bef49c02b8d5407a49dc1de42d08e727086180
+        uses: hoprnet/hopr-workflows/actions/nix-action@nix-action-v1
         with:
           repository: ${{ inputs.source_repo }}
           ref: ${{ inputs.source_branch }}

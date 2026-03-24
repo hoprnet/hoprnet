@@ -30,12 +30,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check cargo deps
-        uses: hoprnet/hopr-workflows/actions/nix-action@04bef49c02b8d5407a49dc1de42d08e727086180
+        uses: hoprnet/hopr-workflows/actions/nix-action@nix-action-v1
         with:
           repository: ${{ inputs.source_repo }}
           ref: ${{ inputs.source_branch }}
           use_cachix: "true"
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          command: |
-            nix develop .#ci --command cargo machete
-            nix develop .#ci --command cargo shear
+          command: nix develop .#ci -c bash -c "cargo machete && cargo shear"
