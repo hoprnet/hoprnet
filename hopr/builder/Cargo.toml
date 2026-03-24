@@ -16,6 +16,7 @@ crate-type = ["rlib"]
 default = ["runtime-tokio"]
 runtime-tokio = [
   "dep:tokio",
+  "dep:validator",
   "hopr-lib/runtime-tokio",
   "hopr-db-node/runtime-tokio",
   "hopr-transport-p2p/runtime-tokio",
