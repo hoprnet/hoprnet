@@ -6,6 +6,7 @@ ignore = [
   "RUSTSEC-2025-0073", # 'alloy-dyn-abi' in 'alloy' - will be removed in 4.0
   "RUSTSEC-2025-0134", # `rustls-pemfile` [unmaintained], blokli-client needs to avoid rust-tls, see https://github.com/hoprnet/blokli/issues/107
   "RUSTSEC-2025-0137", # `alloy` - held back until removed, see https://github.com/hoprnet/hoprnet/issues/7707
+  "RUSTSEC-2026-0049", # `rustls-webpki 0.101.7` via blokli-client's legacy rustls 0.21 chain, no patch in 0.101.x series
 ]
 informational_warnings = ["unmaintained"]
 severity_threshold = "low"
