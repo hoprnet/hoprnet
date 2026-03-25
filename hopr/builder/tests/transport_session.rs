@@ -29,7 +29,7 @@ const FUNDING_AMOUNT: &str = "100 wxHOPR";
 #[case(3)]
 #[serial]
 #[test_log::test(tokio::test)]
-#[timeout(2*TEST_GLOBAL_TIMEOUT)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
 #[cfg(feature = "session-client")]
 /// Tests n-hop session establishment over a fully connected channel network.
 ///

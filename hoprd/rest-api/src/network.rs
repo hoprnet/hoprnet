@@ -5,7 +5,6 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
-use futures::{StreamExt, stream::FuturesUnordered};
 use hopr_lib::{
     Address, HoprBalance, Multiaddr,
     api::graph::{
@@ -225,15 +224,11 @@ pub(super) async fn announced(State(state): State<Arc<InternalState>>) -> impl I
         Ok(accounts) => {
             let peers: Vec<AnnouncedPeerResponse> = accounts
                 .into_iter()
-                .map(|entry| async move {
-                    AnnouncedPeerResponse {
-                        address: entry.chain_addr,
-                        multiaddrs: entry.get_multiaddrs().to_vec(),
-                    }
+                .map(|entry| AnnouncedPeerResponse {
+                    address: entry.chain_addr,
+                    multiaddrs: entry.get_multiaddrs().to_vec(),
                 })
-                .collect::<FuturesUnordered<_>>()
-                .collect()
-                .await;
+                .collect();
             (StatusCode::OK, Json(peers)).into_response()
         }
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),

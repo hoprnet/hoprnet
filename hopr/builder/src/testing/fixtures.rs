@@ -245,7 +245,16 @@ impl ClusterGuard {
 
 pub const SWARM_N: usize = 9;
 
-pub const TEST_GLOBAL_TIMEOUT: Duration = Duration::from_mins(3);
+/// Global per-test timeout.
+///
+/// Coverage instrumentation adds ~2-3x overhead, so we double the timeout
+/// when running under `cargo llvm-cov` (which sets `cfg(coverage)`).
+#[allow(unexpected_cfgs)]
+pub const TEST_GLOBAL_TIMEOUT: Duration = if cfg!(coverage) {
+    Duration::from_mins(12)
+} else {
+    Duration::from_mins(6)
+};
 
 lazy_static::lazy_static! {
     static ref NODE_CHAIN_KEYS: Vec<ChainKeypair> = vec![
