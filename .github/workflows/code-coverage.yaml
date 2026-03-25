@@ -32,12 +32,10 @@ jobs:
       CI: "true"
     steps:
       - name: Generate unit coverage report
-        uses: hoprnet/hopr-workflows/actions/nix-action@290ac3c27a2735cd4860b4a1b41c515cdb5a1feb # nix-action-v1
+        uses: hoprnet/hopr-workflows/actions/nix-action@348f8878a2bc6e1f4f5be0e98ffc7b3f7a79cb67 # nix-action-v1
         with:
           source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-          use_cachix: "true"
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
           command: |
             nix build -L .#hopr-coverage
             cp result coverage-unit.lcov
@@ -61,12 +59,10 @@ jobs:
       CI: "true"
     steps:
       - name: Generate integration coverage report
-        uses: hoprnet/hopr-workflows/actions/nix-action@290ac3c27a2735cd4860b4a1b41c515cdb5a1feb # nix-action-v1
+        uses: hoprnet/hopr-workflows/actions/nix-action@348f8878a2bc6e1f4f5be0e98ffc7b3f7a79cb67 # nix-action-v1
         with:
           source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-          use_cachix: "true"
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
           command: |
             nix develop .#coverage -c cargo llvm-cov \
               --workspace \

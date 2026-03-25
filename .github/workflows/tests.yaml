@@ -31,12 +31,10 @@ jobs:
       CI: "true"
     steps:
       - name: Run unit tests
-        uses: hoprnet/hopr-workflows/actions/nix-action@290ac3c27a2735cd4860b4a1b41c515cdb5a1feb # nix-action-v1
+        uses: hoprnet/hopr-workflows/actions/nix-action@348f8878a2bc6e1f4f5be0e98ffc7b3f7a79cb67 # nix-action-v1
         with:
           source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-          use_cachix: "true"
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
           command: nix build -L .#hopr-test-unit
 
   tests-integration:
@@ -47,12 +45,10 @@ jobs:
       CI: "true"
     steps:
       - name: Run integration tests
-        uses: hoprnet/hopr-workflows/actions/nix-action@290ac3c27a2735cd4860b4a1b41c515cdb5a1feb # nix-action-v1
+        uses: hoprnet/hopr-workflows/actions/nix-action@348f8878a2bc6e1f4f5be0e98ffc7b3f7a79cb67 # nix-action-v1
         with:
           source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-          use_cachix: "true"
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
           command: nix develop -c cargo test --test '*' -- --test-threads=1
 
   tests-unit-nightly:
@@ -71,12 +67,10 @@ jobs:
           credentials_json: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
 
       - name: Run unit tests with nightly
-        uses: hoprnet/hopr-workflows/actions/nix-action@290ac3c27a2735cd4860b4a1b41c515cdb5a1feb # nix-action-v1
+        uses: hoprnet/hopr-workflows/actions/nix-action@348f8878a2bc6e1f4f5be0e98ffc7b3f7a79cb67 # nix-action-v1
         with:
           source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-          use_cachix: "true"
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
           command: nix build -L .#hopr-test-nightly
 
   build-benchmarks:
@@ -86,10 +80,8 @@ jobs:
     if: github.event_name == 'merge_group'
     steps:
       - name: Build benchmarks
-        uses: hoprnet/hopr-workflows/actions/nix-action@290ac3c27a2735cd4860b4a1b41c515cdb5a1feb # nix-action-v1
+        uses: hoprnet/hopr-workflows/actions/nix-action@348f8878a2bc6e1f4f5be0e98ffc7b3f7a79cb67 # nix-action-v1
         with:
           source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-          use_cachix: "true"
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
           command: nix build .#hoprd-bench-build
