@@ -19,6 +19,11 @@ on:
       labels:
         required: true
         type: string
+    secrets:
+      GCP_SA_GITHUB_RUNNER:
+        required: true
+      GH_RUNNER_TOKEN:
+        required: true
   workflow_dispatch:
     inputs:
       network:
@@ -40,6 +45,8 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(inputs.labels, format('package:{0},',inputs.dappnode_repository)))
     name: Build package
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
@@ -49,27 +56,35 @@ jobs:
 
       - name: Set environment variables
         id: vars
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_SOURCE_REPO: ${{ inputs.source_repo }}
+          INPUT_SOURCE_BRANCH: ${{ inputs.source_branch }}
+          INPUT_DAPPNODE_REPOSITORY: ${{ inputs.dappnode_repository }}
+          INPUT_NETWORK: ${{ github.event.inputs.network }}
+          GH_REPOSITORY: ${{ github.repository }}
+          GH_REF_NAME: ${{ github.ref_name }}
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          if [[ "${EVENT_NAME}" == "pull_request" ]]; then
             echo "The workflow is triggered by other pipeline"
-            echo "source_repo=${{ inputs.source_repo }}" | tee -a $GITHUB_OUTPUT
-            echo "source_branch=${{ inputs.source_branch }}"  | tee -a $GITHUB_OUTPUT
-            echo "dappnode_repository=${{ inputs.dappnode_repository }}" | tee -a $GITHUB_OUTPUT
-            if [[ "${{ inputs.dappnode_repository }}" == "DAppNodePackage-Hopr-testnet" ]]; then
-              echo "HOPRD_NETWORK=rotsee" | tee -a $GITHUB_OUTPUT
+            echo "source_repo=${INPUT_SOURCE_REPO}" | tee -a "$GITHUB_OUTPUT"
+            echo "source_branch=${INPUT_SOURCE_BRANCH}" | tee -a "$GITHUB_OUTPUT"
+            echo "dappnode_repository=${INPUT_DAPPNODE_REPOSITORY}" | tee -a "$GITHUB_OUTPUT"
+            if [[ "${INPUT_DAPPNODE_REPOSITORY}" == "DAppNodePackage-Hopr-testnet" ]]; then
+              echo "HOPRD_NETWORK=rotsee" | tee -a "$GITHUB_OUTPUT"
             else
-              echo "HOPRD_NETWORK=dufour" | tee -a $GITHUB_OUTPUT
+              echo "HOPRD_NETWORK=dufour" | tee -a "$GITHUB_OUTPUT"
             fi
           else
             echo "The workflow is triggered manually"
-            echo "source_repo=${{ github.repository }}" | tee -a $GITHUB_OUTPUT
-            echo "source_branch=${{ github.ref_name }}" | tee -a $GITHUB_OUTPUT
-            if [[ "${{ github.event.inputs.network }}" == "rotsee" ]]; then
-              echo "dappnode_repository=DAppNodePackage-Hopr-testnet" | tee -a $GITHUB_OUTPUT
-              echo "HOPRD_NETWORK=rotsee" | tee -a $GITHUB_OUTPUT
+            echo "source_repo=${GH_REPOSITORY}" | tee -a "$GITHUB_OUTPUT"
+            echo "source_branch=${GH_REF_NAME}" | tee -a "$GITHUB_OUTPUT"
+            if [[ "${INPUT_NETWORK}" == "rotsee" ]]; then
+              echo "dappnode_repository=DAppNodePackage-Hopr-testnet" | tee -a "$GITHUB_OUTPUT"
+              echo "HOPRD_NETWORK=rotsee" | tee -a "$GITHUB_OUTPUT"
             else
-              echo "dappnode_repository=DAppNodePackage-Hopr" | tee -a $GITHUB_OUTPUT
-              echo "HOPRD_NETWORK=dufour" | tee -a $GITHUB_OUTPUT
+              echo "dappnode_repository=DAppNodePackage-Hopr" | tee -a "$GITHUB_OUTPUT"
+              echo "HOPRD_NETWORK=dufour" | tee -a "$GITHUB_OUTPUT"
             fi
           fi
 
@@ -112,6 +127,11 @@ jobs:
 
       - name: Setup variables
         id: setup
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          SOURCE_BRANCH: ${{ steps.vars.outputs.source_branch }}
+          BRANCH_MASTER_RELEASE_NAME: ${{ vars.BRANCH_MASTER_RELEASE_NAME }}
+          BRANCH_RELEASE_RELEASE_NAME: ${{ vars.BRANCH_RELEASE_RELEASE_NAME }}
         run: |
           set -x
           # Set current_version based on branch type:
@@ -120,37 +140,41 @@ jobs:
           # - For 'release/*' branches: <release_version>-latest
           # - For other branches: exit with error
           current_version=$(./scripts/get-current-version.sh docker)
-          if [[ -z "${{ github.event.pull_request.number }}" ]]; then
+          if [[ -z "${PR_NUMBER}" ]]; then
             echo "Invoked manually"
-            declare base_branch=${{ steps.vars.outputs.source_branch }}
+            declare base_branch="${SOURCE_BRANCH}"
             if [[ "${base_branch}" == "master" ]]; then
-              echo "current_version=${{ vars.BRANCH_MASTER_RELEASE_NAME }}-latest" >> "$GITHUB_OUTPUT"
+              echo "current_version=${BRANCH_MASTER_RELEASE_NAME}-latest" >> "$GITHUB_OUTPUT"
             elif [[ "${base_branch}" =~ ^"release" ]]; then
-              echo "current_version=${{ vars.BRANCH_RELEASE_RELEASE_NAME }}-latest" >> "$GITHUB_OUTPUT"
+              echo "current_version=${BRANCH_RELEASE_RELEASE_NAME}-latest" >> "$GITHUB_OUTPUT"
             else
               last_commit=$(git rev-parse --short HEAD)
               echo "current_version=${current_version}-commit.${last_commit}" >> "$GITHUB_OUTPUT"
             fi
           else
             echo "Invoked from a pull request"
-            echo "current_version=${current_version}-pr.${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+            echo "current_version=${current_version}-pr.${PR_NUMBER}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Publish DappNode Package
         id: publish
+        env:
+          DEVELOPER_ADDRESS: "0x7305356ad936A06c4ea5DF45AD5E5C3ff9Db818E"
+          DOCKER_IMAGE_REGISTRY: ${{ vars.DOCKER_IMAGE_REGISTRY }}
+          CURRENT_VERSION: ${{ steps.setup.outputs.current_version }}
+          SOURCE_BRANCH: ${{ steps.vars.outputs.source_branch }}
+          HOPRD_NETWORK: ${{ steps.vars.outputs.HOPRD_NETWORK }}
         run: |
-          docker_tag=$(gcloud artifacts docker tags list "${{ vars.DOCKER_IMAGE_REGISTRY }}/hoprd" --filter="tag:${{ steps.setup.outputs.current_version }}" --format="csv[no-heading](tag,version)" | grep -F "${{ steps.setup.outputs.current_version }}," | sed 's/,/@/')
+          docker_tag=$(gcloud artifacts docker tags list "${DOCKER_IMAGE_REGISTRY}/hoprd" --filter="tag:${CURRENT_VERSION}" --format="csv[no-heading](tag,version)" | grep -F "${CURRENT_VERSION}," | sed 's/,/@/')
           yq -i e ".services.node.build.args.UPSTREAM_VERSION |= \"${docker_tag}\"" "./docker-compose.yml"
           npm install
           npx @dappnode/dappnodesdk publish patch  --provider "remote" --upload_to "ipfs" --verbose | tee build.log
 
           echo "DNP (DAppNode Package) built and uploaded" >> "$GITHUB_STEP_SUMMARY"
-          echo "Branch: ${{ steps.vars.outputs.source_branch }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "Network: ${{ steps.vars.outputs.HOPRD_NETWORK }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Branch: ${SOURCE_BRANCH}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Network: ${HOPRD_NETWORK}" >> "$GITHUB_STEP_SUMMARY"
           grep "ipfs" build.log >> "$GITHUB_STEP_SUMMARY"
           ipfs_hash=$(grep -oP 'Release hash : \K/ipfs/\w+' build.log)
           echo "ipfs_hash=$ipfs_hash" >> "$GITHUB_OUTPUT"
           echo "ipfs_hash=$ipfs_hash"
         working-directory: "./dappnode"
-        env:
-          DEVELOPER_ADDRESS: "0x7305356ad936A06c4ea5DF45AD5E5C3ff9Db818E"

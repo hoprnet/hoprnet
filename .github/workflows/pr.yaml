@@ -28,7 +28,6 @@ on:
 
 permissions:
   actions: read
-  security-events: write
   contents: read
 
 concurrency:
@@ -72,10 +71,14 @@ jobs:
   zizmor:
     name: Zizmor
     uses: ./.github/workflows/checks-zizmor.yaml
+    permissions:
+      contents: read
+      security-events: write
     with:
       source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-    secrets: inherit
+    secrets:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
   # ── Stage 2: Tests + Benchmarks (after checks pass) ────────────────────────
   test:

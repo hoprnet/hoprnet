@@ -14,9 +14,7 @@ concurrency:
   group: ${{ github.event.pull_request.head.ref || github.ref_name }}-build
   cancel-in-progress: true
 permissions:
-  contents: write
-  pull-requests: write
-  id-token: write
+  contents: read
 env:
   CARGO_TERM_COLOR: always
 jobs:
@@ -36,7 +34,9 @@ jobs:
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
       dappnode_repository: ${{ matrix.dappnode_repository }}
       labels: ${{ format('{0},', join(github.event.pull_request.labels.*.name, ',')) }}
-    secrets: inherit
+    secrets:
+      GCP_SA_GITHUB_RUNNER: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
+      GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
   build-binaries:
     name: Binary ${{ matrix.architecture }}
     strategy:
@@ -106,8 +106,9 @@ jobs:
   docs:
     name: Docs
     uses: ./.github/workflows/build-docs.yaml
-    secrets: inherit
     with:
       source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
       publish: false
+    secrets:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
