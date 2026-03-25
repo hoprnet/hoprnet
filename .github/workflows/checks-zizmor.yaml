@@ -2,6 +2,14 @@
 name: Zizmor
 
 on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    paths:
+      - ".github/**"
   merge_group:
     types: [checks_requested]
   workflow_call:
@@ -17,7 +25,7 @@ on:
         required: true
 
 concurrency:
-  group: ${{ inputs.source_branch || github.ref_name }}-zizmor
+  group: ${{ inputs.source_branch || github.event.pull_request.head.ref || github.ref_name }}-zizmor
   cancel-in-progress: true
 
 permissions:
@@ -37,7 +45,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          source_branch: ${{ inputs.source_branch }}
+          source_branch: ${{ inputs.source_branch || github.event.pull_request.head.ref || github.ref }}
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           command: nix develop -L .#ci -c bash -c "zizmor --format sarif . > results.sarif"
 

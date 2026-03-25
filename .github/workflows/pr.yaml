@@ -37,18 +37,6 @@ jobs:
     secrets:
       CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-  zizmor:
-    name: Check / Zizmor
-    uses: ./.github/workflows/checks-zizmor.yaml
-    permissions:
-      contents: read
-      security-events: write
-    with:
-      source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
-      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-    secrets:
-      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-
   tests:
     name: Test
     uses: ./.github/workflows/tests.yaml
