@@ -29,6 +29,8 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
+  id-token: write
 
 env:
   CARGO_TERM_COLOR: always
@@ -77,8 +79,6 @@ jobs:
             build_command: nix build -L .#binary-hoprd-x86_64-darwin
             required_label: binary:x86_64-darwin
     uses: hoprnet/hopr-workflows/.github/workflows/build-binaries.yaml@build-binaries-v2
-    permissions:
-      contents: read
     with:
       source_branch: ${{ inputs.source_branch }}
       version_type: commit
@@ -98,10 +98,6 @@ jobs:
     name: Docker
     uses: hoprnet/hopr-workflows/.github/workflows/build-docker.yaml@build-docker-v1
     needs: build-binaries
-    permissions:
-      contents: read
-      pull-requests: write
-      id-token: write
     with:
       source_branch: ${{ inputs.source_branch }}
       version_type: commit
