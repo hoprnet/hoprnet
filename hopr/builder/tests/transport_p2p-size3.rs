@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use anyhow::Context;
 use hopr_builder::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster};
 use hopr_lib::{
@@ -6,10 +8,11 @@ use hopr_lib::{
 };
 use rstest::*;
 use serial_test::serial;
+use tokio::time::sleep;
 
 #[rstest]
 #[test_log::test(tokio::test)]
-#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[timeout(2 * TEST_GLOBAL_TIMEOUT)]
 #[serial]
 /// Ensures nodes expose discoverable peers by fetching the list of public nodes
 /// from a random cluster member and asserting it equals the expected count.
@@ -29,7 +32,7 @@ async fn all_visible_peers_should_be_listed(cluster: &ClusterGuard) -> anyhow::R
 
 #[rstest]
 #[test_log::test(tokio::test)]
-#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[timeout(2 * TEST_GLOBAL_TIMEOUT)]
 /// Confirms peer-to-peer reachability by pinging another sampled node and
 /// verifying the transport API reports success.
 async fn ping_should_succeed_for_all_visible_nodes(cluster: &ClusterGuard) -> anyhow::Result<()> {
@@ -42,7 +45,7 @@ async fn ping_should_succeed_for_all_visible_nodes(cluster: &ClusterGuard) -> an
 
 #[rstest]
 #[test_log::test(tokio::test)]
-#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[timeout(2 * TEST_GLOBAL_TIMEOUT)]
 /// Guards against self-pings by attempting to ping the same node and asserting
 /// the operation fails.
 async fn ping_should_fail_for_self(cluster: &ClusterGuard) -> anyhow::Result<()> {
@@ -56,7 +59,7 @@ async fn ping_should_fail_for_self(cluster: &ClusterGuard) -> anyhow::Result<()>
 
 #[rstest]
 #[test_log::test(tokio::test)]
-#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[timeout(2 * TEST_GLOBAL_TIMEOUT)]
 /// Verifies discovery stays consistent by comparing the announced account list
 /// returned by two nodes and ensuring both contain each other's addresses.
 async fn discovery_should_produce_the_same_public_announcements_inside_the_network(
@@ -93,7 +96,7 @@ async fn discovery_should_produce_the_same_public_announcements_inside_the_netwo
 
 #[rstest]
 #[test_log::test(tokio::test)]
-#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[timeout(2 * TEST_GLOBAL_TIMEOUT)]
 #[serial]
 /// After the cluster has completed probe warmup, each node should have
 /// immediate observations (edges) for every other peer in the graph.
@@ -114,20 +117,29 @@ async fn probe_warmup_populates_graph_edges_for_all_peers(cluster: &ClusterGuard
         "node should be connected to all other cluster members"
     );
 
+    // Wait for probe quality to settle — the fixture only checks that edges exist,
+    // not that probe rounds have produced non-zero scores.
+    let mut scored_all = false;
+    for _ in 0..30 {
+        scored_all = peers.iter().all(|peer| {
+            node.inner()
+                .network_peer_info(peer)
+                .and_then(|obs| obs.immediate_qos().map(|imm| imm.average_probe_rate() > 0.0))
+                .unwrap_or(false)
+        });
+        if scored_all {
+            break;
+        }
+        sleep(Duration::from_secs(2)).await;
+    }
+    assert!(scored_all, "all peers should have non-zero probe rate");
+
     for peer in &peers {
         let obs = node
             .inner()
             .network_peer_info(peer)
             .context("peer should have observations in the graph")?;
 
-        let imm = obs
-            .immediate_qos()
-            .context("peer should have immediate QoS data from probes")?;
-
-        assert!(
-            imm.average_probe_rate() > 0.0,
-            "probe rate should be non-zero after warmup for {peer}"
-        );
         assert!(obs.score() > 0.0, "score should be positive for {peer}");
     }
 
@@ -136,19 +148,29 @@ async fn probe_warmup_populates_graph_edges_for_all_peers(cluster: &ClusterGuard
 
 #[rstest]
 #[test_log::test(tokio::test)]
-#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[timeout(2 * TEST_GLOBAL_TIMEOUT)]
 #[serial]
 /// Exercises the all_network_peers API with a score threshold, verifying
 /// that the probe observations produce non-zero scores for immediate neighbors.
 /// Covers: weight.rs score(), latency_score(), all_network_peers() filtering.
 async fn all_network_peers_returns_scored_entries(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [node] = cluster.sample_nodes::<1>();
+    let expected_count = cluster.size() - 1;
 
-    let all_peers = node
-        .inner()
-        .all_network_peers(0.0)
-        .await
-        .context("failed to get all network peers")?;
+    // Wait for probe quality to propagate — `all_network_peers(0.0)` filters
+    // peers with score > 0 which requires at least one successful probe round.
+    let mut all_peers = Vec::new();
+    for _ in 0..30 {
+        all_peers = node
+            .inner()
+            .all_network_peers(0.0)
+            .await
+            .context("failed to get all network peers")?;
+        if all_peers.len() >= expected_count && all_peers.iter().all(|(_, _, obs)| obs.score() > 0.0) {
+            break;
+        }
+        sleep(Duration::from_secs(2)).await;
+    }
 
     assert!(!all_peers.is_empty(), "should have at least one peer with score > 0");
 
@@ -166,7 +188,7 @@ async fn all_network_peers_returns_scored_entries(cluster: &ClusterGuard) -> any
 
 #[rstest]
 #[test_log::test(tokio::test)]
-#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[timeout(2 * TEST_GLOBAL_TIMEOUT)]
 #[serial]
 /// Pings a peer and verifies the returned observations contain latency data,
 /// exercising the full probe roundtrip: probe.rs cache lookup → process reply
@@ -192,7 +214,7 @@ async fn ping_records_latency_in_observations(cluster: &ClusterGuard) -> anyhow:
 
 #[rstest]
 #[test_log::test(tokio::test)]
-#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[timeout(2 * TEST_GLOBAL_TIMEOUT)]
 #[serial]
 /// Verifies the network graph DOT rendering produces valid output containing
 /// all cluster node identities and edge annotations.
@@ -222,7 +244,7 @@ async fn graph_renders_as_valid_dot_with_all_peers(cluster: &ClusterGuard) -> an
 
 #[rstest]
 #[test_log::test(tokio::test)]
-#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[timeout(2 * TEST_GLOBAL_TIMEOUT)]
 #[serial]
 /// Verifies the reachable-only graph rendering produces a subset that excludes
 /// disconnected subgraphs.
@@ -255,7 +277,7 @@ async fn graph_reachable_edges_are_subset_of_connected(cluster: &ClusterGuard) -
 
 #[rstest]
 #[test_log::test(tokio::test)]
-#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[timeout(2 * TEST_GLOBAL_TIMEOUT)]
 #[serial]
 /// Exercises the ticket price and winning probability chain queries through
 /// the HoprLib API, covering the network.rs endpoint code paths.
@@ -288,7 +310,7 @@ async fn ticket_price_and_probability_are_available(cluster: &ClusterGuard) -> a
 
 #[rstest]
 #[test_log::test(tokio::test)]
-#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[timeout(2 * TEST_GLOBAL_TIMEOUT)]
 #[serial]
 /// Verifies that after probe warmup, observed multiaddresses are populated
 /// for connected peers, exercising the transport layer's address tracking.
@@ -307,7 +329,7 @@ async fn observed_multiaddresses_populated_after_warmup(cluster: &ClusterGuard) 
 
 #[rstest]
 #[test_log::test(tokio::test)]
-#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[timeout(2 * TEST_GLOBAL_TIMEOUT)]
 #[serial]
 /// Verifies that the network health indicator reports a non-red status
 /// after the cluster has fully started and probes have warmed up.

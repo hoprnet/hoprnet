@@ -496,9 +496,10 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
             .expect("failed to build Tokio runtime in local thread");
 
         rt.block_on(async {
-            // Wait for all nodes to reach the 'Running' state
+            // Wait for all nodes to reach the 'Running' state.
+            // Use generous timeouts to accommodate CI and coverage instrumentation overhead.
             futures::future::try_join_all(cluster.iter().map(|instance| {
-                wait_for_status(instance, &HoprState::Running).timeout(futures_time::time::Duration::from_secs(180))
+                wait_for_status(instance, &HoprState::Running).timeout(futures_time::time::Duration::from_secs(360))
             }))
             .await
             .expect("status wait failed");
@@ -506,8 +507,9 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
             // Wait for full mesh connectivity and probe warmup.
             // Connection establishment in the test environment is slow (~100s for 3 nodes)
             // and probe warmup needs additional rounds after connections are up.
+            // Use generous timeouts to accommodate CI and coverage instrumentation overhead.
             futures::future::try_join_all(cluster.iter().map(|instance| {
-                wait_for_connectivity(instance, swarm_size).timeout(futures_time::time::Duration::from_secs(240))
+                wait_for_connectivity(instance, swarm_size).timeout(futures_time::time::Duration::from_secs(480))
             }))
             .await
             .expect("connectivity wait failed");
