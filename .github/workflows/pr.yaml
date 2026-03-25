@@ -126,10 +126,12 @@ jobs:
   # ── Stage 3: Coverage (after tests pass) ────────────────────────────────────
   coverage:
     name: Coverage / ${{ matrix.name }}
-    needs: [test]
+    needs: [test, build-benchmarks]
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
-    if: github.event_name == 'push' || (github.event.pull_request.draft == false)
+    if: >-
+      !failure() && !cancelled()
+      && (github.event_name == 'push' || (github.event.pull_request.draft == false))
     env:
       CI: "true"
     strategy:
