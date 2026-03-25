@@ -2,13 +2,9 @@
 ################################################################################
 # Pull request pipeline for hoprnet
 #
-# All jobs run concurrently within their group.
+# Dispatches checks and tests concurrently.
 ################################################################################
 name: PR
-
-env:
-  RUST_BACKTRACE: "1"
-  FOUNDRY_PROFILE: ci
 
 on:
   merge_group:
@@ -32,38 +28,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ── Checks ─────────────────────────────────────────────────────────────────
-  check:
-    name: Check / ${{ matrix.name }}
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: ${{ matrix.timeout }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Pre-commit
-            runner: self-hosted-hoprnet-small
-            timeout: 15
-            command: nix build -L .#pre-commit-check
-          - name: Lint
-            runner: self-hosted-hoprnet-bigger
-            timeout: 30
-            command: nix run -L .#check
-          - name: Cargo deps
-            runner: self-hosted-hoprnet-bigger
-            timeout: 10
-            command: nix develop .#ci -c bash -c "cargo machete && cargo shear"
-          - name: Audit
-            runner: self-hosted-hoprnet-bigger
-            timeout: 15
-            command: nix run .#audit
-    steps:
-      - name: Run ${{ matrix.name }}
-        uses: hoprnet/hopr-workflows/actions/nix-action@c2aca7e56d25c4a786049ccf816c7f1af8721de8 # nix-action-v1
-        with:
-          source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          command: ${{ matrix.command }}
+  checks:
+    name: Check
+    uses: ./.github/workflows/checks.yaml
+    with:
+      source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+    secrets:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
   zizmor:
     name: Check / Zizmor
@@ -77,89 +49,12 @@ jobs:
     secrets:
       CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-  # ── Tests ──────────────────────────────────────────────────────────────────
-  test:
-    name: Test / ${{ matrix.name }}
-    runs-on: self-hosted-hoprnet-bigger
-    timeout-minutes: ${{ matrix.timeout }}
-    env:
-      CI: "true"
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Unit
-            timeout: 60
-            command: nix build -L .#hopr-test-unit
-          - name: Integration
-            timeout: 60
-            command: nix develop -c cargo test --test '*' -- --test-threads=1
-          - name: Unit Nightly
-            timeout: 60
-            command: nix build -L .#hopr-test-nightly
-    steps:
-      - name: Run ${{ matrix.name }}
-        uses: hoprnet/hopr-workflows/actions/nix-action@c2aca7e56d25c4a786049ccf816c7f1af8721de8 # nix-action-v1
-        with:
-          source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          command: ${{ matrix.command }}
-
-  # ── Benchmarks ─────────────────────────────────────────────────────────────
-  build-benchmarks:
-    name: Benchmark / Build
-    runs-on: self-hosted-hoprnet-bigger
-    timeout-minutes: 20
-    if: github.event_name == 'merge_group'
-    steps:
-      - name: Build benchmarks
-        uses: hoprnet/hopr-workflows/actions/nix-action@c2aca7e56d25c4a786049ccf816c7f1af8721de8 # nix-action-v1
-        with:
-          source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          command: nix build .#hoprd-bench-build
-
-  # ── Coverage ───────────────────────────────────────────────────────────────
-  coverage:
-    name: Coverage / ${{ matrix.name }}
-    runs-on: self-hosted-hoprnet-bigger
-    timeout-minutes: 60
-    if: github.event_name == 'push' || (github.event.pull_request.draft == false)
-    env:
-      CI: "true"
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Unit
-            command: |
-              nix build -L .#hopr-coverage
-              cp result coverage.lcov
-            coverage_file: coverage.lcov
-            flag: unit
-          - name: Integration
-            command: |
-              nix develop .#coverage -c cargo llvm-cov \
-                --workspace \
-                --test '*' \
-                --lcov --output-path coverage.lcov \
-                -- --test-threads=1
-            coverage_file: coverage.lcov
-            flag: integration
-    steps:
-      - name: Generate ${{ matrix.name }} report
-        uses: hoprnet/hopr-workflows/actions/nix-action@c2aca7e56d25c4a786049ccf816c7f1af8721de8 # nix-action-v1
-        with:
-          source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          command: ${{ matrix.command }}
-
-      - name: Upload ${{ matrix.name }} report
-        uses: codecov/codecov-action@18283e04ce6e62d37312384ff67231eb8fd56d24 # v5.4.3
-        if: >-
-          github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
-        with:
-          files: ${{ matrix.coverage_file }}
-          flags: ${{ matrix.flag }}
-          fail_ci_if_error: true
-          token: ${{ secrets.CODECOV_TOKEN }}
+  tests:
+    name: Test
+    uses: ./.github/workflows/tests.yaml
+    with:
+      source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+    secrets:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
