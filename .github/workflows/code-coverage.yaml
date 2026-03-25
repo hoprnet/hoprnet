@@ -32,10 +32,9 @@ jobs:
       CI: "true"
     steps:
       - name: Generate unit coverage report
-        uses: hoprnet/hopr-workflows/actions/nix-action@9ffe6bb3713d11b1df070fb50546bb4321d8c693 # nix-action-v1
+        uses: hoprnet/hopr-workflows/actions/nix-action@290ac3c27a2735cd4860b4a1b41c515cdb5a1feb # nix-action-v1
         with:
-          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
           use_cachix: "true"
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
@@ -62,10 +61,9 @@ jobs:
       CI: "true"
     steps:
       - name: Generate integration coverage report
-        uses: hoprnet/hopr-workflows/actions/nix-action@9ffe6bb3713d11b1df070fb50546bb4321d8c693 # nix-action-v1
+        uses: hoprnet/hopr-workflows/actions/nix-action@290ac3c27a2735cd4860b4a1b41c515cdb5a1feb # nix-action-v1
         with:
-          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
           use_cachix: "true"
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           github_access_token: ${{ secrets.GITHUB_TOKEN }}

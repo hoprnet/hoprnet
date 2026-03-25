@@ -23,8 +23,7 @@ jobs:
     runs-on: self-hosted-hoprnet-bigger
     steps:
       - name: Run Audit
-        uses: hoprnet/hopr-workflows/actions/nix-action@9ffe6bb3713d11b1df070fb50546bb4321d8c693 # nix-action-v1
+        uses: hoprnet/hopr-workflows/actions/nix-action@290ac3c27a2735cd4860b4a1b41c515cdb5a1feb # nix-action-v1
         with:
-          repository: ${{ inputs.source_repo }}
-          ref: ${{ inputs.source_branch }}
+          source_branch: ${{ inputs.source_branch }}
           command: nix run .#audit
