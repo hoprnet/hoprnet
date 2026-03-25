@@ -23,59 +23,46 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  unit-coverage:
-    name: Unit Coverage
+  coverage:
+    name: ${{ matrix.name }}
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
     if: github.event_name == 'push' || (github.event.pull_request.draft == false)
     env:
       CI: "true"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Unit Coverage
+            command: |
+              nix build -L .#hopr-coverage
+              cp result coverage.lcov
+            coverage_file: coverage.lcov
+            flag: unit
+          - name: Integration Coverage
+            command: |
+              nix develop .#coverage -c cargo llvm-cov \
+                --workspace \
+                --test '*' \
+                --lcov --output-path coverage.lcov \
+                -- --test-threads=1
+            coverage_file: coverage.lcov
+            flag: integration
     steps:
-      - name: Generate unit coverage report
+      - name: Generate ${{ matrix.name }} report
         uses: hoprnet/hopr-workflows/actions/nix-action@nix-action-v1
         with:
           source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          command: |
-            nix build -L .#hopr-coverage
-            cp result coverage-unit.lcov
+          command: ${{ matrix.command }}
 
-      - name: Upload unit coverage report
+      - name: Upload ${{ matrix.name }} report
         uses: codecov/codecov-action@18283e04ce6e62d37312384ff67231eb8fd56d24 # v5.4.3
         if: >-
           github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
         with:
-          files: coverage-unit.lcov
-          flags: unit
-          fail_ci_if_error: true
-          token: ${{ secrets.CODECOV_TOKEN }}
-
-  integration-coverage:
-    name: Integration Coverage
-    runs-on: self-hosted-hoprnet-bigger
-    timeout-minutes: 60
-    if: github.event_name == 'push' || (github.event.pull_request.draft == false)
-    env:
-      CI: "true"
-    steps:
-      - name: Generate integration coverage report
-        uses: hoprnet/hopr-workflows/actions/nix-action@nix-action-v1
-        with:
-          source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          command: |
-            nix develop .#coverage -c cargo llvm-cov \
-              --workspace \
-              --test '*' \
-              --lcov --output-path integration-coverage.lcov \
-              -- --test-threads=1
-
-      - name: Upload integration coverage report
-        uses: codecov/codecov-action@18283e04ce6e62d37312384ff67231eb8fd56d24 # v5.4.3
-        if: >-
-          github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
-        with:
-          files: integration-coverage.lcov
-          flags: integration
+          files: ${{ matrix.coverage_file }}
+          flags: ${{ matrix.flag }}
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
