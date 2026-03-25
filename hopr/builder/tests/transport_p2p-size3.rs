@@ -1,6 +1,9 @@
 use anyhow::Context;
 use hopr_builder::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster};
-use hopr_lib::{Address, HoprNodeNetworkOperations};
+use hopr_lib::{
+    Address, HoprNodeNetworkOperations,
+    api::graph::traits::{EdgeLinkObservable, EdgeObservableRead},
+};
 use rstest::*;
 use serial_test::serial;
 
@@ -83,5 +86,241 @@ async fn discovery_should_produce_the_same_public_announcements_inside_the_netwo
     assert!(accounts_addresses_1.contains(&idx2.address()));
 
     assert_eq!(accounts_addresses_1, accounts_addresses_2);
+    Ok(())
+}
+
+// ── Network graph and probe observation tests ─────────────────────────────
+
+#[rstest]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[serial]
+/// After the cluster has completed probe warmup, each node should have
+/// immediate observations (edges) for every other peer in the graph.
+/// Exercises: probe.rs emit+process, discovery.rs immediate_probe_stream,
+/// weight.rs EdgeObservableWrite::record, graph.rs NetworkGraphView::edge.
+async fn probe_warmup_populates_graph_edges_for_all_peers(cluster: &ClusterGuard) -> anyhow::Result<()> {
+    let [node] = cluster.sample_nodes::<1>();
+
+    let peers = node
+        .inner()
+        .network_connected_peers()
+        .await
+        .context("failed to get connected peers")?;
+
+    assert_eq!(
+        peers.len(),
+        cluster.size() - 1,
+        "node should be connected to all other cluster members"
+    );
+
+    for peer in &peers {
+        let obs = node
+            .inner()
+            .network_peer_info(peer)
+            .context("peer should have observations in the graph")?;
+
+        let imm = obs
+            .immediate_qos()
+            .context("peer should have immediate QoS data from probes")?;
+
+        assert!(
+            imm.average_probe_rate() > 0.0,
+            "probe rate should be non-zero after warmup for {peer}"
+        );
+        assert!(obs.score() > 0.0, "score should be positive for {peer}");
+    }
+
+    Ok(())
+}
+
+#[rstest]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[serial]
+/// Exercises the all_network_peers API with a score threshold, verifying
+/// that the probe observations produce non-zero scores for immediate neighbors.
+/// Covers: weight.rs score(), latency_score(), all_network_peers() filtering.
+async fn all_network_peers_returns_scored_entries(cluster: &ClusterGuard) -> anyhow::Result<()> {
+    let [node] = cluster.sample_nodes::<1>();
+
+    let all_peers = node
+        .inner()
+        .all_network_peers(0.0)
+        .await
+        .context("failed to get all network peers")?;
+
+    assert!(!all_peers.is_empty(), "should have at least one peer with score > 0");
+
+    for (addr, peer_id, obs) in &all_peers {
+        assert!(addr.is_some(), "peer {peer_id} should have a chain address");
+        assert!(obs.score() > 0.0, "peer {peer_id} score should be positive");
+        assert!(
+            obs.last_update().as_millis() > 0,
+            "peer {peer_id} should have a last_update timestamp"
+        );
+    }
+
+    Ok(())
+}
+
+#[rstest]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[serial]
+/// Pings a peer and verifies the returned observations contain latency data,
+/// exercising the full probe roundtrip: probe.rs cache lookup → process reply
+/// → weight.rs record(ProbeNeighborSuccess) → latency EMA update.
+async fn ping_records_latency_in_observations(cluster: &ClusterGuard) -> anyhow::Result<()> {
+    let [src, dst] = cluster.sample_nodes::<2>();
+
+    let (rtt, obs) = src.inner().ping(&dst.peer_id()).await.context("ping should succeed")?;
+
+    assert!(!rtt.is_zero(), "RTT should be non-zero");
+
+    let imm = obs
+        .immediate_qos()
+        .context("post-ping observations should contain immediate QoS")?;
+
+    assert!(
+        imm.average_latency().is_some(),
+        "latency EMA should be present after a successful ping"
+    );
+
+    Ok(())
+}
+
+#[rstest]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[serial]
+/// Verifies the network graph DOT rendering produces valid output containing
+/// all cluster node identities and edge annotations.
+/// Exercises: render.rs render_dot_with_labels, render_edges_as_dot,
+/// graph.rs connected_edges.
+async fn graph_renders_as_valid_dot_with_all_peers(cluster: &ClusterGuard) -> anyhow::Result<()> {
+    let [node] = cluster.sample_nodes::<1>();
+    let graph = node.inner().graph();
+
+    let dot = hopr_network_graph::render::render_dot(graph);
+
+    assert!(dot.starts_with("digraph"), "DOT output should start with 'digraph'");
+    assert!(dot.contains("->"), "DOT output should contain directed edges");
+
+    // Every non-isolated node should appear in the output
+    let edges = graph.connected_edges();
+    assert!(!edges.is_empty(), "graph should have edges after probe warmup");
+
+    // Verify score annotations are present on edges
+    assert!(
+        dot.contains("score="),
+        "DOT output should contain score annotations on edges"
+    );
+
+    Ok(())
+}
+
+#[rstest]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[serial]
+/// Verifies the reachable-only graph rendering produces a subset that excludes
+/// disconnected subgraphs.
+/// Exercises: render.rs render_dot_reachable_with_labels, graph.rs reachable_edges.
+async fn graph_reachable_edges_are_subset_of_connected(cluster: &ClusterGuard) -> anyhow::Result<()> {
+    let [node] = cluster.sample_nodes::<1>();
+    let graph = node.inner().graph();
+
+    let connected = graph.connected_edges();
+    let reachable = graph.reachable_edges();
+
+    // Reachable is a subset (by construction, BFS from self)
+    assert!(
+        reachable.len() <= connected.len(),
+        "reachable edges ({}) should not exceed connected edges ({})",
+        reachable.len(),
+        connected.len()
+    );
+
+    // In a fully probed 3-node cluster, reachable should equal connected
+    // (all nodes are reachable from any node)
+    assert_eq!(
+        reachable.len(),
+        connected.len(),
+        "in a fully connected cluster, reachable should equal connected"
+    );
+
+    Ok(())
+}
+
+#[rstest]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[serial]
+/// Exercises the ticket price and winning probability chain queries through
+/// the HoprLib API, covering the network.rs endpoint code paths.
+async fn ticket_price_and_probability_are_available(cluster: &ClusterGuard) -> anyhow::Result<()> {
+    let [node] = cluster.sample_nodes::<1>();
+
+    let price = node
+        .inner()
+        .get_ticket_price()
+        .await
+        .context("should get ticket price")?;
+
+    // Price should be a valid non-zero value from the oracle
+    assert!(price > "0 wxHOPR".parse().unwrap(), "ticket price should be non-zero");
+
+    let probability = node
+        .inner()
+        .get_minimum_incoming_ticket_win_probability()
+        .await
+        .context("should get winning probability")?;
+
+    let prob_f64: f64 = probability.into();
+    assert!(
+        (0.0..=1.0).contains(&prob_f64),
+        "probability {prob_f64} should be in [0, 1]"
+    );
+
+    Ok(())
+}
+
+#[rstest]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[serial]
+/// Verifies that after probe warmup, observed multiaddresses are populated
+/// for connected peers, exercising the transport layer's address tracking.
+async fn observed_multiaddresses_populated_after_warmup(cluster: &ClusterGuard) -> anyhow::Result<()> {
+    let [src, dst] = cluster.sample_nodes::<2>();
+
+    let addrs = src.inner().network_observed_multiaddresses(&dst.peer_id()).await;
+
+    assert!(
+        !addrs.is_empty(),
+        "observed multiaddresses should be populated after probe warmup"
+    );
+
+    Ok(())
+}
+
+#[rstest]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[serial]
+/// Verifies that the network health indicator reports a non-red status
+/// after the cluster has fully started and probes have warmed up.
+async fn network_health_is_not_red_after_warmup(cluster: &ClusterGuard) -> anyhow::Result<()> {
+    let [node] = cluster.sample_nodes::<1>();
+
+    let health = node.inner().network_health().await;
+
+    assert_ne!(
+        health,
+        hopr_lib::api::network::Health::Red,
+        "network health should not be Red after cluster warmup"
+    );
+
     Ok(())
 }

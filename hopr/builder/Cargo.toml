@@ -72,7 +72,7 @@ hopr-metrics = { workspace = true, optional = true }
 hopr-db-node = { workspace = true, features = ["traits", "sqlite"] }
 hopr-chain-connector = { workspace = true }
 hopr-ct-full-network = { workspace = true }
-hopr-network-graph = { workspace = true, features = ["petgraph"] }
+hopr-network-graph = { workspace = true, features = ["petgraph", "graph-api"] }
 hopr-transport-p2p = { workspace = true }
 
 [dev-dependencies]
