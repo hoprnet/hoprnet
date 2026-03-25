@@ -2,10 +2,7 @@
 ################################################################################
 # Pull request pipeline for hoprnet
 #
-# Pipeline stages:
-#   1. Checks + Zizmor (parallel)
-#   2. Tests + Benchmarks (parallel, after checks pass)
-#   3. Coverage (after tests pass)
+# All jobs run concurrently within their group.
 ################################################################################
 name: PR
 
@@ -35,7 +32,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ── Stage 1: Checks ────────────────────────────────────────────────────────
+  # ── Checks ─────────────────────────────────────────────────────────────────
   check:
     name: Check / ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
@@ -80,10 +77,9 @@ jobs:
     secrets:
       CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-  # ── Stage 2: Tests + Benchmarks (after checks pass) ────────────────────────
+  # ── Tests ──────────────────────────────────────────────────────────────────
   test:
     name: Test / ${{ matrix.name }}
-    needs: [check, zizmor]
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: ${{ matrix.timeout }}
     env:
@@ -109,9 +105,9 @@ jobs:
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           command: ${{ matrix.command }}
 
+  # ── Benchmarks ─────────────────────────────────────────────────────────────
   build-benchmarks:
     name: Benchmark / Build
-    needs: [check, zizmor]
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 20
     if: github.event_name == 'merge_group'
@@ -123,15 +119,12 @@ jobs:
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           command: nix build .#hoprd-bench-build
 
-  # ── Stage 3: Coverage (after tests pass) ────────────────────────────────────
+  # ── Coverage ───────────────────────────────────────────────────────────────
   coverage:
     name: Coverage / ${{ matrix.name }}
-    needs: [test, build-benchmarks]
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
-    if: >-
-      !failure() && !cancelled()
-      && (github.event_name == 'push' || (github.event.pull_request.draft == false))
+    if: github.event_name == 'push' || (github.event.pull_request.draft == false)
     env:
       CI: "true"
     strategy:
