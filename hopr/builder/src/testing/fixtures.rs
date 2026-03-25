@@ -96,6 +96,42 @@ impl ClusterGuard {
         Ok(guards)
     }
 
+    /// Polls the network graph on `observer` until it sees at least `expected_channels`
+    /// edges with non-zero balance, or until `timeout` expires.
+    ///
+    /// This replaces fixed-duration sleeps after channel opening: instead of guessing
+    /// how long chain propagation takes, we actively check the graph state.
+    pub async fn wait_for_channel_graph(
+        &self,
+        observer: &TestedHopr,
+        expected_channels: usize,
+        timeout: Duration,
+    ) -> anyhow::Result<()> {
+        let deadline = tokio::time::Instant::now() + timeout;
+        loop {
+            let channels = observer.inner().all_channels().await.unwrap_or_default();
+
+            let open_count = channels
+                .iter()
+                .filter(|c| c.status == hopr_lib::ChannelStatus::Open)
+                .count();
+
+            if open_count >= expected_channels {
+                tracing::info!(open_count, expected_channels, "channel graph converged");
+                return Ok(());
+            }
+
+            if tokio::time::Instant::now() >= deadline {
+                anyhow::bail!(
+                    "channel graph did not converge: {open_count}/{expected_channels} open channels after {timeout:?}"
+                );
+            }
+
+            tracing::trace!(open_count, expected_channels, "waiting for channel graph convergence");
+            sleep(Duration::from_secs(2)).await;
+        }
+    }
+
     /// Create a session between the first and last nodes in the path.
     ///
     /// Channels must already be open before calling this method.
