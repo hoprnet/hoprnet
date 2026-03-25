@@ -465,9 +465,9 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
                         &offchain_keys[i],
                         config,
                         Some(hopr_ct_full_network::ProberConfig {
-                            interval: std::time::Duration::from_secs(1),
+                            interval: std::time::Duration::from_secs(3),
                             ..Default::default()
-                        }), // aggressive setting to facilitate fast n-hop telemetry probing
+                        }), // moderate setting to allow probing without saturating relay traffic
                         connector.clone(),
                         node_db,
                         EchoServer::new(),

@@ -508,7 +508,7 @@ pub mod types {
     ///      "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
     ///      "averageLatency": 100,
     ///      "isConnected": true,
-    ///      "lastUpdate": 1690000000,
+    ///      "lastUpdate": 1690000000000,
     ///      "probeRate": 0.476,
     ///      "score": 0.7
     ///    }
@@ -516,7 +516,6 @@ pub mod types {
     ///  "type": "object",
     ///  "required": [
     ///    "address",
-    ///    "averageLatency",
     ///    "isConnected",
     ///    "lastUpdate",
     ///    "probeRate",
@@ -530,10 +529,14 @@ pub mod types {
     ///      "type": "string"
     ///    },
     ///    "averageLatency": {
+    ///      "description": "Average latency in milliseconds, if available.",
     ///      "examples": [
     ///        100
     ///      ],
-    ///      "type": "integer",
+    ///      "type": [
+    ///        "integer",
+    ///        "null"
+    ///      ],
     ///      "minimum": 0.0
     ///    },
     ///    "isConnected": {
@@ -543,8 +546,9 @@ pub mod types {
     ///      "type": "boolean"
     ///    },
     ///    "lastUpdate": {
+    ///      "description": "Epoch milliseconds of the last observation update.",
     ///      "examples": [
-    ///        1690000000
+    ///        1690000000000
     ///      ],
     ///      "type": "integer",
     ///      "minimum": 0.0
@@ -570,10 +574,16 @@ pub mod types {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     pub struct ConnectedPeerResponse {
         pub address: ::std::string::String,
-        #[serde(rename = "averageLatency")]
-        pub average_latency: u64,
+        ///Average latency in milliseconds, if available.
+        #[serde(
+            rename = "averageLatency",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub average_latency: ::std::option::Option<u64>,
         #[serde(rename = "isConnected")]
         pub is_connected: bool,
+        ///Epoch milliseconds of the last observation update.
         #[serde(rename = "lastUpdate")]
         pub last_update: u64,
         #[serde(rename = "probeRate")]

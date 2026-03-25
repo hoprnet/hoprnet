@@ -58,6 +58,8 @@ async fn create_n_hop_session(#[case] hops: usize) -> anyhow::Result<()> {
     let dst = nodes[nodes.len() - 1];
     let mid = &nodes[1..nodes.len() - 1];
 
+    tracing::info!(hops, src = %src.address(), dst = %dst.address(), "session test node mapping");
+
     // For n-hop (n >= 1), open channels between ALL pairs to create a fully connected network,
     // so the path planner can leverage the full graph data.
     let all_channels = if hops > 0 {
