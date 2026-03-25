@@ -503,9 +503,11 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
             .await
             .expect("status wait failed");
 
-            // Wait for full mesh connectivity
+            // Wait for full mesh connectivity and probe warmup.
+            // Connection establishment in the test environment is slow (~100s for 3 nodes)
+            // and probe warmup needs additional rounds after connections are up.
             futures::future::try_join_all(cluster.iter().map(|instance| {
-                wait_for_connectivity(instance, swarm_size).timeout(futures_time::time::Duration::from_secs(120))
+                wait_for_connectivity(instance, swarm_size).timeout(futures_time::time::Duration::from_secs(240))
             }))
             .await
             .expect("connectivity wait failed");

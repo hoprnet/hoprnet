@@ -86,10 +86,12 @@ async fn create_n_hop_session(#[case] hops: usize) -> anyhow::Result<()> {
 
     // Wait for probing to register opened channels in the graph.
     // Scale the wait by hop count: larger meshes need more probing rounds.
+    // With probe interval at 3s, each round covers one peer, so the graph
+    // needs `hops + 1` rounds minimum (plus chain propagation time).
     if !all_channels.is_empty() {
         let chain_info = cluster.chain_client.query_chain_info().await?;
         let base_delay = chain_propagation_delay(&chain_info);
-        sleep(base_delay * hops as u32).await;
+        sleep(base_delay * (hops as u32 + 2)).await;
     }
 
     let (routing, capabilities) = if hops == 0 {

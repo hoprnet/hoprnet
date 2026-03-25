@@ -489,6 +489,43 @@ mod tests {
         assert_eq!(state.as_config(), cfg);
     }
 
+    #[test]
+    fn balancer_state_values_decay_zero_duration_maps_to_none() {
+        let cfg = SurbBalancerConfig {
+            surb_decay: Some((Duration::ZERO, 0.10)),
+            ..Default::default()
+        };
+        let state = BalancerStateValues::new(cfg);
+        assert!(
+            state.surb_decay().is_none(),
+            "zero duration decay should be filtered out"
+        );
+    }
+
+    #[test]
+    fn balancer_state_values_decay_zero_percent_maps_to_none() {
+        let cfg = SurbBalancerConfig {
+            surb_decay: Some((Duration::from_secs(60), 0.0)),
+            ..Default::default()
+        };
+        let state = BalancerStateValues::new(cfg);
+        assert!(
+            state.surb_decay().is_none(),
+            "zero percent decay should be filtered out"
+        );
+    }
+
+    #[test]
+    fn balancer_state_values_decay_clamping() {
+        let cfg = SurbBalancerConfig {
+            surb_decay: Some((Duration::from_secs(1), 1.5)), // > 1.0 should be clamped
+            ..Default::default()
+        };
+        let state = BalancerStateValues::new(cfg);
+        let (_, pct) = state.surb_decay().expect("decay should be present");
+        assert!((pct - 1.0).abs() < f64::EPSILON, "percentage should be clamped to 1.0");
+    }
+
     #[test_log::test]
     fn surb_balancer_should_start_increase_level_when_below_target() {
         let production_rate = Arc::new(AtomicU64::new(0));

@@ -633,6 +633,12 @@ mod tests {
         assert_eq!(caps_to_ack_mode(Capabilities::empty()), AcknowledgementMode::Partial);
     }
 
+    #[test]
+    fn caps_to_ack_mode_partial_when_only_nack() {
+        let caps: Capabilities = Capability::RetransmissionNack.into();
+        assert_eq!(caps_to_ack_mode(caps), AcknowledgementMode::Partial);
+    }
+
     // --- ClosureReason tests ---
 
     #[test]
@@ -678,6 +684,20 @@ mod tests {
     #[test]
     fn session_id_from_str_rejects_invalid_pseudonym() {
         assert!(SessionId::from_str("notahexvalue:1234").is_err());
+    }
+
+    #[test]
+    fn session_id_from_str_rejects_invalid_tag() {
+        let pseudonym = HoprPseudonym::random();
+        let hex = pseudonym.to_hex();
+        let bad = format!("{hex}:not_a_number");
+        assert!(SessionId::from_str(&bad).is_err());
+    }
+
+    #[test]
+    fn session_id_display_and_debug_are_identical() {
+        let id = SessionId::new(42_u64, HoprPseudonym::random());
+        assert_eq!(format!("{id}"), format!("{id:?}"));
     }
 
     #[test]
