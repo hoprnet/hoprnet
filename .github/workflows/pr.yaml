@@ -37,7 +37,7 @@ concurrency:
 jobs:
   # ── Stage 1: Checks ────────────────────────────────────────────────────────
   check:
-    name: ${{ matrix.name }}
+    name: Check / ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: ${{ matrix.timeout }}
     strategy:
@@ -69,7 +69,7 @@ jobs:
           command: ${{ matrix.command }}
 
   zizmor:
-    name: Zizmor
+    name: Check / Zizmor
     uses: ./.github/workflows/checks-zizmor.yaml
     permissions:
       contents: read
@@ -82,7 +82,7 @@ jobs:
 
   # ── Stage 2: Tests + Benchmarks (after checks pass) ────────────────────────
   test:
-    name: ${{ matrix.name }}
+    name: Test / ${{ matrix.name }}
     needs: [check, zizmor]
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: ${{ matrix.timeout }}
@@ -92,13 +92,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Unit Tests
+          - name: Unit
             timeout: 60
             command: nix build -L .#hopr-test-unit
-          - name: Integration Tests
+          - name: Integration
             timeout: 60
             command: nix develop -c cargo test --test '*' -- --test-threads=1
-          - name: Unit Tests Nightly
+          - name: Unit Nightly
             timeout: 60
             command: nix build -L .#hopr-test-nightly
     steps:
@@ -110,7 +110,7 @@ jobs:
           command: ${{ matrix.command }}
 
   build-benchmarks:
-    name: Build Benchmarks
+    name: Benchmark / Build
     needs: [check, zizmor]
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 20
@@ -125,7 +125,7 @@ jobs:
 
   # ── Stage 3: Coverage (after tests pass) ────────────────────────────────────
   coverage:
-    name: ${{ matrix.name }}
+    name: Coverage / ${{ matrix.name }}
     needs: [test]
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
@@ -136,13 +136,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Unit Coverage
+          - name: Unit
             command: |
               nix build -L .#hopr-coverage
               cp result coverage.lcov
             coverage_file: coverage.lcov
             flag: unit
-          - name: Integration Coverage
+          - name: Integration
             command: |
               nix develop .#coverage -c cargo llvm-cov \
                 --workspace \
