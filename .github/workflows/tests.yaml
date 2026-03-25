@@ -29,7 +29,7 @@ env:
 jobs:
   # ── Tests + Benchmarks (concurrent) ────────────────────────────────────────
   test:
-    name: Test / ${{ matrix.name }}
+    name: ${{ matrix.name }}
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: ${{ matrix.timeout }}
     env:
@@ -56,7 +56,7 @@ jobs:
           command: ${{ matrix.command }}
 
   build-benchmarks:
-    name: Benchmark / Build
+    name: Benchmark
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 20
     if: github.event_name == 'merge_group'
