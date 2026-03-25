@@ -104,6 +104,8 @@ concurrency:
 jobs:
   load-tests:
     name: Load Tests
+    permissions:
+      contents: read
     runs-on: self-hosted-hoprnet-small
     steps:
       - name: Harden Runner
@@ -129,49 +131,70 @@ jobs:
           login_gke: 'true'
           project: hopr-staging
       - name: Set environment variables
+        env:
+          INPUT_TEST_ID: ${{ inputs.test_id }}
+          INPUT_CLUSTER_NODES: ${{ inputs.cluster_nodes }}
+          INPUT_TOPOLOGY: ${{ inputs.topology }}
+          INPUT_WORKLOAD: ${{ inputs.workload }}
+          INPUT_DURATION: ${{ inputs.duration }}
+          INPUT_ECHO_SERVICE_REPLICAS: ${{ inputs.echo_service_replicas }}
+          INPUT_PAYLOAD_SIZE: ${{ inputs.payload_size }}
+          INPUT_DOWNLOAD_THROUGHPUT: ${{ inputs.download_throughput }}
+          INPUT_UPLOAD_THROUGHPUT: ${{ inputs.upload_throughput }}
+          EVENT_TEST_ID: ${{ github.event.inputs.test_id }}
+          EVENT_CLUSTER_NODES: ${{ github.event.inputs.cluster_nodes }}
+          EVENT_TOPOLOGY: ${{ github.event.inputs.topology }}
+          EVENT_WORKLOAD: ${{ github.event.inputs.workload }}
+          EVENT_DURATION: ${{ github.event.inputs.duration }}
+          EVENT_ECHO_SERVICE_REPLICAS: ${{ github.event.inputs.echo_service_replicas }}
+          EVENT_PAYLOAD_SIZE: ${{ github.event.inputs.payload_size }}
+          EVENT_DOWNLOAD_THROUGHPUT: ${{ github.event.inputs.download_throughput }}
+          EVENT_UPLOAD_THROUGHPUT: ${{ github.event.inputs.upload_throughput }}
         run: |
-          if [ -z "${{ github.event.inputs.test_id }}" ]; then
+          if [ -z "${EVENT_TEST_ID}" ]; then
             echo "The workflow is triggered by other pipeline"
             {
-              echo "TESTID=${{ inputs.test_id }}"
-              echo "K6_EXECUTION_NAME=${{ inputs.test_id }}"
-              echo "K6_CLUSTER_NODES=${{ inputs.cluster_nodes }}"
-              echo "K6_TOPOLOGY_NAME=${{ inputs.topology }}"
-              echo "K6_WORKLOAD_NAME=${{ inputs.workload }}"
-              echo "K6_TEST_DURATION=${{ inputs.duration }}"
-              echo "K6_ECHO_SERVERS_REPLICAS=${{ inputs.echo_service_replicas }}"
-              echo "K6_PAYLOAD_SIZE=${{ inputs.payload_size }}"
-              echo "K6_DOWNLOAD_THROUGHPUT=${{ inputs.download_throughput }}"
-              echo "K6_UPLOAD_THROUGHPUT=${{ inputs.upload_throughput }}"
+              echo "TESTID=${INPUT_TEST_ID}"
+              echo "K6_EXECUTION_NAME=${INPUT_TEST_ID}"
+              echo "K6_CLUSTER_NODES=${INPUT_CLUSTER_NODES}"
+              echo "K6_TOPOLOGY_NAME=${INPUT_TOPOLOGY}"
+              echo "K6_WORKLOAD_NAME=${INPUT_WORKLOAD}"
+              echo "K6_TEST_DURATION=${INPUT_DURATION}"
+              echo "K6_ECHO_SERVERS_REPLICAS=${INPUT_ECHO_SERVICE_REPLICAS}"
+              echo "K6_PAYLOAD_SIZE=${INPUT_PAYLOAD_SIZE}"
+              echo "K6_DOWNLOAD_THROUGHPUT=${INPUT_DOWNLOAD_THROUGHPUT}"
+              echo "K6_UPLOAD_THROUGHPUT=${INPUT_UPLOAD_THROUGHPUT}"
             } >> $GITHUB_ENV
           else
             echo "The workflow is triggered manually"
             {
-              echo "TESTID=${{ github.event.inputs.test_id }}"
-              echo "K6_EXECUTION_NAME=${{ github.event.inputs.test_id }}"
-              echo "K6_CLUSTER_NODES=${{ github.event.inputs.cluster_nodes }}"
-              echo "K6_TOPOLOGY_NAME=${{ github.event.inputs.topology }}"
-              echo "K6_WORKLOAD_NAME=${{ github.event.inputs.workload }}"
-              echo "K6_TEST_DURATION=${{ github.event.inputs.duration }}"
-              echo "K6_ECHO_SERVERS_REPLICAS=${{ github.event.inputs.echo_service_replicas }}"
-              echo "K6_PAYLOAD_SIZE=${{ github.event.inputs.payload_size }}"
-              echo "K6_DOWNLOAD_THROUGHPUT=${{ github.event.inputs.download_throughput }}"
-              echo "K6_UPLOAD_THROUGHPUT=${{ github.event.inputs.upload_throughput }}"
+              echo "TESTID=${EVENT_TEST_ID}"
+              echo "K6_EXECUTION_NAME=${EVENT_TEST_ID}"
+              echo "K6_CLUSTER_NODES=${EVENT_CLUSTER_NODES}"
+              echo "K6_TOPOLOGY_NAME=${EVENT_TOPOLOGY}"
+              echo "K6_WORKLOAD_NAME=${EVENT_WORKLOAD}"
+              echo "K6_TEST_DURATION=${EVENT_DURATION}"
+              echo "K6_ECHO_SERVERS_REPLICAS=${EVENT_ECHO_SERVICE_REPLICAS}"
+              echo "K6_PAYLOAD_SIZE=${EVENT_PAYLOAD_SIZE}"
+              echo "K6_DOWNLOAD_THROUGHPUT=${EVENT_DOWNLOAD_THROUGHPUT}"
+              echo "K6_UPLOAD_THROUGHPUT=${EVENT_UPLOAD_THROUGHPUT}"
             } >> $GITHUB_ENV
           fi
-          if [[ "${{ inputs.download_throughput || github.event.inputs.download_throughput }}" -eq 0 ]]; then
+          EFFECTIVE_DOWNLOAD="${INPUT_DOWNLOAD_THROUGHPUT:-${EVENT_DOWNLOAD_THROUGHPUT}}"
+          if [[ "${EFFECTIVE_DOWNLOAD}" -eq 0 ]]; then
             echo "Download throughput is disabled"
             echo "K6_SKIP_SCENARIO_DOWNLOAD=true" >> $GITHUB_ENV
             echo "K6_DOWNLOAD_THROUGHPUT=524288" >> $GITHUB_ENV
           fi
-          if [[ "${{ inputs.upload_throughput || github.event.inputs.upload_throughput }}" -eq 0 ]]; then
+          EFFECTIVE_UPLOAD="${INPUT_UPLOAD_THROUGHPUT:-${EVENT_UPLOAD_THROUGHPUT}}"
+          if [[ "${EFFECTIVE_UPLOAD}" -eq 0 ]]; then
             echo "Upload throughput is disabled"
             echo "K6_SKIP_SCENARIO_UPLOAD=true" >> $GITHUB_ENV
             echo "K6_UPLOAD_THROUGHPUT=524288" >> $GITHUB_ENV
           fi
-          K6_CLUSTER_NODES=${{ github.event.inputs.cluster_nodes || inputs.cluster_nodes }}
-          echo "Getting hoprd API token for cluster $K6_CLUSTER_NODES"
-          HOPRD_API_TOKEN=$(kubectl get secret -n k6-operator-system -o json hoprd-api-tokens | jq --arg entry "${K6_CLUSTER_NODES}" -r '.data[$entry]' | base64 -d)
+          EFFECTIVE_CLUSTER="${EVENT_CLUSTER_NODES:-${INPUT_CLUSTER_NODES}}"
+          echo "Getting hoprd API token for cluster ${EFFECTIVE_CLUSTER}"
+          HOPRD_API_TOKEN=$(kubectl get secret -n k6-operator-system -o json hoprd-api-tokens | jq --arg entry "${EFFECTIVE_CLUSTER}" -r '.data[$entry]' | base64 -d)
           echo "HOPRD_API_TOKEN=${HOPRD_API_TOKEN}" >> $GITHUB_ENV
 
       - name: Setup Load Testing environment

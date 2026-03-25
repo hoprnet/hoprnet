@@ -21,6 +21,8 @@ jobs:
   build-candidate-binaries:
     name: Build Candidate Binaries
     runs-on: self-hosted-hoprnet-bigger
+    permissions:
+      contents: read
     timeout-minutes: 20
     if: github.event.action == 'labeled' && github.event.label.name == 'build:candidate'
     strategy:
@@ -43,4 +45,6 @@ jobs:
           persist-credentials: false
 
       - name: Build binary
-        run: nix build .#${{ matrix.binary }}-candidate
+        run: nix build ".#${BINARY}-candidate"
+        env:
+          BINARY: ${{ matrix.binary }}

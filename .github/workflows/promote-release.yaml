@@ -28,6 +28,8 @@ jobs:
   promote_release:
     name: Promote Release
     runs-on: self-hosted-hoprnet-small
+    permissions:
+      contents: write
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
@@ -47,8 +49,8 @@ jobs:
         run: |
           set -x
           echo "Checkout to tag revision"
-          if ! git tag -l "${{ github.event.inputs.tag_name }}" | grep -xF "${{ github.event.inputs.tag_name }}"; then
-            echo "Git tag ${{ github.event.inputs.tag_name }} does not exists"
+          if ! git tag -l "${TAG_NAME}" | grep -xF "${TAG_NAME}"; then
+            echo "Git tag ${TAG_NAME} does not exists"
             exit 1
           fi
           echo "Create new branch or reuse an existing branch"
@@ -62,9 +64,10 @@ jobs:
             echo "Branch ${release_branch_name} already exists. Skipping promotion..."
             exit 0
           else
-            git checkout "${{ github.event.inputs.tag_name }}"
+            git checkout "${TAG_NAME}"
             git checkout -b "${release_branch_name}"
             git push --set-upstream origin "${release_branch_name}"
           fi
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+          TAG_NAME: ${{ github.event.inputs.tag_name }}

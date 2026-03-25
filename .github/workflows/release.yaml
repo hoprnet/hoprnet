@@ -109,4 +109,6 @@ jobs:
       source_repo: ${{ github.repository }}
       source_branch: ${{ github.ref_name }}
       network: dufour
-    secrets: inherit
+    secrets:
+      GCP_SA_GITHUB_RUNNER: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
+      GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
