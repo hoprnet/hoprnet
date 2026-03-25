@@ -1,36 +1,23 @@
 ---
 ################################################################################
-# Reusable build pipeline (binaries, docker, dappnode, docs)
+# Build pipeline for pull requests
 ################################################################################
 name: Build
 
 on:
-  workflow_call:
-    inputs:
-      source_repo:
-        required: true
-        type: string
-      source_branch:
-        required: true
-        type: string
-      labels:
-        required: false
-        type: string
-        default: ""
-    secrets:
-      GCP_SA_GITHUB_RUNNER:
-        required: true
-      GH_RUNNER_TOKEN:
-        required: true
-      CACHIX_AUTH_TOKEN:
-        required: true
-      GPG_HOPRNET_PRIVATE_KEY:
-        required: true
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+concurrency:
+  group: ${{ github.event.pull_request.head.ref || github.ref_name }}-build
+  cancel-in-progress: true
 
 permissions:
   contents: read
-  pull-requests: write
-  id-token: write
 
 env:
   CARGO_TERM_COLOR: always
@@ -48,10 +35,10 @@ jobs:
       - build-docker
     uses: ./.github/workflows/build-dappnode.yaml
     with:
-      source_repo: ${{ inputs.source_repo }}
-      source_branch: ${{ inputs.source_branch }}
+      source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
       dappnode_repository: ${{ matrix.dappnode_repository }}
-      labels: ${{ inputs.labels }}
+      labels: ${{ format('{0},', join(github.event.pull_request.labels.*.name, ',')) }}
     secrets:
       GCP_SA_GITHUB_RUNNER: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
       GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
@@ -79,8 +66,10 @@ jobs:
             build_command: nix build -L .#binary-hoprd-x86_64-darwin
             required_label: binary:x86_64-darwin
     uses: hoprnet/hopr-workflows/.github/workflows/build-binaries.yaml@build-binaries-v2
+    permissions:
+      contents: read
     with:
-      source_branch: ${{ inputs.source_branch }}
+      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
       version_type: commit
       architecture: ${{ matrix.architecture }}
       cachix_cache_name: hoprnet
@@ -88,7 +77,7 @@ jobs:
       build_command: ${{ matrix.build_command }}
       binary: hoprd
       runner: ${{ matrix.runner }}
-      enabled: ${{ matrix.required_label == '' || contains(inputs.labels, matrix.required_label) }}
+      enabled: ${{ matrix.required_label == '' || contains(github.event.pull_request.labels.*.name, matrix.required_label) }}
     secrets:
       gcp_service_account: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -98,8 +87,12 @@ jobs:
     name: Docker
     uses: hoprnet/hopr-workflows/.github/workflows/build-docker.yaml@build-docker-v1
     needs: build-binaries
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
     with:
-      source_branch: ${{ inputs.source_branch }}
+      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
       version_type: commit
       build_matrix: >-
         [
@@ -122,8 +115,8 @@ jobs:
     name: Docs
     uses: ./.github/workflows/build-docs.yaml
     with:
-      source_repo: ${{ inputs.source_repo }}
-      source_branch: ${{ inputs.source_branch }}
+      source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
       publish: false
     secrets:
       CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
