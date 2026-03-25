@@ -1,124 +1,115 @@
 ---
-#################################################################################
-# Pipeline triggered on every pull request to run unit and smoke tests
-#################################################################################
-name: Test
+################################################################################
+# Reusable test + coverage pipeline
+#
+# Tests and benchmarks run concurrently.
+# Coverage runs after all tests pass.
+################################################################################
+name: Tests
+
+on:
+  workflow_call:
+    inputs:
+      source_repo:
+        required: true
+        type: string
+      source_branch:
+        required: true
+        type: string
+    secrets:
+      CACHIX_AUTH_TOKEN:
+        required: true
+      CODECOV_TOKEN:
+        required: true
 
 env:
   RUST_BACKTRACE: "1"
   FOUNDRY_PROFILE: ci
 
-on:
-  merge_group:
-    types: [checks_requested]
-  pull_request:
-    types:
-      - opened
-      - synchronize
-      - reopened
-      - ready_for_review
-
-concurrency:
-  group: ${{ github.event.pull_request.head.ref || github.ref_name }}-${{ github.workflow}}
-  cancel-in-progress: true
-
 jobs:
-  tests-unit:
-    name: Unit Tests
+  # ── Tests + Benchmarks (concurrent) ────────────────────────────────────────
+  test:
+    name: ${{ matrix.name }}
     runs-on: self-hosted-hoprnet-bigger
-    timeout-minutes: 60
+    timeout-minutes: ${{ matrix.timeout }}
     env:
       CI: "true"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Unit
+            timeout: 60
+            command: nix build -L .#hopr-test-unit
+          - name: Integration
+            timeout: 60
+            command: nix develop -c cargo test --test '*' -- --test-threads=1
+          - name: Unit Nightly
+            timeout: 60
+            command: nix build -L .#hopr-test-nightly
     steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+      - name: Run ${{ matrix.name }}
+        uses: hoprnet/hopr-workflows/actions/nix-action@c2aca7e56d25c4a786049ccf816c7f1af8721de8 # nix-action-v1
         with:
-          disable-sudo: true
-          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
-
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
-          persist-credentials: false
-
-      - name: Run unit tests
-        run: nix build -L .#hopr-test-unit
-
-  tests-integration:
-    name: Integration Tests
-    runs-on: self-hosted-hoprnet-bigger
-    timeout-minutes: 60
-    env:
-      CI: "true"
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
-        with:
-          disable-sudo: true
-          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
-
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
-          persist-credentials: false
-
-      - name: Run integration tests
-        run: nix develop -c cargo test --test '*' -- --test-threads=1
-
-  tests-unit-nightly:
-    name: Unit Tests Nightly
-    runs-on: self-hosted-hoprnet-bigger
-    timeout-minutes: 60
-    env:
-      CI: "true"
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
-        with:
-          disable-sudo: true
-          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
-
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
-          persist-credentials: false
-
-      - name: Set up Google Cloud Credentials
-        id: auth
-        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
-        if: ${{ !env.ACT }}
-        with:
-          token_format: "access_token"
-          credentials_json: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
-
-      - name: Run unit tests with nightly
-        run: |
-          nix build -L .#hopr-test-nightly
+          source_branch: ${{ inputs.source_branch }}
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          command: ${{ matrix.command }}
 
   build-benchmarks:
-    name: Build Benchmarks
+    name: Benchmark
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 20
     if: github.event_name == 'merge_group'
     steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
-        with:
-          disable-sudo: true
-          egress-policy: audit
-
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
-          persist-credentials: false
-
       - name: Build benchmarks
-        run: nix build .#hoprd-bench-build
+        uses: hoprnet/hopr-workflows/actions/nix-action@c2aca7e56d25c4a786049ccf816c7f1af8721de8 # nix-action-v1
+        with:
+          source_branch: ${{ inputs.source_branch }}
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          command: nix build .#hoprd-bench-build
+
+  # ── Coverage (after tests pass) ────────────────────────────────────────────
+  coverage:
+    name: Coverage / ${{ matrix.name }}
+    needs: [test]
+    runs-on: self-hosted-hoprnet-bigger
+    timeout-minutes: 60
+    if: github.event_name == 'push' || (github.event.pull_request.draft == false)
+    env:
+      CI: "true"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Unit
+            command: |
+              nix build -L .#hopr-coverage
+              cp result coverage.lcov
+            coverage_file: coverage.lcov
+            flag: unit
+          - name: Integration
+            command: |
+              nix develop .#coverage -c cargo llvm-cov \
+                --workspace \
+                --test '*' \
+                --lcov --output-path coverage.lcov \
+                -- --test-threads=1
+            coverage_file: coverage.lcov
+            flag: integration
+    steps:
+      - name: Generate ${{ matrix.name }} report
+        uses: hoprnet/hopr-workflows/actions/nix-action@c2aca7e56d25c4a786049ccf816c7f1af8721de8 # nix-action-v1
+        with:
+          source_branch: ${{ inputs.source_branch }}
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          command: ${{ matrix.command }}
+
+      - name: Upload ${{ matrix.name }} report
+        uses: codecov/codecov-action@18283e04ce6e62d37312384ff67231eb8fd56d24 # v5.4.3
+        if: >-
+          github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+        with:
+          files: ${{ matrix.coverage_file }}
+          flags: ${{ matrix.flag }}
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}

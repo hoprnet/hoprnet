@@ -11,8 +11,7 @@ When a new pull request is created it is analyzed by a [Open PR workflow](./open
 On every commit of the PR, then the following workflows start running to check compliance with acceptance criteria:
 
 - [Build](./build.yaml)
-- [Tests](./tests.yaml)
-- [Checks](./checks.yaml)
+- [PR](./pr.yaml) (checks, tests, coverage)
 
 ### Additional actions
 

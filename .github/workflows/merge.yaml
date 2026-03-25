@@ -90,29 +90,22 @@ jobs:
     with:
       source_repo: ${{ github.event.pull_request.base.repo.full_name }}
       source_branch: ${{ github.event.pull_request.base.ref }}
-    secrets: inherit
+    secrets:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      PRIVATE_CARGO_REGISTRY_PROXY_URL: ${{ secrets.PRIVATE_CARGO_REGISTRY_PROXY_URL }}
   docs:
     name: Docs
     needs:
       - build-docker
     uses: ./.github/workflows/build-docs.yaml
-    secrets: inherit
     permissions:
       contents: write
     with:
       source_repo: ${{ github.event.pull_request.base.repo.full_name }}
       source_branch: ${{ github.event.pull_request.base.ref }}
       publish: true
-  zizmor:
-    name: Zizmor
-    uses: ./.github/workflows/checks-zizmor.yaml
-    permissions:
-      contents: read
-      security-events: write
-    with:
-      source_repo: ${{ github.event.pull_request.base.repo.full_name || github.repository }}
-      source_branch: ${{ github.event.pull_request.base.ref || github.ref }}
-    secrets: inherit
+    secrets:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
   notify:
     name: Notify failure
     needs:

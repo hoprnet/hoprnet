@@ -1,57 +1,51 @@
 ---
 ################################################################################
-# Main pipeline to run checks hoprnet
+# Reusable check pipeline
 ################################################################################
 name: Checks
 
 on:
-  merge_group:
-    types: [checks_requested]
-  pull_request:
-    types:
-      - opened
-      - synchronize
-      - reopened
-      - ready_for_review
-
-permissions:
-  actions: read
-  security-events: write
-  contents: read
-
-concurrency:
-  group: ${{ github.event.pull_request.head.ref || github.ref_name }}-checks
-  cancel-in-progress: true
+  workflow_call:
+    inputs:
+      source_repo:
+        required: true
+        type: string
+      source_branch:
+        required: true
+        type: string
+    secrets:
+      CACHIX_AUTH_TOKEN:
+        required: true
 
 jobs:
-  pre-commit:
-    name: Pre-commit
-    uses: ./.github/workflows/checks-pre-commit.yaml
-    with:
-      source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
-      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-    secrets: inherit
-
-  cargo-deps-redundancy:
-    name: Cargo deps redundancy
-    uses: ./.github/workflows/checks-cargo-deps.yaml
-    with:
-      source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
-      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-    secrets: inherit
-
-  audit:
-    name: Audit
-    uses: ./.github/workflows/checks-audit.yaml
-    with:
-      source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
-      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-    secrets: inherit
-
-  lint:
-    name: Lint
-    uses: ./.github/workflows/checks-lint.yaml
-    with:
-      source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
-      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-    secrets: inherit
+  check:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: ${{ matrix.timeout }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Pre-commit
+            runner: self-hosted-hoprnet-small
+            timeout: 15
+            command: nix build -L .#pre-commit-check
+          - name: Lint
+            runner: self-hosted-hoprnet-bigger
+            timeout: 30
+            command: nix run -L .#check
+          - name: Cargo deps
+            runner: self-hosted-hoprnet-bigger
+            timeout: 10
+            command: nix develop .#ci -c bash -c "cargo machete && cargo shear"
+          - name: Audit
+            runner: self-hosted-hoprnet-bigger
+            timeout: 15
+            command: nix run .#audit
+    steps:
+      - name: Run ${{ matrix.name }}
+        uses: hoprnet/hopr-workflows/actions/nix-action@c2aca7e56d25c4a786049ccf816c7f1af8721de8 # nix-action-v1
+        with:
+          source_branch: ${{ inputs.source_branch }}
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          command: ${{ matrix.command }}
