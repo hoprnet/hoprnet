@@ -1,9 +1,8 @@
 ---
-################################################################################
-# Build pipeline for pull requests
-################################################################################
+#################################################################################
+###                       Pipeline to build on pull requests                  ###
+#################################################################################
 name: Build
-
 on:
   pull_request:
     types:
@@ -11,17 +10,15 @@ on:
       - synchronize
       - reopened
       - ready_for_review
-
 concurrency:
   group: ${{ github.event.pull_request.head.ref || github.ref_name }}-build
   cancel-in-progress: true
-
 permissions:
-  contents: read
-
+  contents: write
+  pull-requests: write
+  id-token: write
 env:
   CARGO_TERM_COLOR: always
-
 jobs:
   build-dappnode:
     strategy:
@@ -39,10 +36,7 @@ jobs:
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
       dappnode_repository: ${{ matrix.dappnode_repository }}
       labels: ${{ format('{0},', join(github.event.pull_request.labels.*.name, ',')) }}
-    secrets:
-      GCP_SA_GITHUB_RUNNER: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
-      GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
-
+    secrets: inherit
   build-binaries:
     name: Binary ${{ matrix.architecture }}
     strategy:
@@ -82,7 +76,6 @@ jobs:
       gcp_service_account: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
       gpg_private_key: ${{ secrets.GPG_HOPRNET_PRIVATE_KEY }}
-
   build-docker:
     name: Docker
     uses: hoprnet/hopr-workflows/.github/workflows/build-docker.yaml@build-docker-v1
@@ -110,13 +103,11 @@ jobs:
     secrets:
       gcp_service_account: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-
   docs:
     name: Docs
     uses: ./.github/workflows/build-docs.yaml
+    secrets: inherit
     with:
       source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
       publish: false
-    secrets:
-      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
