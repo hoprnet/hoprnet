@@ -31,7 +31,7 @@ jobs:
       CI: "true"
     steps:
       - name: Run unit tests
-        uses: hoprnet/hopr-workflows/actions/nix-action@348f8878a2bc6e1f4f5be0e98ffc7b3f7a79cb67 # nix-action-v1
+        uses: hoprnet/hopr-workflows/actions/nix-action@nix-action-v1
         with:
           source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -45,7 +45,7 @@ jobs:
       CI: "true"
     steps:
       - name: Run integration tests
-        uses: hoprnet/hopr-workflows/actions/nix-action@348f8878a2bc6e1f4f5be0e98ffc7b3f7a79cb67 # nix-action-v1
+        uses: hoprnet/hopr-workflows/actions/nix-action@nix-action-v1
         with:
           source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -67,7 +67,7 @@ jobs:
           credentials_json: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
 
       - name: Run unit tests with nightly
-        uses: hoprnet/hopr-workflows/actions/nix-action@348f8878a2bc6e1f4f5be0e98ffc7b3f7a79cb67 # nix-action-v1
+        uses: hoprnet/hopr-workflows/actions/nix-action@nix-action-v1
         with:
           source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -80,7 +80,7 @@ jobs:
     if: github.event_name == 'merge_group'
     steps:
       - name: Build benchmarks
-        uses: hoprnet/hopr-workflows/actions/nix-action@348f8878a2bc6e1f4f5be0e98ffc7b3f7a79cb67 # nix-action-v1
+        uses: hoprnet/hopr-workflows/actions/nix-action@nix-action-v1
         with:
           source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
