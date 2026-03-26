@@ -642,6 +642,7 @@ where
         // Initialize the lazy statics here
         lazy_static::initialize(&METRIC_PACKET_COUNT);
         lazy_static::initialize(&METRIC_PACKET_DECODE_TIMEOUTS);
+        lazy_static::initialize(&METRIC_PACKET_REJECTED_COUNT);
         lazy_static::initialize(&METRIC_VALIDATION_ERRORS);
     }
 
