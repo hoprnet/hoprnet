@@ -482,7 +482,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn loopback_probes_emitted_for_two_edge_path() -> anyhow::Result<()> {
+    async fn loopback_probes_should_be_emitted_for_two_edge_path() -> anyhow::Result<()> {
         // Topology: me → a → b, b → me (connected neighbor)
         // Loopback: me → a → b → me
         let me = random_key();
@@ -550,7 +550,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn probe_connected_only_skips_unconnected_peers() -> anyhow::Result<()> {
+    async fn probe_connected_only_should_skip_unconnected_peers() -> anyhow::Result<()> {
         let me = random_key();
         let graph = Arc::new(ChannelGraph::new(me));
 
@@ -586,7 +586,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn probe_connected_only_disabled_probes_all_peers() -> anyhow::Result<()> {
+    async fn probe_connected_only_disabled_should_probe_all_peers() -> anyhow::Result<()> {
         let me = random_key();
         let graph = Arc::new(ChannelGraph::new(me));
 
@@ -621,7 +621,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn loopback_routing_rejects_full_path_with_me() -> anyhow::Result<()> {
+    async fn loopback_routing_should_reject_full_path_with_me() -> anyhow::Result<()> {
         // Verify that passing the full path [me, a, b, me] to loopback_routing
         // exceeds BoundedVec capacity and returns None.
         let me = random_key();

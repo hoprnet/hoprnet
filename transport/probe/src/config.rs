@@ -119,7 +119,7 @@ mod tests {
     }
 
     #[test]
-    fn interval_less_than_timeout_rejected() {
+    fn interval_less_than_timeout_should_be_rejected() {
         let config = ProbeConfig {
             timeout: std::time::Duration::from_secs(10),
             interval: std::time::Duration::from_secs(5),
@@ -129,7 +129,7 @@ mod tests {
     }
 
     #[test]
-    fn interval_equal_to_timeout_accepted() {
+    fn interval_equal_to_timeout_should_be_accepted() {
         let config = ProbeConfig {
             timeout: std::time::Duration::from_secs(5),
             interval: std::time::Duration::from_secs(5),

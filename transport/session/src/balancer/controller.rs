@@ -490,7 +490,7 @@ mod tests {
     }
 
     #[test]
-    fn balancer_state_values_decay_zero_duration_maps_to_none() {
+    fn balancer_state_values_decay_zero_duration_should_map_to_none() {
         let cfg = SurbBalancerConfig {
             surb_decay: Some((Duration::ZERO, 0.10)),
             ..Default::default()
@@ -503,7 +503,7 @@ mod tests {
     }
 
     #[test]
-    fn balancer_state_values_decay_zero_percent_maps_to_none() {
+    fn balancer_state_values_decay_zero_percent_should_map_to_none() {
         let cfg = SurbBalancerConfig {
             surb_decay: Some((Duration::from_secs(60), 0.0)),
             ..Default::default()
@@ -516,7 +516,7 @@ mod tests {
     }
 
     #[test]
-    fn balancer_state_values_decay_clamping() {
+    fn balancer_state_values_decay_should_clamp_above_one() {
         let cfg = SurbBalancerConfig {
             surb_decay: Some((Duration::from_secs(1), 1.5)), // > 1.0 should be clamped
             ..Default::default()

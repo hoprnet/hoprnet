@@ -333,7 +333,7 @@ mod tests {
     }
 
     #[test]
-    fn score_averages_immediate_and_intermediate_when_both_present() {
+    fn score_should_average_immediate_and_intermediate_when_both_present() {
         let mut observation = Observations::default();
 
         // Record a successful immediate probe (simulates neighbor probe success)
@@ -358,7 +358,7 @@ mod tests {
     }
 
     #[test]
-    fn score_uses_intermediate_only_when_no_immediate() {
+    fn score_should_use_intermediate_only_when_no_immediate() {
         let mut observation = Observations::default();
         // Record a successful intermediate probe (no immediate probe recorded)
         observation.record(EdgeWeightType::Intermediate(Ok(std::time::Duration::from_millis(80))));
@@ -371,7 +371,7 @@ mod tests {
     }
 
     #[test]
-    fn score_uses_immediate_only_when_no_intermediate() {
+    fn score_should_use_immediate_only_when_no_intermediate() {
         let mut observation = Observations::default();
         observation.record(EdgeWeightType::Immediate(Ok(std::time::Duration::from_millis(50))));
 

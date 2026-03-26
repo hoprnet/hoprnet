@@ -106,8 +106,7 @@ pub(super) async fn probability(State(state): State<Arc<InternalState>>) -> impl
     "probeRate": 0.476,
     "lastUpdate": 1690000000000,
     "averageLatency": 100,
-    "score": 0.7,
-    "isConnected": true
+    "score": 0.7
 }))]
 /// Immediate observation data for a connected peer.
 pub(crate) struct ConnectedPeerResponse {
@@ -124,8 +123,6 @@ pub(crate) struct ConnectedPeerResponse {
     average_latency: Option<u128>,
     #[schema(example = 0.7)]
     score: f64,
-    #[schema(example = true)]
-    is_connected: bool,
 }
 
 /// Lists peers with immediate observation data from the network graph.
@@ -154,7 +151,7 @@ pub(super) async fn connected(State(state): State<Arc<InternalState>>) -> impl I
 
     let me_key = graph.me();
 
-    // Collect unique peers that have immediate QoS data on edges from `me`.
+    // Collect peers that are connected (is_connected == true) with immediate QoS data.
     let mut peers = Vec::new();
     for (src, dst, obs) in &edges {
         if src != me_key {
@@ -163,6 +160,9 @@ pub(super) async fn connected(State(state): State<Arc<InternalState>>) -> impl I
         let Some(imm) = obs.immediate_qos() else {
             continue;
         };
+        if !imm.is_connected() {
+            continue;
+        }
 
         let address = match hopr.peerid_to_chain_key(&(*dst).into()).await {
             Ok(Some(addr)) => addr,
@@ -175,7 +175,6 @@ pub(super) async fn connected(State(state): State<Arc<InternalState>>) -> impl I
             last_update: obs.last_update().as_millis(),
             average_latency: imm.average_latency().map(|l| l.as_millis()),
             score: obs.score(),
-            is_connected: imm.is_connected(),
         });
     }
 

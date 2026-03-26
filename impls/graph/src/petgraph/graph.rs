@@ -640,7 +640,7 @@ mod tests {
     }
 
     #[test]
-    fn connected_edges_excludes_isolated_nodes() {
+    fn connected_edges_should_exclude_isolated_nodes() {
         let me = pubkey_from(&SECRET_0);
         let a = pubkey_from(&SECRET_1);
         let isolated = pubkey_from(&SECRET_2);
@@ -660,7 +660,7 @@ mod tests {
     }
 
     #[test]
-    fn connected_edges_preserves_observations() {
+    fn connected_edges_should_preserve_observations() {
         let me = pubkey_from(&SECRET_0);
         let peer = pubkey_from(&SECRET_1);
         let graph = ChannelGraph::new(me);
@@ -677,7 +677,7 @@ mod tests {
     }
 
     #[test]
-    fn connected_edges_empty_when_no_edges() {
+    fn connected_edges_should_be_empty_when_no_edges() {
         let me = pubkey_from(&SECRET_0);
         let graph = ChannelGraph::new(me);
         graph.add_node(pubkey_from(&SECRET_1));
@@ -685,7 +685,7 @@ mod tests {
     }
 
     #[test]
-    fn connected_edges_diamond_topology() -> anyhow::Result<()> {
+    fn connected_edges_should_return_all_edges_in_diamond_topology() -> anyhow::Result<()> {
         let me = pubkey_from(&SECRET_0);
         let a = pubkey_from(&SECRET_1);
         let b = pubkey_from(&SECRET_2);

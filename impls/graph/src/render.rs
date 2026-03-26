@@ -103,7 +103,7 @@ mod tests {
     }
 
     #[test]
-    fn empty_graph_renders_empty_digraph() {
+    fn empty_graph_should_render_empty_digraph() {
         let me = pubkey(&SECRET_0);
         let graph = ChannelGraph::new(me);
         let dot = render_dot(&graph);
@@ -111,7 +111,7 @@ mod tests {
     }
 
     #[test]
-    fn isolated_nodes_excluded_from_dot() {
+    fn isolated_nodes_should_be_excluded_from_dot() {
         let me = pubkey(&SECRET_0);
         let graph = ChannelGraph::new(me);
         graph.add_node(pubkey(&SECRET_1));
@@ -121,7 +121,7 @@ mod tests {
     }
 
     #[test]
-    fn diamond_topology_renders_four_edges() -> anyhow::Result<()> {
+    fn diamond_topology_should_render_four_edges() -> anyhow::Result<()> {
         let me = pubkey(&SECRET_0);
         let a = pubkey(&SECRET_1);
         let b = pubkey(&SECRET_2);
@@ -144,7 +144,7 @@ mod tests {
     }
 
     #[test]
-    fn observations_appear_as_edge_labels() {
+    fn observations_should_appear_as_edge_labels() {
         let me = pubkey(&SECRET_0);
         let peer = pubkey(&SECRET_1);
         let graph = ChannelGraph::new(me);
@@ -162,7 +162,7 @@ mod tests {
     }
 
     #[test]
-    fn custom_labels_replace_offchain_keys() -> anyhow::Result<()> {
+    fn custom_labels_should_replace_offchain_keys() -> anyhow::Result<()> {
         let me = pubkey(&SECRET_0);
         let peer = pubkey(&SECRET_1);
         let graph = ChannelGraph::new(me);
@@ -196,7 +196,7 @@ mod tests {
     }
 
     #[test]
-    fn custom_labels_fall_back_to_offchain_key_when_unmapped() -> anyhow::Result<()> {
+    fn custom_labels_should_fall_back_to_offchain_key_when_unmapped() -> anyhow::Result<()> {
         let me = pubkey(&SECRET_0);
         let peer = pubkey(&SECRET_1);
         let graph = ChannelGraph::new(me);
@@ -220,7 +220,7 @@ mod tests {
     }
 
     #[test]
-    fn custom_labels_preserve_edge_attributes() {
+    fn custom_labels_should_preserve_edge_attributes() {
         let me = pubkey(&SECRET_0);
         let peer = pubkey(&SECRET_1);
         let graph = ChannelGraph::new(me);
@@ -249,7 +249,7 @@ mod tests {
     }
 
     #[test]
-    fn render_dot_unchanged_when_identity_label() -> anyhow::Result<()> {
+    fn render_dot_should_be_unchanged_when_identity_label() -> anyhow::Result<()> {
         let me = pubkey(&SECRET_0);
         let peer = pubkey(&SECRET_1);
         let graph = ChannelGraph::new(me);
@@ -267,7 +267,7 @@ mod tests {
     }
 
     #[test]
-    fn reachable_excludes_disconnected_subgraph() -> anyhow::Result<()> {
+    fn reachable_should_exclude_disconnected_subgraph() -> anyhow::Result<()> {
         let me = pubkey(&SECRET_0);
         let a = pubkey(&SECRET_1);
         let b = pubkey(&SECRET_2);
@@ -314,7 +314,7 @@ mod tests {
     }
 
     #[test]
-    fn reachable_includes_transitive_peers() -> anyhow::Result<()> {
+    fn reachable_should_include_transitive_peers() -> anyhow::Result<()> {
         let me = pubkey(&SECRET_0);
         let a = pubkey(&SECRET_1);
         let b = pubkey(&SECRET_2);
@@ -342,7 +342,7 @@ mod tests {
     }
 
     #[test]
-    fn reachable_empty_when_node_has_no_outgoing_edges() -> anyhow::Result<()> {
+    fn reachable_should_be_empty_when_node_has_no_outgoing_edges() -> anyhow::Result<()> {
         let me = pubkey(&SECRET_0);
         let a = pubkey(&SECRET_1);
         let b = pubkey(&SECRET_2);

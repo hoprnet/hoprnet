@@ -102,7 +102,7 @@ async fn discovery_should_produce_the_same_public_announcements_inside_the_netwo
 /// immediate observations (edges) for every other peer in the graph.
 /// Exercises: probe.rs emit+process, discovery.rs immediate_probe_stream,
 /// weight.rs EdgeObservableWrite::record, graph.rs NetworkGraphView::edge.
-async fn probe_warmup_populates_graph_edges_for_all_peers(cluster: &ClusterGuard) -> anyhow::Result<()> {
+async fn probe_warmup_should_populate_graph_edges_for_all_peers(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [node] = cluster.sample_nodes::<1>();
 
     let peers = node
@@ -153,7 +153,7 @@ async fn probe_warmup_populates_graph_edges_for_all_peers(cluster: &ClusterGuard
 /// Exercises the all_network_peers API with a score threshold, verifying
 /// that the probe observations produce non-zero scores for immediate neighbors.
 /// Covers: weight.rs score(), latency_score(), all_network_peers() filtering.
-async fn all_network_peers_returns_scored_entries(cluster: &ClusterGuard) -> anyhow::Result<()> {
+async fn all_network_peers_should_return_scored_entries(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [node] = cluster.sample_nodes::<1>();
     let expected_count = cluster.size() - 1;
 
@@ -193,7 +193,7 @@ async fn all_network_peers_returns_scored_entries(cluster: &ClusterGuard) -> any
 /// Pings a peer and verifies the returned observations contain latency data,
 /// exercising the full probe roundtrip: probe.rs cache lookup → process reply
 /// → weight.rs record(ProbeNeighborSuccess) → latency EMA update.
-async fn ping_records_latency_in_observations(cluster: &ClusterGuard) -> anyhow::Result<()> {
+async fn ping_should_record_latency_in_observations(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [src, dst] = cluster.sample_nodes::<2>();
 
     let (rtt, obs) = src.inner().ping(&dst.peer_id()).await.context("ping should succeed")?;
@@ -220,7 +220,7 @@ async fn ping_records_latency_in_observations(cluster: &ClusterGuard) -> anyhow:
 /// all cluster node identities and edge annotations.
 /// Exercises: render.rs render_dot_with_labels, render_edges_as_dot,
 /// graph.rs connected_edges.
-async fn graph_renders_as_valid_dot_with_all_peers(cluster: &ClusterGuard) -> anyhow::Result<()> {
+async fn graph_should_render_as_valid_dot_with_all_peers(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [node] = cluster.sample_nodes::<1>();
     let graph = node.inner().graph();
 
@@ -249,7 +249,7 @@ async fn graph_renders_as_valid_dot_with_all_peers(cluster: &ClusterGuard) -> an
 /// Verifies the reachable-only graph rendering produces a subset that excludes
 /// disconnected subgraphs.
 /// Exercises: render.rs render_dot_reachable_with_labels, graph.rs reachable_edges.
-async fn graph_reachable_edges_are_subset_of_connected(cluster: &ClusterGuard) -> anyhow::Result<()> {
+async fn graph_reachable_edges_should_be_subset_of_connected(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [node] = cluster.sample_nodes::<1>();
     let graph = node.inner().graph();
 
@@ -281,7 +281,7 @@ async fn graph_reachable_edges_are_subset_of_connected(cluster: &ClusterGuard) -
 #[serial]
 /// Exercises the ticket price and winning probability chain queries through
 /// the HoprLib API, covering the network.rs endpoint code paths.
-async fn ticket_price_and_probability_are_available(cluster: &ClusterGuard) -> anyhow::Result<()> {
+async fn ticket_price_and_probability_should_be_available(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [node] = cluster.sample_nodes::<1>();
 
     let price = node
@@ -320,7 +320,7 @@ async fn ticket_price_and_probability_are_available(cluster: &ClusterGuard) -> a
 #[serial]
 /// Verifies that after probe warmup, observed multiaddresses are populated
 /// for connected peers, exercising the transport layer's address tracking.
-async fn observed_multiaddresses_populated_after_warmup(cluster: &ClusterGuard) -> anyhow::Result<()> {
+async fn observed_multiaddresses_should_be_populated_after_warmup(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [src, dst] = cluster.sample_nodes::<2>();
 
     let addrs = src.inner().network_observed_multiaddresses(&dst.peer_id()).await;
@@ -339,7 +339,7 @@ async fn observed_multiaddresses_populated_after_warmup(cluster: &ClusterGuard) 
 #[serial]
 /// Verifies that the network health indicator reports a non-red status
 /// after the cluster has fully started and probes have warmed up.
-async fn network_health_is_not_red_after_warmup(cluster: &ClusterGuard) -> anyhow::Result<()> {
+async fn network_health_should_not_be_red_after_warmup(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [node] = cluster.sample_nodes::<1>();
 
     let health = node.inner().network_health().await;

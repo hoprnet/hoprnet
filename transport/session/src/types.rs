@@ -634,7 +634,7 @@ mod tests {
     }
 
     #[test]
-    fn caps_to_ack_mode_partial_when_only_nack() {
+    fn caps_to_ack_mode_should_be_partial_when_only_nack() {
         let caps: Capabilities = Capability::RetransmissionNack.into();
         assert_eq!(caps_to_ack_mode(caps), AcknowledgementMode::Partial);
     }
@@ -687,7 +687,7 @@ mod tests {
     }
 
     #[test]
-    fn session_id_from_str_rejects_invalid_tag() {
+    fn session_id_from_str_should_reject_invalid_tag() {
         let pseudonym = HoprPseudonym::random();
         let hex = pseudonym.to_hex();
         let bad = format!("{hex}:not_a_number");
@@ -695,7 +695,7 @@ mod tests {
     }
 
     #[test]
-    fn session_id_display_and_debug_are_identical() {
+    fn session_id_display_and_debug_should_be_identical() {
         let id = SessionId::new(42_u64, HoprPseudonym::random());
         assert_eq!(format!("{id}"), format!("{id:?}"));
     }

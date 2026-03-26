@@ -507,7 +507,6 @@ pub mod types {
     ///    {
     ///      "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
     ///      "averageLatency": 100,
-    ///      "isConnected": true,
     ///      "lastUpdate": 1690000000000,
     ///      "probeRate": 0.476,
     ///      "score": 0.7
@@ -516,7 +515,6 @@ pub mod types {
     ///  "type": "object",
     ///  "required": [
     ///    "address",
-    ///    "isConnected",
     ///    "lastUpdate",
     ///    "probeRate",
     ///    "score"
@@ -538,12 +536,6 @@ pub mod types {
     ///        "null"
     ///      ],
     ///      "minimum": 0.0
-    ///    },
-    ///    "isConnected": {
-    ///      "examples": [
-    ///        true
-    ///      ],
-    ///      "type": "boolean"
     ///    },
     ///    "lastUpdate": {
     ///      "description": "Epoch milliseconds of the last observation update.",
@@ -581,8 +573,6 @@ pub mod types {
             skip_serializing_if = "::std::option::Option::is_none"
         )]
         pub average_latency: ::std::option::Option<u64>,
-        #[serde(rename = "isConnected")]
-        pub is_connected: bool,
         ///Epoch milliseconds of the last observation update.
         #[serde(rename = "lastUpdate")]
         pub last_update: u64,
@@ -2081,7 +2071,7 @@ at least the size of 2 Session packet payloads.*/
 
 API enabling developers to interact with a hoprd node programatically through HTTP REST API.
 
-Version: 4.7.0*/
+Version: 4.8.0*/
 pub struct Client {
     pub(crate) baseurl: String,
     pub(crate) client: reqwest::Client,
@@ -2117,7 +2107,7 @@ impl Client {
 }
 impl ClientInfo<()> for Client {
     fn api_version() -> &'static str {
-        "4.7.0"
+        "4.8.0"
     }
     fn baseurl(&self) -> &str {
         self.baseurl.as_str()
