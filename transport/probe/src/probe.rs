@@ -754,8 +754,10 @@ mod tests {
                     .await;
             });
 
-            // wait for the probes to start and finish
-            tokio::time::sleep(cfg.timeout).await;
+            // Wait for the full probe lifecycle: emit → network round trip → process.
+            // Must exceed cfg.timeout (the cache TTL) to avoid probes being evicted
+            // as timeouts before the pong response is processed.
+            tokio::time::sleep(cfg.timeout * 3).await;
 
             Ok(())
         })
