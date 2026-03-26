@@ -291,7 +291,13 @@ async fn ticket_price_and_probability_are_available(cluster: &ClusterGuard) -> a
         .context("should get ticket price")?;
 
     // Price should be a valid non-zero value from the oracle
-    assert!(price > "0 wxHOPR".parse().unwrap(), "ticket price should be non-zero");
+    assert!(
+        price
+            > "0 wxHOPR"
+                .parse()
+                .context("failed to deserialize the balance for ticket price")?,
+        "ticket price should be non-zero"
+    );
 
     let probability = node
         .inner()
