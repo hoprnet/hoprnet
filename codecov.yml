@@ -27,6 +27,7 @@ ignore:
   - "common/test-stubs/**"
   - "**/benches/**"
   - "**/build.rs"
+  - "**/codegen/**"
   - "hopr/builder/src/testing/**"
 
 flags:
