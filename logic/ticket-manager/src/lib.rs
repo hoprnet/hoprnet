@@ -77,8 +77,8 @@ pub use crate::{
 /// On Relay nodes, the manager maintains FIFO queues of redeemable tickets per incoming channel.
 /// There are two ways to extract tickets from the queue on a Relay:
 ///
-/// 1. redeeming them via [`redeem_stream`](HoprTicketManager::redeem_stream)
-/// 2. neglecting them via [`neglect_tickets`](HoprTicketManager::neglect_tickets)
+/// 1. redeeming them via [`redeem_stream`](hopr_api::tickets::TicketManagement::redeem_stream)
+/// 2. neglecting them via [`neglect_tickets`](hopr_api::tickets::TicketManagement::neglect_tickets)
 ///
 /// Both of these operations extract the tickets in the FIFO order from the queue,
 /// making sure that they are always processed in their natural order (by epoch and index).
@@ -534,7 +534,7 @@ where
     type Error = TicketManagerError;
 
     /// Creates a stream that redeems tickets in-order one by one in the given channel,
-    /// using the given [`ChainWriteTicketOperations`](hopr_api::chain::ChainWriteTicketOperations) on-chain client
+    /// using the given [`ChainWriteTicketOperations`] on-chain client
     /// implementation.
     ///
     /// If `min_redeem_value` is given, all the tickets that are lower than the given value are neglected in the

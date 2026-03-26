@@ -21,7 +21,7 @@ use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, HoprUnacknowledgedTicketProcessor, MemorySurbStore, PacketEncoder,
     SurbStoreConfig,
 };
-use hopr_test_stubs::{StubChainApi, StubPathResolver, StubTicketDb};
+use hopr_test_stubs::{StubChainApi, StubPathResolver};
 use hopr_ticket_manager::{HoprTicketManager, MemoryStore};
 use hopr_transport_mixer::config::MixerConfig;
 use hopr_transport_protocol::TicketEvent;
@@ -108,7 +108,6 @@ fn pipeline_e2e_forward(c: &mut Criterion) {
     let runtime = tokio::runtime::Runtime::new().expect("tokio runtime must be constructible");
 
     let chain_api = build_chain_api();
-    let ticket_db = StubTicketDb::default();
 
     let codec_config = HoprCodecConfig {
         outgoing_ticket_price: Some(HoprBalance::from_str("0.1 wxHOPR").expect("valid balance")),
@@ -201,7 +200,6 @@ fn pipeline_e2e_forward(c: &mut Criterion) {
             let (fwd_path, ret_path) = paths[hop_idx].clone();
             let ack_buf = ack_buffer[..packet_count.min(ack_buffer.len())].to_vec();
             let chain_api = chain_api.clone();
-            let ticket_db = ticket_db.clone();
 
             group.bench_with_input(BenchmarkId::from_parameter(&id), &packet_count, |b, &packet_count| {
                 b.to_async(&runtime).iter_batched(

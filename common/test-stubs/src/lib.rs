@@ -241,20 +241,6 @@ impl ChainValues for StubChainApi {
 }
 
 // ---------------------------------------------------------------------------
-// StubTicketDb
-// ---------------------------------------------------------------------------
-
-/// Minimal in-memory stub for [`HoprDbTicketOperations`].
-///
-/// Only `get_or_create_outgoing_ticket_index` and `update_outgoing_ticket_index`
-/// maintain real state (an atomic counter per channel+epoch). All other methods
-/// return empty / zero defaults.
-#[derive(Clone, Default)]
-pub struct StubTicketDb {
-    _indices: Arc<DashMap<(ChannelId, u32), Arc<AtomicU64>>>,
-}
-
-// ---------------------------------------------------------------------------
 // StubPathResolver
 // ---------------------------------------------------------------------------
 
