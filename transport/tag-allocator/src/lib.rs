@@ -243,6 +243,27 @@ mod tests {
     }
 
     #[test]
+    fn create_allocators_from_config_should_produce_three_allocators() -> anyhow::Result<()> {
+        let cfg = TagAllocatorConfig::default();
+        let allocators = create_allocators_from_config(&cfg).map_err(|e| anyhow::anyhow!("{e}"))?;
+
+        let summary: Vec<(&str, u64)> = allocators
+            .iter()
+            .map(|(usage, alloc)| {
+                let name = match usage {
+                    Usage::Session => "Session",
+                    Usage::SessionTerminalTelemetry => "SessionTerminalTelemetry",
+                    Usage::ProvingTelemetry => "ProvingTelemetry",
+                };
+                (name, alloc.capacity())
+            })
+            .collect();
+        insta::assert_debug_snapshot!(summary);
+
+        Ok(())
+    }
+
+    #[test]
     fn drop_recycles_tag() {
         let allocators = create_allocators(
             ReservedTag::range().end..u16::MAX as u64 + 1,

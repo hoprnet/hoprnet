@@ -178,19 +178,17 @@ impl EdgeObservableRead for Observations {
         self.intermediate_probe.as_ref()
     }
 
-    /// The score is calculated based on the available observations, with priority order:
-    /// 1. intermediate probe
-    /// 2. immediate ones
-    ///
-    /// TODO: find a better way to do this or completely remove this score function,
-    /// as it is not clear how to combine the different observations in a meaningful way.
+    /// The score combines immediate and intermediate observations:
+    /// - When both are present, average their scores (immediate neighbor probes prevent an empty intermediate from
+    ///   masking real measurements).
+    /// - When only intermediate is present, use it directly.
+    /// - When only immediate is present, use it directly.
     fn score(&self) -> f64 {
-        if let Some(qos) = &self.intermediate_probe {
-            qos.score()
-        } else if let Some(qos) = &self.immediate_probe {
-            qos.score()
-        } else {
-            0.0
+        match (&self.immediate_probe, &self.intermediate_probe) {
+            (Some(imm), Some(inter)) => (imm.score() + inter.score()) / 2.0,
+            (None, Some(inter)) => inter.score(),
+            (Some(imm), None) => imm.score(),
+            (None, None) => 0.0,
         }
     }
 }
@@ -332,5 +330,53 @@ mod tests {
         }
 
         assert_in_delta!(observation.score(), 0.5, 0.05);
+    }
+
+    #[test]
+    fn score_should_average_immediate_and_intermediate_when_both_present() {
+        let mut observation = Observations::default();
+
+        // Record a successful immediate probe (simulates neighbor probe success)
+        observation.record(EdgeWeightType::Immediate(Ok(std::time::Duration::from_millis(50))));
+
+        // Record on-chain capacity only (simulates channel existing but no loopback probes)
+        observation.record(EdgeWeightType::Capacity(Some(100)));
+
+        let imm_score = observation.immediate_qos().unwrap().score();
+        let inter_score = observation.intermediate_qos().unwrap().score();
+
+        assert_gt!(imm_score, 0.0, "immediate score should be positive");
+        assert_eq!(
+            inter_score, 0.0,
+            "intermediate score should be zero (no loopback probes)"
+        );
+
+        // The combined score should be the average, not zero
+        let combined = observation.score();
+        assert_gt!(combined, 0.0, "combined score must not be masked by empty intermediate");
+        assert_in_delta!(combined, imm_score / 2.0, 0.001);
+    }
+
+    #[test]
+    fn score_should_use_intermediate_only_when_no_immediate() {
+        let mut observation = Observations::default();
+        // Record a successful intermediate probe (no immediate probe recorded)
+        observation.record(EdgeWeightType::Intermediate(Ok(std::time::Duration::from_millis(80))));
+        observation.record(EdgeWeightType::Capacity(Some(500)));
+
+        assert!(observation.immediate_qos().is_none());
+        let inter_score = observation.intermediate_qos().unwrap().score();
+        assert_gt!(inter_score, 0.0, "intermediate score should be positive");
+        assert_in_delta!(observation.score(), inter_score, 0.001);
+    }
+
+    #[test]
+    fn score_should_use_immediate_only_when_no_intermediate() {
+        let mut observation = Observations::default();
+        observation.record(EdgeWeightType::Immediate(Ok(std::time::Duration::from_millis(50))));
+
+        let imm_score = observation.immediate_qos().unwrap().score();
+        assert!(observation.intermediate_qos().is_none());
+        assert_in_delta!(observation.score(), imm_score, 0.001);
     }
 }

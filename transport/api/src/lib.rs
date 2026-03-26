@@ -698,6 +698,11 @@ where
         mas
     }
 
+    /// Returns a reference to the network graph.
+    pub fn graph(&self) -> &Graph {
+        &self.graph
+    }
+
     #[tracing::instrument(level = "debug", skip(self))]
     pub fn local_multiaddresses(&self) -> Vec<Multiaddr> {
         self.network

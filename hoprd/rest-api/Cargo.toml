@@ -1,6 +1,6 @@
 [package]
 name = "hoprd-api"
-version = "4.7.0"
+version = "4.8.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -54,7 +54,7 @@ hopr-lib = { workspace = true, features = [
 
 hopr-db-node = { workspace = true, features = ["traits", "sqlite"] }
 hopr-chain-connector = { workspace = true }
-hopr-network-graph = { workspace = true, features = ["petgraph"] }
+hopr-network-graph = { workspace = true, features = ["petgraph", "graph-api"] }
 hopr-transport-p2p = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-utils-session = { workspace = true }

@@ -182,11 +182,18 @@ mod test {
 
     use super::all_simple_paths_multi;
 
+    /// Collect paths as sorted Vec<Vec<usize>> for deterministic snapshots.
+    fn sorted_paths<T, I: Iterator<Item = (Vec<petgraph::graph::NodeIndex>, T)>>(iter: I) -> Vec<Vec<usize>> {
+        let mut paths: Vec<Vec<usize>> = iter.map(|(v, _)| v.into_iter().map(|i| i.index()).collect()).collect();
+        paths.sort();
+        paths
+    }
+
     #[test]
     fn undirected_graph_should_find_all_paths_to_multiple_targets() {
         let graph = UnGraph::<i32, i32>::from_edges([(0, 1), (1, 2), (2, 3), (2, 4)]);
         let targets = HashSet::from_iter([3.into(), 4.into()]);
-        let paths: HashSet<Vec<_>> = all_simple_paths_multi::<_, _, RandomState, _, _>(
+        let paths = sorted_paths(all_simple_paths_multi::<_, _, RandomState, _, _>(
             &graph,
             0.into(),
             &targets,
@@ -195,18 +202,15 @@ mod test {
             0,
             None,
             |c, _, _| c,
-        )
-        .map(|(v, _): (Vec<_>, _)| v.into_iter().map(|i| i.index()).collect())
-        .collect();
-        let expected: HashSet<Vec<_>> = HashSet::from_iter([vec![0, 1, 2, 3], vec![0, 1, 2, 4]]);
-        assert_eq!(paths, expected);
+        ));
+        insta::assert_yaml_snapshot!(paths);
     }
 
     #[test]
     fn directed_graph_should_find_all_paths_to_multiple_targets() {
         let graph = DiGraph::<i32, ()>::from_edges([(0, 1), (1, 2), (2, 3), (2, 4)]);
         let targets = HashSet::from_iter([3.into(), 4.into()]);
-        let paths: HashSet<Vec<_>> = all_simple_paths_multi::<_, _, RandomState, _, _>(
+        let paths = sorted_paths(all_simple_paths_multi::<_, _, RandomState, _, _>(
             &graph,
             0.into(),
             &targets,
@@ -215,18 +219,15 @@ mod test {
             0,
             None,
             |c, _, _| c,
-        )
-        .map(|(v, _): (Vec<_>, _)| v.into_iter().map(|i| i.index()).collect())
-        .collect();
-        let expected: HashSet<Vec<_>> = HashSet::from_iter([vec![0, 1, 2, 3], vec![0, 1, 2, 4]]);
-        assert_eq!(paths, expected);
+        ));
+        insta::assert_yaml_snapshot!(paths);
     }
 
     #[test]
     fn undirected_graph_should_respect_max_intermediate_nodes() {
         let graph = UnGraph::<i32, ()>::from_edges([(0, 1), (1, 2), (2, 3), (2, 4)]);
         let targets = HashSet::from_iter([3.into(), 4.into()]);
-        let paths: HashSet<Vec<_>> = all_simple_paths_multi::<_, _, RandomState, _, _>(
+        let paths = sorted_paths(all_simple_paths_multi::<_, _, RandomState, _, _>(
             &graph,
             0.into(),
             &targets,
@@ -235,11 +236,8 @@ mod test {
             0,
             None,
             |c, _, _| c,
-        )
-        .map(|(v, _): (Vec<_>, _)| v.into_iter().map(|i| i.index()).collect())
-        .collect();
-        let expected: HashSet<Vec<_>> = HashSet::from_iter([vec![0, 1, 2, 3], vec![0, 1, 2, 4]]);
-        assert_eq!(paths, expected);
+        ));
+        insta::assert_yaml_snapshot!(paths);
     }
 
     #[test]
@@ -251,7 +249,7 @@ mod test {
         // then yields the grandchild path without checking the max length.
         let graph = DiGraph::<i32, ()>::from_edges([(0, 1), (1, 2), (2, 3)]);
         let targets = HashSet::from_iter([2.into(), 3.into()]);
-        let paths: HashSet<Vec<_>> = all_simple_paths_multi::<_, _, RandomState, _, _>(
+        let paths = sorted_paths(all_simple_paths_multi::<_, _, RandomState, _, _>(
             &graph,
             0.into(),
             &targets,
@@ -260,18 +258,15 @@ mod test {
             0,
             None,
             |c, _, _| c,
-        )
-        .map(|(v, _): (Vec<_>, _)| v.into_iter().map(|i| i.index()).collect())
-        .collect();
-        let expected: HashSet<Vec<_>> = HashSet::from_iter([vec![0, 1, 2]]);
-        assert_eq!(paths, expected);
+        ));
+        insta::assert_yaml_snapshot!(paths);
     }
 
     #[test]
     fn directed_graph_should_respect_max_intermediate_nodes() {
         let graph = DiGraph::<i32, ()>::from_edges([(0, 1), (1, 2), (2, 3), (2, 4)]);
         let targets = HashSet::from_iter([3.into(), 4.into()]);
-        let paths: HashSet<Vec<_>> = all_simple_paths_multi::<_, _, RandomState, _, _>(
+        let paths = sorted_paths(all_simple_paths_multi::<_, _, RandomState, _, _>(
             &graph,
             0.into(),
             &targets,
@@ -280,18 +275,15 @@ mod test {
             0,
             None,
             |c, _, _| c,
-        )
-        .map(|(v, _): (Vec<_>, _)| v.into_iter().map(|i| i.index()).collect())
-        .collect();
-        let expected: HashSet<Vec<_>> = HashSet::from_iter([vec![0, 1, 2, 3], vec![0, 1, 2, 4]]);
-        assert_eq!(paths, expected);
+        ));
+        insta::assert_yaml_snapshot!(paths);
     }
 
     #[test]
     fn inline_targets_should_yield_both_short_and_long_paths() {
         let graph = UnGraph::<i32, ()>::from_edges([(0, 1), (1, 2), (2, 3)]);
         let targets = HashSet::from_iter([2.into(), 3.into()]);
-        let paths: HashSet<Vec<_>> = all_simple_paths_multi::<_, _, RandomState, _, _>(
+        let paths = sorted_paths(all_simple_paths_multi::<_, _, RandomState, _, _>(
             &graph,
             0.into(),
             &targets,
@@ -300,18 +292,15 @@ mod test {
             0,
             None,
             |c, _, _| c,
-        )
-        .map(|(v, _): (Vec<_>, _)| v.into_iter().map(|i| i.index()).collect())
-        .collect();
-        let expected: HashSet<Vec<_>> = HashSet::from_iter([vec![0, 1, 2], vec![0, 1, 2, 3]]);
-        assert_eq!(paths, expected);
+        ));
+        insta::assert_yaml_snapshot!(paths);
     }
 
     #[test]
     fn cyclic_graph_should_yield_only_simple_paths() {
         let graph = DiGraph::<i32, ()>::from_edges([(0, 1), (1, 2), (2, 0), (1, 3)]);
         let targets = HashSet::from_iter([2.into(), 3.into()]);
-        let paths: HashSet<Vec<_>> = all_simple_paths_multi::<_, _, RandomState, _, _>(
+        let paths = sorted_paths(all_simple_paths_multi::<_, _, RandomState, _, _>(
             &graph,
             0.into(),
             &targets,
@@ -320,18 +309,15 @@ mod test {
             0,
             None,
             |c, _, _| c,
-        )
-        .map(|(v, _): (Vec<_>, _)| v.into_iter().map(|i| i.index()).collect())
-        .collect();
-        let expected = HashSet::from_iter([vec![0, 1, 2], vec![0, 1, 3]]);
-        assert_eq!(paths, expected);
+        ));
+        insta::assert_yaml_snapshot!(paths);
     }
 
     #[test]
     fn source_in_target_set_should_not_yield_zero_length_path() {
         let graph = UnGraph::<i32, ()>::from_edges([(0, 1), (1, 2)]);
         let targets = HashSet::from_iter([0.into(), 1.into(), 2.into()]);
-        let paths: HashSet<Vec<_>> = all_simple_paths_multi::<_, _, RandomState, _, _>(
+        let paths = sorted_paths(all_simple_paths_multi::<_, _, RandomState, _, _>(
             &graph,
             0.into(),
             &targets,
@@ -340,11 +326,8 @@ mod test {
             0,
             None,
             |c, _, _| c,
-        )
-        .map(|(v, _): (Vec<_>, _)| v.into_iter().map(|i| i.index()).collect())
-        .collect();
-        let expected = HashSet::from_iter([vec![0, 1], vec![0, 1, 2]]);
-        assert_eq!(paths, expected);
+        ));
+        insta::assert_yaml_snapshot!(paths);
     }
 
     #[test]
@@ -362,7 +345,7 @@ mod test {
             (4, 3),
         ]);
         let targets = HashSet::from_iter([2.into(), 3.into()]);
-        let paths: HashSet<Vec<_>> = all_simple_paths_multi::<_, _, RandomState, _, _>(
+        let paths = sorted_paths(all_simple_paths_multi::<_, _, RandomState, _, _>(
             &graph,
             1.into(),
             &targets,
@@ -371,26 +354,15 @@ mod test {
             0,
             None,
             |c, _, _| c,
-        )
-        .map(|(v, _): (Vec<_>, _)| v.into_iter().map(|i| i.index()).collect())
-        .collect();
-        let expected = HashSet::from_iter([
-            vec![1, 2],
-            vec![1, 5, 4, 2],
-            vec![1, 3, 4, 2],
-            vec![1, 3],
-            vec![1, 2, 3],
-            vec![1, 5, 4, 3],
-            vec![1, 5, 4, 2, 3],
-        ]);
-        assert_eq!(paths, expected);
+        ));
+        insta::assert_yaml_snapshot!(paths);
     }
 
     #[test]
     fn min_intermediate_nodes_should_exclude_shorter_paths() {
         let graph = UnGraph::<i32, ()>::from_edges([(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)]);
         let targets = HashSet::from_iter([1.into(), 3.into()]);
-        let paths: HashSet<Vec<_>> = all_simple_paths_multi::<_, _, RandomState, _, _>(
+        let paths = sorted_paths(all_simple_paths_multi::<_, _, RandomState, _, _>(
             &graph,
             0.into(),
             &targets,
@@ -399,11 +371,8 @@ mod test {
             0,
             None,
             |c, _, _| c,
-        )
-        .map(|(v, _): (Vec<_>, _)| v.into_iter().map(|i| i.index()).collect())
-        .collect();
-        let expected = HashSet::from_iter([vec![0, 2, 3, 1], vec![0, 3, 2, 1], vec![0, 1, 2, 3], vec![0, 2, 1, 3]]);
-        assert_eq!(paths, expected);
+        ));
+        insta::assert_yaml_snapshot!(paths);
     }
 
     #[test]

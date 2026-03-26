@@ -414,6 +414,11 @@ where
         &self.cfg
     }
 
+    /// Returns a reference to the network graph.
+    pub fn graph(&self) -> &Graph {
+        self.transport_api.graph()
+    }
+
     #[inline]
     fn is_public(&self) -> bool {
         self.cfg.publish

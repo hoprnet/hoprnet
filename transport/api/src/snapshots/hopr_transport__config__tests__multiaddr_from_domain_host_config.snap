@@ -1,0 +1,5 @@
+---
+source: transport/api/src/config.rs
+expression: addr.to_string()
+---
+/dns4/example.com/tcp/443

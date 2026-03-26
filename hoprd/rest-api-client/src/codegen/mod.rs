@@ -138,17 +138,19 @@ pub mod types {
         #[serde(rename = "safeNative")]
         pub safe_native: ::std::string::String,
     }
-    ///Represents a peer that has been announced on-chain.
+    ///A peer that has been announced on-chain.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Represents a peer that has been announced on-chain.",
+    ///  "description": "A peer that has been announced on-chain.",
     ///  "examples": [
     ///    {
     ///      "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
-    ///      "multiaddrs": "[/ip4/178.12.1.9/tcp/19092]"
+    ///      "multiaddrs": [
+    ///        "/ip4/178.12.1.9/tcp/19092"
+    ///      ]
     ///    }
     ///  ],
     ///  "type": "object",
@@ -165,7 +167,9 @@ pub mod types {
     ///    },
     ///    "multiaddrs": {
     ///      "examples": [
-    ///        "[/ip4/178.12.1.9/tcp/19092]"
+    ///        [
+    ///          "/ip4/178.12.1.9/tcp/19092"
+    ///        ]
     ///      ],
     ///      "type": "array",
     ///      "items": {
@@ -177,7 +181,7 @@ pub mod types {
     /// ```
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct AnnouncedPeer {
+    pub struct AnnouncedPeerResponse {
         pub address: ::std::string::String,
         pub multiaddrs: ::std::vec::Vec<::std::string::String>,
     }
@@ -492,6 +496,90 @@ pub mod types {
         ///Receipt for the channel close transaction.
         pub receipt: ::std::string::String,
     }
+    ///Immediate observation data for a connected peer.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "Immediate observation data for a connected peer.",
+    ///  "examples": [
+    ///    {
+    ///      "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
+    ///      "averageLatency": 100,
+    ///      "lastUpdate": 1690000000000,
+    ///      "probeRate": 0.476,
+    ///      "score": 0.7
+    ///    }
+    ///  ],
+    ///  "type": "object",
+    ///  "required": [
+    ///    "address",
+    ///    "lastUpdate",
+    ///    "probeRate",
+    ///    "score"
+    ///  ],
+    ///  "properties": {
+    ///    "address": {
+    ///      "examples": [
+    ///        "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe"
+    ///      ],
+    ///      "type": "string"
+    ///    },
+    ///    "averageLatency": {
+    ///      "description": "Average latency in milliseconds, if available.",
+    ///      "examples": [
+    ///        100
+    ///      ],
+    ///      "type": [
+    ///        "integer",
+    ///        "null"
+    ///      ],
+    ///      "minimum": 0.0
+    ///    },
+    ///    "lastUpdate": {
+    ///      "description": "Epoch milliseconds of the last observation update.",
+    ///      "examples": [
+    ///        1690000000000
+    ///      ],
+    ///      "type": "integer",
+    ///      "minimum": 0.0
+    ///    },
+    ///    "probeRate": {
+    ///      "examples": [
+    ///        0.476
+    ///      ],
+    ///      "type": "number",
+    ///      "format": "double"
+    ///    },
+    ///    "score": {
+    ///      "examples": [
+    ///        0.7
+    ///      ],
+    ///      "type": "number",
+    ///      "format": "double"
+    ///    }
+    ///  }
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    pub struct ConnectedPeerResponse {
+        pub address: ::std::string::String,
+        ///Average latency in milliseconds, if available.
+        #[serde(
+            rename = "averageLatency",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub average_latency: ::std::option::Option<u64>,
+        ///Epoch milliseconds of the last observation update.
+        #[serde(rename = "lastUpdate")]
+        pub last_update: u64,
+        #[serde(rename = "probeRate")]
+        pub probe_rate: f64,
+        pub score: f64,
+    }
     ///Reachable entry node information
     ///
     /// <details><summary>JSON schema</summary>
@@ -600,50 +688,6 @@ pub mod types {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     pub struct FundChannelResponse {
         pub hash: ::std::string::String,
-    }
-    ///Heartbeat information for a peer.
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "description": "Heartbeat information for a peer.",
-    ///  "examples": [
-    ///    {
-    ///      "sent": 10,
-    ///      "success": 10
-    ///    }
-    ///  ],
-    ///  "type": "object",
-    ///  "required": [
-    ///    "sent",
-    ///    "success"
-    ///  ],
-    ///  "properties": {
-    ///    "sent": {
-    ///      "examples": [
-    ///        10
-    ///      ],
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "success": {
-    ///      "examples": [
-    ///        10
-    ///      ],
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    }
-    ///  }
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct HeartbeatInfo {
-        pub sent: i64,
-        pub success: i64,
     }
     ///IP transport protocol
     ///
@@ -1022,126 +1066,6 @@ and indexer state.*/
         pub announced: ::std::vec::Vec<::std::string::String>,
         pub observed: ::std::vec::Vec<::std::string::String>,
     }
-    ///Quality information for a peer.
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "description": "Quality information for a peer.",
-    ///  "examples": [
-    ///    {
-    ///      "quality": 0.7
-    ///    }
-    ///  ],
-    ///  "type": "object",
-    ///  "properties": {
-    ///    "score": {
-    ///      "description": "Minimum peer quality to be included in the response.",
-    ///      "examples": [
-    ///        0.7
-    ///      ],
-    ///      "type": "number",
-    ///      "format": "double"
-    ///    }
-    ///  }
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct NodePeersQueryRequest {
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub score: ::std::option::Option<f64>,
-    }
-    impl ::std::default::Default for NodePeersQueryRequest {
-        fn default() -> Self {
-            Self { score: Default::default() }
-        }
-    }
-    ///All connected and announced peers.
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "description": "All connected and announced peers.",
-    ///  "examples": [
-    ///    {
-    ///      "announced": [
-    ///        {
-    ///          "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
-    ///          "multiaddr": "/ip4/178.12.1.9/tcp/19092"
-    ///        }
-    ///      ],
-    ///      "connected": [
-    ///        {
-    ///          "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
-    ///          "backoff": 0.5,
-    ///          "heartbeats": {
-    ///            "sent": 10,
-    ///            "success": 10
-    ///          },
-    ///          "isNew": true,
-    ///          "lastSeen": 1690000000,
-    ///          "lastSeenLatency": 100,
-    ///          "multiaddr": "/ip4/178.12.1.9/tcp/19092",
-    ///          "quality": 0.7
-    ///        }
-    ///      ]
-    ///    }
-    ///  ],
-    ///  "type": "object",
-    ///  "required": [
-    ///    "announced",
-    ///    "connected"
-    ///  ],
-    ///  "properties": {
-    ///    "announced": {
-    ///      "examples": [
-    ///        [
-    ///          {
-    ///            "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
-    ///            "multiaddr": "/ip4/178.12.1.9/tcp/19092"
-    ///          }
-    ///        ]
-    ///      ],
-    ///      "type": "array",
-    ///      "items": {
-    ///        "$ref": "#/components/schemas/AnnouncedPeer"
-    ///      }
-    ///    },
-    ///    "connected": {
-    ///      "examples": [
-    ///        [
-    ///          {
-    ///            "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
-    ///            "backoff": 0.5,
-    ///            "heartbeats": {
-    ///              "sent": 10,
-    ///              "success": 10
-    ///            },
-    ///            "isNew": true,
-    ///            "lastSeen": 1690000000,
-    ///            "lastSeenLatency": 100,
-    ///            "multiaddr": "/ip4/178.12.1.9/tcp/19092",
-    ///            "quality": 0.7
-    ///          }
-    ///        ]
-    ///      ],
-    ///      "type": "array",
-    ///      "items": {
-    ///        "$ref": "#/components/schemas/PeerObservations"
-    ///      }
-    ///    }
-    ///  }
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct NodePeersResponse {
-        pub announced: ::std::vec::Vec<AnnouncedPeer>,
-        pub connected: ::std::vec::Vec<PeerObservations>,
-    }
     ///Received tickets statistics.
     ///
     /// <details><summary>JSON schema</summary>
@@ -1336,92 +1260,6 @@ and indexer state.*/
         ///Receipt of the channel open transaction.
         #[serde(rename = "transactionReceipt")]
         pub transaction_receipt: ::std::string::String,
-    }
-    ///All information about a known peer.
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "description": "All information about a known peer.",
-    ///  "examples": [
-    ///    {
-    ///      "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
-    ///      "averageLatency": 100,
-    ///      "lastSeen": 1690000000,
-    ///      "multiaddr": "/ip4/178.12.1.9/tcp/19092",
-    ///      "probeRate": 0.476,
-    ///      "score": 0.7
-    ///    }
-    ///  ],
-    ///  "type": "object",
-    ///  "required": [
-    ///    "address",
-    ///    "averageLatency",
-    ///    "lastUpdate",
-    ///    "probeRate",
-    ///    "score"
-    ///  ],
-    ///  "properties": {
-    ///    "address": {
-    ///      "examples": [
-    ///        "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe"
-    ///      ],
-    ///      "type": "string"
-    ///    },
-    ///    "averageLatency": {
-    ///      "examples": [
-    ///        100
-    ///      ],
-    ///      "type": "integer",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "lastUpdate": {
-    ///      "examples": [
-    ///        1690000000
-    ///      ],
-    ///      "type": "integer",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "multiaddr": {
-    ///      "examples": [
-    ///        "/ip4/178.12.1.9/tcp/19092"
-    ///      ],
-    ///      "type": [
-    ///        "string",
-    ///        "null"
-    ///      ]
-    ///    },
-    ///    "probeRate": {
-    ///      "examples": [
-    ///        0.476
-    ///      ],
-    ///      "type": "number",
-    ///      "format": "double"
-    ///    },
-    ///    "score": {
-    ///      "examples": [
-    ///        0.7
-    ///      ],
-    ///      "type": "number",
-    ///      "format": "double"
-    ///    }
-    ///  }
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct PeerObservations {
-        pub address: ::std::string::String,
-        #[serde(rename = "averageLatency")]
-        pub average_latency: u64,
-        #[serde(rename = "lastUpdate")]
-        pub last_update: u64,
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub multiaddr: ::std::option::Option<::std::string::String>,
-        #[serde(rename = "probeRate")]
-        pub probe_rate: f64,
-        pub score: f64,
     }
     ///Contains the latency and the reported version of a peer that has been pinged.
     ///
@@ -2233,7 +2071,7 @@ at least the size of 2 Session packet payloads.*/
 
 API enabling developers to interact with a hoprd node programatically through HTTP REST API.
 
-Version: 4.7.0*/
+Version: 4.8.0*/
 pub struct Client {
     pub(crate) baseurl: String,
     pub(crate) client: reqwest::Client,
@@ -2269,7 +2107,7 @@ impl Client {
 }
 impl ClientInfo<()> for Client {
     fn api_version() -> &'static str {
-        "4.7.0"
+        "4.8.0"
     }
     fn baseurl(&self) -> &str {
         self.baseurl.as_str()
@@ -2719,6 +2557,130 @@ Arguments:
             _ => Err(Error::UnexpectedResponse(response)),
         }
     }
+    /**Lists all peers that have been announced on-chain
+
+List all peers announced on-chain
+
+Sends a `GET` request to `/api/v4/network/announced`
+
+*/
+    pub async fn announced<'a>(
+        &'a self,
+    ) -> Result<
+        ResponseValue<::std::vec::Vec<types::AnnouncedPeerResponse>>,
+        Error<()>,
+    > {
+        let url = format!("{}/api/v4/network/announced", self.baseurl,);
+        let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
+        header_map
+            .append(
+                ::reqwest::header::HeaderName::from_static("api-version"),
+                ::reqwest::header::HeaderValue::from_static(Self::api_version()),
+            );
+        #[allow(unused_mut)]
+        let mut request = self
+            .client
+            .get(url)
+            .header(
+                ::reqwest::header::ACCEPT,
+                ::reqwest::header::HeaderValue::from_static("application/json"),
+            )
+            .headers(header_map)
+            .build()?;
+        let info = OperationInfo {
+            operation_id: "announced",
+        };
+        self.pre(&mut request, &info).await?;
+        let result = self.exec(request, &info).await;
+        self.post(&result, &info).await?;
+        let response = result?;
+        match response.status().as_u16() {
+            200u16 => ResponseValue::from_response(response).await,
+            _ => Err(Error::UnexpectedResponse(response)),
+        }
+    }
+    /**Lists peers with immediate observation data from the network graph
+
+List connected peers with immediate observation data from the network graph
+
+Sends a `GET` request to `/api/v4/network/connected`
+
+*/
+    pub async fn connected<'a>(
+        &'a self,
+    ) -> Result<
+        ResponseValue<::std::vec::Vec<types::ConnectedPeerResponse>>,
+        Error<()>,
+    > {
+        let url = format!("{}/api/v4/network/connected", self.baseurl,);
+        let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
+        header_map
+            .append(
+                ::reqwest::header::HeaderName::from_static("api-version"),
+                ::reqwest::header::HeaderValue::from_static(Self::api_version()),
+            );
+        #[allow(unused_mut)]
+        let mut request = self
+            .client
+            .get(url)
+            .header(
+                ::reqwest::header::ACCEPT,
+                ::reqwest::header::HeaderValue::from_static("application/json"),
+            )
+            .headers(header_map)
+            .build()?;
+        let info = OperationInfo {
+            operation_id: "connected",
+        };
+        self.pre(&mut request, &info).await?;
+        let result = self.exec(request, &info).await;
+        self.post(&result, &info).await?;
+        let response = result?;
+        match response.status().as_u16() {
+            200u16 => ResponseValue::from_response(response).await,
+            _ => Err(Error::UnexpectedResponse(response)),
+        }
+    }
+    /**Returns the network graph in DOT (Graphviz) format
+
+Get the network graph in DOT (Graphviz) format
+
+Sends a `GET` request to `/api/v4/network/graph`
+
+Arguments:
+- `reachable_only`: When true, only include edges reachable from this node via directed
+traversal. Disconnected subgraphs that cannot be routed through are excluded.
+*/
+    pub async fn graph<'a>(
+        &'a self,
+        reachable_only: Option<bool>,
+    ) -> Result<ResponseValue<ByteStream>, Error<()>> {
+        let url = format!("{}/api/v4/network/graph", self.baseurl,);
+        let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
+        header_map
+            .append(
+                ::reqwest::header::HeaderName::from_static("api-version"),
+                ::reqwest::header::HeaderValue::from_static(Self::api_version()),
+            );
+        #[allow(unused_mut)]
+        let mut request = self
+            .client
+            .get(url)
+            .query(&progenitor_client::QueryParam::new("reachableOnly", &reachable_only))
+            .headers(header_map)
+            .build()?;
+        let info = OperationInfo {
+            operation_id: "graph",
+        };
+        self.pre(&mut request, &info).await?;
+        let result = self.exec(request, &info).await;
+        self.post(&result, &info).await?;
+        let response = result?;
+        match response.status().as_u16() {
+            200u16 => Ok(ResponseValue::stream(response)),
+            _ => Err(Error::UnexpectedResponse(response)),
+        }
+    }
     /**Gets the current ticket price
 
 Get the current ticket price
@@ -2914,49 +2876,6 @@ Sends a `GET` request to `/api/v4/node/info`
             .build()?;
         let info = OperationInfo {
             operation_id: "info",
-        };
-        self.pre(&mut request, &info).await?;
-        let result = self.exec(request, &info).await;
-        self.post(&result, &info).await?;
-        let response = result?;
-        match response.status().as_u16() {
-            200u16 => ResponseValue::from_response(response).await,
-            _ => Err(Error::UnexpectedResponse(response)),
-        }
-    }
-    /**Lists information for `connected peers` and `announced peers`
-
-Lists information for connected and announced peers
-
-Sends a `GET` request to `/api/v4/node/peers`
-
-Arguments:
-- `score`: Minimum peer quality to be included in the response.
-*/
-    pub async fn peers<'a>(
-        &'a self,
-        score: Option<f64>,
-    ) -> Result<ResponseValue<types::NodePeersResponse>, Error<()>> {
-        let url = format!("{}/api/v4/node/peers", self.baseurl,);
-        let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
-        header_map
-            .append(
-                ::reqwest::header::HeaderName::from_static("api-version"),
-                ::reqwest::header::HeaderValue::from_static(Self::api_version()),
-            );
-        #[allow(unused_mut)]
-        let mut request = self
-            .client
-            .get(url)
-            .header(
-                ::reqwest::header::ACCEPT,
-                ::reqwest::header::HeaderValue::from_static("application/json"),
-            )
-            .query(&progenitor_client::QueryParam::new("score", &score))
-            .headers(header_map)
-            .build()?;
-        let info = OperationInfo {
-            operation_id: "peers",
         };
         self.pre(&mut request, &info).await?;
         let result = self.exec(request, &info).await;

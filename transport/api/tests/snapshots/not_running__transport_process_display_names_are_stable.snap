@@ -1,0 +1,11 @@
+---
+source: transport/api/tests/hopr_transport.rs
+expression: names
+---
+- component responsible for the transport medium (libp2p swarm)
+- "HOPR packet pipeline (HOPR [msg] - ingress)"
+- "HOPR packet pipeline (HOPR [msg] - egress)"
+- "HOPR packet pipeline (HOPR [ack] - ingress)"
+- "HOPR packet pipeline (HOPR [ack] - egress)"
+- "session manager sub-process #0"
+- sync of outgoing ticket indices

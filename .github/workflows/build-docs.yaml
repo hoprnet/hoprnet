@@ -4,9 +4,6 @@
 #################################################################################
 name: "Build docs"
 
-env:
-  needs_nix_setup: false
-
 # yamllint disable-line rule:truthy
 on:
   workflow_call:
@@ -21,6 +18,9 @@ on:
         required: true
         type: boolean
         description: 'Publish the docs'
+    secrets:
+      CACHIX_AUTH_TOKEN:
+        required: true
 
 concurrency:
   group: ${{ inputs.source_branch || github.ref_name }}-docs
@@ -36,40 +36,15 @@ jobs:
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
     steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
-        with:
-          disable-sudo: true
-          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
-
-      - name: Checkout repo
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-          repository: ${{ inputs.source_repo }}
-          ref: ${{ inputs.source_branch }}
-
-      - name: Install Nix
-        if: env.needs_nix_setup == true
-        uses: cachix/install-nix-action@4e002c8ec80594ecd40e759629461e26c8abed15 # v31
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: cachix/cachix-action@3ba601ff5bbb07c7220846facfa2cd81eeee15a1 # v16
-        if: env.needs_nix_setup == true
-        with:
-          name: hoprnet
-          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
-        env:
-          USER: runner
-
-      - name: Validate docs (strict)
-        run: nix develop -c cargo doc --no-deps --document-private-items
-        env:
-          RUSTDOCFLAGS: "-D warnings"
-
       - name: Build docs
-        run: nix build -L .#docs
+        uses: hoprnet/hopr-workflows/actions/nix-action@c2aca7e56d25c4a786049ccf816c7f1af8721de8 # nix-action-v1
+        with:
+          source_branch: ${{ inputs.source_branch }}
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          command: |
+            set -e
+            RUSTDOCFLAGS="-D warnings" nix develop -c cargo doc --no-deps --document-private-items
+            nix build -L .#docs
 
       - name: Increase git buffer size
         if: inputs.publish

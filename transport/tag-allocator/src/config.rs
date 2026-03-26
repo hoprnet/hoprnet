@@ -108,6 +108,8 @@ impl Validate for TagAllocatorConfig {
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
 
     #[test]
@@ -165,5 +167,41 @@ mod tests {
             probing_telemetry: 1000,
         };
         assert!(cfg.validate().is_ok());
+    }
+
+    #[rstest]
+    #[case::session(Usage::Session)]
+    #[case::session_terminal(Usage::SessionTerminalTelemetry)]
+    #[case::proving(Usage::ProvingTelemetry)]
+    fn range_for_should_return_contiguous_non_overlapping_ranges(#[case] usage: Usage) {
+        let cfg = TagAllocatorConfig::default();
+        let range = cfg.range_for(usage);
+
+        assert!(range.start >= ReservedTag::UPPER_BOUND);
+        assert!(range.end > range.start);
+        assert!(range.end <= cfg.tag_range().end);
+    }
+
+    #[test]
+    fn range_for_partitions_should_be_contiguous() {
+        let cfg = TagAllocatorConfig::default();
+        let ranges: Vec<(&str, std::ops::Range<u64>)> = vec![
+            ("Session", cfg.range_for(Usage::Session)),
+            (
+                "SessionTerminalTelemetry",
+                cfg.range_for(Usage::SessionTerminalTelemetry),
+            ),
+            ("ProvingTelemetry", cfg.range_for(Usage::ProvingTelemetry)),
+        ];
+        insta::assert_debug_snapshot!(ranges);
+    }
+
+    #[test]
+    fn tag_range_should_span_all_partitions() {
+        let cfg = TagAllocatorConfig::default();
+        let full = cfg.tag_range();
+
+        assert_eq!(full.start, cfg.range_for(Usage::Session).start);
+        assert_eq!(full.end, cfg.range_for(Usage::ProvingTelemetry).end);
     }
 }

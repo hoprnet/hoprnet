@@ -1,6 +1,6 @@
 [package]
 name = "hopr-builder"
-version = "4.0.4"
+version = "4.1.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -16,6 +16,7 @@ crate-type = ["rlib"]
 default = ["runtime-tokio"]
 runtime-tokio = [
   "dep:tokio",
+  "dep:validator",
   "hopr-lib/runtime-tokio",
   "hopr-db-node/runtime-tokio",
   "hopr-transport-p2p/runtime-tokio",
@@ -71,7 +72,7 @@ hopr-metrics = { workspace = true, optional = true }
 hopr-db-node = { workspace = true, features = ["traits", "sqlite"] }
 hopr-chain-connector = { workspace = true }
 hopr-ct-full-network = { workspace = true }
-hopr-network-graph = { workspace = true, features = ["petgraph"] }
+hopr-network-graph = { workspace = true, features = ["petgraph", "graph-api"] }
 hopr-transport-p2p = { workspace = true }
 
 [dev-dependencies]

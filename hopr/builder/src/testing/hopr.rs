@@ -9,7 +9,6 @@ use hopr_lib::{
     config::{HoprLibConfig, SessionGlobalConfig},
     prelude,
 };
-use tokio::time::sleep;
 
 use crate::testing::{TestingConnector, TestingHopr};
 

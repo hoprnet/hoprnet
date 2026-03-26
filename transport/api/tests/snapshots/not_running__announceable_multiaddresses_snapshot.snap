@@ -1,0 +1,6 @@
+---
+source: transport/api/tests/not_running.rs
+expression: announceable
+---
+- /dns4/example.com/tcp/443
+- /ip4/1.2.3.4/tcp/9000

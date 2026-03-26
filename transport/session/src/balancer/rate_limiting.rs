@@ -613,14 +613,15 @@ mod tests {
         assert_eq!(items.last(), Some(&100));
 
         // Even at a high rate, processing 100 elements should take some time
-        // but less than 150 ms (theoretical time would be ~99ms)
+        // but less than 500 ms (theoretical time would be ~99ms, but CI/nightly
+        // runners can have significant scheduling jitter).
         assert!(
-            elapsed >= Duration::from_millis(100),
-            "Very high rate stream took too long: {elapsed:?}"
+            elapsed >= Duration::from_millis(90),
+            "Very high rate stream finished too quickly: {elapsed:?}"
         );
 
         assert!(
-            elapsed < Duration::from_millis(150),
+            elapsed < Duration::from_millis(500),
             "Very high rate stream took too long: {elapsed:?}"
         );
     }

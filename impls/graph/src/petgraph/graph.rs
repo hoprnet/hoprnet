@@ -55,6 +55,60 @@ impl ChannelGraph {
     }
 }
 
+impl ChannelGraph {
+    /// Returns all edges in the graph as `(source, destination, observations)` triples.
+    ///
+    /// Only nodes that participate in at least one edge appear in the result.
+    /// Isolated nodes (no incoming or outgoing edges) are omitted.
+    pub fn connected_edges(&self) -> Vec<(OffchainPublicKey, OffchainPublicKey, Observations)> {
+        let inner = self.inner.read();
+        inner
+            .graph
+            .edge_indices()
+            .filter_map(|ei| {
+                let (src_idx, dst_idx) = inner.graph.edge_endpoints(ei)?;
+                let src = inner.graph.node_weight(src_idx)?;
+                let dst = inner.graph.node_weight(dst_idx)?;
+                let obs = inner.graph.edge_weight(ei)?;
+                Some((*src, *dst, *obs))
+            })
+            .collect()
+    }
+
+    /// Returns edges reachable from `self.me` via directed BFS.
+    ///
+    /// Only edges where both the source and destination are reachable from our
+    /// node are included. This filters out disconnected subgraphs that we
+    /// cannot actually route through.
+    pub fn reachable_edges(&self) -> Vec<(OffchainPublicKey, OffchainPublicKey, Observations)> {
+        let inner = self.inner.read();
+        let Some(&me_idx) = inner.indices.get_by_left(&self.me) else {
+            return vec![];
+        };
+
+        let mut reachable = std::collections::HashSet::new();
+        let mut bfs = petgraph::visit::Bfs::new(&inner.graph, me_idx);
+        while let Some(node_idx) = bfs.next(&inner.graph) {
+            reachable.insert(node_idx);
+        }
+
+        inner
+            .graph
+            .edge_indices()
+            .filter_map(|ei| {
+                let (src_idx, dst_idx) = inner.graph.edge_endpoints(ei)?;
+                if !reachable.contains(&src_idx) || !reachable.contains(&dst_idx) {
+                    return None;
+                }
+                let src = inner.graph.node_weight(src_idx)?;
+                let dst = inner.graph.node_weight(dst_idx)?;
+                let obs = inner.graph.edge_weight(ei)?;
+                Some((*src, *dst, *obs))
+            })
+            .collect()
+    }
+}
+
 impl hopr_api::graph::NetworkGraphView for ChannelGraph {
     type NodeId = OffchainPublicKey;
     type Observed = Observations;
@@ -582,6 +636,71 @@ mod tests {
 
         assert!(graph.edge(&me, &peer).is_some());
         assert!(graph.edge(&peer, &me).is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn connected_edges_should_exclude_isolated_nodes() {
+        let me = pubkey_from(&SECRET_0);
+        let a = pubkey_from(&SECRET_1);
+        let isolated = pubkey_from(&SECRET_2);
+        let graph = ChannelGraph::new(me);
+        graph.add_node(a);
+        graph.add_node(isolated); // no edges
+        graph.add_edge(&me, &a).unwrap();
+
+        let edges = graph.connected_edges();
+        assert_eq!(edges.len(), 1);
+        assert_eq!(edges[0].0, me);
+        assert_eq!(edges[0].1, a);
+
+        // isolated node must not appear
+        let all_keys: std::collections::HashSet<_> = edges.iter().flat_map(|(s, d, _)| [*s, *d]).collect();
+        assert!(!all_keys.contains(&isolated));
+    }
+
+    #[test]
+    fn connected_edges_should_preserve_observations() {
+        let me = pubkey_from(&SECRET_0);
+        let peer = pubkey_from(&SECRET_1);
+        let graph = ChannelGraph::new(me);
+        graph.add_node(peer);
+        graph.upsert_edge(&me, &peer, |obs| {
+            obs.record(EdgeWeightType::Connected(true));
+            obs.record(EdgeWeightType::Immediate(Ok(std::time::Duration::from_millis(42))));
+        });
+
+        let edges = graph.connected_edges();
+        assert_eq!(edges.len(), 1);
+        let obs = &edges[0].2;
+        assert!(obs.immediate_qos().is_some());
+    }
+
+    #[test]
+    fn connected_edges_should_be_empty_when_no_edges() {
+        let me = pubkey_from(&SECRET_0);
+        let graph = ChannelGraph::new(me);
+        graph.add_node(pubkey_from(&SECRET_1));
+        assert!(graph.connected_edges().is_empty());
+    }
+
+    #[test]
+    fn connected_edges_should_return_all_edges_in_diamond_topology() -> anyhow::Result<()> {
+        let me = pubkey_from(&SECRET_0);
+        let a = pubkey_from(&SECRET_1);
+        let b = pubkey_from(&SECRET_2);
+        let dest = pubkey_from(&SECRET_3);
+        let graph = ChannelGraph::new(me);
+        for n in [a, b, dest] {
+            graph.add_node(n);
+        }
+        graph.add_edge(&me, &a)?;
+        graph.add_edge(&me, &b)?;
+        graph.add_edge(&a, &dest)?;
+        graph.add_edge(&b, &dest)?;
+
+        let edges = graph.connected_edges();
+        assert_eq!(edges.len(), 4);
         Ok(())
     }
 }

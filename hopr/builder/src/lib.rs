@@ -31,6 +31,8 @@ use hopr_lib::{Keypair, UnitaryFloatOps};
 use hopr_network_graph::{ChannelGraph, SharedChannelGraph};
 use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork, PeerDiscovery};
 #[cfg(feature = "runtime-tokio")]
+use validator::Validate;
+#[cfg(feature = "runtime-tokio")]
 use {
     futures::SinkExt,
     hopr_lib::{
@@ -124,6 +126,19 @@ where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
 {
+    if let Some(ref pcfg) = probe_cfg {
+        pcfg.validate()
+            .map_err(|e| anyhow::anyhow!("invalid ProberConfig: {e}"))?;
+
+        let probe_timeout = config.protocol.probe.timeout;
+        anyhow::ensure!(
+            pcfg.interval >= probe_timeout,
+            "ProberConfig interval ({:?}) must be >= ProbeConfig timeout ({:?}) to prevent overlapping probe rounds",
+            pcfg.interval,
+            probe_timeout,
+        );
+    }
+
     // Calculate the minimum capacity based on accounts (each account can generate 2 messages),
     // plus 100 as an additional buffer
     let minimum_capacity = chain_connector

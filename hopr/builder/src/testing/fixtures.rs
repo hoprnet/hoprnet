@@ -96,6 +96,42 @@ impl ClusterGuard {
         Ok(guards)
     }
 
+    /// Polls the network graph on `observer` until it sees at least `expected_channels`
+    /// edges with non-zero balance, or until `timeout` expires.
+    ///
+    /// This replaces fixed-duration sleeps after channel opening: instead of guessing
+    /// how long chain propagation takes, we actively check the graph state.
+    pub async fn wait_for_channel_graph(
+        &self,
+        observer: &TestedHopr,
+        expected_channels: usize,
+        timeout: Duration,
+    ) -> anyhow::Result<()> {
+        let deadline = tokio::time::Instant::now() + timeout;
+        loop {
+            let channels = observer.inner().all_channels().await.unwrap_or_default();
+
+            let open_count = channels
+                .iter()
+                .filter(|c| c.status == hopr_lib::ChannelStatus::Open)
+                .count();
+
+            if open_count >= expected_channels {
+                tracing::info!(open_count, expected_channels, "channel graph converged");
+                return Ok(());
+            }
+
+            if tokio::time::Instant::now() >= deadline {
+                anyhow::bail!(
+                    "channel graph did not converge: {open_count}/{expected_channels} open channels after {timeout:?}"
+                );
+            }
+
+            tracing::trace!(open_count, expected_channels, "waiting for channel graph convergence");
+            sleep(Duration::from_secs(2)).await;
+        }
+    }
+
     /// Create a session between the first and last nodes in the path.
     ///
     /// Channels must already be open before calling this method.
@@ -104,9 +140,10 @@ impl ClusterGuard {
 
         let chain_info = self.chain_client.query_chain_info().await?;
         // Session establishment retries internally with ~20s per attempt.
-        // Use 6x propagation delay (~42s) to allow at least 2 retry cycles,
-        // which is needed under coverage instrumentation overhead.
-        let timeout = chain_propagation_delay(&chain_info) * 6;
+        // Use 9x propagation delay (~63s) to allow at least 3 retry cycles,
+        // which is needed under coverage instrumentation overhead and when
+        // smaller clusters start faster but still need warmup time.
+        let timeout = chain_propagation_delay(&chain_info) * 9;
 
         let ip = IpOrHost::from_str(":0")?;
         let routing = HopRouting::try_from(path.len() - 2)?;
@@ -244,7 +281,16 @@ impl ClusterGuard {
 
 pub const SWARM_N: usize = 9;
 
-pub const TEST_GLOBAL_TIMEOUT: Duration = Duration::from_mins(3);
+/// Global per-test timeout.
+///
+/// Coverage instrumentation adds ~2-3x overhead, so we double the timeout
+/// when running under `cargo llvm-cov` (which sets `cfg(coverage)`).
+#[allow(unexpected_cfgs)]
+pub const TEST_GLOBAL_TIMEOUT: Duration = if cfg!(coverage) {
+    Duration::from_mins(12)
+} else {
+    Duration::from_mins(6)
+};
 
 lazy_static::lazy_static! {
     static ref NODE_CHAIN_KEYS: Vec<ChainKeypair> = vec![
@@ -289,6 +335,38 @@ pub const INITIAL_NODE_NATIVE: u64 = 1;
 pub const INITIAL_NODE_TOKEN: u64 = 10;
 pub const DEFAULT_SAFE_ALLOWANCE: u128 = 1_000_000_000_000_u128;
 pub const MINIMUM_INCOMING_WIN_PROB: f64 = 0.2;
+
+/// Per-node configuration for test clusters.
+#[derive(Debug, Clone, Copy)]
+pub struct TestNodeConfig {
+    /// Outgoing winning probability for this node.
+    pub win_prob: f64,
+}
+
+impl Default for TestNodeConfig {
+    fn default() -> Self {
+        Self { win_prob: 1.0 }
+    }
+}
+
+impl TestNodeConfig {
+    pub fn with_probability(win_prob: f64) -> Self {
+        Self { win_prob }
+    }
+}
+
+/// Generates configs with alternating win probabilities (even=1.0, odd=MINIMUM_INCOMING_WIN_PROB).
+fn alternating_configs(n: usize) -> Vec<TestNodeConfig> {
+    (0..n)
+        .map(|i| {
+            if i % 2 != 0 {
+                TestNodeConfig::with_probability(MINIMUM_INCOMING_WIN_PROB)
+            } else {
+                TestNodeConfig::default()
+            }
+        })
+        .collect()
+}
 
 pub fn build_blokli_client() -> BlokliTestClient<FullStateEmulator> {
     BlokliTestStateBuilder::default()
@@ -335,23 +413,24 @@ pub fn build_blokli_client() -> BlokliTestClient<FullStateEmulator> {
 #[fixture]
 #[once]
 pub fn size_2_cluster_fixture() -> ClusterGuard {
-    cluster_fixture(2)
+    cluster_fixture(alternating_configs(2))
 }
 
 #[fixture]
 #[once]
 pub fn size_3_cluster_fixture() -> ClusterGuard {
-    cluster_fixture(3)
+    cluster_fixture(alternating_configs(3))
 }
 
 #[fixture]
 #[once]
 pub fn size_5_cluster_fixture() -> ClusterGuard {
-    cluster_fixture(5)
+    cluster_fixture(alternating_configs(5))
 }
 
 #[fixture]
-pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
+pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: Vec<TestNodeConfig>) -> ClusterGuard {
+    let size = configs.len();
     if !(1..=SWARM_N).contains(&size) {
         panic!("{size} must be between 1 and {SWARM_N}");
     }
@@ -379,6 +458,7 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
             let onchain_keys = onchain_keys.clone();
             let offchain_keys = offchain_keys.clone();
             let safes = safes.clone();
+            let win_prob = configs[i].win_prob;
 
             let blokli_client = chain_client
                 .clone()
@@ -423,20 +503,16 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
 
                     let connector = std::sync::Arc::new(connector);
 
-                    let config = create_hopr_instance_config(
-                        3001 + i as u16,
-                        safes[i],
-                        if i % 2 != 0 { MINIMUM_INCOMING_WIN_PROB } else { 1.0 },
-                    );
+                    let config = create_hopr_instance_config(3001 + i as u16, safes[i], win_prob);
 
                     let (instance, hopr_process) = crate::build_from_chain_and_db(
                         &onchain_keys[i],
                         &offchain_keys[i],
                         config,
                         Some(hopr_ct_full_network::ProberConfig {
-                            interval: std::time::Duration::from_secs(1),
+                            interval: std::time::Duration::from_secs(3),
                             ..Default::default()
-                        }), // aggressive setting to facilitate fast n-hop telemetry probing
+                        }), // moderate setting to allow probing without saturating relay traffic
                         connector.clone(),
                         node_db,
                         EchoServer::new(),
@@ -465,16 +541,20 @@ pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
             .expect("failed to build Tokio runtime in local thread");
 
         rt.block_on(async {
-            // Wait for all nodes to reach the 'Running' state
+            // Wait for all nodes to reach the 'Running' state.
+            // Use generous timeouts to accommodate CI and coverage instrumentation overhead.
             futures::future::try_join_all(cluster.iter().map(|instance| {
-                wait_for_status(instance, &HoprState::Running).timeout(futures_time::time::Duration::from_secs(180))
+                wait_for_status(instance, &HoprState::Running).timeout(futures_time::time::Duration::from_secs(360))
             }))
             .await
             .expect("status wait failed");
 
-            // Wait for full mesh connectivity
+            // Wait for full mesh connectivity and probe warmup.
+            // Connection establishment in the test environment is slow (~100s for 3 nodes)
+            // and probe warmup needs additional rounds after connections are up.
+            // Use generous timeouts to accommodate CI and coverage instrumentation overhead.
             futures::future::try_join_all(cluster.iter().map(|instance| {
-                wait_for_connectivity(instance, swarm_size).timeout(futures_time::time::Duration::from_secs(120))
+                wait_for_connectivity(instance, swarm_size).timeout(futures_time::time::Duration::from_secs(480))
             }))
             .await
             .expect("connectivity wait failed");

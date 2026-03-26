@@ -1,0 +1,7 @@
+---
+source: transport/session/src/types.rs
+expression: cfg
+---
+capabilities: 0
+frame_mtu: 1500
+frame_timeout: 800ms
