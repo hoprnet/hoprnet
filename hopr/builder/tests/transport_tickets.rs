@@ -6,7 +6,7 @@ use futures_time::future::FutureExt as _;
 use hopr_builder::{
     hopr_lib::{HoprBalance, HoprLibError, UnitaryFloatOps},
     testing::{
-        fixtures::{ClusterGuard, MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, cluster_fixture},
+        fixtures::{ClusterGuard, MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, TestNodeConfig, cluster_fixture},
         hopr::ChannelGuard,
         wait_until,
     },
@@ -16,11 +16,10 @@ use serial_test::serial;
 use tokio::time::sleep;
 
 /// Extra funding per channel to absorb background loopback-probe drain.
-/// 5 nodes probing at 1s intervals over ~30s test windows can consume
-/// dozens of tickets per channel via multi-hop loopback probes.
-const PROBING_OVERHEAD: u64 = 100;
+/// 3 nodes probing at 1s intervals over ~30s test windows can consume
+/// tickets per channel via multi-hop loopback probes.
+const PROBING_OVERHEAD: u64 = 30;
 
-#[ignore = "the test is no longer realizable due to missing reset stats api"]
 #[rstest]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
@@ -30,7 +29,7 @@ const PROBING_OVERHEAD: u64 = 100;
 /// rejects tickets once the channel is exhausted by a combination of test
 /// traffic and background probing.
 async fn relaying_message_rejected_when_channel_out_of_funding(
-    #[with(3)] cluster_fixture: ClusterGuard,
+    #[with(vec![TestNodeConfig::default(); 3])] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
     let [src, mid, dst] = cluster_fixture.sample_nodes::<3>();
 
@@ -110,7 +109,9 @@ async fn relaying_message_rejected_when_channel_out_of_funding(
 #[cfg(feature = "session-client")]
 /// Sends a fixed number of messages so tickets accumulate, then calls
 /// `redeem_all_tickets` and asserts unredeemed value shrinks while redeemed grows.
-async fn redeem_ticket_on_request(#[with(5)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+async fn redeem_ticket_on_request(
+    #[with(vec![TestNodeConfig::default(); 3])] cluster_fixture: ClusterGuard,
+) -> anyhow::Result<()> {
     let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1::<3>();
     let message_count = 10;
 
@@ -180,7 +181,9 @@ async fn redeem_ticket_on_request(#[with(5)] cluster_fixture: ClusterGuard) -> a
 #[cfg(feature = "session-client")]
 /// Demonstrates that closing channels without redeeming moves ticket value into
 /// the neglected bucket by closing both paths after traffic has flowed.
-async fn neglect_ticket_on_closing(#[with(5)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+async fn neglect_ticket_on_closing(
+    #[with(vec![TestNodeConfig::default(); 3])] cluster_fixture: ClusterGuard,
+) -> anyhow::Result<()> {
     let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1::<3>();
 
     let message_count = 3;
@@ -274,7 +277,12 @@ async fn neglect_ticket_on_closing(#[with(5)] cluster_fixture: ClusterGuard) -> 
 /// Lowers the sender's win probability and confirms the relay receives fewer
 /// winning tickets by comparing statistics before and after traffic relay.
 async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
-    #[with(5)] cluster_fixture: ClusterGuard,
+    #[with(vec![
+        TestNodeConfig::with_probability(MINIMUM_INCOMING_WIN_PROB),
+        TestNodeConfig::default(),
+        TestNodeConfig::with_probability(MINIMUM_INCOMING_WIN_PROB),
+    ])]
+    cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
     let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1_intermediaries::<3>();
 
@@ -351,7 +359,12 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
 /// Drops the cluster-wide minimum win probability threshold and asserts session
 /// creation fails when relay win probability is insufficient.
 async fn ticket_with_win_prob_lower_than_min_win_prob_should_be_rejected(
-    #[with(5)] cluster_fixture: ClusterGuard,
+    #[with(vec![
+        TestNodeConfig::with_probability(MINIMUM_INCOMING_WIN_PROB),
+        TestNodeConfig::default(),
+        TestNodeConfig::with_probability(MINIMUM_INCOMING_WIN_PROB),
+    ])]
+    cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
     cluster_fixture.update_winning_probability(0.5).await?;
 
@@ -382,7 +395,12 @@ async fn ticket_with_win_prob_lower_than_min_win_prob_should_be_rejected(
 /// Keeps relay win probability above the minimum, relays traffic, redeems all
 /// tickets and asserts the statistics reflect the successful redemptions.
 async fn relay_with_win_prob_higher_than_min_win_prob_should_succeed(
-    #[with(5)] cluster_fixture: ClusterGuard,
+    #[with(vec![
+        TestNodeConfig::with_probability(MINIMUM_INCOMING_WIN_PROB),
+        TestNodeConfig::default(),
+        TestNodeConfig::with_probability(MINIMUM_INCOMING_WIN_PROB),
+    ])]
+    cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
     let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1_intermediaries::<3>();
     let message_count = 20;

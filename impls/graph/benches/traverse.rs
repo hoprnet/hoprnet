@@ -10,11 +10,8 @@ use hopr_api::{
     },
     types::crypto::prelude::Keypair,
 };
-use hopr_network_graph::ChannelGraph;
-
-/// Default penalty factor applied to edge cost functions.
-const DEFAULT_EDGE_PENALTY: f64 = 0.5;
-/// Default minimum acceptable message acknowledgment rate.
+use hopr_network_graph::{ChannelGraph, DEFAULT_EDGE_PENALTY};
+/// Intentionally 0.0 for benchmarks (no ack filtering).
 const DEFAULT_MIN_ACK_RATE: f64 = 0.0;
 
 // ── Graph construction helpers ───────────────────────────────────────────────

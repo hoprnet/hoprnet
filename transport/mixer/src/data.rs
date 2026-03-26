@@ -37,3 +37,53 @@ impl<T> From<(std::time::Instant, T)> for DelayedData<T> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::{Duration, Instant};
+
+    use rstest::rstest;
+
+    use super::*;
+
+    #[rstest]
+    #[case::equal_timestamps(0, 0, Ordering::Equal)]
+    #[case::earlier_is_less(0, 1000, Ordering::Less)]
+    #[case::later_is_greater(1000, 0, Ordering::Greater)]
+    #[case::ordering_ignores_item_value(0, 0, Ordering::Equal)]
+    fn delayed_data_ordering(#[case] delay_a_ms: u64, #[case] delay_b_ms: u64, #[case] expected: Ordering) {
+        let now = Instant::now();
+        let a = DelayedData {
+            release_at: now + Duration::from_millis(delay_a_ms),
+            item: 1,
+        };
+        let b = DelayedData {
+            release_at: now + Duration::from_millis(delay_b_ms),
+            item: 2,
+        };
+        assert_eq!(a.cmp(&b), expected);
+    }
+
+    #[test]
+    fn from_tuple_sets_fields() {
+        let now = Instant::now();
+        let data = DelayedData::from((now, "hello"));
+        assert_eq!(data.release_at, now);
+        assert_eq!(data.item, "hello");
+    }
+
+    #[test]
+    fn sorting_respects_release_time() {
+        let now = Instant::now();
+        let mut items: Vec<DelayedData<&str>> = [(3, "c"), (1, "a"), (2, "b")]
+            .into_iter()
+            .map(|(secs, val)| DelayedData {
+                release_at: now + Duration::from_secs(secs),
+                item: val,
+            })
+            .collect();
+        items.sort();
+        let sorted: Vec<&str> = items.iter().map(|d| d.item).collect();
+        insta::assert_yaml_snapshot!(sorted);
+    }
+}

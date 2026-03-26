@@ -60,8 +60,9 @@ jobs:
 
       - name: Configure PR and mark as ready
         run: |
-          gh pr edit ${{ steps.update.outputs.pull-request-number }} --add-assignee "@copilot"
-          gh pr edit ${{ steps.update.outputs.pull-request-number }} --add-reviewer "hoprnet/hopr-development"
-          gh pr ready ${{ steps.update.outputs.pull-request-number }}
+          gh pr edit "${PR_NUMBER}" --add-assignee "@copilot"
+          gh pr edit "${PR_NUMBER}" --add-reviewer "hoprnet/hopr-development"
+          gh pr ready "${PR_NUMBER}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.update.outputs.pull-request-number }}

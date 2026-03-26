@@ -22,3 +22,18 @@ pub enum ProtocolError {
 
 /// Result used by the crate, based on the [ProtocolError] error type.
 pub type Result<T> = core::result::Result<T, ProtocolError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn protocol_error_variants_should_display_correctly() {
+        let variants: Vec<String> = vec![
+            ProtocolError::Timeout.to_string(),
+            ProtocolError::Logic("test logic error".into()).to_string(),
+            ProtocolError::GeneralError(GeneralError::ParseError("bad parse".into())).to_string(),
+        ];
+        insta::assert_debug_snapshot!(variants);
+    }
+}

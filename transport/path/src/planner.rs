@@ -127,7 +127,13 @@ where
     ) -> Result<ValidatedPath> {
         let path = match options {
             RoutingOptions::IntermediatePath(explicit_path) => {
-                trace!(?explicit_path, "resolving an explicit intermediate path");
+                tracing::debug!(
+                    direction = "loopback",
+                    ?source,
+                    ?destination,
+                    ?explicit_path,
+                    "resolving intermediate path"
+                );
                 let resolver = ChainPathResolver::from(&*self.resolver);
                 ValidatedPath::new(
                     source,
@@ -219,9 +225,12 @@ where
                 forward_options,
                 return_options,
             } => {
+                tracing::debug!(direction = "forward", %destination, "resolving forward path");
+
                 let forward_path = self
                     .resolve_path(NodeId::Offchain(self.me), *destination, forward_options)
                     .await?;
+                tracing::debug!(direction = "forward", %destination, path = %forward_path, "resolved path");
 
                 let return_paths = if let Some(return_options) = return_options {
                     let num_possible_surbs = HoprPacket::max_surbs_with_message(size_hint).min(max_surbs);
@@ -238,6 +247,13 @@ where
                         .collect::<FuturesUnordered<_>>()
                         .try_collect::<Vec<ValidatedPath>>()
                         .await?
+                        .into_iter()
+                        .enumerate()
+                        .inspect(|(i, rp)| {
+                            tracing::debug!(direction = "return", %destination, index = i, path = %rp, "resolved return path");
+                        })
+                        .map(|(_, rp)| rp)
+                        .collect()
                 } else {
                     vec![]
                 };

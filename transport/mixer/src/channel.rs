@@ -487,4 +487,20 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn sender_should_return_closed_when_receiver_inactive() -> anyhow::Result<()> {
+        let (tx, _rx) = channel::<i32>(MixerConfig::default());
+
+        // Simulate the receiver marking itself inactive (normally happens
+        // in poll_next when sender_count drops to 0).
+        tx.channel.receiver_active.store(false, Ordering::Relaxed);
+
+        let result = tx.send(42);
+        assert!(
+            matches!(result, Err(SenderError::Closed)),
+            "send with inactive receiver should return Closed, got: {result:?}"
+        );
+        Ok(())
+    }
 }

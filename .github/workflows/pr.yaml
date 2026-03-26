@@ -1,0 +1,49 @@
+---
+################################################################################
+# Pull request pipeline for hoprnet
+#
+# Dispatches checks and tests concurrently.
+# Build runs as a separate workflow (calls external reusable workflows).
+################################################################################
+name: PR
+
+on:
+  merge_group:
+    types: [checks_requested]
+  push:
+    branches:
+      - master
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: ${{ github.event.pull_request.head.ref || github.ref_name }}-pr
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Check
+    uses: ./.github/workflows/checks.yaml
+    with:
+      source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+    secrets:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+  tests:
+    name: Test
+    uses: ./.github/workflows/tests.yaml
+    with:
+      source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+    secrets:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

@@ -31,9 +31,12 @@ mod tests {
         let mut controller = SimpleBalancerController::default();
         controller.set_target_and_limit(BalancerControllerBounds::new(100, 100));
         assert_eq!(100, controller.bounds.target());
-        assert_eq!(controller.next_control_output(10), 10);
-        assert_eq!(controller.next_control_output(100), 100);
-        assert_eq!(controller.next_control_output(101), 100);
+
+        let outputs: Vec<_> = [10, 100, 101]
+            .iter()
+            .map(|&level| controller.next_control_output(level))
+            .collect();
+        assert_eq!(outputs, [10, 100, 100]);
         assert_eq!(100, controller.bounds.target());
     }
 }

@@ -67,10 +67,6 @@ sign-file source_file:
      # Clean up
     rm -rf "$gnupghome"
 
-# list all available docker image targets which can be built
-list-docker-images:
-    nix flake show --json | jq '.packages | to_entries | .[0].value | to_entries[] | select(.key | endswith("docker")) | .key'
-
 # spins up the localcluster using the binary
 localcluster clustersize:
     docker rm -f anvil_blokli || true 
