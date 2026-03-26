@@ -33,7 +33,7 @@ lazy_static::lazy_static! {
     .collect();
 }
 
-type TestTransport = HoprTransport<stubs::StubChain, stubs::StubDb, ChannelGraph, StubNet>;
+type TestTransport = HoprTransport<stubs::StubChain, ChannelGraph, StubNet>;
 
 fn create_stubbed_transport(peer_index: usize) -> anyhow::Result<TestTransport> {
     create_stubbed_transport_with_addrs(peer_index, vec![])
@@ -54,12 +54,10 @@ fn create_stubbed_transport_with_cfg(
     let (offchain, chain_kp) = &PEER_KEYS[peer_index];
     let graph = ChannelGraph::new(*offchain.public());
     let chain = stubs::StubChain::new(offchain, chain_kp);
-    let db = stubs::StubDb;
 
     Ok(HoprTransport::new(
         (chain_kp, offchain),
         chain,
-        db,
         graph,
         my_multiaddresses,
         cfg,
