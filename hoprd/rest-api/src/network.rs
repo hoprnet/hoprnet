@@ -104,7 +104,7 @@ pub(super) async fn probability(State(state): State<Arc<InternalState>>) -> impl
 #[schema(example = json!({
     "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
     "probeRate": 0.476,
-    "lastUpdate": 1690000000000_u128,
+    "lastUpdate": 1690000000000,
     "averageLatency": 100,
     "score": 0.7,
     "isConnected": true
@@ -117,7 +117,7 @@ pub(crate) struct ConnectedPeerResponse {
     #[schema(example = 0.476)]
     probe_rate: f64,
     /// Epoch milliseconds of the last observation update.
-    #[schema(example = 1690000000000_u128)]
+    #[schema(example = 1690000000000)]
     last_update: u128,
     /// Average latency in milliseconds, if available.
     #[schema(example = 100)]
