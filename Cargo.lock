@@ -4373,8 +4373,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-async-runtime"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
+ "async-lock",
  "auto_impl",
  "futures",
  "indexmap 2.13.0",
