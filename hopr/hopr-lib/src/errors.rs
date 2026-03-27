@@ -30,8 +30,8 @@ pub enum HoprLibError {
     #[error(transparent)]
     TransportError(#[from] HoprTransportError),
 
-    #[error(transparent)]
-    TicketManagerError(#[from] anyhow::Error),
+    #[error("ticket manager error: {0}")]
+    TicketManagerError(#[source] anyhow::Error),
 
     #[error(transparent)]
     TypeError(#[from] hopr_api::types::primitive::errors::GeneralError),

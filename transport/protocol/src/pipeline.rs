@@ -28,7 +28,7 @@ lazy_static::lazy_static! {
     ).unwrap();
     static ref METRIC_PACKET_REJECTED_COUNT: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
         "hopr_packet_rejected_count",
-        "Number of rejected incoming packets due various reasons",
+        "Number of incoming packets rejected due various reasons",
         &["reason"]
     ).unwrap();
     // Tracks how often the Rayon-backed packet decode path exceeds PACKET_DECODING_TIMEOUT.
@@ -201,7 +201,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                         tracing::trace!(%peer, %error, "not sending ack back on undecodable packet - possible adversarial behavior");
 
                         #[cfg(all(feature = "telemetry", not(test)))]
-                        METRIC_PACKET_REJECTED_COUNT.increment(&["undecodeable"]);
+                        METRIC_PACKET_REJECTED_COUNT.increment(&["undecodable"]);
 
                         None
                     },

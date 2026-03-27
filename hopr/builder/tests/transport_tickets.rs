@@ -194,11 +194,6 @@ async fn neglect_ticket_on_closing(
         .await
         .context("failed to get ticket price")?;
 
-    // mid.inner()
-    // .reset_ticket_statistics()
-    // .await
-    // .context("failed to get ticket statistics")?;
-
     // Snapshot stats right after reset to use as baseline for delta checks
     let stats_after_reset = mid
         .inner()

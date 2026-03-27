@@ -96,12 +96,15 @@ impl ChainWriteTicketOperations for StubChain {
 
     async fn redeem_ticket<'a>(
         &'a self,
-        _: RedeemableTicket,
+        ticket: RedeemableTicket,
     ) -> Result<
         futures::future::BoxFuture<'a, Result<(VerifiedTicket, ChainReceipt), TicketRedeemError<Self::Error>>>,
         TicketRedeemError<Self::Error>,
     > {
-        unimplemented!()
+        Err(TicketRedeemError::ProcessingError(
+            ticket.ticket,
+            StubError("stubs do not redeem tickets".into()),
+        ))
     }
 }
 
