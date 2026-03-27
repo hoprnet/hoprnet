@@ -86,26 +86,54 @@ jobs:
   cache_deps:
     name: Cache deps
     if: github.event.pull_request.merged == true
-    uses: ./.github/workflows/cache-deps.yaml
-    with:
-      source_repo: ${{ github.event.pull_request.base.repo.full_name }}
-      source_branch: ${{ github.event.pull_request.base.ref }}
-    secrets:
-      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      PRIVATE_CARGO_REGISTRY_PROXY_URL: ${{ secrets.PRIVATE_CARGO_REGISTRY_PROXY_URL }}
+    runs-on: self-hosted-hoprnet-small
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Cache dependencies
+        uses: hoprnet/hopr-workflows/actions/nix-action@c2aca7e56d25c4a786049ccf816c7f1af8721de8 # nix-action-v1
+        with:
+          source_branch: ${{ github.event.pull_request.base.ref }}
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          command: |
+            set -e
+            cat >> .cargo/config.toml << TOML
+            [source.hopr-cargo-registry-cache]
+            registry = "sparse+${PRIVATE_CARGO_REGISTRY_PROXY_URL}"
+
+            [source.crates-io]
+            replace-with = "hopr-cargo-registry-cache"
+            TOML
+            nix develop -c cargo fetch
+        env:
+          PRIVATE_CARGO_REGISTRY_PROXY_URL: ${{ secrets.PRIVATE_CARGO_REGISTRY_PROXY_URL }}
   docs:
     name: Docs
     needs:
       - build-docker
-    uses: ./.github/workflows/build-docs.yaml
+    runs-on: self-hosted-hoprnet-bigger
+    timeout-minutes: 60
     permissions:
       contents: write
-    with:
-      source_repo: ${{ github.event.pull_request.base.repo.full_name }}
-      source_branch: ${{ github.event.pull_request.base.ref }}
-      publish: true
-    secrets:
-      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+    steps:
+      - name: Build docs
+        uses: hoprnet/hopr-workflows/actions/nix-action@c2aca7e56d25c4a786049ccf816c7f1af8721de8 # nix-action-v1
+        with:
+          source_branch: ${{ github.event.pull_request.base.ref }}
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          command: |
+            set -e
+            RUSTDOCFLAGS="-D warnings" nix develop -c cargo doc --no-deps --document-private-items
+            nix build -L .#docs
+      - name: Increase git buffer size
+        run: git config --global http.postBuffer 524288000
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@4f9cc6602d3f66b9c108549d475ec49e8ef4d45e # v4.0.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./result/share/doc/
+          force_orphan: true
   notify:
     name: Notify failure
     needs:
