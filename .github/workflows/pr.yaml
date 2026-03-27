@@ -2,8 +2,7 @@
 ################################################################################
 # Pull request pipeline for hoprnet
 #
-# Dispatches checks and tests concurrently.
-# Build runs as a separate workflow (calls external reusable workflows).
+# Single orchestrator: dispatches checks, tests, builds, and dappnode.
 ################################################################################
 name: PR
 
@@ -19,17 +18,21 @@ on:
       - synchronize
       - reopened
       - ready_for_review
+      - labeled
 
 permissions:
-  actions: read
   contents: read
 
 concurrency:
-  group: ${{ github.event.pull_request.head.ref || github.ref_name }}-pr
+  group: >-
+    ${{ format('{0}-{1}',
+      github.event.pull_request.head.ref || github.ref_name,
+      github.event.action == 'labeled' && format('label-{0}', github.event.label.name) || 'pr') }}
   cancel-in-progress: true
 
 jobs:
   checks:
+    if: github.event.action != 'labeled'
     name: Check
     uses: ./.github/workflows/checks.yaml
     with:
@@ -40,6 +43,7 @@ jobs:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
   tests:
+    if: github.event.action != 'labeled'
     name: Test
     uses: ./.github/workflows/tests.yaml
     with:
@@ -53,3 +57,47 @@ jobs:
     secrets:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
       codecov_token: ${{ secrets.CODECOV_TOKEN }}
+
+  build:
+    if: github.event.action != 'labeled'
+    name: Build
+    uses: ./.github/workflows/build.yaml
+    with:
+      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+    secrets:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      GCP_SA_GITHUB_RUNNER: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
+      GPG_HOPRNET_PRIVATE_KEY: ${{ secrets.GPG_HOPRNET_PRIVATE_KEY }}
+
+  build-dappnode:
+    if: github.event.action != 'labeled'
+    strategy:
+      fail-fast: false
+      matrix:
+        dappnode_repository:
+          - DAppNodePackage-Hopr
+          - DAppNodePackage-Hopr-testnet
+    name: ${{ matrix.dappnode_repository }}
+    needs: [build]
+    uses: ./.github/workflows/build-dappnode.yaml
+    with:
+      source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+      dappnode_repository: ${{ matrix.dappnode_repository }}
+      labels: ${{ format('{0},', join(github.event.pull_request.labels.*.name, ',')) }}
+    secrets:
+      GCP_SA_GITHUB_RUNNER: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
+      GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+
+  build-candidate:
+    if: github.event.action == 'labeled' && github.event.label.name == 'build:candidate'
+    name: Build Candidate
+    runs-on: self-hosted-hoprnet-bigger
+    timeout-minutes: 20
+    steps:
+      - name: Build candidate binary
+        uses: hoprnet/hopr-workflows/actions/nix-action@c2aca7e56d25c4a786049ccf816c7f1af8721de8 # nix-action-v1
+        with:
+          source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          command: nix build -L .#hoprd-candidate

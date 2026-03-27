@@ -41,7 +41,7 @@ concurrency:
 
 jobs:
   build:
-    # event_name reflects the caller: 'pull_request' (from build.yaml), 'workflow_run' (from build-dappnode-pr.yaml), or 'workflow_dispatch' (manual)
+    # event_name reflects the caller: 'pull_request' (from pr.yaml) or 'workflow_dispatch' (manual)
     if: >-
       github.event_name == 'workflow_dispatch' || contains(inputs.labels, format('package:{0},', inputs.dappnode_repository))
     name: Build package

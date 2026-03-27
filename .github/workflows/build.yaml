@@ -1,29 +1,28 @@
 ---
 #################################################################################
-###                       Pipeline to build on pull requests                  ###
+###                       Reusable build pipeline                            ###
 #################################################################################
 name: Build
+
 on:
-  pull_request:
-    types:
-      - opened
-      - synchronize
-      - reopened
-      - ready_for_review
-      - labeled
-concurrency:
-  group: >-
-    ${{ format('{0}-{1}',
-      github.event.pull_request.head.ref || github.ref_name,
-      github.event.action == 'labeled' && format('label-{0}', github.event.label.name) || 'build') }}
-  cancel-in-progress: true
-permissions:
-  contents: read
+  workflow_call:
+    inputs:
+      source_branch:
+        required: true
+        type: string
+    secrets:
+      CACHIX_AUTH_TOKEN:
+        required: true
+      GCP_SA_GITHUB_RUNNER:
+        required: true
+      GPG_HOPRNET_PRIVATE_KEY:
+        required: true
+
 env:
   CARGO_TERM_COLOR: always
+
 jobs:
   build-binaries:
-    if: github.event.action != 'labeled'
     name: Binary ${{ matrix.architecture }}
     strategy:
       fail-fast: false
@@ -49,7 +48,7 @@ jobs:
     permissions:
       contents: read
     with:
-      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+      source_branch: ${{ inputs.source_branch }}
       version_type: commit
       architecture: ${{ matrix.architecture }}
       cachix_cache_name: hoprnet
@@ -63,7 +62,6 @@ jobs:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
       gpg_private_key: ${{ secrets.GPG_HOPRNET_PRIVATE_KEY }}
   build-docker:
-    if: github.event.action != 'labeled'
     name: Docker
     uses: hoprnet/hopr-workflows/.github/workflows/build-docker.yaml@build-docker-v1
     needs: build-binaries
@@ -72,7 +70,7 @@ jobs:
       pull-requests: write
       id-token: write
     with:
-      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+      source_branch: ${{ inputs.source_branch }}
       version_type: commit
       build_matrix: >-
         [
@@ -91,7 +89,6 @@ jobs:
       gcp_service_account: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
   docs:
-    if: github.event.action != 'labeled'
     name: Docs
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
@@ -101,23 +98,9 @@ jobs:
       - name: Build docs
         uses: hoprnet/hopr-workflows/actions/nix-action@c2aca7e56d25c4a786049ccf816c7f1af8721de8 # nix-action-v1
         with:
-          source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+          source_branch: ${{ inputs.source_branch }}
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           command: |
             set -e
             RUSTDOCFLAGS="-D warnings" nix develop -c cargo doc --no-deps --document-private-items
             nix build -L .#docs
-  build-candidate:
-    if: github.event.action == 'labeled' && github.event.label.name == 'build:candidate'
-    name: Build Candidate
-    runs-on: self-hosted-hoprnet-bigger
-    timeout-minutes: 20
-    permissions:
-      contents: read
-    steps:
-      - name: Build candidate binary
-        uses: hoprnet/hopr-workflows/actions/nix-action@c2aca7e56d25c4a786049ccf816c7f1af8721de8 # nix-action-v1
-        with:
-          source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          command: nix build -L .#hoprd-candidate
