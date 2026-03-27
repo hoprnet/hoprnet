@@ -75,7 +75,7 @@ jobs:
             runner: ${{ inputs.runner_large }}
             timeout: 30
             command: ${{ inputs.lint_command }}
-          - name: Cargo deps
+          - name: Deps
             enabled: ${{ inputs.cargo_deps }}
             runner: ${{ inputs.runner_large }}
             timeout: 10
