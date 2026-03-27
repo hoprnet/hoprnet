@@ -1,8 +1,11 @@
 ---
 #################################################################################
-# Build candidate binaries when explicitly requested via label
+# Label-triggered PR jobs
+#
+# Additive to pr.yaml — runs only on label events, never interferes with
+# the main pipeline's required status checks.
 #################################################################################
-name: Build Candidate
+name: PR Label
 
 on:
   pull_request:
@@ -10,7 +13,7 @@ on:
       - labeled
 
 concurrency:
-  group: ${{ github.event.pull_request.head.ref || github.ref_name }}-build-candidate
+  group: ${{ github.event.pull_request.head.ref || github.ref_name }}-pr-label
   cancel-in-progress: true
 
 permissions:
