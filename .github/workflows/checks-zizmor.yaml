@@ -36,7 +36,7 @@ jobs:
         with:
           source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          command: nix develop -L .#ci -c bash -c "zizmor --format sarif . > results.sarif"
+          command: nix develop -L .#ci -c bash -c "zizmor --config .zizmor.yml --format sarif . > results.sarif"
 
       - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@89a39a4e59826350b863aa6b6252a07ad50cf83e # v4.32.4

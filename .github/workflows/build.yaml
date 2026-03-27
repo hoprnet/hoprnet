@@ -12,7 +12,10 @@ on:
       - ready_for_review
       - labeled
 concurrency:
-  group: ${{ github.event.pull_request.head.ref || github.ref_name }}-build
+  group: >-
+    ${{ format('{0}-{1}',
+      github.event.pull_request.head.ref || github.ref_name,
+      github.event.action == 'labeled' && format('label-{0}', github.event.label.name) || 'build') }}
   cancel-in-progress: true
 permissions:
   contents: read

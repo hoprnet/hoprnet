@@ -110,6 +110,7 @@ jobs:
           PRIVATE_CARGO_REGISTRY_PROXY_URL: ${{ secrets.PRIVATE_CARGO_REGISTRY_PROXY_URL }}
   docs:
     name: Docs
+    if: github.event.pull_request.merged == true
     needs:
       - build-docker
     runs-on: self-hosted-hoprnet-bigger
