@@ -29,7 +29,6 @@ auto_impl = { workspace = true }
 cfg_eval = { workspace = true, optional = true }
 bloomfilter = { workspace = true }
 futures = { workspace = true }
-futures-time = { workspace = true }
 hex = { workspace = true }
 lazy_static = { workspace = true }
 moka = { workspace = true }
