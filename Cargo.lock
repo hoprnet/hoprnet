@@ -4353,7 +4353,7 @@ dependencies = [
 [[package]]
 name = "hopr-api"
 version = "1.4.0"
-source = "git+https://github.com/hoprnet/hopr-api?branch=lukas%2Fstats-update#8a53676d83261381cf85e5af4a5a3a21b54c76f3"
+source = "git+https://github.com/hoprnet/hopr-api?rev=2638cf57d540bd746593cc95bd788171a4582f13#2638cf57d540bd746593cc95bd788171a4582f13"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -5334,6 +5334,7 @@ dependencies = [
  "bytesize",
  "const_format",
  "futures",
+ "hopr-async-runtime",
  "hopr-chain-connector",
  "hopr-lib",
  "hopr-metrics",

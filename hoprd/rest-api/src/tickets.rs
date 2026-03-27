@@ -8,7 +8,6 @@ use axum::{
 use hopr_lib::{
     HoprBalance, ToHex,
     api::tickets::{ChannelStats, TicketManagement},
-    errors::{HoprLibError, HoprStatusError},
     prelude::Hash,
 };
 use serde::Deserialize;
@@ -156,14 +155,14 @@ pub(super) async fn show_ticket_statistics(State(state): State<Arc<InternalState
 
 /// Starts redeeming of all tickets in all channels.
 ///
-/// **WARNING:** this should almost **never** be used as it can issue a large
-/// number of on-chain transactions. The tickets should almost always be aggregated first.
+/// **WARNING:** If there are many unredeemed tickets in all channels, this operation
+/// can incur significant transaction costs.
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/tickets/redeem"),
         description = "Starts redeeming of all tickets in all channels.",
         responses(
-            (status = 204, description = "Tickets redeemed successfully."),
+            (status = 202, description = "Ticket redemption started successfully."),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 412, description = "The node is not ready."),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -176,20 +175,25 @@ pub(super) async fn show_ticket_statistics(State(state): State<Arc<InternalState
     )]
 pub(super) async fn redeem_all_tickets(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
     let hopr = state.hopr.clone();
-    // TODO: needs spawning
-    match hopr.redeem_all_tickets(0).await {
-        Ok(_) => (StatusCode::NO_CONTENT, "").into_response(),
-        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
-            (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
+
+    hopr_async_runtime::prelude::spawn(async move {
+        match hopr.redeem_all_tickets(0).await {
+            Ok(_) => {
+                tracing::info!("all tickets redeemed on API request");
+            }
+            Err(error) => {
+                tracing::error!(%error, "failed to redeem all tickets on API request");
+            }
         }
-        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
-    }
+    });
+
+    (StatusCode::ACCEPTED, "").into_response()
 }
 
 /// Starts redeeming all tickets in the given channel.
 ///
-/// **WARNING:** this should almost **never** be used as it can issue a large
-/// number of on-chain transactions. The tickets should almost always be aggregated first.
+/// **WARNING:** If there are many unredeemed tickets in the given channel, this operation
+/// can incur significant transaction costs.
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets/redeem"),
@@ -198,7 +202,7 @@ pub(super) async fn redeem_all_tickets(State(state): State<Arc<InternalState>>) 
             ("channelId" = String, Path, description = "ID of the channel.", example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")
         ),
         responses(
-            (status = 204, description = "Tickets redeemed successfully."),
+            (status = 202, description = "Tickets redeemed successfully."),
             (status = 400, description = "Invalid channel id.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Tickets were not found for that channel. That means that no messages were sent inside this channel yet.", body = ApiError),
@@ -218,15 +222,20 @@ pub(super) async fn redeem_tickets_in_channel(
     let hopr = state.hopr.clone();
 
     match Hash::from_hex(channel_id.as_str()) {
-        // TODO: needs spawning
-        Ok(channel_id) => match hopr.redeem_tickets_in_channel(&channel_id, 0).await {
-            Ok(_) => (StatusCode::NO_CONTENT, "").into_response(),
-            // Ok(_) => (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
-            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
-                (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
-            }
-            Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
-        },
+        Ok(channel_id) => {
+            hopr_async_runtime::prelude::spawn(async move {
+                match hopr.redeem_tickets_in_channel(&channel_id, 0).await {
+                    Ok(_) => {
+                        tracing::info!(%channel_id, "tickets in channel redeemed on API request");
+                    }
+                    Err(error) => {
+                        tracing::error!(%error, %channel_id, "failed to redeem tickets in channel on API request");
+                    }
+                }
+            });
+
+            (StatusCode::ACCEPTED, "").into_response()
+        }
         Err(_) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
     }
 }
