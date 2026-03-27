@@ -211,6 +211,8 @@ impl TicketQueue for RedbTicketQueue {
                 )))?;
                 table.pop_first()?.map(|(_, v)| v.value())
             };
+            // Commit the pop operation here, even though the deserialization might fail later,
+            // so that we do not render the queue unusable by keeping the corrupted data in.
             tx.commit()?;
             if let Some(ticket_bytes) = maybe_ticket {
                 Ok(Some(postcard::from_bytes(&ticket_bytes)?))

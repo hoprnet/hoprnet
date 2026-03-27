@@ -145,7 +145,7 @@ fn hopr_encoder_bench(c: &mut Criterion) {
                 b.to_async(runtime).iter_batched(|| (create_encoder(&sender), acks.clone()), |(encoder, acks)| async move {
                     encoder.encode_acknowledgements(&acks, &ack_recipient).await.unwrap()
                 },
-                BatchSize::SmallInput)
+                BatchSize::PerIteration)
             }
         );
     }
@@ -206,7 +206,7 @@ fn hopr_decoder_bench(c: &mut Criterion) {
         b.to_async(runtime).iter_batched(
             || (create_decoder(&relay), packet.data.clone()),
             |(decoder, data)| async move { decoder.decode(prev_hop, data).await.unwrap() },
-            BatchSize::SmallInput,
+            BatchSize::PerIteration,
         )
     });
 
@@ -216,7 +216,7 @@ fn hopr_decoder_bench(c: &mut Criterion) {
         b.to_async(runtime).iter_batched(
             || (create_decoder(&relay), packet.data.clone()),
             |(decoder, data)| async move { decoder.decode(prev_hop, data).await.unwrap() },
-            BatchSize::SmallInput,
+            BatchSize::PerIteration,
         )
     });
 
@@ -234,7 +234,7 @@ fn hopr_decoder_bench(c: &mut Criterion) {
                 )
             },
             |(decoder, data)| async move { decoder.decode(prev_hop, data).await.unwrap() },
-            BatchSize::SmallInput,
+            BatchSize::PerIteration,
         )
     });
 }

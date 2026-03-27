@@ -331,11 +331,6 @@ where
             .await
             .map_err(|e| HoprTransportError::Api(e.to_string()))?;
 
-        self.network
-            .clone()
-            .set(transport_network.clone())
-            .map_err(|_| HoprTransportError::Api("transport network viewer already set".into()))?;
-
         let msg_codec = hopr_transport_protocol::HoprBinaryCodec {};
         let (wire_msg_tx, wire_msg_rx) =
             hopr_transport_protocol::stream::process_stream_protocol(msg_codec, transport_network.clone()).await?;
@@ -644,6 +639,12 @@ where
                     ))
             ),
         );
+
+        // Populate the OnceLock at the end, making sure everything before didn't fail.
+        self.network
+            .clone()
+            .set(transport_network)
+            .map_err(|_| HoprTransportError::Api("transport network viewer already set".into()))?;
 
         Ok(((on_incoming_data_rx, unresolved_routing_msg_tx).into(), processes))
     }
