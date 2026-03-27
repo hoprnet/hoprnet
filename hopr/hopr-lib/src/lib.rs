@@ -24,6 +24,8 @@ pub mod constants;
 pub mod errors;
 /// Public traits for interactions with this library.
 pub mod traits;
+/// Public domain types for peer discovery.
+pub mod types;
 /// Utility module with helper types and functionality over hopr-lib behavior.
 pub mod utils;
 
@@ -110,6 +112,7 @@ pub use crate::{
     config::SafeModule,
     constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE},
     errors::{HoprLibError, HoprStatusError},
+    types::{AnnouncedPeer, AnnouncementOrigin},
 };
 
 /// Public routing configuration for session opening in `hopr-lib`.
@@ -1206,7 +1209,7 @@ where
             .map_err(HoprLibError::chain)
     }
 
-    pub async fn accounts_announced_on_chain(&self) -> Result<Vec<AccountEntry>, HoprLibError> {
+    pub async fn announced_peers(&self) -> Result<Vec<AnnouncedPeer>, HoprLibError> {
         Ok(self
             .chain_api
             .stream_accounts(AccountSelector {
@@ -1215,6 +1218,11 @@ where
             })
             .map_err(HoprLibError::chain)
             .await?
+            .map(|entry| AnnouncedPeer {
+                address: entry.chain_addr,
+                multiaddresses: entry.get_multiaddrs().to_vec(),
+                origin: AnnouncementOrigin::Chain,
+            })
             .collect()
             .await)
     }
