@@ -29,23 +29,28 @@ pub(crate) struct MultiaddressSource {
     #[serde_as(as = "Vec<DisplayFromStr>")]
     #[schema(value_type = Vec<String>, example = json!(["/ip4/10.0.2.100/tcp/19093"]))]
     multiaddrs: Vec<Multiaddr>,
-    #[schema(value_type = String, example = "chain")]
+    #[schema(example = "chain")]
     origin: AnnouncementOriginResponse,
 }
 
 #[serde_as]
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
-    "announced": [
+    "announced": ["/ip4/10.0.2.100/tcp/19093"],
+    "announcedSources": [
         { "multiaddrs": ["/ip4/10.0.2.100/tcp/19093"], "origin": "chain" }
     ],
-    "observed": [
-        "/ip4/10.0.2.100/tcp/19093"
-    ]
+    "observed": ["/ip4/10.0.2.100/tcp/19093"]
 }))]
-/// Contains the multiaddresses of peers that are `announced` (grouped by origin) and `observed` by the node.
+#[serde(rename_all = "camelCase")]
+/// Contains the multiaddresses of peers that are `announced` on-chain and `observed` by the node.
 pub(crate) struct NodePeerInfoResponse {
-    announced: Vec<MultiaddressSource>,
+    /// Flat list of announced multiaddresses (legacy, for backward compatibility).
+    #[serde_as(as = "Vec<DisplayFromStr>")]
+    #[schema(value_type = Vec<String>, example = json!(["/ip4/10.0.2.100/tcp/19093"]))]
+    announced: Vec<Multiaddr>,
+    /// Announced multiaddresses grouped by discovery origin.
+    announced_sources: Vec<MultiaddressSource>,
     #[serde_as(as = "Vec<DisplayFromStr>")]
     #[schema(value_type = Vec<String>, example = json!(["/ip4/10.0.2.100/tcp/19093"]))]
     observed: Vec<Multiaddr>,
@@ -96,11 +101,18 @@ pub(super) async fn show_peer_info(
             );
             match res {
                 Ok((announced, observed)) => {
-                    let announced = vec![MultiaddressSource {
-                        multiaddrs: announced,
+                    let announced_sources = vec![MultiaddressSource {
+                        multiaddrs: announced.clone(),
                         origin: AnnouncementOriginResponse::Chain,
                     }];
-                    Ok((StatusCode::OK, Json(NodePeerInfoResponse { announced, observed })))
+                    Ok((
+                        StatusCode::OK,
+                        Json(NodePeerInfoResponse {
+                            announced,
+                            announced_sources,
+                            observed,
+                        }),
+                    ))
                 }
                 Err(error) => Err(ApiErrorStatus::UnknownFailure(error.to_string())),
             }

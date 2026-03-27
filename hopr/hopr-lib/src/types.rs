@@ -1,4 +1,4 @@
-use hopr_api::{Multiaddr, types::primitive::prelude::Address};
+use crate::{Address, Multiaddr};
 
 /// Origin of a peer announcement — how the node learned about this peer.
 ///

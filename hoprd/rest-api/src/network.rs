@@ -218,7 +218,7 @@ pub(crate) struct AnnouncedPeerResponse {
     #[serde_as(as = "Vec<DisplayFromStr>")]
     #[schema(value_type = Vec<String>, example = json!(["/ip4/178.12.1.9/tcp/19092"]))]
     multiaddrs: Vec<Multiaddr>,
-    #[schema(value_type = String, example = "chain")]
+    #[schema(example = "chain")]
     origin: AnnouncementOriginResponse,
 }
 

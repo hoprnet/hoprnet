@@ -179,10 +179,7 @@ pub mod types {
     ///      }
     ///    },
     ///    "origin": {
-    ///      "examples": [
-    ///        "chain"
-    ///      ],
-    ///      "type": "string"
+    ///      "$ref": "#/components/schemas/AnnouncementOriginResponse"
     ///    }
     ///  }
     ///}
@@ -192,7 +189,7 @@ pub mod types {
     pub struct AnnouncedPeerResponse {
         pub address: ::std::string::String,
         pub multiaddrs: ::std::vec::Vec<::std::string::String>,
-        pub origin: ::std::string::String,
+        pub origin: AnnouncementOriginResponse,
     }
     ///How a peer announcement was discovered.
     ///
@@ -840,10 +837,7 @@ pub mod types {
     ///      }
     ///    },
     ///    "origin": {
-    ///      "examples": [
-    ///        "chain"
-    ///      ],
-    ///      "type": "string"
+    ///      "$ref": "#/components/schemas/AnnouncementOriginResponse"
     ///    }
     ///  }
     ///}
@@ -852,7 +846,7 @@ pub mod types {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     pub struct MultiaddressSource {
         pub multiaddrs: ::std::vec::Vec<::std::string::String>,
-        pub origin: ::std::string::String,
+        pub origin: AnnouncementOriginResponse,
     }
     ///Channel information as seen by the node.
     ///
@@ -1097,16 +1091,19 @@ and indexer state.*/
         #[serde(rename = "providerUrl")]
         pub provider_url: ::std::string::String,
     }
-    ///Contains the multiaddresses of peers that are `announced` (grouped by origin) and `observed` by the node.
+    ///Contains the multiaddresses of peers that are `announced` on-chain and `observed` by the node.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Contains the multiaddresses of peers that are `announced` (grouped by origin) and `observed` by the node.",
+    ///  "description": "Contains the multiaddresses of peers that are `announced` on-chain and `observed` by the node.",
     ///  "examples": [
     ///    {
     ///      "announced": [
+    ///        "/ip4/10.0.2.100/tcp/19093"
+    ///      ],
+    ///      "announcedSources": [
     ///        {
     ///          "multiaddrs": [
     ///            "/ip4/10.0.2.100/tcp/19093"
@@ -1122,10 +1119,24 @@ and indexer state.*/
     ///  "type": "object",
     ///  "required": [
     ///    "announced",
+    ///    "announcedSources",
     ///    "observed"
     ///  ],
     ///  "properties": {
     ///    "announced": {
+    ///      "description": "Flat list of announced multiaddresses (legacy, for backward compatibility).",
+    ///      "examples": [
+    ///        [
+    ///          "/ip4/10.0.2.100/tcp/19093"
+    ///        ]
+    ///      ],
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "string"
+    ///      }
+    ///    },
+    ///    "announcedSources": {
+    ///      "description": "Announced multiaddresses grouped by discovery origin.",
     ///      "type": "array",
     ///      "items": {
     ///        "$ref": "#/components/schemas/MultiaddressSource"
@@ -1148,7 +1159,11 @@ and indexer state.*/
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     pub struct NodePeerInfoResponse {
-        pub announced: ::std::vec::Vec<MultiaddressSource>,
+        ///Flat list of announced multiaddresses (legacy, for backward compatibility).
+        pub announced: ::std::vec::Vec<::std::string::String>,
+        ///Announced multiaddresses grouped by discovery origin.
+        #[serde(rename = "announcedSources")]
+        pub announced_sources: ::std::vec::Vec<MultiaddressSource>,
         pub observed: ::std::vec::Vec<::std::string::String>,
     }
     ///Received tickets statistics.
