@@ -1344,6 +1344,57 @@ mod tests {
     }
 
     #[test]
+    fn ticket_manager_inserted_ticket_with_older_epoch_should_be_neglected() -> anyhow::Result<()> {
+        let mgr = create_mgr()?;
+
+        let tickets = generate_tickets()?;
+        assert!(!tickets.is_empty());
+        let channel_id = tickets[0].ticket_id().id;
+
+        let tickets_from_epoch_1 = tickets
+            .iter()
+            .filter(|ticket| ticket.verified_ticket().channel_epoch == 1)
+            .cloned()
+            .collect::<Vec<_>>();
+        assert!(!tickets_from_epoch_1.is_empty());
+
+        let tickets_from_epoch_2 = tickets
+            .iter()
+            .filter(|ticket| ticket.verified_ticket().channel_epoch == 2)
+            .cloned()
+            .collect::<Vec<_>>();
+        assert!(!tickets_from_epoch_2.is_empty());
+
+        for new_ticket in &tickets_from_epoch_2 {
+            let neglected = mgr.insert_incoming_ticket(*new_ticket)?;
+            assert!(neglected.is_empty());
+        }
+
+        for old_ticket in &tickets_from_epoch_1 {
+            let neglected = mgr.insert_incoming_ticket(*old_ticket)?;
+            assert_eq!(vec![old_ticket.ticket], neglected);
+        }
+
+        let stats = mgr.ticket_stats(Some(&channel_id))?;
+
+        assert_eq!(
+            (tickets_from_epoch_1.len() + tickets_from_epoch_2.len()) as u128,
+            stats.winning_tickets
+        );
+        assert_eq!(
+            tickets_from_epoch_2
+                .iter()
+                .map(|t| t.verified_ticket().amount)
+                .sum::<HoprBalance>(),
+            stats.unredeemed_value
+        );
+        assert_eq!(HoprBalance::zero(), stats.rejected_value);
+        assert_eq!(HoprBalance::zero(), stats.redeemed_value);
+
+        Ok(())
+    }
+
+    #[test]
     fn ticket_manager_ticket_insertion_should_neglect_tickets_from_previous_epochs() -> anyhow::Result<()> {
         let mgr = create_mgr()?;
 
