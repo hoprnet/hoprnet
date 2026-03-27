@@ -84,8 +84,7 @@ fn unrealized_value_redb_bench(c: &mut Criterion) {
 }
 
 fn create_multihop_ticket_redb_bench(c: &mut Criterion) {
-    let store = RedbStore::new_temp().unwrap();
-    let manager: HoprTicketManager<RedbStore, RedbTicketQueue> = HoprTicketManager::new(store).unwrap();
+
     let src = ChainKeypair::random();
     let dst = ChainKeypair::random();
     let channel_entry = ChannelEntry::builder()
@@ -98,8 +97,13 @@ fn create_multihop_ticket_redb_bench(c: &mut Criterion) {
         .unwrap();
 
     c.bench_function("create_multihop_ticket_redb", |b| {
-        b.iter(|| {
+        b.iter_with_setup(|| {
+            let store = RedbStore::new_temp().unwrap();
+            let manager: HoprTicketManager<RedbStore, RedbTicketQueue> = HoprTicketManager::new(store).unwrap();
             manager
+        },
+            |manager| {
+                          manager
                 .next_multihop_ticket(
                     black_box(&channel_entry),
                     black_box(2),

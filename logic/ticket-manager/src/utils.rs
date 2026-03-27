@@ -117,16 +117,18 @@ impl OutgoingIndexCache {
     pub fn save<S: OutgoingIndexStore + Send + Sync + 'static>(
         &self,
         store: std::sync::Arc<parking_lot::RwLock<S>>,
-    ) -> Result<(), S::Error> {
+    ) -> Result<(), anyhow::Error> {
         // Clone entries so that we do not hold any locks
         let cache = self.cache.clone();
         let removed = self.removed.clone();
+        let mut failed = 0;
 
         for entry in cache.iter().filter(|e| e.value().is_dirty()) {
             let (channel_id, epoch) = entry.key();
             let index = entry.value().get();
             if let Err(error) = store.write().save_outgoing_index(channel_id, *epoch, index) {
                 tracing::error!(%error, %channel_id, epoch, "failed to save outgoing index");
+                failed += 1;
             } else {
                 tracing::trace!(%channel_id, epoch, index, "saved outgoing index");
                 entry.value().mark_clean();
@@ -136,12 +138,16 @@ impl OutgoingIndexCache {
         for (channel_id, channel_epoch) in removed.iter().map(|e| (e.0, e.1)) {
             if let Err(error) = store.write().delete_outgoing_index(&channel_id, channel_epoch) {
                 tracing::error!(%error, %channel_id, %channel_epoch, "failed to remove outgoing index");
+                failed += 1;
             } else {
                 tracing::trace!(%channel_id, %channel_epoch, "removed outgoing index");
                 self.removed.remove(&(channel_id, channel_epoch));
             }
         }
 
+        if failed > 0 {
+            anyhow::bail!("failed to save {} outgoing index entries", failed);
+        }
         Ok(())
     }
 }

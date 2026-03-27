@@ -441,19 +441,28 @@ where
                 // drain and neglect all the tickets from the queue. The channel has
                 // apparently restarted its lifecycle, and all the tickets from previous epochs
                 // are unredeemable already
-                if queue
+                if let Some(last_ticket) = queue
                     .0
                     .peek()
                     .map_err(TicketManagerError::store)?
-                    .is_some_and(|last| last.verified_ticket().channel_epoch < ticket.verified_ticket().channel_epoch)
                 {
-                    // Count the neglected value and add it to stats
-                    let mut neg = queue.0.drain().map_err(TicketManagerError::store)?;
-                    queue.1.neglected_value += neg.iter().map(|t| t.verified_ticket().amount).sum::<HoprBalance>();
+                    if last_ticket.verified_ticket().channel_epoch < ticket.verified_ticket().channel_epoch {
+                        // Count the neglected value and add it to stats
+                        let mut neg = queue.0.drain().map_err(TicketManagerError::store)?;
+                        queue.1.neglected_value += neg.iter().map(|t| t.verified_ticket().amount).sum::<HoprBalance>();
 
-                    // Ensures allocation according to the number of drained tickets
-                    neglected_tickets.append(&mut neg);
-                    tracing::warn!(%ticket_id, num_neglected = neglected_tickets.len(), "winning ticket has neglected unredeemed tickets from previous epochs");
+                        // Ensures allocation according to the number of drained tickets
+                        neglected_tickets.append(&mut neg);
+                        tracing::warn!(%ticket_id, num_neglected = neglected_tickets.len(), "winning ticket has neglected unredeemed tickets from previous epochs");
+                    }
+                    else if last_ticket.verified_ticket().channel_epoch > ticket.verified_ticket().channel_epoch {
+                        tracing::warn!(%ticket_id, "tried to insert incoming ticket from an older epoch");
+
+                        queue.1.winning_tickets += 1; // Still count the ticket as winning
+                        queue.1.neglected_value += ticket.verified_ticket().amount;
+                        neglected_tickets.push(ticket.ticket);
+                        return Ok(neglected_tickets);
+                    }
                 }
                 queue.0.push(ticket).map_err(TicketManagerError::store)?;
                 queue.1.winning_tickets += 1;

@@ -118,7 +118,8 @@ impl From<ChannelStats> for NodeTicketStatisticsResponse {
         Self {
             winning_count: value.winning_tickets as u64,
             unredeemed_value: value.unredeemed_value,
-            redeemed_value: Default::default(), // TODO: calculate redeemed value
+            #[allow(deprecated)] // TODO: remove once blokli#237 is merged
+            redeemed_value: value.redeemed_value,
             neglected_value: value.neglected_value,
             rejected_value: value.rejected_value,
         }

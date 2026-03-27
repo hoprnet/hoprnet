@@ -51,7 +51,7 @@ pub struct HoprProtocolConfig {
     pub path_planner: hopr_transport_path::PathPlannerConfig,
     /// Path where to store received winning tickets.
     ///
-    /// If omitted, the ticket storage will be in temporary directory and
+    /// If omitted, the ticket storage will be in a temporary directory and
     /// the tickets might be wiped on application exit.
     #[cfg_attr(feature = "serde", serde(skip))]
     pub ticket_storage_path: Option<String>,
@@ -93,6 +93,10 @@ pub struct HoprPacketPipelineConfig {
     pub pipeline: PacketPipelineConfig,
     /// Defines how often should the packet pipeline synchronize the outgoing ticket
     /// indices to the persistent storage.
+    ///
+    /// If synchronization to a persistent storage does not happen and the node restarts,
+    /// the node will start from the current on-chain channel index and could as a result
+    /// be creating invalid outgoing tickets.
     ///
     /// Default is 15 seconds, minimum is 1 second.
     #[default(default_out_index_sync_period())]

@@ -75,7 +75,7 @@ use std::{
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt, TryStreamExt, channel::mpsc::channel, pin_mut};
 use futures_time::future::FutureExt as FuturesTimeFutureExt;
 use hopr_api::{
-    chain::{AccountSelector, AnnouncementError, ChannelSelector, *},
+    chain::*,
     ct::{CoverTrafficGeneration, ProbingTrafficGeneration},
     node::{ChainInfo, CloseChannelResult, OpenChannelResult, SafeModuleConfig, state::AtomicHoprState},
 };
