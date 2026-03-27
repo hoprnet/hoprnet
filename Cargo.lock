@@ -4951,7 +4951,6 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "bimap",
- "dashmap",
  "futures",
  "hopr-api",
  "thiserror 2.0.18",

@@ -123,6 +123,8 @@ where
     fn enqueue_redemption(&self, channel_id: &ChannelId) -> Result<(), StrategyError> {
         let redemptions = self.running_redemptions.upgradable_read();
         if !redemptions.contains(channel_id) {
+            tracing::debug!(%channel_id, "attempting to start redemption in channel");
+
             let tmgr = self.ticket_manager.clone();
             let client = self.hopr_chain_actions.clone();
             let min_value = self.cfg.minimum_redeem_ticket_value;
@@ -350,7 +352,17 @@ mod tests {
 
     type TestConnector = Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>;
 
-    #[tokio::test]
+    async fn await_redemption_queue_empty(redeems: Arc<parking_lot::RwLock<AbortableList<ChannelId>>>) {
+        loop {
+            hopr_async_runtime::prelude::sleep(Duration::from_millis(100)).await;
+
+            if redeems.read().is_empty() {
+                break;
+            }
+        }
+    }
+
+    #[test_log::test(tokio::test)]
     async fn test_auto_redeeming_strategy_redeem() -> anyhow::Result<()> {
         let ack_ticket = generate_random_ack_ticket(0, 5)?;
 
@@ -382,12 +394,14 @@ mod tests {
                 Ok(futures::stream::once(futures::future::ok(RedemptionResult::Redeemed(ack_ticket.ticket))).boxed())
             });
 
-        {
-            let ars = AutoRedeemingStrategy::new(cfg, Arc::new(connector), Arc::new(mock_tmgr));
+        let ars = AutoRedeemingStrategy::new(cfg, Arc::new(connector), Arc::new(mock_tmgr));
 
-            ars.on_acknowledged_winning_ticket(&ack_ticket.ticket).await?;
-            assert!(ars.on_tick().await.is_err());
-        }
+        ars.on_acknowledged_winning_ticket(&ack_ticket.ticket).await?;
+        assert!(ars.on_tick().await.is_err());
+
+        await_redemption_queue_empty(ars.running_redemptions.clone())
+            .timeout(futures_time::time::Duration::from_secs(5))
+            .await?;
 
         Ok(())
     }
@@ -420,10 +434,22 @@ mod tests {
             )
             .return_once(|_: TestConnector, _, _| Ok(futures::stream::empty().boxed()));
 
-        {
-            let ars = AutoRedeemingStrategy::new(cfg, Arc::new(connector), Arc::new(mock_tmgr));
-            ars.on_tick().await?;
-        }
+        mock_tmgr
+            .expect_redeem_stream()
+            .once()
+            .with(
+                mockall::predicate::always(),
+                mockall::predicate::eq(*CHANNEL_2.get_id()),
+                mockall::predicate::eq(Some(cfg.minimum_redeem_ticket_value)),
+            )
+            .return_once(|_: TestConnector, _, _| Ok(futures::stream::empty().boxed()));
+
+        let ars = AutoRedeemingStrategy::new(cfg, Arc::new(connector), Arc::new(mock_tmgr));
+        ars.on_tick().await?;
+
+        await_redemption_queue_empty(ars.running_redemptions.clone())
+            .timeout(futures_time::time::Duration::from_secs(5))
+            .await?;
 
         Ok(())
     }
@@ -459,18 +485,20 @@ mod tests {
             )
             .return_once(move |_: TestConnector, _, _| Ok(futures::stream::empty().boxed()));
 
-        {
-            let ars = AutoRedeemingStrategy::new(cfg, Arc::new(connector), Arc::new(mock_tmgr));
-            ars.on_own_channel_changed(
-                &channel,
-                ChannelDirection::Incoming,
-                ChannelChange::Status {
-                    left: ChannelStatus::Open,
-                    right: channel.status,
-                },
-            )
+        let ars = AutoRedeemingStrategy::new(cfg, Arc::new(connector), Arc::new(mock_tmgr));
+        ars.on_own_channel_changed(
+            &channel,
+            ChannelDirection::Incoming,
+            ChannelChange::Status {
+                left: ChannelStatus::Open,
+                right: channel.status,
+            },
+        )
+        .await?;
+
+        await_redemption_queue_empty(ars.running_redemptions.clone())
+            .timeout(futures_time::time::Duration::from_secs(5))
             .await?;
-        }
 
         Ok(())
     }
@@ -488,54 +516,56 @@ mod tests {
         .await?;
         connector.connect().await?;
 
-        {
-            let cfg = AutoRedeemingStrategyConfig {
-                minimum_redeem_ticket_value: 0.into(),
-                redeem_on_winning: true,
-                ..Default::default()
-            };
+        let cfg = AutoRedeemingStrategyConfig {
+            minimum_redeem_ticket_value: 0.into(),
+            redeem_on_winning: true,
+            ..Default::default()
+        };
 
-            let mut mock_tmgr = MockTicketMgmt::new();
-            mock_tmgr
-                .expect_redeem_stream()
-                .once()
-                .with(
-                    mockall::predicate::always(),
-                    mockall::predicate::eq(*CHANNEL_1.get_id()),
-                    mockall::predicate::eq(Some(cfg.minimum_redeem_ticket_value)),
+        let mut mock_tmgr = MockTicketMgmt::new();
+        mock_tmgr
+            .expect_redeem_stream()
+            .once()
+            .with(
+                mockall::predicate::always(),
+                mockall::predicate::eq(*CHANNEL_1.get_id()),
+                mockall::predicate::eq(Some(cfg.minimum_redeem_ticket_value)),
+            )
+            .return_once(move |_: TestConnector, _, _| {
+                Ok(futures::stream::once(
+                    futures::future::ok(RedemptionResult::Redeemed(ack_ticket_1.ticket))
+                        .delay(futures_time::time::Duration::from_millis(500)),
                 )
-                .return_once(move |_: TestConnector, _, _| {
-                    Ok(futures::stream::once(
-                        futures::future::ok(RedemptionResult::Redeemed(ack_ticket_1.ticket))
-                            .delay(futures_time::time::Duration::from_millis(500)),
-                    )
-                    .boxed())
-                });
+                .boxed())
+            });
 
-            let ars = AutoRedeemingStrategy::new(cfg, Arc::new(connector), Arc::new(mock_tmgr));
-            ars.on_acknowledged_winning_ticket(&ack_ticket_1.ticket).await?;
-            assert!(matches!(
-                ars.on_acknowledged_winning_ticket(&ack_ticket_1.ticket).await,
-                Err(StrategyError::InProgress)
-            ));
+        let ars = AutoRedeemingStrategy::new(cfg, Arc::new(connector), Arc::new(mock_tmgr));
+        ars.on_acknowledged_winning_ticket(&ack_ticket_1.ticket).await?;
+        assert!(matches!(
+            ars.on_acknowledged_winning_ticket(&ack_ticket_1.ticket).await,
+            Err(StrategyError::InProgress)
+        ));
 
-            let mut channel = *CHANNEL_1;
-            channel.status = ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100)));
+        let mut channel = *CHANNEL_1;
+        channel.status = ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100)));
 
-            assert!(matches!(
-                ars.on_own_channel_changed(
-                    &channel,
-                    ChannelDirection::Incoming,
-                    ChannelChange::Status {
-                        left: ChannelStatus::Open,
-                        right: channel.status,
-                    }
-                )
-                .await,
-                Err(StrategyError::InProgress)
-            ));
-            assert!(ars.on_tick().await.is_err());
-        }
+        assert!(matches!(
+            ars.on_own_channel_changed(
+                &channel,
+                ChannelDirection::Incoming,
+                ChannelChange::Status {
+                    left: ChannelStatus::Open,
+                    right: channel.status,
+                }
+            )
+            .await,
+            Err(StrategyError::InProgress)
+        ));
+        assert!(ars.on_tick().await.is_err());
+
+        await_redemption_queue_empty(ars.running_redemptions.clone())
+            .timeout(futures_time::time::Duration::from_secs(5))
+            .await?;
 
         Ok(())
     }
