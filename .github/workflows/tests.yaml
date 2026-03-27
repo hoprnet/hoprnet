@@ -41,7 +41,7 @@ on:
       integration_test_command:
         required: false
         type: string
-        default: "nix develop -c cargo test --test '*' -- --test-threads=1"
+        default: "nix develop -c cargo nextest run --test '*' -j 1"
       nightly_test_command:
         required: false
         type: string
@@ -60,11 +60,11 @@ on:
         required: false
         type: string
         default: |
-          nix develop .#coverage -c cargo llvm-cov \
+          nix develop .#coverage -c cargo llvm-cov nextest \
             --workspace \
             --test '*' \
             --lcov --output-path coverage.lcov \
-            -- --test-threads=1
+            -j 1
       runner:
         required: false
         type: string

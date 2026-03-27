@@ -206,58 +206,88 @@
               projectBuildArgs // { cargoExtraArgs = "-F capture"; }
             );
 
-            test-unit = fixUtoipaEmbedPaths (
-              rust-builder-local.callPackage nixLib.mkRustPackage (
-                projectBuildArgs
-                // {
-                  src = testSrc;
-                  cargoExtraArgs = "-F allocator-jemalloc";
-                  runTests = true;
-                  prependPackageName = false;
-                  cargoTestExtraArgs = "--lib";
-                }
-              )
-            );
+            test-unit =
+              (fixUtoipaEmbedPaths (
+                rust-builder-local.callPackage nixLib.mkRustPackage (
+                  projectBuildArgs
+                  // {
+                    src = testSrc;
+                    cargoExtraArgs = "-F allocator-jemalloc";
+                    runTests = true;
+                    prependPackageName = false;
+                    cargoTestExtraArgs = "--lib";
+                    extraNativeBuildInputs = [ pkgs.cargo-nextest ];
+                  }
+                )
+              )).overrideAttrs
+                (_: {
+                  checkPhaseCargoCommand = ''
+                    cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -F allocator-jemalloc --lib
+                  '';
+                });
 
-            test-integration = fixUtoipaEmbedPaths (
-              rust-builder-local.callPackage nixLib.mkRustPackage (
-                projectBuildArgs
-                // {
-                  src = testSrc;
-                  cargoExtraArgs = "-F allocator-jemalloc";
-                  runTests = true;
-                  prependPackageName = false;
-                  cargoTestExtraArgs = "--test '*' -- --test-threads=1";
-                }
-              )
-            );
+            test-integration =
+              (fixUtoipaEmbedPaths (
+                rust-builder-local.callPackage nixLib.mkRustPackage (
+                  projectBuildArgs
+                  // {
+                    src = testSrc;
+                    cargoExtraArgs = "-F allocator-jemalloc";
+                    runTests = true;
+                    prependPackageName = false;
+                    cargoTestExtraArgs = "--test '*' -- --test-threads=1";
+                    extraNativeBuildInputs = [ pkgs.cargo-nextest ];
+                  }
+                )
+              )).overrideAttrs
+                (_: {
+                  checkPhaseCargoCommand = ''
+                    cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -F allocator-jemalloc --test '*' -j 1
+                  '';
+                });
 
-            test-nightly = fixUtoipaEmbedPaths (
-              rust-builder-local-nightly.callPackage nixLib.mkRustPackage (
-                projectBuildArgs
-                // {
-                  src = testSrc;
-                  cargoExtraArgs = "-Z panic-abort-tests -F allocator-jemalloc";
-                  runTests = true;
-                  prependPackageName = false;
-                  cargoTestExtraArgs = "--lib";
-                }
-              )
-            );
+            test-nightly =
+              (fixUtoipaEmbedPaths (
+                rust-builder-local-nightly.callPackage nixLib.mkRustPackage (
+                  projectBuildArgs
+                  // {
+                    src = testSrc;
+                    cargoExtraArgs = "-Z panic-abort-tests -F allocator-jemalloc";
+                    runTests = true;
+                    prependPackageName = false;
+                    cargoTestExtraArgs = "--lib";
+                    extraNativeBuildInputs = [ pkgs.cargo-nextest ];
+                  }
+                )
+              )).overrideAttrs
+                (_: {
+                  checkPhaseCargoCommand = ''
+                    cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -Z panic-abort-tests -F allocator-jemalloc --lib
+                  '';
+                });
 
             # Code coverage (outputs LCOV report)
-            coverage-unit = fixUtoipaEmbedPaths (
-              rust-builder-local-coverage.callPackage nixLib.mkRustPackage (
-                projectBuildArgs
-                // {
-                  src = testSrc;
-                  cargoExtraArgs = "-F allocator-jemalloc";
-                  runCoverage = true;
-                  prependPackageName = false;
-                  cargoLlvmCovExtraArgs = "--lcov --output-path $out --lib";
-                }
-              )
-            );
+            coverage-unit =
+              (fixUtoipaEmbedPaths (
+                rust-builder-local-coverage.callPackage nixLib.mkRustPackage (
+                  projectBuildArgs
+                  // {
+                    src = testSrc;
+                    cargoExtraArgs = "-F allocator-jemalloc";
+                    runCoverage = true;
+                    prependPackageName = false;
+                    cargoLlvmCovExtraArgs = "--lcov --output-path $out --lib";
+                    extraNativeBuildInputs = [ pkgs.cargo-nextest ];
+                  }
+                )
+              )).overrideAttrs
+                (_: {
+                  buildPhaseCargoCommand = ''
+                    cargo llvm-cov nextest --lcov --output-path $out --lib \
+                      ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} \
+                      --workspace -F allocator-jemalloc
+                  '';
+                });
 
             hoprd-clippy = rust-builder-local.callPackage nixLib.mkRustPackage (
               projectBuildArgs // { runClippy = true; }
@@ -472,6 +502,7 @@
               cargo-machete
               cargo-shear
               cargo-insta
+              cargo-nextest
               foundry-bin
               nfpm
               envsubst
@@ -586,6 +617,7 @@
             withLlvmTools = true;
             extraPackages = with pkgs; [
               sqlite
+              cargo-nextest
             ];
           };
 
