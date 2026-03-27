@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::Arc};
+// HashMap is used inside the utoipa macro attribute on the `configuration` endpoint.
+#[allow(unused_imports)]
+use std::collections::HashMap;
+use std::sync::Arc;
 
 use axum::{
     extract::{Json, State},
