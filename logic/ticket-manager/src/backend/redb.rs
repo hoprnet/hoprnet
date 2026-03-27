@@ -76,7 +76,10 @@ impl OutgoingIndexStore for RedbStore {
         let table = tx.open_table(OUT_IDX_TABLE)?;
         Ok(table
             .iter()?
-            .filter_map(|v| v.inspect_err(|error| tracing::error!(%error, "outgoing index corrupted in redb storage")).ok())
+            .filter_map(|v| {
+                v.inspect_err(|error| tracing::error!(%error, "outgoing index corrupted in redb storage"))
+                    .ok()
+            })
             .map(|(k, _)| (k.value().0.into(), k.value().1))
             .collect::<Vec<_>>()
             .into_iter())
