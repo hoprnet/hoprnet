@@ -61,7 +61,6 @@ jobs:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: ${{ matrix.timeout }}
-    if: matrix.enabled
     strategy:
       fail-fast: false
       matrix:
@@ -88,6 +87,7 @@ jobs:
             command: ${{ inputs.audit_command }}
     steps:
       - name: Run ${{ matrix.name }}
+        if: matrix.enabled
         uses: hoprnet/hopr-workflows/actions/nix-action@c2aca7e56d25c4a786049ccf816c7f1af8721de8 # nix-action-v1
         with:
           source_branch: ${{ inputs.source_branch }}
