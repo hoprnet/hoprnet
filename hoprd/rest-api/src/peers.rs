@@ -196,3 +196,57 @@ pub(super) async fn ping_peer(
         Err(_) => Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::PeerNotFound).into_response()),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn multiaddress_source_should_serialize_with_single_multiaddress() -> anyhow::Result<()> {
+        let source = MultiaddressSource {
+            multiaddress: "/ip4/1.2.3.4/tcp/9091".parse()?,
+            origin: AnnouncementOriginResponse::Chain,
+        };
+
+        let json = serde_json::to_value(&source)?;
+        assert_eq!(json["multiaddress"], "/ip4/1.2.3.4/tcp/9091");
+        assert_eq!(json["origin"], "chain");
+        Ok(())
+    }
+
+    #[test]
+    fn node_peer_info_response_should_include_both_announced_fields() -> anyhow::Result<()> {
+        let ma: Multiaddr = "/ip4/10.0.2.100/tcp/19093".parse()?;
+        let response = NodePeerInfoResponse {
+            announced: vec![ma.clone()],
+            announced_sources: vec![MultiaddressSource {
+                multiaddress: ma,
+                origin: AnnouncementOriginResponse::Chain,
+            }],
+            observed: vec!["/ip4/10.0.2.100/tcp/19094".parse()?],
+        };
+
+        let json = serde_json::to_value(&response)?;
+        assert!(json["announced"].is_array());
+        assert_eq!(json["announced"][0], "/ip4/10.0.2.100/tcp/19093");
+        assert!(json["announcedSources"].is_array());
+        assert_eq!(json["announcedSources"][0]["multiaddress"], "/ip4/10.0.2.100/tcp/19093");
+        assert_eq!(json["announcedSources"][0]["origin"], "chain");
+        assert!(json["observed"].is_array());
+        Ok(())
+    }
+
+    #[test]
+    fn node_peer_info_response_should_serialize_empty_sources_when_no_announcements() -> anyhow::Result<()> {
+        let response = NodePeerInfoResponse {
+            announced: vec![],
+            announced_sources: vec![],
+            observed: vec!["/ip4/10.0.2.100/tcp/19094".parse()?],
+        };
+
+        let json = serde_json::to_value(&response)?;
+        assert_eq!(json["announced"].as_array().unwrap().len(), 0);
+        assert_eq!(json["announcedSources"].as_array().unwrap().len(), 0);
+        Ok(())
+    }
+}

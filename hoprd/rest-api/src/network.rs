@@ -343,3 +343,92 @@ pub(super) async fn graph(
 
     (StatusCode::OK, [(axum::http::header::CONTENT_TYPE, "text/plain")], dot).into_response()
 }
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use super::*;
+
+    #[test]
+    fn announcement_origin_response_should_serialize_as_lowercase_string() {
+        assert_eq!(
+            serde_json::to_string(&AnnouncementOriginResponse::Chain).unwrap(),
+            "\"chain\""
+        );
+        assert_eq!(
+            serde_json::to_string(&AnnouncementOriginResponse::Dht).unwrap(),
+            "\"dht\""
+        );
+    }
+
+    #[test]
+    fn announcement_origin_response_should_deserialize_from_lowercase_string() {
+        assert_eq!(
+            serde_json::from_str::<AnnouncementOriginResponse>("\"chain\"").unwrap(),
+            AnnouncementOriginResponse::Chain
+        );
+        assert_eq!(
+            serde_json::from_str::<AnnouncementOriginResponse>("\"dht\"").unwrap(),
+            AnnouncementOriginResponse::Dht
+        );
+    }
+
+    #[test]
+    fn announcement_origin_response_should_deserialize_case_insensitively_via_strum() {
+        assert_eq!(
+            AnnouncementOriginResponse::from_str("Chain").unwrap(),
+            AnnouncementOriginResponse::Chain
+        );
+        assert_eq!(
+            AnnouncementOriginResponse::from_str("CHAIN").unwrap(),
+            AnnouncementOriginResponse::Chain
+        );
+        assert_eq!(
+            AnnouncementOriginResponse::from_str("DHT").unwrap(),
+            AnnouncementOriginResponse::Dht
+        );
+    }
+
+    #[test]
+    fn announcement_origin_response_should_display_as_lowercase() {
+        assert_eq!(AnnouncementOriginResponse::Chain.to_string(), "chain");
+        assert_eq!(AnnouncementOriginResponse::Dht.to_string(), "dht");
+    }
+
+    #[test]
+    fn announcement_origin_response_should_reject_invalid_string() {
+        assert!(AnnouncementOriginResponse::from_str("invalid").is_err());
+    }
+
+    #[test]
+    fn chain_origin_should_convert_from_domain_type() {
+        assert_eq!(
+            AnnouncementOriginResponse::from(hopr_lib::AnnouncementOrigin::Chain),
+            AnnouncementOriginResponse::Chain
+        );
+    }
+
+    #[test]
+    fn dht_origin_should_convert_from_domain_type() {
+        assert_eq!(
+            AnnouncementOriginResponse::from(hopr_lib::AnnouncementOrigin::DHT),
+            AnnouncementOriginResponse::Dht
+        );
+    }
+
+    #[test]
+    fn announced_peer_response_should_serialize_with_origin() -> anyhow::Result<()> {
+        let response = AnnouncedPeerResponse {
+            address: Address::default(),
+            multiaddrs: vec!["/ip4/1.2.3.4/tcp/9091".parse()?],
+            origin: AnnouncementOriginResponse::Chain,
+        };
+
+        let json = serde_json::to_value(&response)?;
+        assert_eq!(json["origin"], "chain");
+        assert!(json["multiaddrs"].is_array());
+        assert!(json["address"].is_string());
+        Ok(())
+    }
+}
