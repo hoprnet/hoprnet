@@ -184,8 +184,13 @@ pub(super) async fn connected(State(state): State<Arc<InternalState>>) -> impl I
 // ── Announced peers endpoint ────────────────────────────────────────────────
 
 /// How a peer announcement was discovered.
-#[derive(Debug, Clone, Copy, serde::Serialize, utoipa::ToSchema)]
-#[serde(rename_all = "camelCase")]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, strum::Display, strum::EnumString,
+    utoipa::ToSchema,
+)]
+#[strum(serialize_all = "lowercase", ascii_case_insensitive)]
+#[serde(rename_all = "lowercase")]
+#[schema(example = "chain")]
 pub(crate) enum AnnouncementOriginResponse {
     /// Announced via on-chain registration.
     Chain,

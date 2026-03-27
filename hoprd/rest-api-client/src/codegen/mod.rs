@@ -198,6 +198,9 @@ pub mod types {
     /// ```json
     ///{
     ///  "description": "How a peer announcement was discovered.",
+    ///  "examples": [
+    ///    "chain"
+    ///  ],
     ///  "type": "string",
     ///  "enum": [
     ///    "chain",
