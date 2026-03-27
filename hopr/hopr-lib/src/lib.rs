@@ -268,9 +268,9 @@ pub type HoprTransportIO = socket::HoprSocket<
     futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>,
 >;
 
-type NewTicketEvents = (
-    async_broadcast::Sender<VerifiedTicket>,
-    async_broadcast::InactiveReceiver<VerifiedTicket>,
+type TicketEvents = (
+    async_broadcast::Sender<TicketEvent>,
+    async_broadcast::InactiveReceiver<TicketEvent>,
 );
 
 /// Time to wait until the node's keybinding appears on-chain
@@ -311,7 +311,7 @@ where
     state: Arc<api::node::state::AtomicHoprState>,
     transport_api: HoprTransport<Chain, Graph, Net>,
     chain_api: Chain,
-    winning_ticket_subscribers: NewTicketEvents,
+    ticket_event_subscribers: TicketEvents,
     processes: OnceLock<AbortableList<HoprLibProcess>>,
 }
 
@@ -378,7 +378,7 @@ where
             transport_api: hopr_transport_api,
             chain_api: hopr_chain_api,
             processes: OnceLock::new(),
-            winning_ticket_subscribers: (new_tickets_tx, new_tickets_rx.deactivate()),
+            ticket_event_subscribers: (new_tickets_tx, new_tickets_rx.deactivate()),
         })
     }
 
@@ -634,13 +634,12 @@ where
         let (tickets_tx, tickets_rx) = channel(8192);
         let (tickets_rx, tickets_handle) = futures::stream::abortable(tickets_rx);
         processes.insert(HoprLibProcess::TicketEvents, tickets_handle);
-        let new_ticket_tx = self.winning_ticket_subscribers.0.clone();
+        let new_ticket_tx = self.ticket_event_subscribers.0.clone();
         spawn(
             tickets_rx
-                .filter_map(|ticket: TicketEvent| futures::future::ready(ticket.try_as_winning_ticket()))
-                .for_each(move |ticket| {
-                    if let Err(error) = new_ticket_tx.try_broadcast(ticket.ticket) {
-                        tracing::error!(%error, "failed to broadcast new winning ticket to subscribers");
+                .for_each(move |event| {
+                    if let Err(error) = new_ticket_tx.try_broadcast(event) {
+                        tracing::error!(%error, "failed to broadcast new ticket event to subscribers");
                     }
                     futures::future::ready(())
                 })
@@ -1355,8 +1354,8 @@ where
         self.transport_api.ticket_manager()
     }
 
-    pub fn subscribe_winning_tickets(&self) -> impl Stream<Item = VerifiedTicket> + Send + 'static {
-        self.winning_ticket_subscribers.1.activate_cloned()
+    pub fn subscribe_ticket_events(&self) -> impl Stream<Item = TicketEvent> + Send + 'static {
+        self.ticket_event_subscribers.1.activate_cloned()
     }
 
     pub async fn withdraw_tokens(&self, recipient: Address, amount: HoprBalance) -> Result<Hash, HoprLibError> {

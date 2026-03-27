@@ -313,7 +313,8 @@ async fn main_inner(cfg: HoprdConfig, hopr_keys: HoprKeys) -> anyhow::Result<()>
         hopr_strategy::stream_events_to_strategy_with_tick(
             multi_strategy,
             chain_connector.subscribe()?,
-            node.subscribe_winning_tickets(),
+            node.subscribe_ticket_events()
+                .filter_map(|e| futures::future::ready(e.try_as_winning_ticket().map(|t| t.ticket))),
             cfg.strategy.execution_interval,
             hopr_keys.chain_key.public().to_address(),
         ),

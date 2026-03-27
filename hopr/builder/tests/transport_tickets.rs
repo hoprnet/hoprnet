@@ -1,7 +1,7 @@
 use std::{ops::Mul, time::Duration};
 
 use anyhow::Context;
-use futures::AsyncWriteExt;
+use futures::{AsyncWriteExt, StreamExt, pin_mut};
 use futures_time::future::FutureExt as _;
 use hopr_builder::{
     hopr_lib::{HoprBalance, HoprLibError, UnitaryFloatOps},
@@ -59,43 +59,43 @@ async fn relaying_message_rejected_when_channel_out_of_funding(
         .await
         .context("initial write failed")??;
 
-    let stats_before = mid
-        .inner()
-        .ticket_statistics()
-        .await
-        .context("failed to get ticket statistics")?;
-
     // Continuously send until rejected_value increases (channel funds exhausted).
-    // Background probing accelerates fund depletion alongside our writes.
-    let mut write_succeeded_at_least_once = false;
-    async {
+    // Background probing speeds up fund depletion alongside our writes.
+    let write_succeeded_at_least_once = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let write_succeeded_at_least_once_1 = write_succeeded_at_least_once.clone();
+    let write_fut = std::pin::pin!(async move {
         loop {
             match session
                 .write_all(&sent_data)
                 .timeout(futures_time::time::Duration::from_millis(500))
                 .await
             {
-                Ok(Ok(())) => write_succeeded_at_least_once = true,
+                Ok(Ok(())) => write_succeeded_at_least_once_1.store(true, std::sync::atomic::Ordering::Release),
                 Ok(Err(_)) | Err(_) => {} // write failed or timed out — channel may be drained
             }
             sleep(Duration::from_millis(500)).await;
 
-            let stats_after = mid
-                .inner()
-                .ticket_statistics()
-                .await
-                .context("failed to get ticket statistics")?;
-            if stats_after.rejected_value > stats_before.rejected_value {
-                return anyhow::Ok(());
-            }
+            // This future never completes
         }
-    }
-    .timeout(futures_time::time::Duration::from_secs(120))
-    .await
-    .map_err(|_| anyhow::anyhow!("timed out waiting for ticket rejection after fund exhaustion"))??;
+    });
+
+    let ticket_event_stream = mid
+        .inner()
+        .subscribe_ticket_events()
+        .filter_map(|evt| futures::future::ready(evt.try_as_rejected_ticket()));
+
+    pin_mut!(ticket_event_stream);
+
+    let wait_for_rejection_fut = ticket_event_stream.next();
+
+    // Keep on writing and wait for the rejected ticket
+    let _ = futures::future::select(write_fut, wait_for_rejection_fut)
+        .timeout(futures_time::time::Duration::from_secs(120))
+        .await
+        .map_err(|_| anyhow::anyhow!("timed out waiting for ticket rejection after fund exhaustion"))?;
 
     assert!(
-        write_succeeded_at_least_once,
+        write_succeeded_at_least_once.load(std::sync::atomic::Ordering::Acquire),
         "at least one write should have succeeded before the channel was exhausted"
     );
 
