@@ -20,7 +20,7 @@ on:
         required: false
         type: boolean
         default: true
-      cargo_deps:
+      deps:
         required: false
         type: boolean
         default: true
@@ -36,7 +36,7 @@ on:
         required: false
         type: string
         default: "nix run -L .#check"
-      cargo_deps_command:
+      deps_command:
         required: false
         type: string
         default: 'nix develop .#ci -c bash -c "cargo machete && cargo shear"'
@@ -76,10 +76,10 @@ jobs:
             timeout: 30
             command: ${{ inputs.lint_command }}
           - name: Deps
-            enabled: ${{ inputs.cargo_deps }}
+            enabled: ${{ inputs.deps }}
             runner: ${{ inputs.runner_large }}
             timeout: 10
-            command: ${{ inputs.cargo_deps_command }}
+            command: ${{ inputs.deps_command }}
           - name: Audit
             enabled: ${{ inputs.audit }}
             runner: ${{ inputs.runner_large }}
