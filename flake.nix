@@ -221,8 +221,10 @@
                 )
               )).overrideAttrs
                 (_: {
-                  checkPhaseCargoCommand = ''
+                  checkPhase = ''
+                    runHook preCheck
                     cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -F allocator-jemalloc --lib
+                    runHook postCheck
                   '';
                 });
 
@@ -241,8 +243,10 @@
                 )
               )).overrideAttrs
                 (_: {
-                  checkPhaseCargoCommand = ''
+                  checkPhase = ''
+                    runHook preCheck
                     cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -F allocator-jemalloc --test '*' -j 1
+                    runHook postCheck
                   '';
                 });
 
@@ -261,8 +265,10 @@
                 )
               )).overrideAttrs
                 (_: {
-                  checkPhaseCargoCommand = ''
+                  checkPhase = ''
+                    runHook preCheck
                     cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -Z panic-abort-tests -F allocator-jemalloc --lib
+                    runHook postCheck
                   '';
                 });
 
@@ -282,10 +288,12 @@
                 )
               )).overrideAttrs
                 (_: {
-                  buildPhaseCargoCommand = ''
+                  buildPhase = ''
+                    runHook preBuild
                     cargo llvm-cov nextest --lcov --output-path $out --lib \
                       ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} \
                       --workspace -F allocator-jemalloc
+                    runHook postBuild
                   '';
                 });
 
