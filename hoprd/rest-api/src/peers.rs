@@ -17,18 +17,18 @@ use tracing::debug;
 
 use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState, network::AnnouncementOriginResponse};
 
-/// Multiaddresses grouped by their discovery origin.
+/// A multiaddress paired with its discovery origin.
 #[serde_as]
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
-    "multiaddrs": ["/ip4/10.0.2.100/tcp/19093"],
+    "multiaddress": "/ip4/10.0.2.100/tcp/19093",
     "origin": "chain"
 }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct MultiaddressSource {
-    #[serde_as(as = "Vec<DisplayFromStr>")]
-    #[schema(value_type = Vec<String>, example = json!(["/ip4/10.0.2.100/tcp/19093"]))]
-    multiaddrs: Vec<Multiaddr>,
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String, example = "/ip4/10.0.2.100/tcp/19093")]
+    multiaddress: Multiaddr,
     #[schema(example = "chain")]
     origin: AnnouncementOriginResponse,
 }
@@ -38,7 +38,7 @@ pub(crate) struct MultiaddressSource {
 #[schema(example = json!({
     "announced": ["/ip4/10.0.2.100/tcp/19093"],
     "announcedSources": [
-        { "multiaddrs": ["/ip4/10.0.2.100/tcp/19093"], "origin": "chain" }
+        { "multiaddress": "/ip4/10.0.2.100/tcp/19093", "origin": "chain" }
     ],
     "observed": ["/ip4/10.0.2.100/tcp/19093"]
 }))]
@@ -101,14 +101,13 @@ pub(super) async fn show_peer_info(
             );
             match res {
                 Ok((announced, observed)) => {
-                    let announced_sources = if announced.is_empty() {
-                        Vec::new()
-                    } else {
-                        vec![MultiaddressSource {
-                            multiaddrs: announced.clone(),
+                    let announced_sources: Vec<MultiaddressSource> = announced
+                        .iter()
+                        .map(|ma| MultiaddressSource {
+                            multiaddress: ma.clone(),
                             origin: AnnouncementOriginResponse::Chain,
-                        }]
-                    };
+                        })
+                        .collect();
                     Ok((
                         StatusCode::OK,
                         Json(NodePeerInfoResponse {

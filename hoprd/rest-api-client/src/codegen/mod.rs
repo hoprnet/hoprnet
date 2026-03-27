@@ -804,37 +804,30 @@ pub mod types {
             value.parse()
         }
     }
-    ///Multiaddresses grouped by their discovery origin.
+    ///A multiaddress paired with its discovery origin.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Multiaddresses grouped by their discovery origin.",
+    ///  "description": "A multiaddress paired with its discovery origin.",
     ///  "examples": [
     ///    {
-    ///      "multiaddrs": [
-    ///        "/ip4/10.0.2.100/tcp/19093"
-    ///      ],
+    ///      "multiaddress": "/ip4/10.0.2.100/tcp/19093",
     ///      "origin": "chain"
     ///    }
     ///  ],
     ///  "type": "object",
     ///  "required": [
-    ///    "multiaddrs",
+    ///    "multiaddress",
     ///    "origin"
     ///  ],
     ///  "properties": {
-    ///    "multiaddrs": {
+    ///    "multiaddress": {
     ///      "examples": [
-    ///        [
-    ///          "/ip4/10.0.2.100/tcp/19093"
-    ///        ]
+    ///        "/ip4/10.0.2.100/tcp/19093"
     ///      ],
-    ///      "type": "array",
-    ///      "items": {
-    ///        "type": "string"
-    ///      }
+    ///      "type": "string"
     ///    },
     ///    "origin": {
     ///      "$ref": "#/components/schemas/AnnouncementOriginResponse"
@@ -845,7 +838,7 @@ pub mod types {
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     pub struct MultiaddressSource {
-        pub multiaddrs: ::std::vec::Vec<::std::string::String>,
+        pub multiaddress: ::std::string::String,
         pub origin: AnnouncementOriginResponse,
     }
     ///Channel information as seen by the node.
@@ -1105,9 +1098,7 @@ and indexer state.*/
     ///      ],
     ///      "announcedSources": [
     ///        {
-    ///          "multiaddrs": [
-    ///            "/ip4/10.0.2.100/tcp/19093"
-    ///          ],
+    ///          "multiaddress": "/ip4/10.0.2.100/tcp/19093",
     ///          "origin": "chain"
     ///        }
     ///      ],
