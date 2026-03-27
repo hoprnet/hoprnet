@@ -58,16 +58,93 @@ jobs:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
       codecov_token: ${{ secrets.CODECOV_TOKEN }}
 
-  build:
+  build-binaries:
     if: github.event.action != 'labeled'
-    name: Build
-    uses: ./.github/workflows/build.yaml
+    name: Binary ${{ matrix.architecture }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: x86_64-linux
+            runner: self-hosted-hoprnet-bigger
+            build_command: nix build -L .#binary-hoprd-x86_64-linux
+            required_label: ""
+          - architecture: aarch64-linux
+            runner: self-hosted-hoprnet-bigger
+            build_command: nix build -L .#binary-hoprd-aarch64-linux
+            required_label: "binary:aarch64-linux"
+          - architecture: aarch64-darwin
+            runner: macos-15-xlarge
+            build_command: nix build -L .#binary-hoprd-aarch64-darwin
+            required_label: binary:aarch64-darwin
+          - architecture: x86_64-darwin
+            runner: macos-15-intel
+            build_command: nix build -L .#binary-hoprd-x86_64-darwin
+            required_label: binary:x86_64-darwin
+    uses: hoprnet/hopr-workflows/.github/workflows/build-binaries.yaml@build-binaries-v2
+    permissions:
+      contents: read
     with:
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+      version_type: commit
+      architecture: ${{ matrix.architecture }}
+      cachix_cache_name: hoprnet
+      build_file: hopr/hopr-lib/Cargo.toml
+      build_command: ${{ matrix.build_command }}
+      binary: hoprd
+      runner: ${{ matrix.runner }}
+      enabled: ${{ matrix.required_label == '' || contains(github.event.pull_request.labels.*.name, matrix.required_label) }}
     secrets:
-      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      GCP_SA_GITHUB_RUNNER: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
-      GPG_HOPRNET_PRIVATE_KEY: ${{ secrets.GPG_HOPRNET_PRIVATE_KEY }}
+      gcp_service_account: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
+      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      gpg_private_key: ${{ secrets.GPG_HOPRNET_PRIVATE_KEY }}
+
+  build-docker:
+    if: github.event.action != 'labeled'
+    name: Docker
+    needs: build-binaries
+    uses: hoprnet/hopr-workflows/.github/workflows/build-docker.yaml@build-docker-v1
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    with:
+      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+      version_type: commit
+      build_matrix: >-
+        [
+          {
+            "runner": "self-hosted-hoprnet-bigger",
+            "architecture": "x86_64-linux",
+            "build_command": "nix build -L .#docker-hoprd-x86_64-linux",
+            "build_debug_command": "nix build -L .#docker-hoprd-dev-x86_64-linux"
+          }
+        ]
+      cachix_cache_name: hoprnet
+      build_file: hopr/hopr-lib/Cargo.toml
+      docker_image_name: hoprd
+      docker_image_format: skopeo
+    secrets:
+      gcp_service_account: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
+      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+  docs:
+    if: github.event.action != 'labeled'
+    name: Docs
+    runs-on: self-hosted-hoprnet-bigger
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Build docs
+        uses: hoprnet/hopr-workflows/actions/nix-action@c2aca7e56d25c4a786049ccf816c7f1af8721de8 # nix-action-v1
+        with:
+          source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          command: |
+            set -e
+            RUSTDOCFLAGS="-D warnings" nix develop -c cargo doc --no-deps --document-private-items
+            nix build -L .#docs
 
   build-dappnode:
     if: github.event.action != 'labeled'
@@ -78,7 +155,7 @@ jobs:
           - DAppNodePackage-Hopr
           - DAppNodePackage-Hopr-testnet
     name: ${{ matrix.dappnode_repository }}
-    needs: [build]
+    needs: [build-docker]
     uses: ./.github/workflows/build-dappnode.yaml
     with:
       source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
