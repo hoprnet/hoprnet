@@ -101,10 +101,14 @@ pub(super) async fn show_peer_info(
             );
             match res {
                 Ok((announced, observed)) => {
-                    let announced_sources = vec![MultiaddressSource {
-                        multiaddrs: announced.clone(),
-                        origin: AnnouncementOriginResponse::Chain,
-                    }];
+                    let announced_sources = if announced.is_empty() {
+                        Vec::new()
+                    } else {
+                        vec![MultiaddressSource {
+                            multiaddrs: announced.clone(),
+                            origin: AnnouncementOriginResponse::Chain,
+                        }]
+                    };
                     Ok((
                         StatusCode::OK,
                         Json(NodePeerInfoResponse {
