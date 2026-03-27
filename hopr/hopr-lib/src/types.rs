@@ -4,7 +4,7 @@ use hopr_api::{Multiaddr, types::primitive::prelude::Address};
 ///
 /// Currently only on-chain announcements exist. When DHT-based discovery
 /// is added, a `DHT` variant will surface peers without requiring an
-/// on-chain transaction.
+/// on-chain multiaddress announcement.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AnnouncementOrigin {
     /// Announced via on-chain registration.
