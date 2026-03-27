@@ -32,3 +32,21 @@ jobs:
           source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           command: nix build -L .#hoprd-candidate
+
+  build-dappnode:
+    strategy:
+      fail-fast: false
+      matrix:
+        dappnode_repository:
+          - DAppNodePackage-Hopr
+          - DAppNodePackage-Hopr-testnet
+    name: ${{ matrix.dappnode_repository }}
+    uses: ./.github/workflows/build-dappnode.yaml
+    with:
+      source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+      dappnode_repository: ${{ matrix.dappnode_repository }}
+      labels: ${{ format('{0},', join(github.event.pull_request.labels.*.name, ',')) }}
+    secrets:
+      GCP_SA_GITHUB_RUNNER: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
+      GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
