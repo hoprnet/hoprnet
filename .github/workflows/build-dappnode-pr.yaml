@@ -1,0 +1,66 @@
+---
+################################################################################
+# Build DAppNode packages after the Build workflow completes
+#
+# Triggers via workflow_run so it waits for docker images to be available.
+# Fetches PR labels to gate which dappnode packages to build.
+################################################################################
+name: Build DAppNode (PR)
+
+on:
+  workflow_run:
+    workflows: ["Build"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  setup:
+    name: Resolve PR labels
+    if: >-
+      github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      labels: ${{ steps.labels.outputs.labels }}
+      source_repo: ${{ steps.labels.outputs.source_repo }}
+      source_branch: ${{ steps.labels.outputs.source_branch }}
+    steps:
+      - name: Fetch PR labels
+        id: labels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          REPO: ${{ github.repository }}
+        run: |
+          # Find the PR number from the head branch
+          PR_NUMBER=$(gh api "repos/${REPO}/pulls?head=${HEAD_REPO%%/*}:${HEAD_BRANCH}&state=open" --jq '.[0].number // empty')
+          if [ -z "${PR_NUMBER}" ]; then
+            echo "labels=" >> "$GITHUB_OUTPUT"
+          else
+            LABELS=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}" --jq '[.labels[].name] | join(",")' )
+            echo "labels=${LABELS}," >> "$GITHUB_OUTPUT"
+          fi
+          echo "source_repo=${HEAD_REPO}" >> "$GITHUB_OUTPUT"
+          echo "source_branch=${HEAD_BRANCH}" >> "$GITHUB_OUTPUT"
+
+  build-dappnode:
+    needs: [setup]
+    if: needs.setup.outputs.labels != ''
+    strategy:
+      fail-fast: false
+      matrix:
+        dappnode_repository:
+          - DAppNodePackage-Hopr
+          - DAppNodePackage-Hopr-testnet
+    name: ${{ matrix.dappnode_repository }}
+    uses: ./.github/workflows/build-dappnode.yaml
+    with:
+      source_repo: ${{ needs.setup.outputs.source_repo }}
+      source_branch: ${{ needs.setup.outputs.source_branch }}
+      dappnode_repository: ${{ matrix.dappnode_repository }}
+      labels: ${{ needs.setup.outputs.labels }}
+    secrets:
+      GCP_SA_GITHUB_RUNNER: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
+      GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}

@@ -206,7 +206,7 @@
               projectBuildArgs // { cargoExtraArgs = "-F capture"; }
             );
 
-            hopr-test-unit = fixUtoipaEmbedPaths (
+            test-unit = fixUtoipaEmbedPaths (
               rust-builder-local.callPackage nixLib.mkRustPackage (
                 projectBuildArgs
                 // {
@@ -219,7 +219,7 @@
               )
             );
 
-            hopr-test-integration = fixUtoipaEmbedPaths (
+            test-integration = fixUtoipaEmbedPaths (
               rust-builder-local.callPackage nixLib.mkRustPackage (
                 projectBuildArgs
                 // {
@@ -232,7 +232,7 @@
               )
             );
 
-            hopr-test-nightly = fixUtoipaEmbedPaths (
+            test-nightly = fixUtoipaEmbedPaths (
               rust-builder-local-nightly.callPackage nixLib.mkRustPackage (
                 projectBuildArgs
                 // {
@@ -246,7 +246,7 @@
             );
 
             # Code coverage (outputs LCOV report)
-            hopr-coverage = fixUtoipaEmbedPaths (
+            coverage-unit = fixUtoipaEmbedPaths (
               rust-builder-local-coverage.callPackage nixLib.mkRustPackage (
                 projectBuildArgs
                 // {
@@ -296,7 +296,7 @@
           );
 
           # Compile benchmarks without running them, used for CI build verification.
-          hoprd-bench-build = rust-builder-local.callPackage nixLib.mkRustPackage (
+          bench-build = rust-builder-local.callPackage nixLib.mkRustPackage (
             projectBuildArgs // { buildBench = true; }
           );
 
@@ -724,7 +724,7 @@
             // {
               inherit docs;
               inherit pre-commit-check;
-              inherit hoprd-bench hoprd-bench-build;
+              inherit hoprd-bench bench-build;
               inherit hoprd-man;
               default = hoprdPackages.binary-hoprd;
               hoprd-candidate = (mkHoprdCandidate "");

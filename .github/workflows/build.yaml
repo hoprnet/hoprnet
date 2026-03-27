@@ -19,26 +19,6 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
 jobs:
-  build-dappnode:
-    if: github.event.action != 'labeled'
-    strategy:
-      fail-fast: false
-      matrix:
-        dappnode_repository:
-          - DAppNodePackage-Hopr
-          - DAppNodePackage-Hopr-testnet
-    name: ${{ matrix.dappnode_repository }}
-    needs:
-      - build-docker
-    uses: ./.github/workflows/build-dappnode.yaml
-    with:
-      source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
-      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-      dappnode_repository: ${{ matrix.dappnode_repository }}
-      labels: ${{ format('{0},', join(github.event.pull_request.labels.*.name, ',')) }}
-    secrets:
-      GCP_SA_GITHUB_RUNNER: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
-      GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
   build-binaries:
     if: github.event.action != 'labeled'
     name: Binary ${{ matrix.architecture }}

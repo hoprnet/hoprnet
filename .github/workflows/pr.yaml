@@ -33,17 +33,23 @@ jobs:
     name: Check
     uses: ./.github/workflows/checks.yaml
     with:
-      source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+      runner_small: self-hosted-hoprnet-small
+      runner_large: self-hosted-hoprnet-bigger
     secrets:
-      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
   tests:
     name: Test
     uses: ./.github/workflows/tests.yaml
     with:
-      source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+      unit_tests: true
+      integration_tests: true
+      nightly_tests: true
+      benchmarks: true
+      coverage: true
+      runner: self-hosted-hoprnet-bigger
     secrets:
-      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      codecov_token: ${{ secrets.CODECOV_TOKEN }}
