@@ -186,11 +186,16 @@ pub struct UserHoprLibConfig {
     /// Various HOPR-network and transport-related configuration options.
     #[serde(default)]
     pub network: UserHoprNetworkConfig,
-    /// Location where to store winning tickets.
+    /// Path to a file that acts as incoming ticket storage.
     ///
-    /// If omitted, will be placed in a temporary file and deleted on application exit.
+    /// The file will be in the `redb` file format and can contain already existing tickets.
+    /// If the file does not exist, it will be created.
+    ///
+    /// If omitted, a temporary file will be created and deleted on application exit.
+    ///
+    /// Make sure the file is secure and not accessible by unauthorized users on production.
     #[serde(default)]
-    pub ticket_storage_path: Option<String>,
+    pub ticket_storage_file: Option<String>,
 }
 
 // NOTE: this intentionally does not validate (0.0.0.0) to force user to specify
@@ -210,7 +215,7 @@ impl From<UserHoprLibConfig> for HoprLibConfig {
             publish: value.announce,
             safe_module: value.safe_module,
             protocol: HoprProtocolConfig {
-                ticket_storage_path: value.ticket_storage_path,
+                ticket_storage_file: value.ticket_storage_file,
                 transport: TransportConfig {
                     announce_local_addresses: value.network.announce_local_addresses,
                     prefer_local_addresses: value.network.prefer_local_addresses,

@@ -234,7 +234,7 @@ where
         let probing_tag_allocator = probing_tag_allocator
             .ok_or_else(|| errors::HoprTransportError::Api("probing tag allocator missing".into()))?;
 
-        let ticket_manager = HoprTicketManager::new(match &cfg.ticket_storage_path {
+        let ticket_manager = HoprTicketManager::new(match &cfg.ticket_storage_file {
             Some(path) => RedbStore::new(path).map_err(TicketManagerError::store)?,
             None => RedbStore::new_temp().map_err(TicketManagerError::store)?,
         })?;

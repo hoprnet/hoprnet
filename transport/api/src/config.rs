@@ -49,12 +49,16 @@ pub struct HoprProtocolConfig {
     /// Path planner configuration
     #[cfg_attr(feature = "serde", serde(skip))]
     pub path_planner: hopr_transport_path::PathPlannerConfig,
-    /// Path where to store received winning tickets.
+    /// Path to a file that acts as incoming ticket storage.
     ///
-    /// If omitted, the ticket storage will be in a temporary directory and
-    /// the tickets might be wiped on application exit.
+    /// The file will be in the `redb` file format and can contain already existing tickets.
+    /// If the file does not exist, it will be created.
+    ///
+    /// If omitted, a temporary file will be created and deleted on application exit.
+    ///
+    /// Make sure the file is secure and not accessible by unauthorized users on production.
     #[cfg_attr(feature = "serde", serde(skip))]
-    pub ticket_storage_path: Option<String>,
+    pub ticket_storage_file: Option<String>,
     /// Interval at which per-peer protocol conformance counters are flushed
     /// into the network graph.
     ///
