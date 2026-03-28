@@ -282,7 +282,6 @@ async fn build_api(
                     "/channels/{channelId}/tickets/redeem",
                     post(tickets::redeem_tickets_in_channel),
                 )
-                .route("/tickets", get(tickets::show_all_tickets))
                 .route("/tickets/redeem", post(tickets::redeem_all_tickets))
                 .route("/tickets/statistics", get(tickets::show_ticket_statistics))
                 .route("/network/price", get(network::price))
