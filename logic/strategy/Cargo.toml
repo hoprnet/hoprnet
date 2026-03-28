@@ -20,7 +20,7 @@ telemetry = ["dep:hopr-metrics"]
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
-dashmap = { workspace = true }
+dashmap = { workspace = true, features = ["inline"] }
 futures = { workspace = true }
 futures-time = { workspace = true }
 futures-concurrency = { workspace = true }

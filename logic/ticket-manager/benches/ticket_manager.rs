@@ -1,6 +1,6 @@
-use std::{hint::black_box, ops::RangeBounds};
+use std::{hint::black_box, ops::RangeBounds, time::Duration};
 
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use hopr_api::{
     chain::{ChannelEntry, RedeemableTicket, WinningProbability},
     types::{crypto::prelude::*, crypto_random::Randomizable, internal::prelude::*, primitive::prelude::*},
@@ -49,7 +49,7 @@ fn ticket_insert_redb_bench(c: &mut Criterion) {
     let tickets = generate_owned_tickets(&issuer, &recipient, 1, 1..=1).unwrap();
 
     c.bench_function("ticket_insert_redb", |b| {
-        b.iter_with_setup(
+        b.iter_batched(
             || {
                 let store = RedbStore::new_temp().unwrap();
                 let manager: HoprTicketManager<RedbStore, RedbTicketQueue> = HoprTicketManager::new(store).unwrap();
@@ -58,6 +58,7 @@ fn ticket_insert_redb_bench(c: &mut Criterion) {
             |(manager, ticket)| {
                 manager.insert_incoming_ticket(black_box(ticket)).unwrap();
             },
+            BatchSize::PerIteration,
         )
     });
 }
@@ -96,7 +97,7 @@ fn create_multihop_ticket_redb_bench(c: &mut Criterion) {
         .unwrap();
 
     c.bench_function("create_multihop_ticket_redb", |b| {
-        b.iter_with_setup(
+        b.iter_batched(
             || {
                 let store = RedbStore::new_temp().unwrap();
                 let manager: HoprTicketManager<RedbStore, RedbTicketQueue> = HoprTicketManager::new(store).unwrap();
@@ -112,13 +113,17 @@ fn create_multihop_ticket_redb_bench(c: &mut Criterion) {
                     )
                     .unwrap();
             },
+            BatchSize::PerIteration,
         )
     });
 }
 
 criterion_group!(
-    benches,
-    ticket_insert_redb_bench,
+    name = benches;
+    config = Criterion::default()
+        .sample_size(500)
+        .measurement_time(Duration::from_secs(30));
+    targets = ticket_insert_redb_bench,
     unrealized_value_redb_bench,
     create_multihop_ticket_redb_bench
 );
