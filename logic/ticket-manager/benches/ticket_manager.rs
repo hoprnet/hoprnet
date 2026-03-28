@@ -1,6 +1,6 @@
 use std::{hint::black_box, ops::RangeBounds, time::Duration};
 
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use hopr_api::{
     chain::{ChannelEntry, RedeemableTicket, WinningProbability},
     types::{crypto::prelude::*, crypto_random::Randomizable, internal::prelude::*, primitive::prelude::*},
@@ -48,18 +48,13 @@ fn ticket_insert_redb_bench(c: &mut Criterion) {
     let recipient = ChainKeypair::random();
     let tickets = generate_owned_tickets(&issuer, &recipient, 1, 1..=1).unwrap();
 
+    let store = RedbStore::new_temp().unwrap();
+    let manager: HoprTicketManager<RedbStore, RedbTicketQueue> = HoprTicketManager::new(store).unwrap();
+
     c.bench_function("ticket_insert_redb", |b| {
-        b.iter_batched(
-            || {
-                let store = RedbStore::new_temp().unwrap();
-                let manager: HoprTicketManager<RedbStore, RedbTicketQueue> = HoprTicketManager::new(store).unwrap();
-                (manager, tickets[0])
-            },
-            |(manager, ticket)| {
-                manager.insert_incoming_ticket(black_box(ticket)).unwrap();
-            },
-            BatchSize::PerIteration,
-        )
+        b.iter(|| {
+            manager.insert_incoming_ticket(black_box(tickets[0])).unwrap();
+        });
     });
 }
 
@@ -96,32 +91,27 @@ fn create_multihop_ticket_redb_bench(c: &mut Criterion) {
         .build()
         .unwrap();
 
+    let store = RedbStore::new_temp().unwrap();
+    let manager: HoprTicketManager<RedbStore, RedbTicketQueue> = HoprTicketManager::new(store).unwrap();
+
     c.bench_function("create_multihop_ticket_redb", |b| {
-        b.iter_batched(
-            || {
-                let store = RedbStore::new_temp().unwrap();
-                let manager: HoprTicketManager<RedbStore, RedbTicketQueue> = HoprTicketManager::new(store).unwrap();
-                manager
-            },
-            |manager| {
-                manager
-                    .next_multihop_ticket(
-                        black_box(&channel_entry),
-                        black_box(2),
-                        black_box(WinningProbability::ALWAYS),
-                        black_box(HoprBalance::from(10)),
-                    )
-                    .unwrap();
-            },
-            BatchSize::PerIteration,
-        )
+        b.iter(|| {
+            manager
+                .next_multihop_ticket(
+                    black_box(&channel_entry),
+                    black_box(2),
+                    black_box(WinningProbability::ALWAYS),
+                    black_box(HoprBalance::from(10)),
+                )
+                .unwrap();
+        });
     });
 }
 
 criterion_group!(
     name = benches;
     config = Criterion::default()
-        .sample_size(500)
+        .sample_size(1000)
         .measurement_time(Duration::from_secs(30));
     targets = ticket_insert_redb_bench,
     unrealized_value_redb_bench,
