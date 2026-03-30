@@ -23,7 +23,7 @@ permissions:
 
 jobs:
   zizmor:
-    uses: hoprnet/hopr-workflows/.github/workflows/checks-zizmor.yaml@ec6f7bbfcf41be7b936ffb2245a49120e8f398fb # checks-zizmor-v1
+    uses: hoprnet/hopr-workflows/.github/workflows/checks-zizmor.yaml@3c72575db6e76c5b15cea218dfd828f322b93a25 # checks-zizmor-v1
     permissions:
       contents: read
       security-events: write
