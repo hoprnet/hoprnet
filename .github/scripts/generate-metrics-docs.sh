@@ -16,9 +16,9 @@ METRICS_DOC="$REPO_ROOT/METRICS.md"
 # Outputs tab-separated rows:  name \t type \t description \t detail
 # Requires 8 lines of trailing context to capture buckets/keys on later lines.
 extract_metrics() {
-  git -C "$REPO_ROOT" grep -A8 -E '(Simple|Multi)(Counter|Gauge|Histogram)::new\(' -- '*.rs' 2>/dev/null |
+  (cd "$REPO_ROOT" && grep -rA8 -E '(Simple|Multi)(Counter|Gauge|Histogram)::new\(' --exclude-dir='.git' --exclude-dir='target' --exclude-dir='.cargo' --include='*.rs' .) |
     gawk '
-    /^misc\/metrics\// { next }
+    /^\.\/misc\/metrics\// { next }
 
     # ── new ::new( call → flush previous metric and start fresh ──
     match($0, /(Simple|Multi)(Counter|Gauge|Histogram)::new\(/, t) {
@@ -90,10 +90,21 @@ extract_metrics() {
 # ── --generate: print a column-aligned markdown table and exit ────────────────
 if [[ ${1:-} == "--generate" ]]; then
   # Collect rows first to compute column widths
+  extract_stderr=$(mktemp)
+  trap 'rm -f "$extract_stderr"' EXIT
   rows=()
   while IFS=$'\t' read -r name type desc detail; do
     rows+=("$(printf "\`%s\`\t%s\t%s\t%s" "$name" "$type" "$desc" "$detail")")
-  done < <(extract_metrics)
+  done < <(extract_metrics 2>"$extract_stderr")
+
+  if [[ ${#rows[@]} -eq 0 ]]; then
+    echo "ERROR: extract_metrics produced no output." >&2
+    if [[ -s $extract_stderr ]]; then
+      echo "stderr from extract_metrics:" >&2
+      cat "$extract_stderr" >&2
+    fi
+    exit 1
+  fi
 
   # Compute max width per column (start with header widths)
   headers=("Name" "Type" "Description" "Detail")
