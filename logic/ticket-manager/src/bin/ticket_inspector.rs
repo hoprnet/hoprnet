@@ -1,4 +1,4 @@
-use std::{path::PathBuf, str::FromStr};
+use std::{fmt, path::PathBuf, str::FromStr};
 
 use clap::{Parser, Subcommand};
 use hopr_api::{chain::ChannelId, types::primitive::prelude::HoprBalance};
@@ -98,6 +98,50 @@ enum CommandResult {
     TotalValue(TotalValueResult),
 }
 
+impl fmt::Display for CommandResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CommandResult::ListChannels(res) => {
+                writeln!(f, "Queues found in DB:")?;
+                for channel in &res.channels {
+                    writeln!(f, "  {channel}")?;
+                }
+            }
+            CommandResult::DeleteQueue(res) => {
+                write!(
+                    f,
+                    "Deleted queue for channel {} with {} tickets.",
+                    res.channel_id, res.deleted_tickets_count
+                )?;
+            }
+            CommandResult::ListTickets(res) => {
+                if res.tickets.is_empty() {
+                    write!(f, "No queue found for channel {}", res.channel_id)?;
+                } else {
+                    writeln!(f, "Tickets in queue for channel {}:", res.channel_id)?;
+                    for (i, ticket) in res.tickets.iter().enumerate() {
+                        if i > 0 {
+                            writeln!(f)?;
+                        }
+                        write!(f, "{ticket:#?}")?;
+                    }
+                }
+            }
+            CommandResult::DeleteTicket(res) => {
+                write!(
+                    f,
+                    "Deleted {} tickets up to index {} for channel {}",
+                    res.deleted_count, res.target_index, res.channel_id
+                )?;
+            }
+            CommandResult::TotalValue(res) => {
+                write!(f, "Total ticket value for channel {}: {}", res.channel_id, res.total_sum)?;
+            }
+        }
+        Ok(())
+    }
+}
+
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let mut store = RedbStore::new(&cli.db_path)?;
@@ -113,39 +157,7 @@ fn main() -> anyhow::Result<()> {
             CommandResult::TotalValue(res) => println!("{}", serde_json::to_string_pretty(&res)?),
         }
     } else {
-        match result {
-            CommandResult::ListChannels(res) => {
-                println!("Queues found in DB:");
-                for channel in res.channels {
-                    println!("  {channel}");
-                }
-            }
-            CommandResult::DeleteQueue(res) => {
-                println!(
-                    "Deleted queue for channel {} with {} tickets.",
-                    res.channel_id, res.deleted_tickets_count
-                );
-            }
-            CommandResult::ListTickets(res) => {
-                if res.tickets.is_empty() {
-                    println!("No queue found for channel {}", res.channel_id);
-                } else {
-                    println!("Tickets in queue for channel {}:", res.channel_id);
-                    for ticket in res.tickets {
-                        println!("{ticket:#?}");
-                    }
-                }
-            }
-            CommandResult::DeleteTicket(res) => {
-                println!(
-                    "Deleted {} tickets up to index {} for channel {}",
-                    res.deleted_count, res.target_index, res.channel_id
-                );
-            }
-            CommandResult::TotalValue(res) => {
-                println!("Total ticket value for channel {}: {}", res.channel_id, res.total_sum);
-            }
-        }
+        println!("{result}");
     }
 
     Ok(())
@@ -222,13 +234,10 @@ fn run_command(cli: Cli, store: &mut RedbStore) -> anyhow::Result<CommandResult>
                 }));
             }
             let queue = store.open_or_create_queue(&channel)?;
-            // total_value requires an epoch.
-            // The issue description says "total sum of all ticket amounts for a given channel ID".
-            // Let's iterate and sum them up manually to be sure it's "all".
-            let tickets = queue.iter_unordered()?.collect::<Result<Vec<_>, _>>()?;
-            let total_sum = tickets
-                .iter()
-                .fold(HoprBalance::from(0u64), |acc, t| acc + t.verified_ticket().amount);
+            let total_sum: HoprBalance = queue
+                .iter_unordered()?
+                .filter_map(|t| t.ok().map(|ticket| ticket.verified_ticket().amount))
+                .sum();
 
             Ok(CommandResult::TotalValue(TotalValueResult {
                 channel_id: channel_id.clone(),
