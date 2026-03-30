@@ -268,10 +268,11 @@ fn run_command(cli: Cli, store: &mut impl TicketQueueStore) -> anyhow::Result<Co
             let queue = store.open_or_create_queue(&channel_id)?;
             let total_sum: HoprBalance = queue
                 .iter_unordered()?
-                .filter_map(|t| t
-                    .inspect_err(|error| eprintln!("Error inspecting ticket: {error}"))
-                    .ok()
-                    .map(|ticket| ticket.verified_ticket().amount))
+                .filter_map(|t| {
+                    t.inspect_err(|error| eprintln!("Error inspecting ticket: {error}"))
+                        .ok()
+                        .map(|ticket| ticket.verified_ticket().amount)
+                })
                 .sum();
 
             Ok(CommandResult::TotalValue(TotalValueResult {
@@ -338,9 +339,7 @@ mod tests {
         let cli = Cli {
             db_file: db_path.clone(),
             format: OutputFormat::Plain,
-            command: Commands::DeleteQueue {
-                channel_id: channel,
-            },
+            command: Commands::DeleteQueue { channel_id: channel },
         };
 
         let result = run_command(cli, &mut store)?;
@@ -374,9 +373,7 @@ mod tests {
         let cli = Cli {
             db_file: db_path.clone(),
             format: OutputFormat::Plain,
-            command: Commands::ListTickets {
-                channel_id: channel,
-            },
+            command: Commands::ListTickets { channel_id: channel },
         };
 
         let result = run_command(cli, &mut store)?;
@@ -454,9 +451,7 @@ mod tests {
         let cli = Cli {
             db_file: db_path.clone(),
             format: OutputFormat::Plain,
-            command: Commands::TotalValue {
-                channel_id: channel,
-            },
+            command: Commands::TotalValue { channel_id: channel },
         };
 
         let result = run_command(cli, &mut store)?;
@@ -486,9 +481,7 @@ mod tests {
         let cli = Cli {
             db_file: db_path.clone(),
             format: OutputFormat::Plain,
-            command: Commands::ListTickets {
-                channel_id: channel,
-            },
+            command: Commands::ListTickets { channel_id: channel },
         };
 
         let result = run_command(cli, &mut store)?;
