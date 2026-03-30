@@ -348,46 +348,51 @@ pub(super) async fn graph(
 mod tests {
     use std::str::FromStr;
 
+    use anyhow::Context;
+
     use super::*;
 
     #[test]
-    fn announcement_origin_response_should_serialize_as_lowercase_string() {
+    fn announcement_origin_response_should_serialize_as_lowercase_string() -> anyhow::Result<()> {
         assert_eq!(
-            serde_json::to_string(&AnnouncementOriginResponse::Chain).unwrap(),
+            serde_json::to_string(&AnnouncementOriginResponse::Chain).context("serialize chain origin")?,
             "\"chain\""
         );
         assert_eq!(
-            serde_json::to_string(&AnnouncementOriginResponse::Dht).unwrap(),
+            serde_json::to_string(&AnnouncementOriginResponse::Dht).context("serialize dht origin")?,
             "\"dht\""
         );
+        Ok(())
     }
 
     #[test]
-    fn announcement_origin_response_should_deserialize_from_lowercase_string() {
+    fn announcement_origin_response_should_deserialize_from_lowercase_string() -> anyhow::Result<()> {
         assert_eq!(
-            serde_json::from_str::<AnnouncementOriginResponse>("\"chain\"").unwrap(),
+            serde_json::from_str::<AnnouncementOriginResponse>("\"chain\"").context("deserialize chain origin")?,
             AnnouncementOriginResponse::Chain
         );
         assert_eq!(
-            serde_json::from_str::<AnnouncementOriginResponse>("\"dht\"").unwrap(),
+            serde_json::from_str::<AnnouncementOriginResponse>("\"dht\"").context("deserialize dht origin")?,
             AnnouncementOriginResponse::Dht
         );
+        Ok(())
     }
 
     #[test]
-    fn announcement_origin_response_should_deserialize_case_insensitively_via_strum() {
+    fn announcement_origin_response_should_deserialize_case_insensitively_via_strum() -> anyhow::Result<()> {
         assert_eq!(
-            AnnouncementOriginResponse::from_str("Chain").unwrap(),
+            AnnouncementOriginResponse::from_str("Chain").context("parse 'Chain' via strum")?,
             AnnouncementOriginResponse::Chain
         );
         assert_eq!(
-            AnnouncementOriginResponse::from_str("CHAIN").unwrap(),
+            AnnouncementOriginResponse::from_str("CHAIN").context("parse 'CHAIN' via strum")?,
             AnnouncementOriginResponse::Chain
         );
         assert_eq!(
-            AnnouncementOriginResponse::from_str("DHT").unwrap(),
+            AnnouncementOriginResponse::from_str("DHT").context("parse 'DHT' via strum")?,
             AnnouncementOriginResponse::Dht
         );
+        Ok(())
     }
 
     #[test]
