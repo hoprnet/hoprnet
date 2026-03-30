@@ -183,14 +183,47 @@ pub(super) async fn connected(State(state): State<Arc<InternalState>>) -> impl I
 
 // ── Announced peers endpoint ────────────────────────────────────────────────
 
+/// How a peer announcement was discovered.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    strum::Display,
+    strum::EnumString,
+    utoipa::ToSchema,
+)]
+#[strum(serialize_all = "lowercase", ascii_case_insensitive)]
+#[serde(rename_all = "lowercase")]
+#[schema(example = "chain")]
+pub(crate) enum AnnouncementOriginResponse {
+    /// Announced via on-chain registration.
+    Chain,
+    /// Discovered via DHT.
+    Dht,
+}
+
+impl From<hopr_lib::AnnouncementOrigin> for AnnouncementOriginResponse {
+    fn from(origin: hopr_lib::AnnouncementOrigin) -> Self {
+        match origin {
+            hopr_lib::AnnouncementOrigin::Chain => Self::Chain,
+            hopr_lib::AnnouncementOrigin::DHT => Self::Dht,
+        }
+    }
+}
+
 #[serde_as]
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
     "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
-    "multiaddrs": ["/ip4/178.12.1.9/tcp/19092"]
+    "multiaddrs": ["/ip4/178.12.1.9/tcp/19092"],
+    "origin": "chain"
 }))]
 #[serde(rename_all = "camelCase")]
-/// A peer that has been announced on-chain.
+/// A peer that has been announced.
 pub(crate) struct AnnouncedPeerResponse {
     #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String, example = "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe")]
@@ -198,13 +231,15 @@ pub(crate) struct AnnouncedPeerResponse {
     #[serde_as(as = "Vec<DisplayFromStr>")]
     #[schema(value_type = Vec<String>, example = json!(["/ip4/178.12.1.9/tcp/19092"]))]
     multiaddrs: Vec<Multiaddr>,
+    #[schema(example = "chain")]
+    origin: AnnouncementOriginResponse,
 }
 
-/// Lists all peers that have been announced on-chain.
+/// Lists all announced peers.
 #[utoipa::path(
     get,
     path = const_format::formatcp!("{BASE_PATH}/network/announced"),
-    description = "List all peers announced on-chain",
+    description = "List all announced peers",
     responses(
         (status = 200, description = "Announced peers", body = Vec<AnnouncedPeerResponse>),
         (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -219,16 +254,17 @@ pub(crate) struct AnnouncedPeerResponse {
 pub(super) async fn announced(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match hopr.accounts_announced_on_chain().await {
-        Ok(accounts) => {
-            let peers: Vec<AnnouncedPeerResponse> = accounts
+    match hopr.announced_peers().await {
+        Ok(peers) => {
+            let response: Vec<AnnouncedPeerResponse> = peers
                 .into_iter()
-                .map(|entry| AnnouncedPeerResponse {
-                    address: entry.chain_addr,
-                    multiaddrs: entry.get_multiaddrs().to_vec(),
+                .map(|peer| AnnouncedPeerResponse {
+                    address: peer.address,
+                    multiaddrs: peer.multiaddresses,
+                    origin: peer.origin.into(),
                 })
                 .collect();
-            (StatusCode::OK, Json(peers)).into_response()
+            (StatusCode::OK, Json(response)).into_response()
         }
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
@@ -306,4 +342,93 @@ pub(super) async fn graph(
     let dot = hopr_network_graph::render::render_edges_as_dot(&edges, &label_fn);
 
     (StatusCode::OK, [(axum::http::header::CONTENT_TYPE, "text/plain")], dot).into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use super::*;
+
+    #[test]
+    fn announcement_origin_response_should_serialize_as_lowercase_string() {
+        assert_eq!(
+            serde_json::to_string(&AnnouncementOriginResponse::Chain).unwrap(),
+            "\"chain\""
+        );
+        assert_eq!(
+            serde_json::to_string(&AnnouncementOriginResponse::Dht).unwrap(),
+            "\"dht\""
+        );
+    }
+
+    #[test]
+    fn announcement_origin_response_should_deserialize_from_lowercase_string() {
+        assert_eq!(
+            serde_json::from_str::<AnnouncementOriginResponse>("\"chain\"").unwrap(),
+            AnnouncementOriginResponse::Chain
+        );
+        assert_eq!(
+            serde_json::from_str::<AnnouncementOriginResponse>("\"dht\"").unwrap(),
+            AnnouncementOriginResponse::Dht
+        );
+    }
+
+    #[test]
+    fn announcement_origin_response_should_deserialize_case_insensitively_via_strum() {
+        assert_eq!(
+            AnnouncementOriginResponse::from_str("Chain").unwrap(),
+            AnnouncementOriginResponse::Chain
+        );
+        assert_eq!(
+            AnnouncementOriginResponse::from_str("CHAIN").unwrap(),
+            AnnouncementOriginResponse::Chain
+        );
+        assert_eq!(
+            AnnouncementOriginResponse::from_str("DHT").unwrap(),
+            AnnouncementOriginResponse::Dht
+        );
+    }
+
+    #[test]
+    fn announcement_origin_response_should_display_as_lowercase() {
+        assert_eq!(AnnouncementOriginResponse::Chain.to_string(), "chain");
+        assert_eq!(AnnouncementOriginResponse::Dht.to_string(), "dht");
+    }
+
+    #[test]
+    fn announcement_origin_response_should_reject_invalid_string() {
+        assert!(AnnouncementOriginResponse::from_str("invalid").is_err());
+    }
+
+    #[test]
+    fn chain_origin_should_convert_from_domain_type() {
+        assert_eq!(
+            AnnouncementOriginResponse::from(hopr_lib::AnnouncementOrigin::Chain),
+            AnnouncementOriginResponse::Chain
+        );
+    }
+
+    #[test]
+    fn dht_origin_should_convert_from_domain_type() {
+        assert_eq!(
+            AnnouncementOriginResponse::from(hopr_lib::AnnouncementOrigin::DHT),
+            AnnouncementOriginResponse::Dht
+        );
+    }
+
+    #[test]
+    fn announced_peer_response_should_serialize_with_origin() -> anyhow::Result<()> {
+        let response = AnnouncedPeerResponse {
+            address: Address::default(),
+            multiaddrs: vec!["/ip4/1.2.3.4/tcp/9091".parse()?],
+            origin: AnnouncementOriginResponse::Chain,
+        };
+
+        let json = serde_json::to_value(&response)?;
+        assert_eq!(json["origin"], "chain");
+        assert!(json["multiaddrs"].is_array());
+        assert!(json["address"].is_string());
+        Ok(())
+    }
 }
