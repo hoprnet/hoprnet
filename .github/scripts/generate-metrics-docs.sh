@@ -16,9 +16,9 @@ METRICS_DOC="$REPO_ROOT/METRICS.md"
 # Outputs tab-separated rows:  name \t type \t description \t detail
 # Requires 8 lines of trailing context to capture buckets/keys on later lines.
 extract_metrics() {
-  git -C "$REPO_ROOT" grep -A8 -E '(Simple|Multi)(Counter|Gauge|Histogram)::new\(' -- '*.rs' 2>/dev/null |
+  (cd "$REPO_ROOT" && grep -rA8 -E '(Simple|Multi)(Counter|Gauge|Histogram)::new\(' --include='*.rs' .) 2>/dev/null |
     gawk '
-    /^misc\/metrics\// { next }
+    /^\.\/misc\/metrics\// { next }
 
     # ── new ::new( call → flush previous metric and start fresh ──
     match($0, /(Simple|Multi)(Counter|Gauge|Histogram)::new\(/, t) {
@@ -94,6 +94,11 @@ if [[ ${1:-} == "--generate" ]]; then
   while IFS=$'\t' read -r name type desc detail; do
     rows+=("$(printf "\`%s\`\t%s\t%s\t%s" "$name" "$type" "$desc" "$detail")")
   done < <(extract_metrics)
+
+  if [[ ${#rows[@]} -eq 0 ]]; then
+    echo "ERROR: extract_metrics produced no output — check that grep and gawk are available" >&2
+    exit 1
+  fi
 
   # Compute max width per column (start with header widths)
   headers=("Name" "Type" "Description" "Detail")
