@@ -27,9 +27,68 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  validate-pr-title:
+    name: Validate title
+    runs-on: self-hosted-hoprnet-small
+    permissions:
+      pull-requests: read
+    steps:
+      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            fix
+            feat
+            build
+            chore
+            docs
+            style
+            refactor
+            perf
+            test
+          requireScope: false
+          ignoreLabels: |
+            bot
+            ignore-semantic-pull-request
+
+  label:
+    name: Add labels
+    runs-on: self-hosted-hoprnet-small
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        with:
+          disable-sudo: true
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: actions/labeler@77a4082b841706ac431479b7e2bb11216ffef250 # main on 20.02.2025
+        with:
+          sync-labels: true
+
+      - name: Add "external" label for forked PRs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_REPO: ${{ github.repository }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if [[ "$HEAD_REPO" != "$BASE_REPO" ]]; then
+            gh pr edit "$PR_NUMBER" --add-label "external"
+          fi
+
   checks:
     name: Check
-    uses: ./.github/workflows/checks.yaml
+    uses: hoprnet/hopr-workflows/.github/workflows/checks.yaml@53b3fdc9b49573bce5e53421c6cd3f261141f89c # checks-v1
     with:
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
       runner_small: self-hosted-hoprnet-small
@@ -39,7 +98,7 @@ jobs:
 
   tests:
     name: Test
-    uses: ./.github/workflows/tests.yaml
+    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@53b3fdc9b49573bce5e53421c6cd3f261141f89c # tests-v1
     with:
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
       unit_tests: true
