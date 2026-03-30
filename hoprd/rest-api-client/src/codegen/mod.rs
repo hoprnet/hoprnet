@@ -2566,51 +2566,6 @@ Arguments:
             _ => Err(Error::UnexpectedResponse(response)),
         }
     }
-    /**Lists all tickets for the given channel  ID
-
-Lists all tickets for the given channel ID.
-
-Sends a `GET` request to `/api/v4/channels/{channelId}/tickets`
-
-Arguments:
-- `channel_id`: ID of the channel.
-*/
-    pub async fn show_channel_tickets<'a>(
-        &'a self,
-        channel_id: &'a str,
-    ) -> Result<ResponseValue<::std::vec::Vec<types::ChannelTicket>>, Error<()>> {
-        let url = format!(
-            "{}/api/v4/channels/{}/tickets", self.baseurl, encode_path(& channel_id
-            .to_string()),
-        );
-        let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
-        header_map
-            .append(
-                ::reqwest::header::HeaderName::from_static("api-version"),
-                ::reqwest::header::HeaderValue::from_static(Self::api_version()),
-            );
-        #[allow(unused_mut)]
-        let mut request = self
-            .client
-            .get(url)
-            .header(
-                ::reqwest::header::ACCEPT,
-                ::reqwest::header::HeaderValue::from_static("application/json"),
-            )
-            .headers(header_map)
-            .build()?;
-        let info = OperationInfo {
-            operation_id: "show_channel_tickets",
-        };
-        self.pre(&mut request, &info).await?;
-        let result = self.exec(request, &info).await;
-        self.post(&result, &info).await?;
-        let response = result?;
-        match response.status().as_u16() {
-            200u16 => ResponseValue::from_response(response).await,
-            _ => Err(Error::UnexpectedResponse(response)),
-        }
-    }
     /**Starts redeeming all tickets in the given channel
 
 Starts redeeming all tickets in the given channel.
@@ -3293,45 +3248,6 @@ Arguments:
             _ => Err(Error::UnexpectedResponse(response)),
         }
     }
-    /**Endpoint is deprecated and will be removed in the future. Returns an empty array
-
-(deprecated) Returns an empty array.
-
-Sends a `GET` request to `/api/v4/tickets`
-
-*/
-    pub async fn show_all_tickets<'a>(
-        &'a self,
-    ) -> Result<ResponseValue<::std::vec::Vec<types::ChannelTicket>>, Error<()>> {
-        let url = format!("{}/api/v4/tickets", self.baseurl,);
-        let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
-        header_map
-            .append(
-                ::reqwest::header::HeaderName::from_static("api-version"),
-                ::reqwest::header::HeaderValue::from_static(Self::api_version()),
-            );
-        #[allow(unused_mut)]
-        let mut request = self
-            .client
-            .get(url)
-            .header(
-                ::reqwest::header::ACCEPT,
-                ::reqwest::header::HeaderValue::from_static("application/json"),
-            )
-            .headers(header_map)
-            .build()?;
-        let info = OperationInfo {
-            operation_id: "show_all_tickets",
-        };
-        self.pre(&mut request, &info).await?;
-        let result = self.exec(request, &info).await;
-        self.post(&result, &info).await?;
-        let response = result?;
-        match response.status().as_u16() {
-            200u16 => ResponseValue::from_response(response).await,
-            _ => Err(Error::UnexpectedResponse(response)),
-        }
-    }
     /**Starts redeeming of all tickets in all channels
 
 Starts redeeming of all tickets in all channels.
@@ -3402,40 +3318,6 @@ Sends a `GET` request to `/api/v4/tickets/statistics`
         let response = result?;
         match response.status().as_u16() {
             200u16 => ResponseValue::from_response(response).await,
-            _ => Err(Error::UnexpectedResponse(response)),
-        }
-    }
-    /**Resets the ticket metrics
-
-Resets the ticket metrics.
-
-Sends a `DELETE` request to `/api/v4/tickets/statistics`
-
-*/
-    pub async fn reset_ticket_statistics<'a>(
-        &'a self,
-    ) -> Result<ResponseValue<ByteStream>, Error<types::ApiError>> {
-        let url = format!("{}/api/v4/tickets/statistics", self.baseurl,);
-        let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
-        header_map
-            .append(
-                ::reqwest::header::HeaderName::from_static("api-version"),
-                ::reqwest::header::HeaderValue::from_static(Self::api_version()),
-            );
-        #[allow(unused_mut)]
-        let mut request = self.client.delete(url).headers(header_map).build()?;
-        let info = OperationInfo {
-            operation_id: "reset_ticket_statistics",
-        };
-        self.pre(&mut request, &info).await?;
-        let result = self.exec(request, &info).await;
-        self.post(&result, &info).await?;
-        let response = result?;
-        match response.status().as_u16() {
-            200..=299 => Ok(ResponseValue::stream(response)),
-            401u16 => {
-                Err(Error::ErrorResponse(ResponseValue::from_response(response).await?))
-            }
             _ => Err(Error::UnexpectedResponse(response)),
         }
     }

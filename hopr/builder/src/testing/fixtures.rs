@@ -9,7 +9,6 @@ use hopr_chain_connector::{
     create_trustful_hopr_blokli_connector,
     testing::{BlokliTestClient, BlokliTestStateBuilder, FullStateEmulator},
 };
-use hopr_db_node::HoprNodeDb;
 use hopr_lib::{
     Address, ChainKeypair, HopRouting, HoprBalance, HoprNodeNetworkOperations, HoprNodeOperations,
     HoprSessionClientConfig, HoprState, IpOrHost, Keypair, OffchainKeypair, SealedHost, WinningProbability,
@@ -483,10 +482,6 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
                     .expect("failed to build Tokio runtime");
 
                 let result = runtime.block_on(async {
-                    let node_db = HoprNodeDb::new_in_memory()
-                        .await
-                        .expect("failed to create HoprNodeDb for node");
-
                     let mut connector = create_trustful_hopr_blokli_connector(
                         &onchain_keys[i],
                         BlockchainConnectorConfig::default(),
@@ -505,7 +500,7 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
 
                     let config = create_hopr_instance_config(3001 + i as u16, safes[i], win_prob);
 
-                    let (instance, hopr_process) = crate::build_from_chain_and_db(
+                    let (instance, hopr_process) = crate::build_with_chain(
                         &onchain_keys[i],
                         &offchain_keys[i],
                         config,
@@ -514,7 +509,6 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
                             ..Default::default()
                         }), // moderate setting to allow probing without saturating relay traffic
                         connector.clone(),
-                        node_db,
                         EchoServer::new(),
                     )
                     .await?;

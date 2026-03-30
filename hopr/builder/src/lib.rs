@@ -17,7 +17,6 @@ use hopr_chain_connector::{
     blokli_client::{BlokliClient, BlokliClientConfig},
     create_trustful_hopr_blokli_connector,
 };
-use hopr_db_node::{HoprNodeDb, HoprNodeDbApi, init_hopr_node_db};
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_lib;
 #[cfg(feature = "session-server")]
@@ -44,22 +43,19 @@ use {
 #[cfg(feature = "session-server")]
 use crate::{config::SessionIpForwardingConfig, exit::HoprServerIpForwardingReactor};
 
-pub type ReferenceHopr =
-    Hopr<Arc<HoprBlockchainSafeConnector<BlokliClient>>, HoprNodeDb, SharedChannelGraph, HoprNetwork>;
+pub type ReferenceHopr = Hopr<Arc<HoprBlockchainSafeConnector<BlokliClient>>, SharedChannelGraph, HoprNetwork>;
 
 #[cfg(feature = "runtime-tokio")]
 pub async fn build_reference(
     identity: (&ChainKeypair, &OffchainKeypair),
     config: HoprLibConfig,
     blokli_url: String,
-    db_data_path: String,
     #[cfg(feature = "session-server")] server_config: SessionIpForwardingConfig,
 ) -> anyhow::Result<(
     Arc<ReferenceHopr>,
     impl Future<Output = std::result::Result<HoprTransportIO, HoprLibError>>,
 )> {
     let (chain_key, packet_key) = identity;
-    let node_db = init_hopr_node_db(&db_data_path, true, false).await?;
 
     let mut chain_connector = create_trustful_hopr_blokli_connector(
         chain_key,
@@ -92,13 +88,12 @@ pub async fn build_reference(
     #[cfg(feature = "session-server")]
     let session_server = HoprServerIpForwardingReactor::new(packet_key.clone(), server_config);
 
-    build_from_chain_and_db(
+    build_with_chain(
         chain_key,
         packet_key,
         config,
         None,
         chain_connector,
-        node_db,
         #[cfg(feature = "session-server")]
         session_server,
     )
@@ -106,9 +101,8 @@ pub async fn build_reference(
 }
 
 #[cfg(feature = "runtime-tokio")]
-pub async fn build_from_chain_and_db<
+pub async fn build_with_chain<
     Chain,
-    Db,
     #[cfg(feature = "session-server")] Srv: HoprSessionServer + Clone + Send + 'static,
 >(
     chain_key: &ChainKeypair,
@@ -116,15 +110,13 @@ pub async fn build_from_chain_and_db<
     config: HoprLibConfig,
     probe_cfg: Option<hopr_ct_full_network::ProberConfig>,
     chain_connector: Chain,
-    db: Db,
     #[cfg(feature = "session-server")] server: Srv,
 ) -> anyhow::Result<(
-    Arc<Hopr<Chain, Db, SharedChannelGraph, HoprNetwork>>,
+    Arc<Hopr<Chain, SharedChannelGraph, HoprNetwork>>,
     impl Future<Output = std::result::Result<HoprTransportIO, HoprLibError>>,
 )>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
-    Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
 {
     if let Some(ref pcfg) = probe_cfg {
         pcfg.validate()
@@ -296,16 +288,8 @@ where
     // END = process chain and network events into graph updates
 
     // create the node
-    let node = Arc::new(
-        hopr_lib::Hopr::new(
-            (chain_key, packet_key),
-            chain_connector.clone(),
-            db,
-            graph.clone(),
-            config,
-        )
-        .await?,
-    );
+    let node =
+        Arc::new(hopr_lib::Hopr::new((chain_key, packet_key), chain_connector.clone(), graph.clone(), config).await?);
 
     let node_for_run = node.clone();
     let start = async move {

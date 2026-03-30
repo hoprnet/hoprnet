@@ -48,6 +48,7 @@ futures-time = { workspace = true }
 humantime-serde = { workspace = true, optional = true }
 lazy_static = { workspace = true }
 moka = { workspace = true }
+multiaddr = { workspace = true }
 proc-macro-regex = { workspace = true }
 pcap-file = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
@@ -57,7 +58,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
-hopr-api = { workspace = true, features = ["types-random"] }
+hopr-api = { workspace = true, features = ["types-random", "tickets"] }
 
 hopr-async-runtime = { workspace = true }
 hopr-crypto-packet = { workspace = true }
@@ -65,7 +66,7 @@ hopr-crypto-packet = { workspace = true }
 hopr-network-types = { workspace = true }
 hopr-protocol-app = { workspace = true }
 hopr-protocol-hopr = { workspace = true, features = ["rayon"] }
-multiaddr = { workspace = true }
+hopr-ticket-manager = { workspace = true }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-path = { workspace = true }
 hopr-transport-probe = { workspace = true }

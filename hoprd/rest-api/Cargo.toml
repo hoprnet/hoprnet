@@ -21,7 +21,11 @@ telemetry = [
   "dep:lazy_static",
   "dep:regex",
 ]
-runtime-tokio = ["hopr-transport-p2p/runtime-tokio", "hopr-lib/runtime-tokio"]
+runtime-tokio = [
+  "hopr-transport-p2p/runtime-tokio",
+  "hopr-lib/runtime-tokio",
+  "hopr-async-runtime/runtime-tokio",
+]
 
 [dependencies]
 axum = { workspace = true, features = ["http2"] }
@@ -52,7 +56,7 @@ hopr-lib = { workspace = true, features = [
   "utils_futures",
 ] }
 
-hopr-db-node = { workspace = true, features = ["traits", "sqlite"] }
+hopr-async-runtime = { workspace = true }
 hopr-chain-connector = { workspace = true }
 hopr-network-graph = { workspace = true, features = ["petgraph", "graph-api"] }
 hopr-transport-p2p = { workspace = true }

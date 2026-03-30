@@ -1,10 +1,10 @@
 use std::{ops::Mul, time::Duration};
 
 use anyhow::Context;
-use futures::AsyncWriteExt;
+use futures::{AsyncWriteExt, StreamExt, pin_mut};
 use futures_time::future::FutureExt as _;
 use hopr_builder::{
-    hopr_lib::{ChannelId, HoprBalance, HoprLibError, UnitaryFloatOps},
+    hopr_lib::{HoprBalance, HoprLibError, UnitaryFloatOps},
     testing::{
         fixtures::{ClusterGuard, MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, TestNodeConfig, cluster_fixture},
         hopr::ChannelGuard,
@@ -19,95 +19,6 @@ use tokio::time::sleep;
 /// 3 nodes probing at 1s intervals over ~30s test windows can consume
 /// tickets per channel via multi-hop loopback probes.
 const PROBING_OVERHEAD: u64 = 30;
-
-#[rstest]
-#[test_log::test(tokio::test)]
-#[timeout(TEST_GLOBAL_TIMEOUT)]
-#[serial]
-/// Sends data through a 1-hop session to accumulate ticket statistics, then
-/// issues a reset, and checks the counters drop back to zero.
-async fn ticket_statistics_should_reset_when_cleaned(
-    #[with(vec![TestNodeConfig::default(); 3])] cluster_fixture: ClusterGuard,
-) -> anyhow::Result<()> {
-    let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1::<3>();
-
-    let ticket_price = src
-        .inner()
-        .get_ticket_price()
-        .await
-        .context("failed to get ticket price")?;
-    let funding_amount = ticket_price.mul(10 + PROBING_OVERHEAD);
-
-    let [fw_channels, bw_channels, _telemetry_channels]: [ChannelGuard; 3] = cluster_fixture
-        .open_channels(&[&[src, mid, dst], &[dst, mid, src], &[src, dst]], funding_amount)
-        .await?
-        .try_into()
-        .map_err(|_| anyhow::anyhow!("expected 3 channel guards"))?;
-
-    let mut session = cluster_fixture.create_session(&[src, mid, dst]).await?;
-
-    const BUF_LEN: usize = 5000;
-    let sent_data = hopr_api::types::crypto_random::random_bytes::<BUF_LEN>();
-
-    tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
-        .await
-        .context("write failed")??;
-
-    tokio::time::sleep(Duration::from_secs(2)).await;
-
-    assert!(
-        fw_channels
-            .try_to_get_all_ticket_counts()
-            .await?
-            .first()
-            .context("no tickets found for the first forward channel")?
-            .ne(&0)
-    );
-    assert!(
-        bw_channels
-            .try_to_get_all_ticket_counts()
-            .await?
-            .first()
-            .context("no tickets found for the first backward channel")?
-            .ne(&0)
-    );
-
-    let channels_with_pending_tickets = mid
-        .inner()
-        .all_tickets()
-        .await
-        .context("failed to get all tickets")?
-        .into_iter()
-        .map(|t| *t.channel_id())
-        .collect::<Vec<ChannelId>>();
-
-    assert!(channels_with_pending_tickets.contains(fw_channels.channel_id(0)));
-    assert!(channels_with_pending_tickets.contains(bw_channels.channel_id(0)));
-
-    let stats_before = mid
-        .inner()
-        .ticket_statistics()
-        .await
-        .context("failed to get ticket statistics")?;
-
-    assert!(stats_before.winning_tickets > 0); // As winning prob is set to 1
-
-    mid.inner()
-        .reset_ticket_statistics()
-        .await
-        .context("failed to reset ticket statistics")?;
-
-    let stats_after = mid
-        .inner()
-        .ticket_statistics()
-        .await
-        .context("failed to get ticket statistics")?;
-
-    assert_ne!(stats_before, stats_after);
-    assert_eq!(stats_after.winning_tickets, 0);
-
-    Ok(())
-}
 
 #[rstest]
 #[test_log::test(tokio::test)]
@@ -148,43 +59,43 @@ async fn relaying_message_rejected_when_channel_out_of_funding(
         .await
         .context("initial write failed")??;
 
-    let stats_before = mid
-        .inner()
-        .ticket_statistics()
-        .await
-        .context("failed to get ticket statistics")?;
-
     // Continuously send until rejected_value increases (channel funds exhausted).
-    // Background probing accelerates fund depletion alongside our writes.
-    let mut write_succeeded_at_least_once = false;
-    async {
+    // Background probing speeds up fund depletion alongside our writes.
+    let write_succeeded_at_least_once = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let write_succeeded_at_least_once_1 = write_succeeded_at_least_once.clone();
+    let write_fut = std::pin::pin!(async move {
         loop {
             match session
                 .write_all(&sent_data)
                 .timeout(futures_time::time::Duration::from_millis(500))
                 .await
             {
-                Ok(Ok(())) => write_succeeded_at_least_once = true,
+                Ok(Ok(())) => write_succeeded_at_least_once_1.store(true, std::sync::atomic::Ordering::Release),
                 Ok(Err(_)) | Err(_) => {} // write failed or timed out — channel may be drained
             }
             sleep(Duration::from_millis(500)).await;
 
-            let stats_after = mid
-                .inner()
-                .ticket_statistics()
-                .await
-                .context("failed to get ticket statistics")?;
-            if stats_after.rejected_value() > stats_before.rejected_value() {
-                return anyhow::Ok(());
-            }
+            // This future never completes
         }
-    }
-    .timeout(futures_time::time::Duration::from_secs(120))
-    .await
-    .map_err(|_| anyhow::anyhow!("timed out waiting for ticket rejection after fund exhaustion"))??;
+    });
+
+    let ticket_event_stream = mid
+        .inner()
+        .subscribe_ticket_events()
+        .filter_map(|evt| futures::future::ready(evt.try_as_rejected_ticket()));
+
+    pin_mut!(ticket_event_stream);
+
+    let wait_for_rejection_fut = ticket_event_stream.next();
+
+    // Keep on writing and wait for the rejected ticket
+    let _ = futures::future::select(write_fut, wait_for_rejection_fut)
+        .timeout(futures_time::time::Duration::from_secs(120))
+        .await
+        .map_err(|_| anyhow::anyhow!("timed out waiting for ticket rejection after fund exhaustion"))?;
 
     assert!(
-        write_succeeded_at_least_once,
+        write_succeeded_at_least_once.load(std::sync::atomic::Ordering::Acquire),
         "at least one write should have succeeded before the channel was exhausted"
     );
 
@@ -249,10 +160,11 @@ async fn redeem_ticket_on_request(
         .await
         .context("failed to redeem tickets")?;
 
+    #[allow(deprecated)] // TODO: remove once blokli#237 is merged
     wait_until(
         || async {
             let stats_after = mid.inner().ticket_statistics().await?;
-            Ok::<_, HoprLibError>(stats_after.redeemed_value() > stats_before.redeemed_value())
+            Ok::<_, HoprLibError>(stats_after.redeemed_value > stats_before.redeemed_value)
         },
         Duration::from_secs(5),
     )
@@ -281,11 +193,6 @@ async fn neglect_ticket_on_closing(
         .get_ticket_price()
         .await
         .context("failed to get ticket price")?;
-
-    mid.inner()
-        .reset_ticket_statistics()
-        .await
-        .context("failed to get ticket statistics")?;
 
     // Snapshot stats right after reset to use as baseline for delta checks
     let stats_after_reset = mid
@@ -347,7 +254,7 @@ async fn neglect_ticket_on_closing(
             // After closing the test channels, neglected value must increase.
             // We use a delta check because background probing may have created
             // unredeemed tickets on other channels that remain open.
-            Ok::<_, HoprLibError>(stats_after.neglected_value() > stats_before_close.neglected_value())
+            Ok::<_, HoprLibError>(stats_after.neglected_value > stats_before_close.neglected_value)
         },
         Duration::from_secs(5),
     )
@@ -419,12 +326,13 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
         .await
         .context("failed to redeem tickets")?;
 
+    #[allow(deprecated)] // TODO: remove once blokli#237 is merged
     wait_until(
         || async {
             let stats_after = mid.inner().ticket_statistics().await?;
             Ok::<_, HoprLibError>(
                 stats_after.winning_tickets < stats_before.winning_tickets + message_count as u128
-                    && stats_after.redeemed_value() > stats_before.redeemed_value(),
+                    && stats_after.redeemed_value > stats_before.redeemed_value,
             )
         },
         Duration::from_secs(5),
@@ -532,11 +440,12 @@ async fn relay_with_win_prob_higher_than_min_win_prob_should_succeed(
         .await
         .context("failed to redeem tickets")?;
 
+    #[allow(deprecated)] // TODO: remove once blokli#237 is merged
     wait_until(
         || async {
             let stats_after = mid.inner().ticket_statistics().await?;
             Ok::<_, HoprLibError>(
-                stats_after.redeemed_value() > stats_before.redeemed_value()
+                stats_after.redeemed_value > stats_before.redeemed_value
                     && stats_after.winning_tickets > stats_before.winning_tickets,
             )
         },

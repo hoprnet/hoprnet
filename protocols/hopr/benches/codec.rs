@@ -18,24 +18,23 @@ use hopr_chain_connector::{
     testing::{BlokliTestClient, StaticState},
 };
 use hopr_crypto_packet::prelude::HoprPacket;
-use hopr_db_node::HoprNodeDb;
 use hopr_protocol_hopr::{
-    HoprCodecConfig, HoprDecoder, HoprEncoder, HoprTicketProcessor, HoprTicketProcessorConfig, MemorySurbStore,
-    PacketDecoder, PacketEncoder, SurbStoreConfig,
+    HoprCodecConfig, HoprDecoder, HoprEncoder, MemorySurbStore, PacketDecoder, PacketEncoder, SurbStoreConfig,
 };
+use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue};
 
 use crate::utils::{Node, PEERS, create_blokli_client, create_node};
 
 type TestEncoder = HoprEncoder<
     Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>,
     MemorySurbStore,
-    HoprTicketProcessor<Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>, HoprNodeDb>,
+    Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>,
 >;
 
 type TestDecoder = HoprDecoder<
     Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>,
     MemorySurbStore,
-    HoprTicketProcessor<Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>, HoprNodeDb>,
+    Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>,
 >;
 
 pub fn create_encoder(sender: &Node) -> TestEncoder {
@@ -43,13 +42,7 @@ pub fn create_encoder(sender: &Node) -> TestEncoder {
         sender.chain_key.clone(),
         sender.chain_api.clone(),
         MemorySurbStore::new(SurbStoreConfig::default()),
-        HoprTicketProcessor::new(
-            sender.chain_api.clone(),
-            sender.node_db.clone(),
-            sender.chain_key.clone(),
-            Hash::default(),
-            HoprTicketProcessorConfig::default(),
-        ),
+        HoprTicketManager::new(RedbStore::new_temp().unwrap()).unwrap().into(),
         Hash::default(),
         HoprCodecConfig::default(),
     )
@@ -60,13 +53,7 @@ pub fn create_decoder(receiver: &Node) -> TestDecoder {
         (receiver.offchain_key.clone(), receiver.chain_key.clone()),
         receiver.chain_api.clone(),
         MemorySurbStore::new(SurbStoreConfig::default()),
-        HoprTicketProcessor::new(
-            receiver.chain_api.clone(),
-            receiver.node_db.clone(),
-            receiver.chain_key.clone(),
-            Hash::default(),
-            HoprTicketProcessorConfig::default(),
-        ),
+        HoprTicketManager::new(RedbStore::new_temp().unwrap()).unwrap().into(),
         Hash::default(),
         HoprCodecConfig::default(),
     )
@@ -158,7 +145,7 @@ fn hopr_encoder_bench(c: &mut Criterion) {
                 b.to_async(runtime).iter_batched(|| (create_encoder(&sender), acks.clone()), |(encoder, acks)| async move {
                     encoder.encode_acknowledgements(&acks, &ack_recipient).await.unwrap()
                 },
-                BatchSize::SmallInput)
+                BatchSize::PerIteration)
             }
         );
     }
@@ -219,7 +206,7 @@ fn hopr_decoder_bench(c: &mut Criterion) {
         b.to_async(runtime).iter_batched(
             || (create_decoder(&relay), packet.data.clone()),
             |(decoder, data)| async move { decoder.decode(prev_hop, data).await.unwrap() },
-            BatchSize::SmallInput,
+            BatchSize::PerIteration,
         )
     });
 
@@ -229,7 +216,7 @@ fn hopr_decoder_bench(c: &mut Criterion) {
         b.to_async(runtime).iter_batched(
             || (create_decoder(&relay), packet.data.clone()),
             |(decoder, data)| async move { decoder.decode(prev_hop, data).await.unwrap() },
-            BatchSize::SmallInput,
+            BatchSize::PerIteration,
         )
     });
 
@@ -247,7 +234,7 @@ fn hopr_decoder_bench(c: &mut Criterion) {
                 )
             },
             |(decoder, data)| async move { decoder.decode(prev_hop, data).await.unwrap() },
-            BatchSize::SmallInput,
+            BatchSize::PerIteration,
         )
     });
 }

@@ -6,21 +6,22 @@
 use std::{
     fmt::{Debug, Display, Formatter},
     str::FromStr,
+    time::Duration,
 };
 
 use async_trait::async_trait;
-use futures::{SinkExt, StreamExt, pin_mut};
+use futures::{StreamExt, TryStreamExt};
+use hopr_async_runtime::{AbortableList, spawn_as_abortable};
 use hopr_lib::{
-    AcknowledgedTicketStatus, ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus, ChannelStatusDiscriminants,
-    HoprBalance, Utc, VerifiedTicket,
+    ChannelChange, ChannelDirection, ChannelEntry, ChannelId, ChannelStatus, HoprBalance, VerifiedTicket,
     api::{
-        chain::{ChainReadChannelOperations, ChannelSelector},
-        db::TicketSelector,
+        chain::{ChainReadChannelOperations, ChainWriteTicketOperations, ChannelSelector},
+        tickets::TicketManagement,
     },
 };
+use parking_lot::lock_api::RwLockUpgradableReadGuard;
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
-use tracing::{debug, error, info};
 use validator::Validate;
 
 use crate::{
@@ -85,78 +86,116 @@ pub struct AutoRedeemingStrategyConfig {
 /// The `AutoRedeemingStrategy` automatically sends an acknowledged ticket
 /// for redemption once encountered.
 /// The strategy does not await the result of the redemption.
-pub struct AutoRedeemingStrategy<A, R> {
-    hopr_chain_actions: A,
-    redeem_sink: R,
+pub struct AutoRedeemingStrategy<A, T> {
     cfg: AutoRedeemingStrategyConfig,
+    hopr_chain_actions: A,
+    ticket_manager: T,
+    // Makes sure all ongoing ticket redemptions to be terminated once the strategy is dropped.
+    running_redemptions: std::sync::Arc<parking_lot::RwLock<AbortableList<ChannelId>>>,
 }
 
-impl<A, R> Debug for AutoRedeemingStrategy<A, R> {
+impl<A, T> Debug for AutoRedeemingStrategy<A, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", Strategy::AutoRedeeming(self.cfg))
     }
 }
 
-impl<A, R> Display for AutoRedeemingStrategy<A, R> {
+impl<A, T> Display for AutoRedeemingStrategy<A, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", Strategy::AutoRedeeming(self.cfg))
     }
 }
 
-impl<A, R> AutoRedeemingStrategy<A, R>
+impl<A, T> AutoRedeemingStrategy<A, T>
 where
-    A: ChainReadChannelOperations + Clone + Send + Sync + 'static,
-    R: futures::Sink<TicketSelector> + Clone,
-    StrategyError: From<R::Error>,
+    A: ChainReadChannelOperations + ChainWriteTicketOperations + Clone + Send + Sync + 'static,
+    T: TicketManagement + Clone + Sync + Send + 'static,
 {
-    pub fn new(cfg: AutoRedeemingStrategyConfig, hopr_chain_actions: A, redeem_sink: R) -> Self {
+    pub fn new(cfg: AutoRedeemingStrategyConfig, hopr_chain_actions: A, ticket_manager: T) -> Self {
         Self {
             cfg,
             hopr_chain_actions,
-            redeem_sink,
+            ticket_manager,
+            running_redemptions: std::sync::Arc::new(parking_lot::RwLock::new(AbortableList::default())),
         }
     }
 
-    async fn enqueue_redeem_request(&self, selector: TicketSelector) -> crate::errors::Result<()> {
-        let sink = self.redeem_sink.clone();
-        pin_mut!(sink);
-        Ok(sink
-            .send(selector.with_state(AcknowledgedTicketStatus::Untouched))
-            .await?)
+    fn enqueue_redemption(&self, channel_id: &ChannelId) -> Result<(), StrategyError> {
+        let redemptions = self.running_redemptions.upgradable_read();
+        if !redemptions.contains(channel_id) {
+            tracing::debug!(%channel_id, "attempting to start redemption in channel");
+
+            let tmgr = self.ticket_manager.clone();
+            let client = self.hopr_chain_actions.clone();
+            let min_value = self.cfg.minimum_redeem_ticket_value;
+            let channel_id = *channel_id;
+            let redemptions_clone = self.running_redemptions.clone();
+
+            RwLockUpgradableReadGuard::upgrade(redemptions).insert(
+                channel_id,
+                spawn_as_abortable!(async move {
+                    let redeem_result = match tmgr
+                        .redeem_stream(client.clone(), channel_id, min_value.into())
+                        .map_err(StrategyError::other)
+                    {
+                        Ok(stream) => {
+                            stream
+                                .map_err(StrategyError::other)
+                                .try_for_each(|res| {
+                                    tracing::debug!(?res, %channel_id, "ticket redemption completed");
+                                    futures::future::ok(())
+                                })
+                                .await
+                        }
+                        err => {
+                            // Add small delay to avoid the write lock acquired for insertion
+                            // still being held.
+                            hopr_async_runtime::prelude::sleep(Duration::from_millis(100)).await;
+                            err.map(|_| ())
+                        }
+                    };
+
+                    tracing::debug!(?redeem_result, %channel_id, "redemption in channel complete");
+                    redemptions_clone.write().abort_one(&channel_id);
+                }),
+            );
+            Ok(())
+        } else {
+            tracing::debug!(%channel_id, "existing on-going redemption");
+            Err(StrategyError::InProgress)
+        }
     }
 }
 
 #[async_trait]
-impl<A, R> SingularStrategy for AutoRedeemingStrategy<A, R>
+impl<A, T> SingularStrategy for AutoRedeemingStrategy<A, T>
 where
-    A: ChainReadChannelOperations + Clone + Send + Sync + 'static,
-    R: futures::Sink<TicketSelector> + Sync + Send + Clone,
-    StrategyError: From<R::Error>,
+    A: ChainReadChannelOperations + ChainWriteTicketOperations + Clone + Send + Sync + 'static,
+    T: TicketManagement + Clone + Sync + Send + 'static,
 {
     async fn on_tick(&self) -> crate::errors::Result<()> {
         if !self.cfg.redeem_on_winning {
-            debug!("trying to redeem all tickets in all channels");
+            tracing::debug!("trying to redeem all tickets in all channels");
 
             self.hopr_chain_actions
                 .stream_channels(
                     ChannelSelector::default()
                         .with_destination(*self.hopr_chain_actions.me())
-                        .with_allowed_states(&[
-                            ChannelStatusDiscriminants::Open,
-                            ChannelStatusDiscriminants::PendingToClose,
-                        ])
-                        .with_closure_time_range(Utc::now()..),
+                        .with_redeemable_channels(Duration::from_secs(30).into()),
                 )
                 .await
-                .map_err(|e| StrategyError::Other(e.into()))?
-                .map(|channel| {
-                    Ok(TicketSelector::from(&channel)
-                        .with_amount(self.cfg.minimum_redeem_ticket_value..)
-                        .with_index_range(channel.ticket_index..)
-                        .with_state(AcknowledgedTicketStatus::Untouched))
+                .map_err(StrategyError::other)?
+                .for_each(|channel| {
+                    if let Err(error) = self.enqueue_redemption(channel.get_id()) {
+                        tracing::error!(
+                            %error,
+                            channel_id = %channel.get_id(),
+                            "cannot start redemption in channel"
+                        );
+                    }
+                    futures::future::ready(())
                 })
-                .forward(self.redeem_sink.clone())
-                .await?;
+                .await;
 
             Ok(())
         } else {
@@ -170,21 +209,19 @@ where
                 .hopr_chain_actions
                 .channel_by_id(ack.channel_id())
                 .await
-                .map_err(|e| StrategyError::Other(e.into()))?
+                .map_err(StrategyError::other)?
             {
-                info!(%ack, "redeeming");
+                tracing::info!(%ack, "redeeming");
 
                 if ack.verified_ticket().index < channel.ticket_index {
-                    error!(%ack, "acknowledged ticket is older than channel ticket index");
+                    tracing::error!(%ack, "acknowledged ticket is older than channel ticket index");
                     return Err(CriteriaNotSatisfied);
                 }
 
-                let selector = TicketSelector::from(channel)
-                    .with_amount(self.cfg.minimum_redeem_ticket_value..)
-                    .with_index_range(channel.ticket_index..=ack.verified_ticket().index)
-                    .with_state(AcknowledgedTicketStatus::Untouched);
+                // Raises an error if redemption in this channel is ongoing
+                self.enqueue_redemption(channel.get_id())?;
 
-                self.enqueue_redeem_request(selector).await
+                Ok(())
             } else {
                 Err(CriteriaNotSatisfied)
             }
@@ -205,17 +242,15 @@ where
 
         if let ChannelChange::Status { left: old, right: new } = change {
             if old != ChannelStatus::Open || !matches!(new, ChannelStatus::PendingToClose(_)) {
-                debug!(?channel, "ignoring channel state change that's not in PendingToClose");
+                tracing::debug!(?channel, "ignoring channel state change that's not in PendingToClose");
                 return Ok(());
             }
-            info!(%channel, "channel transitioned to PendingToClose, checking if it has tickets to redeem");
+            tracing::info!(%channel, "channel transitioned to PendingToClose, checking if it has tickets to redeem");
 
-            let selector = TicketSelector::from(channel)
-                .with_amount(self.cfg.minimum_redeem_ticket_value..)
-                .with_index_range(channel.ticket_index..)
-                .with_state(AcknowledgedTicketStatus::Untouched);
+            // Raises an error if redemption in this channel is ongoing
+            self.enqueue_redemption(channel.get_id())?;
 
-            self.enqueue_redeem_request(selector).await
+            Ok(())
         } else {
             Err(CriteriaNotSatisfied)
         }
@@ -230,15 +265,42 @@ mod tests {
         time::{Duration, SystemTime},
     };
 
+    use futures::stream::BoxStream;
+    use futures_time::future::FutureExt as TimeExt;
     use hex_literal::hex;
-    use hopr_api::types::crypto_random::Randomizable;
-    use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::*};
+    use hopr_api::{
+        tickets::{ChannelStats, RedemptionResult},
+        types::crypto_random::Randomizable,
+    };
+    use hopr_chain_connector::{HoprBlockchainSafeConnector, create_trustful_hopr_blokli_connector, testing::*};
     use hopr_lib::{
         Address, BytesRepresentable, ChainKeypair, HalfKey, Hash, Keypair, RedeemableTicket, Response, TicketBuilder,
         UnitaryFloatOps, WinningProbability, XDaiBalance,
     };
 
     use super::*;
+
+    mockall::mock! {
+        pub TicketMgmt {}
+         #[allow(refining_impl_trait)]
+        impl TicketManagement for TicketMgmt {
+            type Error = std::io::Error;
+            fn redeem_stream<C: ChainWriteTicketOperations + Send + Sync + 'static>(
+                &self,
+                client: C,
+                channel_id: ChannelId,
+                min_amount: Option<HoprBalance>,
+            ) -> Result<BoxStream<'static, Result<RedemptionResult, std::io::Error>>, std::io::Error>;
+
+            fn neglect_tickets(
+                &self,
+                channel_id: &ChannelId,
+                max_ticket_index: Option<u64>,
+            ) -> Result<Vec<VerifiedTicket>, std::io::Error>;
+
+            fn ticket_stats<'a>(&self, channel_id: Option<&'a ChannelId>) -> Result<ChannelStats, std::io::Error>;
+        }
+    }
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be valid");
@@ -288,10 +350,21 @@ mod tests {
             .into_redeemable(&BOB, &Hash::default())?)
     }
 
-    #[tokio::test]
+    type TestConnector = Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>;
+
+    async fn await_redemption_queue_empty(redeems: Arc<parking_lot::RwLock<AbortableList<ChannelId>>>) {
+        loop {
+            hopr_async_runtime::prelude::sleep(Duration::from_millis(100)).await;
+
+            if redeems.read().is_empty() {
+                break;
+            }
+        }
+    }
+
+    #[test_log::test(tokio::test)]
     async fn test_auto_redeeming_strategy_redeem() -> anyhow::Result<()> {
         let ack_ticket = generate_random_ack_ticket(0, 5)?;
-        let (tx, rx) = futures::channel::mpsc::channel(10);
 
         let mut connector = create_trustful_hopr_blokli_connector(
             &BOB,
@@ -308,37 +381,33 @@ mod tests {
             ..Default::default()
         };
 
-        {
-            let ars = AutoRedeemingStrategy::new(
-                cfg,
-                Arc::new(connector),
-                tx.sink_map_err(|e| StrategyError::Other(e.into())),
-            );
+        let mut mock_tmgr = MockTicketMgmt::new();
+        mock_tmgr
+            .expect_redeem_stream()
+            .once()
+            .with(
+                mockall::predicate::always(),
+                mockall::predicate::eq(*CHANNEL_1.get_id()),
+                mockall::predicate::eq(Some(cfg.minimum_redeem_ticket_value)),
+            )
+            .return_once(move |_: TestConnector, _, _| {
+                Ok(futures::stream::once(futures::future::ok(RedemptionResult::Redeemed(ack_ticket.ticket))).boxed())
+            });
 
-            ars.on_acknowledged_winning_ticket(&ack_ticket.ticket).await?;
-            assert!(ars.on_tick().await.is_err());
-        }
+        let ars = AutoRedeemingStrategy::new(cfg, Arc::new(connector), Arc::new(mock_tmgr));
 
-        let redeem_requests = rx.collect::<Vec<_>>().await;
-        assert_eq!(
-            redeem_requests,
-            vec![
-                TicketSelector::from(*CHANNEL_1)
-                    .with_amount(HoprBalance::zero()..)
-                    .with_index_range(
-                        ack_ticket.ticket.verified_ticket().index..=ack_ticket.ticket.verified_ticket().index,
-                    )
-                    .with_state(AcknowledgedTicketStatus::Untouched)
-            ]
-        );
+        ars.on_acknowledged_winning_ticket(&ack_ticket.ticket).await?;
+        assert!(ars.on_tick().await.is_err());
+
+        await_redemption_queue_empty(ars.running_redemptions.clone())
+            .timeout(futures_time::time::Duration::from_secs(5))
+            .await?;
 
         Ok(())
     }
 
     #[test_log::test(tokio::test)]
     async fn test_auto_redeeming_strategy_redeem_on_tick() -> anyhow::Result<()> {
-        let (tx, rx) = futures::channel::mpsc::channel(10);
-
         let mut connector = create_trustful_hopr_blokli_connector(
             &BOB,
             Default::default(),
@@ -354,76 +423,33 @@ mod tests {
             ..Default::default()
         };
 
-        {
-            let ars = AutoRedeemingStrategy::new(
-                cfg,
-                Arc::new(connector),
-                tx.sink_map_err(|e| StrategyError::Other(e.into())),
-            );
-            ars.on_tick().await?;
-        }
+        let mut mock_tmgr = MockTicketMgmt::new();
+        mock_tmgr
+            .expect_redeem_stream()
+            .once()
+            .with(
+                mockall::predicate::always(),
+                mockall::predicate::eq(*CHANNEL_1.get_id()),
+                mockall::predicate::eq(Some(cfg.minimum_redeem_ticket_value)),
+            )
+            .return_once(|_: TestConnector, _, _| Ok(futures::stream::empty().boxed()));
 
-        let redeem_requests = rx.collect::<Vec<_>>().await;
-        assert_eq!(
-            redeem_requests,
-            vec![
-                TicketSelector::from(*CHANNEL_2)
-                    .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
-                    .with_index_range(CHANNEL_2.ticket_index..)
-                    .with_state(AcknowledgedTicketStatus::Untouched),
-                TicketSelector::from(*CHANNEL_1)
-                    .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
-                    .with_index_range(CHANNEL_1.ticket_index..)
-                    .with_state(AcknowledgedTicketStatus::Untouched),
-            ]
-        );
+        mock_tmgr
+            .expect_redeem_stream()
+            .once()
+            .with(
+                mockall::predicate::always(),
+                mockall::predicate::eq(*CHANNEL_2.get_id()),
+                mockall::predicate::eq(Some(cfg.minimum_redeem_ticket_value)),
+            )
+            .return_once(|_: TestConnector, _, _| Ok(futures::stream::empty().boxed()));
 
-        Ok(())
-    }
+        let ars = AutoRedeemingStrategy::new(cfg, Arc::new(connector), Arc::new(mock_tmgr));
+        ars.on_tick().await?;
 
-    #[tokio::test]
-    async fn test_auto_redeeming_strategy_redeem_minimum_ticket_amount() -> anyhow::Result<()> {
-        let ack_ticket_below = generate_random_ack_ticket(1, 4)?;
-        let ack_ticket_at = generate_random_ack_ticket(1, 5)?;
-
-        let (tx, rx) = futures::channel::mpsc::channel(10);
-        let mut connector = create_trustful_hopr_blokli_connector(
-            &BOB,
-            Default::default(),
-            CHAIN_CLIENT.clone(),
-            [1u8; Address::SIZE].into(),
-        )
-        .await?;
-        connector.connect().await?;
-
-        let cfg = AutoRedeemingStrategyConfig {
-            minimum_redeem_ticket_value: HoprBalance::from(*PRICE_PER_PACKET * 5),
-            redeem_on_winning: true,
-            ..Default::default()
-        };
-
-        {
-            let ars = AutoRedeemingStrategy::new(
-                cfg,
-                Arc::new(connector),
-                tx.sink_map_err(|e| StrategyError::Other(e.into())),
-            );
-            ars.on_acknowledged_winning_ticket(&ack_ticket_below.ticket)
-                .await
-                .expect_err("ticket below threshold should not satisfy");
-            ars.on_acknowledged_winning_ticket(&ack_ticket_at.ticket).await?;
-        }
-
-        let redeem_requests = rx.collect::<Vec<_>>().await;
-        assert_eq!(
-            redeem_requests,
-            vec![
-                TicketSelector::from(*CHANNEL_1)
-                    .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
-                    .with_index_range(CHANNEL_1.ticket_index..=ack_ticket_at.ticket.verified_ticket().index)
-                    .with_state(AcknowledgedTicketStatus::Untouched)
-            ]
-        );
+        await_redemption_queue_empty(ars.running_redemptions.clone())
+            .timeout(futures_time::time::Duration::from_secs(5))
+            .await?;
 
         Ok(())
     }
@@ -433,7 +459,6 @@ mod tests {
         let mut channel = *CHANNEL_1;
         channel.status = ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100)));
 
-        let (tx, rx) = futures::channel::mpsc::channel(10);
         let mut connector = create_trustful_hopr_blokli_connector(
             &BOB,
             Default::default(),
@@ -449,42 +474,39 @@ mod tests {
             ..Default::default()
         };
 
-        {
-            let ars = AutoRedeemingStrategy::new(
-                cfg,
-                Arc::new(connector),
-                tx.sink_map_err(|e| StrategyError::Other(e.into())),
-            );
-            ars.on_own_channel_changed(
-                &channel,
-                ChannelDirection::Incoming,
-                ChannelChange::Status {
-                    left: ChannelStatus::Open,
-                    right: channel.status,
-                },
+        let mut mock_tmgr = MockTicketMgmt::new();
+        mock_tmgr
+            .expect_redeem_stream()
+            .once()
+            .with(
+                mockall::predicate::always(),
+                mockall::predicate::eq(*CHANNEL_1.get_id()),
+                mockall::predicate::eq(Some(cfg.minimum_redeem_ticket_value)),
             )
-            .await?;
-        }
+            .return_once(move |_: TestConnector, _, _| Ok(futures::stream::empty().boxed()));
 
-        let redeem_requests = rx.collect::<Vec<_>>().await;
-        assert_eq!(
-            redeem_requests,
-            vec![
-                TicketSelector::from(*CHANNEL_1)
-                    .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
-                    .with_index_range(CHANNEL_1.ticket_index..)
-                    .with_state(AcknowledgedTicketStatus::Untouched)
-            ]
-        );
+        let ars = AutoRedeemingStrategy::new(cfg, Arc::new(connector), Arc::new(mock_tmgr));
+        ars.on_own_channel_changed(
+            &channel,
+            ChannelDirection::Incoming,
+            ChannelChange::Status {
+                left: ChannelStatus::Open,
+                right: channel.status,
+            },
+        )
+        .await?;
+
+        await_redemption_queue_empty(ars.running_redemptions.clone())
+            .timeout(futures_time::time::Duration::from_secs(5))
+            .await?;
 
         Ok(())
     }
 
     #[tokio::test]
-    async fn test_auto_redeeming_strategy_redeem_multiple_tickets_in_channel() -> anyhow::Result<()> {
+    async fn test_auto_redeeming_strategy_should_not_redeem_multiple_times_in_same_channel() -> anyhow::Result<()> {
         let ack_ticket_1 = generate_random_ack_ticket(0, 5)?;
 
-        let (tx, rx) = futures::channel::mpsc::channel(10);
         let mut connector = create_trustful_hopr_blokli_connector(
             &BOB,
             Default::default(),
@@ -494,32 +516,56 @@ mod tests {
         .await?;
         connector.connect().await?;
 
-        {
-            let cfg = AutoRedeemingStrategyConfig {
-                minimum_redeem_ticket_value: 0.into(),
-                redeem_on_winning: true,
-                ..Default::default()
-            };
+        let cfg = AutoRedeemingStrategyConfig {
+            minimum_redeem_ticket_value: 0.into(),
+            redeem_on_winning: true,
+            ..Default::default()
+        };
 
-            let ars = AutoRedeemingStrategy::new(
-                cfg,
-                Arc::new(connector),
-                tx.sink_map_err(|e| StrategyError::Other(e.into())),
-            );
-            ars.on_acknowledged_winning_ticket(&ack_ticket_1.ticket).await?;
-            assert!(ars.on_tick().await.is_err());
-        }
+        let mut mock_tmgr = MockTicketMgmt::new();
+        mock_tmgr
+            .expect_redeem_stream()
+            .once()
+            .with(
+                mockall::predicate::always(),
+                mockall::predicate::eq(*CHANNEL_1.get_id()),
+                mockall::predicate::eq(Some(cfg.minimum_redeem_ticket_value)),
+            )
+            .return_once(move |_: TestConnector, _, _| {
+                Ok(futures::stream::once(
+                    futures::future::ok(RedemptionResult::Redeemed(ack_ticket_1.ticket))
+                        .delay(futures_time::time::Duration::from_millis(500)),
+                )
+                .boxed())
+            });
 
-        let redeem_requests = rx.collect::<Vec<_>>().await;
-        assert_eq!(
-            redeem_requests,
-            vec![
-                TicketSelector::from(*CHANNEL_1)
-                    .with_amount(HoprBalance::zero()..)
-                    .with_index_range(CHANNEL_1.ticket_index..=ack_ticket_1.ticket.verified_ticket().index)
-                    .with_state(AcknowledgedTicketStatus::Untouched),
-            ]
-        );
+        let ars = AutoRedeemingStrategy::new(cfg, Arc::new(connector), Arc::new(mock_tmgr));
+        ars.on_acknowledged_winning_ticket(&ack_ticket_1.ticket).await?;
+        assert!(matches!(
+            ars.on_acknowledged_winning_ticket(&ack_ticket_1.ticket).await,
+            Err(StrategyError::InProgress)
+        ));
+
+        let mut channel = *CHANNEL_1;
+        channel.status = ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100)));
+
+        assert!(matches!(
+            ars.on_own_channel_changed(
+                &channel,
+                ChannelDirection::Incoming,
+                ChannelChange::Status {
+                    left: ChannelStatus::Open,
+                    right: channel.status,
+                }
+            )
+            .await,
+            Err(StrategyError::InProgress)
+        ));
+        assert!(ars.on_tick().await.is_err());
+
+        await_redemption_queue_empty(ars.running_redemptions.clone())
+            .timeout(futures_time::time::Duration::from_secs(5))
+            .await?;
 
         Ok(())
     }

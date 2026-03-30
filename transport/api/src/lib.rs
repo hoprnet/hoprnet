@@ -33,13 +33,12 @@ use std::{
 
 use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
 use futures::{
-    FutureExt, StreamExt,
+    FutureExt, SinkExt, StreamExt,
     channel::mpsc::{Sender, channel},
     stream::select_with_strategy,
 };
 pub use hopr_api::{
     Multiaddr, PeerId,
-    db::ChannelTicketStatistics,
     network::{Health, traits::NetworkView},
     types::{
         crypto::{
@@ -52,7 +51,6 @@ pub use hopr_api::{
 use hopr_api::{
     chain::{ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
     ct::{CoverTrafficGeneration, ProbingTrafficGeneration},
-    db::HoprDbTicketOperations,
     graph::{NetworkGraphUpdate, NetworkGraphView, traits::EdgeObservableRead},
     network::{NetworkBuilder, NetworkStreamControl},
     types::primitive::prelude::*,
@@ -94,11 +92,15 @@ use crate::{
 pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RANGE;
 
 pub use hopr_api as api;
-use hopr_api::types::internal::routing::DestinationRouting;
+use hopr_api::{
+    chain::{ChainWriteTicketOperations, ChannelSelector},
+    types::internal::routing::DestinationRouting,
+};
+use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue, TicketManagerError};
 
 // Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
 lazy_static::lazy_static! {
-    static ref SESSION_INITIATION_TIMEOUT_MAX: std::time::Duration = 2 * constants::SESSION_INITIATION_TIMEOUT_BASE * RoutingOptions::MAX_INTERMEDIATE_HOPS as u32;
+    static ref SESSION_INITIATION_TIMEOUT_MAX: Duration = 2 * SESSION_INITIATION_TIMEOUT_BASE * RoutingOptions::MAX_INTERMEDIATE_HOPS as u32;
 
     static ref PEER_ID_CACHE: moka::future::Cache<PeerId, OffchainPublicKey> = moka::future::Cache::builder()
         .time_to_idle(Duration::from_mins(15))
@@ -150,20 +152,24 @@ pub enum HoprTransportProcess {
 
 /// Interface into the physical transport mechanism allowing all off-chain HOPR-related tasks on
 /// the transport.
-pub struct HoprTransport<Chain, Db, Graph, Net>
+pub struct HoprTransport<Chain, Graph, Net>
 where
     Graph: NetworkGraphView<NodeId = OffchainPublicKey> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
     Net: NetworkView + NetworkStreamControl + Clone + Send + Sync + 'static,
 {
     packet_key: OffchainKeypair,
     chain_key: ChainKeypair,
-    db: Db,
     chain_api: Chain,
     ping: Arc<OnceLock<Pinger>>,
     network: Arc<OnceLock<Net>>,
     graph: Graph,
     path_planner: PathPlanner<MemorySurbStore, Chain, HoprGraphPathSelector<Graph>>,
     my_multiaddresses: Vec<Multiaddr>,
+    // TODO: should the Ticket store (RedbStore) be part of the external API of the transport?
+    // The answer is likely: should be external (see #7903) but only once the outgoing index
+    // management is separated from the Ticket Manager and the unrealized value is passed down
+    // via some Arc'd atomic counter.
+    tmgr: Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>,
     smgr: SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>, Sender<IncomingSession>>,
     session_telemetry_tag_allocator: Arc<dyn hopr_transport_tag_allocator::TagAllocator + Send + Sync>,
     probing_tag_allocator: Arc<dyn hopr_transport_tag_allocator::TagAllocator + Send + Sync>,
@@ -171,11 +177,11 @@ where
     cfg: HoprProtocolConfig,
 }
 
-impl<Chain, Db, Graph, Net> HoprTransport<Chain, Db, Graph, Net>
+impl<Chain, Graph, Net> HoprTransport<Chain, Graph, Net>
 where
-    Db: HoprDbTicketOperations + Clone + Send + Sync + 'static,
     Chain: ChainReadChannelOperations
         + ChainReadAccountOperations
+        + ChainWriteTicketOperations
         + ChainKeyOperations
         + ChainValues
         + Clone
@@ -199,7 +205,6 @@ where
     pub fn new(
         identity: (&ChainKeypair, &OffchainKeypair),
         resolver: Chain,
-        db: Db,
         graph: Graph,
         my_multiaddresses: Vec<Multiaddr>,
         cfg: HoprProtocolConfig,
@@ -228,6 +233,11 @@ where
             .ok_or_else(|| errors::HoprTransportError::Api("session telemetry tag allocator missing".into()))?;
         let probing_tag_allocator = probing_tag_allocator
             .ok_or_else(|| errors::HoprTransportError::Api("probing tag allocator missing".into()))?;
+
+        let ticket_manager = HoprTicketManager::new(match &cfg.ticket_storage_file {
+            Some(path) => RedbStore::new(path).map_err(TicketManagerError::store)?,
+            None => RedbStore::new_temp().map_err(TicketManagerError::store)?,
+        })?;
 
         Ok(Self {
             packet_key: identity.1.clone(),
@@ -266,7 +276,7 @@ where
                 },
                 session_tag_allocator,
             ),
-            db,
+            tmgr: Arc::new(ticket_manager),
             chain_api: resolver,
             session_telemetry_tag_allocator,
             probing_tag_allocator,
@@ -296,7 +306,7 @@ where
     )>
     where
         T: futures::Sink<TicketEvent> + Clone + Send + Unpin + 'static,
-        T::Error: std::error::Error,
+        T::Error: std::error::Error + Clone + Send,
         Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
         NetBuilder: NetworkBuilder<Network = Net> + Send + Sync + 'static,
     {
@@ -320,11 +330,6 @@ where
             )
             .await
             .map_err(|e| HoprTransportError::Api(e.to_string()))?;
-
-        self.network
-            .clone()
-            .set(transport_network.clone())
-            .map_err(|_| HoprTransportError::Api("transport network viewer already set".into()))?;
 
         let msg_codec = hopr_transport_protocol::HoprBinaryCodec {};
         let (wire_msg_tx, wire_msg_rx) =
@@ -465,6 +470,28 @@ where
             .in_current_span()
         });
 
+        // Synchronize the ticket manager with the chain before starting the packet pipeline
+
+        self.tmgr.sync_from_incoming_channels(
+            &self
+                .chain_api
+                .stream_channels(ChannelSelector::default().with_destination(&self.chain_key))
+                .await
+                .map_err(HoprTransportError::chain)?
+                .collect::<Vec<_>>()
+                .await,
+        )?;
+
+        self.tmgr.sync_from_outgoing_channels(
+            &self
+                .chain_api
+                .stream_channels(ChannelSelector::default().with_source(&self.chain_key))
+                .await
+                .map_err(HoprTransportError::chain)?
+                .collect::<Vec<_>>()
+                .await,
+        )?;
+
         let channels_dst = self
             .chain_api
             .domain_separators()
@@ -472,15 +499,24 @@ where
             .map_err(HoprTransportError::chain)?
             .channel;
 
+        let tmgr_clone = self.tmgr.clone();
         processes.extend_from(pipeline::run_hopr_packet_pipeline(
             (self.packet_key.clone(), self.chain_key.clone()),
             (mixing_channel_tx, wire_msg_rx),
             (tx_from_protocol, all_resolved_external_msg_rx),
             HoprPipelineComponents {
-                ticket_events,
+                ticket_events: ticket_events.with(move |event| {
+                    // Make sure winning tickets are passed to the ticket manager
+                    if let TicketEvent::WinningTicket(ticket) = &event
+                        && let Err(error) = tmgr_clone.insert_incoming_ticket(**ticket)
+                    {
+                        tracing::error!(%error, "failed to insert winning ticket into redemption queue");
+                    }
+                    futures::future::ok::<_, T::Error>(event)
+                }),
                 surb_store: self.path_planner.surb_store.clone(),
                 chain_api: self.chain_api.clone(),
-                db: self.db.clone(),
+                ticket_manager: self.tmgr.clone(),
                 counters: self.counters.clone(),
             },
             channels_dst,
@@ -604,6 +640,12 @@ where
             ),
         );
 
+        // Populate the OnceLock at the end, making sure everything before didn't fail.
+        self.network
+            .clone()
+            .set(transport_network)
+            .map_err(|_| HoprTransportError::Api("transport network viewer already set".into()))?;
+
         Ok(((on_incoming_data_rx, unresolved_routing_msg_tx).into(), processes))
     }
 
@@ -631,6 +673,10 @@ where
                 "no observations available for peer {peer}",
             )))
         }
+    }
+
+    pub fn ticket_manager(&self) -> impl hopr_api::tickets::TicketManagement + Send + Clone + 'static {
+        self.tmgr.clone()
     }
 
     #[tracing::instrument(level = "debug", skip(self))]

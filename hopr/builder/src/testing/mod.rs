@@ -6,7 +6,6 @@ use hopr_chain_connector::{
     HoprBlockchainSafeConnector,
     testing::{BlokliTestClient, FullStateEmulator},
 };
-use hopr_db_node::HoprNodeDb;
 use hopr_network_graph::SharedChannelGraph;
 use hopr_transport_p2p::HoprNetwork;
 
@@ -16,7 +15,7 @@ pub mod hopr;
 
 pub(crate) type TestingConnector = std::sync::Arc<HoprBlockchainSafeConnector<BlokliTestClient<FullStateEmulator>>>;
 pub(crate) type TestingGraph = SharedChannelGraph;
-pub(crate) type TestingHopr = crate::Hopr<TestingConnector, HoprNodeDb, TestingGraph, HoprNetwork>;
+pub(crate) type TestingHopr = crate::Hopr<TestingConnector, TestingGraph, HoprNetwork>;
 
 /// Waits until either the given async `predicate` returns true or the `timeout` is reached.
 ///

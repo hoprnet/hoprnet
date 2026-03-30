@@ -1,14 +1,9 @@
-use std::sync::{
-    Arc,
-    atomic::{AtomicU64, Ordering},
-};
+use std::sync::Arc;
 
 use bimap::BiMap;
-use dashmap::DashMap;
 use futures::stream::{self, BoxStream};
 use hopr_api::{
     chain::*,
-    db::{ChannelTicketStatistics, HoprDbTicketOperations, TicketMarker, TicketSelector},
     types::{
         crypto::prelude::{Hash, OffchainPublicKey},
         internal::prelude::*,
@@ -242,114 +237,6 @@ impl ChainValues for StubChainApi {
     }
 
     // outgoing_ticket_values: uses default impl that calls minimum_ticket_price + minimum_incoming_ticket_win_prob
-}
-
-// ---------------------------------------------------------------------------
-// StubTicketDb
-// ---------------------------------------------------------------------------
-
-/// Minimal in-memory stub for [`HoprDbTicketOperations`].
-///
-/// Only `get_or_create_outgoing_ticket_index` and `update_outgoing_ticket_index`
-/// maintain real state (an atomic counter per channel+epoch). All other methods
-/// return empty / zero defaults.
-#[derive(Clone, Default)]
-pub struct StubTicketDb {
-    indices: Arc<DashMap<(ChannelId, u32), Arc<AtomicU64>>>,
-}
-
-#[async_trait::async_trait]
-impl HoprDbTicketOperations for StubTicketDb {
-    type Error = StubError;
-
-    async fn stream_tickets<'c, S: Into<TicketSelector>, I: IntoIterator<Item = S> + Send>(
-        &'c self,
-        _selectors: I,
-    ) -> Result<BoxStream<'c, RedeemableTicket>, Self::Error> {
-        Ok(Box::pin(stream::empty()))
-    }
-
-    async fn insert_ticket(&self, _ticket: RedeemableTicket) -> Result<(), Self::Error> {
-        Ok(())
-    }
-
-    async fn mark_tickets_as<S: Into<TicketSelector> + Send, I: IntoIterator<Item = S> + Send>(
-        &self,
-        _selectors: I,
-        _mark_as: TicketMarker,
-    ) -> Result<usize, Self::Error> {
-        Ok(0)
-    }
-
-    async fn mark_unsaved_ticket_rejected(&self, _issuer: &Address, _ticket: &Ticket) -> Result<(), Self::Error> {
-        Ok(())
-    }
-
-    async fn update_ticket_states_and_fetch<'a, S: Into<TicketSelector>, I: IntoIterator<Item = S> + Send>(
-        &'a self,
-        _selectors: I,
-        _new_state: AcknowledgedTicketStatus,
-    ) -> Result<BoxStream<'a, RedeemableTicket>, Self::Error> {
-        Ok(Box::pin(stream::empty()))
-    }
-
-    async fn update_ticket_states<S: Into<TicketSelector>, I: IntoIterator<Item = S> + Send>(
-        &self,
-        _selectors: I,
-        _new_state: AcknowledgedTicketStatus,
-    ) -> Result<usize, Self::Error> {
-        Ok(0)
-    }
-
-    async fn get_ticket_statistics(
-        &self,
-        _channel_id: Option<ChannelId>,
-    ) -> Result<ChannelTicketStatistics, Self::Error> {
-        Ok(ChannelTicketStatistics::default())
-    }
-
-    async fn reset_ticket_statistics(&self) -> Result<(), Self::Error> {
-        Ok(())
-    }
-
-    async fn get_tickets_value(&self, _selector: TicketSelector) -> Result<HoprBalance, Self::Error> {
-        Ok(HoprBalance::zero())
-    }
-
-    async fn get_or_create_outgoing_ticket_index(
-        &self,
-        channel_id: &ChannelId,
-        epoch: u32,
-        current_index: u64,
-    ) -> Result<Option<u64>, Self::Error> {
-        let key = (*channel_id, epoch);
-        let entry = self
-            .indices
-            .entry(key)
-            .or_insert_with(|| Arc::new(AtomicU64::new(current_index)));
-        let idx = entry.value().fetch_add(1, Ordering::Relaxed);
-        // Return None on first creation (matching the real DB behaviour),
-        // otherwise return the current index.
-        if idx == current_index { Ok(None) } else { Ok(Some(idx)) }
-    }
-
-    async fn update_outgoing_ticket_index(
-        &self,
-        channel_id: &ChannelId,
-        epoch: u32,
-        index: u64,
-    ) -> Result<(), Self::Error> {
-        let key = (*channel_id, epoch);
-        if let Some(entry) = self.indices.get(&key) {
-            entry.value().store(index, Ordering::Relaxed);
-        }
-        Ok(())
-    }
-
-    async fn remove_outgoing_ticket_index(&self, channel_id: &ChannelId, epoch: u32) -> Result<(), Self::Error> {
-        self.indices.remove(&(*channel_id, epoch));
-        Ok(())
-    }
 }
 
 // ---------------------------------------------------------------------------

@@ -3,7 +3,6 @@ use std::{num::NonZeroUsize, process::ExitCode, str::FromStr, sync::Arc};
 use async_signal::{Signal, Signals};
 use futures::{FutureExt, StreamExt, future::abortable};
 use hopr_chain_connector::{HoprBlockchainSafeConnector, blokli_client::BlokliClient};
-use hopr_db_node::HoprNodeDb;
 use hopr_lib::{AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, config::HoprLibConfig};
 use hopr_network_graph::SharedChannelGraph;
 use hopr_transport_p2p::HoprNetwork;
@@ -34,7 +33,7 @@ mod telemetry_common;
 const DEFAULT_BLOKLI_URL: &str = "https://blokli.dufour.hoprnet.link";
 
 type HoprBlokliConnector = HoprBlockchainSafeConnector<BlokliClient>;
-type HoprNode = hopr_lib::Hopr<Arc<HoprBlokliConnector>, HoprNodeDb, SharedChannelGraph, HoprNetwork>;
+type HoprNode = hopr_lib::Hopr<Arc<HoprBlokliConnector>, SharedChannelGraph, HoprNetwork>;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, strum::Display)]
 enum HoprdProcess {
@@ -208,7 +207,6 @@ async fn main_inner(cfg: HoprdConfig, hopr_keys: HoprKeys) -> anyhow::Result<()>
     use hopr_api::chain::ChainEvents;
     use hopr_builder::exit::HoprServerIpForwardingReactor;
     use hopr_chain_connector::{BlockchainConnectorConfig, blokli_client, create_trustful_hopr_blokli_connector};
-    use hopr_db_node::init_hopr_node_db;
 
     #[cfg(all(target_os = "linux", feature = "allocator-jemalloc-stats"))]
     let _jemalloc_stats = jemalloc_stats::JemallocStats::start().await;
@@ -248,8 +246,6 @@ async fn main_inner(cfg: HoprdConfig, hopr_keys: HoprKeys) -> anyhow::Result<()>
 
     let mut processes = AbortableList::<HoprdProcess>::default();
 
-    let node_db = init_hopr_node_db(&cfg.db.data, cfg.db.initialize, cfg.db.force_initialize).await?;
-
     let mut chain_connector = create_trustful_hopr_blokli_connector(
         &hopr_keys.chain_key,
         BlockchainConnectorConfig {
@@ -287,13 +283,12 @@ async fn main_inner(cfg: HoprdConfig, hopr_keys: HoprKeys) -> anyhow::Result<()>
         ..Default::default()
     };
 
-    let (node, hopr_process) = hopr_builder::build_from_chain_and_db(
+    let (node, hopr_process) = hopr_builder::build_with_chain(
         &hopr_keys.chain_key,
         &hopr_keys.packet_key,
         hopr_lib_cfg,
         Some(prober_cfg),
         chain_connector.clone(),
-        node_db,
         HoprServerIpForwardingReactor::new(hopr_keys.packet_key.clone(), cfg.session_ip_forwarding.clone()),
     )
     .await?;
@@ -308,7 +303,7 @@ async fn main_inner(cfg: HoprdConfig, hopr_keys: HoprKeys) -> anyhow::Result<()>
     let multi_strategy = Arc::new(hopr_strategy::strategy::MultiStrategy::new(
         cfg.strategy.clone(),
         chain_connector.clone(),
-        node.redemption_requests()?,
+        node.ticket_management(),
     ));
     tracing::debug!(strategies = ?multi_strategy, "initialized strategies");
 
@@ -318,7 +313,8 @@ async fn main_inner(cfg: HoprdConfig, hopr_keys: HoprKeys) -> anyhow::Result<()>
         hopr_strategy::stream_events_to_strategy_with_tick(
             multi_strategy,
             chain_connector.subscribe()?,
-            node.subscribe_winning_tickets(),
+            node.subscribe_ticket_events()
+                .filter_map(|e| futures::future::ready(e.try_as_winning_ticket().map(|t| t.ticket))),
             cfg.strategy.execution_interval,
             hopr_keys.chain_key.public().to_address(),
         ),

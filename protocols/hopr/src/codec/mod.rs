@@ -71,23 +71,23 @@ mod tests {
         HoprBlockchainSafeConnector,
         testing::{BlokliTestClient, StaticState},
     };
-    use hopr_db_node::HoprNodeDb;
+    use hopr_ticket_manager::{HoprTicketManager, MemoryStore, MemoryTicketQueue};
 
     use crate::{
-        HoprCodecConfig, HoprDecoder, HoprEncoder, HoprTicketProcessor, HoprTicketProcessorConfig, MemorySurbStore,
-        PacketDecoder, PacketEncoder, SurbStoreConfig, codec::encoder::MAX_ACKNOWLEDGEMENTS_BATCH_SIZE, utils::*,
+        HoprCodecConfig, HoprDecoder, HoprEncoder, MemorySurbStore, PacketDecoder, PacketEncoder, SurbStoreConfig,
+        codec::encoder::MAX_ACKNOWLEDGEMENTS_BATCH_SIZE, utils::*,
     };
 
     type TestEncoder = HoprEncoder<
         Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>,
         MemorySurbStore,
-        HoprTicketProcessor<Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>, HoprNodeDb>,
+        Arc<HoprTicketManager<MemoryStore, MemoryTicketQueue>>,
     >;
 
     type TestDecoder = HoprDecoder<
         Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>,
         MemorySurbStore,
-        HoprTicketProcessor<Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>, HoprNodeDb>,
+        Arc<HoprTicketManager<MemoryStore, MemoryTicketQueue>>,
     >;
 
     pub fn create_encoder(sender: &Node) -> TestEncoder {
@@ -95,13 +95,7 @@ mod tests {
             sender.chain_key.clone(),
             sender.chain_api.clone(),
             MemorySurbStore::new(SurbStoreConfig::default()),
-            HoprTicketProcessor::new(
-                sender.chain_api.clone(),
-                sender.node_db.clone(),
-                sender.chain_key.clone(),
-                Hash::default(),
-                HoprTicketProcessorConfig::default(),
-            ),
+            HoprTicketManager::new(MemoryStore::default()).unwrap().into(),
             Hash::default(),
             HoprCodecConfig::default(),
         )
@@ -112,13 +106,7 @@ mod tests {
             (receiver.offchain_key.clone(), receiver.chain_key.clone()),
             receiver.chain_api.clone(),
             MemorySurbStore::new(SurbStoreConfig::default()),
-            HoprTicketProcessor::new(
-                receiver.chain_api.clone(),
-                receiver.node_db.clone(),
-                receiver.chain_key.clone(),
-                Hash::default(),
-                HoprTicketProcessorConfig::default(),
-            ),
+            HoprTicketManager::new(MemoryStore::default()).unwrap().into(),
             Hash::default(),
             HoprCodecConfig::default(),
         )

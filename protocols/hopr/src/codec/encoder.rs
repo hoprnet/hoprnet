@@ -9,10 +9,7 @@ use hopr_api::{
 use hopr_crypto_packet::prelude::*;
 use tracing::Instrument;
 
-use crate::{
-    HoprCodecConfig, OutgoingPacket, PacketEncoder, SurbStore, TicketCreationError, TicketTracker,
-    errors::HoprProtocolError,
-};
+use crate::{HoprCodecConfig, OutgoingPacket, PacketEncoder, SurbStore, TicketTracker, errors::HoprProtocolError};
 
 /// Maximum number of acknowledgements that can be packed into a single HOPR packet.
 ///
@@ -97,10 +94,7 @@ where
                     outgoing_ticket_price,
                 )
                 .await
-                .map_err(|e| match e {
-                    TicketCreationError::OutOfFunds(id, a) => HoprProtocolError::OutOfFunds(id, a),
-                    e => HoprProtocolError::TicketTrackerError(e.into()),
-                })?
+                .map_err(|e| HoprProtocolError::TicketTrackerError(e.into()))?
         } else {
             TicketBuilder::zero_hop().counterparty(next_peer)
         };

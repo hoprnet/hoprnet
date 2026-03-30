@@ -28,7 +28,6 @@ use axum::{
     routing::{delete, get, post},
 };
 use hopr_chain_connector::HoprBlockchainSafeConnector;
-use hopr_db_node::HoprNodeDb;
 use hopr_lib::{Address, Hopr, errors::HoprLibError};
 use hopr_network_graph::SharedChannelGraph;
 // pub use hopr_builder::config::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
@@ -57,7 +56,7 @@ pub(crate) const BASE_PATH: &str = const_format::formatcp!("/api/v{}", env!("CAR
 
 type HoprBlokliConnector = HoprBlockchainSafeConnector<hopr_chain_connector::blokli_client::BlokliClient>;
 
-pub(crate) type HoprNode = Hopr<Arc<HoprBlokliConnector>, HoprNodeDb, SharedChannelGraph, HoprNetwork>;
+pub(crate) type HoprNode = Hopr<Arc<HoprBlokliConnector>, SharedChannelGraph, HoprNetwork>;
 
 #[derive(Clone)]
 pub(crate) struct AppState {
@@ -108,10 +107,7 @@ pub(crate) struct InternalState {
         session::close_client,
         tickets::redeem_all_tickets,
         tickets::redeem_tickets_in_channel,
-        tickets::show_all_tickets,
-        tickets::show_channel_tickets,
         tickets::show_ticket_statistics,
-        tickets::reset_ticket_statistics,
     ),
     components(
         schemas(
@@ -280,17 +276,14 @@ async fn build_api(
                 .route("/channels", get(channels::list_channels))
                 .route("/channels", post(channels::open_channel))
                 .route("/channels/{channelId}", get(channels::show_channel))
-                .route("/channels/{channelId}/tickets", get(tickets::show_channel_tickets))
                 .route("/channels/{channelId}", delete(channels::close_channel))
                 .route("/channels/{channelId}/fund", post(channels::fund_channel))
                 .route(
                     "/channels/{channelId}/tickets/redeem",
                     post(tickets::redeem_tickets_in_channel),
                 )
-                .route("/tickets", get(tickets::show_all_tickets))
                 .route("/tickets/redeem", post(tickets::redeem_all_tickets))
                 .route("/tickets/statistics", get(tickets::show_ticket_statistics))
-                .route("/tickets/statistics", delete(tickets::reset_ticket_statistics))
                 .route("/network/price", get(network::price))
                 .route("/network/probability", get(network::probability))
                 .route("/network/connected", get(network::connected))

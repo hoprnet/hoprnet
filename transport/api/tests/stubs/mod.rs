@@ -10,11 +10,9 @@ use futures::stream::{self, BoxStream};
 use hopr_api::{
     Multiaddr, PeerId,
     chain::*,
-    db::*,
     network::{Health, traits::NetworkView},
     types::{
         crypto::prelude::{ChainKeypair, Keypair, OffchainKeypair, OffchainPublicKey},
-        internal::prelude::*,
         primitive::{
             balance::{Balance, Currency, HoprBalance},
             prelude::{Address, KeyIdMapping, KeyIdent},
@@ -92,6 +90,24 @@ impl ChainReadAccountOperations for StubChain {
     }
 }
 
+#[async_trait]
+impl ChainWriteTicketOperations for StubChain {
+    type Error = StubError;
+
+    async fn redeem_ticket<'a>(
+        &'a self,
+        ticket: RedeemableTicket,
+    ) -> Result<
+        futures::future::BoxFuture<'a, Result<(VerifiedTicket, ChainReceipt), TicketRedeemError<Self::Error>>>,
+        TicketRedeemError<Self::Error>,
+    > {
+        Err(TicketRedeemError::ProcessingError(
+            ticket.ticket,
+            StubError("stubs do not redeem tickets".into()),
+        ))
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct StubKeyMapper;
 
@@ -161,91 +177,6 @@ impl ChainValues for StubChain {
             hopr_network_name: "stub-test".into(),
             contract_addresses: Default::default(),
         })
-    }
-}
-
-/// Stub database satisfying `Db` trait bounds.
-#[derive(Debug, Clone)]
-pub struct StubDb;
-
-#[async_trait]
-impl HoprDbTicketOperations for StubDb {
-    type Error = StubError;
-
-    async fn stream_tickets<'c, S: Into<TicketSelector>, I: IntoIterator<Item = S> + Send>(
-        &'c self,
-        _selectors: I,
-    ) -> Result<BoxStream<'c, RedeemableTicket>, Self::Error> {
-        Ok(Box::pin(stream::empty()))
-    }
-
-    async fn insert_ticket(&self, _ticket: RedeemableTicket) -> Result<(), Self::Error> {
-        Ok(())
-    }
-
-    async fn mark_tickets_as<S: Into<TicketSelector> + Send, I: IntoIterator<Item = S> + Send>(
-        &self,
-        _selectors: I,
-        _mark_as: TicketMarker,
-    ) -> Result<usize, Self::Error> {
-        Ok(0)
-    }
-
-    async fn mark_unsaved_ticket_rejected(&self, _issuer: &Address, _ticket: &Ticket) -> Result<(), Self::Error> {
-        Ok(())
-    }
-
-    async fn update_ticket_states_and_fetch<'a, S: Into<TicketSelector>, I: IntoIterator<Item = S> + Send>(
-        &'a self,
-        _selectors: I,
-        _new_state: AcknowledgedTicketStatus,
-    ) -> Result<BoxStream<'a, RedeemableTicket>, Self::Error> {
-        Ok(Box::pin(stream::empty()))
-    }
-
-    async fn update_ticket_states<S: Into<TicketSelector>, I: IntoIterator<Item = S> + Send>(
-        &self,
-        _selectors: I,
-        _new_state: AcknowledgedTicketStatus,
-    ) -> Result<usize, Self::Error> {
-        Ok(0)
-    }
-
-    async fn get_ticket_statistics(
-        &self,
-        _channel_id: Option<ChannelId>,
-    ) -> Result<ChannelTicketStatistics, Self::Error> {
-        Ok(ChannelTicketStatistics::default())
-    }
-
-    async fn reset_ticket_statistics(&self) -> Result<(), Self::Error> {
-        Ok(())
-    }
-
-    async fn get_tickets_value(&self, _selector: TicketSelector) -> Result<HoprBalance, Self::Error> {
-        Ok(HoprBalance::zero())
-    }
-
-    async fn get_or_create_outgoing_ticket_index(
-        &self,
-        _channel_id: &ChannelId,
-        _epoch: u32,
-        _current_index: u64,
-    ) -> Result<Option<u64>, Self::Error> {
-        Ok(None)
-    }
-
-    async fn update_outgoing_ticket_index(
-        &self,
-        _channel_id: &ChannelId,
-        _epoch: u32,
-        _index: u64,
-    ) -> Result<(), Self::Error> {
-        Ok(())
-    }
-
-    async fn remove_outgoing_ticket_index(&self, _channel_id: &ChannelId, _epoch: u32) -> Result<(), Self::Error> {
-        Ok(())
     }
 }
 

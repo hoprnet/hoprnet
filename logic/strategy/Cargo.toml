@@ -18,15 +18,17 @@ runtime-tokio = ["hopr-lib/runtime-tokio", "hopr-async-runtime/runtime-tokio"]
 telemetry = ["dep:hopr-metrics"]
 
 [dependencies]
+anyhow = { workspace = true }
 async-trait = { workspace = true }
+dashmap = { workspace = true, features = ["inline"] }
 futures = { workspace = true }
 futures-time = { workspace = true }
 futures-concurrency = { workspace = true }
 humantime-serde = { workspace = true }
+lazy_static = { workspace = true }
+parking_lot = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
-lazy_static = { workspace = true }
-dashmap = { workspace = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
@@ -38,7 +40,6 @@ hopr-async-runtime = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]
-anyhow = { workspace = true }
 chrono = { workspace = true }
 hex-literal = { workspace = true }
 hopr-lib = { workspace = true, features = ["runtime-tokio"] }

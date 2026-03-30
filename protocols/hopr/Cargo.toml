@@ -29,7 +29,6 @@ auto_impl = { workspace = true }
 cfg_eval = { workspace = true, optional = true }
 bloomfilter = { workspace = true }
 futures = { workspace = true }
-futures-time = { workspace = true }
 hex = { workspace = true }
 lazy_static = { workspace = true }
 moka = { workspace = true }
@@ -46,9 +45,10 @@ validator = { workspace = true }
 
 hopr-api = { workspace = true, features = ["db", "chain", "types-random"] }
 hopr-crypto-packet = { workspace = true }
-hopr-parallelize = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
+hopr-parallelize = { workspace = true }
 hopr-platform = { workspace = true }
+hopr-ticket-manager = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
@@ -56,15 +56,11 @@ hex-literal = { workspace = true }
 lazy_static = { workspace = true }
 tokio = { workspace = true }
 
-hopr-db-node = { workspace = true, features = [
-  "runtime-tokio",
-  "traits",
-  "sqlite",
-] }
 hopr-chain-connector = { workspace = true, features = [
   "testing",
   "runtime-tokio",
 ] }
+
 
 [[bench]]
 name = "bloom_filter"

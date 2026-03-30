@@ -1,0 +1,47 @@
+[package]
+name = "hopr-ticket-manager"
+description = "Manages outgoing ticket indices and incoming redeemable tickets"
+version = "0.1.0"
+rust-version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[features]
+default = ["redb"]
+redb = ["dep:postcard", "dep:redb", "hopr-api/serde"]
+
+[dependencies]
+anyhow = { workspace = true }
+dashmap = { workspace = true, features = ["inline"] }
+hashbrown = { workspace = true, features = ["inline-more"] }
+futures = { workspace = true }
+parking_lot = { workspace = true, features = ["arc_lock"] }
+redb = { workspace = true, optional = true }
+postcard = { workspace = true, optional = true, features = ["use-std"] }
+tempfile = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+hopr-api = { workspace = true, features = [
+  "db",
+  "chain",
+  "tickets",
+  "types-internal",
+  "types-random",
+] }
+hopr-platform = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+rand = { workspace = true }
+test-log = { workspace = true }
+tokio = { workspace = true }
+
+hopr-chain-connector = { workspace = true, features = [
+  "testing",
+  "runtime-tokio",
+] }
+
+[[bench]]
+name = "ticket_manager"
+harness = false

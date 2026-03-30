@@ -26,9 +26,14 @@ lazy_static::lazy_static! {
         "Number of processed packets of different types (sent, received, forwarded)",
         &["type"]
     ).unwrap();
+    static ref METRIC_PACKET_REJECTED_COUNT: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+        "hopr_packet_rejected_count",
+        "Number of incoming packets rejected due various reasons",
+        &["reason"]
+    ).unwrap();
     // Tracks how often the Rayon-backed packet decode path exceeds PACKET_DECODING_TIMEOUT.
     // A sustained non-zero rate here indicates the Rayon pool is saturated—correlate with
-    // hopr_rayon_tasks_cancelled_total and hopr_rayon_queue_wait_seconds to diagnose whether
+    // `hopr_rayon_tasks_cancelled_total` and hopr_rayon_queue_wait_seconds to diagnose whether
     // the bottleneck is queue depth, individual task duration, or both.
     static ref METRIC_PACKET_DECODE_TIMEOUTS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
         "hopr_packet_decode_timeouts_total",
@@ -183,6 +188,10 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                     },
                     Ok(Err(IncomingPacketError::Overloaded(error))) => {
                         tracing::warn!(%peer, %error, "dropping packet due to local CPU overload");
+
+                        #[cfg(all(feature = "telemetry", not(test)))]
+                        METRIC_PACKET_REJECTED_COUNT.increment(&["overloaded"]);
+
                         None
                     },
                     Ok(Err(IncomingPacketError::Undecodable(error))) => {
@@ -190,6 +199,10 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                         //
                         // Potentially adversarial behavior
                         tracing::trace!(%peer, %error, "not sending ack back on undecodable packet - possible adversarial behavior");
+
+                        #[cfg(all(feature = "telemetry", not(test)))]
+                        METRIC_PACKET_REJECTED_COUNT.increment(&["undecodable"]);
+
                         None
                     },
                     Ok(Err(IncomingPacketError::ProcessingError(sender, error))) => {
@@ -201,6 +214,10 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             .unwrap_or_else(|error| {
                                 tracing::error!(%error, "failed to send ack to the egress queue");
                             });
+
+                        #[cfg(all(feature = "telemetry", not(test)))]
+                        METRIC_PACKET_REJECTED_COUNT.increment(&["processing_error"]);
+
                         None
                     },
                     Ok(Err(IncomingPacketError::InvalidTicket(sender, error))) => {
@@ -219,7 +236,10 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             });
 
                         #[cfg(all(feature = "telemetry", not(test)))]
-                        METRIC_VALIDATION_ERRORS.increment(&[error.kind.as_ref()]);
+                        {
+                            METRIC_VALIDATION_ERRORS.increment(&[error.kind.as_ref()]);
+                            METRIC_PACKET_REJECTED_COUNT.increment(&["invalid_ticket"]);
+                        }
 
                         None
                     }
@@ -231,7 +251,10 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             "dropped incoming packet: decode timeout - check the 'hopr_rayon_queue_wait_seconds' metric for pool saturation"
                         );
                         #[cfg(all(feature = "telemetry", not(test)))]
-                        METRIC_PACKET_DECODE_TIMEOUTS.increment();
+                        {
+                            METRIC_PACKET_DECODE_TIMEOUTS.increment();
+                            METRIC_PACKET_REJECTED_COUNT.increment(&["timeout"]);
+                        }
 
                         None
                     }
@@ -301,6 +324,10 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                                 %error,
                                 "failed to insert unacknowledged ticket into the ticket processor"
                             );
+
+                            #[cfg(all(feature = "telemetry", not(test)))]
+                            METRIC_PACKET_REJECTED_COUNT.increment(&["unack_processing_error"]);
+
                             return None;
                         }
 
@@ -615,6 +642,7 @@ where
         // Initialize the lazy statics here
         lazy_static::initialize(&METRIC_PACKET_COUNT);
         lazy_static::initialize(&METRIC_PACKET_DECODE_TIMEOUTS);
+        lazy_static::initialize(&METRIC_PACKET_REJECTED_COUNT);
         lazy_static::initialize(&METRIC_VALIDATION_ERRORS);
     }
 

@@ -52,6 +52,7 @@ pub fn create_hopr_instance_config(host_port: u16, safe: NodeSafeConfig, winn_pr
                 ..Default::default()
             },
             path_planner: Default::default(),
+            ticket_storage_file: None, // Temporary file storage
             counter_flush_interval: Default::default(),
         },
         publish: true,
@@ -174,19 +175,6 @@ impl ChannelGuard {
         }
 
         Ok(Self { channels })
-    }
-
-    pub async fn try_to_get_all_ticket_counts(&self) -> anyhow::Result<Vec<usize>> {
-        let futures = self.channels.iter().map(|(hopr, channel_id)| async move {
-            hopr.tickets_in_channel(channel_id)
-                .await
-                .context("getting ticket statistics must succeed")
-                .into_iter()
-                .count()
-        });
-
-        let stats = join_all(futures).await;
-        Ok(stats)
     }
 
     pub async fn open_channel_between_nodes(

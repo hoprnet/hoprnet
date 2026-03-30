@@ -19,7 +19,6 @@ use futures::{
 };
 use hopr_api::{
     chain::HoprChainApi,
-    db::HoprNodeDbApi,
     graph::{
         NetworkGraphTraverse, NetworkGraphUpdate, NetworkGraphView, NetworkGraphWrite,
         traits::{EdgeObservableRead, EdgeObservableWrite},
@@ -213,16 +212,15 @@ pub struct SessionPool {
 impl SessionPool {
     pub const MAX_SESSION_POOL_SIZE: usize = 5;
 
-    pub async fn new<Chain, Db, Graph, Net>(
+    pub async fn new<Chain, Graph, Net>(
         size: usize,
         dst: Address,
         target: SessionTarget,
         cfg: HoprSessionClientConfig,
-        hopr: Arc<Hopr<Chain, Db, Graph, Net>>,
+        hopr: Arc<Hopr<Chain, Graph, Net>>,
     ) -> Result<Self, anyhow::Error>
     where
         Chain: HoprChainApi + Clone + Send + Sync + 'static,
-        Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
         Graph: NetworkGraphView<NodeId = OffchainPublicKey>
             + NetworkGraphUpdate
             + NetworkGraphWrite<NodeId = OffchainPublicKey>
@@ -313,10 +311,10 @@ impl Drop for SessionPool {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn create_tcp_client_binding<Chain, Db, Graph, Net>(
+pub async fn create_tcp_client_binding<Chain, Graph, Net>(
     bind_host: std::net::SocketAddr,
     port_range: Option<String>,
-    hopr: Arc<Hopr<Chain, Db, Graph, Net>>,
+    hopr: Arc<Hopr<Chain, Graph, Net>>,
     open_listeners: Arc<ListenerJoinHandles>,
     destination: Address,
     target_spec: SessionTargetSpec,
@@ -326,7 +324,6 @@ pub async fn create_tcp_client_binding<Chain, Db, Graph, Net>(
 ) -> Result<(std::net::SocketAddr, Option<SessionId>, usize), BindError>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
-    Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
     Graph: NetworkGraphView<NodeId = OffchainPublicKey>
         + NetworkGraphUpdate
         + NetworkGraphWrite<NodeId = OffchainPublicKey>
@@ -497,10 +494,10 @@ pub enum BindError {
     UnknownFailure(String),
 }
 
-pub async fn create_udp_client_binding<Chain, Db, Graph, Net>(
+pub async fn create_udp_client_binding<Chain, Graph, Net>(
     bind_host: std::net::SocketAddr,
     port_range: Option<String>,
-    hopr: Arc<Hopr<Chain, Db, Graph, Net>>,
+    hopr: Arc<Hopr<Chain, Graph, Net>>,
     open_listeners: Arc<ListenerJoinHandles>,
     destination: Address,
     target_spec: SessionTargetSpec,
@@ -508,7 +505,6 @@ pub async fn create_udp_client_binding<Chain, Db, Graph, Net>(
 ) -> Result<(std::net::SocketAddr, Option<SessionId>, usize), BindError>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
-    Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
     Graph: NetworkGraphView<NodeId = OffchainPublicKey>
         + NetworkGraphUpdate
         + NetworkGraphWrite<NodeId = OffchainPublicKey>

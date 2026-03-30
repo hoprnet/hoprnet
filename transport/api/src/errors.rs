@@ -7,6 +7,7 @@ pub enum NetworkError {
     #[error("performing an operation on own PeerId")]
     DisallowedOperationOnOwnPeerIdError,
 }
+use hopr_ticket_manager::TicketManagerError;
 pub use hopr_transport_protocol::errors::ProtocolError;
 use hopr_transport_session::errors::TransportSessionError;
 use thiserror::Error;
@@ -31,6 +32,9 @@ pub enum HoprTransportError {
 
     #[error("Transport session error: {0}")]
     Session(#[from] TransportSessionError),
+
+    #[error("Ticket manager error: {0}")]
+    TicketManager(#[from] TicketManagerError),
 
     #[error("Packet error: {0}")]
     Packet(#[from] PacketError),

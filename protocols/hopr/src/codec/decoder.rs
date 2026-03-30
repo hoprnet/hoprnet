@@ -12,8 +12,8 @@ use hopr_platform::trace_timed;
 
 use crate::{
     AuxiliaryPacketInfo, HoprCodecConfig, IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket,
-    IncomingPacket, IncomingPacketError, PacketDecoder, SurbStore, TicketCreationError, TicketTracker,
-    errors::HoprProtocolError, tbf::TagBloomFilter,
+    IncomingPacket, IncomingPacketError, PacketDecoder, SurbStore, TicketTracker, errors::HoprProtocolError,
+    tbf::TagBloomFilter,
 };
 
 /// Default [decoder](PacketDecoder) implementation for HOPR packets.
@@ -184,10 +184,7 @@ where
                     outgoing_ticket_price,
                 )
                 .await
-                .map_err(|e| match e {
-                    TicketCreationError::OutOfFunds(id, a) => HoprProtocolError::OutOfFunds(id, a),
-                    e => HoprProtocolError::TicketTrackerError(e.into()),
-                })?
+                .map_err(|e| HoprProtocolError::TicketTrackerError(e.into()))?
         } else {
             TicketBuilder::zero_hop().counterparty(next_hop_addr)
         };

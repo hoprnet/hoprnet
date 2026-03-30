@@ -6,7 +6,6 @@ use hopr_chain_connector::{
     HoprBlockchainSafeConnector, create_trustful_hopr_blokli_connector,
     testing::{BlokliTestClient, BlokliTestStateBuilder, StaticState},
 };
-use hopr_db_node::HoprNodeDb;
 
 lazy_static::lazy_static! {
     pub static ref PEERS: [(ChainKeypair, OffchainKeypair); 5] = [
@@ -22,7 +21,6 @@ lazy_static::lazy_static! {
 pub struct Node {
     pub chain_key: ChainKeypair,
     pub offchain_key: OffchainKeypair,
-    pub node_db: HoprNodeDb,
     pub chain_api: Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>,
 }
 
@@ -88,7 +86,6 @@ pub async fn create_node(index: usize, blokli_client: &BlokliTestClient<StaticSt
     Ok(Node {
         chain_key: PEERS[index].0.clone(),
         offchain_key: PEERS[index].1.clone(),
-        node_db: HoprNodeDb::new_in_memory().await?,
         chain_api: Arc::new(chain_api),
     })
 }

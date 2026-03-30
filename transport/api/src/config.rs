@@ -7,7 +7,7 @@ use std::{
 };
 
 use hopr_api::Multiaddr;
-pub use hopr_protocol_hopr::{HoprCodecConfig, HoprTicketProcessorConfig, SurbStoreConfig};
+pub use hopr_protocol_hopr::{HoprCodecConfig, HoprUnacknowledgedTicketProcessorConfig, SurbStoreConfig};
 pub use hopr_transport_probe::config::ProbeConfig;
 use hopr_transport_protocol::PacketPipelineConfig;
 use hopr_transport_session::{MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION};
@@ -23,7 +23,7 @@ fn default_counter_flush_interval() -> Duration {
 }
 
 /// Complete configuration of the HOPR protocol stack.
-#[derive(Debug, smart_default::SmartDefault, Validate, Clone, Copy, PartialEq)]
+#[derive(Debug, smart_default::SmartDefault, Validate, Clone, PartialEq)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize),
@@ -49,6 +49,16 @@ pub struct HoprProtocolConfig {
     /// Path planner configuration
     #[cfg_attr(feature = "serde", serde(skip))]
     pub path_planner: hopr_transport_path::PathPlannerConfig,
+    /// Path to a file that acts as incoming ticket storage.
+    ///
+    /// The file will be in the `redb` file format and can contain already existing tickets.
+    /// If the file does not exist, it will be created.
+    ///
+    /// If omitted, a temporary file will be created and deleted on application exit.
+    ///
+    /// Make sure the file is secure and not accessible by unauthorized users on production.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    pub ticket_storage_file: Option<String>,
     /// Interval at which per-peer protocol conformance counters are flushed
     /// into the network graph.
     ///
@@ -62,7 +72,7 @@ pub struct HoprProtocolConfig {
 }
 
 /// Configuration of the HOPR packet pipeline.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Validate)]
+#[derive(Clone, Copy, Debug, PartialEq, Validate, smart_default::SmartDefault)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize),
@@ -73,10 +83,10 @@ pub struct HoprPacketPipelineConfig {
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
     pub codec: HoprCodecConfig,
-    /// HOPR ticket processing configuration
+    /// Configuration of unacknowledged tickets processing.
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
-    pub ticket_processing: HoprTicketProcessorConfig,
+    pub ack_processor: HoprUnacknowledgedTicketProcessorConfig,
     /// Single Use Reply Block (SURB) handling configuration
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
@@ -85,6 +95,32 @@ pub struct HoprPacketPipelineConfig {
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
     pub pipeline: PacketPipelineConfig,
+    /// Defines how often should the packet pipeline synchronize the outgoing ticket
+    /// indices to the persistent storage.
+    ///
+    /// If synchronization to a persistent storage does not happen and the node restarts,
+    /// the node will start from the current on-chain channel index and could as a result
+    /// be creating invalid outgoing tickets.
+    ///
+    /// Default is 15 seconds, minimum is 1 second.
+    #[default(default_out_index_sync_period())]
+    #[validate(custom(function = "validate_out_index_sync_period"))]
+    #[cfg_attr(feature = "serde", serde(default, with = "humantime_serde"))]
+    pub out_index_sync_period: Duration,
+}
+
+const MINIMUM_OUT_SYNC_PERIOD: Duration = Duration::from_secs(1);
+
+fn validate_out_index_sync_period(lifetime: &Duration) -> Result<(), ValidationError> {
+    if lifetime < &MINIMUM_OUT_SYNC_PERIOD {
+        Err(ValidationError::new("out_index_sync_period is too low"))
+    } else {
+        Ok(())
+    }
+}
+
+fn default_out_index_sync_period() -> Duration {
+    Duration::from_secs(15)
 }
 
 regex!(is_dns_address_regex "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$");

@@ -19,7 +19,6 @@ default = [
 runtime-tokio = [
   "dep:tokio",
   "hopr-lib/runtime-tokio",
-  "hopr-db-node/runtime-tokio",
   "opentelemetry_sdk?/rt-tokio",
   "opentelemetry_sdk?/experimental_trace_batch_span_processor_with_async_runtime",
   "opentelemetry_sdk?/experimental_logs_batch_log_processor_with_async_runtime",
@@ -37,7 +36,6 @@ telemetry = [
   "dep:hopr-metrics",
   "hopr-lib/telemetry",
   "hoprd-api/telemetry",
-  "hopr-db-node/telemetry",
   "hopr-strategy/telemetry",
   "hopr-transport-p2p/telemetry",
 ]
@@ -118,7 +116,6 @@ hopr-builder = { workspace = true, features = [
   "session-client",
   "session-server",
 ] }
-hopr-db-node = { workspace = true, features = ["traits", "sqlite"] }
 hopr-chain-connector = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-ct-full-network = { workspace = true }
