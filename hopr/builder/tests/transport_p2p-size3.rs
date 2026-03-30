@@ -14,18 +14,18 @@ use tokio::time::sleep;
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
-/// Ensures nodes expose discoverable peers by fetching the list of public nodes
+/// Ensures nodes expose discoverable peers by fetching the list of announced peers
 /// from a random cluster member and asserting it equals the expected count.
 async fn all_visible_peers_should_be_listed(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [node] = cluster.sample_nodes::<1>();
 
-    let nodes = node
+    let peers = node
         .inner()
-        .get_public_nodes()
+        .announced_peers()
         .await
-        .context("should get public nodes")?;
+        .context("should get announced peers")?;
 
-    assert_eq!(nodes.len(), cluster.size());
+    assert_eq!(peers.len(), cluster.size());
 
     Ok(())
 }
@@ -69,20 +69,20 @@ async fn discovery_should_produce_the_same_public_announcements_inside_the_netwo
 
     let accounts_addresses_1 = idx1
         .inner()
-        .accounts_announced_on_chain()
+        .announced_peers()
         .await
-        .context("failed to get announced accounts")?
+        .context("failed to get announced peers")?
         .into_iter()
-        .map(|acc| acc.chain_addr)
+        .map(|peer| peer.address)
         .collect::<Vec<Address>>();
 
     let accounts_addresses_2 = idx2
         .inner()
-        .accounts_announced_on_chain()
+        .announced_peers()
         .await
-        .context("failed to get announced accounts")?
+        .context("failed to get announced peers")?
         .into_iter()
-        .map(|acc| acc.chain_addr)
+        .map(|peer| peer.address)
         .collect::<Vec<Address>>();
 
     assert!(accounts_addresses_1.contains(&idx1.address()));

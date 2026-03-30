@@ -138,25 +138,27 @@ pub mod types {
         #[serde(rename = "safeNative")]
         pub safe_native: ::std::string::String,
     }
-    ///A peer that has been announced on-chain.
+    ///A peer that has been announced.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "A peer that has been announced on-chain.",
+    ///  "description": "A peer that has been announced.",
     ///  "examples": [
     ///    {
     ///      "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
     ///      "multiaddrs": [
     ///        "/ip4/178.12.1.9/tcp/19092"
-    ///      ]
+    ///      ],
+    ///      "origin": "chain"
     ///    }
     ///  ],
     ///  "type": "object",
     ///  "required": [
     ///    "address",
-    ///    "multiaddrs"
+    ///    "multiaddrs",
+    ///    "origin"
     ///  ],
     ///  "properties": {
     ///    "address": {
@@ -175,6 +177,9 @@ pub mod types {
     ///      "items": {
     ///        "type": "string"
     ///      }
+    ///    },
+    ///    "origin": {
+    ///      "$ref": "#/components/schemas/AnnouncementOriginResponse"
     ///    }
     ///  }
     ///}
@@ -184,6 +189,87 @@ pub mod types {
     pub struct AnnouncedPeerResponse {
         pub address: ::std::string::String,
         pub multiaddrs: ::std::vec::Vec<::std::string::String>,
+        pub origin: AnnouncementOriginResponse,
+    }
+    ///How a peer announcement was discovered.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "How a peer announcement was discovered.",
+    ///  "examples": [
+    ///    "chain"
+    ///  ],
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "chain",
+    ///    "dht"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd
+    )]
+    pub enum AnnouncementOriginResponse {
+        #[serde(rename = "chain")]
+        Chain,
+        #[serde(rename = "dht")]
+        Dht,
+    }
+    impl ::std::fmt::Display for AnnouncementOriginResponse {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Chain => f.write_str("chain"),
+                Self::Dht => f.write_str("dht"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for AnnouncementOriginResponse {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "chain" => Ok(Self::Chain),
+                "dht" => Ok(Self::Dht),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for AnnouncementOriginResponse {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for AnnouncementOriginResponse {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for AnnouncementOriginResponse {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
     }
     ///Standardized error response for the API
     ///
@@ -580,54 +666,6 @@ pub mod types {
         pub probe_rate: f64,
         pub score: f64,
     }
-    ///Reachable entry node information
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "description": "Reachable entry node information",
-    ///  "examples": [
-    ///    {
-    ///      "isEligible": true,
-    ///      "multiaddrs": [
-    ///        "/ip4/10.0.2.100/tcp/19091"
-    ///      ]
-    ///    }
-    ///  ],
-    ///  "type": "object",
-    ///  "required": [
-    ///    "isEligible",
-    ///    "multiaddrs"
-    ///  ],
-    ///  "properties": {
-    ///    "isEligible": {
-    ///      "examples": [
-    ///        true
-    ///      ],
-    ///      "type": "boolean"
-    ///    },
-    ///    "multiaddrs": {
-    ///      "examples": [
-    ///        [
-    ///          "/ip4/10.0.2.100/tcp/19091"
-    ///        ]
-    ///      ],
-    ///      "type": "array",
-    ///      "items": {
-    ///        "type": "string"
-    ///      }
-    ///    }
-    ///  }
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct EntryNode {
-        #[serde(rename = "isEligible")]
-        pub is_eligible: bool,
-        pub multiaddrs: ::std::vec::Vec<::std::string::String>,
-    }
     ///Specifies the amount of HOPR tokens to fund a channel with.
     ///
     /// <details><summary>JSON schema</summary>
@@ -768,6 +806,43 @@ pub mod types {
         ) -> ::std::result::Result<Self, self::error::ConversionError> {
             value.parse()
         }
+    }
+    ///A multiaddress paired with its discovery origin.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A multiaddress paired with its discovery origin.",
+    ///  "examples": [
+    ///    {
+    ///      "multiaddress": "/ip4/10.0.2.100/tcp/19093",
+    ///      "origin": "chain"
+    ///    }
+    ///  ],
+    ///  "type": "object",
+    ///  "required": [
+    ///    "multiaddress",
+    ///    "origin"
+    ///  ],
+    ///  "properties": {
+    ///    "multiaddress": {
+    ///      "examples": [
+    ///        "/ip4/10.0.2.100/tcp/19093"
+    ///      ],
+    ///      "type": "string"
+    ///    },
+    ///    "origin": {
+    ///      "$ref": "#/components/schemas/AnnouncementOriginResponse"
+    ///    }
+    ///  }
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    pub struct MultiaddressSource {
+        pub multiaddress: ::std::string::String,
+        pub origin: AnnouncementOriginResponse,
     }
     ///Channel information as seen by the node.
     ///
@@ -1024,6 +1099,12 @@ and indexer state.*/
     ///      "announced": [
     ///        "/ip4/10.0.2.100/tcp/19093"
     ///      ],
+    ///      "announcedSources": [
+    ///        {
+    ///          "multiaddress": "/ip4/10.0.2.100/tcp/19093",
+    ///          "origin": "chain"
+    ///        }
+    ///      ],
     ///      "observed": [
     ///        "/ip4/10.0.2.100/tcp/19093"
     ///      ]
@@ -1032,10 +1113,12 @@ and indexer state.*/
     ///  "type": "object",
     ///  "required": [
     ///    "announced",
+    ///    "announcedSources",
     ///    "observed"
     ///  ],
     ///  "properties": {
     ///    "announced": {
+    ///      "description": "Flat list of announced multiaddresses (legacy, for backward compatibility).",
     ///      "examples": [
     ///        [
     ///          "/ip4/10.0.2.100/tcp/19093"
@@ -1044,6 +1127,13 @@ and indexer state.*/
     ///      "type": "array",
     ///      "items": {
     ///        "type": "string"
+    ///      }
+    ///    },
+    ///    "announcedSources": {
+    ///      "description": "Announced multiaddresses grouped by discovery origin.",
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/components/schemas/MultiaddressSource"
     ///      }
     ///    },
     ///    "observed": {
@@ -1063,7 +1153,11 @@ and indexer state.*/
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     pub struct NodePeerInfoResponse {
+        ///Flat list of announced multiaddresses (legacy, for backward compatibility).
         pub announced: ::std::vec::Vec<::std::string::String>,
+        ///Announced multiaddresses grouped by discovery origin.
+        #[serde(rename = "announcedSources")]
+        pub announced_sources: ::std::vec::Vec<MultiaddressSource>,
         pub observed: ::std::vec::Vec<::std::string::String>,
     }
     ///Received tickets statistics.
@@ -2071,7 +2165,7 @@ at least the size of 2 Session packet payloads.*/
 
 API enabling developers to interact with a hoprd node programatically through HTTP REST API.
 
-Version: 4.8.0*/
+Version: 4.9.0*/
 pub struct Client {
     pub(crate) baseurl: String,
     pub(crate) client: reqwest::Client,
@@ -2107,7 +2201,7 @@ impl Client {
 }
 impl ClientInfo<()> for Client {
     fn api_version() -> &'static str {
-        "4.8.0"
+        "4.9.0"
     }
     fn baseurl(&self) -> &str {
         self.baseurl.as_str()
@@ -2557,9 +2651,9 @@ Arguments:
             _ => Err(Error::UnexpectedResponse(response)),
         }
     }
-    /**Lists all peers that have been announced on-chain
+    /**Lists all announced peers
 
-List all peers announced on-chain
+List all announced peers
 
 Sends a `GET` request to `/api/v4/network/announced`
 
@@ -2793,50 +2887,6 @@ Sends a `GET` request to `/api/v4/node/configuration`
             .build()?;
         let info = OperationInfo {
             operation_id: "configuration",
-        };
-        self.pre(&mut request, &info).await?;
-        let result = self.exec(request, &info).await;
-        self.post(&result, &info).await?;
-        let response = result?;
-        match response.status().as_u16() {
-            200u16 => ResponseValue::from_response(response).await,
-            _ => Err(Error::UnexpectedResponse(response)),
-        }
-    }
-    /**List all known entry nodes with multiaddrs and eligibility
-
-List all known entry nodes with multiaddrs and eligibility
-
-Sends a `GET` request to `/api/v4/node/entry-nodes`
-
-*/
-    pub async fn entry_nodes<'a>(
-        &'a self,
-    ) -> Result<
-        ResponseValue<
-            ::std::collections::HashMap<::std::string::String, types::EntryNode>,
-        >,
-        Error<()>,
-    > {
-        let url = format!("{}/api/v4/node/entry-nodes", self.baseurl,);
-        let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
-        header_map
-            .append(
-                ::reqwest::header::HeaderName::from_static("api-version"),
-                ::reqwest::header::HeaderValue::from_static(Self::api_version()),
-            );
-        #[allow(unused_mut)]
-        let mut request = self
-            .client
-            .get(url)
-            .header(
-                ::reqwest::header::ACCEPT,
-                ::reqwest::header::HeaderValue::from_static("application/json"),
-            )
-            .headers(header_map)
-            .build()?;
-        let info = OperationInfo {
-            operation_id: "entry_nodes",
         };
         self.pre(&mut request, &info).await?;
         let result = self.exec(request, &info).await;

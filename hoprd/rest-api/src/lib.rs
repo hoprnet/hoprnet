@@ -96,7 +96,6 @@ pub(crate) struct InternalState {
         network::announced,
         network::graph,
         node::configuration,
-        node::entry_nodes,
         node::info,
         node::version,
         peers::ping_peer,
@@ -124,8 +123,9 @@ pub(crate) struct InternalState {
             network::TicketProbabilityResponse,
             network::ConnectedPeerResponse,
             network::AnnouncedPeerResponse,
-            node::EntryNode, node::NodeInfoResponse, node::NodeVersionResponse,
-            peers::NodePeerInfoResponse, peers::PingResponse,
+            network::AnnouncementOriginResponse,
+            node::NodeInfoResponse, node::NodeVersionResponse,
+            peers::MultiaddressSource, peers::NodePeerInfoResponse, peers::PingResponse,
             session::SessionClientRequest, session::SessionCapability, session::RoutingOptions, session::SessionTargetSpec, session::SessionClientResponse, session::IpProtocol, session::SessionConfig,
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
         )
@@ -299,7 +299,6 @@ async fn build_api(
                 .route("/node/version", get(node::version))
                 .route("/node/configuration", get(node::configuration))
                 .route("/node/info", get(node::info))
-                .route("/node/entry-nodes", get(node::entry_nodes))
                 .route("/peers/{destination}/ping", post(peers::ping_peer))
                 .route("/session/config/{id}", get(session::session_config))
                 .route("/session/config/{id}", post(session::adjust_session))

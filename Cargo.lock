@@ -4463,7 +4463,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-builder"
-version = "4.0.4"
+version = "4.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4660,7 +4660,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-ct-full-network"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -4817,7 +4817,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-network-graph"
-version = "0.1.3"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "assertables",
@@ -5074,7 +5074,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5118,7 +5118,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-mixer"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "bytesize",
@@ -5194,7 +5194,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-probe"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5274,7 +5274,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.20.2"
+version = "0.21.0"
 dependencies = [
  "anyhow",
  "arrayvec",
@@ -5421,7 +5421,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "4.7.0"
+version = "4.9.0"
 dependencies = [
  "anyhow",
  "axum",
