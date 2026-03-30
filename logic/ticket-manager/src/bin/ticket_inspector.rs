@@ -24,27 +24,37 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// List Channel IDs of all ticket queues in the DB.
+    #[command(alias = "lc")]
     ListChannels,
     /// Delete all tickets by the Channel ID.
+    #[command(alias = "dq")]
     DeleteQueue {
         /// Channel ID to delete
+        #[arg(short, long)]
         channel_id: String,
     },
     /// Pretty-print all tickets in a particular queue.
+    #[command(alias = "l")]
     ListTickets {
         /// Channel ID of the queue
+        #[arg(short, long)]
         channel_id: String,
     },
     /// Delete all tickets in a queue up to a specified ticket matching the Channel ID and index.
+    #[command(alias = "d")]
     DeleteTicket {
         /// Channel ID of the tickets
+        #[arg(short, long)]
         channel_id: String,
         /// Index of the target ticket
+        #[arg(short, long)]
         index: u64,
     },
     /// Print out the total sum of all ticket amounts for a given channel ID.
+    #[command(alias = "t")]
     TotalValue {
         /// Channel ID of the queue
+        #[arg(short, long)]
         channel_id: String,
     },
 }
@@ -74,7 +84,7 @@ struct DeleteTicketResult {
 }
 
 #[derive(Serialize, Debug, PartialEq)]
-struct TotalSumResult {
+struct TotalValueResult {
     channel_id: String,
     total_sum: String,
 }
@@ -85,7 +95,7 @@ enum CommandResult {
     DeleteQueue(DeleteQueueResult),
     ListTickets(TicketList),
     DeleteTicket(DeleteTicketResult),
-    TotalSum(TotalSumResult),
+    TotalValue(TotalValueResult),
 }
 
 fn main() -> anyhow::Result<()> {
@@ -100,14 +110,14 @@ fn main() -> anyhow::Result<()> {
             CommandResult::DeleteQueue(res) => println!("{}", serde_json::to_string_pretty(&res)?),
             CommandResult::ListTickets(res) => println!("{}", serde_json::to_string_pretty(&res)?),
             CommandResult::DeleteTicket(res) => println!("{}", serde_json::to_string_pretty(&res)?),
-            CommandResult::TotalSum(res) => println!("{}", serde_json::to_string_pretty(&res)?),
+            CommandResult::TotalValue(res) => println!("{}", serde_json::to_string_pretty(&res)?),
         }
     } else {
         match result {
             CommandResult::ListChannels(res) => {
                 println!("Queues found in DB:");
                 for channel in res.channels {
-                    println!("  {}", channel);
+                    println!("  {channel}");
                 }
             }
             CommandResult::DeleteQueue(res) => {
@@ -122,7 +132,7 @@ fn main() -> anyhow::Result<()> {
                 } else {
                     println!("Tickets in queue for channel {}:", res.channel_id);
                     for ticket in res.tickets {
-                        println!("{:#?}", ticket);
+                        println!("{ticket:#?}");
                     }
                 }
             }
@@ -132,8 +142,8 @@ fn main() -> anyhow::Result<()> {
                     res.deleted_count, res.target_index, res.channel_id
                 );
             }
-            CommandResult::TotalSum(res) => {
-                println!("Total sum for channel {}: {}", res.channel_id, res.total_sum);
+            CommandResult::TotalValue(res) => {
+                println!("Total ticket value for channel {}: {}", res.channel_id, res.total_sum);
             }
         }
     }
@@ -206,7 +216,7 @@ fn run_command(cli: Cli, store: &mut RedbStore) -> anyhow::Result<CommandResult>
         Commands::TotalValue { channel_id } => {
             let channel = ChannelId::from_str(&channel_id)?;
             if !store.iter_queues()?.any(|c| c == channel) {
-                return Ok(CommandResult::TotalSum(TotalSumResult {
+                return Ok(CommandResult::TotalValue(TotalValueResult {
                     channel_id: channel_id.clone(),
                     total_sum: "0".to_string(),
                 }));
@@ -220,7 +230,7 @@ fn run_command(cli: Cli, store: &mut RedbStore) -> anyhow::Result<CommandResult>
                 .iter()
                 .fold(HoprBalance::from(0u64), |acc, t| acc + t.verified_ticket().amount);
 
-            Ok(CommandResult::TotalSum(TotalSumResult {
+            Ok(CommandResult::TotalValue(TotalValueResult {
                 channel_id: channel_id.clone(),
                 total_sum: total_sum.to_string(),
             }))
@@ -407,7 +417,7 @@ mod tests {
 
         let result = run_command(cli, &mut store)?;
         match result {
-            CommandResult::TotalSum(res) => {
+            CommandResult::TotalValue(res) => {
                 assert_eq!(res.channel_id, channel.to_string());
                 assert_eq!(res.total_sum, expected_sum.to_string());
             }
