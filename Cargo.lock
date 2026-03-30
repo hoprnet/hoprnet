@@ -4959,6 +4959,7 @@ name = "hopr-ticket-manager"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "clap",
  "criterion",
  "dashmap",
  "futures",
@@ -4970,6 +4971,8 @@ dependencies = [
  "postcard",
  "rand 0.10.0",
  "redb",
+ "serde",
+ "serde_json",
  "tempfile",
  "test-log",
  "thiserror 2.0.18",

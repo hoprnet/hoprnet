@@ -18,6 +18,8 @@ use hopr_api::{
 
 #[cfg(feature = "redb")]
 pub use crate::backend::{RedbStore, RedbTicketQueue};
+#[cfg(any(test, feature = "testing"))]
+pub use crate::traits::tests as testing;
 use crate::{
     backend::ValueCachedQueue,
     utils::{ChannelTicketQueue, OutgoingIndexCache},
