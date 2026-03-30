@@ -209,7 +209,7 @@ pub mod tests {
         fill_queue(&mut queue, generate_tickets()?.into_iter())?;
         assert!(!queue.is_empty()?);
 
-        while let Some(_) = queue.pop()? {}
+        while queue.pop()?.is_some() {}
         assert!(queue.is_empty()?);
         assert_eq!(0, queue.len()?);
         assert_eq!(0, queue.iter_unordered()?.count());
@@ -223,7 +223,7 @@ pub mod tests {
         fill_queue(&mut queue, generate_tickets()?.into_iter())?;
         assert!(!queue.is_empty()?);
 
-        while let Some(_) = queue.pop()? {}
+        while queue.pop()?.is_some() {}
         assert_eq!(queue.iter_unordered()?.count(), 0);
         assert!(queue.is_empty()?);
 

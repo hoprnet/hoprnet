@@ -135,7 +135,11 @@ impl fmt::Display for CommandResult {
                 )?;
             }
             CommandResult::TotalValue(res) => {
-                write!(f, "Total ticket value for channel {}: {}", res.channel_id, res.total_sum)?;
+                write!(
+                    f,
+                    "Total ticket value for channel {}: {}",
+                    res.channel_id, res.total_sum
+                )?;
             }
         }
         Ok(())
@@ -190,7 +194,7 @@ fn run_command(cli: Cli, store: &mut RedbStore) -> anyhow::Result<CommandResult>
 
             let json_tickets: Vec<serde_json::Value> = tickets
                 .iter()
-                .map(|t| serde_json::to_value(t))
+                .map(serde_json::to_value)
                 .collect::<Result<Vec<_>, _>>()?;
 
             Ok(CommandResult::ListTickets(TicketList {
