@@ -1,4 +1,4 @@
-use std::{fmt, path::PathBuf, str::FromStr};
+use std::{fmt, path::PathBuf};
 
 use clap::{Parser, Subcommand, ValueEnum};
 use hopr_api::{chain::ChannelId, types::primitive::prelude::HoprBalance};
@@ -41,21 +41,21 @@ enum Commands {
     DeleteQueue {
         /// Channel ID to delete
         #[arg(short, long)]
-        channel_id: String,
+        channel_id: ChannelId,
     },
     /// Display all tickets in a particular queue in-order.
     #[command(short_flag = 'l')]
     ListTickets {
         /// Channel ID of the queue
         #[arg(short, long)]
-        channel_id: String,
+        channel_id: ChannelId,
     },
     /// Delete all tickets in a queue up to a specified ticket matching the Channel ID and index.
     #[command(short_flag = 'e')]
     DeleteTicket {
         /// Channel ID of the tickets
         #[arg(short, long)]
-        channel_id: String,
+        channel_id: ChannelId,
         /// Index of the target ticket
         #[arg(short, long)]
         index: u64,
@@ -65,7 +65,7 @@ enum Commands {
     TotalValue {
         /// Channel ID of the queue
         #[arg(short, long)]
-        channel_id: String,
+        channel_id: ChannelId,
     },
 }
 
@@ -78,14 +78,14 @@ struct ChannelList {
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, PartialEq)]
 struct DeleteQueueResult {
-    channel_id: String,
+    channel_id: ChannelId,
     deleted_tickets_count: usize,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, PartialEq)]
 struct TicketList {
-    channel_id: String,
+    channel_id: ChannelId,
     #[cfg(feature = "serde")]
     tickets: Vec<serde_json::Value>,
     #[cfg(not(feature = "serde"))]
@@ -95,7 +95,7 @@ struct TicketList {
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, PartialEq)]
 struct DeleteTicketResult {
-    channel_id: String,
+    channel_id: ChannelId,
     target_index: u64,
     deleted_count: usize,
 }
@@ -103,7 +103,7 @@ struct DeleteTicketResult {
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, PartialEq)]
 struct TotalValueResult {
-    channel_id: String,
+    channel_id: ChannelId,
     total_sum: String,
 }
 
@@ -202,22 +202,20 @@ fn run_command(cli: Cli, store: &mut impl TicketQueueStore) -> anyhow::Result<Co
             Ok(CommandResult::ListChannels(ChannelList { channels }))
         }
         Commands::DeleteQueue { channel_id } => {
-            let channel = ChannelId::from_str(&channel_id)?;
-            let deleted_tickets = store.delete_queue(&channel)?;
+            let deleted_tickets = store.delete_queue(&channel_id)?;
             Ok(CommandResult::DeleteQueue(DeleteQueueResult {
-                channel_id: channel_id.clone(),
+                channel_id,
                 deleted_tickets_count: deleted_tickets.len(),
             }))
         }
         Commands::ListTickets { channel_id } => {
-            let channel = ChannelId::from_str(&channel_id)?;
-            if !store.iter_queues()?.any(|c| c == channel) {
+            if !store.iter_queues()?.any(|c| c == channel_id) {
                 return Ok(CommandResult::ListTickets(TicketList {
-                    channel_id: channel_id.clone(),
+                    channel_id,
                     tickets: vec![],
                 }));
             }
-            let queue = store.open_or_create_queue(&channel)?;
+            let queue = store.open_or_create_queue(&channel_id)?;
             let tickets: Vec<_> = queue.iter_unordered()?.collect::<Result<Vec<_>, _>>()?;
 
             #[cfg(feature = "serde")]
@@ -230,20 +228,19 @@ fn run_command(cli: Cli, store: &mut impl TicketQueueStore) -> anyhow::Result<Co
             let json_tickets: Vec<String> = tickets.iter().map(|t| format!("{:?}", t)).collect();
 
             Ok(CommandResult::ListTickets(TicketList {
-                channel_id: channel_id.clone(),
+                channel_id,
                 tickets: json_tickets,
             }))
         }
         Commands::DeleteTicket { channel_id, index } => {
-            let channel = ChannelId::from_str(&channel_id)?;
-            if !store.iter_queues()?.any(|c| c == channel) {
+            if !store.iter_queues()?.any(|c| c == channel_id) {
                 return Ok(CommandResult::DeleteTicket(DeleteTicketResult {
-                    channel_id: channel_id.clone(),
+                    channel_id,
                     target_index: index,
                     deleted_count: 0,
                 }));
             }
-            let mut queue = store.open_or_create_queue(&channel)?;
+            let mut queue = store.open_or_create_queue(&channel_id)?;
 
             let mut deleted_count = 0;
             while let Some(ticket) = queue.peek()? {
@@ -256,20 +253,19 @@ fn run_command(cli: Cli, store: &mut impl TicketQueueStore) -> anyhow::Result<Co
             }
 
             Ok(CommandResult::DeleteTicket(DeleteTicketResult {
-                channel_id: channel_id.clone(),
+                channel_id,
                 target_index: index,
                 deleted_count,
             }))
         }
         Commands::TotalValue { channel_id } => {
-            let channel = ChannelId::from_str(&channel_id)?;
-            if !store.iter_queues()?.any(|c| c == channel) {
+            if !store.iter_queues()?.any(|c| c == channel_id) {
                 return Ok(CommandResult::TotalValue(TotalValueResult {
-                    channel_id: channel_id.clone(),
+                    channel_id,
                     total_sum: "0".to_string(),
                 }));
             }
-            let queue = store.open_or_create_queue(&channel)?;
+            let queue = store.open_or_create_queue(&channel_id)?;
             let total_sum: HoprBalance = queue
                 .iter_unordered()?
                 .filter_map(|t| t
@@ -279,7 +275,7 @@ fn run_command(cli: Cli, store: &mut impl TicketQueueStore) -> anyhow::Result<Co
                 .sum();
 
             Ok(CommandResult::TotalValue(TotalValueResult {
-                channel_id: channel_id.clone(),
+                channel_id,
                 total_sum: total_sum.to_string(),
             }))
         }
@@ -343,14 +339,14 @@ mod tests {
             db_file: db_path.clone(),
             format: OutputFormat::Plain,
             command: Commands::DeleteQueue {
-                channel_id: channel.to_string(),
+                channel_id: channel,
             },
         };
 
         let result = run_command(cli, &mut store)?;
         match result {
             CommandResult::DeleteQueue(res) => {
-                assert_eq!(res.channel_id, channel.to_string());
+                assert_eq!(res.channel_id, channel);
                 assert_eq!(res.deleted_tickets_count, 0); // No tickets were in the queue
             }
             _ => panic!("Expected DeleteQueue result"),
@@ -379,14 +375,14 @@ mod tests {
             db_file: db_path.clone(),
             format: OutputFormat::Plain,
             command: Commands::ListTickets {
-                channel_id: channel.to_string(),
+                channel_id: channel,
             },
         };
 
         let result = run_command(cli, &mut store)?;
         match result {
             CommandResult::ListTickets(res) => {
-                assert_eq!(res.channel_id, channel.to_string());
+                assert_eq!(res.channel_id, channel);
                 assert_eq!(res.tickets.len(), 3);
             }
             _ => panic!("Expected ListTickets result"),
@@ -415,7 +411,7 @@ mod tests {
             db_file: db_path.clone(),
             format: OutputFormat::Plain,
             command: Commands::DeleteTicket {
-                channel_id: channel.to_string(),
+                channel_id: channel,
                 index: 2,
             },
         };
@@ -423,7 +419,7 @@ mod tests {
         let result = run_command(cli, &mut store)?;
         match result {
             CommandResult::DeleteTicket(res) => {
-                assert_eq!(res.channel_id, channel.to_string());
+                assert_eq!(res.channel_id, channel);
                 assert_eq!(res.target_index, 2);
                 assert_eq!(res.deleted_count, 3);
             }
@@ -459,14 +455,14 @@ mod tests {
             db_file: db_path.clone(),
             format: OutputFormat::Plain,
             command: Commands::TotalValue {
-                channel_id: channel.to_string(),
+                channel_id: channel,
             },
         };
 
         let result = run_command(cli, &mut store)?;
         match result {
             CommandResult::TotalValue(res) => {
-                assert_eq!(res.channel_id, channel.to_string());
+                assert_eq!(res.channel_id, channel);
                 assert_eq!(res.total_sum, expected_sum.to_string());
             }
             _ => panic!("Expected TotalSum result"),
@@ -491,14 +487,14 @@ mod tests {
             db_file: db_path.clone(),
             format: OutputFormat::Plain,
             command: Commands::ListTickets {
-                channel_id: channel.to_string(),
+                channel_id: channel,
             },
         };
 
         let result = run_command(cli, &mut store)?;
         match result {
             CommandResult::ListTickets(res) => {
-                assert_eq!(res.channel_id, channel.to_string());
+                assert_eq!(res.channel_id, channel);
                 assert!(res.tickets.is_empty());
             }
             _ => panic!("Expected ListTickets result"),
