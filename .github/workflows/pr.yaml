@@ -90,7 +90,7 @@ jobs:
 
   checks:
     name: Check
-    uses: hoprnet/hopr-workflows/.github/workflows/checks.yaml@04a440583ca3ea5b74a1882943870ad3af5cfee5 # checks-v1
+    uses: hoprnet/hopr-workflows/.github/workflows/checks.yaml@16932b38e09bd6b7f3aff7a7cf9172d3a2a1ecf2 # checks-v1
     with:
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
       runner_small: self-hosted-hoprnet-small
@@ -100,7 +100,7 @@ jobs:
 
   tests:
     name: Test
-    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@04a440583ca3ea5b74a1882943870ad3af5cfee5 # tests-v1
+    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@16932b38e09bd6b7f3aff7a7cf9172d3a2a1ecf2 # tests-v1
     with:
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
       unit_tests: true
