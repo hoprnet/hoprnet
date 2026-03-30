@@ -1,7 +1,6 @@
 [advisories]
 ignore = [
   "RUSTSEC-2024-0436", # 'paste' dependency in 'libp2p' [unmaintained]
-  "RUSTSEC-2023-0071", # 'rsa' dependency in 'sqlx' [unfixed]
   "RUSTSEC-2024-0388", # 'derivative' in 'alloy' [unmaintained],
   "RUSTSEC-2025-0073", # 'alloy-dyn-abi' in 'alloy' - will be removed in 4.0
   "RUSTSEC-2025-0134", # `rustls-pemfile` [unmaintained], blokli-client needs to avoid rust-tls, see https://github.com/hoprnet/blokli/issues/107
