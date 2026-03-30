@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::Arc};
+// HashMap is used inside the utoipa macro attribute on the `configuration` endpoint.
+#[allow(unused_imports)]
+use std::collections::HashMap;
+use std::sync::Arc;
 
 use axum::{
     extract::{Json, State},
@@ -9,7 +12,7 @@ use hopr_lib::{
     Address, Multiaddr,
     api::{network::Health, node::HoprNodeNetworkOperations},
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_with::{DisplayFromStr, serde_as};
 
 use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState, checksum_address_serializer};
@@ -147,65 +150,6 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
                 connectivity_status: hopr.network_health().await,
                 channel_closure_period: channel_closure_notice_period.as_secs(),
             };
-
-            Ok((StatusCode::OK, Json(body)).into_response())
-        }
-        Err(error) => Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(error)).into_response()),
-    }
-}
-
-#[serde_as]
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(rename_all = "camelCase")]
-#[schema(example = json!({
-        "isEligible": true,
-        "multiaddrs": ["/ip4/10.0.2.100/tcp/19091"]
-}))]
-/// Reachable entry node information
-pub(crate) struct EntryNode {
-    #[serde_as(as = "Vec<DisplayFromStr>")]
-    #[schema(value_type = Vec<String>, example = json!(["/ip4/10.0.2.100/tcp/19091"]))]
-    multiaddrs: Vec<Multiaddr>,
-    #[schema(example = true)]
-    is_eligible: bool,
-}
-
-/// List all known entry nodes with multiaddrs and eligibility.
-#[utoipa::path(
-        get,
-        path = const_format::formatcp!("{BASE_PATH}/node/entry-nodes"),
-        description = "List all known entry nodes with multiaddrs and eligibility",
-        responses(
-            (status = 200, description = "Fetched public nodes' information", body = HashMap<String, EntryNode>, example = json!({
-                "0x188c4462b75e46f0c7262d7f48d182447b93a93c": {
-                    "isEligible": true,
-                    "multiaddrs": ["/ip4/10.0.2.100/tcp/19091"]
-                }
-            })),
-            (status = 401, description = "Invalid authorization token.", body = ApiError),
-            (status = 422, description = "Unknown failure", body = ApiError)
-        ),
-        security(
-            ("api_token" = []),
-            ("bearer_token" = [])
-        ),
-        tag = "Node"
-    )]
-pub(super) async fn entry_nodes(State(state): State<Arc<InternalState>>) -> Result<impl IntoResponse, ApiError> {
-    let hopr = state.hopr.clone();
-
-    match hopr.get_public_nodes().await {
-        Ok(nodes) => {
-            let mut body = HashMap::new();
-            for (_, address, mas) in nodes.into_iter() {
-                body.insert(
-                    address.to_string(),
-                    EntryNode {
-                        multiaddrs: mas,
-                        is_eligible: true,
-                    },
-                );
-            }
 
             Ok((StatusCode::OK, Json(body)).into_response())
         }
