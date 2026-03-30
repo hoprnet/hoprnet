@@ -10,12 +10,11 @@ edition.workspace = true
 default = ["redb"]
 redb = ["dep:postcard", "dep:redb", "hopr-api/serde"]
 testing = ["hopr-api/types-random", "dep:rand"]
-clap = ["dep:clap"]
 serde = ["dep:serde", "dep:serde_json", "hopr-api/serde"]
 
 [dependencies]
 anyhow = { workspace = true }
-clap = { workspace = true, optional = true }
+clap = { workspace = true }
 dashmap = { workspace = true, features = ["inline"] }
 hashbrown = { workspace = true, features = ["inline-more"] }
 futures = { workspace = true }
@@ -25,6 +24,7 @@ postcard = { workspace = true, optional = true, features = ["use-std"] }
 rand = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
+strum = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
@@ -52,7 +52,7 @@ hopr-chain-connector = { workspace = true, features = [
 [[bin]]
 name = "ticket-inspector"
 path = "src/bin/ticket_inspector.rs"
-required-features = ["redb", "clap", "serde"]
+required-features = ["redb"]
 
 [[bench]]
 name = "ticket_manager"

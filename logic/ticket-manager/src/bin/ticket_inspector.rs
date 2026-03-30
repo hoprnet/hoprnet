@@ -1,24 +1,34 @@
 use std::{fmt, path::PathBuf, str::FromStr};
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use hopr_api::{chain::ChannelId, types::primitive::prelude::HoprBalance};
 use hopr_ticket_manager::{RedbStore, TicketQueue, TicketQueueStore};
+#[cfg(feature = "serde")]
 use serde::Serialize;
+use strum::{Display, EnumString, VariantNames};
 
 #[derive(Parser)]
 #[command(name = "ticket-inspector")]
-#[command(about = "CLI tool to inspect and manipulate hopr-ticket-manager redb database", long_about = None)]
+#[command(about = "CLI tool to inspect and manipulate HOPR redeemable tickets database", long_about = None)]
 struct Cli {
-    /// Path to the redb database file
-    #[arg(long, short = 'f', alias = "f", value_name = "FILE")]
+    /// Path to the database file
+    #[arg(long, short, value_name = "FILE")]
     db_file: PathBuf,
-
-    /// Output in JSON format
-    #[arg(short, long)]
-    json: bool,
-
+    /// Output format
+    #[arg(short, long, value_enum, default_value_t = OutputFormat::Plain)]
+    format: OutputFormat,
     #[command(subcommand)]
     command: Commands,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug, Display, EnumString, VariantNames)]
+#[strum(serialize_all = "lowercase")]
+enum OutputFormat {
+    /// Plain text output
+    Plain,
+    /// JSON output
+    #[cfg(feature = "serde")]
+    Json,
 }
 
 #[derive(Subcommand)]
@@ -41,7 +51,7 @@ enum Commands {
         channel_id: String,
     },
     /// Delete all tickets in a queue up to a specified ticket matching the Channel ID and index.
-    #[command(short_flag = 'd')]
+    #[command(short_flag = 'e')]
     DeleteTicket {
         /// Channel ID of the tickets
         #[arg(short, long)]
@@ -59,37 +69,46 @@ enum Commands {
     },
 }
 
-#[derive(Serialize, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[derive(Debug, PartialEq)]
 struct ChannelList {
     channels: Vec<String>,
 }
 
-#[derive(Serialize, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[derive(Debug, PartialEq)]
 struct DeleteQueueResult {
     channel_id: String,
     deleted_tickets_count: usize,
 }
 
-#[derive(Serialize, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[derive(Debug, PartialEq)]
 struct TicketList {
     channel_id: String,
+    #[cfg(feature = "serde")]
     tickets: Vec<serde_json::Value>,
+    #[cfg(not(feature = "serde"))]
+    tickets: Vec<String>,
 }
 
-#[derive(Serialize, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[derive(Debug, PartialEq)]
 struct DeleteTicketResult {
     channel_id: String,
     target_index: u64,
     deleted_count: usize,
 }
 
-#[derive(Serialize, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[derive(Debug, PartialEq)]
 struct TotalValueResult {
     channel_id: String,
     total_sum: String,
 }
 
-#[derive(Serialize, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[derive(Debug, PartialEq)]
 enum CommandResult {
     ListChannels(ChannelList),
     DeleteQueue(DeleteQueueResult),
@@ -149,29 +168,34 @@ impl fmt::Display for CommandResult {
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     if !cli.db_file.is_file() {
-        return Err(anyhow::anyhow!("Database file does not exist: {}", cli.db_file.display()));
+        return Err(anyhow::anyhow!(
+            "Database file does not exist: {}",
+            cli.db_file.display()
+        ));
     }
 
     let mut store = RedbStore::new(&cli.db_file)?;
-    let is_json = cli.json;
+    let format = cli.format;
     let result = run_command(cli, &mut store)?;
 
-    if is_json {
-        match result {
+    match format {
+        #[cfg(feature = "serde")]
+        OutputFormat::Json => match result {
             CommandResult::ListChannels(res) => println!("{}", serde_json::to_string_pretty(&res)?),
             CommandResult::DeleteQueue(res) => println!("{}", serde_json::to_string_pretty(&res)?),
             CommandResult::ListTickets(res) => println!("{}", serde_json::to_string_pretty(&res)?),
             CommandResult::DeleteTicket(res) => println!("{}", serde_json::to_string_pretty(&res)?),
             CommandResult::TotalValue(res) => println!("{}", serde_json::to_string_pretty(&res)?),
+        },
+        OutputFormat::Plain => {
+            println!("{result}");
         }
-    } else {
-        println!("{result}");
     }
 
     Ok(())
 }
 
-fn run_command(cli: Cli, store: &mut RedbStore) -> anyhow::Result<CommandResult> {
+fn run_command(cli: Cli, store: &mut impl TicketQueueStore) -> anyhow::Result<CommandResult> {
     match cli.command {
         Commands::ListChannels => {
             let channels: Vec<String> = store.iter_queues()?.map(|c| c.to_string()).collect();
@@ -196,10 +220,14 @@ fn run_command(cli: Cli, store: &mut RedbStore) -> anyhow::Result<CommandResult>
             let queue = store.open_or_create_queue(&channel)?;
             let tickets: Vec<_> = queue.iter_unordered()?.collect::<Result<Vec<_>, _>>()?;
 
+            #[cfg(feature = "serde")]
             let json_tickets: Vec<serde_json::Value> = tickets
                 .iter()
                 .map(serde_json::to_value)
                 .collect::<Result<Vec<_>, _>>()?;
+
+            #[cfg(not(feature = "serde"))]
+            let json_tickets: Vec<String> = tickets.iter().map(|t| format!("{:?}", t)).collect();
 
             Ok(CommandResult::ListTickets(TicketList {
                 channel_id: channel_id.clone(),
@@ -244,7 +272,10 @@ fn run_command(cli: Cli, store: &mut RedbStore) -> anyhow::Result<CommandResult>
             let queue = store.open_or_create_queue(&channel)?;
             let total_sum: HoprBalance = queue
                 .iter_unordered()?
-                .filter_map(|t| t.ok().map(|ticket| ticket.verified_ticket().amount))
+                .filter_map(|t| t
+                    .inspect_err(|error| eprintln!("Error inspecting ticket: {error}"))
+                    .ok()
+                    .map(|ticket| ticket.verified_ticket().amount))
                 .sum();
 
             Ok(CommandResult::TotalValue(TotalValueResult {
@@ -280,7 +311,7 @@ mod tests {
 
         let cli = Cli {
             db_file: db_path.clone(),
-            json: true,
+            format: OutputFormat::Plain,
             command: Commands::ListChannels,
         };
 
@@ -310,7 +341,7 @@ mod tests {
 
         let cli = Cli {
             db_file: db_path.clone(),
-            json: true,
+            format: OutputFormat::Plain,
             command: Commands::DeleteQueue {
                 channel_id: channel.to_string(),
             },
@@ -346,7 +377,7 @@ mod tests {
 
         let cli = Cli {
             db_file: db_path.clone(),
-            json: true,
+            format: OutputFormat::Plain,
             command: Commands::ListTickets {
                 channel_id: channel.to_string(),
             },
@@ -382,7 +413,7 @@ mod tests {
 
         let cli = Cli {
             db_file: db_path.clone(),
-            json: true,
+            format: OutputFormat::Plain,
             command: Commands::DeleteTicket {
                 channel_id: channel.to_string(),
                 index: 2,
@@ -426,7 +457,7 @@ mod tests {
 
         let cli = Cli {
             db_file: db_path.clone(),
-            json: true,
+            format: OutputFormat::Plain,
             command: Commands::TotalValue {
                 channel_id: channel.to_string(),
             },
@@ -458,7 +489,7 @@ mod tests {
         // Test with ListTickets command on non-existent channel
         let cli = Cli {
             db_file: db_path.clone(),
-            json: false,
+            format: OutputFormat::Plain,
             command: Commands::ListTickets {
                 channel_id: channel.to_string(),
             },
