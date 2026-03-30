@@ -10,8 +10,8 @@ use serde::Serialize;
 #[command(about = "CLI tool to inspect and manipulate hopr-ticket-manager redb database", long_about = None)]
 struct Cli {
     /// Path to the redb database file
-    #[arg(short, long, value_name = "FILE")]
-    db_path: PathBuf,
+    #[arg(long, short = 'f', alias = "f", value_name = "FILE")]
+    db_file: PathBuf,
 
     /// Output in JSON format
     #[arg(short, long)]
@@ -24,7 +24,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// List Channel IDs of all ticket queues in the DB.
-    #[command(alias = "lc")]
+    #[command(short_flag = 'c')]
     ListChannels,
     /// Delete all tickets by the Channel ID.
     #[command(alias = "dq")]
@@ -33,15 +33,15 @@ enum Commands {
         #[arg(short, long)]
         channel_id: String,
     },
-    /// Pretty-print all tickets in a particular queue.
-    #[command(alias = "l")]
+    /// Display all tickets in a particular queue in-order.
+    #[command(short_flag = 'l')]
     ListTickets {
         /// Channel ID of the queue
         #[arg(short, long)]
         channel_id: String,
     },
     /// Delete all tickets in a queue up to a specified ticket matching the Channel ID and index.
-    #[command(alias = "d")]
+    #[command(short_flag = 'd')]
     DeleteTicket {
         /// Channel ID of the tickets
         #[arg(short, long)]
@@ -51,7 +51,7 @@ enum Commands {
         index: u64,
     },
     /// Print out the total sum of all ticket amounts for a given channel ID.
-    #[command(alias = "t")]
+    #[command(short_flag = 't')]
     TotalValue {
         /// Channel ID of the queue
         #[arg(short, long)]
@@ -148,7 +148,11 @@ impl fmt::Display for CommandResult {
 
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
-    let mut store = RedbStore::new(&cli.db_path)?;
+    if !cli.db_file.is_file() {
+        return Err(anyhow::anyhow!("Database file does not exist: {}", cli.db_file.display()));
+    }
+
+    let mut store = RedbStore::new(&cli.db_file)?;
     let is_json = cli.json;
     let result = run_command(cli, &mut store)?;
 
@@ -275,7 +279,7 @@ mod tests {
         store.open_or_create_queue(&channel2)?;
 
         let cli = Cli {
-            db_path: db_path.clone(),
+            db_file: db_path.clone(),
             json: true,
             command: Commands::ListChannels,
         };
@@ -305,7 +309,7 @@ mod tests {
         assert_eq!(store.iter_queues()?.count(), 1);
 
         let cli = Cli {
-            db_path: db_path.clone(),
+            db_file: db_path.clone(),
             json: true,
             command: Commands::DeleteQueue {
                 channel_id: channel.to_string(),
@@ -341,7 +345,7 @@ mod tests {
         fill_queue(&mut queue, tickets.into_iter())?;
 
         let cli = Cli {
-            db_path: db_path.clone(),
+            db_file: db_path.clone(),
             json: true,
             command: Commands::ListTickets {
                 channel_id: channel.to_string(),
@@ -377,7 +381,7 @@ mod tests {
         assert_eq!(queue.len()?, 5);
 
         let cli = Cli {
-            db_path: db_path.clone(),
+            db_file: db_path.clone(),
             json: true,
             command: Commands::DeleteTicket {
                 channel_id: channel.to_string(),
@@ -421,7 +425,7 @@ mod tests {
         fill_queue(&mut queue, tickets.into_iter())?;
 
         let cli = Cli {
-            db_path: db_path.clone(),
+            db_file: db_path.clone(),
             json: true,
             command: Commands::TotalValue {
                 channel_id: channel.to_string(),
@@ -453,7 +457,7 @@ mod tests {
 
         // Test with ListTickets command on non-existent channel
         let cli = Cli {
-            db_path: db_path.clone(),
+            db_file: db_path.clone(),
             json: false,
             command: Commands::ListTickets {
                 channel_id: channel.to_string(),
