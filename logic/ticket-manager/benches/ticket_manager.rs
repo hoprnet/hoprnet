@@ -1,11 +1,11 @@
-use std::{hint::black_box, ops::RangeBounds, time::Duration};
-use std::num::NonZero;
+use std::{hint::black_box, num::NonZero, ops::RangeBounds, time::Duration};
+
 use criterion::{Criterion, criterion_group, criterion_main};
 use hopr_api::{
     chain::{ChannelEntry, RedeemableTicket, WinningProbability},
+    tickets::TicketFactory,
     types::{crypto::prelude::*, crypto_random::Randomizable, internal::prelude::*, primitive::prelude::*},
 };
-use hopr_api::tickets::TicketFactory;
 use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue};
 
 const TICKET_VALUE: u64 = 10;
@@ -80,9 +80,7 @@ fn unrealized_value_redb_bench(c: &mut Criterion) {
 
     c.bench_function("unrealized_value_redb", |b| {
         b.iter(|| {
-            factory
-                .remaining_incoming_channel_stake(black_box(&channel))
-                .unwrap();
+            factory.remaining_incoming_channel_stake(black_box(&channel)).unwrap();
         })
     });
 }

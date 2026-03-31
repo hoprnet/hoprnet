@@ -17,25 +17,25 @@ use crate::{
 
 pub struct HoprTicketFactory<S> {
     out_idx_tracker: OutgoingIndexCache,
-    queue_map: std::sync::Arc<dyn UnrealizedValue>,
+    queue_map: std::sync::Weak<dyn UnrealizedValue>,
     store: std::sync::Arc<parking_lot::RwLock<S>>,
 }
 
 impl<S: OutgoingIndexStore + 'static> HoprTicketFactory<S> {
     /// Creates a new independent ticket factory instance backed by the given `store`.
-    /// 
+    ///
     /// The `store` must be an [`OutgoingIndexStore`].
     pub fn new(store: S) -> Self {
         Self {
             out_idx_tracker: Default::default(),
-            queue_map: std::sync::Arc::new(()),
+            queue_map: std::sync::Weak::<()>::new(),
             store: std::sync::Arc::new(parking_lot::RwLock::new(store)),
         }
     }
 
     pub(crate) fn new_shared<Q: UnrealizedValue + 'static>(
         store: std::sync::Arc<parking_lot::RwLock<S>>,
-        queue_map: std::sync::Arc<Q>,
+        queue_map: std::sync::Weak<Q>,
     ) -> Self {
         Self {
             out_idx_tracker: Default::default(),
@@ -226,12 +226,16 @@ where
     }
 
     fn remaining_incoming_channel_stake(&self, channel: &ChannelEntry) -> Result<HoprBalance, Self::Error> {
-        let unrealized_value = self
-            .queue_map
-            .unrealized_value(channel.get_id(), channel.ticket_index.into())?;
+        if let Some(queue_map) = self.queue_map.upgrade() {
+            let unrealized_value = queue_map.unrealized_value(channel.get_id(), channel.ticket_index.into())?;
 
-        // Subtraction on HoprBalance type naturally saturating at 0
-        Ok(channel.balance - unrealized_value.unwrap_or_default())
+            // Subtraction on HoprBalance type naturally saturating at 0
+            Ok(channel.balance - unrealized_value.unwrap_or_default())
+        } else {
+            Err(TicketManagerError::Other(anyhow::anyhow!(
+                "cannot get remaining stake for channel without ticket manager"
+            )))
+        }
     }
 }
 

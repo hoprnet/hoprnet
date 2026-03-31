@@ -125,7 +125,7 @@ impl<S: OutgoingIndexStore + TicketQueueStore + 'static> HoprTicketManager<S, S:
     pub fn new_with_factory(store: S) -> (Self, HoprTicketFactory<S>) {
         let store = std::sync::Arc::new(parking_lot::RwLock::new(store));
         let channel_tickets = std::sync::Arc::new(CachedQueueMap::<S::Queue>::default());
-        let factory = HoprTicketFactory::new_shared(store.clone(), channel_tickets.clone());
+        let factory = HoprTicketFactory::new_shared(store.clone(), std::sync::Arc::downgrade(&channel_tickets));
 
         (HoprTicketManager { store, channel_tickets }, factory)
     }
