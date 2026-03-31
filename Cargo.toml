@@ -218,7 +218,7 @@ mimalloc = { version = "0.1.48", default-features = false, features = [
   "secure",
 ] }
 
-hopr-api = { git = "https://github.com/hoprnet/hopr-api", rev = "2638cf57d540bd746593cc95bd788171a4582f13" }
+hopr-api = { git = "https://github.com/hoprnet/hopr-api", rev = "e02ecf08456d7c2075909f891a20c4e9b1673c17" }
 hopr-types = { git = "https://github.com/hoprnet/hopr-types", branch = "main" }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-crypto-keypair = { path = "crypto/keypair", default-features = false }

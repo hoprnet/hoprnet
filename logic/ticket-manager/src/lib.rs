@@ -6,6 +6,7 @@ mod backend;
 mod errors;
 mod traits;
 mod utils;
+mod factory;
 
 use std::{convert::identity, sync::atomic::AtomicBool};
 
