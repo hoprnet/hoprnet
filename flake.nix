@@ -160,6 +160,11 @@
             cargoExtraArgs = "-p hoprd-localcluster";
             cargoToml = ./localcluster/Cargo.toml;
           };
+          ticketInspectorBuildArgs = {
+            inherit src depsSrc rev;
+            cargoExtraArgs = "-p hopr-ticket-manager --bin ticket-inspector -F redb,serde,cli";
+            cargoToml = ./logic/ticket-manager/Cargo.toml;
+          };
 
           # Shared preBuild hook to fix stale sandbox paths in cached utoipa-swagger-ui build script outputs
           fixUtoipaEmbedPaths =
@@ -206,6 +211,12 @@
               projectBuildArgs // { cargoExtraArgs = "-F capture"; }
             );
 
+            # ticket-inspector: diagnostic CLI for inspecting the tickets database
+            binary-ticket-inspector = rust-builder-local.callPackage nixLib.mkRustPackage ticketInspectorBuildArgs;
+            # also used for Docker image
+            binary-ticket-inspector-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage ticketInspectorBuildArgs;
+            binary-ticket-inspector-aarch64-linux = rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage ticketInspectorBuildArgs;
+            
             test-unit =
               (fixUtoipaEmbedPaths (
                 rust-builder-local.callPackage nixLib.mkRustPackage (
@@ -415,6 +426,7 @@
               extraContents = [
                 dockerHoprdEntrypoint
                 hoprdPackages.binary-hoprd-x86_64-linux
+                hoprdPackages.binary-ticket-inspector-x86_64-linux
                 pkgs.cacert
                 pkgs.curl # Required by docker-compose healthcheck
               ];
@@ -427,6 +439,7 @@
               extraContents = [
                 dockerHoprdEntrypoint
                 hoprdPackages.binary-hoprd-dev-x86_64-linux
+                hoprdPackages.binary-ticket-inspector-x86_64-linux
                 pkgs.cacert
                 pkgs.curl # Required by docker-compose healthcheck
               ];
@@ -439,6 +452,7 @@
               extraContents = [
                 dockerHoprdEntrypoint
                 hoprdPackages.binary-hoprd-profile-x86_64-linux
+                hoprdPackages.binary-ticket-inspector-x86_64-linux
                 pkgs.cacert
                 pkgs.curl # Required by docker-compose healthcheck
               ]
@@ -452,6 +466,7 @@
               extraContents = [
                 dockerHoprdEntrypoint
                 hoprdPackages.binary-hoprd-aarch64-linux
+                hoprdPackages.binary-ticket-inspector-aarch64-linux
                 pkgs.cacert
                 pkgs.curl # Required by docker-compose healthcheck
               ];
