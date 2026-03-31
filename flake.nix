@@ -216,7 +216,6 @@
             # also used for Docker image
             binary-ticket-inspector-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage ticketInspectorBuildArgs;
             binary-ticket-inspector-aarch64-linux = rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage ticketInspectorBuildArgs;
-            
             test-unit =
               (fixUtoipaEmbedPaths (
                 rust-builder-local.callPackage nixLib.mkRustPackage (
