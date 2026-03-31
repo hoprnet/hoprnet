@@ -168,10 +168,7 @@ pub trait UnrealizedValue {
         Ok(None)
     }
 }
-
-pub struct NoUnrealizedValue;
-
-impl UnrealizedValue for NoUnrealizedValue {}
+impl UnrealizedValue for () {}
 
 impl<Q: TicketQueue> UnrealizedValue for CachedQueueMap<Q> {
     /// Returns the total value of the tickets in the given queue, or `None` if no such ticket queue exists.

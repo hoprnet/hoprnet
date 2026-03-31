@@ -12,7 +12,7 @@ use hopr_api::{
 
 use crate::{
     OutgoingIndexStore, TicketManagerError, TicketQueueStore,
-    utils::{NoUnrealizedValue, OutgoingIndexCache, UnrealizedValue},
+    utils::{OutgoingIndexCache, UnrealizedValue},
 };
 
 pub struct HoprTicketFactory<S> {
@@ -23,10 +23,12 @@ pub struct HoprTicketFactory<S> {
 
 impl<S: OutgoingIndexStore + 'static> HoprTicketFactory<S> {
     /// Creates a new independent ticket factory instance backed by the given `store`.
+    /// 
+    /// The `store` must be an [`OutgoingIndexStore`].
     pub fn new(store: S) -> Self {
         Self {
             out_idx_tracker: Default::default(),
-            queue_map: std::sync::Arc::new(NoUnrealizedValue),
+            queue_map: std::sync::Arc::new(()),
             store: std::sync::Arc::new(parking_lot::RwLock::new(store)),
         }
     }
