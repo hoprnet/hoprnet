@@ -162,7 +162,7 @@
           };
           ticketInspectorBuildArgs = {
             inherit src depsSrc rev;
-            cargoExtraArgs = "-p hopr-ticket-manager --bin ticket-inspector -F redb,serde";
+            cargoExtraArgs = "-p hopr-ticket-manager --bin ticket-inspector -F redb,serde,cli";
             cargoToml = ./logic/ticket-manager/Cargo.toml;
           };
 
