@@ -100,7 +100,10 @@ pub mod tests {
 
     use hopr_api::chain::HoprBalance;
 
-    use crate::{ValueCachedQueue, backend::memory, traits::tests::*};
+    use crate::{
+        backend::{ValueCachedQueue, memory},
+        traits::tests::*,
+    };
 
     #[test]
     fn value_cached_queue_maintains_natural_ticket_order() -> anyhow::Result<()> {
