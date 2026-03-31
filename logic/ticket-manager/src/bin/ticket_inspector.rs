@@ -198,7 +198,8 @@ fn main() -> anyhow::Result<()> {
 fn run_command(cli: Cli, store: &mut impl TicketQueueStore) -> anyhow::Result<CommandResult> {
     match cli.command {
         Commands::ListChannels => {
-            let channels: Vec<String> = store.iter_queues()?.map(|c| c.to_string()).collect();
+            let mut channels: Vec<String> = store.iter_queues()?.map(|c| c.to_string()).collect();
+            channels.sort();
             Ok(CommandResult::ListChannels(ChannelList { channels }))
         }
         Commands::DeleteQueue { channel_id } => {
@@ -216,21 +217,19 @@ fn run_command(cli: Cli, store: &mut impl TicketQueueStore) -> anyhow::Result<Co
                 }));
             }
             let queue = store.open_or_create_queue(&channel_id)?;
-            let tickets: Vec<_> = queue.iter_unordered()?.collect::<Result<Vec<_>, _>>()?;
+            let mut tickets = queue.iter_unordered()?.collect::<Result<Vec<_>, _>>()?;
+            tickets.sort();
 
             #[cfg(feature = "serde")]
-            let json_tickets: Vec<serde_json::Value> = tickets
-                .iter()
+            let tickets: Vec<serde_json::Value> = tickets
+                .into_iter()
                 .map(serde_json::to_value)
                 .collect::<Result<Vec<_>, _>>()?;
 
             #[cfg(not(feature = "serde"))]
-            let json_tickets: Vec<String> = tickets.iter().map(|t| format!("{:?}", t)).collect();
+            let tickets: Vec<String> = tickets.into_iter().map(|t| format!("{:?}", t)).collect();
 
-            Ok(CommandResult::ListTickets(TicketList {
-                channel_id,
-                tickets: json_tickets,
-            }))
+            Ok(CommandResult::ListTickets(TicketList { channel_id, tickets }))
         }
         Commands::DeleteTicket { channel_id, index } => {
             if !store.iter_queues()?.any(|c| c == channel_id) {
@@ -268,12 +267,10 @@ fn run_command(cli: Cli, store: &mut impl TicketQueueStore) -> anyhow::Result<Co
             let queue = store.open_or_create_queue(&channel_id)?;
             let total_sum: HoprBalance = queue
                 .iter_unordered()?
-                .filter_map(|t| {
-                    t.inspect_err(|error| eprintln!("Error inspecting ticket: {error}"))
-                        .ok()
-                        .map(|ticket| ticket.verified_ticket().amount)
-                })
-                .sum();
+                .map(|r| r.map_err(|e| anyhow::anyhow!("error reading ticket: {e}")))
+                .try_fold(HoprBalance::zero(), |acc, t| {
+                    anyhow::Ok(acc + t?.verified_ticket().amount)
+                })?;
 
             Ok(CommandResult::TotalValue(TotalValueResult {
                 channel_id,
@@ -285,17 +282,67 @@ fn run_command(cli: Cli, store: &mut impl TicketQueueStore) -> anyhow::Result<Co
 
 #[cfg(test)]
 mod tests {
-    use hopr_api::types::crypto::prelude::{ChainKeypair, Keypair};
-    use hopr_ticket_manager::{
-        TicketQueueStore,
-        testing::{fill_queue, generate_owned_tickets},
+    use std::ops::RangeBounds;
+
+    use hopr_api::{
+        chain::{RedeemableTicket, WinningProbability},
+        types::{
+            crypto::prelude::{ChainKeypair, Challenge, HalfKey, Keypair, Response},
+            crypto_random::Randomizable,
+            internal::prelude::TicketBuilder,
+        },
     };
+    use hopr_ticket_manager::TicketQueueStore;
     use tempfile::tempdir;
 
     use super::*;
 
+    pub fn generate_owned_tickets(
+        issuer: &ChainKeypair,
+        recipient: &ChainKeypair,
+        count: usize,
+        epochs: impl RangeBounds<u32> + Iterator<Item = u32>,
+    ) -> anyhow::Result<Vec<RedeemableTicket>> {
+        let mut tickets = Vec::new();
+        for epoch in epochs {
+            for i in 0..count {
+                let hk1 = HalfKey::random();
+                let hk2 = HalfKey::random();
+
+                let ticket = TicketBuilder::default()
+                    .counterparty(recipient)
+                    .index(i as u64)
+                    .channel_epoch(epoch)
+                    .win_prob(WinningProbability::ALWAYS)
+                    .amount(100)
+                    .challenge(Challenge::from_hint_and_share(
+                        &hk1.to_challenge()?,
+                        &hk2.to_challenge()?,
+                    )?)
+                    .build_signed(issuer, &Default::default())?
+                    .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?)
+                    .into_redeemable(recipient, &Default::default())?;
+
+                tickets.push(ticket);
+            }
+        }
+
+        tickets.sort();
+        Ok(tickets)
+    }
+
+    pub fn fill_queue<Q: TicketQueue, I: Iterator<Item = RedeemableTicket>>(
+        queue: &mut Q,
+        iter: I,
+    ) -> anyhow::Result<()> {
+        for ticket in iter {
+            queue.push(ticket)?;
+        }
+        Ok(())
+    }
+
     #[test]
-    fn test_list_channels() -> anyhow::Result<()> {
+    fn list_channels() -> anyhow::Result<()> {
         let dir = tempdir()?;
         let db_path = dir.path().join("test_list.db");
         let mut store = RedbStore::new(&db_path)?;
@@ -326,7 +373,7 @@ mod tests {
     }
 
     #[test]
-    fn test_delete_queue() -> anyhow::Result<()> {
+    fn delete_queue() -> anyhow::Result<()> {
         let dir = tempdir()?;
         let db_path = dir.path().join("test_delete_queue.db");
         let mut store = RedbStore::new(&db_path)?;
@@ -357,7 +404,7 @@ mod tests {
     }
 
     #[test]
-    fn test_list_tickets() -> anyhow::Result<()> {
+    fn list_tickets() -> anyhow::Result<()> {
         let dir = tempdir()?;
         let db_path = dir.path().join("test_list_tickets.db");
         let mut store = RedbStore::new(&db_path)?;
@@ -389,7 +436,7 @@ mod tests {
     }
 
     #[test]
-    fn test_delete_ticket() -> anyhow::Result<()> {
+    fn delete_ticket() -> anyhow::Result<()> {
         let dir = tempdir()?;
         let db_path = dir.path().join("test_delete_ticket.db");
         let mut store = RedbStore::new(&db_path)?;
@@ -431,7 +478,7 @@ mod tests {
     }
 
     #[test]
-    fn test_total_sum() -> anyhow::Result<()> {
+    fn total_sum() -> anyhow::Result<()> {
         let dir = tempdir()?;
         let db_path = dir.path().join("test_total_sum.db");
         let mut store = RedbStore::new(&db_path)?;
@@ -467,7 +514,7 @@ mod tests {
     }
 
     #[test]
-    fn test_open_or_create_queue_inspected() -> anyhow::Result<()> {
+    fn open_or_create_queue_inspected() -> anyhow::Result<()> {
         let dir = tempdir()?;
         let db_path = dir.path().join("test_inspected.db");
         let mut store = RedbStore::new(&db_path)?;

@@ -9,7 +9,6 @@ edition.workspace = true
 [features]
 default = ["redb"]
 redb = ["dep:postcard", "dep:redb", "hopr-api/serde"]
-testing = ["hopr-api/types-random", "dep:rand"]
 serde = ["dep:serde", "dep:serde_json", "hopr-api/serde"]
 
 [dependencies]

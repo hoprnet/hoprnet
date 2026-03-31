@@ -108,7 +108,7 @@ pub(crate) fn default_total_value<Q: TicketQueue + ?Sized>(
 }
 
 // Contains general utilities and test helpers for ticket queue implementations.
-#[cfg(any(test, feature = "testing"))]
+#[cfg(test)]
 pub mod tests {
     use std::ops::RangeBounds;
 
