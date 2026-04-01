@@ -715,10 +715,10 @@ where
             tickets_rx
                 .for_each(move |event| {
                     // Ticket manager processes new winning tickets
-                    if let TicketEvent::WinningTicket(ticket) = &event {
-                        if let Err(error) = tmgr.insert_incoming_ticket(**ticket) {
-                            tracing::error!(%error, "failed to insert incoming ticket into manager");
-                        }
+                    if let TicketEvent::WinningTicket(ticket) = &event
+                        && let Err(error) = tmgr.insert_incoming_ticket(**ticket)
+                    {
+                        tracing::error!(%error, "failed to insert incoming ticket into manager");
                     }
                     if let Err(error) = new_ticket_tx.try_broadcast(event) {
                         tracing::error!(%error, "failed to broadcast new ticket event to subscribers");
