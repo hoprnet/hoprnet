@@ -100,23 +100,11 @@ jobs:
   deploy-staging:
     name: Deploy Gnosis Staging
     runs-on: self-hosted-hoprnet-small
-    # needs: [ build-docker, release ]
+    needs: [ build-docker, release ]
     permissions:
       contents: read
       id-token: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
-      - name: Compute revision suffix
-        id: revision
-        run: echo "suffix=v$(echo '${{ needs.build-docker.outputs.docker_build_version }}' | tr '.' '-')" | tee -a "$GITHUB_OUTPUT"
-      - name: Setup GCP
-        id: gcp
-        uses: hoprnet/hopr-workflows/actions/setup-gcp@setup-gcp-v2
-        with:
-          workload_identity_provider: ${{ vars.WIF_PROVIDER_STAGING }}
-          service_account: ${{ vars.WIF_SERVICE_ACCOUNT_STAGING }}
-          install_sdk: "true"
       - name: Restart Hoprd
         uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3.0.0
         with:

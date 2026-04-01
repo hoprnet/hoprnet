@@ -14,98 +14,87 @@ concurrency:
 permissions:
   contents: read
 jobs:
-  # build-binaries:
-  #   name: Binary ${{ matrix.architecture }}
-  #   if: github.event.pull_request.merged == true
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       include:
-  #         - architecture: x86_64-linux
-  #           runner: self-hosted-hoprnet-bigger
-  #           build_command: nix build -L .#binary-hoprd-x86_64-linux
-  #         - architecture: aarch64-linux
-  #           runner: self-hosted-hoprnet-bigger
-  #           build_command: nix build -L .#binary-hoprd-aarch64-linux
-  #           # - architecture: x86_64-darwin
-  #           #   runner: macos-15-intel
-  #           #   build_command: nix build -L .#binary-hoprd-x86_64-darwin
-  #           # - architecture: aarch64-darwin
-  #           #   runner: macos-15-xlarge
-  #           #   build_command: nix build -L .#binary-hoprd-aarch64-darwin
-  #   uses: hoprnet/hopr-workflows/.github/workflows/build-binaries.yaml@build-binaries-v2
-  #   permissions:
-  #     contents: read
-  #   with:
-  #     source_branch: ${{ github.event.pull_request.base.ref }}
-  #     version_type: pr
-  #     architecture: ${{ matrix.architecture }}
-  #     cachix_cache_name: hoprnet
-  #     build_file: ./hopr/hopr-lib/Cargo.toml
-  #     build_command: ${{ matrix.build_command }}
-  #     binary: hoprd
-  #     runner: ${{ matrix.runner }}
-  #   secrets:
-  #     gcp_service_account: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
-  #     cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-  #     gpg_private_key: ${{ secrets.GPG_HOPRNET_PRIVATE_KEY }}
-  # build-docker:
-  #   name: Docker
-  #   needs: build-binaries
-  #   if: github.event.pull_request.merged == true
-  #   uses: hoprnet/hopr-workflows/.github/workflows/build-docker.yaml@build-docker-v1
-  #   permissions:
-  #     contents: read
-  #     pull-requests: write
-  #     id-token: write
-  #   with:
-  #     source_branch: ${{ github.event.pull_request.base.ref }}
-  #     version_type: pr
-  #     build_matrix: >-
-  #       [
-  #         {
-  #           "runner": "self-hosted-hoprnet-bigger",
-  #           "architecture": "x86_64-linux",
-  #           "build_command": "nix build -L .#docker-hoprd-x86_64-linux"
-  #         },
-  #         {
-  #           "runner": "self-hosted-hoprnet-bigger",
-  #           "architecture": "aarch64-linux",
-  #           "build_command": "nix build -L .#docker-hoprd-aarch64-linux"
-  #         }
-  #       ]
-  #     cachix_cache_name: hoprnet
-  #     build_file: ./hopr/hopr-lib/Cargo.toml
-  #     docker_image_name: hoprd
-  #     docker_image_format: skopeo
-  #     fail_on_scan_vulnerabilities: ${{ vars.FAIL_ON_SCAN_VULNERABILITIES }}
-  #     deployment_namespace: core-team
-  #     deployment_label_selector: app.kubernetes.io/component=node
-  #   secrets:
-  #     gcp_service_account: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
-  #     cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-  #     docker_hub_username: ${{ secrets.DOCKER_HUB_USERNAME }}
-  #     docker_hub_token: ${{ secrets.DOCKER_HUB_TOKEN }}
+  build-binaries:
+    name: Binary ${{ matrix.architecture }}
+    if: github.event.pull_request.merged == true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: x86_64-linux
+            runner: self-hosted-hoprnet-bigger
+            build_command: nix build -L .#binary-hoprd-x86_64-linux
+          - architecture: aarch64-linux
+            runner: self-hosted-hoprnet-bigger
+            build_command: nix build -L .#binary-hoprd-aarch64-linux
+            # - architecture: x86_64-darwin
+            #   runner: macos-15-intel
+            #   build_command: nix build -L .#binary-hoprd-x86_64-darwin
+            # - architecture: aarch64-darwin
+            #   runner: macos-15-xlarge
+            #   build_command: nix build -L .#binary-hoprd-aarch64-darwin
+    uses: hoprnet/hopr-workflows/.github/workflows/build-binaries.yaml@build-binaries-v2
+    permissions:
+      contents: read
+    with:
+      source_branch: ${{ github.event.pull_request.base.ref }}
+      version_type: pr
+      architecture: ${{ matrix.architecture }}
+      cachix_cache_name: hoprnet
+      build_file: ./hopr/hopr-lib/Cargo.toml
+      build_command: ${{ matrix.build_command }}
+      binary: hoprd
+      runner: ${{ matrix.runner }}
+    secrets:
+      gcp_service_account: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
+      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      gpg_private_key: ${{ secrets.GPG_HOPRNET_PRIVATE_KEY }}
+  build-docker:
+    name: Docker
+    needs: build-binaries
+    if: github.event.pull_request.merged == true
+    uses: hoprnet/hopr-workflows/.github/workflows/build-docker.yaml@build-docker-v1
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    with:
+      source_branch: ${{ github.event.pull_request.base.ref }}
+      version_type: pr
+      build_matrix: >-
+        [
+          {
+            "runner": "self-hosted-hoprnet-bigger",
+            "architecture": "x86_64-linux",
+            "build_command": "nix build -L .#docker-hoprd-x86_64-linux"
+          },
+          {
+            "runner": "self-hosted-hoprnet-bigger",
+            "architecture": "aarch64-linux",
+            "build_command": "nix build -L .#docker-hoprd-aarch64-linux"
+          }
+        ]
+      cachix_cache_name: hoprnet
+      build_file: ./hopr/hopr-lib/Cargo.toml
+      docker_image_name: hoprd
+      docker_image_format: skopeo
+      fail_on_scan_vulnerabilities: ${{ vars.FAIL_ON_SCAN_VULNERABILITIES }}
+      deployment_namespace: core-team
+      deployment_label_selector: app.kubernetes.io/component=node
+    secrets:
+      gcp_service_account: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
+      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      docker_hub_username: ${{ secrets.DOCKER_HUB_USERNAME }}
+      docker_hub_token: ${{ secrets.DOCKER_HUB_TOKEN }}
   deploy-dev:
     name: Deploy Gnosis Dev
     runs-on: self-hosted-hoprnet-small
-    # needs: build-docker
+    needs: build-docker
+    if: github.event.pull_request.merged == true
     permissions:
       contents: read
       id-token: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
-      - name: Compute revision suffix
-        id: revision
-        run: echo "suffix=v$(echo '${{ needs.build-docker.outputs.docker_build_version }}' | tr '.' '-')" | tee -a "$GITHUB_OUTPUT"
-      - name: Setup GCP
-        id: gcp
-        uses: hoprnet/hopr-workflows/actions/setup-gcp@setup-gcp-v2
-        with:
-          workload_identity_provider: ${{ vars.WIF_PROVIDER_DEVELOPMENT }}
-          service_account: ${{ vars.WIF_SERVICE_ACCOUNT_DEVELOPMENT }}
-          install_sdk: "true"
       - name: Restart Hoprd
         uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3.0.0
         with:
@@ -116,112 +105,82 @@ jobs:
             {
               "environment": "dev"
             }
-  # deploy-staging:
-  #   name: Deploy Gnosis Staging
-  #   runs-on: self-hosted-hoprnet-small
-  #   # needs: release
-  #   permissions:
-  #     contents: read
-  #     id-token: write
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
-  #     - name: Compute revision suffix
-  #       id: revision
-  #       run: echo "suffix=v$(echo '${{ needs.build-docker.outputs.docker_build_version }}' | tr '.' '-')" | tee -a "$GITHUB_OUTPUT"
-  #     - name: Setup GCP
-  #       id: gcp
-  #       uses: hoprnet/hopr-workflows/actions/setup-gcp@setup-gcp-v2
-  #       with:
-  #         workload_identity_provider: ${{ vars.WIF_PROVIDER_STAGING }}
-  #         service_account: ${{ vars.WIF_SERVICE_ACCOUNT_STAGING }}
-  #         install_sdk: "true"
-  #     - name: Restart Hoprd
-  #       uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3.0.0
-  #       with:
-  #         token: ${{ secrets.GNOSIS_GITHUB_WORKFLOW_TOKEN }}
-  #         repository: gnosis/gnosis_vpn-infrastructure
-  #         event-type: restart_hoprd
-  #         client-payload: |-
-  #           {
-  #             "environment": "staging"
-  #           }
-  # cache_deps:
-  #   name: Cache deps
-  #   if: github.event.pull_request.merged == true
-  #   uses: ./.github/workflows/cache-deps.yaml
-  #   with:
-  #     source_repo: ${{ github.event.pull_request.base.repo.full_name }}
-  #     source_branch: ${{ github.event.pull_request.base.ref }}
-  #   secrets:
-  #     CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-  #     PRIVATE_CARGO_REGISTRY_PROXY_URL: ${{ secrets.PRIVATE_CARGO_REGISTRY_PROXY_URL }}
-  # docs:
-  #   name: Docs
-  #   needs:
-  #     - build-docker
-  #   uses: ./.github/workflows/build-docs.yaml
-  #   permissions:
-  #     contents: write
-  #   with:
-  #     source_repo: ${{ github.event.pull_request.base.repo.full_name }}
-  #     source_branch: ${{ github.event.pull_request.base.ref }}
-  #     publish: true
-  #   secrets:
-  #     CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-  # notify:
-  #   name: Notify failure
-  #   needs:
-  #     - build-binaries
-  #     - build-docker
-  #     - docs
-  #   if: ${{ always() && failure() }}
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Notify failed merge pipeline
-  #       uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
-  #       with:
-  #         api-key: ${{ secrets.ZULIP_API_KEY }}
-  #         email: ${{ secrets.ZULIP_EMAIL }}
-  #         organization-url: "https://hopr.zulipchat.com"
-  #         type: "stream"
-  #         to: "HOPRd"
-  #         topic: "Core"
-  #         content: |
-  #           The merge pipeline has failed for pull request [#${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
-  # cleanup_actions:
-  #   name: Cleanup Actions
-  #   runs-on: self-hosted-hoprnet-small
-  #   permissions:
-  #     actions: write
-  #   steps:
-  #     - name: Harden Runner
-  #       uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
-  #       with:
-  #         disable-sudo: true
-  #         egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
-  #     - name: Checkout hoprnet repository
-  #       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-  #       with:
-  #         persist-credentials: false
-  #         ref: ${{ github.event.pull_request.base.ref }}
-  #     - name: Cleanup
-  #       run: |
-  #         gh extension install actions/gh-actions-cache
+  cache_deps:
+    name: Cache deps
+    if: github.event.pull_request.merged == true
+    uses: ./.github/workflows/cache-deps.yaml
+    with:
+      source_repo: ${{ github.event.pull_request.base.repo.full_name }}
+      source_branch: ${{ github.event.pull_request.base.ref }}
+    secrets:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      PRIVATE_CARGO_REGISTRY_PROXY_URL: ${{ secrets.PRIVATE_CARGO_REGISTRY_PROXY_URL }}
+  docs:
+    name: Docs
+    needs:
+      - build-docker
+    uses: ./.github/workflows/build-docs.yaml
+    permissions:
+      contents: write
+    with:
+      source_repo: ${{ github.event.pull_request.base.repo.full_name }}
+      source_branch: ${{ github.event.pull_request.base.ref }}
+      publish: true
+    secrets:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+  notify:
+    name: Notify failure
+    needs:
+      - build-binaries
+      - build-docker
+      - docs
+    if: ${{ always() && failure() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify failed merge pipeline
+        uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
+        with:
+          api-key: ${{ secrets.ZULIP_API_KEY }}
+          email: ${{ secrets.ZULIP_EMAIL }}
+          organization-url: "https://hopr.zulipchat.com"
+          type: "stream"
+          to: "HOPRd"
+          topic: "Core"
+          content: |
+            The merge pipeline has failed for pull request [#${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+  cleanup_actions:
+    name: Cleanup Actions
+    runs-on: self-hosted-hoprnet-small
+    permissions:
+      actions: write
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.base.ref }}
+      - name: Cleanup
+        run: |
+          gh extension install actions/gh-actions-cache
 
-  #         REPO=${{ github.repository }}
-  #         BRANCH="refs/pull/${{ github.event.pull_request.number }}/merge"
+          REPO=${{ github.repository }}
+          BRANCH="refs/pull/${{ github.event.pull_request.number }}/merge"
 
-  #         echo "Fetching list of cache key"
-  #         cacheKeysForPR=$(gh actions-cache list -R $REPO -B $BRANCH | cut -f 1 )
+          echo "Fetching list of cache key"
+          cacheKeysForPR=$(gh actions-cache list -R $REPO -B $BRANCH | cut -f 1 )
 
-  #         ## Setting this to not fail the workflow while deleting cache keys.
-  #         set +e
-  #         echo "Deleting caches..."
-  #         for cacheKey in $cacheKeysForPR
-  #         do
-  #           gh actions-cache delete $cacheKey -R $REPO -B $BRANCH --confirm
-  #         done
-  #         echo "Done"
-  #       env:
-  #         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ## Setting this to not fail the workflow while deleting cache keys.
+          set +e
+          echo "Deleting caches..."
+          for cacheKey in $cacheKeysForPR
+          do
+            gh actions-cache delete $cacheKey -R $REPO -B $BRANCH --confirm
+          done
+          echo "Done"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
