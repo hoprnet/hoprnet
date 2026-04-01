@@ -100,7 +100,7 @@ jobs:
   deploy-staging:
     name: Deploy Gnosis Staging
     runs-on: self-hosted-hoprnet-small
-    needs: [ build-docker, release ]
+    needs: [build-docker, release]
     permissions:
       contents: read
       id-token: write
