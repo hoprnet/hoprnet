@@ -7,7 +7,7 @@ Coverage uses LLVM source-based instrumentation. CI uploads workspace-wide repor
 This is what CI runs. It produces an LCOV report for the entire workspace:
 
 ```bash
-nix build -L .#hopr-coverage            # LCOV report written to ./result
+nix build -L .#coverage-unit            # LCOV report written to ./result
 ```
 
 ## Single crate (local, from the dev shell)
@@ -74,7 +74,7 @@ xdg-open /tmp/hopr-coverage/html/index.html    # Linux
 
 The `code-coverage` job in `.github/workflows/tests.yaml` runs on every non-draft PR:
 
-1. Builds `nix build -L .#hopr-coverage` (workspace-wide LCOV report).
+1. Builds `nix build -L .#coverage-unit` (workspace-wide LCOV report).
 2. Uploads the report to Codecov using `codecov/codecov-action`.
 3. Codecov posts a status check targeting the base branch coverage with 0% regression tolerance (configured in `codecov.yml`).
 
