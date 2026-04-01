@@ -7,7 +7,7 @@ on:
   pull_request:
     types:
       - closed
-      - synchronize
+      # - synchronize
 concurrency:
   group: merge-${{ github.event.pull_request.base.ref }}
   cancel-in-progress: false
