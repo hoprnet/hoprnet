@@ -20,15 +20,12 @@ use opentelemetry_sdk::{
 };
 use tracing::field::{Field, Visit};
 use tracing_subscriber::prelude::*;
-#[cfg(feature = "prometheus")]
-use {
-    hopr_metrics::{PrometheusMetric, PrometheusMetricFamily, PrometheusMetricType, gather_metric_families},
-    std::{
-        collections::HashSet,
-        sync::mpsc::{self, Sender},
-        thread::{self, JoinHandle},
-    },
-};
+
+use crate::telemetry_common;
+
+const HOPRD_OTLP_ENDPOINT_ENV_KEY: &str = "HOPRD_OTLP_ENDPOINT";
+const LEGACY_OTLP_ENDPOINT_ENV_KEY: &str = "OTEL_EXPORTER_OTLP_ENDPOINT";
+const HOPRD_METRIC_EXPORT_INTERVAL_ENV_KEY: &str = "HOPRD_METRIC_EXPORT_INTERVAL";
 
 flagset::flags! {
     #[repr(u8)]
@@ -760,7 +757,7 @@ fn enabled_signal_names(config: &OtlpConfig, signals: &[OtlpSignal]) -> String {
 
 pub(super) fn init_logging(node_identity: NodeTelemetryIdentity) -> anyhow::Result<TelemetryHandles> {
     let mut telemetry_handles = TelemetryHandles::default();
-    let registry = crate::telemetry_common::build_base_subscriber()?;
+    apply_hoprd_otlp_endpoint_override();
     let config = OtlpConfig::from_env();
 
     if config.enabled {
@@ -795,7 +792,7 @@ pub(super) fn init_logging(node_identity: NodeTelemetryIdentity) -> anyhow::Resu
                 .build();
             let tracer = tracer_provider.tracer(env!("CARGO_PKG_NAME"));
             telemetry_handles.tracer_provider = Some(tracer_provider);
-            Some(tracing_opentelemetry::layer().with_tracer(tracer))
+            Some(tracing_opentelemetry::layer::<tracing_subscriber::registry::Registry>().with_tracer(tracer))
         } else {
             None
         };
@@ -833,14 +830,13 @@ pub(super) fn init_logging(node_identity: NodeTelemetryIdentity) -> anyhow::Resu
         let enabled_signals = enabled_signal_names(&config, &[OtlpSignal::Traces, OtlpSignal::Logs]);
         let metrics_requested = config.has_signal(OtlpSignal::Metrics);
 
-        match (trace_layer, logs_layer) {
-            (Some(trace_layer), Some(logs_layer)) => {
-                tracing::subscriber::set_global_default(registry.with(trace_layer).with(logs_layer))?
-            }
-            (Some(trace_layer), None) => tracing::subscriber::set_global_default(registry.with(trace_layer))?,
-            (None, Some(logs_layer)) => tracing::subscriber::set_global_default(registry.with(logs_layer))?,
-            (None, None) => tracing::subscriber::set_global_default(registry)?,
-        }
+        let otel_layers = match (trace_layer, logs_layer) {
+            (Some(trace), Some(logs)) => vec![trace.boxed(), logs.boxed()],
+            (Some(trace), None) => vec![trace.boxed()],
+            (None, Some(logs)) => vec![logs.boxed()],
+            (None, None) => Vec::new(),
+        };
+        telemetry_common::install_otel_layers(otel_layers)?;
 
         tracing::info!(
             otel_service_name = %config.service_name,
@@ -852,7 +848,14 @@ pub(super) fn init_logging(node_identity: NodeTelemetryIdentity) -> anyhow::Resu
             "OpenTelemetry initialized"
         );
     } else {
-        tracing::subscriber::set_global_default(registry)?;
+        // OTEL disabled — still set up Prometheus text exporter for /metrics
+        let meter_provider = SdkMeterProvider::builder()
+            .with_reader(prometheus_exporter.clone())
+            .build();
+        if !hopr_metrics::init_with_provider(prometheus_exporter, meter_provider.clone()) {
+            tracing::warn!("hopr-metrics global state was already initialized; custom provider not applied");
+        }
+        telemetry_handles.meter_provider = Some(meter_provider);
     }
 
     Ok(telemetry_handles)
