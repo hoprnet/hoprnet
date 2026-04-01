@@ -135,11 +135,37 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./result/share/doc/
           force_orphan: true
+  coverage:
+    name: Coverage
+    if: github.event.pull_request.merged == true
+    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@bbd22e57cf954c15f0a6051d59329857809141dd # workflow-tests-v1
+    with:
+      source_branch: ${{ github.event.pull_request.base.ref }}
+      unit_tests: false
+      integration_tests: false
+      nightly_tests: false
+      benchmarks: false
+      coverage: true
+      unconditional: true
+      unit_coverage_command: |
+        nix build -L .#coverage-unit
+        cp result coverage.lcov
+      integration_coverage_command: |
+        nix develop .#coverage -c env NEXTEST_HIDE_PROGRESS_BAR=1 cargo llvm-cov nextest \
+          --workspace \
+          --test '*' \
+          --lcov --output-path coverage.lcov \
+          -j 1
+      runner: self-hosted-hoprnet-bigger
+    secrets:
+      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      codecov_token: ${{ secrets.CODECOV_TOKEN }}
   notify:
     name: Notify failure
     needs:
       - build-binaries
       - build-docker
+      - coverage
       - docs
     if: ${{ always() && failure() }}
     runs-on: ubuntu-latest
