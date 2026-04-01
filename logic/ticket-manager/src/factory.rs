@@ -15,6 +15,75 @@ use crate::{
     utils::{OutgoingIndexCache, UnrealizedValue},
 };
 
+/// Keeps track of outgoing ticket indices and provides an interface for creating multihop tickets.
+///
+/// It is therefore always used on all noded types (Entry/Relay/Exit) in the outgoing packet pipeline, as
+/// it handles the outgoing ticket indices for new tickets.
+///
+/// For Entry/Exit nodes, the `HoprTicketFactory` is typically created as standalone (via [`HoprTicketFactory::new`]).
+///
+/// To synchronize the on-chain state with the store, it is advised to call
+/// [`sync_outgoing_channels`](HoprTicketFactory::sync_from_outgoing_channels) early
+/// after the construction of the factory, to make sure outgoing indices are up to date. This is typically done only
+/// once after construction and not needed to be done during the life-time of the factory.
+///
+/// The factory is safe to be shared via an `Arc`.
+///
+/// ### Usage in the outgoing packet pipeline
+/// The outgoing packet pipeline usually just calls
+/// [`new_multihop_ticket`](hopr_api::tickets::TicketFactory::new_multihop_ticket) to create a ticket for the next hop
+/// on a multi-hop path. To create zero/last-hop tickets, the factory is not needed as these tickets essentially contain
+/// bogus data and there's no channel required.
+///
+/// The outgoing indices are **not** automatically synchronized back to the underlying store for performance reasons.
+/// The user is responsible for calling [`save_outgoing_indices`](HoprTicketFactory::save_outgoing_indices) to save
+/// the outgoing indices to the store.
+///
+/// This usage is typical for all kinds of nodes (Entry/Relay/Exit).
+///
+/// ### Usage in the incoming packet pipeline in Relay nodes
+/// There is additional usage of the `HoprTicketFactory` in the incoming pipeline in Relay nodes.
+/// The Relay nodes typically need to validate incoming tickets in their incoming packet pipeline **before**
+/// they forward the packet to the outgoing packet pipeline (out to the next hop).
+///
+/// The `HoprTicketFactory` in this case maintains a weak referebce to [`HoprTicketManager`](crate::HoprTicketManager)
+/// if they were created together via [`HoprTicketManager::new_with_factory`].
+///
+/// By using this weak reference, it can get the [remaining channel
+/// stake](hopr_api::tickets::TicketFactory::remaining_incoming_channel_stake) on the given channel by subtracting the
+/// value of unredeemed tickets in the matching channel queue of the associated
+/// [`HoprTicketManager`](crate::HoprTicketManager).
+///
+/// This is useful for Relay nodes that need to validate incoming tickets before forwarding them to the outgoing packet
+/// pipeline.
+///
+/// NOTE: if the `HoprTicketFactor` is not created with a `HoprTicketManager`, it cannot evaluate the remaining stake on
+/// the given channel and will always return the channel balance.
+///
+/// ## Locking and lock-contention
+///
+/// ### Outgoing ticket creation
+/// The [`new_multihop_ticket`](hopr_api::tickets::TicketFactory::new_multihop_ticket) method is designed to be
+/// high-performance and to be called per each outgoing packet. It is using only atomics to track the outgoing
+/// ticket index for a channel. The synchronization to the underlying storage is done on-demand by calling
+/// `save_outgoing_indices`, making quick snapshots of the current state of outgoing indices.
+/// No significant contention is expected unless `save_outgoing_indices` is called very frequently.
+///
+/// ### Remaining channel stake calculation
+/// The [`remaining_incoming_channel_stake`](hopr_api::tickets::TicketFactory::remaining_incoming_channel_stake) method
+/// is designed to be high-performance and to be called per each incoming packet **before** it is forwarded to a next
+/// hop.
+///
+/// This operation acquires the read-part of an RW lock in `HoprTicketManager` (per incoming channel). This may block
+/// the hot-path only if one of the following (write) operations is performed at the same moment:
+///     1. A new incoming winning ticket is inserted into the same incoming channel queue of the `HoprTicketManager`.
+///     2. Ticket redemption has just finished in that particular channel, and the redeemed ticket is dropped from the
+///     same incoming channel queue of the `HoprTicketManager`.
+///     3. Ticket neglection has just finished in that particular channel, and the neglected ticket is dropped from the
+///     same incoming channel queue of the `HoprTicketManager`.
+///
+/// All 3 of these operations are not expected to happen very often on a single channel; therefore, high contention
+/// on the RW lock is not expected.
 pub struct HoprTicketFactory<S> {
     out_idx_tracker: OutgoingIndexCache,
     queue_map: std::sync::Weak<dyn UnrealizedValue>,
@@ -54,7 +123,7 @@ where
     /// This operation is fast and does not immediately put the index into the [`OutgoingIndexStore`].
     ///
     /// The returned value is always guaranteed to be greater or equal to the ticket index on the given `channel`.
-    fn next_outgoing_ticket_index(&self, channel: &ChannelEntry) -> u64 {
+    pub fn next_outgoing_ticket_index(&self, channel: &ChannelEntry) -> u64 {
         let mut next_index = self.out_idx_tracker.next(channel.get_id(), channel.channel_epoch);
         tracing::trace!(%channel, next_index, "next outgoing ticket index");
 
@@ -80,8 +149,8 @@ where
 
     /// Saves outgoing ticket indices back to the store.
     ///
-    /// The operation does nothing if there were no [new tickets created](HoprTicketManager::next_multihop_ticket)
-    /// on any tracked channel.
+    /// The operation does nothing if there were no [new tickets
+    /// created](hopr_api::tickets::TicketFactory::new_multihop_ticket) on any tracked channel.
     pub fn save_outgoing_indices(&self) -> Result<(), TicketManagerError> {
         self.out_idx_tracker
             .save(self.store.clone())
@@ -99,7 +168,7 @@ where
     /// - added to the store with their current index and epoch (if not present in the store), or
     /// - updated to the maximum of the two index values (if present in the store)
     ///
-    /// It is advised to call this function early after the construction of the `HoprTicketManager`
+    /// It is advised to call this function early after the construction of the `HoprTicketFactory`
     /// to ensure pruning of dangling or out-of-date values.
     pub fn sync_from_outgoing_channels(&self, outgoing_channels: &[ChannelEntry]) -> Result<(), TicketManagerError> {
         let outgoing_channels: std::collections::HashSet<_, std::hash::RandomState> =

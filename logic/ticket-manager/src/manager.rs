@@ -15,50 +15,22 @@ use crate::{
     utils::{CachedQueueMap, UnrealizedValue},
 };
 
-/// Keeps track of indices for outgoing tickets and (optionally) of incoming redeemable tickets.
-///
-/// The capabilities of the `HoprTicketManager` are given by the store `S`:
-/// - if the store implements [`OutgoingIndexStore`], the outgoing index tracking functions are available.
-/// - if the store implements [`TicketQueueStore`], the incoming redeemable ticket management is available.
-///
-/// It is possible to have both implementations in the same store object. Some store implementations may offer
-/// persistence, others may not. The `HoprTicketManager` takes ownership of the store object, and other
-/// processes should not attempt to change the store externally. For this reason, stores should not be cloneable.
-///
-/// The HOPR node type gives typical use-cases of the `HoprTicketManager`:
-///
-/// - Entry/Exit nodes only need to provide an `OutgoingIndexStore`, since they are dealing with outgoing tickets only.
-/// - Relay nodes need to provide a store which implements both `OutgoingIndexStore + TicketQueueStore`, because they
-///   need to deal with both outgoing tickets and incoming redeemable tickets.
+/// Keeps track of incoming redeemable tickets and provides ticket redemption and neglection operations.
 ///
 /// To synchronize the on-chain state with the store, it is advised to call
-/// [`sync_outgoing_channels`](HoprTicketManager::sync_from_outgoing_channels) (and
-/// [`sync_incoming_channels`](HoprTicketManager::sync_from_incoming_channels) if applicable to the chosen store) early
+/// [`sync_incoming_channels`](HoprTicketManager::sync_from_incoming_channels) early
 /// after the construction of the manager, to make sure outdated data is discarded early. This is typically done only
 /// once after construction and not needed to be done during the life-time of the manager.
 ///
-/// The manager is safe to be shared via an `Arc`. It is typically shared between the packet processing pipelines
-/// (outgoing on Entry/Exit nodes, incoming on Relay nodes) and some higher level component
-/// that performs redeemable ticket extractions (in the case of a Relay node).
+/// The manager is safe to be shared via an `Arc`.
 ///
-/// ### Usage in outgoing packet pipeline
-/// The outgoing packet pipeline usually just calls the
-/// [`create_multihop_ticket`](HoprTicketManager::next_multihop_ticket) to create a ticket for the next hop on a
-/// multi-hop path. To create zero/last-hop tickets, the ticket manager is not needed as these tickets essentially
-/// contain bogus data and there's no channel required.
-///
-/// The outgoing indices are **not** automatically synchronized back to the underlying store for performance reasons.
-/// The user is responsible for calling [`save_outgoing_indices`](HoprTicketManager::save_outgoing_indices) to save
-/// the outgoing indices to the store.
-///
-/// This usage is typical for all kinds of nodes (Entry/Relay/Exit).
+/// This usage is for Relay nodes only because other types of nodes do not need to keep track of incoming redeemable
+/// tickets.
 ///
 /// ### Usage in incoming packet pipeline
 /// The incoming packet pipeline usually just calls the
 /// [`insert_incoming_ticket`](HoprTicketManager::insert_incoming_ticket) whenever a new winning, redeemable ticket is
 /// received on an incoming channel.
-///
-/// This usage is typical for Relay nodes only.
 ///
 /// ### Redeemable ticket extraction
 /// On Relay nodes, the manager maintains FIFO queues of redeemable tickets per incoming channel.
@@ -75,13 +47,6 @@ use crate::{
 /// ## Locking and lock-contention
 /// There are several methods in the `HoprTicketManager` object that are expected to be called
 /// in the highly performance-sensitive code, on a per-packet basis.
-///
-/// ### Outgoing ticket creation
-/// The [`create_multihop_ticket`](HoprTicketManager::next_multihop_ticket) method is designed to be
-/// high-performance and to be called per each outgoing packet. It is using only atomics to track the outgoing
-/// ticket index for a channel. The synchronization to the underlying storage is done on-demand by calling
-/// `save_outgoing_indices`, making quick snapshots of the current state of outgoing indices.
-/// No significant contention is expected unless `save_outgoing_indices` is called very frequently.`
 ///
 /// ### Incoming winning ticket retrieval
 /// The [`insert_incoming_ticket`](HoprTicketManager::insert_incoming_ticket) method is designed to be
