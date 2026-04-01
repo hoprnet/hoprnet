@@ -1,5 +1,5 @@
 use std::{
-    ops::{Mul, Sub},
+    ops::Mul,
     time::Duration,
 };
 
@@ -12,7 +12,7 @@ use hopr_platform::trace_timed;
 
 use crate::{
     AuxiliaryPacketInfo, HoprCodecConfig, IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket,
-    IncomingPacket, IncomingPacketError, PacketDecoder, SurbStore, TicketTracker, errors::HoprProtocolError,
+    IncomingPacket, IncomingPacketError, PacketDecoder, SurbStore, errors::HoprProtocolError,
     tbf::TagBloomFilter,
 };
 
@@ -33,7 +33,7 @@ impl<Chain, S, T> HoprDecoder<Chain, S, T>
 where
     Chain: ChainReadChannelOperations + ChainKeyOperations + ChainValues + Send + Sync,
     S: SurbStore + Send + Sync,
-    T: TicketTracker + Send + Sync,
+    T: hopr_api::tickets::TicketFactory + Send + Sync,
 {
     /// Creates a new instance of the decoder.
     pub fn new(
@@ -101,16 +101,9 @@ where
         .max(self.cfg.min_incoming_ticket_price.unwrap_or_default());
 
         let remaining_balance = trace_timed!("unrealized_balance lookup", {
-            incoming_channel.balance.sub(
-                self.tracker
-                    .incoming_channel_unrealized_balance(
-                        incoming_channel.get_id(),
-                        incoming_channel.channel_epoch,
-                        incoming_channel.ticket_index,
-                    )
-                    .await
-                    .map_err(|e| HoprProtocolError::TicketTrackerError(e.into()))?,
-            )
+            self.tracker
+                .remaining_incoming_channel_stake(&incoming_channel)
+                .map_err(|e| HoprProtocolError::TicketTrackerError(e.into()))?
         });
 
         // Here also the signature on the ticket gets validated,
@@ -177,13 +170,12 @@ where
             // Again, in this case, we cannot save the ticket we previously extracted because there is no way it gets
             // acknowledged without enough balance.
             self.tracker
-                .create_multihop_ticket(
+                .new_multihop_ticket(
                     &outgoing_channel,
-                    fwd.path_pos,
+                    fwd.path_pos.try_into().expect("path position is always > 1"),
                     outgoing_ticket_win_prob,
                     outgoing_ticket_price,
                 )
-                .await
                 .map_err(|e| HoprProtocolError::TicketTrackerError(e.into()))?
         } else {
             TicketBuilder::zero_hop().counterparty(next_hop_addr)
@@ -205,7 +197,7 @@ impl<Chain, S, T> PacketDecoder for HoprDecoder<Chain, S, T>
 where
     Chain: ChainReadChannelOperations + ChainKeyOperations + ChainValues + Send + Sync,
     S: SurbStore + Send + Sync + 'static,
-    T: TicketTracker + Send + Sync,
+    T: hopr_api::tickets::TicketFactory + Send + Sync,
 {
     type Error = HoprProtocolError;
 

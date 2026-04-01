@@ -83,7 +83,11 @@ pub struct HoprTicketManager<S, Q> {
     store: std::sync::Arc<parking_lot::RwLock<S>>,
 }
 
-impl<S: OutgoingIndexStore + TicketQueueStore + 'static> HoprTicketManager<S, S::Queue> {
+impl<S> HoprTicketManager<S, S::Queue>
+where
+    S:OutgoingIndexStore + TicketQueueStore + 'static,
+    S::Queue: Send + Sync + 'static
+{
     /// Creates the ticket manager in a pair with [`HoprTicketFactory`], both backed by the given `store`.
     ///
     /// The `store` must be [`OutgoingIndexStore`] and [`TicketQueueStore`].

@@ -86,7 +86,7 @@ use crate::{
 /// on the RW lock is not expected.
 pub struct HoprTicketFactory<S> {
     out_idx_tracker: OutgoingIndexCache,
-    queue_map: std::sync::Weak<dyn UnrealizedValue>,
+    queue_map: std::sync::Weak<dyn UnrealizedValue + Send + Sync + 'static>,
     store: std::sync::Arc<parking_lot::RwLock<S>>,
 }
 
@@ -102,7 +102,7 @@ impl<S: OutgoingIndexStore + 'static> HoprTicketFactory<S> {
         }
     }
 
-    pub(crate) fn new_shared<Q: UnrealizedValue + 'static>(
+    pub(crate) fn new_shared<Q: UnrealizedValue + Send + Sync + 'static>(
         store: std::sync::Arc<parking_lot::RwLock<S>>,
         queue_map: std::sync::Weak<Q>,
     ) -> Self {
