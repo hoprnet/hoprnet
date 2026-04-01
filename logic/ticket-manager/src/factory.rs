@@ -225,6 +225,18 @@ where
         Ok(ticket_builder)
     }
 
+    /// Method fulfills the implementation of
+    /// [`TicketFactory::remaining_incoming_channel_stake`](hopr_api::tickets::TicketFactory::remaining_incoming_channel_stake).
+    ///
+    /// ## Implementation details
+    ///
+    /// If this instance is created as standalone (via [`HoprTicketFactory::new`]), or the
+    /// [`HoprTicketManager`](crate::HoprTicketManager) that has been initially
+    /// [created](crate::HoprTicketManager::new_with_factory) with this instance is dropped, this method
+    /// returns `Ok(channel.balance)`.
+    ///
+    /// Otherwise, as per requirements, this method returns the balance of the `channel` diminished by the total value
+    /// of unredeemed tickets tracked by the associated [`HoprTicketManager`](crate::HoprTicketManager).
     fn remaining_incoming_channel_stake(&self, channel: &ChannelEntry) -> Result<HoprBalance, Self::Error> {
         if let Some(queue_map) = self.queue_map.upgrade() {
             let unrealized_value = queue_map.unrealized_value(channel.get_id(), channel.ticket_index.into())?;
@@ -232,9 +244,10 @@ where
             // Subtraction on HoprBalance type naturally saturating at 0
             Ok(channel.balance - unrealized_value.unwrap_or_default())
         } else {
-            Err(TicketManagerError::Other(anyhow::anyhow!(
-                "cannot get remaining stake for channel without ticket manager"
-            )))
+            // We intentionally do not return an error here because the factory should work
+            // without ticket manager.
+            tracing::warn!("cannot get remaining stake for channel without ticket manager");
+            Ok(channel.balance)
         }
     }
 }
@@ -245,15 +258,71 @@ mod tests {
     use hopr_chain_connector::ChainKeypair;
 
     use super::*;
-    use crate::MemoryStore;
+    use crate::{MemoryStore, traits::tests::generate_owned_tickets};
 
-    fn create_mgr() -> anyhow::Result<HoprTicketFactory<MemoryStore>> {
+    fn create_factory() -> anyhow::Result<HoprTicketFactory<MemoryStore>> {
         Ok(HoprTicketFactory::new(MemoryStore::default()))
     }
 
     #[test]
+    fn ticket_factory_remaining_incoming_channel_stake_should_behave_as_identity_without_manager() -> anyhow::Result<()>
+    {
+        let factory = create_factory()?;
+        let channel = ChannelEntry::builder()
+            .between(&ChainKeypair::random(), &ChainKeypair::random())
+            .amount(10)
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(1)
+            .build()?;
+
+        assert_eq!(channel.balance, factory.remaining_incoming_channel_stake(&channel)?);
+        Ok(())
+    }
+
+    #[test]
+    fn ticket_factor_remaining_incoming_channel_stake_should_be_reduced_by_unrealized_value() -> anyhow::Result<()> {
+        let (manager, factory) = crate::HoprTicketManager::new_with_factory(MemoryStore::default());
+
+        let src = ChainKeypair::random();
+        let dst = ChainKeypair::random();
+
+        let tickets = generate_owned_tickets(&src, &dst, 2, 1..=1)?;
+
+        let channel = ChannelEntry::builder()
+            .between(&src, &dst)
+            .balance(tickets[0].verified_ticket().amount * 10)
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(1)
+            .build()?;
+
+        assert_eq!(channel.balance, factory.remaining_incoming_channel_stake(&channel)?);
+
+        manager.insert_incoming_ticket(tickets[0])?;
+
+        assert_eq!(
+            channel.balance - tickets[0].verified_ticket().amount,
+            factory.remaining_incoming_channel_stake(&channel)?
+        );
+
+        manager.insert_incoming_ticket(tickets[1])?;
+
+        assert_eq!(
+            channel.balance - tickets[0].verified_ticket().amount - tickets[1].verified_ticket().amount,
+            factory.remaining_incoming_channel_stake(&channel)?
+        );
+
+        drop(manager);
+
+        assert_eq!(channel.balance, factory.remaining_incoming_channel_stake(&channel)?);
+
+        Ok(())
+    }
+
+    #[test]
     fn ticket_factory_should_create_multihop_tickets() -> anyhow::Result<()> {
-        let mgr = create_mgr()?;
+        let factory = create_factory()?;
 
         let src = ChainKeypair::random();
         let dst = ChainKeypair::random();
@@ -267,9 +336,9 @@ mod tests {
             .build()?;
 
         // Loads index 1 which is the next index for a ticket on this channel
-        mgr.sync_from_outgoing_channels(&[channel])?;
+        factory.sync_from_outgoing_channels(&[channel])?;
 
-        let ticket_1 = mgr
+        let ticket_1 = factory
             .new_multihop_ticket(&channel, 2.try_into()?, WinningProbability::ALWAYS, 10.into())?
             .eth_challenge(Default::default())
             .build_signed(&src, &Default::default())?;
@@ -278,7 +347,7 @@ mod tests {
         assert_eq!(channel.ticket_index, ticket_1.verified_ticket().index);
         assert_eq!(channel.channel_epoch, ticket_1.verified_ticket().channel_epoch);
 
-        let ticket_2 = mgr
+        let ticket_2 = factory
             .new_multihop_ticket(&channel, 2.try_into()?, WinningProbability::ALWAYS, 10.into())?
             .eth_challenge(Default::default())
             .build_signed(&src, &Default::default())?;
@@ -289,7 +358,8 @@ mod tests {
 
         // Should not accept path positions less than 2
         assert!(
-            mgr.new_multihop_ticket(&channel, 1.try_into()?, WinningProbability::ALWAYS, 10.into())
+            factory
+                .new_multihop_ticket(&channel, 1.try_into()?, WinningProbability::ALWAYS, 10.into())
                 .is_err()
         );
 
@@ -298,7 +368,7 @@ mod tests {
 
     #[test]
     fn ticket_manager_create_multihop_ticket_should_fail_on_wrong_input() -> anyhow::Result<()> {
-        let mgr = create_mgr()?;
+        let factory = create_factory()?;
 
         let src = ChainKeypair::random();
         let dst = ChainKeypair::random();
@@ -312,7 +382,8 @@ mod tests {
             .build()?;
 
         assert!(
-            mgr.new_multihop_ticket(&channel, 2.try_into()?, WinningProbability::ALWAYS, 1.into())
+            factory
+                .new_multihop_ticket(&channel, 2.try_into()?, WinningProbability::ALWAYS, 1.into())
                 .is_err()
         );
 
@@ -320,19 +391,22 @@ mod tests {
             ChannelStatus::PendingToClose(std::time::SystemTime::now() - std::time::Duration::from_secs(10));
 
         assert!(
-            mgr.new_multihop_ticket(&channel, 2.try_into()?, WinningProbability::ALWAYS, 1.into())
+            factory
+                .new_multihop_ticket(&channel, 2.try_into()?, WinningProbability::ALWAYS, 1.into())
                 .is_err()
         );
 
         channel.status = ChannelStatus::Open;
 
         assert!(
-            mgr.new_multihop_ticket(&channel, 2.try_into()?, WinningProbability::ALWAYS, 11.into())
+            factory
+                .new_multihop_ticket(&channel, 2.try_into()?, WinningProbability::ALWAYS, 11.into())
                 .is_err()
         );
 
         assert!(
-            mgr.new_multihop_ticket(&channel, 1.try_into()?, WinningProbability::ALWAYS, 1.into())
+            factory
+                .new_multihop_ticket(&channel, 1.try_into()?, WinningProbability::ALWAYS, 1.into())
                 .is_err()
         );
 
@@ -341,7 +415,7 @@ mod tests {
 
     #[test]
     fn ticket_manager_test_next_outgoing_ticket_index() -> anyhow::Result<()> {
-        let mgr = create_mgr()?;
+        let factory = create_factory()?;
 
         let src = ChainKeypair::random();
         let dst = ChainKeypair::random();
@@ -354,40 +428,43 @@ mod tests {
             .epoch(1)
             .build()?;
 
-        assert_eq!(0, mgr.next_outgoing_ticket_index(&channel));
+        assert_eq!(0, factory.next_outgoing_ticket_index(&channel));
 
         channel.ticket_index = 10;
-        assert_eq!(10, mgr.next_outgoing_ticket_index(&channel));
-        assert_eq!(11, mgr.next_outgoing_ticket_index(&channel));
+        assert_eq!(10, factory.next_outgoing_ticket_index(&channel));
+        assert_eq!(11, factory.next_outgoing_ticket_index(&channel));
 
         channel.ticket_index = 100;
-        assert_eq!(100, mgr.next_outgoing_ticket_index(&channel));
-        assert_eq!(101, mgr.next_outgoing_ticket_index(&channel));
+        assert_eq!(100, factory.next_outgoing_ticket_index(&channel));
+        assert_eq!(101, factory.next_outgoing_ticket_index(&channel));
 
         channel.ticket_index = 50;
-        assert_eq!(102, mgr.next_outgoing_ticket_index(&channel));
-        assert_eq!(103, mgr.next_outgoing_ticket_index(&channel));
+        assert_eq!(102, factory.next_outgoing_ticket_index(&channel));
+        assert_eq!(103, factory.next_outgoing_ticket_index(&channel));
 
-        mgr.save_outgoing_indices()?;
-        assert_eq!(Some(104), mgr.store.read().load_outgoing_index(channel.get_id(), 1)?);
+        factory.save_outgoing_indices()?;
+        assert_eq!(
+            Some(104),
+            factory.store.read().load_outgoing_index(channel.get_id(), 1)?
+        );
 
         channel.ticket_index = 0;
         channel.channel_epoch = 2;
 
-        assert_eq!(0, mgr.next_outgoing_ticket_index(&channel));
-        mgr.save_outgoing_indices()?;
+        assert_eq!(0, factory.next_outgoing_ticket_index(&channel));
+        factory.save_outgoing_indices()?;
 
-        assert_eq!(None, mgr.store.read().load_outgoing_index(channel.get_id(), 1)?);
-        assert_eq!(Some(1), mgr.store.read().load_outgoing_index(channel.get_id(), 2)?);
+        assert_eq!(None, factory.store.read().load_outgoing_index(channel.get_id(), 1)?);
+        assert_eq!(Some(1), factory.store.read().load_outgoing_index(channel.get_id(), 2)?);
 
-        assert_eq!(1, mgr.next_outgoing_ticket_index(&channel));
+        assert_eq!(1, factory.next_outgoing_ticket_index(&channel));
 
         Ok(())
     }
 
     #[test]
     fn ticket_manager_should_save_out_indices_to_the_store_on_demand() -> anyhow::Result<()> {
-        let mgr = create_mgr()?;
+        let factory = create_factory()?;
 
         let src = ChainKeypair::random();
         let dst = ChainKeypair::random();
@@ -401,27 +478,27 @@ mod tests {
             .build()?;
 
         // Loads index 1 which is the next index for a ticket on this channel
-        mgr.sync_from_outgoing_channels(&[channel])?;
+        factory.sync_from_outgoing_channels(&[channel])?;
 
-        mgr.new_multihop_ticket(&channel, 2.try_into()?, WinningProbability::ALWAYS, 10.into())?;
+        factory.new_multihop_ticket(&channel, 2.try_into()?, WinningProbability::ALWAYS, 10.into())?;
 
         // Without saving, the store index should not be present in store
-        let saved_index = mgr.store.read().load_outgoing_index(channel.get_id(), 1)?;
+        let saved_index = factory.store.read().load_outgoing_index(channel.get_id(), 1)?;
         assert_eq!(None, saved_index);
 
-        mgr.new_multihop_ticket(&channel, 2.try_into()?, WinningProbability::ALWAYS, 10.into())?;
+        factory.new_multihop_ticket(&channel, 2.try_into()?, WinningProbability::ALWAYS, 10.into())?;
 
-        mgr.save_outgoing_indices()?;
-        let saved_index = mgr.store.read().load_outgoing_index(channel.get_id(), 1)?;
+        factory.save_outgoing_indices()?;
+        let saved_index = factory.store.read().load_outgoing_index(channel.get_id(), 1)?;
         assert_eq!(Some(3), saved_index);
 
-        mgr.new_multihop_ticket(&channel, 2.try_into()?, WinningProbability::ALWAYS, 10.into())?;
+        factory.new_multihop_ticket(&channel, 2.try_into()?, WinningProbability::ALWAYS, 10.into())?;
 
-        let saved_index = mgr.store.read().load_outgoing_index(channel.get_id(), 1)?;
+        let saved_index = factory.store.read().load_outgoing_index(channel.get_id(), 1)?;
         assert_eq!(Some(3), saved_index);
 
-        mgr.save_outgoing_indices()?;
-        let saved_index = mgr.store.read().load_outgoing_index(channel.get_id(), 1)?;
+        factory.save_outgoing_indices()?;
+        let saved_index = factory.store.read().load_outgoing_index(channel.get_id(), 1)?;
         assert_eq!(Some(4), saved_index);
 
         Ok(())
@@ -429,7 +506,7 @@ mod tests {
 
     #[test]
     fn ticket_manager_should_sync_out_indices_from_chain_state() -> anyhow::Result<()> {
-        let mgr = create_mgr()?;
+        let factory = create_factory()?;
 
         let src = ChainKeypair::random();
         let dst = ChainKeypair::random();
@@ -442,10 +519,10 @@ mod tests {
             .epoch(1)
             .build()?;
 
-        mgr.sync_from_outgoing_channels(&[channel])?;
-        mgr.save_outgoing_indices()?;
+        factory.sync_from_outgoing_channels(&[channel])?;
+        factory.save_outgoing_indices()?;
 
-        let saved_index = mgr.store.read().load_outgoing_index(channel.get_id(), 1)?;
+        let saved_index = factory.store.read().load_outgoing_index(channel.get_id(), 1)?;
         assert_eq!(Some(1), saved_index);
 
         Ok(())
@@ -454,7 +531,7 @@ mod tests {
     #[test_log::test]
     fn ticket_manager_should_sync_out_indices_should_remove_indices_for_non_opened_outgoing_channels()
     -> anyhow::Result<()> {
-        let mgr = create_mgr()?;
+        let factory = create_factory()?;
 
         let src = ChainKeypair::random();
         let dst = ChainKeypair::random();
@@ -475,30 +552,36 @@ mod tests {
             .epoch(1)
             .build()?;
 
-        let ticket_1 = mgr
+        let ticket_1 = factory
             .new_multihop_ticket(&channel_1, 2.try_into()?, WinningProbability::ALWAYS, 10.into())?
             .eth_challenge(Default::default())
             .build()?;
-        let ticket_2 = mgr
+        let ticket_2 = factory
             .new_multihop_ticket(&channel_2, 2.try_into()?, WinningProbability::ALWAYS, 10.into())?
             .eth_challenge(Default::default())
             .build()?;
         assert_eq!(0, ticket_1.index);
         assert_eq!(0, ticket_2.index);
 
-        mgr.save_outgoing_indices()?;
+        factory.save_outgoing_indices()?;
 
-        assert_eq!(Some(1), mgr.store.read().load_outgoing_index(channel_1.get_id(), 1)?);
-        assert_eq!(Some(1), mgr.store.read().load_outgoing_index(channel_2.get_id(), 1)?);
+        assert_eq!(
+            Some(1),
+            factory.store.read().load_outgoing_index(channel_1.get_id(), 1)?
+        );
+        assert_eq!(
+            Some(1),
+            factory.store.read().load_outgoing_index(channel_2.get_id(), 1)?
+        );
 
         channel_1.status = ChannelStatus::Closed;
         channel_2.status =
             ChannelStatus::PendingToClose(std::time::SystemTime::now() - std::time::Duration::from_mins(10));
 
-        mgr.sync_from_outgoing_channels(&[channel_1, channel_2])?;
+        factory.sync_from_outgoing_channels(&[channel_1, channel_2])?;
 
-        assert_eq!(None, mgr.store.read().load_outgoing_index(channel_1.get_id(), 1)?);
-        assert_eq!(None, mgr.store.read().load_outgoing_index(channel_2.get_id(), 1)?);
+        assert_eq!(None, factory.store.read().load_outgoing_index(channel_1.get_id(), 1)?);
+        assert_eq!(None, factory.store.read().load_outgoing_index(channel_2.get_id(), 1)?);
 
         Ok(())
     }
