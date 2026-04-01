@@ -138,7 +138,7 @@ jobs:
   coverage:
     name: Coverage
     if: github.event.pull_request.merged == true
-    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@bbd22e57cf954c15f0a6051d59329857809141dd # workflow-tests-v1
+    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@12c56020e16036982e6cc529848edeedfc705865 # worflow-tests-v2
     with:
       source_branch: ${{ github.event.pull_request.base.ref }}
       unit_tests: false
