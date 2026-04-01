@@ -1,7 +1,4 @@
-use std::{
-    ops::Mul,
-    time::Duration,
-};
+use std::{ops::Mul, time::Duration};
 
 use hopr_api::{
     chain::*,
@@ -12,8 +9,7 @@ use hopr_platform::trace_timed;
 
 use crate::{
     AuxiliaryPacketInfo, HoprCodecConfig, IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket,
-    IncomingPacket, IncomingPacketError, PacketDecoder, SurbStore, errors::HoprProtocolError,
-    tbf::TagBloomFilter,
+    IncomingPacket, IncomingPacketError, PacketDecoder, SurbStore, errors::HoprProtocolError, tbf::TagBloomFilter,
 };
 
 /// Default [decoder](PacketDecoder) implementation for HOPR packets.

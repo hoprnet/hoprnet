@@ -33,7 +33,7 @@ use std::{
 
 use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
 use futures::{
-    FutureExt, SinkExt, StreamExt,
+    FutureExt, StreamExt,
     channel::mpsc::{Sender, channel},
     stream::select_with_strategy,
 };
@@ -93,10 +93,8 @@ pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RAN
 
 pub use hopr_api as api;
 use hopr_api::{
-    chain::{ChainWriteTicketOperations, ChannelSelector},
-    types::internal::routing::DestinationRouting,
+    chain::ChainWriteTicketOperations, tickets::TicketFactory, types::internal::routing::DestinationRouting,
 };
-use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue, TicketManagerError};
 
 // Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
 lazy_static::lazy_static! {
@@ -152,11 +150,7 @@ pub enum HoprTransportProcess {
 
 /// Interface into the physical transport mechanism allowing all off-chain HOPR-related tasks on
 /// the transport.
-pub struct HoprTransport<Chain, Graph, Net>
-where
-    Graph: NetworkGraphView<NodeId = OffchainPublicKey> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
-    Net: NetworkView + NetworkStreamControl + Clone + Send + Sync + 'static,
-{
+pub struct HoprTransport<Chain, Graph, Net> {
     packet_key: OffchainKeypair,
     chain_key: ChainKeypair,
     chain_api: Chain,
@@ -165,11 +159,6 @@ where
     graph: Graph,
     path_planner: PathPlanner<MemorySurbStore, Chain, HoprGraphPathSelector<Graph>>,
     my_multiaddresses: Vec<Multiaddr>,
-    // TODO: should the Ticket store (RedbStore) be part of the external API of the transport?
-    // The answer is likely: should be external (see #7903) but only once the outgoing index
-    // management is separated from the Ticket Manager and the unrealized value is passed down
-    // via some Arc'd atomic counter.
-    tmgr: Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>,
     smgr: SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>, Sender<IncomingSession>>,
     session_telemetry_tag_allocator: Arc<dyn hopr_transport_tag_allocator::TagAllocator + Send + Sync>,
     probing_tag_allocator: Arc<dyn hopr_transport_tag_allocator::TagAllocator + Send + Sync>,
@@ -234,11 +223,6 @@ where
         let probing_tag_allocator = probing_tag_allocator
             .ok_or_else(|| errors::HoprTransportError::Api("probing tag allocator missing".into()))?;
 
-        let ticket_manager = HoprTicketManager::new(match &cfg.ticket_storage_file {
-            Some(path) => RedbStore::new(path).map_err(TicketManagerError::store)?,
-            None => RedbStore::new_temp().map_err(TicketManagerError::store)?,
-        })?;
-
         Ok(Self {
             packet_key: identity.1.clone(),
             chain_key: identity.0.clone(),
@@ -276,7 +260,6 @@ where
                 },
                 session_tag_allocator,
             ),
-            tmgr: Arc::new(ticket_manager),
             chain_api: resolver,
             session_telemetry_tag_allocator,
             probing_tag_allocator,
@@ -291,11 +274,12 @@ where
     /// `HoprTransportProcess::BloomFilterSave`, `HoprTransportProcess::Swarm` and session-related
     /// processes and return join handles to the calling function. These processes are not started immediately but
     /// are waiting for a trigger from this piece of code.
-    pub async fn run<T, Ct, NetBuilder>(
+    pub async fn run<T, TFact, Ct, NetBuilder>(
         &self,
         cover_traffic: Ct,
         network_builder: NetBuilder,
         ticket_events: T,
+        ticket_factory: TFact,
         on_incoming_session: Sender<IncomingSession>,
     ) -> errors::Result<(
         HoprSocket<
@@ -309,6 +293,7 @@ where
         T::Error: std::error::Error + Clone + Send,
         Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
         NetBuilder: NetworkBuilder<Network = Net> + Send + Sync + 'static,
+        TFact: TicketFactory + Clone + Send + Sync + 'static,
     {
         let mut processes = AbortableList::<HoprTransportProcess>::default();
 
@@ -470,28 +455,6 @@ where
             .in_current_span()
         });
 
-        // Synchronize the ticket manager with the chain before starting the packet pipeline
-
-        self.tmgr.sync_from_incoming_channels(
-            &self
-                .chain_api
-                .stream_channels(ChannelSelector::default().with_destination(&self.chain_key))
-                .await
-                .map_err(HoprTransportError::chain)?
-                .collect::<Vec<_>>()
-                .await,
-        )?;
-
-        self.tmgr.sync_from_outgoing_channels(
-            &self
-                .chain_api
-                .stream_channels(ChannelSelector::default().with_source(&self.chain_key))
-                .await
-                .map_err(HoprTransportError::chain)?
-                .collect::<Vec<_>>()
-                .await,
-        )?;
-
         let channels_dst = self
             .chain_api
             .domain_separators()
@@ -499,25 +462,16 @@ where
             .map_err(HoprTransportError::chain)?
             .channel;
 
-        let tmgr_clone = self.tmgr.clone();
         processes.extend_from(pipeline::run_hopr_packet_pipeline(
             (self.packet_key.clone(), self.chain_key.clone()),
             (mixing_channel_tx, wire_msg_rx),
             (tx_from_protocol, all_resolved_external_msg_rx),
             HoprPipelineComponents {
-                ticket_events: ticket_events.with(move |event| {
-                    // Make sure winning tickets are passed to the ticket manager
-                    if let TicketEvent::WinningTicket(ticket) = &event
-                        && let Err(error) = tmgr_clone.insert_incoming_ticket(**ticket)
-                    {
-                        tracing::error!(%error, "failed to insert winning ticket into redemption queue");
-                    }
-                    futures::future::ok::<_, T::Error>(event)
-                }),
                 surb_store: self.path_planner.surb_store.clone(),
                 chain_api: self.chain_api.clone(),
-                ticket_manager: self.tmgr.clone(),
                 counters: self.counters.clone(),
+                ticket_factory,
+                ticket_events,
             },
             channels_dst,
             self.cfg.packet,
@@ -673,10 +627,6 @@ where
                 "no observations available for peer {peer}",
             )))
         }
-    }
-
-    pub fn ticket_manager(&self) -> impl hopr_api::tickets::TicketManagement + Send + Clone + 'static {
-        self.tmgr.clone()
     }
 
     #[tracing::instrument(level = "debug", skip(self))]

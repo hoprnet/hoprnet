@@ -28,13 +28,13 @@ use crate::utils::{Node, PEERS, create_blokli_client, create_node};
 type TestEncoder = HoprEncoder<
     Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>,
     MemorySurbStore,
-    HoprTicketFactory<RedbStore>
+    HoprTicketFactory<RedbStore>,
 >;
 
 type TestDecoder = HoprDecoder<
     Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>,
     MemorySurbStore,
-    HoprTicketFactory<RedbStore>
+    HoprTicketFactory<RedbStore>,
 >;
 
 pub fn create_encoder(sender: &Node) -> TestEncoder {

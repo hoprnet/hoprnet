@@ -52,7 +52,6 @@ pub fn create_hopr_instance_config(host_port: u16, safe: NodeSafeConfig, winn_pr
                 ..Default::default()
             },
             path_planner: Default::default(),
-            ticket_storage_file: None, // Temporary file storage
             counter_flush_interval: Default::default(),
         },
         publish: true,

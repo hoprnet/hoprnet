@@ -85,8 +85,8 @@ pub struct HoprTicketManager<S, Q> {
 
 impl<S> HoprTicketManager<S, S::Queue>
 where
-    S:OutgoingIndexStore + TicketQueueStore + 'static,
-    S::Queue: Send + Sync + 'static
+    S: OutgoingIndexStore + TicketQueueStore + 'static,
+    S::Queue: Send + Sync + 'static,
 {
     /// Creates the ticket manager in a pair with [`HoprTicketFactory`], both backed by the given `store`.
     ///

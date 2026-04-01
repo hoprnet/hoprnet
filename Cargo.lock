@@ -4675,7 +4675,9 @@ dependencies = [
  "hopr-network-types",
  "hopr-parallelize",
  "hopr-platform",
+ "hopr-ticket-manager",
  "hopr-transport",
+ "humantime-serde",
  "lazy_static",
  "serde",
  "serde-saphyr",
@@ -4984,7 +4986,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5331,7 +5333,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "4.9.0"
+version = "4.10.0"
 dependencies = [
  "anyhow",
  "axum",
