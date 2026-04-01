@@ -27,7 +27,7 @@ use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, HoprUnacknowledgedTicketProcessor,
     HoprUnacknowledgedTicketProcessorConfig, MemorySurbStore, SurbStoreConfig,
 };
-use hopr_ticket_manager::{HoprTicketManager, RedbStore};
+use hopr_ticket_manager::{HoprTicketFactory, HoprTicketManager, RedbStore};
 use hopr_transport_mixer::config::MixerConfig;
 use hopr_transport_protocol::TicketEvent;
 use lazy_static::lazy_static;
@@ -184,9 +184,7 @@ pub async fn peer_setup_for(
             HoprUnacknowledgedTicketProcessorConfig::default(),
         );
 
-        let (ticket_mgr, ticket_factory) = HoprTicketManager::new_with_factory(RedbStore::new_temp()?);
-
-        let ticket_factory = Arc::new(ticket_factory);
+        let ticket_factory = Arc::new(HoprTicketFactory::new(RedbStore::new_temp()?));
 
         let encoder = HoprEncoder::new(
             PEERS_CHAIN[i].clone(),
