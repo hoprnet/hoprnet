@@ -27,6 +27,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  deploy-dev:
+    name: Deploy Gnosis Dev
+    runs-on: self-hosted-hoprnet-small
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Restart Hoprd
+        uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3.0.0
+        with:
+          token: ${{ secrets.GNOSIS_GITHUB_WORKFLOW_TOKEN }}
+          repository: gnosis/gnosis_vpn-infrastructure
+          event-type: restart_hoprd
+          client-payload: |-
+            {
+              "environment": "dev"
+            }
   validate-pr-title:
     name: Validate title
     if: github.event_name == 'pull_request'
