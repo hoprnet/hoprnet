@@ -41,15 +41,16 @@ concurrency:
 
 jobs:
   build:
-    # The original event_name registered is 'pull_request' even the trigger action is 'workflow_call'
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(inputs.labels, format('package:{0},',inputs.dappnode_repository)))
+    # event_name reflects the caller: 'pull_request' (from pr.yaml) or 'workflow_dispatch' (manual)
+    if: >-
+      github.event_name == 'workflow_dispatch' || contains(inputs.labels, format('package:{0},', inputs.dappnode_repository))
     name: Build package
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
         with:
           disable-sudo: false # sudo is needed for docker compose installation
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs

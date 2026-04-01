@@ -31,8 +31,8 @@ cargo build --profile release           # Production (opt-level 3, lto="fat")
 ### Test
 
 ```bash
-cargo test --lib                        # Unit tests only
-cargo test --test '*' -- --test-threads=1   # Integration tests (MUST be single-threaded)
+cargo nextest run --lib                        # Unit tests only
+cargo nextest run --test '*' -j 1              # Integration tests (MUST be single-threaded)
 cargo bench                             # Benchmarks (in benches/ dirs)
 just run-local-cluster                  # Local multi-node cluster
 ```
@@ -42,7 +42,7 @@ just run-local-cluster                  # Local multi-node cluster
 **Workspace-wide (via Nix, used in CI):**
 
 ```bash
-nix build -L .#hopr-coverage            # LCOV report written to ./result
+nix build -L .#coverage-unit            # LCOV report written to ./result
 ```
 
 **Single crate (local, from the dev shell):**
@@ -57,7 +57,7 @@ nix develop --command bash -c '
 
   LLVM_PROFILE_FILE="$OUTDIR/%p_%m.profraw" \
   RUSTFLAGS="-C instrument-coverage" \
-    cargo test -p "$CRATE" --lib
+    cargo nextest run -p "$CRATE" --lib
 
   llvm-profdata merge -sparse "$OUTDIR"/*.profraw -o "$OUTDIR/coverage.profdata"
 

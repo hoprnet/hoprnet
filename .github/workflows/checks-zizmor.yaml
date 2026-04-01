@@ -23,23 +23,12 @@ permissions:
 
 jobs:
   zizmor:
-    name: Zizmor
-    runs-on: self-hosted-hoprnet-bigger
+    uses: hoprnet/hopr-workflows/.github/workflows/checks-zizmor.yaml@bbd22e57cf954c15f0a6051d59329857809141dd # workflow-checks-zizmor-v1
     permissions:
       contents: read
       security-events: write
-    steps:
-      - name: Run zizmor
-        uses: hoprnet/hopr-workflows/actions/nix-action@c2aca7e56d25c4a786049ccf816c7f1af8721de8 # nix-action-v1
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          command: nix develop -L .#ci -c bash -c "zizmor --format sarif . > results.sarif"
-
-      - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@89a39a4e59826350b863aa6b6252a07ad50cf83e # v4.32.4
-        with:
-          sarif_file: results.sarif
-          category: zizmor
+    with:
+      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+      runner: self-hosted-hoprnet-bigger
+    secrets:
+      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}

@@ -8,10 +8,9 @@ This repository uses several GitHub Actions workflows to automate tasks such as 
 
 When a new pull request is created it is analyzed by a [Open PR workflow](./open-pr.yaml) to assess basic convention.
 
-On every commit of the PR, then the following workflows start running to check compliance with acceptance criteria:
+On every commit of the PR, the following workflow runs to check compliance with acceptance criteria:
 
-- [Build](./build.yaml)
-- [PR](./pr.yaml) (checks, tests, coverage)
+- [PR](./pr.yaml) (checks, tests, builds, docs, coverage)
 
 ### Additional actions
 
