@@ -1,4 +1,7 @@
 ---
+#################################################################################
+###                       Pipeline to merge on pull requests                  ###
+#################################################################################
 name: Merge
 on:
   pull_request:
@@ -83,36 +86,111 @@ jobs:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
       docker_hub_username: ${{ secrets.DOCKER_HUB_USERNAME }}
       docker_hub_token: ${{ secrets.DOCKER_HUB_TOKEN }}
+  deploy-dev:
+    name: Deploy Gnosis Dev
+    runs-on: self-hosted-hoprnet-small
+    needs: build-docker
+    if: github.event.pull_request.merged == true
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Restart Hoprd
+        uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3.0.0
+        with:
+          token: ${{ secrets.GNOSIS_GITHUB_WORKFLOW_TOKEN }}
+          repository: gnosis/gnosis_vpn-infrastructure
+          event-type: restart_hoprd
+          client-payload: |-
+            {
+              "environment": "dev"
+            }
   cache_deps:
     name: Cache deps
     if: github.event.pull_request.merged == true
-    uses: ./.github/workflows/cache-deps.yaml
-    with:
-      source_repo: ${{ github.event.pull_request.base.repo.full_name }}
-      source_branch: ${{ github.event.pull_request.base.ref }}
-    secrets:
-      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      PRIVATE_CARGO_REGISTRY_PROXY_URL: ${{ secrets.PRIVATE_CARGO_REGISTRY_PROXY_URL }}
+    runs-on: self-hosted-hoprnet-small
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Cache dependencies
+        uses: hoprnet/hopr-workflows/actions/nix-action@c2aca7e56d25c4a786049ccf816c7f1af8721de8 # nix-action-v1
+        with:
+          source_branch: ${{ github.event.pull_request.base.ref }}
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          command: |
+            set -e
+            cat >> .cargo/config.toml << TOML
+            [source.hopr-cargo-registry-cache]
+            registry = "sparse+${PRIVATE_CARGO_REGISTRY_PROXY_URL}"
+
+            [source.crates-io]
+            replace-with = "hopr-cargo-registry-cache"
+            TOML
+            nix develop -c cargo fetch
+        env:
+          PRIVATE_CARGO_REGISTRY_PROXY_URL: ${{ secrets.PRIVATE_CARGO_REGISTRY_PROXY_URL }}
   docs:
     name: Docs
+    if: github.event.pull_request.merged == true
     needs:
       - build-docker
-    uses: ./.github/workflows/build-docs.yaml
+    runs-on: self-hosted-hoprnet-bigger
+    timeout-minutes: 60
     permissions:
       contents: write
+    steps:
+      - name: Build docs
+        uses: hoprnet/hopr-workflows/actions/nix-action@c2aca7e56d25c4a786049ccf816c7f1af8721de8 # nix-action-v1
+        with:
+          source_branch: ${{ github.event.pull_request.base.ref }}
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          command: |
+            set -e
+            RUSTDOCFLAGS="-D warnings" nix develop -c cargo doc --no-deps --document-private-items
+            nix build -L .#docs
+      - name: Increase git buffer size
+        run: git config --global http.postBuffer 524288000
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@4f9cc6602d3f66b9c108549d475ec49e8ef4d45e # v4.0.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./result/share/doc/
+          force_orphan: true
+  coverage:
+    name: Coverage
+    if: github.event.pull_request.merged == true
+    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@268553d7984344080e3dc65eb92778c9103af7ec # workflow-tests-v3
     with:
-      source_repo: ${{ github.event.pull_request.base.repo.full_name }}
       source_branch: ${{ github.event.pull_request.base.ref }}
-      publish: true
+      unit_tests: false
+      integration_tests: false
+      nightly_tests: false
+      benchmarks: false
+      unit_coverage: true
+      integration_coverage: true
+      unconditional: true
+      unit_coverage_command: |
+        nix build -L .#coverage-unit
+        cp result coverage.lcov
+      integration_coverage_command: |
+        nix develop .#coverage -c env NEXTEST_HIDE_PROGRESS_BAR=1 cargo llvm-cov nextest \
+          --workspace \
+          --test '*' \
+          --lcov --output-path coverage.lcov \
+          -j 1
+      runner: self-hosted-hoprnet-bigger
     secrets:
-      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      codecov_token: ${{ secrets.CODECOV_TOKEN }}
   notify:
     name: Notify failure
     needs:
       - build-binaries
       - build-docker
+      - coverage
       - docs
-    if: ${{ always() && failure() }}
+    if: ${{ always() && github.event.pull_request.merged == true && !success() }}
     runs-on: ubuntu-latest
     steps:
       - name: Notify failed merge pipeline
@@ -133,7 +211,7 @@ jobs:
       actions: write
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs

@@ -216,59 +216,96 @@
             # also used for Docker image
             binary-ticket-inspector-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage ticketInspectorBuildArgs;
             binary-ticket-inspector-aarch64-linux = rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage ticketInspectorBuildArgs;
+            test-unit =
+              (fixUtoipaEmbedPaths (
+                rust-builder-local.callPackage nixLib.mkRustPackage (
+                  projectBuildArgs
+                  // {
+                    src = testSrc;
+                    cargoExtraArgs = "-F allocator-jemalloc";
+                    runTests = true;
+                    prependPackageName = false;
+                    cargoTestExtraArgs = "--lib";
+                    extraNativeBuildInputs = [ pkgs.cargo-nextest ];
+                  }
+                )
+              )).overrideAttrs
+                (_: {
+                  checkPhase = ''
+                    runHook preCheck
+                    cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -F allocator-jemalloc --lib
+                    runHook postCheck
+                  '';
+                });
 
-            hopr-test-unit = fixUtoipaEmbedPaths (
-              rust-builder-local.callPackage nixLib.mkRustPackage (
-                projectBuildArgs
-                // {
-                  src = testSrc;
-                  cargoExtraArgs = "-F allocator-jemalloc";
-                  runTests = true;
-                  prependPackageName = false;
-                  cargoTestExtraArgs = "--lib";
-                }
-              )
-            );
+            test-integration =
+              (fixUtoipaEmbedPaths (
+                rust-builder-local.callPackage nixLib.mkRustPackage (
+                  projectBuildArgs
+                  // {
+                    src = testSrc;
+                    cargoExtraArgs = "-F allocator-jemalloc";
+                    runTests = true;
+                    prependPackageName = false;
+                    cargoTestExtraArgs = "--test '*' -- --test-threads=1";
+                    extraNativeBuildInputs = [ pkgs.cargo-nextest ];
+                  }
+                )
+              )).overrideAttrs
+                (_: {
+                  checkPhase = ''
+                    runHook preCheck
+                    cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -F allocator-jemalloc --test '*' -j 1
+                    runHook postCheck
+                  '';
+                });
 
-            hopr-test-integration = fixUtoipaEmbedPaths (
-              rust-builder-local.callPackage nixLib.mkRustPackage (
-                projectBuildArgs
-                // {
-                  src = testSrc;
-                  cargoExtraArgs = "-F allocator-jemalloc";
-                  runTests = true;
-                  prependPackageName = false;
-                  cargoTestExtraArgs = "--test '*' -- --test-threads=1";
-                }
-              )
-            );
-
-            hopr-test-nightly = fixUtoipaEmbedPaths (
-              rust-builder-local-nightly.callPackage nixLib.mkRustPackage (
-                projectBuildArgs
-                // {
-                  src = testSrc;
-                  cargoExtraArgs = "-Z panic-abort-tests -F allocator-jemalloc";
-                  runTests = true;
-                  prependPackageName = false;
-                  cargoTestExtraArgs = "--lib";
-                }
-              )
-            );
+            test-nightly =
+              (fixUtoipaEmbedPaths (
+                rust-builder-local-nightly.callPackage nixLib.mkRustPackage (
+                  projectBuildArgs
+                  // {
+                    src = testSrc;
+                    cargoExtraArgs = "-Z panic-abort-tests -F allocator-jemalloc";
+                    runTests = true;
+                    prependPackageName = false;
+                    cargoTestExtraArgs = "--lib";
+                    extraNativeBuildInputs = [ pkgs.cargo-nextest ];
+                  }
+                )
+              )).overrideAttrs
+                (_: {
+                  checkPhase = ''
+                    runHook preCheck
+                    cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -Z panic-abort-tests -F allocator-jemalloc --lib
+                    runHook postCheck
+                  '';
+                });
 
             # Code coverage (outputs LCOV report)
-            hopr-coverage = fixUtoipaEmbedPaths (
-              rust-builder-local-coverage.callPackage nixLib.mkRustPackage (
-                projectBuildArgs
-                // {
-                  src = testSrc;
-                  cargoExtraArgs = "-F allocator-jemalloc";
-                  runCoverage = true;
-                  prependPackageName = false;
-                  cargoLlvmCovExtraArgs = "--lcov --output-path $out --lib";
-                }
-              )
-            );
+            coverage-unit =
+              (fixUtoipaEmbedPaths (
+                rust-builder-local-coverage.callPackage nixLib.mkRustPackage (
+                  projectBuildArgs
+                  // {
+                    src = testSrc;
+                    cargoExtraArgs = "-F allocator-jemalloc";
+                    runCoverage = true;
+                    prependPackageName = false;
+                    cargoLlvmCovExtraArgs = "--lcov --output-path $out --lib";
+                    extraNativeBuildInputs = [ pkgs.cargo-nextest ];
+                  }
+                )
+              )).overrideAttrs
+                (_: {
+                  buildPhase = ''
+                    runHook preBuild
+                    cargo llvm-cov nextest --lcov --output-path $out --lib \
+                      ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} \
+                      --workspace -F allocator-jemalloc
+                    runHook postBuild
+                  '';
+                });
 
             hoprd-clippy = rust-builder-local.callPackage nixLib.mkRustPackage (
               projectBuildArgs // { runClippy = true; }
@@ -307,7 +344,7 @@
           );
 
           # Compile benchmarks without running them, used for CI build verification.
-          hoprd-bench-build = rust-builder-local.callPackage nixLib.mkRustPackage (
+          bench-build = rust-builder-local.callPackage nixLib.mkRustPackage (
             projectBuildArgs // { buildBench = true; }
           );
 
@@ -487,6 +524,7 @@
               cargo-machete
               cargo-shear
               cargo-insta
+              cargo-nextest
               foundry-bin
               nfpm
               envsubst
@@ -601,6 +639,7 @@
             withLlvmTools = true;
             extraPackages = with pkgs; [
               sqlite
+              cargo-nextest
             ];
           };
 
@@ -739,7 +778,7 @@
             // {
               inherit docs;
               inherit pre-commit-check;
-              inherit hoprd-bench hoprd-bench-build;
+              inherit hoprd-bench bench-build;
               inherit hoprd-man;
               default = hoprdPackages.binary-hoprd;
               hoprd-candidate = (mkHoprdCandidate "");
