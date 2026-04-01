@@ -1,4 +1,7 @@
 ---
+#################################################################################
+###                       Pipeline to merge on pull requests                  ###
+#################################################################################
 name: Merge
 on:
   pull_request:
@@ -83,6 +86,25 @@ jobs:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
       docker_hub_username: ${{ secrets.DOCKER_HUB_USERNAME }}
       docker_hub_token: ${{ secrets.DOCKER_HUB_TOKEN }}
+  deploy-dev:
+    name: Deploy Gnosis Dev
+    runs-on: self-hosted-hoprnet-small
+    needs: build-docker
+    if: github.event.pull_request.merged == true
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Restart Hoprd
+        uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3.0.0
+        with:
+          token: ${{ secrets.GNOSIS_GITHUB_WORKFLOW_TOKEN }}
+          repository: gnosis/gnosis_vpn-infrastructure
+          event-type: restart_hoprd
+          client-payload: |-
+            {
+              "environment": "dev"
+            }
   cache_deps:
     name: Cache deps
     if: github.event.pull_request.merged == true
