@@ -2,8 +2,7 @@
 ################################################################################
 # Pull request pipeline for hoprnet
 #
-# Dispatches checks and tests concurrently.
-# Build runs as a separate workflow (calls external reusable workflows).
+# Single orchestrator: dispatches checks, tests, builds, and dappnode.
 ################################################################################
 name: PR
 
@@ -21,7 +20,6 @@ on:
       - ready_for_review
 
 permissions:
-  actions: read
   contents: read
 
 concurrency:
@@ -29,21 +27,183 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  validate-pr-title:
+    name: Validate title
+    if: github.event_name == 'pull_request'
+    runs-on: self-hosted-hoprnet-small
+    permissions:
+      pull-requests: read
+    steps:
+      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            fix
+            feat
+            build
+            chore
+            docs
+            style
+            refactor
+            perf
+            test
+          requireScope: false
+          ignoreLabels: |
+            bot
+            ignore-semantic-pull-request
+
+  label:
+    name: Add labels
+    if: github.event_name == 'pull_request'
+    runs-on: self-hosted-hoprnet-small
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          disable-sudo: true
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: actions/labeler@77a4082b841706ac431479b7e2bb11216ffef250 # main on 20.02.2025
+        with:
+          sync-labels: true
+
+      - name: Add "external" label for forked PRs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_REPO: ${{ github.repository }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if [[ "$HEAD_REPO" != "$BASE_REPO" ]]; then
+            gh pr edit "$PR_NUMBER" --add-label "external"
+          fi
+
   checks:
     name: Check
-    uses: ./.github/workflows/checks.yaml
+    uses: hoprnet/hopr-workflows/.github/workflows/checks.yaml@bbd22e57cf954c15f0a6051d59329857809141dd # workflow-checks-v1
     with:
-      source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+      runner_small: self-hosted-hoprnet-small
+      runner_large: self-hosted-hoprnet-bigger
     secrets:
-      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
   tests:
     name: Test
-    uses: ./.github/workflows/tests.yaml
+    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@bbd22e57cf954c15f0a6051d59329857809141dd # workflow-tests-v1
     with:
-      source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+      unit_tests: true
+      integration_tests: true
+      integration_test_command: "nix develop -c env NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --test '*' -j 1"
+      nightly_tests: true
+      benchmarks: true
+      coverage: true
+      unit_coverage_command: |
+        nix build -L .#coverage-unit
+        cp result coverage.lcov
+      integration_coverage_command: |
+        nix develop .#coverage -c env NEXTEST_HIDE_PROGRESS_BAR=1 cargo llvm-cov nextest \
+          --workspace \
+          --test '*' \
+          --lcov --output-path coverage.lcov \
+          -j 1
+      runner: self-hosted-hoprnet-bigger
     secrets:
-      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      codecov_token: ${{ secrets.CODECOV_TOKEN }}
+
+  build-binaries:
+    name: Binary ${{ matrix.architecture }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: x86_64-linux
+            runner: self-hosted-hoprnet-bigger
+            build_command: nix build -L .#binary-hoprd-x86_64-linux
+            required_label: ""
+          - architecture: aarch64-linux
+            runner: self-hosted-hoprnet-bigger
+            build_command: nix build -L .#binary-hoprd-aarch64-linux
+            required_label: "binary:aarch64-linux"
+          - architecture: aarch64-darwin
+            runner: macos-15-xlarge
+            build_command: nix build -L .#binary-hoprd-aarch64-darwin
+            required_label: binary:aarch64-darwin
+          - architecture: x86_64-darwin
+            runner: macos-15-intel
+            build_command: nix build -L .#binary-hoprd-x86_64-darwin
+            required_label: binary:x86_64-darwin
+    uses: hoprnet/hopr-workflows/.github/workflows/build-binaries.yaml@build-binaries-v2
+    permissions:
+      contents: read
+    with:
+      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+      version_type: commit
+      architecture: ${{ matrix.architecture }}
+      cachix_cache_name: hoprnet
+      build_file: hopr/hopr-lib/Cargo.toml
+      build_command: ${{ matrix.build_command }}
+      binary: hoprd
+      runner: ${{ matrix.runner }}
+      enabled: ${{ matrix.required_label == '' || contains(github.event.pull_request.labels.*.name, matrix.required_label) }}
+    secrets:
+      gcp_service_account: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
+      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      gpg_private_key: ${{ secrets.GPG_HOPRNET_PRIVATE_KEY }}
+
+  build-docker:
+    name: Docker
+    needs: build-binaries
+    uses: hoprnet/hopr-workflows/.github/workflows/build-docker.yaml@build-docker-v1
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    with:
+      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+      version_type: commit
+      build_matrix: >-
+        [
+          {
+            "runner": "self-hosted-hoprnet-bigger",
+            "architecture": "x86_64-linux",
+            "build_command": "nix build -L .#docker-hoprd-x86_64-linux",
+            "build_debug_command": "nix build -L .#docker-hoprd-dev-x86_64-linux"
+          }
+        ]
+      cachix_cache_name: hoprnet
+      build_file: hopr/hopr-lib/Cargo.toml
+      docker_image_name: hoprd
+      docker_image_format: skopeo
+    secrets:
+      gcp_service_account: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
+      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+  docs:
+    name: Docs
+    runs-on: self-hosted-hoprnet-bigger
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Build docs
+        uses: hoprnet/hopr-workflows/actions/nix-action@c2aca7e56d25c4a786049ccf816c7f1af8721de8 # nix-action-v1
+        with:
+          source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          command: |
+            set -e
+            RUSTDOCFLAGS="-D warnings" nix develop -c cargo doc --no-deps --document-private-items
+            nix build -L .#docs

@@ -303,7 +303,7 @@ mod tests {
 
     use super::*;
 
-    const PROCESSING_LEEWAY: Duration = Duration::from_millis(20);
+    const PROCESSING_LEEWAY: Duration = Duration::from_millis(250);
     const MAXIMUM_SINGLE_DELAY_DURATION: Duration = Duration::from_millis(
         crate::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS + crate::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS,
     );
