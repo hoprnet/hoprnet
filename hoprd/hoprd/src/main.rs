@@ -194,7 +194,7 @@ fn main() -> ExitCode {
         .and_then(|runtime| {
             runtime.block_on(async move {
                 #[cfg(feature = "telemetry")]
-                let _telemetry = telemetry::init_logger(node_identity)?;
+                let _telemetry = telemetry::init_telemetry(node_identity)?;
 
                 main_inner(cfg, hopr_keys).await
             })

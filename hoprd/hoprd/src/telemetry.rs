@@ -20,6 +20,15 @@ use opentelemetry_sdk::{
 };
 use tracing::field::{Field, Visit};
 use tracing_subscriber::prelude::*;
+#[cfg(feature = "prometheus")]
+use {
+    hopr_metrics::{PrometheusMetric, PrometheusMetricFamily, PrometheusMetricType, gather_metric_families},
+    std::{
+        collections::HashSet,
+        sync::mpsc::{self, Sender},
+        thread::{self, JoinHandle},
+    },
+};
 
 use crate::telemetry_common;
 
@@ -53,7 +62,7 @@ enum OtlpTransport {
 
 impl OtlpTransport {
     fn from_env() -> Self {
-        match std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT") {
+        match otlp_endpoint_from_env() {
             Ok(raw_url) => Self::from_str(raw_url.trim().split_once("://").map(|(scheme, _)| scheme).unwrap_or(""))
                 .unwrap_or(Self::Grpc),
             Err(_) => Self::Grpc,
@@ -755,9 +764,42 @@ fn enabled_signal_names(config: &OtlpConfig, signals: &[OtlpSignal]) -> String {
         .join(",")
 }
 
+fn otlp_endpoint_from_env() -> Result<String, std::env::VarError> {
+    match std::env::var(HOPRD_OTLP_ENDPOINT_ENV_KEY) {
+        Ok(endpoint) => Ok(endpoint),
+        Err(std::env::VarError::NotPresent) => std::env::var(LEGACY_OTLP_ENDPOINT_ENV_KEY),
+        Err(error) => Err(error),
+    }
+}
+
+fn with_otlp_endpoint_override<B>(builder: B) -> B
+where
+    B: opentelemetry_otlp::WithExportConfig,
+{
+    match otlp_endpoint_from_env() {
+        Ok(endpoint) if !endpoint.trim().is_empty() => builder.with_endpoint(endpoint),
+        _ => builder,
+    }
+}
+
+fn metric_export_interval_override() -> Option<Duration> {
+    let raw_interval = std::env::var(HOPRD_METRIC_EXPORT_INTERVAL_ENV_KEY).ok()?;
+    match raw_interval.trim().parse::<u64>() {
+        Ok(interval_ms) => Some(Duration::from_millis(interval_ms)),
+        Err(error) => {
+            tracing::warn!(
+                env_var = HOPRD_METRIC_EXPORT_INTERVAL_ENV_KEY,
+                value = %raw_interval,
+                error = %error,
+                "Ignoring invalid metric export interval override"
+            );
+            None
+        }
+    }
+}
+
 pub(super) fn init_logging(node_identity: NodeTelemetryIdentity) -> anyhow::Result<TelemetryHandles> {
     let mut telemetry_handles = TelemetryHandles::default();
-    apply_hoprd_otlp_endpoint_override();
     let config = OtlpConfig::from_env();
 
     if config.enabled {
@@ -765,16 +807,20 @@ pub(super) fn init_logging(node_identity: NodeTelemetryIdentity) -> anyhow::Resu
 
         let trace_layer = if config.has_signal(OtlpSignal::Traces) {
             let exporter = match config.transport {
-                OtlpTransport::Grpc => opentelemetry_otlp::SpanExporter::builder()
-                    .with_tonic()
-                    .with_protocol(opentelemetry_otlp::Protocol::Grpc)
-                    .with_timeout(Duration::from_secs(5))
-                    .build()?,
-                OtlpTransport::Http => opentelemetry_otlp::SpanExporter::builder()
-                    .with_http()
-                    .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
-                    .with_timeout(Duration::from_secs(5))
-                    .build()?,
+                OtlpTransport::Grpc => with_otlp_endpoint_override(
+                    opentelemetry_otlp::SpanExporter::builder()
+                        .with_tonic()
+                        .with_protocol(opentelemetry_otlp::Protocol::Grpc)
+                        .with_timeout(Duration::from_secs(5)),
+                )
+                .build()?,
+                OtlpTransport::Http => with_otlp_endpoint_override(
+                    opentelemetry_otlp::SpanExporter::builder()
+                        .with_http()
+                        .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
+                        .with_timeout(Duration::from_secs(5)),
+                )
+                .build()?,
             };
             let batch_processor =
                 opentelemetry_sdk::trace::span_processor_with_async_runtime::BatchSpanProcessor::builder(
@@ -799,16 +845,20 @@ pub(super) fn init_logging(node_identity: NodeTelemetryIdentity) -> anyhow::Resu
 
         let logs_layer = if config.has_signal(OtlpSignal::Logs) {
             let exporter = match config.transport {
-                OtlpTransport::Grpc => opentelemetry_otlp::LogExporter::builder()
-                    .with_tonic()
-                    .with_protocol(opentelemetry_otlp::Protocol::Grpc)
-                    .with_timeout(Duration::from_secs(5))
-                    .build()?,
-                OtlpTransport::Http => opentelemetry_otlp::LogExporter::builder()
-                    .with_http()
-                    .with_protocol(opentelemetry_otlp::Protocol::HttpJson)
-                    .with_timeout(Duration::from_secs(5))
-                    .build()?,
+                OtlpTransport::Grpc => with_otlp_endpoint_override(
+                    opentelemetry_otlp::LogExporter::builder()
+                        .with_tonic()
+                        .with_protocol(opentelemetry_otlp::Protocol::Grpc)
+                        .with_timeout(Duration::from_secs(5)),
+                )
+                .build()?,
+                OtlpTransport::Http => with_otlp_endpoint_override(
+                    opentelemetry_otlp::LogExporter::builder()
+                        .with_http()
+                        .with_protocol(opentelemetry_otlp::Protocol::HttpJson)
+                        .with_timeout(Duration::from_secs(5)),
+                )
+                .build()?,
             };
 
             let batch_processor =
@@ -847,15 +897,6 @@ pub(super) fn init_logging(node_identity: NodeTelemetryIdentity) -> anyhow::Resu
             node_peer_id = %node_identity.node_peer_id,
             "OpenTelemetry initialized"
         );
-    } else {
-        // OTEL disabled — still set up Prometheus text exporter for /metrics
-        let meter_provider = SdkMeterProvider::builder()
-            .with_reader(prometheus_exporter.clone())
-            .build();
-        if !hopr_metrics::init_with_provider(prometheus_exporter, meter_provider.clone()) {
-            tracing::warn!("hopr-metrics global state was already initialized; custom provider not applied");
-        }
-        telemetry_handles.meter_provider = Some(meter_provider);
     }
 
     Ok(telemetry_handles)
@@ -876,23 +917,30 @@ pub(super) fn init_metrics(
 
     let resource = build_otel_resource(&config, &node_identity);
     let exporter = match config.transport {
-        OtlpTransport::Grpc => opentelemetry_otlp::MetricExporter::builder()
-            .with_tonic()
-            .with_protocol(opentelemetry_otlp::Protocol::Grpc)
-            .with_timeout(Duration::from_secs(5))
-            .build()?,
-        OtlpTransport::Http => opentelemetry_otlp::MetricExporter::builder()
-            .with_http()
-            .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
-            .with_timeout(Duration::from_secs(5))
-            .build()?,
+        OtlpTransport::Grpc => with_otlp_endpoint_override(
+            opentelemetry_otlp::MetricExporter::builder()
+                .with_tonic()
+                .with_protocol(opentelemetry_otlp::Protocol::Grpc)
+                .with_timeout(Duration::from_secs(5)),
+        )
+        .build()?,
+        OtlpTransport::Http => with_otlp_endpoint_override(
+            opentelemetry_otlp::MetricExporter::builder()
+                .with_http()
+                .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
+                .with_timeout(Duration::from_secs(5)),
+        )
+        .build()?,
     };
 
-    let reader = opentelemetry_sdk::metrics::periodic_reader_with_async_runtime::PeriodicReader::builder(
+    let mut reader_builder = opentelemetry_sdk::metrics::periodic_reader_with_async_runtime::PeriodicReader::builder(
         exporter,
         opentelemetry_sdk::runtime::Tokio,
-    )
-    .build();
+    );
+    if let Some(interval) = metric_export_interval_override() {
+        reader_builder = reader_builder.with_interval(interval);
+    }
+    let reader = reader_builder.build();
     let meter_provider = SdkMeterProvider::builder()
         .with_reader(reader)
         .with_resource(resource)
