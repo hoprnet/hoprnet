@@ -122,6 +122,11 @@ fn update_hopr_lib_config_from_env_vars(cfg: &mut HoprLibConfig) -> anyhow::Resu
 
 #[cfg(feature = "runtime-tokio")]
 fn main() -> ExitCode {
+    if let Err(e) = telemetry_common::install_base_subscriber() {
+        eprintln!("ERROR: failed to initialize base log subscriber: {e}");
+        return ExitCode::FAILURE;
+    }
+
     let num_cpu_threads = std::env::var("HOPRD_NUM_CPU_THREADS").ok().and_then(|v| {
         usize::from_str(&v)
             .map_err(anyhow::Error::from)
@@ -169,8 +174,8 @@ fn main() -> ExitCode {
 
     #[cfg(feature = "telemetry")]
     let node_identity = telemetry::NodeTelemetryIdentity {
-        node_address: hopr_lib::Keypair::public(&hopr_keys.chain_key).to_address().to_hex(),
-        node_peer_id: hopr_lib::Keypair::public(&hopr_keys.packet_key).to_peerid_str(),
+        node_address: Keypair::public(&hopr_keys.chain_key).to_address().to_hex(),
+        node_peer_id: Keypair::public(&hopr_keys.packet_key).to_peerid_str(),
         extra_labels: std::env::var("HOPRD_OTEL_EXPORT_LABELS")
             .unwrap_or_default()
             .split(',')
@@ -186,8 +191,6 @@ fn main() -> ExitCode {
             runtime.block_on(async move {
                 #[cfg(feature = "telemetry")]
                 let _telemetry = telemetry::init_logger(node_identity)?;
-                #[cfg(not(feature = "telemetry"))]
-                tracing::subscriber::set_global_default(telemetry_common::build_base_subscriber()?)?;
 
                 main_inner(cfg, hopr_keys).await
             })
@@ -236,8 +239,8 @@ async fn main_inner(cfg: HoprdConfig, hopr_keys: HoprKeys) -> anyhow::Result<()>
     update_hopr_lib_config_from_env_vars(&mut hopr_lib_cfg)?;
 
     tracing::info!(
-        packet_key = hopr_lib::Keypair::public(&hopr_keys.packet_key).to_peerid_str(),
-        blockchain_address = hopr_lib::Keypair::public(&hopr_keys.chain_key).to_address().to_hex(),
+        packet_key = Keypair::public(&hopr_keys.packet_key).to_peerid_str(),
+        blockchain_address = Keypair::public(&hopr_keys.chain_key).to_address().to_hex(),
         "Node public identifiers"
     );
 

@@ -14,6 +14,8 @@ use opentelemetry_sdk::{
 use tracing::field::{Field, Visit};
 use tracing_subscriber::prelude::*;
 
+use crate::telemetry_common;
+
 const HOPRD_OTLP_ENDPOINT_ENV_KEY: &str = "HOPRD_OTLP_ENDPOINT";
 const LEGACY_OTLP_ENDPOINT_ENV_KEY: &str = "OTEL_EXPORTER_OTLP_ENDPOINT";
 const HOPRD_METRIC_EXPORT_INTERVAL_ENV_KEY: &str = "HOPRD_METRIC_EXPORT_INTERVAL";
@@ -414,7 +416,6 @@ impl Drop for TelemetryHandles {
 
 pub(super) fn init_logger(node_identity: NodeTelemetryIdentity) -> anyhow::Result<TelemetryHandles> {
     let mut telemetry_handles = TelemetryHandles::default();
-    let registry = crate::telemetry_common::build_base_subscriber()?;
     apply_hoprd_otlp_endpoint_override();
     let config = OtlpConfig::from_env();
 
@@ -464,7 +465,7 @@ pub(super) fn init_logger(node_identity: NodeTelemetryIdentity) -> anyhow::Resul
                 .build();
             let tracer = tracer_provider.tracer(env!("CARGO_PKG_NAME"));
             telemetry_handles.tracer_provider = Some(tracer_provider);
-            Some(tracing_opentelemetry::layer().with_tracer(tracer))
+            Some(tracing_opentelemetry::layer::<tracing_subscriber::registry::Registry>().with_tracer(tracer))
         } else {
             None
         };
@@ -627,14 +628,13 @@ pub(super) fn init_logger(node_identity: NodeTelemetryIdentity) -> anyhow::Resul
             .collect::<Vec<_>>()
             .join(",");
 
-        match (trace_layer, logs_layer) {
-            (Some(trace_layer), Some(logs_layer)) => {
-                tracing::subscriber::set_global_default(registry.with(trace_layer).with(logs_layer))?
-            }
-            (Some(trace_layer), None) => tracing::subscriber::set_global_default(registry.with(trace_layer))?,
-            (None, Some(logs_layer)) => tracing::subscriber::set_global_default(registry.with(logs_layer))?,
-            (None, None) => tracing::subscriber::set_global_default(registry)?,
-        }
+        let otel_layers = match (trace_layer, logs_layer) {
+            (Some(trace), Some(logs)) => vec![trace.boxed(), logs.boxed()],
+            (Some(trace), None) => vec![trace.boxed()],
+            (None, Some(logs)) => vec![logs.boxed()],
+            (None, None) => Vec::new(),
+        };
+        telemetry_common::install_otel_layers(otel_layers)?;
 
         tracing::info!(
             otel_signals = %enabled_signals,
@@ -650,8 +650,6 @@ pub(super) fn init_logger(node_identity: NodeTelemetryIdentity) -> anyhow::Resul
             tracing::warn!("hopr-metrics global state was already initialized; custom provider not applied");
         }
         telemetry_handles.meter_provider = Some(meter_provider);
-
-        tracing::subscriber::set_global_default(registry)?;
     }
 
     Ok(telemetry_handles)
