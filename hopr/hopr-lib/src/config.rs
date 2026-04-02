@@ -93,7 +93,10 @@ pub struct HoprLibConfig {
     /// Default is 15 seconds, minimum is 1 second.
     #[default(default_out_index_sync_period())]
     #[validate(custom(function = "validate_out_index_sync_period"))]
-    #[cfg_attr(feature = "serde", serde(default, with = "humantime_serde"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "default_out_index_sync_period", with = "humantime_serde")
+    )]
     pub out_index_sync_period: Duration,
 }
 

@@ -681,8 +681,12 @@ where
         // Make sure outgoing ticket indices in the ticket factory are periodically persisted to disk
         let (index_sync_handle, index_sync_reg) = futures::future::AbortHandle::new_pair();
         let tfact = ticket_factory.clone();
-        spawn(futures::stream::Abortable::new(
-            futures_time::stream::interval(self.cfg.out_index_sync_period.into()).for_each(move |_| {
+        spawn(
+            futures::stream::Abortable::new(
+                futures_time::stream::interval(self.cfg.out_index_sync_period.into()),
+                index_sync_reg,
+            )
+            .for_each(move |_| {
                 let tfact = tfact.clone();
                 async move {
                     if let Err(error) =
@@ -697,13 +701,12 @@ where
                     }
                 }
             }),
-            index_sync_reg,
-        ));
+        );
         processes.insert(HoprLibProcess::OutIndexSync, index_sync_handle);
 
         self.ticket_manager
             .set(ticket_manager.clone())
-            .map_err(|_| HoprLibError::other(anyhow!("cannot to set ticket manager")))?;
+            .map_err(|_| HoprLibError::other(anyhow!("cannot set ticket manager")))?;
 
         info!("starting ticket events processor");
         let (tickets_tx, tickets_rx) = channel(8192);

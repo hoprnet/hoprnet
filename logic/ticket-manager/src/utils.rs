@@ -164,7 +164,13 @@ impl<Q> Default for CachedQueueMap<Q> {
 }
 
 pub trait UnrealizedValue {
-    fn unrealized_value(&self, _: &ChannelId, _: Option<u64>) -> Result<Option<HoprBalance>, TicketManagerError> {
+    /// Compute the total value of tickets in the channel with the given `channel_id`,
+    /// and optionally only starting from the given first ticket index.
+    fn unrealized_value(
+        &self,
+        _channel_id: &ChannelId,
+        _min_index: Option<u64>,
+    ) -> Result<Option<HoprBalance>, TicketManagerError> {
         Ok(None)
     }
 }

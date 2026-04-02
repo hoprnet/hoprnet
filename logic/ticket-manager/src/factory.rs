@@ -11,7 +11,7 @@ use hopr_api::{
 };
 
 use crate::{
-    OutgoingIndexStore, TicketManagerError, TicketQueueStore,
+    OutgoingIndexStore, TicketManagerError,
     utils::{OutgoingIndexCache, UnrealizedValue},
 };
 
@@ -148,10 +148,11 @@ where
         next_index
     }
 
-    /// Saves outgoing ticket indices back to the store.
+    /// Saves updated outgoing ticket indices back to the store.
     ///
     /// The operation does nothing if there were no [new tickets
-    /// created](hopr_api::tickets::TicketFactory::new_multihop_ticket) on any tracked channel.
+    /// created](hopr_api::tickets::TicketFactory::new_multihop_ticket) on any tracked channel, or the indices were
+    /// not updated.
     pub fn save_outgoing_indices(&self) -> Result<(), TicketManagerError> {
         self.out_idx_tracker
             .save(self.store.clone())
@@ -211,8 +212,8 @@ where
                 Ok(Some(out_index)) => out_index,
                 Ok(None) => 0,
                 Err(error) => {
-                    tracing::error!(%error, %id, "failed to load outgoing index for channel, falling back to channel ticket index");
-                    0
+                    tracing::error!(%error, %id, "failed to load outgoing index for channel");
+                    return Err(TicketManagerError::store(error));
                 }
             };
 
@@ -232,8 +233,7 @@ where
 
 impl<S> hopr_api::tickets::TicketFactory for HoprTicketFactory<S>
 where
-    S: OutgoingIndexStore + TicketQueueStore + Send + Sync + 'static,
-    S::Queue: Send + Sync + 'static,
+    S: OutgoingIndexStore + Send + Sync + 'static,
 {
     type Error = TicketManagerError;
 
@@ -309,7 +309,11 @@ where
     /// of unredeemed tickets tracked by the associated [`HoprTicketManager`](crate::HoprTicketManager).
     fn remaining_incoming_channel_stake(&self, channel: &ChannelEntry) -> Result<HoprBalance, Self::Error> {
         if let Some(queue_map) = self.queue_map.upgrade() {
-            let unrealized_value = queue_map.unrealized_value(channel.get_id(), channel.ticket_index.into())?;
+            // Here we do not use the current channel ticket index as the minimum index we should start
+            // computing the unrealized value from, because we assume the tickets get neglected as soon as
+            // the index on the channel increases. This is typically done by the ticket manager after
+            // successful ticket redemption.
+            let unrealized_value = queue_map.unrealized_value(channel.get_id(), None)?;
 
             // Subtraction on HoprBalance type naturally saturating at 0
             Ok(channel.balance - unrealized_value.unwrap_or_default())
