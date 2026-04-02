@@ -46,8 +46,9 @@ use crate::{
 /// The Relay nodes typically need to validate incoming tickets in their incoming packet pipeline **before**
 /// they forward the packet to the outgoing packet pipeline (out to the next hop).
 ///
-/// The `HoprTicketFactory` in this case maintains a weak referebce to [`HoprTicketManager`](crate::HoprTicketManager)
-/// if they were created together via [`HoprTicketManager::new_with_factory`](crate::HoprTicketManager::new_with_factory).
+/// The `HoprTicketFactory` in this case maintains a weak reference to [`HoprTicketManager`](crate::HoprTicketManager)
+/// if they were created together via
+/// [`HoprTicketManager::new_with_factory`](crate::HoprTicketManager::new_with_factory).
 ///
 /// By using this weak reference, it can get the [remaining channel
 /// stake](hopr_api::tickets::TicketFactory::remaining_incoming_channel_stake) on the given channel by subtracting the
