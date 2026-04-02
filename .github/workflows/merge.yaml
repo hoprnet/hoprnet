@@ -1,4 +1,7 @@
 ---
+#################################################################################
+###                       Pipeline to merge on pull requests                  ###
+#################################################################################
 name: Merge
 on:
   pull_request:
@@ -83,6 +86,25 @@ jobs:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
       docker_hub_username: ${{ secrets.DOCKER_HUB_USERNAME }}
       docker_hub_token: ${{ secrets.DOCKER_HUB_TOKEN }}
+  deploy-dev:
+    name: Deploy Gnosis Dev
+    runs-on: self-hosted-hoprnet-small
+    needs: build-docker
+    if: github.event.pull_request.merged == true
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Restart Hoprd
+        uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3.0.0
+        with:
+          token: ${{ secrets.GNOSIS_GITHUB_WORKFLOW_TOKEN }}
+          repository: gnosis/gnosis_vpn-infrastructure
+          event-type: restart_hoprd
+          client-payload: |-
+            {
+              "environment": "dev"
+            }
   cache_deps:
     name: Cache deps
     if: github.event.pull_request.merged == true
@@ -135,13 +157,40 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./result/share/doc/
           force_orphan: true
+  coverage:
+    name: Coverage
+    if: github.event.pull_request.merged == true
+    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@268553d7984344080e3dc65eb92778c9103af7ec # workflow-tests-v3
+    with:
+      source_branch: ${{ github.event.pull_request.base.ref }}
+      unit_tests: false
+      integration_tests: false
+      nightly_tests: false
+      benchmarks: false
+      unit_coverage: true
+      integration_coverage: true
+      unconditional: true
+      unit_coverage_command: |
+        nix build -L .#coverage-unit
+        cp result coverage.lcov
+      integration_coverage_command: |
+        nix develop .#coverage -c env NEXTEST_HIDE_PROGRESS_BAR=1 cargo llvm-cov nextest \
+          --workspace \
+          --test '*' \
+          --lcov --output-path coverage.lcov \
+          -j 1
+      runner: self-hosted-hoprnet-bigger
+    secrets:
+      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      codecov_token: ${{ secrets.CODECOV_TOKEN }}
   notify:
     name: Notify failure
     needs:
       - build-binaries
       - build-docker
+      - coverage
       - docs
-    if: ${{ always() && failure() }}
+    if: ${{ always() && github.event.pull_request.merged == true && !success() }}
     runs-on: ubuntu-latest
     steps:
       - name: Notify failed merge pipeline
