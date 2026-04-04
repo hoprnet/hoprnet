@@ -362,9 +362,16 @@ where
                             // In this case, no matter if the ticket has been redeemed,
                             // neglected or rejected, we're still removing it from the queue.
                             // Otherwise, the ticket stays in the queue due to a recoverable error
-
                             let mut queue_write = state.queue.write();
-                            let pop_res = queue_write.0.pop().map_err(TicketManagerError::store)?;
+
+                            // Check if the next ticket to pop is really the one we just redeemed,
+                            // otherwise we might be popping a wrong ticket.
+                            let pop_res = queue_write.0
+                                .peek()
+                                .map_err(TicketManagerError::store)?
+                                .filter(|ticket_to_pop| ticket_to_pop == &ticket_to_redeem)
+                                .and_then(|_| queue_write.0.pop().map_err(TicketManagerError::store).transpose())
+                                .transpose()?;
 
                             // Do accounting of the ticket into the stats
                             match redeem_complete_result {

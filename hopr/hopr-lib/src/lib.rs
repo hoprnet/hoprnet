@@ -681,6 +681,7 @@ where
         // Make sure outgoing ticket indices in the ticket factory are periodically persisted to disk
         let (index_sync_handle, index_sync_reg) = futures::future::AbortHandle::new_pair();
         let tfact = ticket_factory.clone();
+        let tfact2 = ticket_factory.clone();
         spawn(
             futures::stream::Abortable::new(
                 futures_time::stream::interval(self.cfg.out_index_sync_period.into()),
@@ -700,6 +701,16 @@ where
                         tracing::trace!("successfully synced ticket indices");
                     }
                 }
+            })
+            .inspect(move |_| {
+                // Do an extra save here on graceful shutdown
+                if let Err(error) = tfact2.save_outgoing_indices() {
+                    tracing::error!(%error, "failed to sync ticket indices to persistent storage on shutdown");
+                }
+                tracing::warn!(
+                    task = %HoprLibProcess::OutIndexSync,
+                    "long-running background task finished"
+                )
             }),
         );
         processes.insert(HoprLibProcess::OutIndexSync, index_sync_handle);

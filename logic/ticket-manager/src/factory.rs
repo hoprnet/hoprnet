@@ -272,13 +272,18 @@ where
             )));
         }
 
-        // The next ticket is worth: price * remaining hop count / winning probability
+        // The next ticket is worth: price * remaining hop count / winning probability\
+        // The check will also not allow creation of tickets with 0 winning probability.
         let amount = HoprBalance::from(
             price_per_hop
                 .amount()
                 .saturating_mul(U256::from(current_path_pos - 1))
                 .div_f64(winning_probability.into())
-                .expect("winning probability is always less than or equal to 1"),
+                .map_err(|_| {
+                    TicketManagerError::Other(anyhow::anyhow!(
+                        "invalid winning probability for outgoing ticket: {winning_probability}"
+                    ))
+                })?,
         );
 
         if channel.balance.lt(&amount) {
@@ -355,7 +360,7 @@ mod tests {
     }
 
     #[test]
-    fn ticket_factor_remaining_incoming_channel_stake_should_be_reduced_by_unrealized_value() -> anyhow::Result<()> {
+    fn ticket_factory_remaining_incoming_channel_stake_should_be_reduced_by_unrealized_value() -> anyhow::Result<()> {
         let (manager, factory) = crate::HoprTicketManager::new_with_factory(MemoryStore::default());
 
         let src = ChainKeypair::random();
@@ -390,6 +395,30 @@ mod tests {
         drop(manager);
 
         assert_eq!(channel.balance, factory.remaining_incoming_channel_stake(&channel)?);
+
+        Ok(())
+    }
+
+    #[test]
+    fn ticket_factory_should_not_create_tickets_with_zero_winning_probability() -> anyhow::Result<()> {
+        let factory = create_factory()?;
+
+        let src = ChainKeypair::random();
+        let dst = ChainKeypair::random();
+
+        let channel = ChannelEntry::builder()
+            .between(&src, &dst)
+            .amount(10)
+            .ticket_index(1)
+            .status(ChannelStatus::Open)
+            .epoch(1)
+            .build()?;
+
+        assert!(
+            factory
+                .new_multihop_ticket(&channel, 2.try_into()?, WinningProbability::NEVER, 10.into())
+                .is_err()
+        );
 
         Ok(())
     }
