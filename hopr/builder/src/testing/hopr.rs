@@ -87,7 +87,7 @@ impl TestedHopr {
         assert_eq!(HoprState::Running, instance.status(), "hopr instance must be running");
         Self {
             runtime: Some(runtime),
-            instance: instance,
+            instance,
             socket,
             connector,
         }
@@ -96,7 +96,9 @@ impl TestedHopr {
 
 impl Drop for TestedHopr {
     fn drop(&mut self) {
-        let _ = self.instance.shutdown();
+        if let Some(mut instance) = Arc::into_inner(self.instance) {
+            let _ = instance.shutdown();
+        }
         std::thread::sleep(Duration::from_secs(1));
         if let Some(runtime) = self.runtime.take() {
             runtime.shutdown_background();

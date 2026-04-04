@@ -715,10 +715,6 @@ where
         );
         processes.insert(HoprLibProcess::OutIndexSync, index_sync_handle);
 
-        self.ticket_manager
-            .set(ticket_manager.clone())
-            .map_err(|_| HoprLibError::other(anyhow!("cannot set ticket manager")))?;
-
         info!("starting ticket events processor");
         let (tickets_tx, tickets_rx) = channel(8192);
         let (tickets_rx, tickets_handle) = futures::stream::abortable(tickets_rx);
@@ -801,6 +797,10 @@ where
 
         self.state.store(HoprState::Running, Ordering::Relaxed);
 
+        self.ticket_manager
+            .set(ticket_manager)
+            .map_err(|_| HoprLibError::other(anyhow!("cannot set ticket manager")))?;
+
         info!(
             id = %self.me_peer_id(),
             version = constants::APP_VERSION,
@@ -819,6 +819,7 @@ where
         );
 
         let _ = self.processes.set(processes);
+
         Ok(hopr_socket)
     }
 
@@ -829,12 +830,13 @@ where
     /// Such operations will return [`HoprStatusError::NotThereYet`].
     ///
     /// This is the final state and cannot be reversed by calling `run` again.
-    pub fn shutdown(&self) -> Result<(), HoprLibError> {
+    pub fn shutdown(&mut self) -> Result<(), HoprLibError> {
         self.error_if_not_in_state(HoprState::Running, "node is not running".into())?;
         if let Some(processes) = self.processes.get() {
             processes.abort_all();
         }
         self.state.store(HoprState::Terminated, Ordering::Relaxed);
+        self.ticket_manager.take();
         info!("NODE SHUTDOWN COMPLETE");
         Ok(())
     }

@@ -128,6 +128,9 @@ where
     /// For all opened or effectively opened incoming channels inside `incoming_channels`, either an existing
     /// ticket queue is opened or a new one is created (without any tickets in it).
     ///
+    /// If there are any unredeemable tickets in the existing queues (with an older epoch or lower index than the
+    /// current index), they are neglected as well.
+    ///
     /// All the neglected tickets are returned from the function to make further accounting possible,
     /// but they are no longer redeemable.
     ///
@@ -178,9 +181,23 @@ where
 
             // Either open an existing queue for that channel or create a new one
             let mut store_write = parking_lot::RwLockUpgradableReadGuard::upgrade(store_read);
-            let queue = store_write
+            let mut queue = store_write
                 .open_or_create_queue(id)
                 .map_err(TicketManagerError::store)?;
+
+            // Clean up the queue from tickets which are unredeemable (old epoch or lower than current index).
+            while queue
+                .peek()
+                .map_err(TicketManagerError::store)?
+                .filter(|ticket| {
+                    ticket.verified_ticket().channel_epoch < channel.channel_epoch
+                        || ticket.verified_ticket().index < channel.ticket_index
+                })
+                .is_some()
+            {
+                neglected.extend(queue.pop().map_err(TicketManagerError::store)?.map(|t| t.ticket));
+            }
+
             store_read = parking_lot::RwLockWriteGuard::downgrade_to_upgradable(store_write);
 
             // Wrap the queue with a ticket value cache adapter
@@ -618,9 +635,61 @@ mod tests {
                 tickets[0].verified_ticket().counterparty,
             )
             .amount(10)
-            .ticket_index(1)
+            .ticket_index(tickets[0].verified_ticket().index)
             .status(ChannelStatus::Closed)
-            .epoch(1)
+            .epoch(tickets[0].verified_ticket().channel_epoch)
+            .build()?;
+
+        let neglected = mgr.sync_from_incoming_channels(&[channel])?;
+        assert_eq!(1, neglected.len());
+        assert_eq!(tickets[0].ticket, neglected[0]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn ticket_manager_should_neglect_tickets_from_older_epoch_channels_on_sync() -> anyhow::Result<()> {
+        let mgr = create_mgr()?;
+
+        let tickets = generate_tickets()?;
+        let neglected = mgr.insert_incoming_ticket(tickets[0])?;
+        assert!(neglected.is_empty());
+
+        let channel = ChannelEntry::builder()
+            .between(
+                *tickets[0].ticket.verified_issuer(),
+                tickets[0].verified_ticket().counterparty,
+            )
+            .amount(10)
+            .ticket_index(1)
+            .status(ChannelStatus::Open)
+            .epoch(tickets[0].verified_ticket().channel_epoch + 1)
+            .build()?;
+
+        let neglected = mgr.sync_from_incoming_channels(&[channel])?;
+        assert_eq!(1, neglected.len());
+        assert_eq!(tickets[0].ticket, neglected[0]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn ticket_manager_should_neglect_tickets_with_older_index_channels_on_sync() -> anyhow::Result<()> {
+        let mgr = create_mgr()?;
+
+        let tickets = generate_tickets()?;
+        let neglected = mgr.insert_incoming_ticket(tickets[0])?;
+        assert!(neglected.is_empty());
+
+        let channel = ChannelEntry::builder()
+            .between(
+                *tickets[0].ticket.verified_issuer(),
+                tickets[0].verified_ticket().counterparty,
+            )
+            .amount(10)
+            .ticket_index(tickets[0].verified_ticket().index + 1)
+            .status(ChannelStatus::Open)
+            .epoch(tickets[0].verified_ticket().channel_epoch)
             .build()?;
 
         let neglected = mgr.sync_from_incoming_channels(&[channel])?;
@@ -692,7 +761,7 @@ mod tests {
                 tickets[0].verified_ticket().counterparty,
             )
             .amount(10)
-            .ticket_index(tickets.len() as u64)
+            .ticket_index(0)
             .status(ChannelStatus::Open)
             .epoch(1)
             .build()?;
@@ -760,7 +829,7 @@ mod tests {
                 tickets[0].verified_ticket().counterparty,
             )
             .amount(10)
-            .ticket_index(tickets.len() as u64)
+            .ticket_index(0)
             .status(ChannelStatus::Open)
             .epoch(1)
             .build()?;
