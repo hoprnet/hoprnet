@@ -830,13 +830,12 @@ where
     /// Such operations will return [`HoprStatusError::NotThereYet`].
     ///
     /// This is the final state and cannot be reversed by calling `run` again.
-    pub fn shutdown(&mut self) -> Result<(), HoprLibError> {
+    pub fn shutdown(&self) -> Result<(), HoprLibError> {
         self.error_if_not_in_state(HoprState::Running, "node is not running".into())?;
         if let Some(processes) = self.processes.get() {
             processes.abort_all();
         }
         self.state.store(HoprState::Terminated, Ordering::Relaxed);
-        self.ticket_manager.take();
         info!("NODE SHUTDOWN COMPLETE");
         Ok(())
     }
@@ -1383,6 +1382,8 @@ where
     }
 
     pub fn ticket_management(&self) -> Result<impl TicketManagement + Clone + Send + 'static, HoprLibError> {
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for transport operations".into())?;
+
         self.ticket_manager
             .get()
             .cloned()
