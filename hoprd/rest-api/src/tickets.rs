@@ -112,13 +112,13 @@ impl From<ChannelStats> for NodeTicketStatisticsResponse {
     )]
 pub(super) async fn show_ticket_statistics(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
     let hopr = state.hopr.clone();
-    match hopr
-        .ticket_management()
-        .ticket_stats(None)
-        .map(NodeTicketStatisticsResponse::from)
-    {
-        Ok(stats) => (StatusCode::OK, Json(stats)).into_response(),
-        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+    if let Ok(ticket_mgt) = hopr.ticket_management() {
+        match ticket_mgt.ticket_stats(None).map(NodeTicketStatisticsResponse::from) {
+            Ok(stats) => (StatusCode::OK, Json(stats)).into_response(),
+            Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+        }
+    } else {
+        (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::NotReady).into_response()
     }
 }
 

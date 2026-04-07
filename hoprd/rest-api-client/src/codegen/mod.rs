@@ -2165,7 +2165,7 @@ at least the size of 2 Session packet payloads.*/
 
 API enabling developers to interact with a hoprd node programatically through HTTP REST API.
 
-Version: 4.9.0*/
+Version: 4.10.0*/
 pub struct Client {
     pub(crate) baseurl: String,
     pub(crate) client: reqwest::Client,
@@ -2201,7 +2201,7 @@ impl Client {
 }
 impl ClientInfo<()> for Client {
     fn api_version() -> &'static str {
-        "4.9.0"
+        "4.10.0"
     }
     fn baseurl(&self) -> &str {
         self.baseurl.as_str()

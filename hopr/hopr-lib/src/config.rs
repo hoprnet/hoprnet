@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use hopr_api::types::primitive::prelude::*;
 pub use hopr_transport::{
     TagAllocatorConfig,
@@ -72,6 +74,44 @@ pub struct HoprLibConfig {
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
     pub safe_module: SafeModule,
+    /// Path to a file that acts as incoming ticket storage.
+    ///
+    /// The file will be in the `redb` file format and can contain already existing tickets.
+    /// If the file does not exist, it will be created.
+    ///
+    /// If omitted, a temporary file will be created and deleted on application exit.
+    ///
+    /// Make sure the file is secure and not accessible by unauthorized users on production.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub ticket_storage_file: Option<String>,
+    /// Defines how often the outgoing ticket indices be saved to the persistent storage.
+    ///
+    /// If synchronization to a persistent storage does not happen and the node restarts,
+    /// the node will start from the current on-chain channel index and could as a result
+    /// be creating invalid outgoing tickets.
+    ///
+    /// Default is 15 seconds, minimum is 1 second.
+    #[default(default_out_index_sync_period())]
+    #[validate(custom(function = "validate_out_index_sync_period"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "default_out_index_sync_period", with = "humantime_serde")
+    )]
+    pub out_index_sync_period: Duration,
+}
+
+const MINIMUM_OUT_SYNC_PERIOD: Duration = Duration::from_secs(1);
+
+fn validate_out_index_sync_period(lifetime: &Duration) -> Result<(), ValidationError> {
+    if lifetime < &MINIMUM_OUT_SYNC_PERIOD {
+        Err(ValidationError::new("out_index_sync_period is too low"))
+    } else {
+        Ok(())
+    }
+}
+
+fn default_out_index_sync_period() -> Duration {
+    Duration::from_secs(15)
 }
 
 // NOTE: this intentionally does not validate (0.0.0.0) to force user to specify

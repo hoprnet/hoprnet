@@ -4352,8 +4352,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "1.4.0"
-source = "git+https://github.com/hoprnet/hopr-api?rev=2638cf57d540bd746593cc95bd788171a4582f13#2638cf57d540bd746593cc95bd788171a4582f13"
+version = "1.5.0"
+source = "git+https://github.com/hoprnet/hopr-api?rev=05816d0bb7645d05c67f1091c2216fd7c83a96cf#05816d0bb7645d05c67f1091c2216fd7c83a96cf"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -4383,8 +4383,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-bindings"
-version = "4.7.0"
-source = "git+https://github.com/hoprnet/contracts?branch=main#da7effb8a708eca4fc1a73d276645ce7ce21d2e8"
+version = "4.7.2"
+source = "git+https://github.com/hoprnet/contracts?branch=main#1fa67e150e719965595cdaf44236825b80b19c04"
 dependencies = [
  "alloy",
  "anyhow",
@@ -4469,8 +4469,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-types"
-version = "1.4.0"
-source = "git+https://github.com/hoprnet/hopr-types?branch=main#e75962d55dfd0843d17ef98adf79aa6c77ada203"
+version = "1.4.1"
+source = "git+https://github.com/hoprnet/hopr-types?branch=main#4113209db2d57f41cd1315c73f92123c5b560c48"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4533,8 +4533,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-random"
-version = "1.4.0"
-source = "git+https://github.com/hoprnet/hopr-types?branch=main#e75962d55dfd0843d17ef98adf79aa6c77ada203"
+version = "1.4.1"
+source = "git+https://github.com/hoprnet/hopr-types?branch=main#4113209db2d57f41cd1315c73f92123c5b560c48"
 dependencies = [
  "generic-array 1.3.5",
  "lazy_static",
@@ -4564,8 +4564,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-types"
-version = "1.4.0"
-source = "git+https://github.com/hoprnet/hopr-types?branch=main#e75962d55dfd0843d17ef98adf79aa6c77ada203"
+version = "1.4.1"
+source = "git+https://github.com/hoprnet/hopr-types?branch=main#4113209db2d57f41cd1315c73f92123c5b560c48"
 dependencies = [
  "aes",
  "blake3",
@@ -4634,8 +4634,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-internal-types"
-version = "1.4.0"
-source = "git+https://github.com/hoprnet/hopr-types?branch=main#e75962d55dfd0843d17ef98adf79aa6c77ada203"
+version = "1.4.1"
+source = "git+https://github.com/hoprnet/hopr-types?branch=main#4113209db2d57f41cd1315c73f92123c5b560c48"
 dependencies = [
  "aquamarine",
  "async-trait",
@@ -4675,7 +4675,9 @@ dependencies = [
  "hopr-network-types",
  "hopr-parallelize",
  "hopr-platform",
+ "hopr-ticket-manager",
  "hopr-transport",
+ "humantime-serde",
  "lazy_static",
  "serde",
  "serde-saphyr",
@@ -4775,8 +4777,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-primitive-types"
-version = "1.4.0"
-source = "git+https://github.com/hoprnet/hopr-types?branch=main#e75962d55dfd0843d17ef98adf79aa6c77ada203"
+version = "1.4.1"
+source = "git+https://github.com/hoprnet/hopr-types?branch=main#4113209db2d57f41cd1315c73f92123c5b560c48"
 dependencies = [
  "bigdecimal",
  "chrono",
@@ -4806,7 +4808,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-hopr"
-version = "4.4.3"
+version = "4.5.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4956,8 +4958,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-ticket-manager"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
+ "ahash",
  "anyhow",
  "clap",
  "criterion",
@@ -4983,7 +4986,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5241,8 +5244,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-types"
-version = "1.4.0"
-source = "git+https://github.com/hoprnet/hopr-types?branch=main#e75962d55dfd0843d17ef98adf79aa6c77ada203"
+version = "1.4.1"
+source = "git+https://github.com/hoprnet/hopr-types?branch=main#4113209db2d57f41cd1315c73f92123c5b560c48"
 dependencies = [
  "hopr-chain-types",
  "hopr-crypto-random",
@@ -5330,7 +5333,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "4.9.0"
+version = "4.10.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -8939,7 +8942,7 @@ checksum = "546b4da4f679832602a8f8ab8ddc10b6b1d2e1a13b4f9dddcaee499436fa06ad"
 dependencies = [
  "ahash",
  "annotate-snippets",
- "base64 0.22.1",
+ "base64 0.21.7",
  "encoding_rs_io",
  "getrandom 0.3.4",
  "nohash-hasher",
@@ -10633,7 +10636,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]

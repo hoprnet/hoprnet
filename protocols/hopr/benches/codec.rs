@@ -21,20 +21,20 @@ use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, MemorySurbStore, PacketDecoder, PacketEncoder, SurbStoreConfig,
 };
-use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue};
+use hopr_ticket_manager::{HoprTicketFactory, HoprTicketManager, RedbStore, RedbTicketQueue};
 
 use crate::utils::{Node, PEERS, create_blokli_client, create_node};
 
 type TestEncoder = HoprEncoder<
     Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>,
     MemorySurbStore,
-    Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>,
+    HoprTicketFactory<RedbStore>,
 >;
 
 type TestDecoder = HoprDecoder<
     Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>,
     MemorySurbStore,
-    Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>,
+    HoprTicketFactory<RedbStore>,
 >;
 
 pub fn create_encoder(sender: &Node) -> TestEncoder {
@@ -42,7 +42,7 @@ pub fn create_encoder(sender: &Node) -> TestEncoder {
         sender.chain_key.clone(),
         sender.chain_api.clone(),
         MemorySurbStore::new(SurbStoreConfig::default()),
-        HoprTicketManager::new(RedbStore::new_temp().unwrap()).unwrap().into(),
+        HoprTicketFactory::new(RedbStore::new_temp().unwrap()),
         Hash::default(),
         HoprCodecConfig::default(),
     )
@@ -53,7 +53,7 @@ pub fn create_decoder(receiver: &Node) -> TestDecoder {
         (receiver.offchain_key.clone(), receiver.chain_key.clone()),
         receiver.chain_api.clone(),
         MemorySurbStore::new(SurbStoreConfig::default()),
-        HoprTicketManager::new(RedbStore::new_temp().unwrap()).unwrap().into(),
+        HoprTicketFactory::new(RedbStore::new_temp().unwrap()),
         Hash::default(),
         HoprCodecConfig::default(),
     )

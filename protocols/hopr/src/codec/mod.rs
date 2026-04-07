@@ -71,7 +71,7 @@ mod tests {
         HoprBlockchainSafeConnector,
         testing::{BlokliTestClient, StaticState},
     };
-    use hopr_ticket_manager::{HoprTicketManager, MemoryStore, MemoryTicketQueue};
+    use hopr_ticket_manager::{HoprTicketFactory, MemoryStore};
 
     use crate::{
         HoprCodecConfig, HoprDecoder, HoprEncoder, MemorySurbStore, PacketDecoder, PacketEncoder, SurbStoreConfig,
@@ -81,13 +81,13 @@ mod tests {
     type TestEncoder = HoprEncoder<
         Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>,
         MemorySurbStore,
-        Arc<HoprTicketManager<MemoryStore, MemoryTicketQueue>>,
+        HoprTicketFactory<MemoryStore>,
     >;
 
     type TestDecoder = HoprDecoder<
         Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>,
         MemorySurbStore,
-        Arc<HoprTicketManager<MemoryStore, MemoryTicketQueue>>,
+        HoprTicketFactory<MemoryStore>,
     >;
 
     pub fn create_encoder(sender: &Node) -> TestEncoder {
@@ -95,7 +95,7 @@ mod tests {
             sender.chain_key.clone(),
             sender.chain_api.clone(),
             MemorySurbStore::new(SurbStoreConfig::default()),
-            HoprTicketManager::new(MemoryStore::default()).unwrap().into(),
+            HoprTicketFactory::new(MemoryStore::default()),
             Hash::default(),
             HoprCodecConfig::default(),
         )
@@ -106,7 +106,7 @@ mod tests {
             (receiver.offchain_key.clone(), receiver.chain_key.clone()),
             receiver.chain_api.clone(),
             MemorySurbStore::new(SurbStoreConfig::default()),
-            HoprTicketManager::new(MemoryStore::default()).unwrap().into(),
+            HoprTicketFactory::new(MemoryStore::default()),
             Hash::default(),
             HoprCodecConfig::default(),
         )
