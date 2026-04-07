@@ -275,10 +275,10 @@ where
                     sender_id,
                     surb,
                     remaining,
-                } =
-                    self.surb_store.find_surb(matcher).await.ok_or_else(|| {
-                        PathPlannerError::Surb(format!("no surb for pseudonym {}", matcher.pseudonym()))
-                    })?;
+                } = self
+                    .surb_store
+                    .find_surb(matcher)
+                    .ok_or_else(|| PathPlannerError::Surb(format!("no surb for pseudonym {}", matcher.pseudonym())))?;
                 Ok((ResolvedTransportRouting::Return(sender_id, surb), Some(remaining)))
             }
         }

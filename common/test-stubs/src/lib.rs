@@ -154,16 +154,15 @@ impl StubChainApi {
 
 // -- ChainKeyOperations -----------------------------------------------------
 
-#[async_trait::async_trait]
 impl ChainKeyOperations for StubChainApi {
     type Error = StubError;
     type Mapper = StubKeyIdMapper;
 
-    async fn chain_key_to_packet_key(&self, chain: &Address) -> Result<Option<OffchainPublicKey>, Self::Error> {
+    fn chain_key_to_packet_key(&self, chain: &Address) -> Result<Option<OffchainPublicKey>, Self::Error> {
         Ok(self.key_addr_map.get_by_right(chain).copied())
     }
 
-    async fn packet_key_to_chain_key(&self, packet: &OffchainPublicKey) -> Result<Option<Address>, Self::Error> {
+    fn packet_key_to_chain_key(&self, packet: &OffchainPublicKey) -> Result<Option<Address>, Self::Error> {
         Ok(self.key_addr_map.get_by_left(packet).copied())
     }
 
@@ -174,7 +173,6 @@ impl ChainKeyOperations for StubChainApi {
 
 // -- ChainReadChannelOperations ---------------------------------------------
 
-#[async_trait::async_trait]
 impl ChainReadChannelOperations for StubChainApi {
     type Error = StubError;
 
@@ -182,14 +180,11 @@ impl ChainReadChannelOperations for StubChainApi {
         &self.me
     }
 
-    async fn channel_by_id(&self, channel_id: &ChannelId) -> Result<Option<ChannelEntry>, Self::Error> {
+    fn channel_by_id(&self, channel_id: &ChannelId) -> Result<Option<ChannelEntry>, Self::Error> {
         Ok(self.channels.iter().find(|c| c.get_id() == channel_id).cloned())
     }
 
-    async fn stream_channels<'a>(
-        &'a self,
-        _selector: ChannelSelector,
-    ) -> Result<BoxStream<'a, ChannelEntry>, Self::Error> {
+    fn stream_channels<'a>(&'a self, _selector: ChannelSelector) -> Result<BoxStream<'a, ChannelEntry>, Self::Error> {
         Ok(Box::pin(stream::iter(self.channels.clone())))
     }
 }

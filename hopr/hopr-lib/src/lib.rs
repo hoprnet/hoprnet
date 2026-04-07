@@ -658,7 +658,6 @@ where
                 &self
                     .chain_api
                     .stream_channels(ChannelSelector::default().with_destination(me_onchain))
-                    .await
                     .map_err(HoprLibError::chain)?
                     .collect::<Vec<_>>()
                     .await,
@@ -671,7 +670,6 @@ where
                 &self
                     .chain_api
                     .stream_channels(ChannelSelector::default().with_source(me_onchain))
-                    .await
                     .map_err(HoprLibError::chain)?
                     .collect::<Vec<_>>()
                     .await,

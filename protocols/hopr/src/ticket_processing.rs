@@ -160,15 +160,15 @@ impl<Chain> HoprUnacknowledgedTicketProcessor<Chain> {
                 .eviction_listener(
                     |_, value: moka::sync::Cache<HalfKeyChallenge, UnacknowledgedTicket>, cause| {
                         if !matches!(cause, moka::notification::RemovalCause::Replaced) {
-                                #[cfg(all(feature = "telemetry", not(test)))]
-                                UNACK_PEERS.decrement(1.0);
+                            #[cfg(all(feature = "telemetry", not(test)))]
+                            UNACK_PEERS.decrement(1.0);
 
-                                #[cfg(all(feature = "telemetry", not(test)))]
+                            #[cfg(all(feature = "telemetry", not(test)))]
                             if matches!(
                                 cause,
                                 moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size
                             ) {
-                                    UNACK_PEER_EVICTIONS.increment();
+                                UNACK_PEER_EVICTIONS.increment();
                             }
                         }
                         // Explicitly invalidate all inner cache entries so their eviction
@@ -203,8 +203,7 @@ where
     ) -> Result<(), Self::Error> {
         tracing::trace!(%ticket, "received unacknowledged ticket");
 
-        self
-            .unacknowledged_tickets
+        self.unacknowledged_tickets
             .get_with_by_ref(next_hop, || {
                 #[cfg(all(feature = "telemetry", not(test)))]
                 UNACK_PEERS.increment(1.0);

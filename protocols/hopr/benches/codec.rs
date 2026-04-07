@@ -21,7 +21,7 @@ use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, MemorySurbStore, PacketDecoder, PacketEncoder, SurbStoreConfig,
 };
-use hopr_ticket_manager::{HoprTicketFactory, HoprTicketManager, RedbStore, RedbTicketQueue};
+use hopr_ticket_manager::{HoprTicketFactory, RedbStore};
 
 use crate::utils::{Node, PEERS, create_blokli_client, create_node};
 
@@ -145,12 +145,10 @@ fn hopr_encoder_bench(c: &mut Criterion) {
                 b.iter_batched(
                     || (create_encoder(&sender), acks.clone()),
                     |(encoder, acks)| encoder.encode_acknowledgements(&acks, &ack_recipient).unwrap(),
-                    BatchSize::SmallInput,
+                    BatchSize::PerIteration,
                 )
             },
-                BatchSize::PerIteration)
-            }
-        );
+        )
     }
 }
 
