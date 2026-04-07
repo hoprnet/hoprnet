@@ -80,10 +80,12 @@ pub enum HoprProtocolError {
 }
 
 impl HoprProtocolError {
+    /// Convenience method to create chain resolver error.
     pub fn resolver<E: Into<anyhow::Error>>(e: E) -> Self {
         Self::ResolverError(e.into())
     }
 
+    /// Convenience method to create ticket factory error.
     pub fn ticket_factory<E: Into<anyhow::Error>>(e: E) -> Self {
         Self::TicketFactoryError(e.into())
     }

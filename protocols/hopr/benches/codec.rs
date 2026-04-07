@@ -123,11 +123,10 @@ fn hopr_encoder_bench(c: &mut Criterion) {
             BenchmarkId::from_parameter(format!("{}hop_{}surbs_{}b", hops, rps, data.len())),
             &routing,
             |b, routing| {
-                let encoder = create_encoder(&sender);
                 b.iter_batched(
-                    || (data.clone(), routing.clone()),
-                    |(data, routing)| encoder.encode_packet(data, routing, None).unwrap(),
-                    BatchSize::SmallInput,
+                    || (create_encoder(&sender), data.clone(), routing.clone()),
+                    |(encoder, data, routing)| encoder.encode_packet(data, routing, None).unwrap(),
+                    BatchSize::PerIteration,
                 )
             },
         );

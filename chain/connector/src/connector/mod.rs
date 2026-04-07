@@ -307,17 +307,17 @@ where
                 })
                 .inspect_ok(|(new_ticket_price, new_win_prob)| {
                     // This cannot block, because there are no other concurrent writers/upgradeable readers
-                    let mut tv = ticket_values.upgradable_read();
-                    if let Some((current_win_prob, mut current_ticket_price)) = tv.as_ref().copied() {
-                        if &current_ticket_price != new_ticket_price {
-                            let mut tv_write = parking_lot::RwLockUpgradableReadGuard::upgrade(tv);
-                            tv_write.replace((current_win_prob, *new_ticket_price));
-                            tv = parking_lot::RwLockWriteGuard::downgrade_to_upgradable(tv_write);
-                            current_ticket_price = *new_ticket_price;
-                        }
-                        if !current_win_prob.approx_eq(new_win_prob) {
-                            let mut tv_write = parking_lot::RwLockUpgradableReadGuard::upgrade(tv);
-                            tv_write.replace((*new_win_prob, current_ticket_price));
+                    let tv = ticket_values.upgradable_read();
+                    if let Some((current_win_prob, current_ticket_price)) = tv.as_ref().copied() {
+                        if &current_ticket_price != new_ticket_price && !current_win_prob.approx_eq(new_win_prob) {
+                            parking_lot::RwLockUpgradableReadGuard::upgrade(tv)
+                                .replace((*new_win_prob, *new_ticket_price));
+                        } else if &current_ticket_price != new_ticket_price {
+                            parking_lot::RwLockUpgradableReadGuard::upgrade(tv)
+                                .replace((current_win_prob, *new_ticket_price));
+                        } else if !current_win_prob.approx_eq(new_win_prob) {
+                            parking_lot::RwLockUpgradableReadGuard::upgrade(tv)
+                                .replace((*new_win_prob, current_ticket_price));
                         }
                     }
                 })
@@ -570,11 +570,12 @@ where
 }
 
 impl<B, C, P, R> HoprBlockchainConnector<C, R, B, P> {
+    #[inline]
     pub(crate) fn check_connection_state(&self) -> Result<(), ConnectorError> {
         self.connection_handle
             .as_ref()
             .filter(|handle| !handle.is_aborted()) // Do a safety check
-            .ok_or(ConnectorError::InvalidState("connector is not connected"))
+            .ok_or_else(|| ConnectorError::InvalidState("connector is not connected"))
             .map(|_| ())
     }
 

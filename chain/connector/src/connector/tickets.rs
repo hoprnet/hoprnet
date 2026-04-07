@@ -11,6 +11,8 @@ impl<B, C, P, R> hopr_api::chain::ChainReadTicketOperations for HoprBlockchainCo
     type Error = ConnectorError;
 
     fn incoming_ticket_values(&self) -> Result<(WinningProbability, HoprBalance), Self::Error> {
+        self.check_connection_state()?;
+
         // Does not block unless Blokli constantly pushes updated winning probability or ticket price update
         self.ticket_values
             .read()
