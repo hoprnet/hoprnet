@@ -90,6 +90,9 @@ pub struct HoprBlockchainConnector<C, B, P, R> {
     channel_by_parties: moka::sync::Cache<ChannelParties, Option<ChannelEntry>, ahash::RandomState>,
     // Contains chain info (no TTL - kept fresh by subscription handler)
     values: moka::future::Cache<u32, ParsedChainInfo>,
+    // Ticket values (winning probability, price), kept fresh by subscription handler
+    // Set only when connected
+    ticket_values: std::sync::Arc<parking_lot::RwLock<Option<(WinningProbability, HoprBalance)>>>,
 }
 
 const EXPECTED_NUM_NODES: usize = 10_000;
@@ -155,6 +158,7 @@ where
                 .build_with_hasher(ahash::RandomState::default()),
             // No TTL: kept fresh by the Blokli subscription handler
             values: moka::future::CacheBuilder::new(1).build(),
+            ticket_values: Default::default(),
         }
     }
 
@@ -203,7 +207,10 @@ where
         let channel_by_parties = self.channel_by_parties.clone();
 
         // Query chain info to populate the cache
-        self.query_cached_chain_info().await?;
+        let initial_chain_values = self.query_cached_chain_info().await?;
+        self.ticket_values
+            .write()
+            .replace((initial_chain_values.ticket_win_prob, initial_chain_values.ticket_price));
 
         #[allow(clippy::large_enum_variant)]
         #[derive(Debug)]
@@ -214,6 +221,7 @@ where
             TicketPrice((HoprBalance, Option<HoprBalance>)),
         }
 
+        let ticket_values = self.ticket_values.clone();
         hopr_async_runtime::prelude::spawn(async move {
             let sync_started = std::time::Instant::now();
 
@@ -296,6 +304,22 @@ where
                 .inspect_ok(|entry| tracing::trace!(?entry, "new ticket params"))
                 .try_filter_map(|ticket_value_event| {
                     futures::future::ready(model_to_ticket_params(ticket_value_event).map(Some))
+                })
+                .inspect_ok(|(new_ticket_price, new_win_prob)| {
+                    // This cannot block, because there are no other concurrent writers/upgradeable readers
+                    let mut tv = ticket_values.upgradable_read();
+                    if let Some((current_win_prob, mut current_ticket_price)) = tv.as_ref().copied() {
+                        if &current_ticket_price != new_ticket_price {
+                            let mut tv_write = parking_lot::RwLockUpgradableReadGuard::upgrade(tv);
+                            tv_write.replace((current_win_prob, *new_ticket_price));
+                            tv = parking_lot::RwLockWriteGuard::downgrade_to_upgradable(tv_write);
+                            current_ticket_price = *new_ticket_price;
+                        }
+                        if !current_win_prob.approx_eq(new_win_prob) {
+                            let mut tv_write = parking_lot::RwLockUpgradableReadGuard::upgrade(tv);
+                            tv_write.replace((*new_win_prob, current_ticket_price));
+                        }
+                    }
                 })
                 .and_then(|(new_ticket_price, new_win_prob)| {
                     let values_cache = values_cache.clone();

@@ -1053,7 +1053,7 @@ where
             futures::stream::iter(self.transport_api.all_network_peers(minimum_score).await?)
                 .filter_map(|(pubkey, info)| async move {
                     let peer_id = PeerId::from(pubkey);
-                    let address = self.peerid_to_chain_key(&peer_id).await.ok().flatten();
+                    let address = self.peerid_to_chain_key(&peer_id).ok().flatten();
                     Some((address, peer_id, info))
                 })
                 .collect::<Vec<_>>()
@@ -1070,16 +1070,14 @@ where
     }
 
     async fn network_observed_multiaddresses(&self, peer: &PeerId) -> Vec<Multiaddr> {
-        let Ok(pubkey) = hopr_transport::peer_id_to_public_key(peer).await else {
+        let Ok(pubkey) = hopr_transport::peer_id_to_public_key(peer) else {
             return vec![];
         };
         self.transport_api.network_observed_multiaddresses(&pubkey).await
     }
 
     async fn multiaddresses_announced_on_chain(&self, peer: &PeerId) -> Result<Vec<Multiaddr>, Self::Error> {
-        let pubkey = hopr_transport::peer_id_to_public_key(peer)
-            .await
-            .map_err(HoprLibError::TransportError)?;
+        let pubkey = hopr_transport::peer_id_to_public_key(peer).map_err(HoprLibError::TransportError)?;
 
         match self
             .chain_api
@@ -1102,9 +1100,7 @@ where
 
     async fn ping(&self, peer: &PeerId) -> Result<(Duration, Self::TransportObservable), Self::Error> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
-        let pubkey = hopr_transport::peer_id_to_public_key(peer)
-            .await
-            .map_err(HoprLibError::TransportError)?;
+        let pubkey = hopr_transport::peer_id_to_public_key(peer).map_err(HoprLibError::TransportError)?;
         Ok(self.transport_api.ping(&pubkey).await?)
     }
 }
@@ -1200,32 +1196,26 @@ where
             .await)
     }
 
-    pub async fn peerid_to_chain_key(&self, peer_id: &PeerId) -> Result<Option<Address>, HoprLibError> {
-        let pubkey = hopr_transport::peer_id_to_public_key(peer_id)
-            .await
-            .map_err(HoprLibError::TransportError)?;
+    pub fn peerid_to_chain_key(&self, peer_id: &PeerId) -> Result<Option<Address>, HoprLibError> {
+        let pubkey = hopr_transport::peer_id_to_public_key(peer_id).map_err(HoprLibError::TransportError)?;
 
-        // TODO: block
         self.chain_api
             .packet_key_to_chain_key(&pubkey)
             .map_err(HoprLibError::chain)
     }
 
-    pub async fn chain_key_to_peerid(&self, address: &Address) -> Result<Option<PeerId>, HoprLibError> {
-        // TODO: block
+    pub fn chain_key_to_peerid(&self, address: &Address) -> Result<Option<PeerId>, HoprLibError> {
         self.chain_api
             .chain_key_to_packet_key(address)
             .map(|pk| pk.map(|v| v.into()))
             .map_err(HoprLibError::chain)
     }
 
-    pub async fn channel_from_hash(&self, channel_id: &Hash) -> Result<Option<ChannelEntry>, HoprLibError> {
-        // TODO: block
+    pub fn channel_from_hash(&self, channel_id: &Hash) -> Result<Option<ChannelEntry>, HoprLibError> {
         self.chain_api.channel_by_id(channel_id).map_err(HoprLibError::chain)
     }
 
-    pub async fn channel(&self, src: &Address, dest: &Address) -> Result<Option<ChannelEntry>, HoprLibError> {
-        // TODO: block
+    pub fn channel(&self, src: &Address, dest: &Address) -> Result<Option<ChannelEntry>, HoprLibError> {
         self.chain_api
             .channel_by_parties(src, dest)
             .map_err(HoprLibError::chain)
@@ -1430,12 +1420,16 @@ where
 
         let min_value = min_value.into();
 
-        // TODO: block
-        let channel = self
-            .chain_api
-            .channel_by_id(channel_id)
-            .map_err(HoprLibError::chain)?
-            .ok_or(HoprLibError::GeneralError("channel not found".into()))?;
+        let chain_api = self.chain_api.clone();
+        let channel_id = *channel_id;
+        let channel = hopr_async_runtime::prelude::spawn_blocking(move || {
+            chain_api
+                .channel_by_id(&channel_id)
+                .map_err(HoprLibError::chain)?
+                .ok_or(HoprLibError::GeneralError("channel not found".into()))
+        })
+        .await
+        .map_err(HoprLibError::other)??;
 
         self.ticket_management()?
             .redeem_in_channels(

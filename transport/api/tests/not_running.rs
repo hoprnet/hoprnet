@@ -211,19 +211,19 @@ async fn announceable_multiaddresses_snapshot() -> anyhow::Result<()> {
 
 // --- peer_id_to_public_key utility ---
 
-#[tokio::test]
-async fn peer_id_converts_to_public_key() -> anyhow::Result<()> {
+#[test]
+fn peer_id_converts_to_public_key() -> anyhow::Result<()> {
     let peer_id = PeerId::from(*PEER_KEYS[0].0.public());
-    let key = peer_id_to_public_key(&peer_id).await?;
+    let key = peer_id_to_public_key(&peer_id)?;
     assert_eq!(key, *PEER_KEYS[0].0.public());
     Ok(())
 }
 
-#[tokio::test]
-async fn peer_id_conversion_is_repeatable() -> anyhow::Result<()> {
+#[test]
+fn peer_id_conversion_is_repeatable() -> anyhow::Result<()> {
     let peer_id = PeerId::from(*PEER_KEYS[1].0.public());
-    let k1 = peer_id_to_public_key(&peer_id).await?;
-    let k2 = peer_id_to_public_key(&peer_id).await?;
+    let k1 = peer_id_to_public_key(&peer_id)?;
+    let k2 = peer_id_to_public_key(&peer_id)?;
     assert_eq!(k1, k2);
     Ok(())
 }

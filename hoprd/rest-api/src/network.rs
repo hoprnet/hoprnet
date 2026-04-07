@@ -164,7 +164,7 @@ pub(super) async fn connected(State(state): State<Arc<InternalState>>) -> impl I
             continue;
         }
 
-        let address = match hopr.peerid_to_chain_key(&(*dst).into()).await {
+        let address = match hopr.peerid_to_chain_key(&(*dst).into()) {
             Ok(Some(addr)) => addr,
             _ => continue,
         };
@@ -330,7 +330,7 @@ pub(super) async fn graph(
 
     let mut key_to_addr: HashMap<hopr_lib::OffchainPublicKey, String> = HashMap::new();
     for key in &unique_keys {
-        let label = match hopr.peerid_to_chain_key(&(*key).into()).await {
+        let label = match hopr.peerid_to_chain_key(&(*key).into()) {
             Ok(Some(addr)) => addr.to_string(),
             _ => key.to_string(),
         };

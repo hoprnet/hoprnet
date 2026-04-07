@@ -93,7 +93,7 @@ pub(super) async fn show_peer_info(
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match hopr.chain_key_to_peerid(&destination).await {
+    match hopr.chain_key_to_peerid(&destination) {
         Ok(Some(peer)) => {
             let res = futures::try_join!(
                 hopr.multiaddresses_announced_on_chain(&peer),
@@ -169,7 +169,7 @@ pub(super) async fn ping_peer(
 
     let hopr = state.hopr.clone();
 
-    match hopr.chain_key_to_peerid(&destination).await {
+    match hopr.chain_key_to_peerid(&destination) {
         Ok(Some(peer)) => match hopr.ping(&peer).await {
             Ok((latency, _status)) => {
                 let resp = Json(PingResponse { latency: latency / 2 });

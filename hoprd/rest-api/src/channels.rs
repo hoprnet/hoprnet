@@ -361,7 +361,7 @@ pub(super) async fn show_channel(
     let hopr = state.hopr.clone();
 
     match Hash::from_hex(channel_id.as_str()) {
-        Ok(channel_id) => match hopr.channel_from_hash(&channel_id).await {
+        Ok(channel_id) => match hopr.channel_from_hash(&channel_id) {
             Ok(Some(channel)) => {
                 let info = query_topology_info(channel).await;
                 match info {

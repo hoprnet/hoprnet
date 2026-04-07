@@ -127,7 +127,7 @@ impl TestedHopr {
     }
 
     pub async fn channel_from_hash(&self, channel_hash: &prelude::Hash) -> Option<ChannelEntry> {
-        self.instance.channel_from_hash(channel_hash).await.unwrap_or(None)
+        self.instance.channel_from_hash(channel_hash).unwrap_or(None)
     }
 
     pub async fn outgoing_channels_by_status(&self, status: ChannelStatus) -> Option<Vec<ChannelEntry>> {
@@ -198,8 +198,7 @@ impl ChannelGuard {
             let channel_id = *channel_id;
             async move {
                 if hopr
-                    .channel_from_hash(&channel_id)
-                    .await?
+                    .channel_from_hash(&channel_id)?
                     .is_some_and(|c| matches!(c.status, ChannelStatus::Open))
                 {
                     hopr.close_channel_by_id(&channel_id)
@@ -221,7 +220,7 @@ impl ChannelGuard {
             let channel_id = *channel_id;
             super::wait_until(
                 || async {
-                    let ch = hopr.channel_from_hash(&channel_id).await.ok().flatten();
+                    let ch = hopr.channel_from_hash(&channel_id).ok().flatten();
                     match ch.as_ref().map(|c| &c.status) {
                         None | Some(ChannelStatus::Closed) => return Ok(true),
                         Some(ChannelStatus::PendingToClose(_)) => {
@@ -256,7 +255,7 @@ impl Drop for ChannelGuard {
                     for (hopr, channel_id) in &channels {
                         let _ = super::wait_until(
                             || async {
-                                let ch = hopr.channel_from_hash(channel_id).await.ok().flatten();
+                                let ch = hopr.channel_from_hash(channel_id).ok().flatten();
                                 match ch.as_ref().map(|c| &c.status) {
                                     None | Some(ChannelStatus::Closed) => return Ok(true),
                                     Some(ChannelStatus::PendingToClose(_)) => {

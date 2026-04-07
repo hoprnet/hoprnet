@@ -16,7 +16,7 @@ use crate::{
 pub struct HoprDecoder<Chain, S, T> {
     chain_api: Chain,
     surb_store: std::sync::Arc<S>,
-    tracker: T,
+    ticket_factory: T,
     packet_key: OffchainKeypair,
     chain_key: ChainKeypair,
     channels_dst: Hash,
@@ -47,7 +47,7 @@ where
             chain_key,
             channels_dst,
             cfg,
-            tracker,
+            ticket_factory: tracker,
             tbf: parking_lot::Mutex::new(Default::default()),
             peer_id_cache: moka::sync::Cache::builder()
                 .time_to_idle(Duration::from_secs(600))
@@ -94,9 +94,9 @@ where
             .max(self.cfg.min_incoming_ticket_price.unwrap_or_default());
 
         let remaining_balance = trace_timed!("unrealized_balance lookup", {
-            self.tracker
+            self.ticket_factory
                 .remaining_incoming_channel_stake(&incoming_channel)
-                .map_err(|e| HoprProtocolError::TicketTrackerError(e.into()))?
+                .map_err(HoprProtocolError::ticket_factory)?
         });
 
         // Here also the signature on the ticket gets validated,
@@ -146,14 +146,14 @@ where
             // The following operation fails if there's not enough balance on the channel to the next hop.
             // Again, in this case, we cannot save the ticket we previously extracted because there is no way it gets
             // acknowledged without enough balance.
-            self.tracker
+            self.ticket_factory
                 .new_multihop_ticket(
                     &outgoing_channel,
                     fwd.path_pos.try_into().expect("path position is always > 1"),
                     outgoing_ticket_win_prob,
                     outgoing_ticket_price,
                 )
-                .map_err(|e| HoprProtocolError::TicketTrackerError(e.into()))?
+                .map_err(HoprProtocolError::ticket_factory)?
         } else {
             TicketBuilder::zero_hop().counterparty(next_hop_addr)
         };

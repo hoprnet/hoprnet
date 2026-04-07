@@ -89,7 +89,7 @@ where
                     outgoing_ticket_win_prob,
                     outgoing_ticket_price,
                 )
-                .map_err(|e| HoprProtocolError::TicketTrackerError(e.into()))?
+                .map_err(HoprProtocolError::ticket_factory)?
         } else {
             TicketBuilder::zero_hop().counterparty(next_peer)
         };

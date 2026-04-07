@@ -10,16 +10,13 @@ use crate::{backend::Backend, connector::HoprBlockchainConnector, errors::Connec
 impl<B, C, P, R> hopr_api::chain::ChainReadTicketOperations for HoprBlockchainConnector<C, B, P, R> {
     type Error = ConnectorError;
 
-    fn outgoing_ticket_values(
-        &self,
-        configured_wp: Option<WinningProbability>,
-        configured_price: Option<HoprBalance>,
-    ) -> Result<(WinningProbability, HoprBalance), Self::Error> {
-        todo!()
-    }
-
     fn incoming_ticket_values(&self) -> Result<(WinningProbability, HoprBalance), Self::Error> {
-        todo!()
+        // Does not block unless Blokli constantly pushes updated winning probability or ticket price update
+        self.ticket_values
+            .read()
+            .as_ref()
+            .copied()
+            .ok_or_else(|| ConnectorError::InvalidState("connector is not connected"))
     }
 }
 

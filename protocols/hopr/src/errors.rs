@@ -60,8 +60,8 @@ pub enum HoprProtocolError {
     #[error("chain resolver error: {0}")]
     ResolverError(#[source] anyhow::Error),
 
-    #[error("ticket tracker error: {0}")]
-    TicketTrackerError(#[source] anyhow::Error),
+    #[error("ticket factory error: {0}")]
+    TicketFactoryError(#[source] anyhow::Error),
 
     #[error(transparent)]
     TicketValidationError(#[from] TicketValidationError),
@@ -84,7 +84,7 @@ impl HoprProtocolError {
         Self::ResolverError(e.into())
     }
 
-    pub fn ticket_tracker<E: Into<anyhow::Error>>(e: E) -> Self {
-        Self::TicketTrackerError(e.into())
+    pub fn ticket_factory<E: Into<anyhow::Error>>(e: E) -> Self {
+        Self::TicketFactoryError(e.into())
     }
 }

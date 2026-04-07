@@ -204,12 +204,15 @@ where
 
     async fn on_acknowledged_winning_ticket(&self, ack: &VerifiedTicket) -> crate::errors::Result<()> {
         if self.cfg.redeem_on_winning && ack.verified_ticket().amount.ge(&self.cfg.minimum_redeem_ticket_value) {
-            // TODO: block
-            if let Some(channel) = self
-                .hopr_chain_actions
-                .channel_by_id(ack.channel_id())
-                .map_err(StrategyError::other)?
-            {
+            let chain_api = self.hopr_chain_actions.clone();
+            let channel_id = *ack.channel_id();
+            let maybe_channel = hopr_async_runtime::prelude::spawn_blocking(move || {
+                chain_api.channel_by_id(&channel_id).map_err(StrategyError::other)
+            })
+            .await
+            .map_err(StrategyError::other)??;
+
+            if let Some(channel) = maybe_channel {
                 tracing::info!(%ack, "redeeming");
 
                 if ack.verified_ticket().index < channel.ticket_index {
