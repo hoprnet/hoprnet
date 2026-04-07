@@ -4820,7 +4820,6 @@ dependencies = [
  "bloomfilter",
  "cfg_eval",
  "criterion",
- "futures",
  "hex",
  "hex-literal",
  "hopr-api",
