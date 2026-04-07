@@ -145,4 +145,25 @@ mod tests {
         assert_eq!(1, filter.count());
         assert!(filter.check(&ONES_TAG));
     }
+
+    #[test]
+    fn tag_bloom_filter_set_method() {
+        let mut filter = TagBloomFilter::with_capacity(2);
+        filter.set(&ZEROS_TAG);
+        assert_eq!(1, filter.count());
+        assert!(filter.check(&ZEROS_TAG));
+
+        filter.set(&ONES_TAG);
+        assert_eq!(2, filter.count());
+        assert!(filter.check(&ONES_TAG));
+
+        // This should trigger reset
+        let another_tag: PacketTag = [0x42; PACKET_TAG_LENGTH];
+        filter.set(&another_tag);
+        assert_eq!(1, filter.count());
+        assert!(filter.check(&another_tag));
+        // Bloom filter might still have other tags due to nature of bloom filter,
+        // but it was cleared, so for a small capacity they should likely be gone
+        // (unless there is a collision).
+    }
 }

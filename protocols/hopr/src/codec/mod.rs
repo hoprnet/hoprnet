@@ -259,4 +259,85 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn decode_should_fail_on_invalid_data() -> anyhow::Result<()> {
+        let blokli_client = create_blokli_client()?;
+        let receiver = create_node(0, &blokli_client).await?;
+        let decoder = create_decoder(&receiver);
+
+        let sender_peer_id = PEERS[1].1.public().into();
+        let invalid_data = vec![0u8; 100].into_boxed_slice();
+
+        let result = decoder.decode(sender_peer_id, invalid_data);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().is_undecodable());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn decode_should_fail_on_replay() -> anyhow::Result<()> {
+        let blokli_client = create_blokli_client()?;
+        let sender = create_node(0, &blokli_client).await?;
+        let receiver = create_node(1, &blokli_client).await?;
+
+        let encoder = create_encoder(&sender);
+        let decoder = create_decoder(&receiver);
+
+        let data = b"some message";
+        let out_packet = encoder.encode_packet(
+            data,
+            ResolvedTransportRouting::Forward {
+                pseudonym: HoprPseudonym::random(),
+                forward_path: ValidatedPath::direct(
+                    *receiver.offchain_key.public(),
+                    receiver.chain_key.public().to_address(),
+                ),
+                return_paths: vec![],
+            },
+            None,
+        )?;
+
+        // First decode should succeed
+        decoder.decode(sender.offchain_key.public().into(), out_packet.data.clone())?;
+
+        // Second decode with same packet should fail (replay)
+        let result = decoder.decode(sender.offchain_key.public().into(), out_packet.data);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().is_processing_error());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn decode_should_fail_on_incorrect_key() -> anyhow::Result<()> {
+        let blokli_client = create_blokli_client()?;
+        let sender = create_node(0, &blokli_client).await?;
+        let receiver = create_node(1, &blokli_client).await?;
+        let incorrect_receiver = create_node(2, &blokli_client).await?;
+
+        let encoder = create_encoder(&sender);
+        let decoder = create_decoder(&incorrect_receiver);
+
+        let data = b"some message";
+        let out_packet = encoder.encode_packet(
+            data,
+            ResolvedTransportRouting::Forward {
+                pseudonym: HoprPseudonym::random(),
+                forward_path: ValidatedPath::direct(
+                    *receiver.offchain_key.public(),
+                    receiver.chain_key.public().to_address(),
+                ),
+                return_paths: vec![],
+            },
+            None,
+        )?;
+
+        let result = decoder.decode(sender.offchain_key.public().into(), out_packet.data);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().is_undecodable());
+
+        Ok(())
+    }
 }

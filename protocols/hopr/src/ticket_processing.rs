@@ -478,4 +478,42 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn ticket_processor_should_ignore_bogus_acknowledgements() -> anyhow::Result<()> {
+        let blokli_client = create_blokli_client()?;
+        let node = create_node(1, &blokli_client).await?;
+        let ticket_processor = HoprUnacknowledgedTicketProcessor::new(
+            node.chain_api.clone(),
+            node.chain_key.clone(),
+            Hash::default(),
+            HoprUnacknowledgedTicketProcessorConfig::default(),
+        );
+
+        let own_share = HalfKey::random();
+        let ack_share = HalfKey::random();
+        let challenge = Challenge::from_own_share_and_half_key(&own_share.to_challenge()?, &ack_share)?;
+
+        let unack_ticket = TicketBuilder::default()
+            .counterparty(&PEERS[1].0)
+            .index(0)
+            .channel_epoch(1)
+            .amount(10_u32)
+            .challenge(challenge)
+            .build_signed(&PEERS[0].0, &Hash::default())?
+            .into_unacknowledged(own_share);
+
+        ticket_processor.insert_unacknowledged_ticket(PEERS[2].1.public(), ack_share.to_challenge()?, unack_ticket)?;
+
+        // Create an acknowledgement from a DIFFERENT peer, but we'll try to pass it as if it's from PEERS[2]
+        let bogus_ack_share = HalfKey::random();
+        let bogus_ack = VerifiedAcknowledgement::new(bogus_ack_share, &PEERS[1].1).leak();
+
+        let resolutions = ticket_processor.acknowledge_tickets(*PEERS[2].1.public(), vec![bogus_ack])?;
+        // Should ignore because signature is invalid (it's from PEERS[1] but we're telling the processor it's from
+        // PEERS[2])
+        assert_eq!(0, resolutions.len());
+
+        Ok(())
+    }
 }
