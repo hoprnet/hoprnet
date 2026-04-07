@@ -148,7 +148,7 @@ fn hopr_encoder_bench(c: &mut Criterion) {
                     BatchSize::PerIteration,
                 )
             },
-        )
+        );
     }
 }
 

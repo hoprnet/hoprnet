@@ -46,7 +46,6 @@ impl StubChain {
     }
 }
 
-#[async_trait]
 impl ChainReadChannelOperations for StubChain {
     type Error = StubError;
 
@@ -54,14 +53,11 @@ impl ChainReadChannelOperations for StubChain {
         &self.me_addr
     }
 
-    async fn channel_by_id(&self, _channel_id: &ChannelId) -> Result<Option<ChannelEntry>, Self::Error> {
+    fn channel_by_id(&self, _channel_id: &ChannelId) -> Result<Option<ChannelEntry>, Self::Error> {
         Ok(None)
     }
 
-    async fn stream_channels<'a>(
-        &'a self,
-        _selector: ChannelSelector,
-    ) -> Result<BoxStream<'a, ChannelEntry>, Self::Error> {
+    fn stream_channels<'a>(&'a self, _selector: ChannelSelector) -> Result<BoxStream<'a, ChannelEntry>, Self::Error> {
         Ok(Box::pin(stream::empty()))
     }
 }
@@ -70,10 +66,7 @@ impl ChainReadChannelOperations for StubChain {
 impl ChainReadAccountOperations for StubChain {
     type Error = StubError;
 
-    async fn stream_accounts<'a>(
-        &'a self,
-        _selector: AccountSelector,
-    ) -> Result<BoxStream<'a, AccountEntry>, Self::Error> {
+    fn stream_accounts<'a>(&'a self, _selector: AccountSelector) -> Result<BoxStream<'a, AccountEntry>, Self::Error> {
         Ok(Box::pin(stream::empty()))
     }
 
@@ -87,6 +80,25 @@ impl ChainReadAccountOperations for StubChain {
         _timeout: Duration,
     ) -> Result<AccountEntry, Self::Error> {
         Err(StubError("not implemented".into()))
+    }
+}
+
+impl ChainReadTicketOperations for StubChain {
+    type Error = StubError;
+
+    fn outgoing_ticket_values(
+        &self,
+        configured_wp: Option<WinningProbability>,
+        configured_price: Option<HoprBalance>,
+    ) -> Result<(WinningProbability, HoprBalance), Self::Error> {
+        Ok((
+            configured_wp.unwrap_or(WinningProbability::ALWAYS),
+            configured_price.unwrap_or(1.into()),
+        ))
+    }
+
+    fn incoming_ticket_values(&self) -> Result<(WinningProbability, HoprBalance), Self::Error> {
+        Ok((WinningProbability::ALWAYS, 1.into()))
     }
 }
 
@@ -121,16 +133,15 @@ impl KeyIdMapping<KeyIdent, OffchainPublicKey> for StubKeyMapper {
     }
 }
 
-#[async_trait]
 impl ChainKeyOperations for StubChain {
     type Error = StubError;
     type Mapper = StubKeyMapper;
 
-    async fn chain_key_to_packet_key(&self, chain: &Address) -> Result<Option<OffchainPublicKey>, Self::Error> {
+    fn chain_key_to_packet_key(&self, chain: &Address) -> Result<Option<OffchainPublicKey>, Self::Error> {
         Ok(self.keys.get_by_left(chain).copied())
     }
 
-    async fn packet_key_to_chain_key(&self, packet: &OffchainPublicKey) -> Result<Option<Address>, Self::Error> {
+    fn packet_key_to_chain_key(&self, packet: &OffchainPublicKey) -> Result<Option<Address>, Self::Error> {
         Ok(self.keys.get_by_right(packet).copied())
     }
 

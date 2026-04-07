@@ -22,7 +22,7 @@ use hopr_protocol_hopr::{
     SurbStoreConfig,
 };
 use hopr_test_stubs::{StubChainApi, StubPathResolver};
-use hopr_ticket_manager::{HoprTicketFactory, HoprTicketManager, MemoryStore};
+use hopr_ticket_manager::{HoprTicketFactory, MemoryStore};
 use hopr_transport_mixer::config::MixerConfig;
 use hopr_transport_protocol::TicketEvent;
 use libp2p::PeerId;
@@ -136,7 +136,6 @@ fn pipeline_e2e_forward(c: &mut Criterion) {
             let ack = VerifiedAcknowledgement::random(&PEERS[SENDER_IDX]);
             let packet = ack_encoder
                 .encode_acknowledgements(&[ack], PEERS[SENDER_IDX].public())
-                .await
                 .expect("ack encoding must succeed");
             buffer.push((sender_peer_id, packet.data));
         }

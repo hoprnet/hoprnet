@@ -189,6 +189,25 @@ impl ChainReadChannelOperations for StubChainApi {
     }
 }
 
+impl ChainReadTicketOperations for StubChainApi {
+    type Error = StubError;
+
+    fn outgoing_ticket_values(
+        &self,
+        configured_wp: Option<WinningProbability>,
+        configured_price: Option<HoprBalance>,
+    ) -> Result<(WinningProbability, HoprBalance), Self::Error> {
+        Ok((
+            configured_wp.unwrap_or(self.win_prob),
+            configured_price.unwrap_or(self.ticket_price),
+        ))
+    }
+
+    fn incoming_ticket_values(&self) -> Result<(WinningProbability, HoprBalance), Self::Error> {
+        Ok((self.win_prob, self.ticket_price))
+    }
+}
+
 // -- ChainValues ------------------------------------------------------------
 
 #[async_trait::async_trait]
