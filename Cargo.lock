@@ -4353,7 +4353,7 @@ dependencies = [
 [[package]]
 name = "hopr-api"
 version = "1.5.0"
-source = "git+https://github.com/hoprnet/hopr-api?branch=lukas%2Fticket-factory-api#cf8e0163f8be039aaac68290137fb47c4d0d3114"
+source = "git+https://github.com/hoprnet/hopr-api?rev=05816d0bb7645d05c67f1091c2216fd7c83a96cf#05816d0bb7645d05c67f1091c2216fd7c83a96cf"
 dependencies = [
  "async-trait",
  "atomic_enum",
