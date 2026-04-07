@@ -21,7 +21,7 @@ pub const MAX_ACKNOWLEDGEMENTS_BATCH_SIZE: usize =
 pub struct HoprEncoder<Chain, S, T> {
     chain_api: Chain,
     surb_store: S,
-    tracker: T,
+    ticket_factory: T,
     chain_key: ChainKeypair,
     channels_dst: Hash,
     cfg: HoprCodecConfig,
@@ -33,14 +33,14 @@ impl<Chain, S, T> HoprEncoder<Chain, S, T> {
         chain_key: ChainKeypair,
         chain_api: Chain,
         surb_store: S,
-        tracker: T,
+        ticket_factory: T,
         channels_dst: Hash,
         cfg: HoprCodecConfig,
     ) -> Self {
         Self {
             chain_api,
             surb_store,
-            tracker,
+            ticket_factory,
             chain_key,
             channels_dst,
             cfg,
@@ -82,7 +82,7 @@ where
                 .outgoing_ticket_values(self.cfg.outgoing_win_prob, self.cfg.outgoing_ticket_price)
                 .map_err(HoprProtocolError::resolver)?;
 
-            self.tracker
+            self.ticket_factory
                 .new_multihop_ticket(
                     &channel,
                     (num_hops as u8).try_into().expect("cannot fail due to num_hops > 1"),

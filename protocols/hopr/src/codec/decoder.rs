@@ -36,7 +36,7 @@ where
         (packet_key, chain_key): (OffchainKeypair, ChainKeypair),
         chain_api: Chain,
         surb_store: S,
-        tracker: T,
+        ticket_factory: T,
         channels_dst: Hash,
         cfg: HoprCodecConfig,
     ) -> Self {
@@ -47,7 +47,7 @@ where
             chain_key,
             channels_dst,
             cfg,
-            ticket_factory: tracker,
+            ticket_factory,
             tbf: parking_lot::Mutex::new(Default::default()),
             peer_id_cache: moka::sync::Cache::builder()
                 .time_to_idle(Duration::from_secs(600))
