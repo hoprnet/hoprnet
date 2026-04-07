@@ -141,7 +141,7 @@ impl IncomingPacket {
     }
 }
 
-/// Contains a SURB found in the SURB ring buffer via  [`SurbStore::find_surb`].
+/// Contains a SURB found in the SURB ring buffer via `SurbStore::find_surb`.
 #[derive(Debug)]
 pub struct FoundSurb {
     /// Complete sender ID of the SURB.

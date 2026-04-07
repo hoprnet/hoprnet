@@ -20,16 +20,21 @@ const QUEUE_SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_millis
 const PACKET_DECODING_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(150);
 const PACKET_ENCODING_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(150);
 
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_PACKET_COUNT:  hopr_metrics::MultiCounter =  hopr_metrics::MultiCounter::new(
         "hopr_packets_count",
         "Number of processed packets of different types (sent, received, forwarded)",
         &["type"]
     ).unwrap();
+    static ref METRIC_PACKET_REJECTED_COUNT: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+        "hopr_packet_rejected_count",
+        "Number of incoming packets rejected due various reasons",
+        &["reason"]
+    ).unwrap();
     // Tracks how often the Rayon-backed packet decode path exceeds PACKET_DECODING_TIMEOUT.
     // A sustained non-zero rate here indicates the Rayon pool is saturated—correlate with
-    // hopr_rayon_tasks_cancelled_total and hopr_rayon_queue_wait_seconds to diagnose whether
+    // `hopr_rayon_tasks_cancelled_total` and hopr_rayon_queue_wait_seconds to diagnose whether
     // the bottleneck is queue depth, individual task duration, or both.
     static ref METRIC_PACKET_DECODE_TIMEOUTS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
         "hopr_packet_decode_timeouts_total",
@@ -70,6 +75,7 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
     app_outgoing: AppOut,
     encoder: std::sync::Arc<E>,
     wire_outgoing: WOut,
+    counters: crate::counters::PeerProtocolCounterRegistry,
     concurrency: usize,
 ) where
     AppOut: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
@@ -81,6 +87,7 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
         .then_concurrent(
             |(routing, data)| {
                 let encoder = encoder.clone();
+                let counters = counters.clone();
                 async move {
                     match hopr_parallelize::cpu::spawn_fifo_blocking(
                         move || {
@@ -98,9 +105,10 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
                     .await
                     {
                         Ok(Ok(Ok(packet))) => {
-                            #[cfg(all(feature = "prometheus", not(test)))]
+                            #[cfg(all(feature = "telemetry", not(test)))]
                             METRIC_PACKET_COUNT.increment(&["sent"]);
 
+                            counters.get_or_create(&packet.next_hop).record_message_sent();
                             tracing::trace!(peer = packet.next_hop.to_peerid_str(), "protocol message out");
                             Some((packet.next_hop.into(), packet.data))
                         }
@@ -147,6 +155,7 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
 ///                             | --> `wire_outgoing` (forwarded)
 ///                             | --> `ack_incoming` (forwarded)
 ///                             | --> `app_incoming` (final)
+#[allow(clippy::too_many_arguments)]
 async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, AppIn, AppInErr>(
     (wire_outgoing, wire_incoming): (WOut, WIn),
     decoder: std::sync::Arc<D>,
@@ -154,6 +163,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
     ticket_events: TEvt,
     (ack_outgoing, ack_incoming): (AckOut, AckIn),
     app_incoming: AppIn,
+    counters: crate::counters::PeerProtocolCounterRegistry,
     concurrency: usize,
 ) where
     WIn: futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + 'static,
@@ -190,11 +200,23 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                         tracing::trace!(%peer, ?packet, "successfully decoded incoming packet");
                         Some(packet)
                     },
-                    Ok(Ok(Err(IncomingPacketError::Undecodable(error)))) => {
+                    Ok(Err(IncomingPacketError::Overloaded(error))) => {
+                        tracing::warn!(%peer, %error, "dropping packet due to local CPU overload");
+
+                        #[cfg(all(feature = "telemetry", not(test)))]
+                        METRIC_PACKET_REJECTED_COUNT.increment(&["overloaded"]);
+
+                        None
+                    },
+                    Ok(Err(IncomingPacketError::Undecodable(error))) => {
                         // Do not send an ack back if the packet could not be decoded at all
                         //
                         // Potentially adversarial behavior
                         tracing::trace!(%peer, %error, "not sending ack back on undecodable packet - possible adversarial behavior");
+
+                        #[cfg(all(feature = "telemetry", not(test)))]
+                        METRIC_PACKET_REJECTED_COUNT.increment(&["undecodable"]);
+
                         None
                     },
                     Ok(Ok(Err(IncomingPacketError::ProcessingError(sender, error)))) => {
@@ -206,6 +228,10 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             .unwrap_or_else(|error| {
                                 tracing::error!(%error, "failed to send ack to the egress queue");
                             });
+
+                        #[cfg(all(feature = "telemetry", not(test)))]
+                        METRIC_PACKET_REJECTED_COUNT.increment(&["processing_error"]);
+
                         None
                     },
                     Ok(Ok(Err(IncomingPacketError::InvalidTicket(sender, error)))) => {
@@ -223,8 +249,11 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                                 tracing::error!(%error, "failed to send ack to the egress queue");
                             });
 
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_VALIDATION_ERRORS.increment(&[error.kind.as_ref()]);
+                        #[cfg(all(feature = "telemetry", not(test)))]
+                        {
+                            METRIC_VALIDATION_ERRORS.increment(&[error.kind.as_ref()]);
+                            METRIC_PACKET_REJECTED_COUNT.increment(&["invalid_ticket"]);
+                        }
 
                         None
                     }
@@ -239,8 +268,11 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             timeout_ms = PACKET_DECODING_TIMEOUT.as_millis() as u64,
                             "dropped incoming packet: decode timeout - check the 'hopr_rayon_queue_wait_seconds' metric for pool saturation"
                         );
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_PACKET_DECODE_TIMEOUTS.increment();
+                        #[cfg(all(feature = "telemetry", not(test)))]
+                        {
+                            METRIC_PACKET_DECODE_TIMEOUTS.increment();
+                            METRIC_PACKET_REJECTED_COUNT.increment(&["timeout"]);
+                        }
 
                         None
                     }
@@ -253,6 +285,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
             let mut wire_outgoing = wire_outgoing.clone();
             let mut ack_incoming = ack_incoming.clone();
             let mut ack_outgoing_success = ack_outgoing_success.clone();
+            let counters = counters.clone();
             async move {
                 match packet {
                     IncomingPacket::Acknowledgement(ack) => {
@@ -287,7 +320,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                                 tracing::error!(%error, "failed to send ack to the egress queue");
                             });
 
-                        #[cfg(all(feature = "prometheus", not(test)))]
+                        #[cfg(all(feature = "telemetry", not(test)))]
                         METRIC_PACKET_COUNT.increment(&["received"]);
 
                         Some((sender, plain_text, info))
@@ -310,6 +343,10 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                                 %error,
                                 "failed to insert unacknowledged ticket into the ticket processor"
                             );
+
+                            #[cfg(all(feature = "telemetry", not(test)))]
+                            METRIC_PACKET_REJECTED_COUNT.increment(&["unack_processing_error"]);
+
                             return None;
                         }
 
@@ -320,15 +357,18 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             "forwarding packet to the next hop"
                         );
 
-                        wire_outgoing
-                            .send((next_hop.into(), data))
-                            .await
-                            .unwrap_or_else(|error| {
-                                tracing::error!(%error, "failed to forward a packet to the transport layer");
-                            });
+                        match wire_outgoing.send((next_hop.into(), data)).await {
+                            Ok(()) => {
+                                counters.get_or_create(&next_hop).record_message_sent();
 
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_PACKET_COUNT.increment(&["forwarded"]);
+                                #[cfg(all(feature = "telemetry", not(test)))]
+                                METRIC_PACKET_COUNT.increment(&["forwarded"]);
+                            }
+                            Err(error) => {
+                                tracing::error!(%error, "failed to forward a packet to the transport layer");
+                                return None;
+                            }
+                        }
 
                         // Send acknowledgement back
                         tracing::trace!(previous_hop = previous_hop.to_peerid_str(), "acknowledging forwarded packet back");
@@ -464,6 +504,7 @@ async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
     ack_incoming: AckIn,
     ticket_events: TEvt,
     ticket_proc: std::sync::Arc<T>,
+    counters: crate::counters::PeerProtocolCounterRegistry,
 ) where
     AckIn: futures::Stream<Item = (OffchainPublicKey, Vec<Acknowledgement>)> + Send + 'static,
     T: UnacknowledgedTicketProcessor + Sync + Send + 'static,
@@ -474,7 +515,9 @@ async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
         .for_each_concurrent(NUM_CONCURRENT_TICKET_ACK_PROCESSING, move |(peer, acks)| {
             let ticket_proc = ticket_proc.clone();
             let mut ticket_evt = ticket_events.clone();
+            let counters = counters.clone();
             async move {
+                counters.get_or_create(&peer).record_acks_received(acks.len() as u64);
                 tracing::trace!(num = acks.len(), "received acknowledgements");
                 match hopr_parallelize::cpu::spawn_fifo_blocking(
                     move || ticket_proc.acknowledge_tickets(peer, acks),
@@ -599,6 +642,7 @@ pub struct PacketPipelineConfig {
 /// The pipeline does not handle the mixing itself, that needs to be injected as a separate process
 /// overlay on top of the `wire_msg` Stream or Sink.
 #[tracing::instrument(skip_all, level = "trace", fields(me = packet_key.public().to_peerid_str()))]
+#[allow(clippy::too_many_arguments)]
 pub fn run_packet_pipeline<WIn, WOut, C, D, T, TEvt, AppOut, AppIn>(
     packet_key: OffchainKeypair,
     wire_msg: (WOut, WIn),
@@ -607,6 +651,7 @@ pub fn run_packet_pipeline<WIn, WOut, C, D, T, TEvt, AppOut, AppIn>(
     ticket_events: TEvt,
     cfg: PacketPipelineConfig,
     api: (AppOut, AppIn),
+    counters: crate::counters::PeerProtocolCounterRegistry,
 ) -> AbortableList<PacketPipelineProcesses>
 where
     WOut: futures::Sink<(PeerId, Box<[u8]>)> + Clone + Unpin + Send + 'static,
@@ -623,11 +668,12 @@ where
 {
     let mut processes = AbortableList::default();
 
-    #[cfg(all(feature = "prometheus", not(test)))]
+    #[cfg(all(feature = "telemetry", not(test)))]
     {
         // Initialize the lazy statics here
         lazy_static::initialize(&METRIC_PACKET_COUNT);
         lazy_static::initialize(&METRIC_PACKET_DECODE_TIMEOUTS);
+        lazy_static::initialize(&METRIC_PACKET_REJECTED_COUNT);
         lazy_static::initialize(&METRIC_VALIDATION_ERRORS);
     }
 
@@ -664,8 +710,14 @@ where
     processes.insert(
         PacketPipelineProcesses::MsgOut,
         spawn_as_abortable!(
-            start_outgoing_packet_pipeline(app_in, encoder.clone(), wire_out.clone(), output_concurrency)
-                .in_current_span()
+            start_outgoing_packet_pipeline(
+                app_in,
+                encoder.clone(),
+                wire_out.clone(),
+                counters.clone(),
+                output_concurrency
+            )
+            .in_current_span()
         ),
     );
 
@@ -679,6 +731,7 @@ where
                 ticket_events.clone(),
                 (outgoing_ack_tx, incoming_ack_tx),
                 app_out,
+                counters.clone(),
                 input_concurrency,
             )
             .in_current_span()
@@ -695,7 +748,9 @@ where
 
     processes.insert(
         PacketPipelineProcesses::AckIn,
-        spawn_as_abortable!(start_incoming_ack_pipeline(incoming_ack_rx, ticket_events, ticket_proc).in_current_span()),
+        spawn_as_abortable!(
+            start_incoming_ack_pipeline(incoming_ack_rx, ticket_events, ticket_proc, counters).in_current_span()
+        ),
     );
 
     processes

@@ -211,7 +211,7 @@ impl NetworkBehaviour for Behaviour {
                 // on a failed dial get the next scheduled dial using the backoff
                 if let Some(peer) = peer_id {
                     let backoff = self.not_connected_peers.remove(&peer).unwrap_or_else(|| {
-                        tracing::error!(%peer, "no backoff for a failed dial, creating new backoff");
+                        tracing::debug!(%peer, "no backoff for a failed dial, creating new backoff");
                         initial_backoff()
                     });
                     self.schedule_dial_with(peer, backoff);

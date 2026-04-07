@@ -138,23 +138,27 @@ pub mod types {
         #[serde(rename = "safeNative")]
         pub safe_native: ::std::string::String,
     }
-    ///Represents a peer that has been announced on-chain.
+    ///A peer that has been announced.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Represents a peer that has been announced on-chain.",
+    ///  "description": "A peer that has been announced.",
     ///  "examples": [
     ///    {
     ///      "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
-    ///      "multiaddrs": "[/ip4/178.12.1.9/tcp/19092]"
+    ///      "multiaddrs": [
+    ///        "/ip4/178.12.1.9/tcp/19092"
+    ///      ],
+    ///      "origin": "chain"
     ///    }
     ///  ],
     ///  "type": "object",
     ///  "required": [
     ///    "address",
-    ///    "multiaddrs"
+    ///    "multiaddrs",
+    ///    "origin"
     ///  ],
     ///  "properties": {
     ///    "address": {
@@ -165,21 +169,107 @@ pub mod types {
     ///    },
     ///    "multiaddrs": {
     ///      "examples": [
-    ///        "[/ip4/178.12.1.9/tcp/19092]"
+    ///        [
+    ///          "/ip4/178.12.1.9/tcp/19092"
+    ///        ]
     ///      ],
     ///      "type": "array",
     ///      "items": {
     ///        "type": "string"
     ///      }
+    ///    },
+    ///    "origin": {
+    ///      "$ref": "#/components/schemas/AnnouncementOriginResponse"
     ///    }
     ///  }
     ///}
     /// ```
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct AnnouncedPeer {
+    pub struct AnnouncedPeerResponse {
         pub address: ::std::string::String,
         pub multiaddrs: ::std::vec::Vec<::std::string::String>,
+        pub origin: AnnouncementOriginResponse,
+    }
+    ///How a peer announcement was discovered.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "How a peer announcement was discovered.",
+    ///  "examples": [
+    ///    "chain"
+    ///  ],
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "chain",
+    ///    "dht"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd
+    )]
+    pub enum AnnouncementOriginResponse {
+        #[serde(rename = "chain")]
+        Chain,
+        #[serde(rename = "dht")]
+        Dht,
+    }
+    impl ::std::fmt::Display for AnnouncementOriginResponse {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Chain => f.write_str("chain"),
+                Self::Dht => f.write_str("dht"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for AnnouncementOriginResponse {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "chain" => Ok(Self::Chain),
+                "dht" => Ok(Self::Dht),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for AnnouncementOriginResponse {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for AnnouncementOriginResponse {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for AnnouncementOriginResponse {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
     }
     ///Standardized error response for the API
     ///
@@ -492,53 +582,89 @@ pub mod types {
         ///Receipt for the channel close transaction.
         pub receipt: ::std::string::String,
     }
-    ///Reachable entry node information
+    ///Immediate observation data for a connected peer.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Reachable entry node information",
+    ///  "description": "Immediate observation data for a connected peer.",
     ///  "examples": [
     ///    {
-    ///      "isEligible": true,
-    ///      "multiaddrs": [
-    ///        "/ip4/10.0.2.100/tcp/19091"
-    ///      ]
+    ///      "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
+    ///      "averageLatency": 100,
+    ///      "lastUpdate": 1690000000000,
+    ///      "probeRate": 0.476,
+    ///      "score": 0.7
     ///    }
     ///  ],
     ///  "type": "object",
     ///  "required": [
-    ///    "isEligible",
-    ///    "multiaddrs"
+    ///    "address",
+    ///    "lastUpdate",
+    ///    "probeRate",
+    ///    "score"
     ///  ],
     ///  "properties": {
-    ///    "isEligible": {
+    ///    "address": {
     ///      "examples": [
-    ///        true
+    ///        "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe"
     ///      ],
-    ///      "type": "boolean"
+    ///      "type": "string"
     ///    },
-    ///    "multiaddrs": {
+    ///    "averageLatency": {
+    ///      "description": "Average latency in milliseconds, if available.",
     ///      "examples": [
-    ///        [
-    ///          "/ip4/10.0.2.100/tcp/19091"
-    ///        ]
+    ///        100
     ///      ],
-    ///      "type": "array",
-    ///      "items": {
-    ///        "type": "string"
-    ///      }
+    ///      "type": [
+    ///        "integer",
+    ///        "null"
+    ///      ],
+    ///      "minimum": 0.0
+    ///    },
+    ///    "lastUpdate": {
+    ///      "description": "Epoch milliseconds of the last observation update.",
+    ///      "examples": [
+    ///        1690000000000
+    ///      ],
+    ///      "type": "integer",
+    ///      "minimum": 0.0
+    ///    },
+    ///    "probeRate": {
+    ///      "examples": [
+    ///        0.476
+    ///      ],
+    ///      "type": "number",
+    ///      "format": "double"
+    ///    },
+    ///    "score": {
+    ///      "examples": [
+    ///        0.7
+    ///      ],
+    ///      "type": "number",
+    ///      "format": "double"
     ///    }
     ///  }
     ///}
     /// ```
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct EntryNode {
-        #[serde(rename = "isEligible")]
-        pub is_eligible: bool,
-        pub multiaddrs: ::std::vec::Vec<::std::string::String>,
+    pub struct ConnectedPeerResponse {
+        pub address: ::std::string::String,
+        ///Average latency in milliseconds, if available.
+        #[serde(
+            rename = "averageLatency",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub average_latency: ::std::option::Option<u64>,
+        ///Epoch milliseconds of the last observation update.
+        #[serde(rename = "lastUpdate")]
+        pub last_update: u64,
+        #[serde(rename = "probeRate")]
+        pub probe_rate: f64,
+        pub score: f64,
     }
     ///Specifies the amount of HOPR tokens to fund a channel with.
     ///
@@ -600,50 +726,6 @@ pub mod types {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     pub struct FundChannelResponse {
         pub hash: ::std::string::String,
-    }
-    ///Heartbeat information for a peer.
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "description": "Heartbeat information for a peer.",
-    ///  "examples": [
-    ///    {
-    ///      "sent": 10,
-    ///      "success": 10
-    ///    }
-    ///  ],
-    ///  "type": "object",
-    ///  "required": [
-    ///    "sent",
-    ///    "success"
-    ///  ],
-    ///  "properties": {
-    ///    "sent": {
-    ///      "examples": [
-    ///        10
-    ///      ],
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "success": {
-    ///      "examples": [
-    ///        10
-    ///      ],
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    }
-    ///  }
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct HeartbeatInfo {
-        pub sent: i64,
-        pub success: i64,
     }
     ///IP transport protocol
     ///
@@ -724,6 +806,43 @@ pub mod types {
         ) -> ::std::result::Result<Self, self::error::ConversionError> {
             value.parse()
         }
+    }
+    ///A multiaddress paired with its discovery origin.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A multiaddress paired with its discovery origin.",
+    ///  "examples": [
+    ///    {
+    ///      "multiaddress": "/ip4/10.0.2.100/tcp/19093",
+    ///      "origin": "chain"
+    ///    }
+    ///  ],
+    ///  "type": "object",
+    ///  "required": [
+    ///    "multiaddress",
+    ///    "origin"
+    ///  ],
+    ///  "properties": {
+    ///    "multiaddress": {
+    ///      "examples": [
+    ///        "/ip4/10.0.2.100/tcp/19093"
+    ///      ],
+    ///      "type": "string"
+    ///    },
+    ///    "origin": {
+    ///      "$ref": "#/components/schemas/AnnouncementOriginResponse"
+    ///    }
+    ///  }
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    pub struct MultiaddressSource {
+        pub multiaddress: ::std::string::String,
+        pub origin: AnnouncementOriginResponse,
     }
     ///Channel information as seen by the node.
     ///
@@ -980,6 +1099,12 @@ and indexer state.*/
     ///      "announced": [
     ///        "/ip4/10.0.2.100/tcp/19093"
     ///      ],
+    ///      "announcedSources": [
+    ///        {
+    ///          "multiaddress": "/ip4/10.0.2.100/tcp/19093",
+    ///          "origin": "chain"
+    ///        }
+    ///      ],
     ///      "observed": [
     ///        "/ip4/10.0.2.100/tcp/19093"
     ///      ]
@@ -988,10 +1113,12 @@ and indexer state.*/
     ///  "type": "object",
     ///  "required": [
     ///    "announced",
+    ///    "announcedSources",
     ///    "observed"
     ///  ],
     ///  "properties": {
     ///    "announced": {
+    ///      "description": "Flat list of announced multiaddresses (legacy, for backward compatibility).",
     ///      "examples": [
     ///        [
     ///          "/ip4/10.0.2.100/tcp/19093"
@@ -1000,6 +1127,13 @@ and indexer state.*/
     ///      "type": "array",
     ///      "items": {
     ///        "type": "string"
+    ///      }
+    ///    },
+    ///    "announcedSources": {
+    ///      "description": "Announced multiaddresses grouped by discovery origin.",
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/components/schemas/MultiaddressSource"
     ///      }
     ///    },
     ///    "observed": {
@@ -1019,128 +1153,12 @@ and indexer state.*/
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     pub struct NodePeerInfoResponse {
+        ///Flat list of announced multiaddresses (legacy, for backward compatibility).
         pub announced: ::std::vec::Vec<::std::string::String>,
+        ///Announced multiaddresses grouped by discovery origin.
+        #[serde(rename = "announcedSources")]
+        pub announced_sources: ::std::vec::Vec<MultiaddressSource>,
         pub observed: ::std::vec::Vec<::std::string::String>,
-    }
-    ///Quality information for a peer.
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "description": "Quality information for a peer.",
-    ///  "examples": [
-    ///    {
-    ///      "quality": 0.7
-    ///    }
-    ///  ],
-    ///  "type": "object",
-    ///  "properties": {
-    ///    "score": {
-    ///      "description": "Minimum peer quality to be included in the response.",
-    ///      "examples": [
-    ///        0.7
-    ///      ],
-    ///      "type": "number",
-    ///      "format": "double"
-    ///    }
-    ///  }
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct NodePeersQueryRequest {
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub score: ::std::option::Option<f64>,
-    }
-    impl ::std::default::Default for NodePeersQueryRequest {
-        fn default() -> Self {
-            Self { score: Default::default() }
-        }
-    }
-    ///All connected and announced peers.
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "description": "All connected and announced peers.",
-    ///  "examples": [
-    ///    {
-    ///      "announced": [
-    ///        {
-    ///          "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
-    ///          "multiaddr": "/ip4/178.12.1.9/tcp/19092"
-    ///        }
-    ///      ],
-    ///      "connected": [
-    ///        {
-    ///          "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
-    ///          "backoff": 0.5,
-    ///          "heartbeats": {
-    ///            "sent": 10,
-    ///            "success": 10
-    ///          },
-    ///          "isNew": true,
-    ///          "lastSeen": 1690000000,
-    ///          "lastSeenLatency": 100,
-    ///          "multiaddr": "/ip4/178.12.1.9/tcp/19092",
-    ///          "quality": 0.7
-    ///        }
-    ///      ]
-    ///    }
-    ///  ],
-    ///  "type": "object",
-    ///  "required": [
-    ///    "announced",
-    ///    "connected"
-    ///  ],
-    ///  "properties": {
-    ///    "announced": {
-    ///      "examples": [
-    ///        [
-    ///          {
-    ///            "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
-    ///            "multiaddr": "/ip4/178.12.1.9/tcp/19092"
-    ///          }
-    ///        ]
-    ///      ],
-    ///      "type": "array",
-    ///      "items": {
-    ///        "$ref": "#/components/schemas/AnnouncedPeer"
-    ///      }
-    ///    },
-    ///    "connected": {
-    ///      "examples": [
-    ///        [
-    ///          {
-    ///            "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
-    ///            "backoff": 0.5,
-    ///            "heartbeats": {
-    ///              "sent": 10,
-    ///              "success": 10
-    ///            },
-    ///            "isNew": true,
-    ///            "lastSeen": 1690000000,
-    ///            "lastSeenLatency": 100,
-    ///            "multiaddr": "/ip4/178.12.1.9/tcp/19092",
-    ///            "quality": 0.7
-    ///          }
-    ///        ]
-    ///      ],
-    ///      "type": "array",
-    ///      "items": {
-    ///        "$ref": "#/components/schemas/PeerObservations"
-    ///      }
-    ///    }
-    ///  }
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct NodePeersResponse {
-        pub announced: ::std::vec::Vec<AnnouncedPeer>,
-        pub connected: ::std::vec::Vec<PeerObservations>,
     }
     ///Received tickets statistics.
     ///
@@ -1336,168 +1354,6 @@ and indexer state.*/
         ///Receipt of the channel open transaction.
         #[serde(rename = "transactionReceipt")]
         pub transaction_receipt: ::std::string::String,
-    }
-    ///All information about a known peer.
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "description": "All information about a known peer.",
-    ///  "examples": [
-    ///    {
-    ///      "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
-    ///      "averageLatency": 100,
-    ///      "lastSeen": 1690000000,
-    ///      "multiaddr": "/ip4/178.12.1.9/tcp/19092",
-    ///      "packetStats": {
-    ///        "bytesIn": 51200,
-    ///        "bytesOut": 102400,
-    ///        "packetsIn": 50,
-    ///        "packetsOut": 100
-    ///      },
-    ///      "probeRate": 0.476,
-    ///      "score": 0.7
-    ///    }
-    ///  ],
-    ///  "type": "object",
-    ///  "required": [
-    ///    "address",
-    ///    "averageLatency",
-    ///    "lastUpdate",
-    ///    "probeRate",
-    ///    "score"
-    ///  ],
-    ///  "properties": {
-    ///    "address": {
-    ///      "examples": [
-    ///        "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe"
-    ///      ],
-    ///      "type": "string"
-    ///    },
-    ///    "averageLatency": {
-    ///      "examples": [
-    ///        100
-    ///      ],
-    ///      "type": "integer",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "lastUpdate": {
-    ///      "examples": [
-    ///        1690000000
-    ///      ],
-    ///      "type": "integer",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "multiaddr": {
-    ///      "examples": [
-    ///        "/ip4/178.12.1.9/tcp/19092"
-    ///      ],
-    ///      "type": [
-    ///        "string",
-    ///        "null"
-    ///      ]
-    ///    },
-    ///    "probeRate": {
-    ///      "examples": [
-    ///        0.476
-    ///      ],
-    ///      "type": "number",
-    ///      "format": "double"
-    ///    },
-    ///    "score": {
-    ///      "examples": [
-    ///        0.7
-    ///      ],
-    ///      "type": "number",
-    ///      "format": "double"
-    ///    }
-    ///  }
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct PeerObservations {
-        pub address: ::std::string::String,
-        #[serde(rename = "averageLatency")]
-        pub average_latency: u64,
-        #[serde(rename = "lastUpdate")]
-        pub last_update: u64,
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub multiaddr: ::std::option::Option<::std::string::String>,
-        #[serde(rename = "probeRate")]
-        pub probe_rate: f64,
-        pub score: f64,
-    }
-    ///Packet statistics for a peer.
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "description": "Packet statistics for a peer.",
-    ///  "examples": [
-    ///    {
-    ///      "bytesIn": 51200,
-    ///      "bytesOut": 102400,
-    ///      "packetsIn": 50,
-    ///      "packetsOut": 100
-    ///    }
-    ///  ],
-    ///  "type": "object",
-    ///  "required": [
-    ///    "bytesIn",
-    ///    "bytesOut",
-    ///    "packetsIn",
-    ///    "packetsOut"
-    ///  ],
-    ///  "properties": {
-    ///    "bytesIn": {
-    ///      "examples": [
-    ///        51200
-    ///      ],
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "bytesOut": {
-    ///      "examples": [
-    ///        102400
-    ///      ],
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "packetsIn": {
-    ///      "examples": [
-    ///        50
-    ///      ],
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "packetsOut": {
-    ///      "examples": [
-    ///        100
-    ///      ],
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    }
-    ///  }
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct PeerPacketStatsResponse {
-        #[serde(rename = "bytesIn")]
-        pub bytes_in: i64,
-        #[serde(rename = "bytesOut")]
-        pub bytes_out: i64,
-        #[serde(rename = "packetsIn")]
-        pub packets_in: i64,
-        #[serde(rename = "packetsOut")]
-        pub packets_out: i64,
     }
     ///Contains the latency and the reported version of a peer that has been pinged.
     ///
@@ -2093,606 +1949,6 @@ at least the size of 2 Session packet payloads.*/
             }
         }
     }
-    ///Session acknowledgement metrics.
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "description": "Session acknowledgement metrics.",
-    ///  "type": "object",
-    ///  "required": [
-    ///    "incomingAcknowledgedFrames",
-    ///    "incomingRetransmissionRequests",
-    ///    "incomingSegments",
-    ///    "mode",
-    ///    "outgoingAcknowledgedFrames",
-    ///    "outgoingRetransmissionRequests",
-    ///    "outgoingSegments"
-    ///  ],
-    ///  "properties": {
-    ///    "incomingAcknowledgedFrames": {
-    ///      "description": "Total incoming frame acknowledgements.",
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "incomingRetransmissionRequests": {
-    ///      "description": "Total incoming retransmission requests received.",
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "incomingSegments": {
-    ///      "description": "Total incoming segments received.",
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "mode": {
-    ///      "$ref": "#/components/schemas/SessionStatsAckMode"
-    ///    },
-    ///    "outgoingAcknowledgedFrames": {
-    ///      "description": "Total outgoing frames acknowledgements",
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "outgoingRetransmissionRequests": {
-    ///      "description": "Total outgoing retransmission requests received.",
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "outgoingSegments": {
-    ///      "description": "Total outgoing segments sent.",
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    }
-    ///  }
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct SessionStatsAck {
-        ///Total incoming frame acknowledgements.
-        #[serde(rename = "incomingAcknowledgedFrames")]
-        pub incoming_acknowledged_frames: i64,
-        ///Total incoming retransmission requests received.
-        #[serde(rename = "incomingRetransmissionRequests")]
-        pub incoming_retransmission_requests: i64,
-        ///Total incoming segments received.
-        #[serde(rename = "incomingSegments")]
-        pub incoming_segments: i64,
-        pub mode: SessionStatsAckMode,
-        ///Total outgoing frames acknowledgements
-        #[serde(rename = "outgoingAcknowledgedFrames")]
-        pub outgoing_acknowledged_frames: i64,
-        ///Total outgoing retransmission requests received.
-        #[serde(rename = "outgoingRetransmissionRequests")]
-        pub outgoing_retransmission_requests: i64,
-        ///Total outgoing segments sent.
-        #[serde(rename = "outgoingSegments")]
-        pub outgoing_segments: i64,
-    }
-    ///Session acknowledgement mode for metrics.
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "description": "Session acknowledgement mode for metrics.",
-    ///  "type": "string",
-    ///  "enum": [
-    ///    "none",
-    ///    "partial",
-    ///    "full",
-    ///    "both"
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(
-        ::serde::Deserialize,
-        ::serde::Serialize,
-        Clone,
-        Copy,
-        Debug,
-        Eq,
-        Hash,
-        Ord,
-        PartialEq,
-        PartialOrd
-    )]
-    pub enum SessionStatsAckMode {
-        #[serde(rename = "none")]
-        None,
-        #[serde(rename = "partial")]
-        Partial,
-        #[serde(rename = "full")]
-        Full,
-        #[serde(rename = "both")]
-        Both,
-    }
-    impl ::std::fmt::Display for SessionStatsAckMode {
-        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-            match *self {
-                Self::None => f.write_str("none"),
-                Self::Partial => f.write_str("partial"),
-                Self::Full => f.write_str("full"),
-                Self::Both => f.write_str("both"),
-            }
-        }
-    }
-    impl ::std::str::FromStr for SessionStatsAckMode {
-        type Err = self::error::ConversionError;
-        fn from_str(
-            value: &str,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            match value {
-                "none" => Ok(Self::None),
-                "partial" => Ok(Self::Partial),
-                "full" => Ok(Self::Full),
-                "both" => Ok(Self::Both),
-                _ => Err("invalid value".into()),
-            }
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for SessionStatsAckMode {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &str,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for SessionStatsAckMode {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for SessionStatsAckMode {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    ///Session frame buffer metrics.
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "description": "Session frame buffer metrics.",
-    ///  "type": "object",
-    ///  "required": [
-    ///    "frameCapacity",
-    ///    "frameMtu",
-    ///    "frameTimeoutMs",
-    ///    "framesCompleted",
-    ///    "framesDiscarded",
-    ///    "framesEmitted",
-    ///    "incompleteFrames"
-    ///  ],
-    ///  "properties": {
-    ///    "frameCapacity": {
-    ///      "description": "Configured capacity of the frame buffer.",
-    ///      "type": "integer",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "frameMtu": {
-    ///      "description": "Maximum Transmission Unit for frames.",
-    ///      "type": "integer",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "frameTimeoutMs": {
-    ///      "description": "Configured timeout for frame reassembly/acknowledgement (in milliseconds).",
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "framesCompleted": {
-    ///      "description": "Total number of frames successfully completed/assembled.",
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "framesDiscarded": {
-    ///      "description": "Total number of frames discarded (e.g. due to timeout or errors).",
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "framesEmitted": {
-    ///      "description": "Total number of frames emitted to the application.",
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "incompleteFrames": {
-    ///      "description": "Number of frames currently being assembled (incomplete).",
-    ///      "type": "integer",
-    ///      "minimum": 0.0
-    ///    }
-    ///  }
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct SessionStatsFrameBuffer {
-        ///Configured capacity of the frame buffer.
-        #[serde(rename = "frameCapacity")]
-        pub frame_capacity: u64,
-        ///Maximum Transmission Unit for frames.
-        #[serde(rename = "frameMtu")]
-        pub frame_mtu: u64,
-        ///Configured timeout for frame reassembly/acknowledgement (in milliseconds).
-        #[serde(rename = "frameTimeoutMs")]
-        pub frame_timeout_ms: i64,
-        ///Total number of frames successfully completed/assembled.
-        #[serde(rename = "framesCompleted")]
-        pub frames_completed: i64,
-        ///Total number of frames discarded (e.g. due to timeout or errors).
-        #[serde(rename = "framesDiscarded")]
-        pub frames_discarded: i64,
-        ///Total number of frames emitted to the application.
-        #[serde(rename = "framesEmitted")]
-        pub frames_emitted: i64,
-        ///Number of frames currently being assembled (incomplete).
-        #[serde(rename = "incompleteFrames")]
-        pub incomplete_frames: u64,
-    }
-    ///Session lifetime metrics.
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "description": "Session lifetime metrics.",
-    ///  "type": "object",
-    ///  "required": [
-    ///    "createdAtMs",
-    ///    "idleMs",
-    ///    "lastActivityAtMs",
-    ///    "state",
-    ///    "uptimeMs"
-    ///  ],
-    ///  "properties": {
-    ///    "createdAtMs": {
-    ///      "description": "Time when the session was created (in milliseconds since UNIX epoch).",
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "idleMs": {
-    ///      "description": "Duration since the last activity (in milliseconds).",
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "lastActivityAtMs": {
-    ///      "description": "Time of the last read or write activity (in milliseconds since UNIX epoch).",
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "state": {
-    ///      "$ref": "#/components/schemas/SessionStatsState"
-    ///    },
-    ///    "uptimeMs": {
-    ///      "description": "Total duration the session has been alive (in milliseconds).",
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    }
-    ///  }
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct SessionStatsLifetime {
-        ///Time when the session was created (in milliseconds since UNIX epoch).
-        #[serde(rename = "createdAtMs")]
-        pub created_at_ms: i64,
-        ///Duration since the last activity (in milliseconds).
-        #[serde(rename = "idleMs")]
-        pub idle_ms: i64,
-        ///Time of the last read or write activity (in milliseconds since UNIX epoch).
-        #[serde(rename = "lastActivityAtMs")]
-        pub last_activity_at_ms: i64,
-        pub state: SessionStatsState,
-        ///Total duration the session has been alive (in milliseconds).
-        #[serde(rename = "uptimeMs")]
-        pub uptime_ms: i64,
-    }
-    ///Complete snapshot of session metrics.
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "description": "Complete snapshot of session metrics.",
-    ///  "type": "object",
-    ///  "required": [
-    ///    "ack",
-    ///    "frameBuffer",
-    ///    "lifetime",
-    ///    "sessionId",
-    ///    "snapshotAtMs",
-    ///    "surb",
-    ///    "transport"
-    ///  ],
-    ///  "properties": {
-    ///    "ack": {
-    ///      "$ref": "#/components/schemas/SessionStatsAck"
-    ///    },
-    ///    "frameBuffer": {
-    ///      "$ref": "#/components/schemas/SessionStatsFrameBuffer"
-    ///    },
-    ///    "lifetime": {
-    ///      "$ref": "#/components/schemas/SessionStatsLifetime"
-    ///    },
-    ///    "sessionId": {
-    ///      "description": "The session ID.",
-    ///      "type": "string"
-    ///    },
-    ///    "snapshotAtMs": {
-    ///      "description": "Time when this snapshot was taken (in milliseconds since UNIX epoch).",
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "surb": {
-    ///      "$ref": "#/components/schemas/SessionStatsSurb"
-    ///    },
-    ///    "transport": {
-    ///      "$ref": "#/components/schemas/SessionStatsTransport"
-    ///    }
-    ///  }
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct SessionStatsResponse {
-        pub ack: SessionStatsAck,
-        #[serde(rename = "frameBuffer")]
-        pub frame_buffer: SessionStatsFrameBuffer,
-        pub lifetime: SessionStatsLifetime,
-        ///The session ID.
-        #[serde(rename = "sessionId")]
-        pub session_id: ::std::string::String,
-        ///Time when this snapshot was taken (in milliseconds since UNIX epoch).
-        #[serde(rename = "snapshotAtMs")]
-        pub snapshot_at_ms: i64,
-        pub surb: SessionStatsSurb,
-        pub transport: SessionStatsTransport,
-    }
-    ///Session lifecycle state for metrics.
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "description": "Session lifecycle state for metrics.",
-    ///  "type": "string",
-    ///  "enum": [
-    ///    "active",
-    ///    "closing",
-    ///    "closed"
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(
-        ::serde::Deserialize,
-        ::serde::Serialize,
-        Clone,
-        Copy,
-        Debug,
-        Eq,
-        Hash,
-        Ord,
-        PartialEq,
-        PartialOrd
-    )]
-    pub enum SessionStatsState {
-        #[serde(rename = "active")]
-        Active,
-        #[serde(rename = "closing")]
-        Closing,
-        #[serde(rename = "closed")]
-        Closed,
-    }
-    impl ::std::fmt::Display for SessionStatsState {
-        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-            match *self {
-                Self::Active => f.write_str("active"),
-                Self::Closing => f.write_str("closing"),
-                Self::Closed => f.write_str("closed"),
-            }
-        }
-    }
-    impl ::std::str::FromStr for SessionStatsState {
-        type Err = self::error::ConversionError;
-        fn from_str(
-            value: &str,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            match value {
-                "active" => Ok(Self::Active),
-                "closing" => Ok(Self::Closing),
-                "closed" => Ok(Self::Closed),
-                _ => Err("invalid value".into()),
-            }
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for SessionStatsState {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &str,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for SessionStatsState {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for SessionStatsState {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    ///Session SURB (Single Use Reply Block) metrics.
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "description": "Session SURB (Single Use Reply Block) metrics.",
-    ///  "type": "object",
-    ///  "required": [
-    ///    "bufferEstimate",
-    ///    "consumedTotal",
-    ///    "producedTotal",
-    ///    "ratePerSec",
-    ///    "refillInFlight"
-    ///  ],
-    ///  "properties": {
-    ///    "bufferEstimate": {
-    ///      "description": "Estimated number of SURBs currently available.",
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "consumedTotal": {
-    ///      "description": "Total SURBs consumed/used.",
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "producedTotal": {
-    ///      "description": "Total SURBs produced/minted.",
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "ratePerSec": {
-    ///      "description": "Rate of SURB consumption/production per second.",
-    ///      "type": "number",
-    ///      "format": "double"
-    ///    },
-    ///    "refillInFlight": {
-    ///      "description": "Whether a SURB refill request is currently in flight.",
-    ///      "type": "boolean"
-    ///    },
-    ///    "targetBuffer": {
-    ///      "description": "Target number of SURBs to maintain in buffer (if configured).",
-    ///      "type": [
-    ///        "integer",
-    ///        "null"
-    ///      ],
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    }
-    ///  }
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct SessionStatsSurb {
-        ///Estimated number of SURBs currently available.
-        #[serde(rename = "bufferEstimate")]
-        pub buffer_estimate: i64,
-        ///Total SURBs consumed/used.
-        #[serde(rename = "consumedTotal")]
-        pub consumed_total: i64,
-        ///Total SURBs produced/minted.
-        #[serde(rename = "producedTotal")]
-        pub produced_total: i64,
-        #[serde(rename = "ratePerSec")]
-        pub rate_per_sec: f64,
-        ///Whether a SURB refill request is currently in flight.
-        #[serde(rename = "refillInFlight")]
-        pub refill_in_flight: bool,
-        ///Target number of SURBs to maintain in buffer (if configured).
-        #[serde(
-            rename = "targetBuffer",
-            default,
-            skip_serializing_if = "::std::option::Option::is_none"
-        )]
-        pub target_buffer: ::std::option::Option<i64>,
-    }
-    ///Session transport-level metrics.
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "description": "Session transport-level metrics.",
-    ///  "type": "object",
-    ///  "required": [
-    ///    "bytesIn",
-    ///    "bytesOut",
-    ///    "packetsIn",
-    ///    "packetsOut"
-    ///  ],
-    ///  "properties": {
-    ///    "bytesIn": {
-    ///      "description": "Total bytes received.",
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "bytesOut": {
-    ///      "description": "Total bytes sent.",
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "packetsIn": {
-    ///      "description": "Total packets received.",
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    },
-    ///    "packetsOut": {
-    ///      "description": "Total packets sent.",
-    ///      "type": "integer",
-    ///      "format": "int64",
-    ///      "minimum": 0.0
-    ///    }
-    ///  }
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct SessionStatsTransport {
-        ///Total bytes received.
-        #[serde(rename = "bytesIn")]
-        pub bytes_in: i64,
-        ///Total bytes sent.
-        #[serde(rename = "bytesOut")]
-        pub bytes_out: i64,
-        ///Total packets received.
-        #[serde(rename = "packetsIn")]
-        pub packets_in: i64,
-        ///Total packets sent.
-        #[serde(rename = "packetsOut")]
-        pub packets_out: i64,
-    }
     ///Session target specification.
     ///
     /// <details><summary>JSON schema</summary>
@@ -2909,7 +2165,7 @@ at least the size of 2 Session packet payloads.*/
 
 API enabling developers to interact with a hoprd node programatically through HTTP REST API.
 
-Version: 4.6.1*/
+Version: 4.10.0*/
 pub struct Client {
     pub(crate) baseurl: String,
     pub(crate) client: reqwest::Client,
@@ -2945,7 +2201,7 @@ impl Client {
 }
 impl ClientInfo<()> for Client {
     fn api_version() -> &'static str {
-        "4.6.1"
+        "4.10.0"
     }
     fn baseurl(&self) -> &str {
         self.baseurl.as_str()
@@ -3310,51 +2566,6 @@ Arguments:
             _ => Err(Error::UnexpectedResponse(response)),
         }
     }
-    /**Lists all tickets for the given channel  ID
-
-Lists all tickets for the given channel ID.
-
-Sends a `GET` request to `/api/v4/channels/{channelId}/tickets`
-
-Arguments:
-- `channel_id`: ID of the channel.
-*/
-    pub async fn show_channel_tickets<'a>(
-        &'a self,
-        channel_id: &'a str,
-    ) -> Result<ResponseValue<::std::vec::Vec<types::ChannelTicket>>, Error<()>> {
-        let url = format!(
-            "{}/api/v4/channels/{}/tickets", self.baseurl, encode_path(& channel_id
-            .to_string()),
-        );
-        let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
-        header_map
-            .append(
-                ::reqwest::header::HeaderName::from_static("api-version"),
-                ::reqwest::header::HeaderValue::from_static(Self::api_version()),
-            );
-        #[allow(unused_mut)]
-        let mut request = self
-            .client
-            .get(url)
-            .header(
-                ::reqwest::header::ACCEPT,
-                ::reqwest::header::HeaderValue::from_static("application/json"),
-            )
-            .headers(header_map)
-            .build()?;
-        let info = OperationInfo {
-            operation_id: "show_channel_tickets",
-        };
-        self.pre(&mut request, &info).await?;
-        let result = self.exec(request, &info).await;
-        self.post(&result, &info).await?;
-        let response = result?;
-        match response.status().as_u16() {
-            200u16 => ResponseValue::from_response(response).await,
-            _ => Err(Error::UnexpectedResponse(response)),
-        }
-    }
     /**Starts redeeming all tickets in the given channel
 
 Starts redeeming all tickets in the given channel.
@@ -3392,6 +2603,130 @@ Arguments:
             400u16 => {
                 Err(Error::ErrorResponse(ResponseValue::from_response(response).await?))
             }
+            _ => Err(Error::UnexpectedResponse(response)),
+        }
+    }
+    /**Lists all announced peers
+
+List all announced peers
+
+Sends a `GET` request to `/api/v4/network/announced`
+
+*/
+    pub async fn announced<'a>(
+        &'a self,
+    ) -> Result<
+        ResponseValue<::std::vec::Vec<types::AnnouncedPeerResponse>>,
+        Error<()>,
+    > {
+        let url = format!("{}/api/v4/network/announced", self.baseurl,);
+        let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
+        header_map
+            .append(
+                ::reqwest::header::HeaderName::from_static("api-version"),
+                ::reqwest::header::HeaderValue::from_static(Self::api_version()),
+            );
+        #[allow(unused_mut)]
+        let mut request = self
+            .client
+            .get(url)
+            .header(
+                ::reqwest::header::ACCEPT,
+                ::reqwest::header::HeaderValue::from_static("application/json"),
+            )
+            .headers(header_map)
+            .build()?;
+        let info = OperationInfo {
+            operation_id: "announced",
+        };
+        self.pre(&mut request, &info).await?;
+        let result = self.exec(request, &info).await;
+        self.post(&result, &info).await?;
+        let response = result?;
+        match response.status().as_u16() {
+            200u16 => ResponseValue::from_response(response).await,
+            _ => Err(Error::UnexpectedResponse(response)),
+        }
+    }
+    /**Lists peers with immediate observation data from the network graph
+
+List connected peers with immediate observation data from the network graph
+
+Sends a `GET` request to `/api/v4/network/connected`
+
+*/
+    pub async fn connected<'a>(
+        &'a self,
+    ) -> Result<
+        ResponseValue<::std::vec::Vec<types::ConnectedPeerResponse>>,
+        Error<()>,
+    > {
+        let url = format!("{}/api/v4/network/connected", self.baseurl,);
+        let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
+        header_map
+            .append(
+                ::reqwest::header::HeaderName::from_static("api-version"),
+                ::reqwest::header::HeaderValue::from_static(Self::api_version()),
+            );
+        #[allow(unused_mut)]
+        let mut request = self
+            .client
+            .get(url)
+            .header(
+                ::reqwest::header::ACCEPT,
+                ::reqwest::header::HeaderValue::from_static("application/json"),
+            )
+            .headers(header_map)
+            .build()?;
+        let info = OperationInfo {
+            operation_id: "connected",
+        };
+        self.pre(&mut request, &info).await?;
+        let result = self.exec(request, &info).await;
+        self.post(&result, &info).await?;
+        let response = result?;
+        match response.status().as_u16() {
+            200u16 => ResponseValue::from_response(response).await,
+            _ => Err(Error::UnexpectedResponse(response)),
+        }
+    }
+    /**Returns the network graph in DOT (Graphviz) format
+
+Get the network graph in DOT (Graphviz) format
+
+Sends a `GET` request to `/api/v4/network/graph`
+
+Arguments:
+- `reachable_only`: When true, only include edges reachable from this node via directed
+traversal. Disconnected subgraphs that cannot be routed through are excluded.
+*/
+    pub async fn graph<'a>(
+        &'a self,
+        reachable_only: Option<bool>,
+    ) -> Result<ResponseValue<ByteStream>, Error<()>> {
+        let url = format!("{}/api/v4/network/graph", self.baseurl,);
+        let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
+        header_map
+            .append(
+                ::reqwest::header::HeaderName::from_static("api-version"),
+                ::reqwest::header::HeaderValue::from_static(Self::api_version()),
+            );
+        #[allow(unused_mut)]
+        let mut request = self
+            .client
+            .get(url)
+            .query(&progenitor_client::QueryParam::new("reachableOnly", &reachable_only))
+            .headers(header_map)
+            .build()?;
+        let info = OperationInfo {
+            operation_id: "graph",
+        };
+        self.pre(&mut request, &info).await?;
+        let result = self.exec(request, &info).await;
+        self.post(&result, &info).await?;
+        let response = result?;
+        match response.status().as_u16() {
+            200u16 => Ok(ResponseValue::stream(response)),
             _ => Err(Error::UnexpectedResponse(response)),
         }
     }
@@ -3517,50 +2852,6 @@ Sends a `GET` request to `/api/v4/node/configuration`
             _ => Err(Error::UnexpectedResponse(response)),
         }
     }
-    /**List all known entry nodes with multiaddrs and eligibility
-
-List all known entry nodes with multiaddrs and eligibility
-
-Sends a `GET` request to `/api/v4/node/entry-nodes`
-
-*/
-    pub async fn entry_nodes<'a>(
-        &'a self,
-    ) -> Result<
-        ResponseValue<
-            ::std::collections::HashMap<::std::string::String, types::EntryNode>,
-        >,
-        Error<()>,
-    > {
-        let url = format!("{}/api/v4/node/entry-nodes", self.baseurl,);
-        let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
-        header_map
-            .append(
-                ::reqwest::header::HeaderName::from_static("api-version"),
-                ::reqwest::header::HeaderValue::from_static(Self::api_version()),
-            );
-        #[allow(unused_mut)]
-        let mut request = self
-            .client
-            .get(url)
-            .header(
-                ::reqwest::header::ACCEPT,
-                ::reqwest::header::HeaderValue::from_static("application/json"),
-            )
-            .headers(header_map)
-            .build()?;
-        let info = OperationInfo {
-            operation_id: "entry_nodes",
-        };
-        self.pre(&mut request, &info).await?;
-        let result = self.exec(request, &info).await;
-        self.post(&result, &info).await?;
-        let response = result?;
-        match response.status().as_u16() {
-            200u16 => ResponseValue::from_response(response).await,
-            _ => Err(Error::UnexpectedResponse(response)),
-        }
-    }
     /**Get information about this HOPR Node
 
 Get information about this HOPR Node
@@ -3590,49 +2881,6 @@ Sends a `GET` request to `/api/v4/node/info`
             .build()?;
         let info = OperationInfo {
             operation_id: "info",
-        };
-        self.pre(&mut request, &info).await?;
-        let result = self.exec(request, &info).await;
-        self.post(&result, &info).await?;
-        let response = result?;
-        match response.status().as_u16() {
-            200u16 => ResponseValue::from_response(response).await,
-            _ => Err(Error::UnexpectedResponse(response)),
-        }
-    }
-    /**Lists information for `connected peers` and `announced peers`
-
-Lists information for connected and announced peers
-
-Sends a `GET` request to `/api/v4/node/peers`
-
-Arguments:
-- `score`: Minimum peer quality to be included in the response.
-*/
-    pub async fn peers<'a>(
-        &'a self,
-        score: Option<f64>,
-    ) -> Result<ResponseValue<types::NodePeersResponse>, Error<()>> {
-        let url = format!("{}/api/v4/node/peers", self.baseurl,);
-        let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
-        header_map
-            .append(
-                ::reqwest::header::HeaderName::from_static("api-version"),
-                ::reqwest::header::HeaderValue::from_static(Self::api_version()),
-            );
-        #[allow(unused_mut)]
-        let mut request = self
-            .client
-            .get(url)
-            .header(
-                ::reqwest::header::ACCEPT,
-                ::reqwest::header::HeaderValue::from_static("application/json"),
-            )
-            .query(&progenitor_client::QueryParam::new("score", &score))
-            .headers(header_map)
-            .build()?;
-        let info = OperationInfo {
-            operation_id: "peers",
         };
         self.pre(&mut request, &info).await?;
         let result = self.exec(request, &info).await;
@@ -3772,51 +3020,6 @@ Arguments:
             _ => Err(Error::UnexpectedResponse(response)),
         }
     }
-    /**Get packet statistics for a specific connected peer
-
-Get packet statistics for a specific connected peer
-
-Sends a `GET` request to `/api/v4/peers/{destination}/stats`
-
-Arguments:
-- `destination`: Address of the requested peer
-*/
-    pub async fn peer_stats<'a>(
-        &'a self,
-        destination: &'a str,
-    ) -> Result<ResponseValue<types::PeerPacketStatsResponse>, Error<()>> {
-        let url = format!(
-            "{}/api/v4/peers/{}/stats", self.baseurl, encode_path(& destination
-            .to_string()),
-        );
-        let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
-        header_map
-            .append(
-                ::reqwest::header::HeaderName::from_static("api-version"),
-                ::reqwest::header::HeaderValue::from_static(Self::api_version()),
-            );
-        #[allow(unused_mut)]
-        let mut request = self
-            .client
-            .get(url)
-            .header(
-                ::reqwest::header::ACCEPT,
-                ::reqwest::header::HeaderValue::from_static("application/json"),
-            )
-            .headers(header_map)
-            .build()?;
-        let info = OperationInfo {
-            operation_id: "peer_stats",
-        };
-        self.pre(&mut request, &info).await?;
-        let result = self.exec(request, &info).await;
-        self.post(&result, &info).await?;
-        let response = result?;
-        match response.status().as_u16() {
-            200u16 => ResponseValue::from_response(response).await,
-            _ => Err(Error::UnexpectedResponse(response)),
-        }
-    }
     /**Gets configuration of an existing active session.
 
 Sends a `GET` request to `/api/v4/session/config/{id}`
@@ -3895,48 +3098,6 @@ Arguments:
             400u16 => {
                 Err(Error::ErrorResponse(ResponseValue::from_response(response).await?))
             }
-            _ => Err(Error::UnexpectedResponse(response)),
-        }
-    }
-    /**Gets stats for an existing active session.
-
-Sends a `GET` request to `/api/v4/session/stats/{id}`
-
-Arguments:
-- `id`: Session ID
-*/
-    pub async fn session_stats<'a>(
-        &'a self,
-        id: &'a str,
-    ) -> Result<ResponseValue<types::SessionStatsResponse>, Error<()>> {
-        let url = format!(
-            "{}/api/v4/session/stats/{}", self.baseurl, encode_path(& id.to_string()),
-        );
-        let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
-        header_map
-            .append(
-                ::reqwest::header::HeaderName::from_static("api-version"),
-                ::reqwest::header::HeaderValue::from_static(Self::api_version()),
-            );
-        #[allow(unused_mut)]
-        let mut request = self
-            .client
-            .get(url)
-            .header(
-                ::reqwest::header::ACCEPT,
-                ::reqwest::header::HeaderValue::from_static("application/json"),
-            )
-            .headers(header_map)
-            .build()?;
-        let info = OperationInfo {
-            operation_id: "session_stats",
-        };
-        self.pre(&mut request, &info).await?;
-        let result = self.exec(request, &info).await;
-        self.post(&result, &info).await?;
-        let response = result?;
-        match response.status().as_u16() {
-            200u16 => ResponseValue::from_response(response).await,
             _ => Err(Error::UnexpectedResponse(response)),
         }
     }
@@ -4087,45 +3248,6 @@ Arguments:
             _ => Err(Error::UnexpectedResponse(response)),
         }
     }
-    /**Endpoint is deprecated and will be removed in the future. Returns an empty array
-
-(deprecated) Returns an empty array.
-
-Sends a `GET` request to `/api/v4/tickets`
-
-*/
-    pub async fn show_all_tickets<'a>(
-        &'a self,
-    ) -> Result<ResponseValue<::std::vec::Vec<types::ChannelTicket>>, Error<()>> {
-        let url = format!("{}/api/v4/tickets", self.baseurl,);
-        let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
-        header_map
-            .append(
-                ::reqwest::header::HeaderName::from_static("api-version"),
-                ::reqwest::header::HeaderValue::from_static(Self::api_version()),
-            );
-        #[allow(unused_mut)]
-        let mut request = self
-            .client
-            .get(url)
-            .header(
-                ::reqwest::header::ACCEPT,
-                ::reqwest::header::HeaderValue::from_static("application/json"),
-            )
-            .headers(header_map)
-            .build()?;
-        let info = OperationInfo {
-            operation_id: "show_all_tickets",
-        };
-        self.pre(&mut request, &info).await?;
-        let result = self.exec(request, &info).await;
-        self.post(&result, &info).await?;
-        let response = result?;
-        match response.status().as_u16() {
-            200u16 => ResponseValue::from_response(response).await,
-            _ => Err(Error::UnexpectedResponse(response)),
-        }
-    }
     /**Starts redeeming of all tickets in all channels
 
 Starts redeeming of all tickets in all channels.
@@ -4196,40 +3318,6 @@ Sends a `GET` request to `/api/v4/tickets/statistics`
         let response = result?;
         match response.status().as_u16() {
             200u16 => ResponseValue::from_response(response).await,
-            _ => Err(Error::UnexpectedResponse(response)),
-        }
-    }
-    /**Resets the ticket metrics
-
-Resets the ticket metrics.
-
-Sends a `DELETE` request to `/api/v4/tickets/statistics`
-
-*/
-    pub async fn reset_ticket_statistics<'a>(
-        &'a self,
-    ) -> Result<ResponseValue<ByteStream>, Error<types::ApiError>> {
-        let url = format!("{}/api/v4/tickets/statistics", self.baseurl,);
-        let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
-        header_map
-            .append(
-                ::reqwest::header::HeaderName::from_static("api-version"),
-                ::reqwest::header::HeaderValue::from_static(Self::api_version()),
-            );
-        #[allow(unused_mut)]
-        let mut request = self.client.delete(url).headers(header_map).build()?;
-        let info = OperationInfo {
-            operation_id: "reset_ticket_statistics",
-        };
-        self.pre(&mut request, &info).await?;
-        let result = self.exec(request, &info).await;
-        self.post(&result, &info).await?;
-        let response = result?;
-        match response.status().as_u16() {
-            200..=299 => Ok(ResponseValue::stream(response)),
-            401u16 => {
-                Err(Error::ErrorResponse(ResponseValue::from_response(response).await?))
-            }
             _ => Err(Error::UnexpectedResponse(response)),
         }
     }

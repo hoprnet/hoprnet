@@ -1,9 +1,6 @@
-use std::ops::Mul;
-
-use hopr_api::types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*};
+use hopr_api::types::{crypto::prelude::*, internal::prelude::*};
 use hopr_crypto_packet::prelude::*;
 
-use crate::TicketCreationError;
 pub use crate::{
     errors::IncomingPacketError,
     types::{FoundSurb, IncomingPacket, OutgoingPacket, ResolvedAcknowledgement},
@@ -89,7 +86,7 @@ pub trait PacketDecoder {
     fn decode(&self, sender: PeerId, data: Box<[u8]>) -> Result<IncomingPacket, IncomingPacketError<Self::Error>>;
 }
 
-/// Defines errors returned by [`UnacknowledgedTicketProcessor::acknowledge_ticket`].
+/// Defines errors returned by `UnacknowledgedTicketProcessor::acknowledge_ticket`.
 #[derive(Debug, thiserror::Error)]
 pub enum TicketAcknowledgementError<E> {
     /// An acknowledgement from a peer was not expected.
@@ -147,63 +144,4 @@ pub trait UnacknowledgedTicketProcessor {
         peer: OffchainPublicKey,
         acks: Vec<Acknowledgement>,
     ) -> Result<Vec<ResolvedAcknowledgement>, TicketAcknowledgementError<Self::Error>>;
-}
-
-/// Allows tracking ticket indices of outgoing channels and
-/// unrealized balances of incoming channels.
-#[auto_impl::auto_impl(&, Box, Arc)]
-pub trait TicketTracker {
-    type Error: std::error::Error + Send + Sync + 'static;
-
-    /// Gets the next ticket index for an outgoing ticket for the given channel.
-    ///
-    /// This operation should be fast and non-blocking.
-    fn next_outgoing_ticket_index(&self, channel: &ChannelEntry) -> Result<u64, Self::Error>;
-
-    /// Retrieves the unrealized balance of the given channel.
-    ///
-    /// This allows guarding from situations where the ticket issuer issues more tickets
-    /// than there's balance in the given channel.
-    ///
-    /// This operation should be fast and non-blocking.
-    fn incoming_channel_unrealized_balance(
-        &self,
-        channel_id: &ChannelId,
-        epoch: u32,
-        index: u64,
-    ) -> Result<HoprBalance, Self::Error>;
-
-    /// Convenience function that allows creating multi-hop tickets.
-    fn create_multihop_ticket(
-        &self,
-        channel: &ChannelEntry,
-        current_path_pos: u8,
-        winning_prob: WinningProbability,
-        ticket_price: HoprBalance,
-    ) -> Result<TicketBuilder, TicketCreationError<Self::Error>> {
-        // The next ticket is worth: price * remaining hop count / winning probability
-        let amount = HoprBalance::from(
-            ticket_price
-                .amount()
-                .mul(U256::from(current_path_pos - 1))
-                .div_f64(winning_prob.into())
-                .expect("winning probability is always less than or equal to 1"),
-        );
-
-        if channel.balance.lt(&amount) {
-            return Err(TicketCreationError::OutOfFunds(*channel.get_id(), amount));
-        }
-
-        let ticket_builder = TicketBuilder::default()
-            .counterparty(channel.destination)
-            .balance(amount)
-            .index(
-                self.next_outgoing_ticket_index(channel)
-                    .map_err(TicketCreationError::Other)?,
-            )
-            .win_prob(winning_prob)
-            .channel_epoch(channel.channel_epoch);
-
-        Ok(ticket_builder)
-    }
 }

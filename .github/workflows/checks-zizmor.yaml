@@ -1,69 +1,34 @@
 ---
 name: Zizmor
 
-env:
-  needs_nix_setup: false
-
 on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    paths:
+      - ".github/**"
   merge_group:
     types: [checks_requested]
-  workflow_call:
-    inputs:
-      source_repo:
-        required: true
-        type: string
-      source_branch:
-        required: true
-        type: string
 
 concurrency:
-  group: ${{ inputs.source_branch || github.ref_name }}-zizmor
+  group: ${{ github.event.pull_request.head.ref || github.ref_name }}-zizmor
   cancel-in-progress: true
 
-permissions: {}
+permissions:
+  contents: read
+  security-events: write
 
 jobs:
   zizmor:
-    name: Zizmor
-    runs-on: self-hosted-hoprnet-bigger
+    uses: hoprnet/hopr-workflows/.github/workflows/checks-zizmor.yaml@bbd22e57cf954c15f0a6051d59329857809141dd # workflow-checks-zizmor-v1
     permissions:
       contents: read
       security-events: write
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
-        with:
-          disable-sudo: true
-          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
-
-      - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-          repository: ${{ inputs.source_repo }}
-          ref: ${{ inputs.source_branch }}
-
-      - name: Install Nix
-        if: env.needs_nix_setup == true
-        uses: cachix/install-nix-action@4e002c8ec80594ecd40e759629461e26c8abed15 # v31
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: cachix/cachix-action@3ba601ff5bbb07c7220846facfa2cd81eeee15a1 # v16
-        if: env.needs_nix_setup == true
-        with:
-          name: hoprnet
-          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
-        env:
-          USER: runner
-
-      - name: Run zizmor
-        run: nix develop -L .#ci -c bash -c "zizmor --format sarif . > results.sarif"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@45cbd0c69e560cd9e7cd7f8c32362050c9b7ded2 # v4.32.2
-        with:
-          sarif_file: results.sarif
-          category: zizmor
+    with:
+      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+      runner: self-hosted-hoprnet-bigger
+    secrets:
+      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}

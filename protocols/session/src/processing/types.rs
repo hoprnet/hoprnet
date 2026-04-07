@@ -13,7 +13,7 @@ pub struct FrameBuilder {
     seg_remaining: SeqNum,
     recv_bytes: usize,
     pub(crate) last_recv: Instant,
-    #[cfg(all(not(test), feature = "prometheus"))]
+    #[cfg(all(not(test), feature = "telemetry"))]
     pub(crate) created: Instant,
 }
 
@@ -26,7 +26,7 @@ impl From<Segment> for FrameBuilder {
             seg_remaining: value.seq_flags.seq_len() - 1,
             recv_bytes: value.data.len(),
             last_recv: Instant::now(),
-            #[cfg(all(not(test), feature = "prometheus"))]
+            #[cfg(all(not(test), feature = "telemetry"))]
             created: Instant::now(),
         };
 
@@ -121,7 +121,7 @@ impl FrameInspector {
         Self(FrameDashMap::with_capacity(Self::INCOMPLETE_FRAME_RATIO * capacity + 1))
     }
 
-    /// Returns a [`MissingSegmentsBitmap`] of missing segments in a frame.
+    /// Returns a bitmap of missing segments in a frame.
     pub fn missing_segments(&self, frame_id: &FrameId) -> Option<MissingSegmentsBitmap> {
         self.0.0.get(frame_id).map(|f| f.as_missing())
     }

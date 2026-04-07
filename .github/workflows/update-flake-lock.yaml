@@ -19,7 +19,7 @@ jobs:
     runs-on: self-hosted-hoprnet-small
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
         with:
           disable-sudo: false
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -60,8 +60,9 @@ jobs:
 
       - name: Configure PR and mark as ready
         run: |
-          gh pr edit ${{ steps.update.outputs.pull-request-number }} --add-assignee "@copilot"
-          gh pr edit ${{ steps.update.outputs.pull-request-number }} --add-reviewer "hoprnet/hopr-development"
-          gh pr ready ${{ steps.update.outputs.pull-request-number }}
+          gh pr edit "${PR_NUMBER}" --add-assignee "@copilot"
+          gh pr edit "${PR_NUMBER}" --add-reviewer "hoprnet/hopr-development"
+          gh pr ready "${PR_NUMBER}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.update.outputs.pull-request-number }}

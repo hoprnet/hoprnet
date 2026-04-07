@@ -1,0 +1,14 @@
+---
+source: transport/session/src/balancer/controller.rs
+expression: cfg
+---
+SurbBalancerConfig {
+    target_surb_buffer_size: 7000,
+    max_surbs_per_sec: 5000,
+    surb_decay: Some(
+        (
+            60s,
+            0.05,
+        ),
+    ),
+}

@@ -312,7 +312,7 @@ pub struct IncomingSession {
 }
 
 /// Configures the Session protocol socket over HOPR.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, smart_default::SmartDefault)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, smart_default::SmartDefault, serde::Serialize)]
 pub struct HoprSessionConfig {
     /// Capabilities of the Session protocol socket.
     ///
@@ -328,6 +328,7 @@ pub struct HoprSessionConfig {
     ///
     /// Default is 800 ms
     #[default(Duration::from_millis(800))]
+    #[serde(with = "humantime_serde")]
     pub frame_timeout: Duration,
 }
 
@@ -343,8 +344,6 @@ pub struct HoprSession {
     routing: DestinationRouting,
     cfg: HoprSessionConfig,
     on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
-    #[cfg(feature = "telemetry")]
-    metrics: std::sync::Arc<crate::telemetry::SessionTelemetry>,
 }
 
 pub(crate) const SESSION_SOCKET_CAPACITY: usize = 16384;
@@ -364,7 +363,6 @@ impl HoprSession {
         cfg: HoprSessionConfig,
         hopr: (Tx, Rx),
         on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
-        #[cfg(feature = "telemetry")] metrics: std::sync::Arc<crate::telemetry::SessionTelemetry>,
     ) -> Result<Self, TransportSessionError>
     where
         Tx: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Send + Sync + Unpin + 'static,
@@ -374,14 +372,14 @@ impl HoprSession {
         let routing_clone = routing.clone();
 
         #[cfg(feature = "telemetry")]
-        let (metrics_write, metrics_read) = (metrics.clone(), metrics.clone());
+        let (session_id_write, session_id_read) = (id, id);
 
         // Wrap the HOPR transport so that it appears as regular transport to the SessionSocket
         let transport = DuplexIO(
             AsyncWriteSink::<{ ApplicationData::PAYLOAD_SIZE }, _>(hopr.0.sink_map_err(std::io::Error::other).with(
                 move |buf: Box<[u8]>| {
                     #[cfg(feature = "telemetry")]
-                    metrics_write.record_write(buf.len());
+                    crate::telemetry::record_session_write(&session_id_write, buf.len());
                     // The Session protocol does not set any packet info on outgoing packets.
                     // However, the SessionManager on top usually overrides this.
                     futures::future::ready(
@@ -396,7 +394,7 @@ impl HoprSession {
             hopr.1
                 .map(move |data| {
                     #[cfg(feature = "telemetry")]
-                    metrics_read.record_read(data.data.plain_text.len());
+                    crate::telemetry::record_session_read(&session_id_read, data.data.plain_text.len());
                     Ok::<_, std::io::Error>(data.data.plain_text)
                 })
                 .into_async_read(),
@@ -438,7 +436,7 @@ impl HoprSession {
                     AcknowledgementState::<{ ApplicationData::PAYLOAD_SIZE }>::new(id, ack_cfg),
                     socket_cfg,
                     #[cfg(feature = "telemetry")]
-                    metrics.clone(),
+                    id,
                 )?)
             } else {
                 debug!(?socket_cfg, "opening new stateless session socket");
@@ -448,7 +446,7 @@ impl HoprSession {
                     transport,
                     socket_cfg,
                     #[cfg(feature = "telemetry")]
-                    metrics.clone(),
+                    id,
                 )?)
             }
         } else {
@@ -462,8 +460,6 @@ impl HoprSession {
             routing,
             cfg,
             on_close,
-            #[cfg(feature = "telemetry")]
-            metrics,
         })
     }
 
@@ -480,11 +476,6 @@ impl HoprSession {
     /// Configuration of this Session.
     pub fn config(&self) -> &HoprSessionConfig {
         &self.cfg
-    }
-
-    #[cfg(feature = "telemetry")]
-    pub fn metrics(&self) -> &std::sync::Arc<crate::telemetry::SessionTelemetry> {
-        &self.metrics
     }
 }
 
@@ -532,7 +523,7 @@ impl futures::AsyncWrite for HoprSession {
         tracing::trace!("hopr session closed");
 
         #[cfg(feature = "telemetry")]
-        this.metrics.set_state(crate::telemetry::SessionLifecycleState::Closing);
+        crate::telemetry::set_session_state(this.id, crate::telemetry::SessionLifecycleState::Closing);
 
         if let Some(notifier) = this.on_close.take() {
             tracing::trace!("notifying write half closure of session");
@@ -574,9 +565,6 @@ impl tokio::io::AsyncWrite for HoprSession {
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "telemetry")]
-    use std::sync::Arc;
-
     use anyhow::Context;
     use futures::{AsyncReadExt, AsyncWriteExt};
     use hopr_types::{
@@ -584,8 +572,151 @@ mod tests {
     };
 
     use super::*;
-    #[cfg(feature = "telemetry")]
-    use crate::telemetry::SessionTelemetry;
+
+    // --- ByteCapabilities tests ---
+
+    #[test]
+    fn byte_capabilities_roundtrip_via_u8() -> anyhow::Result<()> {
+        let flags: Capabilities = Capability::Segmentation.into();
+        let caps = ByteCapabilities::from(flags);
+        let byte_val: u8 = caps.into();
+        let restored = ByteCapabilities::try_from(byte_val)?;
+        assert_eq!(caps, restored);
+        Ok(())
+    }
+
+    #[test]
+    fn byte_capabilities_invalid_bits_are_rejected() {
+        // 0xFF has bits set that don't correspond to any Capability
+        assert!(ByteCapabilities::try_from(0xFF_u8).is_err());
+    }
+
+    #[test]
+    fn byte_capabilities_empty_is_zero() {
+        let caps = ByteCapabilities::from(Capabilities::empty());
+        let byte_val: u8 = caps.into();
+        assert_eq!(byte_val, 0);
+    }
+
+    #[test]
+    fn byte_capabilities_combined_flags() -> anyhow::Result<()> {
+        let caps: Capabilities = Capability::Segmentation | Capability::NoRateControl;
+        let byte_caps = ByteCapabilities::from(caps);
+        let byte_val: u8 = byte_caps.into();
+        let restored = ByteCapabilities::try_from(byte_val)?;
+        assert_eq!(*restored.as_ref(), caps);
+        Ok(())
+    }
+
+    // --- caps_to_ack_mode tests ---
+
+    #[test]
+    fn caps_to_ack_mode_both_when_ack_and_nack() {
+        let caps: Capabilities = Capability::RetransmissionAck | Capability::RetransmissionNack;
+        assert_eq!(caps_to_ack_mode(caps), AcknowledgementMode::Both);
+    }
+
+    #[test]
+    fn caps_to_ack_mode_full_when_only_ack() {
+        let caps: Capabilities = Capability::RetransmissionAck.into();
+        assert_eq!(caps_to_ack_mode(caps), AcknowledgementMode::Full);
+    }
+
+    #[test]
+    fn caps_to_ack_mode_partial_when_no_retransmission() {
+        let caps: Capabilities = Capability::Segmentation.into();
+        assert_eq!(caps_to_ack_mode(caps), AcknowledgementMode::Partial);
+    }
+
+    #[test]
+    fn caps_to_ack_mode_partial_when_empty() {
+        assert_eq!(caps_to_ack_mode(Capabilities::empty()), AcknowledgementMode::Partial);
+    }
+
+    #[test]
+    fn caps_to_ack_mode_should_be_partial_when_only_nack() {
+        let caps: Capabilities = Capability::RetransmissionNack.into();
+        assert_eq!(caps_to_ack_mode(caps), AcknowledgementMode::Partial);
+    }
+
+    // --- ClosureReason tests ---
+
+    #[test]
+    fn closure_reason_display_values_are_stable() {
+        let reasons = [
+            ClosureReason::WriteClosed,
+            ClosureReason::EmptyRead,
+            ClosureReason::Eviction,
+        ];
+        insta::assert_debug_snapshot!(reasons);
+    }
+
+    // --- HoprSessionConfig tests ---
+
+    #[test]
+    fn hopr_session_config_default_snapshot() {
+        let cfg = HoprSessionConfig::default();
+        insta::assert_yaml_snapshot!(cfg);
+    }
+
+    // --- SessionTarget tests ---
+
+    #[test]
+    fn session_target_variants_debug_snapshot() -> anyhow::Result<()> {
+        let targets: Vec<SessionTarget> = vec![
+            SessionTarget::UdpStream(SealedHost::Plain(
+                "127.0.0.1:8080".parse().context("parsing UDP target")?,
+            )),
+            SessionTarget::TcpStream(SealedHost::Plain("10.0.0.1:443".parse().context("parsing TCP target")?)),
+            SessionTarget::ExitNode(42),
+        ];
+        insta::assert_debug_snapshot!(targets);
+        Ok(())
+    }
+
+    // --- SessionId edge cases ---
+
+    #[test]
+    fn session_id_from_str_rejects_missing_delimiter() {
+        assert!(SessionId::from_str("nodelmiter").is_err());
+    }
+
+    #[test]
+    fn session_id_from_str_rejects_invalid_pseudonym() {
+        assert!(SessionId::from_str("notahexvalue:1234").is_err());
+    }
+
+    #[test]
+    fn session_id_from_str_should_reject_invalid_tag() {
+        let pseudonym = HoprPseudonym::random();
+        let hex = pseudonym.to_hex();
+        let bad = format!("{hex}:not_a_number");
+        assert!(SessionId::from_str(&bad).is_err());
+    }
+
+    #[test]
+    fn session_id_display_and_debug_should_be_identical() {
+        let id = SessionId::new(42_u64, HoprPseudonym::random());
+        assert_eq!(format!("{id}"), format!("{id:?}"));
+    }
+
+    #[test]
+    fn session_id_hash_eq_consistency() {
+        use std::collections::HashSet;
+        let pseudonym = HoprPseudonym::random();
+        let id1 = SessionId::new(1234_u64, pseudonym);
+        let id2 = SessionId::new(1234_u64, pseudonym);
+        let id3 = SessionId::new(5678_u64, pseudonym);
+        let id4 = SessionId::new(1234_u64, HoprPseudonym::random());
+
+        let mut set = HashSet::new();
+        set.insert(id1);
+        assert!(set.contains(&id2));
+        assert!(!set.contains(&id3));
+        assert!(!set.contains(&id4), "same id but different pseudonym should not match");
+    }
+
+    // --- Existing tests ---
 
     #[test]
     fn test_session_id_to_str_from_str() -> anyhow::Result<()> {
@@ -634,11 +765,6 @@ mod tests {
         let id = SessionId::new(1234_u64, HoprPseudonym::random());
         const DATA_LEN: usize = 5000;
 
-        #[cfg(feature = "telemetry")]
-        let alice_metrics = Arc::new(SessionTelemetry::new(id, Default::default()));
-        #[cfg(feature = "telemetry")]
-        let bob_metrics = Arc::new(SessionTelemetry::new(id, Default::default()));
-
         let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
         let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
 
@@ -656,8 +782,6 @@ mod tests {
                     .inspect(|d| debug!("alice rcvd: {}", d.data.total_len())),
             ),
             None,
-            #[cfg(feature = "telemetry")]
-            alice_metrics,
         )?;
 
         let mut bob_session = HoprSession::new(
@@ -674,8 +798,6 @@ mod tests {
                     .inspect(|d| debug!("bob rcvd: {}", d.data.total_len())),
             ),
             None,
-            #[cfg(feature = "telemetry")]
-            bob_metrics,
         )?;
 
         let alice_sent = hopr_types::crypto_random::random_bytes::<DATA_LEN>();
@@ -718,11 +840,6 @@ mod tests {
         let id = SessionId::new(1234_u64, HoprPseudonym::random());
         const DATA_LEN: usize = 5000;
 
-        #[cfg(feature = "telemetry")]
-        let alice_metrics = Arc::new(SessionTelemetry::new(id, Default::default()));
-        #[cfg(feature = "telemetry")]
-        let bob_metrics = Arc::new(SessionTelemetry::new(id, Default::default()));
-
         let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
         let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
 
@@ -743,8 +860,6 @@ mod tests {
                     .inspect(|d| debug!("alice rcvd: {}", d.data.total_len())),
             ),
             None,
-            #[cfg(feature = "telemetry")]
-            alice_metrics,
         )?;
 
         let mut bob_session = HoprSession::new(
@@ -764,8 +879,6 @@ mod tests {
                     .inspect(|d| debug!("bob rcvd: {}", d.data.total_len())),
             ),
             None,
-            #[cfg(feature = "telemetry")]
-            bob_metrics,
         )?;
 
         let alice_sent = hopr_types::crypto_random::random_bytes::<DATA_LEN>();

@@ -6,8 +6,6 @@ use axum::{
     response::IntoResponse,
 };
 use futures::FutureExt;
-#[cfg(feature = "telemetry")]
-use hopr_lib::PeerPacketStatsSnapshot;
 use hopr_lib::{
     Address, Multiaddr,
     api::node::HoprNodeNetworkOperations,
@@ -17,23 +15,42 @@ use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, DurationMilliSeconds, serde_as};
 use tracing::debug;
 
-use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState};
+use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState, network::AnnouncementOriginResponse};
+
+/// A multiaddress paired with its discovery origin.
+#[serde_as]
+#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
+    "multiaddress": "/ip4/10.0.2.100/tcp/19093",
+    "origin": "chain"
+}))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct MultiaddressSource {
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String, example = "/ip4/10.0.2.100/tcp/19093")]
+    multiaddress: Multiaddr,
+    #[schema(example = "chain")]
+    origin: AnnouncementOriginResponse,
+}
 
 #[serde_as]
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
-    "announced": [
-        "/ip4/10.0.2.100/tcp/19093"
+    "announced": ["/ip4/10.0.2.100/tcp/19093"],
+    "announcedSources": [
+        { "multiaddress": "/ip4/10.0.2.100/tcp/19093", "origin": "chain" }
     ],
-    "observed": [
-        "/ip4/10.0.2.100/tcp/19093"
-    ]
+    "observed": ["/ip4/10.0.2.100/tcp/19093"]
 }))]
+#[serde(rename_all = "camelCase")]
 /// Contains the multiaddresses of peers that are `announced` on-chain and `observed` by the node.
 pub(crate) struct NodePeerInfoResponse {
+    /// Flat list of announced multiaddresses (legacy, for backward compatibility).
     #[serde_as(as = "Vec<DisplayFromStr>")]
     #[schema(value_type = Vec<String>, example = json!(["/ip4/10.0.2.100/tcp/19093"]))]
     announced: Vec<Multiaddr>,
+    /// Announced multiaddresses grouped by discovery origin.
+    announced_sources: Vec<MultiaddressSource>,
     #[serde_as(as = "Vec<DisplayFromStr>")]
     #[schema(value_type = Vec<String>, example = json!(["/ip4/10.0.2.100/tcp/19093"]))]
     observed: Vec<Multiaddr>,
@@ -83,7 +100,23 @@ pub(super) async fn show_peer_info(
                 hopr.network_observed_multiaddresses(&peer).map(Ok)
             );
             match res {
-                Ok((announced, observed)) => Ok((StatusCode::OK, Json(NodePeerInfoResponse { announced, observed }))),
+                Ok((announced, observed)) => {
+                    let announced_sources: Vec<MultiaddressSource> = announced
+                        .iter()
+                        .map(|ma| MultiaddressSource {
+                            multiaddress: ma.clone(),
+                            origin: AnnouncementOriginResponse::Chain,
+                        })
+                        .collect();
+                    Ok((
+                        StatusCode::OK,
+                        Json(NodePeerInfoResponse {
+                            announced,
+                            announced_sources,
+                            observed,
+                        }),
+                    ))
+                }
                 Err(error) => Err(ApiErrorStatus::UnknownFailure(error.to_string())),
             }
         }
@@ -164,88 +197,56 @@ pub(super) async fn ping_peer(
     }
 }
 
-#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
-#[schema(example = json!({
-    "packetsOut": 100,
-    "packetsIn": 50,
-    "bytesOut": 102400,
-    "bytesIn": 51200
-}))]
-#[serde(rename_all = "camelCase")]
-/// Packet statistics for a peer.
-pub(crate) struct PeerPacketStatsResponse {
-    #[schema(example = 100)]
-    pub packets_out: u64,
-    #[schema(example = 50)]
-    pub packets_in: u64,
-    #[schema(example = 102400)]
-    pub bytes_out: u64,
-    #[schema(example = 51200)]
-    pub bytes_in: u64,
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[cfg(feature = "telemetry")]
-impl From<PeerPacketStatsSnapshot> for PeerPacketStatsResponse {
-    fn from(snapshot: PeerPacketStatsSnapshot) -> Self {
-        Self {
-            packets_out: snapshot.packets_out,
-            packets_in: snapshot.packets_in,
-            bytes_out: snapshot.bytes_out,
-            bytes_in: snapshot.bytes_in,
-        }
-    }
-}
+    #[test]
+    fn multiaddress_source_should_serialize_with_single_multiaddress() -> anyhow::Result<()> {
+        let source = MultiaddressSource {
+            multiaddress: "/ip4/1.2.3.4/tcp/9091".parse()?,
+            origin: AnnouncementOriginResponse::Chain,
+        };
 
-/// Get packet statistics for a specific connected peer.
-///
-/// Returns the number of packets and bytes sent/received to/from the peer
-/// since the connection was established.
-#[utoipa::path(
-    get,
-    path = const_format::formatcp!("{BASE_PATH}/peers/{{destination}}/stats"),
-    description = "Get packet statistics for a specific connected peer",
-    params(
-        ("destination" = String, Path, description = "Address of the requested peer", example = "0x07eaf07d6624f741e04f4092a755a9027aaab7f6"),
-    ),
-    responses(
-        (status = 200, description = "Peer packet statistics", body = PeerPacketStatsResponse),
-        (status = 404, description = "Peer not found or not connected", body = ApiError),
-        (status = 401, description = "Invalid authorization token.", body = ApiError),
-    ),
-    security(
-        ("api_token" = []),
-        ("bearer_token" = [])
-    ),
-    tag = "Peers",
-)]
-pub(super) async fn peer_stats(
-    Path(DestinationParams {
-        destination: _destination,
-    }): Path<DestinationParams>,
-    State(_state): State<Arc<InternalState>>,
-) -> impl IntoResponse {
-    #[cfg(not(feature = "telemetry"))]
-    {
-        Err::<(StatusCode, Json<PeerPacketStatsResponse>), _>(ApiErrorStatus::UnknownFailure(
-            "BUILT WITHOUT STATS SUPPORT".into(),
-        ))
+        let json = serde_json::to_value(&source)?;
+        assert_eq!(json["multiaddress"], "/ip4/1.2.3.4/tcp/9091");
+        assert_eq!(json["origin"], "chain");
+        Ok(())
     }
 
-    #[cfg(feature = "telemetry")]
-    {
-        let hopr = _state.hopr.clone();
+    #[test]
+    fn node_peer_info_response_should_include_both_announced_fields() -> anyhow::Result<()> {
+        let ma: Multiaddr = "/ip4/10.0.2.100/tcp/19093".parse()?;
+        let response = NodePeerInfoResponse {
+            announced: vec![ma.clone()],
+            announced_sources: vec![MultiaddressSource {
+                multiaddress: ma,
+                origin: AnnouncementOriginResponse::Chain,
+            }],
+            observed: vec!["/ip4/10.0.2.100/tcp/19094".parse()?],
+        };
 
-        match hopr.chain_key_to_peerid(&_destination).await {
-            Ok(Some(peer)) => match hopr.network_peer_packet_stats(&peer).await {
-                Ok(Some(stats)) => {
-                    let resp = Json(PeerPacketStatsResponse::from(stats));
-                    Ok((StatusCode::OK, resp))
-                }
-                Ok(None) => Err(ApiErrorStatus::PeerNotFound),
-                Err(_) => Err(ApiErrorStatus::PeerNotFound),
-            },
-            Ok(None) => Err(ApiErrorStatus::PeerNotFound),
-            Err(_) => Err(ApiErrorStatus::PeerNotFound),
-        }
+        let json = serde_json::to_value(&response)?;
+        assert!(json["announced"].is_array());
+        assert_eq!(json["announced"][0], "/ip4/10.0.2.100/tcp/19093");
+        assert!(json["announcedSources"].is_array());
+        assert_eq!(json["announcedSources"][0]["multiaddress"], "/ip4/10.0.2.100/tcp/19093");
+        assert_eq!(json["announcedSources"][0]["origin"], "chain");
+        assert!(json["observed"].is_array());
+        Ok(())
+    }
+
+    #[test]
+    fn node_peer_info_response_should_serialize_empty_sources_when_no_announcements() -> anyhow::Result<()> {
+        let response = NodePeerInfoResponse {
+            announced: vec![],
+            announced_sources: vec![],
+            observed: vec!["/ip4/10.0.2.100/tcp/19094".parse()?],
+        };
+
+        let json = serde_json::to_value(&response)?;
+        assert_eq!(json["announced"].as_array().unwrap().len(), 0);
+        assert_eq!(json["announcedSources"].as_array().unwrap().len(), 0);
+        Ok(())
     }
 }

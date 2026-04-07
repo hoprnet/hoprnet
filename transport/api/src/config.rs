@@ -7,7 +7,7 @@ use std::{
 };
 
 use hopr_api::Multiaddr;
-pub use hopr_protocol_hopr::{HoprCodecConfig, HoprTicketProcessorConfig, SurbStoreConfig};
+pub use hopr_protocol_hopr::{HoprCodecConfig, HoprUnacknowledgedTicketProcessorConfig, SurbStoreConfig};
 pub use hopr_transport_probe::config::ProbeConfig;
 use hopr_transport_protocol::PacketPipelineConfig;
 use hopr_transport_session::{MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION};
@@ -16,8 +16,14 @@ use validator::{Validate, ValidationError, ValidationErrors};
 
 use crate::errors::HoprTransportError;
 
+const DEFAULT_COUNTER_FLUSH_INTERVAL: Duration = Duration::from_secs(15);
+
+fn default_counter_flush_interval() -> Duration {
+    DEFAULT_COUNTER_FLUSH_INTERVAL
+}
+
 /// Complete configuration of the HOPR protocol stack.
-#[derive(Debug, smart_default::SmartDefault, Validate, Clone, Copy, PartialEq)]
+#[derive(Debug, smart_default::SmartDefault, Validate, Clone, PartialEq)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize),
@@ -40,10 +46,23 @@ pub struct HoprProtocolConfig {
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
     pub session: SessionGlobalConfig,
+    /// Path planner configuration
+    #[cfg_attr(feature = "serde", serde(skip))]
+    pub path_planner: hopr_transport_path::PathPlannerConfig,
+    /// Interval at which per-peer protocol conformance counters are flushed
+    /// into the network graph.
+    ///
+    /// Default is 15 seconds.
+    #[default(default_counter_flush_interval())]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "default_counter_flush_interval", with = "humantime_serde")
+    )]
+    pub counter_flush_interval: Duration,
 }
 
 /// Configuration of the HOPR packet pipeline.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Validate)]
+#[derive(Clone, Copy, Debug, PartialEq, Validate, smart_default::SmartDefault)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize),
@@ -54,10 +73,10 @@ pub struct HoprPacketPipelineConfig {
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
     pub codec: HoprCodecConfig,
-    /// HOPR ticket processing configuration
+    /// Configuration of unacknowledged tickets processing.
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
-    pub ticket_processing: HoprTicketProcessorConfig,
+    pub ack_processor: HoprUnacknowledgedTicketProcessorConfig,
     /// Single Use Reply Block (SURB) handling configuration
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
@@ -253,8 +272,6 @@ pub struct TransportConfig {
     pub prefer_local_addresses: bool,
 }
 
-const DEFAULT_SESSION_MAX_SESSIONS: u32 = 2048;
-
 const DEFAULT_SESSION_IDLE_TIMEOUT: Duration = Duration::from_mins(3);
 
 const SESSION_IDLE_MIN_TIMEOUT: Duration = Duration::from_secs(2);
@@ -266,10 +283,6 @@ const DEFAULT_SESSION_ESTABLISH_MAX_RETRIES: u32 = 3;
 const DEFAULT_SESSION_BALANCER_SAMPLING: Duration = Duration::from_millis(100);
 
 const DEFAULT_SESSION_BALANCER_BUFFER_DURATION: Duration = Duration::from_secs(5);
-
-fn default_session_max_sessions() -> u32 {
-    DEFAULT_SESSION_MAX_SESSIONS
-}
 
 fn default_session_balancer_buffer_duration() -> Duration {
     DEFAULT_SESSION_BALANCER_BUFFER_DURATION
@@ -334,16 +347,6 @@ pub struct SessionGlobalConfig {
     )]
     pub idle_timeout: Duration,
 
-    /// The maximum number of outgoing or incoming Sessions that
-    /// are allowed by the Session manager.
-    ///
-    /// Minimum is 1, the maximum is given by the Session tag range.
-    /// Default is 2048.
-    #[default(default_session_max_sessions())]
-    #[cfg_attr(feature = "serde", serde(default = "default_session_max_sessions"))]
-    #[validate(range(min = 1))]
-    pub maximum_sessions: u32,
-
     /// Maximum retries to attempt to establish the Session
     /// Set 0 for no retries.
     ///
@@ -388,6 +391,11 @@ pub struct SessionGlobalConfig {
         serde(default = "default_session_balancer_buffer_duration", with = "humantime_serde")
     )]
     pub balancer_minimum_surb_buffer_duration: Duration,
+
+    /// Tag allocator partition configuration.
+    #[validate(nested)]
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub tag_allocator: hopr_transport_tag_allocator::TagAllocatorConfig,
 }
 
 #[cfg(test)]
@@ -501,5 +509,91 @@ mod tests {
         temp_env::with_vars([("DAPPNODE", Some("true")), ("HOPRD_NAT", Some("false"))], || {
             assert_eq!(default_multiaddr_transport(1234), "tcp/1234");
         });
+    }
+
+    // --- HostConfig::FromStr tests ---
+
+    #[test]
+    fn host_config_parses_ipv4_address() {
+        let cfg = HostConfig::from_str("1.2.3.4:9091").unwrap();
+        insta::assert_debug_snapshot!(cfg);
+    }
+
+    #[test]
+    fn host_config_parses_domain() {
+        let cfg = HostConfig::from_str("example.com:443").unwrap();
+        insta::assert_debug_snapshot!(cfg);
+    }
+
+    #[test]
+    fn host_config_rejects_missing_port() {
+        assert!(HostConfig::from_str("1.2.3.4").is_err());
+    }
+
+    #[test]
+    fn host_config_rejects_invalid_port() {
+        assert!(HostConfig::from_str("1.2.3.4:abc").is_err());
+    }
+
+    #[test]
+    fn host_config_rejects_invalid_host() {
+        assert!(HostConfig::from_str("-invalid-.com:80").is_err());
+    }
+
+    #[test]
+    fn host_config_display_roundtrip() {
+        let cfg = HostConfig {
+            address: HostType::IPv4("10.0.0.1".into()),
+            port: 8080,
+        };
+        insta::assert_yaml_snapshot!(cfg.to_string());
+    }
+
+    // --- TryFrom<&HostConfig> for Multiaddr tests ---
+
+    #[test]
+    fn multiaddr_from_ipv4_host_config() {
+        let cfg = HostConfig {
+            address: HostType::IPv4("1.2.3.4".into()),
+            port: 9091,
+        };
+        let addr = Multiaddr::try_from(&cfg).unwrap();
+        insta::assert_yaml_snapshot!(addr.to_string());
+    }
+
+    #[test]
+    fn multiaddr_from_domain_host_config() {
+        let cfg = HostConfig {
+            address: HostType::Domain("example.com".into()),
+            port: 443,
+        };
+        let addr = Multiaddr::try_from(&cfg).unwrap();
+        insta::assert_yaml_snapshot!(addr.to_string());
+    }
+
+    // --- SessionGlobalConfig validation tests ---
+
+    #[test]
+    fn session_global_config_default_is_valid() {
+        let cfg = SessionGlobalConfig::default();
+        assert!(cfg.validate().is_ok());
+    }
+
+    #[test]
+    fn session_global_config_too_low_idle_timeout_is_rejected() {
+        let cfg = SessionGlobalConfig {
+            idle_timeout: Duration::from_millis(100),
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn session_global_config_too_many_retries_is_rejected() {
+        let cfg = SessionGlobalConfig {
+            establish_max_retries: 21,
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_err());
     }
 }

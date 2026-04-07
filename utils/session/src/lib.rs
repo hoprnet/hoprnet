@@ -19,14 +19,16 @@ use futures::{
 };
 use hopr_api::{
     chain::HoprChainApi,
-    db::HoprNodeDbApi,
-    graph::{NetworkGraphUpdate, NetworkGraphView},
+    graph::{
+        NetworkGraphTraverse, NetworkGraphUpdate, NetworkGraphView, NetworkGraphWrite,
+        traits::{EdgeObservableRead, EdgeObservableWrite},
+    },
     network::NetworkStreamControl,
 };
 use hopr_async_runtime::Abortable;
 use hopr_lib::{
-    Address, Hopr, HoprSession, NetworkView, OffchainPublicKey, SURB_SIZE, ServiceId, SessionClientConfig, SessionId,
-    SessionTarget, errors::HoprLibError, exports::types::internal::routing::RoutingOptions, transfer_session,
+    Address, Hopr, HoprSession, HoprSessionClientConfig, NetworkView, OffchainPublicKey, RoutingOptions, SURB_SIZE,
+    ServiceId, SessionId, SessionTarget, errors::HoprLibError, transfer_session,
 };
 use hopr_network_types::{
     prelude::{ConnectedUdpStream, IpOrHost, IpProtocol, SealedHost, UdpStreamParallelism},
@@ -47,7 +49,7 @@ pub const HOPR_UDP_BUFFER_SIZE: usize = 16384;
 /// Size of the queue (back-pressure) for data incoming from a UDP stream.
 pub const HOPR_UDP_QUEUE_SIZE: usize = 8192;
 
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_ACTIVE_CLIENTS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
         "hopr_session_hoprd_clients",
@@ -210,17 +212,25 @@ pub struct SessionPool {
 impl SessionPool {
     pub const MAX_SESSION_POOL_SIZE: usize = 5;
 
-    pub async fn new<Chain, Db, Graph, Net>(
+    pub async fn new<Chain, Graph, Net>(
         size: usize,
         dst: Address,
         target: SessionTarget,
-        cfg: SessionClientConfig,
-        hopr: Arc<Hopr<Chain, Db, Graph, Net>>,
+        cfg: HoprSessionClientConfig,
+        hopr: Arc<Hopr<Chain, Graph, Net>>,
     ) -> Result<Self, anyhow::Error>
     where
         Chain: HoprChainApi + Clone + Send + Sync + 'static,
-        Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
-        Graph: NetworkGraphView<NodeId = OffchainPublicKey> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
+        Graph: NetworkGraphView<NodeId = OffchainPublicKey>
+            + NetworkGraphUpdate
+            + NetworkGraphWrite<NodeId = OffchainPublicKey>
+            + NetworkGraphTraverse<NodeId = OffchainPublicKey>
+            + Clone
+            + Send
+            + Sync
+            + 'static,
+        <Graph as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
+        <Graph as NetworkGraphWrite>::Observed: EdgeObservableWrite + Send,
         Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
     {
         let pool = Arc::new(parking_lot::Mutex::new(VecDeque::with_capacity(size)));
@@ -301,21 +311,29 @@ impl Drop for SessionPool {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn create_tcp_client_binding<Chain, Db, Graph, Net>(
+pub async fn create_tcp_client_binding<Chain, Graph, Net>(
     bind_host: std::net::SocketAddr,
     port_range: Option<String>,
-    hopr: Arc<Hopr<Chain, Db, Graph, Net>>,
+    hopr: Arc<Hopr<Chain, Graph, Net>>,
     open_listeners: Arc<ListenerJoinHandles>,
     destination: Address,
     target_spec: SessionTargetSpec,
-    config: SessionClientConfig,
+    config: HoprSessionClientConfig,
     use_session_pool: Option<usize>,
     max_client_sessions: Option<usize>,
 ) -> Result<(std::net::SocketAddr, Option<SessionId>, usize), BindError>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
-    Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
-    Graph: NetworkGraphView<NodeId = OffchainPublicKey> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Graph: NetworkGraphView<NodeId = OffchainPublicKey>
+        + NetworkGraphUpdate
+        + NetworkGraphWrite<NodeId = OffchainPublicKey>
+        + NetworkGraphTraverse<NodeId = OffchainPublicKey>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+    <Graph as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
+    <Graph as NetworkGraphWrite>::Observed: EdgeObservableWrite + Send,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     // Bind the TCP socket first
@@ -411,7 +429,7 @@ where
                             let (abort_handle, abort_reg) = AbortHandle::new_pair();
                             active_sessions.insert(session_id, (sock_addr, abort_handle));
 
-                            #[cfg(all(feature = "prometheus", not(test)))]
+                            #[cfg(all(feature = "telemetry", not(test)))]
                             METRIC_ACTIVE_CLIENTS.increment(&["tcp"], 1.0);
 
                             hopr_async_runtime::prelude::spawn(
@@ -425,7 +443,7 @@ where
 
                                         debug!(%session_id, "tcp session has ended");
 
-                                        #[cfg(all(feature = "prometheus", not(test)))]
+                                        #[cfg(all(feature = "telemetry", not(test)))]
                                         METRIC_ACTIVE_CLIENTS.decrement(&["tcp"], 1.0);
                                     },
                                 ),
@@ -450,8 +468,8 @@ where
         StoredSessionEntry {
             destination,
             target: target_spec,
-            forward_path: config.forward_path_options,
-            return_path: config.return_path_options,
+            forward_path: config.forward_path.into(),
+            return_path: config.return_path.into(),
             clients: active_sessions,
             max_client_sessions: max_clients,
             max_surb_upstream: config
@@ -476,19 +494,27 @@ pub enum BindError {
     UnknownFailure(String),
 }
 
-pub async fn create_udp_client_binding<Chain, Db, Graph, Net>(
+pub async fn create_udp_client_binding<Chain, Graph, Net>(
     bind_host: std::net::SocketAddr,
     port_range: Option<String>,
-    hopr: Arc<Hopr<Chain, Db, Graph, Net>>,
+    hopr: Arc<Hopr<Chain, Graph, Net>>,
     open_listeners: Arc<ListenerJoinHandles>,
     destination: Address,
     target_spec: SessionTargetSpec,
-    config: SessionClientConfig,
+    config: HoprSessionClientConfig,
 ) -> Result<(std::net::SocketAddr, Option<SessionId>, usize), BindError>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
-    Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
-    Graph: NetworkGraphView<NodeId = OffchainPublicKey> + NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    Graph: NetworkGraphView<NodeId = OffchainPublicKey>
+        + NetworkGraphUpdate
+        + NetworkGraphWrite<NodeId = OffchainPublicKey>
+        + NetworkGraphTraverse<NodeId = OffchainPublicKey>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+    <Graph as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
+    <Graph as NetworkGraphWrite>::Observed: EdgeObservableWrite + Send,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
     // Bind the UDP socket first
@@ -534,12 +560,12 @@ where
     let session_id = *session.id();
     clients.insert(session_id, (bind_host, abort_handle.clone()));
     hopr_async_runtime::prelude::spawn(async move {
-        #[cfg(all(feature = "prometheus", not(test)))]
+        #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_ACTIVE_CLIENTS.increment(&["udp"], 1.0);
 
         bind_session_to_stream(session, udp_socket, HOPR_UDP_BUFFER_SIZE, Some(abort_reg)).await;
 
-        #[cfg(all(feature = "prometheus", not(test)))]
+        #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_ACTIVE_CLIENTS.decrement(&["udp"], 1.0);
 
         // Once the Session closes, remove it from the list
@@ -551,8 +577,8 @@ where
         StoredSessionEntry {
             destination,
             target: target_spec,
-            forward_path: config.forward_path_options.clone(),
-            return_path: config.return_path_options.clone(),
+            forward_path: config.forward_path.into(),
+            return_path: config.return_path.into(),
             max_client_sessions: max_clients,
             max_surb_upstream: config
                 .surb_management
@@ -692,8 +718,6 @@ async fn bind_session_to_stream<T>(
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use anyhow::Context;
     use futures::{
         FutureExt, StreamExt,
@@ -705,7 +729,7 @@ mod tests {
         Address, ApplicationData, ApplicationDataIn, ApplicationDataOut, HoprPseudonym, HoprSession, SessionId,
         exports::types::internal::routing::{DestinationRouting, RoutingOptions},
     };
-    use hopr_transport::session::{HoprSessionConfig, SessionTelemetry};
+    use hopr_transport::session::HoprSessionConfig;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     use super::*;
@@ -737,14 +761,12 @@ mod tests {
         let session_id = SessionId::new(4567u64, HoprPseudonym::random());
         let peer: Address = "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F".parse()?;
         let cfg = HoprSessionConfig::default();
-        let metrics = Arc::new(SessionTelemetry::new(session_id, cfg));
         let session = HoprSession::new(
             session_id,
             DestinationRouting::forward_only(peer, RoutingOptions::IntermediatePath(Default::default())),
             cfg,
             loopback_transport(),
             None,
-            metrics,
         )?;
 
         let (bound_addr, tcp_listener) = tcp_listen_on(("127.0.0.1", 0), None)
@@ -782,14 +804,12 @@ mod tests {
         let session_id = SessionId::new(4567u64, HoprPseudonym::random());
         let peer: Address = "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F".parse()?;
         let cfg = HoprSessionConfig::default();
-        let metrics = Arc::new(SessionTelemetry::new(session_id, cfg));
         let session = HoprSession::new(
             session_id,
             DestinationRouting::forward_only(peer, RoutingOptions::IntermediatePath(Default::default())),
             cfg,
             loopback_transport(),
             None,
-            metrics,
         )?;
 
         let (listen_addr, udp_listener) = udp_bind_to(("127.0.0.1", 0), None)

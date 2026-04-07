@@ -1,7 +1,7 @@
 //! The library code containing the graph data structure for transport and incentivization layer (through the "channel
 //! graph").
 //!
-//! [`NetworkGraph`] is the main data structure representing the network of nodes and channels. It combines 2 layers:
+//! `NetworkGraph` is the main data structure representing the network of nodes and channels. It combines 2 layers:
 //! 1. The **channel graph** layer, which represents the network topology with nodes and channels as loaded from the
 //!    chain.
 //! 2. The **network layer**, which represents the nodes based on their physical connectability and QoS attributes.
@@ -15,21 +15,28 @@
 //! The weights accumulate different properties of the edges to represent the cost of using that edge for routing or
 //! whether the edge can be used at all. Weights are represented as a struct containing different fields, each
 //! representing a different property of the edge. The used properties are:
-//! - presence of incentivization channel with remaining balance (Option<Balance>)
-//! - presence of peer for immediate direct network connection and its quality (Option<ImmediateQoS>)
-//! - presence of intermediate connection through other nodes (Option<IntermediateQoS>)
+//! - presence of incentivization channel with remaining balance (`Option<Balance>`)
+//! - presence of peer for immediate direct network connection and its quality (`Option<ImmediateQoS>`)
+//! - presence of intermediate connection through other nodes (`Option<IntermediateQoS>`)
 
 #[cfg(feature = "petgraph")]
 pub mod petgraph;
 
-pub mod costs;
 pub mod errors;
+#[cfg(feature = "graph-api")]
+pub mod render;
 pub mod weight;
 
 use hopr_api::OffchainPublicKey;
 #[cfg(feature = "petgraph")]
 pub use petgraph::*;
 pub use weight::Observations;
+
+/// Default penalty multiplier for edges lacking probe-based quality observations.
+pub const DEFAULT_EDGE_PENALTY: f64 = 0.5;
+
+/// Default minimum acceptable message acknowledgment rate for path selection.
+pub const DEFAULT_MIN_ACK_RATE: f64 = 0.1;
 
 /// A thread-safe, shareable handle to a [`ChannelGraph`].
 ///

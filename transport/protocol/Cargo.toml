@@ -11,7 +11,7 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-prometheus = ["dep:hopr-metrics", "hopr-protocol-hopr/prometheus"]
+telemetry = ["dep:hopr-metrics", "hopr-protocol-hopr/telemetry"]
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 serde = [
   "dep:serde",
@@ -24,6 +24,7 @@ serde = [
 [dependencies]
 anyhow = { workspace = true }
 ahash = { workspace = true }
+dashmap = { workspace = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
 halfbrown = { workspace = true }
@@ -36,10 +37,7 @@ serde = { workspace = true, features = ["derive"], optional = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
-tokio-util = { workspace = true, default-features = false, features = [
-  "codec",
-  "compat",
-] }
+tokio-util = { workspace = true, features = ["codec", "compat"] }
 tracing = { workspace = true }
 validator = { workspace = true }
 
@@ -50,7 +48,7 @@ hopr-crypto-packet = { workspace = true }
 hopr-network-types = { workspace = true }
 hopr-metrics = { optional = true, workspace = true }
 
-hopr-protocol-hopr = { workspace = true }
+hopr-protocol-hopr = { workspace = true, features = ["rayon"] }
 hopr-protocol-app = { workspace = true }
 hopr-parallelize = { workspace = true, features = ["rayon"] }
 
@@ -58,25 +56,34 @@ hopr-parallelize = { workspace = true, features = ["rayon"] }
 [dev-dependencies]
 async-trait = { workspace = true }
 async_channel_io = { version = "0.3.0" }
+hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 bytesize = { workspace = true }
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 futures-concurrency = { workspace = true }
 hex-literal = { workspace = true }
+insta = { workspace = true, features = ["yaml"] }
+rstest = { workspace = true }
 serial_test = { workspace = true }
 test-log = { workspace = true }
 tokio = { workspace = true }
 
 hopr-api = { workspace = true }
-hopr-db-node = { workspace = true, features = ["runtime-tokio"] }
 hopr-chain-connector = { workspace = true, features = [
   "testing",
   "runtime-tokio",
 ] }
 hopr-network-types = { workspace = true }
 hopr-transport-mixer = { workspace = true }
+hopr-ticket-manager = { workspace = true }
+hopr-test-stubs = { workspace = true }
+hopr-transport-protocol = { path = ".", features = ["serde"] }
 
 [[bench]]
 name = "protocol_throughput_emulated"
+harness = false
+
+[[bench]]
+name = "pipeline_e2e"
 harness = false
 
 [package.metadata.cargo-machete]

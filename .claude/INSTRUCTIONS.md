@@ -31,11 +31,58 @@ cargo build --profile release           # Production (opt-level 3, lto="fat")
 ### Test
 
 ```bash
-cargo test --lib                        # Unit tests only
-cargo test --test '*' -- --test-threads=1   # Integration tests (MUST be single-threaded)
+cargo nextest run --lib                        # Unit tests only
+cargo nextest run --test '*' -j 1              # Integration tests (MUST be single-threaded)
 cargo bench                             # Benchmarks (in benches/ dirs)
 just run-local-cluster                  # Local multi-node cluster
 ```
+
+### Code Coverage
+
+**Workspace-wide (via Nix, used in CI):**
+
+```bash
+nix build -L .#coverage-unit            # LCOV report written to ./result
+```
+
+**Single crate (local, from the dev shell):**
+
+```bash
+nix develop --command bash -c '
+  OUTDIR=/tmp/hopr-coverage
+  CRATE=hopr-transport-mixer            # ← change to target crate
+  CRATE_US=${CRATE//-/_}
+
+  rm -rf "$OUTDIR" && mkdir -p "$OUTDIR"
+
+  LLVM_PROFILE_FILE="$OUTDIR/%p_%m.profraw" \
+  RUSTFLAGS="-C instrument-coverage" \
+    cargo nextest run -p "$CRATE" --lib
+
+  llvm-profdata merge -sparse "$OUTDIR"/*.profraw -o "$OUTDIR/coverage.profdata"
+
+  BINARY=$(find target/debug/deps -name "${CRATE_US}-*" -type f \
+    ! -name "*.d" ! -name "*.rmeta" ! -name "*.o" \
+    | while read f; do file "$f" | grep -q "Mach-O\|ELF" && echo "$f"; done | head -1)
+
+  llvm-cov report "$BINARY" \
+    --instr-profile="$OUTDIR/coverage.profdata" \
+    --ignore-filename-regex="\.cargo|rustc"
+
+  llvm-cov export "$BINARY" \
+    --instr-profile="$OUTDIR/coverage.profdata" \
+    --ignore-filename-regex="\.cargo|rustc" \
+    --format=lcov > "$OUTDIR/coverage.lcov"
+
+  genhtml "$OUTDIR/coverage.lcov" \
+    --output-directory "$OUTDIR/html" \
+    --title "$CRATE coverage"
+
+  echo "Report: $OUTDIR/html/index.html"
+'
+```
+
+Open the HTML report with `open /tmp/hopr-coverage/html/index.html`.
 
 ### Setup
 

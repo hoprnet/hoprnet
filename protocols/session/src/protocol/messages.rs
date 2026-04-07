@@ -158,7 +158,7 @@ impl<const C: usize> FrameAcknowledgements<C> {
         self.0.len() == Self::MAX_ACK_FRAMES
     }
 
-    /// Creates a vector of [`FrameAcknowledgements`](FrameAcknowledgements) from the given iterator
+    /// Creates a vector of [`FrameAcknowledgements`] from the given iterator
     /// of acknowledged [`FrameIds`](FrameId).
     pub fn new_multiple<T: IntoIterator<Item = FrameId>>(items: T) -> Vec<Self> {
         let mut out = Vec::with_capacity(2);
@@ -257,11 +257,9 @@ mod tests {
 
         let expected = (0..(2 * MAX + 2) as FrameId).collect::<Vec<_>>();
         let acks = FrameAcknowledgements::<1024>::new_multiple(expected.clone());
-        assert_eq!(3, acks.len());
 
-        assert_eq!(MAX, acks[0].len());
-        assert_eq!(MAX, acks[1].len());
-        assert_eq!(2, acks[2].len());
+        let chunk_lengths: Vec<_> = acks.iter().map(|a| a.len()).collect();
+        assert_eq!(chunk_lengths, [MAX, MAX, 2]);
 
         let actual = acks.into_iter().flat_map(|a| a.into_iter()).collect::<Vec<_>>();
         assert_eq!(expected, actual);
@@ -283,7 +281,7 @@ mod tests {
 
         // Iterator of SegmentIds is guaranteed to be sorted
         let missing = req.into_iter().collect::<Vec<SegmentId>>();
-        let missing_seg_ids = [
+        let expected = [
             SegmentId(2, 2),
             SegmentId(3, 2),
             SegmentId(3, 3),
@@ -298,7 +296,6 @@ mod tests {
             SegmentId(4, 6),
             SegmentId(4, 7),
         ];
-
-        assert_eq!(missing, missing_seg_ids);
+        assert_eq!(missing, expected);
     }
 }

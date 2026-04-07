@@ -1,6 +1,6 @@
 use hopr_api::{
     chain::{ChainKeyOperations, ChainReadChannelOperations, ChainReadTicketOperations, ChainValues},
-    db::HoprDbTicketOperations,
+    tickets::TicketFactory,
     types::{
         crypto::prelude::*,
         internal::{prelude::*, routing::ResolvedTransportRouting},
@@ -16,22 +16,24 @@ use crate::{HoprTransportProcess, config::HoprPacketPipelineConfig};
 
 /// Contains all components required to run the HOPR packet pipeline.
 #[derive(Clone)]
-pub struct HoprPipelineComponents<TEvt, S, Chain, Db> {
+pub struct HoprPipelineComponents<TEvt, S, Chain, TFact> {
     /// Sink for [`TicketEvents`](TicketEvent).
     pub ticket_events: TEvt,
     /// Store for SURBs and Reply Openers.
     pub surb_store: S,
     /// Chain API for interacting with the blockchain.
     pub chain_api: Chain,
-    /// Database for storing tickets and other data.
-    pub db: Db,
+    /// Ticket factory for creating outgoing tickets
+    pub ticket_factory: TFact,
+    /// Per-peer protocol conformance counters.
+    pub counters: hopr_transport_protocol::PeerProtocolCounterRegistry,
 }
 
-pub fn run_hopr_packet_pipeline<WIn, WOut, Chain, S, Db, TEvt, AppOut, AppIn>(
+pub fn run_hopr_packet_pipeline<WIn, WOut, Chain, S, TEvt, TFact, AppOut, AppIn>(
     (packet_key, chain_key): (OffchainKeypair, ChainKeypair),
     wire_msg: (WOut, WIn),
     api: (AppOut, AppIn),
-    components: HoprPipelineComponents<TEvt, S, Chain, Db>,
+    components: HoprPipelineComponents<TEvt, S, Chain, TFact>,
     channels_dst: Hash,
     cfg: HoprPacketPipelineConfig,
 ) -> AbortableList<HoprTransportProcess>
@@ -39,7 +41,6 @@ where
     WOut: futures::Sink<(PeerId, Box<[u8]>)> + Clone + Unpin + Send + 'static,
     WOut::Error: std::error::Error,
     WIn: futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + 'static,
-    Db: HoprDbTicketOperations + Clone + Send + Sync + 'static,
     Chain: ChainKeyOperations
         + ChainReadChannelOperations
         + ChainReadTicketOperations
@@ -51,6 +52,7 @@ where
     S: SurbStore + Clone + Send + Sync + 'static,
     TEvt: futures::Sink<TicketEvent> + Clone + Unpin + Send + 'static,
     TEvt::Error: std::error::Error,
+    TFact: TicketFactory + Clone + Send + Sync + 'static,
     AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
     AppOut::Error: std::error::Error,
     AppIn: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
@@ -59,29 +61,27 @@ where
         ticket_events,
         surb_store,
         chain_api,
-        db,
+        ticket_factory,
+        counters,
     } = components;
 
-    let ticket_proc = HoprTicketProcessor::new(
-        chain_api.clone(),
-        db.clone(),
-        chain_key.clone(),
-        channels_dst,
-        cfg.ticket_processing,
-    );
+    let unack_ticket_proc =
+        HoprUnacknowledgedTicketProcessor::new(chain_api.clone(), chain_key.clone(), channels_dst, cfg.ack_processor);
+
     let encoder = HoprEncoder::new(
         chain_key.clone(),
         chain_api.clone(),
         surb_store.clone(),
-        ticket_proc.clone(),
+        ticket_factory.clone(),
         channels_dst,
         cfg.codec,
     );
+
     let decoder = HoprDecoder::new(
         (packet_key.clone(), chain_key.clone()),
         chain_api.clone(),
         surb_store,
-        ticket_proc.clone(),
+        ticket_factory.clone(),
         channels_dst,
         cfg.codec,
     );
@@ -114,19 +114,16 @@ where
         )
     };
 
-    let (index_sync_handle, index_sync_reg) = futures::future::AbortHandle::new_pair();
-    hopr_async_runtime::prelude::spawn(ticket_proc.outgoing_index_sync_task(index_sync_reg));
-    processes.insert(HoprTransportProcess::OutgoingIndexSync, index_sync_handle);
-
     processes.flat_map_extend_from(
         run_packet_pipeline(
             packet_key.clone(),
             wire_msg,
             (encoder, decoder),
-            ticket_proc,
+            unack_ticket_proc,
             ticket_events,
             cfg.pipeline,
             api,
+            counters,
         ),
         HoprTransportProcess::Pipeline,
     );

@@ -14,6 +14,12 @@
   </p>
 </p>
 
+<p align="center">
+  <a href="https://codecov.io/gh/hoprnet/hoprnet">
+    <img src="https://codecov.io/gh/hoprnet/hoprnet/branch/master/graph/badge.svg" alt="codecov">
+  </a>
+</p>
+
 ## Table of Contents
 
 - [Table of Contents](#table-of-contents)
@@ -70,30 +76,22 @@ Unless stated otherwise, the following sections only apply to `hoprd`.
 
 ## Install
 
-For production purposes always run the latest stable release.
-
 Multiple options for installation exist, the preferred choice for any production system should be to use the container image (e.g. using `docker`).
 
 All releases and associated changelogs are located in the [official releases](https://github.com/hoprnet/hoprnet/releases) section of the [`hoprnet`](https://github.com/hoprnet/hoprnet) repository.
 
 ### Install via Docker
 
-The following instructions show how any `$RELEASE` may be installed, to select the release, override the `$RELEASE` variable, e.g.:
+Checkout [DockerHub](https://hub.docker.com/r/hoprnet/hoprd/tags) for specific version tag or use a custom tag:
 
-- `export RELEASE=latest` to track the latest changes on the repository's `master` branch
-- `export RELEASE=kaunas` to track the latest changes on the repository's `release/kaunas` branch (3.0.X)
-- `export RELEASE=<version>` to get a specific `<version>`
-
-Container image has the format
-`europe-west3-docker.pkg.dev/hoprassociation/docker-images/$PROJECT:$RELEASE`.
-where:
-
-- `$PROJECT` can be: `hoprd`
-
-Pull the container image with `docker`:
+- I want the latest code from active development → `latest` or `latest-main`
+- I want the latest stable release from active development → `release-main`
+- I want the latest code from the LTS branch → `latest-lts`
+- I want the latest stable release from the LTS branch → `release-lts`
+- I want what is currently running in production → `stable`
 
 ```bash
-docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:kaunas
+docker pull hoprnet/hoprd:stable
 ```
 
 It is recommended to setup an alias `hoprd` for the docker command invocation.
@@ -189,7 +187,6 @@ On top of the default configuration options generated for the command line, the 
 - `HOPRD_LOG_FORMAT` - override for the default stdout log formatter (follows tracing formatting options)
 - `HOPRD_USE_OPENTELEMETRY` - enable the OpenTelemetry output for this node
 - `HOPRD_OTEL_SIGNALS` - comma-separated OTLP signals to export when OpenTelemetry is enabled (`traces`, `logs`, `metrics`), defaults to `traces`
-- `OTEL_SERVICE_NAME` - the name of this node for the OpenTelemetry service
 - `HOPR_INTERNAL_CHAIN_DISCOVERY_CHANNEL_CAPACITY` - the maximum capacity of the channel for chain generated discovery signals for the p2p transport
 - `HOPR_INTERNAL_ACKED_TICKET_CHANNEL_CAPACITY` - the maximum capacity of the acknowledged ticket processing queue
 - `HOPR_INTERNAL_LIBP2P_MAX_CONCURRENTLY_DIALED_PEER_COUNT` - the maximum number of concurrently dialed peers in libp2p
@@ -365,31 +362,11 @@ For usage examples of the generated SDK, refer to the generated README.md file i
 
 ### Building a Docker image
 
-Docker images can be built using the respective nix flake outputs.
-The available images can be listed with:
+Docker images can be built using the respective nix flake outputs. The following command builds the `hoprd` image for `x86_64-linux` platform:
 
 ```bash
-just list-docker-images
+nix build .#docker-hoprd-x86_64-linux
 ```
-
-The following command builds the `hoprd` image for the host platform:
-
-```bash
-nix build .#hoprd-docker
-```
-
-If needed images for other platforms can be built by specifying the target
-platform. For example, to build the `hoprd` image for the `x86_64-linux`
-platform, while being on a Darwin host system, use the following command:
-
-```bash
-nix build .#packages.x86_64-linux.hoprd-docker
-```
-
-NOTE: Building for different platforms requires nix distributed builds to be
-set up properly.
-See [Nix documentation](https://nix.dev/manual/nix/2.28/advanced-topics/distributed-builds.html)
-for more information.
 
 ## Local cluster
 
@@ -403,17 +380,7 @@ Run only unit tests: `cargo test --lib`
 
 ### Github Actions CI
 
-We run a fair amount of automation using Github Actions. To ease development
-of these workflows one can use [act][2] to run workflows locally in a
-Docker environment.
-
-E.g. running the build workflow:
-
-```bash
-act -j build
-```
-
-For more information please refer to [act][2]'s documentation.
+We run a fair amount of automation using Github Actions. Too see the full list of workflows checkout [workflow docs](./.github/workflows/README.md)
 
 ### End-to-End Testing
 
@@ -430,6 +397,10 @@ With the environment activated, execute the tests locally:
 ```bash
 just run-smoke-test integration
 ```
+
+## Code Coverage
+
+Coverage reports are generated using LLVM source-based instrumentation and uploaded to [Codecov](https://codecov.io/gh/hoprnet/hoprnet). See [docs/coverage.md](docs/coverage.md) for workspace-wide and single-crate usage.
 
 ## Profiling & Instrumentation
 
@@ -448,18 +419,23 @@ Once an instrumented tokio is built into hoprd, the application can be instrumen
 
 `hoprd` can stream OpenTelemetry to a compatible endpoint. This behavior is turned off by default. To enable it, configure these environment variables:
 
+Detailed reference: [`OTLP.md`](OTLP.md)
+
 - `HOPRD_USE_OPENTELEMETRY` - `true` to enable the OpenTelemetry streaming, `false` to disable it
 - `HOPRD_OTEL_SIGNALS` - comma-separated signal list from `traces`, `logs`, `metrics` (default: `traces`)
-- `OTEL_SERVICE_NAME` - identifier used as `service.name` for this instance (for example `my_hoprd_instance`)
-- `OTEL_EXPORTER_OTLP_ENDPOINT` - base URL of an OTLP endpoint. Transport is inferred from URL scheme (`grpc://...`, `http://...`, or `https://...`)
+- `HOPRD_OTLP_ENDPOINT` - base URL of an OTLP endpoint. Transport is inferred from URL scheme (`grpc://...`, `http://...`, or `https://...`)
+- `HOPRD_METRIC_EXPORT_INTERVAL` - OTLP metric export interval config in `default,prefix=interval` form (for example `15000,hopr_session=1000`). Intervals support raw milliseconds (`15000`) or suffixes (`1s`, `250ms`, `1m`).
+- `HOPRD_OTEL_EXPORT_LABELS` - comma-separated `key=value` pairs added as extra attributes to all OTEL signals (for example `HOPRD_OTEL_EXPORT_LABELS="country=UK,city=london"`).
 
 Examples:
 
 - Traces only (backward-compatible default): `HOPRD_OTEL_SIGNALS=traces`
 - Metrics only: `HOPRD_OTEL_SIGNALS=metrics`
 - Full export: `HOPRD_OTEL_SIGNALS=traces,logs,metrics`
+- OTEL traces, logs, and metrics include `node_address` and `node_peer_id` attributes automatically.
+- OTLP logs are emitted as structured objects (typed fields/attributes), and use OTLP HTTP JSON protocol when `HOPRD_OTLP_ENDPOINT` is `http(s)://...`.
 - With metrics enabled, OTEL exports keep Prometheus family naming (`<metric>`, `<metric>_count`, `<metric>_sum`, `<metric>_bucket`) and labels (`le` for histogram buckets, `quantile` for summaries).
-- Session snapshot metrics are also exported directly to OTEL (`hopr_session_*` series with `session_id` attribute) without being added to the Prometheus `/metrics` endpoint.
+- Session metrics are exported to OTEL (`hopr_session_*` series with `session_id` attribute) and are excluded from the Prometheus `/metrics` endpoint.
 
 ### Profiling Criterion benchmarks via `flamegraph`
 
@@ -499,10 +475,10 @@ However, for that to work the `hoprd` binary has to be built with the feature `c
 For ease of use we provide different nix flake outputs that build the `hoprd`
 with the `capture` feature enabled:
 
-- `nix build .#hoprd-x86_64-linux-profile`
-- `nix build .#hoprd-aarch64-linux-profile`
-- `nix build .#hoprd-x86_64-darwin-profile`
-- `nix build .#hoprd-aarch64-darwin-profile`
+- `nix build .#binary-hoprd-profile-x86_64-linux`
+- `nix build .#binary-hoprd-profile-aarch64-linux`
+- `nix build .#binary-hoprd-profile-x86_64-darwin`
+- `nix build .#binary-hoprd-profile-aarch64-darwin`
 
 ## Contact
 

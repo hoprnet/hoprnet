@@ -21,9 +21,6 @@ pub enum HoprLibError {
     #[error("configuration validation failed: {0}")]
     ConfigurationError(#[from] validator::ValidationErrors),
 
-    #[error("database error: {0}")]
-    DbError(#[source] anyhow::Error),
-
     #[error("chain error: {0}")]
     ChainError(#[source] anyhow::Error),
 
@@ -32,6 +29,9 @@ pub enum HoprLibError {
 
     #[error(transparent)]
     TransportError(#[from] HoprTransportError),
+
+    #[error("ticket manager error: {0}")]
+    TicketManagerError(#[source] anyhow::Error),
 
     #[error(transparent)]
     TypeError(#[from] hopr_api::types::primitive::errors::GeneralError),
@@ -53,8 +53,8 @@ impl HoprLibError {
         Self::ChainError(e.into())
     }
 
-    pub fn db<E: Into<anyhow::Error>>(e: E) -> Self {
-        Self::DbError(e.into())
+    pub fn ticket_manager<E: Into<anyhow::Error>>(e: E) -> Self {
+        Self::TicketManagerError(e.into())
     }
 
     pub fn other(e: impl Into<anyhow::Error>) -> Self {

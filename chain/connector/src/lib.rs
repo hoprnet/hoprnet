@@ -2,12 +2,12 @@ mod backend;
 mod connector;
 pub mod errors;
 mod reader;
-#[cfg(feature = "testing")]
+#[cfg(any(test, feature = "testing"))]
 pub mod testing;
 
 pub(crate) mod utils;
 
-#[cfg(feature = "testing")]
+#[cfg(any(test, feature = "testing"))]
 pub use backend::InMemoryBackend;
 pub use backend::{Backend, TempDbBackend, TempDbError};
 pub use connector::{BlockchainConnectorConfig, HoprBlockchainConnector};
@@ -56,7 +56,7 @@ pub type HoprBlockchainBasicConnector<C> = HoprBlockchainConnector<
 /// Convenience function to create [`HoprBlockchainConnector`] with own contract addresses.
 ///
 /// The returned instance uses [`TempDbBackend`] and
-/// [`hopr_api::types::chain::payload::bindings_based::SafePayloadGenerator`]
+/// `SafePayloadGenerator`
 pub fn create_trustless_hopr_blokli_connector<C>(
     chain_key: &ChainKeypair,
     cfg: BlockchainConnectorConfig,

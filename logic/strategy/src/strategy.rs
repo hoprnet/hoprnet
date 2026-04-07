@@ -24,25 +24,25 @@ use async_trait::async_trait;
 use hopr_lib::{
     ChannelChange, ChannelDirection, ChannelEntry, VerifiedTicket,
     api::{
-        chain::{ChainReadChannelOperations, ChainWriteChannelOperations},
-        db::TicketSelector,
+        chain::{
+            ChainReadChannelOperations, ChainReadSafeOperations, ChainValues, ChainWriteChannelOperations,
+            ChainWriteTicketOperations,
+        },
+        tickets::TicketManagement,
     },
 };
 use serde::{Deserialize, Serialize};
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 use strum::VariantNames;
 use tracing::{error, warn};
 use validator::{Validate, ValidationError};
 
 use crate::{
-    Strategy,
-    auto_funding::AutoFundingStrategy,
-    auto_redeeming::AutoRedeemingStrategy,
-    channel_finalizer::ClosureFinalizerStrategy,
-    errors::{Result, StrategyError},
+    Strategy, auto_funding::AutoFundingStrategy, auto_redeeming::AutoRedeemingStrategy,
+    channel_finalizer::ClosureFinalizerStrategy, errors::Result,
 };
 
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_ENABLED_STRATEGIES: hopr_metrics::MultiGauge =
         hopr_metrics::MultiGauge::new("hopr_strategy_enabled_strategies", "List of enabled strategies", &["strategy"]).unwrap();
@@ -149,15 +149,22 @@ impl MultiStrategy {
     /// Constructs new `MultiStrategy`.
     ///
     /// The strategy can contain another `MultiStrategy` if `allow_recursive` is set.
-    pub fn new<A, R>(cfg: MultiStrategyConfig, hopr_chain_actions: A, redeem_sink: R) -> Self
+    pub fn new<A, R>(cfg: MultiStrategyConfig, hopr_chain_actions: A, ticket_manager: R) -> Self
     where
-        A: ChainReadChannelOperations + ChainWriteChannelOperations + Clone + Send + Sync + 'static,
-        R: futures::Sink<TicketSelector> + Sync + Send + Clone + 'static,
-        StrategyError: From<R::Error>,
+        A: ChainReadChannelOperations
+            + ChainReadSafeOperations
+            + ChainValues
+            + ChainWriteChannelOperations
+            + ChainWriteTicketOperations
+            + Clone
+            + Send
+            + Sync
+            + 'static,
+        R: TicketManagement + Sync + Send + Clone + 'static,
     {
         let mut strategies = Vec::<Box<dyn SingularStrategy + Send + Sync>>::new();
 
-        #[cfg(all(feature = "prometheus", not(test)))]
+        #[cfg(all(feature = "telemetry", not(test)))]
         Strategy::VARIANTS
             .iter()
             .for_each(|s| METRIC_ENABLED_STRATEGIES.set(&[*s], 0_f64));
@@ -167,7 +174,7 @@ impl MultiStrategy {
                 Strategy::AutoRedeeming(sub_cfg) => strategies.push(Box::new(AutoRedeemingStrategy::new(
                     *sub_cfg,
                     hopr_chain_actions.clone(),
-                    redeem_sink.clone(),
+                    ticket_manager.clone(),
                 ))),
                 Strategy::AutoFunding(sub_cfg) => {
                     strategies.push(Box::new(AutoFundingStrategy::new(*sub_cfg, hopr_chain_actions.clone())))
@@ -184,7 +191,7 @@ impl MultiStrategy {
                         strategies.push(Box::new(Self::new(
                             cfg_clone,
                             hopr_chain_actions.clone(),
-                            redeem_sink.clone(),
+                            ticket_manager.clone(),
                         )))
                     } else {
                         error!("recursive multi-strategy not allowed and skipped")
@@ -198,7 +205,7 @@ impl MultiStrategy {
                 })),
             }
 
-            #[cfg(all(feature = "prometheus", not(test)))]
+            #[cfg(all(feature = "telemetry", not(test)))]
             METRIC_ENABLED_STRATEGIES.set(&[&strategy.to_string()], 1_f64);
         }
 
@@ -286,7 +293,7 @@ mod tests {
         s1.expect_on_tick()
             .times(1)
             .in_sequence(&mut seq)
-            .returning(|| Err(Other("error".into())));
+            .returning(|| Err(Other(anyhow::anyhow!("error"))));
 
         let mut s2 = MockSingularStrategy::new();
         s2.expect_on_tick().times(1).in_sequence(&mut seq).returning(|| Ok(()));
@@ -315,7 +322,7 @@ mod tests {
         s1.expect_on_tick()
             .times(1)
             .in_sequence(&mut seq)
-            .returning(|| Err(Other("error".into())));
+            .returning(|| Err(Other(anyhow::anyhow!("error"))));
 
         let mut s2 = MockSingularStrategy::new();
         s2.expect_on_tick().never().in_sequence(&mut seq).returning(|| Ok(()));

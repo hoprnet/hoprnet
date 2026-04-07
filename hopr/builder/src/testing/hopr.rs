@@ -9,7 +9,6 @@ use hopr_lib::{
     config::{HoprLibConfig, SessionGlobalConfig},
     prelude,
 };
-use tokio::time::sleep;
 
 use crate::testing::{TestingConnector, TestingHopr};
 
@@ -52,6 +51,8 @@ pub fn create_hopr_instance_config(host_port: u16, safe: NodeSafeConfig, winn_pr
                 },
                 ..Default::default()
             },
+            path_planner: Default::default(),
+            counter_flush_interval: Default::default(),
         },
         publish: true,
         ..Default::default()
@@ -86,7 +87,7 @@ impl TestedHopr {
         assert_eq!(HoprState::Running, instance.status(), "hopr instance must be running");
         Self {
             runtime: Some(runtime),
-            instance: instance,
+            instance,
             socket,
             connector,
         }
@@ -175,19 +176,6 @@ impl ChannelGuard {
         Ok(Self { channels })
     }
 
-    pub async fn try_to_get_all_ticket_counts(&self) -> anyhow::Result<Vec<usize>> {
-        let futures = self.channels.iter().map(|(hopr, channel_id)| async move {
-            hopr.tickets_in_channel(channel_id)
-                .await
-                .context("getting ticket statistics must succeed")
-                .into_iter()
-                .count()
-        });
-
-        let stats = join_all(futures).await;
-        Ok(stats)
-    }
-
     pub async fn open_channel_between_nodes(
         src: Arc<TestingHopr>,
         dst: Arc<TestingHopr>,
@@ -204,6 +192,7 @@ impl ChannelGuard {
     }
 
     pub async fn try_close_channels_all_channels(&self) -> anyhow::Result<()> {
+        // First pass: initiate closure on Open channels → PendingToClose
         let futures = self.channels.iter().map(|(hopr, channel_id)| {
             let hopr = hopr.clone();
             let channel_id = *channel_id;
@@ -225,28 +214,29 @@ impl ChannelGuard {
 
         join_all(futures).await.into_iter().collect::<Result<Vec<_>, _>>()?;
 
-        sleep(Duration::from_secs(2)).await;
-
-        let futures = self.channels.iter().map(|(hopr, channel_id)| {
+        // Poll each channel until it reaches Closed state, attempting finalization
+        // when the grace period has elapsed (PendingToClose → Closed).
+        for (hopr, channel_id) in &self.channels {
             let hopr = hopr.clone();
             let channel_id = *channel_id;
-            async move {
-                if hopr
-                    .channel_from_hash(&channel_id)
-                    .await?
-                    .is_some_and(|c| matches!(c.status, ChannelStatus::PendingToClose(_)))
-                {
-                    hopr.close_channel_by_id(&channel_id)
-                        .await
-                        .map(|_| ())
-                        .context("closing channel must succeed")
-                } else {
-                    Ok(())
-                }
-            }
-        });
-
-        join_all(futures).await.into_iter().collect::<Result<Vec<_>, _>>()?;
+            super::wait_until(
+                || async {
+                    let ch = hopr.channel_from_hash(&channel_id).await.ok().flatten();
+                    match ch.as_ref().map(|c| &c.status) {
+                        None | Some(ChannelStatus::Closed) => return Ok(true),
+                        Some(ChannelStatus::PendingToClose(_)) => {
+                            // Attempt finalization; ignore errors (grace period may not have elapsed)
+                            let _ = hopr.close_channel_by_id(&channel_id).await;
+                        }
+                        _ => {}
+                    }
+                    Ok::<_, hopr_lib::HoprLibError>(false)
+                },
+                Duration::from_secs(30),
+            )
+            .await
+            .context("channel did not reach Closed state")?;
+        }
 
         Ok(())
     }
@@ -262,10 +252,23 @@ impl Drop for ChannelGuard {
                         let _ = hopr.close_channel_by_id(channel_id).await;
                     }
 
-                    sleep(Duration::from_secs(2)).await;
-
-                    for (hopr, channel_id) in channels {
-                        let _ = hopr.close_channel_by_id(&channel_id).await;
+                    // Poll each channel until Closed, attempting finalization when possible
+                    for (hopr, channel_id) in &channels {
+                        let _ = super::wait_until(
+                            || async {
+                                let ch = hopr.channel_from_hash(channel_id).await.ok().flatten();
+                                match ch.as_ref().map(|c| &c.status) {
+                                    None | Some(ChannelStatus::Closed) => return Ok(true),
+                                    Some(ChannelStatus::PendingToClose(_)) => {
+                                        let _ = hopr.close_channel_by_id(channel_id).await;
+                                    }
+                                    _ => {}
+                                }
+                                Ok::<_, hopr_lib::HoprLibError>(false)
+                            },
+                            Duration::from_secs(30),
+                        )
+                        .await;
                     }
                 });
             }

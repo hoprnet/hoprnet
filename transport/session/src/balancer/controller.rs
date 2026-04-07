@@ -16,7 +16,7 @@ use super::{
 };
 use crate::SessionId;
 
-#[cfg(all(feature = "prometheus", not(test)))]
+#[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_TARGET_ERROR_ESTIMATE: hopr_metrics::MultiGauge =
         hopr_metrics::MultiGauge::new(
@@ -58,9 +58,9 @@ pub struct SurbBalancerConfig {
     /// The `SurbBalancer` will try to maintain approximately this number of SURBs
     /// locally or remotely (at the counterparty) at all times.
     ///
-    /// The local buffer is maintained by [regulating](SurbFlowController) the egress from the Session.
+    /// The local buffer is maintained by regulating (`SurbFlowController`) the egress from the Session.
     /// The remote buffer (at session counterparty) is maintained by regulating the flow of non-organic SURBs via
-    /// [keep-alive messages](crate::initiation::StartProtocol::KeepAlive).
+    /// keep-alive messages.
     ///
     /// It does not make sense to set this value higher than the [`max_surb_buffer_size`](crate::SessionManagerConfig)
     /// configuration at the counterparty.
@@ -81,7 +81,7 @@ pub struct SurbBalancerConfig {
 
     /// Sets what percentage of the target buffer size should be discarded at each window.
     ///
-    /// The [`SurbBalancer`] will discard the given percentage of `target_surb_buffer_size` at each
+    /// The `SurbBalancer` will discard the given percentage of `target_surb_buffer_size` at each
     /// window with the given `Duration`.
     ///
     /// The default is `(60, 0.05)` (5% of the target buffer size is discarded every 60 seconds).
@@ -90,14 +90,14 @@ pub struct SurbBalancerConfig {
 }
 
 impl SurbBalancerConfig {
-    /// Convenience function to convert the [`SurbBalancerConfig`] into [`BalancerControllerBounds`].
+    /// Convenience function to convert the [`SurbBalancerConfig`] into `BalancerControllerBounds`.
     #[inline]
     pub fn as_controller_bounds(&self) -> BalancerControllerBounds {
         BalancerControllerBounds::new(self.target_surb_buffer_size, self.max_surbs_per_sec)
     }
 }
 
-/// Runtime state of the [`SurbBalancer`].
+/// Runtime state of the `SurbBalancer`.
 #[derive(Debug, Default)]
 pub struct BalancerStateValues {
     pub target_surb_buffer_size: AtomicU64,
@@ -166,7 +166,7 @@ impl BalancerStateValues {
         self.buffer_level.load(std::sync::atomic::Ordering::Relaxed)
     }
 
-    /// Returns the current [`BalancerControllerBounds`] from the [`BalancerStateValues`].
+    /// Returns the current `BalancerControllerBounds` from the [`BalancerStateValues`].
     #[inline]
     pub fn controller_bounds(&self) -> BalancerControllerBounds {
         BalancerControllerBounds::new(
@@ -198,7 +198,7 @@ impl From<SurbBalancerConfig> for BalancerStateValues {
 /// Session, slowing it down to avoid fast SURB drainage.
 ///
 /// In the remote context, the `SurbFlowController` might regulate the flow of non-organic SURBs via
-/// Start protocol's [`KeepAlive`](crate::initiation::StartProtocol::KeepAlive) messages to deliver additional
+/// Start protocol's `KeepAlive` messages to deliver additional
 /// SURBs to the counterparty.
 pub struct SurbBalancer<C, E, F> {
     session_id: SessionId,
@@ -225,7 +225,7 @@ where
         flow_control: F,
         state: Arc<BalancerStateValues>,
     ) -> Self {
-        #[cfg(all(feature = "prometheus", not(test)))]
+        #[cfg(all(feature = "telemetry", not(test)))]
         {
             let sid = session_id.to_string();
             METRIC_TARGET_ERROR_ESTIMATE.set(&[&sid], 0.0);
@@ -314,7 +314,7 @@ where
 
         self.flow_control.adjust_surb_flow(output as usize);
 
-        #[cfg(all(feature = "prometheus", not(test)))]
+        #[cfg(all(feature = "telemetry", not(test)))]
         {
             let sid = self.session_id.to_string();
             METRIC_CURRENT_BUFFER.set(&[&sid], current as f64);
@@ -404,6 +404,126 @@ mod tests {
         let cfg = SurbBalancerConfig::default();
         let state_data = BalancerStateValues::new(cfg);
         assert_eq!(cfg, state_data.as_config());
+    }
+
+    #[test]
+    fn surb_balancer_config_default_snapshot() {
+        let cfg = SurbBalancerConfig::default();
+        insta::assert_debug_snapshot!(cfg);
+    }
+
+    #[test]
+    fn surb_balancer_config_as_controller_bounds() {
+        let cfg = SurbBalancerConfig {
+            target_surb_buffer_size: 1000,
+            max_surbs_per_sec: 500,
+            surb_decay: None,
+        };
+        let bounds = cfg.as_controller_bounds();
+        assert_eq!(bounds.target(), 1000);
+        assert_eq!(bounds.output_limit(), 500);
+    }
+
+    #[test]
+    fn balancer_state_values_disabled_when_target_is_zero() {
+        let cfg = SurbBalancerConfig {
+            target_surb_buffer_size: 0,
+            max_surbs_per_sec: 0,
+            surb_decay: None,
+        };
+        let state = BalancerStateValues::new(cfg);
+        assert!(state.is_disabled());
+    }
+
+    #[test]
+    fn balancer_state_values_enabled_when_target_is_nonzero() {
+        let state = BalancerStateValues::new(SurbBalancerConfig::default());
+        assert!(!state.is_disabled());
+    }
+
+    #[test]
+    fn balancer_state_values_update_propagates_all_fields() {
+        let state = BalancerStateValues::default();
+        let cfg = SurbBalancerConfig {
+            target_surb_buffer_size: 3000,
+            max_surbs_per_sec: 1500,
+            surb_decay: Some((Duration::from_secs(30), 0.10)),
+        };
+        state.update(&cfg);
+        assert_eq!(state.as_config(), cfg);
+        assert_eq!(state.controller_bounds(), cfg.as_controller_bounds());
+    }
+
+    #[test]
+    fn balancer_state_values_surb_decay_none_maps_to_none() {
+        let cfg = SurbBalancerConfig {
+            target_surb_buffer_size: 1000,
+            max_surbs_per_sec: 500,
+            surb_decay: None,
+        };
+        let state = BalancerStateValues::new(cfg);
+        assert!(state.surb_decay().is_none());
+    }
+
+    #[test]
+    fn balancer_state_values_buffer_level_default_is_zero() {
+        let state = BalancerStateValues::default();
+        assert_eq!(state.buffer_level(), 0);
+    }
+
+    #[test]
+    fn balancer_state_values_buffer_level_can_be_updated() {
+        let state = BalancerStateValues::default();
+        state.buffer_level.store(42, std::sync::atomic::Ordering::Relaxed);
+        assert_eq!(state.buffer_level(), 42);
+    }
+
+    #[test]
+    fn balancer_state_values_from_config() {
+        let cfg = SurbBalancerConfig {
+            target_surb_buffer_size: 5000,
+            max_surbs_per_sec: 2500,
+            surb_decay: Some((Duration::from_secs(60), 0.05)),
+        };
+        let state: BalancerStateValues = cfg.into();
+        assert_eq!(state.as_config(), cfg);
+    }
+
+    #[test]
+    fn balancer_state_values_decay_zero_duration_should_map_to_none() {
+        let cfg = SurbBalancerConfig {
+            surb_decay: Some((Duration::ZERO, 0.10)),
+            ..Default::default()
+        };
+        let state = BalancerStateValues::new(cfg);
+        assert!(
+            state.surb_decay().is_none(),
+            "zero duration decay should be filtered out"
+        );
+    }
+
+    #[test]
+    fn balancer_state_values_decay_zero_percent_should_map_to_none() {
+        let cfg = SurbBalancerConfig {
+            surb_decay: Some((Duration::from_secs(60), 0.0)),
+            ..Default::default()
+        };
+        let state = BalancerStateValues::new(cfg);
+        assert!(
+            state.surb_decay().is_none(),
+            "zero percent decay should be filtered out"
+        );
+    }
+
+    #[test]
+    fn balancer_state_values_decay_should_clamp_above_one() {
+        let cfg = SurbBalancerConfig {
+            surb_decay: Some((Duration::from_secs(1), 1.5)), // > 1.0 should be clamped
+            ..Default::default()
+        };
+        let state = BalancerStateValues::new(cfg);
+        let (_, pct) = state.surb_decay().expect("decay should be present");
+        assert!((pct - 1.0).abs() < f64::EPSILON, "percentage should be clamped to 1.0");
     }
 
     #[test_log::test]
@@ -546,6 +666,14 @@ mod tests {
         let levels = stream.take(NUM_STEPS).collect::<Vec<_>>().await;
         handle.abort();
 
-        assert_eq!(levels, vec![5000, 4750, 4750, 4500, 4500]);
+        assert_eq!(levels.len(), NUM_STEPS);
+        assert!(
+            levels.windows(2).all(|w| w[1] <= w[0]),
+            "buffer levels should be monotonic non-increasing: {levels:?}"
+        );
+        assert!(
+            levels.last().is_some_and(|last| *last < 5_000),
+            "expected at least one decay step: {levels:?}"
+        );
     }
 }

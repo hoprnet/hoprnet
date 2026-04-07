@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use hopr_builder::config::SessionIpForwardingConfig;
 use hopr_lib::{
-    HoprBalance, HoprProtocolConfig, SafeModule, WinningProbability,
+    HoprBalance, HoprProtocolConfig, SafeModule, TagAllocatorConfig, WinningProbability,
     config::{
         HoprLibConfig, HoprPacketPipelineConfig, HostConfig, HostType, ProbeConfig, SessionGlobalConfig,
         TransportConfig,
@@ -102,7 +102,7 @@ fn default_session_idle_timeout() -> Duration {
 }
 
 fn default_max_sessions() -> usize {
-    HoprLibConfig::default().protocol.session.maximum_sessions as usize
+    HoprLibConfig::default().protocol.session.tag_allocator.session as usize
 }
 
 fn default_session_establish_max_retries() -> usize {
@@ -186,6 +186,16 @@ pub struct UserHoprLibConfig {
     /// Various HOPR-network and transport-related configuration options.
     #[serde(default)]
     pub network: UserHoprNetworkConfig,
+    /// Path to a file that acts as incoming ticket storage.
+    ///
+    /// The file will be in the `redb` file format and can contain already existing tickets.
+    /// If the file does not exist, it will be created.
+    ///
+    /// If omitted, a temporary file will be created and deleted on application exit.
+    ///
+    /// Make sure the file is secure and not accessible by unauthorized users on production.
+    #[serde(default)]
+    pub ticket_storage_file: Option<String>,
 }
 
 // NOTE: this intentionally does not validate (0.0.0.0) to force user to specify
@@ -204,6 +214,7 @@ impl From<UserHoprLibConfig> for HoprLibConfig {
             host: value.host,
             publish: value.announce,
             safe_module: value.safe_module,
+            ticket_storage_file: value.ticket_storage_file,
             protocol: HoprProtocolConfig {
                 transport: TransportConfig {
                     announce_local_addresses: value.network.announce_local_addresses,
@@ -227,11 +238,17 @@ impl From<UserHoprLibConfig> for HoprLibConfig {
                 },
                 session: SessionGlobalConfig {
                     idle_timeout: value.network.session_idle_timeout,
-                    maximum_sessions: value.network.maximum_sessions as u32,
                     establish_max_retries: value.network.session_establish_max_retries as u32,
+                    tag_allocator: TagAllocatorConfig {
+                        session: value.network.maximum_sessions as u64,
+                        ..Default::default()
+                    },
                     ..Default::default()
                 },
+                path_planner: Default::default(),
+                counter_flush_interval: Default::default(),
             },
+            ..Default::default()
         }
     }
 }

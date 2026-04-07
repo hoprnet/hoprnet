@@ -1,0 +1,1235 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background: #1a1a2e;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+      #graph {
+        width: 100%;
+        height: 100%;
+      }
+      .title {
+        text-anchor: middle;
+        font-size: 15px;
+        font-weight: 600;
+        fill: #aaa;
+      }
+      .node rect {
+        rx: 6;
+        ry: 6;
+        transition:
+          fill 0.6s ease,
+          stroke 0.6s ease;
+      }
+      .node text {
+        font-size: 11px;
+        pointer-events: none;
+      }
+      .node .role-label {
+        font-size: 9px;
+        font-weight: 700;
+      }
+      .node .id-label {
+        fill: #ddd;
+      }
+      .link {
+        fill: none;
+        stroke-linecap: round;
+        stroke-dasharray: 6 4;
+        animation: dash-flow 1.2s linear infinite;
+      }
+      @keyframes dash-flow {
+        to {
+          stroke-dashoffset: -20;
+        }
+      }
+      .link-heat {
+        fill: none;
+        stroke-linecap: round;
+        pointer-events: none;
+        transition:
+          stroke 1s ease,
+          stroke-width 1s ease,
+          opacity 1s ease;
+      }
+      marker {
+        overflow: visible;
+      }
+      #controls {
+        display: none;
+        width: 100%;
+        padding: 12px 16px;
+        font-family: sans-serif;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="layout" style="display: flex; width: 100%; height: 100vh">
+      <div
+        id="left-col"
+        style="flex: 1; display: flex; flex-direction: column; min-width: 0"
+      >
+        <svg id="graph"></svg>
+        <div id="controls">
+          <div style="display: flex; align-items: center; gap: 10px">
+            <button
+              id="playBtn"
+              style="
+                width: 60px;
+                padding: 4px 0;
+                cursor: pointer;
+                border: 1px solid #555;
+                border-radius: 4px;
+                background: #2a2a3e;
+                color: #ccc;
+              "
+            >
+              Play
+            </button>
+            <input
+              id="slider"
+              type="range"
+              min="0"
+              max="100"
+              value="0"
+              style="flex: 1; cursor: pointer; accent-color: #2196f3"
+            />
+            <span
+              id="timeLabel"
+              style="min-width: 100px; text-align: right; color: #888"
+              >0:00</span
+            >
+          </div>
+          <div
+            style="
+              margin-top: 6px;
+              display: flex;
+              align-items: center;
+              gap: 16px;
+              font-size: 11px;
+            "
+          >
+            <span style="color: #64b5f6">&#9679; forward</span>
+            <span style="color: #ffb74d">&#9679; return</span>
+            <span style="color: #e040fb">&#9679; loopback</span>
+            <span style="color: #66bb6a">&#9632; SRC</span>
+            <span style="color: #ef5350">&#9632; DST</span>
+            <label
+              style="
+                color: #888;
+                display: flex;
+                align-items: center;
+                gap: 3px;
+                cursor: pointer;
+              "
+            >
+              <input
+                type="checkbox"
+                id="hideLoopbacks"
+                style="accent-color: #555; cursor: pointer"
+              />
+              Hide loopbacks
+            </label>
+            <label
+              style="
+                color: #888;
+                display: flex;
+                align-items: center;
+                gap: 3px;
+                cursor: pointer;
+              "
+            >
+              <input
+                type="checkbox"
+                id="hideSurbs"
+                checked
+                style="accent-color: #555; cursor: pointer"
+              />
+              Hide SURBs
+            </label>
+            <label
+              style="color: #888; display: flex; align-items: center; gap: 4px"
+            >
+              Batch:
+              <select
+                id="batchSelect"
+                style="
+                  background: #2a2a3e;
+                  color: #ccc;
+                  border: 1px solid #555;
+                  border-radius: 3px;
+                  padding: 1px 4px;
+                  font-size: 11px;
+                "
+              >
+                <!-- populated dynamically -->
+              </select>
+            </label>
+            <label
+              style="
+                margin-left: auto;
+                color: #888;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+              "
+            >
+              Speed:
+              <select
+                id="speedSelect"
+                style="
+                  background: #2a2a3e;
+                  color: #ccc;
+                  border: 1px solid #555;
+                  border-radius: 3px;
+                  padding: 1px 4px;
+                  font-size: 11px;
+                "
+              >
+                <!-- populated dynamically -->
+              </select>
+            </label>
+            <span style="color: #555">Space=play &#8592;&#8594;=step</span>
+          </div>
+        </div>
+      </div>
+      <!-- /left-col -->
+      <div
+        id="stats-panel"
+        style="
+          display: none;
+          width: 320px;
+          flex-shrink: 0;
+          height: 100vh;
+          overflow-y: auto;
+          padding: 12px;
+          background: #1e1e30;
+          border-left: 1px solid #333;
+          font-family: monospace;
+          font-size: 11px;
+          color: #ccc;
+          line-height: 1.6;
+        "
+      ></div>
+    </div>
+    <!-- /layout -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script>
+      const GRAPH_DATA = __GRAPH_DATA__;
+      const PATH_EVENTS = __PATH_EVENTS__;
+      const PATH_STATS = __PATH_STATS__;
+      const SRC_NODE = __SRC_NODE__;
+      const DST_NODE = __DST_NODE__;
+
+      const graphEl = document.getElementById("graph");
+      const WIDTH = Math.max(window.innerWidth - 340, 800),
+        HEIGHT = Math.max(window.innerHeight - 80, 600),
+        MARGIN = 60;
+
+      const svg = d3
+        .select("#graph")
+        .attr("width", WIDTH)
+        .attr("height", HEIGHT)
+        .attr("viewBox", `0 0 ${WIDTH} ${HEIGHT}`)
+        .attr("preserveAspectRatio", "xMidYMid meet");
+
+      // Dynamic resize: keep the SVG filling its container
+      window.addEventListener("resize", () => {
+        const r = graphEl.parentElement.getBoundingClientRect();
+        const w = Math.max(r.width, 400);
+        const h = Math.max(r.height || window.innerHeight - 80, 400);
+        svg.attr("width", w).attr("height", h);
+      });
+
+      const COLORS = {
+        forward: "#42A5F5",
+        return_: "#FFA726",
+        loopback: "#E040FB",
+        inactive: "rgba(255,255,255,0.06)",
+        srcFill: "#388E3C",
+        dstFill: "#B71C1C",
+        relay: "#1e3a5f",
+        loopbackRelay: "#4A148C",
+        idle: "#2a2a3e",
+      };
+
+      const nodes = GRAPH_DATA.nodes.map((id, i) => ({ id, index: i }));
+      const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+      const links = GRAPH_DATA.edges.map(([s, t, label]) => ({
+        source: nodeMap.get(s),
+        target: nodeMap.get(t),
+        label,
+        id: `${s}->${t}`,
+      }));
+      const linkById = new Map(links.map((l) => [l.id, l]));
+
+      // Pin our node to the center so the graph radiates outward from us
+      const centerX = WIDTH / 2,
+        centerY = HEIGHT / 2;
+      const srcNodeData = nodes.find((n) => n.id === SRC_NODE);
+      if (srcNodeData) {
+        srcNodeData.fx = centerX;
+        srcNodeData.fy = centerY;
+      }
+
+      // Scale force layout parameters to the number of nodes
+      const nodeCount = nodes.length;
+      const linkDist = nodeCount > 100 ? 60 : nodeCount > 30 ? 120 : 220;
+      const chargeStr = nodeCount > 100 ? -200 : nodeCount > 30 ? -600 : -1500;
+      const collisionR = nodeCount > 100 ? 20 : nodeCount > 30 ? 40 : 80;
+
+      // Force layout
+      const sim = d3
+        .forceSimulation(nodes)
+        .force(
+          "link",
+          d3
+            .forceLink(links)
+            .id((d) => d.id)
+            .distance(linkDist),
+        )
+        .force("charge", d3.forceManyBody().strength(chargeStr))
+        .force("center", d3.forceCenter(centerX, centerY + 15))
+        .force("collision", d3.forceCollide().radius(collisionR))
+        .stop();
+      for (let i = 0; i < 500; i++) sim.tick();
+      nodes.forEach((n) => {
+        n.x = Math.max(MARGIN, Math.min(WIDTH - MARGIN, n.x));
+        n.y = Math.max(MARGIN, Math.min(HEIGHT - MARGIN, n.y));
+        n.fx = n.x;
+        n.fy = n.y;
+      });
+
+      // SVG defs
+      const defs = svg.append("defs");
+
+      function makeGlow(id, radius) {
+        const f = defs
+          .append("filter")
+          .attr("id", id)
+          .attr("x", "-50%")
+          .attr("y", "-50%")
+          .attr("width", "200%")
+          .attr("height", "200%");
+        f.append("feGaussianBlur")
+          .attr("in", "SourceGraphic")
+          .attr("stdDeviation", radius)
+          .attr("result", "blur");
+        f.append("feColorMatrix")
+          .attr("in", "blur")
+          .attr("type", "saturate")
+          .attr("values", "3")
+          .attr("result", "sat");
+        const m = f.append("feMerge");
+        m.append("feMergeNode").attr("in", "sat");
+        m.append("feMergeNode").attr("in", "SourceGraphic");
+      }
+      makeGlow("glow-sm", 3);
+      makeGlow("glow-md", 6);
+      makeGlow("glow-lg", 10);
+
+      const nodeShadow = defs
+        .append("filter")
+        .attr("id", "node-shadow")
+        .attr("x", "-20%")
+        .attr("y", "-20%")
+        .attr("width", "140%")
+        .attr("height", "140%");
+      nodeShadow
+        .append("feDropShadow")
+        .attr("dx", 0)
+        .attr("dy", 2)
+        .attr("stdDeviation", 3)
+        .attr("flood-color", "rgba(0,0,0,0.5)");
+
+      function makeMarker(id, color) {
+        defs
+          .append("marker")
+          .attr("id", id)
+          .attr("viewBox", "0 -5 10 10")
+          .attr("refX", 20)
+          .attr("refY", 0)
+          .attr("markerWidth", 8)
+          .attr("markerHeight", 8)
+          .attr("orient", "auto")
+          .append("path")
+          .attr("d", "M0,-4L10,0L0,4Z")
+          .attr("fill", color);
+      }
+      makeMarker("arr-off", "rgba(255,255,255,0.08)");
+
+      // Title
+      const titleText = svg
+        .append("text")
+        .attr("class", "title")
+        .attr("x", WIDTH / 2)
+        .attr("y", 24);
+
+      // Heat layer (cumulative glow underneath)
+      const heatGroup = svg.append("g");
+      const linkGroup = svg.append("g");
+      const particleGroup = svg.append("g");
+      const nodeGroup = svg.append("g");
+
+      // Arc path
+      function linkArc(d) {
+        const hasRev = links.some(
+          (l) => l.source.id === d.target.id && l.target.id === d.source.id,
+        );
+        const dx = d.target.x - d.source.x,
+          dy = d.target.y - d.source.y;
+        const dr = hasRev ? Math.sqrt(dx * dx + dy * dy) * 1.5 : 0;
+        return `M${d.source.x},${d.source.y}A${dr},${dr} 0 0,1 ${d.target.x},${d.target.y}`;
+      }
+
+      // Heat paths (glow layer)
+      const heatPaths = heatGroup
+        .selectAll("path")
+        .data(links)
+        .join("path")
+        .attr("class", "link-heat")
+        .attr("d", linkArc)
+        .attr("stroke", "transparent")
+        .attr("stroke-width", 0)
+        .attr("opacity", 0);
+
+      // Base edge paths
+      const linkPaths = linkGroup
+        .selectAll("path")
+        .data(links)
+        .join("path")
+        .attr("class", "link")
+        .attr("d", linkArc)
+        .attr("marker-end", "url(#arr-off)")
+        .attr("stroke", COLORS.inactive)
+        .attr("stroke-width", 0.8);
+
+      // Store path elements for particle animation
+      const pathElements = {};
+      linkPaths.each(function (d) {
+        pathElements[d.id] = this;
+      });
+
+      // Place small directional chevrons along each edge
+      const chevronGroup = svg.insert("g", ".nodes").attr("class", "chevrons");
+      const CHEVRON_SPACING = 80; // px between chevrons
+      linkPaths.each(function (d) {
+        const pathEl = this;
+        const len = pathEl.getTotalLength();
+        if (len < 60) return; // too short
+        const start = len * 0.25;
+        const end = len * 0.75;
+        for (let dist = start; dist <= end; dist += CHEVRON_SPACING) {
+          const p1 = pathEl.getPointAtLength(dist - 4);
+          const p2 = pathEl.getPointAtLength(dist + 4);
+          const angle = (Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180) / Math.PI;
+          const pt = pathEl.getPointAtLength(dist);
+          chevronGroup
+            .append("path")
+            .attr("d", "M-3.5,-3L2,0L-3.5,3")
+            .attr("transform", `translate(${pt.x},${pt.y}) rotate(${angle})`)
+            .attr("fill", "none")
+            .attr("stroke", "rgba(255,255,255,0.2)")
+            .attr("stroke-width", 1.2)
+            .attr("stroke-linecap", "round");
+        }
+      });
+
+      // Nodes
+      const nodeGs = nodeGroup
+        .selectAll("g")
+        .data(nodes)
+        .join("g")
+        .attr("class", "node")
+        .attr("transform", (d) => `translate(${d.x},${d.y})`);
+
+      const nodeW = nodeCount > 100 ? 30 : nodeCount > 30 ? 60 : 110;
+      const nodeH = nodeCount > 100 ? 14 : nodeCount > 30 ? 24 : 36;
+
+      nodeGs
+        .append("rect")
+        .attr("x", -nodeW / 2)
+        .attr("y", -nodeH / 2)
+        .attr("width", nodeW)
+        .attr("height", nodeH)
+        .attr("fill", (d) => {
+          if (d.id === SRC_NODE) return COLORS.srcFill;
+          if (d.id === DST_NODE) return COLORS.dstFill;
+          return COLORS.idle;
+        })
+        .attr("stroke", (d) => {
+          if (d.id === SRC_NODE) return "#66BB6A";
+          if (d.id === DST_NODE) return "#ef5350";
+          return "#444";
+        })
+        .attr("stroke-width", (d) =>
+          d.id === SRC_NODE || d.id === DST_NODE ? 2.5 : 1.5,
+        )
+        .attr("filter", "url(#node-shadow)");
+
+      const labelFontSize =
+        nodeCount > 100 ? "6px" : nodeCount > 30 ? "8px" : "9px";
+      const idFontSize =
+        nodeCount > 100 ? "5px" : nodeCount > 30 ? "9px" : "11px";
+
+      nodeGs
+        .append("text")
+        .attr("class", "role-label")
+        .attr("text-anchor", "middle")
+        .attr("dy", nodeCount > 100 ? -2 : -6)
+        .attr("fill", (d) =>
+          d.id === SRC_NODE || d.id === DST_NODE ? "#fff" : "transparent",
+        )
+        .style("font-size", labelFontSize)
+        .text((d) => {
+          if (d.id === SRC_NODE) return "SRC";
+          if (d.id === DST_NODE) return "DST";
+          return "";
+        });
+
+      nodeGs
+        .append("text")
+        .attr("class", "id-label")
+        .attr("text-anchor", "middle")
+        .attr("dy", nodeCount > 100 ? 3 : 10)
+        .style("font-size", idFontSize)
+        .text((d) => {
+          if (nodeCount > 100) {
+            if (d.id === SRC_NODE) return "SRC";
+            if (d.id === DST_NODE) return "DST";
+            return d.id.slice(2, 6);
+          }
+          return d.id.length > 14
+            ? d.id.slice(0, 8) + "..." + d.id.slice(-4)
+            : d.id;
+        });
+
+      // ── Edge heat tracking ──
+      const edgeHeat = new Map();
+
+      function updateHeat(edgeIds) {
+        // Clear previous batch — only the current batch is active
+        edgeHeat.clear();
+        // Boost active
+        for (const eid of edgeIds) {
+          edgeHeat.set(eid, (edgeHeat.get(eid) || 0) + 1);
+        }
+        // Render heat
+        const maxH = Math.max(1, ...edgeHeat.values());
+        heatPaths
+          .attr("stroke", (d) => {
+            const h = edgeHeat.get(d.id);
+            if (!h) return "transparent";
+            const ratio = h / maxH;
+            // green -> yellow -> red
+            const r = ratio <= 0.5 ? Math.round(255 * ratio * 2) : 255;
+            const g =
+              ratio <= 0.5 ? 255 : Math.round(255 * (1 - (ratio - 0.5) * 2));
+            return `rgb(${r},${g},0)`;
+          })
+          .attr("stroke-width", (d) => {
+            const h = edgeHeat.get(d.id);
+            return h ? 2 + (h / maxH) * 12 : 0;
+          })
+          .attr("opacity", (d) => {
+            const h = edgeHeat.get(d.id);
+            return h ? 0.15 + (h / maxH) * 0.4 : 0;
+          })
+          .attr("filter", (d) => {
+            const h = edgeHeat.get(d.id);
+            if (!h) return null;
+            const ratio = h / maxH;
+            return ratio > 0.7
+              ? "url(#glow-lg)"
+              : ratio > 0.3
+                ? "url(#glow-md)"
+                : "url(#glow-sm)";
+          });
+      }
+
+      // ── Playback engine ──
+      // No Promises. A single tick loop drives everything.
+      let eventIndex = 0;
+      let playing = false;
+      let tickTimer = null;
+
+      const BASE_PACKET_MS = 600;
+      const MIN_PACKET_MS = 120;
+
+      // Compute the real-time burst interval from the data.
+      const gaps = [];
+      for (let i = 1; i < PATH_EVENTS.length; i++) {
+        const delta = PATH_EVENTS[i].ts_ms - PATH_EVENTS[i - 1].ts_ms;
+        if (delta > 50) gaps.push(delta); // only inter-burst gaps
+      }
+      const medianGapMs = gaps.length
+        ? gaps.sort((a, b) => a - b)[Math.floor(gaps.length / 2)]
+        : 1000;
+
+      // Total time span of all events
+      const totalSpanMs =
+        PATH_EVENTS.length > 1
+          ? PATH_EVENTS[PATH_EVENTS.length - 1].ts_ms - PATH_EVENTS[0].ts_ms
+          : 0;
+
+      // At speed S, one burst animation takes BASE_PACKET_MS/S ms,
+      // and the gap between bursts takes medianGapMs/S ms.
+      // The "time window per burst" the user sees = (BASE_PACKET_MS + medianGapMs) / S.
+      // Real-time: S where the window equals the actual gap.
+      const realTimeSpeed = Math.max(
+        1,
+        Math.ceil(BASE_PACKET_MS / medianGapMs),
+      );
+
+      function formatWindow(s) {
+        if (s === 0) return "max";
+        const windowMs = (BASE_PACKET_MS + medianGapMs) / s;
+        if (windowMs >= 1000) return `${(windowMs / 1000).toFixed(1)}s/burst`;
+        return `${Math.round(windowMs)}ms/burst`;
+      }
+
+      function formatTotalTime(s) {
+        if (s === 0) return "";
+        const totalSec = totalSpanMs / s / 1000;
+        if (totalSec >= 60) return ` (${(totalSec / 60).toFixed(1)}min)`;
+        return ` (${Math.round(totalSec)}s)`;
+      }
+
+      // Build speed options
+      const speedMultipliers = [1, 5, 10, 20, 100];
+      const speedOptions = speedMultipliers.map((m, i) => ({
+        value: realTimeSpeed * m,
+        label: `${formatWindow(realTimeSpeed * m)}${formatTotalTime(realTimeSpeed * m)}`,
+        selected: i === 0,
+      }));
+      speedOptions.push({ value: 0, label: "max", selected: false });
+
+      const speedSelect = document.getElementById("speedSelect");
+      speedOptions.forEach((opt) => {
+        const el = document.createElement("option");
+        el.value = opt.value;
+        el.textContent = opt.label;
+        if (opt.selected) el.selected = true;
+        speedSelect.appendChild(el);
+      });
+
+      let speed = realTimeSpeed;
+
+      const BURST_THRESHOLD_MS = 50; // events within this window are batched
+
+      // Compute typical burst size from the data
+      let maxBurstSize = 1;
+      {
+        let burstCount = 0;
+        for (let i = 0; i < PATH_EVENTS.length; i++) {
+          if (
+            i === 0 ||
+            PATH_EVENTS[i].ts_ms - PATH_EVENTS[i - 1].ts_ms > BURST_THRESHOLD_MS
+          ) {
+            if (burstCount > maxBurstSize) maxBurstSize = burstCount;
+            burstCount = 1;
+          } else {
+            burstCount++;
+          }
+        }
+        if (burstCount > maxBurstSize) maxBurstSize = burstCount;
+      }
+
+      // Build batch size options: 1, 4, 10, 50, full burst
+      let batchLimit = 0; // 0 = unlimited (full burst)
+      const batchOptions = [
+        { value: 1, label: "1 at a time" },
+        { value: 4, label: "4 simultaneous" },
+        { value: 10, label: "10 simultaneous" },
+        { value: 50, label: "50 simultaneous" },
+        { value: 0, label: `full burst (~${maxBurstSize})`, selected: true },
+      ];
+      const batchSelect = document.getElementById("batchSelect");
+      batchOptions.forEach((opt) => {
+        const el = document.createElement("option");
+        el.value = opt.value;
+        el.textContent = opt.label;
+        if (opt.selected) el.selected = true;
+        batchSelect.appendChild(el);
+      });
+      batchSelect.addEventListener("change", () => {
+        batchLimit = parseInt(batchSelect.value, 10);
+      });
+
+      // Active particle state
+      let activeDot = null;
+      let activeTrail = null;
+      let activeEdges = []; // edge IDs to traverse
+      let activeEdgeIdx = 0; // which edge we're on
+      let activeColor = null;
+      let edgeStartTime = 0;
+      let edgeDuration = 0;
+      let waitUntil = 0; // timestamp: wait before starting next event
+
+      function getPacketDuration() {
+        if (speed === 0) return MIN_PACKET_MS;
+        return Math.max(MIN_PACKET_MS, BASE_PACKET_MS / speed);
+      }
+
+      const MAX_GAP_MS = 300; // keep flow continuous — pacing comes from packet animation speed
+
+      // Collect a burst of events starting at idx that share the same timestamp.
+      // When batchLimit > 0, take at most that many events and stop —
+      // the next call continues from where we left off within the same burst.
+      function collectBurst(idx) {
+        const start = PATH_EVENTS[idx];
+        if (!start) return { events: [], endIdx: idx };
+        const hideLoopbacks = document.getElementById("hideLoopbacks")?.checked;
+        const hideSurbs = document.getElementById("hideSurbs")?.checked;
+        const limit = batchLimit || Infinity;
+        const batch = [];
+        let i = idx;
+        while (i < PATH_EVENTS.length) {
+          const evt = PATH_EVENTS[i];
+          // Stop at burst boundary only if we've collected at least something
+          if (batch.length > 0 && evt.ts_ms - start.ts_ms > BURST_THRESHOLD_MS)
+            break;
+          const skip =
+            (hideLoopbacks && evt.loopback) || (hideSurbs && evt.surb);
+          if (!skip) {
+            batch.push(evt);
+            if (batch.length >= limit) {
+              i++;
+              break;
+            }
+          }
+          i++;
+        }
+        return { events: batch, endIdx: i };
+      }
+
+      function getDelayToNext(idx) {
+        if (speed === 0) return 30;
+        const curr = PATH_EVENTS[idx];
+        if (!curr) return 100;
+        // Find next event outside current burst
+        let next = null;
+        for (let i = idx + 1; i < PATH_EVENTS.length; i++) {
+          if (PATH_EVENTS[i].ts_ms - curr.ts_ms > BURST_THRESHOLD_MS) {
+            next = PATH_EVENTS[i];
+            break;
+          }
+        }
+        if (!next) return 100;
+        const deltaMs = next.ts_ms - curr.ts_ms;
+        return Math.min(MAX_GAP_MS, Math.max(30, deltaMs / speed));
+      }
+
+      function startEvent(idx) {
+        // Batch all same-timestamp events
+        const { events: burst, endIdx } = collectBurst(idx);
+        if (!burst.length) {
+          eventIndex = endIdx % PATH_EVENTS.length;
+          waitUntil = performance.now() + 30;
+          return;
+        }
+
+        // Apply heat for ALL events in the burst
+        const allEdges = burst.flatMap((e) => e.edges);
+        updateHeat(allEdges);
+
+        // Pick a representative event for the particle animation (first forward, or first)
+        const evt = burst.find((e) => e.direction === "forward") || burst[0];
+        // Advance index past the entire burst
+        eventIndex = endIdx % PATH_EVENTS.length;
+
+        const hasLoopback = burst.some((e) => e.loopback);
+        const loopbackCount = burst.filter((e) => e.loopback).length;
+        activeColor = hasLoopback
+          ? COLORS.loopback
+          : evt.direction === "forward"
+            ? COLORS.forward
+            : COLORS.return_;
+        const fwdCount = burst.filter((e) => e.direction === "forward").length;
+        const retCount = burst.length - fwdCount;
+        const speedLabel = speed === 0 ? "max" : speed + "x";
+        const loopLabel = loopbackCount > 0 ? ` ${loopbackCount}loop` : "";
+        titleText.text(
+          `batch ${burst.length} (${fwdCount}fwd ${retCount}ret${loopLabel})  ${evt.time || ""}  [${speedLabel}]`,
+        );
+
+        nodeGs.select("rect").attr("fill", (d) => {
+          if (d.id === SRC_NODE)
+            return hasLoopback ? COLORS.loopbackRelay : COLORS.srcFill;
+          if (d.id === DST_NODE) return COLORS.dstFill;
+          if (
+            evt.edges.some((eid) => {
+              const l = linkById.get(eid);
+              return l && (l.source.id === d.id || l.target.id === d.id);
+            })
+          )
+            return hasLoopback ? COLORS.loopbackRelay : COLORS.relay;
+          return COLORS.idle;
+        });
+
+        const slider = document.getElementById("slider");
+        if (slider) slider.value = idx;
+
+        // Clean up previous particle
+        if (activeDot) {
+          activeDot.remove();
+          activeDot = null;
+        }
+        if (activeTrail) {
+          activeTrail.remove();
+          activeTrail = null;
+        }
+
+        activeEdges = evt.edges;
+        activeEdgeIdx = 0;
+
+        if (!activeEdges.length) {
+          // No edges matched — skip to next event immediately
+          waitUntil = performance.now() + 50;
+          return;
+        }
+
+        const dotR = hasLoopback ? 12 : 6;
+        const trailR = hasLoopback ? 28 : 14;
+        const dotFilter = hasLoopback ? "url(#glow-lg)" : "url(#glow-md)";
+
+        activeDot = particleGroup
+          .append("circle")
+          .attr("r", dotR)
+          .attr("fill", activeColor)
+          .attr("filter", dotFilter)
+          .attr("opacity", 0.9);
+        activeTrail = particleGroup
+          .append("circle")
+          .attr("r", trailR)
+          .attr("fill", activeColor)
+          .attr("opacity", 0.2)
+          .attr("filter", "url(#glow-lg)");
+
+        // Start first edge
+        const totalDur = getPacketDuration();
+        edgeDuration = Math.max(totalDur / activeEdges.length, 20);
+        edgeStartTime = performance.now();
+
+        // Brighten first edge
+        linkPaths
+          .filter((d) => d.id === activeEdges[0])
+          .attr("stroke", activeColor)
+          .attr("stroke-width", 2.5)
+          .attr("opacity", 1)
+          .style("stroke-dasharray", "12 6")
+          .style("animation-duration", "0.4s");
+      }
+
+      function tick() {
+        if (!playing) return;
+
+        const now = performance.now();
+
+        // Waiting between events?
+        if (waitUntil > now) return;
+
+        // No active animation? Start next event.
+        if (!activeDot || activeEdgeIdx >= activeEdges.length) {
+          // Clean up
+          if (activeDot) {
+            activeDot.remove();
+            activeDot = null;
+          }
+          if (activeTrail) {
+            activeTrail.remove();
+            activeTrail = null;
+          }
+
+          // Schedule delay, then advance
+          if (waitUntil === 0) {
+            waitUntil = now + getDelayToNext(eventIndex);
+            return;
+          }
+          // Delay passed — start event (burst handles index advancement)
+          waitUntil = 0;
+          startEvent(eventIndex);
+          return;
+        }
+
+        // Animate current edge
+        const eid = activeEdges[activeEdgeIdx];
+        const pathEl = pathElements[eid];
+        if (!pathEl) {
+          // Skip missing edge
+          activeEdgeIdx++;
+          edgeStartTime = now;
+          return;
+        }
+
+        const elapsed = now - edgeStartTime;
+        const progress = Math.min(elapsed / edgeDuration, 1);
+        const eased =
+          progress < 0.5
+            ? 2 * progress * progress
+            : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+        const len = pathEl.getTotalLength();
+        const pt = pathEl.getPointAtLength(eased * len);
+        activeDot.attr("cx", pt.x).attr("cy", pt.y);
+        activeTrail.attr("cx", pt.x).attr("cy", pt.y);
+
+        if (progress >= 1) {
+          // Dim edge — restore subtle dash
+          linkPaths
+            .filter((d) => d.id === eid)
+            .attr("stroke", COLORS.inactive)
+            .attr("stroke-width", 0.8)
+            .attr("opacity", 1)
+            .style("stroke-dasharray", "6 4")
+            .style("animation-duration", "1.2s");
+
+          activeEdgeIdx++;
+          edgeStartTime = now;
+
+          // Brighten next edge — bold fast dash
+          if (activeEdgeIdx < activeEdges.length) {
+            const nextEid = activeEdges[activeEdgeIdx];
+            linkPaths
+              .filter((d) => d.id === nextEid)
+              .attr("stroke", activeColor)
+              .attr("stroke-width", 2.5)
+              .attr("opacity", 1)
+              .style("stroke-dasharray", "12 6")
+              .style("animation-duration", "0.4s");
+          }
+        }
+      }
+
+      function startPlaying() {
+        if (playing) return;
+        playing = true;
+        waitUntil = 0;
+        const btn = document.getElementById("playBtn");
+        if (btn) btn.textContent = "Pause";
+        if (!tickTimer) tickTimer = setInterval(tick, 16);
+        startEvent(eventIndex);
+      }
+
+      function stopPlaying() {
+        playing = false;
+        const btn = document.getElementById("playBtn");
+        if (btn) btn.textContent = "Play";
+        // Don't clear tickTimer — it's harmless and avoids re-creation issues
+      }
+
+      // Expose for Playwright (synchronous snapshot: just render heat + title, no animation)
+      window.playEvent = function (idx) {
+        const evt = PATH_EVENTS[idx];
+        if (!evt) return Promise.resolve();
+        const color =
+          evt.direction === "forward" ? COLORS.forward : COLORS.return_;
+        const label = evt.direction === "forward" ? "fwd" : "ret";
+        titleText.text(
+          `${label} #${idx + 1}/${PATH_EVENTS.length}  ${evt.time || ""}`,
+        );
+        updateHeat(evt.edges);
+        // Flash the edges
+        for (const eid of evt.edges) {
+          linkPaths
+            .filter((d) => d.id === eid)
+            .attr("stroke", color)
+            .attr("stroke-width", 3)
+            .attr("opacity", 1);
+        }
+        return new Promise((r) => setTimeout(r, 100));
+      };
+      window.eventCount = PATH_EVENTS.length;
+
+      // ── Interactive player ──
+      if (__INTERACTIVE__) {
+        const controls = document.getElementById("controls");
+        controls.style.display = "block";
+
+        // Populate stats panel with D3 bar charts
+        const statsPanel = document.getElementById("stats-panel");
+        if (
+          statsPanel &&
+          (PATH_STATS.forward.length || PATH_STATS.return.length)
+        ) {
+          statsPanel.style.display = "block";
+
+          // Tooltip div
+          const tooltip = document.createElement("div");
+          tooltip.style.cssText =
+            "display:none; position:fixed; background:#222; color:#ddd; padding:8px 12px; border-radius:4px; font-size:10px; font-family:monospace; pointer-events:none; z-index:100; max-width:500px; word-break:break-all; border:1px solid #555;";
+          document.body.appendChild(tooltip);
+
+          function shortPath(fullPath) {
+            return fullPath
+              .split(" → ")
+              .map((eid, i) => "P" + (i + 1))
+              .join("→");
+          }
+
+          function formatPathTooltip(entry, direction) {
+            const nodes = entry.path.split(" → ");
+            const lines = nodes.map((n, i) => {
+              if (i === 0) return n;
+              return `→ ${n}`;
+            });
+            return (
+              `<b>${entry.count}x (${entry.pct.toFixed(4)})</b><br><br>` +
+              lines.join("<br>")
+            );
+          }
+
+          function renderChart(containerId, title, color, entries, direction) {
+            if (!entries.length) return;
+            const total = entries.reduce((a, e) => a + e.count, 0);
+            const cW = 340,
+              cH = 160,
+              margin = { top: 28, right: 12, bottom: 36, left: 40 };
+            const w = cW - margin.left - margin.right,
+              h = cH - margin.top - margin.bottom;
+
+            const container = d3.select("#" + containerId);
+            const chart = container
+              .append("svg")
+              .attr("width", cW)
+              .attr("height", cH)
+              .append("g")
+              .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            // Title
+            container
+              .select("svg")
+              .append("text")
+              .attr("x", cW / 2)
+              .attr("y", 16)
+              .attr("text-anchor", "middle")
+              .attr("fill", color)
+              .attr("font-size", "12px")
+              .attr("font-weight", "600")
+              .text(`${title} (${total} total)`);
+
+            const x = d3
+              .scaleBand()
+              .domain(entries.map((_, i) => i))
+              .range([0, w])
+              .padding(0.2);
+            const y = d3
+              .scaleLinear()
+              .domain([0, d3.max(entries, (e) => e.pct)])
+              .nice()
+              .range([h, 0]);
+
+            // Y axis (percentage)
+            chart
+              .append("g")
+              .call(
+                d3
+                  .axisLeft(y)
+                  .ticks(4)
+                  .tickSize(-w)
+                  .tickFormat((d) => d.toFixed(2)),
+              )
+              .call((g) => g.select(".domain").remove())
+              .call((g) => g.selectAll(".tick line").attr("stroke", "#333"))
+              .call((g) =>
+                g
+                  .selectAll(".tick text")
+                  .attr("fill", "#888")
+                  .attr("font-size", "9px"),
+              );
+
+            // X axis labels with hover tooltips
+            const xAxis = chart
+              .append("g")
+              .attr("transform", `translate(0,${h})`)
+              .call(d3.axisBottom(x).tickFormat((i) => "P" + (i + 1)))
+              .call((g) => g.select(".domain").attr("stroke", "#444"));
+            xAxis
+              .selectAll(".tick text")
+              .attr("fill", "#888")
+              .attr("font-size", "9px")
+              .style("cursor", "pointer")
+              .on("mouseenter", function (ev) {
+                const i = +d3.select(this).text().slice(1) - 1;
+                const e = entries[i];
+                if (!e) return;
+                tooltip.innerHTML = formatPathTooltip(e, direction);
+                tooltip.style.display = "block";
+              })
+              .on("mousemove", (ev) => {
+                tooltip.style.left = ev.clientX + 12 + "px";
+                tooltip.style.top = ev.clientY - 10 + "px";
+              })
+              .on("mouseleave", () => {
+                tooltip.style.display = "none";
+              });
+
+            // Bars
+            chart
+              .selectAll(".bar")
+              .data(entries)
+              .join("rect")
+              .attr("class", "bar")
+              .attr("x", (_, i) => x(i))
+              .attr("y", (e) => y(e.pct))
+              .attr("width", x.bandwidth())
+              .attr("height", (e) => h - y(e.pct))
+              .attr("fill", color)
+              .attr("opacity", 0.75)
+              .attr("rx", 2)
+              .on("mouseenter", (ev, e) => {
+                tooltip.innerHTML = formatPathTooltip(e, direction);
+                tooltip.style.display = "block";
+              })
+              .on("mousemove", (ev) => {
+                tooltip.style.left = ev.clientX + 12 + "px";
+                tooltip.style.top = ev.clientY - 10 + "px";
+              })
+              .on("mouseleave", () => {
+                tooltip.style.display = "none";
+              });
+
+            // Count labels on bars
+            chart
+              .selectAll(".bar-label")
+              .data(entries)
+              .join("text")
+              .attr("x", (_, i) => x(i) + x.bandwidth() / 2)
+              .attr("y", (e) => y(e.pct) - 3)
+              .attr("text-anchor", "middle")
+              .attr("fill", "#aaa")
+              .attr("font-size", "9px")
+              .text((e) => e.pct.toFixed(2));
+
+            // KDE-like smooth density curve overlay
+            if (entries.length >= 2) {
+              const points = entries.map((e, i) => [
+                x(i) + x.bandwidth() / 2,
+                e.pct,
+              ]);
+              // Catmull-Rom spline through bar tops
+              const lineGen = d3
+                .line()
+                .x((d) => d[0])
+                .y((d) => y(d[1]))
+                .curve(d3.curveCatmullRom.alpha(0.5));
+              chart
+                .append("path")
+                .datum(points)
+                .attr("d", lineGen)
+                .attr("fill", "none")
+                .attr("stroke", color)
+                .attr("stroke-width", 2)
+                .attr("opacity", 0.8);
+              // Filled area under curve
+              const areaGen = d3
+                .area()
+                .x((d) => d[0])
+                .y0(h)
+                .y1((d) => y(d[1]))
+                .curve(d3.curveCatmullRom.alpha(0.5));
+              chart
+                .append("path")
+                .datum(points)
+                .attr("d", areaGen)
+                .attr("fill", color)
+                .attr("opacity", 0.08);
+            }
+          }
+
+          // Create chart containers
+          statsPanel.innerHTML =
+            '<div id="fwd-chart"></div><div id="ret-chart" style="margin-top:8px;"></div>';
+          renderChart(
+            "fwd-chart",
+            "Forward paths",
+            "#42A5F5",
+            PATH_STATS.forward,
+            "forward",
+          );
+          renderChart(
+            "ret-chart",
+            "Return paths",
+            "#FFA726",
+            PATH_STATS.return,
+            "return",
+          );
+        }
+        const playBtn = document.getElementById("playBtn");
+        const slider = document.getElementById("slider");
+        const timeLabel = document.getElementById("timeLabel");
+
+        slider.max = PATH_EVENTS.length - 1;
+
+        // Speed selector
+        const speedSelect = document.getElementById("speedSelect");
+        speedSelect.addEventListener("change", () => {
+          speed = parseFloat(speedSelect.value);
+        });
+
+        playBtn.addEventListener("click", () => {
+          if (playing) stopPlaying();
+          else startPlaying();
+        });
+
+        slider.addEventListener("input", (e) => {
+          stopPlaying();
+          eventIndex = parseInt(e.target.value);
+          window.playEvent(eventIndex);
+        });
+
+        document.addEventListener("keydown", (e) => {
+          if (e.code === "Space") {
+            e.preventDefault();
+            if (playing) stopPlaying();
+            else startPlaying();
+          }
+          if (e.code === "ArrowRight") {
+            stopPlaying();
+            eventIndex = Math.min(eventIndex + 1, PATH_EVENTS.length - 1);
+            window.playEvent(eventIndex);
+          }
+          if (e.code === "ArrowLeft") {
+            stopPlaying();
+            eventIndex = Math.max(eventIndex - 1, 0);
+            window.playEvent(eventIndex);
+          }
+          // Number keys for quick speed
+          if (e.code === "Digit1") {
+            speed = 1;
+            speedSelect.value = "1";
+          }
+          if (e.code === "Digit2") {
+            speed = 2;
+            speedSelect.value = "2";
+          }
+          if (e.code === "Digit4") {
+            speed = 4;
+            speedSelect.value = "4";
+          }
+          if (e.code === "Digit0") {
+            speed = 0;
+            speedSelect.value = "0";
+          }
+        });
+
+        // Auto-start at real-time
+        startPlaying();
+      }
+    </script>
+  </body>
+</html>

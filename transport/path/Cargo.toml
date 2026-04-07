@@ -1,0 +1,48 @@
+[package]
+name = "hopr-transport-path"
+version = "0.2.1"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+description = "Graph-based path planning and selection for the HOPR transport layer"
+edition = "2024"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+default = []
+telemetry = ["dep:hopr-metrics"]
+
+[dependencies]
+anyhow = { workspace = true }
+futures = { workspace = true }
+futures-time = { workspace = true }
+lazy_static = { workspace = true }
+moka = { workspace = true }
+smart-default = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+hopr-api = { workspace = true, features = ["chain", "graph"] }
+hopr-statistics = { workspace = true, features = ["weighted"] }
+hopr-crypto-packet = { workspace = true }
+hopr-protocol-hopr = { workspace = true, features = ["rayon"] }
+hopr-types = { workspace = true, features = [
+  "crypto",
+  "random",
+  "internal",
+  "primitive",
+  "serde",
+] }
+
+hopr-metrics = { workspace = true, optional = true }
+
+[dev-dependencies]
+async-trait = { workspace = true }
+bimap = { workspace = true }
+futures = { workspace = true }
+hex-literal = { workspace = true }
+tokio = { workspace = true }
+
+hopr-network-graph = { workspace = true, features = ["petgraph"] }
+hopr-protocol-hopr = { workspace = true }

@@ -8,10 +8,7 @@ use hopr_api::{
 };
 use hopr_crypto_packet::prelude::*;
 
-use crate::{
-    HoprCodecConfig, OutgoingPacket, PacketEncoder, SurbStore, TicketCreationError, TicketTracker,
-    errors::HoprProtocolError,
-};
+use crate::{HoprCodecConfig, OutgoingPacket, PacketEncoder, SurbStore, errors::HoprProtocolError};
 
 /// Maximum number of acknowledgements that can be packed into a single HOPR packet.
 ///
@@ -55,7 +52,7 @@ impl<Chain, S, T> HoprEncoder<Chain, S, T>
 where
     Chain: ChainKeyOperations + ChainReadChannelOperations + ChainReadTicketOperations + ChainValues + Sync,
     S: SurbStore,
-    T: TicketTracker + Sync,
+    T: hopr_api::tickets::TicketFactory + Sync,
 {
     fn encode_packet_internal<D: AsRef<[u8]> + Send + 'static, Sig: Into<PacketSignals> + Send + 'static>(
         &self,
@@ -86,16 +83,13 @@ where
                 .map_err(HoprProtocolError::resolver)?;
 
             self.tracker
-                .create_multihop_ticket(
+                .new_multihop_ticket(
                     &channel,
-                    num_hops as u8,
+                    (num_hops as u8).try_into().expect("cannot fail due to num_hops > 1"),
                     outgoing_ticket_win_prob,
                     outgoing_ticket_price,
                 )
-                .map_err(|e| match e {
-                    TicketCreationError::OutOfFunds(id, a) => HoprProtocolError::OutOfFunds(id, a),
-                    e => HoprProtocolError::TicketTrackerError(e.into()),
-                })?
+                .map_err(|e| HoprProtocolError::TicketTrackerError(e.into()))?
         } else {
             TicketBuilder::zero_hop().counterparty(next_peer)
         };
@@ -139,7 +133,7 @@ impl<Chain, S, T> PacketEncoder for HoprEncoder<Chain, S, T>
 where
     Chain: ChainKeyOperations + ChainReadChannelOperations + ChainReadTicketOperations + ChainValues + Send + Sync,
     S: SurbStore + Send + Sync,
-    T: TicketTracker + Send + Sync,
+    T: hopr_api::tickets::TicketFactory + Send + Sync,
 {
     type Error = HoprProtocolError;
 

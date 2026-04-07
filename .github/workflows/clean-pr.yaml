@@ -13,10 +13,13 @@ jobs:
   cleanup-pr:
     name: Remove cache
     runs-on: self-hosted-hoprnet-small
+    permissions:
+      actions: write
+      contents: read
     timeout-minutes: 10
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -31,14 +34,17 @@ jobs:
         id: gcp
         uses: hoprnet/hopr-workflows/actions/setup-gcp@644d936de4e1c8f5c50ba50f8526209455c28b4a # master
         with:
-          google_credentials: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+          google_credentials: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
           login_artifact_registry: 'true'
           install_sdk: 'true'
 
       - name: Cleanup Github pipeline cache
         run: |
-          cacheKeysForPR=($(gh actions-cache list -R ${{ github.repository }} -B refs/pull/${{ github.event.inputs.pr_number }}/merge | cut -f 1 | tr '\n' ' '))
+          cacheKeysForPR=($(gh actions-cache list -R "${REPO}" -B "refs/pull/${PR_NUMBER}/merge" | cut -f 1 | tr '\n' ' '))
           for cacheKey in $cacheKeysForPR
           do
-            gh actions-cache delete $cacheKey -R ${{ github.repository }} -B refs/pull/${{ github.event.inputs.pr_number }}/merge --confirm
+            gh actions-cache delete $cacheKey -R "${REPO}" -B "refs/pull/${PR_NUMBER}/merge" --confirm
           done
+        env:
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.inputs.pr_number }}

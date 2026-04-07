@@ -1,6 +1,6 @@
 [package]
 name = "hopr-statistics"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Types and functionality used for statistical analysis."
 edition.workspace = true
@@ -16,9 +16,11 @@ crate-type = ["rlib"]
 default = []
 serde = ["dep:serde"]
 moving = []
+weighted = ["dep:rand"]
 
 [dependencies]
 serde = { workspace = true, optional = true }
+rand = { workspace = true, optional = true }
 
 [dev-dependencies]
 assertables = { workspace = true }

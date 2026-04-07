@@ -1,6 +1,6 @@
 [package]
 name = "hoprd"
-version = "4.0.0-rc.3"
+version = "4.0.1-rc.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -13,22 +13,12 @@ build = "build.rs"
 [features]
 default = [
   "runtime-tokio",
-  "prometheus",
   "telemetry",
-  "explicit-path",
   "transport-quic",
 ] # uses tokio by default because of axum
-prometheus = [
-  "hopr-lib/prometheus",
-  "hoprd-api/prometheus",
-  "hopr-db-node/prometheus",
-  "hopr-strategy/prometheus",
-  "hopr-transport-p2p/prometheus",
-]
 runtime-tokio = [
   "dep:tokio",
   "hopr-lib/runtime-tokio",
-  "hopr-db-node/runtime-tokio",
   "opentelemetry_sdk?/rt-tokio",
   "opentelemetry_sdk?/experimental_trace_batch_span_processor_with_async_runtime",
   "opentelemetry_sdk?/experimental_logs_batch_log_processor_with_async_runtime",
@@ -40,11 +30,16 @@ telemetry = [
   "dep:opentelemetry",
   "dep:opentelemetry-otlp",
   "dep:opentelemetry_sdk",
+  "dep:opentelemetry-prometheus-text-exporter",
   "dep:flagset",
   "dep:tracing-opentelemetry",
+  "dep:hopr-metrics",
+  "hopr-lib/telemetry",
+  "hoprd-api/telemetry",
+  "hopr-strategy/telemetry",
+  "hopr-transport-p2p/telemetry",
 ]
 transport-quic = ["hopr-transport-p2p/transport-quic"]
-explicit-path = ["hoprd-api/explicit-path"]
 capture = ["hopr-lib/capture"]
 # To use profiling:
 # 1. Set RUSTFLAGS="--cfg tokio_unstable" before building
@@ -87,8 +82,8 @@ tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["fmt", "json"] }
 validator = { workspace = true }
-opentelemetry = { workspace = true, optional = true }
-opentelemetry-otlp = { workspace = true, default-features = false, features = [
+opentelemetry = { workspace = true, optional = true, features = ["metrics"] }
+opentelemetry-otlp = { workspace = true, features = [
   "trace",
   "metrics",
   "logs",
@@ -97,7 +92,11 @@ opentelemetry-otlp = { workspace = true, default-features = false, features = [
   "http-proto",
   "grpc-tonic",
 ], optional = true }
-opentelemetry_sdk = { workspace = true, optional = true }
+opentelemetry_sdk = { workspace = true, optional = true, features = [
+  "metrics",
+  "experimental_metrics_custom_reader",
+] }
+opentelemetry-prometheus-text-exporter = { workspace = true, optional = true }
 tracing-opentelemetry = { workspace = true, optional = true }
 
 hopr-strategy = { workspace = true }
@@ -117,10 +116,10 @@ hopr-builder = { workspace = true, features = [
   "session-client",
   "session-server",
 ] }
-hopr-db-node = { workspace = true }
 hopr-chain-connector = { workspace = true }
-hopr-network-graph = { workspace = true }
-hopr-metrics = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
+hopr-ct-full-network = { workspace = true }
+hopr-network-graph = { workspace = true, features = ["petgraph"] }
 hopr-transport-p2p = { workspace = true }
 
 # Target-specific dependencies for memory allocators

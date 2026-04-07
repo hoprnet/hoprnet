@@ -3,7 +3,6 @@ use std::{num::NonZeroUsize, process::ExitCode, str::FromStr, sync::Arc};
 use async_signal::{Signal, Signals};
 use futures::{FutureExt, StreamExt, future::abortable};
 use hopr_chain_connector::{HoprBlockchainSafeConnector, blokli_client::BlokliClient};
-use hopr_db_node::HoprNodeDb;
 use hopr_lib::{AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, config::HoprLibConfig};
 use hopr_network_graph::SharedChannelGraph;
 use hopr_transport_p2p::HoprNetwork;
@@ -34,7 +33,7 @@ mod telemetry_common;
 const DEFAULT_BLOKLI_URL: &str = "https://blokli.dufour.hoprnet.link";
 
 type HoprBlokliConnector = HoprBlockchainSafeConnector<BlokliClient>;
-type HoprNode = hopr_lib::Hopr<Arc<HoprBlokliConnector>, HoprNodeDb, SharedChannelGraph, HoprNetwork>;
+type HoprNode = hopr_lib::Hopr<Arc<HoprBlokliConnector>, SharedChannelGraph, HoprNetwork>;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, strum::Display)]
 enum HoprdProcess {
@@ -123,6 +122,11 @@ fn update_hopr_lib_config_from_env_vars(cfg: &mut HoprLibConfig) -> anyhow::Resu
 
 #[cfg(feature = "runtime-tokio")]
 fn main() -> ExitCode {
+    if let Err(e) = telemetry_common::install_base_subscriber() {
+        eprintln!("ERROR: failed to initialize base log subscriber: {e}");
+        return ExitCode::FAILURE;
+    }
+
     let num_cpu_threads = std::env::var("HOPRD_NUM_CPU_THREADS").ok().and_then(|v| {
         usize::from_str(&v)
             .map_err(anyhow::Error::from)
@@ -139,15 +143,56 @@ fn main() -> ExitCode {
             .ok()
     });
 
+    let args = <CliArgs as clap::Parser>::parse();
+    let cfg = match HoprdConfig::try_from(args) {
+        Ok(cfg) => cfg,
+        Err(error) => {
+            tracing::error!(%error, "hoprd exited with an error");
+            return ExitCode::FAILURE;
+        }
+    };
+    if let Err(error) = cfg.validate() {
+        tracing::error!(%error, "hoprd exited with an error");
+        return ExitCode::FAILURE;
+    }
+
+    let maybe_keys = match &cfg.identity.private_key {
+        Some(private_key) => IdentityRetrievalModes::FromPrivateKey { private_key },
+        None => IdentityRetrievalModes::FromFile {
+            password: &cfg.identity.password,
+            id_path: &cfg.identity.file,
+        },
+    };
+
+    let hopr_keys: HoprKeys = match maybe_keys.try_into() {
+        Ok(hopr_keys) => hopr_keys,
+        Err(error) => {
+            tracing::error!(%error, "hoprd exited with an error");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    #[cfg(feature = "telemetry")]
+    let node_identity = telemetry::NodeTelemetryIdentity {
+        node_address: Keypair::public(&hopr_keys.chain_key).to_address().to_hex(),
+        node_peer_id: Keypair::public(&hopr_keys.packet_key).to_peerid_str(),
+        extra_labels: std::env::var("HOPRD_OTEL_EXPORT_LABELS")
+            .unwrap_or_default()
+            .split(',')
+            .filter_map(|pair| {
+                let (k, v) = pair.trim().split_once('=')?;
+                Some((k.trim().to_string(), v.trim().to_string()))
+            })
+            .collect(),
+    };
+
     hopr_lib::prepare_tokio_runtime(num_cpu_threads, num_io_threads)
         .and_then(|runtime| {
-            runtime.block_on(async {
+            runtime.block_on(async move {
                 #[cfg(feature = "telemetry")]
-                let _telemetry = telemetry::init_logger()?;
-                #[cfg(not(feature = "telemetry"))]
-                tracing::subscriber::set_global_default(telemetry_common::build_base_subscriber()?)?;
+                let _telemetry = telemetry::init_logger(node_identity)?;
 
-                main_inner().await
+                main_inner(cfg, hopr_keys).await
             })
         })
         .map(|_| {
@@ -161,11 +206,10 @@ fn main() -> ExitCode {
 }
 
 #[cfg(feature = "runtime-tokio")]
-async fn main_inner() -> anyhow::Result<()> {
+async fn main_inner(cfg: HoprdConfig, hopr_keys: HoprKeys) -> anyhow::Result<()> {
     use hopr_api::chain::ChainEvents;
     use hopr_builder::exit::HoprServerIpForwardingReactor;
     use hopr_chain_connector::{BlockchainConnectorConfig, blokli_client, create_trustful_hopr_blokli_connector};
-    use hopr_db_node::init_hopr_node_db;
 
     #[cfg(all(target_os = "linux", feature = "allocator-jemalloc-stats"))]
     let _jemalloc_stats = jemalloc_stats::JemallocStats::start().await;
@@ -175,10 +219,6 @@ async fn main_inner() -> anyhow::Result<()> {
     } else {
         tracing::info!("Executable was built using the RELEASE profile.");
     }
-
-    let args = <CliArgs as clap::Parser>::parse();
-    let cfg = HoprdConfig::try_from(args)?;
-    cfg.validate()?;
 
     let git_hash = option_env!("VERGEN_GIT_SHA").unwrap_or("unknown");
     tracing::info!(
@@ -198,19 +238,9 @@ async fn main_inner() -> anyhow::Result<()> {
     let mut hopr_lib_cfg: HoprLibConfig = cfg.hopr.clone().into();
     update_hopr_lib_config_from_env_vars(&mut hopr_lib_cfg)?;
 
-    // Find or create an identity
-    let hopr_keys: HoprKeys = match &cfg.identity.private_key {
-        Some(private_key) => IdentityRetrievalModes::FromPrivateKey { private_key },
-        None => IdentityRetrievalModes::FromFile {
-            password: &cfg.identity.password,
-            id_path: &cfg.identity.file,
-        },
-    }
-    .try_into()?;
-
     tracing::info!(
-        packet_key = hopr_lib::Keypair::public(&hopr_keys.packet_key).to_peerid_str(),
-        blockchain_address = hopr_lib::Keypair::public(&hopr_keys.chain_key).to_address().to_hex(),
+        packet_key = Keypair::public(&hopr_keys.packet_key).to_peerid_str(),
+        blockchain_address = Keypair::public(&hopr_keys.chain_key).to_address().to_hex(),
         "Node public identifiers"
     );
 
@@ -218,8 +248,6 @@ async fn main_inner() -> anyhow::Result<()> {
     tracing::info!("creating the HOPRd node instance from hopr-lib");
 
     let mut processes = AbortableList::<HoprdProcess>::default();
-
-    let node_db = init_hopr_node_db(&cfg.db.data, cfg.db.initialize, cfg.db.force_initialize).await?;
 
     let mut chain_connector = create_trustful_hopr_blokli_connector(
         &hopr_keys.chain_key,
@@ -252,12 +280,18 @@ async fn main_inner() -> anyhow::Result<()> {
     chain_connector.connect().await?;
     let chain_connector = Arc::new(chain_connector);
 
-    let (node, hopr_process) = hopr_builder::build_from_chain_and_db(
+    let prober_cfg = hopr_ct_full_network::ProberConfig {
+        interval: cfg.hopr.network.probe_interval,
+        shuffle_ttl: cfg.hopr.network.probe_interval * 2,
+        ..Default::default()
+    };
+
+    let (node, hopr_process) = hopr_builder::build_with_chain(
         &hopr_keys.chain_key,
         &hopr_keys.packet_key,
         hopr_lib_cfg,
+        Some(prober_cfg),
         chain_connector.clone(),
-        node_db,
         HoprServerIpForwardingReactor::new(hopr_keys.packet_key.clone(), cfg.session_ip_forwarding.clone()),
     )
     .await?;
@@ -272,7 +306,7 @@ async fn main_inner() -> anyhow::Result<()> {
     let multi_strategy = Arc::new(hopr_strategy::strategy::MultiStrategy::new(
         cfg.strategy.clone(),
         chain_connector.clone(),
-        node.redemption_requests()?,
+        node.ticket_management()?,
     ));
     tracing::debug!(strategies = ?multi_strategy, "initialized strategies");
 
@@ -282,7 +316,8 @@ async fn main_inner() -> anyhow::Result<()> {
         hopr_strategy::stream_events_to_strategy_with_tick(
             multi_strategy,
             chain_connector.subscribe()?,
-            node.subscribe_winning_tickets(),
+            node.subscribe_ticket_events()
+                .filter_map(|e| futures::future::ready(e.try_as_winning_ticket().map(|t| t.ticket))),
             cfg.strategy.execution_interval,
             hopr_keys.chain_key.public().to_address(),
         ),

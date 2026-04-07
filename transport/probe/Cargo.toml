@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-probe"
-version = "0.4.1"
+version = "0.5.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -32,16 +32,19 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
-hopr-api = { workspace = true, features = ["ct", "types-random"] }
+hopr-api = { workspace = true, features = ["ct", "types-random", "graph"] }
 
 hopr-async-runtime = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-protocol-app = { workspace = true }
+hopr-transport-tag-allocator = { workspace = true }
 
 [dev-dependencies]
 hex-literal = { workspace = true }
+insta = { workspace = true, features = ["yaml"] }
 lazy_static = { workspace = true }
 more-asserts = { workspace = true }
+rstest = { workspace = true }
 tokio = { workspace = true }
 
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }

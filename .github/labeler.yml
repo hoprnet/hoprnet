@@ -95,18 +95,12 @@ crate:hopr-transport:
 crate:hopr-transport-bloom:
   - changed-files:
       - any-glob-to-any-file: transport/bloom/**
-crate:hopr-transport-identity:
-  - changed-files:
-      - any-glob-to-any-file: transport/identity/**
 crate:hopr-transport-mixer:
   - changed-files:
       - any-glob-to-any-file: transport/mixer/**
-crate:hopr-transport-network:
-  - changed-files:
-      - any-glob-to-any-file: transport/network/**
 crate:hopr-transport-p2p:
   - changed-files:
-      - any-glob-to-any-file: transport/p2p/**
+      - any-glob-to-any-file: impls/transport/p2p/**
 crate:hopr-transport-packet:
   - changed-files:
       - any-glob-to-any-file: transport/packet/**
