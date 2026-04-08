@@ -520,4 +520,158 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn ticket_processor_should_ignore_unknown_challenges() -> anyhow::Result<()> {
+        let blokli_client = create_blokli_client()?;
+        let node = create_node(1, &blokli_client).await?;
+        let ticket_processor = HoprUnacknowledgedTicketProcessor::new(
+            node.chain_api.clone(),
+            node.chain_key.clone(),
+            Hash::default(),
+            HoprUnacknowledgedTicketProcessorConfig::default(),
+        );
+
+        // We insert ONE ticket
+        let own_share = HalfKey::random();
+        let ack_share = HalfKey::random();
+        let challenge = Challenge::from_own_share_and_half_key(&own_share.to_challenge()?, &ack_share)?;
+
+        let unack_ticket = TicketBuilder::default()
+            .counterparty(&PEERS[1].0)
+            .index(0)
+            .channel_epoch(1)
+            .amount(10_u32)
+            .challenge(challenge)
+            .build_signed(&PEERS[0].0, &Hash::default())?
+            .into_unacknowledged(own_share);
+
+        ticket_processor.insert_unacknowledged_ticket(PEERS[2].1.public(), ack_share.to_challenge()?, unack_ticket)?;
+
+        // Now we send TWO acks: one for the ticket we inserted, and one random/unknown
+        let unknown_ack_share = HalfKey::random();
+        let acks = vec![
+            VerifiedAcknowledgement::new(ack_share, &PEERS[2].1).leak(),
+            VerifiedAcknowledgement::new(unknown_ack_share, &PEERS[2].1).leak(),
+        ];
+
+        let resolutions = ticket_processor.acknowledge_tickets(*PEERS[2].1.public(), acks)?;
+        // Should only resolve the one we knew about
+        assert_eq!(1, resolutions.len());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn ticket_processor_should_ignore_epoch_mismatch() -> anyhow::Result<()> {
+        let blokli_client = create_blokli_client()?;
+        let node = create_node(1, &blokli_client).await?;
+        let ticket_processor = HoprUnacknowledgedTicketProcessor::new(
+            node.chain_api.clone(),
+            node.chain_key.clone(),
+            Hash::default(),
+            HoprUnacknowledgedTicketProcessorConfig::default(),
+        );
+
+        let own_share = HalfKey::random();
+        let ack_share = HalfKey::random();
+        let challenge = Challenge::from_own_share_and_half_key(&own_share.to_challenge()?, &ack_share)?;
+
+        // Channel in utils.rs has epoch 1. We'll create a ticket with epoch 2.
+        let unack_ticket = TicketBuilder::default()
+            .counterparty(&PEERS[1].0)
+            .index(0)
+            .channel_epoch(2) // Mismatch!
+            .amount(10_u32)
+            .challenge(challenge)
+            .build_signed(&PEERS[0].0, &Hash::default())?
+            .into_unacknowledged(own_share);
+
+        ticket_processor.insert_unacknowledged_ticket(PEERS[2].1.public(), ack_share.to_challenge()?, unack_ticket)?;
+
+        let ack = VerifiedAcknowledgement::new(ack_share, &PEERS[2].1).leak();
+        let resolutions = ticket_processor.acknowledge_tickets(*PEERS[2].1.public(), vec![ack])?;
+        assert_eq!(0, resolutions.len());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn ticket_processor_should_ignore_missing_channel() -> anyhow::Result<()> {
+        let blokli_client = create_blokli_client()?;
+        let node = create_node(1, &blokli_client).await?;
+        let ticket_processor = HoprUnacknowledgedTicketProcessor::new(
+            node.chain_api.clone(),
+            node.chain_key.clone(),
+            Hash::default(),
+            HoprUnacknowledgedTicketProcessorConfig::default(),
+        );
+
+        let own_share = HalfKey::random();
+        let ack_share = HalfKey::random();
+        let challenge = Challenge::from_own_share_and_half_key(&own_share.to_challenge()?, &ack_share)?;
+
+        let unknown_issuer = ChainKeypair::random();
+
+        let unack_ticket = TicketBuilder::default()
+            .counterparty(&node.chain_key)
+            .index(0)
+            .channel_epoch(1)
+            .amount(10_u32)
+            .challenge(challenge)
+            .build_signed(&unknown_issuer, &Hash::default())?
+            .into_unacknowledged(own_share);
+
+        ticket_processor.insert_unacknowledged_ticket(PEERS[2].1.public(), ack_share.to_challenge()?, unack_ticket)?;
+
+        let ack = VerifiedAcknowledgement::new(ack_share, &PEERS[2].1).leak();
+        let resolutions = ticket_processor.acknowledge_tickets(*PEERS[2].1.public(), vec![ack])?;
+        assert_eq!(
+            0,
+            resolutions.len(),
+            "Expected 0 resolutions for missing channel, got: {:?}",
+            resolutions
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn ticket_processor_should_handle_losing_tickets() -> anyhow::Result<()> {
+        let blokli_client = create_blokli_client()?;
+        let node = create_node(1, &blokli_client).await?;
+        let ticket_processor = HoprUnacknowledgedTicketProcessor::new(
+            node.chain_api.clone(),
+            node.chain_key.clone(),
+            Hash::default(),
+            HoprUnacknowledgedTicketProcessorConfig::default(),
+        );
+
+        let own_share = HalfKey::random();
+        let ack_share = HalfKey::random();
+        let challenge = Challenge::from_own_share_and_half_key(&own_share.to_challenge()?, &ack_share)?;
+
+        let unack_ticket = TicketBuilder::default()
+            .counterparty(&PEERS[1].0)
+            .index(0)
+            .win_prob(WinningProbability::NEVER)
+            .channel_epoch(1)
+            .amount(0_u32)
+            .challenge(challenge)
+            .build_signed(&PEERS[0].0, &Hash::default())?
+            .into_unacknowledged(own_share);
+
+        ticket_processor.insert_unacknowledged_ticket(PEERS[2].1.public(), ack_share.to_challenge()?, unack_ticket)?;
+
+        let ack = VerifiedAcknowledgement::new(ack_share, &PEERS[2].1).leak();
+        let resolutions = ticket_processor.acknowledge_tickets(*PEERS[2].1.public(), vec![ack])?;
+        assert_eq!(1, resolutions.len());
+        assert!(
+            matches!(resolutions[0], ResolvedAcknowledgement::RelayingLoss(_)),
+            "Expected RelayingLoss for 0-amount ticket, got: {:?}",
+            resolutions[0]
+        );
+
+        Ok(())
+    }
 }
