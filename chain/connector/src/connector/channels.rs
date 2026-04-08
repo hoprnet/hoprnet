@@ -593,4 +593,257 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn connector_should_not_close_non_existing_channel() -> anyhow::Result<()> {
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_hopr_network_chain_info("rotsee")
+            .build_dynamic_client(MODULE_ADDR.into());
+
+        let mut connector = create_connector(blokli_client)?;
+        connector.connect().await?;
+
+        let channel_id = ChannelId::from([1u8; ChannelId::SIZE]);
+        let result = connector.close_channel(&channel_id).await;
+
+        match result {
+            Err(e) => {
+                let err_msg = e.to_string();
+                assert!(
+                    err_msg.contains("does not exist"),
+                    "Expected 'does not exist' error, got: {}",
+                    err_msg
+                );
+            }
+            _ => panic!("Expected error when closing non-existing channel"),
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connector_should_not_close_already_closed_channel() -> anyhow::Result<()> {
+        let offchain_key_1 = OffchainKeypair::from_secret(&hex!(
+            "60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"
+        ))?;
+        let account_1 = AccountEntry {
+            public_key: *offchain_key_1.public(),
+            chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
+            entry_type: AccountType::NotAnnounced,
+            safe_address: Some([1u8; Address::SIZE].into()),
+            key_id: 1.into(),
+        };
+        let offchain_key_2 = OffchainKeypair::from_secret(&hex!(
+            "71bf1f42ebbfcd89c3e197a3fd7cda79b92499e509b6fefa0fe44d02821d146a"
+        ))?;
+        let account_2 = AccountEntry {
+            public_key: *offchain_key_2.public(),
+            chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_2)?.public().to_address(),
+            entry_type: AccountType::NotAnnounced,
+            safe_address: Some([2u8; Address::SIZE].into()),
+            key_id: 2.into(),
+        };
+
+        let channel_1 = ChannelEntry::builder()
+            .between(
+                &ChainKeypair::from_secret(&PRIVATE_KEY_1)?,
+                &ChainKeypair::from_secret(&PRIVATE_KEY_2)?,
+            )
+            .amount(10)
+            .ticket_index(1)
+            .status(ChannelStatus::Closed)
+            .epoch(1)
+            .build()?;
+
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_accounts([
+                (account_1, HoprBalance::new_base(100), XDaiBalance::new_base(1)),
+                (account_2, HoprBalance::new_base(100), XDaiBalance::new_base(1)),
+            ])
+            .with_channels([channel_1])
+            .with_hopr_network_chain_info("rotsee")
+            .build_dynamic_client(MODULE_ADDR.into());
+
+        let mut connector = create_connector(blokli_client)?;
+        connector.connect().await?;
+
+        let result = connector.close_channel(channel_1.get_id()).await;
+
+        match result {
+            Err(e) => {
+                let err_msg = e.to_string();
+                assert!(
+                    err_msg.contains("is closed"),
+                    "Expected 'is closed' error, got: {}",
+                    err_msg
+                );
+            }
+            _ => panic!("Expected error when closing already closed channel"),
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connector_should_not_close_unowned_channel() -> anyhow::Result<()> {
+        let offchain_key_2 = OffchainKeypair::from_secret(&hex!(
+            "71bf1f42ebbfcd89c3e197a3fd7cda79b92499e509b6fefa0fe44d02821d146a"
+        ))?;
+        let account_2 = AccountEntry {
+            public_key: *offchain_key_2.public(),
+            chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_2)?.public().to_address(),
+            entry_type: AccountType::NotAnnounced,
+            safe_address: Some([2u8; Address::SIZE].into()),
+            key_id: 2.into(),
+        };
+        let _offchain_key_3 = OffchainKeypair::from_secret(&hex!(
+            "0000000000000000000000000000000000000000000000000000000000000003"
+        ))?;
+        let account_3 = AccountEntry {
+            public_key: *_offchain_key_3.public(),
+            chain_addr: ChainKeypair::from_secret(&hex!(
+                "0000000000000000000000000000000000000000000000000000000000000003"
+            ))?
+            .public()
+            .to_address(),
+            entry_type: AccountType::NotAnnounced,
+            safe_address: Some([3u8; Address::SIZE].into()),
+            key_id: 3.into(),
+        };
+
+        // node is using PRIVATE_KEY_1, so it owns account_1
+        // this channel is between PRIVATE_KEY_2 and PRIVATE_KEY_3
+        let channel_1 = ChannelEntry::builder()
+            .between(
+                &ChainKeypair::from_secret(&PRIVATE_KEY_2)?,
+                &ChainKeypair::from_secret(&hex!(
+                    "0000000000000000000000000000000000000000000000000000000000000003"
+                ))?,
+            )
+            .amount(10)
+            .ticket_index(1)
+            .status(ChannelStatus::Open)
+            .epoch(1)
+            .build()?;
+
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_accounts([
+                (account_2, HoprBalance::new_base(100), XDaiBalance::new_base(1)),
+                (account_3, HoprBalance::new_base(100), XDaiBalance::new_base(1)),
+            ])
+            .with_channels([channel_1])
+            .with_hopr_network_chain_info("rotsee")
+            .build_dynamic_client(MODULE_ADDR.into());
+
+        let mut connector = create_connector(blokli_client)?;
+        connector.connect().await?;
+
+        let result = connector.close_channel(channel_1.get_id()).await;
+
+        match result {
+            Err(e) => {
+                let err_msg = e.to_string();
+                assert!(
+                    err_msg.contains("cannot close channels that is not own"),
+                    "Expected ownership error, got: {}",
+                    err_msg
+                );
+            }
+            _ => panic!("Expected error when closing unowned channel"),
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connector_should_not_fund_non_existing_channel() -> anyhow::Result<()> {
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_hopr_network_chain_info("rotsee")
+            .build_dynamic_client(MODULE_ADDR.into());
+
+        let mut connector = create_connector(blokli_client)?;
+        connector.connect().await?;
+
+        let channel_id = ChannelId::from([1u8; ChannelId::SIZE]);
+        let result = connector.fund_channel(&channel_id, 10.into()).await;
+
+        match result {
+            Err(e) => {
+                let err_msg = e.to_string();
+                assert!(
+                    err_msg.contains("does not exist"),
+                    "Expected 'does not exist' error, got: {}",
+                    err_msg
+                );
+            }
+            _ => panic!("Expected error when funding non-existing channel"),
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connector_should_not_finalize_channel_closure_before_time() -> anyhow::Result<()> {
+        let offchain_key_1 = OffchainKeypair::from_secret(&hex!(
+            "60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"
+        ))?;
+        let account_1 = AccountEntry {
+            public_key: *offchain_key_1.public(),
+            chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
+            entry_type: AccountType::NotAnnounced,
+            safe_address: Some([1u8; Address::SIZE].into()),
+            key_id: 1.into(),
+        };
+        let offchain_key_2 = OffchainKeypair::from_secret(&hex!(
+            "71bf1f42ebbfcd89c3e197a3fd7cda79b92499e509b6fefa0fe44d02821d146a"
+        ))?;
+        let account_2 = AccountEntry {
+            public_key: *offchain_key_2.public(),
+            chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_2)?.public().to_address(),
+            entry_type: AccountType::NotAnnounced,
+            safe_address: Some([2u8; Address::SIZE].into()),
+            key_id: 2.into(),
+        };
+
+        let channel_1 = ChannelEntry::builder()
+            .between(
+                &ChainKeypair::from_secret(&PRIVATE_KEY_1)?,
+                &ChainKeypair::from_secret(&PRIVATE_KEY_2)?,
+            )
+            .amount(10)
+            .ticket_index(1)
+            .status(ChannelStatus::PendingToClose(
+                std::time::SystemTime::now() + Duration::from_secs(3600),
+            ))
+            .epoch(1)
+            .build()?;
+
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_accounts([
+                (account_1, HoprBalance::new_base(100), XDaiBalance::new_base(1)),
+                (account_2, HoprBalance::new_base(100), XDaiBalance::new_base(1)),
+            ])
+            .with_channels([channel_1])
+            .with_hopr_network_chain_info("rotsee")
+            .build_dynamic_client(MODULE_ADDR.into());
+
+        let mut connector = create_connector(blokli_client)?;
+        connector.connect().await?;
+
+        let result = connector.close_channel(channel_1.get_id()).await;
+
+        match result {
+            Err(e) => {
+                let err_msg = e.to_string();
+                assert!(
+                    err_msg.contains("channel closure time has not elapsed"),
+                    "Expected time elapsed error, got: {}",
+                    err_msg
+                );
+            }
+            _ => panic!("Expected error when closing channel before time elapsed"),
+        }
+
+        Ok(())
+    }
 }
