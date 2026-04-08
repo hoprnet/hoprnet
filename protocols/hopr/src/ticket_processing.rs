@@ -176,7 +176,9 @@ impl<Chain> HoprUnacknowledgedTicketProcessor<Chain> {
                     // listeners fire (decrementing UNACK_TICKETS and per-peer metrics).
                     // Without this, dropping the inner cache silently leaks those metrics.
                     value.invalidate_all();
-                    value.run_pending_tasks();
+                    // TODO: Improve the metrics in the module in general, because run_pending_tasks() is lengthy
+                    // See https://github.com/hoprnet/hoprnet/issues/8014
+                    // value.run_pending_tasks();
                 },
             );
         }
