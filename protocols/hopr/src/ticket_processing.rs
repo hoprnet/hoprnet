@@ -153,32 +153,36 @@ impl<Chain> HoprUnacknowledgedTicketProcessor<Chain> {
             }
         }
 
-        Self {
-            unacknowledged_tickets: moka::sync::Cache::builder()
-                .time_to_idle(cfg.unack_ticket_timeout)
-                .max_capacity(100_000)
-                .eviction_listener(
-                    |_, value: moka::sync::Cache<HalfKeyChallenge, UnacknowledgedTicket>, cause| {
-                        if !matches!(cause, moka::notification::RemovalCause::Replaced) {
-                            #[cfg(all(feature = "telemetry", not(test)))]
-                            UNACK_PEERS.decrement(1.0);
+        #[allow(unused_mut)]
+        let mut builder = moka::sync::Cache::builder()
+            .time_to_idle(cfg.unack_ticket_timeout)
+            .max_capacity(100_000);
 
-                            #[cfg(all(feature = "telemetry", not(test)))]
-                            if matches!(
-                                cause,
-                                moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size
-                            ) {
-                                UNACK_PEER_EVICTIONS.increment();
-                            }
+        #[cfg(all(feature = "telemetry", not(test)))]
+        {
+            builder = builder.eviction_listener(
+                |_, value: moka::sync::Cache<HalfKeyChallenge, UnacknowledgedTicket>, cause| {
+                    if !matches!(cause, moka::notification::RemovalCause::Replaced) {
+                        UNACK_PEERS.decrement(1.0);
+
+                        if matches!(
+                            cause,
+                            moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size
+                        ) {
+                            UNACK_PEER_EVICTIONS.increment();
                         }
-                        // Explicitly invalidate all inner cache entries so their eviction
-                        // listeners fire (decrementing UNACK_TICKETS and per-peer metrics).
-                        // Without this, dropping the inner cache silently leaks those metrics.
-                        value.invalidate_all();
-                        value.run_pending_tasks();
-                    },
-                )
-                .build(),
+                    }
+                    // Explicitly invalidate all inner cache entries so their eviction
+                    // listeners fire (decrementing UNACK_TICKETS and per-peer metrics).
+                    // Without this, dropping the inner cache silently leaks those metrics.
+                    value.invalidate_all();
+                    value.run_pending_tasks();
+                },
+            );
+        }
+
+        Self {
+            unacknowledged_tickets: builder.build(),
             chain_api,
             chain_key,
             channels_dst,
@@ -205,39 +209,39 @@ where
 
         self.unacknowledged_tickets
             .get_with_by_ref(next_hop, || {
-                #[cfg(all(feature = "telemetry", not(test)))]
-                UNACK_PEERS.increment(1.0);
+                #[allow(unused_mut)]
+                let mut builder = moka::sync::Cache::builder()
+                    .time_to_live(self.cfg.unack_ticket_timeout)
+                    .max_capacity(self.cfg.max_unack_tickets as u64);
 
                 #[cfg(all(feature = "telemetry", not(test)))]
-                let next_hop = *next_hop;
-                moka::sync::Cache::builder()
-                    .time_to_live(self.cfg.unack_ticket_timeout)
-                    .max_capacity(self.cfg.max_unack_tickets as u64)
-                    .eviction_listener(move |_key, _value, cause| {
-                        #[cfg(all(feature = "telemetry", not(test)))]
-                        {
-                            let peer_id_for_eviction = next_hop.to_peerid_str();
-                            UNACK_TICKETS.decrement(1.0);
-                            UNACK_TICKETS_PER_PEER.decrement(
-                                &[if *PER_PEER_ENABLED {
-                                    peer_id_for_eviction.as_str()
-                                } else {
-                                    "redacted"
-                                }],
-                                1.0,
-                            );
-                        }
+                {
+                    UNACK_PEERS.increment(1.0);
+
+                    let next_hop = *next_hop;
+                    builder = builder.eviction_listener(move |_, _, cause| {
+                        let peer_id_for_eviction = next_hop.to_peerid_str();
+                        UNACK_TICKETS.decrement(1.0);
+                        UNACK_TICKETS_PER_PEER.decrement(
+                            &[if *PER_PEER_ENABLED {
+                                peer_id_for_eviction.as_str()
+                            } else {
+                                "redacted"
+                            }],
+                            1.0,
+                        );
 
                         // Only count Expired/Size removals as evictions (not Explicit or Replaced)
                         if matches!(
                             cause,
                             moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size
                         ) {
-                            #[cfg(all(feature = "telemetry", not(test)))]
                             UNACK_EVICTIONS.increment();
                         }
-                    })
-                    .build()
+                    });
+                }
+
+                builder.build()
             })
             .insert(challenge, ticket);
 
