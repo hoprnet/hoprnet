@@ -55,7 +55,7 @@ where
     }
 }
 
-async fn channel_by_id_no_block<B: Backend + Send + Sync + 'static>(
+async fn channel_by_id_async<B: Backend + Send + Sync + 'static>(
     channel_by_id: moka::sync::Cache<ChannelId, Option<ChannelEntry>, ahash::RandomState>,
     backend: std::sync::Arc<B>,
     channel_id: ChannelId,
@@ -148,7 +148,7 @@ where
     ) -> Result<BoxFuture<'a, Result<ChainReceipt, Self::Error>>, Self::Error> {
         self.check_connection_state()?;
 
-        let channel = channel_by_id_no_block(self.channel_by_id.clone(), self.backend.clone(), *channel_id)
+        let channel = channel_by_id_async(self.channel_by_id.clone(), self.backend.clone(), *channel_id)
             .await?
             .ok_or_else(|| ConnectorError::ChannelDoesNotExist(*channel_id))?;
 
@@ -166,7 +166,7 @@ where
 
         use hopr_api::chain::ChainReadChannelOperations;
 
-        let channel = channel_by_id_no_block(self.channel_by_id.clone(), self.backend.clone(), *channel_id)
+        let channel = channel_by_id_async(self.channel_by_id.clone(), self.backend.clone(), *channel_id)
             .await?
             .ok_or_else(|| ConnectorError::ChannelDoesNotExist(*channel_id))?;
 

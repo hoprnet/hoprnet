@@ -1211,7 +1211,7 @@ where
             .map_err(HoprLibError::chain)
     }
 
-    pub fn channel_from_hash(&self, channel_id: &Hash) -> Result<Option<ChannelEntry>, HoprLibError> {
+    pub fn channel_by_id(&self, channel_id: &ChannelId) -> Result<Option<ChannelEntry>, HoprLibError> {
         self.chain_api.channel_by_id(channel_id).map_err(HoprLibError::chain)
     }
 
