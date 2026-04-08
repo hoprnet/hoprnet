@@ -22,7 +22,7 @@ use hopr_protocol_hopr::{
     SurbStoreConfig,
 };
 use hopr_test_stubs::{StubChainApi, StubPathResolver};
-use hopr_ticket_manager::{HoprTicketManager, MemoryStore};
+use hopr_ticket_manager::{HoprTicketFactory, HoprTicketManager, MemoryStore};
 use hopr_transport_mixer::config::MixerConfig;
 use hopr_transport_protocol::TicketEvent;
 use libp2p::PeerId;
@@ -124,7 +124,7 @@ fn pipeline_e2e_forward(c: &mut Criterion) {
             PEERS_CHAIN[1].clone(),
             chain_api.clone(),
             MemorySurbStore::new(SurbStoreConfig::default()),
-            HoprTicketManager::new(MemoryStore::default()).unwrap(),
+            HoprTicketFactory::new(MemoryStore::default()),
             Default::default(),
             HoprCodecConfig::default(),
         );
@@ -228,7 +228,7 @@ fn pipeline_e2e_forward(c: &mut Criterion) {
                             Default::default(),
                         );
 
-                        let ticket_mgr = std::sync::Arc::new(HoprTicketManager::new(MemoryStore::default()).unwrap());
+                        let ticket_mgr = std::sync::Arc::new(HoprTicketFactory::new(MemoryStore::default()));
 
                         let encoder = HoprEncoder::new(
                             PEERS_CHAIN[SENDER_IDX].clone(),

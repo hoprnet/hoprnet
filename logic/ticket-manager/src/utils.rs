@@ -5,7 +5,7 @@ use hopr_api::{
     types::internal::prelude::TicketBuilder,
 };
 
-use crate::{OutgoingIndexStore, TicketQueue};
+use crate::{OutgoingIndexStore, TicketManagerError, TicketQueue, backend::ValueCachedQueue};
 
 /// Tracks outgoing ticket indices for a channel, starting from 0.
 #[derive(Debug)]
@@ -149,6 +149,67 @@ impl OutgoingIndexCache {
             anyhow::bail!("failed to save {} outgoing index entries", failed);
         }
         Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct CachedQueueMap<Q>(
+    pub(crate) dashmap::DashMap<ChannelId, ChannelTicketQueue<ValueCachedQueue<Q>>, ahash::RandomState>,
+);
+
+impl<Q> Default for CachedQueueMap<Q> {
+    fn default() -> Self {
+        Self(dashmap::DashMap::with_hasher(ahash::RandomState::default()))
+    }
+}
+
+pub trait UnrealizedValue {
+    /// Compute the total value of tickets in the channel with the given `channel_id`,
+    /// and optionally only starting from the given first ticket index.
+    fn unrealized_value(
+        &self,
+        _channel_id: &ChannelId,
+        _min_index: Option<u64>,
+    ) -> Result<Option<HoprBalance>, TicketManagerError> {
+        Ok(None)
+    }
+}
+impl UnrealizedValue for () {}
+
+impl<Q: TicketQueue> UnrealizedValue for CachedQueueMap<Q> {
+    /// Returns the total value of the tickets in the given queue, or `None` if no such ticket queue exists.
+    fn unrealized_value(
+        &self,
+        channel_id: &ChannelId,
+        min_index: Option<u64>,
+    ) -> Result<Option<HoprBalance>, TicketManagerError> {
+        if let Some(ticket_queue) = self.0.get(channel_id) {
+            // There is low contention on this read lock, because write locks are acquired only
+            // when a new winning ticket has been added, redeemed or neglected, all of which are fairly rare operations.
+            let queue = ticket_queue.queue.read();
+
+            // Get the epoch of the first extractable ticket in the queue.
+            // The ticket insertion takes care that there are no tickets
+            // with epochs other than the current epoch.
+            if let Some(epoch) = queue
+                .0
+                .peek()
+                .map_err(TicketManagerError::store)?
+                .map(|t| t.verified_ticket().channel_epoch)
+            {
+                Ok(Some(
+                    queue
+                        .0
+                        .total_value(epoch, min_index)
+                        .map_err(TicketManagerError::store)?,
+                ))
+            } else {
+                // No tickets in the queue, so the unrealized value is zero.
+                Ok(Some(HoprBalance::zero()))
+            }
+        } else {
+            Ok(None)
+        }
     }
 }
 

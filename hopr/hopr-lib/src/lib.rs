@@ -74,6 +74,7 @@ use std::{
     time::Duration,
 };
 
+use anyhow::anyhow;
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt, TryStreamExt, channel::mpsc::channel, pin_mut};
 use futures_time::future::FutureExt as FuturesTimeFutureExt;
 use hopr_api::{
@@ -94,6 +95,7 @@ pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 pub use hopr_network_types::prelude::*;
 #[cfg(all(feature = "telemetry", not(test)))]
 use hopr_platform::time::native::current_time;
+use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue};
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport::transfer_session;
 pub use hopr_transport::*;
@@ -199,6 +201,8 @@ pub enum HoprLibProcess {
     ChannelEvents,
     #[strum(to_string = "on received ticket event (winning or rejected)")]
     TicketEvents,
+    #[strum(to_string = "persisting of outgoing ticket indices")]
+    OutIndexSync,
 }
 
 #[cfg(all(feature = "telemetry", not(test)))]
@@ -315,6 +319,7 @@ where
     transport_api: HoprTransport<Chain, Graph, Net>,
     chain_api: Chain,
     ticket_event_subscribers: TicketEvents,
+    ticket_manager: OnceLock<Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>>,
     processes: OnceLock<AbortableList<HoprLibProcess>>,
 }
 
@@ -382,6 +387,7 @@ where
             chain_api: hopr_chain_api,
             processes: OnceLock::new(),
             ticket_event_subscribers: (new_tickets_tx, new_tickets_rx.deactivate()),
+            ticket_manager: Default::default(),
         })
     }
 
@@ -633,14 +639,97 @@ where
             );
         }
 
+        info!("starting ticket manager & factory");
+        let store = self
+            .cfg
+            .ticket_storage_file
+            .as_ref()
+            .map(RedbStore::new)
+            .unwrap_or_else(RedbStore::new_temp)
+            .map_err(HoprLibError::ticket_manager)?;
+
+        let (ticket_manager, ticket_factory) = HoprTicketManager::new_with_factory(store);
+        let ticket_manager = Arc::new(ticket_manager);
+        let ticket_factory = Arc::new(ticket_factory);
+
+        // Synchronize the ticket manager with the chain before starting the packet pipeline
+        ticket_manager
+            .sync_from_incoming_channels(
+                &self
+                    .chain_api
+                    .stream_channels(ChannelSelector::default().with_destination(me_onchain))
+                    .await
+                    .map_err(HoprLibError::chain)?
+                    .collect::<Vec<_>>()
+                    .await,
+            )
+            .map_err(HoprLibError::ticket_manager)?;
+
+        // Synchronize the ticket factory with the chain before starting the packet pipeline
+        ticket_factory
+            .sync_from_outgoing_channels(
+                &self
+                    .chain_api
+                    .stream_channels(ChannelSelector::default().with_source(me_onchain))
+                    .await
+                    .map_err(HoprLibError::chain)?
+                    .collect::<Vec<_>>()
+                    .await,
+            )
+            .map_err(HoprLibError::ticket_manager)?;
+
+        // Make sure outgoing ticket indices in the ticket factory are periodically persisted to disk
+        let (index_sync_handle, index_sync_reg) = futures::future::AbortHandle::new_pair();
+        let tfact = ticket_factory.clone();
+        let tfact2 = ticket_factory.clone();
+        spawn(
+            futures::stream::Abortable::new(
+                futures_time::stream::interval(self.cfg.out_index_sync_period.into()),
+                index_sync_reg,
+            )
+            .for_each(move |_| {
+                let tfact = tfact.clone();
+                async move {
+                    if let Err(error) =
+                        hopr_async_runtime::prelude::spawn_blocking(move || tfact.save_outgoing_indices())
+                            .map_err(hopr_ticket_manager::TicketManagerError::store)
+                            .and_then(futures::future::ready)
+                            .await
+                    {
+                        tracing::error!(%error, "failed to sync ticket indices to persistent storage:");
+                    } else {
+                        tracing::trace!("successfully synced ticket indices");
+                    }
+                }
+            })
+            .inspect(move |_| {
+                // Do an extra save here on graceful shutdown
+                if let Err(error) = tfact2.save_outgoing_indices() {
+                    tracing::error!(%error, "failed to sync ticket indices to persistent storage on shutdown");
+                }
+                tracing::warn!(
+                    task = %HoprLibProcess::OutIndexSync,
+                    "long-running background task finished"
+                )
+            }),
+        );
+        processes.insert(HoprLibProcess::OutIndexSync, index_sync_handle);
+
         info!("starting ticket events processor");
         let (tickets_tx, tickets_rx) = channel(8192);
         let (tickets_rx, tickets_handle) = futures::stream::abortable(tickets_rx);
         processes.insert(HoprLibProcess::TicketEvents, tickets_handle);
         let new_ticket_tx = self.ticket_event_subscribers.0.clone();
+        let tmgr = ticket_manager.clone();
         spawn(
             tickets_rx
                 .for_each(move |event| {
+                    // Ticket manager processes new winning tickets
+                    if let TicketEvent::WinningTicket(ticket) = &event
+                        && let Err(error) = tmgr.insert_incoming_ticket(**ticket)
+                    {
+                        tracing::error!(%error, "failed to insert incoming ticket into manager");
+                    }
                     if let Err(error) = new_ticket_tx.try_broadcast(event) {
                         tracing::error!(%error, "failed to broadcast new ticket event to subscribers");
                     }
@@ -657,7 +746,7 @@ where
         info!("starting transport");
         let (hopr_socket, transport_processes) = self
             .transport_api
-            .run(cover_traffic, network_builder, tickets_tx, session_tx)
+            .run(cover_traffic, network_builder, tickets_tx, ticket_factory, session_tx)
             .await?;
         processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
 
@@ -666,7 +755,8 @@ where
         processes.insert(HoprLibProcess::ChannelEvents, chain_events_sub_handle);
         let chain = self.chain_api.clone();
         let events = chain.subscribe().map_err(HoprLibError::chain)?;
-        let tmgr = self.transport_api.ticket_manager();
+        let tmgr = ticket_manager.clone();
+
         spawn(
             futures::stream::Abortable::new(
                 events
@@ -681,6 +771,7 @@ where
                 async move {
                     match closed_channel.direction(chain.me()) {
                         Some(ChannelDirection::Incoming) => {
+                            // Ticket manager neglects tickets on incoming channel closure
                             match tmgr.neglect_tickets(closed_channel.get_id(), None) {
                                 Ok(neglected) if !neglected.is_empty() => {
                                     warn!(num_neglected = neglected.len(), %closed_channel, "tickets on incoming closed channel were neglected");
@@ -706,6 +797,10 @@ where
 
         self.state.store(HoprState::Running, Ordering::Relaxed);
 
+        self.ticket_manager
+            .set(ticket_manager)
+            .map_err(|_| HoprLibError::other(anyhow!("cannot set ticket manager")))?;
+
         info!(
             id = %self.me_peer_id(),
             version = constants::APP_VERSION,
@@ -724,6 +819,7 @@ where
         );
 
         let _ = self.processes.set(processes);
+
         Ok(hopr_socket)
     }
 
@@ -1285,10 +1381,21 @@ where
         Ok(CloseChannelResult { tx_hash })
     }
 
+    pub fn ticket_management(&self) -> Result<impl TicketManagement + Clone + Send + 'static, HoprLibError> {
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for transport operations".into())?;
+
+        self.ticket_manager
+            .get()
+            .cloned()
+            .ok_or(HoprLibError::StatusError(HoprStatusError::NotThereYet(
+                HoprState::Running,
+                "Node is not ready for transport operations".into(),
+            )))
+    }
+
     // TODO: this method can be sync unless we allow querying of the redeemed value from Blokli
     pub async fn ticket_statistics(&self) -> Result<ChannelStats, HoprLibError> {
-        self.transport_api
-            .ticket_manager()
+        self.ticket_management()?
             .ticket_stats(None)
             .map_err(HoprLibError::ticket_manager)
     }
@@ -1301,7 +1408,7 @@ where
 
         let min_value = min_value.into();
 
-        self.ticket_management()
+        self.ticket_management()?
             .redeem_in_channels(
                 self.chain_api.clone(),
                 None,
@@ -1340,8 +1447,7 @@ where
             .map_err(HoprLibError::chain)?
             .ok_or(HoprLibError::GeneralError("channel not found".into()))?;
 
-        self.transport_api
-            .ticket_manager()
+        self.ticket_management()?
             .redeem_in_channels(
                 self.chain_api.clone(),
                 ChannelSelector::default()
@@ -1356,10 +1462,6 @@ where
             .map_err(HoprLibError::ticket_manager)
             .try_collect::<Vec<_>>()
             .await
-    }
-
-    pub fn ticket_management(&self) -> impl TicketManagement + Clone + Send + 'static {
-        self.transport_api.ticket_manager()
     }
 
     pub fn subscribe_ticket_events(&self) -> impl Stream<Item = TicketEvent> + Send + 'static {
