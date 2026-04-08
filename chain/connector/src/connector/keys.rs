@@ -120,11 +120,13 @@ where
 mod tests {
     use hex_literal::hex;
     use hopr_api::{
-        chain::ChainKeyOperations,
+        chain::{ChainKeyOperations, HoprKeyIdent, KeyIdMapping},
         types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*},
     };
 
-    use crate::{connector::tests::create_connector, testing::BlokliTestStateBuilder};
+    use crate::{
+        backend::Backend, connector::tests::create_connector, errors::ConnectorError, testing::BlokliTestStateBuilder,
+    };
 
     #[tokio::test]
     async fn connector_should_map_keys_to_ids_and_back() -> anyhow::Result<()> {
@@ -160,6 +162,124 @@ mod tests {
 
         assert_eq!(Some(account.key_id), mapper.map_key_to_id(offchain_key.public()));
         assert_eq!(Some(*offchain_key.public()), mapper.map_id_to_public(&account.key_id));
+
+        Ok(())
+    }
+
+    struct MockErrorBackend;
+
+    impl Backend for MockErrorBackend {
+        type Error = ConnectorError;
+
+        fn insert_account(&self, _entry: AccountEntry) -> Result<Option<AccountEntry>, Self::Error> {
+            Err(ConnectorError::InvalidState("mock error"))
+        }
+
+        fn insert_channel(&self, _channel: ChannelEntry) -> Result<Option<ChannelEntry>, Self::Error> {
+            Err(ConnectorError::InvalidState("mock error"))
+        }
+
+        fn get_account_by_id(&self, _id: &HoprKeyIdent) -> Result<Option<AccountEntry>, Self::Error> {
+            Err(ConnectorError::InvalidState("mock error"))
+        }
+
+        fn get_account_by_key(&self, _key: &OffchainPublicKey) -> Result<Option<AccountEntry>, Self::Error> {
+            Err(ConnectorError::InvalidState("mock error"))
+        }
+
+        fn get_account_by_address(&self, _chain_key: &Address) -> Result<Option<AccountEntry>, Self::Error> {
+            Err(ConnectorError::InvalidState("mock error"))
+        }
+
+        fn get_channel_by_id(&self, _id: &ChannelId) -> Result<Option<ChannelEntry>, Self::Error> {
+            Err(ConnectorError::InvalidState("mock error"))
+        }
+    }
+
+    #[test]
+    fn mapper_should_handle_backend_errors() {
+        let mapper = super::HoprKeyMapper {
+            id_to_key: moka::sync::Cache::builder()
+                .max_capacity(10)
+                .build_with_hasher(ahash::RandomState::default()),
+            key_to_id: moka::sync::Cache::builder()
+                .max_capacity(10)
+                .build_with_hasher(ahash::RandomState::default()),
+            backend: std::sync::Arc::new(MockErrorBackend),
+        };
+
+        let key = *OffchainKeypair::random().public();
+        let id = HoprKeyIdent::from(1);
+
+        assert_eq!(None, mapper.map_key_to_id(&key));
+        assert_eq!(None, mapper.map_id_to_public(&id));
+    }
+
+    #[test]
+    fn mapper_should_handle_missing_accounts() {
+        use crate::InMemoryBackend;
+        let mapper = super::HoprKeyMapper {
+            id_to_key: moka::sync::Cache::builder()
+                .max_capacity(10)
+                .build_with_hasher(ahash::RandomState::default()),
+            key_to_id: moka::sync::Cache::builder()
+                .max_capacity(10)
+                .build_with_hasher(ahash::RandomState::default()),
+            backend: std::sync::Arc::new(InMemoryBackend::default()),
+        };
+
+        let key = *OffchainKeypair::random().public();
+        let id = HoprKeyIdent::from(1);
+
+        assert_eq!(None, mapper.map_key_to_id(&key));
+        assert_eq!(None, mapper.map_id_to_public(&id));
+    }
+
+    #[tokio::test]
+    async fn connector_should_check_connection_state() -> anyhow::Result<()> {
+        let blokli_client = BlokliTestStateBuilder::default().build_static_client();
+        let connector = create_connector(blokli_client)?;
+
+        let key = *OffchainKeypair::random().public();
+        let addr = Address::from([0u8; 20]);
+
+        assert!(connector.packet_key_to_chain_key(&key).is_err());
+        assert!(connector.chain_key_to_packet_key(&addr).is_err());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connector_should_handle_backend_errors() -> anyhow::Result<()> {
+        let blokli_client = BlokliTestStateBuilder::default().build_static_client();
+        let connector = create_connector(blokli_client)?;
+
+        // Instead of manual struct initialization, use what we have and inject the error backend
+        let mapper = super::HoprKeyMapper {
+            id_to_key: moka::sync::Cache::builder()
+                .max_capacity(10)
+                .build_with_hasher(ahash::RandomState::default()),
+            key_to_id: moka::sync::Cache::builder()
+                .max_capacity(10)
+                .build_with_hasher(ahash::RandomState::default()),
+            backend: std::sync::Arc::new(MockErrorBackend),
+        };
+
+        let mut connector = crate::connector::HoprBlockchainConnector::new(
+            connector.chain_key.clone(),
+            connector.cfg.clone(),
+            (*connector.client).clone(),
+            MockErrorBackend,
+            connector.payload_generator.clone(),
+        );
+        connector.mapper = mapper;
+        connector.connect().await?;
+
+        let key = *OffchainKeypair::random().public();
+        let addr = Address::from([0u8; 20]);
+
+        assert!(connector.packet_key_to_chain_key(&key).is_err());
+        assert!(connector.chain_key_to_packet_key(&addr).is_err());
 
         Ok(())
     }
