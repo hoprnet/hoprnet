@@ -4832,6 +4832,7 @@ dependencies = [
  "humantime-serde",
  "lazy_static",
  "moka",
+ "parameterized",
  "parking_lot",
  "ringbuffer",
  "serde",

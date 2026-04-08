@@ -400,8 +400,9 @@ mod tests {
     use super::*;
     use crate::utils::*;
 
-    #[tokio::test]
-    async fn ticket_processor_should_acknowledge_previously_inserted_tickets() -> anyhow::Result<()> {
+    #[parameterized::parameterized(batch = { true, false })]
+    #[parameterized_macro(tokio::test)]
+    async fn ticket_processor_should_acknowledge_previously_inserted_tickets(batch: bool) -> anyhow::Result<()> {
         let blokli_client = create_blokli_client()?;
 
         let node = create_node(1, &blokli_client).await?;
@@ -410,7 +411,10 @@ mod tests {
             node.chain_api.clone(),
             node.chain_key.clone(),
             Hash::default(),
-            HoprUnacknowledgedTicketProcessorConfig::default(),
+            HoprUnacknowledgedTicketProcessorConfig {
+                use_batch_verification: batch,
+                ..HoprUnacknowledgedTicketProcessorConfig::default()
+            },
         );
 
         const NUM_TICKETS: usize = 5;
