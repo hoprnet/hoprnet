@@ -45,6 +45,11 @@ use crate::{config::SessionIpForwardingConfig, exit::HoprServerIpForwardingReact
 
 pub type ReferenceHopr = Hopr<Arc<HoprBlockchainSafeConnector<BlokliClient>>, SharedChannelGraph, HoprNetwork>;
 
+// TODO(pub API): Make this an actual builder pattern based only on HOPR API defined interfaces
+// - move the Builder into the hopr-lib
+// - make Hopr object constructor private or get rid of it completely
+// - add specific options to the Builder based on the node type (Entry/Relay/Exit)
+
 #[cfg(feature = "runtime-tokio")]
 pub async fn build_reference(
     identity: (&ChainKeypair, &OffchainKeypair),

@@ -94,6 +94,8 @@ enum StrategyEvent {
     Ticket(VerifiedTicket),
 }
 
+// TODO(pub API): Make strategies accept Hopr object instead of the individual APIs
+
 /// Streams [`ChainEvents`](ChainEvent), [`VerifiedTickets`](VerifiedTicket) and `tick` at regular time
 /// intervals as events into the given `strategy`.
 pub fn stream_events_to_strategy_with_tick<C, T, S>(

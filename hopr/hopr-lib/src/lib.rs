@@ -298,28 +298,17 @@ const ON_CHAIN_RESOLUTION_EVENT_TIMEOUT: Duration = Duration::from_secs(90);
 /// that manual interaction is unnecessary.
 ///
 /// As such, the `hopr_lib` serves mainly as an integration point into Rust programs.
-pub struct Hopr<Chain, Graph, Net>
-where
-    Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
-        + hopr_api::graph::NetworkGraphUpdate
-        + hopr_api::graph::NetworkGraphWrite<NodeId = OffchainPublicKey>
-        + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
-        + Clone
-        + Send
-        + Sync
-        + 'static,
-    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
-        hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
-    <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
-    Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
-{
+pub struct Hopr<Chain, Graph, Net> {
     me: OffchainKeypair,
     cfg: config::HoprLibConfig,
+    // TODO(pub API): possibly does not need to be atomic
     state: Arc<api::node::state::AtomicHoprState>,
     transport_api: HoprTransport<Chain, Graph, Net>,
     chain_api: Chain,
     ticket_event_subscribers: TicketEvents,
+    // TODO(pub API): move into the builder nad put conditionally only on Relays
     ticket_manager: OnceLock<Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>>,
+    // TODO(pub API): remove the oncelock, but keep that a member to tie the lifetime of processes to Hopr object
     processes: OnceLock<AbortableList<HoprLibProcess>>,
 }
 
@@ -339,6 +328,7 @@ where
     <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
+    // TODO(pub API): remove and move into the Builder
     pub async fn new(
         identity: (&ChainKeypair, &OffchainKeypair),
         hopr_chain_api: Chain,
@@ -408,17 +398,19 @@ where
         self.transport_api.graph()
     }
 
+    // TODO(pub API): Remove
     #[inline]
     fn is_public(&self) -> bool {
         self.cfg.publish
     }
 
+    // TODO(pub API): make part of the builder
     pub async fn run<
         Ct,
         NetBuilder,
         #[cfg(feature = "session-server")] T: traits::HoprSessionServer + Clone + Send + 'static,
     >(
-        &self,
+        &mut self,
         cover_traffic: Ct,
         network_builder: NetBuilder,
         #[cfg(feature = "session-server")] serve_handler: T,
@@ -828,7 +820,9 @@ where
     /// Such operations will return [`HoprStatusError::NotThereYet`].
     ///
     /// This is the final state and cannot be reversed by calling `run` again.
-    pub fn shutdown(&self) -> Result<(), HoprLibError> {
+    // TODO(pub API): remove the shutdown, because Drop takes care of the processes
+    // But make sure the tests work (shutdown was added because it was in Arc inside the test fixture)
+    pub fn shutdown(&mut self) -> Result<(), HoprLibError> {
         self.error_if_not_in_state(HoprState::Running, "node is not running".into())?;
         if let Some(processes) = self.processes.get() {
             processes.abort_all();
@@ -840,6 +834,8 @@ where
 
     /// Create a client session connection returning a session object that implements
     /// [`futures::io::AsyncRead`] and [`futures::io::AsyncWrite`] and can bu used as a read/write binary session.
+    // TODO(pub API): Wrap HoprSession into ConfigurableHoprSession which contains HoprSession + Weak<SessionManager>
+    // It exposes the update_surb_balancer_config and get_surb_balancer_config thanks to the weak ref
     #[cfg(feature = "session-client")]
     pub async fn connect_to(
         &self,
@@ -868,18 +864,21 @@ where
 
     /// Sends keep-alive to the given [`SessionId`], making sure the session is not
     /// closed due to inactivity.
+    // TODO(pub API): Remove, will be part of ConfigurableHoprSession object
     #[cfg(feature = "session-client")]
     pub async fn keep_alive_session(&self, id: &SessionId) -> errors::Result<()> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for session operations".into())?;
         Ok(self.transport_api.probe_session(id).await?)
     }
 
+    // TODO(pub API): Remove, will be part of ConfigurableHoprSession object
     #[cfg(feature = "session-client")]
     pub async fn get_session_surb_balancer_config(&self, id: &SessionId) -> errors::Result<Option<SurbBalancerConfig>> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for session operations".into())?;
         Ok(self.transport_api.session_surb_balancing_cfg(id).await?)
     }
 
+    // TODO(pub API): Remove, will be part of ConfigurableHoprSession object
     #[cfg(feature = "session-client")]
     pub async fn update_session_surb_balancer_config(
         &self,
@@ -1007,6 +1006,7 @@ where
         (*self.me.public()).into()
     }
 
+    // TODO(pub API): get this from the Transport object?
     async fn get_public_nodes(&self) -> Result<Vec<(PeerId, Address, Vec<Multiaddr>)>, Self::Error> {
         Ok(self
             .chain_api
@@ -1098,6 +1098,7 @@ where
         }
     }
 
+    // TODO(pub API): deprecate this
     async fn ping(&self, peer: &PeerId) -> Result<(Duration, Self::TransportObservable), Self::Error> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
         let pubkey = hopr_transport::peer_id_to_public_key(peer).map_err(HoprLibError::TransportError)?;
@@ -1105,6 +1106,8 @@ where
     }
 }
 
+// TODO(pub API): move into HoprIncentiveApi trait
+// HoprIncentiveApi: HoprChainVisibilityApi + HoprRedeemableTicketApi
 impl<Chain, Graph, Net> Hopr<Chain, Graph, Net>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
@@ -1129,6 +1132,7 @@ where
         *self.chain_api.me()
     }
 
+    // TODO(pub API): remove, because we already expose the config()
     pub fn get_safe_config(&self) -> SafeModuleConfig {
         SafeModuleConfig {
             safe_address: self.cfg.safe_module.safe_address,
@@ -1136,6 +1140,8 @@ where
         }
     }
 
+    // TODO(pub API): replace with: fn async visit<T>(fn: FnOnce(&impl HoprChainApi) -> Result<T, ..>) -> Result<T,
+    // HoprLibError>
     pub async fn get_balance<C: Currency + Send>(&self) -> Result<Balance<C>, HoprLibError> {
         self.chain_api
             .balance(self.me_onchain())
@@ -1143,6 +1149,8 @@ where
             .map_err(HoprLibError::chain)
     }
 
+    // TODO(pub API): replace with: fn async visit<T>(fn: FnOnce(&impl HoprChainApi) -> Result<T, ..>) -> Result<T,
+    // HoprLibError>
     pub async fn get_safe_balance<C: Currency + Send>(&self) -> Result<Balance<C>, HoprLibError> {
         self.chain_api
             .balance(self.cfg.safe_module.safe_address)
@@ -1150,6 +1158,8 @@ where
             .map_err(HoprLibError::chain)
     }
 
+    // TODO(pub API): replace with: fn async visit<T>(fn: FnOnce(&impl HoprChainApi) -> Result<T, ..>) -> Result<T,
+    // HoprLibError>
     pub async fn safe_allowance(&self) -> Result<HoprBalance, HoprLibError> {
         self.chain_api
             .safe_allowance(self.cfg.safe_module.safe_address)
@@ -1157,14 +1167,20 @@ where
             .map_err(HoprLibError::chain)
     }
 
+    // TODO(pub API): replace with: fn async visit<T>(fn: FnOnce(&impl HoprChainApi) -> Result<T, ..>) -> Result<T,
+    // HoprLibError>
     pub async fn chain_info(&self) -> Result<ChainInfo, HoprLibError> {
         self.chain_api.chain_info().await.map_err(HoprLibError::chain)
     }
 
+    // TODO(pub API): replace with: fn async visit<T>(fn: FnOnce(&impl HoprChainApi) -> Result<T, ..>) -> Result<T,
+    // HoprLibError>
     pub async fn get_ticket_price(&self) -> Result<HoprBalance, HoprLibError> {
         self.chain_api.minimum_ticket_price().await.map_err(HoprLibError::chain)
     }
 
+    // TODO(pub API): replace with: fn async visit<T>(fn: FnOnce(&impl HoprChainApi) -> Result<T, ..>) -> Result<T,
+    // HoprLibError>
     pub async fn get_minimum_incoming_ticket_win_probability(&self) -> Result<WinningProbability, HoprLibError> {
         self.chain_api
             .minimum_incoming_ticket_win_prob()
@@ -1172,6 +1188,8 @@ where
             .map_err(HoprLibError::chain)
     }
 
+    // TODO(pub API): replace with: fn async visit<T>(fn: FnOnce(&impl HoprChainApi) -> Result<T, ..>) -> Result<T,
+    // HoprLibError>
     pub async fn get_channel_closure_notice_period(&self) -> Result<Duration, HoprLibError> {
         self.chain_api
             .channel_closure_notice_period()
@@ -1179,6 +1197,7 @@ where
             .map_err(HoprLibError::chain)
     }
 
+    // TODO(pub API): comes from different component, let's remove
     pub async fn announced_peers(&self) -> Result<Vec<AnnouncedPeer>, HoprLibError> {
         Ok(self
             .chain_api
@@ -1361,6 +1380,7 @@ where
         Ok(CloseChannelResult { tx_hash })
     }
 
+    // TODO(pub API): not needed externally
     pub fn ticket_management(&self) -> Result<impl TicketManagement + Clone + Send + 'static, HoprLibError> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for transport operations".into())?;
 
@@ -1374,7 +1394,7 @@ where
     }
 
     // TODO: this method can be sync unless we allow querying of the redeemed value from Blokli
-    pub async fn ticket_statistics(&self) -> Result<ChannelStats, HoprLibError> {
+    pub fn ticket_statistics(&self) -> Result<ChannelStats, HoprLibError> {
         self.ticket_management()?
             .ticket_stats(None)
             .map_err(HoprLibError::ticket_manager)
