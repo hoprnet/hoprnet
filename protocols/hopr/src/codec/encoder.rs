@@ -7,9 +7,8 @@ use hopr_api::{
     },
 };
 use hopr_crypto_packet::prelude::*;
-use tracing::Instrument;
 
-use crate::{HoprCodecConfig, OutgoingPacket, PacketEncoder, SurbStore, TicketTracker, errors::HoprProtocolError};
+use crate::{HoprCodecConfig, OutgoingPacket, PacketEncoder, SurbStore, errors::HoprProtocolError};
 
 /// Maximum number of acknowledgements that can be packed into a single HOPR packet.
 ///
@@ -22,7 +21,7 @@ pub const MAX_ACKNOWLEDGEMENTS_BATCH_SIZE: usize =
 pub struct HoprEncoder<Chain, S, T> {
     chain_api: Chain,
     surb_store: S,
-    tracker: T,
+    ticket_factory: T,
     chain_key: ChainKeypair,
     channels_dst: Hash,
     cfg: HoprCodecConfig,
@@ -34,14 +33,14 @@ impl<Chain, S, T> HoprEncoder<Chain, S, T> {
         chain_key: ChainKeypair,
         chain_api: Chain,
         surb_store: S,
-        tracker: T,
+        ticket_factory: T,
         channels_dst: Hash,
         cfg: HoprCodecConfig,
     ) -> Self {
         Self {
             chain_api,
             surb_store,
-            tracker,
+            ticket_factory,
             chain_key,
             channels_dst,
             cfg,
@@ -51,11 +50,11 @@ impl<Chain, S, T> HoprEncoder<Chain, S, T> {
 
 impl<Chain, S, T> HoprEncoder<Chain, S, T>
 where
-    Chain: ChainKeyOperations + ChainReadChannelOperations + ChainValues + Sync,
+    Chain: ChainKeyOperations + ChainReadChannelOperations + ChainReadTicketOperations + ChainValues + Sync,
     S: SurbStore,
-    T: TicketTracker + Sync,
+    T: hopr_api::tickets::TicketFactory + Sync,
 {
-    async fn encode_packet_internal<D: AsRef<[u8]> + Send + 'static, Sig: Into<PacketSignals> + Send + 'static>(
+    fn encode_packet_internal<D: AsRef<[u8]> + Send + 'static, Sig: Into<PacketSignals> + Send + 'static>(
         &self,
         next_peer: OffchainPublicKey,
         data: D,
@@ -67,8 +66,7 @@ where
         let next_peer = self
             .chain_api
             .packet_key_to_chain_key(&next_peer)
-            .await
-            .map_err(|e| HoprProtocolError::ResolverError(e.into()))?
+            .map_err(HoprProtocolError::resolver)?
             .ok_or(HoprProtocolError::KeyNotFound)?;
 
         // Decide whether to create a multi-hop or a zero-hop ticket
@@ -76,49 +74,37 @@ where
             let channel = self
                 .chain_api
                 .channel_by_parties(self.chain_key.as_ref(), &next_peer)
-                .await
-                .map_err(|e| HoprProtocolError::ResolverError(e.into()))?
+                .map_err(HoprProtocolError::resolver)?
                 .ok_or_else(|| HoprProtocolError::ChannelNotFound(*self.chain_key.as_ref(), next_peer))?;
 
             let (outgoing_ticket_win_prob, outgoing_ticket_price) = self
                 .chain_api
                 .outgoing_ticket_values(self.cfg.outgoing_win_prob, self.cfg.outgoing_ticket_price)
-                .await
-                .map_err(|e| HoprProtocolError::ResolverError(e.into()))?;
+                .map_err(HoprProtocolError::resolver)?;
 
-            self.tracker
-                .create_multihop_ticket(
+            self.ticket_factory
+                .new_multihop_ticket(
                     &channel,
-                    num_hops as u8,
+                    (num_hops as u8).try_into().expect("cannot fail due to num_hops > 1"),
                     outgoing_ticket_win_prob,
                     outgoing_ticket_price,
                 )
-                .await
-                .map_err(|e| HoprProtocolError::TicketTrackerError(e.into()))?
+                .map_err(HoprProtocolError::ticket_factory)?
         } else {
             TicketBuilder::zero_hop().counterparty(next_peer)
         };
 
         // Construct the outgoing packet
-        let chain_key = self.chain_key.clone();
-        let mapper = self.chain_api.key_id_mapper_ref().clone();
-        let domain_separator = self.channels_dst;
-        let (packet, openers) = hopr_parallelize::cpu::spawn_fifo_blocking(
-            move || {
-                HoprPacket::into_outgoing(
-                    data.as_ref(),
-                    &pseudonym,
-                    routing,
-                    &chain_key,
-                    next_ticket,
-                    &mapper,
-                    &domain_separator,
-                    signals,
-                )
-            },
-            "packet_encode",
-        )
-        .await??;
+        let (packet, openers) = HoprPacket::into_outgoing(
+            data.as_ref(),
+            &pseudonym,
+            routing,
+            &self.chain_key,
+            next_ticket,
+            self.chain_api.key_id_mapper_ref(),
+            &self.channels_dst,
+            signals,
+        )?;
 
         // Store the reply openers under the given SenderId
         // This is a no-op for reply packets
@@ -143,17 +129,16 @@ where
     }
 }
 
-#[async_trait::async_trait]
 impl<Chain, S, T> PacketEncoder for HoprEncoder<Chain, S, T>
 where
-    Chain: ChainKeyOperations + ChainReadChannelOperations + ChainValues + Send + Sync,
+    Chain: ChainKeyOperations + ChainReadChannelOperations + ChainReadTicketOperations + ChainValues + Send + Sync,
     S: SurbStore + Send + Sync,
-    T: TicketTracker + Send + Sync,
+    T: hopr_api::tickets::TicketFactory + Send + Sync,
 {
     type Error = HoprProtocolError;
 
     #[tracing::instrument(skip_all, level = "trace")]
-    async fn encode_packet<D: AsRef<[u8]> + Send + 'static, Sig: Into<PacketSignals> + Send + 'static>(
+    fn encode_packet<D: AsRef<[u8]> + Send + 'static, Sig: Into<PacketSignals> + Send + 'static>(
         &self,
         data: D,
         routing: ResolvedTransportRouting<HoprSurb>,
@@ -192,12 +177,10 @@ where
 
         tracing::trace!(len = data.as_ref().len(), "encoding packet");
         self.encode_packet_internal(next_peer, data, num_hops, signals, routing, pseudonym)
-            .in_current_span()
-            .await
     }
 
     #[tracing::instrument(skip_all, level = "trace", fields(destination = destination.to_peerid_str()))]
-    async fn encode_acknowledgements(
+    fn encode_acknowledgements(
         &self,
         acks: &[VerifiedAcknowledgement],
         destination: &OffchainPublicKey,
@@ -216,7 +199,5 @@ where
             PacketRouting::NoAck(*destination),
             HoprPseudonym::random(),
         )
-        .in_current_span()
-        .await
     }
 }

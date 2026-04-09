@@ -251,7 +251,6 @@ impl<
                     .with_source(*self.hopr_chain_actions.me())
                     .with_allowed_states(&[ChannelStatusDiscriminants::Open]),
             )
-            .await
             .map_err(|e| StrategyError::Other(e.into()))?;
 
         while let Some(channel) = channels.next().await {

@@ -7,7 +7,7 @@ pub mod config;
 #[cfg(any(feature = "testing", test))]
 pub mod testing;
 
-use std::sync::Arc;
+use std::{convert::identity, sync::Arc};
 
 use futures::{FutureExt, StreamExt as _};
 use futures_concurrency::stream::StreamExt;
@@ -209,11 +209,18 @@ where
                                     ChainEvent::ChannelClosed(channel) |
                                     ChainEvent::ChannelBalanceIncreased(channel, _) |
                                     ChainEvent::ChannelBalanceDecreased(channel, _) => {
-                                        let from = chain_reader.chain_key_to_packet_key(&channel.source).await;
-                                        let to = chain_reader.chain_key_to_packet_key(&channel.destination).await;
+                                    let keys = hopr_async_runtime::prelude::spawn_blocking(move || {
+                                        chain_reader
+                                            .chain_key_to_packet_key(&channel.source)
+                                            .and_then(|src| Ok(src.zip(chain_reader.chain_key_to_packet_key(&channel.destination)?)))
+                                            .map_err(anyhow::Error::from)
+                                    }).await
+                                        .map_err(anyhow::Error::from)
+                                        .and_then(identity);
 
-                                        match (from, to) {
-                                            (Ok(Some(from)), Ok(Some(to))) => {
+
+                                    match keys {
+                                        Ok(Some((from, to))) => {
                                                 let capacity =  if matches!(channel.status, ChannelStatus::Closed) {
                                                     None
                                                 } else if let Ok(ticket_value) = ticket_price.read().div_f64(win_probability.read().as_f64()) {
@@ -235,11 +242,11 @@ where
                                                     dest: to
                                             })));
                                             },
-                                            (Ok(_), Ok(_)) => {
+                                        Ok(None) => {
                                                 tracing::error!(%channel, "could not find packet keys for the channel endpoints");
                                             },
-                                            (Err(e), _) | (_, Err(e)) => {
-                                                tracing::error!(%e, %channel, "failed to convert chain keys to packet keys for graph update");
+                                        Err(error) => {
+                                            tracing::error!(%error, %channel, "failed to convert chain keys to packet keys for graph update");
                                             }
                                         }
                                     },
@@ -259,7 +266,7 @@ where
                             Event::Network(network_event) => {
                                 match network_event {
                                     NetworkEvent::PeerConnected(peer_id) =>
-                                        if let Ok(opk) = hopr_lib::peer_id_to_public_key(&peer_id).await {
+                                        if let Ok(opk) = hopr_lib::peer_id_to_public_key(&peer_id) {
                                             graph_updater.record_edge(hopr_lib::api::graph::MeasurableEdge::<NeighborTelemetry, PathTelemetry>::ConnectionStatus {
                                                 peer: opk,
                                                 connected: true
@@ -268,7 +275,7 @@ where
                                             tracing::error!(%peer_id, "failed to convert peer ID to public key for graph update");
                                         },
                                     NetworkEvent::PeerDisconnected(peer_id) =>
-                                        if let Ok(opk) = hopr_lib::peer_id_to_public_key(&peer_id).await {
+                                        if let Ok(opk) = hopr_lib::peer_id_to_public_key(&peer_id) {
                                             graph_updater.record_edge(hopr_lib::api::graph::MeasurableEdge::<NeighborTelemetry, PathTelemetry>::ConnectionStatus {
                                                 peer: opk,
                                                 connected: false

@@ -21,20 +21,20 @@ use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, MemorySurbStore, PacketDecoder, PacketEncoder, SurbStoreConfig,
 };
-use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue};
+use hopr_ticket_manager::{HoprTicketFactory, RedbStore};
 
 use crate::utils::{Node, PEERS, create_blokli_client, create_node};
 
 type TestEncoder = HoprEncoder<
     Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>,
     MemorySurbStore,
-    Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>,
+    HoprTicketFactory<RedbStore>,
 >;
 
 type TestDecoder = HoprDecoder<
     Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>,
     MemorySurbStore,
-    Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>,
+    HoprTicketFactory<RedbStore>,
 >;
 
 pub fn create_encoder(sender: &Node) -> TestEncoder {
@@ -42,7 +42,7 @@ pub fn create_encoder(sender: &Node) -> TestEncoder {
         sender.chain_key.clone(),
         sender.chain_api.clone(),
         MemorySurbStore::new(SurbStoreConfig::default()),
-        HoprTicketManager::new(RedbStore::new_temp().unwrap()).unwrap().into(),
+        HoprTicketFactory::new(RedbStore::new_temp().unwrap()),
         Hash::default(),
         HoprCodecConfig::default(),
     )
@@ -53,7 +53,7 @@ pub fn create_decoder(receiver: &Node) -> TestDecoder {
         (receiver.offchain_key.clone(), receiver.chain_key.clone()),
         receiver.chain_api.clone(),
         MemorySurbStore::new(SurbStoreConfig::default()),
-        HoprTicketManager::new(RedbStore::new_temp().unwrap()).unwrap().into(),
+        HoprTicketFactory::new(RedbStore::new_temp().unwrap()),
         Hash::default(),
         HoprCodecConfig::default(),
     )
@@ -123,12 +123,10 @@ fn hopr_encoder_bench(c: &mut Criterion) {
             BenchmarkId::from_parameter(format!("{}hop_{}surbs_{}b", hops, rps, data.len())),
             &routing,
             |b, routing| {
-                let runtime = tokio::runtime::Runtime::new().unwrap();
-                let encoder = create_encoder(&sender);
-                b.to_async(runtime).iter_batched(
-                    || (data.clone(), routing.clone()),
-                    |(data, routing)| async { encoder.encode_packet(data, routing, None).await.unwrap() },
-                    BatchSize::SmallInput,
+                b.iter_batched(
+                    || (create_encoder(&sender), data.clone(), routing.clone()),
+                    |(encoder, data, routing)| encoder.encode_packet(data, routing, None).unwrap(),
+                    BatchSize::PerIteration,
                 )
             },
         );
@@ -140,13 +138,15 @@ fn hopr_encoder_bench(c: &mut Criterion) {
             BenchmarkId::from_parameter(format!("ack_batch_{num_acks}")),
             &num_acks,
             |b, num_acks| {
-                let runtime = tokio::runtime::Runtime::new().unwrap();
-                let acks = (0..*num_acks).map(|_| VerifiedAcknowledgement::random(&PEERS[0].1)).collect::<Vec<_>>();
-                b.to_async(runtime).iter_batched(|| (create_encoder(&sender), acks.clone()), |(encoder, acks)| async move {
-                    encoder.encode_acknowledgements(&acks, &ack_recipient).await.unwrap()
-                },
-                BatchSize::PerIteration)
-            }
+                let acks = (0..*num_acks)
+                    .map(|_| VerifiedAcknowledgement::random(&PEERS[0].1))
+                    .collect::<Vec<_>>();
+                b.iter_batched(
+                    || (create_encoder(&sender), acks.clone()),
+                    |(encoder, acks)| encoder.encode_acknowledgements(&acks, &ack_recipient).unwrap(),
+                    BatchSize::PerIteration,
+                )
+            },
         );
     }
 }
@@ -189,51 +189,45 @@ fn hopr_decoder_bench(c: &mut Criterion) {
     };
 
     let encoder = create_encoder(&sender);
-    let relay_packet = runtime.block_on(async { encoder.encode_packet(data, routing, None).await.unwrap() });
-    let ack_packet = runtime.block_on(async {
+    let relay_packet = encoder.encode_packet(data, routing, None).unwrap();
+    let ack_packet = {
         let acks = (0..10)
             .map(|_| VerifiedAcknowledgement::random(&PEERS[0].1))
             .collect::<Vec<_>>();
-        encoder
-            .encode_acknowledgements(&acks, PEERS[1].1.public())
-            .await
-            .unwrap()
-    });
+        encoder.encode_acknowledgements(&acks, PEERS[1].1.public()).unwrap()
+    };
 
     let prev_hop: PeerId = PEERS[0].1.public().into();
     group.bench_with_input("relay", &relay_packet, |b, packet| {
-        let runtime = tokio::runtime::Runtime::new().unwrap();
-        b.to_async(runtime).iter_batched(
+        b.iter_batched(
             || (create_decoder(&relay), packet.data.clone()),
-            |(decoder, data)| async move { decoder.decode(prev_hop, data).await.unwrap() },
+            |(decoder, data)| decoder.decode(prev_hop, data),
             BatchSize::PerIteration,
         )
     });
 
     let prev_hop: PeerId = PEERS[0].1.public().into();
     group.bench_with_input("ack_recipient", &ack_packet, |b, packet| {
-        let runtime = tokio::runtime::Runtime::new().unwrap();
-        b.to_async(runtime).iter_batched(
+        b.iter_batched(
             || (create_decoder(&relay), packet.data.clone()),
-            |(decoder, data)| async move { decoder.decode(prev_hop, data).await.unwrap() },
+            |(decoder, data)| decoder.decode(prev_hop, data),
             BatchSize::PerIteration,
         )
     });
 
     let decoder = create_decoder(&relay);
-    let final_packet = runtime.block_on(async { decoder.decode(prev_hop, relay_packet.data).await.unwrap() });
+    let final_packet = decoder.decode(prev_hop, relay_packet.data).unwrap();
 
     let prev_hop: PeerId = PEERS[1].1.public().into();
     group.bench_with_input("recipient", &final_packet, |b, packet| {
-        let runtime = tokio::runtime::Runtime::new().unwrap();
-        b.to_async(runtime).iter_batched(
+        b.iter_batched(
             || {
                 (
                     create_decoder(&recipient),
                     packet.try_as_forwarded_ref().unwrap().data.clone(),
                 )
             },
-            |(decoder, data)| async move { decoder.decode(prev_hop, data).await.unwrap() },
+            |(decoder, data)| decoder.decode(prev_hop, data),
             BatchSize::PerIteration,
         )
     });

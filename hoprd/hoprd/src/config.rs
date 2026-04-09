@@ -214,8 +214,8 @@ impl From<UserHoprLibConfig> for HoprLibConfig {
             host: value.host,
             publish: value.announce,
             safe_module: value.safe_module,
+            ticket_storage_file: value.ticket_storage_file,
             protocol: HoprProtocolConfig {
-                ticket_storage_file: value.ticket_storage_file,
                 transport: TransportConfig {
                     announce_local_addresses: value.network.announce_local_addresses,
                     prefer_local_addresses: value.network.prefer_local_addresses,
@@ -248,6 +248,7 @@ impl From<UserHoprLibConfig> for HoprLibConfig {
                 path_planner: Default::default(),
                 counter_flush_interval: Default::default(),
             },
+            ..Default::default()
         }
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "hopr-protocol-hopr"
-version = "4.4.3"
+version = "4.5.0"
 edition.workspace = true
 rust-version.workspace = true
 authors = ["HOPR Association <tech@hoprnet.org>"]
@@ -28,7 +28,6 @@ async-trait = { workspace = true }
 auto_impl = { workspace = true }
 cfg_eval = { workspace = true, optional = true }
 bloomfilter = { workspace = true }
-futures = { workspace = true }
 hex = { workspace = true }
 lazy_static = { workspace = true }
 moka = { workspace = true }
@@ -43,7 +42,12 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
-hopr-api = { workspace = true, features = ["db", "chain", "types-random"] }
+hopr-api = { workspace = true, features = [
+  "db",
+  "chain",
+  "types-random",
+  "tickets",
+] }
 hopr-crypto-packet = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-parallelize = { workspace = true }
@@ -54,6 +58,7 @@ hopr-ticket-manager = { workspace = true }
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 hex-literal = { workspace = true }
 lazy_static = { workspace = true }
+parameterized = { workspace = true }
 tokio = { workspace = true }
 
 hopr-chain-connector = { workspace = true, features = [

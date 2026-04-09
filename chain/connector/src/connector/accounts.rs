@@ -65,10 +65,7 @@ where
 {
     type Error = ConnectorError;
 
-    async fn stream_accounts<'a>(
-        &'a self,
-        selector: AccountSelector,
-    ) -> Result<BoxStream<'a, AccountEntry>, Self::Error> {
+    fn stream_accounts(&self, selector: AccountSelector) -> Result<BoxStream<'_, AccountEntry>, Self::Error> {
         self.check_connection_state()?;
 
         Ok(self.build_account_stream(selector)?.boxed())
@@ -77,7 +74,7 @@ where
     async fn count_accounts(&self, selector: AccountSelector) -> Result<usize, Self::Error> {
         self.check_connection_state()?;
 
-        Ok(self.stream_accounts(selector).await?.count().await)
+        Ok(self.stream_accounts(selector)?.count().await)
     }
 
     async fn await_key_binding(
@@ -271,8 +268,7 @@ mod tests {
         connector.connect().await?;
 
         let accounts = connector
-            .stream_accounts(AccountSelector::default())
-            .await?
+            .stream_accounts(AccountSelector::default())?
             .collect::<Vec<_>>()
             .await;
 
@@ -314,21 +310,21 @@ mod tests {
         connector.connect().await?;
 
         let selector = AccountSelector::default().with_chain_key(account_1.chain_addr);
-        let accounts = connector.stream_accounts(selector).await?.collect::<Vec<_>>().await;
+        let accounts = connector.stream_accounts(selector)?.collect::<Vec<_>>().await;
         let count = connector.count_accounts(selector).await?;
 
         assert_eq!(accounts.len(), count);
         assert_eq!(accounts, vec![account_1.clone()]);
 
         let selector = AccountSelector::default().with_offchain_key(account_1.public_key);
-        let accounts = connector.stream_accounts(selector).await?.collect::<Vec<_>>().await;
+        let accounts = connector.stream_accounts(selector)?.collect::<Vec<_>>().await;
         let count = connector.count_accounts(selector).await?;
 
         assert_eq!(accounts.len(), count);
         assert_eq!(accounts, vec![account_1.clone()]);
 
         let selector = AccountSelector::default().with_public_only(true);
-        let accounts = connector.stream_accounts(selector).await?.collect::<Vec<_>>().await;
+        let accounts = connector.stream_accounts(selector)?.collect::<Vec<_>>().await;
         let count = connector.count_accounts(selector).await?;
 
         assert_eq!(accounts.len(), count);
@@ -337,7 +333,7 @@ mod tests {
         let selector = AccountSelector::default()
             .with_chain_key(account_1.chain_addr)
             .with_public_only(true);
-        let accounts = connector.stream_accounts(selector).await?.collect::<Vec<_>>().await;
+        let accounts = connector.stream_accounts(selector)?.collect::<Vec<_>>().await;
         let count = connector.count_accounts(selector).await?;
 
         assert_eq!(count, 0);
@@ -369,8 +365,7 @@ mod tests {
         insta::assert_yaml_snapshot!(*connector.client.snapshot());
 
         let accounts = connector
-            .stream_accounts(AccountSelector::default().with_public_only(true))
-            .await?
+            .stream_accounts(AccountSelector::default().with_public_only(true))?
             .collect::<Vec<_>>()
             .await;
 
@@ -405,8 +400,7 @@ mod tests {
         insta::assert_yaml_snapshot!(*connector.client.snapshot());
 
         let accounts = connector
-            .stream_accounts(AccountSelector::default())
-            .await?
+            .stream_accounts(AccountSelector::default())?
             .collect::<Vec<_>>()
             .await;
 
@@ -488,8 +482,7 @@ mod tests {
         insta::assert_yaml_snapshot!(*connector.client.snapshot());
 
         let accounts = connector
-            .stream_accounts(AccountSelector::default().with_public_only(true))
-            .await?
+            .stream_accounts(AccountSelector::default().with_public_only(true))?
             .collect::<Vec<_>>()
             .await;
 

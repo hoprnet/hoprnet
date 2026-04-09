@@ -80,7 +80,6 @@ where
                     .with_allowed_states(&[ChannelStatusDiscriminants::PendingToClose])
                     .with_closure_time_range(now.sub(self.cfg.max_closure_overdue)..=now),
             )
-            .await
             .map_err(|e| errors::StrategyError::Other(e.into()))?;
 
         while let Some(channel) = outgoing_channels.next().await {

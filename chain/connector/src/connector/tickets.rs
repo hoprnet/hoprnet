@@ -7,6 +7,21 @@ use hopr_api::{
 
 use crate::{backend::Backend, connector::HoprBlockchainConnector, errors::ConnectorError};
 
+impl<B, C, P, R> hopr_api::chain::ChainReadTicketOperations for HoprBlockchainConnector<C, B, P, R> {
+    type Error = ConnectorError;
+
+    fn incoming_ticket_values(&self) -> Result<(WinningProbability, HoprBalance), Self::Error> {
+        self.check_connection_state()?;
+
+        // Does not block unless Blokli constantly pushes updated winning probability or ticket price update
+        self.ticket_values
+            .read()
+            .as_ref()
+            .copied()
+            .ok_or_else(|| ConnectorError::InvalidState("connector is not connected"))
+    }
+}
+
 impl<B, C, P> HoprBlockchainConnector<C, B, P, P::TxRequest>
 where
     B: Backend + Send + Sync + 'static,

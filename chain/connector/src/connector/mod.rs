@@ -81,15 +81,18 @@ pub struct HoprBlockchainConnector<C, B, P, R> {
     // KeyId <-> OffchainPublicKey mapping
     mapper: HoprKeyMapper<B>,
     // Fast retrieval of chain keys by address
-    chain_to_packet: moka::future::Cache<Address, Option<OffchainPublicKey>, ahash::RandomState>,
+    chain_to_packet: moka::sync::Cache<Address, Option<OffchainPublicKey>, ahash::RandomState>,
     // Fast retrieval of packet keys by chain key
-    packet_to_chain: moka::future::Cache<OffchainPublicKey, Option<Address>, ahash::RandomState>,
+    packet_to_chain: moka::sync::Cache<OffchainPublicKey, Option<Address>, ahash::RandomState>,
     // Fast retrieval of channel entries by id
-    channel_by_id: moka::future::Cache<ChannelId, Option<ChannelEntry>, ahash::RandomState>,
+    channel_by_id: moka::sync::Cache<ChannelId, Option<ChannelEntry>, ahash::RandomState>,
     // Fast retrieval of channel entries by parties
-    channel_by_parties: moka::future::Cache<ChannelParties, Option<ChannelEntry>, ahash::RandomState>,
+    channel_by_parties: moka::sync::Cache<ChannelParties, Option<ChannelEntry>, ahash::RandomState>,
     // Contains chain info (no TTL - kept fresh by subscription handler)
     values: moka::future::Cache<u32, ParsedChainInfo>,
+    // Ticket values (winning probability, price), kept fresh by subscription handler
+    // Set only when connected
+    ticket_values: std::sync::Arc<parking_lot::RwLock<Option<(WinningProbability, HoprBalance)>>>,
 }
 
 const EXPECTED_NUM_NODES: usize = 10_000;
@@ -141,20 +144,21 @@ where
                     .build_with_hasher(ahash::RandomState::default()),
                 backend,
             },
-            chain_to_packet: moka::future::CacheBuilder::new(EXPECTED_NUM_NODES as u64)
+            chain_to_packet: moka::sync::CacheBuilder::new(EXPECTED_NUM_NODES as u64)
                 .time_to_idle(DEFAULT_CACHE_TIMEOUT)
                 .build_with_hasher(ahash::RandomState::default()),
-            packet_to_chain: moka::future::CacheBuilder::new(EXPECTED_NUM_NODES as u64)
+            packet_to_chain: moka::sync::CacheBuilder::new(EXPECTED_NUM_NODES as u64)
                 .time_to_idle(DEFAULT_CACHE_TIMEOUT)
                 .build_with_hasher(ahash::RandomState::default()),
-            channel_by_id: moka::future::CacheBuilder::new(EXPECTED_NUM_CHANNELS as u64)
+            channel_by_id: moka::sync::CacheBuilder::new(EXPECTED_NUM_CHANNELS as u64)
                 .time_to_idle(DEFAULT_CACHE_TIMEOUT)
                 .build_with_hasher(ahash::RandomState::default()),
-            channel_by_parties: moka::future::CacheBuilder::new(EXPECTED_NUM_CHANNELS as u64)
+            channel_by_parties: moka::sync::CacheBuilder::new(EXPECTED_NUM_CHANNELS as u64)
                 .time_to_idle(DEFAULT_CACHE_TIMEOUT)
                 .build_with_hasher(ahash::RandomState::default()),
             // No TTL: kept fresh by the Blokli subscription handler
             values: moka::future::CacheBuilder::new(1).build(),
+            ticket_values: Default::default(),
         }
     }
 
@@ -203,7 +207,10 @@ where
         let channel_by_parties = self.channel_by_parties.clone();
 
         // Query chain info to populate the cache
-        self.query_cached_chain_info().await?;
+        let initial_chain_values = self.query_cached_chain_info().await?;
+        self.ticket_values
+            .write()
+            .replace((initial_chain_values.ticket_win_prob, initial_chain_values.ticket_price));
 
         #[allow(clippy::large_enum_variant)]
         #[derive(Debug)]
@@ -214,6 +221,7 @@ where
             TicketPrice((HoprBalance, Option<HoprBalance>)),
         }
 
+        let ticket_values = self.ticket_values.clone();
         hopr_async_runtime::prelude::spawn(async move {
             let sync_started = std::time::Instant::now();
 
@@ -250,20 +258,12 @@ where
                     })
                     .map_err(ConnectorError::backend)
                     .and_then(move |res| {
-                        let chain_to_packet = chain_to_packet.clone();
-                        let packet_to_chain = packet_to_chain.clone();
-                        async move {
-                            if let Ok((upserted_account, _)) = &res {
-                                // Rather update the cached entry than invalidating it
-                                chain_to_packet
-                                    .insert(upserted_account.chain_addr, Some(upserted_account.public_key))
-                                    .await;
-                                packet_to_chain
-                                    .insert(upserted_account.public_key, Some(upserted_account.chain_addr))
-                                    .await;
-                            }
-                            res.map(SubscribedEventType::Account).map_err(ConnectorError::backend)
+                        if let Ok((upserted_account, _)) = &res {
+                            // Rather update the cached entry than invalidating it
+                            chain_to_packet.insert(upserted_account.chain_addr, Some(upserted_account.public_key));
+                            packet_to_chain.insert(upserted_account.public_key, Some(upserted_account.chain_addr));
                         }
+                        futures::future::ready(res.map(SubscribedEventType::Account).map_err(ConnectorError::backend))
                     })
                 })
                 .fuse();
@@ -288,18 +288,12 @@ where
                     .and_then(move |res| {
                         let channel_by_id = channel_by_id.clone();
                         let channel_by_parties = channel_by_parties.clone();
-                        async move {
-                            if let Ok((upserted_channel, _)) = &res {
-                                // Rather update the cached entry than invalidating it
-                                channel_by_id
-                                    .insert(*upserted_channel.get_id(), Some(*upserted_channel))
-                                    .await;
-                                channel_by_parties
-                                    .insert(ChannelParties::from(upserted_channel), Some(*upserted_channel))
-                                    .await;
-                            }
-                            res.map(SubscribedEventType::Channel).map_err(ConnectorError::backend)
+                        if let Ok((upserted_channel, _)) = &res {
+                            // Rather update the cached entry than invalidating it
+                            channel_by_id.insert(*upserted_channel.get_id(), Some(*upserted_channel));
+                            channel_by_parties.insert(ChannelParties::from(upserted_channel), Some(*upserted_channel));
                         }
+                        futures::future::ready(res.map(SubscribedEventType::Channel).map_err(ConnectorError::backend))
                     })
                 })
                 .fuse();
@@ -310,6 +304,22 @@ where
                 .inspect_ok(|entry| tracing::trace!(?entry, "new ticket params"))
                 .try_filter_map(|ticket_value_event| {
                     futures::future::ready(model_to_ticket_params(ticket_value_event).map(Some))
+                })
+                .inspect_ok(|(new_ticket_price, new_win_prob)| {
+                    // This cannot block, because there are no other concurrent writers/upgradeable readers
+                    let tv = ticket_values.upgradable_read();
+                    if let Some((current_win_prob, current_ticket_price)) = tv.as_ref().copied() {
+                        if &current_ticket_price != new_ticket_price && !current_win_prob.approx_eq(new_win_prob) {
+                            parking_lot::RwLockUpgradableReadGuard::upgrade(tv)
+                                .replace((*new_win_prob, *new_ticket_price));
+                        } else if &current_ticket_price != new_ticket_price {
+                            parking_lot::RwLockUpgradableReadGuard::upgrade(tv)
+                                .replace((current_win_prob, *new_ticket_price));
+                        } else if !current_win_prob.approx_eq(new_win_prob) {
+                            parking_lot::RwLockUpgradableReadGuard::upgrade(tv)
+                                .replace((*new_win_prob, current_ticket_price));
+                        }
+                    }
                 })
                 .and_then(|(new_ticket_price, new_win_prob)| {
                     let values_cache = values_cache.clone();
@@ -560,11 +570,12 @@ where
 }
 
 impl<B, C, P, R> HoprBlockchainConnector<C, R, B, P> {
+    #[inline]
     pub(crate) fn check_connection_state(&self) -> Result<(), ConnectorError> {
         self.connection_handle
             .as_ref()
             .filter(|handle| !handle.is_aborted()) // Do a safety check
-            .ok_or(ConnectorError::InvalidState("connector is not connected"))
+            .ok_or_else(|| ConnectorError::InvalidState("connector is not connected"))
             .map(|_| ())
     }
 

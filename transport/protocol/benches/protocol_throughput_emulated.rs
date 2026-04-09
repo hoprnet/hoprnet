@@ -22,7 +22,7 @@ use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, HoprUnacknowledgedTicketProcessor,
     HoprUnacknowledgedTicketProcessorConfig, MemorySurbStore, SurbStoreConfig,
 };
-use hopr_ticket_manager::{HoprTicketManager, RedbStore};
+use hopr_ticket_manager::{HoprTicketFactory, HoprTicketManager, RedbStore};
 use hopr_transport_protocol::TicketEvent;
 use libp2p::PeerId;
 
@@ -52,7 +52,7 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                     let mut node_dbs = Vec::new();
                     let mut connectors = Vec::new();
                     for i in 0..PEER_COUNT {
-                        let node_db = Arc::new(HoprTicketManager::new(RedbStore::new_temp().unwrap()).unwrap());
+                        let node_db = Arc::new(HoprTicketFactory::new(RedbStore::new_temp().unwrap()));
                         node_dbs.push(node_db);
 
                         let mut connector = create_trustful_hopr_blokli_connector(

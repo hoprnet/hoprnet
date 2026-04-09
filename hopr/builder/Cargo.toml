@@ -72,6 +72,7 @@ hopr-chain-connector = { workspace = true }
 hopr-ct-full-network = { workspace = true }
 hopr-network-graph = { workspace = true, features = ["petgraph", "graph-api"] }
 hopr-transport-p2p = { workspace = true }
+hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }

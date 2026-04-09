@@ -17,17 +17,21 @@ pub enum IncomingPacketError<E: std::error::Error> {
     /// Such errors are fatal and therefore the packet cannot be acknowledged.
     #[error("packet is not decodable: {0}")]
     Undecodable(E),
-    /// Packet dropped due to local resource exhaustion (not sender's fault).
-    #[error("local overload: {0}")]
-    Overloaded(E),
     /// Packet is decodable but cannot be processed due to other reasons.
     ///
     /// Such errors are protocol-related and packets must be acknowledged.
     #[error("packet from {0} decodable, but cannot be processed: {1}")]
-    ProcessingError(OffchainPublicKey, E),
+    ProcessingError(Box<OffchainPublicKey>, E),
     /// Packet is decodable, but the ticket is invalid.
     #[error("packet from {0} is decodable, but the ticket is invalid: {1}")]
-    InvalidTicket(OffchainPublicKey, TicketValidationError),
+    InvalidTicket(Box<OffchainPublicKey>, TicketValidationError),
+}
+
+impl<E: std::error::Error> IncomingPacketError<E> {
+    /// Packet is undecodable and should NOT be acknowledged.
+    pub fn undecodable<Err: Into<E>>(error: Err) -> Self {
+        Self::Undecodable(error.into())
+    }
 }
 
 #[derive(Error, Debug)]
@@ -56,8 +60,8 @@ pub enum HoprProtocolError {
     #[error("chain resolver error: {0}")]
     ResolverError(#[source] anyhow::Error),
 
-    #[error("ticket tracker error: {0}")]
-    TicketTrackerError(#[source] anyhow::Error),
+    #[error("ticket factory error: {0}")]
+    TicketFactoryError(#[source] anyhow::Error),
 
     #[error(transparent)]
     TicketValidationError(#[from] TicketValidationError),
@@ -73,4 +77,16 @@ pub enum HoprProtocolError {
 
     #[error("rayon thread pool queue full: {0}")]
     SpawnError(#[from] hopr_parallelize::cpu::SpawnError),
+}
+
+impl HoprProtocolError {
+    /// Convenience method to create chain resolver error.
+    pub fn resolver<E: Into<anyhow::Error>>(e: E) -> Self {
+        Self::ResolverError(e.into())
+    }
+
+    /// Convenience method to create ticket factory error.
+    pub fn ticket_factory<E: Into<anyhow::Error>>(e: E) -> Self {
+        Self::TicketFactoryError(e.into())
+    }
 }

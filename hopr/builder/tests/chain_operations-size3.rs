@@ -111,7 +111,6 @@ async fn test_channel_retrieval(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let channel_by_parties = ext
         .inner()
         .channel(&src.address(), &dst.address())
-        .await
         .context("failed to get channel by parties")?
         .context("channel not found")?;
 

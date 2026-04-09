@@ -306,7 +306,7 @@ async fn main_inner(cfg: HoprdConfig, hopr_keys: HoprKeys) -> anyhow::Result<()>
     let multi_strategy = Arc::new(hopr_strategy::strategy::MultiStrategy::new(
         cfg.strategy.clone(),
         chain_connector.clone(),
-        node.ticket_management(),
+        node.ticket_management()?,
     ));
     tracing::debug!(strategies = ?multi_strategy, "initialized strategies");
 

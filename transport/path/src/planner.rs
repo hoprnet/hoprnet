@@ -275,10 +275,10 @@ where
                     sender_id,
                     surb,
                     remaining,
-                } =
-                    self.surb_store.find_surb(matcher).await.ok_or_else(|| {
-                        PathPlannerError::Surb(format!("no surb for pseudonym {}", matcher.pseudonym()))
-                    })?;
+                } = self
+                    .surb_store
+                    .find_surb(matcher)
+                    .ok_or_else(|| PathPlannerError::Surb(format!("no surb for pseudonym {}", matcher.pseudonym())))?;
                 Ok((ResolvedTransportRouting::Return(sender_id, surb), Some(remaining)))
             }
         }
@@ -371,7 +371,6 @@ where
 mod tests {
     use std::str::FromStr;
 
-    use async_trait::async_trait;
     use bimap::BiMap;
     use futures::stream::{self, BoxStream};
     use hex_literal::hex;
@@ -476,19 +475,18 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl ChainKeyOperations for TestChainApi {
         type Error = TestError;
         type Mapper = Mapper;
 
-        async fn chain_key_to_packet_key(
+        fn chain_key_to_packet_key(
             &self,
             chain: &Address,
         ) -> std::result::Result<Option<OffchainPublicKey>, TestError> {
             Ok(self.key_addr_map.get_by_right(chain).copied())
         }
 
-        async fn packet_key_to_chain_key(
+        fn packet_key_to_chain_key(
             &self,
             packet: &OffchainPublicKey,
         ) -> std::result::Result<Option<Address>, TestError> {
@@ -500,7 +498,6 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl ChainReadChannelOperations for TestChainApi {
         type Error = TestError;
 
@@ -508,7 +505,7 @@ mod tests {
             &self.me
         }
 
-        async fn channel_by_id(&self, channel_id: &ChannelId) -> std::result::Result<Option<ChannelEntry>, TestError> {
+        fn channel_by_id(&self, channel_id: &ChannelId) -> std::result::Result<Option<ChannelEntry>, TestError> {
             Ok(self
                 .channels
                 .iter()
@@ -516,7 +513,7 @@ mod tests {
                 .cloned())
         }
 
-        async fn stream_channels<'a>(
+        fn stream_channels<'a>(
             &'a self,
             _selector: ChannelSelector,
         ) -> std::result::Result<BoxStream<'a, ChannelEntry>, TestError> {

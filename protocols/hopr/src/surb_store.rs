@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use hopr_api::types::internal::{prelude::HoprPseudonym, routing::SurbMatcher};
 use hopr_crypto_packet::prelude::*;
-use moka::{future::Cache, notification::RemovalCause};
+use moka::notification::RemovalCause;
 use ringbuffer::RingBuffer;
 use validator::ValidationError;
 
@@ -161,7 +161,7 @@ pub struct SurbStoreConfig {
 #[derive(Clone)]
 pub struct MemorySurbStore {
     pseudonym_openers: moka::sync::Cache<HoprPseudonym, moka::sync::Cache<HoprSurbId, ReplyOpener>>,
-    surbs_per_pseudonym: Cache<HoprPseudonym, SurbRingBuffer<HoprSurb>>,
+    surbs_per_pseudonym: moka::sync::Cache<HoprPseudonym, SurbRingBuffer<HoprSurb>>,
     cfg: Arc<SurbStoreConfig>,
 }
 
@@ -182,7 +182,7 @@ impl MemorySurbStore {
                 .build(),
             // SURBs are indexed only by Pseudonyms, which have longer lifetimes.
             // For each Pseudonym, there's an RB of SURBs and their IDs.
-            surbs_per_pseudonym: Cache::builder()
+            surbs_per_pseudonym: moka::sync::Cache::builder()
                 .time_to_idle(cfg.pseudonyms_lifetime.max(MINIMUM_SURB_LIFETIME))
                 .eviction_policy(moka::policy::EvictionPolicy::lru())
                 .eviction_listener(|pseudonym, _reply_opener, cause| {
@@ -204,9 +204,9 @@ impl Default for MemorySurbStore {
 #[async_trait::async_trait]
 impl SurbStore for MemorySurbStore {
     #[tracing::instrument(skip_all, level = "trace", fields(?matcher), ret)]
-    async fn find_surb(&self, matcher: SurbMatcher) -> Option<FoundSurb> {
+    fn find_surb(&self, matcher: SurbMatcher) -> Option<FoundSurb> {
         let pseudonym = matcher.pseudonym();
-        let surbs_for_pseudonym = self.surbs_per_pseudonym.get(&pseudonym).await?;
+        let surbs_for_pseudonym = self.surbs_per_pseudonym.get(&pseudonym)?;
 
         match matcher {
             SurbMatcher::Pseudonym(_) => surbs_for_pseudonym.pop_one().map(|popped_surb| FoundSurb {
@@ -231,13 +231,10 @@ impl SurbStore for MemorySurbStore {
     }
 
     #[tracing::instrument(skip_all, level = "trace", fields(%pseudonym, num_surbs = surbs.len()))]
-    async fn insert_surbs(&self, pseudonym: HoprPseudonym, surbs: Vec<(HoprSurbId, HoprSurb)>) -> usize {
+    fn insert_surbs(&self, pseudonym: HoprPseudonym, surbs: Vec<(HoprSurbId, HoprSurb)>) -> usize {
         self.surbs_per_pseudonym
             .entry_by_ref(&pseudonym)
-            .or_insert_with(futures::future::lazy(|_| {
-                SurbRingBuffer::new(self.cfg.rb_capacity.max(MIN_SURB_RB_CAPACITY))
-            }))
-            .await
+            .or_insert_with(|| SurbRingBuffer::new(self.cfg.rb_capacity.max(MIN_SURB_RB_CAPACITY)))
             .value()
             .push(surbs)
     }

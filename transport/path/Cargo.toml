@@ -38,7 +38,6 @@ hopr-types = { workspace = true, features = [
 hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]
-async-trait = { workspace = true }
 bimap = { workspace = true }
 futures = { workspace = true }
 hex-literal = { workspace = true }

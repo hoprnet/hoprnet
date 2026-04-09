@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-protocol"
-version = "1.4.2"
+version = "1.5.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -50,6 +50,7 @@ hopr-metrics = { optional = true, workspace = true }
 
 hopr-protocol-hopr = { workspace = true, features = ["rayon"] }
 hopr-protocol-app = { workspace = true }
+hopr-parallelize = { workspace = true, features = ["rayon"] }
 
 
 [dev-dependencies]

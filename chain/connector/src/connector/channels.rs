@@ -55,6 +55,21 @@ where
     }
 }
 
+async fn channel_by_id_async<B: Backend + Send + Sync + 'static>(
+    channel_by_id: moka::sync::Cache<ChannelId, Option<ChannelEntry>, ahash::RandomState>,
+    backend: std::sync::Arc<B>,
+    channel_id: ChannelId,
+) -> Result<Option<ChannelEntry>, ConnectorError> {
+    Ok(hopr_async_runtime::prelude::spawn_blocking(move || {
+        channel_by_id.try_get_with_by_ref(&channel_id, || {
+            tracing::warn!(%channel_id, "cache miss on channel_by_id");
+            backend.get_channel_by_id(&channel_id).map_err(ConnectorError::backend)
+        })
+    })
+    .await
+    .map_err(ConnectorError::backend)??)
+}
+
 #[async_trait::async_trait]
 impl<B, C, P, R> hopr_api::chain::ChainReadChannelOperations for HoprBlockchainConnector<C, B, P, R>
 where
@@ -69,53 +84,34 @@ where
         self.chain_key.public().as_ref()
     }
 
-    async fn channel_by_parties(&self, src: &Address, dst: &Address) -> Result<Option<ChannelEntry>, Self::Error> {
+    fn channel_by_parties(&self, src: &Address, dst: &Address) -> Result<Option<ChannelEntry>, Self::Error> {
         self.check_connection_state()?;
 
-        let backend = self.backend.clone();
         let src = *src;
         let dst = *dst;
         Ok(self
             .channel_by_parties
-            .try_get_with(ChannelParties::new(src, dst), async move {
+            .try_get_with(ChannelParties::new(src, dst), || {
                 tracing::warn!(%src, %dst, "cache miss on channel_by_parties");
-                match hopr_async_runtime::prelude::spawn_blocking(move || {
-                    let channel_id = generate_channel_id(&src, &dst);
-                    backend.get_channel_by_id(&channel_id)
-                })
-                .await
-                {
-                    Ok(Ok(value)) => Ok(value),
-                    Ok(Err(e)) => Err(ConnectorError::backend(e)),
-                    Err(e) => Err(ConnectorError::backend(e)),
-                }
-            })
-            .await?)
+                let channel_id = generate_channel_id(&src, &dst);
+                self.backend
+                    .get_channel_by_id(&channel_id)
+                    .map_err(ConnectorError::backend)
+            })?)
     }
 
-    async fn channel_by_id(&self, channel_id: &ChannelId) -> Result<Option<ChannelEntry>, Self::Error> {
+    fn channel_by_id(&self, channel_id: &ChannelId) -> Result<Option<ChannelEntry>, Self::Error> {
         self.check_connection_state()?;
 
-        let channel_id = *channel_id;
-        let backend = self.backend.clone();
-        Ok(self
-            .channel_by_id
-            .try_get_with_by_ref(&channel_id, async move {
-                tracing::warn!(%channel_id, "cache miss on channel_by_id");
-                match hopr_async_runtime::prelude::spawn_blocking(move || backend.get_channel_by_id(&channel_id)).await
-                {
-                    Ok(Ok(value)) => Ok(value),
-                    Ok(Err(e)) => Err(ConnectorError::backend(e)),
-                    Err(e) => Err(ConnectorError::backend(e)),
-                }
-            })
-            .await?)
+        Ok(self.channel_by_id.try_get_with_by_ref(channel_id, || {
+            tracing::warn!(%channel_id, "cache miss on channel_by_id");
+            self.backend
+                .get_channel_by_id(channel_id)
+                .map_err(ConnectorError::backend)
+        })?)
     }
 
-    async fn stream_channels<'a>(
-        &'a self,
-        selector: ChannelSelector,
-    ) -> Result<BoxStream<'a, ChannelEntry>, Self::Error> {
+    fn stream_channels(&self, selector: ChannelSelector) -> Result<BoxStream<'_, ChannelEntry>, Self::Error> {
         self.check_connection_state()?;
 
         Ok(self.build_channel_stream(selector)?.boxed())
@@ -152,12 +148,10 @@ where
     ) -> Result<BoxFuture<'a, Result<ChainReceipt, Self::Error>>, Self::Error> {
         self.check_connection_state()?;
 
-        use hopr_api::chain::ChainReadChannelOperations;
-
-        let channel = self
-            .channel_by_id(channel_id)
+        let channel = channel_by_id_async(self.channel_by_id.clone(), self.backend.clone(), *channel_id)
             .await?
             .ok_or_else(|| ConnectorError::ChannelDoesNotExist(*channel_id))?;
+
         let tx_req = self.payload_generator.fund_channel(channel.destination, amount)?;
         tracing::debug!(%channel_id, %amount, "funding channel");
 
@@ -172,8 +166,7 @@ where
 
         use hopr_api::chain::ChainReadChannelOperations;
 
-        let channel = self
-            .channel_by_id(channel_id)
+        let channel = channel_by_id_async(self.channel_by_id.clone(), self.backend.clone(), *channel_id)
             .await?
             .ok_or_else(|| ConnectorError::ChannelDoesNotExist(*channel_id))?;
 
@@ -285,26 +278,21 @@ mod tests {
         let mut connector = create_connector(blokli_client)?;
         connector.connect().await?;
 
-        assert_eq!(Some(channel_1), connector.channel_by_id(channel_1.get_id()).await?);
+        assert_eq!(Some(channel_1), connector.channel_by_id(channel_1.get_id())?);
         assert_eq!(
             Some(channel_1),
-            connector
-                .channel_by_parties(&channel_1.source, &channel_1.destination)
-                .await?
+            connector.channel_by_parties(&channel_1.source, &channel_1.destination)?
         );
-        assert_eq!(Some(channel_2), connector.channel_by_id(channel_2.get_id()).await?);
+        assert_eq!(Some(channel_2), connector.channel_by_id(channel_2.get_id())?);
         assert_eq!(
             Some(channel_2),
-            connector
-                .channel_by_parties(&channel_2.source, &channel_2.destination)
-                .await?
+            connector.channel_by_parties(&channel_2.source, &channel_2.destination)?
         );
 
         assert_eq!(
             vec![channel_1, channel_2],
             connector
-                .stream_channels(ChannelSelector::default())
-                .await?
+                .stream_channels(ChannelSelector::default())?
                 .collect::<Vec<_>>()
                 .await
         );
@@ -312,8 +300,7 @@ mod tests {
         assert_eq!(
             vec![channel_1],
             connector
-                .stream_channels(ChannelSelector::default().with_allowed_states(&[ChannelStatusDiscriminants::Open]))
-                .await?
+                .stream_channels(ChannelSelector::default().with_allowed_states(&[ChannelStatusDiscriminants::Open]))?
                 .collect::<Vec<_>>()
                 .await
         );
@@ -322,8 +309,7 @@ mod tests {
             connector
                 .stream_channels(
                     ChannelSelector::default().with_allowed_states(&[ChannelStatusDiscriminants::PendingToClose])
-                )
-                .await?
+                )?
                 .collect::<Vec<_>>()
                 .await
         );
@@ -336,8 +322,7 @@ mod tests {
                         .with_closure_time_range(
                             DateTime::from(std::time::SystemTime::UNIX_EPOCH + Duration::from_mins(11))..
                         )
-                )
-                .await?
+                )?
                 .collect::<Vec<_>>()
                 .await
         );
@@ -605,6 +590,259 @@ mod tests {
         connector.close_channel(channel_1.get_id()).await?.await?;
 
         insta::assert_yaml_snapshot!(*connector.client().snapshot());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connector_should_not_close_non_existing_channel() -> anyhow::Result<()> {
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_hopr_network_chain_info("rotsee")
+            .build_dynamic_client(MODULE_ADDR.into());
+
+        let mut connector = create_connector(blokli_client)?;
+        connector.connect().await?;
+
+        let channel_id = ChannelId::from([1u8; ChannelId::SIZE]);
+        let result = connector.close_channel(&channel_id).await;
+
+        match result {
+            Err(e) => {
+                let err_msg = e.to_string();
+                assert!(
+                    err_msg.contains("does not exist"),
+                    "Expected 'does not exist' error, got: {}",
+                    err_msg
+                );
+            }
+            _ => panic!("Expected error when closing non-existing channel"),
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connector_should_not_close_already_closed_channel() -> anyhow::Result<()> {
+        let offchain_key_1 = OffchainKeypair::from_secret(&hex!(
+            "60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"
+        ))?;
+        let account_1 = AccountEntry {
+            public_key: *offchain_key_1.public(),
+            chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
+            entry_type: AccountType::NotAnnounced,
+            safe_address: Some([1u8; Address::SIZE].into()),
+            key_id: 1.into(),
+        };
+        let offchain_key_2 = OffchainKeypair::from_secret(&hex!(
+            "71bf1f42ebbfcd89c3e197a3fd7cda79b92499e509b6fefa0fe44d02821d146a"
+        ))?;
+        let account_2 = AccountEntry {
+            public_key: *offchain_key_2.public(),
+            chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_2)?.public().to_address(),
+            entry_type: AccountType::NotAnnounced,
+            safe_address: Some([2u8; Address::SIZE].into()),
+            key_id: 2.into(),
+        };
+
+        let channel_1 = ChannelEntry::builder()
+            .between(
+                &ChainKeypair::from_secret(&PRIVATE_KEY_1)?,
+                &ChainKeypair::from_secret(&PRIVATE_KEY_2)?,
+            )
+            .amount(10)
+            .ticket_index(1)
+            .status(ChannelStatus::Closed)
+            .epoch(1)
+            .build()?;
+
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_accounts([
+                (account_1, HoprBalance::new_base(100), XDaiBalance::new_base(1)),
+                (account_2, HoprBalance::new_base(100), XDaiBalance::new_base(1)),
+            ])
+            .with_channels([channel_1])
+            .with_hopr_network_chain_info("rotsee")
+            .build_dynamic_client(MODULE_ADDR.into());
+
+        let mut connector = create_connector(blokli_client)?;
+        connector.connect().await?;
+
+        let result = connector.close_channel(channel_1.get_id()).await;
+
+        match result {
+            Err(e) => {
+                let err_msg = e.to_string();
+                assert!(
+                    err_msg.contains("is closed"),
+                    "Expected 'is closed' error, got: {}",
+                    err_msg
+                );
+            }
+            _ => panic!("Expected error when closing already closed channel"),
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connector_should_not_close_unowned_channel() -> anyhow::Result<()> {
+        let offchain_key_2 = OffchainKeypair::from_secret(&hex!(
+            "71bf1f42ebbfcd89c3e197a3fd7cda79b92499e509b6fefa0fe44d02821d146a"
+        ))?;
+        let account_2 = AccountEntry {
+            public_key: *offchain_key_2.public(),
+            chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_2)?.public().to_address(),
+            entry_type: AccountType::NotAnnounced,
+            safe_address: Some([2u8; Address::SIZE].into()),
+            key_id: 2.into(),
+        };
+        let _offchain_key_3 = OffchainKeypair::from_secret(&hex!(
+            "0000000000000000000000000000000000000000000000000000000000000003"
+        ))?;
+        let account_3 = AccountEntry {
+            public_key: *_offchain_key_3.public(),
+            chain_addr: ChainKeypair::from_secret(&hex!(
+                "0000000000000000000000000000000000000000000000000000000000000003"
+            ))?
+            .public()
+            .to_address(),
+            entry_type: AccountType::NotAnnounced,
+            safe_address: Some([3u8; Address::SIZE].into()),
+            key_id: 3.into(),
+        };
+
+        // node is using PRIVATE_KEY_1, so it owns account_1
+        // this channel is between PRIVATE_KEY_2 and PRIVATE_KEY_3
+        let channel_1 = ChannelEntry::builder()
+            .between(
+                &ChainKeypair::from_secret(&PRIVATE_KEY_2)?,
+                &ChainKeypair::from_secret(&hex!(
+                    "0000000000000000000000000000000000000000000000000000000000000003"
+                ))?,
+            )
+            .amount(10)
+            .ticket_index(1)
+            .status(ChannelStatus::Open)
+            .epoch(1)
+            .build()?;
+
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_accounts([
+                (account_2, HoprBalance::new_base(100), XDaiBalance::new_base(1)),
+                (account_3, HoprBalance::new_base(100), XDaiBalance::new_base(1)),
+            ])
+            .with_channels([channel_1])
+            .with_hopr_network_chain_info("rotsee")
+            .build_dynamic_client(MODULE_ADDR.into());
+
+        let mut connector = create_connector(blokli_client)?;
+        connector.connect().await?;
+
+        let result = connector.close_channel(channel_1.get_id()).await;
+
+        match result {
+            Err(e) => {
+                let err_msg = e.to_string();
+                assert!(
+                    err_msg.contains("cannot close channels that is not own"),
+                    "Expected ownership error, got: {}",
+                    err_msg
+                );
+            }
+            _ => panic!("Expected error when closing unowned channel"),
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connector_should_not_fund_non_existing_channel() -> anyhow::Result<()> {
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_hopr_network_chain_info("rotsee")
+            .build_dynamic_client(MODULE_ADDR.into());
+
+        let mut connector = create_connector(blokli_client)?;
+        connector.connect().await?;
+
+        let channel_id = ChannelId::from([1u8; ChannelId::SIZE]);
+        let result = connector.fund_channel(&channel_id, 10.into()).await;
+
+        match result {
+            Err(e) => {
+                let err_msg = e.to_string();
+                assert!(
+                    err_msg.contains("does not exist"),
+                    "Expected 'does not exist' error, got: {}",
+                    err_msg
+                );
+            }
+            _ => panic!("Expected error when funding non-existing channel"),
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connector_should_not_finalize_channel_closure_before_time() -> anyhow::Result<()> {
+        let offchain_key_1 = OffchainKeypair::from_secret(&hex!(
+            "60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"
+        ))?;
+        let account_1 = AccountEntry {
+            public_key: *offchain_key_1.public(),
+            chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
+            entry_type: AccountType::NotAnnounced,
+            safe_address: Some([1u8; Address::SIZE].into()),
+            key_id: 1.into(),
+        };
+        let offchain_key_2 = OffchainKeypair::from_secret(&hex!(
+            "71bf1f42ebbfcd89c3e197a3fd7cda79b92499e509b6fefa0fe44d02821d146a"
+        ))?;
+        let account_2 = AccountEntry {
+            public_key: *offchain_key_2.public(),
+            chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_2)?.public().to_address(),
+            entry_type: AccountType::NotAnnounced,
+            safe_address: Some([2u8; Address::SIZE].into()),
+            key_id: 2.into(),
+        };
+
+        let channel_1 = ChannelEntry::builder()
+            .between(
+                &ChainKeypair::from_secret(&PRIVATE_KEY_1)?,
+                &ChainKeypair::from_secret(&PRIVATE_KEY_2)?,
+            )
+            .amount(10)
+            .ticket_index(1)
+            .status(ChannelStatus::PendingToClose(
+                std::time::SystemTime::now() + Duration::from_secs(3600),
+            ))
+            .epoch(1)
+            .build()?;
+
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_accounts([
+                (account_1, HoprBalance::new_base(100), XDaiBalance::new_base(1)),
+                (account_2, HoprBalance::new_base(100), XDaiBalance::new_base(1)),
+            ])
+            .with_channels([channel_1])
+            .with_hopr_network_chain_info("rotsee")
+            .build_dynamic_client(MODULE_ADDR.into());
+
+        let mut connector = create_connector(blokli_client)?;
+        connector.connect().await?;
+
+        let result = connector.close_channel(channel_1.get_id()).await;
+
+        match result {
+            Err(e) => {
+                let err_msg = e.to_string();
+                assert!(
+                    err_msg.contains("channel closure time has not elapsed"),
+                    "Expected time elapsed error, got: {}",
+                    err_msg
+                );
+            }
+            _ => panic!("Expected error when closing channel before time elapsed"),
+        }
 
         Ok(())
     }

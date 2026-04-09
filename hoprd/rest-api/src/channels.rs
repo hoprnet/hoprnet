@@ -361,17 +361,20 @@ pub(super) async fn show_channel(
     let hopr = state.hopr.clone();
 
     match Hash::from_hex(channel_id.as_str()) {
-        Ok(channel_id) => match hopr.channel_from_hash(&channel_id).await {
-            Ok(Some(channel)) => {
-                let info = query_topology_info(channel).await;
-                match info {
-                    Ok(info) => (StatusCode::OK, Json(info)).into_response(),
-                    Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+        Ok(channel_id) => {
+            match hopr_async_runtime::prelude::spawn_blocking(move || hopr.channel_by_id(&channel_id)).await {
+                Ok(Ok(Some(channel))) => {
+                    let info = query_topology_info(channel).await;
+                    match info {
+                        Ok(info) => (StatusCode::OK, Json(info)).into_response(),
+                        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+                    }
                 }
+                Ok(Ok(None)) => (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
+                Ok(Err(e)) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+                Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
             }
-            Ok(None) => (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
-            Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
-        },
+        }
         Err(_) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
     }
 }
