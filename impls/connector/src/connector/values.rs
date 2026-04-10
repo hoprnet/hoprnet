@@ -179,4 +179,20 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn connector_should_retrieve_redeemed_stats() -> anyhow::Result<()> {
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_hopr_network_chain_info("rotsee")
+            .build_static_client();
+
+        let connector = create_connector(blokli_client)?;
+
+        let stats = connector.redemption_stats([1u8; Address::SIZE]).await?;
+
+        assert_eq!(0, stats.redeemed_count);
+        assert_eq!(HoprBalance::zero(), stats.redeemed_value);
+
+        Ok(())
+    }
 }

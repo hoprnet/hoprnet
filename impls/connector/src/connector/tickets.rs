@@ -155,7 +155,7 @@ mod tests {
     use blokli_client::BlokliTestClient;
     use hex_literal::hex;
     use hopr_api::{
-        chain::{ChainWriteChannelOperations, ChainWriteTicketOperations},
+        chain::{ChainValues, ChainWriteChannelOperations, ChainWriteTicketOperations},
         types::primitive::prelude::*,
     };
 
@@ -245,6 +245,71 @@ mod tests {
         connector.redeem_ticket(ticket).await?.await?;
 
         insta::assert_yaml_snapshot!(*connector.client().snapshot());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connector_should_redeem_ticket_and_increase_redeemed_stats() -> anyhow::Result<()> {
+        let blokli_client = prepare_client()?;
+
+        let mut connector = create_connector(blokli_client)?;
+        connector.connect().await?;
+
+        let hkc1 = ChainKeypair::from_secret(&hex!(
+            "e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8"
+        ))?;
+        let hkc2 = ChainKeypair::from_secret(&hex!(
+            "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
+        ))?;
+
+        let ticket = TicketBuilder::default()
+            .counterparty(&ChainKeypair::from_secret(&PRIVATE_KEY_1)?)
+            .amount(1)
+            .index(1)
+            .channel_epoch(1)
+            .eth_challenge(
+                Challenge::from_hint_and_share(
+                    &HalfKeyChallenge::new(hkc1.public().as_ref()),
+                    &HalfKeyChallenge::new(hkc2.public().as_ref()),
+                )?
+                .to_ethereum_challenge(),
+            )
+            .build_signed(&ChainKeypair::from_secret(&PRIVATE_KEY_2)?, &Hash::default())?
+            .into_acknowledged(Response::from_half_keys(
+                &HalfKey::try_from(hkc1.secret().as_ref())?,
+                &HalfKey::try_from(hkc2.secret().as_ref())?,
+            )?)
+            .into_redeemable(&ChainKeypair::from_secret(&PRIVATE_KEY_1)?, &Hash::default())?;
+
+        connector.redeem_ticket(ticket).await?.await?;
+
+        let ticket = TicketBuilder::default()
+            .counterparty(&ChainKeypair::from_secret(&PRIVATE_KEY_1)?)
+            .amount(1)
+            .index(2)
+            .channel_epoch(1)
+            .eth_challenge(
+                Challenge::from_hint_and_share(
+                    &HalfKeyChallenge::new(hkc1.public().as_ref()),
+                    &HalfKeyChallenge::new(hkc2.public().as_ref()),
+                )?
+                .to_ethereum_challenge(),
+            )
+            .build_signed(&ChainKeypair::from_secret(&PRIVATE_KEY_2)?, &Hash::default())?
+            .into_acknowledged(Response::from_half_keys(
+                &HalfKey::try_from(hkc1.secret().as_ref())?,
+                &HalfKey::try_from(hkc2.secret().as_ref())?,
+            )?)
+            .into_redeemable(&ChainKeypair::from_secret(&PRIVATE_KEY_1)?, &Hash::default())?;
+
+        connector.redeem_ticket(ticket).await?.await?;
+
+        insta::assert_yaml_snapshot!(*connector.client().snapshot());
+
+        let stats = connector.redemption_stats([1u8; Address::SIZE]).await?;
+        assert_eq!(2, stats.redeemed_count);
+        assert_eq!(HoprBalance::from(2), stats.redeemed_value);
 
         Ok(())
     }

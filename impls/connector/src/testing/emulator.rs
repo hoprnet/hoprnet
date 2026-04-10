@@ -445,7 +445,7 @@ impl BlokliTestStateMutator for FullStateEmulator {
                                 })?;
                             let current_redeemed_count: u64 = stats.redemption_count.0.parse().map_err(|_| {
                                 blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
-                                    "failed to parse redemed count on {safe_addr}"
+                                    "failed to parse redeemed count on {safe_addr}"
                                 ))
                             })?;
 

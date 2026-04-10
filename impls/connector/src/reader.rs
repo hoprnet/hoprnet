@@ -182,3 +182,26 @@ where
             .into())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use hopr_api::chain::ChainValues;
+
+    use super::*;
+    use crate::testing::BlokliTestStateBuilder;
+
+    #[tokio::test]
+    async fn redeemed_stats() -> anyhow::Result<()> {
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_hopr_network_chain_info("rotsee")
+            .build_static_client();
+
+        let reader = HoprBlockchainReader::new(blokli_client);
+
+        let stats = reader.redemption_stats([1u8; Address::SIZE]).await?;
+        assert_eq!(0, stats.redeemed_count);
+        assert_eq!(HoprBalance::zero(), stats.redeemed_value);
+
+        Ok(())
+    }
+}
