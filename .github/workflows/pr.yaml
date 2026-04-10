@@ -27,7 +27,7 @@ jobs:
   validate-pr-title:
     name: Validate title
     if: github.event_name == 'pull_request'
-    runs-on: depot-ubuntu-24.04-4
+    runs-on: depot-ubuntu-24.04
     permissions:
       pull-requests: read
     steps:
@@ -53,7 +53,7 @@ jobs:
   label:
     name: Add labels
     if: github.event_name == 'pull_request'
-    runs-on: depot-ubuntu-24.04-4
+    runs-on: depot-ubuntu-24.04
     permissions:
       contents: read
       issues: write
@@ -91,7 +91,7 @@ jobs:
     with:
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
       runner_small: depot-ubuntu-24.04-4
-      runner_large: depot-ubuntu-24.04-16
+      runner_large: depot-ubuntu-24.04-8
     secrets:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
@@ -175,7 +175,7 @@ jobs:
       build_matrix: >-
         [
           {
-            "runner": "depot-ubuntu-24.04-16",
+            "runner": "depot-ubuntu-24.04-8",
             "architecture": "x86_64-linux",
             "build_command": "nix build -L .#docker-hoprd-x86_64-linux",
             "build_debug_command": "nix build -L .#docker-hoprd-dev-x86_64-linux"
@@ -191,7 +191,7 @@ jobs:
 
   docs:
     name: Docs
-    runs-on: depot-ubuntu-24.04-16
+    runs-on: depot-ubuntu-24.04-8
     timeout-minutes: 60
     permissions:
       contents: read

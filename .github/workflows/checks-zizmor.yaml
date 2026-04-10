@@ -29,6 +29,6 @@ jobs:
       security-events: write
     with:
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-      runner: depot-ubuntu-24.04-16
+      runner: depot-ubuntu-24.04-4
     secrets:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}

@@ -39,7 +39,7 @@ concurrency:
 jobs:
   build:
     name: package
-    runs-on: depot-ubuntu-24.04-4
+    runs-on: depot-ubuntu-24.04
     permissions:
       contents: read
     timeout-minutes: 60

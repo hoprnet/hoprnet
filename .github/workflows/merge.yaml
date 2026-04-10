@@ -64,12 +64,12 @@ jobs:
       build_matrix: >-
         [
           {
-            "runner": "depot-ubuntu-24.04-16",
+            "runner": "depot-ubuntu-24.04-8",
             "architecture": "x86_64-linux",
             "build_command": "nix build -L .#docker-hoprd-x86_64-linux"
           },
           {
-            "runner": "depot-ubuntu-24.04-16",
+            "runner": "depot-ubuntu-24.04-8",
             "architecture": "aarch64-linux",
             "build_command": "nix build -L .#docker-hoprd-aarch64-linux"
           }
@@ -88,7 +88,7 @@ jobs:
       docker_hub_token: ${{ secrets.DOCKER_HUB_TOKEN }}
   deploy-dev:
     name: Deploy Gnosis Dev
-    runs-on: depot-ubuntu-24.04-4
+    runs-on: depot-ubuntu-24.04
     needs: build-docker
     if: github.event.pull_request.merged == true
     permissions:
@@ -135,7 +135,7 @@ jobs:
     if: github.event.pull_request.merged == true
     needs:
       - build-docker
-    runs-on: depot-ubuntu-24.04-16
+    runs-on: depot-ubuntu-24.04-8
     timeout-minutes: 60
     permissions:
       contents: write
@@ -179,7 +179,7 @@ jobs:
             The merge pipeline has failed for pull request [#${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
   cleanup_actions:
     name: Cleanup Actions
-    runs-on: depot-ubuntu-24.04-4
+    runs-on: depot-ubuntu-24.04
     permissions:
       actions: write
     steps:
