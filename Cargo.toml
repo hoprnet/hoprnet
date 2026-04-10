@@ -3,7 +3,6 @@
 resolver = "2"
 
 members = [
-  "chain/connector",
   "common/async-runtime",
   "common/network-types",
   "common/parallelize",
@@ -16,7 +15,6 @@ members = [
   "hoprd/hoprd",
   "hoprd/rest-api",
   "hoprd/rest-api-client",
-  "logic/strategy",
   "logic/ticket-manager",
   "misc/metrics",
   "misc/platform",
@@ -35,9 +33,11 @@ members = [
   "localcluster",
   # implementations
   "hopr/builder",
+  "impls/connector",
   "impls/ct/immediate",
   "impls/ct/full-network",
   "impls/graph",
+  "impls/strategy",
   "impls/transport/p2p",
 ]
 
@@ -236,7 +236,7 @@ hopr-protocol-app = { path = "protocols/app", default-features = false }
 hopr-protocol-hopr = { path = "protocols/hopr", default-features = false }
 hopr-protocol-session = { path = "protocols/session", default-features = false }
 hopr-protocol-start = { path = "protocols/start", default-features = false }
-hopr-strategy = { path = "logic/strategy", default-features = false }
+hopr-strategy = { path = "impls/strategy", default-features = false }
 hopr-ticket-manager = { path = "logic/ticket-manager" }
 hopr-transport = { path = "transport/api", default-features = false }
 hopr-transport-mixer = { path = "transport/mixer", default-features = false }
@@ -249,7 +249,7 @@ hoprd = { path = "hoprd/hoprd", default-features = false }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
 hoprd-api-client = { path = "hoprd/rest-api-client" }
 hopr-utils-session = { path = "utils/session" }
-hopr-chain-connector = { path = "chain/connector" }
+hopr-chain-connector = { path = "impls/connector" }
 hopr-statistics = { path = "common/statistics" }
 hopr-test-stubs = { path = "common/test-stubs" }
 
