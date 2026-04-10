@@ -90,8 +90,8 @@ jobs:
     uses: hoprnet/hopr-workflows/.github/workflows/checks.yaml@bbd22e57cf954c15f0a6051d59329857809141dd # workflow-checks-v1
     with:
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-      runner_small: depot-ubuntu-24.04-4
-      runner_large: depot-ubuntu-24.04-8
+      runner_small: depot-ubuntu-24.04
+      runner_large: depot-ubuntu-24.04-4
     secrets:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
@@ -128,11 +128,11 @@ jobs:
       matrix:
         include:
           - architecture: x86_64-linux
-            runner: depot-ubuntu-24.04-16
+            runner: depot-ubuntu-24.04-8
             build_command: nix build -L .#binary-hoprd-x86_64-linux
             required_label: ""
           - architecture: aarch64-linux
-            runner: depot-ubuntu-24.04-16
+            runner: depot-ubuntu-24.04-8
             build_command: nix build -L .#binary-hoprd-aarch64-linux
             required_label: "binary:aarch64-linux"
           - architecture: aarch64-darwin
@@ -175,7 +175,7 @@ jobs:
       build_matrix: >-
         [
           {
-            "runner": "depot-ubuntu-24.04-8",
+            "runner": "depot-ubuntu-24.04-4",
             "architecture": "x86_64-linux",
             "build_command": "nix build -L .#docker-hoprd-x86_64-linux",
             "build_debug_command": "nix build -L .#docker-hoprd-dev-x86_64-linux"
@@ -191,7 +191,7 @@ jobs:
 
   docs:
     name: Docs
-    runs-on: depot-ubuntu-24.04-8
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 60
     permissions:
       contents: read

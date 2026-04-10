@@ -22,10 +22,10 @@ jobs:
       matrix:
         include:
           - architecture: x86_64-linux
-            runner: depot-ubuntu-24.04-16
+            runner: depot-ubuntu-24.04-8
             build_command: nix build -L .#binary-hoprd-x86_64-linux
           - architecture: aarch64-linux
-            runner: depot-ubuntu-24.04-16
+            runner: depot-ubuntu-24.04-8
             build_command: nix build -L .#binary-hoprd-aarch64-linux
             # - architecture: x86_64-darwin
             #   runner: depot-macos-15
@@ -64,12 +64,12 @@ jobs:
       build_matrix: >-
         [
           {
-            "runner": "depot-ubuntu-24.04-8",
+            "runner": "depot-ubuntu-24.04-4",
             "architecture": "x86_64-linux",
             "build_command": "nix build -L .#docker-hoprd-x86_64-linux"
           },
           {
-            "runner": "depot-ubuntu-24.04-8",
+            "runner": "depot-ubuntu-24.04-4",
             "architecture": "aarch64-linux",
             "build_command": "nix build -L .#docker-hoprd-aarch64-linux"
           }
@@ -135,7 +135,7 @@ jobs:
     if: github.event.pull_request.merged == true
     needs:
       - build-docker
-    runs-on: depot-ubuntu-24.04-8
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 60
     permissions:
       contents: write

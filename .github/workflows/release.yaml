@@ -26,7 +26,7 @@ jobs:
       matrix:
         include:
           - architecture: x86_64-linux
-            runner: depot-ubuntu-24.04-16
+            runner: depot-ubuntu-24.04-8
             build_command: nix build -L .#binary-hoprd-x86_64-linux
     uses: hoprnet/hopr-workflows/.github/workflows/build-binaries.yaml@build-binaries-v2
     permissions:
@@ -58,7 +58,7 @@ jobs:
       build_matrix: >-
         [
           {
-            "runner": "depot-ubuntu-24.04-8",
+            "runner": "depot-ubuntu-24.04-4",
             "architecture": "x86_64-linux",
             "build_command": "nix build -L .#docker-hoprd-x86_64-linux",
             "smoke_test_command": "nix develop -c just smoke-test"
