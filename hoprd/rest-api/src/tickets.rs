@@ -71,9 +71,6 @@ pub(crate) struct NodeTicketStatisticsResponse {
     #[schema(value_type = String, example = "20 wxHOPR")]
     unredeemed_value: HoprBalance,
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String,example = "100 wxHOPR")]
-    redeemed_value: HoprBalance,
-    #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String,example = "0 wxHOPR")]
     neglected_value: HoprBalance,
     #[serde_as(as = "DisplayFromStr")]
@@ -86,8 +83,6 @@ impl From<ChannelStats> for NodeTicketStatisticsResponse {
         Self {
             winning_count: value.winning_tickets as u64,
             unredeemed_value: value.unredeemed_value,
-            #[allow(deprecated)] // TODO: remove once blokli#237 is merged
-            redeemed_value: value.redeemed_value,
             neglected_value: value.neglected_value,
             rejected_value: value.rejected_value,
         }

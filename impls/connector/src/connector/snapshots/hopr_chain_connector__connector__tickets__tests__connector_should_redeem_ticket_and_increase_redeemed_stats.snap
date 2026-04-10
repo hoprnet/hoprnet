@@ -18,7 +18,7 @@ accounts:
 native_balances:
   668430def9eacd2b5064acf85d73fb0b351a1c8c:
     __typename: NativeBalance
-    balance: 0.999999999999999999 xDai
+    balance: 0.999999999999999998 xDai
   "0101010101010101010101010101010101010101":
     __typename: NativeBalance
     balance: 0 xDai
@@ -34,7 +34,7 @@ token_balances:
     balance: 0 wxHOPR
   "0101010101010101010101010101010101010101":
     __typename: HoprBalance
-    balance: 100 wxHOPR
+    balance: 100.000000000000000002 wxHOPR
   bea83ba0fcee21da44a30c893f466e6bf0c29bbb:
     __typename: HoprBalance
     balance: 0 wxHOPR
@@ -59,19 +59,23 @@ deployed_safes:
     chain_key: bea83ba0fcee21da44a30c893f466e6bf0c29bbb
     module_address: ff263744a4621e2cac0f4882cc623bee3c9aef8d
     registered_nodes: []
-safe_redeem_stats: {}
+safe_redeem_stats:
+  "0101010101010101010101010101010101010101":
+    __typename: RedeemedStats
+    redeemed_amount: 0.000000000000000002 wxHOPR
+    redemption_count: "2"
 tx_counts:
-  668430def9eacd2b5064acf85d73fb0b351a1c8c: 1
+  668430def9eacd2b5064acf85d73fb0b351a1c8c: 2
 channels:
   e555945b137ef926702c021fa24104e2268de40641e63b8b747019b09e100802:
-    balance: 0.00000000000000001 wxHOPR
+    balance: 0.000000000000000008 wxHOPR
     closure_time: ~
     concrete_channel_id: e555945b137ef926702c021fa24104e2268de40641e63b8b747019b09e100802
     destination: 1
     epoch: 1
     source: 2
-    status: CLOSED
-    ticket_index: "1"
+    status: OPEN
+    ticket_index: "3"
 chain_info:
   channel_closure_grace_period: "300"
   channel_dst: "0000000000000000000000000000000000000000000000000000000000000000"

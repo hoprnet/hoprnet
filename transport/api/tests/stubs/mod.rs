@@ -189,6 +189,13 @@ impl ChainValues for StubChain {
             contract_addresses: Default::default(),
         })
     }
+
+    async fn redemption_stats<A: Into<Address> + Send>(&self, _: A) -> Result<RedemptionStats, Self::Error> {
+        Ok(RedemptionStats {
+            redeemed_count: 0,
+            redeemed_value: HoprBalance::zero(),
+        })
+    }
 }
 
 /// Stub network view satisfying `Net` trait bounds (never used before `run()`).

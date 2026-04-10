@@ -54,7 +54,7 @@ arrayvec = { version = "0.7.6" }
 assertables = "9.8.6"
 async-broadcast = "0.7.2"
 async-lock = "3.4.2"
-async-signal = "0.2.13"
+async-signal = "0.2.14"
 async-trait = "0.1.89"
 asynchronous-codec = { version = "0.7.0" }
 auto_impl = "1.3.0"
@@ -63,7 +63,7 @@ backon = { version = "1.6.0", default-features = false }
 base64 = "0.22.1"
 bimap = "0.6.3"
 bitvec = "1.0.1"
-blokli-client = { git = "https://github.com/hoprnet/blokli" } # Always use the latest for now
+blokli-client = { git = "https://github.com/hoprnet/blokli", branch = "main" } # Always use the latest for now
 bloomfilter = { version = "3.0.1" }
 bytesize = { version = "2.3.1", features = ["serde"] }
 bytes = "1.11.1"
@@ -94,7 +94,7 @@ futures-timer = "3.0.3"
 futures-time = "3.0.1"
 generic-array = "1.3.5"
 halfbrown = "0.4.0"
-hashbrown = "0.16.1"
+hashbrown = "0.17.0"
 hex = "0.4.3"
 hex-literal = "1.1.0"
 hickory-resolver = { version = "0.25.2", default-features = false, features = [
@@ -147,7 +147,7 @@ progenitor-client = "0.13.0"
 rayon = "1.11.0"
 rand = { version = "0.10.0", features = ["thread_rng"] }
 rand_distr = "0.6.0"
-redb = "3.1.1"
+redb = "4.0.0"
 regex = "1.12.3"
 reqwest = { version = "0.13.2", default-features = false, features = [
   "json",
@@ -164,9 +164,9 @@ serde_json = "1.0.149"
 serde_repr = "0.1.20"
 serde_with = { version = "3.18.0", features = ["base64"] }
 serde_urlencoded = "0.7.1"
-serde-saphyr = "0.0.22"
+serde-saphyr = "0.0.23"
 serial_test = "3.4.0"
-signal-hook = "0.4.3"
+signal-hook = "0.4.4"
 smart-default = "0.7.1"
 socket2 = "0.6.3"
 strum = { version = "0.28.0", features = ["derive"] }
@@ -177,7 +177,7 @@ test-log = { version = "0.2.19", features = ["trace"] }
 thiserror = "2.0.18"
 tikv-jemallocator = "0.6.1"
 tikv-jemalloc-ctl = { version = "0.6.1", features = ["stats"] }
-tokio = { version = "1.50.0", features = [
+tokio = { version = "1.51.1", features = [
   "rt-multi-thread",
   "macros",
   "tracing",
@@ -218,8 +218,8 @@ mimalloc = { version = "0.1.48", default-features = false, features = [
   "secure",
 ] }
 
-hopr-api = "1.5.2"
-hopr-types = { version = "1.5.1", features = ["use-bindings"] }
+hopr-api = "1.6.1"
+hopr-types = { version = "1.5.3", features = ["use-bindings"] }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-crypto-keypair = { path = "crypto/keypair", default-features = false }
 hopr-crypto-packet = { path = "crypto/packet", default-features = false }

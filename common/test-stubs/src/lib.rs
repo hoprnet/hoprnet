@@ -250,7 +250,12 @@ impl ChainValues for StubChainApi {
         })
     }
 
-    // outgoing_ticket_values: uses default impl that calls minimum_ticket_price + minimum_incoming_ticket_win_prob
+    async fn redemption_stats<A: Into<Address> + Send>(&self, _: A) -> Result<RedemptionStats, Self::Error> {
+        Ok(RedemptionStats {
+            redeemed_count: 0,
+            redeemed_value: HoprBalance::zero(),
+        })
+    }
 }
 
 // ---------------------------------------------------------------------------

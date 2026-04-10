@@ -1,5 +1,5 @@
 ---
-source: logic/strategy/src/auto_funding.rs
+source: impls/strategy/src/auto_funding.rs
 expression: "*snapshot.refresh()"
 ---
 accounts:
@@ -111,6 +111,7 @@ deployed_safes:
     chain_key: 68499f50ff68d523385dc60686069935d17d762a
     module_address: c6cf223b5fa5a0002e5f975453407134b848c312
     registered_nodes: []
+safe_redeem_stats: {}
 tx_counts:
   bea83ba0fcee21da44a30c893f466e6bf0c29bbb: 1
 channels:
