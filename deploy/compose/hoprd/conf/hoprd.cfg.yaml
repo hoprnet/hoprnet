@@ -1,31 +1,26 @@
+---
 blokli_url: https://blokli.prod.hoprnet.link
 identity:
   file: "/app/hoprd/conf/hopr.id"
 db:
   data: /app/hoprd/data
-  initialize: true
-  force_initialize: false
 api:
-  enable: false
-  auth: None
+  enable: true
   host:
     address:
-      IPv4: 127.0.0.1
+      IPv4: 0.0.0.0
     port: 3001
 strategy:
   on_fail_continue: true
   allow_recursive: false
-  execution_interval: 60s
   strategies:
     - AutoRedeeming:
-        redeem_only_aggregated: false
         redeem_all_on_close: true
         minimum_redeem_ticket_value: "1 wxHOPR"
         redeem_on_winning: true
     - ClosureFinalizer:
         max_closure_overdue: 300s
 hopr:
-  announce: true
   host:
     address:
       IPv4: 127.0.0.1 # NOTE: adapt this to reflect your public IP
