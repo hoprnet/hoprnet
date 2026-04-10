@@ -97,16 +97,16 @@ jobs:
 
   tests:
     name: Test
-    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@cfadaaa8ec3f22764689169ed8bd05d6b973d62e # workflow-tests-v4
+    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@10cf5ffa21ceef42226dc3925d0d1d3314721d28 # workflow-tests-v4
     with:
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-      unit_tests: true
-      integration_tests: true
+      enable_unit_tests: true
+      enable_integration_tests: true
       integration_test_command: "nix develop -c env NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --test '*' -j 1"
-      nightly_tests: true
-      benchmarks: true
-      unit_coverage: true
-      integration_coverage: true
+      enable_nightly_tests: true
+      enable_benchmarks: true
+      enable_unit_coverage: true
+      enable_integration_coverage: true
       unit_coverage_command: |
         nix build -L .#coverage-unit
         cp result coverage.lcov

@@ -16,16 +16,15 @@ concurrency:
 jobs:
   coverage:
     name: Coverage
-    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@cfadaaa8ec3f22764689169ed8bd05d6b973d62e # workflow-tests-v4
+    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@10cf5ffa21ceef42226dc3925d0d1d3314721d28 # workflow-tests-v4
     with:
       source_branch: ${{ github.ref_name }}
-      unit_tests: false
-      integration_tests: false
-      nightly_tests: false
-      benchmarks: false
-      unit_coverage: true
-      integration_coverage: true
-      unconditional: true
+      enable_unit_tests: false
+      enable_integration_tests: false
+      enable_nightly_tests: false
+      enable_benchmarks: false
+      enable_unit_coverage: true
+      enable_integration_coverage: true
       unit_coverage_command: |
         nix build -L .#coverage-unit
         cp result coverage.lcov
