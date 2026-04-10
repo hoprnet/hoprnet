@@ -387,6 +387,12 @@ mod tests {
     }
 
     #[test]
+    fn example_config_should_be_serializable_into_string() -> anyhow::Result<()> {
+        serde_saphyr::from_str::<HoprdConfig>(include_str!("../../../deploy/compose/hoprd/conf/hoprd.cfg.yaml"))?;
+        Ok(())
+    }
+
+    #[test]
     fn test_config_should_be_deserializable_from_a_string_in_a_file() -> anyhow::Result<()> {
         let mut config_file = NamedTempFile::new()?;
         let mut prepared_config_file = config_file.reopen()?;

@@ -31,5 +31,5 @@ hopr:
       IPv4: 127.0.0.1 # NOTE: adapt this to reflect your public IP
     port: 9091 # NOTE: adapt this to reflect your public PORT - the value set in HOPRD_P2P_PORT
   safe_module:
-    safe_address: # NOTE: fill in value
-    module_address: # NOTE: fill in value
+    safe_address: "0x0000000000000000000000000000000000000000" # NOTE: fill in value
+    module_address: "0x0000000000000000000000000000000000000000" # NOTE: fill in value
