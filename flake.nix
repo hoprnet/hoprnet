@@ -123,6 +123,7 @@
             extraFiles = [
               ./hopr/builder/tests
               ./hoprd/hoprd/example_cfg.yaml
+              ./deploy/compose/hoprd/conf/hoprd.cfg.yaml
               (fs.fileFilter (file: file.hasExt "snap") ./.)
             ];
           };

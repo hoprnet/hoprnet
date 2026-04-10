@@ -1,28 +1,30 @@
 ---
-blokli_url: https://blokli.prod.hoprnet.link # NOTE: change this value to the URL of your Blokli provider
-db:
-  data: /app/hoprd/data
-strategy:
-  on_fail_continue: true
-  allow_recursive: true
-  strategies:
-    - !AutoRedeeming
-      redeem_only_aggregated: false
-      minimum_redeem_ticket_value: "1 wxHOPR"
-    - !ClosureFinalizer
-      max_closure_overdue: 300s
-hopr:
-  host:
-    address: !IPv4 127.0.0.1 # NOTE: adapt this to reflect your public IP
-    port: 9091 # NOTE: adapt this to reflect your public PORT - the value set in HOPRD_P2P_PORT
-  safe_module:
-    safe_address: # NOTE: fill in value
-    module_address: # NOTE: fill in value
-    safe_transaction_service_provider: https://safe-transaction.prod.hoprnet.link/
+blokli_url: https://blokli.prod.hoprnet.link
 identity:
   file: "/app/hoprd/conf/hopr.id"
+db:
+  data: /app/hoprd/data
 api:
   enable: true
   host:
-    address: !IPv4 0.0.0.0
+    address:
+      IPv4: 0.0.0.0
     port: 3001
+strategy:
+  on_fail_continue: true
+  allow_recursive: false
+  strategies:
+    - AutoRedeeming:
+        redeem_all_on_close: true
+        minimum_redeem_ticket_value: "1 wxHOPR"
+        redeem_on_winning: true
+    - ClosureFinalizer:
+        max_closure_overdue: 300s
+hopr:
+  host:
+    address:
+      IPv4: 127.0.0.1 # NOTE: adapt this to reflect your public IP
+    port: 9091 # NOTE: adapt this to reflect your public PORT - the value set in HOPRD_P2P_PORT
+  safe_module:
+    safe_address: "0x0000000000000000000000000000000000000000" # NOTE: fill in value
+    module_address: "0x0000000000000000000000000000000000000000" # NOTE: fill in value
