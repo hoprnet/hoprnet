@@ -12,7 +12,7 @@ on:
 jobs:
   cleanup-pr:
     name: Remove cache
-    runs-on: self-hosted-hoprnet-small
+    runs-on: depot-ubuntu-24.04-4
     permissions:
       actions: write
       contents: read

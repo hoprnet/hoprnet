@@ -26,7 +26,7 @@ jobs:
       matrix:
         include:
           - architecture: x86_64-linux
-            runner: self-hosted-hoprnet-bigger
+            runner: depot-ubuntu-24.04-16
             build_command: nix build -L .#binary-hoprd-x86_64-linux
     uses: hoprnet/hopr-workflows/.github/workflows/build-binaries.yaml@build-binaries-v2
     permissions:
@@ -58,7 +58,7 @@ jobs:
       build_matrix: >-
         [
           {
-            "runner": "self-hosted-hoprnet-bigger",
+            "runner": "depot-ubuntu-24.04-16",
             "architecture": "x86_64-linux",
             "build_command": "nix build -L .#docker-hoprd-x86_64-linux",
             "smoke_test_command": "nix develop -c just smoke-test"
@@ -78,7 +78,7 @@ jobs:
     needs:
       - build-binaries
       - build-docker
-    runs-on: self-hosted-hoprnet-small
+    runs-on: depot-ubuntu-24.04-4
     permissions:
       contents: write
     steps:
@@ -99,7 +99,7 @@ jobs:
           github_token: ${{ secrets.GH_RUNNER_TOKEN }}
   deploy-staging:
     name: Deploy Gnosis Staging
-    runs-on: self-hosted-hoprnet-small
+    runs-on: depot-ubuntu-24.04-4
     needs: [build-docker, release]
     permissions:
       contents: read

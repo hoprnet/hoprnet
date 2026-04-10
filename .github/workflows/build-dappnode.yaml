@@ -45,7 +45,7 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' || contains(inputs.labels, format('package:{0},', inputs.dappnode_repository))
     name: Build package
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04
     permissions:
       contents: read
     steps:

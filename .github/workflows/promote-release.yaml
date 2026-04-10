@@ -27,7 +27,7 @@ concurrency:
 jobs:
   promote_release:
     name: Promote Release
-    runs-on: self-hosted-hoprnet-small
+    runs-on: depot-ubuntu-24.04-4
     permissions:
       contents: write
     steps:

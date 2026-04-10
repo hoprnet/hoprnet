@@ -27,7 +27,7 @@ jobs:
   validate-pr-title:
     name: Validate title
     if: github.event_name == 'pull_request'
-    runs-on: self-hosted-hoprnet-small
+    runs-on: depot-ubuntu-24.04-4
     permissions:
       pull-requests: read
     steps:
@@ -53,7 +53,7 @@ jobs:
   label:
     name: Add labels
     if: github.event_name == 'pull_request'
-    runs-on: self-hosted-hoprnet-small
+    runs-on: depot-ubuntu-24.04-4
     permissions:
       contents: read
       issues: write
@@ -90,8 +90,8 @@ jobs:
     uses: hoprnet/hopr-workflows/.github/workflows/checks.yaml@bbd22e57cf954c15f0a6051d59329857809141dd # workflow-checks-v1
     with:
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-      runner_small: self-hosted-hoprnet-small
-      runner_large: self-hosted-hoprnet-bigger
+      runner_small: depot-ubuntu-24.04-4
+      runner_large: depot-ubuntu-24.04-16
     secrets:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
@@ -116,7 +116,7 @@ jobs:
           --test '*' \
           --lcov --output-path coverage.lcov \
           -j 1
-      runner: self-hosted-hoprnet-bigger
+      runner: depot-ubuntu-24.04-16
     secrets:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
       codecov_token: ${{ secrets.CODECOV_TOKEN }}
@@ -128,19 +128,19 @@ jobs:
       matrix:
         include:
           - architecture: x86_64-linux
-            runner: self-hosted-hoprnet-bigger
+            runner: depot-ubuntu-24.04-16
             build_command: nix build -L .#binary-hoprd-x86_64-linux
             required_label: ""
           - architecture: aarch64-linux
-            runner: self-hosted-hoprnet-bigger
+            runner: depot-ubuntu-24.04-16
             build_command: nix build -L .#binary-hoprd-aarch64-linux
             required_label: "binary:aarch64-linux"
           - architecture: aarch64-darwin
-            runner: macos-15-xlarge
+            runner: depot-macos-15
             build_command: nix build -L .#binary-hoprd-aarch64-darwin
             required_label: binary:aarch64-darwin
           - architecture: x86_64-darwin
-            runner: macos-15-intel
+            runner: depot-macos-15
             build_command: nix build -L .#binary-hoprd-x86_64-darwin
             required_label: binary:x86_64-darwin
     uses: hoprnet/hopr-workflows/.github/workflows/build-binaries.yaml@build-binaries-v2
@@ -175,7 +175,7 @@ jobs:
       build_matrix: >-
         [
           {
-            "runner": "self-hosted-hoprnet-bigger",
+            "runner": "depot-ubuntu-24.04-16",
             "architecture": "x86_64-linux",
             "build_command": "nix build -L .#docker-hoprd-x86_64-linux",
             "build_debug_command": "nix build -L .#docker-hoprd-dev-x86_64-linux"
@@ -191,7 +191,7 @@ jobs:
 
   docs:
     name: Docs
-    runs-on: self-hosted-hoprnet-bigger
+    runs-on: depot-ubuntu-24.04-16
     timeout-minutes: 60
     permissions:
       contents: read
