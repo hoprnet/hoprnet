@@ -1560,7 +1560,7 @@ dependencies = [
 [[package]]
 name = "blokli-client"
 version = "0.23.1"
-source = "git+https://github.com/hoprnet/blokli?branch=lukas%2Ffix-default-redeemed-stats#c593ba5d4e7f7b5b8bba7b955e518a9ee2505cf0"
+source = "git+https://github.com/hoprnet/blokli?branch=main#e17923466742921800f8da17258b83ba334149d8"
 dependencies = [
  "anyhow",
  "async-broadcast",
