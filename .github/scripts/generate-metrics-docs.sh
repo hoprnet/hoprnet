@@ -137,7 +137,7 @@ fi
 
 # ── --fix: regenerate METRICS.md in place and stage it ─────────────────────────
 if [[ ${1:-} == "--fix" ]]; then
-  expected=$("$0" --generate)
+  expected=$(bash "$0" --generate)
   echo "$expected" >"$METRICS_DOC"
   git -C "$REPO_ROOT" add "$METRICS_DOC"
   echo "METRICS.md updated and staged."
@@ -158,7 +158,7 @@ normalize_table() {
 }
 
 # Generate expected content and compare with the actual file (whitespace-tolerant)
-expected=$("$0" --generate)
+expected=$(bash "$0" --generate)
 
 if ! diff -q <(echo "$expected" | normalize_table) <(normalize_table <"$METRICS_DOC") >/dev/null 2>&1; then
   echo "ERROR: METRICS.md is out of date. Differences:"
