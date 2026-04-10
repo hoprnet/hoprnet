@@ -97,7 +97,7 @@ jobs:
 
   tests:
     name: Test
-    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@a34788ec4bf2bf4bd65aa39163ad920cc9d2833b # workflow-tests-v4
+    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@f24407b0e31b7c48f884198aff01178a7c691610 # workflow-tests-v4
     with:
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
       enable_unit_tests: true
@@ -116,7 +116,7 @@ jobs:
           --test '*' \
           --lcov --output-path coverage.lcov \
           -j 1
-      runner: depot-ubuntu-24.04-16
+      runner_unit: depot-ubuntu-24.04-16
       runner_integration: depot-ubuntu-24.04-8
     secrets:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
