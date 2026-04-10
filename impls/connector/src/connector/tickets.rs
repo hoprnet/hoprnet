@@ -46,8 +46,10 @@ where
                     ticket.ticket.channel_id().into(),
                 )),
                 status: None,
+                ..Default::default()
             })
             .await?
+            .channels
             .first()
             .cloned()
             .ok_or_else(|| {

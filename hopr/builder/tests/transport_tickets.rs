@@ -3,6 +3,7 @@ use std::{ops::Mul, time::Duration};
 use anyhow::Context;
 use futures::{AsyncWriteExt, StreamExt, pin_mut};
 use futures_time::future::FutureExt as _;
+use hopr_api::chain::ChainValues;
 use hopr_builder::{
     hopr_lib::{HoprBalance, HoprLibError, UnitaryFloatOps},
     testing::{
@@ -145,7 +146,7 @@ async fn redeem_ticket_on_request(
 
     wait_until(
         || async {
-            let stats_before = mid.inner().ticket_statistics().await?;
+            let stats_before = mid.inner().ticket_statistics()?;
             Ok::<_, HoprLibError>(stats_before.unredeemed_value >= message_count.into())
         },
         Duration::from_secs(15),
@@ -153,17 +154,23 @@ async fn redeem_ticket_on_request(
     .await
     .context("failed to wait for: `stats_before.unredeemed_value > message_count.into()`")?;
 
-    let stats_before = mid.inner().ticket_statistics().await?;
+    let stats_before = mid
+        .connector
+        .redemption_stats(mid.inner().get_safe_config().safe_address)
+        .await?;
 
     mid.inner()
         .redeem_all_tickets(0)
         .await
         .context("failed to redeem tickets")?;
 
-    #[allow(deprecated)] // TODO: remove once blokli#237 is merged
+    let mid_connector = mid.connector.clone();
     wait_until(
         || async {
-            let stats_after = mid.inner().ticket_statistics().await?;
+            let stats_after = mid_connector
+                .redemption_stats(mid.inner().get_safe_config().safe_address)
+                .await
+                .map_err(HoprLibError::chain)?;
             Ok::<_, HoprLibError>(stats_after.redeemed_value > stats_before.redeemed_value)
         },
         Duration::from_secs(5),
@@ -198,7 +205,6 @@ async fn neglect_ticket_on_closing(
     let stats_after_reset = mid
         .inner()
         .ticket_statistics()
-        .await
         .context("failed to get ticket statistics")?;
 
     let funding_amount = ticket_price.mul(message_count + PROBING_OVERHEAD);
@@ -228,7 +234,7 @@ async fn neglect_ticket_on_closing(
     // background probing).
     wait_until(
         || async {
-            let stats = mid.inner().ticket_statistics().await?;
+            let stats = mid.inner().ticket_statistics()?;
             Ok::<_, HoprLibError>(
                 stats.unredeemed_value >= stats_after_reset.unredeemed_value + HoprBalance::from(message_count),
             )
@@ -242,7 +248,6 @@ async fn neglect_ticket_on_closing(
     let stats_before_close = mid
         .inner()
         .ticket_statistics()
-        .await
         .context("failed to get ticket statistics")?;
 
     fw_channel.try_close_channels_all_channels().await?;
@@ -250,7 +255,7 @@ async fn neglect_ticket_on_closing(
 
     wait_until(
         || async {
-            let stats_after = mid.inner().ticket_statistics().await?;
+            let stats_after = mid.inner().ticket_statistics()?;
             // After closing the test channels, neglected value must increase.
             // We use a delta check because background probing may have created
             // unredeemed tickets on other channels that remain open.
@@ -310,8 +315,12 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
     let stats_before = mid
         .inner()
         .ticket_statistics()
-        .await
         .context("failed to get ticket statistics")?;
+
+    let chain_stats_before = mid
+        .connector
+        .redemption_stats(mid.inner().get_safe_config().safe_address)
+        .await?;
 
     for _ in 1..=message_count {
         tokio::time::timeout(Duration::from_millis(500), session.write_all(&sent_data))
@@ -326,13 +335,17 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
         .await
         .context("failed to redeem tickets")?;
 
-    #[allow(deprecated)] // TODO: remove once blokli#237 is merged
+    let mid_connector = mid.connector.clone();
     wait_until(
         || async {
-            let stats_after = mid.inner().ticket_statistics().await?;
+            let stats_after = mid.inner().ticket_statistics()?;
+            let chain_stats_after = mid_connector
+                .redemption_stats(mid.inner().get_safe_config().safe_address)
+                .await
+                .map_err(HoprLibError::chain)?;
             Ok::<_, HoprLibError>(
                 stats_after.winning_tickets < stats_before.winning_tickets + message_count as u128
-                    && stats_after.redeemed_value > stats_before.redeemed_value,
+                    && chain_stats_after.redeemed_value > chain_stats_before.redeemed_value,
             )
         },
         Duration::from_secs(5),
@@ -425,8 +438,12 @@ async fn relay_with_win_prob_higher_than_min_win_prob_should_succeed(
     let stats_before = mid
         .inner()
         .ticket_statistics()
-        .await
         .context("failed to get ticket statistics")?;
+
+    let chain_stats_before = mid
+        .connector
+        .redemption_stats(mid.inner().get_safe_config().safe_address)
+        .await?;
 
     for _ in 1..=message_count {
         tokio::time::timeout(Duration::from_millis(500), session.write_all(&sent_data))
@@ -440,12 +457,16 @@ async fn relay_with_win_prob_higher_than_min_win_prob_should_succeed(
         .await
         .context("failed to redeem tickets")?;
 
-    #[allow(deprecated)] // TODO: remove once blokli#237 is merged
+    let mid_connector = mid.connector.clone();
     wait_until(
         || async {
-            let stats_after = mid.inner().ticket_statistics().await?;
+            let stats_after = mid.inner().ticket_statistics()?;
+            let chain_stats_after = mid_connector
+                .redemption_stats(mid.inner().get_safe_config().safe_address)
+                .await
+                .map_err(HoprLibError::chain)?;
             Ok::<_, HoprLibError>(
-                stats_after.redeemed_value > stats_before.redeemed_value
+                chain_stats_after.redeemed_value > chain_stats_before.redeemed_value
                     && stats_after.winning_tickets > stats_before.winning_tickets,
             )
         },

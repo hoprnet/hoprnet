@@ -1,6 +1,6 @@
 use std::{ops::Add, str::FromStr};
 
-use blokli_client::{BlokliTestState, BlokliTestStateMutator};
+use blokli_client::{BlokliTestState, BlokliTestStateMutator, api::types::RedeemedStats};
 use hopr_api::types::{
     chain::{ContractAddresses, ParsedHoprChainAction},
     internal::channels::generate_channel_id,
@@ -433,6 +433,36 @@ impl BlokliTestStateMutator for FullStateEmulator {
                     })?;
                     safe_balance.balance =
                         blokli_client::api::types::TokenValueString((balance + *ticket_amount).to_string());
+
+                    match state.safe_redeem_stats.entry(safe_addr.clone()) {
+                        Entry::Occupied(mut e) => {
+                            let stats = e.get_mut();
+                            let current_redeemed_amount: HoprBalance =
+                                stats.redeemed_amount.0.parse().map_err(|_| {
+                                    blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
+                                        "failed to parse redeemed value on {safe_addr}"
+                                    ))
+                                })?;
+                            let current_redeemed_count: u64 = stats.redemption_count.0.parse().map_err(|_| {
+                                blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
+                                    "failed to parse redemed count on {safe_addr}"
+                                ))
+                            })?;
+
+                            stats.redeemed_amount = blokli_client::api::types::TokenValueString(
+                                (current_redeemed_amount + *ticket_amount).to_string(),
+                            );
+                            stats.redemption_count =
+                                blokli_client::api::types::Uint64((current_redeemed_count + 1).to_string());
+                        }
+                        Entry::Vacant(v) => {
+                            v.insert(RedeemedStats {
+                                __typename: "RedeemedStats".to_string(),
+                                redeemed_amount: blokli_client::api::types::TokenValueString(ticket_amount.to_string()),
+                                redemption_count: blokli_client::api::types::Uint64("1".into()),
+                            });
+                        }
+                    }
 
                     tracing::debug!(%channel_id, %ticket_index, %safe_addr, "ticket redeemed into safe");
                 } else {

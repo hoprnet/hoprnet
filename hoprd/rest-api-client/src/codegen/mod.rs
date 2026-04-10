@@ -1179,7 +1179,6 @@ and indexer state.*/
     ///  "type": "object",
     ///  "required": [
     ///    "neglectedValue",
-    ///    "redeemedValue",
     ///    "rejectedValue",
     ///    "unredeemedValue",
     ///    "winningCount"
@@ -1188,12 +1187,6 @@ and indexer state.*/
     ///    "neglectedValue": {
     ///      "examples": [
     ///        "0 wxHOPR"
-    ///      ],
-    ///      "type": "string"
-    ///    },
-    ///    "redeemedValue": {
-    ///      "examples": [
-    ///        "100 wxHOPR"
     ///      ],
     ///      "type": "string"
     ///    },
@@ -1225,8 +1218,6 @@ and indexer state.*/
     pub struct NodeTicketStatisticsResponse {
         #[serde(rename = "neglectedValue")]
         pub neglected_value: ::std::string::String,
-        #[serde(rename = "redeemedValue")]
-        pub redeemed_value: ::std::string::String,
         #[serde(rename = "rejectedValue")]
         pub rejected_value: ::std::string::String,
         #[serde(rename = "unredeemedValue")]

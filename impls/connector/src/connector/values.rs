@@ -1,9 +1,9 @@
 use std::time::Duration;
 
-use blokli_client::api::BlokliQueryClient;
+use blokli_client::api::{BlokliQueryClient, RedeemedStatsSelector};
 use futures::TryFutureExt;
 use hopr_api::{
-    chain::{ChainInfo, DomainSeparators},
+    chain::{ChainInfo, DomainSeparators, RedemptionStats},
     types::{internal::prelude::WinningProbability, primitive::prelude::*},
 };
 
@@ -11,7 +11,7 @@ use crate::{
     HoprBlockchainReader,
     connector::HoprBlockchainConnector,
     errors::ConnectorError,
-    utils::{ParsedChainInfo, model_to_chain_info},
+    utils::{ParsedChainInfo, model_to_chain_info, model_to_redeemed_stats},
 };
 
 pub(crate) const CHAIN_INFO_CACHE_KEY: u32 = 0;
@@ -79,6 +79,15 @@ where
 
     async fn chain_info(&self) -> Result<ChainInfo, Self::Error> {
         Ok(self.query_cached_chain_info().await?.info)
+    }
+
+    async fn redemption_stats<A: Into<Address> + Send>(&self, safe_addr: A) -> Result<RedemptionStats, Self::Error> {
+        let safe_addr = safe_addr.into();
+        model_to_redeemed_stats(
+            self.client
+                .query_redeemed_stats(RedeemedStatsSelector::SafeAddress(safe_addr.into()))
+                .await?,
+        )
     }
 }
 
