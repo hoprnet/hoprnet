@@ -35,7 +35,7 @@ jobs:
           --test '*' \
           --lcov --output-path coverage.lcov \
           -j 1
-      runner: self-hosted-hoprnet-bigger
+      runner: depot-ubuntu-24.04-16
     secrets:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
       codecov_token: ${{ secrets.CODECOV_TOKEN }}
