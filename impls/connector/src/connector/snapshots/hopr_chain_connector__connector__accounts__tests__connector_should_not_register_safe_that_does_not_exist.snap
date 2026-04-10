@@ -1,5 +1,5 @@
 ---
-source: chain/connector/src/connector/accounts.rs
+source: impls/connector/src/connector/accounts.rs
 expression: "*connector.client.snapshot()"
 ---
 accounts: {}
@@ -10,6 +10,7 @@ native_balances:
 token_balances: {}
 safe_allowances: {}
 deployed_safes: {}
+safe_redeem_stats: {}
 tx_counts: {}
 channels: {}
 chain_info:
