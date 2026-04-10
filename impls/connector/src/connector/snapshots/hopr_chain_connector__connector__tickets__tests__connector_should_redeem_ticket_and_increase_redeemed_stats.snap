@@ -1,0 +1,98 @@
+---
+source: impls/connector/src/connector/tickets.rs
+expression: "*connector.client().snapshot()"
+---
+accounts:
+  1:
+    chain_key: 668430def9eacd2b5064acf85d73fb0b351a1c8c
+    keyid: 1
+    multi_addresses: []
+    packet_key: 3f6b51c1158631d57d2ecfe0cc49396de92be26bcea89b77cd60223f1023f1a0
+    safe_address: "0101010101010101010101010101010101010101"
+  2:
+    chain_key: bea83ba0fcee21da44a30c893f466e6bf0c29bbb
+    keyid: 2
+    multi_addresses: []
+    packet_key: 4b8f66f9df296e7d7c2280d9c833c879297ee9d435d6e075d46fad5717211b72
+    safe_address: "0202020202020202020202020202020202020202"
+native_balances:
+  668430def9eacd2b5064acf85d73fb0b351a1c8c:
+    __typename: NativeBalance
+    balance: 0.999999999999999998 xDai
+  "0101010101010101010101010101010101010101":
+    __typename: NativeBalance
+    balance: 0 xDai
+  bea83ba0fcee21da44a30c893f466e6bf0c29bbb:
+    __typename: NativeBalance
+    balance: 1 xDai
+  "0202020202020202020202020202020202020202":
+    __typename: NativeBalance
+    balance: 0 xDai
+token_balances:
+  668430def9eacd2b5064acf85d73fb0b351a1c8c:
+    __typename: HoprBalance
+    balance: 0 wxHOPR
+  "0101010101010101010101010101010101010101":
+    __typename: HoprBalance
+    balance: 100.000000000000000002 wxHOPR
+  bea83ba0fcee21da44a30c893f466e6bf0c29bbb:
+    __typename: HoprBalance
+    balance: 0 wxHOPR
+  "0202020202020202020202020202020202020202":
+    __typename: HoprBalance
+    balance: 100 wxHOPR
+safe_allowances:
+  "0101010101010101010101010101010101010101":
+    __typename: SafeHoprAllowance
+    allowance: 10000000000000 wxHOPR
+  "0202020202020202020202020202020202020202":
+    __typename: SafeHoprAllowance
+    allowance: 10000000000000 wxHOPR
+deployed_safes:
+  "0101010101010101010101010101010101010101":
+    address: "0101010101010101010101010101010101010101"
+    chain_key: 668430def9eacd2b5064acf85d73fb0b351a1c8c
+    module_address: 463977c851087dca6e69d488fbd69dbad3ffc7fe
+    registered_nodes: []
+  "0202020202020202020202020202020202020202":
+    address: "0202020202020202020202020202020202020202"
+    chain_key: bea83ba0fcee21da44a30c893f466e6bf0c29bbb
+    module_address: ff263744a4621e2cac0f4882cc623bee3c9aef8d
+    registered_nodes: []
+safe_redeem_stats:
+  "0101010101010101010101010101010101010101":
+    __typename: RedeemedStats
+    redeemed_amount: 0.000000000000000002 wxHOPR
+    redemption_count: "2"
+tx_counts:
+  668430def9eacd2b5064acf85d73fb0b351a1c8c: 2
+channels:
+  e555945b137ef926702c021fa24104e2268de40641e63b8b747019b09e100802:
+    balance: 0.000000000000000008 wxHOPR
+    closure_time: ~
+    concrete_channel_id: e555945b137ef926702c021fa24104e2268de40641e63b8b747019b09e100802
+    destination: 1
+    epoch: 1
+    source: 2
+    status: OPEN
+    ticket_index: "3"
+chain_info:
+  channel_closure_grace_period: "300"
+  channel_dst: "0000000000000000000000000000000000000000000000000000000000000000"
+  block_number: 1
+  chain_id: 100
+  gas_price: "1000000000"
+  ledger_dst: "0000000000000000000000000000000000000000000000000000000000000000"
+  max_fee_per_gas: "3000000000"
+  max_priority_fee_per_gas: "100000000"
+  min_ticket_winning_probability: 1
+  key_binding_fee: 0.01 wxHOPR
+  safe_registry_dst: "0000000000000000000000000000000000000000000000000000000000000000"
+  ticket_price: 1 wxHOPR
+  network: rotsee
+  contract_addresses: "{\"announcements\":\"0xe08E8EfAc66c83a5e2cE9E0a696f8416A5AB6136\",\"channels\":\"0x81a79fcDe8FFE6452e51D8E0493B37C2a5a09c57\",\"module_implementation\":\"0x5F36592e29D90558bc629a4afd87D37d38d9a595\",\"node_safe_migration\":\"0xb9a6F18b40f632869dEFa4bbB2212c63767Eb159\",\"node_safe_registry\":\"0x8cDf9A10646403C9aA797610D4C782aD26D334f4\",\"node_stake_factory\":\"0x6827eC1Bf6232B07f30C2F2924Ea681412b07687\",\"ticket_price_oracle\":\"0xca2c60433eC6a10dDEabBbE3Ce7f9737b1a0628C\",\"token\":\"0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1\",\"winning_probability_oracle\":\"0x5136Bac09C78af89bDA56F5086A3F3E2Ee4EAfCa\"}"
+  expected_block_time: "5"
+  finality: "3"
+version: "1"
+health: OK
+active_txs: {}
