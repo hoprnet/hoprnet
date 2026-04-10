@@ -1559,8 +1559,8 @@ dependencies = [
 
 [[package]]
 name = "blokli-client"
-version = "0.23.0"
-source = "git+https://github.com/hoprnet/blokli?branch=lukas%2Fadd-redeem-stats-to-testing#2a1fcb8048ac65798cdb319a9052405ed1d4acb9"
+version = "0.23.1"
+source = "git+https://github.com/hoprnet/blokli?branch=lukas%2Ffix-default-redeemed-stats#c593ba5d4e7f7b5b8bba7b955e518a9ee2505cf0"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -6454,7 +6454,7 @@ dependencies = [
  "rcgen",
  "ring",
  "rustls 0.23.37",
- "rustls-webpki 0.103.10",
+ "rustls-webpki 0.103.11",
  "thiserror 2.0.18",
  "x509-parser",
  "yasna",
@@ -8510,7 +8510,7 @@ dependencies = [
  "once_cell",
  "ring",
  "rustls-pki-types",
- "rustls-webpki 0.103.10",
+ "rustls-webpki 0.103.11",
  "subtle",
  "zeroize",
 ]
@@ -8570,9 +8570,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.10"
+version = "0.103.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df33b2b81ac578cabaf06b89b0631153a3f416b0a886e8a7a1707fb51abbd1ef"
+checksum = "20a6af516fea4b20eccceaf166e8aa666ac996208e8a644ce3ef5aa783bc7cd4"
 dependencies = [
  "ring",
  "rustls-pki-types",
