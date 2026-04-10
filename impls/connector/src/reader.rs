@@ -1,16 +1,16 @@
 use std::time::Duration;
 
-use blokli_client::api::{BlokliQueryClient, BlokliSubscriptionClient};
+use blokli_client::api::{BlokliQueryClient, BlokliSubscriptionClient, RedeemedStatsSelector};
 use futures::{StreamExt, TryStreamExt};
 use futures_time::future::FutureExt as FuturesTimeExt;
 use hopr_api::{
-    chain::{ChainInfo, DeployedSafe, DomainSeparators, SafeSelector},
+    chain::{ChainInfo, DeployedSafe, DomainSeparators, RedemptionStats, SafeSelector},
     types::{internal::prelude::*, primitive::prelude::*},
 };
 
 use crate::{
     errors::ConnectorError,
-    utils::{model_to_chain_info, model_to_deployed_safe},
+    utils::{model_to_chain_info, model_to_deployed_safe, model_to_redeemed_stats},
 };
 
 /// A simplified version of [`HoprBlockchainConnector`](crate::HoprBlockchainConnector)
@@ -87,6 +87,15 @@ where
     async fn chain_info(&self) -> Result<ChainInfo, Self::Error> {
         let chain_info = self.0.query_chain_info().await?;
         Ok(model_to_chain_info(chain_info)?.info)
+    }
+
+    async fn redemption_stats<A: Into<Address> + Send>(&self, safe_addr: A) -> Result<RedemptionStats, Self::Error> {
+        let safe_addr = safe_addr.into();
+        model_to_redeemed_stats(
+            self.0
+                .query_redeemed_stats(RedeemedStatsSelector::SafeAddress(safe_addr.into()))
+                .await?,
+        )
     }
 }
 
@@ -171,5 +180,34 @@ where
             })
             .await?
             .into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use hopr_api::chain::ChainValues;
+
+    use super::*;
+    use crate::testing::BlokliTestStateBuilder;
+
+    #[tokio::test]
+    async fn redeemed_stats() -> anyhow::Result<()> {
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_deployed_safes([DeployedSafe {
+                address: [1u8; Address::SIZE].into(),
+                owner: [2u8; Address::SIZE].into(),
+                module: [3u8; Address::SIZE].into(),
+                registered_nodes: vec![],
+            }])
+            .with_hopr_network_chain_info("rotsee")
+            .build_static_client();
+
+        let reader = HoprBlockchainReader::new(blokli_client);
+
+        let stats = reader.redemption_stats([1u8; Address::SIZE]).await?;
+        assert_eq!(0, stats.redeemed_count);
+        assert_eq!(HoprBalance::zero(), stats.redeemed_value);
+
+        Ok(())
     }
 }

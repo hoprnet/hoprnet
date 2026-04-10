@@ -172,11 +172,13 @@ where
             .round() as u32;
         let min_channels = (self
             .client
-            .count_channels(blokli_client::api::ChannelSelector {
+            .query_channel_stats(blokli_client::api::ChannelSelector {
                 filter: None,
                 status: Some(blokli_client::api::types::ChannelStatus::Open),
+                ..Default::default()
             })
-            .await? as f64
+            .await?
+            .count as f64
             * sync_quota)
             .round() as u32;
         tracing::debug!(min_accounts, min_channels, "connection thresholds");

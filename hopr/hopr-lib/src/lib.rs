@@ -1373,8 +1373,7 @@ where
             )))
     }
 
-    // TODO: this method can be sync unless we allow querying of the redeemed value from Blokli
-    pub async fn ticket_statistics(&self) -> Result<ChannelStats, HoprLibError> {
+    pub fn ticket_statistics(&self) -> Result<ChannelStats, HoprLibError> {
         self.ticket_management()?
             .ticket_stats(None)
             .map_err(HoprLibError::ticket_manager)

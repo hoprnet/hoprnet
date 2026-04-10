@@ -1,5 +1,5 @@
 ---
-source: chain/connector/src/connector/accounts.rs
+source: impls/connector/src/connector/accounts.rs
 expression: "*connector.client.snapshot()"
 ---
 accounts: {}
@@ -16,6 +16,7 @@ deployed_safes:
     module_address: "1111111111111111111111111111111111111111"
     registered_nodes:
       - 668430def9eacd2b5064acf85d73fb0b351a1c8c
+safe_redeem_stats: {}
 tx_counts:
   668430def9eacd2b5064acf85d73fb0b351a1c8c: 1
 channels: {}

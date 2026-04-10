@@ -1,5 +1,5 @@
 ---
-source: chain/connector/src/connector/tickets.rs
+source: impls/connector/src/connector/tickets.rs
 expression: "*connector.client().snapshot()"
 ---
 accounts:
@@ -59,6 +59,11 @@ deployed_safes:
     chain_key: bea83ba0fcee21da44a30c893f466e6bf0c29bbb
     module_address: ff263744a4621e2cac0f4882cc623bee3c9aef8d
     registered_nodes: []
+safe_redeem_stats:
+  "0101010101010101010101010101010101010101":
+    __typename: RedeemedStats
+    redeemed_amount: 0.000000000000000001 wxHOPR
+    redemption_count: "1"
 tx_counts:
   668430def9eacd2b5064acf85d73fb0b351a1c8c: 1
 channels:

@@ -1,7 +1,7 @@
 use std::{str::FromStr, time::Duration};
 
 use hopr_api::{
-    chain::{ChainInfo, DeployedSafe, DomainSeparators},
+    chain::{ChainInfo, DeployedSafe, DomainSeparators, RedemptionStats},
     types::{
         chain::{chain_events::ChainEvent, payload::GasEstimation},
         crypto::types::Hash,
@@ -78,6 +78,23 @@ pub(crate) fn model_to_graph_entry(
         .build()?;
 
     Ok((src, dst, channel))
+}
+
+pub(crate) fn model_to_redeemed_stats(
+    model: blokli_client::api::types::RedeemedStats,
+) -> Result<RedemptionStats, ConnectorError> {
+    Ok(RedemptionStats {
+        redeemed_count: model
+            .redemption_count
+            .0
+            .parse()
+            .map_err(|_| ConnectorError::TypeConversion("invalid redemption count".into()))?,
+        redeemed_value: model
+            .redeemed_amount
+            .0
+            .parse()
+            .map_err(|_| ConnectorError::TypeConversion("invalid redeemed amount".into()))?,
+    })
 }
 
 pub(crate) fn model_to_ticket_params(
