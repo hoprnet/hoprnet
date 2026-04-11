@@ -22,16 +22,16 @@ jobs:
       matrix:
         include:
           - architecture: x86_64-linux
-            runner: self-hosted-hoprnet-bigger
+            runner: depot-ubuntu-24.04-8
             build_command: nix build -L .#binary-hoprd-x86_64-linux
           - architecture: aarch64-linux
-            runner: self-hosted-hoprnet-bigger
+            runner: depot-ubuntu-24.04-8
             build_command: nix build -L .#binary-hoprd-aarch64-linux
             # - architecture: x86_64-darwin
-            #   runner: macos-15-intel
+            #   runner: depot-macos-15
             #   build_command: nix build -L .#binary-hoprd-x86_64-darwin
             # - architecture: aarch64-darwin
-            #   runner: macos-15-xlarge
+            #   runner: depot-macos-15
             #   build_command: nix build -L .#binary-hoprd-aarch64-darwin
     uses: hoprnet/hopr-workflows/.github/workflows/build-binaries.yaml@build-binaries-v2
     permissions:
@@ -64,12 +64,12 @@ jobs:
       build_matrix: >-
         [
           {
-            "runner": "self-hosted-hoprnet-bigger",
+            "runner": "depot-ubuntu-24.04-4",
             "architecture": "x86_64-linux",
             "build_command": "nix build -L .#docker-hoprd-x86_64-linux"
           },
           {
-            "runner": "self-hosted-hoprnet-bigger",
+            "runner": "depot-ubuntu-24.04-4",
             "architecture": "aarch64-linux",
             "build_command": "nix build -L .#docker-hoprd-aarch64-linux"
           }
@@ -88,7 +88,7 @@ jobs:
       docker_hub_token: ${{ secrets.DOCKER_HUB_TOKEN }}
   deploy-dev:
     name: Deploy Gnosis Dev
-    runs-on: self-hosted-hoprnet-small
+    runs-on: depot-ubuntu-24.04
     needs: build-docker
     if: github.event.pull_request.merged == true
     permissions:
@@ -108,7 +108,7 @@ jobs:
   cache_deps:
     name: Cache deps
     if: github.event.pull_request.merged == true
-    runs-on: self-hosted-hoprnet-small
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 60
     permissions:
       contents: read
@@ -135,7 +135,7 @@ jobs:
     if: github.event.pull_request.merged == true
     needs:
       - build-docker
-    runs-on: self-hosted-hoprnet-bigger
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 60
     permissions:
       contents: write
@@ -164,7 +164,7 @@ jobs:
       - build-docker
       - docs
     if: ${{ always() && github.event.pull_request.merged == true && !success() }}
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04
     steps:
       - name: Notify failed merge pipeline
         uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
@@ -179,7 +179,7 @@ jobs:
             The merge pipeline has failed for pull request [#${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
   cleanup_actions:
     name: Cleanup Actions
-    runs-on: self-hosted-hoprnet-small
+    runs-on: depot-ubuntu-24.04
     permissions:
       actions: write
     steps:
