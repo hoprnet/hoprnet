@@ -27,6 +27,8 @@ pub mod traits;
 pub mod types;
 /// Utility module with helper types and functionality over hopr-lib behavior.
 pub mod utils;
+/// Builder module for the [`Hopr`] object.
+pub mod builder;
 
 pub use hopr_api as api;
 
@@ -319,7 +321,6 @@ where
     <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
-    /*
     pub async fn new(
         identity: (&ChainKeypair, &OffchainKeypair),
         hopr_chain_api: Chain,
@@ -799,7 +800,7 @@ where
         let _ = self.processes.set(processes);
 
         Ok(hopr_socket)
-    }*/
+    }
 
     fn error_if_not_in_state(&self, state: HoprState, error: String) -> errors::Result<()> {
         if HoprNodeOperations::status(self) == state {
@@ -826,15 +827,24 @@ where
         Ok(())
     }
 
-    /// Create a client session connection returning a session object that implements
-    /// [`futures::io::AsyncRead`] and [`futures::io::AsyncWrite`] and can bu used as a read/write binary session.
+    /// Tries to create a new client Session connection returning a [session object](HoprSession) that implements
+    /// [`futures::io::AsyncRead`] and [`futures::io::AsyncWrite`] and can be used as a read/write socket.
+    ///
+    /// The [`HoprSessionConfigurator`] is also returned allowing the Session to be controlled.
+    ///
+    /// This method does retry automatically if the Session establishment fails.
+    /// See [`SessionGlobalConfig`](config::SessionGlobalConfig) for more details on how to configure
+    /// the retry mechanism.
+    ///
+    /// An opened Session can be closed either by dropping the returned `HoprSession` object or
+    /// by the other party closing it.
     #[cfg(feature = "session-client")]
     pub async fn connect_to(
         &self,
         destination: Address,
         target: SessionTarget,
         cfg: HoprSessionClientConfig,
-    ) -> errors::Result<HoprSession> {
+    ) -> errors::Result<(HoprSession, HoprSessionConfigurator)> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         let backoff = backon::ConstantBuilder::default()
@@ -852,30 +862,6 @@ where
         .retry(backoff)
         .sleep(backon::FuturesTimerSleeper)
         .await?)
-    }
-
-    /// Sends keep-alive to the given [`SessionId`], making sure the session is not
-    /// closed due to inactivity.
-    #[cfg(feature = "session-client")]
-    pub async fn keep_alive_session(&self, id: &SessionId) -> errors::Result<()> {
-        self.error_if_not_in_state(HoprState::Running, "Node is not ready for session operations".into())?;
-        Ok(self.transport_api.probe_session(id).await?)
-    }
-
-    #[cfg(feature = "session-client")]
-    pub async fn get_session_surb_balancer_config(&self, id: &SessionId) -> errors::Result<Option<SurbBalancerConfig>> {
-        self.error_if_not_in_state(HoprState::Running, "Node is not ready for session operations".into())?;
-        Ok(self.transport_api.session_surb_balancing_cfg(id).await?)
-    }
-
-    #[cfg(feature = "session-client")]
-    pub async fn update_session_surb_balancer_config(
-        &self,
-        id: &SessionId,
-        cfg: SurbBalancerConfig,
-    ) -> errors::Result<()> {
-        self.error_if_not_in_state(HoprState::Running, "Node is not ready for session operations".into())?;
-        Ok(self.transport_api.update_session_surb_balancing_cfg(id, cfg).await?)
     }
 }
 
@@ -930,6 +916,8 @@ where
     }
 }
 
+// Available only on Relay nodes that specify `TMgr` that implements TicketManagement
+// Otherwise, the ticket-related operations are not available (e.g.: on Entry and Exit nodes)
 impl<Chain, Graph, Net, TMgr> hopr_api::node::HoprNodeTicketOperations for Hopr<Chain, Graph, Net, TMgr>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
