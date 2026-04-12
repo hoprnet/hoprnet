@@ -80,7 +80,7 @@ use futures_time::future::FutureExt as FuturesTimeFutureExt;
 use hopr_api::{
     chain::*,
     ct::{CoverTrafficGeneration, ProbingTrafficGeneration},
-    node::{ChainInfo, CloseChannelResult, OpenChannelResult, AtomicHoprState},
+    node::{ChainInfo, AtomicHoprState},
 };
 pub use hopr_api::{
     graph::EdgeLinkObservable,
@@ -90,7 +90,7 @@ pub use hopr_api::{
     types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*},
 };
 use hopr_api::graph::HoprGraphApi;
-use hopr_api::node::{ChainEventResolver, CompoundError, HoprNodeChainNetworkOperationsExt, NodeOnchainIdentity};
+use hopr_api::node::{ChainEventResolver, EitherErr, EitherErrExt, EventWaitResult, HoprNodeChainNetworkOperationsExt, NodeOnchainIdentity};
 use hopr_async_runtime::prelude::spawn;
 pub use hopr_async_runtime::{Abortable, AbortableList};
 pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
@@ -895,10 +895,7 @@ where
     }
 
     fn wait_for_on_chain_event<F>(&self, predicate: F, context: String, timeout: Duration) ->
-       Result<
-           ChainEventResolver<<Self::ChainApi as HoprChainApi>::ChainError, Self::NodeChainError>,
-           <Self::ChainApi as HoprChainApi>::ChainError,
-       >
+    EventWaitResult<<Self::ChainApi as HoprChainApi>::ChainError, Self::NodeChainError>
     where
         F: Fn(&ChainEvent) -> bool + Send + Sync + 'static
     {
@@ -917,17 +914,15 @@ where
                 let res = event_stream
                     .next()
                     .timeout(futures_time::time::Duration::from(timeout))
-                    .map_err(|_| HoprLibError::GeneralError(format!("{ctx} timed out after {timeout:?}")))
-                    .await
-                    .map_err(CompoundError::right)?
+                    .map_err(|_| HoprLibError::GeneralError(format!("{ctx} timed out after {timeout:?}")).into_right())
+                    .await?
                     .ok_or(HoprLibError::GeneralError(format!(
                         "failed to yield an on-chain event for {ctx}"
-                    )))
-                    .map_err(CompoundError::right);
+                    )).into_right());
                 debug!(%ctx, ?res, "on-chain event waiting done");
                 res
             })
-                .map_err(move |_| CompoundError::right(HoprLibError::GeneralError(format!("failed to spawn future for {context}"))))
+                .map_err(move |_| HoprLibError::GeneralError(format!("failed to spawn future for {context}")).into_right())
                 .and_then(futures::future::ready)
                 .boxed(),
             handle,
