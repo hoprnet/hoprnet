@@ -10,7 +10,7 @@ use crate::errors::HoprLibError;
 /// Waits until the given address is funded.
 ///
 /// This is done by querying the RPC provider for balance with backoff until `max_delay` argument.
-pub async fn wait_for_funds<R: ChainValues>(
+pub async fn wait_for_funds<R: ChainValues, E1: std::error::Error, E2: std::error::Error>(
     min_balance: XDaiBalance,
     suggested_balance: XDaiBalance,
     max_delay: Duration,

@@ -1,4 +1,4 @@
-use hopr_api::node::state::HoprState;
+use hopr_api::node::HoprState;
 pub use hopr_transport::errors::{HoprTransportError, ProbeError, ProtocolError};
 use thiserror::Error;
 
@@ -30,9 +30,6 @@ pub enum HoprLibError {
     #[error(transparent)]
     TransportError(#[from] HoprTransportError),
 
-    #[error("ticket manager error: {0}")]
-    TicketManagerError(#[source] anyhow::Error),
-
     #[error(transparent)]
     TypeError(#[from] hopr_api::types::primitive::errors::GeneralError),
 
@@ -51,10 +48,6 @@ pub type Result<T> = std::result::Result<T, HoprLibError>;
 impl HoprLibError {
     pub fn chain<E: Into<anyhow::Error>>(e: E) -> Self {
         Self::ChainError(e.into())
-    }
-
-    pub fn ticket_manager<E: Into<anyhow::Error>>(e: E) -> Self {
-        Self::TicketManagerError(e.into())
     }
 
     pub fn other(e: impl Into<anyhow::Error>) -> Self {

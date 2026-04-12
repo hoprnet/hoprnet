@@ -97,6 +97,12 @@ where
                 .await?,
         )
     }
+
+    async fn typical_resolution_time(&self) -> Result<Duration, Self::Error> {
+        let chain_info = self.0.query_chain_info().await?;
+        let info = model_to_chain_info(chain_info)?;
+        Ok(info.expected_block_time * info.finality)
+    }
 }
 
 #[async_trait::async_trait]

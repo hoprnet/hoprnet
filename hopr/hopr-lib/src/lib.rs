@@ -80,15 +80,17 @@ use futures_time::future::FutureExt as FuturesTimeFutureExt;
 use hopr_api::{
     chain::*,
     ct::{CoverTrafficGeneration, ProbingTrafficGeneration},
-    node::{ChainInfo, CloseChannelResult, OpenChannelResult, SafeModuleConfig, state::AtomicHoprState},
+    node::{ChainInfo, CloseChannelResult, OpenChannelResult, AtomicHoprState},
 };
 pub use hopr_api::{
     graph::EdgeLinkObservable,
     network::{NetworkBuilder, NetworkStreamControl},
-    node::{HoprNodeNetworkOperations, HoprNodeOperations, state::HoprState},
+    node::{HoprNodeNetworkOperations, HoprNodeOperations, HoprState},
     tickets::{ChannelStats, RedemptionResult, TicketManagement, TicketManagementExt},
     types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*},
 };
+use hopr_api::graph::HoprGraphApi;
+use hopr_api::node::{ChainEventResolver, CompoundError, HoprNodeChainNetworkOperationsExt, NodeOnchainIdentity};
 use hopr_async_runtime::prelude::spawn;
 pub use hopr_async_runtime::{Abortable, AbortableList};
 pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
@@ -276,16 +278,13 @@ pub type HoprTransportIO = socket::HoprSocket<
 >;
 
 type TicketEvents = (
-    async_broadcast::Sender<TicketEvent>,
-    async_broadcast::InactiveReceiver<TicketEvent>,
+    async_broadcast::Sender<hopr_api::node::TicketEvent>,
+    async_broadcast::InactiveReceiver<hopr_api::node::TicketEvent>,
 );
 
 /// Time to wait until the node's keybinding appears on-chain
 const NODE_READY_TIMEOUT: Duration = Duration::from_secs(120);
 
-/// Timeout to wait until an on-chain event is received in response to a successful on-chain operation resolution.
-// TODO: use the value from ChainInfo instead (once available via https://github.com/hoprnet/blokli/issues/200)
-const ON_CHAIN_RESOLUTION_EVENT_TIMEOUT: Duration = Duration::from_secs(90);
 
 /// HOPR main object providing the entire HOPR node functionality
 ///
@@ -298,51 +297,34 @@ const ON_CHAIN_RESOLUTION_EVENT_TIMEOUT: Duration = Duration::from_secs(90);
 /// that manual interaction is unnecessary.
 ///
 /// As such, the `hopr_lib` serves mainly as an integration point into Rust programs.
-pub struct Hopr<Chain, Graph, Net>
-where
-    Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
-        + hopr_api::graph::NetworkGraphUpdate
-        + hopr_api::graph::NetworkGraphWrite<NodeId = OffchainPublicKey>
-        + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
-        + Clone
-        + Send
-        + Sync
-        + 'static,
-    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
-        hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
-    <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
-    Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
-{
+pub struct Hopr<Chain, Graph, Net, TMgr> {
     me: OffchainKeypair,
+    chain_id: NodeOnchainIdentity,
     cfg: config::HoprLibConfig,
-    state: Arc<api::node::state::AtomicHoprState>,
+    state: Arc<AtomicHoprState>,
     transport_api: HoprTransport<Chain, Graph, Net>,
     chain_api: Chain,
     ticket_event_subscribers: TicketEvents,
-    ticket_manager: OnceLock<Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>>,
+    ticket_manager: TMgr,
     processes: OnceLock<AbortableList<HoprLibProcess>>,
 }
 
-impl<Chain, Graph, Net> Hopr<Chain, Graph, Net>
+
+impl<Chain, Graph, Net, TMgr> Hopr<Chain, Graph, Net, TMgr>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
-    Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
-        + hopr_api::graph::NetworkGraphUpdate
-        + hopr_api::graph::NetworkGraphWrite<NodeId = OffchainPublicKey>
-        + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
-        + Clone
-        + Send
-        + Sync
-        + 'static,
+    Graph: HoprGraphApi<HoprNodeId = OffchainPublicKey> + Clone + Send + Sync + 'static,
     <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
         hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
     <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
 {
+    /*
     pub async fn new(
         identity: (&ChainKeypair, &OffchainKeypair),
         hopr_chain_api: Chain,
         graph: Graph,
+        ticket_manager: TMgr,
         cfg: config::HoprLibConfig,
     ) -> errors::Result<Self> {
         if hopr_api::types::crypto_random::is_rng_fixed() {
@@ -381,23 +363,21 @@ where
 
         Ok(Self {
             me: identity.1.clone(),
+            chain_id: NodeOnchainIdentity {
+                node_address: *identity.0.as_ref(),
+                safe_address: cfg.safe_module.safe_address,
+                module_address: cfg.safe_module.module_address,
+            },
             cfg,
             state: Arc::new(AtomicHoprState::new(HoprState::Uninitialized)),
             transport_api: hopr_transport_api,
             chain_api: hopr_chain_api,
             processes: OnceLock::new(),
             ticket_event_subscribers: (new_tickets_tx, new_tickets_rx.deactivate()),
-            ticket_manager: Default::default(),
+            ticket_manager,
         })
     }
 
-    fn error_if_not_in_state(&self, state: HoprState, error: String) -> errors::Result<()> {
-        if HoprNodeOperations::status(self) == state {
-            Ok(())
-        } else {
-            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(state, error)))
-        }
-    }
 
     pub fn config(&self) -> &config::HoprLibConfig {
         &self.cfg
@@ -819,6 +799,14 @@ where
         let _ = self.processes.set(processes);
 
         Ok(hopr_socket)
+    }*/
+
+    fn error_if_not_in_state(&self, state: HoprState, error: String) -> errors::Result<()> {
+        if HoprNodeOperations::status(self) == state {
+            Ok(())
+        } else {
+            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(state, error)))
+        }
     }
 
     /// Used to practically shut down all node's processes without dropping the instance.
@@ -828,7 +816,7 @@ where
     /// Such operations will return [`HoprStatusError::NotThereYet`].
     ///
     /// This is the final state and cannot be reversed by calling `run` again.
-    pub fn shutdown(&self) -> Result<(), HoprLibError> {
+    pub fn shutdown(&self) -> errors::Result<()> {
         self.error_if_not_in_state(HoprState::Running, "node is not running".into())?;
         if let Some(processes) = self.processes.get() {
             processes.abort_all();
@@ -889,27 +877,39 @@ where
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for session operations".into())?;
         Ok(self.transport_api.update_session_surb_balancing_cfg(id, cfg).await?)
     }
+}
 
-    /// Spawns a one-shot awaiter that hooks up to the [`ChainEvent`] bus and either matching the given `predicate`
-    /// successfully or timing out after `timeout`.
-    fn spawn_wait_for_on_chain_event(
-        &self,
-        context: impl std::fmt::Display,
-        predicate: impl Fn(&ChainEvent) -> bool + Send + Sync + 'static,
-        timeout: Duration,
-    ) -> errors::Result<(
-        impl Future<Output = errors::Result<ChainEvent>>,
-        hopr_async_runtime::AbortHandle,
-    )> {
+impl<Chain, Graph, Net, TMgr> hopr_api::node::HoprNodeChainOperations for Hopr<Chain, Graph, Net, TMgr>
+where
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+{
+    type NodeChainError = HoprLibError;
+    type ChainApi = Chain;
+
+    fn identity(&self) -> &NodeOnchainIdentity {
+        &self.chain_id
+    }
+
+    fn chain_api(&self) -> &Self::ChainApi {
+        &self.chain_api
+    }
+
+    fn wait_for_on_chain_event<F>(&self, predicate: F, context: String, timeout: Duration) ->
+       Result<
+           ChainEventResolver<<Self::ChainApi as HoprChainApi>::ChainError, Self::NodeChainError>,
+           <Self::ChainApi as HoprChainApi>::ChainError,
+       >
+    where
+        F: Fn(&ChainEvent) -> bool + Send + Sync + 'static
+    {
         debug!(%context, "registering wait for on-chain event");
         let (event_stream, handle) = futures::stream::abortable(
             self.chain_api
-                .subscribe()
-                .map_err(HoprLibError::chain)?
+                .subscribe()?
                 .skip_while(move |event| futures::future::ready(!predicate(event))),
         );
 
-        let ctx = context.to_string();
+        let ctx = context.clone();
 
         Ok((
             spawn(async move {
@@ -918,35 +918,40 @@ where
                     .next()
                     .timeout(futures_time::time::Duration::from(timeout))
                     .map_err(|_| HoprLibError::GeneralError(format!("{ctx} timed out after {timeout:?}")))
-                    .await?
+                    .await
+                    .map_err(CompoundError::right)?
                     .ok_or(HoprLibError::GeneralError(format!(
                         "failed to yield an on-chain event for {ctx}"
-                    )));
+                    )))
+                    .map_err(CompoundError::right);
                 debug!(%ctx, ?res, "on-chain event waiting done");
                 res
             })
-            .map_err(move |_| HoprLibError::GeneralError(format!("failed to spawn future for {context}")))
-            .and_then(futures::future::ready),
+                .map_err(move |_| CompoundError::right(HoprLibError::GeneralError(format!("failed to spawn future for {context}"))))
+                .and_then(futures::future::ready)
+                .boxed(),
             handle,
         ))
     }
 }
 
-impl<Chain, Graph, Net> Hopr<Chain, Graph, Net>
+impl<Chain, Graph, Net, TMgr> hopr_api::node::HoprNodeTicketOperations for Hopr<Chain, Graph, Net, TMgr>
 where
-    Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
-        + hopr_api::graph::NetworkGraphUpdate
-        + hopr_api::graph::NetworkGraphWrite<NodeId = OffchainPublicKey>
-        + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
-        + Clone
-        + Send
-        + Sync
-        + 'static,
-    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
-        hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
-    <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
-    Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+    TMgr: TicketManagement + Clone + Send + Sync + 'static,
 {
+    type TicketManager = TMgr;
+
+    fn subscribe_ticket_events(&self) -> impl Stream<Item=hopr_api::node::TicketEvent> + Send + 'static {
+        self.ticket_event_subscribers.1.activate_cloned()
+    }
+
+    fn ticket_management(&self) -> &Self::TicketManager {
+        &self.ticket_manager
+    }
+}
+
+impl<Chain, Graph, Net, TMgr> Hopr<Chain, Graph, Net, TMgr> {
     // === telemetry
     /// Prometheus formatted metrics collected by the hopr-lib components.
     pub fn collect_hopr_metrics() -> errors::Result<String> {
@@ -960,54 +965,35 @@ where
     }
 }
 
-// === Trait implementations for the high-level node API ===
-
-impl<Chain, Graph, Net> HoprNodeOperations for Hopr<Chain, Graph, Net>
-where
-    Chain: HoprChainApi + Clone + Send + Sync + 'static,
-    Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
-        + hopr_api::graph::NetworkGraphUpdate
-        + hopr_api::graph::NetworkGraphWrite<NodeId = OffchainPublicKey>
-        + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
-        + Clone
-        + Send
-        + Sync
-        + 'static,
-    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
-        hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
-    <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
-    Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
-{
+impl<Chain, Graph, Net, TMgr> HoprNodeOperations for Hopr<Chain, Graph, Net, TMgr> {
     fn status(&self) -> HoprState {
         self.state.load(Ordering::Relaxed)
     }
 }
 
 #[async_trait::async_trait]
-impl<Chain, Graph, Net> HoprNodeNetworkOperations for Hopr<Chain, Graph, Net>
+impl<Chain, Graph, Net, TMgr> HoprNodeNetworkOperations for Hopr<Chain, Graph, Net, TMgr>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
-    Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
-        + hopr_api::graph::NetworkGraphUpdate
-        + hopr_api::graph::NetworkGraphWrite<NodeId = OffchainPublicKey>
-        + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
-        + Clone
-        + Send
-        + Sync
-        + 'static,
+    Graph: HoprGraphApi<HoprNodeId = OffchainPublicKey> + Clone + Send + Sync + 'static,
     <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
         hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
     <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
+    TMgr: Send + Sync + 'static,
 {
-    type Error = HoprLibError;
+    type NodeNetworkError = HoprLibError;
     type TransportObservable = <Graph as hopr_api::graph::NetworkGraphView>::Observed;
 
     fn me_peer_id(&self) -> PeerId {
         (*self.me.public()).into()
     }
 
-    async fn get_public_nodes(&self) -> Result<Vec<(PeerId, Address, Vec<Multiaddr>)>, Self::Error> {
+    fn peer_id_to_offchain_key(&self, peer_id: &PeerId) -> Result<OffchainPublicKey, Self::NodeNetworkError> {
+        Ok(hopr_transport::peer_id_to_public_key(peer_id)?)
+    }
+
+    async fn get_public_nodes(&self) -> Result<Vec<(PeerId, Address, Vec<Multiaddr>)>, Self::NodeNetworkError> {
         Ok(self
             .chain_api
             .stream_accounts(AccountSelector {
@@ -1030,7 +1016,7 @@ where
         self.transport_api.network_health().await
     }
 
-    async fn network_connected_peers(&self) -> Result<Vec<PeerId>, Self::Error> {
+    async fn network_connected_peers(&self) -> Result<Vec<PeerId>, Self::NodeNetworkError> {
         Ok(self
             .transport_api
             .network_connected_peers()
@@ -1048,16 +1034,17 @@ where
     async fn all_network_peers(
         &self,
         minimum_score: f64,
-    ) -> Result<Vec<(Option<Address>, PeerId, Self::TransportObservable)>, Self::Error> {
+    ) -> Result<Vec<(Option<Address>, PeerId, Self::TransportObservable)>, Self::NodeNetworkError> {
         Ok(
-            futures::stream::iter(self.transport_api.all_network_peers(minimum_score).await?)
-                .filter_map(|(pubkey, info)| async move {
+            self.transport_api.all_network_peers(minimum_score)
+                .await?
+                .into_iter()
+                .filter_map(|(pubkey, info)| {
                     let peer_id = PeerId::from(pubkey);
                     let address = self.peerid_to_chain_key(&peer_id).ok().flatten();
                     Some((address, peer_id, info))
                 })
                 .collect::<Vec<_>>()
-                .await,
         )
     }
 
@@ -1076,7 +1063,7 @@ where
         self.transport_api.network_observed_multiaddresses(&pubkey).await
     }
 
-    async fn multiaddresses_announced_on_chain(&self, peer: &PeerId) -> Result<Vec<Multiaddr>, Self::Error> {
+    async fn multiaddresses_announced_on_chain(&self, peer: &PeerId) -> Result<Vec<Multiaddr>, Self::NodeNetworkError> {
         let pubkey = hopr_transport::peer_id_to_public_key(peer).map_err(HoprLibError::TransportError)?;
 
         match self
@@ -1098,376 +1085,9 @@ where
         }
     }
 
-    async fn ping(&self, peer: &PeerId) -> Result<(Duration, Self::TransportObservable), Self::Error> {
+    async fn ping(&self, peer: &PeerId) -> Result<(Duration, Self::TransportObservable), Self::NodeNetworkError> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
         let pubkey = hopr_transport::peer_id_to_public_key(peer).map_err(HoprLibError::TransportError)?;
         Ok(self.transport_api.ping(&pubkey).await?)
-    }
-}
-
-impl<Chain, Graph, Net> Hopr<Chain, Graph, Net>
-where
-    Chain: HoprChainApi + Clone + Send + Sync + 'static,
-    Graph: hopr_api::graph::NetworkGraphView<NodeId = OffchainPublicKey>
-        + hopr_api::graph::NetworkGraphUpdate
-        + hopr_api::graph::NetworkGraphWrite<NodeId = OffchainPublicKey>
-        + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
-        + Clone
-        + Send
-        + Sync
-        + 'static,
-    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
-        hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
-    <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
-    Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
-{
-    // Minimum grace period left in PendingToClose channel, so
-    // that ticket redemption should still be attempted.
-    const PENDING_TO_CLOSE_TOLERANCE: Duration = Duration::from_secs(5);
-
-    pub fn me_onchain(&self) -> Address {
-        *self.chain_api.me()
-    }
-
-    pub fn get_safe_config(&self) -> SafeModuleConfig {
-        SafeModuleConfig {
-            safe_address: self.cfg.safe_module.safe_address,
-            module_address: self.cfg.safe_module.module_address,
-        }
-    }
-
-    pub async fn get_balance<C: Currency + Send>(&self) -> Result<Balance<C>, HoprLibError> {
-        self.chain_api
-            .balance(self.me_onchain())
-            .await
-            .map_err(HoprLibError::chain)
-    }
-
-    pub async fn get_safe_balance<C: Currency + Send>(&self) -> Result<Balance<C>, HoprLibError> {
-        self.chain_api
-            .balance(self.cfg.safe_module.safe_address)
-            .await
-            .map_err(HoprLibError::chain)
-    }
-
-    pub async fn safe_allowance(&self) -> Result<HoprBalance, HoprLibError> {
-        self.chain_api
-            .safe_allowance(self.cfg.safe_module.safe_address)
-            .await
-            .map_err(HoprLibError::chain)
-    }
-
-    pub async fn chain_info(&self) -> Result<ChainInfo, HoprLibError> {
-        self.chain_api.chain_info().await.map_err(HoprLibError::chain)
-    }
-
-    pub async fn get_ticket_price(&self) -> Result<HoprBalance, HoprLibError> {
-        self.chain_api.minimum_ticket_price().await.map_err(HoprLibError::chain)
-    }
-
-    pub async fn get_minimum_incoming_ticket_win_probability(&self) -> Result<WinningProbability, HoprLibError> {
-        self.chain_api
-            .minimum_incoming_ticket_win_prob()
-            .await
-            .map_err(HoprLibError::chain)
-    }
-
-    pub async fn get_channel_closure_notice_period(&self) -> Result<Duration, HoprLibError> {
-        self.chain_api
-            .channel_closure_notice_period()
-            .await
-            .map_err(HoprLibError::chain)
-    }
-
-    pub async fn announced_peers(&self) -> Result<Vec<AnnouncedPeer>, HoprLibError> {
-        Ok(self
-            .chain_api
-            .stream_accounts(AccountSelector {
-                public_only: true,
-                ..Default::default()
-            })
-            .map_err(HoprLibError::chain)?
-            .map(|entry| AnnouncedPeer {
-                address: entry.chain_addr,
-                multiaddresses: entry.get_multiaddrs().to_vec(),
-                origin: AnnouncementOrigin::Chain,
-            })
-            .collect()
-            .await)
-    }
-
-    pub fn peerid_to_chain_key(&self, peer_id: &PeerId) -> Result<Option<Address>, HoprLibError> {
-        let pubkey = hopr_transport::peer_id_to_public_key(peer_id).map_err(HoprLibError::TransportError)?;
-
-        self.chain_api
-            .packet_key_to_chain_key(&pubkey)
-            .map_err(HoprLibError::chain)
-    }
-
-    pub fn chain_key_to_peerid(&self, address: &Address) -> Result<Option<PeerId>, HoprLibError> {
-        self.chain_api
-            .chain_key_to_packet_key(address)
-            .map(|pk| pk.map(|v| v.into()))
-            .map_err(HoprLibError::chain)
-    }
-
-    pub fn channel_by_id(&self, channel_id: &ChannelId) -> Result<Option<ChannelEntry>, HoprLibError> {
-        self.chain_api.channel_by_id(channel_id).map_err(HoprLibError::chain)
-    }
-
-    pub fn channel(&self, src: &Address, dest: &Address) -> Result<Option<ChannelEntry>, HoprLibError> {
-        self.chain_api
-            .channel_by_parties(src, dest)
-            .map_err(HoprLibError::chain)
-    }
-
-    pub async fn channels_from(&self, src: &Address) -> Result<Vec<ChannelEntry>, HoprLibError> {
-        Ok(self
-            .chain_api
-            .stream_channels(ChannelSelector::default().with_source(*src).with_allowed_states(&[
-                ChannelStatusDiscriminants::Closed,
-                ChannelStatusDiscriminants::Open,
-                ChannelStatusDiscriminants::PendingToClose,
-            ]))
-            .map_err(HoprLibError::chain)?
-            .collect()
-            .await)
-    }
-
-    pub async fn channels_to(&self, dest: &Address) -> Result<Vec<ChannelEntry>, HoprLibError> {
-        Ok(self
-            .chain_api
-            .stream_channels(
-                ChannelSelector::default()
-                    .with_destination(*dest)
-                    .with_allowed_states(&[
-                        ChannelStatusDiscriminants::Closed,
-                        ChannelStatusDiscriminants::Open,
-                        ChannelStatusDiscriminants::PendingToClose,
-                    ]),
-            )
-            .map_err(HoprLibError::chain)?
-            .collect()
-            .await)
-    }
-
-    pub async fn all_channels(&self) -> Result<Vec<ChannelEntry>, HoprLibError> {
-        Ok(self
-            .chain_api
-            .stream_channels(ChannelSelector::default().with_allowed_states(&[
-                ChannelStatusDiscriminants::Closed,
-                ChannelStatusDiscriminants::Open,
-                ChannelStatusDiscriminants::PendingToClose,
-            ]))
-            .map_err(HoprLibError::chain)?
-            .collect()
-            .await)
-    }
-
-    pub async fn open_channel(
-        &self,
-        destination: &Address,
-        amount: HoprBalance,
-    ) -> Result<OpenChannelResult, HoprLibError> {
-        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
-
-        let channel_id = generate_channel_id(&self.me_onchain(), destination);
-
-        // Subscribe to chain events BEFORE sending the transaction to avoid
-        // a race where the event is broadcast before the subscriber activates.
-        let (event_awaiter, event_abort) = self.spawn_wait_for_on_chain_event(
-            format!("open channel to {destination} ({channel_id})"),
-            move |event| matches!(event, ChainEvent::ChannelOpened(c) if c.get_id() == &channel_id),
-            ON_CHAIN_RESOLUTION_EVENT_TIMEOUT,
-        )?;
-
-        let confirm_awaiter = self
-            .chain_api
-            .open_channel(destination, amount)
-            .await
-            .map_err(HoprLibError::chain)?;
-
-        let tx_hash = confirm_awaiter.await.map_err(|e| {
-            event_abort.abort();
-            HoprLibError::chain(e)
-        })?;
-
-        let event = event_awaiter.await?;
-        debug!(%event, "open channel event received");
-
-        Ok(OpenChannelResult { tx_hash, channel_id })
-    }
-
-    pub async fn fund_channel(&self, channel_id: &ChannelId, amount: HoprBalance) -> Result<Hash, HoprLibError> {
-        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
-
-        let channel_id = *channel_id;
-
-        // Subscribe to chain events BEFORE sending the transaction to avoid
-        // a race where the event is broadcast before the subscriber activates.
-        let (event_awaiter, event_abort) = self.spawn_wait_for_on_chain_event(
-            format!("fund channel {channel_id}"),
-            move |event| matches!(event, ChainEvent::ChannelBalanceIncreased(c, a) if c.get_id() == &channel_id && a == &amount),
-            ON_CHAIN_RESOLUTION_EVENT_TIMEOUT
-        )?;
-
-        let confirm_awaiter = self
-            .chain_api
-            .fund_channel(&channel_id, amount)
-            .await
-            .map_err(HoprLibError::chain)?;
-
-        let res = confirm_awaiter.await.map_err(|e| {
-            event_abort.abort();
-            HoprLibError::chain(e)
-        })?;
-
-        let event = event_awaiter.await?;
-        debug!(%event, "fund channel event received");
-
-        Ok(res)
-    }
-
-    pub async fn close_channel_by_id(&self, channel_id: &ChannelId) -> Result<CloseChannelResult, HoprLibError> {
-        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
-
-        let channel_id = *channel_id;
-
-        // Subscribe to chain events BEFORE sending the transaction to avoid
-        // a race where the event is broadcast before the subscriber activates.
-        let (event_awaiter, event_abort) = self.spawn_wait_for_on_chain_event(
-            format!("close channel {channel_id}"),
-            move |event| {
-                matches!(event, ChainEvent::ChannelClosed(c) if c.get_id() == &channel_id)
-                    || matches!(event, ChainEvent::ChannelClosureInitiated(c) if c.get_id() == &channel_id)
-            },
-            ON_CHAIN_RESOLUTION_EVENT_TIMEOUT,
-        )?;
-
-        let confirm_awaiter = self
-            .chain_api
-            .close_channel(&channel_id)
-            .await
-            .map_err(HoprLibError::chain)?;
-
-        let tx_hash = confirm_awaiter.await.map_err(|e| {
-            event_abort.abort();
-            HoprLibError::chain(e)
-        })?;
-
-        let event = event_awaiter.await?;
-        debug!(%event, "close channel event received");
-
-        Ok(CloseChannelResult { tx_hash })
-    }
-
-    pub fn ticket_management(&self) -> Result<impl TicketManagement + Clone + Send + 'static, HoprLibError> {
-        self.error_if_not_in_state(HoprState::Running, "Node is not ready for transport operations".into())?;
-
-        self.ticket_manager
-            .get()
-            .cloned()
-            .ok_or(HoprLibError::StatusError(HoprStatusError::NotThereYet(
-                HoprState::Running,
-                "Node is not ready for transport operations".into(),
-            )))
-    }
-
-    pub fn ticket_statistics(&self) -> Result<ChannelStats, HoprLibError> {
-        self.ticket_management()?
-            .ticket_stats(None)
-            .map_err(HoprLibError::ticket_manager)
-    }
-
-    pub async fn redeem_all_tickets<B: Into<HoprBalance> + Send>(
-        &self,
-        min_value: B,
-    ) -> Result<Vec<RedemptionResult>, HoprLibError> {
-        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
-
-        let min_value = min_value.into();
-
-        self.ticket_management()?
-            .redeem_in_channels(
-                self.chain_api.clone(),
-                None,
-                min_value.into(),
-                Some(Self::PENDING_TO_CLOSE_TOLERANCE),
-            )
-            .await
-            .map_err(HoprLibError::ticket_manager)?
-            .try_collect::<Vec<_>>()
-            .map_err(HoprLibError::ticket_manager)
-            .await
-    }
-
-    pub async fn redeem_tickets_with_counterparty<B: Into<HoprBalance> + Send>(
-        &self,
-        counterparty: &Address,
-        min_value: B,
-    ) -> Result<Vec<RedemptionResult>, HoprLibError> {
-        self.redeem_tickets_in_channel(&generate_channel_id(counterparty, &self.me_onchain()), min_value)
-            .await
-    }
-
-    pub async fn redeem_tickets_in_channel<B: Into<HoprBalance> + Send>(
-        &self,
-        channel_id: &ChannelId,
-        min_value: B,
-    ) -> Result<Vec<RedemptionResult>, HoprLibError> {
-        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
-
-        let min_value = min_value.into();
-
-        let chain_api = self.chain_api.clone();
-        let channel_id = *channel_id;
-        let channel = hopr_async_runtime::prelude::spawn_blocking(move || {
-            chain_api
-                .channel_by_id(&channel_id)
-                .map_err(HoprLibError::chain)?
-                .ok_or(HoprLibError::GeneralError("channel not found".into()))
-        })
-        .await
-        .map_err(HoprLibError::other)??;
-
-        self.ticket_management()?
-            .redeem_in_channels(
-                self.chain_api.clone(),
-                ChannelSelector::default()
-                    .with_source(channel.source)
-                    .with_destination(channel.destination)
-                    .into(),
-                min_value.into(),
-                Some(Self::PENDING_TO_CLOSE_TOLERANCE),
-            )
-            .await
-            .map_err(HoprLibError::ticket_manager)?
-            .map_err(HoprLibError::ticket_manager)
-            .try_collect::<Vec<_>>()
-            .await
-    }
-
-    pub fn subscribe_ticket_events(&self) -> impl Stream<Item = TicketEvent> + Send + 'static {
-        self.ticket_event_subscribers.1.activate_cloned()
-    }
-
-    pub async fn withdraw_tokens(&self, recipient: Address, amount: HoprBalance) -> Result<Hash, HoprLibError> {
-        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
-
-        self.chain_api
-            .withdraw(amount, &recipient)
-            .and_then(identity)
-            .map_err(HoprLibError::chain)
-            .await
-    }
-
-    pub async fn withdraw_native(&self, recipient: Address, amount: XDaiBalance) -> Result<Hash, HoprLibError> {
-        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
-
-        self.chain_api
-            .withdraw(amount, &recipient)
-            .and_then(identity)
-            .map_err(HoprLibError::chain)
-            .await
     }
 }

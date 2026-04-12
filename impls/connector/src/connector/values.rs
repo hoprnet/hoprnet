@@ -89,6 +89,11 @@ where
                 .await?,
         )
     }
+
+    async fn typical_resolution_time(&self) -> Result<Duration, Self::Error> {
+        let v = self.query_cached_chain_info().await?;
+        Ok(v.expected_block_time * v.finality)
+    }
 }
 
 #[cfg(test)]

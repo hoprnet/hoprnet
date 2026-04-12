@@ -43,7 +43,6 @@ tracing = { workspace = true }
 validator = { workspace = true }
 
 hopr-api = { workspace = true, features = [
-  "db",
   "chain",
   "types-random",
   "tickets",

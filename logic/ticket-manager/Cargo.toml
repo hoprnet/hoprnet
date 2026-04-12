@@ -31,7 +31,6 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 hopr-api = { workspace = true, features = [
-  "db",
   "chain",
   "tickets",
   "types-internal",
