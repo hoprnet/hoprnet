@@ -1,4 +1,4 @@
-use std::{convert::identity, sync::Arc, time::Duration};
+use std::{convert::identity, path::PathBuf, sync::Arc, time::Duration};
 
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt, channel::mpsc::channel};
 use futures_concurrency::stream::StreamExt as ConcurrencyStreamExt;
@@ -15,7 +15,7 @@ use hopr_async_runtime::AbortableList;
 use hopr_ct_full_network::ProberConfig;
 use hopr_network_graph::{ChannelGraph, SharedChannelGraph};
 use hopr_network_types::addr::is_public_address;
-use hopr_ticket_manager::{HoprTicketFactory, HoprTicketManager, OutgoingIndexStore, TicketQueueStore};
+use hopr_ticket_manager::{HoprTicketFactory, HoprTicketManager, RedbStore, RedbTicketQueue};
 use hopr_transport::HoprTransport;
 use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork, PeerDiscovery};
 use tokio::spawn;
@@ -28,7 +28,25 @@ use crate::{
     exports::types::chain::chain_events::ChainEvent, helpers, traits::HoprSessionServer,
 };
 
-pub type SharedTicketManager<B, Q> = Arc<HoprTicketManager<B, Q>>;
+#[cfg(all(feature = "telemetry", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_PROCESS_START_TIME:  hopr_metrics::SimpleGauge =  hopr_metrics::SimpleGauge::new(
+        "hopr_start_time",
+        "The unix timestamp in seconds at which the process was started"
+    ).unwrap();
+    static ref METRIC_HOPR_LIB_VERSION:  hopr_metrics::MultiGauge =  hopr_metrics::MultiGauge::new(
+        "hopr_lib_version",
+        "Executed version of hopr-lib",
+        &["version"]
+    ).unwrap();
+    static ref METRIC_HOPR_NODE_INFO:  hopr_metrics::MultiGauge =  hopr_metrics::MultiGauge::new(
+        "hopr_node_addresses",
+        "Node on-chain and off-chain addresses",
+        &["peerid", "address", "safe_address", "module_address"]
+    ).unwrap();
+}
+
+pub type SharedTicketManager = Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>;
 
 pub struct HoprBuilder<Chain, Srv> {
     chain: Option<Chain>,
@@ -37,6 +55,7 @@ pub struct HoprBuilder<Chain, Srv> {
     _session_server: Option<Srv>,
     cfg: HoprLibConfig,
     prober_cfg: ProberConfig,
+    ticket_index_db_path: Option<PathBuf>,
     // Set during build, not by the user
     network_builder: Option<HoprLibp2pNetworkBuilder>,
     graph: Option<SharedChannelGraph>,
@@ -55,6 +74,7 @@ impl<Chain, Srv> Default for HoprBuilder<Chain, Srv> {
             _session_server: None,
             cfg: Default::default(),
             prober_cfg: Default::default(),
+            ticket_index_db_path: None,
             network_builder: None,
             graph: None,
             ct: None,
@@ -64,34 +84,72 @@ impl<Chain, Srv> Default for HoprBuilder<Chain, Srv> {
 }
 
 impl<Chain, Srv> HoprBuilder<Chain, Srv> {
+    /// Set the `Chain` object.
+    ///
+    /// This parameter is required.
     pub fn chain(mut self, chain: Chain) -> Self {
         self.chain = Some(chain);
         self
     }
 
+    /// Set the node's on-chain and off-chain identity.
+    ///
+    /// This parameter is required.
     pub fn identity<I: for<'a> Into<(&'a ChainKeypair, &'a OffchainKeypair)>>(mut self, identity: I) -> Self {
         let (ckp, okp) = identity.into();
         self.identity = Some((ckp.clone(), okp.clone()));
         self
     }
 
+    /// Sets the node Safe and module addresses.
+    ///
+    /// This parameter is required.
     pub fn safe_and_module(mut self, safe: &Address, module: &Address) -> Self {
         self.safe_and_module = Some((*safe, *module));
         self
     }
 
+    /// Path where to store the outgoing ticket indices.
+    ///
+    /// This parameter is optional. If not set, a temporary file is used and discarded
+    /// after the node is stopped.
+    pub fn with_index_db_path(mut self, path_buf: PathBuf) -> Self {
+        // This is currently same as ticket db location
+        self.ticket_index_db_path = Some(path_buf);
+        self
+    }
+
+    /// Path where to store the incoming winning tickets.
+    ///
+    /// This parameter is optional. If not set, a temporary file is used and discarded
+    /// after the node is stopped.
+    pub fn with_ticket_db_path(mut self, path_buf: PathBuf) -> Self {
+        // This is currently same as ticket db location
+        self.ticket_index_db_path = Some(path_buf);
+        self
+    }
+
+    /// Sets the [`HoprLibConfig`].
+    ///
+    /// This parameter is optional, uses default if not set.
     pub fn with_config(mut self, cfg: HoprLibConfig) -> Self {
         self.cfg = cfg;
         self
     }
 
+    /// Sets the [`ProberConfig`].
+    ///
+    /// This parameter is optional, uses default if not set.
     pub fn with_ct_prober_config(mut self, cfg: ProberConfig) -> Self {
         self.prober_cfg = cfg;
         self
     }
 
+    /// Sets the Session Server handler.
+    ///
+    /// This parameter is required when built with the `session-server` feature.
     #[cfg(feature = "session-server")]
-    pub fn with_session_server(mut self, session_server: Srv) -> Self {
+    pub fn session_server(mut self, session_server: Srv) -> Self {
         self._session_server = Some(session_server);
         self
     }
@@ -160,8 +218,8 @@ where
                     Network(NetworkEvent),
                 }
 
-                let ticket_price = std::sync::Arc::new(parking_lot::RwLock::new(chain_reader.minimum_ticket_price().await.unwrap_or_default()));
-                let win_probability = std::sync::Arc::new(parking_lot::RwLock::new(chain_reader.minimum_incoming_ticket_win_prob().await.unwrap_or_default()));
+                let ticket_price = Arc::new(parking_lot::RwLock::new(chain_reader.minimum_ticket_price().await.unwrap_or_default()));
+                let win_probability = Arc::new(parking_lot::RwLock::new(chain_reader.minimum_incoming_ticket_win_prob().await.unwrap_or_default()));
 
                 network_events
                     .map(Event::Network)
@@ -311,21 +369,21 @@ where
         )
         .map_err(HoprLibError::TransportError)?;
 
-        // TODO: initialize the metrics properly
-        // #[cfg(all(feature = "telemetry", not(test)))]
-        // {
-        // METRIC_PROCESS_START_TIME.set(current_time().as_unix_timestamp().as_secs_f64());
-        // METRIC_HOPR_LIB_VERSION.set(
-        // &[const_format::formatcp!("{}", constants::APP_VERSION)],
-        // const_format::formatcp!(
-        // "{}.{}",
-        // env!("CARGO_PKG_VERSION_MAJOR"),
-        // env!("CARGO_PKG_VERSION_MINOR")
-        // )
-        // .parse()
-        // .unwrap_or(0.0),
-        // );
-        // }
+        #[cfg(all(feature = "telemetry", not(test)))]
+        {
+            use crate::AsUnixTimestamp;
+            METRIC_PROCESS_START_TIME.set(hopr_platform::time::current_time().as_unix_timestamp().as_secs_f64());
+            METRIC_HOPR_LIB_VERSION.set(
+                &[const_format::formatcp!("{}", constants::APP_VERSION)],
+                const_format::formatcp!(
+                    "{}.{}",
+                    env!("CARGO_PKG_VERSION_MAJOR"),
+                    env!("CARGO_PKG_VERSION_MINOR")
+                )
+                .parse()
+                .unwrap_or(0.0),
+            );
+        }
 
         let (mut new_tickets_tx, new_tickets_rx) = async_broadcast::broadcast(2048);
         new_tickets_tx.set_await_active(false);
@@ -550,15 +608,18 @@ where
     /// Builds an instance of an edge (Entry or Exit) [`Hopr`] node that is already started and running.
     ///
     /// This cannot process winning tickets nor relay packets.
-    pub async fn build_edge<B: OutgoingIndexStore + Send + Sync + 'static>(
-        mut self,
-        out_index_backend: B,
-    ) -> Result<Hopr<Chain, SharedChannelGraph, HoprNetwork, ()>, HoprLibError> {
+    pub async fn build_edge(mut self) -> Result<Hopr<Chain, SharedChannelGraph, HoprNetwork, ()>, HoprLibError> {
         // No ticket manager needed here
         let mut hopr = self.pre_build(()).await?;
 
+        let backend = self
+            .ticket_index_db_path
+            .map(RedbStore::new)
+            .unwrap_or_else(RedbStore::new_temp)
+            .map_err(hopr_ticket_manager::TicketManagerError::store)?;
+
         // Ticket factory can be constructed alone - without TicketManager
-        let ticket_factory = Arc::new(HoprTicketFactory::new(out_index_backend));
+        let ticket_factory = Arc::new(HoprTicketFactory::new(backend));
 
         // Synchronize the ticket factory with the chain before starting the packet pipeline
         ticket_factory.sync_from_outgoing_channels(
@@ -570,7 +631,7 @@ where
                 .await,
         )?;
 
-        tracing::info!("starting transport");
+        tracing::info!("starting transport for edge node");
 
         // TODO: use HoprSocket?
         let (_, transport_processes) = hopr
@@ -588,6 +649,8 @@ where
         hopr.processes
             .flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
 
+        hopr.state
+            .store(HoprState::Running, std::sync::atomic::Ordering::Relaxed);
         tracing::info!(
             id = %hopr.transport_id.public().to_peerid_str(),
             version = constants::APP_VERSION,
@@ -600,18 +663,20 @@ where
     /// Builds an instance of a full [`Hopr`] node that is already started and running.
     ///
     /// This can process winning tickets and relay packets.
-    pub async fn build_relay<B>(
+    pub async fn build_relay(
         mut self,
-        ticket_backend: B,
-    ) -> Result<Hopr<Chain, SharedChannelGraph, HoprNetwork, SharedTicketManager<B, B::Queue>>, HoprLibError>
-    where
-        B: TicketQueueStore + OutgoingIndexStore + Send + Sync + 'static,
-        B::Queue: Send + Sync + 'static,
-    {
+    ) -> Result<Hopr<Chain, SharedChannelGraph, HoprNetwork, SharedTicketManager>, HoprLibError> {
         tracing::info!("starting ticket manager & factory");
 
+        let backend = self
+            .ticket_index_db_path
+            .clone()
+            .map(RedbStore::new)
+            .unwrap_or_else(RedbStore::new_temp)
+            .map_err(hopr_ticket_manager::TicketManagerError::store)?;
+
         // Ticket factor must be constructed along with TicketManager
-        let (ticket_manager, ticket_factory) = HoprTicketManager::new_with_factory(ticket_backend);
+        let (ticket_manager, ticket_factory) = HoprTicketManager::new_with_factory(backend);
         let ticket_manager = Arc::new(ticket_manager);
         let ticket_factory = Arc::new(ticket_factory);
 
@@ -768,23 +833,25 @@ where
                 .inspect(|_| tracing::warn!(task = %HoprLibProcess::ChannelEvents, "long-running background task finished"))
         );
 
+        hopr.state
+            .store(HoprState::Running, std::sync::atomic::Ordering::Relaxed);
+
         tracing::info!(
             id = %hopr.transport_id.public().to_peerid_str(),
             version = constants::APP_VERSION,
             "NODE STARTED AND RUNNING"
         );
 
-        // TODO: Update metric properly
-        // #[cfg(all(feature = "telemetry", not(test)))]
-        // METRIC_HOPR_NODE_INFO.set(
-        // &[
-        // &self.transport_id.public().to_peerid_str(),
-        // &me_onchain.to_string(),
-        // &self.cfg.safe_module.safe_address.to_string(),
-        // &self.cfg.safe_module.module_address.to_string(),
-        // ],
-        // 1.0,
-        // );
+        #[cfg(all(feature = "telemetry", not(test)))]
+        METRIC_HOPR_NODE_INFO.set(
+            &[
+                &hopr.transport_id.public().to_peerid_str(),
+                &hopr.chain_id.node_address.to_string(),
+                &hopr.chain_id.safe_address.to_string(),
+                &hopr.chain_id.module_address.to_string(),
+            ],
+            1.0,
+        );
 
         Ok(hopr)
     }
