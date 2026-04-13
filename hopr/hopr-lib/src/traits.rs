@@ -1,5 +1,4 @@
 /// Session-related traits.
-#[cfg(feature = "session-server")]
 pub mod session {
     use crate::{errors::Result, exports::transport::IncomingSession};
 
@@ -12,5 +11,4 @@ pub mod session {
     }
 }
 
-#[cfg(feature = "session-server")]
 pub use session::HoprSessionServer;

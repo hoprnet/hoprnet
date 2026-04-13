@@ -18,6 +18,9 @@ pub enum HoprLibError {
     #[error("HOPR lib Error: '{0}'")]
     GeneralError(String),
 
+    #[error("hopr object could not be built: {0}")]
+    BuilderError(&'static str),
+
     #[error("configuration validation failed: {0}")]
     ConfigurationError(#[from] validator::ValidationErrors),
 
@@ -38,6 +41,9 @@ pub enum HoprLibError {
 
     #[error("rayon thread pool queue full: {0}")]
     SpawnError(#[from] hopr_parallelize::cpu::SpawnError),
+
+    #[error("ticket manager error: {0}")]
+    TicketManager(#[from] hopr_ticket_manager::TicketManagerError),
 
     #[error("unspecified error: {0}")]
     Other(#[source] anyhow::Error),

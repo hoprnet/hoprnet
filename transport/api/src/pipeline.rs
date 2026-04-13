@@ -10,7 +10,7 @@ use hopr_async_runtime::AbortableList;
 use hopr_crypto_packet::HoprSurb;
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
-use hopr_transport_protocol::{TicketEvent, run_packet_pipeline};
+use hopr_transport_protocol::run_packet_pipeline;
 
 use crate::{HoprTransportProcess, config::HoprPacketPipelineConfig};
 
@@ -50,7 +50,7 @@ where
         + Sync
         + 'static,
     S: SurbStore + Clone + Send + Sync + 'static,
-    TEvt: futures::Sink<TicketEvent> + Clone + Unpin + Send + 'static,
+    TEvt: futures::Sink<hopr_api::node::TicketEvent> + Clone + Unpin + Send + 'static,
     TEvt::Error: std::error::Error,
     TFact: TicketFactory + Clone + Send + Sync + 'static,
     AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,

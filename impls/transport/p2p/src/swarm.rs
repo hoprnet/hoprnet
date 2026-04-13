@@ -3,18 +3,17 @@ use std::num::NonZeroU8;
 use std::sync::Arc;
 
 use dashmap::DashSet;
-use futures::{FutureExt, Stream, StreamExt, stream::BoxStream};
+use futures::{FutureExt, Stream, StreamExt};
 use hopr_api::{Multiaddr, OffchainKeypair, network::NetworkBuilder};
 use hopr_network_types::prelude::is_public_address;
 use libp2p::{
     autonat,
-    identity::PublicKey,
     swarm::{NetworkInfo, SwarmEvent},
 };
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
-    HoprNetwork, HoprNetworkBehavior, HoprNetworkBehaviorEvent, PeerDiscovery, constants,
+    HoprNetwork, HoprNetworkBehavior, HoprNetworkBehaviorEvent, PeerDiscovery,
     errors::Result,
     utils::{replace_transport_with_unspecified, resolve_dns_if_any},
 };

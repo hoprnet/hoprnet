@@ -1,6 +1,9 @@
 use futures::{SinkExt, StreamExt};
 use futures_time::{future::FutureExt as TimeExt, stream::StreamExt as TimeStreamExt};
-use hopr_api::types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::Address};
+use hopr_api::{
+    node::TicketEvent,
+    types::{crypto::prelude::*, internal::prelude::*},
+};
 use hopr_async_runtime::{AbortableList, spawn_as_abortable};
 use hopr_crypto_packet::HoprSurb;
 use hopr_network_types::timeout::{SinkTimeoutError, TimeoutSinkExt, TimeoutStreamExt};
@@ -59,15 +62,6 @@ pub enum PacketPipelineProcesses {
     AckIn,
     #[strum(to_string = "HOPR [msg] - mixer")]
     Mixer,
-}
-
-/// Ticket events emitted from the packet processing pipeline.
-#[derive(Debug, Clone, strum::EnumIs, strum::EnumTryAs)]
-pub enum TicketEvent {
-    /// A winning ticket was received.
-    WinningTicket(Box<RedeemableTicket>),
-    /// A ticket has been rejected.
-    RejectedTicket(Box<Ticket>, Option<Address>),
 }
 
 /// Performs encoding of outgoing Application protocol packets into HOPR protocol outgoing packets.

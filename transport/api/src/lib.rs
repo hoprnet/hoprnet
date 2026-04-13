@@ -67,7 +67,7 @@ use hopr_transport_probe::{
     Probe,
     ping::{PingConfig, Pinger},
 };
-pub use hopr_transport_protocol::{PeerProtocolCounterRegistry, TicketEvent};
+pub use hopr_transport_protocol::PeerProtocolCounterRegistry;
 pub use hopr_transport_session as session;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::transfer_session;
@@ -177,10 +177,12 @@ impl HoprSessionConfigurator {
     /// NOTE: This operation only sends the Session Keep-Alive packet and **DOES NOT** guarantee the other side
     /// has received it.
     pub async fn ping(&self) -> errors::Result<()> {
-        Ok(self.smgr
+        Ok(self
+            .smgr
             .upgrade()
             .ok_or(HoprTransportError::Other(anyhow::anyhow!("session manager is dropped")))?
-            .ping_session(&self.id).await?)
+            .ping_session(&self.id)
+            .await?)
     }
 
     /// Gets the configuration of the SURB balancer.
@@ -189,7 +191,8 @@ impl HoprSessionConfigurator {
     ///
     /// Returns `Ok(None)` if the Session has been created without a SURB balancer.
     pub async fn get_surb_balancer_config(&self) -> errors::Result<Option<SurbBalancerConfig>> {
-        Ok(self.smgr
+        Ok(self
+            .smgr
             .upgrade()
             .ok_or(HoprTransportError::Other(anyhow::anyhow!("session manager is dropped")))?
             .get_surb_balancer_config(&self.id)
@@ -201,7 +204,8 @@ impl HoprSessionConfigurator {
     /// Returns an error if the Session is closed, the Session manager is gone, or the
     /// Session has been created without a SURB balancer.
     pub async fn update_surb_balancer_config(&self, config: SurbBalancerConfig) -> errors::Result<()> {
-        Ok(self.smgr
+        Ok(self
+            .smgr
             .upgrade()
             .ok_or(HoprTransportError::Other(anyhow::anyhow!("session manager is dropped")))?
             .update_surb_balancer_config(&self.id, config)
@@ -321,7 +325,8 @@ where
                     surb_target_notify: true,
                 },
                 session_tag_allocator,
-            ).into(),
+            )
+            .into(),
             chain_api: resolver,
             session_telemetry_tag_allocator,
             probing_tag_allocator,
@@ -351,7 +356,7 @@ where
         AbortableList<HoprTransportProcess>,
     )>
     where
-        T: futures::Sink<TicketEvent> + Clone + Send + Unpin + 'static,
+        T: futures::Sink<hopr_api::node::TicketEvent> + Clone + Send + Unpin + 'static,
         T::Error: std::error::Error + Clone + Send,
         Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
         NetBuilder: NetworkBuilder<Network = Net> + Send + Sync + 'static,
@@ -700,10 +705,13 @@ where
     ) -> errors::Result<(HoprSession, HoprSessionConfigurator)> {
         let session = self.smgr.new_session(destination, target, cfg).await?;
         let id = *session.id();
-        Ok((session, HoprSessionConfigurator {
-            id,
-            smgr: Arc::downgrade(&self.smgr),
-        }))
+        Ok((
+            session,
+            HoprSessionConfigurator {
+                id,
+                smgr: Arc::downgrade(&self.smgr),
+            },
+        ))
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
