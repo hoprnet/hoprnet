@@ -351,7 +351,7 @@ where
     ) -> Result<Hopr<Chain, SharedChannelGraph, HoprNetwork, TMgr>, HoprLibError> {
         self.cfg.validate()?;
 
-        let hopr_chain_api = self
+        let chain_api = self
             .chain
             .clone()
             .ok_or(HoprLibError::BuilderError("missing chain object"))?;
@@ -362,9 +362,9 @@ where
 
         self.build_graph_and_network().await?;
 
-        let hopr_transport_api = HoprTransport::new(
+        let transport_api = HoprTransport::new(
             (&chain_id, &transport_id),
-            hopr_chain_api.clone(),
+            chain_api.clone(),
             self.graph.clone().ok_or(HoprLibError::BuilderError("missing graph"))?,
             vec![(&self.cfg.host).try_into().map_err(HoprLibError::TransportError)?],
             self.cfg.protocol.clone(),
@@ -406,16 +406,12 @@ where
             *SUGGESTED_NATIVE_BALANCE,
             Duration::from_secs(200),
             me_onchain,
-            &hopr_chain_api,
+            &chain_api,
         )
         .await?;
 
-        #[allow(unused_mut)]
-        let mut processes = AbortableList::<HoprLibProcess>::default();
-
         tracing::info!("starting HOPR node...");
-
-        let balance: XDaiBalance = hopr_chain_api.balance(me_onchain).await.map_err(HoprLibError::chain)?;
+        let balance: XDaiBalance = chain_api.balance(me_onchain).await.map_err(HoprLibError::chain)?;
         let minimum_balance = *constants::MIN_NATIVE_BALANCE;
 
         tracing::info!(
@@ -433,10 +429,7 @@ where
 
         // Once we are able to query the chain,
         // check if the ticket price is configured correctly.
-        let network_min_ticket_price = hopr_chain_api
-            .minimum_ticket_price()
-            .await
-            .map_err(HoprLibError::chain)?;
+        let network_min_ticket_price = chain_api.minimum_ticket_price().await.map_err(HoprLibError::chain)?;
         let configured_ticket_price = self.cfg.protocol.packet.codec.outgoing_ticket_price;
         if configured_ticket_price.is_some_and(|c| c < network_min_ticket_price) {
             return Err(HoprLibError::GeneralError(format!(
@@ -446,7 +439,7 @@ where
         }
         // Once we are able to query the chain,
         // check if the winning probability is configured correctly.
-        let network_min_win_prob = hopr_chain_api
+        let network_min_win_prob = chain_api
             .minimum_incoming_ticket_win_prob()
             .await
             .map_err(HoprLibError::chain)?;
@@ -470,7 +463,7 @@ where
         }
 
         tracing::info!(%safe_addr, "registering safe with this node");
-        match hopr_chain_api.register_safe(&safe_addr).await {
+        match chain_api.register_safe(&safe_addr).await {
             Ok(awaiter) => {
                 // Wait until the registration is confirmed on-chain, otherwise we cannot proceed.
                 awaiter.await.map_err(|error| {
@@ -497,7 +490,7 @@ where
         let multiaddresses_to_announce = if self.cfg.publish {
             // The multiaddresses are filtered for the non-private ones,
             // unless `announce_local_addresses` is set to `true`.
-            hopr_transport_api.announceable_multiaddresses()
+            transport_api.announceable_multiaddresses()
         } else {
             Vec::with_capacity(0)
         };
@@ -508,17 +501,18 @@ where
             .filter(|a| !is_public_address(a))
             .for_each(|multi_addr| tracing::warn!(?multi_addr, "announcing private multiaddress"));
 
-        let chain_api = hopr_chain_api.clone();
+        let chain_api_clone = chain_api.clone();
         let me_offchain = *transport_id.public();
-        let node_ready = spawn(async move { chain_api.await_key_binding(&me_offchain, NODE_READY_TIMEOUT).await });
+        let node_ready = spawn(async move {
+            chain_api_clone
+                .await_key_binding(&me_offchain, NODE_READY_TIMEOUT)
+                .await
+        });
 
         // At this point the node is already registered with Safe, so
         // we can announce via Safe-compliant TX
         tracing::info!(?multiaddresses_to_announce, "announcing node on chain");
-        match hopr_chain_api
-            .announce(&multiaddresses_to_announce, &transport_id)
-            .await
-        {
+        match chain_api.announce(&multiaddresses_to_announce, &transport_id).await {
             Ok(awaiter) => {
                 // Wait until the announcement is confirmed on-chain, otherwise we cannot proceed.
                 awaiter.await.map_err(|error| {
@@ -554,6 +548,9 @@ where
             .and_then(|s| s.trim().parse::<usize>().ok())
             .filter(|&c| c > 0)
             .unwrap_or(256);
+
+        #[allow(unused_mut)]
+        let mut processes = AbortableList::<HoprLibProcess>::default();
 
         let (session_tx, _session_rx) = channel::<IncomingSession>(incoming_session_channel_capacity);
         #[cfg(feature = "session-server")]
@@ -591,7 +588,6 @@ where
         self.session_tx = Some(session_tx);
 
         Ok(Hopr {
-            transport_id,
             chain_id: NodeOnchainIdentity {
                 node_address: chain_id.public().to_address(),
                 safe_address: self.cfg.safe_module.safe_address,
@@ -599,17 +595,18 @@ where
             },
             cfg: self.cfg.clone(),
             state: Arc::new(AtomicHoprState::new(HoprState::Uninitialized)),
-            transport_api: hopr_transport_api,
-            chain_api: hopr_chain_api,
-            processes,
             ticket_event_subscribers: (new_tickets_tx, new_tickets_rx.deactivate()),
+            transport_id,
+            transport_api,
+            chain_api,
+            processes,
             ticket_manager,
         })
     }
 
     /// Builds an instance of an edge (Entry or Exit) [`Hopr`] node that is already started and running.
     ///
-    /// This cannot process winning tickets nor relay packets.
+    /// This *cannot* process winning tickets nor relay packets.
     pub async fn build_edge(mut self) -> Result<Hopr<Chain, SharedChannelGraph, HoprNetwork, ()>, HoprLibError> {
         // No ticket manager needed here
         let mut hopr = self.pre_build_hopr(()).await?;
@@ -656,7 +653,7 @@ where
         tracing::info!(
             id = %hopr.transport_id.public().to_peerid_str(),
             version = constants::APP_VERSION,
-            "NODE STARTED AND RUNNING"
+            "EDGE NODE STARTED AND RUNNING"
         );
 
         Ok(hopr)
@@ -665,7 +662,7 @@ where
     /// Builds an instance of a full [`Hopr`] node that is already started and running.
     ///
     /// This can process winning tickets and relay packets.
-    pub async fn build_relay(
+    pub async fn build_full(
         mut self,
     ) -> Result<Hopr<Chain, SharedChannelGraph, HoprNetwork, SharedTicketManager>, HoprLibError> {
         tracing::info!("starting ticket manager & factory");
@@ -770,7 +767,7 @@ where
                 }),
         );
 
-        tracing::info!("starting transport for relay node");
+        tracing::info!("starting transport for full node");
 
         // TODO: use HoprSocket?
         let (_, transport_processes) = hopr
@@ -841,7 +838,7 @@ where
         tracing::info!(
             id = %hopr.transport_id.public().to_peerid_str(),
             version = constants::APP_VERSION,
-            "NODE STARTED AND RUNNING"
+            "FULL NODE STARTED AND RUNNING"
         );
 
         #[cfg(all(feature = "telemetry", not(test)))]
