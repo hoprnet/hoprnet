@@ -185,13 +185,11 @@ impl From<HoprSessionClientConfig> for hopr_transport::SessionClientConfig {
 
 /// Long-running tasks that are spawned by the HOPR node.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, strum::Display, strum::EnumCount)]
-pub enum HoprLibProcess {
+pub(crate) enum HoprLibProcess {
     #[strum(to_string = "transport: {0}")]
     Transport(HoprTransportProcess),
     #[strum(to_string = "session server providing the exit node session stream functionality")]
     SessionServer,
-    #[strum(to_string = "ticket redemption queue driver")]
-    TicketRedemptions,
     #[strum(to_string = "subscription for on-chain channel updates")]
     ChannelEvents,
     #[strum(to_string = "on received ticket event (winning or rejected)")]

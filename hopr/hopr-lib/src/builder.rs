@@ -46,8 +46,10 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
+/// Shareable [`HoprTicketManager`] with [`RedbStore`] backend.
 pub type SharedTicketManager = Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>;
 
+/// Builder for the [`Hopr`] object.
 pub struct HoprBuilder<Chain, Srv> {
     chain: Option<Chain>,
     identity: Option<(ChainKeypair, OffchainKeypair)>,
@@ -343,7 +345,7 @@ where
         Ok(())
     }
 
-    async fn pre_build<TMgr>(
+    async fn pre_build_hopr<TMgr>(
         &mut self,
         ticket_manager: TMgr,
     ) -> Result<Hopr<Chain, SharedChannelGraph, HoprNetwork, TMgr>, HoprLibError> {
@@ -610,7 +612,7 @@ where
     /// This cannot process winning tickets nor relay packets.
     pub async fn build_edge(mut self) -> Result<Hopr<Chain, SharedChannelGraph, HoprNetwork, ()>, HoprLibError> {
         // No ticket manager needed here
-        let mut hopr = self.pre_build(()).await?;
+        let mut hopr = self.pre_build_hopr(()).await?;
 
         let backend = self
             .ticket_index_db_path
@@ -681,7 +683,7 @@ where
         let ticket_factory = Arc::new(ticket_factory);
 
         // Construct with TicketManager
-        let mut hopr = self.pre_build(ticket_manager.clone()).await?;
+        let mut hopr = self.pre_build_hopr(ticket_manager.clone()).await?;
 
         // Synchronize the ticket manager with the chain before starting the packet pipeline
         ticket_manager.sync_from_incoming_channels(
