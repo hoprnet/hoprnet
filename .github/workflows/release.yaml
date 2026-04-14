@@ -26,7 +26,7 @@ jobs:
       matrix:
         include:
           - architecture: x86_64-linux
-            runner: self-hosted-hoprnet-bigger
+            runner: depot-ubuntu-24.04-8
             build_command: nix build -L .#binary-hoprd-x86_64-linux
     uses: hoprnet/hopr-workflows/.github/workflows/build-binaries.yaml@build-binaries-v2
     permissions:
@@ -58,7 +58,7 @@ jobs:
       build_matrix: >-
         [
           {
-            "runner": "self-hosted-hoprnet-bigger",
+            "runner": "depot-ubuntu-24.04-4",
             "architecture": "x86_64-linux",
             "build_command": "nix build -L .#docker-hoprd-x86_64-linux",
             "smoke_test_command": "nix develop -c just smoke-test"
@@ -78,7 +78,7 @@ jobs:
     needs:
       - build-binaries
       - build-docker
-    runs-on: self-hosted-hoprnet-small
+    runs-on: depot-ubuntu-24.04
     permissions:
       contents: write
     steps:
@@ -99,14 +99,14 @@ jobs:
           github_token: ${{ secrets.GH_RUNNER_TOKEN }}
   deploy-staging:
     name: Deploy Gnosis Staging
-    runs-on: self-hosted-hoprnet-small
+    runs-on: depot-ubuntu-24.04
     needs: [build-docker, release]
     permissions:
       contents: read
       id-token: write
     steps:
       - name: Restart Hoprd
-        uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3.0.0
+        uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4.0.1
         with:
           token: ${{ secrets.GNOSIS_GITHUB_WORKFLOW_TOKEN }}
           repository: gnosis/gnosis_vpn-infrastructure

@@ -23,7 +23,7 @@ jobs:
   build-candidate:
     name: Build Candidate
     if: github.event.label.name == 'build:candidate'
-    runs-on: self-hosted-hoprnet-bigger
+    runs-on: depot-ubuntu-24.04-16
     timeout-minutes: 20
     steps:
       - name: Build candidate binary

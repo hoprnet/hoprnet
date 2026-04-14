@@ -6,6 +6,7 @@ ignore = [
   "RUSTSEC-2025-0134", # `rustls-pemfile` [unmaintained], blokli-client needs to avoid rust-tls, see https://github.com/hoprnet/blokli/issues/107
   "RUSTSEC-2025-0137", # `alloy` - held back until removed, see https://github.com/hoprnet/hoprnet/issues/7707
   "RUSTSEC-2026-0049", # `rustls-webpki` - needs alloy removal
+  "RUSTSEC-2026-0097", # workspace already pins `rand` 0.10.1, but Cargo.lock still contains transitive `rand` 0.9.3; remove this ignore once upstream deps stop pulling 0.9.3
 ]
 informational_warnings = ["unmaintained"]
 severity_threshold = "low"

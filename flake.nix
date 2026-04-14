@@ -115,7 +115,10 @@
           src = nixLib.mkSrc {
             root = ./.;
             inherit fs;
-            extraFiles = [ ./hoprd/hoprd/example_cfg.yaml ];
+            extraFiles = [
+              ./hoprd/hoprd/example_cfg.yaml
+              ./deploy/compose/hoprd/conf/hoprd.cfg.yaml
+            ];
           };
           testSrc = nixLib.mkTestSrc {
             root = ./.;

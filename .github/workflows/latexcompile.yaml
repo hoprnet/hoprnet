@@ -19,10 +19,10 @@ permissions:
 
 jobs:
   build_latex:
-    runs-on: self-hosted-hoprnet-small
+    runs-on: depot-ubuntu-24.04
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -45,7 +45,7 @@ jobs:
         run: make -j build-yellowpaper
 
       - name: Commit & Push changes
-        uses: EndBug/add-and-commit@a94899bca583c204427a224a7af87c02f9b325d5 # v9.1.4
+        uses: EndBug/add-and-commit@290ea2c423ad77ca9c62ae0f5b224379612c0321 # v10.0.0
         with:
           new_branch: ${{ github.ref }}
           message: 'chore(build): update yellowpaper'
