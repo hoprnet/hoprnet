@@ -18,6 +18,7 @@
   <a href="https://codecov.io/gh/hoprnet/hoprnet">
     <img src="https://codecov.io/gh/hoprnet/hoprnet/branch/master/graph/badge.svg" alt="codecov">
   </a>
+  <a href="https://codspeed.io/hoprnet/hoprnet?utm_source=badge"><img src="https://img.shields.io/endpoint?url=https://codspeed.io/badge.json" alt="CodSpeed"/></a>
 </p>
 
 ## Table of Contents

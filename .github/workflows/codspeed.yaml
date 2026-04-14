@@ -1,0 +1,62 @@
+---
+name: CodSpeed
+
+on:
+  push:
+    branches:
+      - "master"
+  pull_request:
+  # `workflow_dispatch` allows CodSpeed to trigger backtest
+  # performance analysis in order to generate initial data.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: ${{ github.head_ref || github.ref_name }}-codspeed
+  cancel-in-progress: true
+
+jobs:
+  codspeed:
+    name: Benchmarks
+    runs-on: depot-ubuntu-24.04-8
+    timeout-minutes: 60
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        with:
+          disable-sudo: false
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libssl-dev pkg-config protobuf-compiler
+
+      - name: Setup Rust toolchain and cargo-codspeed
+        uses: moonrepo/setup-rust@abb2d32350334249b178c401e5ec5836e0cd88d3 # v1.3.0
+        with:
+          cache-target: release
+          bins: cargo-codspeed
+
+      - name: Build the benchmark targets
+        run: |
+          cargo codspeed build \
+            -p hopr-crypto-packet \
+            -p hopr-network-graph \
+            -p hopr-transport-mixer \
+            -p hopr-protocol-session \
+            -p hopr-transport-session
+
+      - name: Run the benchmarks
+        uses: CodSpeedHQ/action@fc9e362522e1a09af163f1cbd74e243909f06b46 # v4
+        with:
+          mode: simulation
+          run: cargo codspeed run
