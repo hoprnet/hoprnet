@@ -2,6 +2,5 @@
 # This file defines the default code owners for different parts of the repository.
 # Code owners are automatically requested for review when someone opens a pull request
 # that modifies code that they own.
-#
 # Emergency contacts (for critical issues)
-# Lead maintainers: @Teebor-Choka @tolbrino @NumberFour8 @QYuQianchen @jeandemeusy
+# Lead maintainers: @Teebor-Choka @tolbrino @NumberFour8 @QYuQianchen @jeandemeusy @ausias-armesto
