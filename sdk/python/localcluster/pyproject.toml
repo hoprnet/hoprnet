@@ -1,8 +1,8 @@
 [project]
 name = "sdk-localcluster"
 version = "1.0.1"
-requires-python = ">=3.14.3,<3.15"
-dependencies = ["click>=8.3.1", "pyyaml>=6.0.3"]
+requires-python = ">=3.14.4,<3.15"
+dependencies = ["click>=8.3.2", "pyyaml>=6.0.3"]
 
 [tool.setuptools]
 py-modules = []
