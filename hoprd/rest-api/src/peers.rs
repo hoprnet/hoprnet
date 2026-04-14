@@ -88,8 +88,7 @@ pub(crate) struct PeerQosInfo {
     ],
     "observed": ["/ip4/10.0.2.100/tcp/19093"],
     "qos": { "probeRate": 0.476, "lastUpdate": 1690000000000_u128, "averageLatency": 100, "score": 0.7 },
-    "outgoingChannel": { "id": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f", "status": "Open", "balance": "10 wxHOPR" },
-    "incomingChannel": null
+    "outgoingChannel": { "id": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f", "status": "Open", "balance": "10 wxHOPR" }
 }))]
 #[serde(rename_all = "camelCase")]
 /// Comprehensive information about a peer: multiaddresses, QoS observations, and channel state.
@@ -149,7 +148,7 @@ pub(super) async fn show_peer_info(
 
     let peer = match hopr.chain_key_to_peerid(&destination) {
         Ok(Some(peer)) => peer,
-        Ok(None) | Err(_) => return Err(ApiErrorStatus::PeerNotFound),
+        Ok(None) | Err(_) => return (StatusCode::NOT_FOUND, ApiErrorStatus::PeerNotFound).into_response(),
     };
 
     // 1. Multiaddresses (announced + observed)
@@ -159,7 +158,13 @@ pub(super) async fn show_peer_info(
     );
     let (announced, observed) = match res {
         Ok(v) => v,
-        Err(error) => return Err(ApiErrorStatus::UnknownFailure(error.to_string())),
+        Err(error) => {
+            return (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ApiErrorStatus::UnknownFailure(error.to_string()),
+            )
+                .into_response();
+        }
     };
 
     let announced_sources: Vec<MultiaddressSource> = announced
@@ -225,7 +230,7 @@ pub(super) async fn show_peer_info(
             balance: ch.balance,
         });
 
-    Ok((
+    (
         StatusCode::OK,
         Json(NodePeerInfoResponse {
             announced_sources,
@@ -234,7 +239,8 @@ pub(super) async fn show_peer_info(
             outgoing_channel,
             incoming_channel,
         }),
-    ))
+    )
+        .into_response()
 }
 
 #[serde_as]
@@ -379,5 +385,92 @@ mod tests {
         assert!(json.get("outgoingChannel").is_none());
         assert!(json.get("incomingChannel").is_none());
         Ok(())
+    }
+
+    #[test]
+    fn peer_channel_info_should_serialize_correctly() -> anyhow::Result<()> {
+        let info = PeerChannelInfo {
+            id: Hash::default(),
+            status: ChannelStatus::Open,
+            balance: "10 wxHOPR".parse()?,
+        };
+
+        let json = serde_json::to_value(&info)?;
+        assert_eq!(json["status"], "Open");
+        assert_eq!(json["balance"], "10 wxHOPR");
+        assert!(json.get("id").is_some());
+        Ok(())
+    }
+
+    #[test]
+    fn peer_qos_info_should_serialize_with_all_fields() {
+        let qos = PeerQosInfo {
+            probe_rate: 0.5,
+            last_update: 1690000000000,
+            average_latency: Some(100),
+            score: 0.7,
+        };
+
+        let json = serde_json::to_value(&qos).unwrap();
+        assert_eq!(json["probeRate"], 0.5);
+        assert_eq!(json["lastUpdate"], 1690000000000_u64);
+        assert_eq!(json["averageLatency"], 100);
+        assert_eq!(json["score"], 0.7);
+    }
+
+    #[test]
+    fn peer_qos_info_should_serialize_without_latency() {
+        let qos = PeerQosInfo {
+            probe_rate: 0.3,
+            last_update: 1690000000000,
+            average_latency: None,
+            score: 0.5,
+        };
+
+        let json = serde_json::to_value(&qos).unwrap();
+        assert!(json.get("averageLatency").unwrap().is_null());
+    }
+
+    #[test]
+    fn node_peer_info_response_should_include_populated_optional_fields() -> anyhow::Result<()> {
+        let response = NodePeerInfoResponse {
+            announced_sources: vec![],
+            observed: vec![],
+            qos: Some(PeerQosInfo {
+                probe_rate: 0.5,
+                last_update: 1690000000000,
+                average_latency: Some(100),
+                score: 0.7,
+            }),
+            outgoing_channel: Some(PeerChannelInfo {
+                id: Hash::default(),
+                status: ChannelStatus::Open,
+                balance: "10 wxHOPR".parse()?,
+            }),
+            incoming_channel: Some(PeerChannelInfo {
+                id: Hash::default(),
+                status: ChannelStatus::Open,
+                balance: "5 wxHOPR".parse()?,
+            }),
+        };
+
+        let json = serde_json::to_value(&response)?;
+        assert!(json.get("qos").is_some());
+        assert!(json.get("outgoingChannel").is_some());
+        assert!(json.get("incomingChannel").is_some());
+        assert_eq!(json["qos"]["probeRate"], 0.5);
+        assert_eq!(json["outgoingChannel"]["balance"], "10 wxHOPR");
+        assert_eq!(json["incomingChannel"]["balance"], "5 wxHOPR");
+        Ok(())
+    }
+
+    #[test]
+    fn ping_response_should_serialize_latency_as_millis() {
+        let response = PingResponse {
+            latency: std::time::Duration::from_millis(200),
+        };
+
+        let json = serde_json::to_value(&response).unwrap();
+        assert_eq!(json["latency"], 200);
     }
 }

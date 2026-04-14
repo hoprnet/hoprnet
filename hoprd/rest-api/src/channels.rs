@@ -380,7 +380,10 @@ pub(super) async fn show_channel(
                 Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
             }
         }
-        Ok(Err(status)) => (StatusCode::NOT_FOUND, status).into_response(),
+        Ok(Err(status)) => match status {
+            ApiErrorStatus::ChannelNotFound => (StatusCode::NOT_FOUND, status).into_response(),
+            _ => (StatusCode::UNPROCESSABLE_ENTITY, status).into_response(),
+        },
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }
@@ -437,7 +440,13 @@ pub(super) async fn close_channel(
 
     let channel_id = match resolve_outgoing_channel(&hopr, &counterparty) {
         Ok(ch) => *ch.get_id(),
-        Err(status) => return (StatusCode::NOT_FOUND, status).into_response(),
+        Err(status) => {
+            let code = match status {
+                ApiErrorStatus::ChannelNotFound => StatusCode::NOT_FOUND,
+                _ => StatusCode::UNPROCESSABLE_ENTITY,
+            };
+            return (code, status).into_response();
+        }
     };
 
     match hopr.close_channel_by_id(&channel_id).await {
@@ -517,7 +526,13 @@ pub(super) async fn fund_channel(
 
     let channel_id = match resolve_outgoing_channel(&hopr, &counterparty) {
         Ok(ch) => *ch.get_id(),
-        Err(status) => return (StatusCode::NOT_FOUND, status).into_response(),
+        Err(status) => {
+            let code = match status {
+                ApiErrorStatus::ChannelNotFound => StatusCode::NOT_FOUND,
+                _ => StatusCode::UNPROCESSABLE_ENTITY,
+            };
+            return (code, status).into_response();
+        }
     };
 
     match hopr.fund_channel(&channel_id, fund_req.amount).await {

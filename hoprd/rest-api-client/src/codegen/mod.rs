@@ -1102,7 +1102,6 @@ and indexer state.*/
     ///          "origin": "chain"
     ///        }
     ///      ],
-    ///      "incomingChannel": null,
     ///      "observed": [
     ///        "/ip4/10.0.2.100/tcp/19093"
     ///      ],
@@ -1520,13 +1519,13 @@ and indexer state.*/
     pub struct PingResponse {
         pub latency: i64,
     }
-    ///Optional request body for ticket redemption.
+    ///Request body for ticket redemption with optional fields.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Optional request body for ticket redemption.",
+    ///  "description": "Request body for ticket redemption with optional fields.",
     ///  "examples": [
     ///    {
     ///      "counterparty": "0x188c4462b75e46f0c7262d7f48d182447b93a93c"
@@ -2339,7 +2338,7 @@ at least the size of 2 Session packet payloads.*/
 
 API enabling developers to interact with a hoprd node programatically through HTTP REST API.
 
-Version: 4.10.0*/
+Version: 4.11.0*/
 pub struct Client {
     pub(crate) baseurl: String,
     pub(crate) client: reqwest::Client,
@@ -2375,7 +2374,7 @@ impl Client {
 }
 impl ClientInfo<()> for Client {
     fn api_version() -> &'static str {
-        "4.10.0"
+        "4.11.0"
     }
     fn baseurl(&self) -> &str {
         self.baseurl.as_str()

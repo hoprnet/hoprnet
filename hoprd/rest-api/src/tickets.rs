@@ -117,7 +117,7 @@ pub(super) async fn show_ticket_statistics(State(state): State<Arc<InternalState
     "counterparty": "0x188c4462b75e46f0c7262d7f48d182447b93a93c"
 }))]
 #[serde(rename_all = "camelCase")]
-/// Optional request body for ticket redemption.
+/// Request body for ticket redemption with optional fields.
 pub(crate) struct RedeemTicketsRequest {
     /// On-chain address of the counterparty whose incoming channel tickets to redeem.
     /// If omitted, tickets in all channels are redeemed.
@@ -145,6 +145,7 @@ pub(crate) struct RedeemTicketsRequest {
             (status = 202, description = "Ticket redemption started successfully."),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Channel with counterparty not found.", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError),
         ),
         security(
             ("api_token" = []),
@@ -195,5 +196,56 @@ pub(super) async fn redeem_tickets(
 
             (StatusCode::ACCEPTED, "").into_response()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ticket_statistics_response_should_serialize_correctly() {
+        let stats = NodeTicketStatisticsResponse {
+            winning_count: 5,
+            unredeemed_value: "20 wxHOPR".parse().unwrap(),
+            neglected_value: "0 wxHOPR".parse().unwrap(),
+            rejected_value: "0 wxHOPR".parse().unwrap(),
+        };
+
+        let json = serde_json::to_value(&stats).unwrap();
+        assert_eq!(json["winningCount"], 5);
+        assert_eq!(json["unredeemedValue"], "20 wxHOPR");
+        assert_eq!(json["neglectedValue"], "0 wxHOPR");
+        assert_eq!(json["rejectedValue"], "0 wxHOPR");
+    }
+
+    #[test]
+    fn redeem_tickets_request_should_deserialize_with_counterparty() {
+        let json = serde_json::json!({
+            "counterparty": "0x188c4462b75e46f0c7262d7f48d182447b93a93c"
+        });
+
+        let req: RedeemTicketsRequest = serde_json::from_value(json).unwrap();
+        assert!(req.counterparty.is_some());
+    }
+
+    #[test]
+    fn redeem_tickets_request_should_deserialize_without_counterparty() {
+        let json = serde_json::json!({});
+        let req: RedeemTicketsRequest = serde_json::from_value(json).unwrap();
+        assert!(req.counterparty.is_none());
+    }
+
+    #[test]
+    fn channel_stats_should_convert_to_response() {
+        let stats = ChannelStats {
+            winning_tickets: 10,
+            unredeemed_value: "100 wxHOPR".parse().unwrap(),
+            neglected_value: "5 wxHOPR".parse().unwrap(),
+            rejected_value: "1 wxHOPR".parse().unwrap(),
+        };
+
+        let response = NodeTicketStatisticsResponse::from(stats);
+        assert_eq!(response.winning_count, 10);
     }
 }
