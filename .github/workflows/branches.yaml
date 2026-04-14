@@ -70,14 +70,12 @@ jobs:
 
       - name: Build the benchmark targets
         run: |
-          nix develop -c bash -c '\
-            cargo install cargo-codspeed && \
-            cargo codspeed build \
-              -p hopr-crypto-packet \
-              -p hopr-network-graph \
-              -p hopr-transport-mixer \
-              -p hopr-protocol-session \
-              -p hopr-transport-session'
+          nix develop -c cargo codspeed build \
+            -p hopr-crypto-packet \
+            -p hopr-network-graph \
+            -p hopr-transport-mixer \
+            -p hopr-protocol-session \
+            -p hopr-transport-session
 
       - name: Run the benchmarks
         uses: CodSpeedHQ/action@e736f0d2aeb36da38e9f08eca4dff7967408d154 # v4.8.2

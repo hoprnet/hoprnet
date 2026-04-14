@@ -529,6 +529,7 @@
               cargo-shear
               cargo-insta
               cargo-nextest
+              pkgs-unstable.cargo-codspeed
               foundry-bin
               nfpm
               envsubst
