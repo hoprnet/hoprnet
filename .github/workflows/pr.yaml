@@ -206,3 +206,17 @@ jobs:
             set -e
             RUSTDOCFLAGS="-D warnings" nix develop -c cargo doc --no-deps --document-private-items
             nix build -L .#docs
+
+  bench-build:
+    name: Bench build
+    runs-on: depot-ubuntu-24.04-8
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Build benchmarks
+        uses: hoprnet/hopr-workflows/actions/nix-action@c2aca7e56d25c4a786049ccf816c7f1af8721de8 # nix-action-v1
+        with:
+          source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          command: nix build -L .#bench-build
