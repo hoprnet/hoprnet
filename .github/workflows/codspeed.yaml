@@ -35,28 +35,25 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq libssl-dev pkg-config protobuf-compiler
-
-      - name: Setup Rust toolchain and cargo-codspeed
-        uses: moonrepo/setup-rust@abb2d32350334249b178c401e5ec5836e0cd88d3 # v1.3.0
+      - name: Setup Nix
+        uses: hoprnet/hopr-workflows/actions/setup-nix@setup-nix-v1
         with:
-          cache-target: release
-          bins: cargo-codspeed
+          cachix_cache_name: hoprnet
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: Build the benchmark targets
         run: |
-          cargo codspeed build \
-            -p hopr-crypto-packet \
-            -p hopr-network-graph \
-            -p hopr-transport-mixer \
-            -p hopr-protocol-session \
-            -p hopr-transport-session
+          nix develop -c bash -c '\
+            cargo install cargo-codspeed && \
+            cargo codspeed build \
+              -p hopr-crypto-packet \
+              -p hopr-network-graph \
+              -p hopr-transport-mixer \
+              -p hopr-protocol-session \
+              -p hopr-transport-session'
 
       - name: Run the benchmarks
         uses: CodSpeedHQ/action@fc9e362522e1a09af163f1cbd74e243909f06b46 # v4
         with:
           mode: simulation
-          run: cargo codspeed run
+          run: nix develop -c cargo codspeed run
