@@ -15,6 +15,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref }}
@@ -45,11 +46,15 @@ jobs:
         uses: DeterminateSystems/magic-nix-cache-action@v9
 
       - name: Build benchmarks
-        # We use nix develop .#ci to have cargo-codspeed and the right rust toolchain
         run: nix develop .#ci -c cargo codspeed build
 
+      - name: Install CodSpeed Runner
+        run: |
+          curl -fsSL https://codspeed.io/install.sh | bash
+          echo "$HOME/.codspeed/bin" >> $GITHUB_PATH
+
       - name: Run benchmarks
-        uses: CodSpeedHQ/action@v3
+        uses: CodSpeedHQ/action@v4
         with:
           run: nix develop .#ci -c cargo codspeed run
           token: ${{ secrets.CODSPEED_TOKEN }}
