@@ -7,7 +7,7 @@ use axum::{
 };
 use futures::FutureExt;
 use hopr_lib::{
-    Address, ChannelStatus, HoprBalance, Multiaddr,
+    Address, ChannelEntry, ChannelStatus, HoprBalance, Multiaddr,
     api::{
         graph::{EdgeLinkObservable, traits::EdgeObservableRead},
         node::HoprNodeNetworkOperations,
@@ -118,6 +118,32 @@ pub(crate) struct DestinationParams {
     destination: Address,
 }
 
+/// Converts announced multiaddresses to the API response format.
+fn to_announced_sources(announced: Vec<Multiaddr>) -> Vec<MultiaddressSource> {
+    announced
+        .into_iter()
+        .map(|ma| MultiaddressSource {
+            multiaddress: ma,
+            origin: AnnouncementOriginResponse::Chain,
+        })
+        .collect()
+}
+
+/// Extracts [`PeerChannelInfo`] from a channel lookup result, filtering out closed channels.
+fn channel_entry_to_peer_info(
+    result: Result<Option<ChannelEntry>, hopr_lib::errors::HoprLibError>,
+) -> Option<PeerChannelInfo> {
+    result
+        .ok()
+        .flatten()
+        .filter(|ch| ch.status != ChannelStatus::Closed)
+        .map(|ch| PeerChannelInfo {
+            id: *ch.get_id(),
+            status: ch.status,
+            balance: ch.balance,
+        })
+}
+
 /// Returns comprehensive information about the given peer.
 ///
 /// Includes announced and observed multiaddresses, QoS observation data from the
@@ -167,13 +193,7 @@ pub(super) async fn show_peer_info(
         }
     };
 
-    let announced_sources: Vec<MultiaddressSource> = announced
-        .into_iter()
-        .map(|ma| MultiaddressSource {
-            multiaddress: ma,
-            origin: AnnouncementOriginResponse::Chain,
-        })
-        .collect();
+    let announced_sources = to_announced_sources(announced);
 
     // 2. QoS data from graph
     let qos = {
@@ -209,26 +229,8 @@ pub(super) async fn show_peer_info(
 
     // 3. Channel state
     let me = hopr.me_onchain();
-    let outgoing_channel = hopr
-        .channel(&me, &destination)
-        .ok()
-        .flatten()
-        .filter(|ch| ch.status != ChannelStatus::Closed)
-        .map(|ch| PeerChannelInfo {
-            id: *ch.get_id(),
-            status: ch.status,
-            balance: ch.balance,
-        });
-    let incoming_channel = hopr
-        .channel(&destination, &me)
-        .ok()
-        .flatten()
-        .filter(|ch| ch.status != ChannelStatus::Closed)
-        .map(|ch| PeerChannelInfo {
-            id: *ch.get_id(),
-            status: ch.status,
-            balance: ch.balance,
-        });
+    let outgoing_channel = channel_entry_to_peer_info(hopr.channel(&me, &destination));
+    let incoming_channel = channel_entry_to_peer_info(hopr.channel(&destination, &me));
 
     (
         StatusCode::OK,
@@ -472,5 +474,96 @@ mod tests {
 
         let json = serde_json::to_value(&response).unwrap();
         assert_eq!(json["latency"], 200);
+    }
+
+    #[test]
+    fn to_announced_sources_should_convert_multiaddresses() {
+        let addrs: Vec<Multiaddr> = vec![
+            "/ip4/10.0.2.100/tcp/19093".parse().unwrap(),
+            "/ip4/10.0.2.101/tcp/19094".parse().unwrap(),
+        ];
+
+        let sources = to_announced_sources(addrs);
+        assert_eq!(sources.len(), 2);
+        assert_eq!(sources[0].origin, AnnouncementOriginResponse::Chain);
+        assert_eq!(sources[1].origin, AnnouncementOriginResponse::Chain);
+    }
+
+    #[test]
+    fn to_announced_sources_should_return_empty_for_empty_input() {
+        let sources = to_announced_sources(vec![]);
+        assert!(sources.is_empty());
+    }
+
+    #[test]
+    fn channel_entry_to_peer_info_should_return_some_for_open_channel() {
+        let ch = ChannelEntry::builder()
+            .between(
+                "0x07eaf07d6624f741e04f4092a755a9027aaab7f6".parse::<Address>().unwrap(),
+                "0x188c4462b75e46f0c7262d7f48d182447b93a93c".parse::<Address>().unwrap(),
+            )
+            .balance("10 wxHOPR".parse().unwrap())
+            .status(ChannelStatus::Open)
+            .build()
+            .unwrap();
+
+        let info = channel_entry_to_peer_info(Ok(Some(ch)));
+        assert!(info.is_some());
+        let info = info.unwrap();
+        assert_eq!(info.status, ChannelStatus::Open);
+        assert_eq!(info.balance, "10 wxHOPR".parse().unwrap());
+    }
+
+    #[test]
+    fn channel_entry_to_peer_info_should_return_some_for_pending_to_close() {
+        let ch = ChannelEntry::builder()
+            .between(
+                "0x07eaf07d6624f741e04f4092a755a9027aaab7f6".parse::<Address>().unwrap(),
+                "0x188c4462b75e46f0c7262d7f48d182447b93a93c".parse::<Address>().unwrap(),
+            )
+            .balance("5 wxHOPR".parse().unwrap())
+            .status(ChannelStatus::PendingToClose(std::time::SystemTime::now()))
+            .build()
+            .unwrap();
+
+        assert!(channel_entry_to_peer_info(Ok(Some(ch))).is_some());
+    }
+
+    #[test]
+    fn channel_entry_to_peer_info_should_return_none_for_closed_channel() {
+        let ch = ChannelEntry::builder()
+            .between(
+                "0x07eaf07d6624f741e04f4092a755a9027aaab7f6".parse::<Address>().unwrap(),
+                "0x188c4462b75e46f0c7262d7f48d182447b93a93c".parse::<Address>().unwrap(),
+            )
+            .balance("10 wxHOPR".parse().unwrap())
+            .status(ChannelStatus::Closed)
+            .build()
+            .unwrap();
+
+        assert!(channel_entry_to_peer_info(Ok(Some(ch))).is_none());
+    }
+
+    #[test]
+    fn channel_entry_to_peer_info_should_return_none_for_no_channel() {
+        assert!(channel_entry_to_peer_info(Ok(None)).is_none());
+    }
+
+    #[test]
+    fn channel_entry_to_peer_info_should_return_none_for_error() {
+        let err = hopr_lib::errors::HoprLibError::GeneralError("test".into());
+        assert!(channel_entry_to_peer_info(Err(err)).is_none());
+    }
+
+    #[test]
+    fn destination_params_should_deserialize() {
+        let json = serde_json::json!({
+            "destination": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6"
+        });
+        let params: DestinationParams = serde_json::from_value(json).unwrap();
+        assert_eq!(
+            params.destination,
+            "0x07eaf07d6624f741e04f4092a755a9027aaab7f6".parse().unwrap()
+        );
     }
 }
