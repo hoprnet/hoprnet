@@ -7,7 +7,7 @@ use axum::{
 };
 use futures::TryFutureExt;
 use hopr_lib::{
-    Address, AsUnixTimestamp, ChannelEntry, ChannelStatus, HoprBalance, ToHex,
+    Address, AsUnixTimestamp, ChannelEntry, ChannelStatus, HoprBalance,
     errors::{HoprLibError, HoprStatusError},
     prelude::Hash,
 };
@@ -324,26 +324,38 @@ pub(super) async fn open_channel(
     }
 }
 
-#[derive(Deserialize, utoipa::ToSchema)]
-#[schema(example = json!({
-    "channelId": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f"
-}))]
+#[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ChannelIdParams {
-    channel_id: String,
+pub(crate) struct CounterpartyParams {
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String)]
+    counterparty: Address,
 }
 
-/// Returns information about the given channel.
+/// Resolves the outgoing channel from this node to the given counterparty.
+///
+/// Looks up the channel where `source = me` and `destination = counterparty`
+/// that is not in `Closed` state.
+fn resolve_outgoing_channel(hopr: &crate::HoprNode, counterparty: &Address) -> Result<ChannelEntry, ApiErrorStatus> {
+    let me = hopr.me_onchain();
+    match hopr.channel(&me, counterparty) {
+        Ok(Some(ch)) if ch.status != ChannelStatus::Closed => Ok(ch),
+        Ok(_) => Err(ApiErrorStatus::ChannelNotFound),
+        Err(e) => Err(ApiErrorStatus::from(e)),
+    }
+}
+
+/// Returns information about the channel with the given counterparty.
 #[utoipa::path(
         get,
-        path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}"),
-        description = "Returns information about the given channel.",
+        path = const_format::formatcp!("{BASE_PATH}/channels/{{counterparty}}"),
+        description = "Returns information about the channel with the given counterparty.",
         params(
-            ("channelId" = String, Path, description = "ID of the channel.", example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")
+            ("counterparty" = String, Path, description = "On-chain address of the counterparty.", example = "0x188c4462b75e46f0c7262d7f48d182447b93a93c")
         ),
         responses(
             (status = 200, description = "Channel fetched successfully", body = ChannelInfoResponse),
-            (status = 400, description = "Invalid channel id.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -355,27 +367,21 @@ pub(crate) struct ChannelIdParams {
         tag = "Channels",
     )]
 pub(super) async fn show_channel(
-    Path(ChannelIdParams { channel_id }): Path<ChannelIdParams>,
+    Path(CounterpartyParams { counterparty }): Path<CounterpartyParams>,
     State(state): State<Arc<InternalState>>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match Hash::from_hex(channel_id.as_str()) {
-        Ok(channel_id) => {
-            match hopr_async_runtime::prelude::spawn_blocking(move || hopr.channel_by_id(&channel_id)).await {
-                Ok(Ok(Some(channel))) => {
-                    let info = query_topology_info(channel).await;
-                    match info {
-                        Ok(info) => (StatusCode::OK, Json(info)).into_response(),
-                        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
-                    }
-                }
-                Ok(Ok(None)) => (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
-                Ok(Err(e)) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+    match hopr_async_runtime::prelude::spawn_blocking(move || resolve_outgoing_channel(&hopr, &counterparty)).await {
+        Ok(Ok(channel)) => {
+            let info = query_topology_info(channel).await;
+            match info {
+                Ok(info) => (StatusCode::OK, Json(info)).into_response(),
                 Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
             }
         }
-        Err(_) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
+        Ok(Err(status)) => (StatusCode::NOT_FOUND, status).into_response(),
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }
 
@@ -398,21 +404,20 @@ pub(crate) struct CloseChannelResponse {
     // channel_status: ChannelStatus,
 }
 
-/// Closes the given channel.
+/// Closes the channel with the given counterparty.
 ///
 /// If the channel is currently `Open`, it will transition it to `PendingToClose`.
-/// If the channels are in `PendingToClose` and the channel closure period has elapsed,
+/// If the channel is in `PendingToClose` and the channel closure period has elapsed,
 /// it will transition it to `Closed`.
 #[utoipa::path(
         delete,
-        path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}"),
-        description = "Closes the given channel.",
+        path = const_format::formatcp!("{BASE_PATH}/channels/{{counterparty}}"),
+        description = "Closes the channel with the given counterparty.",
         params(
-            ("channelId" = String, Path, description = "ID of the channel.", example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")
+            ("counterparty" = String, Path, description = "On-chain address of the counterparty.", example = "0x188c4462b75e46f0c7262d7f48d182447b93a93c")
         ),
         responses(
             (status = 200, description = "Channel closed successfully", body = CloseChannelResponse),
-            (status = 400, description = "Invalid channel id.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
             (status = 412, description = "The node is not ready."),
@@ -425,33 +430,28 @@ pub(crate) struct CloseChannelResponse {
         tag = "Channels",
     )]
 pub(super) async fn close_channel(
-    Path(ChannelIdParams { channel_id }): Path<ChannelIdParams>,
+    Path(CounterpartyParams { counterparty }): Path<CounterpartyParams>,
     State(state): State<Arc<InternalState>>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match Hash::from_hex(channel_id.as_str()) {
-        Ok(channel_id) => match hopr.close_channel_by_id(&channel_id).await {
-            Ok(receipt) => (
-                StatusCode::OK,
-                Json(CloseChannelResponse {
-                    // channel_status: receipt.status,
-                    receipt: receipt.tx_hash,
-                }),
-            )
-                .into_response(),
-            // Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
-            // hopr_lib::errors::ChainActionsError::ChannelDoesNotExist,
-            // ))) => (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
-            // Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
-            // hopr_lib::errors::ChainActionsError::InvalidArguments(_),
-            // ))) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnsupportedFeature).into_response(),
-            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
-                (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
-            }
-            Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
-        },
-        Err(_) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
+    let channel_id = match resolve_outgoing_channel(&hopr, &counterparty) {
+        Ok(ch) => *ch.get_id(),
+        Err(status) => return (StatusCode::NOT_FOUND, status).into_response(),
+    };
+
+    match hopr.close_channel_by_id(&channel_id).await {
+        Ok(receipt) => (
+            StatusCode::OK,
+            Json(CloseChannelResponse {
+                receipt: receipt.tx_hash,
+            }),
+        )
+            .into_response(),
+        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
+            (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
+        }
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }
 
@@ -481,13 +481,13 @@ pub(crate) struct FundBodyRequest {
     amount: HoprBalance,
 }
 
-/// Funds the given channel with the given amount of HOPR tokens.
+/// Funds the channel with the given counterparty with the given amount of HOPR tokens.
 #[utoipa::path(
         post,
-        path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/fund"),
-        description = "Funds the given channel with the given amount of HOPR tokens.",
+        path = const_format::formatcp!("{BASE_PATH}/channels/{{counterparty}}/fund"),
+        description = "Funds the channel with the given counterparty with the given amount of HOPR tokens.",
         params(
-            ("channelId" = String, Path, description = "ID of the channel.", example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")
+            ("counterparty" = String, Path, description = "On-chain address of the counterparty.", example = "0x188c4462b75e46f0c7262d7f48d182447b93a93c")
         ),
         request_body(
             content = FundBodyRequest,
@@ -496,7 +496,6 @@ pub(crate) struct FundBodyRequest {
         ),
         responses(
             (status = 200, description = "Channel funded successfully", body = FundChannelResponse),
-            (status = 400, description = "Invalid channel id.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 403, description = "Failed to fund the channel because of insufficient HOPR balance or allowance.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
@@ -510,29 +509,22 @@ pub(crate) struct FundBodyRequest {
         tag = "Channels",
     )]
 pub(super) async fn fund_channel(
-    Path(ChannelIdParams { channel_id }): Path<ChannelIdParams>,
+    Path(CounterpartyParams { counterparty }): Path<CounterpartyParams>,
     State(state): State<Arc<InternalState>>,
     Json(fund_req): Json<FundBodyRequest>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match Hash::from_hex(channel_id.as_str()) {
-        Ok(channel_id) => match hopr.fund_channel(&channel_id, fund_req.amount).await {
-            Ok(hash) => (StatusCode::OK, Json(FundChannelResponse { hash })).into_response(),
-            // Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
-            // hopr_lib::errors::ChainActionsError::ChannelDoesNotExist,
-            // ))) => (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
-            // Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
-            // hopr_lib::errors::ChainActionsError::NotEnoughAllowance,
-            // ))) => (StatusCode::FORBIDDEN, ApiErrorStatus::NotEnoughAllowance).into_response(),
-            // Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
-            // hopr_lib::errors::ChainActionsError::BalanceTooLow,
-            // ))) => (StatusCode::FORBIDDEN, ApiErrorStatus::NotEnoughBalance).into_response(),
-            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
-                (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
-            }
-            Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
-        },
-        Err(_) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
+    let channel_id = match resolve_outgoing_channel(&hopr, &counterparty) {
+        Ok(ch) => *ch.get_id(),
+        Err(status) => return (StatusCode::NOT_FOUND, status).into_response(),
+    };
+
+    match hopr.fund_channel(&channel_id, fund_req.amount).await {
+        Ok(hash) => (StatusCode::OK, Json(FundChannelResponse { hash })).into_response(),
+        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
+            (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
+        }
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }

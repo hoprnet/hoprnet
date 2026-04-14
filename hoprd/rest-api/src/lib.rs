@@ -105,8 +105,7 @@ pub(crate) struct InternalState {
         session::adjust_session,
         session::session_config,
         session::close_client,
-        tickets::redeem_all_tickets,
-        tickets::redeem_tickets_in_channel,
+        tickets::redeem_tickets,
         tickets::show_ticket_statistics,
     ),
     components(
@@ -121,9 +120,9 @@ pub(crate) struct InternalState {
             network::AnnouncedPeerResponse,
             network::AnnouncementOriginResponse,
             node::NodeInfoResponse, node::NodeVersionResponse,
-            peers::MultiaddressSource, peers::NodePeerInfoResponse, peers::PingResponse,
+            peers::MultiaddressSource, peers::NodePeerInfoResponse, peers::PeerChannelInfo, peers::PeerQosInfo, peers::PingResponse,
             session::SessionClientRequest, session::SessionCapability, session::RoutingOptions, session::SessionTargetSpec, session::SessionClientResponse, session::IpProtocol, session::SessionConfig,
-            tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
+            tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket, tickets::RedeemTicketsRequest,
         )
     ),
     modifiers(&SecurityAddon),
@@ -275,14 +274,10 @@ async fn build_api(
                 .route("/peers/{destination}", get(peers::show_peer_info))
                 .route("/channels", get(channels::list_channels))
                 .route("/channels", post(channels::open_channel))
-                .route("/channels/{channelId}", get(channels::show_channel))
-                .route("/channels/{channelId}", delete(channels::close_channel))
-                .route("/channels/{channelId}/fund", post(channels::fund_channel))
-                .route(
-                    "/channels/{channelId}/tickets/redeem",
-                    post(tickets::redeem_tickets_in_channel),
-                )
-                .route("/tickets/redeem", post(tickets::redeem_all_tickets))
+                .route("/channels/{counterparty}", get(channels::show_channel))
+                .route("/channels/{counterparty}", delete(channels::close_channel))
+                .route("/channels/{counterparty}/fund", post(channels::fund_channel))
+                .route("/tickets/redeem", post(tickets::redeem_tickets))
                 .route("/tickets/statistics", get(tickets::show_ticket_statistics))
                 .route("/network/price", get(network::price))
                 .route("/network/probability", get(network::probability))

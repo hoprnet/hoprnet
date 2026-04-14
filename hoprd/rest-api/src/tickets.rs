@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Json, Path, State},
+    extract::{Json, State},
     http::status::StatusCode,
     response::IntoResponse,
 };
 use hopr_lib::{
-    HoprBalance, ToHex,
+    Address, ChannelStatus, HoprBalance,
     api::tickets::{ChannelStats, TicketManagement},
     prelude::Hash,
 };
@@ -45,12 +45,6 @@ pub(crate) struct ChannelTicket {
         example = "0xe445fcf4e90d25fe3c9199ccfaff85e23ecce8773304d85e7120f1f38787f2329822470487a37f1b5408c8c0b73e874ee9f7594a632713b6096e616857999891"
     )]
     signature: String,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct ChannelIdParams {
-    channel_id: String,
 }
 
 #[serde_as]
@@ -117,17 +111,40 @@ pub(super) async fn show_ticket_statistics(State(state): State<Arc<InternalState
     }
 }
 
-/// Starts redeeming of all tickets in all channels.
+#[serde_as]
+#[derive(Debug, Default, Clone, Deserialize, utoipa::ToSchema)]
+#[schema(example = json!({
+    "counterparty": "0x188c4462b75e46f0c7262d7f48d182447b93a93c"
+}))]
+#[serde(rename_all = "camelCase")]
+/// Optional request body for ticket redemption.
+pub(crate) struct RedeemTicketsRequest {
+    /// On-chain address of the counterparty whose incoming channel tickets to redeem.
+    /// If omitted, tickets in all channels are redeemed.
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[schema(value_type = Option<String>, example = "0x188c4462b75e46f0c7262d7f48d182447b93a93c")]
+    counterparty: Option<Address>,
+}
+
+/// Starts redeeming tickets.
 ///
-/// **WARNING:** If there are many unredeemed tickets in all channels, this operation
-/// can incur significant transaction costs.
+/// When a `counterparty` is specified, only tickets in the incoming channel from that
+/// counterparty are redeemed. When omitted, tickets in all channels are redeemed.
+///
+/// **WARNING:** Redeeming many tickets can incur significant transaction costs.
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/tickets/redeem"),
-        description = "Starts redeeming of all tickets in all channels.",
+        description = "Starts redeeming tickets. When a counterparty is specified, only tickets from that counterparty are redeemed.",
+        request_body(
+            content = RedeemTicketsRequest,
+            description = "Optional counterparty to scope ticket redemption.",
+            content_type = "application/json",
+        ),
         responses(
             (status = 202, description = "Ticket redemption started successfully."),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 404, description = "Channel with counterparty not found.", body = ApiError),
         ),
         security(
             ("api_token" = []),
@@ -135,53 +152,22 @@ pub(super) async fn show_ticket_statistics(State(state): State<Arc<InternalState
         ),
         tag = "Tickets"
     )]
-pub(super) async fn redeem_all_tickets(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
-    let hopr = state.hopr.clone();
-
-    hopr_async_runtime::prelude::spawn(async move {
-        match hopr.redeem_all_tickets(0).await {
-            Ok(_) => {
-                tracing::info!("all tickets redeemed on API request");
-            }
-            Err(error) => {
-                tracing::error!(%error, "failed to redeem all tickets on API request");
-            }
-        }
-    });
-
-    (StatusCode::ACCEPTED, "").into_response()
-}
-
-/// Starts redeeming all tickets in the given channel.
-///
-/// **WARNING:** If there are many unredeemed tickets in the given channel, this operation
-/// can incur significant transaction costs.
-#[utoipa::path(
-        post,
-        path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets/redeem"),
-        description = "Starts redeeming all tickets in the given channel.",
-        params(
-            ("channelId" = String, Path, description = "ID of the channel.", example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")
-        ),
-        responses(
-            (status = 202, description = "Ticket redemption started successfully."),
-            (status = 400, description = "Invalid channel id.", body = ApiError),
-            (status = 401, description = "Invalid authorization token.", body = ApiError)
-        ),
-        security(
-            ("api_token" = []),
-            ("bearer_token" = [])
-        ),
-        tag = "Channels"
-    )]
-pub(super) async fn redeem_tickets_in_channel(
-    Path(ChannelIdParams { channel_id }): Path<ChannelIdParams>,
+pub(super) async fn redeem_tickets(
     State(state): State<Arc<InternalState>>,
+    Json(req): Json<RedeemTicketsRequest>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match Hash::from_hex(channel_id.as_str()) {
-        Ok(channel_id) => {
+    match req.counterparty {
+        Some(counterparty) => {
+            // Resolve the incoming channel from the counterparty (counterparty → me).
+            let me = hopr.me_onchain();
+            let channel_id = match hopr.channel(&counterparty, &me) {
+                Ok(Some(ch)) if ch.status != ChannelStatus::Closed => *ch.get_id(),
+                Ok(_) => return (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
+                Err(e) => return (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+            };
+
             hopr_async_runtime::prelude::spawn(async move {
                 match hopr.redeem_tickets_in_channel(&channel_id, 0).await {
                     Ok(_) => {
@@ -195,6 +181,19 @@ pub(super) async fn redeem_tickets_in_channel(
 
             (StatusCode::ACCEPTED, "").into_response()
         }
-        Err(_) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
+        None => {
+            hopr_async_runtime::prelude::spawn(async move {
+                match hopr.redeem_all_tickets(0).await {
+                    Ok(_) => {
+                        tracing::info!("all tickets redeemed on API request");
+                    }
+                    Err(error) => {
+                        tracing::error!(%error, "failed to redeem all tickets on API request");
+                    }
+                }
+            });
+
+            (StatusCode::ACCEPTED, "").into_response()
+        }
     }
 }

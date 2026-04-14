@@ -1087,54 +1087,53 @@ and indexer state.*/
         #[serde(rename = "providerUrl")]
         pub provider_url: ::std::string::String,
     }
-    ///Contains the multiaddresses of peers that are `announced` on-chain and `observed` by the node.
+    ///Comprehensive information about a peer: multiaddresses, QoS observations, and channel state.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Contains the multiaddresses of peers that are `announced` on-chain and `observed` by the node.",
+    ///  "description": "Comprehensive information about a peer: multiaddresses, QoS observations, and channel state.",
     ///  "examples": [
     ///    {
-    ///      "announced": [
-    ///        "/ip4/10.0.2.100/tcp/19093"
-    ///      ],
     ///      "announcedSources": [
     ///        {
     ///          "multiaddress": "/ip4/10.0.2.100/tcp/19093",
     ///          "origin": "chain"
     ///        }
     ///      ],
+    ///      "incomingChannel": null,
     ///      "observed": [
     ///        "/ip4/10.0.2.100/tcp/19093"
-    ///      ]
+    ///      ],
+    ///      "outgoingChannel": {
+    ///        "balance": "10 wxHOPR",
+    ///        "id": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
+    ///        "status": "Open"
+    ///      },
+    ///      "qos": {
+    ///        "averageLatency": 100,
+    ///        "lastUpdate": 1690000000000,
+    ///        "probeRate": 0.476,
+    ///        "score": 0.7
+    ///      }
     ///    }
     ///  ],
     ///  "type": "object",
     ///  "required": [
-    ///    "announced",
     ///    "announcedSources",
     ///    "observed"
     ///  ],
     ///  "properties": {
-    ///    "announced": {
-    ///      "description": "Flat list of announced multiaddresses (legacy, for backward compatibility).",
-    ///      "examples": [
-    ///        [
-    ///          "/ip4/10.0.2.100/tcp/19093"
-    ///        ]
-    ///      ],
-    ///      "type": "array",
-    ///      "items": {
-    ///        "type": "string"
-    ///      }
-    ///    },
     ///    "announcedSources": {
     ///      "description": "Announced multiaddresses grouped by discovery origin.",
     ///      "type": "array",
     ///      "items": {
     ///        "$ref": "#/components/schemas/MultiaddressSource"
     ///      }
+    ///    },
+    ///    "incomingChannel": {
+    ///      "$ref": "#/components/schemas/PeerChannelInfo"
     ///    },
     ///    "observed": {
     ///      "examples": [
@@ -1146,6 +1145,12 @@ and indexer state.*/
     ///      "items": {
     ///        "type": "string"
     ///      }
+    ///    },
+    ///    "outgoingChannel": {
+    ///      "$ref": "#/components/schemas/PeerChannelInfo"
+    ///    },
+    ///    "qos": {
+    ///      "$ref": "#/components/schemas/PeerQosInfo"
     ///    }
     ///  }
     ///}
@@ -1153,12 +1158,24 @@ and indexer state.*/
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     pub struct NodePeerInfoResponse {
-        ///Flat list of announced multiaddresses (legacy, for backward compatibility).
-        pub announced: ::std::vec::Vec<::std::string::String>,
         ///Announced multiaddresses grouped by discovery origin.
         #[serde(rename = "announcedSources")]
         pub announced_sources: ::std::vec::Vec<MultiaddressSource>,
+        #[serde(
+            rename = "incomingChannel",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub incoming_channel: ::std::option::Option<PeerChannelInfo>,
         pub observed: ::std::vec::Vec<::std::string::String>,
+        #[serde(
+            rename = "outgoingChannel",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub outgoing_channel: ::std::option::Option<PeerChannelInfo>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub qos: ::std::option::Option<PeerQosInfo>,
     }
     ///Received tickets statistics.
     ///
@@ -1346,6 +1363,130 @@ and indexer state.*/
         #[serde(rename = "transactionReceipt")]
         pub transaction_receipt: ::std::string::String,
     }
+    ///Channel information for a specific peer.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "Channel information for a specific peer.",
+    ///  "examples": [
+    ///    {
+    ///      "balance": "10 wxHOPR",
+    ///      "id": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
+    ///      "status": "Open"
+    ///    }
+    ///  ],
+    ///  "type": "object",
+    ///  "required": [
+    ///    "balance",
+    ///    "id",
+    ///    "status"
+    ///  ],
+    ///  "properties": {
+    ///    "balance": {
+    ///      "examples": [
+    ///        "10 wxHOPR"
+    ///      ],
+    ///      "type": "string"
+    ///    },
+    ///    "id": {
+    ///      "examples": [
+    ///        "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f"
+    ///      ],
+    ///      "type": "string"
+    ///    },
+    ///    "status": {
+    ///      "examples": [
+    ///        "Open"
+    ///      ],
+    ///      "type": "string"
+    ///    }
+    ///  }
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    pub struct PeerChannelInfo {
+        pub balance: ::std::string::String,
+        pub id: ::std::string::String,
+        pub status: ::std::string::String,
+    }
+    ///QoS observation data for a peer.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "QoS observation data for a peer.",
+    ///  "examples": [
+    ///    {
+    ///      "averageLatency": 100,
+    ///      "lastUpdate": 1690000000000,
+    ///      "probeRate": 0.476,
+    ///      "score": 0.7
+    ///    }
+    ///  ],
+    ///  "type": "object",
+    ///  "required": [
+    ///    "lastUpdate",
+    ///    "probeRate",
+    ///    "score"
+    ///  ],
+    ///  "properties": {
+    ///    "averageLatency": {
+    ///      "description": "Average latency in milliseconds, if available.",
+    ///      "examples": [
+    ///        100
+    ///      ],
+    ///      "type": [
+    ///        "integer",
+    ///        "null"
+    ///      ],
+    ///      "minimum": 0.0
+    ///    },
+    ///    "lastUpdate": {
+    ///      "description": "Epoch milliseconds of the last observation update.",
+    ///      "examples": [
+    ///        1690000000000
+    ///      ],
+    ///      "type": "integer",
+    ///      "minimum": 0.0
+    ///    },
+    ///    "probeRate": {
+    ///      "examples": [
+    ///        0.476
+    ///      ],
+    ///      "type": "number",
+    ///      "format": "double"
+    ///    },
+    ///    "score": {
+    ///      "examples": [
+    ///        0.7
+    ///      ],
+    ///      "type": "number",
+    ///      "format": "double"
+    ///    }
+    ///  }
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    pub struct PeerQosInfo {
+        ///Average latency in milliseconds, if available.
+        #[serde(
+            rename = "averageLatency",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub average_latency: ::std::option::Option<u64>,
+        ///Epoch milliseconds of the last observation update.
+        #[serde(rename = "lastUpdate")]
+        pub last_update: u64,
+        #[serde(rename = "probeRate")]
+        pub probe_rate: f64,
+        pub score: f64,
+    }
     ///Contains the latency and the reported version of a peer that has been pinged.
     ///
     /// <details><summary>JSON schema</summary>
@@ -1378,6 +1519,48 @@ and indexer state.*/
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     pub struct PingResponse {
         pub latency: i64,
+    }
+    ///Optional request body for ticket redemption.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "Optional request body for ticket redemption.",
+    ///  "examples": [
+    ///    {
+    ///      "counterparty": "0x188c4462b75e46f0c7262d7f48d182447b93a93c"
+    ///    }
+    ///  ],
+    ///  "type": "object",
+    ///  "properties": {
+    ///    "counterparty": {
+    ///      "description": "On-chain address of the counterparty whose incoming channel tickets to redeem.\nIf omitted, tickets in all channels are redeemed.",
+    ///      "examples": [
+    ///        "0x188c4462b75e46f0c7262d7f48d182447b93a93c"
+    ///      ],
+    ///      "type": [
+    ///        "string",
+    ///        "null"
+    ///      ]
+    ///    }
+    ///  }
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    pub struct RedeemTicketsRequest {
+        /**On-chain address of the counterparty whose incoming channel tickets to redeem.
+If omitted, tickets in all channels are redeemed.*/
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub counterparty: ::std::option::Option<::std::string::String>,
+    }
+    impl ::std::default::Default for RedeemTicketsRequest {
+        fn default() -> Self {
+            Self {
+                counterparty: Default::default(),
+            }
+        }
     }
     ///`RoutingOptions`
     ///
@@ -2421,21 +2604,22 @@ Arguments:
             _ => Err(Error::UnexpectedResponse(response)),
         }
     }
-    /**Returns information about the given channel
+    /**Returns information about the channel with the given counterparty
 
-Returns information about the given channel.
+Returns information about the channel with the given counterparty.
 
-Sends a `GET` request to `/api/v4/channels/{channelId}`
+Sends a `GET` request to `/api/v4/channels/{counterparty}`
 
 Arguments:
-- `channel_id`: ID of the channel.
+- `counterparty`: On-chain address of the counterparty.
 */
     pub async fn show_channel<'a>(
         &'a self,
-        channel_id: &'a str,
+        counterparty: &'a str,
     ) -> Result<ResponseValue<types::ChannelInfoResponse>, Error<()>> {
         let url = format!(
-            "{}/api/v4/channels/{}", self.baseurl, encode_path(& channel_id.to_string()),
+            "{}/api/v4/channels/{}", self.baseurl, encode_path(& counterparty
+            .to_string()),
         );
         let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
         header_map
@@ -2465,21 +2649,22 @@ Arguments:
             _ => Err(Error::UnexpectedResponse(response)),
         }
     }
-    /**Closes the given channel
+    /**Closes the channel with the given counterparty
 
-Closes the given channel.
+Closes the channel with the given counterparty.
 
-Sends a `DELETE` request to `/api/v4/channels/{channelId}`
+Sends a `DELETE` request to `/api/v4/channels/{counterparty}`
 
 Arguments:
-- `channel_id`: ID of the channel.
+- `counterparty`: On-chain address of the counterparty.
 */
     pub async fn close_channel<'a>(
         &'a self,
-        channel_id: &'a str,
+        counterparty: &'a str,
     ) -> Result<ResponseValue<types::CloseChannelResponse>, Error<()>> {
         let url = format!(
-            "{}/api/v4/channels/{}", self.baseurl, encode_path(& channel_id.to_string()),
+            "{}/api/v4/channels/{}", self.baseurl, encode_path(& counterparty
+            .to_string()),
         );
         let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
         header_map
@@ -2509,23 +2694,23 @@ Arguments:
             _ => Err(Error::UnexpectedResponse(response)),
         }
     }
-    /**Funds the given channel with the given amount of HOPR tokens
+    /**Funds the channel with the given counterparty with the given amount of HOPR tokens
 
-Funds the given channel with the given amount of HOPR tokens.
+Funds the channel with the given counterparty with the given amount of HOPR tokens.
 
-Sends a `POST` request to `/api/v4/channels/{channelId}/fund`
+Sends a `POST` request to `/api/v4/channels/{counterparty}/fund`
 
 Arguments:
-- `channel_id`: ID of the channel.
+- `counterparty`: On-chain address of the counterparty.
 - `body`: Specifies the amount of HOPR tokens to fund a channel with.
 */
     pub async fn fund_channel<'a>(
         &'a self,
-        channel_id: &'a str,
+        counterparty: &'a str,
         body: &'a types::FundBodyRequest,
     ) -> Result<ResponseValue<types::FundChannelResponse>, Error<()>> {
         let url = format!(
-            "{}/api/v4/channels/{}/fund", self.baseurl, encode_path(& channel_id
+            "{}/api/v4/channels/{}/fund", self.baseurl, encode_path(& counterparty
             .to_string()),
         );
         let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
@@ -2554,46 +2739,6 @@ Arguments:
         let response = result?;
         match response.status().as_u16() {
             200u16 => ResponseValue::from_response(response).await,
-            _ => Err(Error::UnexpectedResponse(response)),
-        }
-    }
-    /**Starts redeeming all tickets in the given channel
-
-Starts redeeming all tickets in the given channel.
-
-Sends a `POST` request to `/api/v4/channels/{channelId}/tickets/redeem`
-
-Arguments:
-- `channel_id`: ID of the channel.
-*/
-    pub async fn redeem_tickets_in_channel<'a>(
-        &'a self,
-        channel_id: &'a str,
-    ) -> Result<ResponseValue<ByteStream>, Error<types::ApiError>> {
-        let url = format!(
-            "{}/api/v4/channels/{}/tickets/redeem", self.baseurl, encode_path(&
-            channel_id.to_string()),
-        );
-        let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
-        header_map
-            .append(
-                ::reqwest::header::HeaderName::from_static("api-version"),
-                ::reqwest::header::HeaderValue::from_static(Self::api_version()),
-            );
-        #[allow(unused_mut)]
-        let mut request = self.client.post(url).headers(header_map).build()?;
-        let info = OperationInfo {
-            operation_id: "redeem_tickets_in_channel",
-        };
-        self.pre(&mut request, &info).await?;
-        let result = self.exec(request, &info).await;
-        self.post(&result, &info).await?;
-        let response = result?;
-        match response.status().as_u16() {
-            200..=299 => Ok(ResponseValue::stream(response)),
-            400u16 => {
-                Err(Error::ErrorResponse(ResponseValue::from_response(response).await?))
-            }
             _ => Err(Error::UnexpectedResponse(response)),
         }
     }
@@ -2921,10 +3066,10 @@ Sends a `GET` request to `/api/v4/node/version`
             _ => Err(Error::UnexpectedResponse(response)),
         }
     }
-    /**Returns transport-related information about the given peer
+    /**Returns comprehensive information about the given peer
 
-This includes the peer ids that the given peer has `announced` on-chain
-and peer ids that are actually `observed` by the transport layer.
+Includes announced and observed multiaddresses, QoS observation data from the
+network graph, and the state of any channels between this node and the peer.
 
 Sends a `GET` request to `/api/v4/peers/{destination}`
 
@@ -3239,15 +3384,18 @@ Arguments:
             _ => Err(Error::UnexpectedResponse(response)),
         }
     }
-    /**Starts redeeming of all tickets in all channels
+    /**Starts redeeming tickets
 
-Starts redeeming of all tickets in all channels.
+Starts redeeming tickets. When a counterparty is specified, only tickets from that counterparty are redeemed.
 
 Sends a `POST` request to `/api/v4/tickets/redeem`
 
+Arguments:
+- `body`: Optional counterparty to scope ticket redemption.
 */
-    pub async fn redeem_all_tickets<'a>(
+    pub async fn redeem_tickets<'a>(
         &'a self,
+        body: &'a types::RedeemTicketsRequest,
     ) -> Result<ResponseValue<ByteStream>, Error<types::ApiError>> {
         let url = format!("{}/api/v4/tickets/redeem", self.baseurl,);
         let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
@@ -3257,9 +3405,9 @@ Sends a `POST` request to `/api/v4/tickets/redeem`
                 ::reqwest::header::HeaderValue::from_static(Self::api_version()),
             );
         #[allow(unused_mut)]
-        let mut request = self.client.post(url).headers(header_map).build()?;
+        let mut request = self.client.post(url).json(&body).headers(header_map).build()?;
         let info = OperationInfo {
-            operation_id: "redeem_all_tickets",
+            operation_id: "redeem_tickets",
         };
         self.pre(&mut request, &info).await?;
         let result = self.exec(request, &info).await;

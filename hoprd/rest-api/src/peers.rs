@@ -7,9 +7,13 @@ use axum::{
 };
 use futures::FutureExt;
 use hopr_lib::{
-    Address, Multiaddr,
-    api::node::HoprNodeNetworkOperations,
+    Address, ChannelStatus, HoprBalance, Multiaddr,
+    api::{
+        graph::{EdgeLinkObservable, traits::EdgeObservableRead},
+        node::HoprNodeNetworkOperations,
+    },
     errors::{HoprLibError, HoprStatusError, HoprTransportError},
+    prelude::Hash,
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, DurationMilliSeconds, serde_as};
@@ -33,27 +37,77 @@ pub(crate) struct MultiaddressSource {
     origin: AnnouncementOriginResponse,
 }
 
+/// Channel information for a specific peer.
 #[serde_as]
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
-    "announced": ["/ip4/10.0.2.100/tcp/19093"],
+    "id": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
+    "status": "Open",
+    "balance": "10 wxHOPR"
+}))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PeerChannelInfo {
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String, example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")]
+    id: Hash,
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String, example = "Open")]
+    status: ChannelStatus,
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String, example = "10 wxHOPR")]
+    balance: HoprBalance,
+}
+
+/// QoS observation data for a peer.
+#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
+    "probeRate": 0.476,
+    "lastUpdate": 1690000000000_u128,
+    "averageLatency": 100,
+    "score": 0.7
+}))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PeerQosInfo {
+    #[schema(example = 0.476)]
+    probe_rate: f64,
+    /// Epoch milliseconds of the last observation update.
+    #[schema(example = 1690000000000_u128)]
+    last_update: u128,
+    /// Average latency in milliseconds, if available.
+    #[schema(example = 100)]
+    average_latency: Option<u128>,
+    #[schema(example = 0.7)]
+    score: f64,
+}
+
+#[serde_as]
+#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
     "announcedSources": [
         { "multiaddress": "/ip4/10.0.2.100/tcp/19093", "origin": "chain" }
     ],
-    "observed": ["/ip4/10.0.2.100/tcp/19093"]
+    "observed": ["/ip4/10.0.2.100/tcp/19093"],
+    "qos": { "probeRate": 0.476, "lastUpdate": 1690000000000_u128, "averageLatency": 100, "score": 0.7 },
+    "outgoingChannel": { "id": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f", "status": "Open", "balance": "10 wxHOPR" },
+    "incomingChannel": null
 }))]
 #[serde(rename_all = "camelCase")]
-/// Contains the multiaddresses of peers that are `announced` on-chain and `observed` by the node.
+/// Comprehensive information about a peer: multiaddresses, QoS observations, and channel state.
 pub(crate) struct NodePeerInfoResponse {
-    /// Flat list of announced multiaddresses (legacy, for backward compatibility).
-    #[serde_as(as = "Vec<DisplayFromStr>")]
-    #[schema(value_type = Vec<String>, example = json!(["/ip4/10.0.2.100/tcp/19093"]))]
-    announced: Vec<Multiaddr>,
     /// Announced multiaddresses grouped by discovery origin.
     announced_sources: Vec<MultiaddressSource>,
     #[serde_as(as = "Vec<DisplayFromStr>")]
     #[schema(value_type = Vec<String>, example = json!(["/ip4/10.0.2.100/tcp/19093"]))]
     observed: Vec<Multiaddr>,
+    /// QoS observation data from the network graph, if connected.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    qos: Option<PeerQosInfo>,
+    /// Outgoing channel (this node → peer), if one exists and is not closed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    outgoing_channel: Option<PeerChannelInfo>,
+    /// Incoming channel (peer → this node), if one exists and is not closed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    incoming_channel: Option<PeerChannelInfo>,
 }
 
 #[serde_as]
@@ -65,10 +119,10 @@ pub(crate) struct DestinationParams {
     destination: Address,
 }
 
-/// Returns transport-related information about the given peer.
+/// Returns comprehensive information about the given peer.
 ///
-/// This includes the peer ids that the given peer has `announced` on-chain
-/// and peer ids that are actually `observed` by the transport layer.
+/// Includes announced and observed multiaddresses, QoS observation data from the
+/// network graph, and the state of any channels between this node and the peer.
 #[utoipa::path(
     get,
     path = const_format::formatcp!("{BASE_PATH}/peers/{{destination}}"),
@@ -93,36 +147,94 @@ pub(super) async fn show_peer_info(
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match hopr.chain_key_to_peerid(&destination) {
-        Ok(Some(peer)) => {
-            let res = futures::try_join!(
-                hopr.multiaddresses_announced_on_chain(&peer),
-                hopr.network_observed_multiaddresses(&peer).map(Ok)
-            );
-            match res {
-                Ok((announced, observed)) => {
-                    let announced_sources: Vec<MultiaddressSource> = announced
-                        .iter()
-                        .map(|ma| MultiaddressSource {
-                            multiaddress: ma.clone(),
-                            origin: AnnouncementOriginResponse::Chain,
-                        })
-                        .collect();
-                    Ok((
-                        StatusCode::OK,
-                        Json(NodePeerInfoResponse {
-                            announced,
-                            announced_sources,
-                            observed,
-                        }),
-                    ))
-                }
-                Err(error) => Err(ApiErrorStatus::UnknownFailure(error.to_string())),
+    let peer = match hopr.chain_key_to_peerid(&destination) {
+        Ok(Some(peer)) => peer,
+        Ok(None) | Err(_) => return Err(ApiErrorStatus::PeerNotFound),
+    };
+
+    // 1. Multiaddresses (announced + observed)
+    let res = futures::try_join!(
+        hopr.multiaddresses_announced_on_chain(&peer),
+        hopr.network_observed_multiaddresses(&peer).map(Ok)
+    );
+    let (announced, observed) = match res {
+        Ok(v) => v,
+        Err(error) => return Err(ApiErrorStatus::UnknownFailure(error.to_string())),
+    };
+
+    let announced_sources: Vec<MultiaddressSource> = announced
+        .into_iter()
+        .map(|ma| MultiaddressSource {
+            multiaddress: ma,
+            origin: AnnouncementOriginResponse::Chain,
+        })
+        .collect();
+
+    // 2. QoS data from graph
+    let qos = {
+        let graph = hopr.graph();
+        let me_key = graph.me();
+        let edges = graph.connected_edges();
+
+        let mut found = None;
+        for (src, dst, obs) in &edges {
+            if src != me_key {
+                continue;
             }
+            // Resolve this edge's destination to an on-chain address
+            let addr = match hopr.peerid_to_chain_key(&(*dst).into()) {
+                Ok(Some(a)) => a,
+                _ => continue,
+            };
+            if addr != destination {
+                continue;
+            }
+            if let Some(imm) = obs.immediate_qos() {
+                found = Some(PeerQosInfo {
+                    probe_rate: imm.average_probe_rate(),
+                    last_update: obs.last_update().as_millis(),
+                    average_latency: imm.average_latency().map(|l| l.as_millis()),
+                    score: obs.score(),
+                });
+            }
+            break;
         }
-        Ok(None) => Err(ApiErrorStatus::PeerNotFound),
-        Err(_) => Err(ApiErrorStatus::PeerNotFound),
-    }
+        found
+    };
+
+    // 3. Channel state
+    let me = hopr.me_onchain();
+    let outgoing_channel = hopr
+        .channel(&me, &destination)
+        .ok()
+        .flatten()
+        .filter(|ch| ch.status != ChannelStatus::Closed)
+        .map(|ch| PeerChannelInfo {
+            id: *ch.get_id(),
+            status: ch.status,
+            balance: ch.balance,
+        });
+    let incoming_channel = hopr
+        .channel(&destination, &me)
+        .ok()
+        .flatten()
+        .filter(|ch| ch.status != ChannelStatus::Closed)
+        .map(|ch| PeerChannelInfo {
+            id: *ch.get_id(),
+            status: ch.status,
+            balance: ch.balance,
+        });
+
+    Ok((
+        StatusCode::OK,
+        Json(NodePeerInfoResponse {
+            announced_sources,
+            observed,
+            qos,
+            outgoing_channel,
+            incoming_channel,
+        }),
+    ))
 }
 
 #[serde_as]
@@ -215,20 +327,21 @@ mod tests {
     }
 
     #[test]
-    fn node_peer_info_response_should_include_both_announced_fields() -> anyhow::Result<()> {
+    fn node_peer_info_response_should_include_announced_sources() -> anyhow::Result<()> {
         let ma: Multiaddr = "/ip4/10.0.2.100/tcp/19093".parse()?;
         let response = NodePeerInfoResponse {
-            announced: vec![ma.clone()],
             announced_sources: vec![MultiaddressSource {
                 multiaddress: ma,
                 origin: AnnouncementOriginResponse::Chain,
             }],
             observed: vec!["/ip4/10.0.2.100/tcp/19094".parse()?],
+            qos: None,
+            outgoing_channel: None,
+            incoming_channel: None,
         };
 
         let json = serde_json::to_value(&response)?;
-        assert!(json["announced"].is_array());
-        assert_eq!(json["announced"][0], "/ip4/10.0.2.100/tcp/19093");
+        assert!(json.get("announced").is_none());
         assert!(json["announcedSources"].is_array());
         assert_eq!(json["announcedSources"][0]["multiaddress"], "/ip4/10.0.2.100/tcp/19093");
         assert_eq!(json["announcedSources"][0]["origin"], "chain");
@@ -239,14 +352,32 @@ mod tests {
     #[test]
     fn node_peer_info_response_should_serialize_empty_sources_when_no_announcements() -> anyhow::Result<()> {
         let response = NodePeerInfoResponse {
-            announced: vec![],
             announced_sources: vec![],
             observed: vec!["/ip4/10.0.2.100/tcp/19094".parse()?],
+            qos: None,
+            outgoing_channel: None,
+            incoming_channel: None,
         };
 
         let json = serde_json::to_value(&response)?;
-        assert_eq!(json["announced"].as_array().unwrap().len(), 0);
         assert_eq!(json["announcedSources"].as_array().unwrap().len(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn node_peer_info_response_should_omit_null_optional_fields() -> anyhow::Result<()> {
+        let response = NodePeerInfoResponse {
+            announced_sources: vec![],
+            observed: vec![],
+            qos: None,
+            outgoing_channel: None,
+            incoming_channel: None,
+        };
+
+        let json = serde_json::to_value(&response)?;
+        assert!(json.get("qos").is_none());
+        assert!(json.get("outgoingChannel").is_none());
+        assert!(json.get("incomingChannel").is_none());
         Ok(())
     }
 }
