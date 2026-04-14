@@ -529,13 +529,13 @@
               cargo-shear
               cargo-insta
               cargo-nextest
+              pkgs-unstable.cargo-codspeed
               foundry-bin
               nfpm
               envsubst
               uv
               graphviz
-            ];
-            shellHook = ''
+            ];            shellHook = ''
               ${pre-commit-check.shellHook}
             '';
           };
@@ -552,11 +552,11 @@
               cargo-machete
               cargo-shear
               cargo-insta
+              pkgs-unstable.cargo-codspeed
               foundry-bin
               nfpm
               envsubst
-            ];
-            shellHook = ''
+            ];            shellHook = ''
               # Fix macOS dylib loading for nightly rustfmt (rust-overlay symlink issue)
               export DYLD_LIBRARY_PATH="${nightlyToolchain}/lib:$DYLD_LIBRARY_PATH"
               ${pre-commit-check.shellHook}
@@ -575,6 +575,7 @@
               pkgs-unstable.cargo-audit
               cargo-machete
               cargo-shear
+              pkgs-unstable.cargo-codspeed
               graphviz
               swagger-codegen3
               vacuum-go
@@ -583,7 +584,6 @@
               perl
             ];
           };
-
           testShell = nixLib.mkDevShell {
             rustToolchainFile = ./rust-toolchain.toml;
             shellName = "HOPR Testing";
