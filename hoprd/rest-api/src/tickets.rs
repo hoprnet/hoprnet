@@ -143,6 +143,7 @@ pub(crate) struct RedeemTicketsRequest {
         ),
         responses(
             (status = 202, description = "Ticket redemption started successfully."),
+            (status = 400, description = "Invalid request body or malformed JSON.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Channel with counterparty not found.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError),

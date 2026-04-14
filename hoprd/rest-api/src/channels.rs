@@ -356,6 +356,7 @@ fn resolve_outgoing_channel(hopr: &crate::HoprNode, counterparty: &Address) -> R
         ),
         responses(
             (status = 200, description = "Channel fetched successfully", body = ChannelInfoResponse),
+            (status = 400, description = "Invalid counterparty address.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -421,6 +422,7 @@ pub(crate) struct CloseChannelResponse {
         ),
         responses(
             (status = 200, description = "Channel closed successfully", body = CloseChannelResponse),
+            (status = 400, description = "Invalid counterparty address.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
             (status = 412, description = "The node is not ready."),
@@ -505,6 +507,7 @@ pub(crate) struct FundBodyRequest {
         ),
         responses(
             (status = 200, description = "Channel funded successfully", body = FundChannelResponse),
+            (status = 400, description = "Invalid counterparty address or request body.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 403, description = "Failed to fund the channel because of insufficient HOPR balance or allowance.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
