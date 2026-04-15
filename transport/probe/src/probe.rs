@@ -13,7 +13,7 @@ use hopr_api::{
 use hopr_async_runtime::AbortableList;
 use hopr_platform::time::native::current_time;
 use hopr_protocol_app::{
-    prelude::{ApplicationDataIn, ApplicationDataOut, ReservedTag},
+    prelude::{ApplicationDataIn, ApplicationDataOut, OutgoingPacketInfo, ReservedTag},
     v1::Tag,
 };
 use hopr_transport_tag_allocator::{AllocatedTag, TagAllocator};
@@ -197,7 +197,15 @@ impl Probe {
                                             forward_options,
                                             return_options,
                                         };
-                                        let data = ApplicationDataOut::with_no_packet_info(data);
+                                        // Neighbor probes are sent to a direct neighbor and returned via a zero-hop
+                                        // return path: only 1 SURB is ever consumed. See hoprnet/hoprnet#7972.
+                                        let data = ApplicationDataOut {
+                                            data,
+                                            packet_info: Some(OutgoingPacketInfo {
+                                                max_surbs_in_packet: 1,
+                                                ..Default::default()
+                                            }),
+                                        };
                                         pin_mut!(push_to_network);
 
                                         if let Err(_error) = push_to_network.send((routing, data)).await {
@@ -241,8 +249,19 @@ impl Probe {
                                         ) {
                                             pin_mut!(push_to_network);
 
+                                            // Loopback telemetry probes are self-routed and never replied to via
+                                            // SURB, so no SURBs should be bundled. See hoprnet/hoprnet#7972.
                                             if let Err(_error) = push_to_network
-                                                .send((routing, ApplicationDataOut::with_no_packet_info(packet)))
+                                                .send((
+                                                    routing,
+                                                    ApplicationDataOut {
+                                                        data: packet,
+                                                        packet_info: Some(OutgoingPacketInfo {
+                                                            max_surbs_in_packet: 0,
+                                                            ..Default::default()
+                                                        }),
+                                                    },
+                                                ))
                                                 .await
                                             {
                                                 tracing::error!("failed to send out a ping");
