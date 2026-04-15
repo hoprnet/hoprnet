@@ -12,10 +12,12 @@ use validator::{Validate, ValidationError, ValidationErrors};
 
 use crate::PeerId;
 
-const TICKET_ACK_BUFFER_SIZE: usize = 1_000_000;
-const NUM_CONCURRENT_TICKET_ACK_PROCESSING: usize = 10;
-const ACK_OUT_BUFFER_SIZE: usize = 1_000_000;
-const NUM_CONCURRENT_ACK_OUT_PROCESSING: usize = 10;
+/// Default concurrency for the incoming acknowledgement processing pipeline when not overridden
+/// via [`AcknowledgementPipelineConfig::ack_input_concurrency`].
+const DEFAULT_ACK_INPUT_CONCURRENCY: usize = 10;
+/// Default concurrency for the outgoing acknowledgement processing pipeline when not overridden
+/// via [`AcknowledgementPipelineConfig::ack_output_concurrency`].
+const DEFAULT_ACK_OUTPUT_CONCURRENCY: usize = 10;
 const QUEUE_SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(50);
 const PACKET_DECODING_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(150);
 const PACKET_ENCODING_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(150);
@@ -453,7 +455,7 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
             futures::stream::iter(groups)
         })
         .for_each_concurrent(
-            NUM_CONCURRENT_ACK_OUT_PROCESSING,
+            cfg.ack_output_concurrency.filter(|&n| n > 0).unwrap_or(DEFAULT_ACK_OUTPUT_CONCURRENCY),
             move |(destination, acks)| {
                 let encoder = encoder.clone();
                 let mut wire_outgoing = wire_outgoing.clone();
@@ -497,6 +499,7 @@ async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
     ticket_events: TEvt,
     ticket_proc: std::sync::Arc<T>,
     counters: crate::counters::PeerProtocolCounterRegistry,
+    concurrency: usize,
 ) where
     AckIn: futures::Stream<Item = (OffchainPublicKey, Vec<Acknowledgement>)> + Send + 'static,
     T: UnacknowledgedTicketProcessor + Sync + Send + 'static,
@@ -504,7 +507,7 @@ async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
     TEvt::Error: std::error::Error,
 {
     ack_incoming
-        .for_each_concurrent(NUM_CONCURRENT_TICKET_ACK_PROCESSING, move |(peer, acks)| {
+        .for_each_concurrent(concurrency, move |(peer, acks)| {
             let ticket_proc = ticket_proc.clone();
             let mut ticket_evt = ticket_events.clone();
             let counters = counters.clone();
@@ -570,6 +573,14 @@ fn default_ack_grouping_capacity() -> usize {
     5
 }
 
+fn default_ticket_ack_buffer_size() -> usize {
+    50_000
+}
+
+fn default_ack_out_buffer_size() -> usize {
+    50_000
+}
+
 /// Configuration for the acknowledgement processing pipeline.
 #[derive(Debug, Copy, Clone, smart_default::SmartDefault, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -592,6 +603,35 @@ pub struct AcknowledgementPipelineConfig {
     #[default(default_ack_grouping_capacity())]
     #[cfg_attr(feature = "serde", serde(default = "default_ack_grouping_capacity"))]
     pub ack_grouping_capacity: usize,
+    /// Capacity of the `incoming_ack` MPSC channel carrying received acknowledgements
+    /// to the ticket-ack processing pipeline.
+    ///
+    /// The previous hardcoded value of 1_000_000 pre-allocated ~MBs of ring buffer per node even
+    /// though real-world throughput rarely saturates more than a few thousand entries. Let the
+    /// 50 ms sink timeouts ([`QUEUE_SEND_TIMEOUT`]) propagate backpressure instead.
+    ///
+    /// Default is 50_000.
+    #[default(default_ticket_ack_buffer_size())]
+    #[cfg_attr(feature = "serde", serde(default = "default_ticket_ack_buffer_size"))]
+    pub ticket_ack_buffer_size: usize,
+    /// Capacity of the `outgoing_ack` MPSC channel carrying acknowledgements to be sent back
+    /// to the previous hop.
+    ///
+    /// Default is 50_000. See [`ticket_ack_buffer_size`](Self::ticket_ack_buffer_size) for the
+    /// rationale on why this is smaller than the original hardcoded 1_000_000.
+    #[default(default_ack_out_buffer_size())]
+    #[cfg_attr(feature = "serde", serde(default = "default_ack_out_buffer_size"))]
+    pub ack_out_buffer_size: usize,
+    /// Maximum concurrency when processing incoming (received) acknowledgements.
+    ///
+    /// `None` or `Some(0)` both fall back to the default
+    /// (see [`DEFAULT_ACK_INPUT_CONCURRENCY`]).
+    pub ack_input_concurrency: Option<usize>,
+    /// Maximum concurrency when processing outgoing (sent-back) acknowledgements.
+    ///
+    /// `None` or `Some(0)` both fall back to the default
+    /// (see [`DEFAULT_ACK_OUTPUT_CONCURRENCY`]).
+    pub ack_output_concurrency: Option<usize>,
 }
 
 // Requires manual implementation due to https://github.com/Keats/validator/issues/285
@@ -603,6 +643,12 @@ impl Validate for AcknowledgementPipelineConfig {
         }
         if self.ack_buffer_interval < std::time::Duration::from_millis(10) {
             errors.add("ack_buffer_interval", ValidationError::new("must be at least 10 ms"));
+        }
+        if self.ticket_ack_buffer_size == 0 {
+            errors.add("ticket_ack_buffer_size", ValidationError::new("must be greater than 0"));
+        }
+        if self.ack_out_buffer_size == 0 {
+            errors.add("ack_out_buffer_size", ValidationError::new("must be greater than 0"));
         }
         if errors.is_empty() { Ok(()) } else { Err(errors) }
     }
@@ -670,10 +716,11 @@ where
     }
 
     let (outgoing_ack_tx, outgoing_ack_rx) =
-        futures::channel::mpsc::channel::<(OffchainPublicKey, Option<HalfKey>)>(ACK_OUT_BUFFER_SIZE);
+        futures::channel::mpsc::channel::<(OffchainPublicKey, Option<HalfKey>)>(cfg.ack_config.ack_out_buffer_size);
 
-    let (incoming_ack_tx, incoming_ack_rx) =
-        futures::channel::mpsc::channel::<(OffchainPublicKey, Vec<Acknowledgement>)>(TICKET_ACK_BUFFER_SIZE);
+    let (incoming_ack_tx, incoming_ack_rx) = futures::channel::mpsc::channel::<(OffchainPublicKey, Vec<Acknowledgement>)>(
+        cfg.ack_config.ticket_ack_buffer_size,
+    );
 
     // Attach timeouts to all Sinks so that the pipelines are not blocked when
     // some channel is not being timely processed
@@ -738,10 +785,23 @@ where
         ),
     );
 
+    let ack_input_concurrency = cfg
+        .ack_config
+        .ack_input_concurrency
+        .filter(|&n| n > 0)
+        .unwrap_or(DEFAULT_ACK_INPUT_CONCURRENCY);
+
     processes.insert(
         PacketPipelineProcesses::AckIn,
         spawn_as_abortable!(
-            start_incoming_ack_pipeline(incoming_ack_rx, ticket_events, ticket_proc, counters).in_current_span()
+            start_incoming_ack_pipeline(
+                incoming_ack_rx,
+                ticket_events,
+                ticket_proc,
+                counters,
+                ack_input_concurrency
+            )
+            .in_current_span()
         ),
     );
 
