@@ -237,7 +237,7 @@ impl<T> Stream for Receiver<T> {
 
         // Phase 2: poll the timer WITHOUT holding the mutex so senders can keep pushing.
         let this = self.get_mut();
-        trace!("reseting the timer");
+        trace!("resetting the timer");
         this.timer.reset(sleep_for);
         futures::ready!(this.timer.poll_unpin(cx));
 

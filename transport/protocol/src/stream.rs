@@ -133,6 +133,7 @@ where
     let max_concurrent_packets = std::env::var("HOPR_TRANSPORT_MAX_CONCURRENT_PACKETS")
         .ok()
         .and_then(|v| v.parse().ok())
+        .filter(|&n: &usize| n > 0)
         .unwrap_or(MAX_CONCURRENT_PACKETS);
 
     let global_stream_open_timeout = std::env::var("HOPR_TRANSPORT_STREAM_OPEN_TIMEOUT_MS")
