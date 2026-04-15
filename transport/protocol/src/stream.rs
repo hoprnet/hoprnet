@@ -147,19 +147,24 @@ where
         .filter(|&n: &usize| n > 0)
         .unwrap_or(DEFAULT_FRAME_WRITER_BACKPRESSURE_BOUNDARY);
 
+    // Pack the handles only needed to open a NEW peer stream into a single Arc. This
+    // lets us pay one Arc bump per packet at the closure level instead of three (control,
+    // codec, tx_in), and defers the per-field `.clone()` to the cache-miss path that
+    // actually needs them.
+    let open_ctx = Arc::new((control, codec, tx_in));
+
     let cache_ingress = cache_out.clone();
-    let codec_ingress = codec.clone();
-    let tx_in_ingress = tx_in.clone();
+    let open_ctx_ingress = open_ctx.clone();
 
     // terminated when the incoming is dropped
     let _ingress_process = hopr_async_runtime::prelude::spawn(
         incoming
             .for_each(move |(peer, stream)| {
-                let codec = codec_ingress.clone();
                 let cache = cache_ingress.clone();
-                let tx_in = tx_in_ingress.clone();
+                let open_ctx = open_ctx_ingress.clone();
 
                 tracing::debug!(%peer, "received incoming peer-to-peer stream");
+                let (_control, codec, tx_in) = (&open_ctx.0, &open_ctx.1, &open_ctx.2);
                 let send = build_peer_stream_io(
                     peer,
                     stream,
@@ -187,17 +192,20 @@ where
             .inspect(|(peer, _)| tracing::trace!(%peer, "proceeding to deliver message to peer"))
             .for_each_concurrent(max_concurrent_packets, move |(peer, msg)| {
                 let cache = cache_out.clone();
-                let control = control.clone();
-                let codec = codec.clone();
-                let tx_in = tx_in.clone();
+                let open_ctx = open_ctx.clone();
 
                 async move {
-                    let cache_clone = cache.clone();
                     tracing::trace!(%peer, "trying to deliver message to peer");
 
+                    let cache_clone = cache.clone();
                     let cached: Result<Sender<<C as Decoder>::Item>, Arc<anyhow::Error>> = cache
                         .try_get_with(peer, async move {
                             tracing::trace!(%peer, "peer is not in cache, opening new stream");
+
+                            // Only the cache-miss path needs the stream-open handles.
+                            // Clone them out of the shared `open_ctx` once here rather
+                            // than on every outgoing message.
+                            let (control, codec, tx_in) = (&open_ctx.0, &open_ctx.1, &open_ctx.2);
 
                             // There must be a timeout on the `open` operation; otherwise
                             //  a single impossible ` open ` operation will block the peer ID entry in the
@@ -205,6 +213,7 @@ where
                             // processing pipeline.
                             use futures_time::future::FutureExt as TimeExt;
                             let stream = control
+                                .clone()
                                 .open(peer)
                                 .timeout(futures_time::time::Duration::from(global_stream_open_timeout))
                                 .await
@@ -216,7 +225,7 @@ where
                             Ok(build_peer_stream_io(
                                 peer,
                                 stream,
-                                cache_clone.clone(),
+                                cache_clone,
                                 codec.clone(),
                                 tx_in.clone(),
                                 frame_writer_backpressure_boundary,
