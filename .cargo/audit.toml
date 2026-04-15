@@ -21,9 +21,9 @@ stale = false
 # TODO: restore `deny = ["warnings"]` once `core2` (yanked, transitive via libp2p's multihash) is resolved upstream.
 # cargo-audit has no per-package yanked ignore — see https://github.com/rustsec/rustsec/issues/1453
 deny = ["unmaintained", "unsound"]
-format = "terminal" # "terminal" (human readable report) or "json"
-quiet = false       # Only print information on error
-show_tree = true    # Show inverse dependency trees along with advisories (default: true)
+format = "terminal"                # "terminal" (human readable report) or "json"
+quiet = false                      # Only print information on error
+show_tree = true                   # Show inverse dependency trees along with advisories (default: true)
 
 [target]
 arch = [

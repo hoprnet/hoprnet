@@ -108,7 +108,7 @@ impl<T> Sender<T> {
         self.push_item(item)
     }
 
-    /// Locked critical section shared between [`Sink::start_send`] and [`Sender::send`].
+    /// Locked critical section shared between `Sink::start_send` and [`Sender::send`].
     #[tracing::instrument(level = "trace", skip(self, item))]
     fn push_item(&self, item: T) -> Result<(), SenderError> {
         if !self.channel.receiver_active.load(Ordering::Relaxed) {
@@ -600,7 +600,8 @@ mod tests {
             received += 1;
         }
         assert_eq!(
-            received, ITERATIONS,
+            received,
+            ITERATIONS,
             "receiver dropped {} pending items on sender shutdown",
             ITERATIONS - received
         );
