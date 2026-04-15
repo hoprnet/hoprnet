@@ -195,13 +195,15 @@ impl<T> Stream for Receiver<T> {
     #[tracing::instrument(level = "trace", skip(self, cx))]
     fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Option<Self::Item>> {
         let now = std::time::Instant::now();
-        if self.channel.sender_count.load(Ordering::Relaxed) == 0 {
-            self.channel.receiver_active.store(false, Ordering::Relaxed);
-            return Poll::Ready(None);
-        }
+        let no_senders = self.channel.sender_count.load(Ordering::Relaxed) == 0;
 
         // Phase 1: under lock, try to pop a due item; otherwise register the waker and
         // capture the duration to sleep. Drop the lock before touching the timer.
+        //
+        // When all senders have dropped (`no_senders`), we must still drain any items
+        // remaining in the buffer before terminating the stream — returning `None`
+        // with pending items in flight would silently discard packets the senders
+        // enqueued before closing.
         let sleep_for = {
             let mut channel = self.channel.channel.lock();
 
@@ -221,6 +223,14 @@ impl<T> Stream for Receiver<T> {
                 return Poll::Ready(Some(data));
             }
 
+            // Buffer is either empty or every item is still in the future.
+            if channel.buffer.is_empty() && no_senders {
+                // Nothing left to deliver and nobody is going to enqueue more.
+                drop(channel);
+                self.channel.receiver_active.store(false, Ordering::Relaxed);
+                return Poll::Ready(None);
+            }
+
             match channel.waker.as_mut() {
                 Some(existing) => existing.clone_from(cx.waker()),
                 None => channel.waker = Some(cx.waker().clone()),
@@ -229,6 +239,8 @@ impl<T> Stream for Receiver<T> {
             match channel.buffer.peek() {
                 Some(next) => next.0.release_at.duration_since(now),
                 None => {
+                    // Senders still alive (else we would have returned `None` above) —
+                    // wait for one of them to push.
                     trace!(from = "direct", "pending (empty buffer)");
                     return Poll::Pending;
                 }
@@ -559,6 +571,39 @@ mod tests {
             .expect("receiver task should finish");
         assert!(first.is_some(), "first item must be received");
         assert!(second.is_some(), "second item must be received");
+        Ok(())
+    }
+
+    /// Regression test: if the last sender drops after enqueueing items, the receiver
+    /// must drain them before closing. Pre-fix the receiver returned `None` as soon as
+    /// `sender_count == 0`, silently discarding anything still in the buffer.
+    #[tokio::test]
+    async fn receiver_drains_buffered_items_after_last_sender_drops() -> anyhow::Result<()> {
+        let cfg = MixerConfig {
+            min_delay: Duration::from_millis(0),
+            delay_range: Duration::from_millis(1),
+            ..MixerConfig::default()
+        };
+        let (tx, mut rx) = channel::<u32>(cfg);
+
+        const ITERATIONS: usize = 16;
+        for i in 0..ITERATIONS as u32 {
+            tx.send(i)?;
+        }
+
+        // Drop the only sender. sender_count goes to 0, but buffer still has ITERATIONS items.
+        drop(tx);
+
+        // Must still yield every item before terminating.
+        let mut received = 0usize;
+        while let Some(_item) = timeout(Duration::from_millis(500), rx.next()).await? {
+            received += 1;
+        }
+        assert_eq!(
+            received, ITERATIONS,
+            "receiver dropped {} pending items on sender shutdown",
+            ITERATIONS - received
+        );
         Ok(())
     }
 }
