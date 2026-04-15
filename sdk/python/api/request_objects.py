@@ -16,6 +16,13 @@ class FundChannelBody(RequestData):
 
 
 @dataclass
+class RedeemTicketsBody(RequestData):
+    """Optional counterparty address to scope ticket redemption to that incoming channel."""
+
+    address: Union[str, None] = APIfield("address", None)
+
+
+@dataclass
 class GetChannelsBody(RequestData):
     full_topology: bool = APIfield("fullTopology", False)
     including_closed: bool = APIfield("includingClosed", False)

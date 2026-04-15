@@ -20,6 +20,7 @@ from .request_objects import (
     GetChannelsBody,
     GetPeersBody,
     OpenChannelBody,
+    RedeemTicketsBody,
     SessionCapabilitiesBody,
     SetSessionConfigBody,
     WithdrawBody,
@@ -126,31 +127,36 @@ class HoprdAPI(ApiLib):
         data = OpenChannelBody(amount.as_str, destination)
         return await self.try_req(Method.POST, "/channels", OpenedChannel, data=data)
 
-    async def fund_channel(self, channel_id: str, amount: Balance) -> bool:
+    async def fund_channel(self, address: str, amount: Balance) -> bool:
         """
-        Funds a given channel.
-        :param: channel_id: str
-        :param: amount: float
+        Funds the outgoing channel to the given counterparty with the given amount.
+        :param: address: on-chain counterparty address (not the channel id)
+        :param: amount: Balance
         :return: bool
         """
         data = FundChannelBody(amount.as_str)
-        return await self.try_req(Method.POST, f"/channels/{channel_id}/fund", data=data, return_state=True)
+        return await self.try_req(Method.POST, f"/channels/{address}/fund", data=data, return_state=True)
 
-    async def close_channel(self, channel_id: str) -> bool:
+    async def close_channel(self, address: str, direction: str = "outgoing") -> bool:
         """
-        Closes a given channel.
-        :param: channel_id: str
+        Closes the channel with the given counterparty in the given direction.
+        :param: address: on-chain counterparty address (not the channel id)
+        :param: direction: "outgoing" (default, this node -> counterparty) or "incoming"
         :return: bool
         """
-        return await self.try_req(Method.DELETE, f"/channels/{channel_id}", return_state=True)
+        return await self.try_req(Method.DELETE, f"/channels/{address}?direction={direction}", return_state=True)
 
-    async def channel_redeem_tickets(self, channel_id: str) -> bool:
+    async def channel_redeem_tickets(self, address: str) -> bool:
         """
-        Redeems tickets in a specific channel.
-        :param: channel_id: str
+        Redeems tickets in the incoming channel from the given counterparty.
+
+        The channel-scoped redeem route was removed; this now calls
+        POST /tickets/redeem with the counterparty address in the body.
+        :param: address: on-chain counterparty address
         :return: bool
         """
-        return await self.try_req(Method.POST, f"/channels/{channel_id}/tickets/redeem", return_state=True)
+        data = RedeemTicketsBody(address=address)
+        return await self.try_req(Method.POST, "/tickets/redeem", data=data, return_state=True)
 
     async def all_channels(self, include_closed: bool) -> Optional[Channels]:
         """
@@ -180,13 +186,14 @@ class HoprdAPI(ApiLib):
 
         return Channels(response, "outgoing") if response else response
 
-    async def get_channel(self, channel_id: str) -> Optional[Channel]:
+    async def get_channel(self, address: str, direction: str = "outgoing") -> Optional[Channel]:
         """
-        Returns the channel object.
-        :param: channel_id: str
+        Returns the channel with the given counterparty in the given direction.
+        :param: address: on-chain counterparty address (not the channel id)
+        :param: direction: "outgoing" (default, this node -> counterparty) or "incoming"
         :return: channel: response
         """
-        return await self.try_req(Method.GET, f"/channels/{channel_id}", Channel)
+        return await self.try_req(Method.GET, f"/channels/{address}?direction={direction}", Channel)
 
     async def channels_aggregate_tickets(self, channel_id: str) -> bool:
         """
@@ -204,12 +211,18 @@ class HoprdAPI(ApiLib):
         """
         return await self.try_req(Method.GET, f"/channels/{channel_id}/tickets", list[Ticket])
 
-    async def tickets_redeem(self):
+    async def tickets_redeem(self, address: Optional[str] = None):
         """
-        Redeems all tickets.
+        Redeems tickets.
+
+        When `address` is omitted, redeems tickets in all incoming channels.
+        When `address` is provided, scopes redemption to the incoming channel
+        from that counterparty.
+        :param: address: optional on-chain counterparty address
         :return: bool
         """
-        return await self.try_req(Method.POST, "/tickets/redeem", return_state=True)
+        data = RedeemTicketsBody(address=address) if address is not None else RedeemTicketsBody()
+        return await self.try_req(Method.POST, "/tickets/redeem", data=data, return_state=True)
 
     async def peers(self) -> list[ConnectedPeer]:
         """
