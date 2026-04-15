@@ -4870,7 +4870,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-mixer"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "anyhow",
  "bytesize",
@@ -4979,7 +4979,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "1.6.1"
+version = "1.6.3"
 dependencies = [
  "ahash",
  "anyhow",

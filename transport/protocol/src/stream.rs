@@ -20,14 +20,18 @@ use tokio_util::{
 const GLOBAL_STREAM_OPEN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
 const MAX_CONCURRENT_PACKETS: usize = 30;
 
-/// Default number of buffered messages on the framed writer before a flush is forced.
+/// Default pending-write-buffer byte threshold on the framed writer before a flush is
+/// forced. **This value is in bytes, not in messages** — that is how
+/// `tokio_util::codec::FramedWrite::set_backpressure_boundary` is defined.
 ///
-/// The previous value of `1` forced a flush syscall on every message — making a relay
-/// forwarding N packets issue N individual writes rather than coalescing adjacent small
-/// frames. `4` is a conservative default that lets short bursts batch while still
-/// flushing quickly under normal single-packet traffic. Override with
-/// `HOPR_TRANSPORT_FRAME_WRITER_BACKPRESSURE_BOUNDARY`.
-const DEFAULT_FRAME_WRITER_BACKPRESSURE_BOUNDARY: usize = 4;
+/// The previous value of `1` byte forced a flush syscall on every message (the buffer
+/// exceeds one byte the moment a frame is encoded), making a relay forwarding N packets
+/// issue N individual writes rather than coalescing adjacent small frames. `4096` bytes
+/// is a conservative default that lets roughly ~4 HOPR packets (~1 KiB each) batch into
+/// a single write while still flushing quickly under single-packet traffic.
+///
+/// Override with `HOPR_TRANSPORT_FRAME_WRITER_BACKPRESSURE_BYTES`.
+const DEFAULT_FRAME_WRITER_BACKPRESSURE_BYTES: usize = 4096;
 
 fn build_peer_stream_io<S, C>(
     peer: PeerId,
@@ -35,7 +39,7 @@ fn build_peer_stream_io<S, C>(
     cache: moka::future::Cache<PeerId, Sender<<C as Decoder>::Item>>,
     codec: C,
     ingress_from_peers: Sender<(PeerId, <C as Decoder>::Item)>,
-    frame_writer_backpressure_boundary: usize,
+    frame_writer_backpressure_bytes: usize,
 ) -> Sender<<C as Decoder>::Item>
 where
     S: AsyncRead + AsyncWrite + Send + 'static,
@@ -50,10 +54,12 @@ where
 
     let mut frame_writer = FramedWrite::new(stream_tx.compat_write(), codec.clone());
 
-    // Lower the backpressure boundary to force a flush once the buffered frame count
-    // reaches this threshold. A value of 1 flushes on every message (high syscall rate,
-    // lowest latency); higher values coalesce adjacent small frames on busy relays.
-    frame_writer.set_backpressure_boundary(frame_writer_backpressure_boundary);
+    // `set_backpressure_boundary` is a *byte* threshold on `FramedWrite`'s internal
+    // pending-write buffer: once the encoded frames exceed this many bytes, the next
+    // `poll_ready` call will issue a flush. A small value (e.g. `1`) flushes on every
+    // message for the lowest latency at the cost of one syscall per frame; a larger
+    // value lets adjacent small frames coalesce into a single write on busy relays.
+    frame_writer.set_backpressure_boundary(frame_writer_backpressure_bytes);
 
     // Send all outgoing data to the peer
     hopr_async_runtime::prelude::spawn(
@@ -142,11 +148,11 @@ where
         .map(std::time::Duration::from_millis)
         .unwrap_or(GLOBAL_STREAM_OPEN_TIMEOUT);
 
-    let frame_writer_backpressure_boundary = std::env::var("HOPR_TRANSPORT_FRAME_WRITER_BACKPRESSURE_BOUNDARY")
+    let frame_writer_backpressure_bytes = std::env::var("HOPR_TRANSPORT_FRAME_WRITER_BACKPRESSURE_BYTES")
         .ok()
         .and_then(|v| v.parse().ok())
         .filter(|&n: &usize| n > 0)
-        .unwrap_or(DEFAULT_FRAME_WRITER_BACKPRESSURE_BOUNDARY);
+        .unwrap_or(DEFAULT_FRAME_WRITER_BACKPRESSURE_BYTES);
 
     // Pack the handles only needed to open a NEW peer stream into a single Arc. This
     // lets us pay one Arc bump per packet at the closure level instead of three (control,
@@ -172,7 +178,7 @@ where
                     cache.clone(),
                     codec.clone(),
                     tx_in.clone(),
-                    frame_writer_backpressure_boundary,
+                    frame_writer_backpressure_bytes,
                 );
 
                 async move {
@@ -229,7 +235,7 @@ where
                                 cache_clone,
                                 codec.clone(),
                                 tx_in.clone(),
-                                frame_writer_backpressure_boundary,
+                                frame_writer_backpressure_bytes,
                             ))
                         })
                         .await;
