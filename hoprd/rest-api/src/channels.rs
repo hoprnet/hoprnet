@@ -747,4 +747,104 @@ mod tests {
             "0x188c4462b75e46f0c7262d7f48d182447b93a93c".parse().unwrap()
         );
     }
+
+    #[test]
+    fn channel_info_response_should_serialize_all_fields() {
+        let ch = test_channel(ChannelStatus::Open);
+        let info = channel_to_topology_info(&ch);
+        let json = serde_json::to_value(&info).unwrap();
+
+        assert_eq!(json["channelId"], ch.get_id().to_string());
+        assert_eq!(
+            json["source"].as_str().unwrap().to_lowercase(),
+            ch.source.to_string().to_lowercase()
+        );
+        assert_eq!(
+            json["destination"].as_str().unwrap().to_lowercase(),
+            ch.destination.to_string().to_lowercase()
+        );
+        assert_eq!(json["balance"], "10 wxHOPR");
+        assert_eq!(json["status"], "Open");
+        assert_eq!(json["ticketIndex"], 0);
+        assert_eq!(json["channelEpoch"], 1);
+        assert_eq!(json["closureTime"], 0);
+    }
+
+    #[test]
+    fn channel_to_topology_info_should_compute_closure_time_for_pending_to_close() {
+        let ch = test_channel(ChannelStatus::PendingToClose(
+            std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_700_000_000),
+        ));
+        let info = channel_to_topology_info(&ch);
+        assert_eq!(info.closure_time, 1_700_000_000);
+    }
+
+    #[test]
+    fn node_channels_response_should_serialize_all_three_groups() {
+        let ch = test_channel(ChannelStatus::Open);
+        let node_ch = NodeChannel {
+            id: *ch.get_id(),
+            peer_address: ch.destination,
+            status: ch.status,
+            balance: ch.balance,
+        };
+        let resp = NodeChannelsResponse {
+            incoming: vec![node_ch.clone()],
+            outgoing: vec![node_ch.clone()],
+            all: vec![channel_to_topology_info(&ch)],
+        };
+        let json = serde_json::to_value(&resp).unwrap();
+        assert_eq!(json["incoming"].as_array().unwrap().len(), 1);
+        assert_eq!(json["outgoing"].as_array().unwrap().len(), 1);
+        assert_eq!(json["all"].as_array().unwrap().len(), 1);
+        assert_eq!(json["incoming"][0]["status"], "Open");
+        assert_eq!(json["all"][0]["channelId"], ch.get_id().to_string());
+    }
+
+    #[test]
+    fn open_channel_body_request_should_include_destination() {
+        let json = serde_json::json!({
+            "amount": "10 wxHOPR",
+            "destination": "0xa8194d36e322592d4c707b70dbe96121f5c74c64"
+        });
+        let req: OpenChannelBodyRequest = serde_json::from_value(json).unwrap();
+        assert_eq!(
+            req.destination,
+            "0xa8194d36e322592d4c707b70dbe96121f5c74c64".parse().unwrap()
+        );
+        assert_eq!(req.amount, "10 wxHOPR".parse().unwrap());
+    }
+
+    #[test]
+    fn open_channel_response_should_serialize_correctly() {
+        let resp = OpenChannelResponse {
+            channel_id: Hash::default(),
+            transaction_receipt: Hash::default(),
+        };
+        let json = serde_json::to_value(&resp).unwrap();
+        assert!(json.get("channelId").is_some());
+        assert!(json.get("transactionReceipt").is_some());
+    }
+
+    #[test]
+    fn close_channel_response_should_serialize_correctly() {
+        let resp = CloseChannelResponse {
+            receipt: Hash::default(),
+        };
+        let json = serde_json::to_value(&resp).unwrap();
+        assert!(json.get("receipt").is_some());
+    }
+
+    #[test]
+    fn fund_channel_response_should_serialize_correctly() {
+        let resp = FundChannelResponse { hash: Hash::default() };
+        let json = serde_json::to_value(&resp).unwrap();
+        assert!(json.get("hash").is_some());
+    }
+
+    #[test]
+    fn address_params_should_reject_invalid_address() {
+        let json = serde_json::json!({ "address": "not-an-address" });
+        assert!(serde_json::from_value::<AddressParams>(json).is_err());
+    }
 }

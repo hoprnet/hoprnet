@@ -248,5 +248,39 @@ mod tests {
 
         let response = NodeTicketStatisticsResponse::from(stats);
         assert_eq!(response.winning_count, 10);
+        assert_eq!(response.unredeemed_value, "100 wxHOPR".parse().unwrap());
+        assert_eq!(response.neglected_value, "5 wxHOPR".parse().unwrap());
+        assert_eq!(response.rejected_value, "1 wxHOPR".parse().unwrap());
+    }
+
+    #[test]
+    fn redeem_tickets_request_default_should_have_no_address() {
+        let req = RedeemTicketsRequest::default();
+        assert!(req.address.is_none());
+    }
+
+    #[test]
+    fn redeem_tickets_request_should_reject_invalid_address() {
+        let json = serde_json::json!({ "address": "not-an-address" });
+        assert!(serde_json::from_value::<RedeemTicketsRequest>(json).is_err());
+    }
+
+    #[test]
+    fn channel_ticket_should_serialize_correctly() {
+        let ticket = ChannelTicket {
+            channel_id: Hash::default(),
+            amount: "1.0 wxHOPR".parse().unwrap(),
+            index: 7,
+            win_prob: "1".to_string(),
+            channel_epoch: 2,
+            signature: "0xdeadbeef".to_string(),
+        };
+        let json = serde_json::to_value(&ticket).unwrap();
+        assert_eq!(json["amount"], "1 wxHOPR");
+        assert_eq!(json["index"], 7);
+        assert_eq!(json["winProb"], "1");
+        assert_eq!(json["channelEpoch"], 2);
+        assert_eq!(json["signature"], "0xdeadbeef");
+        assert!(json.get("channelId").is_some());
     }
 }

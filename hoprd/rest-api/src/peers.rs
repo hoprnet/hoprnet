@@ -566,4 +566,69 @@ mod tests {
             "0x07eaf07d6624f741e04f4092a755a9027aaab7f6".parse().unwrap()
         );
     }
+
+    #[test]
+    fn address_params_should_reject_invalid_address() {
+        let json = serde_json::json!({ "address": "not-an-address" });
+        assert!(serde_json::from_value::<AddressParams>(json).is_err());
+    }
+
+    #[test]
+    fn peer_channel_info_should_serialize_pending_to_close_status() -> anyhow::Result<()> {
+        let info = PeerChannelInfo {
+            id: Hash::default(),
+            status: ChannelStatus::PendingToClose(std::time::UNIX_EPOCH + std::time::Duration::from_secs(1)),
+            balance: "3 wxHOPR".parse()?,
+        };
+        let json = serde_json::to_value(&info)?;
+        assert!(json["status"].as_str().unwrap().starts_with("PendingToClose"));
+        Ok(())
+    }
+
+    #[test]
+    fn to_announced_sources_should_preserve_order() {
+        let addrs: Vec<Multiaddr> = vec![
+            "/ip4/10.0.2.100/tcp/19093".parse().unwrap(),
+            "/ip4/10.0.2.101/tcp/19094".parse().unwrap(),
+            "/ip4/10.0.2.102/tcp/19095".parse().unwrap(),
+        ];
+        let sources = to_announced_sources(addrs.clone());
+        for (i, src) in sources.iter().enumerate() {
+            assert_eq!(src.multiaddress, addrs[i]);
+        }
+    }
+
+    #[test]
+    fn multiaddress_source_origin_should_serialize_as_lowercase_string() -> anyhow::Result<()> {
+        let source = MultiaddressSource {
+            multiaddress: "/ip4/127.0.0.1/tcp/1".parse()?,
+            origin: AnnouncementOriginResponse::Chain,
+        };
+        let json = serde_json::to_value(&source)?;
+        assert_eq!(json["origin"], "chain");
+        Ok(())
+    }
+
+    #[test]
+    fn node_peer_info_response_should_flatten_announced_sources_in_json() -> anyhow::Result<()> {
+        let response = NodePeerInfoResponse {
+            announced_sources: vec![
+                MultiaddressSource {
+                    multiaddress: "/ip4/10.0.2.100/tcp/19093".parse()?,
+                    origin: AnnouncementOriginResponse::Chain,
+                },
+                MultiaddressSource {
+                    multiaddress: "/ip4/10.0.2.100/tcp/19094".parse()?,
+                    origin: AnnouncementOriginResponse::Chain,
+                },
+            ],
+            observed: vec![],
+            qos: None,
+            outgoing_channel: None,
+            incoming_channel: None,
+        };
+        let json = serde_json::to_value(&response)?;
+        assert_eq!(json["announcedSources"].as_array().unwrap().len(), 2);
+        Ok(())
+    }
 }
