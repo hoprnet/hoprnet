@@ -114,7 +114,7 @@ pub(super) async fn show_ticket_statistics(State(state): State<Arc<InternalState
 #[serde_as]
 #[derive(Debug, Default, Clone, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
-    "counterparty": "0x188c4462b75e46f0c7262d7f48d182447b93a93c"
+    "address": "0x188c4462b75e46f0c7262d7f48d182447b93a93c"
 }))]
 #[serde(rename_all = "camelCase")]
 /// Request body for ticket redemption with optional fields.
@@ -123,22 +123,22 @@ pub(crate) struct RedeemTicketsRequest {
     /// If omitted, tickets in all channels are redeemed.
     #[serde_as(as = "Option<DisplayFromStr>")]
     #[schema(value_type = Option<String>, example = "0x188c4462b75e46f0c7262d7f48d182447b93a93c")]
-    counterparty: Option<Address>,
+    address: Option<Address>,
 }
 
 /// Starts redeeming tickets.
 ///
-/// When a `counterparty` is specified, only tickets in the incoming channel from that
+/// When an `address` is specified, only tickets in the incoming channel from that
 /// counterparty are redeemed. When omitted, tickets in all channels are redeemed.
 ///
 /// **WARNING:** Redeeming many tickets can incur significant transaction costs.
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/tickets/redeem"),
-        description = "Starts redeeming tickets. When a counterparty is specified, only tickets from that counterparty are redeemed.",
+        description = "Starts redeeming tickets. When a counterparty address is specified, only tickets from that counterparty are redeemed.",
         request_body(
             content = RedeemTicketsRequest,
-            description = "Optional counterparty to scope ticket redemption.",
+            description = "Optional counterparty address to scope ticket redemption.",
             content_type = "application/json",
         ),
         responses(
@@ -160,11 +160,11 @@ pub(super) async fn redeem_tickets(
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match req.counterparty {
-        Some(counterparty) => {
+    match req.address {
+        Some(address) => {
             // Resolve the incoming channel from the counterparty (counterparty → me).
             let me = hopr.me_onchain();
-            let channel_id = match hopr.channel(&counterparty, &me) {
+            let channel_id = match hopr.channel(&address, &me) {
                 Ok(Some(ch)) if ch.status != ChannelStatus::Closed => *ch.get_id(),
                 Ok(_) => return (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
                 Err(e) => return (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
@@ -221,20 +221,20 @@ mod tests {
     }
 
     #[test]
-    fn redeem_tickets_request_should_deserialize_with_counterparty() {
+    fn redeem_tickets_request_should_deserialize_with_address() {
         let json = serde_json::json!({
-            "counterparty": "0x188c4462b75e46f0c7262d7f48d182447b93a93c"
+            "address": "0x188c4462b75e46f0c7262d7f48d182447b93a93c"
         });
 
         let req: RedeemTicketsRequest = serde_json::from_value(json).unwrap();
-        assert!(req.counterparty.is_some());
+        assert!(req.address.is_some());
     }
 
     #[test]
-    fn redeem_tickets_request_should_deserialize_without_counterparty() {
+    fn redeem_tickets_request_should_deserialize_without_address() {
         let json = serde_json::json!({});
         let req: RedeemTicketsRequest = serde_json::from_value(json).unwrap();
-        assert!(req.counterparty.is_none());
+        assert!(req.address.is_none());
     }
 
     #[test]

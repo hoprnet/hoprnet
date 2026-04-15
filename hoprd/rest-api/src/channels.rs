@@ -325,10 +325,32 @@ pub(super) async fn open_channel(
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct CounterpartyParams {
+pub(crate) struct AddressParams {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
-    counterparty: Address,
+    address: Address,
+}
+
+/// Direction of a channel relative to this node.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum ChannelDirection {
+    /// Channel this node is the source of (this node → counterparty).
+    #[default]
+    Outgoing,
+    /// Channel this node is the destination of (counterparty → this node).
+    Incoming,
+}
+
+/// Query parameters selecting which channel (incoming or outgoing) to address.
+#[derive(Debug, Clone, Default, Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
+#[into_params(parameter_in = Query)]
+#[serde(default, rename_all = "camelCase")]
+pub(crate) struct ChannelDirectionQuery {
+    /// Direction of the channel relative to this node. Defaults to `outgoing`.
+    #[schema(required = false, example = "outgoing")]
+    #[serde(default)]
+    direction: ChannelDirection,
 }
 
 /// Filters a channel lookup result to find a non-closed channel.
@@ -343,23 +365,32 @@ fn filter_open_channel(result: Result<Option<ChannelEntry>, HoprLibError>) -> Re
     }
 }
 
-/// Resolves the outgoing channel from this node to the given counterparty.
-fn resolve_outgoing_channel(hopr: &crate::HoprNode, counterparty: &Address) -> Result<ChannelEntry, ApiErrorStatus> {
+/// Resolves the channel with the given counterparty in the specified direction.
+fn resolve_channel(
+    hopr: &crate::HoprNode,
+    address: &Address,
+    direction: ChannelDirection,
+) -> Result<ChannelEntry, ApiErrorStatus> {
     let me = hopr.me_onchain();
-    filter_open_channel(hopr.channel(&me, counterparty))
+    let lookup = match direction {
+        ChannelDirection::Outgoing => hopr.channel(&me, address),
+        ChannelDirection::Incoming => hopr.channel(address, &me),
+    };
+    filter_open_channel(lookup)
 }
 
-/// Returns information about the channel with the given counterparty.
+/// Returns information about the channel with the given counterparty address in the given direction.
 #[utoipa::path(
         get,
-        path = const_format::formatcp!("{BASE_PATH}/channels/{{counterparty}}"),
-        description = "Returns information about the channel with the given counterparty.",
+        path = const_format::formatcp!("{BASE_PATH}/channels/{{address}}"),
+        description = "Returns information about the channel with the given counterparty address. Use the `direction` query parameter to choose between the outgoing (this node → counterparty, default) and incoming (counterparty → this node) channel.",
         params(
-            ("counterparty" = String, Path, description = "On-chain address of the counterparty.", example = "0x188c4462b75e46f0c7262d7f48d182447b93a93c")
+            ("address" = String, Path, description = "On-chain address of the counterparty.", example = "0x188c4462b75e46f0c7262d7f48d182447b93a93c"),
+            ChannelDirectionQuery
         ),
         responses(
             (status = 200, description = "Channel fetched successfully", body = ChannelInfoResponse),
-            (status = 400, description = "Invalid counterparty address.", body = ApiError),
+            (status = 400, description = "Invalid counterparty address or direction.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -371,12 +402,13 @@ fn resolve_outgoing_channel(hopr: &crate::HoprNode, counterparty: &Address) -> R
         tag = "Channels",
     )]
 pub(super) async fn show_channel(
-    Path(CounterpartyParams { counterparty }): Path<CounterpartyParams>,
+    Path(AddressParams { address }): Path<AddressParams>,
+    Query(ChannelDirectionQuery { direction }): Query<ChannelDirectionQuery>,
     State(state): State<Arc<InternalState>>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match hopr_async_runtime::prelude::spawn_blocking(move || resolve_outgoing_channel(&hopr, &counterparty)).await {
+    match hopr_async_runtime::prelude::spawn_blocking(move || resolve_channel(&hopr, &address, direction)).await {
         Ok(Ok(channel)) => (StatusCode::OK, Json(channel_to_topology_info(&channel))).into_response(),
         Ok(Err(status)) => match status {
             ApiErrorStatus::ChannelNotFound => (StatusCode::NOT_FOUND, status).into_response(),
@@ -405,21 +437,22 @@ pub(crate) struct CloseChannelResponse {
     // channel_status: ChannelStatus,
 }
 
-/// Closes the channel with the given counterparty.
+/// Closes the channel with the given counterparty in the given direction.
 ///
 /// If the channel is currently `Open`, it will transition it to `PendingToClose`.
 /// If the channel is in `PendingToClose` and the channel closure period has elapsed,
 /// it will transition it to `Closed`.
 #[utoipa::path(
         delete,
-        path = const_format::formatcp!("{BASE_PATH}/channels/{{counterparty}}"),
-        description = "Closes the channel with the given counterparty.",
+        path = const_format::formatcp!("{BASE_PATH}/channels/{{address}}"),
+        description = "Closes the channel with the given counterparty. Use the `direction` query parameter to choose between the outgoing (this node → counterparty, default) and incoming (counterparty → this node) channel.",
         params(
-            ("counterparty" = String, Path, description = "On-chain address of the counterparty.", example = "0x188c4462b75e46f0c7262d7f48d182447b93a93c")
+            ("address" = String, Path, description = "On-chain address of the counterparty.", example = "0x188c4462b75e46f0c7262d7f48d182447b93a93c"),
+            ChannelDirectionQuery
         ),
         responses(
             (status = 200, description = "Channel closed successfully", body = CloseChannelResponse),
-            (status = 400, description = "Invalid counterparty address.", body = ApiError),
+            (status = 400, description = "Invalid counterparty address or direction.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
             (status = 412, description = "The node is not ready."),
@@ -432,12 +465,13 @@ pub(crate) struct CloseChannelResponse {
         tag = "Channels",
     )]
 pub(super) async fn close_channel(
-    Path(CounterpartyParams { counterparty }): Path<CounterpartyParams>,
+    Path(AddressParams { address }): Path<AddressParams>,
+    Query(ChannelDirectionQuery { direction }): Query<ChannelDirectionQuery>,
     State(state): State<Arc<InternalState>>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    let channel_id = match resolve_outgoing_channel(&hopr, &counterparty) {
+    let channel_id = match resolve_channel(&hopr, &address, direction) {
         Ok(ch) => *ch.get_id(),
         Err(status) => {
             let code = match status {
@@ -489,13 +523,16 @@ pub(crate) struct FundBodyRequest {
     amount: HoprBalance,
 }
 
-/// Funds the channel with the given counterparty with the given amount of HOPR tokens.
+/// Funds the outgoing channel to the given counterparty with the given amount of HOPR tokens.
+///
+/// Funding applies only to the outgoing channel (this node → counterparty), since only
+/// the channel source can add stake.
 #[utoipa::path(
         post,
-        path = const_format::formatcp!("{BASE_PATH}/channels/{{counterparty}}/fund"),
-        description = "Funds the channel with the given counterparty with the given amount of HOPR tokens.",
+        path = const_format::formatcp!("{BASE_PATH}/channels/{{address}}/fund"),
+        description = "Funds the outgoing channel to the given counterparty with the given amount of HOPR tokens.",
         params(
-            ("counterparty" = String, Path, description = "On-chain address of the counterparty.", example = "0x188c4462b75e46f0c7262d7f48d182447b93a93c")
+            ("address" = String, Path, description = "On-chain address of the counterparty.", example = "0x188c4462b75e46f0c7262d7f48d182447b93a93c")
         ),
         request_body(
             content = FundBodyRequest,
@@ -518,13 +555,13 @@ pub(crate) struct FundBodyRequest {
         tag = "Channels",
     )]
 pub(super) async fn fund_channel(
-    Path(CounterpartyParams { counterparty }): Path<CounterpartyParams>,
+    Path(AddressParams { address }): Path<AddressParams>,
     State(state): State<Arc<InternalState>>,
     Json(fund_req): Json<FundBodyRequest>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    let channel_id = match resolve_outgoing_channel(&hopr, &counterparty) {
+    let channel_id = match resolve_channel(&hopr, &address, ChannelDirection::Outgoing) {
         Ok(ch) => *ch.get_id(),
         Err(status) => {
             let code = match status {
@@ -670,5 +707,44 @@ mod tests {
         let json = serde_json::json!({ "amount": "5 wxHOPR" });
         let req: FundBodyRequest = serde_json::from_value(json).unwrap();
         assert_eq!(req.amount, "5 wxHOPR".parse().unwrap());
+    }
+
+    #[test]
+    fn channel_direction_should_default_to_outgoing() {
+        assert_eq!(ChannelDirection::default(), ChannelDirection::Outgoing);
+    }
+
+    #[test]
+    fn channel_direction_query_should_default_to_outgoing_when_missing() {
+        let q: ChannelDirectionQuery = serde_json::from_str("{}").unwrap();
+        assert_eq!(q.direction, ChannelDirection::Outgoing);
+    }
+
+    #[test]
+    fn channel_direction_should_parse_outgoing() {
+        let d: ChannelDirection = serde_json::from_str(r#""outgoing""#).unwrap();
+        assert_eq!(d, ChannelDirection::Outgoing);
+    }
+
+    #[test]
+    fn channel_direction_should_parse_incoming() {
+        let d: ChannelDirection = serde_json::from_str(r#""incoming""#).unwrap();
+        assert_eq!(d, ChannelDirection::Incoming);
+    }
+
+    #[test]
+    fn channel_direction_should_reject_unknown_value() {
+        let res: Result<ChannelDirection, _> = serde_json::from_str(r#""both""#);
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn address_params_should_deserialize() {
+        let json = serde_json::json!({ "address": "0x188c4462b75e46f0c7262d7f48d182447b93a93c" });
+        let params: AddressParams = serde_json::from_value(json).unwrap();
+        assert_eq!(
+            params.address,
+            "0x188c4462b75e46f0c7262d7f48d182447b93a93c".parse().unwrap()
+        );
     }
 }

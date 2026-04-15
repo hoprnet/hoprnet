@@ -114,6 +114,7 @@ pub(crate) struct InternalState {
             account::AccountAddressesResponse, account::AccountBalancesResponse, account::WithdrawBodyRequest, account::WithdrawResponse,
             channels::ChannelsQueryRequest,channels::CloseChannelResponse, channels::OpenChannelBodyRequest, channels::OpenChannelResponse, channels::FundChannelResponse,
             channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundBodyRequest,
+            channels::ChannelDirection, channels::ChannelDirectionQuery,
             network::TicketPriceResponse,
             network::TicketProbabilityResponse,
             network::ConnectedPeerResponse,
@@ -271,12 +272,12 @@ async fn build_api(
                 .route("/account/addresses", get(account::addresses))
                 .route("/account/balances", get(account::balances))
                 .route("/account/withdraw", post(account::withdraw))
-                .route("/peers/{destination}", get(peers::show_peer_info))
+                .route("/peers/{address}", get(peers::show_peer_info))
                 .route("/channels", get(channels::list_channels))
                 .route("/channels", post(channels::open_channel))
-                .route("/channels/{counterparty}", get(channels::show_channel))
-                .route("/channels/{counterparty}", delete(channels::close_channel))
-                .route("/channels/{counterparty}/fund", post(channels::fund_channel))
+                .route("/channels/{address}", get(channels::show_channel))
+                .route("/channels/{address}", delete(channels::close_channel))
+                .route("/channels/{address}/fund", post(channels::fund_channel))
                 .route("/tickets/redeem", post(tickets::redeem_tickets))
                 .route("/tickets/statistics", get(tickets::show_ticket_statistics))
                 .route("/network/price", get(network::price))
@@ -287,7 +288,7 @@ async fn build_api(
                 .route("/node/version", get(node::version))
                 .route("/node/configuration", get(node::configuration))
                 .route("/node/info", get(node::info))
-                .route("/peers/{destination}/ping", post(peers::ping_peer))
+                .route("/peers/{address}/ping", post(peers::ping_peer))
                 .route("/session/config/{id}", get(session::session_config))
                 .route("/session/config/{id}", post(session::adjust_session))
                 .route("/session/{protocol}", post(session::create_client))

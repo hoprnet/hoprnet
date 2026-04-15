@@ -314,6 +314,116 @@ pub mod types {
         pub error: ::std::option::Option<::std::string::String>,
         pub status: ::std::string::String,
     }
+    ///Direction of a channel relative to this node.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "Direction of a channel relative to this node.",
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "outgoing",
+    ///    "incoming"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd
+    )]
+    pub enum ChannelDirection {
+        #[serde(rename = "outgoing")]
+        Outgoing,
+        #[serde(rename = "incoming")]
+        Incoming,
+    }
+    impl ::std::fmt::Display for ChannelDirection {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Outgoing => f.write_str("outgoing"),
+                Self::Incoming => f.write_str("incoming"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ChannelDirection {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "outgoing" => Ok(Self::Outgoing),
+                "incoming" => Ok(Self::Incoming),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChannelDirection {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChannelDirection {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChannelDirection {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///Query parameters selecting which channel (incoming or outgoing) to address.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "Query parameters selecting which channel (incoming or outgoing) to address.",
+    ///  "type": "object",
+    ///  "properties": {
+    ///    "direction": {
+    ///      "default": "outgoing",
+    ///      "oneOf": [
+    ///        {
+    ///          "$ref": "#/components/schemas/ChannelDirection"
+    ///        }
+    ///      ]
+    ///    }
+    ///  }
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    pub struct ChannelDirectionQuery {
+        #[serde(default = "defaults::channel_direction_query_direction")]
+        pub direction: ChannelDirection,
+    }
+    impl ::std::default::Default for ChannelDirectionQuery {
+        fn default() -> Self {
+            Self {
+                direction: defaults::channel_direction_query_direction(),
+            }
+        }
+    }
     ///General information about a channel state.
     ///
     /// <details><summary>JSON schema</summary>
@@ -1528,12 +1638,12 @@ and indexer state.*/
     ///  "description": "Request body for ticket redemption with optional fields.",
     ///  "examples": [
     ///    {
-    ///      "counterparty": "0x188c4462b75e46f0c7262d7f48d182447b93a93c"
+    ///      "address": "0x188c4462b75e46f0c7262d7f48d182447b93a93c"
     ///    }
     ///  ],
     ///  "type": "object",
     ///  "properties": {
-    ///    "counterparty": {
+    ///    "address": {
     ///      "description": "On-chain address of the counterparty whose incoming channel tickets to redeem.\nIf omitted, tickets in all channels are redeemed.",
     ///      "examples": [
     ///        "0x188c4462b75e46f0c7262d7f48d182447b93a93c"
@@ -1552,12 +1662,12 @@ and indexer state.*/
         /**On-chain address of the counterparty whose incoming channel tickets to redeem.
 If omitted, tickets in all channels are redeemed.*/
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub counterparty: ::std::option::Option<::std::string::String>,
+        pub address: ::std::option::Option<::std::string::String>,
     }
     impl ::std::default::Default for RedeemTicketsRequest {
         fn default() -> Self {
             Self {
-                counterparty: Default::default(),
+                address: Default::default(),
             }
         }
     }
@@ -2332,6 +2442,12 @@ at least the size of 2 Session packet payloads.*/
     pub struct WithdrawResponse {
         pub receipt: ::std::string::String,
     }
+    /// Generation of default values for serde.
+    pub mod defaults {
+        pub(super) fn channel_direction_query_direction() -> super::ChannelDirection {
+            super::ChannelDirection::Outgoing
+        }
+    }
 }
 #[derive(Clone, Debug)]
 /**Client for hoprd-api
@@ -2603,22 +2719,23 @@ Arguments:
             _ => Err(Error::UnexpectedResponse(response)),
         }
     }
-    /**Returns information about the channel with the given counterparty
+    /**Returns information about the channel with the given counterparty address in the given direction
 
-Returns information about the channel with the given counterparty.
+Returns information about the channel with the given counterparty address. Use the `direction` query parameter to choose between the outgoing (this node → counterparty, default) and incoming (counterparty → this node) channel.
 
-Sends a `GET` request to `/api/v4/channels/{counterparty}`
+Sends a `GET` request to `/api/v4/channels/{address}`
 
 Arguments:
-- `counterparty`: On-chain address of the counterparty.
+- `address`: On-chain address of the counterparty.
+- `direction`: Direction of the channel relative to this node. Defaults to `outgoing`.
 */
     pub async fn show_channel<'a>(
         &'a self,
-        counterparty: &'a str,
+        address: &'a str,
+        direction: Option<types::ChannelDirection>,
     ) -> Result<ResponseValue<types::ChannelInfoResponse>, Error<()>> {
         let url = format!(
-            "{}/api/v4/channels/{}", self.baseurl, encode_path(& counterparty
-            .to_string()),
+            "{}/api/v4/channels/{}", self.baseurl, encode_path(& address.to_string()),
         );
         let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
         header_map
@@ -2634,6 +2751,7 @@ Arguments:
                 ::reqwest::header::ACCEPT,
                 ::reqwest::header::HeaderValue::from_static("application/json"),
             )
+            .query(&progenitor_client::QueryParam::new("direction", &direction))
             .headers(header_map)
             .build()?;
         let info = OperationInfo {
@@ -2648,22 +2766,23 @@ Arguments:
             _ => Err(Error::UnexpectedResponse(response)),
         }
     }
-    /**Closes the channel with the given counterparty
+    /**Closes the channel with the given counterparty in the given direction
 
-Closes the channel with the given counterparty.
+Closes the channel with the given counterparty. Use the `direction` query parameter to choose between the outgoing (this node → counterparty, default) and incoming (counterparty → this node) channel.
 
-Sends a `DELETE` request to `/api/v4/channels/{counterparty}`
+Sends a `DELETE` request to `/api/v4/channels/{address}`
 
 Arguments:
-- `counterparty`: On-chain address of the counterparty.
+- `address`: On-chain address of the counterparty.
+- `direction`: Direction of the channel relative to this node. Defaults to `outgoing`.
 */
     pub async fn close_channel<'a>(
         &'a self,
-        counterparty: &'a str,
+        address: &'a str,
+        direction: Option<types::ChannelDirection>,
     ) -> Result<ResponseValue<types::CloseChannelResponse>, Error<()>> {
         let url = format!(
-            "{}/api/v4/channels/{}", self.baseurl, encode_path(& counterparty
-            .to_string()),
+            "{}/api/v4/channels/{}", self.baseurl, encode_path(& address.to_string()),
         );
         let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
         header_map
@@ -2679,6 +2798,7 @@ Arguments:
                 ::reqwest::header::ACCEPT,
                 ::reqwest::header::HeaderValue::from_static("application/json"),
             )
+            .query(&progenitor_client::QueryParam::new("direction", &direction))
             .headers(header_map)
             .build()?;
         let info = OperationInfo {
@@ -2693,23 +2813,23 @@ Arguments:
             _ => Err(Error::UnexpectedResponse(response)),
         }
     }
-    /**Funds the channel with the given counterparty with the given amount of HOPR tokens
+    /**Funds the outgoing channel to the given counterparty with the given amount of HOPR tokens
 
-Funds the channel with the given counterparty with the given amount of HOPR tokens.
+Funds the outgoing channel to the given counterparty with the given amount of HOPR tokens.
 
-Sends a `POST` request to `/api/v4/channels/{counterparty}/fund`
+Sends a `POST` request to `/api/v4/channels/{address}/fund`
 
 Arguments:
-- `counterparty`: On-chain address of the counterparty.
+- `address`: On-chain address of the counterparty.
 - `body`: Specifies the amount of HOPR tokens to fund a channel with.
 */
     pub async fn fund_channel<'a>(
         &'a self,
-        counterparty: &'a str,
+        address: &'a str,
         body: &'a types::FundBodyRequest,
     ) -> Result<ResponseValue<types::FundChannelResponse>, Error<()>> {
         let url = format!(
-            "{}/api/v4/channels/{}/fund", self.baseurl, encode_path(& counterparty
+            "{}/api/v4/channels/{}/fund", self.baseurl, encode_path(& address
             .to_string()),
         );
         let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
@@ -3070,17 +3190,17 @@ Sends a `GET` request to `/api/v4/node/version`
 Includes announced and observed multiaddresses, QoS observation data from the
 network graph, and the state of any channels between this node and the peer.
 
-Sends a `GET` request to `/api/v4/peers/{destination}`
+Sends a `GET` request to `/api/v4/peers/{address}`
 
 Arguments:
-- `destination`: Address of the requested peer
+- `address`: On-chain address of the requested peer
 */
     pub async fn show_peer_info<'a>(
         &'a self,
-        destination: &'a str,
+        address: &'a str,
     ) -> Result<ResponseValue<types::NodePeerInfoResponse>, Error<()>> {
         let url = format!(
-            "{}/api/v4/peers/{}", self.baseurl, encode_path(& destination.to_string()),
+            "{}/api/v4/peers/{}", self.baseurl, encode_path(& address.to_string()),
         );
         let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
         header_map
@@ -3114,18 +3234,17 @@ Arguments:
 
 Directly ping the given peer
 
-Sends a `POST` request to `/api/v4/peers/{destination}/ping`
+Sends a `POST` request to `/api/v4/peers/{address}/ping`
 
 Arguments:
-- `destination`: Address of the requested peer
+- `address`: On-chain address of the requested peer
 */
     pub async fn ping_peer<'a>(
         &'a self,
-        destination: &'a str,
+        address: &'a str,
     ) -> Result<ResponseValue<types::PingResponse>, Error<()>> {
         let url = format!(
-            "{}/api/v4/peers/{}/ping", self.baseurl, encode_path(& destination
-            .to_string()),
+            "{}/api/v4/peers/{}/ping", self.baseurl, encode_path(& address.to_string()),
         );
         let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
         header_map
@@ -3385,12 +3504,12 @@ Arguments:
     }
     /**Starts redeeming tickets
 
-Starts redeeming tickets. When a counterparty is specified, only tickets from that counterparty are redeemed.
+Starts redeeming tickets. When a counterparty address is specified, only tickets from that counterparty are redeemed.
 
 Sends a `POST` request to `/api/v4/tickets/redeem`
 
 Arguments:
-- `body`: Optional counterparty to scope ticket redemption.
+- `body`: Optional counterparty address to scope ticket redemption.
 */
     pub async fn redeem_tickets<'a>(
         &'a self,

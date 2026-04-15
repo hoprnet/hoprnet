@@ -112,10 +112,10 @@ pub(crate) struct NodePeerInfoResponse {
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct DestinationParams {
+pub(crate) struct AddressParams {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
-    destination: Address,
+    address: Address,
 }
 
 /// Converts announced multiaddresses to the API response format.
@@ -150,13 +150,13 @@ fn channel_entry_to_peer_info(
 /// network graph, and the state of any channels between this node and the peer.
 #[utoipa::path(
     get,
-    path = const_format::formatcp!("{BASE_PATH}/peers/{{destination}}"),
+    path = const_format::formatcp!("{BASE_PATH}/peers/{{address}}"),
     params(
-        ("destination" = String, Path, description = "Address of the requested peer", example = "0x07eaf07d6624f741e04f4092a755a9027aaab7f6"),
+        ("address" = String, Path, description = "On-chain address of the requested peer", example = "0x07eaf07d6624f741e04f4092a755a9027aaab7f6"),
     ),
     responses(
         (status = 200, description = "Peer information fetched successfully.", body = NodePeerInfoResponse),
-        (status = 400, description = "Invalid destination", body = ApiError),
+        (status = 400, description = "Invalid peer address", body = ApiError),
         (status = 401, description = "Invalid authorization token.", body = ApiError),
         (status = 422, description = "Unknown failure", body = ApiError)
     ),
@@ -167,12 +167,12 @@ fn channel_entry_to_peer_info(
     tag = "Peers",
 )]
 pub(super) async fn show_peer_info(
-    Path(DestinationParams { destination }): Path<DestinationParams>,
+    Path(AddressParams { address }): Path<AddressParams>,
     State(state): State<Arc<InternalState>>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    let peer = match hopr.chain_key_to_peerid(&destination) {
+    let peer = match hopr.chain_key_to_peerid(&address) {
         Ok(Some(peer)) => peer,
         Ok(None) | Err(_) => return (StatusCode::NOT_FOUND, ApiErrorStatus::PeerNotFound).into_response(),
     };
@@ -211,7 +211,7 @@ pub(super) async fn show_peer_info(
                 Ok(Some(a)) => a,
                 _ => continue,
             };
-            if addr != destination {
+            if addr != address {
                 continue;
             }
             if let Some(imm) = obs.immediate_qos() {
@@ -229,8 +229,8 @@ pub(super) async fn show_peer_info(
 
     // 3. Channel state
     let me = hopr.me_onchain();
-    let outgoing_channel = channel_entry_to_peer_info(hopr.channel(&me, &destination));
-    let incoming_channel = channel_entry_to_peer_info(hopr.channel(&destination, &me));
+    let outgoing_channel = channel_entry_to_peer_info(hopr.channel(&me, &address));
+    let incoming_channel = channel_entry_to_peer_info(hopr.channel(&address, &me));
 
     (
         StatusCode::OK,
@@ -261,16 +261,16 @@ pub(crate) struct PingResponse {
 /// Directly pings the given peer.
 #[utoipa::path(
     post,
-    path = const_format::formatcp!("{BASE_PATH}/peers/{{destination}}/ping"),
+    path = const_format::formatcp!("{BASE_PATH}/peers/{{address}}/ping"),
     description = "Directly ping the given peer",
     params(
-        ("destination" = String, Path, description = "Address of the requested peer", example = "0x07eaf07d6624f741e04f4092a755a9027aaab7f6"),
+        ("address" = String, Path, description = "On-chain address of the requested peer", example = "0x07eaf07d6624f741e04f4092a755a9027aaab7f6"),
     ),
     responses(
         (status = 200, description = "Ping successful", body = PingResponse),
-        (status = 400, description = "Invalid peer id", body = ApiError),
+        (status = 400, description = "Invalid peer address", body = ApiError),
         (status = 401, description = "Invalid authorization token.", body = ApiError),
-        (status = 404, description = "Peer id not found in the network.", body = ApiError),
+        (status = 404, description = "Peer address not found in the network.", body = ApiError),
         (status = 408, description = "Peer timed out.", body = ApiError),
         (status = 412, description = "The node is not ready."),
         (status = 422, description = "Unknown failure", body = ApiError)
@@ -282,14 +282,14 @@ pub(crate) struct PingResponse {
     tag = "Peers",
 )]
 pub(super) async fn ping_peer(
-    Path(DestinationParams { destination }): Path<DestinationParams>,
+    Path(AddressParams { address }): Path<AddressParams>,
     State(state): State<Arc<InternalState>>,
 ) -> Result<impl IntoResponse, ApiError> {
-    debug!(%destination, "Manually ping peer");
+    debug!(%address, "Manually ping peer");
 
     let hopr = state.hopr.clone();
 
-    match hopr.chain_key_to_peerid(&destination) {
+    match hopr.chain_key_to_peerid(&address) {
         Ok(Some(peer)) => match hopr.ping(&peer).await {
             Ok((latency, _status)) => {
                 let resp = Json(PingResponse { latency: latency / 2 });
@@ -556,13 +556,13 @@ mod tests {
     }
 
     #[test]
-    fn destination_params_should_deserialize() {
+    fn address_params_should_deserialize() {
         let json = serde_json::json!({
-            "destination": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6"
+            "address": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6"
         });
-        let params: DestinationParams = serde_json::from_value(json).unwrap();
+        let params: AddressParams = serde_json::from_value(json).unwrap();
         assert_eq!(
-            params.destination,
+            params.address,
             "0x07eaf07d6624f741e04f4092a755a9027aaab7f6".parse().unwrap()
         );
     }
