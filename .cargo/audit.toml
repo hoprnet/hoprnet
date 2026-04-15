@@ -7,6 +7,8 @@ ignore = [
   "RUSTSEC-2025-0137", # `alloy` - held back until removed, see https://github.com/hoprnet/hoprnet/issues/7707
   "RUSTSEC-2026-0049", # `rustls-webpki` - needs alloy removal
   "RUSTSEC-2026-0097", # workspace already pins `rand` 0.10.1, but Cargo.lock still contains transitive `rand` 0.9.3; remove this ignore once upstream deps stop pulling 0.9.3
+  "RUSTSEC-2026-0098", # `rustls-webpki` 0.101.7 transitive via blokli-client → eventsource-client 0.16 → rustls 0.21; remove once blokli-client migrates off legacy rustls, see https://github.com/hoprnet/blokli/issues/107
+  "RUSTSEC-2026-0099", # `rustls-webpki` 0.101.7 transitive via blokli-client → eventsource-client 0.16 → rustls 0.21; remove once blokli-client migrates off legacy rustls, see https://github.com/hoprnet/blokli/issues/107
 ]
 informational_warnings = ["unmaintained"]
 severity_threshold = "low"
@@ -35,5 +37,7 @@ os = [
 ] # Ignore advisories for operating systems other than these
 
 [yanked]
-enabled = true      # Warn for yanked crates in Cargo.lock (default: true)
+# Disabled: `core2` 0.4.0 is yanked but hard-pinned by `multihash` 0.19.3 → `libp2p-identity` 0.2.13 (latest).
+# cargo-audit has no per-crate yanked ignore; re-enable once libp2p drops the core2 dependency.
+enabled = false
 update_index = true # Auto-update the crates.io index (default: true)
