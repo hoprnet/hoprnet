@@ -1,4 +1,4 @@
-use futures::{SinkExt, StreamExt};
+use futures::{SinkExt, StreamExt, future::Either};
 use futures_time::{future::FutureExt as TimeExt, stream::StreamExt as TimeStreamExt};
 use hopr_api::types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::Address};
 use hopr_async_runtime::{AbortableList, spawn_as_abortable};
@@ -274,15 +274,14 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
             }.instrument(tracing::debug_span!("incoming_packet_decode", %peer))
         }, concurrency)
         .filter_map(futures::future::ready)
+        // Branch on the packet type BEFORE building the async future so each arm only clones
+        // the handles it actually needs. `futures::future::Either` lets us return three
+        // distinct async blocks from one closure without boxing.
         .then_concurrent(move |packet| {
-            let ticket_proc = ticket_proc_success.clone();
-            let mut wire_outgoing = wire_outgoing.clone();
-            let mut ack_incoming = ack_incoming.clone();
-            let mut ack_outgoing_success = ack_outgoing_success.clone();
-            let counters = counters.clone();
-            async move {
-                match packet {
-                    IncomingPacket::Acknowledgement(ack) => {
+            match packet {
+                IncomingPacket::Acknowledgement(ack) => {
+                    let mut ack_incoming = ack_incoming.clone();
+                    Either::Left(async move {
                         let IncomingAcknowledgementPacket { previous_hop, received_acks, .. } = *ack;
                         tracing::trace!(previous_hop = previous_hop.to_peerid_str(), num_acks = received_acks.len(), "incoming acknowledgements");
                         ack_incoming
@@ -294,8 +293,11 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
 
                         // We do not acknowledge back acknowledgements.
                         None
-                    },
-                    IncomingPacket::Final(final_packet) => {
+                    })
+                }
+                IncomingPacket::Final(final_packet) => {
+                    let mut ack_outgoing_success = ack_outgoing_success.clone();
+                    Either::Right(Either::Left(async move {
                         let IncomingFinalPacket {
                             previous_hop,
                             sender,
@@ -318,8 +320,14 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                         METRIC_PACKET_COUNT.increment(&["received"]);
 
                         Some((sender, plain_text, info))
-                    }
-                    IncomingPacket::Forwarded(fwd_packet) => {
+                    }))
+                }
+                IncomingPacket::Forwarded(fwd_packet) => {
+                    let ticket_proc = ticket_proc_success.clone();
+                    let mut wire_outgoing = wire_outgoing.clone();
+                    let mut ack_outgoing_success = ack_outgoing_success.clone();
+                    let counters = counters.clone();
+                    Either::Right(Either::Right(async move {
                         let IncomingForwardedPacket {
                             previous_hop,
                             next_hop,
@@ -374,9 +382,10 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             });
 
                         None
-                    }
+                    }))
                 }
-            }}, concurrency)
+            }
+        }, concurrency)
         .filter_map(|maybe_data| futures::future::ready(
             // Create the ApplicationDataIn data structure for incoming data
             maybe_data
