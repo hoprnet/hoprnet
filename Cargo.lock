@@ -4995,7 +4995,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "1.5.1"
+version = "1.6.0"
 dependencies = [
  "ahash",
  "anyhow",
