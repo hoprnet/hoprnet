@@ -284,7 +284,11 @@ pub fn channel<T>(cfg: crate::config::MixerConfig) -> (Sender<T>, Receiver<T>) {
     buffer.reserve(cfg.capacity);
 
     let channel = TrackedChannel {
-        channel: Arc::new(Mutex::new(Channel::<T> { buffer, waker: None, cfg })),
+        channel: Arc::new(Mutex::new(Channel::<T> {
+            buffer,
+            waker: None,
+            cfg,
+        })),
         sender_count: Arc::new(AtomicUsize::new(1)),
         receiver_active: Arc::new(AtomicBool::new(true)),
     };
@@ -550,8 +554,9 @@ mod tests {
         );
 
         // Sanity: both items eventually arrive.
-        let (first, second) =
-            timeout(Duration::from_millis(1500), rx_task).await?.expect("receiver task should finish");
+        let (first, second) = timeout(Duration::from_millis(1500), rx_task)
+            .await?
+            .expect("receiver task should finish");
         assert!(first.is_some(), "first item must be received");
         assert!(second.is_some(), "second item must be received");
         Ok(())
