@@ -7,7 +7,7 @@ use axum::{
 };
 use futures::TryFutureExt;
 use hopr_lib::{
-    Address, AsUnixTimestamp, ChannelEntry, ChannelStatus, HoprBalance, ToHex,
+    Address, AsUnixTimestamp, ChannelEntry, ChannelStatus, HoprBalance,
     errors::{HoprLibError, HoprStatusError},
     prelude::Hash,
 };
@@ -110,8 +110,8 @@ pub(crate) struct NodeChannelsResponse {
     all: Vec<ChannelInfoResponse>,
 }
 
-async fn query_topology_info(channel: ChannelEntry) -> Result<ChannelInfoResponse, HoprLibError> {
-    Ok(ChannelInfoResponse {
+fn channel_to_topology_info(channel: &ChannelEntry) -> ChannelInfoResponse {
+    ChannelInfoResponse {
         channel_id: *channel.get_id(),
         source: channel.source,
         destination: channel.destination,
@@ -123,7 +123,7 @@ async fn query_topology_info(channel: ChannelEntry) -> Result<ChannelInfoRespons
             .closure_time_at()
             .map(|ct| ct.as_unix_timestamp().as_secs())
             .unwrap_or_default(),
-    })
+    }
 }
 
 #[derive(Debug, Default, Copy, Clone, Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
@@ -172,9 +172,7 @@ pub(super) async fn list_channels(
     if query.full_topology {
         let topology = hopr
             .all_channels()
-            .and_then(|channels| async move {
-                futures::future::try_join_all(channels.into_iter().map(query_topology_info)).await
-            })
+            .and_then(|channels| async move { Ok(channels.iter().map(channel_to_topology_info).collect::<Vec<_>>()) })
             .await;
 
         match topology {
@@ -324,26 +322,75 @@ pub(super) async fn open_channel(
     }
 }
 
-#[derive(Deserialize, utoipa::ToSchema)]
-#[schema(example = json!({
-    "channelId": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f"
-}))]
+#[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ChannelIdParams {
-    channel_id: String,
+pub(crate) struct AddressParams {
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String)]
+    address: Address,
 }
 
-/// Returns information about the given channel.
+/// Direction of a channel relative to this node.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum ChannelDirection {
+    /// Channel this node is the source of (this node → counterparty).
+    #[default]
+    Outgoing,
+    /// Channel this node is the destination of (counterparty → this node).
+    Incoming,
+}
+
+/// Query parameters selecting which channel (incoming or outgoing) to address.
+#[derive(Debug, Clone, Default, Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
+#[into_params(parameter_in = Query)]
+#[serde(default, rename_all = "camelCase")]
+pub(crate) struct ChannelDirectionQuery {
+    /// Direction of the channel relative to this node. Defaults to `outgoing`.
+    #[schema(required = false, example = "outgoing")]
+    #[serde(default)]
+    direction: ChannelDirection,
+}
+
+/// Filters a channel lookup result to find a non-closed channel.
+///
+/// Returns `ChannelNotFound` when the channel is absent or closed,
+/// and `UnknownFailure` for lookup errors.
+fn filter_open_channel(result: Result<Option<ChannelEntry>, HoprLibError>) -> Result<ChannelEntry, ApiErrorStatus> {
+    match result {
+        Ok(Some(ch)) if ch.status != ChannelStatus::Closed => Ok(ch),
+        Ok(_) => Err(ApiErrorStatus::ChannelNotFound),
+        Err(e) => Err(ApiErrorStatus::from(e)),
+    }
+}
+
+/// Resolves the channel with the given counterparty in the specified direction.
+fn resolve_channel(
+    hopr: &crate::HoprNode,
+    address: &Address,
+    direction: ChannelDirection,
+) -> Result<ChannelEntry, ApiErrorStatus> {
+    let me = hopr.me_onchain();
+    let lookup = match direction {
+        ChannelDirection::Outgoing => hopr.channel(&me, address),
+        ChannelDirection::Incoming => hopr.channel(address, &me),
+    };
+    filter_open_channel(lookup)
+}
+
+/// Returns information about the channel with the given counterparty address in the given direction.
 #[utoipa::path(
         get,
-        path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}"),
-        description = "Returns information about the given channel.",
+        path = const_format::formatcp!("{BASE_PATH}/channels/{{address}}"),
+        description = "Returns information about the channel with the given counterparty address. Use the `direction` query parameter to choose between the outgoing (this node → counterparty, default) and incoming (counterparty → this node) channel.",
         params(
-            ("channelId" = String, Path, description = "ID of the channel.", example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")
+            ("address" = String, Path, description = "On-chain address of the counterparty.", example = "0x188c4462b75e46f0c7262d7f48d182447b93a93c"),
+            ChannelDirectionQuery
         ),
         responses(
             (status = 200, description = "Channel fetched successfully", body = ChannelInfoResponse),
-            (status = 400, description = "Invalid channel id.", body = ApiError),
+            (status = 400, description = "Invalid counterparty address or direction.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -355,27 +402,19 @@ pub(crate) struct ChannelIdParams {
         tag = "Channels",
     )]
 pub(super) async fn show_channel(
-    Path(ChannelIdParams { channel_id }): Path<ChannelIdParams>,
+    Path(AddressParams { address }): Path<AddressParams>,
+    Query(ChannelDirectionQuery { direction }): Query<ChannelDirectionQuery>,
     State(state): State<Arc<InternalState>>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match Hash::from_hex(channel_id.as_str()) {
-        Ok(channel_id) => {
-            match hopr_async_runtime::prelude::spawn_blocking(move || hopr.channel_by_id(&channel_id)).await {
-                Ok(Ok(Some(channel))) => {
-                    let info = query_topology_info(channel).await;
-                    match info {
-                        Ok(info) => (StatusCode::OK, Json(info)).into_response(),
-                        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
-                    }
-                }
-                Ok(Ok(None)) => (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
-                Ok(Err(e)) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
-                Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
-            }
-        }
-        Err(_) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
+    match hopr_async_runtime::prelude::spawn_blocking(move || resolve_channel(&hopr, &address, direction)).await {
+        Ok(Ok(channel)) => (StatusCode::OK, Json(channel_to_topology_info(&channel))).into_response(),
+        Ok(Err(status)) => match status {
+            ApiErrorStatus::ChannelNotFound => (StatusCode::NOT_FOUND, status).into_response(),
+            _ => (StatusCode::UNPROCESSABLE_ENTITY, status).into_response(),
+        },
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }
 
@@ -398,21 +437,22 @@ pub(crate) struct CloseChannelResponse {
     // channel_status: ChannelStatus,
 }
 
-/// Closes the given channel.
+/// Closes the channel with the given counterparty in the given direction.
 ///
 /// If the channel is currently `Open`, it will transition it to `PendingToClose`.
-/// If the channels are in `PendingToClose` and the channel closure period has elapsed,
+/// If the channel is in `PendingToClose` and the channel closure period has elapsed,
 /// it will transition it to `Closed`.
 #[utoipa::path(
         delete,
-        path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}"),
-        description = "Closes the given channel.",
+        path = const_format::formatcp!("{BASE_PATH}/channels/{{address}}"),
+        description = "Closes the channel with the given counterparty. Use the `direction` query parameter to choose between the outgoing (this node → counterparty, default) and incoming (counterparty → this node) channel.",
         params(
-            ("channelId" = String, Path, description = "ID of the channel.", example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")
+            ("address" = String, Path, description = "On-chain address of the counterparty.", example = "0x188c4462b75e46f0c7262d7f48d182447b93a93c"),
+            ChannelDirectionQuery
         ),
         responses(
             (status = 200, description = "Channel closed successfully", body = CloseChannelResponse),
-            (status = 400, description = "Invalid channel id.", body = ApiError),
+            (status = 400, description = "Invalid counterparty address or direction.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
             (status = 412, description = "The node is not ready."),
@@ -425,33 +465,35 @@ pub(crate) struct CloseChannelResponse {
         tag = "Channels",
     )]
 pub(super) async fn close_channel(
-    Path(ChannelIdParams { channel_id }): Path<ChannelIdParams>,
+    Path(AddressParams { address }): Path<AddressParams>,
+    Query(ChannelDirectionQuery { direction }): Query<ChannelDirectionQuery>,
     State(state): State<Arc<InternalState>>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match Hash::from_hex(channel_id.as_str()) {
-        Ok(channel_id) => match hopr.close_channel_by_id(&channel_id).await {
-            Ok(receipt) => (
-                StatusCode::OK,
-                Json(CloseChannelResponse {
-                    // channel_status: receipt.status,
-                    receipt: receipt.tx_hash,
-                }),
-            )
-                .into_response(),
-            // Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
-            // hopr_lib::errors::ChainActionsError::ChannelDoesNotExist,
-            // ))) => (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
-            // Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
-            // hopr_lib::errors::ChainActionsError::InvalidArguments(_),
-            // ))) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnsupportedFeature).into_response(),
-            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
-                (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
-            }
-            Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
-        },
-        Err(_) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
+    let channel_id = match resolve_channel(&hopr, &address, direction) {
+        Ok(ch) => *ch.get_id(),
+        Err(status) => {
+            let code = match status {
+                ApiErrorStatus::ChannelNotFound => StatusCode::NOT_FOUND,
+                _ => StatusCode::UNPROCESSABLE_ENTITY,
+            };
+            return (code, status).into_response();
+        }
+    };
+
+    match hopr.close_channel_by_id(&channel_id).await {
+        Ok(receipt) => (
+            StatusCode::OK,
+            Json(CloseChannelResponse {
+                receipt: receipt.tx_hash,
+            }),
+        )
+            .into_response(),
+        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
+            (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
+        }
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }
 
@@ -481,13 +523,16 @@ pub(crate) struct FundBodyRequest {
     amount: HoprBalance,
 }
 
-/// Funds the given channel with the given amount of HOPR tokens.
+/// Funds the outgoing channel to the given counterparty with the given amount of HOPR tokens.
+///
+/// Funding applies only to the outgoing channel (this node → counterparty), since only
+/// the channel source can add stake.
 #[utoipa::path(
         post,
-        path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/fund"),
-        description = "Funds the given channel with the given amount of HOPR tokens.",
+        path = const_format::formatcp!("{BASE_PATH}/channels/{{address}}/fund"),
+        description = "Funds the outgoing channel to the given counterparty with the given amount of HOPR tokens.",
         params(
-            ("channelId" = String, Path, description = "ID of the channel.", example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")
+            ("address" = String, Path, description = "On-chain address of the counterparty.", example = "0x188c4462b75e46f0c7262d7f48d182447b93a93c")
         ),
         request_body(
             content = FundBodyRequest,
@@ -496,7 +541,7 @@ pub(crate) struct FundBodyRequest {
         ),
         responses(
             (status = 200, description = "Channel funded successfully", body = FundChannelResponse),
-            (status = 400, description = "Invalid channel id.", body = ApiError),
+            (status = 400, description = "Invalid counterparty address or request body.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 403, description = "Failed to fund the channel because of insufficient HOPR balance or allowance.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
@@ -510,29 +555,296 @@ pub(crate) struct FundBodyRequest {
         tag = "Channels",
     )]
 pub(super) async fn fund_channel(
-    Path(ChannelIdParams { channel_id }): Path<ChannelIdParams>,
+    Path(AddressParams { address }): Path<AddressParams>,
     State(state): State<Arc<InternalState>>,
     Json(fund_req): Json<FundBodyRequest>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match Hash::from_hex(channel_id.as_str()) {
-        Ok(channel_id) => match hopr.fund_channel(&channel_id, fund_req.amount).await {
-            Ok(hash) => (StatusCode::OK, Json(FundChannelResponse { hash })).into_response(),
-            // Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
-            // hopr_lib::errors::ChainActionsError::ChannelDoesNotExist,
-            // ))) => (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
-            // Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
-            // hopr_lib::errors::ChainActionsError::NotEnoughAllowance,
-            // ))) => (StatusCode::FORBIDDEN, ApiErrorStatus::NotEnoughAllowance).into_response(),
-            // Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
-            // hopr_lib::errors::ChainActionsError::BalanceTooLow,
-            // ))) => (StatusCode::FORBIDDEN, ApiErrorStatus::NotEnoughBalance).into_response(),
-            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
-                (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
-            }
-            Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
-        },
-        Err(_) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
+    let channel_id = match resolve_channel(&hopr, &address, ChannelDirection::Outgoing) {
+        Ok(ch) => *ch.get_id(),
+        Err(status) => {
+            let code = match status {
+                ApiErrorStatus::ChannelNotFound => StatusCode::NOT_FOUND,
+                _ => StatusCode::UNPROCESSABLE_ENTITY,
+            };
+            return (code, status).into_response();
+        }
+    };
+
+    match hopr.fund_channel(&channel_id, fund_req.amount).await {
+        Ok(hash) => (StatusCode::OK, Json(FundChannelResponse { hash })).into_response(),
+        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
+            (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
+        }
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use hopr_lib::errors::HoprLibError;
+
+    use super::*;
+
+    fn test_channel(status: ChannelStatus) -> ChannelEntry {
+        let src: Address = "0x07eaf07d6624f741e04f4092a755a9027aaab7f6".parse().unwrap();
+        let dst: Address = "0x188c4462b75e46f0c7262d7f48d182447b93a93c".parse().unwrap();
+        ChannelEntry::builder()
+            .between(src, dst)
+            .balance("10 wxHOPR".parse().unwrap())
+            .status(status)
+            .build()
+            .unwrap()
+    }
+
+    #[test]
+    fn channel_to_topology_info_should_convert_open_channel() {
+        let ch = test_channel(ChannelStatus::Open);
+        let info = channel_to_topology_info(&ch);
+
+        assert_eq!(info.channel_id, *ch.get_id());
+        assert_eq!(info.source, ch.source);
+        assert_eq!(info.destination, ch.destination);
+        assert_eq!(info.balance, ch.balance);
+        assert_eq!(info.status, ch.status);
+        assert_eq!(info.channel_epoch, 1);
+        assert_eq!(info.ticket_index, 0);
+        assert_eq!(info.closure_time, 0);
+    }
+
+    #[test]
+    fn channel_to_topology_info_should_serialize_correctly() {
+        let ch = test_channel(ChannelStatus::Open);
+        let info = channel_to_topology_info(&ch);
+        let json = serde_json::to_value(&info).unwrap();
+
+        assert_eq!(json["status"], "Open");
+        assert_eq!(json["balance"], "10 wxHOPR");
+        assert!(json.get("channelId").is_some());
+        assert!(json.get("source").is_some());
+        assert!(json.get("destination").is_some());
+    }
+
+    #[test]
+    fn filter_open_channel_should_return_open_channel() {
+        let ch = test_channel(ChannelStatus::Open);
+        let result = filter_open_channel(Ok(Some(ch.clone())));
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().get_id(), ch.get_id());
+    }
+
+    #[test]
+    fn filter_open_channel_should_return_pending_to_close() {
+        let ch = test_channel(ChannelStatus::PendingToClose(std::time::SystemTime::now()));
+        assert!(filter_open_channel(Ok(Some(ch))).is_ok());
+    }
+
+    #[test]
+    fn filter_open_channel_should_reject_closed_channel() {
+        let ch = test_channel(ChannelStatus::Closed);
+        let result = filter_open_channel(Ok(Some(ch)));
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), ApiErrorStatus::ChannelNotFound);
+    }
+
+    #[test]
+    fn filter_open_channel_should_reject_none() {
+        let result = filter_open_channel(Ok(None));
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), ApiErrorStatus::ChannelNotFound);
+    }
+
+    #[test]
+    fn filter_open_channel_should_map_error_to_unknown_failure() {
+        let err = HoprLibError::GeneralError("test".into());
+        let result = filter_open_channel(Err(err));
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ApiErrorStatus::UnknownFailure(_)));
+    }
+
+    #[test]
+    fn node_channel_should_serialize_correctly() {
+        let ch = test_channel(ChannelStatus::Open);
+        let node_ch = NodeChannel {
+            id: *ch.get_id(),
+            peer_address: ch.destination,
+            status: ch.status,
+            balance: ch.balance,
+        };
+        let json = serde_json::to_value(&node_ch).unwrap();
+        assert_eq!(json["status"], "Open");
+        assert_eq!(json["balance"], "10 wxHOPR");
+    }
+
+    #[test]
+    fn channels_query_request_should_default_to_false() {
+        let req: ChannelsQueryRequest = serde_json::from_str("{}").unwrap();
+        assert!(!req.including_closed);
+        assert!(!req.full_topology);
+    }
+
+    #[test]
+    fn channels_query_request_should_deserialize_flags() {
+        let req: ChannelsQueryRequest =
+            serde_json::from_str(r#"{"includingClosed": true, "fullTopology": true}"#).unwrap();
+        assert!(req.including_closed);
+        assert!(req.full_topology);
+    }
+
+    #[test]
+    fn open_channel_body_request_should_deserialize() {
+        let json = serde_json::json!({
+            "amount": "10 wxHOPR",
+            "destination": "0xa8194d36e322592d4c707b70dbe96121f5c74c64"
+        });
+        let req: OpenChannelBodyRequest = serde_json::from_value(json).unwrap();
+        assert_eq!(req.amount, "10 wxHOPR".parse().unwrap());
+    }
+
+    #[test]
+    fn fund_body_request_should_deserialize() {
+        let json = serde_json::json!({ "amount": "5 wxHOPR" });
+        let req: FundBodyRequest = serde_json::from_value(json).unwrap();
+        assert_eq!(req.amount, "5 wxHOPR".parse().unwrap());
+    }
+
+    #[test]
+    fn channel_direction_should_default_to_outgoing() {
+        assert_eq!(ChannelDirection::default(), ChannelDirection::Outgoing);
+    }
+
+    #[test]
+    fn channel_direction_query_should_default_to_outgoing_when_missing() {
+        let q: ChannelDirectionQuery = serde_json::from_str("{}").unwrap();
+        assert_eq!(q.direction, ChannelDirection::Outgoing);
+    }
+
+    #[test]
+    fn channel_direction_should_parse_outgoing() {
+        let d: ChannelDirection = serde_json::from_str(r#""outgoing""#).unwrap();
+        assert_eq!(d, ChannelDirection::Outgoing);
+    }
+
+    #[test]
+    fn channel_direction_should_parse_incoming() {
+        let d: ChannelDirection = serde_json::from_str(r#""incoming""#).unwrap();
+        assert_eq!(d, ChannelDirection::Incoming);
+    }
+
+    #[test]
+    fn channel_direction_should_reject_unknown_value() {
+        let res: Result<ChannelDirection, _> = serde_json::from_str(r#""both""#);
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn address_params_should_deserialize() {
+        let json = serde_json::json!({ "address": "0x188c4462b75e46f0c7262d7f48d182447b93a93c" });
+        let params: AddressParams = serde_json::from_value(json).unwrap();
+        assert_eq!(
+            params.address,
+            "0x188c4462b75e46f0c7262d7f48d182447b93a93c".parse().unwrap()
+        );
+    }
+
+    #[test]
+    fn channel_info_response_should_serialize_all_fields() {
+        let ch = test_channel(ChannelStatus::Open);
+        let info = channel_to_topology_info(&ch);
+        let json = serde_json::to_value(&info).unwrap();
+
+        assert_eq!(json["channelId"], ch.get_id().to_string());
+        assert_eq!(
+            json["source"].as_str().unwrap().to_lowercase(),
+            ch.source.to_string().to_lowercase()
+        );
+        assert_eq!(
+            json["destination"].as_str().unwrap().to_lowercase(),
+            ch.destination.to_string().to_lowercase()
+        );
+        assert_eq!(json["balance"], "10 wxHOPR");
+        assert_eq!(json["status"], "Open");
+        assert_eq!(json["ticketIndex"], 0);
+        assert_eq!(json["channelEpoch"], 1);
+        assert_eq!(json["closureTime"], 0);
+    }
+
+    #[test]
+    fn channel_to_topology_info_should_compute_closure_time_for_pending_to_close() {
+        let ch = test_channel(ChannelStatus::PendingToClose(
+            std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_700_000_000),
+        ));
+        let info = channel_to_topology_info(&ch);
+        assert_eq!(info.closure_time, 1_700_000_000);
+    }
+
+    #[test]
+    fn node_channels_response_should_serialize_all_three_groups() {
+        let ch = test_channel(ChannelStatus::Open);
+        let node_ch = NodeChannel {
+            id: *ch.get_id(),
+            peer_address: ch.destination,
+            status: ch.status,
+            balance: ch.balance,
+        };
+        let resp = NodeChannelsResponse {
+            incoming: vec![node_ch.clone()],
+            outgoing: vec![node_ch.clone()],
+            all: vec![channel_to_topology_info(&ch)],
+        };
+        let json = serde_json::to_value(&resp).unwrap();
+        assert_eq!(json["incoming"].as_array().unwrap().len(), 1);
+        assert_eq!(json["outgoing"].as_array().unwrap().len(), 1);
+        assert_eq!(json["all"].as_array().unwrap().len(), 1);
+        assert_eq!(json["incoming"][0]["status"], "Open");
+        assert_eq!(json["all"][0]["channelId"], ch.get_id().to_string());
+    }
+
+    #[test]
+    fn open_channel_body_request_should_include_destination() {
+        let json = serde_json::json!({
+            "amount": "10 wxHOPR",
+            "destination": "0xa8194d36e322592d4c707b70dbe96121f5c74c64"
+        });
+        let req: OpenChannelBodyRequest = serde_json::from_value(json).unwrap();
+        assert_eq!(
+            req.destination,
+            "0xa8194d36e322592d4c707b70dbe96121f5c74c64".parse().unwrap()
+        );
+        assert_eq!(req.amount, "10 wxHOPR".parse().unwrap());
+    }
+
+    #[test]
+    fn open_channel_response_should_serialize_correctly() {
+        let resp = OpenChannelResponse {
+            channel_id: Hash::default(),
+            transaction_receipt: Hash::default(),
+        };
+        let json = serde_json::to_value(&resp).unwrap();
+        assert!(json.get("channelId").is_some());
+        assert!(json.get("transactionReceipt").is_some());
+    }
+
+    #[test]
+    fn close_channel_response_should_serialize_correctly() {
+        let resp = CloseChannelResponse {
+            receipt: Hash::default(),
+        };
+        let json = serde_json::to_value(&resp).unwrap();
+        assert!(json.get("receipt").is_some());
+    }
+
+    #[test]
+    fn fund_channel_response_should_serialize_correctly() {
+        let resp = FundChannelResponse { hash: Hash::default() };
+        let json = serde_json::to_value(&resp).unwrap();
+        assert!(json.get("hash").is_some());
+    }
+
+    #[test]
+    fn address_params_should_reject_invalid_address() {
+        let json = serde_json::json!({ "address": "not-an-address" });
+        assert!(serde_json::from_value::<AddressParams>(json).is_err());
     }
 }

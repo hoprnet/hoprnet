@@ -6,6 +6,7 @@ ignore = [
   "RUSTSEC-2025-0137", # `alloy` - held back until removed, see https://github.com/hoprnet/hoprnet/issues/7707
   "RUSTSEC-2026-0049", # `rustls-webpki` - needs alloy removal
   "RUSTSEC-2026-0097", # workspace already pins `rand` 0.10.1, but Cargo.lock still contains transitive `rand` 0.9.3; remove this ignore once upstream deps stop pulling 0.9.3
+  "RUSTSEC-2026-0098", # `rustls-webpki` 0.101.7 pulled transitively by blokli-client -> eventsource-client 0.16.2 -> hyper-rustls 0.24.2; our own `rustls-webpki` bumped to >=0.103.12 in Cargo.lock. Drop once blokli-client upgrades eventsource-client (see https://github.com/hoprnet/blokli/issues/107)
 ]
 informational_warnings = ["unmaintained"]
 severity_threshold = "low"
@@ -17,7 +18,9 @@ fetch = true
 stale = false
 
 [output]
-deny = ["warnings"]
+# TODO: restore `deny = ["warnings"]` once `core2` (yanked, transitive via libp2p's multihash) is resolved upstream.
+# cargo-audit has no per-package yanked ignore — see https://github.com/rustsec/rustsec/issues/1453
+deny = ["unmaintained", "unsound"]
 format = "terminal" # "terminal" (human readable report) or "json"
 quiet = false       # Only print information on error
 show_tree = true    # Show inverse dependency trees along with advisories (default: true)
