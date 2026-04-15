@@ -433,27 +433,35 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
         })
         .buffer(futures_time::time::Duration::from(cfg.ack_buffer_interval))
         .filter(|acks| futures::future::ready(!acks.is_empty()))
-        .flat_map(|buffered_acks| {
-            // Split the acknowledgements into groups based on the sender
-            // The halfbrown hash map will use Vec for a lower number of distinct senders, and possibly transition to
-            // the hashbrown hash map when the number of distinct senders exceeds 32.
-            let mut groups = halfbrown::HashMap::<OffchainPublicKey, Vec<VerifiedAcknowledgement>, ahash::RandomState>::with_capacity_and_hasher(
+        // Group by sender, reusing the same HashMap across buffer cycles so we don't
+        // re-allocate its bucket storage every `cfg.ack_buffer_interval` (default 200ms).
+        //
+        // The halfbrown map uses a Vec backing for a small number of distinct senders
+        // (<32) and transitions to hashbrown otherwise — calling `drain()` keeps the
+        // underlying allocation, leaving us with only the per-group Vec<Ack> to allocate
+        // (which downstream consumes as owned values).
+        .scan(
+            halfbrown::HashMap::<OffchainPublicKey, Vec<VerifiedAcknowledgement>, ahash::RandomState>::with_capacity_and_hasher(
                 cfg.ack_grouping_capacity,
-                ahash::RandomState::default()
-            );
-            for (dst, ack) in buffered_acks {
-                groups
-                    .entry(dst)
-                    .and_modify(|v| v.push(ack))
-                    .or_insert_with(|| vec![ack]);
-            }
-            tracing::trace!(
-                num_groups = groups.len(),
-                num_acks = groups.values().map(|v| v.len()).sum::<usize>(),
-                "acknowledgements grouped"
-            );
-            futures::stream::iter(groups)
-        })
+                ahash::RandomState::default(),
+            ),
+            |groups, buffered_acks| {
+                for (dst, ack) in buffered_acks {
+                    groups
+                        .entry(dst)
+                        .and_modify(|v| v.push(ack))
+                        .or_insert_with(|| vec![ack]);
+                }
+                tracing::trace!(
+                    num_groups = groups.len(),
+                    num_acks = groups.values().map(|v| v.len()).sum::<usize>(),
+                    "acknowledgements grouped"
+                );
+                let drained: Vec<_> = groups.drain().collect();
+                futures::future::ready(Some(futures::stream::iter(drained)))
+            },
+        )
+        .flatten()
         .for_each_concurrent(
             cfg.ack_output_concurrency.filter(|&n| n > 0).unwrap_or(DEFAULT_ACK_OUTPUT_CONCURRENCY),
             move |(destination, acks)| {
