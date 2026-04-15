@@ -3,16 +3,17 @@ use std::{
     collections::BinaryHeap,
     future::poll_fn,
     sync::{
-        Arc, Mutex,
+        Arc,
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     task::Poll,
     time::Duration,
 };
 
-use futures::{FutureExt, SinkExt, Stream, StreamExt};
+use futures::{FutureExt, Stream, StreamExt};
 use futures_timer::Delay;
-use tracing::{error, trace};
+use parking_lot::Mutex;
+use tracing::trace;
 
 use crate::{config::MixerConfig, data::DelayedData};
 
@@ -73,10 +74,6 @@ pub enum SenderError {
     /// The channel is closed due to receiver being dropped.
     #[error("Channel is closed")]
     Closed,
-
-    /// The mutex lock over the channel failed.
-    #[error("Channel lock failed")]
-    Lock,
 }
 
 /// Sender object interacting with the mixing channel.
@@ -98,12 +95,7 @@ impl<T> Drop for Sender<T> {
         if self.channel.sender_count.fetch_sub(1, Ordering::Relaxed) == 1
             && !self.channel.receiver_active.load(Ordering::Relaxed)
         {
-            let mut channel = self.channel.channel.lock().unwrap_or_else(|e| {
-                self.channel.channel.clear_poison();
-                e.into_inner()
-            });
-
-            channel.waker = None;
+            self.channel.channel.lock().waker = None;
         }
     }
 }
@@ -111,8 +103,40 @@ impl<T> Drop for Sender<T> {
 impl<T> Sender<T> {
     /// Send one item to the mixing channel.
     pub fn send(&self, item: T) -> Result<(), SenderError> {
-        let mut sender = self.clone();
-        sender.start_send_unpin(item)
+        self.push_item(item)
+    }
+
+    /// Locked critical section shared between [`Sink::start_send`] and [`Sender::send`].
+    #[tracing::instrument(level = "trace", skip(self, item))]
+    fn push_item(&self, item: T) -> Result<(), SenderError> {
+        if !self.channel.receiver_active.load(Ordering::Relaxed) {
+            return Err(SenderError::Closed);
+        }
+
+        let mut channel = self.channel.channel.lock();
+
+        let random_delay = channel.cfg.random_delay();
+
+        trace!(delay_in_ms = random_delay.as_millis(), "generated mixer delay",);
+
+        let delayed_data: DelayedData<T> = (std::time::Instant::now() + random_delay, item).into();
+        channel.buffer.push(Reverse(delayed_data));
+
+        if let Some(waker) = channel.waker.as_ref() {
+            waker.wake_by_ref();
+        }
+
+        #[cfg(all(feature = "telemetry", not(test)))]
+        {
+            METRIC_QUEUE_SIZE.increment(1.0f64);
+
+            let weight = 1.0f64 / channel.cfg.metric_delay_window as f64;
+            METRIC_MIXER_AVERAGE_DELAY.set(
+                (weight * random_delay.as_millis() as f64) + ((1.0f64 - weight) * METRIC_MIXER_AVERAGE_DELAY.get()),
+            );
+        }
+
+        Ok(())
     }
 }
 
@@ -128,38 +152,8 @@ impl<T> futures::sink::Sink<T> for Sender<T> {
         }
     }
 
-    #[tracing::instrument(level = "trace", skip(self, item))]
     fn start_send(self: std::pin::Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        let is_active = self.channel.receiver_active.load(Ordering::Relaxed);
-
-        if is_active {
-            let mut channel = self.channel.channel.lock().map_err(|_| SenderError::Lock)?;
-
-            let random_delay = channel.cfg.random_delay();
-
-            trace!(delay_in_ms = random_delay.as_millis(), "generated mixer delay",);
-
-            let delayed_data: DelayedData<T> = (std::time::Instant::now() + random_delay, item).into();
-            channel.buffer.push(Reverse(delayed_data));
-
-            if let Some(waker) = channel.waker.as_ref() {
-                waker.wake_by_ref();
-            }
-
-            #[cfg(all(feature = "telemetry", not(test)))]
-            {
-                METRIC_QUEUE_SIZE.increment(1.0f64);
-
-                let weight = 1.0f64 / channel.cfg.metric_delay_window as f64;
-                METRIC_MIXER_AVERAGE_DELAY.set(
-                    (weight * random_delay.as_millis() as f64) + ((1.0f64 - weight) * METRIC_MIXER_AVERAGE_DELAY.get()),
-                );
-            }
-
-            Ok(())
-        } else {
-            Err(SenderError::Closed)
-        }
+        self.push_item(item)
     }
 
     fn poll_flush(self: std::pin::Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -178,10 +172,6 @@ pub enum ReceiverError {
     /// The channel is closed due to receiver being dropped.
     #[error("Channel is closed")]
     Closed,
-
-    /// The mutex lock over the channel failed.
-    #[error("Channel lock failed")]
-    Lock,
 }
 
 /// Receiver object interacting with the mixer channel.
@@ -199,10 +189,7 @@ impl<T> Stream for Receiver<T> {
     fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Option<Self::Item>> {
         let now = std::time::Instant::now();
         if self.channel.sender_count.load(Ordering::Relaxed) > 0 {
-            let Ok(mut channel) = self.channel.channel.lock() else {
-                error!("mutex is poisoned, terminating stream");
-                return Poll::Ready(None);
-            };
+            let mut channel = self.channel.channel.lock();
 
             if channel.buffer.peek().map(|x| x.0.release_at < now).unwrap_or(false) {
                 let data = channel
@@ -298,7 +285,7 @@ pub fn channel<T>(cfg: crate::config::MixerConfig) -> (Sender<T>, Receiver<T>) {
 
 #[cfg(test)]
 mod tests {
-    use futures::StreamExt;
+    use futures::{SinkExt, StreamExt};
     use tokio::time::timeout;
 
     use super::*;

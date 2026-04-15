@@ -4899,6 +4899,7 @@ dependencies = [
  "humantime-serde",
  "insta",
  "lazy_static",
+ "parking_lot",
  "rstest",
  "rust-stream-ext-concurrent",
  "serde",
