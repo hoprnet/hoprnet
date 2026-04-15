@@ -206,3 +206,57 @@ jobs:
             set -e
             RUSTDOCFLAGS="-D warnings" nix develop -c cargo doc --no-deps --document-private-items
             nix build -L .#docs
+
+  bench-build:
+    name: Bench build
+    runs-on: self-hosted-hoprnet-bigger
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Build benchmarks
+        uses: hoprnet/hopr-workflows/actions/nix-action@c2aca7e56d25c4a786049ccf816c7f1af8721de8 # nix-action-v1
+        with:
+          source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          command: nix build -L .#bench-build
+
+  codspeed:
+    name: CodSpeed Benchmarks
+    if: contains(github.event.pull_request.labels.*.name, 'perf:benchmark')
+    runs-on: self-hosted-hoprnet-bigger
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        with:
+          disable-sudo: false
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Nix
+        uses: hoprnet/hopr-workflows/actions/setup-nix@setup-nix-v1
+        with:
+          cachix_cache_name: hoprnet
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Build the benchmark targets
+        run: |
+          nix build -L .#codspeed-bench-build
+          mkdir -p target
+          # Nix builds are read-only, we need to copy them to target/codspeed and make them writable for CodSpeed
+          cp -rv result/ target/codspeed
+          chmod -R +w target/codspeed
+
+      - name: Run the benchmarks
+        uses: CodSpeedHQ/action@e736f0d2aeb36da38e9f08eca4dff7967408d154 # v4.8.2
+        with:
+          mode: simulation
+          run: nix develop -c cargo codspeed run

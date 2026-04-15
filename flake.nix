@@ -352,6 +352,42 @@
             projectBuildArgs // { buildBench = true; }
           );
 
+          # Build CodSpeed benchmarks with instrumentation.
+          codspeed-bench-build =
+            (rust-builder-local.callPackage nixLib.mkRustPackage (
+              projectBuildArgs
+              // {
+                # Use the same cargoToml as binary-hoprd to satisfy mkRustPackage's expectations about package names
+                cargoExtraArgs = "-p hopr-crypto-packet -p hopr-network-graph -p hopr-transport-mixer -p hopr-protocol-session -p hopr-transport-session -p hopr-transport-protocol -p hopr-ticket-manager -p hopr-protocol-hopr";
+                extraNativeBuildInputs = [ pkgs-unstable.cargo-codspeed ];
+              }
+            )).overrideAttrs
+              (old: {
+                doNotPostBuildInstallCargoBinaries = true;
+                # Override build phase to use cargo-codspeed
+                buildPhase = ''
+                  runHook preBuild
+                  # We need to ensure we are using the vendored dependencies from mkRustPackage
+                  # but cargo-codspeed might need some help to find them.
+                  # mkRustPackage usually sets up .cargo/config.toml with the vendor directory.
+                  cargo codspeed build $cargoExtraArgs
+                  runHook postBuild
+                '';
+                # Override install phase to get the codspeed output
+                installPhase = ''
+                  runHook preInstall
+                  mkdir -p $out
+                  # The instrumented binaries are in target/codspeed
+                  if [ -d target/codspeed ]; then
+                    cp -rv target/codspeed/* $out/
+                  else
+                    echo "Error: target/codspeed directory not found"
+                    exit 1
+                  fi
+                  runHook postInstall
+                '';
+              });
+
           profileDeps = with pkgs; [
             gdb
             # FIXME: heaptrack would be useful, but it adds 700MB to the image size (unpacked)
@@ -535,7 +571,8 @@
               envsubst
               uv
               graphviz
-            ];            shellHook = ''
+            ];
+            shellHook = ''
               ${pre-commit-check.shellHook}
             '';
           };
@@ -556,7 +593,8 @@
               foundry-bin
               nfpm
               envsubst
-            ];            shellHook = ''
+            ];
+            shellHook = ''
               # Fix macOS dylib loading for nightly rustfmt (rust-overlay symlink issue)
               export DYLD_LIBRARY_PATH="${nightlyToolchain}/lib:$DYLD_LIBRARY_PATH"
               ${pre-commit-check.shellHook}
@@ -782,7 +820,7 @@
             // {
               inherit docs;
               inherit pre-commit-check;
-              inherit hoprd-bench bench-build;
+              inherit hoprd-bench bench-build codspeed-bench-build;
               inherit hoprd-man;
               default = hoprdPackages.binary-hoprd;
               hoprd-candidate = (mkHoprdCandidate "");
