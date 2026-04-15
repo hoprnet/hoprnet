@@ -625,7 +625,7 @@ pub struct AcknowledgementPipelineConfig {
     ///
     /// The previous hardcoded value of 1_000_000 pre-allocated ~MBs of ring buffer per node even
     /// though real-world throughput rarely saturates more than a few thousand entries. Let the
-    /// 50 ms sink timeouts ([`QUEUE_SEND_TIMEOUT`]) propagate backpressure instead.
+    /// 50 ms sink timeouts (`QUEUE_SEND_TIMEOUT`) propagate backpressure instead.
     ///
     /// Default is 50_000.
     #[default(default_ticket_ack_buffer_size())]
@@ -641,13 +641,11 @@ pub struct AcknowledgementPipelineConfig {
     pub ack_out_buffer_size: usize,
     /// Maximum concurrency when processing incoming (received) acknowledgements.
     ///
-    /// `None` or `Some(0)` both fall back to the default
-    /// (see [`DEFAULT_ACK_INPUT_CONCURRENCY`]).
+    /// `None` or `Some(0)` both fall back to a default of 10.
     pub ack_input_concurrency: Option<usize>,
     /// Maximum concurrency when processing outgoing (sent-back) acknowledgements.
     ///
-    /// `None` or `Some(0)` both fall back to the default
-    /// (see [`DEFAULT_ACK_OUTPUT_CONCURRENCY`]).
+    /// `None` or `Some(0)` both fall back to a default of 10.
     pub ack_output_concurrency: Option<usize>,
 }
 
