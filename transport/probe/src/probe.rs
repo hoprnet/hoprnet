@@ -961,83 +961,66 @@ mod tests {
         .await
     }
 
-    /// Regression test for hoprnet/hoprnet#7972: a neighbor (heartbeat) probe must be emitted with
-    /// `max_surbs_in_packet == 1` so that the path planner resolves exactly one return path for the
-    /// zero-hop pong — no more, no less.
-    #[tokio::test]
-    async fn probe_should_emit_neighbor_probes_with_exactly_one_surb() -> anyhow::Result<()> {
-        let cfg = ProbeConfig {
-            timeout: std::time::Duration::from_secs(1),
-            interval: std::time::Duration::from_secs(0),
-            ..Default::default()
-        };
-
-        let store = PeerStore {
-            get_peers: Arc::new(RwLock::new(VecDeque::new())),
-            on_finished: Arc::new(RwLock::new(Vec::new())),
-        };
-
-        test_with_probing(cfg, store, move |iface: TestInterface| async move {
-            let mut manual_probe_tx = iface.manual_probe_tx;
-            let mut from_probing_to_network_rx = iface.from_probing_to_network_rx;
-
-            let (tx, _rx) = futures::channel::mpsc::channel::<std::result::Result<Duration, ()>>(128);
-            manual_probe_tx.send((NEIGHBOURS[0], PingQueryReplier::new(tx))).await?;
-
-            let (routing, data_out) =
-                tokio::time::timeout(std::time::Duration::from_secs(1), from_probing_to_network_rx.next())
-                    .await?
-                    .ok_or_else(|| anyhow::anyhow!("no neighbor probe emitted"))?;
-
-            assert!(
-                matches!(routing, DestinationRouting::Forward { .. }),
-                "neighbor probe must use forward routing, got {routing:?}"
-            );
-            let packet_info = data_out
-                .packet_info
-                .ok_or_else(|| anyhow::anyhow!("neighbor probe must carry explicit OutgoingPacketInfo"))?;
-            assert_eq!(
-                packet_info.max_surbs_in_packet, 1,
-                "neighbor probes must request exactly 1 SURB (one for the zero-hop pong)"
-            );
-
-            Ok(())
-        })
-        .await
-    }
-
-    /// Regression test for hoprnet/hoprnet#7972: a loopback telemetry probe is self-routed and never
-    /// replied to, so it must be emitted with `max_surbs_in_packet == 0` — otherwise the path planner
-    /// resolves wasted return paths that land in the SURB store and expire unused.
-    #[tokio::test]
-    async fn probe_should_emit_loopback_probes_with_zero_surbs() -> anyhow::Result<()> {
-        use hopr_api::ct::{ProbeRouting, ProbingTrafficGeneration};
-
-        /// Minimal traffic generator emitting a single loopback probe, then idling.
-        #[derive(Clone)]
-        struct OneShotLoopbackGenerator {
+    /// How a probe gets triggered inside the test: either via the manual ping channel
+    /// (for neighbor probes) or by injecting a single [`ProbeRouting::Looping`] into the
+    /// probing traffic generator (for loopback probes).
+    #[derive(Clone)]
+    enum TestProbeStrategy {
+        ManualNeighbor,
+        OneShotLoopback {
             routing: DestinationRouting,
             path_id: hopr_api::types::internal::routing::PathId,
-        }
+        },
+    }
 
-        impl ProbingTrafficGeneration for OneShotLoopbackGenerator {
-            fn build(&self) -> futures::stream::BoxStream<'static, ProbeRouting> {
-                let probe = ProbeRouting::Looping((self.routing.clone(), self.path_id));
-                Box::pin(futures::StreamExt::chain(
-                    futures::stream::iter(std::iter::once(probe)),
-                    futures::stream::pending(),
-                ))
+    impl hopr_api::ct::ProbingTrafficGeneration for TestProbeStrategy {
+        fn build(&self) -> futures::stream::BoxStream<'static, hopr_api::ct::ProbeRouting> {
+            match self {
+                Self::ManualNeighbor => Box::pin(futures::stream::pending()),
+                Self::OneShotLoopback { routing, path_id } => {
+                    let probe = hopr_api::ct::ProbeRouting::Looping((routing.clone(), *path_id));
+                    Box::pin(futures::StreamExt::chain(
+                        futures::stream::iter(std::iter::once(probe)),
+                        futures::stream::pending(),
+                    ))
+                }
             }
         }
+    }
 
+    /// Regression test for hoprnet/hoprnet#7972: each probe type must be emitted with the
+    /// exact SURB count it actually consumes — no more, no less — so the path planner does
+    /// not resolve (and the SURB store does not accumulate) unused return paths.
+    ///
+    /// - Neighbor probe: 1 SURB (zero-hop pong return).
+    /// - Loopback probe: 0 SURBs (self-routed, never replied to).
+    #[rstest::rstest]
+    #[case::neighbor_probe_requests_one_surb(TestProbeStrategy::ManualNeighbor, 1)]
+    #[case::loopback_probe_requests_zero_surbs(
+        TestProbeStrategy::OneShotLoopback {
+            routing: DestinationRouting::Forward {
+                destination: Box::new((*OFFCHAIN_KEYPAIR.public()).into()),
+                pseudonym: Some(HoprPseudonym::random()),
+                forward_options: RoutingOptions::Hops(1.try_into().expect("1 is a valid u8")),
+                return_options: None,
+            },
+            path_id: [1, 2, 3, 4, 5],
+        },
+        0,
+    )]
+    #[tokio::test]
+    async fn probe_should_emit_with_expected_surb_count(
+        #[case] strategy: TestProbeStrategy,
+        #[case] expected_max_surbs: usize,
+    ) -> anyhow::Result<()> {
         let cfg = ProbeConfig {
             timeout: std::time::Duration::from_secs(1),
             interval: std::time::Duration::from_secs(0),
             ..Default::default()
         };
 
-        // Wire up the same probing harness `test_with_probing` uses, but with our
-        // loopback-emitting traffic generator injected instead of `ImmediateNeighborProber`.
+        // Wire up a full probing harness with the parameterized strategy injected as the
+        // traffic generator. Mirrors `test_with_probing` but allows arbitrary `ProbingTrafficGeneration`.
         let tag_allocators = hopr_transport_tag_allocator::create_allocators(
             ReservedTag::range().end..u16::MAX as u64 + 1,
             [
@@ -1060,7 +1043,7 @@ mod tests {
             futures::channel::mpsc::channel::<(DestinationRouting, ApplicationDataOut)>(100);
         let (_from_network_to_probing_tx, from_network_to_probing_rx) =
             futures::channel::mpsc::channel::<(HoprPseudonym, ApplicationDataIn)>(100);
-        let (_manual_probe_tx, manual_probe_rx) =
+        let (mut manual_probe_tx, manual_probe_rx) =
             futures::channel::mpsc::channel::<(OffchainPublicKey, PingQueryReplier)>(100);
 
         let store = PeerStore {
@@ -1068,49 +1051,37 @@ mod tests {
             on_finished: Arc::new(RwLock::new(Vec::new())),
         };
 
-        let generator = OneShotLoopbackGenerator {
-            routing: DestinationRouting::Forward {
-                destination: Box::new((*OFFCHAIN_KEYPAIR.public()).into()),
-                pseudonym: Some(HoprPseudonym::random()),
-                forward_options: RoutingOptions::Hops(1.try_into().expect("1 is a valid u8")),
-                return_options: None,
-            },
-            path_id: [1, 2, 3, 4, 5],
-        };
-
+        // Kick off the probing process before triggering — the strategy's stream drives
+        // the loopback case, and we push to `manual_probe_tx` below for the neighbor case.
+        let is_manual = matches!(strategy, TestProbeStrategy::ManualNeighbor);
         let jhs = probe
             .continuously_scan(
                 (from_probing_to_network_tx, from_network_to_probing_rx),
                 manual_probe_rx,
                 from_probing_up_tx,
-                generator,
+                strategy,
                 store,
             )
             .await;
 
-        let (routing, data_out) =
+        if is_manual {
+            let (tx, _rx) = futures::channel::mpsc::channel::<std::result::Result<Duration, ()>>(128);
+            manual_probe_tx.send((NEIGHBOURS[0], PingQueryReplier::new(tx))).await?;
+        }
+
+        let (_routing, data_out) =
             tokio::time::timeout(std::time::Duration::from_secs(1), from_probing_to_network_rx.next())
                 .await?
-                .ok_or_else(|| anyhow::anyhow!("no loopback probe emitted"))?;
+                .ok_or_else(|| anyhow::anyhow!("no probe emitted"))?;
 
         jhs.abort_all();
 
-        assert!(
-            matches!(
-                routing,
-                DestinationRouting::Forward {
-                    return_options: None,
-                    ..
-                }
-            ),
-            "loopback probe must use forward routing with no return options, got {routing:?}"
-        );
         let packet_info = data_out
             .packet_info
-            .ok_or_else(|| anyhow::anyhow!("loopback probe must carry explicit OutgoingPacketInfo"))?;
+            .ok_or_else(|| anyhow::anyhow!("probe must carry explicit OutgoingPacketInfo"))?;
         assert_eq!(
-            packet_info.max_surbs_in_packet, 0,
-            "loopback probes must request 0 SURBs (self-routed, never replied to)"
+            packet_info.max_surbs_in_packet, expected_max_surbs,
+            "probe must request exactly {expected_max_surbs} SURB(s)"
         );
 
         Ok(())
