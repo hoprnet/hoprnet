@@ -4870,7 +4870,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-mixer"
-version = "0.2.0"
+version = "0.3.2"
 dependencies = [
  "anyhow",
  "bytesize",
@@ -4883,6 +4883,7 @@ dependencies = [
  "humantime-serde",
  "insta",
  "lazy_static",
+ "parking_lot",
  "rstest",
  "rust-stream-ext-concurrent",
  "serde",
@@ -4978,7 +4979,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "1.5.0"
+version = "1.6.3"
 dependencies = [
  "ahash",
  "anyhow",
