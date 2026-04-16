@@ -975,17 +975,6 @@ where
         self.ping(key).await
     }
 
-    async fn all_network_peers(
-        &self,
-        min_quality: f64,
-    ) -> Result<Vec<(OffchainPublicKey, Self::Observable)>, Self::Error> {
-        self.all_network_peers(min_quality).await
-    }
-
-    fn network_peer_info(&self, key: &OffchainPublicKey) -> Option<Self::Observable> {
-        self.network_peer_observations(key)
-    }
-
     async fn observed_multiaddresses(&self, key: &OffchainPublicKey) -> Vec<Multiaddr> {
         self.network_observed_multiaddresses(key).await
     }

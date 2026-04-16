@@ -82,14 +82,14 @@ use hopr_api::{
     node::{
         AtomicHoprState, ComponentStatus, EitherErrExt, EventWaitResult,
         HasChainApi, HasGraphView, HasNetworkView, HasTicketManagement, HasTransportApi,
-        HoprChainKeyOperationsExt, NodeOnchainIdentity,
+        NodeOnchainIdentity,
     },
 };
 pub use hopr_api::{
     graph::EdgeLinkObservable,
     network::{NetworkBuilder, NetworkStreamControl},
     node::{
-        HoprIncentiveOperations, HoprNodeNetworkOperations, HoprNodeOperations, HoprState,
+        HoprIncentiveOperations, HoprNodeOperations, HoprState,
         TransportOperations,
     },
     tickets::{ChannelStats, RedemptionResult, TicketManagement, TicketManagementExt},
