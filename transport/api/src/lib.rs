@@ -886,3 +886,107 @@ fn build_mixer_cfg_from_env() -> MixerConfig {
 
     mixer_cfg
 }
+
+// ---------------------------------------------------------------------------
+// NetworkView impl for HoprTransport — wraps OnceLock<Net> access
+// ---------------------------------------------------------------------------
+
+impl<Chain, Graph, Net> NetworkView for HoprTransport<Chain, Graph, Net>
+where
+    Net: NetworkView + Send + Sync + 'static,
+{
+    fn listening_as(&self) -> std::collections::HashSet<Multiaddr> {
+        self.network
+            .get()
+            .map(|n| n.listening_as())
+            .unwrap_or_default()
+    }
+
+    fn multiaddress_of(&self, peer: &PeerId) -> Option<std::collections::HashSet<Multiaddr>> {
+        self.network.get()?.multiaddress_of(peer)
+    }
+
+    fn discovered_peers(&self) -> std::collections::HashSet<PeerId> {
+        self.network
+            .get()
+            .map(|n| n.discovered_peers())
+            .unwrap_or_default()
+    }
+
+    fn connected_peers(&self) -> std::collections::HashSet<PeerId> {
+        self.network
+            .get()
+            .map(|n| n.connected_peers())
+            .unwrap_or_default()
+    }
+
+    fn is_connected(&self, peer: &PeerId) -> bool {
+        self.network
+            .get()
+            .map(|n| n.is_connected(peer))
+            .unwrap_or(false)
+    }
+
+    fn health(&self) -> Health {
+        self.network
+            .get()
+            .map(|n| n.health())
+            .unwrap_or(Health::Red)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TransportOperations impl for HoprTransport
+// ---------------------------------------------------------------------------
+
+#[async_trait::async_trait]
+impl<Chain, Graph, Net> hopr_api::node::TransportOperations for HoprTransport<Chain, Graph, Net>
+where
+    Chain: ChainReadChannelOperations
+        + ChainReadAccountOperations
+        + hopr_api::chain::ChainWriteTicketOperations
+        + ChainKeyOperations
+        + hopr_api::chain::ChainReadTicketOperations
+        + ChainValues
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+    Graph: NetworkGraphView<NodeId = OffchainPublicKey>
+        + NetworkGraphUpdate
+        + hopr_api::graph::NetworkGraphWrite<NodeId = OffchainPublicKey>
+        + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+    <Graph as NetworkGraphView>::Observed: EdgeObservableRead + Send,
+    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
+    <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
+    Net: NetworkView + NetworkStreamControl + Clone + Send + Sync + 'static,
+{
+    type Observable = <Graph as NetworkGraphView>::Observed;
+    type Error = errors::HoprTransportError;
+
+    async fn ping(
+        &self,
+        key: &OffchainPublicKey,
+    ) -> Result<(Duration, Self::Observable), Self::Error> {
+        self.ping(key).await
+    }
+
+    async fn all_network_peers(
+        &self,
+        min_quality: f64,
+    ) -> Result<Vec<(OffchainPublicKey, Self::Observable)>, Self::Error> {
+        self.all_network_peers(min_quality).await
+    }
+
+    fn network_peer_info(&self, key: &OffchainPublicKey) -> Option<Self::Observable> {
+        self.network_peer_observations(key)
+    }
+
+    async fn observed_multiaddresses(&self, key: &OffchainPublicKey) -> Vec<Multiaddr> {
+        self.network_observed_multiaddresses(key).await
+    }
+}
