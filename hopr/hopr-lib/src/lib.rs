@@ -89,7 +89,7 @@ pub use hopr_api::{
     graph::EdgeLinkObservable,
     network::{NetworkBuilder, NetworkStreamControl},
     node::{
-        HoprIncentiveOperations, HoprNodeOperations, HoprState,
+        EitherErr, HoprIncentiveOperations, HoprNodeOperations, HoprState,
         TransportOperations,
     },
     tickets::{ChannelStats, RedemptionResult, TicketManagement, TicketManagementExt},

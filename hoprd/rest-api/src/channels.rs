@@ -5,9 +5,11 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
-use futures::TryFutureExt;
+use futures::{StreamExt, TryFutureExt};
 use hopr_lib::{
-    Address, AsUnixTimestamp, ChannelEntry, ChannelStatus, HoprBalance,
+    Address, AsUnixTimestamp, ChannelEntry, ChannelStatus, HoprBalance, HoprIncentiveOperations,
+    api::chain::{ChainKeyOperations, ChainReadChannelOperations, ChannelSelector},
+    api::node::HasChainApi,
     errors::{HoprLibError, HoprStatusError},
     prelude::Hash,
 };
@@ -171,27 +173,31 @@ pub(super) async fn list_channels(
 
     if query.full_topology {
         let topology = hopr
-            .all_channels()
-            .and_then(|channels| async move { Ok(channels.iter().map(channel_to_topology_info).collect::<Vec<_>>()) })
-            .await;
+            .chain_api()
+            .stream_channels(ChannelSelector::default())
+            .map(|stream| stream.collect::<Vec<_>>());
 
         match topology {
-            Ok(all) => (
-                StatusCode::OK,
-                Json(NodeChannelsResponse {
-                    incoming: vec![],
-                    outgoing: vec![],
-                    all,
-                }),
-            )
-                .into_response(),
-            Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+            Ok(stream) => {
+                let all = stream.await.iter().map(channel_to_topology_info).collect::<Vec<_>>();
+                (
+                    StatusCode::OK,
+                    Json(NodeChannelsResponse {
+                        incoming: vec![],
+                        outgoing: vec![],
+                        all,
+                    }),
+                )
+                    .into_response()
+            }
+            Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(HoprLibError::chain(e))).into_response(),
         }
     } else {
+        let me = hopr.identity().node_address;
         let channels = hopr
-            .channels_to(&hopr.me_onchain())
+            .channels_to(me)
             .and_then(|incoming| async {
-                let outgoing = hopr.channels_from(&hopr.me_onchain()).await?;
+                let outgoing = hopr.channels_from(me).await?;
                 Ok((incoming, outgoing))
             })
             .await;
@@ -224,7 +230,7 @@ pub(super) async fn list_channels(
 
                 (StatusCode::OK, Json(channel_info)).into_response()
             }
-            Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+            Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnknownFailure(e.to_string())).into_response(),
         }
     }
 }
@@ -297,28 +303,19 @@ pub(super) async fn open_channel(
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match hopr.open_channel(&open_req.destination, open_req.amount).await {
+    match hopr.open_channel(open_req.destination, open_req.amount).await {
         Ok(channel_details) => (
             StatusCode::CREATED,
             Json(OpenChannelResponse {
-                channel_id: channel_details.channel_id,
-                transaction_receipt: channel_details.tx_hash,
+                channel_id: channel_details.output().copied().unwrap_or_default(),
+                transaction_receipt: *channel_details.tx_hash(),
             }),
         )
             .into_response(),
-        // Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
-        // hopr_lib::errors::ChainActionsError::BalanceTooLow,
-        // ))) => (StatusCode::FORBIDDEN, ApiErrorStatus::NotEnoughBalance).into_response(),
-        // Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
-        // hopr_lib::errors::ChainActionsError::NotEnoughAllowance,
-        // ))) => (StatusCode::FORBIDDEN, ApiErrorStatus::NotEnoughAllowance).into_response(),
-        // Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
-        // hopr_lib::errors::ChainActionsError::ChannelAlreadyExists,
-        // ))) => (StatusCode::CONFLICT, ApiErrorStatus::ChannelAlreadyOpen).into_response(),
-        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
+        Err(hopr_lib::EitherErr::Right(HoprLibError::StatusError(HoprStatusError::NotThereYet(..)))) => {
             (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
         }
-        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnknownFailure(e.to_string())).into_response(),
     }
 }
 
@@ -357,11 +354,11 @@ pub(crate) struct ChannelDirectionQuery {
 ///
 /// Returns `ChannelNotFound` when the channel is absent or closed,
 /// and `UnknownFailure` for lookup errors.
-fn filter_open_channel(result: Result<Option<ChannelEntry>, HoprLibError>) -> Result<ChannelEntry, ApiErrorStatus> {
+fn filter_open_channel<E: std::error::Error>(result: Result<Option<ChannelEntry>, E>) -> Result<ChannelEntry, ApiErrorStatus> {
     match result {
         Ok(Some(ch)) if ch.status != ChannelStatus::Closed => Ok(ch),
         Ok(_) => Err(ApiErrorStatus::ChannelNotFound),
-        Err(e) => Err(ApiErrorStatus::from(e)),
+        Err(e) => Err(ApiErrorStatus::UnknownFailure(e.to_string())),
     }
 }
 
@@ -371,10 +368,10 @@ fn resolve_channel(
     address: &Address,
     direction: ChannelDirection,
 ) -> Result<ChannelEntry, ApiErrorStatus> {
-    let me = hopr.me_onchain();
+    let me = hopr.identity().node_address;
     let lookup = match direction {
-        ChannelDirection::Outgoing => hopr.channel(&me, address),
-        ChannelDirection::Incoming => hopr.channel(address, &me),
+        ChannelDirection::Outgoing => hopr.channel(me, *address),
+        ChannelDirection::Incoming => hopr.channel(*address, me),
     };
     filter_open_channel(lookup)
 }
@@ -483,17 +480,17 @@ pub(super) async fn close_channel(
     };
 
     match hopr.close_channel_by_id(&channel_id).await {
-        Ok(receipt) => (
+        Ok(output) => (
             StatusCode::OK,
             Json(CloseChannelResponse {
-                receipt: receipt.tx_hash,
+                receipt: *output.tx_hash(),
             }),
         )
             .into_response(),
-        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
+        Err(hopr_lib::EitherErr::Right(HoprLibError::StatusError(HoprStatusError::NotThereYet(..)))) => {
             (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
         }
-        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnknownFailure(e.to_string())).into_response(),
     }
 }
 
@@ -573,11 +570,11 @@ pub(super) async fn fund_channel(
     };
 
     match hopr.fund_channel(&channel_id, fund_req.amount).await {
-        Ok(hash) => (StatusCode::OK, Json(FundChannelResponse { hash })).into_response(),
-        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
+        Ok(output) => (StatusCode::OK, Json(FundChannelResponse { hash: *output.tx_hash() })).into_response(),
+        Err(hopr_lib::EitherErr::Right(HoprLibError::StatusError(HoprStatusError::NotThereYet(..)))) => {
             (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
         }
-        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnknownFailure(e.to_string())).into_response(),
     }
 }
 
@@ -629,7 +626,7 @@ mod tests {
     #[test]
     fn filter_open_channel_should_return_open_channel() {
         let ch = test_channel(ChannelStatus::Open);
-        let result = filter_open_channel(Ok(Some(ch.clone())));
+        let result = filter_open_channel::<HoprLibError>(Ok(Some(ch.clone())));
         assert!(result.is_ok());
         assert_eq!(result.unwrap().get_id(), ch.get_id());
     }
@@ -637,20 +634,20 @@ mod tests {
     #[test]
     fn filter_open_channel_should_return_pending_to_close() {
         let ch = test_channel(ChannelStatus::PendingToClose(std::time::SystemTime::now()));
-        assert!(filter_open_channel(Ok(Some(ch))).is_ok());
+        assert!(filter_open_channel::<HoprLibError>(Ok(Some(ch))).is_ok());
     }
 
     #[test]
     fn filter_open_channel_should_reject_closed_channel() {
         let ch = test_channel(ChannelStatus::Closed);
-        let result = filter_open_channel(Ok(Some(ch)));
+        let result = filter_open_channel::<HoprLibError>(Ok(Some(ch)));
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), ApiErrorStatus::ChannelNotFound);
     }
 
     #[test]
     fn filter_open_channel_should_reject_none() {
-        let result = filter_open_channel(Ok(None));
+        let result = filter_open_channel::<HoprLibError>(Ok(None));
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), ApiErrorStatus::ChannelNotFound);
     }

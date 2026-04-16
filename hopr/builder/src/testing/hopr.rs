@@ -3,9 +3,9 @@ use std::{fmt::Formatter, sync::Arc, time::Duration};
 use anyhow::Context;
 use futures::future::join_all;
 use hopr_lib::{
-    Address, ChannelEntry, ChannelStatus, Hash, HoprBalance, HoprNodeNetworkOperations, HoprNodeOperations,
-    HoprTransportIO, PeerId,
-    api::node::state::HoprState,
+    Address, ChannelEntry, ChannelStatus, Hash, HoprBalance, HoprIncentiveOperations, HoprNodeOperations,
+    PeerId,
+    api::node::{HasChainApi, state::HoprState},
     config::{HoprLibConfig, SessionGlobalConfig},
     prelude,
 };
@@ -64,15 +64,13 @@ pub struct TestedHopr {
     runtime: Option<tokio::runtime::Runtime>,
     /// HOPR instance that is used for testing.
     pub instance: Arc<TestingHopr>,
-    /// Transport socket that can be used to send and receive data via the HOPR node.
-    pub socket: HoprTransportIO,
     pub connector: TestingConnector,
 }
 
 impl std::fmt::Debug for TestedHopr {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TestedHopr")
-            .field("instance", &self.instance.me_onchain())
+            .field("instance", &self.instance.identity().node_address)
             .finish()
     }
 }
@@ -81,14 +79,12 @@ impl TestedHopr {
     pub fn new(
         runtime: tokio::runtime::Runtime,
         instance: Arc<TestingHopr>,
-        socket: HoprTransportIO,
         connector: TestingConnector,
     ) -> Self {
         assert_eq!(HoprState::Running, instance.status(), "hopr instance must be running");
         Self {
             runtime: Some(runtime),
             instance,
-            socket,
             connector,
         }
     }
@@ -111,11 +107,11 @@ impl TestedHopr {
     }
 
     pub fn address(&self) -> Address {
-        self.instance.me_onchain()
+        self.instance.identity().node_address
     }
 
     pub fn peer_id(&self) -> PeerId {
-        self.instance.me_peer_id()
+        (*self.instance.graph().me()).into()
     }
 
     pub fn connector(&self) -> &TestingConnector {
@@ -166,7 +162,7 @@ impl ChannelGuard {
             let dst = &window[1];
 
             let channel = src
-                .open_channel(&dst.me_onchain(), funding)
+                .open_channel(&dst.identity().node_address, funding)
                 .await
                 .context("opening channel must succeed")?;
 
@@ -182,7 +178,7 @@ impl ChannelGuard {
         funding: HoprBalance,
     ) -> anyhow::Result<Self> {
         let channel = src
-            .open_channel(&dst.me_onchain(), funding)
+            .open_channel(&dst.identity().node_address, funding)
             .await
             .context("failed to open channel")?;
 

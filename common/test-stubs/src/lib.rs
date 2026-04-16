@@ -256,6 +256,10 @@ impl ChainValues for StubChainApi {
             redeemed_value: HoprBalance::zero(),
         })
     }
+
+    async fn typical_resolution_time(&self) -> Result<std::time::Duration, Self::Error> {
+        Ok(std::time::Duration::from_secs(15))
+    }
 }
 
 // ---------------------------------------------------------------------------

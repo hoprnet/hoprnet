@@ -3,7 +3,11 @@ use std::{num::NonZeroUsize, process::ExitCode, str::FromStr, sync::Arc};
 use async_signal::{Signal, Signals};
 use futures::{FutureExt, StreamExt, future::abortable};
 use hopr_chain_connector::{HoprBlockchainSafeConnector, blokli_client::BlokliClient};
-use hopr_lib::{AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, config::HoprLibConfig};
+use hopr_lib::{
+    AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex,
+    api::node::HasTicketManagement,
+    config::HoprLibConfig,
+};
 use hopr_network_graph::SharedChannelGraph;
 use hopr_transport_p2p::HoprNetwork;
 use hoprd::{cli::CliArgs, config::HoprdConfig, errors::HoprdError};
@@ -33,7 +37,7 @@ mod telemetry_common;
 const DEFAULT_BLOKLI_URL: &str = "https://blokli.dufour.hoprnet.link";
 
 type HoprBlokliConnector = HoprBlockchainSafeConnector<BlokliClient>;
-type HoprNode = hopr_lib::Hopr<Arc<HoprBlokliConnector>, SharedChannelGraph, HoprNetwork>;
+type HoprNode = hopr_lib::Hopr<Arc<HoprBlokliConnector>, SharedChannelGraph, HoprNetwork, hopr_lib::builder::SharedTicketManager>;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, strum::Display)]
 enum HoprdProcess {
@@ -287,7 +291,7 @@ async fn main_inner(cfg: HoprdConfig, hopr_keys: HoprKeys) -> anyhow::Result<()>
         ..Default::default()
     };
 
-    let (node, hopr_process) = hopr_builder::build_with_chain(
+    let node = hopr_builder::build_with_chain(
         &hopr_keys.chain_key,
         &hopr_keys.packet_key,
         hopr_lib_cfg,
@@ -302,12 +306,10 @@ async fn main_inner(cfg: HoprdConfig, hopr_keys: HoprKeys) -> anyhow::Result<()>
         processes.extend_from(list);
     }
 
-    let _hopr_socket = hopr_process.await?;
-
     let multi_strategy = Arc::new(hopr_strategy::strategy::MultiStrategy::new(
         cfg.strategy.clone(),
         chain_connector.clone(),
-        node.ticket_management()?,
+        node.ticket_management().clone(),
     ));
     tracing::debug!(strategies = ?multi_strategy, "initialized strategies");
 

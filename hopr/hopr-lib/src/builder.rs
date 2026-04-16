@@ -97,9 +97,8 @@ impl<Chain, Srv> HoprBuilder<Chain, Srv> {
     /// Set the node's on-chain and off-chain identity.
     ///
     /// This parameter is required.
-    pub fn identity<I: for<'a> Into<(&'a ChainKeypair, &'a OffchainKeypair)>>(mut self, identity: I) -> Self {
-        let (ckp, okp) = identity.into();
-        self.identity = Some((ckp.clone(), okp.clone()));
+    pub fn identity(mut self, chain_key: &ChainKeypair, offchain_key: &OffchainKeypair) -> Self {
+        self.identity = Some((chain_key.clone(), offchain_key.clone()));
         self
     }
 

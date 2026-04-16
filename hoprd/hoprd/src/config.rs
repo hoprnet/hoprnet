@@ -214,7 +214,6 @@ impl From<UserHoprLibConfig> for HoprLibConfig {
             host: value.host,
             publish: value.announce,
             safe_module: value.safe_module,
-            ticket_storage_file: value.ticket_storage_file,
             protocol: HoprProtocolConfig {
                 transport: TransportConfig {
                     announce_local_addresses: value.network.announce_local_addresses,

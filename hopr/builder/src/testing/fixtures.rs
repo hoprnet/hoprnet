@@ -500,7 +500,7 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
 
                     let config = create_hopr_instance_config(3001 + i as u16, safes[i], win_prob);
 
-                    let (instance, hopr_process) = crate::build_with_chain(
+                    let instance = crate::build_with_chain(
                         &onchain_keys[i],
                         &offchain_keys[i],
                         config,
@@ -513,11 +513,10 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
                     )
                     .await?;
 
-                    let socket = hopr_process.await?;
-                    anyhow::Ok((instance, socket, connector))
+                    anyhow::Ok((instance, connector))
                 });
 
-                result.map(|(instance, socket, connector)| TestedHopr::new(runtime, instance, socket, connector))
+                result.map(|(instance, connector)| TestedHopr::new(runtime, instance, connector))
             })
             .join()
             .map_err(|_| anyhow::anyhow!("hopr node starting thread panicked"))
