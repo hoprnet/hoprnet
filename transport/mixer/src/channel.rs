@@ -3,16 +3,17 @@ use std::{
     collections::BinaryHeap,
     future::poll_fn,
     sync::{
-        Arc, Mutex,
+        Arc,
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     task::Poll,
     time::Duration,
 };
 
-use futures::{FutureExt, SinkExt, Stream, StreamExt};
+use futures::{FutureExt, Stream, StreamExt};
 use futures_timer::Delay;
-use tracing::{error, trace};
+use parking_lot::Mutex;
+use tracing::trace;
 
 use crate::{config::MixerConfig, data::DelayedData};
 
@@ -39,13 +40,15 @@ lazy_static::lazy_static! {
 /// 2. Data is stored in the heap with its release timestamp
 /// 3. The heap maintains ordering so items with earliest release time are at the top
 ///
-/// The channel uses a single timer thread that is instantiated on the first
-/// timer reset and shared across all operations. This channel is **unbounded** by nature
-/// using the `capacity` in the configuration to solely pre-allocate the buffer.
+/// This channel is **unbounded** by nature using the `capacity` in the configuration
+/// to solely pre-allocate the buffer.
+///
+/// The timer used by the receiver to wait for the next release deadline is **not** stored
+/// behind this mutex — it lives on the [`Receiver`] itself. Keeping it out of the shared
+/// state is what lets the receiver poll the timer without blocking senders.
 struct Channel<T> {
     /// Buffer holding the data with a timestamp ordering to ensure the min heap behavior.
     buffer: BinaryHeap<Reverse<DelayedData<T>>>,
-    timer: futures_timer::Delay,
     waker: Option<std::task::Waker>,
     cfg: MixerConfig,
 }
@@ -73,10 +76,6 @@ pub enum SenderError {
     /// The channel is closed due to receiver being dropped.
     #[error("Channel is closed")]
     Closed,
-
-    /// The mutex lock over the channel failed.
-    #[error("Channel lock failed")]
-    Lock,
 }
 
 /// Sender object interacting with the mixing channel.
@@ -98,12 +97,7 @@ impl<T> Drop for Sender<T> {
         if self.channel.sender_count.fetch_sub(1, Ordering::Relaxed) == 1
             && !self.channel.receiver_active.load(Ordering::Relaxed)
         {
-            let mut channel = self.channel.channel.lock().unwrap_or_else(|e| {
-                self.channel.channel.clear_poison();
-                e.into_inner()
-            });
-
-            channel.waker = None;
+            self.channel.channel.lock().waker = None;
         }
     }
 }
@@ -111,8 +105,40 @@ impl<T> Drop for Sender<T> {
 impl<T> Sender<T> {
     /// Send one item to the mixing channel.
     pub fn send(&self, item: T) -> Result<(), SenderError> {
-        let mut sender = self.clone();
-        sender.start_send_unpin(item)
+        self.push_item(item)
+    }
+
+    /// Locked critical section shared between `Sink::start_send` and [`Sender::send`].
+    #[tracing::instrument(level = "trace", skip(self, item))]
+    fn push_item(&self, item: T) -> Result<(), SenderError> {
+        if !self.channel.receiver_active.load(Ordering::Relaxed) {
+            return Err(SenderError::Closed);
+        }
+
+        let mut channel = self.channel.channel.lock();
+
+        let random_delay = channel.cfg.random_delay();
+
+        trace!(delay_in_ms = random_delay.as_millis(), "generated mixer delay",);
+
+        let delayed_data: DelayedData<T> = (std::time::Instant::now() + random_delay, item).into();
+        channel.buffer.push(Reverse(delayed_data));
+
+        if let Some(waker) = channel.waker.as_ref() {
+            waker.wake_by_ref();
+        }
+
+        #[cfg(all(feature = "telemetry", not(test)))]
+        {
+            METRIC_QUEUE_SIZE.increment(1.0f64);
+
+            let weight = 1.0f64 / channel.cfg.metric_delay_window as f64;
+            METRIC_MIXER_AVERAGE_DELAY.set(
+                (weight * random_delay.as_millis() as f64) + ((1.0f64 - weight) * METRIC_MIXER_AVERAGE_DELAY.get()),
+            );
+        }
+
+        Ok(())
     }
 }
 
@@ -128,38 +154,8 @@ impl<T> futures::sink::Sink<T> for Sender<T> {
         }
     }
 
-    #[tracing::instrument(level = "trace", skip(self, item))]
     fn start_send(self: std::pin::Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        let is_active = self.channel.receiver_active.load(Ordering::Relaxed);
-
-        if is_active {
-            let mut channel = self.channel.channel.lock().map_err(|_| SenderError::Lock)?;
-
-            let random_delay = channel.cfg.random_delay();
-
-            trace!(delay_in_ms = random_delay.as_millis(), "generated mixer delay",);
-
-            let delayed_data: DelayedData<T> = (std::time::Instant::now() + random_delay, item).into();
-            channel.buffer.push(Reverse(delayed_data));
-
-            if let Some(waker) = channel.waker.as_ref() {
-                waker.wake_by_ref();
-            }
-
-            #[cfg(all(feature = "telemetry", not(test)))]
-            {
-                METRIC_QUEUE_SIZE.increment(1.0f64);
-
-                let weight = 1.0f64 / channel.cfg.metric_delay_window as f64;
-                METRIC_MIXER_AVERAGE_DELAY.set(
-                    (weight * random_delay.as_millis() as f64) + ((1.0f64 - weight) * METRIC_MIXER_AVERAGE_DELAY.get()),
-                );
-            }
-
-            Ok(())
-        } else {
-            Err(SenderError::Closed)
-        }
+        self.push_item(item)
     }
 
     fn poll_flush(self: std::pin::Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -178,18 +174,19 @@ pub enum ReceiverError {
     /// The channel is closed due to receiver being dropped.
     #[error("Channel is closed")]
     Closed,
-
-    /// The mutex lock over the channel failed.
-    #[error("Channel lock failed")]
-    Lock,
 }
 
 /// Receiver object interacting with the mixer channel.
 ///
 /// The receiver receives already mixed elements without any knowledge of
 /// the original order.
+///
+/// The release-deadline timer lives on the receiver itself (not behind the shared
+/// mutex). Senders therefore never wait on this timer's poll — a sender can push into
+/// the buffer while the receiver is parked on the timer.
 pub struct Receiver<T> {
     channel: TrackedChannel<T>,
+    timer: Delay,
 }
 
 impl<T> Stream for Receiver<T> {
@@ -198,17 +195,23 @@ impl<T> Stream for Receiver<T> {
     #[tracing::instrument(level = "trace", skip(self, cx))]
     fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Option<Self::Item>> {
         let now = std::time::Instant::now();
-        if self.channel.sender_count.load(Ordering::Relaxed) > 0 {
-            let Ok(mut channel) = self.channel.channel.lock() else {
-                error!("mutex is poisoned, terminating stream");
-                return Poll::Ready(None);
-            };
+        let no_senders = self.channel.sender_count.load(Ordering::Relaxed) == 0;
+
+        // Phase 1: under lock, try to pop a due item; otherwise register the waker and
+        // capture the duration to sleep. Drop the lock before touching the timer.
+        //
+        // When all senders have dropped (`no_senders`), we must still drain any items
+        // remaining in the buffer before terminating the stream — returning `None`
+        // with pending items in flight would silently discard packets the senders
+        // enqueued before closing.
+        let sleep_for = {
+            let mut channel = self.channel.channel.lock();
 
             if channel.buffer.peek().map(|x| x.0.release_at < now).unwrap_or(false) {
                 let data = channel
                     .buffer
                     .pop()
-                    .expect("The value should be present within the same locked access")
+                    .expect("value must be present during the same locked access")
                     .0
                     .item;
 
@@ -220,41 +223,55 @@ impl<T> Stream for Receiver<T> {
                 return Poll::Ready(Some(data));
             }
 
-            if let Some(waker) = channel.waker.as_mut() {
-                waker.clone_from(cx.waker());
-            } else {
-                let waker = cx.waker().clone();
-                channel.waker = Some(waker);
+            // Buffer is either empty or every item is still in the future.
+            if channel.buffer.is_empty() && no_senders {
+                // Nothing left to deliver and nobody is going to enqueue more.
+                drop(channel);
+                self.channel.receiver_active.store(false, Ordering::Relaxed);
+                return Poll::Ready(None);
             }
 
-            if let Some(next) = channel.buffer.peek() {
-                let remaining = next.0.release_at.duration_since(now);
+            match channel.waker.as_mut() {
+                Some(existing) => existing.clone_from(cx.waker()),
+                None => channel.waker = Some(cx.waker().clone()),
+            }
 
-                trace!("reseting the timer");
-                channel.timer.reset(remaining);
+            match channel.buffer.peek() {
+                Some(next) => next.0.release_at.duration_since(now),
+                None => {
+                    // Senders still alive (else we would have returned `None` above) —
+                    // wait for one of them to push.
+                    trace!(from = "direct", "pending (empty buffer)");
+                    return Poll::Pending;
+                }
+            }
+        };
 
-                futures::ready!(channel.timer.poll_unpin(cx));
+        // Phase 2: poll the timer WITHOUT holding the mutex so senders can keep pushing.
+        let this = self.get_mut();
+        trace!("resetting the timer");
+        this.timer.reset(sleep_for);
+        futures::ready!(this.timer.poll_unpin(cx));
 
+        // Phase 3: timer fired. Re-take the lock. Because there is only one receiver,
+        // the item at the top is still present; senders can only have added more.
+        // A newly-pushed item with an earlier deadline is also safe to pop — it merely
+        // yields in a different order than originally expected, which is consistent
+        // with the mixer's design of not preserving input order.
+        let mut channel = this.channel.channel.lock();
+        match channel.buffer.pop() {
+            Some(entry) => {
                 trace!(from = "timer", "yield item");
 
                 #[cfg(all(feature = "telemetry", not(test)))]
                 METRIC_QUEUE_SIZE.decrement(1.0f64);
 
-                return Poll::Ready(Some(
-                    channel
-                        .buffer
-                        .pop()
-                        .expect("The value should be present within the locked access")
-                        .0
-                        .item,
-                ));
+                Poll::Ready(Some(entry.0.item))
             }
-
-            trace!(from = "direct", "pending");
-            Poll::Pending
-        } else {
-            self.channel.receiver_active.store(false, Ordering::Relaxed);
-            Poll::Ready(None)
+            None => {
+                trace!(from = "timer", "buffer drained before we re-acquired the lock");
+                Poll::Pending
+            }
         }
     }
 }
@@ -281,7 +298,6 @@ pub fn channel<T>(cfg: crate::config::MixerConfig) -> (Sender<T>, Receiver<T>) {
     let channel = TrackedChannel {
         channel: Arc::new(Mutex::new(Channel::<T> {
             buffer,
-            timer: Delay::new(Duration::from_secs(0)),
             waker: None,
             cfg,
         })),
@@ -292,13 +308,16 @@ pub fn channel<T>(cfg: crate::config::MixerConfig) -> (Sender<T>, Receiver<T>) {
         Sender {
             channel: channel.clone(),
         },
-        Receiver { channel },
+        Receiver {
+            channel,
+            timer: Delay::new(Duration::from_secs(0)),
+        },
     )
 }
 
 #[cfg(test)]
 mod tests {
-    use futures::StreamExt;
+    use futures::{SinkExt, StreamExt};
     use tokio::time::timeout;
 
     use super::*;
@@ -500,6 +519,91 @@ mod tests {
         assert!(
             matches!(result, Err(SenderError::Closed)),
             "send with inactive receiver should return Closed, got: {result:?}"
+        );
+        Ok(())
+    }
+
+    /// Regression test for #7947 item 2: the receiver must not hold the channel
+    /// mutex across its timer poll, otherwise a sender trying to push a new item
+    /// would block until the original timer deadline expired.
+    #[tokio::test]
+    async fn sender_can_push_while_receiver_is_parked_on_timer() -> anyhow::Result<()> {
+        // Mixer with a long minimum delay — the receiver's first poll will park on the
+        // timer for at least this duration.
+        let cfg = MixerConfig {
+            min_delay: Duration::from_millis(500),
+            delay_range: Duration::from_millis(1),
+            ..MixerConfig::default()
+        };
+        let (tx, mut rx) = channel::<u32>(cfg);
+
+        // Prime: push one item so the receiver's timer branch activates.
+        tx.send(0)?;
+
+        // Drive the receiver far enough to install the timer for the first item, then
+        // try to push again from another task. If the mutex were held across the timer
+        // poll, this second send would block for ~500 ms.
+        let rx_task = tokio::task::spawn(async move {
+            // Collect both items back.
+            let first = rx.next().await;
+            let second = rx.next().await;
+            (first, second)
+        });
+
+        // Give the receiver a moment to enter the timer branch (it will have locked,
+        // seen the not-yet-due item, stored the waker, unlocked, and started polling
+        // the Delay).
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        // The crucial assertion: this `send()` must return promptly — not block for
+        // ~450 ms. We measure the latency of the send itself.
+        let send_started = std::time::Instant::now();
+        tx.send(1)?;
+        let send_latency = send_started.elapsed();
+        assert!(
+            send_latency < Duration::from_millis(100),
+            "sender was blocked by receiver's timer poll: send took {send_latency:?}"
+        );
+
+        // Sanity: both items eventually arrive.
+        let (first, second) = timeout(Duration::from_millis(1500), rx_task)
+            .await?
+            .expect("receiver task should finish");
+        assert!(first.is_some(), "first item must be received");
+        assert!(second.is_some(), "second item must be received");
+        Ok(())
+    }
+
+    /// Regression test: if the last sender drops after enqueueing items, the receiver
+    /// must drain them before closing. Pre-fix the receiver returned `None` as soon as
+    /// `sender_count == 0`, silently discarding anything still in the buffer.
+    #[tokio::test]
+    async fn receiver_drains_buffered_items_after_last_sender_drops() -> anyhow::Result<()> {
+        let cfg = MixerConfig {
+            min_delay: Duration::from_millis(0),
+            delay_range: Duration::from_millis(1),
+            ..MixerConfig::default()
+        };
+        let (tx, mut rx) = channel::<u32>(cfg);
+
+        const ITERATIONS: usize = 16;
+        for i in 0..ITERATIONS as u32 {
+            tx.send(i)?;
+        }
+
+        // Drop the only sender. sender_count goes to 0, but buffer still has ITERATIONS items.
+        drop(tx);
+
+        // Must still yield every item before terminating.
+        let mut received = 0usize;
+        while let Some(_item) = timeout(Duration::from_millis(500), rx.next()).await? {
+            received += 1;
+        }
+        assert_eq!(
+            received,
+            ITERATIONS,
+            "receiver dropped {} pending items on sender shutdown",
+            ITERATIONS - received
         );
         Ok(())
     }

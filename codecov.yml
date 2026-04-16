@@ -29,6 +29,12 @@ ignore:
   - "**/build.rs"
   - "**/codegen/**"
   - "hopr/builder/src/testing/**"
+  # Non-Rust directories (Python SDK, shell scripts, tools, deployment manifests, docs)
+  - "sdk/**"
+  - "scripts/**"
+  - "tools/**"
+  - "deploy/**"
+  - "docs/**"
 
 flags:
   unit:

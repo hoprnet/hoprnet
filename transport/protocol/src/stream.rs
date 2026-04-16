@@ -20,12 +20,26 @@ use tokio_util::{
 const GLOBAL_STREAM_OPEN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
 const MAX_CONCURRENT_PACKETS: usize = 30;
 
+/// Default pending-write-buffer byte threshold on the framed writer before a flush is
+/// forced. **This value is in bytes, not in messages** — that is how
+/// `tokio_util::codec::FramedWrite::set_backpressure_boundary` is defined.
+///
+/// The previous value of `1` byte forced a flush syscall on every message (the buffer
+/// exceeds one byte the moment a frame is encoded), making a relay forwarding N packets
+/// issue N individual writes rather than coalescing adjacent small frames. `4096` bytes
+/// is a conservative default that lets roughly ~4 HOPR packets (~1 KiB each) batch into
+/// a single write while still flushing quickly under single-packet traffic.
+///
+/// Override with `HOPR_TRANSPORT_FRAME_WRITER_BACKPRESSURE_BYTES`.
+const DEFAULT_FRAME_WRITER_BACKPRESSURE_BYTES: usize = 4096;
+
 fn build_peer_stream_io<S, C>(
     peer: PeerId,
     stream: S,
     cache: moka::future::Cache<PeerId, Sender<<C as Decoder>::Item>>,
     codec: C,
     ingress_from_peers: Sender<(PeerId, <C as Decoder>::Item)>,
+    frame_writer_backpressure_bytes: usize,
 ) -> Sender<<C as Decoder>::Item>
 where
     S: AsyncRead + AsyncWrite + Send + 'static,
@@ -40,8 +54,12 @@ where
 
     let mut frame_writer = FramedWrite::new(stream_tx.compat_write(), codec.clone());
 
-    // Lower the backpressure boundary to make sure each message is flushed after writing to buffer
-    frame_writer.set_backpressure_boundary(1);
+    // `set_backpressure_boundary` is a *byte* threshold on `FramedWrite`'s internal
+    // pending-write buffer: once the encoded frames exceed this many bytes, the next
+    // `poll_ready` call will issue a flush. A small value (e.g. `1`) flushes on every
+    // message for the lowest latency at the cost of one syscall per frame; a larger
+    // value lets adjacent small frames coalesce into a single write on busy relays.
+    frame_writer.set_backpressure_boundary(frame_writer_backpressure_bytes);
 
     // Send all outgoing data to the peer
     hopr_async_runtime::prelude::spawn(
@@ -118,20 +136,50 @@ where
         .accept()
         .map_err(|e| crate::errors::ProtocolError::Logic(format!("failed to listen on protocol: {e}")))?;
 
+    let max_concurrent_packets = std::env::var("HOPR_TRANSPORT_MAX_CONCURRENT_PACKETS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .filter(|&n: &usize| n > 0)
+        .unwrap_or(MAX_CONCURRENT_PACKETS);
+
+    let global_stream_open_timeout = std::env::var("HOPR_TRANSPORT_STREAM_OPEN_TIMEOUT_MS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .map(std::time::Duration::from_millis)
+        .unwrap_or(GLOBAL_STREAM_OPEN_TIMEOUT);
+
+    let frame_writer_backpressure_bytes = std::env::var("HOPR_TRANSPORT_FRAME_WRITER_BACKPRESSURE_BYTES")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .filter(|&n: &usize| n > 0)
+        .unwrap_or(DEFAULT_FRAME_WRITER_BACKPRESSURE_BYTES);
+
+    // Pack the handles only needed to open a NEW peer stream into a single Arc. This
+    // lets us pay one Arc bump per packet at the closure level instead of three (control,
+    // codec, tx_in), and defers the per-field `.clone()` to the cache-miss path that
+    // actually needs them.
+    let open_ctx = Arc::new((control, codec, tx_in));
+
     let cache_ingress = cache_out.clone();
-    let codec_ingress = codec.clone();
-    let tx_in_ingress = tx_in.clone();
+    let open_ctx_ingress = open_ctx.clone();
 
     // terminated when the incoming is dropped
     let _ingress_process = hopr_async_runtime::prelude::spawn(
         incoming
             .for_each(move |(peer, stream)| {
-                let codec = codec_ingress.clone();
                 let cache = cache_ingress.clone();
-                let tx_in = tx_in_ingress.clone();
+                let open_ctx = open_ctx_ingress.clone();
 
                 tracing::debug!(%peer, "received incoming peer-to-peer stream");
-                let send = build_peer_stream_io(peer, stream, cache.clone(), codec.clone(), tx_in.clone());
+                let (_control, codec, tx_in) = (&open_ctx.0, &open_ctx.1, &open_ctx.2);
+                let send = build_peer_stream_io(
+                    peer,
+                    stream,
+                    cache.clone(),
+                    codec.clone(),
+                    tx_in.clone(),
+                    frame_writer_backpressure_bytes,
+                );
 
                 async move {
                     cache.insert(peer, send).await;
@@ -145,34 +193,26 @@ where
             }),
     );
 
-    let max_concurrent_packets = std::env::var("HOPR_TRANSPORT_MAX_CONCURRENT_PACKETS")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(MAX_CONCURRENT_PACKETS);
-
-    let global_stream_open_timeout = std::env::var("HOPR_TRANSPORT_STREAM_OPEN_TIMEOUT_MS")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .map(std::time::Duration::from_millis)
-        .unwrap_or(GLOBAL_STREAM_OPEN_TIMEOUT);
-
     // terminated when the rx_in is dropped
     let _egress_process = hopr_async_runtime::prelude::spawn(
         rx_out
             .inspect(|(peer, _)| tracing::trace!(%peer, "proceeding to deliver message to peer"))
             .for_each_concurrent(max_concurrent_packets, move |(peer, msg)| {
                 let cache = cache_out.clone();
-                let control = control.clone();
-                let codec = codec.clone();
-                let tx_in = tx_in.clone();
+                let open_ctx = open_ctx.clone();
 
                 async move {
-                    let cache_clone = cache.clone();
                     tracing::trace!(%peer, "trying to deliver message to peer");
 
+                    let cache_clone = cache.clone();
                     let cached: Result<Sender<<C as Decoder>::Item>, Arc<anyhow::Error>> = cache
                         .try_get_with(peer, async move {
                             tracing::trace!(%peer, "peer is not in cache, opening new stream");
+
+                            // Only the cache-miss path needs the stream-open handles.
+                            // Clone them out of the shared `open_ctx` once here rather
+                            // than on every outgoing message.
+                            let (control, codec, tx_in) = (&open_ctx.0, &open_ctx.1, &open_ctx.2);
 
                             // There must be a timeout on the `open` operation; otherwise
                             //  a single impossible ` open ` operation will block the peer ID entry in the
@@ -180,6 +220,7 @@ where
                             // processing pipeline.
                             use futures_time::future::FutureExt as TimeExt;
                             let stream = control
+                                .clone()
                                 .open(peer)
                                 .timeout(futures_time::time::Duration::from(global_stream_open_timeout))
                                 .await
@@ -191,9 +232,10 @@ where
                             Ok(build_peer_stream_io(
                                 peer,
                                 stream,
-                                cache_clone.clone(),
+                                cache_clone,
                                 codec.clone(),
                                 tx_in.clone(),
+                                frame_writer_backpressure_bytes,
                             ))
                         })
                         .await;

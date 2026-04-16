@@ -272,6 +272,7 @@ async fn main_inner(cfg: HoprdConfig, hopr_keys: HoprKeys) -> anyhow::Result<()>
                 timeout: std::time::Duration::from_secs(30),
                 stream_reconnect_timeout: std::time::Duration::from_secs(30),
                 subscription_stream_restart_delay: Some(std::time::Duration::from_secs(1)),
+                ..Default::default()
             },
         ),
         cfg.hopr.safe_module.module_address,

@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Json, Path, State},
+    extract::{Json, State},
     http::status::StatusCode,
     response::IntoResponse,
 };
 use hopr_lib::{
-    HoprBalance, ToHex,
+    Address, ChannelStatus, HoprBalance,
     api::tickets::{ChannelStats, TicketManagement},
     prelude::Hash,
 };
@@ -45,12 +45,6 @@ pub(crate) struct ChannelTicket {
         example = "0xe445fcf4e90d25fe3c9199ccfaff85e23ecce8773304d85e7120f1f38787f2329822470487a37f1b5408c8c0b73e874ee9f7594a632713b6096e616857999891"
     )]
     signature: String,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct ChannelIdParams {
-    channel_id: String,
 }
 
 #[serde_as]
@@ -117,17 +111,42 @@ pub(super) async fn show_ticket_statistics(State(state): State<Arc<InternalState
     }
 }
 
-/// Starts redeeming of all tickets in all channels.
+#[serde_as]
+#[derive(Debug, Default, Clone, Deserialize, utoipa::ToSchema)]
+#[schema(example = json!({
+    "address": "0x188c4462b75e46f0c7262d7f48d182447b93a93c"
+}))]
+#[serde(rename_all = "camelCase")]
+/// Request body for ticket redemption with optional fields.
+pub(crate) struct RedeemTicketsRequest {
+    /// On-chain address of the counterparty whose incoming channel tickets to redeem.
+    /// If omitted, tickets in all channels are redeemed.
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[schema(value_type = Option<String>, example = "0x188c4462b75e46f0c7262d7f48d182447b93a93c")]
+    address: Option<Address>,
+}
+
+/// Starts redeeming tickets.
 ///
-/// **WARNING:** If there are many unredeemed tickets in all channels, this operation
-/// can incur significant transaction costs.
+/// When an `address` is specified, only tickets in the incoming channel from that
+/// counterparty are redeemed. When omitted, tickets in all channels are redeemed.
+///
+/// **WARNING:** Redeeming many tickets can incur significant transaction costs.
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/tickets/redeem"),
-        description = "Starts redeeming of all tickets in all channels.",
+        description = "Starts redeeming tickets. When a counterparty address is specified, only tickets from that counterparty are redeemed.",
+        request_body(
+            content = RedeemTicketsRequest,
+            description = "Optional counterparty address to scope ticket redemption.",
+            content_type = "application/json",
+        ),
         responses(
             (status = 202, description = "Ticket redemption started successfully."),
+            (status = 400, description = "Invalid request body or malformed JSON.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 404, description = "Channel with counterparty not found.", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError),
         ),
         security(
             ("api_token" = []),
@@ -135,53 +154,22 @@ pub(super) async fn show_ticket_statistics(State(state): State<Arc<InternalState
         ),
         tag = "Tickets"
     )]
-pub(super) async fn redeem_all_tickets(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
-    let hopr = state.hopr.clone();
-
-    hopr_async_runtime::prelude::spawn(async move {
-        match hopr.redeem_all_tickets(0).await {
-            Ok(_) => {
-                tracing::info!("all tickets redeemed on API request");
-            }
-            Err(error) => {
-                tracing::error!(%error, "failed to redeem all tickets on API request");
-            }
-        }
-    });
-
-    (StatusCode::ACCEPTED, "").into_response()
-}
-
-/// Starts redeeming all tickets in the given channel.
-///
-/// **WARNING:** If there are many unredeemed tickets in the given channel, this operation
-/// can incur significant transaction costs.
-#[utoipa::path(
-        post,
-        path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets/redeem"),
-        description = "Starts redeeming all tickets in the given channel.",
-        params(
-            ("channelId" = String, Path, description = "ID of the channel.", example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")
-        ),
-        responses(
-            (status = 202, description = "Ticket redemption started successfully."),
-            (status = 400, description = "Invalid channel id.", body = ApiError),
-            (status = 401, description = "Invalid authorization token.", body = ApiError)
-        ),
-        security(
-            ("api_token" = []),
-            ("bearer_token" = [])
-        ),
-        tag = "Channels"
-    )]
-pub(super) async fn redeem_tickets_in_channel(
-    Path(ChannelIdParams { channel_id }): Path<ChannelIdParams>,
+pub(super) async fn redeem_tickets(
     State(state): State<Arc<InternalState>>,
+    Json(req): Json<RedeemTicketsRequest>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match Hash::from_hex(channel_id.as_str()) {
-        Ok(channel_id) => {
+    match req.address {
+        Some(address) => {
+            // Resolve the incoming channel from the counterparty (counterparty → me).
+            let me = hopr.me_onchain();
+            let channel_id = match hopr.channel(&address, &me) {
+                Ok(Some(ch)) if ch.status != ChannelStatus::Closed => *ch.get_id(),
+                Ok(_) => return (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
+                Err(e) => return (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+            };
+
             hopr_async_runtime::prelude::spawn(async move {
                 match hopr.redeem_tickets_in_channel(&channel_id, 0).await {
                     Ok(_) => {
@@ -195,6 +183,104 @@ pub(super) async fn redeem_tickets_in_channel(
 
             (StatusCode::ACCEPTED, "").into_response()
         }
-        Err(_) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
+        None => {
+            hopr_async_runtime::prelude::spawn(async move {
+                match hopr.redeem_all_tickets(0).await {
+                    Ok(_) => {
+                        tracing::info!("all tickets redeemed on API request");
+                    }
+                    Err(error) => {
+                        tracing::error!(%error, "failed to redeem all tickets on API request");
+                    }
+                }
+            });
+
+            (StatusCode::ACCEPTED, "").into_response()
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ticket_statistics_response_should_serialize_correctly() {
+        let stats = NodeTicketStatisticsResponse {
+            winning_count: 5,
+            unredeemed_value: "20 wxHOPR".parse().unwrap(),
+            neglected_value: "0 wxHOPR".parse().unwrap(),
+            rejected_value: "0 wxHOPR".parse().unwrap(),
+        };
+
+        let json = serde_json::to_value(&stats).unwrap();
+        assert_eq!(json["winningCount"], 5);
+        assert_eq!(json["unredeemedValue"], "20 wxHOPR");
+        assert_eq!(json["neglectedValue"], "0 wxHOPR");
+        assert_eq!(json["rejectedValue"], "0 wxHOPR");
+    }
+
+    #[test]
+    fn redeem_tickets_request_should_deserialize_with_address() {
+        let json = serde_json::json!({
+            "address": "0x188c4462b75e46f0c7262d7f48d182447b93a93c"
+        });
+
+        let req: RedeemTicketsRequest = serde_json::from_value(json).unwrap();
+        assert!(req.address.is_some());
+    }
+
+    #[test]
+    fn redeem_tickets_request_should_deserialize_without_address() {
+        let json = serde_json::json!({});
+        let req: RedeemTicketsRequest = serde_json::from_value(json).unwrap();
+        assert!(req.address.is_none());
+    }
+
+    #[test]
+    fn channel_stats_should_convert_to_response() {
+        let stats = ChannelStats {
+            winning_tickets: 10,
+            unredeemed_value: "100 wxHOPR".parse().unwrap(),
+            neglected_value: "5 wxHOPR".parse().unwrap(),
+            rejected_value: "1 wxHOPR".parse().unwrap(),
+        };
+
+        let response = NodeTicketStatisticsResponse::from(stats);
+        assert_eq!(response.winning_count, 10);
+        assert_eq!(response.unredeemed_value, "100 wxHOPR".parse().unwrap());
+        assert_eq!(response.neglected_value, "5 wxHOPR".parse().unwrap());
+        assert_eq!(response.rejected_value, "1 wxHOPR".parse().unwrap());
+    }
+
+    #[test]
+    fn redeem_tickets_request_default_should_have_no_address() {
+        let req = RedeemTicketsRequest::default();
+        assert!(req.address.is_none());
+    }
+
+    #[test]
+    fn redeem_tickets_request_should_reject_invalid_address() {
+        let json = serde_json::json!({ "address": "not-an-address" });
+        assert!(serde_json::from_value::<RedeemTicketsRequest>(json).is_err());
+    }
+
+    #[test]
+    fn channel_ticket_should_serialize_correctly() {
+        let ticket = ChannelTicket {
+            channel_id: Hash::default(),
+            amount: "1.0 wxHOPR".parse().unwrap(),
+            index: 7,
+            win_prob: "1".to_string(),
+            channel_epoch: 2,
+            signature: "0xdeadbeef".to_string(),
+        };
+        let json = serde_json::to_value(&ticket).unwrap();
+        assert_eq!(json["amount"], "1 wxHOPR");
+        assert_eq!(json["index"], 7);
+        assert_eq!(json["winProb"], "1");
+        assert_eq!(json["channelEpoch"], 2);
+        assert_eq!(json["signature"], "0xdeadbeef");
+        assert!(json.get("channelId").is_some());
     }
 }

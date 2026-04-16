@@ -21,9 +21,13 @@ impl<const SIZE: usize> Decoder for FixedLengthCodec<SIZE> {
     fn decode(&mut self, src: &mut tokio_util::bytes::BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         let len = src.len();
         if len >= SIZE {
-            let packet = src.split_to(SIZE).freeze();
+            // `split_to` already hands us a contiguous, non-owning view onto the buffer.
+            // `to_vec` issues a single memcpy into a fresh Vec; the prior `Box::from_iter`
+            // walked byte-by-byte via the `Bytes` iterator, paying a branch + bounds
+            // check per byte on the inbound packet hot path.
+            let packet = src.split_to(SIZE);
 
-            Ok(Some(Box::from_iter(packet)))
+            Ok(Some(packet.to_vec().into_boxed_slice()))
         } else {
             tracing::trace!(
                 available_bytes = len,
