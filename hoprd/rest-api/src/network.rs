@@ -270,7 +270,11 @@ pub(super) async fn announced(State(state): State<Arc<InternalState>>) -> impl I
                 .collect();
             (StatusCode::OK, Json(response)).into_response()
         }
-        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnknownFailure(e.to_string())).into_response(),
+        Err(e) => (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ApiErrorStatus::UnknownFailure(e.to_string()),
+        )
+            .into_response(),
     }
 }
 

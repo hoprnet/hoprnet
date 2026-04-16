@@ -14,8 +14,7 @@ use libp2p::{
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
-    HoprNetwork, HoprNetworkBehavior, HoprNetworkBehaviorEvent, PeerDiscovery,
-    constants,
+    HoprNetwork, HoprNetworkBehavior, HoprNetworkBehaviorEvent, PeerDiscovery, constants,
     errors::Result,
     utils::{replace_transport_with_unspecified, resolve_dns_if_any},
 };

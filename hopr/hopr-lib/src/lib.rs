@@ -76,27 +76,23 @@ use std::{
 
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt, pin_mut};
 use futures_time::future::FutureExt as FuturesTimeFutureExt;
+#[cfg(feature = "session-client")]
+pub use hopr_api::node::HoprSessionClientOperations;
 use hopr_api::{
     chain::*,
     graph::HoprGraphApi,
     node::{
-        AtomicHoprState, ComponentStatus, EitherErrExt, EventWaitResult,
-        HasChainApi, HasGraphView, HasNetworkView, HasTicketManagement, HasTransportApi,
-        NodeOnchainIdentity,
+        AtomicHoprState, ComponentStatus, EitherErrExt, EventWaitResult, HasChainApi, HasGraphView, HasNetworkView,
+        HasTicketManagement, HasTransportApi, NodeOnchainIdentity,
     },
 };
 pub use hopr_api::{
     graph::EdgeLinkObservable,
     network::{NetworkBuilder, NetworkStreamControl},
-    node::{
-        EitherErr, HoprIncentiveOperations, HoprNodeOperations, HoprState,
-        TransportOperations,
-    },
+    node::{EitherErr, HoprIncentiveOperations, HoprNodeOperations, HoprState, TransportOperations},
     tickets::{ChannelStats, RedemptionResult, TicketManagement, TicketManagementExt},
     types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*},
 };
-#[cfg(feature = "session-client")]
-pub use hopr_api::node::HoprSessionClientOperations;
 use hopr_async_runtime::prelude::spawn;
 pub use hopr_async_runtime::{Abortable, AbortableList};
 pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
@@ -315,7 +311,6 @@ where
             Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(state, error)))
         }
     }
-
 }
 
 #[cfg(feature = "session-client")]
@@ -330,11 +325,11 @@ where
     Net: hopr_api::network::NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
     TMgr: Send + Sync + 'static,
 {
+    type Config = HoprSessionClientConfig;
+    type Error = HoprLibError;
     type Session = HoprSession;
     type SessionConfigurator = HoprSessionConfigurator;
     type Target = SessionTarget;
-    type Config = HoprSessionClientConfig;
-    type Error = HoprLibError;
 
     async fn connect_to(
         &self,
@@ -516,10 +511,7 @@ where
 
 impl<Chain, Graph, Net, TMgr> Hopr<Chain, Graph, Net, TMgr> {
     /// Gets the SURB balancer configuration of a session by its ID.
-    pub async fn get_session_surb_balancer_config(
-        &self,
-        id: &SessionId,
-    ) -> errors::Result<Option<SurbBalancerConfig>> {
+    pub async fn get_session_surb_balancer_config(&self, id: &SessionId) -> errors::Result<Option<SurbBalancerConfig>> {
         Ok(self.transport_api.get_session_surb_balancer_config(id).await?)
     }
 
@@ -529,7 +521,10 @@ impl<Chain, Graph, Net, TMgr> Hopr<Chain, Graph, Net, TMgr> {
         id: &SessionId,
         config: SurbBalancerConfig,
     ) -> errors::Result<()> {
-        Ok(self.transport_api.update_session_surb_balancer_config(id, config).await?)
+        Ok(self
+            .transport_api
+            .update_session_surb_balancer_config(id, config)
+            .await?)
     }
 }
 

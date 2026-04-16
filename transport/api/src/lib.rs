@@ -855,10 +855,7 @@ impl<Chain, Graph, Net> HoprTransport<Chain, Graph, Net> {
     /// Gets the SURB balancer configuration of a session by its ID.
     ///
     /// Returns `Ok(None)` if the session does not use a SURB balancer.
-    pub async fn get_session_surb_balancer_config(
-        &self,
-        id: &SessionId,
-    ) -> errors::Result<Option<SurbBalancerConfig>> {
+    pub async fn get_session_surb_balancer_config(&self, id: &SessionId) -> errors::Result<Option<SurbBalancerConfig>> {
         Ok(self.smgr.get_surb_balancer_config(id).await?)
     }
 
@@ -917,10 +914,7 @@ where
     Net: NetworkView + Send + Sync + 'static,
 {
     fn listening_as(&self) -> std::collections::HashSet<Multiaddr> {
-        self.network
-            .get()
-            .map(|n| n.listening_as())
-            .unwrap_or_default()
+        self.network.get().map(|n| n.listening_as()).unwrap_or_default()
     }
 
     fn multiaddress_of(&self, peer: &PeerId) -> Option<std::collections::HashSet<Multiaddr>> {
@@ -928,31 +922,19 @@ where
     }
 
     fn discovered_peers(&self) -> std::collections::HashSet<PeerId> {
-        self.network
-            .get()
-            .map(|n| n.discovered_peers())
-            .unwrap_or_default()
+        self.network.get().map(|n| n.discovered_peers()).unwrap_or_default()
     }
 
     fn connected_peers(&self) -> std::collections::HashSet<PeerId> {
-        self.network
-            .get()
-            .map(|n| n.connected_peers())
-            .unwrap_or_default()
+        self.network.get().map(|n| n.connected_peers()).unwrap_or_default()
     }
 
     fn is_connected(&self, peer: &PeerId) -> bool {
-        self.network
-            .get()
-            .map(|n| n.is_connected(peer))
-            .unwrap_or(false)
+        self.network.get().map(|n| n.is_connected(peer)).unwrap_or(false)
     }
 
     fn health(&self) -> Health {
-        self.network
-            .get()
-            .map(|n| n.health())
-            .unwrap_or(Health::Red)
+        self.network.get().map(|n| n.health()).unwrap_or(Health::Red)
     }
 }
 
@@ -986,13 +968,10 @@ where
     <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
     Net: NetworkView + NetworkStreamControl + Clone + Send + Sync + 'static,
 {
-    type Observable = <Graph as NetworkGraphView>::Observed;
     type Error = errors::HoprTransportError;
+    type Observable = <Graph as NetworkGraphView>::Observed;
 
-    async fn ping(
-        &self,
-        key: &OffchainPublicKey,
-    ) -> Result<(Duration, Self::Observable), Self::Error> {
+    async fn ping(&self, key: &OffchainPublicKey) -> Result<(Duration, Self::Observable), Self::Error> {
         self.ping(key).await
     }
 

@@ -279,10 +279,7 @@ impl SessionPool {
                         let pool = pool_clone_2.clone();
                         async move {
                             // Collect configurators to ping (release lock before awaiting)
-                            let configurators: Vec<_> = pool.lock()
-                                .iter()
-                                .map(|(_, cfg)| cfg.clone())
-                                .collect();
+                            let configurators: Vec<_> = pool.lock().iter().map(|(_, cfg)| cfg.clone()).collect();
 
                             let mut dead_ids = Vec::new();
                             for configurator in &configurators {
@@ -298,7 +295,7 @@ impl SessionPool {
                             }
                         }
                     })
-                ))
+                )),
             })
         } else {
             Ok(Self { pool: None, ah: None })
@@ -306,7 +303,9 @@ impl SessionPool {
     }
 
     pub fn pop(&mut self) -> Option<HoprSession> {
-        self.pool.as_ref().and_then(|pool| pool.lock().pop_front().map(|(session, _)| session))
+        self.pool
+            .as_ref()
+            .and_then(|pool| pool.lock().pop_front().map(|(session, _)| session))
     }
 }
 

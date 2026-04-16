@@ -8,8 +8,10 @@ use axum::{
 use futures::{StreamExt, TryFutureExt};
 use hopr_lib::{
     Address, AsUnixTimestamp, ChannelEntry, ChannelStatus, HoprBalance, HoprIncentiveOperations,
-    api::chain::{ChainKeyOperations, ChainReadChannelOperations, ChannelSelector},
-    api::node::HasChainApi,
+    api::{
+        chain::{ChainKeyOperations, ChainReadChannelOperations, ChannelSelector},
+        node::HasChainApi,
+    },
     errors::{HoprLibError, HoprStatusError},
     prelude::Hash,
 };
@@ -190,7 +192,11 @@ pub(super) async fn list_channels(
                 )
                     .into_response()
             }
-            Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(HoprLibError::chain(e))).into_response(),
+            Err(e) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ApiErrorStatus::from(HoprLibError::chain(e)),
+            )
+                .into_response(),
         }
     } else {
         let me = hopr.identity().node_address;
@@ -230,7 +236,11 @@ pub(super) async fn list_channels(
 
                 (StatusCode::OK, Json(channel_info)).into_response()
             }
-            Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnknownFailure(e.to_string())).into_response(),
+            Err(e) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ApiErrorStatus::UnknownFailure(e.to_string()),
+            )
+                .into_response(),
         }
     }
 }
@@ -315,7 +325,11 @@ pub(super) async fn open_channel(
         Err(hopr_lib::EitherErr::Right(HoprLibError::StatusError(HoprStatusError::NotThereYet(..)))) => {
             (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
         }
-        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnknownFailure(e.to_string())).into_response(),
+        Err(e) => (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ApiErrorStatus::UnknownFailure(e.to_string()),
+        )
+            .into_response(),
     }
 }
 
@@ -354,7 +368,9 @@ pub(crate) struct ChannelDirectionQuery {
 ///
 /// Returns `ChannelNotFound` when the channel is absent or closed,
 /// and `UnknownFailure` for lookup errors.
-fn filter_open_channel<E: std::error::Error>(result: Result<Option<ChannelEntry>, E>) -> Result<ChannelEntry, ApiErrorStatus> {
+fn filter_open_channel<E: std::error::Error>(
+    result: Result<Option<ChannelEntry>, E>,
+) -> Result<ChannelEntry, ApiErrorStatus> {
     match result {
         Ok(Some(ch)) if ch.status != ChannelStatus::Closed => Ok(ch),
         Ok(_) => Err(ApiErrorStatus::ChannelNotFound),
@@ -490,7 +506,11 @@ pub(super) async fn close_channel(
         Err(hopr_lib::EitherErr::Right(HoprLibError::StatusError(HoprStatusError::NotThereYet(..)))) => {
             (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
         }
-        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnknownFailure(e.to_string())).into_response(),
+        Err(e) => (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ApiErrorStatus::UnknownFailure(e.to_string()),
+        )
+            .into_response(),
     }
 }
 
@@ -570,11 +590,21 @@ pub(super) async fn fund_channel(
     };
 
     match hopr.fund_channel(&channel_id, fund_req.amount).await {
-        Ok(output) => (StatusCode::OK, Json(FundChannelResponse { hash: *output.tx_hash() })).into_response(),
+        Ok(output) => (
+            StatusCode::OK,
+            Json(FundChannelResponse {
+                hash: *output.tx_hash(),
+            }),
+        )
+            .into_response(),
         Err(hopr_lib::EitherErr::Right(HoprLibError::StatusError(HoprStatusError::NotThereYet(..)))) => {
             (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
         }
-        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnknownFailure(e.to_string())).into_response(),
+        Err(e) => (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ApiErrorStatus::UnknownFailure(e.to_string()),
+        )
+            .into_response(),
     }
 }
 

@@ -186,10 +186,12 @@ pub(super) async fn show_peer_info(
         offchain_key: Some(offchain_key),
         ..Default::default()
     }) {
-        Ok(stream) => stream
-            .flat_map(|account| futures::stream::iter(account.get_multiaddrs().to_vec()))
-            .collect()
-            .await,
+        Ok(stream) => {
+            stream
+                .flat_map(|account| futures::stream::iter(account.get_multiaddrs().to_vec()))
+                .collect()
+                .await
+        }
         Err(error) => {
             return (
                 StatusCode::UNPROCESSABLE_ENTITY,
@@ -324,7 +326,11 @@ pub(super) async fn ping_peer(
         Err(HoprTransportError::Probe(hopr_lib::ProbeError::NonExistingPeer)) => {
             Ok((StatusCode::NOT_FOUND, ApiErrorStatus::PeerNotFound).into_response())
         }
-        Err(e) => Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnknownFailure(e.to_string())).into_response()),
+        Err(e) => Ok((
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ApiErrorStatus::UnknownFailure(e.to_string()),
+        )
+            .into_response()),
     }
 }
 

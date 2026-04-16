@@ -43,7 +43,12 @@ async fn ping_should_succeed_for_all_visible_nodes(cluster: &ClusterGuard) -> an
     let [src, dst] = cluster.sample_nodes::<2>();
 
     let dst_key = hopr_lib::peer_id_to_offchain_key(&dst.peer_id())?;
-    let _ = src.inner().transport().ping(&dst_key).await.context("failed to ping peer")?;
+    let _ = src
+        .inner()
+        .transport()
+        .ping(&dst_key)
+        .await
+        .context("failed to ping peer")?;
 
     Ok(())
 }

@@ -106,7 +106,11 @@ pub(super) async fn show_ticket_statistics(State(state): State<Arc<InternalState
     let hopr = state.hopr.clone();
     match hopr.ticket_statistics() {
         Ok(stats) => (StatusCode::OK, Json(NodeTicketStatisticsResponse::from(stats))).into_response(),
-        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnknownFailure(e.to_string())).into_response(),
+        Err(e) => (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ApiErrorStatus::UnknownFailure(e.to_string()),
+        )
+            .into_response(),
     }
 }
 
@@ -166,7 +170,13 @@ pub(super) async fn redeem_tickets(
             let channel_id = match hopr.channel(address, me) {
                 Ok(Some(ch)) if ch.status != ChannelStatus::Closed => *ch.get_id(),
                 Ok(_) => return (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
-                Err(e) => return (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnknownFailure(e.to_string())).into_response(),
+                Err(e) => {
+                    return (
+                        StatusCode::UNPROCESSABLE_ENTITY,
+                        ApiErrorStatus::UnknownFailure(e.to_string()),
+                    )
+                        .into_response();
+                }
             };
 
             hopr_async_runtime::prelude::spawn(async move {

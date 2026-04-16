@@ -4,8 +4,7 @@ use async_signal::{Signal, Signals};
 use futures::{FutureExt, StreamExt, future::abortable};
 use hopr_chain_connector::{HoprBlockchainSafeConnector, blokli_client::BlokliClient};
 use hopr_lib::{
-    AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex,
-    api::node::HasTicketManagement,
+    AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, api::node::HasTicketManagement,
     config::HoprLibConfig,
 };
 use hopr_network_graph::SharedChannelGraph;
@@ -37,7 +36,8 @@ mod telemetry_common;
 const DEFAULT_BLOKLI_URL: &str = "https://blokli.dufour.hoprnet.link";
 
 type HoprBlokliConnector = HoprBlockchainSafeConnector<BlokliClient>;
-type HoprNode = hopr_lib::Hopr<Arc<HoprBlokliConnector>, SharedChannelGraph, HoprNetwork, hopr_lib::builder::SharedTicketManager>;
+type HoprNode =
+    hopr_lib::Hopr<Arc<HoprBlokliConnector>, SharedChannelGraph, HoprNetwork, hopr_lib::builder::SharedTicketManager>;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, strum::Display)]
 enum HoprdProcess {

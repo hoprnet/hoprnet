@@ -28,8 +28,7 @@ use axum::{
     routing::{delete, get, post},
 };
 use hopr_chain_connector::HoprBlockchainSafeConnector;
-use hopr_lib::{Address, Hopr, errors::HoprLibError};
-use hopr_lib::builder::SharedTicketManager;
+use hopr_lib::{Address, Hopr, builder::SharedTicketManager, errors::HoprLibError};
 use hopr_network_graph::SharedChannelGraph;
 // pub use hopr_builder::config::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
 use hopr_transport_p2p::HoprNetwork;

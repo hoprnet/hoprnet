@@ -194,7 +194,11 @@ pub(super) async fn withdraw(
                 }),
             )
                 .into_response(),
-            Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnknownFailure(e.to_string())).into_response(),
+            Err(e) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ApiErrorStatus::UnknownFailure(e.to_string()),
+            )
+                .into_response(),
         }
     } else if let Ok(hopr) = HoprBalance::from_str(&req_data.amount) {
         match state.hopr.withdraw(&req_data.address, hopr).await {
@@ -205,9 +209,17 @@ pub(super) async fn withdraw(
                 }),
             )
                 .into_response(),
-            Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnknownFailure(e.to_string())).into_response(),
+            Err(e) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ApiErrorStatus::UnknownFailure(e.to_string()),
+            )
+                .into_response(),
         }
     } else {
-        (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnknownFailure("invalid currency".into())).into_response()
+        (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ApiErrorStatus::UnknownFailure("invalid currency".into()),
+        )
+            .into_response()
     }
 }
