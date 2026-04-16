@@ -49,11 +49,9 @@ telemetry = ["hopr-lib/telemetry", "dep:hopr-metrics", "dep:lazy_static"]
 anyhow = { workspace = true }
 async-trait = { workspace = true, optional = true }
 futures = { workspace = true }
-futures-concurrency = { workspace = true }
 futures-time = { workspace = true, optional = true }
 hex-literal = { workspace = true, optional = true }
 lazy_static = { workspace = true, optional = true }
-parking_lot = { workspace = true }
 rand = { workspace = true, optional = true }
 rstest = { workspace = true, optional = true }
 smart-default = { workspace = true, optional = true }
@@ -72,7 +70,6 @@ hopr-chain-connector = { workspace = true }
 hopr-ct-full-network = { workspace = true }
 hopr-network-graph = { workspace = true, features = ["petgraph", "graph-api"] }
 hopr-transport-p2p = { workspace = true }
-hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }

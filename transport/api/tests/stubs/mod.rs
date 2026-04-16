@@ -196,6 +196,10 @@ impl ChainValues for StubChain {
             redeemed_value: HoprBalance::zero(),
         })
     }
+
+    async fn typical_resolution_time(&self) -> Result<Duration, Self::Error> {
+        Ok(Duration::from_secs(30))
+    }
 }
 
 /// Stub network view satisfying `Net` trait bounds (never used before `run()`).

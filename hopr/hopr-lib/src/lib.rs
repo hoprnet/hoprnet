@@ -100,7 +100,7 @@ pub use hopr_network_types::prelude::*;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport::transfer_session;
 pub use hopr_transport::*;
-use tracing::{debug, error};
+use tracing::debug;
 
 pub use crate::{
     config::SafeModule,

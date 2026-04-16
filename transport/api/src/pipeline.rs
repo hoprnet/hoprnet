@@ -17,7 +17,7 @@ use crate::{HoprTransportProcess, config::HoprPacketPipelineConfig};
 /// Contains all components required to run the HOPR packet pipeline.
 #[derive(Clone)]
 pub struct HoprPipelineComponents<TEvt, S, Chain, TFact> {
-    /// Sink for [`TicketEvents`](TicketEvent).
+    /// Sink for ticket events.
     pub ticket_events: TEvt,
     /// Store for SURBs and Reply Openers.
     pub surb_store: S,
