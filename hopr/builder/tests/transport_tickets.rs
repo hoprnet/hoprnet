@@ -3,7 +3,7 @@ use std::{ops::Mul, time::Duration};
 use anyhow::Context;
 use futures::{AsyncWriteExt, StreamExt, pin_mut};
 use futures_time::future::FutureExt as _;
-use hopr_api::chain::ChainValues;
+use hopr_api::{chain::ChainValues, node::{HasChainApi, HoprIncentiveOperations}};
 use hopr_builder::{
     hopr_lib::{HoprBalance, HoprLibError, UnitaryFloatOps},
     testing::{
@@ -156,7 +156,7 @@ async fn redeem_ticket_on_request(
 
     let stats_before = mid
         .connector
-        .redemption_stats(mid.inner().get_safe_config().safe_address)
+        .redemption_stats(mid.inner().identity().safe_address)
         .await?;
 
     mid.inner()
@@ -168,7 +168,7 @@ async fn redeem_ticket_on_request(
     wait_until(
         || async {
             let stats_after = mid_connector
-                .redemption_stats(mid.inner().get_safe_config().safe_address)
+                .redemption_stats(mid.inner().identity().safe_address)
                 .await
                 .map_err(HoprLibError::chain)?;
             Ok::<_, HoprLibError>(stats_after.redeemed_value > stats_before.redeemed_value)
@@ -319,7 +319,7 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
 
     let chain_stats_before = mid
         .connector
-        .redemption_stats(mid.inner().get_safe_config().safe_address)
+        .redemption_stats(mid.inner().identity().safe_address)
         .await?;
 
     for _ in 1..=message_count {
@@ -340,7 +340,7 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
         || async {
             let stats_after = mid.inner().ticket_statistics()?;
             let chain_stats_after = mid_connector
-                .redemption_stats(mid.inner().get_safe_config().safe_address)
+                .redemption_stats(mid.inner().identity().safe_address)
                 .await
                 .map_err(HoprLibError::chain)?;
             Ok::<_, HoprLibError>(
@@ -442,7 +442,7 @@ async fn relay_with_win_prob_higher_than_min_win_prob_should_succeed(
 
     let chain_stats_before = mid
         .connector
-        .redemption_stats(mid.inner().get_safe_config().safe_address)
+        .redemption_stats(mid.inner().identity().safe_address)
         .await?;
 
     for _ in 1..=message_count {
@@ -462,7 +462,7 @@ async fn relay_with_win_prob_higher_than_min_win_prob_should_succeed(
         || async {
             let stats_after = mid.inner().ticket_statistics()?;
             let chain_stats_after = mid_connector
-                .redemption_stats(mid.inner().get_safe_config().safe_address)
+                .redemption_stats(mid.inner().identity().safe_address)
                 .await
                 .map_err(HoprLibError::chain)?;
             Ok::<_, HoprLibError>(

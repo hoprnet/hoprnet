@@ -27,8 +27,8 @@ use hopr_api::{
 };
 use hopr_async_runtime::Abortable;
 use hopr_lib::{
-    Address, Hopr, HoprSession, HoprSessionClientConfig, NetworkView, OffchainPublicKey, RoutingOptions, SURB_SIZE,
-    ServiceId, SessionId, SessionTarget, errors::HoprLibError, transfer_session,
+    Address, Hopr, HoprSession, HoprSessionClientConfig, HoprSessionConfigurator, NetworkView, OffchainPublicKey,
+    RoutingOptions, SURB_SIZE, ServiceId, SessionId, SessionTarget, errors::HoprLibError, transfer_session,
 };
 use hopr_network_types::{
     prelude::{ConnectedUdpStream, IpOrHost, IpProtocol, SealedHost, UdpStreamParallelism},
@@ -205,19 +205,19 @@ impl Abortable for ListenerJoinHandles {
 }
 
 pub struct SessionPool {
-    pool: Option<Arc<parking_lot::Mutex<VecDeque<HoprSession>>>>,
+    pool: Option<Arc<parking_lot::Mutex<VecDeque<(HoprSession, HoprSessionConfigurator)>>>>,
     ah: Option<AbortHandle>,
 }
 
 impl SessionPool {
     pub const MAX_SESSION_POOL_SIZE: usize = 5;
 
-    pub async fn new<Chain, Graph, Net>(
+    pub async fn new<Chain, Graph, Net, TMgr>(
         size: usize,
         dst: Address,
         target: SessionTarget,
         cfg: HoprSessionClientConfig,
-        hopr: Arc<Hopr<Chain, Graph, Net>>,
+        hopr: Arc<Hopr<Chain, Graph, Net, TMgr>>,
     ) -> Result<Self, anyhow::Error>
     where
         Chain: HoprChainApi + Clone + Send + Sync + 'static,
@@ -232,6 +232,7 @@ impl SessionPool {
         <Graph as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
         <Graph as NetworkGraphWrite>::Observed: EdgeObservableWrite + Send,
         Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
+        TMgr: Send + Sync + 'static,
     {
         let pool = Arc::new(parking_lot::Mutex::new(VecDeque::with_capacity(size)));
         let hopr_clone = hopr.clone();
@@ -245,9 +246,9 @@ impl SessionPool {
                 let cfg = cfg.clone();
                 async move {
                     match hopr.connect_to(dst, target.clone(), cfg.clone()).await {
-                        Ok(s) => {
-                            debug!(session_id = %s.id(), num_session = i, "created a new session in pool");
-                            pool.lock().push_back(s);
+                        Ok((session, configurator)) => {
+                            debug!(session_id = %session.id(), num_session = i, "created a new session in pool");
+                            pool.lock().push_back((session, configurator));
                             Ok(())
                         }
                         Err(error) => {
@@ -263,7 +264,6 @@ impl SessionPool {
         if !pool.lock().is_empty() {
             let pool_clone_1 = pool.clone();
             let pool_clone_2 = pool.clone();
-            let pool_clone_3 = pool.clone();
             Ok(Self {
                 pool: Some(pool),
                 ah: Some(hopr_async_runtime::spawn_as_abortable!(
@@ -274,19 +274,26 @@ impl SessionPool {
                         // Continue the infinite interval stream until there are sessions in the pool
                         futures::future::ready(!pool_clone_1.lock().is_empty())
                     })
-                    .flat_map(move |_| {
-                        // Get all SessionIds of the remaining Sessions in the pool
-                        let ids = pool_clone_2.lock().iter().map(|s| *s.id()).collect::<Vec<_>>();
-                        futures::stream::iter(ids)
-                    })
-                    .for_each(move |id| {
-                        let hopr = hopr.clone();
-                        let pool = pool_clone_3.clone();
+                    .for_each(move |_| {
+                        let pool = pool_clone_2.clone();
                         async move {
-                            // Make sure the Session is still alive, otherwise remove it from the pool
-                            if let Err(error) = hopr.keep_alive_session(&id).await {
-                                error!(%error, %dst, session_id = %id, "session in pool is not alive, removing from pool");
-                                pool.lock().retain(|s| *s.id() != id);
+                            // Collect configurators to ping (release lock before awaiting)
+                            let configurators: Vec<_> = pool.lock()
+                                .iter()
+                                .map(|(_, cfg)| cfg.clone())
+                                .collect();
+
+                            let mut dead_ids = Vec::new();
+                            for configurator in &configurators {
+                                if let Err(error) = configurator.ping().await {
+                                    let id = *configurator.id();
+                                    error!(%error, session_id = %id, "session in pool is not alive, will remove");
+                                    dead_ids.push(id);
+                                }
+                            }
+
+                            if !dead_ids.is_empty() {
+                                pool.lock().retain(|(_, cfg)| !dead_ids.contains(cfg.id()));
                             }
                         }
                     })
@@ -298,7 +305,7 @@ impl SessionPool {
     }
 
     pub fn pop(&mut self) -> Option<HoprSession> {
-        self.pool.as_ref().and_then(|pool| pool.lock().pop_front())
+        self.pool.as_ref().and_then(|pool| pool.lock().pop_front().map(|(session, _)| session))
     }
 }
 
@@ -311,10 +318,10 @@ impl Drop for SessionPool {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn create_tcp_client_binding<Chain, Graph, Net>(
+pub async fn create_tcp_client_binding<Chain, Graph, Net, TMgr>(
     bind_host: std::net::SocketAddr,
     port_range: Option<String>,
-    hopr: Arc<Hopr<Chain, Graph, Net>>,
+    hopr: Arc<Hopr<Chain, Graph, Net, TMgr>>,
     open_listeners: Arc<ListenerJoinHandles>,
     destination: Address,
     target_spec: SessionTargetSpec,
@@ -335,6 +342,7 @@ where
     <Graph as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
     <Graph as NetworkGraphWrite>::Observed: EdgeObservableWrite + Send,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
+    TMgr: Send + Sync + 'static,
 {
     // Bind the TCP socket first
     let (bound_host, tcp_listener) = tcp_listen_on(bind_host, port_range).await.map_err(|e| {
@@ -414,7 +422,7 @@ where
                                 None => {
                                     debug!("no more active sessions in the pool, creating a new one");
                                     match hopr.connect_to(destination, target, data).await {
-                                        Ok(s) => s,
+                                        Ok((s, _configurator)) => s,
                                         Err(error) => {
                                             error!(%error, "failed to establish session");
                                             return;
@@ -494,10 +502,10 @@ pub enum BindError {
     UnknownFailure(String),
 }
 
-pub async fn create_udp_client_binding<Chain, Graph, Net>(
+pub async fn create_udp_client_binding<Chain, Graph, Net, TMgr>(
     bind_host: std::net::SocketAddr,
     port_range: Option<String>,
-    hopr: Arc<Hopr<Chain, Graph, Net>>,
+    hopr: Arc<Hopr<Chain, Graph, Net, TMgr>>,
     open_listeners: Arc<ListenerJoinHandles>,
     destination: Address,
     target_spec: SessionTargetSpec,
@@ -516,6 +524,7 @@ where
     <Graph as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
     <Graph as NetworkGraphWrite>::Observed: EdgeObservableWrite + Send,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
+    TMgr: Send + Sync + 'static,
 {
     // Bind the UDP socket first
     let (bound_host, udp_socket) = udp_bind_to(bind_host, port_range).await.map_err(|e| {
@@ -534,7 +543,7 @@ where
         .map_err(|e| BindError::UnknownFailure(e.to_string()))?;
 
     // Create a single session for the UDP socket
-    let session = hopr
+    let (session, _configurator) = hopr
         .connect_to(destination, target, config.clone())
         .await
         .map_err(|e| BindError::UnknownFailure(e.to_string()))?;

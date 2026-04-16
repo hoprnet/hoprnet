@@ -7,9 +7,13 @@ use axum::{
 };
 use hopr_lib::{
     Address, HoprBalance, Multiaddr,
-    api::graph::{
-        EdgeLinkObservable,
-        traits::{EdgeNetworkObservableRead, EdgeObservableRead},
+    api::{
+        chain::ChainKeyOperations,
+        graph::{
+            EdgeLinkObservable,
+            traits::{EdgeNetworkObservableRead, EdgeObservableRead},
+        },
+        node::{HasChainApi, HoprIncentiveOperations},
     },
 };
 use serde_with::{DisplayFromStr, serde_as};
@@ -164,7 +168,7 @@ pub(super) async fn connected(State(state): State<Arc<InternalState>>) -> impl I
             continue;
         }
 
-        let address = match hopr.peerid_to_chain_key(&(*dst).into()) {
+        let address = match hopr.chain_api().packet_key_to_chain_key(dst) {
             Ok(Some(addr)) => addr,
             _ => continue,
         };
@@ -258,15 +262,15 @@ pub(super) async fn announced(State(state): State<Arc<InternalState>>) -> impl I
         Ok(peers) => {
             let response: Vec<AnnouncedPeerResponse> = peers
                 .into_iter()
-                .map(|peer| AnnouncedPeerResponse {
-                    address: peer.address,
-                    multiaddrs: peer.multiaddresses,
-                    origin: peer.origin.into(),
+                .map(|entry| AnnouncedPeerResponse {
+                    address: entry.chain_addr,
+                    multiaddrs: entry.get_multiaddrs().to_vec(),
+                    origin: AnnouncementOriginResponse::Chain,
                 })
                 .collect();
             (StatusCode::OK, Json(response)).into_response()
         }
-        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnknownFailure(e.to_string())).into_response(),
     }
 }
 
@@ -330,7 +334,7 @@ pub(super) async fn graph(
 
     let mut key_to_addr: HashMap<hopr_lib::OffchainPublicKey, String> = HashMap::new();
     for key in &unique_keys {
-        let label = match hopr.peerid_to_chain_key(&(*key).into()) {
+        let label = match hopr.chain_api().packet_key_to_chain_key(key) {
             Ok(Some(addr)) => addr.to_string(),
             _ => key.to_string(),
         };

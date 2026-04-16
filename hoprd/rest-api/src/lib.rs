@@ -29,6 +29,7 @@ use axum::{
 };
 use hopr_chain_connector::HoprBlockchainSafeConnector;
 use hopr_lib::{Address, Hopr, errors::HoprLibError};
+use hopr_lib::builder::SharedTicketManager;
 use hopr_network_graph::SharedChannelGraph;
 // pub use hopr_builder::config::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
 use hopr_transport_p2p::HoprNetwork;
@@ -56,7 +57,7 @@ pub(crate) const BASE_PATH: &str = const_format::formatcp!("/api/v{}", env!("CAR
 
 type HoprBlokliConnector = HoprBlockchainSafeConnector<hopr_chain_connector::blokli_client::BlokliClient>;
 
-pub(crate) type HoprNode = Hopr<Arc<HoprBlokliConnector>, SharedChannelGraph, HoprNetwork>;
+pub(crate) type HoprNode = Hopr<Arc<HoprBlokliConnector>, SharedChannelGraph, HoprNetwork, SharedTicketManager>;
 
 #[derive(Clone)]
 pub(crate) struct AppState {

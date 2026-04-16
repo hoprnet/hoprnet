@@ -6,7 +6,7 @@ use hopr_builder::testing::{
     hopr::ChannelGuard,
 };
 use hopr_chain_connector::blokli_client::BlokliQueryClient;
-use hopr_lib::{Address, BytesRepresentable, ChannelId, ChannelStatus, HoprBalance};
+use hopr_lib::{Address, BytesRepresentable, ChannelId, ChannelStatus, HoprBalance, api::node::HoprIncentiveOperations};
 use rstest::*;
 use serial_test::serial;
 use tokio::time::sleep;
@@ -170,7 +170,7 @@ async fn test_withdraw_native(cluster: &ClusterGuard) -> anyhow::Result<()> {
 
     let _ = src
         .inner()
-        .withdraw_native(target_addr, withdrawn_amount)
+        .withdraw(&target_addr, withdrawn_amount)
         .await
         .context("failed to withdraw native")?;
 

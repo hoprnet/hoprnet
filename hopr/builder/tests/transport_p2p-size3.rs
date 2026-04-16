@@ -3,8 +3,12 @@ use std::time::Duration;
 use anyhow::Context;
 use hopr_builder::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster};
 use hopr_lib::{
-    Address, HoprNodeNetworkOperations,
-    api::graph::traits::{EdgeLinkObservable, EdgeObservableRead},
+    Address,
+    api::{
+        graph::traits::{EdgeLinkObservable, EdgeObservableRead},
+        network::NetworkView,
+        node::{HasNetworkView, HasTransportApi, HoprIncentiveOperations, TransportOperations},
+    },
 };
 use rstest::*;
 use serial_test::serial;
@@ -38,7 +42,8 @@ async fn all_visible_peers_should_be_listed(cluster: &ClusterGuard) -> anyhow::R
 async fn ping_should_succeed_for_all_visible_nodes(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [src, dst] = cluster.sample_nodes::<2>();
 
-    let _ = src.inner().ping(&dst.peer_id()).await.context("failed to ping peer")?;
+    let dst_key = hopr_lib::peer_id_to_offchain_key(&dst.peer_id())?;
+    let _ = src.inner().transport().ping(&dst_key).await.context("failed to ping peer")?;
 
     Ok(())
 }
@@ -50,7 +55,8 @@ async fn ping_should_succeed_for_all_visible_nodes(cluster: &ClusterGuard) -> an
 /// the operation fails.
 async fn ping_should_fail_for_self(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [random_int] = cluster.sample_nodes::<1>();
-    let res = random_int.inner().ping(&random_int.peer_id()).await;
+    let self_key = hopr_lib::peer_id_to_offchain_key(&random_int.peer_id())?;
+    let res = random_int.inner().transport().ping(&self_key).await;
 
     assert!(res.is_err());
 
@@ -73,7 +79,7 @@ async fn discovery_should_produce_the_same_public_announcements_inside_the_netwo
         .await
         .context("failed to get announced peers")?
         .into_iter()
-        .map(|peer| peer.address)
+        .map(|peer| peer.chain_addr)
         .collect::<Vec<Address>>();
 
     let accounts_addresses_2 = idx2
@@ -82,7 +88,7 @@ async fn discovery_should_produce_the_same_public_announcements_inside_the_netwo
         .await
         .context("failed to get announced peers")?
         .into_iter()
-        .map(|peer| peer.address)
+        .map(|peer| peer.chain_addr)
         .collect::<Vec<Address>>();
 
     assert!(accounts_addresses_1.contains(&idx1.address()));
@@ -342,7 +348,7 @@ async fn observed_multiaddresses_should_be_populated_after_warmup(cluster: &Clus
 async fn network_health_should_not_be_red_after_warmup(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [node] = cluster.sample_nodes::<1>();
 
-    let health = node.inner().network_health().await;
+    let health = node.inner().network_view().health();
 
     assert_ne!(
         health,

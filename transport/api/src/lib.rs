@@ -851,6 +851,27 @@ where
     }
 }
 
+impl<Chain, Graph, Net> HoprTransport<Chain, Graph, Net> {
+    /// Gets the SURB balancer configuration of a session by its ID.
+    ///
+    /// Returns `Ok(None)` if the session does not use a SURB balancer.
+    pub async fn get_session_surb_balancer_config(
+        &self,
+        id: &SessionId,
+    ) -> errors::Result<Option<SurbBalancerConfig>> {
+        Ok(self.smgr.get_surb_balancer_config(id).await?)
+    }
+
+    /// Updates the SURB balancer configuration of a session by its ID.
+    pub async fn update_session_surb_balancer_config(
+        &self,
+        id: &SessionId,
+        config: SurbBalancerConfig,
+    ) -> errors::Result<()> {
+        Ok(self.smgr.update_surb_balancer_config(id, config).await?)
+    }
+}
+
 fn build_mixer_cfg_from_env() -> MixerConfig {
     let mixer_cfg = MixerConfig {
         min_delay: std::time::Duration::from_millis(
