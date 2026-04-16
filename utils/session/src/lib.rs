@@ -27,8 +27,9 @@ use hopr_api::{
 };
 use hopr_async_runtime::Abortable;
 use hopr_lib::{
-    Address, Hopr, HoprSession, HoprSessionClientConfig, HoprSessionConfigurator, NetworkView, OffchainPublicKey,
-    RoutingOptions, SURB_SIZE, ServiceId, SessionId, SessionTarget, errors::HoprLibError, transfer_session,
+    Address, Hopr, HoprSession, HoprSessionClientConfig, HoprSessionClientOperations, HoprSessionConfigurator,
+    NetworkView, OffchainPublicKey, RoutingOptions, SURB_SIZE, ServiceId, SessionId, SessionTarget,
+    errors::HoprLibError, transfer_session,
 };
 use hopr_network_types::{
     prelude::{ConnectedUdpStream, IpOrHost, IpProtocol, SealedHost, UdpStreamParallelism},

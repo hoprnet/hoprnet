@@ -95,6 +95,8 @@ pub use hopr_api::{
     tickets::{ChannelStats, RedemptionResult, TicketManagement, TicketManagementExt},
     types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*},
 };
+#[cfg(feature = "session-client")]
+pub use hopr_api::node::HoprSessionClientOperations;
 use hopr_async_runtime::prelude::spawn;
 pub use hopr_async_runtime::{Abortable, AbortableList};
 pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
@@ -314,24 +316,32 @@ where
         }
     }
 
-    /// Tries to create a new client Session connection returning a [session object](HoprSession) that implements
-    /// [`futures::io::AsyncRead`] and [`futures::io::AsyncWrite`] and can be used as a read/write socket.
-    ///
-    /// The [`HoprSessionConfigurator`] is also returned allowing the Session to be controlled.
-    ///
-    /// This method does retry automatically if the Session establishment fails.
-    /// See [`SessionGlobalConfig`](config::SessionGlobalConfig) for more details on how to configure
-    /// the retry mechanism.
-    ///
-    /// An opened Session can be closed either by dropping the returned `HoprSession` object or
-    /// by the other party closing it.
-    #[cfg(feature = "session-client")]
-    pub async fn connect_to(
+}
+
+#[cfg(feature = "session-client")]
+#[async_trait::async_trait]
+impl<Chain, Graph, Net, TMgr> hopr_api::node::HoprSessionClientOperations for Hopr<Chain, Graph, Net, TMgr>
+where
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+    Graph: HoprGraphApi<HoprNodeId = OffchainPublicKey> + Clone + Send + Sync + 'static,
+    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
+        hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
+    <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
+    Net: hopr_api::network::NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
+    TMgr: Send + Sync + 'static,
+{
+    type Session = HoprSession;
+    type SessionConfigurator = HoprSessionConfigurator;
+    type Target = SessionTarget;
+    type Config = HoprSessionClientConfig;
+    type Error = HoprLibError;
+
+    async fn connect_to(
         &self,
         destination: Address,
-        target: SessionTarget,
-        cfg: HoprSessionClientConfig,
-    ) -> errors::Result<(HoprSession, HoprSessionConfigurator)> {
+        target: Self::Target,
+        cfg: Self::Config,
+    ) -> Result<(Self::Session, Self::SessionConfigurator), Self::Error> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         let backoff = backon::ConstantBuilder::default()
