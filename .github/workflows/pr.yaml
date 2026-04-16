@@ -50,6 +50,48 @@ jobs:
             bot
             ignore-semantic-pull-request
 
+  benchmarks:
+    name: Run Benchmarks
+    runs-on: self-hosted-hoprnet-bigger
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: true
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@08dcb617662c05839fe4254c600fb162963e4801 # v26
+        with:
+          nix_path: nixpkgs=channel:nixos-24.05
+
+      - name: Setup Cachix
+        uses: cachix/cachix-action@ad2ddac53f97c0f737c540da6c99bb57230c27bc # v15
+        with:
+          name: hoprnet
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+      - name: Run Benchmarks with Nix
+        run: |
+          nix build -L .#hoprd-bench-bencher --out-link bench-results.txt
+          # The result of nix build is a symlink to the store. 
+          # We need a real file for the benchmark action.
+          cp $(readlink -f bench-results.txt) output.txt
+
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: Rust Criterion Benchmarks
+          tool: 'cargo'
+          output-file-path: output.txt
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+          # Show alert only on PR
+          comment-on-alert: true
+          fail-on-alert: false
+          alert-threshold: '200%'
+          # Store and show results on gh-pages
+          gh-pages-branch: gh-pages
+          benchmark-data-dir-path: benchmarks
   label:
     name: Add labels
     if: github.event_name == 'pull_request'

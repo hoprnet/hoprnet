@@ -347,6 +347,27 @@
             projectBuildArgs // { runBench = true; }
           );
 
+          # Benchmarks output in bencher format for GitHub Action Benchmark
+          hoprd-bench-bencher = (rust-builder-local.callPackage nixLib.mkRustPackage (
+            projectBuildArgs // {
+              src = testSrc;
+              cargoExtraArgs = "--workspace -F allocator-jemalloc";
+            }
+          )).overrideAttrs (old: {
+            buildPhase = ''
+              runHook preBuild
+              # We use cargo bench but only for the workspace and output in bencher format.
+              # We redirect to a temporary file first to avoid tee-ing to $out while it's being written.
+              cargo bench --workspace -- --output-format bencher | tee bench_output.txt
+              cp bench_output.txt $out
+              runHook postBuild
+            '';
+            # Disable install phase as we only care about the output file
+            installPhase = "true";
+            # Benchmarks are run in buildPhase here to capture output to $out
+            doCheck = false;
+          });
+
           # Compile benchmarks without running them, used for CI build verification.
           bench-build = rust-builder-local.callPackage nixLib.mkRustPackage (
             projectBuildArgs // { buildBench = true; }
@@ -782,7 +803,7 @@
             // {
               inherit docs;
               inherit pre-commit-check;
-              inherit hoprd-bench bench-build;
+              inherit hoprd-bench hoprd-bench-bencher bench-build;
               inherit hoprd-man;
               default = hoprdPackages.binary-hoprd;
               hoprd-candidate = (mkHoprdCandidate "");
