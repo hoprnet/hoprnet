@@ -256,10 +256,6 @@ jobs:
           chmod -R +w target/codspeed
 
       - name: Run the benchmarks
-        run: |
-          curl -fsSL https://codspeed.io/install.sh | bash
-          source $HOME/.cargo/env
-          codspeed --version
-          codspeed run --mode simulation -- cargo codspeed run
+        run: nix run .#run-codspeed
         env:
           CODSPEED_TOKEN: ${{ secrets.CODSPEED_TOKEN }}

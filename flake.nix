@@ -812,6 +812,14 @@
             inherit update-github-labels find-port-ci;
             check = run-check;
             audit = run-audit;
+            run-codspeed = flake-utils.lib.mkApp {
+              drv = pkgs.writeShellScriptBin "run-codspeed" ''
+                curl -fsSL https://codspeed.io/install.sh | bash
+                source $HOME/.cargo/env
+                codspeed --version
+                codspeed run --mode simulation -- cargo codspeed run
+              '';
+            };
           };
 
           packages =
