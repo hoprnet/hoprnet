@@ -4714,6 +4714,7 @@ dependencies = [
  "hopr-network-graph",
  "hopr-reference",
  "hopr-ticket-manager",
+ "hopr-transport",
  "hopr-transport-p2p",
  "lazy_static",
  "opentelemetry-prometheus-text-exporter",

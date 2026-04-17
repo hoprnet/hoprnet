@@ -167,6 +167,38 @@ where
 
     let network_builder = HoprLibp2pNetworkBuilder::new(peer_discovery_rx);
 
+    // Wire network events (peer connected/disconnected) → graph updates
+    {
+        use futures::StreamExt;
+        use hopr_lib::api::graph::NetworkGraphUpdate;
+        let network_events = network_builder.subscribe_network_events();
+        let graph_updater = graph.clone();
+        tokio::spawn(async move {
+            network_events
+                .for_each(|event| {
+                    let graph_updater = graph_updater.clone();
+                    async move {
+                        let (peer_id, connected) = match event {
+                            hopr_lib::api::network::NetworkEvent::PeerConnected(p) => (p, true),
+                            hopr_lib::api::network::NetworkEvent::PeerDisconnected(p) => (p, false),
+                        };
+                        if let Ok(opk) = hopr_lib::api::OffchainPublicKey::from_peerid(&peer_id) {
+                            graph_updater.record_edge(
+                                hopr_lib::api::graph::MeasurableEdge::<
+                                    hopr_transport::NeighborTelemetry,
+                                    hopr_transport::PathTelemetry,
+                                >::ConnectionStatus {
+                                    peer: opk,
+                                    connected,
+                                },
+                            );
+                        }
+                    }
+                })
+                .await;
+        });
+    }
+
     let prober_cfg = probe_cfg.unwrap_or_default();
     let cover_traffic =
         hopr_ct_full_network::FullNetworkDiscovery::new(*packet_key.public(), prober_cfg, graph.clone());

@@ -67,6 +67,7 @@ validator = { workspace = true, optional = true }
 
 hopr-lib = { workspace = true, features = ["utils_parallel"] }
 hopr-metrics = { workspace = true, optional = true }
+hopr-transport = { workspace = true }
 # impls
 hopr-chain-connector = { workspace = true }
 hopr-ct-full-network = { workspace = true }
