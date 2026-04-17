@@ -122,9 +122,9 @@ impl<Chain, Graph, NB, TMgr, Srv, Ct, TFact> HoprBuilder<Chain, Graph, NB, TMgr,
         self
     }
 
-    /// Sets the ticket management for incoming ticket processing (relay nodes).
+    /// Sets the ticket management for incoming ticket processing.
     ///
-    /// If not set, the node operates in edge mode (no ticket processing).
+    /// Required. For edge nodes that don't process tickets, pass `()`.
     pub fn with_ticket_management(mut self, mgr: TMgr) -> Self {
         self.ticket_manager = Some(mgr);
         self
@@ -585,7 +585,10 @@ where
                     "long-running background task finished"
                 )
             });
-            spawn(proc);
+            processes.insert(
+                HoprLibProcess::ChannelEvents,
+                hopr_async_runtime::spawn_as_abortable!(proc),
+            );
         }
 
         // === Start transport ===

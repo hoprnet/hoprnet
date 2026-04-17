@@ -211,7 +211,12 @@ async fn ping_should_record_latency_in_observations(cluster: &ClusterGuard) -> a
     let [src, dst] = cluster.sample_nodes::<2>();
 
     let dst_key = hopr_lib::peer_id_to_offchain_key(&dst.peer_id())?;
-    let (rtt, obs) = src.inner().transport().ping(&dst_key).await.context("ping should succeed")?;
+    let (rtt, obs) = src
+        .inner()
+        .transport()
+        .ping(&dst_key)
+        .await
+        .context("ping should succeed")?;
 
     assert!(!rtt.is_zero(), "RTT should be non-zero");
 

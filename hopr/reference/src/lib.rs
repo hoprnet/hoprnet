@@ -137,11 +137,11 @@ where
     let (peer_discovery_tx, peer_discovery_rx) = futures::channel::mpsc::channel(2048);
     {
         use futures::{SinkExt, StreamExt};
-        use hopr_lib::api::chain::{ChainEvents, StateSyncOptions};
+        use hopr_lib::api::chain::StateSyncOptions;
         let chain_events = chain_connector
             .subscribe_with_state_sync([StateSyncOptions::PublicAccounts])
             .map_err(|e| anyhow::anyhow!("failed to subscribe to chain events: {e}"))?;
-        let mut tx = peer_discovery_tx;
+        let tx = peer_discovery_tx;
         tokio::spawn(async move {
             chain_events
                 .for_each(|event| {

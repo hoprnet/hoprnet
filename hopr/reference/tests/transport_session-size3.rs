@@ -42,10 +42,7 @@ async fn test_keep_alive_session(cluster: &ClusterGuard) -> anyhow::Result<()> {
 
     sleep(Duration::from_secs(2)).await;
 
-    configurator
-        .ping()
-        .await
-        .context("failed to keep alive session")?;
+    configurator.ping().await.context("failed to keep alive session")?;
 
     sleep(Duration::from_secs(3)).await; // sleep longer than the session timeout
 
