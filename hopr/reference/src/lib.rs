@@ -183,15 +183,13 @@ where
                             hopr_lib::api::network::NetworkEvent::PeerDisconnected(p) => (p, false),
                         };
                         if let Ok(opk) = hopr_lib::api::OffchainPublicKey::from_peerid(&peer_id) {
-                            graph_updater.record_edge(
-                                hopr_lib::api::graph::MeasurableEdge::<
-                                    hopr_transport::NeighborTelemetry,
-                                    hopr_transport::PathTelemetry,
-                                >::ConnectionStatus {
-                                    peer: opk,
-                                    connected,
-                                },
-                            );
+                            graph_updater.record_edge(hopr_lib::api::graph::MeasurableEdge::<
+                                hopr_transport::NeighborTelemetry,
+                                hopr_transport::PathTelemetry,
+                            >::ConnectionStatus {
+                                peer: opk,
+                                connected,
+                            });
                         }
                     }
                 })

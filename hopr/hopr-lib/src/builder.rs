@@ -458,6 +458,58 @@ where
                 }),
         );
 
+        // === Channel closure → ticket neglect ===
+        // When an incoming channel is closed, neglect any remaining tickets.
+        {
+            let chain_for_neglect = chain_api.clone();
+            let tmgr_for_neglect = ticket_manager.clone();
+            let events = chain_api.subscribe().map_err(HoprLibError::chain)?;
+            let (neglect_handle, neglect_reg) = hopr_async_runtime::AbortHandle::new_pair();
+            spawn(
+                futures::stream::Abortable::new(
+                    events.filter_map(move |event| {
+                        futures::future::ready(match event {
+                            ChainEvent::ChannelClosed(ch) => Some(ch),
+                            _ => None,
+                        })
+                    }),
+                    neglect_reg,
+                )
+                .for_each(move |closed_channel| {
+                    let chain = chain_for_neglect.clone();
+                    let tmgr = tmgr_for_neglect.clone();
+                    async move {
+                        use hopr_api::types::internal::prelude::ChannelDirection;
+                        if let Some(ChannelDirection::Incoming) = closed_channel.direction(chain.me()) {
+                            match tmgr.neglect_tickets(closed_channel.get_id(), None) {
+                                Ok(neglected) if !neglected.is_empty() => {
+                                    tracing::warn!(
+                                        num_neglected = neglected.len(),
+                                        %closed_channel,
+                                        "tickets on incoming closed channel were neglected"
+                                    );
+                                }
+                                Ok(_) => {}
+                                Err(error) => {
+                                    tracing::error!(
+                                        %error, %closed_channel,
+                                        "failed to neglect tickets on closed channel"
+                                    );
+                                }
+                            }
+                        }
+                    }
+                })
+                .inspect(|_| {
+                    tracing::warn!(
+                        task = %HoprLibProcess::ChannelEvents,
+                        "channel closure ticket neglect task finished"
+                    )
+                }),
+            );
+            processes.insert(HoprLibProcess::OutIndexSync, neglect_handle);
+        }
+
         // === Chain → Graph event wiring ===
         // Subscribe to chain and network events, update the graph accordingly.
         // This runs as a background task for the lifetime of the node.
