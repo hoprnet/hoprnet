@@ -12,7 +12,7 @@ use hopr_lib::{
     Address, Multiaddr,
     api::{
         network::{Health, NetworkView},
-        node::{HasChainApi, HasNetworkView, HoprIncentiveOperations},
+        node::{HasChainApi, HasNetworkView, IncentiveChannelOperations},
     },
 };
 use serde::Serialize;

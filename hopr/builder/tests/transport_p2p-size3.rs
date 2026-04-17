@@ -7,7 +7,7 @@ use hopr_lib::{
     api::{
         graph::traits::{EdgeLinkObservable, EdgeObservableRead},
         network::NetworkView,
-        node::{HasNetworkView, HasTransportApi, HoprIncentiveOperations, TransportOperations},
+        node::{HasNetworkView, HasTransportApi, IncentiveChannelOperations, TransportOperations},
     },
 };
 use rstest::*;

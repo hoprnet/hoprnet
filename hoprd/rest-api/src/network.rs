@@ -13,7 +13,7 @@ use hopr_lib::{
             EdgeLinkObservable,
             traits::{EdgeNetworkObservableRead, EdgeObservableRead},
         },
-        node::{HasChainApi, HoprIncentiveOperations},
+        node::{HasChainApi, IncentiveChannelOperations},
     },
 };
 use serde_with::{DisplayFromStr, serde_as};

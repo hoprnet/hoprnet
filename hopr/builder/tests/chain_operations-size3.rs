@@ -7,7 +7,7 @@ use hopr_builder::testing::{
 };
 use hopr_chain_connector::blokli_client::BlokliQueryClient;
 use hopr_lib::{
-    Address, BytesRepresentable, ChannelId, ChannelStatus, HoprBalance, api::node::HoprIncentiveOperations,
+    Address, BytesRepresentable, ChannelId, ChannelStatus, HoprBalance, api::node::IncentiveChannelOperations,
 };
 use rstest::*;
 use serial_test::serial;

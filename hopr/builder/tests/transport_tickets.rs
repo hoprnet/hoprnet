@@ -5,7 +5,7 @@ use futures::{AsyncWriteExt, StreamExt, pin_mut};
 use futures_time::future::FutureExt as _;
 use hopr_api::{
     chain::ChainValues,
-    node::{HasChainApi, HoprIncentiveOperations},
+    node::{HasChainApi, IncentiveChannelOperations, IncentiveRedeemOperations},
 };
 use hopr_builder::{
     hopr_lib::{HoprBalance, HoprLibError, UnitaryFloatOps},

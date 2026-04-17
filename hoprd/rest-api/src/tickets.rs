@@ -6,7 +6,7 @@ use axum::{
     response::IntoResponse,
 };
 use hopr_lib::{
-    Address, ChannelStatus, HoprBalance, HoprIncentiveOperations,
+    Address, ChannelStatus, HoprBalance, IncentiveChannelOperations, IncentiveRedeemOperations,
     api::{node::HasChainApi, tickets::ChannelStats},
     prelude::Hash,
 };

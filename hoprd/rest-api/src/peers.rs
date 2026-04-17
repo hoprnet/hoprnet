@@ -6,7 +6,7 @@ use axum::{
     response::IntoResponse,
 };
 use hopr_lib::{
-    Address, ChannelEntry, ChannelStatus, HoprBalance, HoprIncentiveOperations, Multiaddr,
+    Address, ChannelEntry, ChannelStatus, HoprBalance, IncentiveChannelOperations, Multiaddr,
     api::{
         chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations},
         graph::{EdgeLinkObservable, traits::EdgeObservableRead},

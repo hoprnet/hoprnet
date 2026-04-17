@@ -89,7 +89,10 @@ use hopr_api::{
 pub use hopr_api::{
     graph::EdgeLinkObservable,
     network::{NetworkBuilder, NetworkStreamControl},
-    node::{EitherErr, HoprIncentiveOperations, HoprNodeOperations, HoprState, TransportOperations},
+    node::{
+        EitherErr, HoprNodeOperations, HoprState, IncentiveChannelOperations, IncentiveRedeemOperations,
+        TransportOperations,
+    },
     tickets::{ChannelStats, RedemptionResult, TicketManagement, TicketManagementExt},
     types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*},
 };

@@ -7,7 +7,7 @@ use axum::{
 };
 use futures::{StreamExt, TryFutureExt};
 use hopr_lib::{
-    Address, AsUnixTimestamp, ChannelEntry, ChannelStatus, HoprBalance, HoprIncentiveOperations,
+    Address, AsUnixTimestamp, ChannelEntry, ChannelStatus, HoprBalance, IncentiveChannelOperations,
     api::{
         chain::{ChainReadChannelOperations, ChannelSelector},
         node::HasChainApi,

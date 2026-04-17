@@ -7,7 +7,7 @@ use axum::{
 };
 use hopr_lib::{
     Address, HoprBalance, WxHOPR, XDai, XDaiBalance,
-    api::node::{HasChainApi, HoprIncentiveOperations},
+    api::node::{HasChainApi, IncentiveChannelOperations},
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};

@@ -3,7 +3,7 @@ use std::{fmt::Formatter, sync::Arc, time::Duration};
 use anyhow::Context;
 use futures::future::join_all;
 use hopr_lib::{
-    Address, ChannelEntry, ChannelStatus, Hash, HoprBalance, HoprIncentiveOperations, HoprNodeOperations, HoprState,
+    Address, ChannelEntry, ChannelStatus, Hash, HoprBalance, HoprNodeOperations, HoprState, IncentiveChannelOperations,
     PeerId,
     api::node::HasChainApi,
     config::{HoprLibConfig, SessionGlobalConfig},
@@ -121,11 +121,11 @@ impl TestedHopr {
     }
 
     pub async fn channel_from_hash(&self, channel_hash: &prelude::Hash) -> Option<ChannelEntry> {
-        HoprIncentiveOperations::channel_by_id(&*self.instance, channel_hash).unwrap_or(None)
+        IncentiveChannelOperations::channel_by_id(&*self.instance, channel_hash).unwrap_or(None)
     }
 
     pub async fn outgoing_channels_by_status(&self, status: ChannelStatus) -> Option<Vec<ChannelEntry>> {
-        match HoprIncentiveOperations::channels_from(&*self.instance, self.address()).await {
+        match IncentiveChannelOperations::channels_from(&*self.instance, self.address()).await {
             Ok(channels) => Some(channels.iter().filter(|c| c.status == status).cloned().collect()),
             Err(_) => None,
         }
@@ -159,7 +159,7 @@ impl ChannelGuard {
             let src = &window[0];
             let dst = &window[1];
 
-            let channel = HoprIncentiveOperations::open_channel(&**src, dst.identity().node_address, funding)
+            let channel = IncentiveChannelOperations::open_channel(&**src, dst.identity().node_address, funding)
                 .await
                 .context("opening channel must succeed")?;
 
@@ -177,7 +177,7 @@ impl ChannelGuard {
         dst: Arc<TestingHopr>,
         funding: HoprBalance,
     ) -> anyhow::Result<Self> {
-        let channel = HoprIncentiveOperations::open_channel(&*src, dst.identity().node_address, funding)
+        let channel = IncentiveChannelOperations::open_channel(&*src, dst.identity().node_address, funding)
             .await
             .context("failed to open channel")?;
 
@@ -195,10 +195,10 @@ impl ChannelGuard {
             let hopr = hopr.clone();
             let channel_id = *channel_id;
             async move {
-                if HoprIncentiveOperations::channel_by_id(&*hopr, &channel_id)?
+                if IncentiveChannelOperations::channel_by_id(&*hopr, &channel_id)?
                     .is_some_and(|c| matches!(c.status, ChannelStatus::Open))
                 {
-                    HoprIncentiveOperations::close_channel_by_id(&*hopr, &channel_id)
+                    IncentiveChannelOperations::close_channel_by_id(&*hopr, &channel_id)
                         .await
                         .map(|_| ())
                         .context("channel closure initiation must succeed")
@@ -217,14 +217,14 @@ impl ChannelGuard {
             let channel_id = *channel_id;
             super::wait_until(
                 || async {
-                    let ch = HoprIncentiveOperations::channel_by_id(&*hopr, &channel_id)
+                    let ch = IncentiveChannelOperations::channel_by_id(&*hopr, &channel_id)
                         .ok()
                         .flatten();
                     match ch.as_ref().map(|c| &c.status) {
                         None | Some(ChannelStatus::Closed) => return Ok(true),
                         Some(ChannelStatus::PendingToClose(_)) => {
                             // Attempt finalization; ignore errors (grace period may not have elapsed)
-                            let _ = HoprIncentiveOperations::close_channel_by_id(&*hopr, &channel_id).await;
+                            let _ = IncentiveChannelOperations::close_channel_by_id(&*hopr, &channel_id).await;
                         }
                         _ => {}
                     }
@@ -247,20 +247,21 @@ impl Drop for ChannelGuard {
             if let Ok(runtime) = tokio::runtime::Builder::new_current_thread().enable_all().build() {
                 runtime.block_on(async move {
                     for (hopr, channel_id) in &channels {
-                        let _ = HoprIncentiveOperations::close_channel_by_id(&**hopr, channel_id).await;
+                        let _ = IncentiveChannelOperations::close_channel_by_id(&**hopr, channel_id).await;
                     }
 
                     // Poll each channel until Closed, attempting finalization when possible
                     for (hopr, channel_id) in &channels {
                         let _ = super::wait_until(
                             || async {
-                                let ch = HoprIncentiveOperations::channel_by_id(&**hopr, channel_id)
+                                let ch = IncentiveChannelOperations::channel_by_id(&**hopr, channel_id)
                                     .ok()
                                     .flatten();
                                 match ch.as_ref().map(|c| &c.status) {
                                     None | Some(ChannelStatus::Closed) => return Ok(true),
                                     Some(ChannelStatus::PendingToClose(_)) => {
-                                        let _ = HoprIncentiveOperations::close_channel_by_id(&**hopr, channel_id).await;
+                                        let _ =
+                                            IncentiveChannelOperations::close_channel_by_id(&**hopr, channel_id).await;
                                     }
                                     _ => {}
                                 }
