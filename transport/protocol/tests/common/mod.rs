@@ -12,6 +12,7 @@ use futures_time::future::FutureExt;
 use hex_literal::hex;
 use hopr_api::{
     chain::*,
+    node::TicketEvent,
     types::{
         crypto::prelude::*,
         crypto_random::{random_bytes, random_integer},
@@ -29,7 +30,6 @@ use hopr_protocol_hopr::{
 };
 use hopr_ticket_manager::{HoprTicketFactory, RedbStore};
 use hopr_transport_mixer::config::MixerConfig;
-use hopr_api::node::TicketEvent;
 use lazy_static::lazy_static;
 use libp2p::PeerId;
 use tracing::debug;
