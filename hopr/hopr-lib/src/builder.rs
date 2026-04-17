@@ -171,7 +171,7 @@ where
     NB: NetworkBuilder + Send + Sync + 'static,
     <NB as NetworkBuilder>::Network:
         hopr_api::network::NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
-    TMgr: TicketManagement + Default + Clone + Send + Sync + 'static,
+    TMgr: TicketManagement + Clone + Send + Sync + 'static,
     Srv: HoprSessionServer + Clone + Send + 'static,
     Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
     TFact: TicketFactory + Clone + Send + Sync + 'static,
@@ -230,7 +230,7 @@ where
         // Telemetry
         #[cfg(all(feature = "telemetry", not(test)))]
         {
-            use hopr_api::types::internal::prelude::AsUnixTimestamp;
+            use hopr_api::types::primitive::traits::AsUnixTimestamp;
             METRIC_PROCESS_START_TIME
                 .set(hopr_platform::time::current_time().as_unix_timestamp().as_secs_f64());
             METRIC_HOPR_LIB_VERSION.set(
@@ -456,17 +456,24 @@ where
         }
 
         // === Ticket event handling ===
-        let ticket_manager = self.ticket_manager.take().unwrap_or_default();
+        let ticket_manager = self
+            .ticket_manager
+            .take()
+            .ok_or(HoprLibError::BuilderError("missing ticket management"))?;
 
         let (tickets_tx, tickets_rx) = channel(8192);
         let (tickets_rx_stream, tickets_handle) = futures::stream::abortable(tickets_rx);
         processes.insert(HoprLibProcess::TicketEvents, tickets_handle);
         let new_ticket_tx = new_tickets_tx.clone();
+        let tmgr_clone = ticket_manager.clone();
         spawn(
             tickets_rx_stream
                 .for_each(move |event| {
-                    // TODO: Ticket insertion needs `insert_incoming_ticket` on TicketManagement trait.
-                    // For now, winning tickets are broadcast to subscribers only.
+                    if let TicketEvent::WinningTicket(ticket) = &event {
+                        if let Err(error) = tmgr_clone.insert_incoming_ticket(**ticket) {
+                            tracing::error!(%error, "failed to insert incoming ticket");
+                        }
+                    }
                     if let Err(error) = new_ticket_tx.try_broadcast(event) {
                         tracing::error!(%error, "failed to broadcast ticket event");
                     }

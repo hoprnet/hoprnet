@@ -510,6 +510,14 @@ where
                 })
             })
     }
+
+    fn insert_incoming_ticket(
+        &self,
+        ticket: hopr_api::types::internal::prelude::RedeemableTicket,
+    ) -> Result<Vec<hopr_api::types::internal::prelude::VerifiedTicket>, TicketManagerError> {
+        // Delegate to the inherent method
+        self.insert_incoming_ticket(ticket)
+    }
 }
 
 #[cfg(test)]
