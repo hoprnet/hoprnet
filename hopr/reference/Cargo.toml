@@ -26,12 +26,14 @@ session-server = [
   "dep:serde",
   "dep:serde_with",
   "dep:smart-default",
+  "dep:tokio",
   "dep:tokio-retry",
   "dep:validator",
   "hopr-lib/session-server",
 ]
 session-client = ["hopr-lib/session-client"]
 testing = [
+  "runtime-tokio",
   "session-client",
   "session-server",
   "dep:async-trait",

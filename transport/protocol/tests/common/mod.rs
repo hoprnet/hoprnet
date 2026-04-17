@@ -29,7 +29,7 @@ use hopr_protocol_hopr::{
 };
 use hopr_ticket_manager::{HoprTicketFactory, RedbStore};
 use hopr_transport_mixer::config::MixerConfig;
-use hopr_transport_protocol::TicketEvent;
+use hopr_api::node::TicketEvent;
 use lazy_static::lazy_static;
 use libp2p::PeerId;
 use tracing::debug;

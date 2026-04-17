@@ -301,6 +301,11 @@ mod tests {
             ) -> Result<Vec<VerifiedTicket>, std::io::Error>;
 
             fn ticket_stats<'a>(&self, channel_id: Option<&'a ChannelId>) -> Result<ChannelStats, std::io::Error>;
+
+            fn insert_incoming_ticket(
+                &self,
+                ticket: hopr_api::types::internal::prelude::RedeemableTicket,
+            ) -> Result<Vec<VerifiedTicket>, std::io::Error>;
         }
     }
 
