@@ -7,10 +7,7 @@ use axum::{
 };
 use hopr_lib::{
     Address, ChannelStatus, HoprBalance, HoprIncentiveOperations,
-    api::{
-        node::{HasChainApi, HasTicketManagement},
-        tickets::{ChannelStats, TicketManagement},
-    },
+    api::{node::HasChainApi, tickets::ChannelStats},
     prelude::Hash,
 };
 use serde::Deserialize;

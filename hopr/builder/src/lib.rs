@@ -17,11 +17,10 @@ use hopr_chain_connector::{
 };
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_lib;
-use hopr_lib::Keypair;
 #[cfg(feature = "session-server")]
 use hopr_lib::traits::HoprSessionServer;
 #[cfg(feature = "runtime-tokio")]
-use hopr_lib::{ChainKeypair, Hopr, HoprLibError, OffchainKeypair, config::HoprLibConfig};
+use hopr_lib::{ChainKeypair, Hopr, OffchainKeypair, config::HoprLibConfig};
 use hopr_network_graph::SharedChannelGraph;
 use hopr_transport_p2p::HoprNetwork;
 #[cfg(feature = "runtime-tokio")]

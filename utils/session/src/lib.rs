@@ -205,8 +205,10 @@ impl Abortable for ListenerJoinHandles {
     }
 }
 
+type SessionPoolInner = Arc<parking_lot::Mutex<VecDeque<(HoprSession, HoprSessionConfigurator)>>>;
+
 pub struct SessionPool {
-    pool: Option<Arc<parking_lot::Mutex<VecDeque<(HoprSession, HoprSessionConfigurator)>>>>,
+    pool: Option<SessionPoolInner>,
     ah: Option<AbortHandle>,
 }
 

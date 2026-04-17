@@ -9,7 +9,7 @@ use futures::{StreamExt, TryFutureExt};
 use hopr_lib::{
     Address, AsUnixTimestamp, ChannelEntry, ChannelStatus, HoprBalance, HoprIncentiveOperations,
     api::{
-        chain::{ChainKeyOperations, ChainReadChannelOperations, ChannelSelector},
+        chain::{ChainReadChannelOperations, ChannelSelector},
         node::HasChainApi,
     },
     errors::{HoprLibError, HoprStatusError},

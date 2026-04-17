@@ -190,6 +190,7 @@ impl From<HoprSessionClientConfig> for hopr_transport::SessionClientConfig {
 
 /// Long-running tasks that are spawned by the HOPR node.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, strum::Display, strum::EnumCount)]
+#[allow(dead_code)]
 pub(crate) enum HoprLibProcess {
     #[strum(to_string = "transport: {0}")]
     Transport(HoprTransportProcess),

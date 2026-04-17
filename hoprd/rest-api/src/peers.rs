@@ -5,16 +5,15 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
-use futures::FutureExt;
 use hopr_lib::{
     Address, ChannelEntry, ChannelStatus, HoprBalance, HoprIncentiveOperations, Multiaddr,
     api::{
         chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations},
         graph::{EdgeLinkObservable, traits::EdgeObservableRead},
         network::NetworkView,
-        node::{HasChainApi, HasGraphView, HasNetworkView, HasTransportApi},
+        node::{HasChainApi, HasNetworkView, HasTransportApi},
     },
-    errors::{HoprLibError, HoprStatusError, HoprTransportError},
+    errors::{HoprLibError, HoprTransportError},
     prelude::Hash,
 };
 use serde::{Deserialize, Serialize};
