@@ -15,8 +15,7 @@ pub mod hopr;
 
 pub(crate) type TestingConnector = std::sync::Arc<HoprBlockchainSafeConnector<BlokliTestClient<FullStateEmulator>>>;
 pub(crate) type TestingGraph = SharedChannelGraph;
-pub(crate) type TestingHopr =
-    crate::Hopr<TestingConnector, TestingGraph, HoprNetwork, crate::SharedTicketManager>;
+pub(crate) type TestingHopr = crate::Hopr<TestingConnector, TestingGraph, HoprNetwork, crate::SharedTicketManager>;
 
 /// Waits until either the given async `predicate` returns true or the `timeout` is reached.
 ///

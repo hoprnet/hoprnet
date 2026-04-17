@@ -9,6 +9,7 @@ pub mod testing;
 
 use std::sync::Arc;
 
+#[cfg(feature = "runtime-tokio")]
 use hopr_chain_connector::{
     BlockchainConnectorConfig, HoprBlockchainSafeConnector,
     api::HoprChainApi,
@@ -17,13 +18,16 @@ use hopr_chain_connector::{
 };
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_lib;
+#[cfg(feature = "runtime-tokio")]
 use hopr_lib::builder::{ChainKeypair, Keypair, OffchainKeypair};
 #[cfg(feature = "session-server")]
 use hopr_lib::traits::HoprSessionServer;
 #[cfg(feature = "runtime-tokio")]
 use hopr_lib::{Hopr, config::HoprLibConfig};
+#[cfg(feature = "runtime-tokio")]
 use hopr_network_graph::{ChannelGraph, SharedChannelGraph};
-use hopr_ticket_manager::{HoprTicketFactory, HoprTicketManager, RedbStore, RedbTicketQueue};
+use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue};
+#[cfg(feature = "runtime-tokio")]
 use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork};
 #[cfg(feature = "runtime-tokio")]
 use validator::Validate;
@@ -36,12 +40,8 @@ pub type SharedTicketManager = Arc<HoprTicketManager<RedbStore, RedbTicketQueue>
 
 /// The reference HOPR node type using canonical implementations.
 #[cfg(feature = "runtime-tokio")]
-pub type ReferenceHopr = Hopr<
-    Arc<HoprBlockchainSafeConnector<BlokliClient>>,
-    SharedChannelGraph,
-    HoprNetwork,
-    SharedTicketManager,
->;
+pub type ReferenceHopr =
+    Hopr<Arc<HoprBlockchainSafeConnector<BlokliClient>>, SharedChannelGraph, HoprNetwork, SharedTicketManager>;
 
 /// Builds a reference HOPR node using canonical implementations:
 /// - Blokli blockchain connector

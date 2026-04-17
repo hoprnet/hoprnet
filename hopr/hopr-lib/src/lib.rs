@@ -287,6 +287,7 @@ pub struct Hopr<Chain, Graph, Net, TMgr> {
     pub(crate) chain_api: Chain,
     pub(crate) ticket_event_subscribers: TicketEvents,
     pub(crate) ticket_manager: TMgr,
+    #[allow(dead_code)] // Handles must stay alive to keep background tasks running
     pub(crate) processes: AbortableList<HoprLibProcess>,
 }
 

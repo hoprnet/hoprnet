@@ -1,13 +1,13 @@
 use std::ops::Mul;
 
 use anyhow::Context;
-use hopr_reference::testing::{
-    fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, chain_propagation_delay, size_3_cluster_fixture as cluster},
-    hopr::ChannelGuard,
-};
 use hopr_chain_connector::blokli_client::BlokliQueryClient;
 use hopr_lib::{
     Address, BytesRepresentable, ChannelId, ChannelStatus, HoprBalance, api::node::IncentiveChannelOperations,
+};
+use hopr_reference::testing::{
+    fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, chain_propagation_delay, size_3_cluster_fixture as cluster},
+    hopr::ChannelGuard,
 };
 use rstest::*;
 use serial_test::serial;

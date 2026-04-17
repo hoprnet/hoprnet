@@ -1,6 +1,9 @@
 use std::{sync::Arc, time::Duration};
 
-use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt, channel::mpsc::channel};
+use futures::{FutureExt, StreamExt, channel::mpsc::channel};
+// Re-exports for downstream convenience
+pub use hopr_api::types::crypto::keypairs::Keypair;
+pub use hopr_api::types::crypto::prelude::{ChainKeypair, OffchainKeypair};
 use hopr_api::{
     chain::{AnnouncementError, HoprChainApi, SafeRegistrationError},
     ct::{CoverTrafficGeneration, ProbingTrafficGeneration},
@@ -20,10 +23,6 @@ use crate::{
     Hopr, HoprLibError, HoprLibProcess, IncomingSession, MIN_NATIVE_BALANCE, NODE_READY_TIMEOUT,
     SUGGESTED_NATIVE_BALANCE, config::HoprLibConfig, constants, traits::HoprSessionServer,
 };
-
-// Re-exports for downstream convenience
-pub use hopr_api::types::crypto::keypairs::Keypair;
-pub use hopr_api::types::crypto::prelude::{ChainKeypair, OffchainKeypair};
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
@@ -70,9 +69,7 @@ pub struct HoprBuilder<Chain = (), Graph = (), NB = (), TMgr = (), Srv = (), Ct 
 }
 
 // Manual Default — no trait bounds on generics
-impl<Chain, Graph, NB, TMgr, Srv, Ct, TFact> Default
-    for HoprBuilder<Chain, Graph, NB, TMgr, Srv, Ct, TFact>
-{
+impl<Chain, Graph, NB, TMgr, Srv, Ct, TFact> Default for HoprBuilder<Chain, Graph, NB, TMgr, Srv, Ct, TFact> {
     fn default() -> Self {
         Self {
             chain: None,
@@ -91,9 +88,7 @@ impl<Chain, Graph, NB, TMgr, Srv, Ct, TFact> Default
 
 // === Configuration methods (no trait bounds needed) ===
 
-impl<Chain, Graph, NB, TMgr, Srv, Ct, TFact>
-    HoprBuilder<Chain, Graph, NB, TMgr, Srv, Ct, TFact>
-{
+impl<Chain, Graph, NB, TMgr, Srv, Ct, TFact> HoprBuilder<Chain, Graph, NB, TMgr, Srv, Ct, TFact> {
     /// Sets the chain API implementation.
     pub fn with_chain_api(mut self, chain: Chain) -> Self {
         self.chain = Some(chain);
@@ -159,15 +154,13 @@ impl<Chain, Graph, NB, TMgr, Srv, Ct, TFact>
 
 // === Build method ===
 
-impl<Chain, Graph, NB, TMgr, Srv, Ct, TFact>
-    HoprBuilder<Chain, Graph, NB, TMgr, Srv, Ct, TFact>
+impl<Chain, Graph, NB, TMgr, Srv, Ct, TFact> HoprBuilder<Chain, Graph, NB, TMgr, Srv, Ct, TFact>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Graph: HoprGraphApi<HoprNodeId = hopr_api::OffchainPublicKey> + Clone + Send + Sync + 'static,
     <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
         hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
-    <Graph as hopr_api::graph::NetworkGraphWrite>::Observed:
-        hopr_api::graph::traits::EdgeObservableWrite + Send,
+    <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
     NB: NetworkBuilder + Send + Sync + 'static,
     <NB as NetworkBuilder>::Network:
         hopr_api::network::NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
@@ -187,19 +180,14 @@ where
     /// 6. Announce multiaddresses
     /// 7. Await key binding confirmation
     /// 8. Start transport and background processes
-    pub async fn build(
-        mut self,
-    ) -> Result<Hopr<Chain, Graph, <NB as NetworkBuilder>::Network, TMgr>, HoprLibError> {
+    pub async fn build(mut self) -> Result<Hopr<Chain, Graph, <NB as NetworkBuilder>::Network, TMgr>, HoprLibError> {
         self.cfg.validate()?;
 
         let chain_api = self
             .chain
             .clone()
             .ok_or(HoprLibError::BuilderError("missing chain API"))?;
-        let graph = self
-            .graph
-            .clone()
-            .ok_or(HoprLibError::BuilderError("missing graph"))?;
+        let graph = self.graph.clone().ok_or(HoprLibError::BuilderError("missing graph"))?;
         let (chain_id, transport_id) = self
             .identity
             .clone()
@@ -231,8 +219,7 @@ where
         #[cfg(all(feature = "telemetry", not(test)))]
         {
             use hopr_api::types::primitive::traits::AsUnixTimestamp;
-            METRIC_PROCESS_START_TIME
-                .set(hopr_platform::time::current_time().as_unix_timestamp().as_secs_f64());
+            METRIC_PROCESS_START_TIME.set(hopr_platform::time::current_time().as_unix_timestamp().as_secs_f64());
             METRIC_HOPR_LIB_VERSION.set(
                 &[const_format::formatcp!("{}", constants::APP_VERSION)],
                 const_format::formatcp!(
@@ -285,8 +272,7 @@ where
         }
 
         // === Ticket price / win prob validation ===
-        let network_min_ticket_price =
-            chain_api.minimum_ticket_price().await.map_err(HoprLibError::chain)?;
+        let network_min_ticket_price = chain_api.minimum_ticket_price().await.map_err(HoprLibError::chain)?;
         let configured_ticket_price = self.cfg.protocol.packet.codec.outgoing_ticket_price;
         if configured_ticket_price.is_some_and(|c| c < network_min_ticket_price) {
             return Err(HoprLibError::GeneralError(format!(
@@ -301,10 +287,7 @@ where
             .map_err(HoprLibError::chain)?;
         let configured_win_prob = self.cfg.protocol.packet.codec.outgoing_win_prob;
         if !std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true")
-            && configured_win_prob.is_some_and(|c| {
-                use hopr_api::types::primitive::prelude::UnitaryFloatOps;
-                c.approx_cmp(&network_min_win_prob).is_lt()
-            })
+            && configured_win_prob.is_some_and(|c| c.approx_cmp(&network_min_win_prob).is_lt())
         {
             return Err(HoprLibError::GeneralError(format!(
                 "configured outgoing win probability < network minimum: {configured_win_prob:?} < \
@@ -336,18 +319,12 @@ where
                 })?;
                 tracing::info!(%safe_addr, "safe successfully registered with this node");
             }
-            Err(SafeRegistrationError::AlreadyRegistered(registered_safe))
-                if registered_safe == safe_addr =>
-            {
+            Err(SafeRegistrationError::AlreadyRegistered(registered_safe)) if registered_safe == safe_addr => {
                 tracing::info!(%safe_addr, "this safe is already registered with this node");
             }
-            Err(SafeRegistrationError::AlreadyRegistered(registered_safe))
-                if registered_safe != safe_addr =>
-            {
+            Err(SafeRegistrationError::AlreadyRegistered(registered_safe)) if registered_safe != safe_addr => {
                 tracing::error!(%safe_addr, %registered_safe, "node registered with different safe");
-                return Err(HoprLibError::GeneralError(
-                    "node registered with different safe".into(),
-                ));
+                return Err(HoprLibError::GeneralError("node registered with different safe".into()));
             }
             Err(error) => {
                 tracing::error!(%safe_addr, %error, "safe registration failed");
@@ -376,10 +353,7 @@ where
         });
 
         tracing::info!(?multiaddresses_to_announce, "announcing node on chain");
-        match chain_api
-            .announce(&multiaddresses_to_announce, &transport_id)
-            .await
-        {
+        match chain_api.announce(&multiaddresses_to_announce, &transport_id).await {
             Ok(awaiter) => {
                 awaiter.await.map_err(|error| {
                     tracing::error!(?multiaddresses_to_announce, %error, "node announcement failed");
@@ -401,15 +375,9 @@ where
             .await
             .map_err(HoprLibError::other)?
             .map_err(HoprLibError::chain)?;
-        if this_node_account.chain_addr != me_onchain
-            || this_node_account
-                .safe_address
-                .is_none_or(|a| a != safe_addr)
-        {
+        if this_node_account.chain_addr != me_onchain || this_node_account.safe_address.is_none_or(|a| a != safe_addr) {
             tracing::error!(%this_node_account, "account key-binding mismatch");
-            return Err(HoprLibError::GeneralError(
-                "account key-binding mismatch".into(),
-            ));
+            return Err(HoprLibError::GeneralError("account key-binding mismatch".into()));
         }
 
         tracing::info!(%this_node_account, "node account is ready");
@@ -469,10 +437,10 @@ where
         spawn(
             tickets_rx_stream
                 .for_each(move |event| {
-                    if let TicketEvent::WinningTicket(ticket) = &event {
-                        if let Err(error) = tmgr_clone.insert_incoming_ticket(**ticket) {
-                            tracing::error!(%error, "failed to insert incoming ticket");
-                        }
+                    if let TicketEvent::WinningTicket(ticket) = &event
+                        && let Err(error) = tmgr_clone.insert_incoming_ticket(**ticket)
+                    {
+                        tracing::error!(%error, "failed to insert incoming ticket");
                     }
                     if let Err(error) = new_ticket_tx.try_broadcast(event) {
                         tracing::error!(%error, "failed to broadcast ticket event");
@@ -495,7 +463,7 @@ where
         processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
 
         // === Assemble Hopr object ===
-        let mut hopr = Hopr {
+        let hopr = Hopr {
             chain_id: NodeOnchainIdentity {
                 node_address: chain_id.public().to_address(),
                 safe_address: self.cfg.safe_module.safe_address,
