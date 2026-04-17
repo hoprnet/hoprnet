@@ -5,7 +5,7 @@ use futures::{AsyncWriteExt, StreamExt, pin_mut};
 use futures_time::future::FutureExt as _;
 use hopr_api::{
     chain::ChainValues,
-    node::{HasChainApi, IncentiveChannelOperations, IncentiveRedeemOperations},
+    node::{HasChainApi, HasTicketManagement, IncentiveChannelOperations, IncentiveRedeemOperations},
 };
 use hopr_reference::{
     hopr_lib::{HoprBalance, HoprLibError, UnitaryFloatOps},
@@ -149,7 +149,7 @@ async fn redeem_ticket_on_request(
 
     wait_until(
         || async {
-            let stats_before = mid.inner().ticket_statistics()?;
+            let stats_before = mid.inner().ticket_statistics().map_err(HoprLibError::other)?;
             Ok::<_, HoprLibError>(stats_before.unredeemed_value >= message_count.into())
         },
         Duration::from_secs(15),
@@ -237,7 +237,7 @@ async fn neglect_ticket_on_closing(
     // background probing).
     wait_until(
         || async {
-            let stats = mid.inner().ticket_statistics()?;
+            let stats = mid.inner().ticket_statistics().map_err(HoprLibError::other)?;
             Ok::<_, HoprLibError>(
                 stats.unredeemed_value >= stats_after_reset.unredeemed_value + HoprBalance::from(message_count),
             )
@@ -258,7 +258,7 @@ async fn neglect_ticket_on_closing(
 
     wait_until(
         || async {
-            let stats_after = mid.inner().ticket_statistics()?;
+            let stats_after = mid.inner().ticket_statistics().map_err(HoprLibError::other)?;
             // After closing the test channels, neglected value must increase.
             // We use a delta check because background probing may have created
             // unredeemed tickets on other channels that remain open.
@@ -341,7 +341,7 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
     let mid_connector = mid.connector.clone();
     wait_until(
         || async {
-            let stats_after = mid.inner().ticket_statistics()?;
+            let stats_after = mid.inner().ticket_statistics().map_err(HoprLibError::other)?;
             let chain_stats_after = mid_connector
                 .redemption_stats(mid.inner().identity().safe_address)
                 .await
@@ -463,7 +463,7 @@ async fn relay_with_win_prob_higher_than_min_win_prob_should_succeed(
     let mid_connector = mid.connector.clone();
     wait_until(
         || async {
-            let stats_after = mid.inner().ticket_statistics()?;
+            let stats_after = mid.inner().ticket_statistics().map_err(HoprLibError::other)?;
             let chain_stats_after = mid_connector
                 .redemption_stats(mid.inner().identity().safe_address)
                 .await

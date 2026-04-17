@@ -133,10 +133,39 @@ where
     // Create concrete components
     let graph: SharedChannelGraph = Arc::new(ChannelGraph::new(*packet_key.public()));
 
-    let network_builder = HoprLibp2pNetworkBuilder::new(
-        // TODO: peer discovery channel needs to be wired to chain events
-        futures::channel::mpsc::channel(2048).1,
-    );
+    // Wire chain announcement events → network peer discovery
+    let (peer_discovery_tx, peer_discovery_rx) = futures::channel::mpsc::channel(2048);
+    {
+        use futures::{SinkExt, StreamExt};
+        use hopr_lib::api::chain::{ChainEvents, StateSyncOptions};
+        let chain_events = chain_connector
+            .subscribe_with_state_sync([StateSyncOptions::PublicAccounts])
+            .map_err(|e| anyhow::anyhow!("failed to subscribe to chain events: {e}"))?;
+        let mut tx = peer_discovery_tx;
+        tokio::spawn(async move {
+            chain_events
+                .for_each(|event| {
+                    let mut tx = tx.clone();
+                    async move {
+                        if let hopr_lib::api::types::chain::chain_events::ChainEvent::Announcement(account) = event {
+                            let peer_id: hopr_lib::api::PeerId = account.public_key.into();
+                            if let Err(error) = tx
+                                .send(hopr_transport_p2p::PeerDiscovery::Announce(
+                                    peer_id,
+                                    account.get_multiaddrs().to_vec(),
+                                ))
+                                .await
+                            {
+                                tracing::error!(%peer_id, %error, "failed to send peer discovery event");
+                            }
+                        }
+                    }
+                })
+                .await;
+        });
+    }
+
+    let network_builder = HoprLibp2pNetworkBuilder::new(peer_discovery_rx);
 
     let prober_cfg = probe_cfg.unwrap_or_default();
     let cover_traffic =

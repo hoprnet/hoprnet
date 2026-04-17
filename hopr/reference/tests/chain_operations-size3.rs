@@ -112,13 +112,13 @@ async fn test_channel_retrieval(cluster: &ClusterGuard) -> anyhow::Result<()> {
 
     let channel_by_parties = ext
         .inner()
-        .channel(&src.address(), &dst.address())
+        .channel(src.address(), dst.address())
         .context("failed to get channel by parties")?
         .context("channel not found")?;
 
     let channel_from_ids = ext
         .inner()
-        .channels_from(&src.address())
+        .channels_from(src.address())
         .await
         .context("failed to get channels from src")?
         .into_iter()
@@ -127,7 +127,7 @@ async fn test_channel_retrieval(cluster: &ClusterGuard) -> anyhow::Result<()> {
 
     let channel_to_ids = ext
         .inner()
-        .channels_to(&dst.address())
+        .channels_to(dst.address())
         .await
         .context("failed to get channels to dst")?
         .into_iter()

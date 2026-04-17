@@ -2,8 +2,8 @@ use std::{str::FromStr, time::Duration};
 
 use anyhow::Context;
 use hopr_lib::{
-    HopRouting, HoprSessionClientConfig, SessionCapabilities, SessionTarget,
-    errors::{HoprLibError, HoprTransportError},
+    HopRouting, HoprSessionClientConfig, HoprSessionClientOperations, SessionCapabilities, SessionTarget,
+    errors::HoprTransportError,
     exports::transport::session::{IpOrHost, SealedHost},
 };
 use hopr_reference::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster};
@@ -24,7 +24,7 @@ async fn test_keep_alive_session(cluster: &ClusterGuard) -> anyhow::Result<()> {
 
     let ip = IpOrHost::from_str(":0")?;
 
-    let session = src
+    let (_session, configurator) = src
         .inner()
         .connect_to(
             dst.address(),
@@ -42,17 +42,17 @@ async fn test_keep_alive_session(cluster: &ClusterGuard) -> anyhow::Result<()> {
 
     sleep(Duration::from_secs(2)).await;
 
-    src.inner()
-        .keep_alive_session(session.id())
+    configurator
+        .ping()
         .await
         .context("failed to keep alive session")?;
 
     sleep(Duration::from_secs(3)).await; // sleep longer than the session timeout
 
-    match src.inner().keep_alive_session(session.id()).await {
-        Err(HoprLibError::TransportError(HoprTransportError::Session(hopr_lib::TransportSessionError::Manager(
+    match configurator.ping().await {
+        Err(HoprTransportError::Session(hopr_lib::TransportSessionError::Manager(
             hopr_lib::SessionManagerError::NonExistingSession,
-        )))) => {}
+        ))) => {}
         Err(e) => panic!(
             "expected SessionNotFound error when keeping alive session, but got different error: {:?}",
             e
