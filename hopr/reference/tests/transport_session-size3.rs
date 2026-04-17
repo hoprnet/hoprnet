@@ -1,7 +1,7 @@
 use std::{str::FromStr, time::Duration};
 
 use anyhow::Context;
-use hopr_builder::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster};
+use hopr_reference::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster};
 use hopr_lib::{
     HopRouting, HoprSessionClientConfig, SessionCapabilities, SessionTarget,
     errors::{HoprLibError, HoprTransportError},

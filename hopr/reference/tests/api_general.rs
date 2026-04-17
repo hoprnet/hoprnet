@@ -1,5 +1,5 @@
 use anyhow::Context;
-use hopr_builder::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_2_cluster_fixture as cluster};
+use hopr_reference::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_2_cluster_fixture as cluster};
 use hopr_lib::{
     PeerId,
     api::{chain::ChainKeyOperations, node::HasChainApi},

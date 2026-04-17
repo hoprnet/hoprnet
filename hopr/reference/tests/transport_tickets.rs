@@ -7,7 +7,7 @@ use hopr_api::{
     chain::ChainValues,
     node::{HasChainApi, IncentiveChannelOperations, IncentiveRedeemOperations},
 };
-use hopr_builder::{
+use hopr_reference::{
     hopr_lib::{HoprBalance, HoprLibError, UnitaryFloatOps},
     testing::{
         fixtures::{ClusterGuard, MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, TestNodeConfig, cluster_fixture},

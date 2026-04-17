@@ -1,7 +1,7 @@
 use std::ops::Mul;
 
 use anyhow::Context;
-use hopr_builder::testing::{
+use hopr_reference::testing::{
     fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, chain_propagation_delay, size_3_cluster_fixture as cluster},
     hopr::ChannelGuard,
 };

@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use hopr_builder::config::SessionIpForwardingConfig;
+use hopr_reference::config::SessionIpForwardingConfig;
 use hopr_lib::{
     HoprBalance, HoprProtocolConfig, SafeModule, TagAllocatorConfig, WinningProbability,
     config::{

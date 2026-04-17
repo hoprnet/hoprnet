@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::Context;
-use hopr_builder::config::SessionIpForwardingConfig;
+use hopr_reference::config::SessionIpForwardingConfig;
 use hopr_chain_connector::{
     BlockchainConnectorConfig,
     api::*,

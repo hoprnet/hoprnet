@@ -37,7 +37,7 @@ const DEFAULT_BLOKLI_URL: &str = "https://blokli.dufour.hoprnet.link";
 
 type HoprBlokliConnector = HoprBlockchainSafeConnector<BlokliClient>;
 type HoprNode =
-    hopr_lib::Hopr<Arc<HoprBlokliConnector>, SharedChannelGraph, HoprNetwork, hopr_builder::SharedTicketManager>;
+    hopr_lib::Hopr<Arc<HoprBlokliConnector>, SharedChannelGraph, HoprNetwork, hopr_reference::SharedTicketManager>;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, strum::Display)]
 enum HoprdProcess {
@@ -212,7 +212,7 @@ fn main() -> ExitCode {
 #[cfg(feature = "runtime-tokio")]
 async fn main_inner(cfg: HoprdConfig, hopr_keys: HoprKeys) -> anyhow::Result<()> {
     use hopr_api::chain::ChainEvents;
-    use hopr_builder::exit::HoprServerIpForwardingReactor;
+    use hopr_reference::exit::HoprServerIpForwardingReactor;
     use hopr_chain_connector::{BlockchainConnectorConfig, blokli_client, create_trustful_hopr_blokli_connector};
 
     #[cfg(all(target_os = "linux", feature = "allocator-jemalloc-stats"))]
@@ -291,7 +291,7 @@ async fn main_inner(cfg: HoprdConfig, hopr_keys: HoprKeys) -> anyhow::Result<()>
         ..Default::default()
     };
 
-    let node = hopr_builder::build_with_chain(
+    let node = hopr_reference::build_with_chain(
         &hopr_keys.chain_key,
         &hopr_keys.packet_key,
         hopr_lib_cfg,
