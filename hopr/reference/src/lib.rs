@@ -206,14 +206,12 @@ where
     let ticket_manager = Arc::new(ticket_manager);
     let ticket_factory = Arc::new(ticket_factory);
 
-    // Use the abstract builder
+    // Use the abstract builder with build_full for relay node
     let mut builder = hopr_lib::builder::HoprBuilder::default()
         .with_chain_api(chain_connector)
         .with_graph(graph)
         .with_network_builder(network_builder)
         .with_cover_traffic(cover_traffic)
-        .with_ticket_factory(ticket_factory)
-        .with_ticket_management(ticket_manager)
         .with_identity(chain_key, packet_key)
         .with_safe_module(&config.safe_module.safe_address, &config.safe_module.module_address)
         .with_config(config);
@@ -228,7 +226,7 @@ where
         builder = builder.with_session_server(());
     }
 
-    let node = builder.build().await?;
+    let node = builder.build_full(ticket_manager, ticket_factory).await?;
 
     Ok(Arc::new(node))
 }
