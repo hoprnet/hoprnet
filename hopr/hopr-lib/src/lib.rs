@@ -514,25 +514,6 @@ where
 }
 
 impl<Chain, Graph, Net, TMgr> Hopr<Chain, Graph, Net, TMgr> {
-    /// Gets the SURB balancer configuration of a session by its ID.
-    pub async fn get_session_surb_balancer_config(&self, id: &SessionId) -> errors::Result<Option<SurbBalancerConfig>> {
-        Ok(self.transport_api.get_session_surb_balancer_config(id).await?)
-    }
-
-    /// Updates the SURB balancer configuration of a session by its ID.
-    pub async fn update_session_surb_balancer_config(
-        &self,
-        id: &SessionId,
-        config: SurbBalancerConfig,
-    ) -> errors::Result<()> {
-        Ok(self
-            .transport_api
-            .update_session_surb_balancer_config(id, config)
-            .await?)
-    }
-}
-
-impl<Chain, Graph, Net, TMgr> Hopr<Chain, Graph, Net, TMgr> {
     /// Prometheus formatted metrics collected by the hopr-lib components.
     pub fn collect_hopr_metrics() -> errors::Result<String> {
         cfg_if::cfg_if! {

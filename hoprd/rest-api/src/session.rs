@@ -654,15 +654,24 @@ pub(crate) async fn adjust_session(
         SessionId::from_str(&session_id).map_err(|_| (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidSessionId))?;
 
     if let Some(cfg) = Option::<SurbBalancerConfig>::from(args) {
-        match state.hopr.update_session_surb_balancer_config(&session_id, cfg).await {
-            Ok(_) => Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::NO_CONTENT, "").into_response()),
-            Err(HoprLibError::TransportError(HoprTransportError::Session(TransportSessionError::Manager(
-                SessionManagerError::NonExistingSession,
-            )))) => Err((StatusCode::NOT_FOUND, ApiErrorStatus::SessionNotFound)),
-            Err(e) => Err((
-                StatusCode::NOT_ACCEPTABLE,
-                ApiErrorStatus::UnknownFailure(e.to_string()),
-            )),
+        // Find the configurator for this session across all listeners
+        let configurator = state.open_listeners.0.iter().find_map(|entry| {
+            entry
+                .value()
+                .get_clients()
+                .get(&session_id)
+                .map(|client| client.value().2.clone())
+        });
+
+        match configurator {
+            Some(configurator) => match configurator.update_surb_balancer_config(cfg).await {
+                Ok(_) => Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::NO_CONTENT, "").into_response()),
+                Err(e) => Err((
+                    StatusCode::NOT_ACCEPTABLE,
+                    ApiErrorStatus::UnknownFailure(e.to_string()),
+                )),
+            },
+            None => Err((StatusCode::NOT_FOUND, ApiErrorStatus::SessionNotFound)),
         }
     } else {
         Err::<_, (StatusCode, ApiErrorStatus)>((StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidInput))
@@ -696,15 +705,27 @@ pub(crate) async fn session_config(
     let session_id =
         SessionId::from_str(&session_id).map_err(|_| (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidSessionId))?;
 
-    match state.hopr.get_session_surb_balancer_config(&session_id).await {
-        Ok(Some(cfg)) => {
-            Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::OK, Json(SessionConfig::from(cfg))).into_response())
-        }
-        Ok(None) => Err((StatusCode::NOT_FOUND, ApiErrorStatus::SessionNotFound)),
-        Err(e) => Err((
-            StatusCode::UNPROCESSABLE_ENTITY,
-            ApiErrorStatus::UnknownFailure(e.to_string()),
-        )),
+    // Find the configurator for this session across all listeners
+    let configurator = state.open_listeners.0.iter().find_map(|entry| {
+        entry
+            .value()
+            .get_clients()
+            .get(&session_id)
+            .map(|client| client.value().2.clone())
+    });
+
+    match configurator {
+        Some(configurator) => match configurator.get_surb_balancer_config().await {
+            Ok(Some(cfg)) => {
+                Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::OK, Json(SessionConfig::from(cfg))).into_response())
+            }
+            Ok(None) => Err((StatusCode::NOT_FOUND, ApiErrorStatus::SessionNotFound)),
+            Err(e) => Err((
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ApiErrorStatus::UnknownFailure(e.to_string()),
+            )),
+        },
+        None => Err((StatusCode::NOT_FOUND, ApiErrorStatus::SessionNotFound)),
     }
 }
 
