@@ -61,7 +61,7 @@ validator = { workspace = true }
 hopr-api = { workspace = true, features = ["types-random", "tickets", "node"] }
 
 hopr-async-runtime = { workspace = true }
-hopr-crypto-packet = { workspace = true }
+hopr-crypto-packet = { workspace = true, features = ["rayon"] }
 
 hopr-network-types = { workspace = true }
 hopr-protocol-app = { workspace = true }

@@ -15,14 +15,14 @@ use crate::{PixSpec, SsaIndex, SsaPolyShare, SurbPolynomialIndex, errors};
 type RawPolynomial<S> = Vec<DefaultShare<IdentifierPrimeField<S>, IdentifierPrimeField<S>>>;
 type RawPolynomialVerifier<E> = Vec<ShareVerifierGroup<E>>;
 
-struct SecretPolynomial<S: PixSpec> {
+struct IndexedPolynomial<S: PixSpec> {
     spi: SurbPolynomialIndex<S::Pseudonym>,
     raw: RawPolynomial<S::Scalar>,
     shares_generated: usize,
     t: usize,
 }
 
-impl<S: PixSpec> SecretPolynomial<S> {
+impl<S: PixSpec> IndexedPolynomial<S> {
     pub fn next_share(&mut self, x: S::Scalar) -> SsaPolyShare<S> {
         let eval = self.raw.evaluate(&x.into(), self.t);
         self.shares_generated += 1;
@@ -32,7 +32,7 @@ impl<S: PixSpec> SecretPolynomial<S> {
 
 struct SsaPseudonymEntry<S: PixSpec> {
     ssa_index: SsaIndex,
-    poly_queue: VecDeque<SecretPolynomial<S>>,
+    poly_queue: VecDeque<IndexedPolynomial<S>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -177,7 +177,7 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
                         poly_queue: raw_polynomials
                             .into_iter()
                             .enumerate()
-                            .map(|(poly_index, raw)| SecretPolynomial {
+                            .map(|(poly_index, raw)| IndexedPolynomial {
                                 spi: SurbPolynomialIndex::new(*pseudonym, new_index, poly_index as u32),
                                 raw,
                                 shares_generated: 0,
@@ -206,7 +206,7 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
                         entry
                             .poly_queue
                             .extend(raw_polynomials.into_iter().enumerate().map(|(poly_index, raw)| {
-                                SecretPolynomial {
+                                IndexedPolynomial {
                                     spi: SurbPolynomialIndex::new(*pseudonym, new_index, poly_index as u32),
                                     raw,
                                     shares_generated: 0,
