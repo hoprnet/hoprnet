@@ -9,7 +9,7 @@ use hopr_api::{
     ct::{CoverTrafficGeneration, ProbingTrafficGeneration},
     graph::{EdgeCapacityUpdate, HoprGraphApi},
     network::{NetworkBuilder, NetworkStreamControl},
-    node::{AtomicHoprState, HoprState, NodeOnchainIdentity, TicketEvent},
+    node::{AtomicHoprState, HoprSessionServer, HoprState, NodeOnchainIdentity, TicketEvent},
     tickets::{TicketFactory, TicketManagement},
     types::{
         chain::chain_events::ChainEvent,
@@ -24,7 +24,7 @@ use validator::Validate;
 
 use crate::{
     Hopr, HoprLibError, HoprLibProcess, IncomingSession, MIN_NATIVE_BALANCE, NODE_READY_TIMEOUT,
-    SUGGESTED_NATIVE_BALANCE, config::HoprLibConfig, constants, traits::HoprSessionServer,
+    SUGGESTED_NATIVE_BALANCE, config::HoprLibConfig, constants,
 };
 
 #[cfg(all(feature = "telemetry", not(test)))]
@@ -176,7 +176,7 @@ where
     NB: NetworkBuilder + Send + Sync + 'static,
     <NB as NetworkBuilder>::Network:
         hopr_api::network::NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
-    Srv: HoprSessionServer + Clone + Send + 'static,
+    Srv: HoprSessionServer<Session = IncomingSession> + Send + Clone + 'static,
     Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
 {
     /// Builds an edge (entry/exit) [`Hopr`] node.

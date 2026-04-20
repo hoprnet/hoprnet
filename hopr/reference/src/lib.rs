@@ -106,7 +106,7 @@ pub async fn build_reference(
 #[cfg(feature = "runtime-tokio")]
 pub async fn build_with_chain<
     Chain,
-    #[cfg(feature = "session-server")] Srv: HoprSessionServer + Clone + Send + 'static,
+    #[cfg(feature = "session-server")] Srv: HoprSessionServer<Session = hopr_lib::IncomingSession> + Send + Clone + 'static,
 >(
     chain_key: &ChainKeypair,
     packet_key: &OffchainKeypair,
