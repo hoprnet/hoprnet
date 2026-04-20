@@ -20,8 +20,6 @@ use hopr_chain_connector::{
 pub use hopr_lib;
 #[cfg(feature = "runtime-tokio")]
 use hopr_lib::builder::{ChainKeypair, Keypair, OffchainKeypair};
-#[cfg(feature = "session-server")]
-use hopr_lib::traits::HoprSessionServer;
 #[cfg(feature = "runtime-tokio")]
 use hopr_lib::{Hopr, config::HoprLibConfig};
 #[cfg(feature = "runtime-tokio")]
@@ -106,7 +104,7 @@ pub async fn build_reference(
 #[cfg(feature = "runtime-tokio")]
 pub async fn build_with_chain<
     Chain,
-    #[cfg(feature = "session-server")] Srv: HoprSessionServer<Session = hopr_lib::IncomingSession> + Send + Clone + 'static,
+    #[cfg(feature = "session-server")] Srv: hopr_lib::api::node::HoprSessionServer<Session = hopr_lib::IncomingSession> + Send + Clone + 'static,
 >(
     chain_key: &ChainKeypair,
     packet_key: &OffchainKeypair,
@@ -206,8 +204,8 @@ where
     let ticket_manager = Arc::new(ticket_manager);
     let ticket_factory = Arc::new(ticket_factory);
 
-    // Use the abstract builder with build_full for relay node
-    let mut builder = hopr_lib::builder::HoprBuilder::default()
+    // Use the abstract builder — session server is wired separately
+    let builder = hopr_lib::builder::HoprBuilder::default()
         .with_chain_api(chain_connector)
         .with_graph(graph)
         .with_network_builder(network_builder)
@@ -216,17 +214,28 @@ where
         .with_safe_module(&config.safe_module.safe_address, &config.safe_module.module_address)
         .with_config(config);
 
+    let built = builder.build_full(ticket_manager, ticket_factory).await?;
+
+    // Wire session server to the incoming session receiver
     #[cfg(feature = "session-server")]
     {
-        builder = builder.with_session_server(server);
+        use futures::StreamExt;
+        let session_rx = built.session_rx;
+        tokio::spawn(async move {
+            session_rx
+                .for_each_concurrent(None, move |session| {
+                    let server = server.clone();
+                    async move {
+                        let session_id = *session.session.id();
+                        match server.process(session).await {
+                            Ok(()) => tracing::debug!(?session_id, "session processed successfully"),
+                            Err(error) => tracing::error!(?session_id, %error, "session processing failed"),
+                        }
+                    }
+                })
+                .await;
+        });
     }
 
-    #[cfg(not(feature = "session-server"))]
-    {
-        builder = builder.with_session_server(());
-    }
-
-    let node = builder.build_full(ticket_manager, ticket_factory).await?;
-
-    Ok(Arc::new(node))
+    Ok(Arc::new(built.node))
 }

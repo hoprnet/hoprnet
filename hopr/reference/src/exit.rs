@@ -57,7 +57,7 @@ impl HoprServerIpForwardingReactor {
 pub const SERVICE_ID_LOOPBACK: ServiceId = 0;
 
 #[async_trait::async_trait]
-impl hopr_lib::traits::HoprSessionServer for HoprServerIpForwardingReactor {
+impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
     type Error = hopr_lib::errors::HoprLibError;
     type Session = hopr_lib::exports::transport::IncomingSession;
 

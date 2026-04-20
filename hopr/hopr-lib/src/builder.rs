@@ -9,7 +9,7 @@ use hopr_api::{
     ct::{CoverTrafficGeneration, ProbingTrafficGeneration},
     graph::{EdgeCapacityUpdate, HoprGraphApi},
     network::{NetworkBuilder, NetworkStreamControl},
-    node::{AtomicHoprState, HoprSessionServer, HoprState, NodeOnchainIdentity, TicketEvent},
+    node::{AtomicHoprState, HoprState, NodeOnchainIdentity, TicketEvent},
     tickets::{TicketFactory, TicketManagement},
     types::{
         chain::chain_events::ChainEvent,
@@ -61,6 +61,7 @@ struct PreBuiltNode<Chain, Graph, Net, NB, Ct> {
     ),
     processes: AbortableList<HoprLibProcess>,
     session_tx: futures::channel::mpsc::Sender<IncomingSession>,
+    session_rx: futures::channel::mpsc::Receiver<IncomingSession>,
     // Moved out for transport.run()
     cover_traffic: Ct,
     network_builder: NB,
@@ -79,32 +80,28 @@ struct PreBuiltNode<Chain, Graph, Net, NB, Ct> {
 /// - `Chain` — blockchain API ([`HoprChainApi`])
 /// - `Graph` — network graph ([`HoprGraphApi`])
 /// - `NB` — network builder factory ([`NetworkBuilder`])
-/// - `Srv` — session server handler ([`HoprSessionServer`])
 /// - `Ct` — cover traffic / probing ([`ProbingTrafficGeneration`] + [`CoverTrafficGeneration`])
 ///
-/// Ticket management and ticket factory are **not** builder generics — they are
-/// parameters to the build methods, because edge and relay nodes construct them
-/// differently (standalone factory vs coupled factory+manager).
-pub struct HoprBuilder<Chain = (), Graph = (), NB = (), Srv = (), Ct = ()> {
+/// Ticket management, ticket factory, and session server are **not** builder generics —
+/// they are parameters to the build methods or handled by the caller after building.
+pub struct HoprBuilder<Chain = (), Graph = (), NB = (), Ct = ()> {
     chain: Option<Chain>,
     graph: Option<Graph>,
     network_builder: Option<NB>,
     cover_traffic: Option<Ct>,
-    session_server: Option<Srv>,
     identity: Option<(ChainKeypair, OffchainKeypair)>,
     safe_and_module: Option<(Address, Address)>,
     cfg: HoprLibConfig,
 }
 
 // Manual Default — no trait bounds on generics
-impl<Chain, Graph, NB, Srv, Ct> Default for HoprBuilder<Chain, Graph, NB, Srv, Ct> {
+impl<Chain, Graph, NB, Ct> Default for HoprBuilder<Chain, Graph, NB, Ct> {
     fn default() -> Self {
         Self {
             chain: None,
             graph: None,
             network_builder: None,
             cover_traffic: None,
-            session_server: None,
             identity: None,
             safe_and_module: None,
             cfg: Default::default(),
@@ -114,7 +111,7 @@ impl<Chain, Graph, NB, Srv, Ct> Default for HoprBuilder<Chain, Graph, NB, Srv, C
 
 // === Configuration methods (no trait bounds needed) ===
 
-impl<Chain, Graph, NB, Srv, Ct> HoprBuilder<Chain, Graph, NB, Srv, Ct> {
+impl<Chain, Graph, NB, Ct> HoprBuilder<Chain, Graph, NB, Ct> {
     /// Sets the chain API implementation.
     pub fn with_chain_api(mut self, chain: Chain) -> Self {
         self.chain = Some(chain);
@@ -139,12 +136,6 @@ impl<Chain, Graph, NB, Srv, Ct> HoprBuilder<Chain, Graph, NB, Srv, Ct> {
         self
     }
 
-    /// Sets the session server handler.
-    pub fn with_session_server(mut self, srv: Srv) -> Self {
-        self.session_server = Some(srv);
-        self
-    }
-
     /// Sets the node's on-chain and off-chain identity.
     pub fn with_identity(mut self, chain_key: &ChainKeypair, offchain_key: &OffchainKeypair) -> Self {
         self.identity = Some((chain_key.clone(), offchain_key.clone()));
@@ -164,9 +155,23 @@ impl<Chain, Graph, NB, Srv, Ct> HoprBuilder<Chain, Graph, NB, Srv, Ct> {
     }
 }
 
+/// Result of a successful build, containing the node and a receiver for incoming sessions.
+///
+/// The caller is responsible for attaching a session server to the `session_rx`
+/// if the node should process incoming sessions.
+pub struct BuiltNode<Chain, Graph, Net, TMgr> {
+    /// The built HOPR node.
+    pub node: Hopr<Chain, Graph, Net, TMgr>,
+    /// Receiver for incoming sessions from the transport layer.
+    ///
+    /// Attach a [`HoprSessionServer`](hopr_api::node::HoprSessionServer) to this
+    /// receiver to process incoming sessions, or drop it to discard them.
+    pub session_rx: futures::channel::mpsc::Receiver<IncomingSession>,
+}
+
 // === Build methods ===
 
-impl<Chain, Graph, NB, Srv, Ct> HoprBuilder<Chain, Graph, NB, Srv, Ct>
+impl<Chain, Graph, NB, Ct> HoprBuilder<Chain, Graph, NB, Ct>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Graph: HoprGraphApi<HoprNodeId = hopr_api::OffchainPublicKey> + Clone + Send + Sync + 'static,
@@ -176,7 +181,6 @@ where
     NB: NetworkBuilder + Send + Sync + 'static,
     <NB as NetworkBuilder>::Network:
         hopr_api::network::NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
-    Srv: HoprSessionServer<Session = IncomingSession> + Send + Clone + 'static,
     Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
 {
     /// Builds an edge (entry/exit) [`Hopr`] node.
@@ -189,11 +193,12 @@ where
     pub async fn build_edge<TFact>(
         self,
         ticket_factory: TFact,
-    ) -> Result<Hopr<Chain, Graph, <NB as NetworkBuilder>::Network, ()>, HoprLibError>
+    ) -> Result<BuiltNode<Chain, Graph, <NB as NetworkBuilder>::Network, ()>, HoprLibError>
     where
         TFact: TicketFactory + Clone + Send + Sync + 'static,
     {
         let pre = self.pre_build().await?;
+        let session_rx = pre.session_rx;
 
         // Edge nodes drain incoming tickets — no ticket processing.
         tracing::info!("starting transport for edge node");
@@ -211,7 +216,7 @@ where
         let mut processes = pre.processes;
         processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
 
-        let hopr = Hopr {
+        let node = Hopr {
             chain_id: NodeOnchainIdentity {
                 node_address: pre.chain_id.public().to_address(),
                 safe_address: pre.cfg.safe_module.safe_address,
@@ -227,15 +232,15 @@ where
             ticket_manager: (),
         };
 
-        hopr.state
+        node.state
             .store(HoprState::Running, std::sync::atomic::Ordering::Relaxed);
         tracing::info!(
-            id = %hopr.transport_id.public().to_peerid_str(),
+            id = %node.transport_id.public().to_peerid_str(),
             version = constants::APP_VERSION,
             "EDGE NODE STARTED AND RUNNING"
         );
 
-        Ok(hopr)
+        Ok(BuiltNode { node, session_rx })
     }
 
     /// Builds a full (relay) [`Hopr`] node.
@@ -251,12 +256,13 @@ where
         self,
         ticket_manager: TMgr,
         ticket_factory: TFact,
-    ) -> Result<Hopr<Chain, Graph, <NB as NetworkBuilder>::Network, TMgr>, HoprLibError>
+    ) -> Result<BuiltNode<Chain, Graph, <NB as NetworkBuilder>::Network, TMgr>, HoprLibError>
     where
         TMgr: TicketManagement + Clone + Send + Sync + 'static,
         TFact: TicketFactory + Clone + Send + Sync + 'static,
     {
         let pre = self.pre_build().await?;
+        let session_rx = pre.session_rx;
 
         let mut processes = pre.processes;
 
@@ -361,7 +367,7 @@ where
             .await?;
         processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
 
-        let hopr = Hopr {
+        let node = Hopr {
             chain_id: NodeOnchainIdentity {
                 node_address: pre.chain_id.public().to_address(),
                 safe_address: pre.cfg.safe_module.safe_address,
@@ -377,11 +383,11 @@ where
             ticket_manager,
         };
 
-        hopr.state
+        node.state
             .store(HoprState::Running, std::sync::atomic::Ordering::Relaxed);
 
         tracing::info!(
-            id = %hopr.transport_id.public().to_peerid_str(),
+            id = %node.transport_id.public().to_peerid_str(),
             version = constants::APP_VERSION,
             "FULL NODE STARTED AND RUNNING"
         );
@@ -389,22 +395,18 @@ where
         #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_HOPR_NODE_INFO.set(
             &[
-                &hopr.transport_id.public().to_peerid_str(),
-                &hopr.chain_id.node_address.to_string(),
-                &hopr.chain_id.safe_address.to_string(),
-                &hopr.chain_id.module_address.to_string(),
+                &node.transport_id.public().to_peerid_str(),
+                &node.chain_id.node_address.to_string(),
+                &node.chain_id.safe_address.to_string(),
+                &node.chain_id.module_address.to_string(),
             ],
             1.0,
         );
 
-        Ok(hopr)
+        Ok(BuiltNode { node, session_rx })
     }
 
     /// Shared initialization sequence for both edge and full node builds.
-    ///
-    /// Performs: config validation, transport creation, fund waiting, ticket parameter
-    /// validation, Safe registration, node announcement, key binding, session
-    /// infrastructure, and chain→graph event wiring.
     async fn pre_build(
         mut self,
     ) -> Result<PreBuiltNode<Chain, Graph, <NB as NetworkBuilder>::Network, NB, Ct>, HoprLibError> {
@@ -605,51 +607,20 @@ where
 
         tracing::info!(%this_node_account, "node account is ready");
 
-        // === Session infrastructure ===
-        tracing::info!("initializing session infrastructure");
+        // === Session channel ===
         let incoming_session_capacity = std::env::var("HOPR_INTERNAL_SESSION_INCOMING_CAPACITY")
             .ok()
             .and_then(|s| s.trim().parse::<usize>().ok())
             .filter(|&c| c > 0)
             .unwrap_or(256);
 
-        #[allow(unused_mut)]
-        let mut processes = AbortableList::<HoprLibProcess>::default();
-
-        let (session_tx, _session_rx) = channel::<IncomingSession>(incoming_session_capacity);
-
-        if let Some(serve_handler) = self.session_server.take() {
-            tracing::debug!(capacity = incoming_session_capacity, "creating session server");
-            processes.insert(
-                HoprLibProcess::SessionServer,
-                hopr_async_runtime::spawn_as_abortable!(
-                    _session_rx
-                        .for_each_concurrent(None, move |session| {
-                            let serve_handler = serve_handler.clone();
-                            async move {
-                                let session_id = *session.session.id();
-                                match serve_handler.process(session).await {
-                                    Ok(_) => {
-                                        tracing::debug!(?session_id, "session processed successfully")
-                                    }
-                                    Err(error) => {
-                                        tracing::error!(?session_id, %error, "session processing failed")
-                                    }
-                                }
-                            }
-                        })
-                        .inspect(|_| tracing::warn!(
-                            task = %HoprLibProcess::SessionServer,
-                            "long-running background task finished"
-                        ))
-                ),
-            );
-        }
+        let processes = AbortableList::<HoprLibProcess>::default();
+        let (session_tx, session_rx) = channel::<IncomingSession>(incoming_session_capacity);
 
         // === Chain → Graph event wiring ===
         // Subscribe to chain events and update the graph accordingly.
         // This runs as a background task for the lifetime of the node.
-        {
+        let mut processes = {
             let chain_events = chain_api
                 .subscribe_with_state_sync([StateSyncOptions::PublicAccounts, StateSyncOptions::OpenedChannels])
                 .map_err(HoprLibError::chain)?;
@@ -773,11 +744,13 @@ where
                     "long-running background task finished"
                 )
             });
+            let mut processes = processes;
             processes.insert(
                 HoprLibProcess::ChannelEvents,
                 hopr_async_runtime::spawn_as_abortable!(proc),
             );
-        }
+            processes
+        };
 
         Ok(PreBuiltNode {
             chain_id,
@@ -789,6 +762,7 @@ where
             ticket_event_subscribers: (new_tickets_tx, new_tickets_rx.deactivate()),
             processes,
             session_tx,
+            session_rx,
             cover_traffic,
             network_builder,
         })
