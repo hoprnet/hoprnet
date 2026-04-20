@@ -10,7 +10,7 @@ use vsss_rs::{
     },
 };
 
-use crate::{PixSpec, SsaIndex, SsaPolyShare, SurbPolynomialIndex, errors};
+use crate::{PixSpec, SsaIndex, SsaPolyShare, SsaShareVerifier, SurbPolynomialIndex, errors};
 
 type RawPolynomial<S> = Vec<DefaultShare<IdentifierPrimeField<S>, IdentifierPrimeField<S>>>;
 type RawPolynomialVerifier<E> = Vec<ShareVerifierGroup<E>>;
@@ -33,13 +33,6 @@ impl<S: PixSpec> IndexedPolynomial<S> {
 struct SsaPseudonymEntry<S: PixSpec> {
     ssa_index: SsaIndex,
     poly_queue: VecDeque<IndexedPolynomial<S>>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct SsaShareVerifier<S: PixSpec> {
-    spi: SurbPolynomialIndex<S::Pseudonym>,
-    poly_commitment: Vec<ShareVerifierGroup<S::Element>>,
 }
 
 fn new_polynomial_with_verifier<S: PixSpec>(
@@ -74,13 +67,19 @@ fn new_polynomial_with_verifier<S: PixSpec>(
     Ok((polynomial, verifier))
 }
 
+/// Configuration for the [`SsaShareGenerator`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault, validator::Validate)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SsaGeneratorConfig {
+    /// The number of polynomials to generate per SSA commitment.
     #[default(1024)]
+    #[validate(range(min = 1))]
     pub polynomials_per_ssa: usize,
+    /// Minimum number of shares required to reconstruct each SSA polynomial.
     #[default(200)]
+    #[validate(range(min = 2))]
     pub threshold: usize,
+    /// Additional number of shares to generate beyond the threshold for redundancy.
     #[default(20)]
     pub surplus_shares: usize,
 }
@@ -331,7 +330,35 @@ mod tests {
     }
 
     #[test]
-    fn ssa_generator_corresponds_to_verifier() -> anyhow::Result<()> {
+    fn ssa_generator_shares_must_be_verifiable() -> anyhow::Result<()> {
+        let mut rng = vsss_rs::elliptic_curve::rand_core::OsRng;
+
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 10,
+            threshold: 10,
+            surplus_shares: 2,
+        });
+
+        let p = SimplePseudonym::random();
+        let (_, vs) = generator.new_ssa_commitment(&p)?;
+
+        for poly_index in 0..10 {
+            for _ in 0..12 {
+                let x = k256::Scalar::random(&mut rng);
+
+                let (_, share) = generator
+                    .next_share(&p, x)
+                    .ok_or(anyhow::anyhow!("failed to generate share"))?;
+
+                vs[poly_index].verify(&share, x)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn ssa_generator_corresponds_to_standard_verifier_and_recoverer() -> anyhow::Result<()> {
         let mut rng = vsss_rs::elliptic_curve::rand_core::OsRng;
 
         let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
