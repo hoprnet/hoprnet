@@ -41,11 +41,7 @@ pub type SharedTicketManager = Arc<HoprTicketManager<RedbStore, RedbTicketQueue>
 pub type ReferenceHopr =
     Hopr<Arc<HoprBlockchainSafeConnector<BlokliClient>>, SharedChannelGraph, HoprNetwork, SharedTicketManager>;
 
-/// Builds a reference HOPR node using canonical implementations:
-/// - Blokli blockchain connector
-/// - Petgraph-based channel graph
-/// - libp2p-based P2P network
-/// - Redb-backed ticket management
+/// Builds a reference HOPR node using canonical implementations.
 #[cfg(feature = "runtime-tokio")]
 pub async fn build_reference(
     identity: (&ChainKeypair, &OffchainKeypair),
@@ -104,7 +100,7 @@ pub async fn build_reference(
 #[cfg(feature = "runtime-tokio")]
 pub async fn build_with_chain<
     Chain,
-    #[cfg(feature = "session-server")] Srv: hopr_lib::api::node::HoprSessionServer<Session = hopr_lib::IncomingSession> + Send + Clone + 'static,
+    #[cfg(feature = "session-server")] Srv: hopr_lib::api::node::HoprSessionServer<Session = hopr_lib::IncomingSession, Error: std::fmt::Display>,
 >(
     chain_key: &ChainKeypair,
     packet_key: &OffchainKeypair,
@@ -204,7 +200,6 @@ where
     let ticket_manager = Arc::new(ticket_manager);
     let ticket_factory = Arc::new(ticket_factory);
 
-    // Use the abstract builder — session server is wired separately
     let builder = hopr_lib::builder::HoprBuilder::default()
         .with_chain_api(chain_connector)
         .with_graph(graph)
@@ -214,28 +209,14 @@ where
         .with_safe_module(&config.safe_module.safe_address, &config.safe_module.module_address)
         .with_config(config);
 
-    let built = builder.build_full(ticket_manager, ticket_factory).await?;
+    let node = builder
+        .build_full(
+            ticket_manager,
+            ticket_factory,
+            #[cfg(feature = "session-server")]
+            server,
+        )
+        .await?;
 
-    // Wire session server to the incoming session receiver
-    #[cfg(feature = "session-server")]
-    {
-        use futures::StreamExt;
-        let session_rx = built.session_rx;
-        tokio::spawn(async move {
-            session_rx
-                .for_each_concurrent(None, move |session| {
-                    let server = server.clone();
-                    async move {
-                        let session_id = *session.session.id();
-                        match server.process(session).await {
-                            Ok(()) => tracing::debug!(?session_id, "session processed successfully"),
-                            Err(error) => tracing::error!(?session_id, %error, "session processing failed"),
-                        }
-                    }
-                })
-                .await;
-        });
-    }
-
-    Ok(Arc::new(built.node))
+    Ok(Arc::new(node))
 }
