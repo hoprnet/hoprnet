@@ -226,6 +226,7 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
 #[cfg(test)]
 mod tests {
     use hopr_types::{crypto::types::SimplePseudonym, crypto_random::Randomizable};
+    use vsss_rs::{FeldmanVerifierSet, ReadableShareSet};
 
     use super::*;
 
@@ -324,6 +325,50 @@ mod tests {
             generator
                 .next_share(&p1, k256::Scalar::random(vsss_rs::elliptic_curve::rand_core::OsRng))
                 .is_none()
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn ssa_generator_corresponds_to_verifier() -> anyhow::Result<()> {
+        let mut rng = vsss_rs::elliptic_curve::rand_core::OsRng;
+
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 10,
+            threshold: 10,
+            surplus_shares: 2,
+        });
+
+        let p = SimplePseudonym::random();
+        let (orig_commitment, vs) = generator.new_ssa_commitment(&p)?;
+        let vs = vs.into_iter().map(|v| v.poly_commitment).collect::<Vec<_>>();
+
+        let mut recovered_secret = k256::Scalar::default();
+        for poly_index in 0..10 {
+            let mut shares = Vec::new();
+            for _ in 0..12 {
+                let x = k256::Scalar::random(&mut rng);
+
+                let (_, share) = generator
+                    .next_share(&p, x)
+                    .ok_or(anyhow::anyhow!("failed to generate share"))?;
+                let complete_share = DefaultShare {
+                    identifier: x.into(),
+                    value: k256::Scalar::from_repr(share.0).unwrap().into(),
+                };
+
+                vs[poly_index]
+                    .verify_share(&complete_share)
+                    .map_err(|_| anyhow::anyhow!("invalid share"))?;
+                shares.push(complete_share);
+            }
+            recovered_secret += shares.combine().map_err(anyhow::Error::msg)?.0;
+        }
+
+        assert_eq!(
+            orig_commitment.to_affine(),
+            (k256::ProjectivePoint::GENERATOR * recovered_secret).to_affine()
         );
 
         Ok(())
