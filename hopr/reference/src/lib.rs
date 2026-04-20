@@ -135,7 +135,7 @@ where
     // Sync ticket manager and factory with on-chain state
     {
         use futures::StreamExt;
-        use hopr_lib::api::chain::{ChannelSelector, HoprChainApi};
+        use hopr_lib::api::chain::ChannelSelector;
 
         let me = chain_connector.me();
         let incoming_channels: Vec<_> = chain_connector
