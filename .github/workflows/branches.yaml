@@ -41,6 +41,7 @@ jobs:
       codecov_token: ${{ secrets.CODECOV_TOKEN }}
   build-benchmarks:
     name: Build Benchmarks
+    needs: coverage
     runs-on: self-hosted-hoprnet-bigger
     permissions:
       contents: read
@@ -84,17 +85,30 @@ jobs:
       - name: Install Bencher CLI
         uses: bencherdev/bencher@0f8f620172ccd6225d40a7590598eb7b41718af8
       - name: Execute and Upload
+        id: bencher
+        shell: bash
         run: |
+          set +e
+          # Capture stdout and stderr, tee to file
           bencher run \
-            --project hoprnet \
+            --project "$BENCHER_PROJECT" \
             --token "${{ secrets.BENCHER_API_TOKEN }}" \
             --adapter rust_criterion \
             --branch "$GITHUB_REF_NAME" \
             --err \
-            "nix run .#bench"
+            "nix run .#bench-run" 2>&1 | tee bencher_output.txt
+          EXIT_CODE=${PIPESTATUS[0]}
+          set -e
+
+          # Extract Bencher Report URL
+          BENCHER_REPORT_URL=$(grep -oE "https://bencher.dev/perf/${BENCHER_PROJECT}/reports/[^[:space:]]+" bencher_output.txt | head -n 1)
+          echo "bencher_report_url=${BENCHER_REPORT_URL:-https://bencher.dev/console/projects/${BENCHER_PROJECT}}" >> "$GITHUB_OUTPUT"
+
+          exit $EXIT_CODE
         env:
           BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BENCHER_PROJECT: ${{ github.event.repository.name }}
       - name: Notify performance drop
         uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
         if: failure()
@@ -107,4 +121,5 @@ jobs:
           topic: "Benchmark regressions"
           content: |
             The benchmark results for branch `${{ github.repository }} ${{ github.ref_name }}` at commit (${{ github.sha }}) have dropped, or failed.
-            Please check [Bencher](https://bencher.dev/console/projects/hoprnet) for more details.
+
+            Please check the specific [Bencher Report](${{ steps.bencher.outputs.bencher_report_url }}) for more details.

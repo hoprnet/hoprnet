@@ -8,6 +8,7 @@ use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_m
 use futures::{SinkExt, StreamExt};
 use hopr_api::{
     chain::ChainValues,
+    node::TicketEvent,
     types::{
         crypto::keypairs::Keypair,
         crypto_random::Randomizable,
@@ -23,7 +24,6 @@ use hopr_protocol_hopr::{
     HoprUnacknowledgedTicketProcessorConfig, MemorySurbStore, SurbStoreConfig,
 };
 use hopr_ticket_manager::{HoprTicketFactory, HoprTicketManager, RedbStore};
-use hopr_transport_protocol::TicketEvent;
 use libp2p::PeerId;
 
 const SAMPLE_SIZE: usize = 50;
