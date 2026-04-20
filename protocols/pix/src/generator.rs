@@ -113,10 +113,10 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
         self.polynomials.get(pseudonym).and_then(|entry| {
             let polys = &mut entry.lock().poly_queue;
             while !polys.is_empty() {
-                if let Some(poly) = polys.front_mut() {
-                    if poly.shares_generated < self.cfg.threshold + self.cfg.surplus_shares {
-                        return Some((poly.spi, poly.next_share(x)));
-                    }
+                if let Some(poly) = polys.front_mut()
+                    && poly.shares_generated < self.cfg.threshold + self.cfg.surplus_shares
+                {
+                    return Some((poly.spi, poly.next_share(x)));
                 }
                 polys.pop_front();
             }
