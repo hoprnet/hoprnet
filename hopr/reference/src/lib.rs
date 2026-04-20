@@ -124,9 +124,12 @@ where
         );
     }
 
-    let graph: SharedChannelGraph = Arc::new(ChannelGraph::new(*packet_key.public()));
+    let backend = RedbStore::new_temp().map_err(hopr_ticket_manager::TicketManagerError::store)?;
+    let (ticket_manager, ticket_factory) = HoprTicketManager::new_with_factory(backend);
+    let ticket_manager = Arc::new(ticket_manager);
+    let ticket_factory = Arc::new(ticket_factory);
 
-    // Wire chain announcement events → network peer discovery
+    // Chain→peer-discovery wiring
     let (peer_discovery_tx, peer_discovery_rx) = futures::channel::mpsc::channel(2048);
     {
         use futures::{SinkExt, StreamExt};
@@ -158,55 +161,30 @@ where
         });
     }
 
-    let network_builder = HoprLibp2pNetworkBuilder::new(peer_discovery_rx);
+    // Build the network eagerly (before the builder) so the factory closure can be sync
+    let nb = HoprLibp2pNetworkBuilder::new(peer_discovery_rx);
+    let (network, network_process) = nb
+        .build(packet_key, vec![], "/hopr/mix/1.1.0", false)
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to build network: {e}"))?;
 
-    // Wire network events → graph updates
-    {
-        use futures::StreamExt;
-        use hopr_lib::api::graph::NetworkGraphUpdate;
-        let network_events = network_builder.subscribe_network_events();
-        let graph_updater = graph.clone();
-        tokio::spawn(async move {
-            network_events
-                .for_each(|event| {
-                    let graph_updater = graph_updater.clone();
-                    async move {
-                        let (peer_id, connected) = match event {
-                            hopr_lib::api::network::NetworkEvent::PeerConnected(p) => (p, true),
-                            hopr_lib::api::network::NetworkEvent::PeerDisconnected(p) => (p, false),
-                        };
-                        if let Ok(opk) = hopr_lib::api::OffchainPublicKey::from_peerid(&peer_id) {
-                            graph_updater.record_edge(hopr_lib::api::graph::MeasurableEdge::<
-                                hopr_transport::NeighborTelemetry,
-                                hopr_transport::PathTelemetry,
-                            >::ConnectionStatus {
-                                peer: opk,
-                                connected,
-                            });
-                        }
-                    }
-                })
-                .await;
-        });
-    }
-
+    // Graph and cover traffic are also created eagerly
+    let graph: SharedChannelGraph = Arc::new(ChannelGraph::new(*packet_key.public()));
     let prober_cfg = probe_cfg.unwrap_or_default();
     let cover_traffic =
         hopr_ct_full_network::FullNetworkDiscovery::new(*packet_key.public(), prober_cfg, graph.clone());
 
-    let backend = RedbStore::new_temp().map_err(hopr_ticket_manager::TicketManagerError::store)?;
-    let (ticket_manager, ticket_factory) = HoprTicketManager::new_with_factory(backend);
-    let ticket_manager = Arc::new(ticket_manager);
-    let ticket_factory = Arc::new(ticket_factory);
+    let safe_address = config.safe_module.safe_address;
+    let module_address = config.safe_module.module_address;
 
-    let builder = hopr_lib::builder::HoprBuilder::default()
-        .with_chain_api(chain_connector)
-        .with_graph(graph)
-        .with_network_builder(network_builder)
-        .with_cover_traffic(cover_traffic)
+    let builder = hopr_lib::builder::HoprBuilder::new()
         .with_identity(chain_key, packet_key)
-        .with_safe_module(&config.safe_module.safe_address, &config.safe_module.module_address)
-        .with_config(config);
+        .with_config(config)
+        .with_safe_module(&safe_address, &module_address)
+        .with_chain_api(move |_ctx| chain_connector)
+        .with_graph(move |_ctx| graph)
+        .with_network(move |_ctx| (network, network_process))
+        .with_cover_traffic(move |_ctx| cover_traffic);
 
     #[cfg(feature = "session-server")]
     let builder = builder.with_session_server(server);

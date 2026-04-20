@@ -52,7 +52,7 @@ use hopr_api::{
     chain::{ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
     ct::{CoverTrafficGeneration, ProbingTrafficGeneration},
     graph::{NetworkGraphUpdate, NetworkGraphView, traits::EdgeObservableRead},
-    network::{NetworkBuilder, NetworkStreamControl},
+    network::{BoxedProcessFn, NetworkStreamControl},
     types::primitive::prelude::*,
 };
 use hopr_async_runtime::{AbortableList, prelude::spawn, spawn_as_abortable};
@@ -341,10 +341,11 @@ where
     /// `HoprTransportProcess::BloomFilterSave`, `HoprTransportProcess::Swarm` and session-related
     /// processes and return join handles to the calling function. These processes are not started immediately but
     /// are waiting for a trigger from this piece of code.
-    pub async fn run<T, TFact, Ct, NetBuilder>(
+    pub async fn run<T, TFact, Ct>(
         &self,
         cover_traffic: Ct,
-        network_builder: NetBuilder,
+        network: Net,
+        network_process: BoxedProcessFn,
         ticket_events: T,
         ticket_factory: TFact,
         on_incoming_session: Sender<IncomingSession>,
@@ -359,7 +360,6 @@ where
         T: futures::Sink<hopr_api::node::TicketEvent> + Clone + Send + Unpin + 'static,
         T::Error: std::error::Error + Clone + Send,
         Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
-        NetBuilder: NetworkBuilder<Network = Net> + Send + Sync + 'static,
         TFact: TicketFactory + Clone + Send + Sync + 'static,
     {
         let mut processes = AbortableList::<HoprTransportProcess>::default();
@@ -369,19 +369,8 @@ where
 
         // -- transport medium
 
-        // NOTE: Private address filtering is implemented at multiple levels for defense-in-depth:
-        // 1. Discovery events are filtered before they reach the transport component
-        // 2. SwarmEvent::NewExternalAddrOfPeer events are filtered using is_public_address()
-        let allow_private_addresses = self.cfg.transport.prefer_local_addresses;
-        let (transport_network, transport_layer_process) = network_builder
-            .build(
-                &self.packet_key,
-                self.my_multiaddresses.clone(),
-                hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL,
-                allow_private_addresses,
-            )
-            .await
-            .map_err(|e| HoprTransportError::Api(e.to_string()))?;
+        let transport_network = network;
+        let transport_layer_process = network_process;
 
         let msg_codec = hopr_transport_protocol::HoprBinaryCodec {};
         let (wire_msg_tx, wire_msg_rx) =
@@ -935,6 +924,15 @@ where
 
     fn health(&self) -> Health {
         self.network.get().map(|n| n.health()).unwrap_or(Health::Red)
+    }
+
+    fn subscribe_network_events(
+        &self,
+    ) -> impl futures::Stream<Item = hopr_api::network::NetworkEvent> + Send + 'static {
+        match self.network.get() {
+            Some(n) => futures::future::Either::Left(n.subscribe_network_events()),
+            None => futures::future::Either::Right(futures::stream::empty()),
+        }
     }
 }
 

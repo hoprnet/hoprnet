@@ -9,7 +9,7 @@ use hopr_api::{
     chain::{AnnouncementError, HoprChainApi, SafeRegistrationError, StateSyncOptions},
     ct::{CoverTrafficGeneration, ProbingTrafficGeneration},
     graph::{EdgeCapacityUpdate, HoprGraphApi},
-    network::{NetworkBuilder, NetworkStreamControl},
+    network::{BoxedProcessFn, NetworkStreamControl, NetworkView},
     node::{AtomicHoprState, HoprState, NodeOnchainIdentity, TicketEvent},
     tickets::{TicketFactory, TicketManagement},
     types::{
@@ -46,49 +46,89 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-/// Intermediate state produced by the shared initialization sequence.
-struct PreHopr<Chain, Graph, Net, NB, Ct> {
-    chain_id: ChainKeypair,
-    transport_id: OffchainKeypair,
-    cfg: HoprLibConfig,
-    state: Arc<AtomicHoprState>,
-    transport_api: HoprTransport<Chain, Graph, Net>,
-    chain_api: Chain,
-    ticket_event_subscribers: (
-        async_broadcast::Sender<TicketEvent>,
-        async_broadcast::InactiveReceiver<TicketEvent>,
-    ),
-    processes: AbortableList<HoprLibProcess>,
-    session_tx: futures::channel::mpsc::Sender<IncomingSession>,
-    cover_traffic: Ct,
-    network_builder: NB,
+// ---------------------------------------------------------------------------
+// BuildCtx — passed to factory closures
+// ---------------------------------------------------------------------------
+
+/// Type-erased factory closure producing `T` from a [`BuildCtx`] reference.
+type Factory<T> = Box<dyn FnOnce(&BuildCtx) -> T + Send>;
+
+/// Context available to factory closures during the build step.
+pub struct BuildCtx {
+    /// Node's on-chain keypair.
+    pub chain_key: ChainKeypair,
+    /// Node's off-chain (packet) keypair.
+    pub packet_key: OffchainKeypair,
+    /// Node configuration.
+    pub cfg: HoprLibConfig,
 }
 
-/// Abstract builder for the [`Hopr`] node object.
+// ---------------------------------------------------------------------------
+// Type-state builder phases
+// ---------------------------------------------------------------------------
+
+/// Initial builder — forces `with_identity` first.
+#[derive(Default)]
+pub struct HoprBuilder;
+
+impl HoprBuilder {
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// Sets the node's on-chain and off-chain identity.
+    pub fn with_identity(self, chain_key: &ChainKeypair, offchain_key: &OffchainKeypair) -> HoprBuilderWithIdentity {
+        HoprBuilderWithIdentity {
+            chain_key: chain_key.clone(),
+            packet_key: offchain_key.clone(),
+        }
+    }
+}
+
+/// Builder with identity set — forces `with_config` next.
+pub struct HoprBuilderWithIdentity {
+    chain_key: ChainKeypair,
+    packet_key: OffchainKeypair,
+}
+
+impl HoprBuilderWithIdentity {
+    /// Sets the node configuration and produces the configured builder.
+    pub fn with_config(self, cfg: HoprLibConfig) -> HoprBuilderConfigured {
+        HoprBuilderConfigured {
+            ctx: BuildCtx {
+                chain_key: self.chain_key,
+                packet_key: self.packet_key,
+                cfg,
+            },
+            safe_and_module: None,
+            chain_factory: None,
+            graph_factory: None,
+            network_factory: None,
+            ct_factory: None,
+            #[cfg(feature = "session-server")]
+            session: None,
+        }
+    }
+}
+
+/// Configured builder accepting factory closures for components.
 ///
-/// Provides two distinct build paths:
-///
-/// - [`build_edge`](HoprBuilder::build_edge) — standalone ticket factory, no ticket management
-/// - [`build_full`](HoprBuilder::build_full) — coupled ticket factory + ticket manager
+/// All `with_*` factory methods accept `FnOnce(&BuildCtx) -> T` closures
+/// that are invoked during `build_edge()`/`build_full()`.
 ///
 /// # Type Parameters
 ///
-/// - `Chain` — blockchain API ([`HoprChainApi`])
-/// - `Graph` — network graph ([`HoprGraphApi`])
-/// - `NB` — network builder factory ([`NetworkBuilder`])
-/// - `Ct` — cover traffic / probing ([`ProbingTrafficGeneration`] + [`CoverTrafficGeneration`])
-pub struct HoprBuilder<Chain = (), Graph = (), NB = (), Ct = ()> {
-    chain: Option<Chain>,
-    graph: Option<Graph>,
-    network_builder: Option<NB>,
-    cover_traffic: Option<Ct>,
-    identity: Option<(ChainKeypair, OffchainKeypair)>,
+/// - `Chain` — blockchain API produced by the chain factory
+/// - `Graph` — network graph produced by the graph factory
+/// - `Net` — network produced by the network factory
+/// - `Ct` — cover traffic produced by the cover traffic factory
+pub struct HoprBuilderConfigured<Chain = (), Graph = (), Net = (), Ct = ()> {
+    ctx: BuildCtx,
     safe_and_module: Option<(Address, Address)>,
-    cfg: HoprLibConfig,
-    /// Pre-spawned session server: `(session_tx, abort_handle)`.
-    /// Created by [`with_session_server`](HoprBuilder::with_session_server).
-    /// Sessions are not emitted until transport starts during build, so
-    /// spawning the consumer early is safe.
+    chain_factory: Option<Factory<Chain>>,
+    graph_factory: Option<Factory<Graph>>,
+    network_factory: Option<Factory<(Net, BoxedProcessFn)>>,
+    ct_factory: Option<Factory<Ct>>,
     #[cfg(feature = "session-server")]
     session: Option<(
         futures::channel::mpsc::Sender<IncomingSession>,
@@ -96,71 +136,85 @@ pub struct HoprBuilder<Chain = (), Graph = (), NB = (), Ct = ()> {
     )>,
 }
 
-impl<Chain, Graph, NB, Ct> Default for HoprBuilder<Chain, Graph, NB, Ct> {
-    fn default() -> Self {
-        Self {
-            chain: None,
-            graph: None,
-            network_builder: None,
-            cover_traffic: None,
-            identity: None,
-            safe_and_module: None,
-            cfg: Default::default(),
-            #[cfg(feature = "session-server")]
-            session: None,
-        }
-    }
-}
-
-impl<Chain, Graph, NB, Ct> HoprBuilder<Chain, Graph, NB, Ct> {
-    /// Sets the chain API implementation.
-    pub fn with_chain_api(mut self, chain: Chain) -> Self {
-        self.chain = Some(chain);
-        self
-    }
-
-    /// Sets the network graph.
-    pub fn with_graph(mut self, graph: Graph) -> Self {
-        self.graph = Some(graph);
-        self
-    }
-
-    /// Sets the network builder (factory for P2P network).
-    pub fn with_network_builder(mut self, builder: NB) -> Self {
-        self.network_builder = Some(builder);
-        self
-    }
-
-    /// Sets the cover traffic and probing provider.
-    pub fn with_cover_traffic(mut self, ct: Ct) -> Self {
-        self.cover_traffic = Some(ct);
-        self
-    }
-
-    /// Sets the node's on-chain and off-chain identity.
-    pub fn with_identity(mut self, chain_key: &ChainKeypair, offchain_key: &OffchainKeypair) -> Self {
-        self.identity = Some((chain_key.clone(), offchain_key.clone()));
-        self
-    }
-
+impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
     /// Sets the node Safe and module addresses.
     pub fn with_safe_module(mut self, safe: &Address, module: &Address) -> Self {
         self.safe_and_module = Some((*safe, *module));
         self
     }
 
-    /// Sets the [`HoprLibConfig`].
-    pub fn with_config(mut self, cfg: HoprLibConfig) -> Self {
-        self.cfg = cfg;
-        self
+    /// Sets the chain API factory.
+    pub fn with_chain_api<NewChain>(
+        self,
+        f: impl FnOnce(&BuildCtx) -> NewChain + Send + 'static,
+    ) -> HoprBuilderConfigured<NewChain, Graph, Net, Ct> {
+        HoprBuilderConfigured {
+            ctx: self.ctx,
+            safe_and_module: self.safe_and_module,
+            chain_factory: Some(Box::new(f)),
+            graph_factory: self.graph_factory,
+            network_factory: self.network_factory,
+            ct_factory: self.ct_factory,
+            #[cfg(feature = "session-server")]
+            session: self.session,
+        }
+    }
+
+    /// Sets the graph factory.
+    pub fn with_graph<NewGraph>(
+        self,
+        f: impl FnOnce(&BuildCtx) -> NewGraph + Send + 'static,
+    ) -> HoprBuilderConfigured<Chain, NewGraph, Net, Ct> {
+        HoprBuilderConfigured {
+            ctx: self.ctx,
+            safe_and_module: self.safe_and_module,
+            chain_factory: self.chain_factory,
+            graph_factory: Some(Box::new(f)),
+            network_factory: self.network_factory,
+            ct_factory: self.ct_factory,
+            #[cfg(feature = "session-server")]
+            session: self.session,
+        }
+    }
+
+    /// Sets the network factory. Must return `(Net, BoxedProcessFn)`.
+    pub fn with_network<NewNet>(
+        self,
+        f: impl FnOnce(&BuildCtx) -> (NewNet, BoxedProcessFn) + Send + 'static,
+    ) -> HoprBuilderConfigured<Chain, Graph, NewNet, Ct> {
+        HoprBuilderConfigured {
+            ctx: self.ctx,
+            safe_and_module: self.safe_and_module,
+            chain_factory: self.chain_factory,
+            graph_factory: self.graph_factory,
+            network_factory: Some(Box::new(f)),
+            ct_factory: self.ct_factory,
+            #[cfg(feature = "session-server")]
+            session: self.session,
+        }
+    }
+
+    /// Sets the cover traffic factory.
+    pub fn with_cover_traffic<NewCt>(
+        self,
+        f: impl FnOnce(&BuildCtx) -> NewCt + Send + 'static,
+    ) -> HoprBuilderConfigured<Chain, Graph, Net, NewCt> {
+        HoprBuilderConfigured {
+            ctx: self.ctx,
+            safe_and_module: self.safe_and_module,
+            chain_factory: self.chain_factory,
+            graph_factory: self.graph_factory,
+            network_factory: self.network_factory,
+            ct_factory: Some(Box::new(f)),
+            #[cfg(feature = "session-server")]
+            session: self.session,
+        }
     }
 
     /// Attaches a session server for handling incoming sessions.
     ///
-    /// Eagerly spawns the server task and creates the incoming session channel.
-    /// The spawned task blocks on the receiver until transport starts emitting
-    /// sessions during [`build_edge`](HoprBuilder::build_edge) or
-    /// [`build_full`](HoprBuilder::build_full).
+    /// Eagerly spawns the server task. Sessions are not emitted until
+    /// transport starts during build, so spawning the consumer early is safe.
     #[cfg(feature = "session-server")]
     pub fn with_session_server(
         mut self,
@@ -200,25 +254,44 @@ impl<Chain, Graph, NB, Ct> HoprBuilder<Chain, Graph, NB, Ct> {
     }
 }
 
-// === Build methods ===
+// ---------------------------------------------------------------------------
+// Intermediate pre-build state
+// ---------------------------------------------------------------------------
 
-impl<Chain, Graph, NB, Ct> HoprBuilder<Chain, Graph, NB, Ct>
+struct PreHopr<Chain, Graph, Net, Ct> {
+    chain_id: ChainKeypair,
+    transport_id: OffchainKeypair,
+    cfg: HoprLibConfig,
+    state: Arc<AtomicHoprState>,
+    transport_api: HoprTransport<Chain, Graph, Net>,
+    chain_api: Chain,
+    ticket_event_subscribers: (
+        async_broadcast::Sender<TicketEvent>,
+        async_broadcast::InactiveReceiver<TicketEvent>,
+    ),
+    processes: AbortableList<HoprLibProcess>,
+    session_tx: futures::channel::mpsc::Sender<IncomingSession>,
+    cover_traffic: Ct,
+    network: Net,
+    network_process: BoxedProcessFn,
+}
+
+// ---------------------------------------------------------------------------
+// Build methods
+// ---------------------------------------------------------------------------
+
+impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Graph: HoprGraphApi<HoprNodeId = hopr_api::OffchainPublicKey> + Clone + Send + Sync + 'static,
     <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
         hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
     <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
-    NB: NetworkBuilder + Send + Sync + 'static,
-    <NB as NetworkBuilder>::Network:
-        hopr_api::network::NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
+    Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
     Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
 {
     /// Builds an edge (entry/exit) [`Hopr`] node.
-    pub async fn build_edge<TFact>(
-        self,
-        ticket_factory: TFact,
-    ) -> Result<Hopr<Chain, Graph, <NB as NetworkBuilder>::Network, ()>, HoprLibError>
+    pub async fn build_edge<TFact>(self, ticket_factory: TFact) -> Result<Hopr<Chain, Graph, Net, ()>, HoprLibError>
     where
         TFact: TicketFactory + Clone + Send + Sync + 'static,
     {
@@ -229,7 +302,8 @@ where
             .transport_api
             .run(
                 pre.cover_traffic,
-                pre.network_builder,
+                pre.network,
+                pre.network_process,
                 futures::sink::drain(),
                 ticket_factory,
                 pre.session_tx,
@@ -271,7 +345,7 @@ where
         self,
         ticket_manager: TMgr,
         ticket_factory: TFact,
-    ) -> Result<Hopr<Chain, Graph, <NB as NetworkBuilder>::Network, TMgr>, HoprLibError>
+    ) -> Result<Hopr<Chain, Graph, Net, TMgr>, HoprLibError>
     where
         TMgr: TicketManagement + Clone + Send + Sync + 'static,
         TFact: TicketFactory + Clone + Send + Sync + 'static,
@@ -368,7 +442,8 @@ where
             .transport_api
             .run(
                 pre.cover_traffic,
-                pre.network_builder,
+                pre.network,
+                pre.network_process,
                 tickets_tx,
                 ticket_factory,
                 pre.session_tx,
@@ -415,32 +490,34 @@ where
         Ok(hopr)
     }
 
-    /// Shared initialization sequence for both build paths.
-    async fn pre_build(self) -> Result<PreHopr<Chain, Graph, <NB as NetworkBuilder>::Network, NB, Ct>, HoprLibError> {
-        let mut chain = self.chain;
-        let mut graph = self.graph;
-        let mut network_builder = self.network_builder;
-        let mut cover_traffic = self.cover_traffic;
-        let cfg = self.cfg;
+    /// Shared initialization: invoke factories, wire events, do on-chain setup.
+    async fn pre_build(self) -> Result<PreHopr<Chain, Graph, Net, Ct>, HoprLibError> {
+        let ctx = self.ctx;
+        ctx.cfg.validate()?;
 
-        cfg.validate()?;
+        // Invoke factories
+        let chain_api = (self
+            .chain_factory
+            .ok_or(HoprLibError::BuilderError("missing chain factory"))?)(&ctx);
+        let graph = (self
+            .graph_factory
+            .ok_or(HoprLibError::BuilderError("missing graph factory"))?)(&ctx);
+        let (network, network_process) =
+            (self
+                .network_factory
+                .ok_or(HoprLibError::BuilderError("missing network factory"))?)(&ctx);
+        let cover_traffic = (self
+            .ct_factory
+            .ok_or(HoprLibError::BuilderError("missing cover traffic factory"))?)(&ctx);
 
-        let chain_api = chain.take().ok_or(HoprLibError::BuilderError("missing chain API"))?;
-        let graph = graph.take().ok_or(HoprLibError::BuilderError("missing graph"))?;
-        let (chain_id, transport_id) = self.identity.ok_or(HoprLibError::BuilderError("missing identity"))?;
-        let cover_traffic = cover_traffic
-            .take()
-            .ok_or(HoprLibError::BuilderError("missing cover traffic"))?;
-        let network_builder = network_builder
-            .take()
-            .ok_or(HoprLibError::BuilderError("missing network builder"))?;
+        let (chain_id, transport_id) = (ctx.chain_key.clone(), ctx.packet_key.clone());
 
         let transport_api = HoprTransport::new(
             (&chain_id, &transport_id),
             chain_api.clone(),
             graph.clone(),
-            vec![(&cfg.host).try_into().map_err(HoprLibError::TransportError)?],
-            cfg.protocol.clone(),
+            vec![(&ctx.cfg.host).try_into().map_err(HoprLibError::TransportError)?],
+            ctx.cfg.protocol.clone(),
         )
         .map_err(HoprLibError::TransportError)?;
 
@@ -498,7 +575,7 @@ where
         }
 
         let network_min_ticket_price = chain_api.minimum_ticket_price().await.map_err(HoprLibError::chain)?;
-        let configured_ticket_price = cfg.protocol.packet.codec.outgoing_ticket_price;
+        let configured_ticket_price = ctx.cfg.protocol.packet.codec.outgoing_ticket_price;
         if configured_ticket_price.is_some_and(|c| c < network_min_ticket_price) {
             return Err(HoprLibError::GeneralError(format!(
                 "configured outgoing ticket price < network minimum: {configured_ticket_price:?} < \
@@ -510,7 +587,7 @@ where
             .minimum_incoming_ticket_win_prob()
             .await
             .map_err(HoprLibError::chain)?;
-        let configured_win_prob = cfg.protocol.packet.codec.outgoing_win_prob;
+        let configured_win_prob = ctx.cfg.protocol.packet.codec.outgoing_win_prob;
         if !std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true")
             && configured_win_prob.is_some_and(|c| c.approx_cmp(&network_min_win_prob).is_lt())
         {
@@ -527,7 +604,7 @@ where
             "Node information"
         );
 
-        let safe_addr = cfg.safe_module.safe_address;
+        let safe_addr = ctx.cfg.safe_module.safe_address;
         if me_onchain == safe_addr {
             return Err(HoprLibError::GeneralError(
                 "cannot use self as staking safe address".into(),
@@ -556,7 +633,7 @@ where
             }
         }
 
-        let multiaddresses_to_announce = if cfg.publish {
+        let multiaddresses_to_announce = if ctx.cfg.publish {
             transport_api.announceable_multiaddresses()
         } else {
             Vec::with_capacity(0)
@@ -604,8 +681,7 @@ where
 
         tracing::info!(%this_node_account, "node account is ready");
 
-        // Session channel — use pre-spawned session server channel if available,
-        // otherwise create a dummy channel (sessions will be dropped).
+        // Session channel
         let mut processes = AbortableList::<HoprLibProcess>::default();
 
         #[cfg(feature = "session-server")]
@@ -623,7 +699,37 @@ where
             tx
         };
 
-        // Chain → Graph event wiring
+        // Network → graph event wiring (subscribe before transport starts)
+        {
+            let network_events = network.subscribe_network_events();
+            let graph_updater = graph.clone();
+            spawn(async move {
+                network_events
+                    .for_each(|event| {
+                        let graph_updater = graph_updater.clone();
+                        async move {
+                            let (peer_id, connected) = match event {
+                                hopr_api::network::NetworkEvent::PeerConnected(p) => (p, true),
+                                hopr_api::network::NetworkEvent::PeerDisconnected(p) => (p, false),
+                            };
+                            if let Ok(opk) = hopr_api::OffchainPublicKey::from_peerid(&peer_id) {
+                                graph_updater.record_edge(hopr_api::graph::MeasurableEdge::<
+                                    hopr_transport::NeighborTelemetry,
+                                    hopr_transport::PathTelemetry,
+                                >::ConnectionStatus {
+                                    peer: opk,
+                                    connected,
+                                });
+                            } else {
+                                tracing::error!(%peer_id, "failed to convert peer ID to public key for graph update");
+                            }
+                        }
+                    })
+                    .await;
+            });
+        }
+
+        // Chain → graph event wiring
         {
             let chain_events = chain_api
                 .subscribe_with_state_sync([StateSyncOptions::PublicAccounts, StateSyncOptions::OpenedChannels])
@@ -757,7 +863,7 @@ where
         Ok(PreHopr {
             chain_id,
             transport_id,
-            cfg,
+            cfg: ctx.cfg,
             state: Arc::new(AtomicHoprState::new(HoprState::Uninitialized)),
             transport_api,
             chain_api,
@@ -765,7 +871,8 @@ where
             processes,
             session_tx,
             cover_traffic,
-            network_builder,
+            network,
+            network_process,
         })
     }
 }

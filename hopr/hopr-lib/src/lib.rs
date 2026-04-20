@@ -86,7 +86,7 @@ use hopr_api::{
 };
 pub use hopr_api::{
     graph::EdgeLinkObservable,
-    network::{NetworkBuilder, NetworkStreamControl},
+    network::NetworkStreamControl,
     node::{
         EitherErr, HoprNodeOperations, HoprState, IncentiveChannelOperations, IncentiveRedeemOperations,
         TransportOperations,
