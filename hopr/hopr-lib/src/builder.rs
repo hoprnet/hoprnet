@@ -200,7 +200,10 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
     #[cfg(feature = "session-server")]
     pub fn with_session_server(
         self,
-        server: impl hopr_api::node::HoprSessionServer<Session = IncomingSession, Error: std::fmt::Display>,
+        server: impl hopr_api::node::HoprSessionServer<Session = IncomingSession, Error: std::fmt::Display>
+        + Clone
+        + Send
+        + 'static,
     ) -> HoprBuilderWithSession<Chain, Graph, Net, Ct> {
         let incoming_session_capacity = std::env::var("HOPR_INTERNAL_SESSION_INCOMING_CAPACITY")
             .ok()
