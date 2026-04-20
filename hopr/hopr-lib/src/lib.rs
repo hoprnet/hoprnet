@@ -23,8 +23,6 @@ pub mod config;
 pub mod constants;
 /// Lists all errors thrown from this library.
 pub mod errors;
-/// Public traits for interactions with this library.
-pub mod traits;
 /// Public domain types for peer discovery.
 pub mod types;
 /// Utility module with helper types and functionality over hopr-lib behavior.
@@ -88,7 +86,7 @@ use hopr_api::{
 };
 pub use hopr_api::{
     graph::EdgeLinkObservable,
-    network::{NetworkBuilder, NetworkStreamControl},
+    network::NetworkStreamControl,
     node::{
         EitherErr, HoprNodeOperations, HoprState, IncentiveChannelOperations, IncentiveRedeemOperations,
         TransportOperations,
@@ -309,6 +307,7 @@ where
         self.transport_api.graph()
     }
 
+    #[cfg(feature = "session-client")]
     fn error_if_not_in_state(&self, state: HoprState, error: String) -> errors::Result<()> {
         if HoprNodeOperations::status(self) == state {
             Ok(())

@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use dashmap::DashSet;
 use futures::{FutureExt, Stream, StreamExt, stream::BoxStream};
-use hopr_api::{Multiaddr, OffchainKeypair, network::NetworkBuilder};
+use hopr_api::{Multiaddr, OffchainKeypair, network::BoxedProcessFn};
 use hopr_network_types::prelude::is_public_address;
 use libp2p::{
     autonat,
@@ -167,17 +167,12 @@ pub struct InactiveConfiguredNetwork {
     swarm: libp2p::Swarm<HoprNetworkBehavior>,
 }
 
-/// Builder of the network view and an actual background process running the libp2p core
-/// event processing loop.
+/// Factory for constructing the libp2p network and its background process.
 ///
-/// This object is primarily constructed to allow delayed starting of the background process,
-/// as well as setup all the interconnections with the underlying network views to allow complex
-/// functionality and signalling.
+/// Accepts a peer discovery stream and produces a [`HoprNetwork`] + background
+/// process function. The network supports event subscription via
+/// [`NetworkView::subscribe_network_events`](hopr_api::network::NetworkView::subscribe_network_events).
 pub struct HoprLibp2pNetworkBuilder {
-    subscribtions: (
-        async_broadcast::Sender<hopr_api::network::NetworkEvent>,
-        async_broadcast::InactiveReceiver<hopr_api::network::NetworkEvent>,
-    ),
     bootstrap: std::pin::Pin<Box<dyn Stream<Item = PeerDiscovery> + Send + Sync>>,
 }
 
@@ -186,18 +181,9 @@ impl HoprLibp2pNetworkBuilder {
     where
         T: Stream<Item = PeerDiscovery> + Send + Sync + 'static,
     {
-        let (tx, rx) = async_broadcast::broadcast(1000);
         Self {
-            subscribtions: (tx, rx.deactivate()),
             bootstrap: Box::pin(bootstrap),
         }
-    }
-
-    pub fn subscribe_network_events(
-        &self,
-    ) -> impl futures::Stream<Item = hopr_api::network::NetworkEvent> + Send + Sync + 'static {
-        let rx = self.subscribtions.1.clone();
-        rx.activate()
     }
 }
 
@@ -207,17 +193,18 @@ impl std::fmt::Debug for HoprLibp2pNetworkBuilder {
     }
 }
 
-#[async_trait::async_trait]
-impl NetworkBuilder for HoprLibp2pNetworkBuilder {
-    type Network = HoprNetwork;
-
-    async fn build(
+impl HoprLibp2pNetworkBuilder {
+    /// Build the network and return it along with its background process.
+    ///
+    /// The returned [`HoprNetwork`] supports event subscription — subscribe
+    /// before starting the process to avoid missing events.
+    pub async fn build(
         self,
         identity: &OffchainKeypair,
         my_multiaddresses: Vec<Multiaddr>,
         protocol: &'static str,
         allow_private_addresses: bool,
-    ) -> std::result::Result<(Self::Network, hopr_api::network::BoxedProcessFn), impl std::error::Error> {
+    ) -> std::result::Result<(HoprNetwork, BoxedProcessFn), impl std::error::Error> {
         #[cfg(all(feature = "telemetry", not(test)))]
         {
             METRIC_NETWORK_HEALTH.set(0.0);
@@ -237,14 +224,15 @@ impl NetworkBuilder for HoprLibp2pNetworkBuilder {
         let store = crate::peer_store::NetworkPeerStore::new(me, my_multiaddresses.into_iter().collect());
         let tracker: Arc<DashSet<libp2p::PeerId>> = Default::default();
 
+        let (notifier, event_rx) = async_broadcast::broadcast(1000);
+
         let network = HoprNetwork {
             tracker: tracker.clone(),
             store: Arc::new(store.clone()),
             control: swarm.behaviour().streams.new_control(),
             protocol: libp2p::StreamProtocol::new(protocol),
+            event_rx: event_rx.deactivate(),
         };
-
-        let notifier = self.subscribtions.0.clone();
 
         #[cfg(all(feature = "telemetry", not(test)))]
         let network_inner = network.clone();

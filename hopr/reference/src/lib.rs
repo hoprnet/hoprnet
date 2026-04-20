@@ -20,8 +20,6 @@ use hopr_chain_connector::{
 pub use hopr_lib;
 #[cfg(feature = "runtime-tokio")]
 use hopr_lib::builder::{ChainKeypair, Keypair, OffchainKeypair};
-#[cfg(feature = "session-server")]
-use hopr_lib::traits::HoprSessionServer;
 #[cfg(feature = "runtime-tokio")]
 use hopr_lib::{Hopr, config::HoprLibConfig};
 #[cfg(feature = "runtime-tokio")]
@@ -43,11 +41,7 @@ pub type SharedTicketManager = Arc<HoprTicketManager<RedbStore, RedbTicketQueue>
 pub type ReferenceHopr =
     Hopr<Arc<HoprBlockchainSafeConnector<BlokliClient>>, SharedChannelGraph, HoprNetwork, SharedTicketManager>;
 
-/// Builds a reference HOPR node using canonical implementations:
-/// - Blokli blockchain connector
-/// - Petgraph-based channel graph
-/// - libp2p-based P2P network
-/// - Redb-backed ticket management
+/// Builds a reference HOPR node using canonical implementations.
 #[cfg(feature = "runtime-tokio")]
 pub async fn build_reference(
     identity: (&ChainKeypair, &OffchainKeypair),
@@ -106,7 +100,10 @@ pub async fn build_reference(
 #[cfg(feature = "runtime-tokio")]
 pub async fn build_with_chain<
     Chain,
-    #[cfg(feature = "session-server")] Srv: HoprSessionServer + Clone + Send + 'static,
+    #[cfg(feature = "session-server")] Srv: hopr_lib::api::node::HoprSessionServer<Session = hopr_lib::IncomingSession, Error: std::fmt::Display>
+        + Clone
+        + Send
+        + 'static,
 >(
     chain_key: &ChainKeypair,
     packet_key: &OffchainKeypair,
@@ -130,10 +127,37 @@ where
         );
     }
 
-    // Create concrete components
-    let graph: SharedChannelGraph = Arc::new(ChannelGraph::new(*packet_key.public()));
+    let backend = RedbStore::new_temp().map_err(hopr_ticket_manager::TicketManagerError::store)?;
+    let (ticket_manager, ticket_factory) = HoprTicketManager::new_with_factory(backend);
+    let ticket_manager = Arc::new(ticket_manager);
+    let ticket_factory = Arc::new(ticket_factory);
 
-    // Wire chain announcement events → network peer discovery
+    // Sync ticket manager and factory with on-chain state
+    {
+        use futures::StreamExt;
+        use hopr_lib::api::chain::ChannelSelector;
+
+        let me = chain_connector.me();
+        let incoming_channels: Vec<_> = chain_connector
+            .stream_channels(ChannelSelector::default().with_destination(*me))
+            .map_err(|e| anyhow::anyhow!("failed to stream incoming channels: {e}"))?
+            .collect()
+            .await;
+        ticket_manager
+            .sync_from_incoming_channels(&incoming_channels)
+            .map_err(|e| anyhow::anyhow!("failed to sync ticket manager: {e}"))?;
+
+        let outgoing_channels: Vec<_> = chain_connector
+            .stream_channels(ChannelSelector::default().with_source(*me))
+            .map_err(|e| anyhow::anyhow!("failed to stream outgoing channels: {e}"))?
+            .collect()
+            .await;
+        ticket_factory
+            .sync_from_outgoing_channels(&outgoing_channels)
+            .map_err(|e| anyhow::anyhow!("failed to sync ticket factory: {e}"))?;
+    }
+
+    // Chain→peer-discovery wiring
     let (peer_discovery_tx, peer_discovery_rx) = futures::channel::mpsc::channel(2048);
     {
         use futures::{SinkExt, StreamExt};
@@ -165,66 +189,40 @@ where
         });
     }
 
-    let network_builder = HoprLibp2pNetworkBuilder::new(peer_discovery_rx);
-
-    // Wire network events (peer connected/disconnected) → graph updates
-    {
-        use futures::StreamExt;
-        use hopr_lib::api::graph::NetworkGraphUpdate;
-        let network_events = network_builder.subscribe_network_events();
-        let graph_updater = graph.clone();
-        tokio::spawn(async move {
-            network_events
-                .for_each(|event| {
-                    let graph_updater = graph_updater.clone();
-                    async move {
-                        let (peer_id, connected) = match event {
-                            hopr_lib::api::network::NetworkEvent::PeerConnected(p) => (p, true),
-                            hopr_lib::api::network::NetworkEvent::PeerDisconnected(p) => (p, false),
-                        };
-                        if let Ok(opk) = hopr_lib::api::OffchainPublicKey::from_peerid(&peer_id) {
-                            graph_updater.record_edge(hopr_lib::api::graph::MeasurableEdge::<
-                                hopr_transport::NeighborTelemetry,
-                                hopr_transport::PathTelemetry,
-                            >::ConnectionStatus {
-                                peer: opk,
-                                connected,
-                            });
-                        }
-                    }
-                })
-                .await;
-        });
-    }
-
     let prober_cfg = probe_cfg.unwrap_or_default();
-    let cover_traffic =
-        hopr_ct_full_network::FullNetworkDiscovery::new(*packet_key.public(), prober_cfg, graph.clone());
+    let graph: SharedChannelGraph = Arc::new(ChannelGraph::new(*packet_key.public()));
+    let graph_for_ct = graph.clone();
 
-    let backend = RedbStore::new_temp().map_err(hopr_ticket_manager::TicketManagerError::store)?;
-    let (ticket_manager, ticket_factory) = HoprTicketManager::new_with_factory(backend);
-    let ticket_manager = Arc::new(ticket_manager);
-    let ticket_factory = Arc::new(ticket_factory);
+    let safe_address = config.safe_module.safe_address;
+    let module_address = config.safe_module.module_address;
 
-    // Use the abstract builder with build_full for relay node
-    let mut builder = hopr_lib::builder::HoprBuilder::default()
-        .with_chain_api(chain_connector)
-        .with_graph(graph)
-        .with_network_builder(network_builder)
-        .with_cover_traffic(cover_traffic)
+    let builder = hopr_lib::builder::HoprBuilder::new()
         .with_identity(chain_key, packet_key)
-        .with_safe_module(&config.safe_module.safe_address, &config.safe_module.module_address)
-        .with_config(config);
+        .with_config(config)
+        .with_safe_module(&safe_address, &module_address)
+        .with_chain_api(move |_ctx| chain_connector)
+        .with_graph(move |_ctx| graph)
+        .with_network(move |ctx| {
+            let multiaddresses = vec![
+                (&ctx.cfg.host)
+                    .try_into()
+                    .expect("host config must be a valid multiaddress"),
+            ];
+            let nb = HoprLibp2pNetworkBuilder::new(peer_discovery_rx);
+            futures::executor::block_on(nb.build(
+                &ctx.packet_key,
+                multiaddresses,
+                "/hopr/mix/1.1.0",
+                ctx.cfg.protocol.transport.prefer_local_addresses,
+            ))
+            .expect("network must be constructible")
+        })
+        .with_cover_traffic(move |ctx| {
+            hopr_ct_full_network::FullNetworkDiscovery::new(*ctx.packet_key.public(), prober_cfg, graph_for_ct)
+        });
 
     #[cfg(feature = "session-server")]
-    {
-        builder = builder.with_session_server(server);
-    }
-
-    #[cfg(not(feature = "session-server"))]
-    {
-        builder = builder.with_session_server(());
-    }
+    let builder = builder.with_session_server(server);
 
     let node = builder.build_full(ticket_manager, ticket_factory).await?;
 

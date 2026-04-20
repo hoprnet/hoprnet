@@ -39,7 +39,7 @@ serde = [
   "hopr-transport/serde",
 ]
 session-client = ["hopr-api/node-session-client"]
-session-server = []
+session-server = ["hopr-api/node-session-server"]
 transport-announce-quic = ["hopr-transport/p2p-announce-quic"]
 
 # === utility features ===

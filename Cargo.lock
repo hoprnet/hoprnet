@@ -4283,8 +4283,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "1.8.0"
-source = "git+https://github.com/hoprnet/hopr-api?branch=kauki%2Frefactor%2Fnode%2Fhas-accessors#937abfab528e24c840c21033c0f72daf3a912391"
+version = "1.7.0"
+source = "git+https://github.com/hoprnet/hopr-api?branch=main#6d4b4efe23e45b63e13be1d21319f6ca4b8e7029"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -4714,7 +4714,6 @@ dependencies = [
  "hopr-network-graph",
  "hopr-reference",
  "hopr-ticket-manager",
- "hopr-transport",
  "hopr-transport-p2p",
  "lazy_static",
  "opentelemetry-prometheus-text-exporter",
@@ -8751,7 +8750,7 @@ checksum = "09fbdfe7a27a1b1633dfc0c4c8e65940b8d819c5ddb9cca48ebc3223b00c8b14"
 dependencies = [
  "ahash",
  "annotate-snippets",
- "base64 0.22.1",
+ "base64 0.21.7",
  "encoding_rs_io",
  "getrandom 0.3.4",
  "nohash-hasher",

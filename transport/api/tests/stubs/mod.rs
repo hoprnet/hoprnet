@@ -230,6 +230,12 @@ impl NetworkView for StubNet {
     fn health(&self) -> Health {
         Health::Red
     }
+
+    fn subscribe_network_events(
+        &self,
+    ) -> impl futures::Stream<Item = hopr_api::network::NetworkEvent> + Send + 'static {
+        futures::stream::empty()
+    }
 }
 
 #[async_trait]
