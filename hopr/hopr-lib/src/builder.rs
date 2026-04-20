@@ -45,27 +45,10 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-/// Intermediate state produced by the shared initialization sequence.
-struct PreHopr<Chain, Graph, Net, NB, Ct> {
-    chain_id: ChainKeypair,
-    transport_id: OffchainKeypair,
-    cfg: HoprLibConfig,
-    state: Arc<AtomicHoprState>,
-    transport_api: HoprTransport<Chain, Graph, Net>,
-    chain_api: Chain,
-    ticket_event_subscribers: (
-        async_broadcast::Sender<TicketEvent>,
-        async_broadcast::InactiveReceiver<TicketEvent>,
-    ),
-    processes: AbortableList<HoprLibProcess>,
-    session_tx: futures::channel::mpsc::Sender<IncomingSession>,
-    session_rx: futures::channel::mpsc::Receiver<IncomingSession>,
-    cover_traffic: Ct,
-    network_builder: NB,
-}
+// ---------------------------------------------------------------------------
+// Session server attachment helper
+// ---------------------------------------------------------------------------
 
-/// Attaches a session server to the incoming session receiver and inserts
-/// the spawned process into the process list.
 #[cfg(feature = "session-server")]
 fn attach_session_server<Srv>(
     session_rx: futures::channel::mpsc::Receiver<IncomingSession>,
@@ -100,24 +83,12 @@ fn attach_session_server<Srv>(
     );
 }
 
-/// Abstract builder for the [`Hopr`] node object.
-///
-/// Collects components common to all node types (edge and relay/full) and provides
-/// two distinct build paths:
-///
-/// - [`build_edge`](HoprBuilder::build_edge) — standalone ticket factory, no ticket management
-/// - [`build_full`](HoprBuilder::build_full) — coupled ticket factory + ticket manager
-///
-/// # Type Parameters
-///
-/// - `Chain` — blockchain API ([`HoprChainApi`])
-/// - `Graph` — network graph ([`HoprGraphApi`])
-/// - `NB` — network builder factory ([`NetworkBuilder`])
-/// - `Ct` — cover traffic / probing ([`ProbingTrafficGeneration`] + [`CoverTrafficGeneration`])
-///
-/// Ticket management, ticket factory, and session server are **not** builder generics —
-/// they are parameters to the build methods.
-pub struct HoprBuilder<Chain = (), Graph = (), NB = (), Ct = ()> {
+// ---------------------------------------------------------------------------
+// Builder core — shared across feature variants
+// ---------------------------------------------------------------------------
+
+/// Internal core holding builder fields common to all feature configurations.
+struct HoprBuilderCore<Chain, Graph, NB, Ct> {
     chain: Option<Chain>,
     graph: Option<Graph>,
     network_builder: Option<NB>,
@@ -127,7 +98,7 @@ pub struct HoprBuilder<Chain = (), Graph = (), NB = (), Ct = ()> {
     cfg: HoprLibConfig,
 }
 
-impl<Chain, Graph, NB, Ct> Default for HoprBuilder<Chain, Graph, NB, Ct> {
+impl<Chain, Graph, NB, Ct> Default for HoprBuilderCore<Chain, Graph, NB, Ct> {
     fn default() -> Self {
         Self {
             chain: None,
@@ -141,53 +112,26 @@ impl<Chain, Graph, NB, Ct> Default for HoprBuilder<Chain, Graph, NB, Ct> {
     }
 }
 
-impl<Chain, Graph, NB, Ct> HoprBuilder<Chain, Graph, NB, Ct> {
-    /// Sets the chain API implementation.
-    pub fn with_chain_api(mut self, chain: Chain) -> Self {
-        self.chain = Some(chain);
-        self
-    }
-
-    /// Sets the network graph.
-    pub fn with_graph(mut self, graph: Graph) -> Self {
-        self.graph = Some(graph);
-        self
-    }
-
-    /// Sets the network builder (factory for P2P network).
-    pub fn with_network_builder(mut self, builder: NB) -> Self {
-        self.network_builder = Some(builder);
-        self
-    }
-
-    /// Sets the cover traffic and probing provider.
-    pub fn with_cover_traffic(mut self, ct: Ct) -> Self {
-        self.cover_traffic = Some(ct);
-        self
-    }
-
-    /// Sets the node's on-chain and off-chain identity.
-    pub fn with_identity(mut self, chain_key: &ChainKeypair, offchain_key: &OffchainKeypair) -> Self {
-        self.identity = Some((chain_key.clone(), offchain_key.clone()));
-        self
-    }
-
-    /// Sets the node Safe and module addresses.
-    pub fn with_safe_module(mut self, safe: &Address, module: &Address) -> Self {
-        self.safe_and_module = Some((*safe, *module));
-        self
-    }
-
-    /// Sets the [`HoprLibConfig`].
-    pub fn with_config(mut self, cfg: HoprLibConfig) -> Self {
-        self.cfg = cfg;
-        self
-    }
+/// Intermediate state produced by the shared initialization sequence.
+struct PreHopr<Chain, Graph, Net, NB, Ct> {
+    chain_id: ChainKeypair,
+    transport_id: OffchainKeypair,
+    cfg: HoprLibConfig,
+    state: Arc<AtomicHoprState>,
+    transport_api: HoprTransport<Chain, Graph, Net>,
+    chain_api: Chain,
+    ticket_event_subscribers: (
+        async_broadcast::Sender<TicketEvent>,
+        async_broadcast::InactiveReceiver<TicketEvent>,
+    ),
+    processes: AbortableList<HoprLibProcess>,
+    session_tx: futures::channel::mpsc::Sender<IncomingSession>,
+    session_rx: futures::channel::mpsc::Receiver<IncomingSession>,
+    cover_traffic: Ct,
+    network_builder: NB,
 }
 
-// === Build methods ===
-
-impl<Chain, Graph, NB, Ct> HoprBuilder<Chain, Graph, NB, Ct>
+impl<Chain, Graph, NB, Ct> HoprBuilderCore<Chain, Graph, NB, Ct>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Graph: HoprGraphApi<HoprNodeId = hopr_api::OffchainPublicKey> + Clone + Send + Sync + 'static,
@@ -199,235 +143,6 @@ where
         hopr_api::network::NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
     Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
 {
-    /// Builds an edge (entry/exit) [`Hopr`] node.
-    ///
-    /// Edge nodes use a standalone ticket factory for outgoing tickets but do **not**
-    /// process incoming winning tickets — the incoming ticket sink is drained.
-    ///
-    /// When the `session-server` feature is enabled, a session server must be provided
-    /// to handle incoming sessions. Without the feature, incoming sessions are dropped.
-    pub async fn build_edge<TFact>(
-        self,
-        ticket_factory: TFact,
-        #[cfg(feature = "session-server")] session_server: impl hopr_api::node::HoprSessionServer<
-            Session = IncomingSession,
-            Error: std::fmt::Display,
-        >,
-    ) -> Result<Hopr<Chain, Graph, <NB as NetworkBuilder>::Network, ()>, HoprLibError>
-    where
-        TFact: TicketFactory + Clone + Send + Sync + 'static,
-    {
-        let pre = self.pre_build().await?;
-
-        tracing::info!("starting transport for edge node");
-        let (_, transport_processes) = pre
-            .transport_api
-            .run(
-                pre.cover_traffic,
-                pre.network_builder,
-                futures::sink::drain(),
-                ticket_factory,
-                pre.session_tx,
-            )
-            .await?;
-
-        let mut processes = pre.processes;
-        processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
-
-        #[cfg(feature = "session-server")]
-        attach_session_server(pre.session_rx, session_server, &mut processes);
-
-        let hopr = Hopr {
-            chain_id: NodeOnchainIdentity {
-                node_address: pre.chain_id.public().to_address(),
-                safe_address: pre.cfg.safe_module.safe_address,
-                module_address: pre.cfg.safe_module.module_address,
-            },
-            cfg: pre.cfg,
-            state: pre.state.clone(),
-            ticket_event_subscribers: pre.ticket_event_subscribers,
-            transport_id: pre.transport_id,
-            transport_api: pre.transport_api,
-            chain_api: pre.chain_api,
-            processes,
-            ticket_manager: (),
-        };
-
-        hopr.state
-            .store(HoprState::Running, std::sync::atomic::Ordering::Relaxed);
-        tracing::info!(
-            id = %hopr.transport_id.public().to_peerid_str(),
-            version = constants::APP_VERSION,
-            "EDGE NODE STARTED AND RUNNING"
-        );
-
-        Ok(hopr)
-    }
-
-    /// Builds a full (relay) [`Hopr`] node.
-    ///
-    /// Full nodes process incoming winning tickets via the `ticket_manager` and use a
-    /// coupled ticket factory that accounts for unrealized balance.
-    ///
-    /// When the `session-server` feature is enabled, a session server must be provided
-    /// to handle incoming sessions. Without the feature, incoming sessions are dropped.
-    pub async fn build_full<TMgr, TFact>(
-        self,
-        ticket_manager: TMgr,
-        ticket_factory: TFact,
-        #[cfg(feature = "session-server")] session_server: impl hopr_api::node::HoprSessionServer<
-            Session = IncomingSession,
-            Error: std::fmt::Display,
-        >,
-    ) -> Result<Hopr<Chain, Graph, <NB as NetworkBuilder>::Network, TMgr>, HoprLibError>
-    where
-        TMgr: TicketManagement + Clone + Send + Sync + 'static,
-        TFact: TicketFactory + Clone + Send + Sync + 'static,
-    {
-        let pre = self.pre_build().await?;
-
-        let mut processes = pre.processes;
-
-        // === Ticket event processing ===
-        tracing::info!("starting ticket events processor");
-        let (tickets_tx, tickets_rx) = channel(8192);
-        let (tickets_rx_stream, tickets_handle) = futures::stream::abortable(tickets_rx);
-        processes.insert(HoprLibProcess::TicketEvents, tickets_handle);
-        let new_ticket_tx = pre.ticket_event_subscribers.0.clone();
-        let tmgr_clone = ticket_manager.clone();
-        spawn(
-            tickets_rx_stream
-                .for_each(move |event| {
-                    if let TicketEvent::WinningTicket(ticket) = &event
-                        && let Err(error) = tmgr_clone.insert_incoming_ticket(**ticket)
-                    {
-                        tracing::error!(%error, "failed to insert incoming ticket");
-                    }
-                    if let Err(error) = new_ticket_tx.try_broadcast(event) {
-                        tracing::error!(%error, "failed to broadcast ticket event");
-                    }
-                    futures::future::ready(())
-                })
-                .inspect(|_| {
-                    tracing::warn!(
-                        task = %HoprLibProcess::TicketEvents,
-                        "long-running background task finished"
-                    )
-                }),
-        );
-
-        // === Channel closure → ticket neglect ===
-        {
-            let chain_for_neglect = pre.chain_api.clone();
-            let tmgr_for_neglect = ticket_manager.clone();
-            let events = pre.chain_api.subscribe().map_err(HoprLibError::chain)?;
-            let (neglect_handle, neglect_reg) = hopr_async_runtime::AbortHandle::new_pair();
-            spawn(
-                futures::stream::Abortable::new(
-                    events.filter_map(move |event| {
-                        futures::future::ready(match event {
-                            ChainEvent::ChannelClosed(ch) => Some(ch),
-                            _ => None,
-                        })
-                    }),
-                    neglect_reg,
-                )
-                .for_each(move |closed_channel| {
-                    let chain = chain_for_neglect.clone();
-                    let tmgr = tmgr_for_neglect.clone();
-                    async move {
-                        use hopr_api::types::internal::prelude::ChannelDirection;
-                        match closed_channel.direction(chain.me()) {
-                            Some(ChannelDirection::Incoming) => {
-                                match tmgr.neglect_tickets(closed_channel.get_id(), None) {
-                                    Ok(neglected) if !neglected.is_empty() => {
-                                        tracing::warn!(
-                                            num_neglected = neglected.len(),
-                                            %closed_channel,
-                                            "tickets on incoming closed channel were neglected"
-                                        );
-                                    }
-                                    Ok(_) => {}
-                                    Err(error) => {
-                                        tracing::error!(
-                                            %error, %closed_channel,
-                                            "failed to neglect tickets on closed channel"
-                                        );
-                                    }
-                                }
-                            }
-                            Some(ChannelDirection::Outgoing) => {}
-                            _ => {}
-                        }
-                    }
-                })
-                .inspect(|_| {
-                    tracing::warn!(
-                        task = %HoprLibProcess::ChannelEvents,
-                        "channel closure ticket neglect task finished"
-                    )
-                }),
-            );
-            processes.insert(HoprLibProcess::OutIndexSync, neglect_handle);
-        }
-
-        // === Start transport ===
-        tracing::info!("starting transport for full node");
-        let (_, transport_processes) = pre
-            .transport_api
-            .run(
-                pre.cover_traffic,
-                pre.network_builder,
-                tickets_tx,
-                ticket_factory,
-                pre.session_tx,
-            )
-            .await?;
-        processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
-
-        #[cfg(feature = "session-server")]
-        attach_session_server(pre.session_rx, session_server, &mut processes);
-
-        let hopr = Hopr {
-            chain_id: NodeOnchainIdentity {
-                node_address: pre.chain_id.public().to_address(),
-                safe_address: pre.cfg.safe_module.safe_address,
-                module_address: pre.cfg.safe_module.module_address,
-            },
-            cfg: pre.cfg,
-            state: pre.state.clone(),
-            ticket_event_subscribers: pre.ticket_event_subscribers,
-            transport_id: pre.transport_id,
-            transport_api: pre.transport_api,
-            chain_api: pre.chain_api,
-            processes,
-            ticket_manager,
-        };
-
-        hopr.state
-            .store(HoprState::Running, std::sync::atomic::Ordering::Relaxed);
-
-        tracing::info!(
-            id = %hopr.transport_id.public().to_peerid_str(),
-            version = constants::APP_VERSION,
-            "FULL NODE STARTED AND RUNNING"
-        );
-
-        #[cfg(all(feature = "telemetry", not(test)))]
-        METRIC_HOPR_NODE_INFO.set(
-            &[
-                &hopr.transport_id.public().to_peerid_str(),
-                &hopr.chain_id.node_address.to_string(),
-                &hopr.chain_id.safe_address.to_string(),
-                &hopr.chain_id.module_address.to_string(),
-            ],
-            1.0,
-        );
-
-        Ok(hopr)
-    }
-
-    /// Shared initialization sequence for both edge and full node builds.
     async fn pre_build(
         mut self,
     ) -> Result<PreHopr<Chain, Graph, <NB as NetworkBuilder>::Network, NB, Ct>, HoprLibError> {
@@ -776,5 +491,564 @@ where
             cover_traffic,
             network_builder,
         })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HoprBuilder — with session-server feature
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "session-server")]
+pub struct HoprBuilder<Chain = (), Graph = (), NB = (), Ct = (), Srv = ()> {
+    core: HoprBuilderCore<Chain, Graph, NB, Ct>,
+    session_server: Option<Srv>,
+}
+
+#[cfg(feature = "session-server")]
+impl<Chain, Graph, NB, Ct, Srv> Default for HoprBuilder<Chain, Graph, NB, Ct, Srv> {
+    fn default() -> Self {
+        Self {
+            core: Default::default(),
+            session_server: None,
+        }
+    }
+}
+
+#[cfg(feature = "session-server")]
+impl<Chain, Graph, NB, Ct, Srv> HoprBuilder<Chain, Graph, NB, Ct, Srv> {
+    pub fn with_chain_api(mut self, chain: Chain) -> Self {
+        self.core.chain = Some(chain);
+        self
+    }
+
+    pub fn with_graph(mut self, graph: Graph) -> Self {
+        self.core.graph = Some(graph);
+        self
+    }
+
+    pub fn with_network_builder(mut self, builder: NB) -> Self {
+        self.core.network_builder = Some(builder);
+        self
+    }
+
+    pub fn with_cover_traffic(mut self, ct: Ct) -> Self {
+        self.core.cover_traffic = Some(ct);
+        self
+    }
+
+    pub fn with_identity(mut self, chain_key: &ChainKeypair, offchain_key: &OffchainKeypair) -> Self {
+        self.core.identity = Some((chain_key.clone(), offchain_key.clone()));
+        self
+    }
+
+    pub fn with_safe_module(mut self, safe: &Address, module: &Address) -> Self {
+        self.core.safe_and_module = Some((*safe, *module));
+        self
+    }
+
+    pub fn with_config(mut self, cfg: HoprLibConfig) -> Self {
+        self.core.cfg = cfg;
+        self
+    }
+
+    /// Sets the session server for handling incoming sessions.
+    pub fn with_session_server(mut self, srv: Srv) -> Self {
+        self.session_server = Some(srv);
+        self
+    }
+}
+
+#[cfg(feature = "session-server")]
+impl<Chain, Graph, NB, Ct, Srv> HoprBuilder<Chain, Graph, NB, Ct, Srv>
+where
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+    Graph: HoprGraphApi<HoprNodeId = hopr_api::OffchainPublicKey> + Clone + Send + Sync + 'static,
+    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
+        hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
+    <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
+    NB: NetworkBuilder + Send + Sync + 'static,
+    <NB as NetworkBuilder>::Network:
+        hopr_api::network::NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
+    Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
+    Srv: hopr_api::node::HoprSessionServer<Session = IncomingSession>,
+    <Srv as hopr_api::node::HoprSessionServer>::Error: std::fmt::Display,
+{
+    /// Builds an edge (entry/exit) [`Hopr`] node.
+    pub async fn build_edge<TFact>(
+        self,
+        ticket_factory: TFact,
+    ) -> Result<Hopr<Chain, Graph, <NB as NetworkBuilder>::Network, ()>, HoprLibError>
+    where
+        TFact: TicketFactory + Clone + Send + Sync + 'static,
+    {
+        let pre = self.core.pre_build().await?;
+
+        tracing::info!("starting transport for edge node");
+        let (_, transport_processes) = pre
+            .transport_api
+            .run(
+                pre.cover_traffic,
+                pre.network_builder,
+                futures::sink::drain(),
+                ticket_factory,
+                pre.session_tx,
+            )
+            .await?;
+
+        let mut processes = pre.processes;
+        processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
+
+        if let Some(server) = self.session_server {
+            attach_session_server(pre.session_rx, server, &mut processes);
+        }
+
+        let hopr = Hopr {
+            chain_id: NodeOnchainIdentity {
+                node_address: pre.chain_id.public().to_address(),
+                safe_address: pre.cfg.safe_module.safe_address,
+                module_address: pre.cfg.safe_module.module_address,
+            },
+            cfg: pre.cfg,
+            state: pre.state.clone(),
+            ticket_event_subscribers: pre.ticket_event_subscribers,
+            transport_id: pre.transport_id,
+            transport_api: pre.transport_api,
+            chain_api: pre.chain_api,
+            processes,
+            ticket_manager: (),
+        };
+
+        hopr.state
+            .store(HoprState::Running, std::sync::atomic::Ordering::Relaxed);
+        tracing::info!(
+            id = %hopr.transport_id.public().to_peerid_str(),
+            version = constants::APP_VERSION,
+            "EDGE NODE STARTED AND RUNNING"
+        );
+
+        Ok(hopr)
+    }
+
+    /// Builds a full (relay) [`Hopr`] node.
+    pub async fn build_full<TMgr, TFact>(
+        self,
+        ticket_manager: TMgr,
+        ticket_factory: TFact,
+    ) -> Result<Hopr<Chain, Graph, <NB as NetworkBuilder>::Network, TMgr>, HoprLibError>
+    where
+        TMgr: TicketManagement + Clone + Send + Sync + 'static,
+        TFact: TicketFactory + Clone + Send + Sync + 'static,
+    {
+        let pre = self.core.pre_build().await?;
+        let mut processes = pre.processes;
+
+        // Ticket event processing
+        tracing::info!("starting ticket events processor");
+        let (tickets_tx, tickets_rx) = channel(8192);
+        let (tickets_rx_stream, tickets_handle) = futures::stream::abortable(tickets_rx);
+        processes.insert(HoprLibProcess::TicketEvents, tickets_handle);
+        let new_ticket_tx = pre.ticket_event_subscribers.0.clone();
+        let tmgr_clone = ticket_manager.clone();
+        spawn(
+            tickets_rx_stream
+                .for_each(move |event| {
+                    if let TicketEvent::WinningTicket(ticket) = &event
+                        && let Err(error) = tmgr_clone.insert_incoming_ticket(**ticket)
+                    {
+                        tracing::error!(%error, "failed to insert incoming ticket");
+                    }
+                    if let Err(error) = new_ticket_tx.try_broadcast(event) {
+                        tracing::error!(%error, "failed to broadcast ticket event");
+                    }
+                    futures::future::ready(())
+                })
+                .inspect(|_| {
+                    tracing::warn!(
+                        task = %HoprLibProcess::TicketEvents,
+                        "long-running background task finished"
+                    )
+                }),
+        );
+
+        // Channel closure → ticket neglect
+        {
+            let chain_for_neglect = pre.chain_api.clone();
+            let tmgr_for_neglect = ticket_manager.clone();
+            let events = pre.chain_api.subscribe().map_err(HoprLibError::chain)?;
+            let (neglect_handle, neglect_reg) = hopr_async_runtime::AbortHandle::new_pair();
+            spawn(
+                futures::stream::Abortable::new(
+                    events.filter_map(move |event| {
+                        futures::future::ready(match event {
+                            ChainEvent::ChannelClosed(ch) => Some(ch),
+                            _ => None,
+                        })
+                    }),
+                    neglect_reg,
+                )
+                .for_each(move |closed_channel| {
+                    let chain = chain_for_neglect.clone();
+                    let tmgr = tmgr_for_neglect.clone();
+                    async move {
+                        use hopr_api::types::internal::prelude::ChannelDirection;
+                        match closed_channel.direction(chain.me()) {
+                            Some(ChannelDirection::Incoming) => {
+                                match tmgr.neglect_tickets(closed_channel.get_id(), None) {
+                                    Ok(neglected) if !neglected.is_empty() => {
+                                        tracing::warn!(
+                                            num_neglected = neglected.len(),
+                                            %closed_channel,
+                                            "tickets on incoming closed channel were neglected"
+                                        );
+                                    }
+                                    Ok(_) => {}
+                                    Err(error) => {
+                                        tracing::error!(
+                                            %error, %closed_channel,
+                                            "failed to neglect tickets on closed channel"
+                                        );
+                                    }
+                                }
+                            }
+                            Some(ChannelDirection::Outgoing) => {}
+                            _ => {}
+                        }
+                    }
+                })
+                .inspect(|_| {
+                    tracing::warn!(
+                        task = %HoprLibProcess::ChannelEvents,
+                        "channel closure ticket neglect task finished"
+                    )
+                }),
+            );
+            processes.insert(HoprLibProcess::OutIndexSync, neglect_handle);
+        }
+
+        // Start transport
+        tracing::info!("starting transport for full node");
+        let (_, transport_processes) = pre
+            .transport_api
+            .run(
+                pre.cover_traffic,
+                pre.network_builder,
+                tickets_tx,
+                ticket_factory,
+                pre.session_tx,
+            )
+            .await?;
+        processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
+
+        if let Some(server) = self.session_server {
+            attach_session_server(pre.session_rx, server, &mut processes);
+        }
+
+        let hopr = Hopr {
+            chain_id: NodeOnchainIdentity {
+                node_address: pre.chain_id.public().to_address(),
+                safe_address: pre.cfg.safe_module.safe_address,
+                module_address: pre.cfg.safe_module.module_address,
+            },
+            cfg: pre.cfg,
+            state: pre.state.clone(),
+            ticket_event_subscribers: pre.ticket_event_subscribers,
+            transport_id: pre.transport_id,
+            transport_api: pre.transport_api,
+            chain_api: pre.chain_api,
+            processes,
+            ticket_manager,
+        };
+
+        hopr.state
+            .store(HoprState::Running, std::sync::atomic::Ordering::Relaxed);
+
+        tracing::info!(
+            id = %hopr.transport_id.public().to_peerid_str(),
+            version = constants::APP_VERSION,
+            "FULL NODE STARTED AND RUNNING"
+        );
+
+        #[cfg(all(feature = "telemetry", not(test)))]
+        METRIC_HOPR_NODE_INFO.set(
+            &[
+                &hopr.transport_id.public().to_peerid_str(),
+                &hopr.chain_id.node_address.to_string(),
+                &hopr.chain_id.safe_address.to_string(),
+                &hopr.chain_id.module_address.to_string(),
+            ],
+            1.0,
+        );
+
+        Ok(hopr)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HoprBuilder — without session-server feature
+// ---------------------------------------------------------------------------
+
+#[cfg(not(feature = "session-server"))]
+pub struct HoprBuilder<Chain = (), Graph = (), NB = (), Ct = ()> {
+    core: HoprBuilderCore<Chain, Graph, NB, Ct>,
+}
+
+#[cfg(not(feature = "session-server"))]
+impl<Chain, Graph, NB, Ct> Default for HoprBuilder<Chain, Graph, NB, Ct> {
+    fn default() -> Self {
+        Self {
+            core: Default::default(),
+        }
+    }
+}
+
+#[cfg(not(feature = "session-server"))]
+impl<Chain, Graph, NB, Ct> HoprBuilder<Chain, Graph, NB, Ct> {
+    pub fn with_chain_api(mut self, chain: Chain) -> Self {
+        self.core.chain = Some(chain);
+        self
+    }
+
+    pub fn with_graph(mut self, graph: Graph) -> Self {
+        self.core.graph = Some(graph);
+        self
+    }
+
+    pub fn with_network_builder(mut self, builder: NB) -> Self {
+        self.core.network_builder = Some(builder);
+        self
+    }
+
+    pub fn with_cover_traffic(mut self, ct: Ct) -> Self {
+        self.core.cover_traffic = Some(ct);
+        self
+    }
+
+    pub fn with_identity(mut self, chain_key: &ChainKeypair, offchain_key: &OffchainKeypair) -> Self {
+        self.core.identity = Some((chain_key.clone(), offchain_key.clone()));
+        self
+    }
+
+    pub fn with_safe_module(mut self, safe: &Address, module: &Address) -> Self {
+        self.core.safe_and_module = Some((*safe, *module));
+        self
+    }
+
+    pub fn with_config(mut self, cfg: HoprLibConfig) -> Self {
+        self.core.cfg = cfg;
+        self
+    }
+}
+
+#[cfg(not(feature = "session-server"))]
+impl<Chain, Graph, NB, Ct> HoprBuilder<Chain, Graph, NB, Ct>
+where
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+    Graph: HoprGraphApi<HoprNodeId = hopr_api::OffchainPublicKey> + Clone + Send + Sync + 'static,
+    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
+        hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
+    <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
+    NB: NetworkBuilder + Send + Sync + 'static,
+    <NB as NetworkBuilder>::Network:
+        hopr_api::network::NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
+    Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
+{
+    /// Builds an edge (entry/exit) [`Hopr`] node.
+    pub async fn build_edge<TFact>(
+        self,
+        ticket_factory: TFact,
+    ) -> Result<Hopr<Chain, Graph, <NB as NetworkBuilder>::Network, ()>, HoprLibError>
+    where
+        TFact: TicketFactory + Clone + Send + Sync + 'static,
+    {
+        let pre = self.core.pre_build().await?;
+
+        tracing::info!("starting transport for edge node");
+        let (_, transport_processes) = pre
+            .transport_api
+            .run(
+                pre.cover_traffic,
+                pre.network_builder,
+                futures::sink::drain(),
+                ticket_factory,
+                pre.session_tx,
+            )
+            .await?;
+
+        let mut processes = pre.processes;
+        processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
+
+        let hopr = Hopr {
+            chain_id: NodeOnchainIdentity {
+                node_address: pre.chain_id.public().to_address(),
+                safe_address: pre.cfg.safe_module.safe_address,
+                module_address: pre.cfg.safe_module.module_address,
+            },
+            cfg: pre.cfg,
+            state: pre.state.clone(),
+            ticket_event_subscribers: pre.ticket_event_subscribers,
+            transport_id: pre.transport_id,
+            transport_api: pre.transport_api,
+            chain_api: pre.chain_api,
+            processes,
+            ticket_manager: (),
+        };
+
+        hopr.state
+            .store(HoprState::Running, std::sync::atomic::Ordering::Relaxed);
+        tracing::info!(
+            id = %hopr.transport_id.public().to_peerid_str(),
+            version = constants::APP_VERSION,
+            "EDGE NODE STARTED AND RUNNING"
+        );
+
+        Ok(hopr)
+    }
+
+    /// Builds a full (relay) [`Hopr`] node.
+    pub async fn build_full<TMgr, TFact>(
+        self,
+        ticket_manager: TMgr,
+        ticket_factory: TFact,
+    ) -> Result<Hopr<Chain, Graph, <NB as NetworkBuilder>::Network, TMgr>, HoprLibError>
+    where
+        TMgr: TicketManagement + Clone + Send + Sync + 'static,
+        TFact: TicketFactory + Clone + Send + Sync + 'static,
+    {
+        let pre = self.core.pre_build().await?;
+        let mut processes = pre.processes;
+
+        // Ticket event processing
+        tracing::info!("starting ticket events processor");
+        let (tickets_tx, tickets_rx) = channel(8192);
+        let (tickets_rx_stream, tickets_handle) = futures::stream::abortable(tickets_rx);
+        processes.insert(HoprLibProcess::TicketEvents, tickets_handle);
+        let new_ticket_tx = pre.ticket_event_subscribers.0.clone();
+        let tmgr_clone = ticket_manager.clone();
+        spawn(
+            tickets_rx_stream
+                .for_each(move |event| {
+                    if let TicketEvent::WinningTicket(ticket) = &event
+                        && let Err(error) = tmgr_clone.insert_incoming_ticket(**ticket)
+                    {
+                        tracing::error!(%error, "failed to insert incoming ticket");
+                    }
+                    if let Err(error) = new_ticket_tx.try_broadcast(event) {
+                        tracing::error!(%error, "failed to broadcast ticket event");
+                    }
+                    futures::future::ready(())
+                })
+                .inspect(|_| {
+                    tracing::warn!(
+                        task = %HoprLibProcess::TicketEvents,
+                        "long-running background task finished"
+                    )
+                }),
+        );
+
+        // Channel closure → ticket neglect
+        {
+            let chain_for_neglect = pre.chain_api.clone();
+            let tmgr_for_neglect = ticket_manager.clone();
+            let events = pre.chain_api.subscribe().map_err(HoprLibError::chain)?;
+            let (neglect_handle, neglect_reg) = hopr_async_runtime::AbortHandle::new_pair();
+            spawn(
+                futures::stream::Abortable::new(
+                    events.filter_map(move |event| {
+                        futures::future::ready(match event {
+                            ChainEvent::ChannelClosed(ch) => Some(ch),
+                            _ => None,
+                        })
+                    }),
+                    neglect_reg,
+                )
+                .for_each(move |closed_channel| {
+                    let chain = chain_for_neglect.clone();
+                    let tmgr = tmgr_for_neglect.clone();
+                    async move {
+                        use hopr_api::types::internal::prelude::ChannelDirection;
+                        match closed_channel.direction(chain.me()) {
+                            Some(ChannelDirection::Incoming) => {
+                                match tmgr.neglect_tickets(closed_channel.get_id(), None) {
+                                    Ok(neglected) if !neglected.is_empty() => {
+                                        tracing::warn!(
+                                            num_neglected = neglected.len(),
+                                            %closed_channel,
+                                            "tickets on incoming closed channel were neglected"
+                                        );
+                                    }
+                                    Ok(_) => {}
+                                    Err(error) => {
+                                        tracing::error!(
+                                            %error, %closed_channel,
+                                            "failed to neglect tickets on closed channel"
+                                        );
+                                    }
+                                }
+                            }
+                            Some(ChannelDirection::Outgoing) => {}
+                            _ => {}
+                        }
+                    }
+                })
+                .inspect(|_| {
+                    tracing::warn!(
+                        task = %HoprLibProcess::ChannelEvents,
+                        "channel closure ticket neglect task finished"
+                    )
+                }),
+            );
+            processes.insert(HoprLibProcess::OutIndexSync, neglect_handle);
+        }
+
+        tracing::info!("starting transport for full node");
+        let (_, transport_processes) = pre
+            .transport_api
+            .run(
+                pre.cover_traffic,
+                pre.network_builder,
+                tickets_tx,
+                ticket_factory,
+                pre.session_tx,
+            )
+            .await?;
+        processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
+
+        let hopr = Hopr {
+            chain_id: NodeOnchainIdentity {
+                node_address: pre.chain_id.public().to_address(),
+                safe_address: pre.cfg.safe_module.safe_address,
+                module_address: pre.cfg.safe_module.module_address,
+            },
+            cfg: pre.cfg,
+            state: pre.state.clone(),
+            ticket_event_subscribers: pre.ticket_event_subscribers,
+            transport_id: pre.transport_id,
+            transport_api: pre.transport_api,
+            chain_api: pre.chain_api,
+            processes,
+            ticket_manager,
+        };
+
+        hopr.state
+            .store(HoprState::Running, std::sync::atomic::Ordering::Relaxed);
+
+        tracing::info!(
+            id = %hopr.transport_id.public().to_peerid_str(),
+            version = constants::APP_VERSION,
+            "FULL NODE STARTED AND RUNNING"
+        );
+
+        #[cfg(all(feature = "telemetry", not(test)))]
+        METRIC_HOPR_NODE_INFO.set(
+            &[
+                &hopr.transport_id.public().to_peerid_str(),
+                &hopr.chain_id.node_address.to_string(),
+                &hopr.chain_id.safe_address.to_string(),
+                &hopr.chain_id.module_address.to_string(),
+            ],
+            1.0,
+        );
+
+        Ok(hopr)
     }
 }

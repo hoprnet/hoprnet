@@ -124,7 +124,6 @@ where
         );
     }
 
-    // Create concrete components
     let graph: SharedChannelGraph = Arc::new(ChannelGraph::new(*packet_key.public()));
 
     // Wire chain announcement events → network peer discovery
@@ -161,7 +160,7 @@ where
 
     let network_builder = HoprLibp2pNetworkBuilder::new(peer_discovery_rx);
 
-    // Wire network events (peer connected/disconnected) → graph updates
+    // Wire network events → graph updates
     {
         use futures::StreamExt;
         use hopr_lib::api::graph::NetworkGraphUpdate;
@@ -209,14 +208,10 @@ where
         .with_safe_module(&config.safe_module.safe_address, &config.safe_module.module_address)
         .with_config(config);
 
-    let node = builder
-        .build_full(
-            ticket_manager,
-            ticket_factory,
-            #[cfg(feature = "session-server")]
-            server,
-        )
-        .await?;
+    #[cfg(feature = "session-server")]
+    let builder = builder.with_session_server(server);
+
+    let node = builder.build_full(ticket_manager, ticket_factory).await?;
 
     Ok(Arc::new(node))
 }
