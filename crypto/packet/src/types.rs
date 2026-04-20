@@ -255,7 +255,7 @@ mod tests {
                     &path_ids,
                     &por_strings,
                     recv_data,
-                    SurbReceiverInfo::new(por_values, [0u8; 32]),
+                    SurbReceiverInfo::new(por_values, [0u8; 36]),
                 )
                 .map(|(s, _)| s)
             })

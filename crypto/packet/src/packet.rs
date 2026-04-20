@@ -420,7 +420,7 @@ fn create_surb_for_path<
             .collect::<Result<Vec<_>>>()?,
         &por_strings,
         recv_data,
-        SurbReceiverInfo::new(por_values, [0u8; 32]),
+        SurbReceiverInfo::new(por_values, [0u8; 36]),
     )
     .map(|(s, r)| (s, (recv_data.surb_id(), r)))?)
 }

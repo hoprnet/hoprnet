@@ -91,17 +91,17 @@ impl BytesRepresentable for ProofOfRelayValues {
 
 /// Wraps the [`ProofOfRelayValues`] with some additional information about the sender of the packet,
 /// that is supposed to be passed along with the SURB.
-// TODO: currently 32 bytes are reserved for future use by Shamir's secret sharing scheme.
+// TODO: currently 36 bytes are reserved for future use by Shamir's secret sharing scheme.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SurbReceiverInfo(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
 
 impl SurbReceiverInfo {
-    pub fn new(pov: ProofOfRelayValues, share: [u8; 32]) -> Self {
+    pub fn new(pov: ProofOfRelayValues, reserved: [u8; 36]) -> Self {
         let mut ret = [0u8; Self::SIZE];
         ret[0..ProofOfRelayValues::SIZE].copy_from_slice(&pov.0);
         // Share is currently not used but will be used in the future
-        ret[ProofOfRelayValues::SIZE..ProofOfRelayValues::SIZE + 32].copy_from_slice(&share);
+        ret[ProofOfRelayValues::SIZE..ProofOfRelayValues::SIZE + 32].copy_from_slice(&reserved);
         Self(ret)
     }
 
