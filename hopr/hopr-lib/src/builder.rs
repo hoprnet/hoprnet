@@ -48,7 +48,7 @@ lazy_static::lazy_static! {
 /// Intermediate state produced by the shared initialization sequence.
 ///
 /// Holds all resources needed by the divergent `build_edge` / `build_full` finalization steps.
-struct PreBuiltNode<Chain, Graph, Net, NB, Ct> {
+struct PreHopr<Chain, Graph, Net, NB, Ct> {
     chain_id: ChainKeypair,
     transport_id: OffchainKeypair,
     cfg: HoprLibConfig,
@@ -409,7 +409,7 @@ where
     /// Shared initialization sequence for both edge and full node builds.
     async fn pre_build(
         mut self,
-    ) -> Result<PreBuiltNode<Chain, Graph, <NB as NetworkBuilder>::Network, NB, Ct>, HoprLibError> {
+    ) -> Result<PreHopr<Chain, Graph, <NB as NetworkBuilder>::Network, NB, Ct>, HoprLibError> {
         self.cfg.validate()?;
 
         let chain_api = self
@@ -620,7 +620,7 @@ where
         // === Chain → Graph event wiring ===
         // Subscribe to chain events and update the graph accordingly.
         // This runs as a background task for the lifetime of the node.
-        let mut processes = {
+        let processes = {
             let chain_events = chain_api
                 .subscribe_with_state_sync([StateSyncOptions::PublicAccounts, StateSyncOptions::OpenedChannels])
                 .map_err(HoprLibError::chain)?;
@@ -752,7 +752,7 @@ where
             processes
         };
 
-        Ok(PreBuiltNode {
+        Ok(PreHopr {
             chain_id,
             transport_id,
             cfg: self.cfg,

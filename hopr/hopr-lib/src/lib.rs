@@ -23,8 +23,6 @@ pub mod config;
 pub mod constants;
 /// Lists all errors thrown from this library.
 pub mod errors;
-/// Public traits for interactions with this library.
-pub mod traits;
 /// Public domain types for peer discovery.
 pub mod types;
 /// Utility module with helper types and functionality over hopr-lib behavior.
