@@ -132,6 +132,31 @@ where
     let ticket_manager = Arc::new(ticket_manager);
     let ticket_factory = Arc::new(ticket_factory);
 
+    // Sync ticket manager and factory with on-chain state
+    {
+        use futures::StreamExt;
+        use hopr_lib::api::chain::{ChannelSelector, HoprChainApi};
+
+        let me = chain_connector.me();
+        let incoming_channels: Vec<_> = chain_connector
+            .stream_channels(ChannelSelector::default().with_destination(*me))
+            .map_err(|e| anyhow::anyhow!("failed to stream incoming channels: {e}"))?
+            .collect()
+            .await;
+        ticket_manager
+            .sync_from_incoming_channels(&incoming_channels)
+            .map_err(|e| anyhow::anyhow!("failed to sync ticket manager: {e}"))?;
+
+        let outgoing_channels: Vec<_> = chain_connector
+            .stream_channels(ChannelSelector::default().with_source(*me))
+            .map_err(|e| anyhow::anyhow!("failed to stream outgoing channels: {e}"))?
+            .collect()
+            .await;
+        ticket_factory
+            .sync_from_outgoing_channels(&outgoing_channels)
+            .map_err(|e| anyhow::anyhow!("failed to sync ticket factory: {e}"))?;
+    }
+
     // Chain→peer-discovery wiring
     let (peer_discovery_tx, peer_discovery_rx) = futures::channel::mpsc::channel(2048);
     {
