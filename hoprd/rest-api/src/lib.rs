@@ -28,9 +28,10 @@ use axum::{
     routing::{delete, get, post},
 };
 use hopr_chain_connector::HoprBlockchainSafeConnector;
-use hopr_lib::{Address, Hopr, builder::SharedTicketManager, errors::HoprLibError};
+use hopr_lib::{Hopr, api::types::primitive::prelude::Address, errors::HoprLibError};
 use hopr_network_graph::SharedChannelGraph;
-// pub use hopr_builder::config::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
+use hopr_reference::SharedTicketManager;
+// pub use hopr_reference::config::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
 use hopr_transport_p2p::HoprNetwork;
 use hopr_utils_session::ListenerJoinHandles;
 use serde::Serialize;

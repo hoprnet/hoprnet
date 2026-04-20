@@ -156,7 +156,7 @@ dependencies = [
  "either",
  "k256",
  "once_cell",
- "rand 0.8.5",
+ "rand 0.8.6",
  "secp256k1 0.30.0",
  "serde",
  "serde_json",
@@ -412,7 +412,7 @@ dependencies = [
  "alloy-signer-local",
  "k256",
  "libc",
- "rand 0.8.5",
+ "rand 0.8.6",
  "serde_json",
  "tempfile",
  "thiserror 2.0.18",
@@ -627,7 +627,7 @@ dependencies = [
  "alloy-signer",
  "async-trait",
  "k256",
- "rand 0.8.5",
+ "rand 0.8.6",
  "thiserror 2.0.18",
 ]
 
@@ -1051,7 +1051,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1df2c09229cbc5a028b1d70e00fdb2acee28b1055dfb5ca73eea49c5a25c4e7c"
 dependencies = [
  "num-traits",
- "rand 0.8.5",
+ "rand 0.8.6",
 ]
 
 [[package]]
@@ -1061,7 +1061,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94893f1e0c6eeab764ade8dc4c0db24caf4fe7cbbaafc0eba0a9030f447b5185"
 dependencies = [
  "num-traits",
- "rand 0.8.5",
+ "rand 0.8.6",
 ]
 
 [[package]]
@@ -1071,7 +1071,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "246a225cc6131e9ee4f24619af0f19d67761fff15d7ccc22e42b80846e69449a"
 dependencies = [
  "num-traits",
- "rand 0.8.5",
+ "rand 0.8.6",
 ]
 
 [[package]]
@@ -2033,11 +2033,12 @@ checksum = "2f421161cb492475f1661ddc9815a745a1c894592070661180fdec3d4872e9c3"
 
 [[package]]
 name = "const_format"
-version = "0.2.35"
+version = "0.2.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7faa7469a93a566e9ccc1c73fe783b4a65c274c5ace346038dca9c39fe0030ad"
+checksum = "4481a617ad9a412be3b97c5d403fef8ed023103368908b9c50af598ff467cc1e"
 dependencies = [
  "const_format_proc_macros",
+ "konst",
 ]
 
 [[package]]
@@ -2929,7 +2930,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "835c052cb0c08c1acf6ffd71c022172e18723949c8282f2b9f27efbc51e64534"
 dependencies = [
  "byteorder",
- "rand 0.8.5",
+ "rand 0.8.6",
  "rustc-hex",
  "static_assertions",
 ]
@@ -4283,7 +4284,7 @@ dependencies = [
 [[package]]
 name = "hopr-api"
 version = "1.8.0"
-source = "git+https://github.com/hoprnet/hopr-api?branch=kauki%2Frefactor%2Fnode%2Fhas-accessors#b100ba23108abadbba6c076d4789867b99b20e64"
+source = "git+https://github.com/hoprnet/hopr-api?branch=kauki%2Frefactor%2Fnode%2Fhas-accessors#937abfab528e24c840c21033c0f72daf3a912391"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -4327,40 +4328,6 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tracing",
-]
-
-[[package]]
-name = "hopr-builder"
-version = "4.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "futures",
- "futures-time",
- "hex-literal",
- "hopr-api",
- "hopr-builder",
- "hopr-chain-connector",
- "hopr-ct-full-network",
- "hopr-lib",
- "hopr-metrics",
- "hopr-network-graph",
- "hopr-transport-p2p",
- "lazy_static",
- "opentelemetry-prometheus-text-exporter",
- "opentelemetry_sdk",
- "rand 0.10.1",
- "rstest",
- "serde",
- "serde_with",
- "serial_test",
- "smart-default",
- "test-log",
- "tokio",
- "tokio-retry",
- "tokio-util",
- "tracing",
- "validator",
 ]
 
 [[package]]
@@ -4511,20 +4478,16 @@ dependencies = [
  "cfg_eval",
  "const_format",
  "futures",
- "futures-concurrency",
  "futures-time",
  "hopr-api",
  "hopr-async-runtime",
  "hopr-crypto-keypair",
- "hopr-ct-full-network",
  "hopr-metrics",
- "hopr-network-graph",
  "hopr-network-types",
  "hopr-parallelize",
  "hopr-platform",
  "hopr-ticket-manager",
  "hopr-transport",
- "hopr-transport-p2p",
  "humantime-serde",
  "lazy_static",
  "parking_lot",
@@ -4732,6 +4695,42 @@ dependencies = [
  "serde_cbor_2",
  "strum 0.28.0",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "hopr-reference"
+version = "4.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "futures",
+ "futures-time",
+ "hex-literal",
+ "hopr-api",
+ "hopr-chain-connector",
+ "hopr-ct-full-network",
+ "hopr-lib",
+ "hopr-metrics",
+ "hopr-network-graph",
+ "hopr-reference",
+ "hopr-ticket-manager",
+ "hopr-transport",
+ "hopr-transport-p2p",
+ "lazy_static",
+ "opentelemetry-prometheus-text-exporter",
+ "opentelemetry_sdk",
+ "rand 0.10.1",
+ "rstest",
+ "serde",
+ "serde_with",
+ "serial_test",
+ "smart-default",
+ "test-log",
+ "tokio",
+ "tokio-retry",
+ "tokio-util",
+ "tracing",
+ "validator",
 ]
 
 [[package]]
@@ -5208,12 +5207,12 @@ dependencies = [
  "futures",
  "home",
  "hopr-api",
- "hopr-builder",
  "hopr-chain-connector",
  "hopr-ct-full-network",
  "hopr-lib",
  "hopr-metrics",
  "hopr-network-graph",
+ "hopr-reference",
  "hopr-strategy",
  "hopr-transport-p2p",
  "hopr-utils-session",
@@ -5260,6 +5259,7 @@ dependencies = [
  "hopr-lib",
  "hopr-metrics",
  "hopr-network-graph",
+ "hopr-reference",
  "hopr-transport-p2p",
  "hopr-utils-session",
  "human-bandwidth",
@@ -5312,9 +5312,9 @@ dependencies = [
  "anyhow",
  "clap",
  "futures",
- "hopr-builder",
  "hopr-chain-connector",
  "hopr-lib",
+ "hopr-reference",
  "hopr-types 1.5.3",
  "hoprd",
  "hoprd-api",
@@ -5971,6 +5971,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "konst"
+version = "0.2.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "128133ed7824fcd73d6e7b17957c5eb7bacb885649bd8c69708b2331a10bcefb"
+dependencies = [
+ "konst_macro_rules",
+]
+
+[[package]]
+name = "konst_macro_rules"
+version = "0.2.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4933f3f57a8e9d9da04db23fb153356ecaf00cbd14aee46279c33dc80925c37"
+
+[[package]]
 name = "kstring"
 version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6096,7 +6111,7 @@ dependencies = [
  "libp2p-swarm",
  "quick-protobuf",
  "quick-protobuf-codec",
- "rand 0.8.5",
+ "rand 0.8.6",
  "rand_core 0.6.4",
  "thiserror 2.0.18",
  "tracing",
@@ -6131,7 +6146,7 @@ dependencies = [
  "parking_lot",
  "pin-project",
  "quick-protobuf",
- "rand 0.8.5",
+ "rand 0.8.6",
  "rw-stream-sink",
  "thiserror 2.0.18",
  "tracing",
@@ -6187,7 +6202,7 @@ dependencies = [
  "hkdf",
  "multihash",
  "quick-protobuf",
- "rand 0.8.5",
+ "rand 0.8.6",
  "serde",
  "sha2",
  "thiserror 2.0.18",
@@ -6207,7 +6222,7 @@ dependencies = [
  "libp2p-core",
  "libp2p-identity",
  "libp2p-swarm",
- "rand 0.8.5",
+ "rand 0.8.6",
  "smallvec",
  "socket2 0.5.10",
  "tokio",
@@ -6244,7 +6259,7 @@ dependencies = [
  "multiaddr",
  "multihash",
  "quick-protobuf",
- "rand 0.8.5",
+ "rand 0.8.6",
  "snow",
  "static_assertions",
  "thiserror 2.0.18",
@@ -6266,7 +6281,7 @@ dependencies = [
  "libp2p-identity",
  "libp2p-tls",
  "quinn",
- "rand 0.8.5",
+ "rand 0.8.6",
  "ring",
  "rustls",
  "socket2 0.5.10",
@@ -6287,7 +6302,7 @@ dependencies = [
  "libp2p-core",
  "libp2p-identity",
  "libp2p-swarm",
- "rand 0.8.5",
+ "rand 0.8.6",
  "smallvec",
  "tracing",
 ]
@@ -6302,7 +6317,7 @@ dependencies = [
  "libp2p-core",
  "libp2p-identity",
  "libp2p-swarm",
- "rand 0.8.5",
+ "rand 0.8.6",
  "tracing",
 ]
 
@@ -6321,7 +6336,7 @@ dependencies = [
  "libp2p-identity",
  "libp2p-swarm-derive",
  "multistream-select",
- "rand 0.8.5",
+ "rand 0.8.6",
  "smallvec",
  "tokio",
  "tracing",
@@ -7871,9 +7886,9 @@ checksum = "dc33ff2d4973d518d823d61aa239014831e521c75da58e3df4840d3f47749d09"
 
 [[package]]
 name = "rand"
-version = "0.8.5"
+version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34af8d1a0e25924bc5b7c43c079c942339d8f0a8b57c39049bef581b46327404"
+checksum = "5ca0ecfa931c29007047d1bc58e623ab12e5590e8c7cc53200d5202b69266d8a"
 dependencies = [
  "libc",
  "rand_chacha 0.3.1",
@@ -8297,7 +8312,7 @@ dependencies = [
  "parity-scale-codec",
  "primitive-types 0.12.2",
  "proptest",
- "rand 0.8.5",
+ "rand 0.8.6",
  "rand 0.9.4",
  "rlp",
  "ruint-macro",
@@ -8633,7 +8648,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b50c5943d326858130af85e049f2661ba3c78b26589b8ab98e65e80ae44a1252"
 dependencies = [
  "bitcoin_hashes",
- "rand 0.8.5",
+ "rand 0.8.6",
  "secp256k1-sys 0.10.1",
  "serde",
 ]
@@ -8736,7 +8751,7 @@ checksum = "09fbdfe7a27a1b1633dfc0c4c8e65940b8d819c5ddb9cca48ebc3223b00c8b14"
 dependencies = [
  "ahash",
  "annotate-snippets",
- "base64 0.21.7",
+ "base64 0.22.1",
  "encoding_rs_io",
  "getrandom 0.3.4",
  "nohash-hasher",
@@ -10881,7 +10896,7 @@ dependencies = [
  "nohash-hasher",
  "parking_lot",
  "pin-project",
- "rand 0.8.5",
+ "rand 0.8.6",
  "static_assertions",
 ]
 

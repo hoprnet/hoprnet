@@ -1,5 +1,5 @@
 [package]
-name = "hopr-builder"
+name = "hopr-reference"
 version = "4.1.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
@@ -26,12 +26,14 @@ session-server = [
   "dep:serde",
   "dep:serde_with",
   "dep:smart-default",
+  "dep:tokio",
   "dep:tokio-retry",
   "dep:validator",
   "hopr-lib/session-server",
 ]
 session-client = ["hopr-lib/session-client"]
 testing = [
+  "runtime-tokio",
   "session-client",
   "session-server",
   "dep:async-trait",
@@ -65,10 +67,12 @@ validator = { workspace = true, optional = true }
 
 hopr-lib = { workspace = true, features = ["utils_parallel"] }
 hopr-metrics = { workspace = true, optional = true }
+hopr-transport = { workspace = true }
 # impls
 hopr-chain-connector = { workspace = true }
 hopr-ct-full-network = { workspace = true }
 hopr-network-graph = { workspace = true, features = ["petgraph", "graph-api"] }
+hopr-ticket-manager = { workspace = true }
 hopr-transport-p2p = { workspace = true }
 
 [dev-dependencies]
@@ -78,7 +82,7 @@ serial_test = { workspace = true }
 test-log = { workspace = true }
 tokio = { workspace = true }
 
-hopr-builder = { workspace = true, features = ["testing"] }
+hopr-reference = { workspace = true, features = ["testing"] }
 hopr-api = { workspace = true, features = ["types-random"] }
 hopr-metrics = { workspace = true }
 opentelemetry_sdk = { workspace = true, features = [
