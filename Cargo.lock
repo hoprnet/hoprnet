@@ -4284,7 +4284,7 @@ dependencies = [
 [[package]]
 name = "hopr-api"
 version = "1.8.0"
-source = "git+https://github.com/hoprnet/hopr-api?branch=kauki%2Frefactor%2Fnode%2Fhas-accessors#4e7839d20e86e4aeb72639c7d146f8be5e651fe6"
+source = "git+https://github.com/hoprnet/hopr-api?branch=kauki%2Frefactor%2Fnode%2Fhas-accessors#66740f046deea4f8984d8bcfcffef31b0dd34e19"
 dependencies = [
  "async-trait",
  "atomic_enum",

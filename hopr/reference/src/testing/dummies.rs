@@ -1,5 +1,5 @@
 use futures::AsyncReadExt;
-use hopr_lib::{IncomingSession, builder::HoprSessionServer, errors::HoprLibError};
+use hopr_lib::{IncomingSession, api::node::HoprSessionServer, errors::HoprLibError};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, FuturesAsyncWriteCompatExt};
 
 #[derive(Debug, Clone, Default)]
@@ -14,6 +14,7 @@ impl EchoServer {
 #[async_trait::async_trait]
 impl HoprSessionServer for EchoServer {
     type Error = HoprLibError;
+    type Session = IncomingSession;
 
     async fn process(&self, session: IncomingSession) -> Result<(), HoprLibError> {
         tokio::spawn(async move {

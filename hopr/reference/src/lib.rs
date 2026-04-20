@@ -98,7 +98,10 @@ pub async fn build_reference(
 /// Builds a HOPR node with a custom chain connector using canonical implementations
 /// for all other components.
 #[cfg(feature = "runtime-tokio")]
-pub async fn build_with_chain<Chain, #[cfg(feature = "session-server")] Srv: hopr_lib::builder::HoprSessionServer>(
+pub async fn build_with_chain<
+    Chain,
+    #[cfg(feature = "session-server")] Srv: hopr_lib::api::node::HoprSessionServer<Session = hopr_lib::IncomingSession, Error: std::fmt::Display>,
+>(
     chain_key: &ChainKeypair,
     packet_key: &OffchainKeypair,
     config: HoprLibConfig,
