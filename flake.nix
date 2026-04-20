@@ -774,6 +774,18 @@
             inherit update-github-labels find-port-ci;
             check = run-check;
             audit = run-audit;
+            bench = {
+              type = "app";
+              program = toString (
+                pkgs.writeShellScript "bench" ''
+                  set -euo pipefail
+                  for bin in ${hoprdPackages.bench-build}/bin/*_bench*; do
+                    $bin --bench
+                  done
+                ''
+              );
+              meta.description = "Run all benchmarks";
+            };
           };
 
           packages =
