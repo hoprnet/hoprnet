@@ -53,6 +53,20 @@ lazy_static::lazy_static! {
 /// Type-erased factory closure producing `T` from a [`BuildCtx`] reference.
 type Factory<T> = Box<dyn FnOnce(&BuildCtx) -> T + Send>;
 
+/// Trait for processing incoming HOPR sessions on exit nodes.
+///
+/// Implementors define how each incoming session is handled (e.g. IP forwarding,
+/// echo, etc.). Used by [`HoprBuilderConfigured::with_session_server`].
+#[cfg(feature = "session-server")]
+#[async_trait::async_trait]
+pub trait HoprSessionServer: Clone + Send + 'static {
+    /// Error type for session processing.
+    type Error: std::fmt::Display + Send + Sync + 'static;
+
+    /// Fully process a single incoming HOPR session.
+    async fn process(&self, session: IncomingSession) -> Result<(), Self::Error>;
+}
+
 /// Context available to factory closures during the build step.
 pub struct BuildCtx {
     /// Node's on-chain keypair.
@@ -216,10 +230,7 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
     /// Eagerly spawns the server task. Sessions are not emitted until
     /// transport starts during build, so spawning the consumer early is safe.
     #[cfg(feature = "session-server")]
-    pub fn with_session_server(
-        mut self,
-        server: impl hopr_api::node::HoprSessionServer<Session = IncomingSession, Error: std::fmt::Display>,
-    ) -> Self {
+    pub fn with_session_server(mut self, server: impl HoprSessionServer) -> Self {
         let incoming_session_capacity = std::env::var("HOPR_INTERNAL_SESSION_INCOMING_CAPACITY")
             .ok()
             .and_then(|s| s.trim().parse::<usize>().ok())
