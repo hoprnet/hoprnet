@@ -8,8 +8,7 @@ use axum::{
 use base64::Engine;
 use hopr_lib::{
     Address, HopRouting, HoprSessionClientConfig, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities, SessionId,
-    SessionManagerError, SessionTarget, SurbBalancerConfig, TransportSessionError,
-    errors::{HoprLibError, HoprTransportError},
+    SessionTarget, SurbBalancerConfig, errors::HoprLibError,
 };
 use hopr_utils_session::{ListenerId, build_binding_host, create_tcp_client_binding, create_udp_client_binding};
 use serde::{Deserialize, Serialize};

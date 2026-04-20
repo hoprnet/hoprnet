@@ -872,6 +872,46 @@ mod tests {
         Ok(())
     }
 
+    fn stub_stored_entry() -> StoredSessionEntry {
+        let (abort_handle, _) = AbortHandle::new_pair();
+        StoredSessionEntry {
+            destination: Address::default(),
+            target: SessionTargetSpec::Plain("localhost:8080".into()),
+            forward_path: RoutingOptions::Hops(Default::default()),
+            return_path: RoutingOptions::Hops(Default::default()),
+            max_client_sessions: 5,
+            max_surb_upstream: None,
+            response_buffer: None,
+            session_pool: None,
+            abort_handle,
+            clients: Arc::new(DashMap::new()),
+        }
+    }
+
+    #[test]
+    fn find_configurator_should_return_none_when_no_listeners() {
+        let handles = ListenerJoinHandles::default();
+        let session_id = SessionId::new(1234u64, HoprPseudonym::random());
+        assert!(handles.find_configurator(&session_id).is_none());
+    }
+
+    #[test]
+    fn find_configurator_should_return_none_when_session_not_tracked() {
+        let handles = ListenerJoinHandles::default();
+        let listener_id = ListenerId(IpProtocol::TCP, "127.0.0.1:9091".parse().unwrap());
+        handles.0.insert(listener_id, stub_stored_entry());
+
+        let session_id = SessionId::new(5678u64, HoprPseudonym::random());
+        assert!(handles.find_configurator(&session_id).is_none());
+    }
+
+    #[test]
+    fn stored_session_entry_clients_should_start_empty() {
+        let entry = stub_stored_entry();
+        assert!(entry.get_clients().is_empty());
+        assert_eq!(entry.max_client_sessions, 5);
+    }
+
     #[test]
     fn build_binding_address() {
         let default = "10.0.0.1:10000".parse().unwrap();
