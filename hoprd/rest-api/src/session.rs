@@ -654,14 +654,7 @@ pub(crate) async fn adjust_session(
         SessionId::from_str(&session_id).map_err(|_| (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidSessionId))?;
 
     if let Some(cfg) = Option::<SurbBalancerConfig>::from(args) {
-        // Find the configurator for this session across all listeners
-        let configurator = state.open_listeners.0.iter().find_map(|entry| {
-            entry
-                .value()
-                .get_clients()
-                .get(&session_id)
-                .map(|client| client.value().2.clone())
-        });
+        let configurator = state.open_listeners.find_configurator(&session_id);
 
         match configurator {
             Some(configurator) => match configurator.update_surb_balancer_config(cfg).await {

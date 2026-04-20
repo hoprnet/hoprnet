@@ -192,6 +192,19 @@ impl std::fmt::Display for ListenerId {
 #[derive(Default)]
 pub struct ListenerJoinHandles(pub DashMap<ListenerId, StoredSessionEntry>);
 
+impl ListenerJoinHandles {
+    /// Finds the [`HoprSessionConfigurator`] for the given session ID across all listeners.
+    pub fn find_configurator(&self, session_id: &SessionId) -> Option<HoprSessionConfigurator> {
+        self.0.iter().find_map(|entry| {
+            entry
+                .value()
+                .get_clients()
+                .get(session_id)
+                .map(|client| client.value().2.clone())
+        })
+    }
+}
+
 impl Abortable for ListenerJoinHandles {
     fn abort_task(&self) {
         self.0.alter_all(|_, v| {
