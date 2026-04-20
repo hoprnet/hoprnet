@@ -58,7 +58,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
-hopr-api = { workspace = true, features = ["types-random", "tickets"] }
+hopr-api = { workspace = true, features = ["types-random", "tickets", "node"] }
 
 hopr-async-runtime = { workspace = true }
 hopr-crypto-packet = { workspace = true }

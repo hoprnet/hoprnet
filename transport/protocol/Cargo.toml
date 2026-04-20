@@ -67,7 +67,7 @@ serial_test = { workspace = true }
 test-log = { workspace = true }
 tokio = { workspace = true }
 
-hopr-api = { workspace = true }
+hopr-api = { workspace = true, features = ["node"] }
 hopr-chain-connector = { workspace = true, features = [
   "testing",
   "runtime-tokio",

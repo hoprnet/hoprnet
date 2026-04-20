@@ -6,8 +6,8 @@ use axum::{
     response::IntoResponse,
 };
 use hopr_lib::{
-    Address, ChannelStatus, HoprBalance,
-    api::tickets::{ChannelStats, TicketManagement},
+    Address, ChannelStatus, HoprBalance, IncentiveChannelOperations, IncentiveRedeemOperations,
+    api::{node::HasChainApi, tickets::ChannelStats},
     prelude::Hash,
 };
 use serde::Deserialize;
@@ -101,13 +101,13 @@ impl From<ChannelStats> for NodeTicketStatisticsResponse {
     )]
 pub(super) async fn show_ticket_statistics(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
     let hopr = state.hopr.clone();
-    if let Ok(ticket_mgt) = hopr.ticket_management() {
-        match ticket_mgt.ticket_stats(None).map(NodeTicketStatisticsResponse::from) {
-            Ok(stats) => (StatusCode::OK, Json(stats)).into_response(),
-            Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
-        }
-    } else {
-        (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::NotReady).into_response()
+    match hopr.ticket_statistics() {
+        Ok(stats) => (StatusCode::OK, Json(NodeTicketStatisticsResponse::from(stats))).into_response(),
+        Err(e) => (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ApiErrorStatus::UnknownFailure(e.to_string()),
+        )
+            .into_response(),
     }
 }
 
@@ -163,15 +163,21 @@ pub(super) async fn redeem_tickets(
     match req.address {
         Some(address) => {
             // Resolve the incoming channel from the counterparty (counterparty → me).
-            let me = hopr.me_onchain();
-            let channel_id = match hopr.channel(&address, &me) {
+            let me = hopr.identity().node_address;
+            let channel_id = match hopr.channel(address, me) {
                 Ok(Some(ch)) if ch.status != ChannelStatus::Closed => *ch.get_id(),
                 Ok(_) => return (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
-                Err(e) => return (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+                Err(e) => {
+                    return (
+                        StatusCode::UNPROCESSABLE_ENTITY,
+                        ApiErrorStatus::UnknownFailure(e.to_string()),
+                    )
+                        .into_response();
+                }
             };
 
             hopr_async_runtime::prelude::spawn(async move {
-                match hopr.redeem_tickets_in_channel(&channel_id, 0).await {
+                match hopr.redeem_tickets_with_counterparty(address, 0).await {
                     Ok(_) => {
                         tracing::info!(%channel_id, "tickets in channel redeemed on API request");
                     }

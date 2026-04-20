@@ -32,7 +32,7 @@ members = [
   "utils/session",
   "localcluster",
   # implementations
-  "hopr/builder",
+  "hopr/reference",
   "impls/connector",
   "impls/ct/immediate",
   "impls/ct/full-network",
@@ -218,7 +218,7 @@ mimalloc = { version = "0.1.48", default-features = false, features = [
   "secure",
 ] }
 
-hopr-api = { git = "https://github.com/hoprnet/hopr-api", branch = "lukas/add-hopr-api" }
+hopr-api = { git = "https://github.com/hoprnet/hopr-api", branch = "kauki/refactor/node/has-accessors" }
 hopr-types = { version = "1.5.3", features = ["use-bindings"] }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-crypto-keypair = { path = "crypto/keypair", default-features = false }
@@ -254,7 +254,7 @@ hopr-statistics = { path = "common/statistics" }
 hopr-test-stubs = { path = "common/test-stubs" }
 
 # referential implementations
-hopr-builder = { path = "hopr/builder", default-features = false }
+hopr-reference = { path = "hopr/reference", default-features = false }
 hopr-transport-p2p = { path = "impls/transport/p2p", default-features = false }
 hopr-ct-immediate = { path = "impls/ct/immediate", default-features = false }
 hopr-ct-full-network = { path = "impls/ct/full-network", default-features = false }

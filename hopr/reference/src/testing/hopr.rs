@@ -3,9 +3,9 @@ use std::{fmt::Formatter, sync::Arc, time::Duration};
 use anyhow::Context;
 use futures::future::join_all;
 use hopr_lib::{
-    Address, ChannelEntry, ChannelStatus, Hash, HoprBalance, HoprNodeNetworkOperations, HoprNodeOperations,
-    HoprTransportIO, PeerId,
-    api::node::state::HoprState,
+    Address, ChannelEntry, ChannelStatus, Hash, HoprBalance, HoprNodeOperations, HoprState, IncentiveChannelOperations,
+    PeerId,
+    api::node::HasChainApi,
     config::{HoprLibConfig, SessionGlobalConfig},
     prelude,
 };
@@ -64,31 +64,27 @@ pub struct TestedHopr {
     runtime: Option<tokio::runtime::Runtime>,
     /// HOPR instance that is used for testing.
     pub instance: Arc<TestingHopr>,
-    /// Transport socket that can be used to send and receive data via the HOPR node.
-    pub socket: HoprTransportIO,
     pub connector: TestingConnector,
 }
 
 impl std::fmt::Debug for TestedHopr {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TestedHopr")
-            .field("instance", &self.instance.me_onchain())
+            .field("instance", &self.instance.identity().node_address)
             .finish()
     }
 }
 
 impl TestedHopr {
-    pub fn new(
-        runtime: tokio::runtime::Runtime,
-        instance: Arc<TestingHopr>,
-        socket: HoprTransportIO,
-        connector: TestingConnector,
-    ) -> Self {
-        assert_eq!(HoprState::Running, instance.status(), "hopr instance must be running");
+    pub fn new(runtime: tokio::runtime::Runtime, instance: Arc<TestingHopr>, connector: TestingConnector) -> Self {
+        assert_eq!(
+            HoprState::Running,
+            HoprNodeOperations::status(&*instance),
+            "hopr instance must be running"
+        );
         Self {
             runtime: Some(runtime),
             instance,
-            socket,
             connector,
         }
     }
@@ -96,8 +92,6 @@ impl TestedHopr {
 
 impl Drop for TestedHopr {
     fn drop(&mut self) {
-        let _ = self.instance.shutdown();
-        std::thread::sleep(Duration::from_secs(1));
         if let Some(runtime) = self.runtime.take() {
             runtime.shutdown_background();
         }
@@ -111,11 +105,11 @@ impl TestedHopr {
     }
 
     pub fn address(&self) -> Address {
-        self.instance.me_onchain()
+        self.instance.identity().node_address
     }
 
     pub fn peer_id(&self) -> PeerId {
-        self.instance.me_peer_id()
+        (*self.instance.graph().me()).into()
     }
 
     pub fn connector(&self) -> &TestingConnector {
@@ -127,11 +121,11 @@ impl TestedHopr {
     }
 
     pub async fn channel_from_hash(&self, channel_hash: &prelude::Hash) -> Option<ChannelEntry> {
-        self.instance.channel_by_id(channel_hash).unwrap_or(None)
+        IncentiveChannelOperations::channel_by_id(&*self.instance, channel_hash).unwrap_or(None)
     }
 
     pub async fn outgoing_channels_by_status(&self, status: ChannelStatus) -> Option<Vec<ChannelEntry>> {
-        match self.instance.channels_from(&self.address()).await {
+        match IncentiveChannelOperations::channels_from(&*self.instance, self.address()).await {
             Ok(channels) => Some(channels.iter().filter(|c| c.status == status).cloned().collect()),
             Err(_) => None,
         }
@@ -165,12 +159,14 @@ impl ChannelGuard {
             let src = &window[0];
             let dst = &window[1];
 
-            let channel = src
-                .open_channel(&dst.me_onchain(), funding)
+            let channel = IncentiveChannelOperations::open_channel(&**src, dst.identity().node_address, funding)
                 .await
                 .context("opening channel must succeed")?;
 
-            channels.push((src.clone(), channel.channel_id));
+            channels.push((
+                src.clone(),
+                *channel.output().expect("open_channel must return a channel ID"),
+            ));
         }
 
         Ok(Self { channels })
@@ -181,13 +177,15 @@ impl ChannelGuard {
         dst: Arc<TestingHopr>,
         funding: HoprBalance,
     ) -> anyhow::Result<Self> {
-        let channel = src
-            .open_channel(&dst.me_onchain(), funding)
+        let channel = IncentiveChannelOperations::open_channel(&*src, dst.identity().node_address, funding)
             .await
             .context("failed to open channel")?;
 
         Ok(Self {
-            channels: vec![(src.clone(), channel.channel_id)],
+            channels: vec![(
+                src.clone(),
+                *channel.output().expect("open_channel must return a channel ID"),
+            )],
         })
     }
 
@@ -197,11 +195,10 @@ impl ChannelGuard {
             let hopr = hopr.clone();
             let channel_id = *channel_id;
             async move {
-                if hopr
-                    .channel_by_id(&channel_id)?
+                if IncentiveChannelOperations::channel_by_id(&*hopr, &channel_id)?
                     .is_some_and(|c| matches!(c.status, ChannelStatus::Open))
                 {
-                    hopr.close_channel_by_id(&channel_id)
+                    IncentiveChannelOperations::close_channel_by_id(&*hopr, &channel_id)
                         .await
                         .map(|_| ())
                         .context("channel closure initiation must succeed")
@@ -220,12 +217,14 @@ impl ChannelGuard {
             let channel_id = *channel_id;
             super::wait_until(
                 || async {
-                    let ch = hopr.channel_by_id(&channel_id).ok().flatten();
+                    let ch = IncentiveChannelOperations::channel_by_id(&*hopr, &channel_id)
+                        .ok()
+                        .flatten();
                     match ch.as_ref().map(|c| &c.status) {
                         None | Some(ChannelStatus::Closed) => return Ok(true),
                         Some(ChannelStatus::PendingToClose(_)) => {
                             // Attempt finalization; ignore errors (grace period may not have elapsed)
-                            let _ = hopr.close_channel_by_id(&channel_id).await;
+                            let _ = IncentiveChannelOperations::close_channel_by_id(&*hopr, &channel_id).await;
                         }
                         _ => {}
                     }
@@ -248,18 +247,21 @@ impl Drop for ChannelGuard {
             if let Ok(runtime) = tokio::runtime::Builder::new_current_thread().enable_all().build() {
                 runtime.block_on(async move {
                     for (hopr, channel_id) in &channels {
-                        let _ = hopr.close_channel_by_id(channel_id).await;
+                        let _ = IncentiveChannelOperations::close_channel_by_id(&**hopr, channel_id).await;
                     }
 
                     // Poll each channel until Closed, attempting finalization when possible
                     for (hopr, channel_id) in &channels {
                         let _ = super::wait_until(
                             || async {
-                                let ch = hopr.channel_by_id(channel_id).ok().flatten();
+                                let ch = IncentiveChannelOperations::channel_by_id(&**hopr, channel_id)
+                                    .ok()
+                                    .flatten();
                                 match ch.as_ref().map(|c| &c.status) {
                                     None | Some(ChannelStatus::Closed) => return Ok(true),
                                     Some(ChannelStatus::PendingToClose(_)) => {
-                                        let _ = hopr.close_channel_by_id(channel_id).await;
+                                        let _ =
+                                            IncentiveChannelOperations::close_channel_by_id(&**hopr, channel_id).await;
                                     }
                                     _ => {}
                                 }

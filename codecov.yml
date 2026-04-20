@@ -28,7 +28,7 @@ ignore:
   - "**/benches/**"
   - "**/build.rs"
   - "**/codegen/**"
-  - "hopr/builder/src/testing/**"
+  - "hopr/reference/src/testing/**"
   # Non-Rust directories (Python SDK, shell scripts, tools, deployment manifests, docs)
   - "sdk/**"
   - "scripts/**"
