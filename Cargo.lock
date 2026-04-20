@@ -1559,8 +1559,8 @@ dependencies = [
 
 [[package]]
 name = "blokli-client"
-version = "0.23.1"
-source = "git+https://github.com/hoprnet/blokli?rev=9bee1183c63ba005c709ada1a275a759d2413d8b#9bee1183c63ba005c709ada1a275a759d2413d8b"
+version = "0.24.0"
+source = "git+https://github.com/hoprnet/blokli?rev=68b2659539a0b77209351a8994f4d07c91779fe6#68b2659539a0b77209351a8994f4d07c91779fe6"
 dependencies = [
  "anyhow",
  "async-broadcast",

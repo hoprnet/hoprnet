@@ -563,6 +563,13 @@ where
             .enqueue_transaction(tx_req, tx_timeout.max(MIN_TX_CONFIRM_TIMEOUT))
             .await?
             .and_then(|tx| {
+                if let Some(tx_exec) = tx.safe_execution
+                    && !tx_exec.success
+                {
+                    return futures::future::err(ConnectorError::InnerTxFailed(
+                        tx_exec.revert_reason.unwrap_or("n/a".into()),
+                    ));
+                }
                 futures::future::ready(
                     ChainReceipt::from_str(&tx.transaction_hash.0)
                         .map_err(|_| ConnectorError::TypeConversion("invalid tx hash".into())),
