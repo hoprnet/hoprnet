@@ -1,7 +1,7 @@
 #[derive(Debug, thiserror::Error)]
 pub enum PixError {
     #[error("secret sharing error: {0}")]
-    VsssError(vsss_rs::Error)
+    VsssError(vsss_rs::Error),
 }
 
 impl From<vsss_rs::Error> for PixError {

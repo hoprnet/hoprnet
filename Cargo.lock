@@ -4667,6 +4667,8 @@ dependencies = [
 name = "hopr-protocol-pix"
 version = "0.1.0"
 dependencies = [
+ "ahash",
+ "anyhow",
  "criterion",
  "hopr-parallelize",
  "hopr-types 1.5.3",

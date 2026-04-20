@@ -224,7 +224,9 @@ hopr-api = { git = "https://github.com/hoprnet/hopr-api", branch = "main" }
 hopr-types = { version = "1.5.3", features = ["use-bindings"] }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-crypto-keypair = { path = "crypto/keypair", default-features = false }
-hopr-crypto-packet = { path = "crypto/packet", default-features = false, features = ["rayon"] }
+hopr-crypto-packet = { path = "crypto/packet", default-features = false, features = [
+  "rayon",
+] }
 hopr-crypto-sphinx = { path = "crypto/sphinx", default-features = false, features = [
   "x25519",
   "ed25519",
@@ -235,8 +237,12 @@ hopr-network-types = { path = "common/network-types", default-features = false }
 hopr-parallelize = { path = "common/parallelize", default-features = false }
 hopr-platform = { path = "misc/platform", default-features = false }
 hopr-protocol-app = { path = "protocols/app", default-features = false }
-hopr-protocol-hopr = { path = "protocols/hopr", default-features = false, features = ["rayon"] }
-hopr-protocol-pix = { path = "protocols/pix", default-features = false, features = ["rayon"] }
+hopr-protocol-hopr = { path = "protocols/hopr", default-features = false, features = [
+  "rayon",
+] }
+hopr-protocol-pix = { path = "protocols/pix", default-features = false, features = [
+  "rayon",
+] }
 hopr-protocol-session = { path = "protocols/session", default-features = false }
 hopr-protocol-start = { path = "protocols/start", default-features = false }
 hopr-strategy = { path = "impls/strategy", default-features = false }
