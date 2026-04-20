@@ -51,7 +51,7 @@ lazy_static::lazy_static! {
 type Factory<T> = Box<dyn FnOnce(&BuildCtx) -> T + Send>;
 
 /// Context available to factory closures during the build step.
-pub(crate) struct BuildCtx {
+pub struct BuildCtx {
     /// Node's on-chain keypair.
     pub chain_key: ChainKeypair,
     /// Node's off-chain (packet) keypair.
