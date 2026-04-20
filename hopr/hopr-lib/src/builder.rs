@@ -14,6 +14,7 @@ use hopr_api::{
     tickets::{TicketFactory, TicketManagement},
     types::{
         chain::chain_events::ChainEvent,
+        internal::prelude::{ChannelDirection, ChannelStatus},
         primitive::prelude::{Address, UnitaryFloatOps},
     },
 };
@@ -417,12 +418,13 @@ where
             })?;
             tracing::info!(%safe_addr, "safe successfully registered with this node");
         }
-        Err(SafeRegistrationError::AlreadyRegistered(registered_safe)) if registered_safe == safe_addr => {
-            tracing::info!(%safe_addr, "this safe is already registered with this node");
-        }
-        Err(SafeRegistrationError::AlreadyRegistered(registered_safe)) if registered_safe != safe_addr => {
-            tracing::error!(%safe_addr, %registered_safe, "node registered with different safe");
-            return Err(HoprLibError::GeneralError("node registered with different safe".into()));
+        Err(SafeRegistrationError::AlreadyRegistered(registered_safe)) => {
+            if registered_safe == safe_addr {
+                tracing::info!(%safe_addr, "this safe is already registered with this node");
+            } else {
+                tracing::error!(%safe_addr, %registered_safe, "node registered with different safe");
+                return Err(HoprLibError::GeneralError("node registered with different safe".into()));
+            }
         }
         Err(error) => {
             tracing::error!(%safe_addr, %error, "safe registration failed");
@@ -433,7 +435,7 @@ where
     let multiaddresses_to_announce = if ctx.cfg.publish {
         transport_api.announceable_multiaddresses()
     } else {
-        Vec::with_capacity(0)
+        Vec::new()
     };
 
     multiaddresses_to_announce
@@ -562,10 +564,7 @@ where
 
                                 match keys {
                                     Ok(Some((from, to))) => {
-                                        let capacity = if matches!(
-                                            channel.status,
-                                            hopr_api::types::internal::prelude::ChannelStatus::Closed
-                                        ) {
+                                        let capacity = if matches!(channel.status, ChannelStatus::Closed) {
                                             None
                                         } else if let Ok(ticket_value) =
                                             ticket_price.read().div_f64(win_probability.read().as_f64())
@@ -771,7 +770,6 @@ macro_rules! impl_build_methods {
                         let chain = chain_for_neglect.clone();
                         let tmgr = tmgr_for_neglect.clone();
                         async move {
-                            use hopr_api::types::internal::prelude::ChannelDirection;
                             match closed_channel.direction(chain.me()) {
                                 Some(ChannelDirection::Incoming) => {
                                     match tmgr.neglect_tickets(closed_channel.get_id(), None) {
