@@ -161,18 +161,9 @@ where
         });
     }
 
-    // Build the network eagerly (before the builder) so the factory closure can be sync
-    let nb = HoprLibp2pNetworkBuilder::new(peer_discovery_rx);
-    let (network, network_process) = nb
-        .build(packet_key, vec![], "/hopr/mix/1.1.0", false)
-        .await
-        .map_err(|e| anyhow::anyhow!("failed to build network: {e}"))?;
-
-    // Graph and cover traffic are also created eagerly
-    let graph: SharedChannelGraph = Arc::new(ChannelGraph::new(*packet_key.public()));
     let prober_cfg = probe_cfg.unwrap_or_default();
-    let cover_traffic =
-        hopr_ct_full_network::FullNetworkDiscovery::new(*packet_key.public(), prober_cfg, graph.clone());
+    let graph: SharedChannelGraph = Arc::new(ChannelGraph::new(*packet_key.public()));
+    let graph_for_ct = graph.clone();
 
     let safe_address = config.safe_module.safe_address;
     let module_address = config.safe_module.module_address;
@@ -183,8 +174,14 @@ where
         .with_safe_module(&safe_address, &module_address)
         .with_chain_api(move |_ctx| chain_connector)
         .with_graph(move |_ctx| graph)
-        .with_network(move |_ctx| (network, network_process))
-        .with_cover_traffic(move |_ctx| cover_traffic);
+        .with_network(move |ctx| {
+            let nb = HoprLibp2pNetworkBuilder::new(peer_discovery_rx);
+            futures::executor::block_on(nb.build(&ctx.packet_key, vec![], "/hopr/mix/1.1.0", false))
+                .expect("network must be constructible")
+        })
+        .with_cover_traffic(move |ctx| {
+            hopr_ct_full_network::FullNetworkDiscovery::new(*ctx.packet_key.public(), prober_cfg, graph_for_ct)
+        });
 
     #[cfg(feature = "session-server")]
     let builder = builder.with_session_server(server);
