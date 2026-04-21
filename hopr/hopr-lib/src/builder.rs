@@ -201,9 +201,7 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
     /// allowing async network construction without blocking the executor.
     pub fn with_network<NewNet>(
         self,
-        f: impl FnOnce(BuildCtx) -> Pin<Box<dyn Future<Output = (NewNet, BoxedProcessFn)> + Send>>
-            + Send
-            + 'static,
+        f: impl FnOnce(BuildCtx) -> Pin<Box<dyn Future<Output = (NewNet, BoxedProcessFn)> + Send>> + Send + 'static,
     ) -> HoprBuilderConfigured<Chain, Graph, NewNet, Ct> {
         HoprBuilderConfigured {
             ctx: self.ctx,
@@ -342,11 +340,11 @@ where
     let graph = (configured
         .graph_factory
         .ok_or(HoprLibError::BuilderError("missing graph factory"))?)(&ctx);
-    let (network, network_process) = (configured
-        .network_factory
-        .ok_or(HoprLibError::BuilderError("missing network factory"))?)
-    (ctx.clone())
-    .await;
+    let (network, network_process) =
+        (configured
+            .network_factory
+            .ok_or(HoprLibError::BuilderError("missing network factory"))?)(ctx.clone())
+        .await;
     let cover_traffic = (configured
         .ct_factory
         .ok_or(HoprLibError::BuilderError("missing cover traffic factory"))?)(&ctx);

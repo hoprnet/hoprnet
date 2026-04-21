@@ -337,6 +337,8 @@ mod tests {
     use hopr_chain_connector::ChainKeypair;
 
     use super::*;
+    use hopr_api::tickets::TicketManagement;
+
     use crate::{MemoryStore, traits::tests::generate_owned_tickets};
 
     fn create_factory() -> anyhow::Result<HoprTicketFactory<MemoryStore>> {

@@ -12,6 +12,8 @@ use std::sync::Arc;
 use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue};
 
 #[cfg(feature = "runtime-tokio")]
+pub use hopr_lib;
+#[cfg(feature = "runtime-tokio")]
 use {
     hopr_chain_connector::{
         BlockchainConnectorConfig, HoprBlockchainSafeConnector,
@@ -25,8 +27,6 @@ use {
     hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork},
     validator::Validate,
 };
-#[cfg(feature = "runtime-tokio")]
-pub use hopr_lib;
 
 #[cfg(feature = "session-server")]
 use crate::{config::SessionIpForwardingConfig, exit::HoprServerIpForwardingReactor};

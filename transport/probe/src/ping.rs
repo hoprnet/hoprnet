@@ -75,7 +75,7 @@ impl Pinger {
 
         match timeout_fut(self.config.timeout, rx.next()).await {
             Ok(Some(Ok(latency))) => {
-                debug!(latency_ms = latency.as_millis() as u64, %peer, "Ping succeeded",);
+                debug!(?latency, %peer, "Ping succeeded",);
                 Ok(latency)
             }
             Ok(Some(Err(_))) => {

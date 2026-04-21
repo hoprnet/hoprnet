@@ -459,11 +459,14 @@ where
                             debug!(?sock_addr, %session_id, "new session for incoming TCP connection");
 
                             let (abort_handle, abort_reg) = AbortHandle::new_pair();
-                            active_sessions.insert(session_id, ClientEntry {
-                                sock_addr,
-                                abort_handle,
-                                configurator,
-                            });
+                            active_sessions.insert(
+                                session_id,
+                                ClientEntry {
+                                    sock_addr,
+                                    abort_handle,
+                                    configurator,
+                                },
+                            );
 
                             #[cfg(all(feature = "telemetry", not(test)))]
                             METRIC_ACTIVE_CLIENTS.increment(&["tcp"], 1.0);
@@ -595,11 +598,14 @@ where
 
     // TODO: add multiple client support to UDP sessions (#7370)
     let session_id = *session.id();
-    clients.insert(session_id, ClientEntry {
-        sock_addr: bound_host,
-        abort_handle: abort_handle.clone(),
-        configurator,
-    });
+    clients.insert(
+        session_id,
+        ClientEntry {
+            sock_addr: bound_host,
+            abort_handle: abort_handle.clone(),
+            configurator,
+        },
+    );
     hopr_async_runtime::prelude::spawn(async move {
         #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_ACTIVE_CLIENTS.increment(&["udp"], 1.0);
@@ -936,7 +942,10 @@ mod tests {
         let spec = SessionTargetSpec::Plain("localhost:8080".into());
         let s = spec.to_string();
         assert_eq!(s, "localhost:8080");
-        assert_eq!(SessionTargetSpec::from_str(&s).unwrap(), SessionTargetSpec::Plain("localhost:8080".into()));
+        assert_eq!(
+            SessionTargetSpec::from_str(&s).unwrap(),
+            SessionTargetSpec::Plain("localhost:8080".into())
+        );
     }
 
     #[test]
@@ -945,7 +954,10 @@ mod tests {
         let spec = SessionTargetSpec::Sealed(data.clone());
         let s = spec.to_string();
         assert!(s.starts_with("$$"));
-        assert_eq!(SessionTargetSpec::from_str(&s).unwrap(), SessionTargetSpec::Sealed(data));
+        assert_eq!(
+            SessionTargetSpec::from_str(&s).unwrap(),
+            SessionTargetSpec::Sealed(data)
+        );
     }
 
     #[test]

@@ -306,7 +306,11 @@ pub(super) async fn ping_peer(
         Ok(Some(key)) => key,
         Ok(None) => return Ok((StatusCode::NOT_FOUND, ApiErrorStatus::PeerNotFound).into_response()),
         Err(e) => {
-            return Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnknownFailure(e.to_string())).into_response())
+            return Ok((
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ApiErrorStatus::UnknownFailure(e.to_string()),
+            )
+                .into_response());
         }
     };
 
