@@ -305,7 +305,9 @@ pub(super) async fn ping_peer(
     let offchain_key = match hopr.chain_api().chain_key_to_packet_key(&address) {
         Ok(Some(key)) => key,
         Ok(None) => return Ok((StatusCode::NOT_FOUND, ApiErrorStatus::PeerNotFound).into_response()),
-        Err(_) => return Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::PeerNotFound).into_response()),
+        Err(e) => {
+            return Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnknownFailure(e.to_string())).into_response())
+        }
     };
 
     match hopr.transport().ping(&offchain_key).await {
