@@ -1,4 +1,6 @@
-use hopr_api::graph::{CostFn, NetworkGraphTraverse, NetworkGraphView, costs::EdgeCostFn, traits::EdgeObservableRead};
+use hopr_api::graph::{
+    NetworkGraphTraverse, NetworkGraphView, ValueFn, function::EdgeValueFn, traits::EdgeObservableRead,
+};
 use hopr_types::{crypto::types::OffchainPublicKey, internal::errors::PathError};
 
 // Duplicated from hopr_network_graph::{DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE}
@@ -28,7 +30,7 @@ fn compute_paths<G, C>(
 where
     G: NetworkGraphTraverse<NodeId = OffchainPublicKey> + NetworkGraphView<NodeId = OffchainPublicKey>,
     <G as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
-    C: CostFn<Weight = <G as NetworkGraphTraverse>::Observed, Cost = f64>,
+    C: ValueFn<Weight = <G as NetworkGraphTraverse>::Observed, Value = f64>,
 {
     let raw = graph.simple_paths(src, dest, length.get(), Some(take), cost_fn);
 
@@ -48,7 +50,7 @@ where
         .collect::<Vec<_>>()
 }
 
-/// Extended forward path search: find shorter paths using [`EdgeCostFn::forward_without_self_loopback`]
+/// Extended forward path search: find shorter paths using [`EdgeValueFn::forward_without_self_loopback`]
 /// and append `dest` to each one.
 ///
 /// This handles the case where the last edge (relay -> dest) has no graph edge
@@ -73,7 +75,7 @@ where
         src,
         shorter_length.get(),
         Some(take),
-        EdgeCostFn::forward_without_self_loopback(DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE),
+        EdgeValueFn::forward_without_self_loopback(DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE),
     );
 
     raw.into_iter()
@@ -113,8 +115,8 @@ where
 ///
 /// Stores the planner's own identity (`me`) so that it can choose the
 /// appropriate cost function:
-/// - forward path (`src == me`): [`EdgeCostFn::forward`]
-/// - return path (`dest == me`): [`EdgeCostFn::returning`]
+/// - forward path (`src == me`): [`EdgeValueFn::forward`]
+/// - return path (`dest == me`): [`EdgeValueFn::returning`]
 #[derive(Clone)]
 pub struct HoprGraphPathSelector<G> {
     me: OffchainPublicKey,
@@ -179,7 +181,7 @@ where
                 &dest,
                 length,
                 self.max_paths,
-                EdgeCostFn::forward(length, DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE),
+                EdgeValueFn::forward(length, DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE),
             );
             tracing::debug!(
                 direction,
@@ -188,7 +190,7 @@ where
                 "[forward] phase 1 candidates"
             );
 
-            // Phase 2: if not enough paths, do an extended search with EdgeCostFn::forward_without_self_loopback
+            // Phase 2: if not enough paths, do an extended search with EdgeValueFn::forward_without_self_loopback
             // for (length - 1) edges and assume the last hop can be done by anybody.
             if found.len() < self.max_paths
                 && let Some(shorter) = std::num::NonZeroUsize::new(length.get() - 1)
@@ -212,7 +214,7 @@ where
                 &dest,
                 length,
                 self.max_paths,
-                EdgeCostFn::returning(length, DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE),
+                EdgeValueFn::returning(length, DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE),
             );
             tracing::debug!(direction, count = found.len(), "[return] candidates");
             found

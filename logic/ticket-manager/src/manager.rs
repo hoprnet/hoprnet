@@ -29,7 +29,7 @@ use crate::{
 ///
 /// ### Usage in incoming packet pipeline
 /// The incoming packet pipeline usually just calls the
-/// [`insert_incoming_ticket`](HoprTicketManager::insert_incoming_ticket) whenever a new winning, redeemable ticket is
+/// [`insert_incoming_ticket`](hopr_api::tickets::TicketManagement::insert_incoming_ticket) whenever a new winning, redeemable ticket is
 /// received on an incoming channel.
 ///
 /// ### Redeemable ticket extraction
@@ -49,7 +49,7 @@ use crate::{
 /// in the highly performance-sensitive code, on a per-packet basis.
 ///
 /// ### Incoming winning ticket retrieval
-/// The [`insert_incoming_ticket`](HoprTicketManager::insert_incoming_ticket) method is designed to be
+/// The [`insert_incoming_ticket`](hopr_api::tickets::TicketManagement::insert_incoming_ticket) method is designed to be
 /// high-performance and to be called per each incoming packet **after** it has been forwarded to a next hop.
 ///
 /// This operation acquires the write-part of an RW lock (per incoming channel).

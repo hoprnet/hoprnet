@@ -3,8 +3,8 @@ use std::{collections::HashSet, hash::RandomState, sync::Arc};
 use hopr_api::{
     OffchainPublicKey,
     graph::{
-        costs::EdgeCostFn,
-        traits::{CostFn, EdgeNetworkObservableRead, EdgeObservableRead},
+        function::EdgeValueFn,
+        traits::{EdgeNetworkObservableRead, EdgeObservableRead, ValueFn},
     },
     types::internal::routing::PathId,
 };
@@ -15,7 +15,7 @@ use crate::{
 };
 
 /// A shared cost function that computes a cumulative cost from edge observations.
-pub(crate) type SharedCostFn<C> = Arc<dyn Fn(C, &crate::Observations, usize) -> C + Send + Sync>;
+pub(crate) type SharedValueFn<C> = Arc<dyn Fn(C, &crate::Observations, usize) -> C + Send + Sync>;
 
 /// Core path-finding routine that runs `all_simple_paths_multi` on the
 /// inner petgraph.
@@ -26,9 +26,9 @@ pub(crate) fn find_paths<C>(
     destinations: &HashSet<NodeIndex>,
     length: usize,
     take_count: Option<usize>,
-    initial_cost: C,
-    min_cost: Option<C>,
-    cost_fn: SharedCostFn<C>,
+    initial_value: C,
+    min_value: Option<C>,
+    value_fn: SharedValueFn<C>,
 ) -> Vec<(Vec<OffchainPublicKey>, PathId, C)>
 where
     C: Clone + PartialOrd,
@@ -45,9 +45,9 @@ where
         destinations,
         intermediates,
         Some(intermediates),
-        initial_cost,
-        min_cost,
-        move |c, w, i| cost_fn(c, w, i),
+        initial_value,
+        min_value,
+        move |c, w, i| value_fn(c, w, i),
     )
     .filter_map(|(node_indices, final_cost)| {
         // Build PathId from node indices along the path
@@ -79,14 +79,14 @@ impl hopr_api::graph::NetworkGraphTraverse for ChannelGraph {
     type NodeId = OffchainPublicKey;
     type Observed = crate::Observations;
 
-    fn simple_paths<C: CostFn<Weight = Self::Observed>>(
+    fn simple_paths<C: ValueFn<Weight = Self::Observed>>(
         &self,
         source: &Self::NodeId,
         destination: &Self::NodeId,
         length: usize,
         take_count: Option<usize>,
-        cost_fn: C,
-    ) -> Vec<(Vec<Self::NodeId>, PathId, C::Cost)> {
+        value_fn: C,
+    ) -> Vec<(Vec<Self::NodeId>, PathId, C::Value)> {
         if length == 0 {
             return Default::default();
         }
@@ -106,19 +106,19 @@ impl hopr_api::graph::NetworkGraphTraverse for ChannelGraph {
             &end,
             length,
             take_count,
-            cost_fn.initial_cost(),
-            cost_fn.min_cost(),
-            cost_fn.into_cost_fn(),
+            value_fn.initial_value(),
+            value_fn.min_value(),
+            value_fn.into_value_fn(),
         )
     }
 
-    fn simple_paths_from<C: CostFn<Weight = Self::Observed>>(
+    fn simple_paths_from<C: ValueFn<Weight = Self::Observed>>(
         &self,
         source: &Self::NodeId,
         length: usize,
         take_count: Option<usize>,
-        cost_fn: C,
-    ) -> Vec<(Vec<Self::NodeId>, PathId, C::Cost)> {
+        value_fn: C,
+    ) -> Vec<(Vec<Self::NodeId>, PathId, C::Value)> {
         if length == 0 {
             return Default::default();
         }
@@ -136,9 +136,9 @@ impl hopr_api::graph::NetworkGraphTraverse for ChannelGraph {
             &destinations,
             length,
             take_count,
-            cost_fn.initial_cost(),
-            cost_fn.min_cost(),
-            cost_fn.into_cost_fn(),
+            value_fn.initial_value(),
+            value_fn.min_value(),
+            value_fn.into_value_fn(),
         )
     }
 
@@ -160,7 +160,7 @@ impl hopr_api::graph::NetworkGraphTraverse for ChannelGraph {
                     })
                     .collect::<HashSet<_>>();
 
-                let cost_fn = EdgeCostFn::forward_without_self_loopback(DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE);
+                let value_fn = EdgeValueFn::forward_without_self_loopback(DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE);
 
                 return find_paths(
                     &inner,
@@ -168,9 +168,9 @@ impl hopr_api::graph::NetworkGraphTraverse for ChannelGraph {
                     &connected_neighbors,
                     length,
                     take_count,
-                    cost_fn.initial_cost(),
-                    cost_fn.min_cost(),
-                    cost_fn.into_cost_fn(),
+                    value_fn.initial_value(),
+                    value_fn.min_value(),
+                    value_fn.into_value_fn(),
                 )
                 .into_iter()
                 .map(|(mut a, mut b, _c)| {
@@ -197,7 +197,7 @@ mod tests {
     use hopr_api::{
         graph::{
             NetworkGraphTraverse, NetworkGraphWrite,
-            costs::EdgeCostFn,
+            function::EdgeValueFn,
             traits::{EdgeObservableWrite, EdgeWeightType},
         },
         types::{
@@ -252,7 +252,7 @@ mod tests {
             &dest,
             1,
             None,
-            EdgeCostFn::forward(
+            EdgeValueFn::forward(
                 std::num::NonZeroUsize::new(1).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
                 TEST_MIN_ACK_RATE,
@@ -284,7 +284,7 @@ mod tests {
             &dest,
             2,
             None,
-            EdgeCostFn::forward(length, TEST_EDGE_PENALTY, TEST_MIN_ACK_RATE),
+            EdgeValueFn::forward(length, TEST_EDGE_PENALTY, TEST_MIN_ACK_RATE),
         );
 
         assert!(!routes.is_empty(), "should find at least one 2-edge route");
@@ -315,14 +315,14 @@ mod tests {
             &dest,
             2,
             None,
-            EdgeCostFn::forward(length, TEST_EDGE_PENALTY, TEST_MIN_ACK_RATE),
+            EdgeValueFn::forward(length, TEST_EDGE_PENALTY, TEST_MIN_ACK_RATE),
         );
         let routes_other = graph.simple_paths(
             &me,
             &dest,
             2,
             None,
-            EdgeCostFn::forward(length, 0.99, TEST_MIN_ACK_RATE),
+            EdgeValueFn::forward(length, 0.99, TEST_MIN_ACK_RATE),
         );
 
         assert_eq!(routes_test.len(), 1);
@@ -353,7 +353,7 @@ mod tests {
             &dest,
             1,
             None,
-            EdgeCostFn::forward(
+            EdgeValueFn::forward(
                 std::num::NonZeroUsize::new(1).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
                 TEST_MIN_ACK_RATE,
@@ -376,7 +376,7 @@ mod tests {
             &unknown,
             1,
             None,
-            EdgeCostFn::forward(
+            EdgeValueFn::forward(
                 std::num::NonZeroUsize::new(1).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
                 TEST_MIN_ACK_RATE,
@@ -415,7 +415,7 @@ mod tests {
             &dest,
             2,
             None,
-            EdgeCostFn::forward(
+            EdgeValueFn::forward(
                 std::num::NonZeroUsize::new(2).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
                 TEST_MIN_ACK_RATE,
@@ -448,7 +448,7 @@ mod tests {
             &dest,
             3,
             None,
-            EdgeCostFn::forward(
+            EdgeValueFn::forward(
                 std::num::NonZeroUsize::new(3).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
                 TEST_MIN_ACK_RATE,
@@ -482,7 +482,7 @@ mod tests {
             &dest,
             3,
             None,
-            EdgeCostFn::forward(
+            EdgeValueFn::forward(
                 std::num::NonZeroUsize::new(3).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
                 TEST_MIN_ACK_RATE,
@@ -506,7 +506,7 @@ mod tests {
             &dest,
             2,
             None,
-            EdgeCostFn::forward(
+            EdgeValueFn::forward(
                 std::num::NonZeroUsize::new(2).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
                 TEST_MIN_ACK_RATE,
@@ -528,7 +528,7 @@ mod tests {
             &other,
             0,
             None,
-            EdgeCostFn::forward(
+            EdgeValueFn::forward(
                 std::num::NonZeroUsize::new(1).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
                 TEST_MIN_ACK_RATE,
@@ -556,7 +556,7 @@ mod tests {
             &dest,
             2,
             None,
-            EdgeCostFn::forward(
+            EdgeValueFn::forward(
                 std::num::NonZeroUsize::new(2).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
                 TEST_MIN_ACK_RATE,
@@ -627,14 +627,14 @@ mod tests {
         mark_edge_loopback_ready(&graph, &me, &a);
         mark_edge_loopback_ready(&graph, &me, &b);
 
-        // Mark middle edges with capacity (required by EdgeCostFn::forward)
+        // Mark middle edges with capacity (required by EdgeValueFn::forward)
         mark_edge_with_capacity(&graph, &a, &c);
         mark_edge_with_capacity(&graph, &a, &d);
         mark_edge_with_capacity(&graph, &b, &c);
         mark_edge_with_capacity(&graph, &b, &d);
         mark_edge_with_capacity(&graph, &b, &e);
 
-        // Last edges (c→f, d→f, e→f) are lenient with EdgeCostFn::forward
+        // Last edges (c→f, d→f, e→f) are lenient with EdgeValueFn::forward
 
         // --- 3-edge paths: should find exactly 5 ---
         let routes_3 = graph.simple_paths(
@@ -642,7 +642,7 @@ mod tests {
             &f,
             3,
             None,
-            EdgeCostFn::forward(
+            EdgeValueFn::forward(
                 std::num::NonZeroUsize::new(3).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
                 TEST_MIN_ACK_RATE,
@@ -664,7 +664,7 @@ mod tests {
             &f,
             1,
             None,
-            EdgeCostFn::forward(
+            EdgeValueFn::forward(
                 std::num::NonZeroUsize::new(1).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
                 TEST_MIN_ACK_RATE,
@@ -702,7 +702,7 @@ mod tests {
             &me,
             3,
             None,
-            EdgeCostFn::forward(
+            EdgeValueFn::forward(
                 std::num::NonZeroUsize::new(3).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
                 TEST_MIN_ACK_RATE,
@@ -732,7 +732,7 @@ mod tests {
             &dest,
             1,
             None,
-            EdgeCostFn::forward(
+            EdgeValueFn::forward(
                 std::num::NonZeroUsize::new(1).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
                 TEST_MIN_ACK_RATE,
@@ -771,7 +771,7 @@ mod tests {
             &dest,
             3,
             None,
-            EdgeCostFn::forward(
+            EdgeValueFn::forward(
                 std::num::NonZeroUsize::new(3).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
                 TEST_MIN_ACK_RATE,
@@ -817,7 +817,7 @@ mod tests {
             &dest,
             2,
             None,
-            EdgeCostFn::forward(
+            EdgeValueFn::forward(
                 std::num::NonZeroUsize::new(2).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
                 TEST_MIN_ACK_RATE,
@@ -839,7 +839,7 @@ mod tests {
         Ok(())
     }
 
-    // ── return-path tests (EdgeCostFn::returning) ──────────────────────────
+    // ── return-path tests (EdgeValueFn::returning) ──────────────────────────
 
     #[test]
     fn return_path_one_edge_should_find_route() -> anyhow::Result<()> {
@@ -859,7 +859,7 @@ mod tests {
             &me,
             1,
             None,
-            EdgeCostFn::returning(
+            EdgeValueFn::returning(
                 std::num::NonZeroUsize::new(1).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
                 TEST_MIN_ACK_RATE,
@@ -894,7 +894,7 @@ mod tests {
             &me,
             2,
             None,
-            EdgeCostFn::returning(
+            EdgeValueFn::returning(
                 std::num::NonZeroUsize::new(2).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
                 TEST_MIN_ACK_RATE,
@@ -927,7 +927,7 @@ mod tests {
             &me,
             2,
             None,
-            EdgeCostFn::returning(
+            EdgeValueFn::returning(
                 std::num::NonZeroUsize::new(2).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
                 TEST_MIN_ACK_RATE,
@@ -963,7 +963,7 @@ mod tests {
             &me,
             2,
             None,
-            EdgeCostFn::returning(
+            EdgeValueFn::returning(
                 std::num::NonZeroUsize::new(2).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
                 TEST_MIN_ACK_RATE,
@@ -1005,7 +1005,7 @@ mod tests {
             &me,
             2,
             None,
-            EdgeCostFn::returning(
+            EdgeValueFn::returning(
                 std::num::NonZeroUsize::new(2).context("should be non-zero")?,
                 TEST_EDGE_PENALTY,
                 TEST_MIN_ACK_RATE,
@@ -1022,7 +1022,7 @@ mod tests {
     // ── simple_loopback_to_self tests ──────────────────────────────────
 
     /// Marks an edge as connected AND with intermediate capacity so that it
-    /// satisfies the `EdgeCostFn::forward_without_self_loopback` at edge index 0 (connected + capacity)
+    /// satisfies the `EdgeValueFn::forward_without_self_loopback` at edge index 0 (connected + capacity)
     /// and at any other index (capacity).
     fn mark_edge_loopback_ready(graph: &ChannelGraph, src: &OffchainPublicKey, dest: &OffchainPublicKey) {
         graph.upsert_edge(src, dest, |obs| {
@@ -1034,7 +1034,7 @@ mod tests {
     }
 
     /// Marks an edge with intermediate capacity and probe data (no connected flag).
-    /// Satisfies `EdgeCostFn::forward_without_self_loopback` at index > 0 but NOT at index 0.
+    /// Satisfies `EdgeValueFn::forward_without_self_loopback` at index > 0 but NOT at index 0.
     fn mark_edge_with_capacity(graph: &ChannelGraph, src: &OffchainPublicKey, dest: &OffchainPublicKey) {
         graph.upsert_edge(src, dest, |obs| {
             obs.record(EdgeWeightType::Intermediate(Ok(std::time::Duration::from_millis(50))));
@@ -1122,7 +1122,7 @@ mod tests {
 
         assert!(
             graph.simple_loopback_to_self(2, None).is_empty(),
-            "edge me→a lacks intermediate capacity, so EdgeCostFn::forward_without_self_loopback prunes it"
+            "edge me→a lacks intermediate capacity, so EdgeValueFn::forward_without_self_loopback prunes it"
         );
 
         Ok(())
@@ -1150,7 +1150,7 @@ mod tests {
 
         assert!(
             graph.simple_loopback_to_self(2, None).is_empty(),
-            "edge a→b lacks capacity, so EdgeCostFn::forward_without_self_loopback prunes the path"
+            "edge a→b lacks capacity, so EdgeValueFn::forward_without_self_loopback prunes the path"
         );
 
         Ok(())
