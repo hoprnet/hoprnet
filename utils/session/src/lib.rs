@@ -143,11 +143,11 @@ pub struct StoredSessionEntry {
     /// The abort handle for the Session processing.
     pub abort_handle: AbortHandle,
 
-    clients: Arc<DashMap<SessionId, (SocketAddr, AbortHandle)>>,
+    clients: Arc<DashMap<SessionId, (SocketAddr, AbortHandle, HoprSessionConfigurator)>>,
 }
 
 impl StoredSessionEntry {
-    pub fn get_clients(&self) -> &Arc<DashMap<SessionId, (SocketAddr, AbortHandle)>> {
+    pub fn get_clients(&self) -> &Arc<DashMap<SessionId, (SocketAddr, AbortHandle, HoprSessionConfigurator)>> {
         &self.clients
     }
 }
@@ -191,6 +191,19 @@ impl std::fmt::Display for ListenerId {
 
 #[derive(Default)]
 pub struct ListenerJoinHandles(pub DashMap<ListenerId, StoredSessionEntry>);
+
+impl ListenerJoinHandles {
+    /// Finds the [`HoprSessionConfigurator`] for the given session ID across all listeners.
+    pub fn find_configurator(&self, session_id: &SessionId) -> Option<HoprSessionConfigurator> {
+        self.0.iter().find_map(|entry| {
+            entry
+                .value()
+                .get_clients()
+                .get(session_id)
+                .map(|client| client.value().2.clone())
+        })
+    }
+}
 
 impl Abortable for ListenerJoinHandles {
     fn abort_task(&self) {
@@ -304,10 +317,8 @@ impl SessionPool {
         }
     }
 
-    pub fn pop(&mut self) -> Option<HoprSession> {
-        self.pool
-            .as_ref()
-            .and_then(|pool| pool.lock().pop_front().map(|(session, _)| session))
+    pub fn pop(&mut self) -> Option<(HoprSession, HoprSessionConfigurator)> {
+        self.pool.as_ref().and_then(|pool| pool.lock().pop_front())
     }
 }
 
@@ -398,7 +409,7 @@ where
                 let active_sessions = active_sessions_clone_2.clone();
 
                 // Try to pop from the pool only if a client was accepted
-                let maybe_pooled_session = accepted_client.is_ok().then(|| session_pool.pop()).flatten();
+                let maybe_pooled = accepted_client.is_ok().then(|| session_pool.pop()).flatten();
                 async move {
                     match accepted_client {
                         Ok((sock_addr, mut stream)) => {
@@ -416,15 +427,15 @@ where
                             }
 
                             // See if we still have some session pooled
-                            let session = match maybe_pooled_session {
-                                Some(s) => {
+                            let (session, configurator) = match maybe_pooled {
+                                Some((s, c)) => {
                                     debug!(session_id = %s.id(), "using pooled session");
-                                    s
+                                    (s, c)
                                 }
                                 None => {
                                     debug!("no more active sessions in the pool, creating a new one");
                                     match hopr.connect_to(destination, target, data).await {
-                                        Ok((s, _configurator)) => s,
+                                        Ok((s, c)) => (s, c),
                                         Err(error) => {
                                             error!(%error, "failed to establish session");
                                             return;
@@ -437,7 +448,7 @@ where
                             debug!(?sock_addr, %session_id, "new session for incoming TCP connection");
 
                             let (abort_handle, abort_reg) = AbortHandle::new_pair();
-                            active_sessions.insert(session_id, (sock_addr, abort_handle));
+                            active_sessions.insert(session_id, (sock_addr, abort_handle, configurator));
 
                             #[cfg(all(feature = "telemetry", not(test)))]
                             METRIC_ACTIVE_CLIENTS.increment(&["tcp"], 1.0);
@@ -467,7 +478,7 @@ where
 
         // Once the listener is done, abort all active sessions created by the listener
         active_sessions_clone.iter().for_each(|entry| {
-            let (sock_addr, handle) = entry.value();
+            let (sock_addr, handle, _) = entry.value();
             debug!(session_id = %entry.key(), ?sock_addr, "aborting opened TCP session after listener has been closed");
             handle.abort()
         });
@@ -545,7 +556,7 @@ where
         .map_err(|e| BindError::UnknownFailure(e.to_string()))?;
 
     // Create a single session for the UDP socket
-    let (session, _configurator) = hopr
+    let (session, configurator) = hopr
         .connect_to(destination, target, config.clone())
         .await
         .map_err(|e| BindError::UnknownFailure(e.to_string()))?;
@@ -569,7 +580,7 @@ where
 
     // TODO: add multiple client support to UDP sessions (#7370)
     let session_id = *session.id();
-    clients.insert(session_id, (bind_host, abort_handle.clone()));
+    clients.insert(session_id, (bind_host, abort_handle.clone(), configurator));
     hopr_async_runtime::prelude::spawn(async move {
         #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_ACTIVE_CLIENTS.increment(&["udp"], 1.0);
@@ -859,6 +870,46 @@ mod tests {
         jh.timeout(futures_time::time::Duration::from_millis(200)).await??;
 
         Ok(())
+    }
+
+    fn stub_stored_entry() -> StoredSessionEntry {
+        let (abort_handle, _) = AbortHandle::new_pair();
+        StoredSessionEntry {
+            destination: Address::default(),
+            target: SessionTargetSpec::Plain("localhost:8080".into()),
+            forward_path: RoutingOptions::Hops(Default::default()),
+            return_path: RoutingOptions::Hops(Default::default()),
+            max_client_sessions: 5,
+            max_surb_upstream: None,
+            response_buffer: None,
+            session_pool: None,
+            abort_handle,
+            clients: Arc::new(DashMap::new()),
+        }
+    }
+
+    #[test]
+    fn find_configurator_should_return_none_when_no_listeners() {
+        let handles = ListenerJoinHandles::default();
+        let session_id = SessionId::new(1234u64, HoprPseudonym::random());
+        assert!(handles.find_configurator(&session_id).is_none());
+    }
+
+    #[test]
+    fn find_configurator_should_return_none_when_session_not_tracked() {
+        let handles = ListenerJoinHandles::default();
+        let listener_id = ListenerId(IpProtocol::TCP, "127.0.0.1:9091".parse().unwrap());
+        handles.0.insert(listener_id, stub_stored_entry());
+
+        let session_id = SessionId::new(5678u64, HoprPseudonym::random());
+        assert!(handles.find_configurator(&session_id).is_none());
+    }
+
+    #[test]
+    fn stored_session_entry_clients_should_start_empty() {
+        let entry = stub_stored_entry();
+        assert!(entry.get_clients().is_empty());
+        assert_eq!(entry.max_client_sessions, 5);
     }
 
     #[test]
