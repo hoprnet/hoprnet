@@ -66,20 +66,21 @@ where
 
 impl<S: PixSpec> Eq for PartialSsaShare<S> where <Scalar<S> as PrimeField>::Repr: Eq {}
 
-/// Defines the index of a polynomial in a single use reply block (SURB).
+/// Defines the index of a polynomial in a Session Stealth Address (SSA) corresponding
+/// to a specific Session.
 ///
 /// The index consists of the following parts:
-/// 1. The Pseudonym part of the `HoprSenderId`
+/// 1. The Pseudonym part of the `HoprSenderId` - fixed for the given Session.
 /// 2. Index (i) of the Session Stealth Address (SSA)
 /// 3. Index (j) of the polynomial used to reconstruct the portion of the SSA.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, PartialOrd, Ord)]
-pub struct SurbPolynomialIndex<P = SimplePseudonym> {
+pub struct SsaPolynomialIndex<P = SimplePseudonym> {
     pseudonym: P,
     ssa_index: u32,
     poly_index: u32,
 }
 
-impl<P> SurbPolynomialIndex<P> {
+impl<P> SsaPolynomialIndex<P> {
     pub fn new(pseudonym: P, ssa_index: u32, poly_index: u32) -> Self {
         Self {
             pseudonym,
@@ -107,35 +108,39 @@ impl<P> SurbPolynomialIndex<P> {
     }
 }
 
-pub(crate) fn msg_to_scalar<S: PixSpec>(pseudonym: &S::Pseudonym, msg: impl AsRef<[u8]>) -> errors::Result<Scalar<S>> {
+pub(crate) fn msg_to_scalar<S: PixSpec>(spi: &SsaPolynomialIndex<S::Pseudonym>, msg: impl AsRef<[u8]>) -> errors::Result<Scalar<S>> {
     Ok(<S::Curve as GroupDigest>::hash_to_scalar::<ExpandMsgXmd<Sha3_256>>(
-        &[msg.as_ref()],
+        &[
+            msg.as_ref(),
+            spi.pseudonym().as_ref(),
+            spi.ssa_index().to_be_bytes().as_ref(),
+            spi.poly_index().to_be_bytes().as_ref(),
+        ],
         &[
             format!("{:?}_XMD:SHA3-256_SSWU_RO_", S::Curve::default()).as_bytes(),
-            pseudonym.as_ref(),
         ],
     )?)
 }
 
-/// Verifier for shares of a polynomial with the given [`SurbPolynomialIndex`].
+/// Verifier for shares of a polynomial with the given [`SsaPolynomialIndex`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SsaShareVerifier<S: PixSpec> {
-    pub(crate) spi: SurbPolynomialIndex<S::Pseudonym>,
+    pub(crate) spi: SsaPolynomialIndex<S::Pseudonym>,
     pub(crate) poly_commitment: Vec<ShareVerifierGroup<Element<S>>>,
 }
 
 impl<S: PixSpec> SsaShareVerifier<S> {
-    /// Returns the [`SurbPolynomialIndex`] of the polynomial corresponding to this verifier.
+    /// Returns the [`SsaPolynomialIndex`] of the polynomial corresponding to this verifier.
     #[inline]
-    pub fn spi(&self) -> &SurbPolynomialIndex<S::Pseudonym> {
+    pub fn spi(&self) -> &SsaPolynomialIndex<S::Pseudonym> {
         &self.spi
     }
 
     /// Verifies that the given `share` corresponding to `msg` belongs to the polynomial associated with this verifier.
     pub fn verify(&self, share: &PartialSsaShare<S>, msg: impl AsRef<[u8]>) -> errors::Result<()> {
         let share: DefaultShare<IdentifierPrimeField<Scalar<S>>, IdentifierPrimeField<Scalar<S>>> = DefaultShare {
-            identifier: msg_to_scalar::<S>(self.spi.pseudonym(), msg)?.into(),
+            identifier: msg_to_scalar::<S>(&self.spi, msg)?.into(),
             value: Option::from(Scalar::<S>::from_repr(share.0.clone()))
                 .map(|s: Scalar<S>| s.into())
                 .ok_or(vsss_rs::Error::InvalidShare)?,
@@ -188,10 +193,13 @@ impl<S: PixSpec> SsaShareVerifier<S> {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use hopr_types::crypto_random::Randomizable;
+    use anyhow::Context;
     use vsss_rs::{
         ParticipantIdGeneratorType,
-        elliptic_curve::rand_core::{CryptoRng, RngCore},
+        elliptic_curve::{
+            Field,
+            rand_core::{CryptoRng, RngCore},
+        },
         feldman,
     };
 
@@ -204,36 +212,29 @@ pub(crate) mod tests {
         type Pseudonym = SimplePseudonym;
     }
 
+    type Share<S> = DefaultShare<IdentifierPrimeField<Scalar<S>>, IdentifierPrimeField<Scalar<S>>>;
+
     fn standard_shamir_generate<S: PixSpec>(
-        secret: &IdentifierPrimeField<>,
+        secret: Scalar<S>,
         t: usize,
-        x: &[S],
+        x: &[Scalar<S>],
         mut rng: impl RngCore + CryptoRng,
-    ) -> anyhow::Result<(
-        Vec<DefaultShare<IdentifierPrimeField<S>, IdentifierPrimeField<S>>>,
-        Vec<ShareVerifierGroup<P>>,
-    )>
-    where
-        S: PrimeField,
-        P: Default + GroupEncoding + Group<Scalar = S>,
-    {
+    ) -> anyhow::Result<(Vec<Share<S>>, Vec<ShareVerifierGroup<Element<S>>>)> {
         anyhow::ensure!(t > 0, "t must be greater than 0");
         anyhow::ensure!(x.len() >= t, "x must have at least t elements");
 
-        let (shares, verifier_set) = feldman::split_secret_with_participant_generator::<
-            DefaultShare<IdentifierPrimeField<S>, IdentifierPrimeField<S>>,
-            ShareVerifierGroup<P>,
-        >(
-            t,
-            x.len(),
-            &secret,
-            None,
-            &mut rng,
-            &[ParticipantIdGeneratorType::list(
-                &x.into_iter().map(|x| (*x).into()).collect::<Vec<_>>(),
-            )],
-        )
-        .map_err(anyhow::Error::msg)?;
+        let (shares, verifier_set) =
+            feldman::split_secret_with_participant_generator::<Share<S>, ShareVerifierGroup<Element<S>>>(
+                t,
+                x.len(),
+                &secret.into(),
+                None,
+                &mut rng,
+                &[ParticipantIdGeneratorType::list(
+                    &x.iter().map(|x| (*x).into()).collect::<Vec<_>>(),
+                )],
+            )
+            .map_err(anyhow::Error::msg)?;
 
         Ok((shares, verifier_set))
     }
@@ -241,18 +242,17 @@ pub(crate) mod tests {
     #[test]
     fn ssa_shared_verifier_must_correspond_to_standard() -> anyhow::Result<()> {
         let mut rng = vsss_rs::elliptic_curve::rand_core::OsRng;
-        let secret = IdentifierPrimeField::<k256::Scalar>::random(&mut rng);
+        let secret = k256::Scalar::random(&mut rng);
 
-        let p = SimplePseudonym::random();
-        let x = (0..20_u32)
-            .map(|i| msg_to_scalar::<TestSpec>(&p, i.to_be_bytes()).unwrap())
+        let spi = SsaPolynomialIndex::new(SimplePseudonym::try_from([0u8; 10].as_ref())?, 1, 1);
+        let x = (0..=20_u32)
+            .map(|i| msg_to_scalar::<TestSpec>(&spi, i.to_be_bytes()).unwrap())
             .collect::<Vec<_>>();
 
-        let (shares, verifier) =
-            standard_shamir_generate::<k256::Scalar, k256::ProjectivePoint>(&secret, 10, &x, &mut rng)?;
+        let (shares, verifier) = standard_shamir_generate::<TestSpec>(secret, 10, &x, &mut rng)?;
 
         let verifier: SsaShareVerifier<TestSpec> = SsaShareVerifier {
-            spi: SurbPolynomialIndex::new(p, 1, 1),
+            spi,
             poly_commitment: verifier,
         };
 
@@ -260,7 +260,9 @@ pub(crate) mod tests {
 
         for (i, s) in shares.into_iter().enumerate() {
             let share: PartialSsaShare<TestSpec> = PartialSsaShare(s.value.0.to_repr());
-            verifier.verify(&share, i.to_be_bytes())?;
+            verifier
+                .verify(&share, (i as u32).to_be_bytes())
+                .context(format!("Verification failed for share index {i}"))?;
         }
 
         Ok(())

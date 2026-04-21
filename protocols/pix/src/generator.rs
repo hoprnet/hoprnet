@@ -11,14 +11,14 @@ use vsss_rs::{
 };
 
 use crate::{
-    Element, PartialSsaShare, PixSpec, Scalar, SsaIndex, SsaShareVerifier, SurbPolynomialIndex, errors, msg_to_scalar,
+    Element, PartialSsaShare, PixSpec, Scalar, SsaIndex, SsaShareVerifier, SsaPolynomialIndex, errors, msg_to_scalar,
 };
 
 type RawPolynomial<S> = Vec<DefaultShare<IdentifierPrimeField<Scalar<S>>, IdentifierPrimeField<Scalar<S>>>>;
 type RawPolynomialVerifier<S> = Vec<ShareVerifierGroup<Element<S>>>;
 
 struct IndexedPolynomial<S: PixSpec> {
-    spi: SurbPolynomialIndex<S::Pseudonym>,
+    spi: SsaPolynomialIndex<S::Pseudonym>,
     raw: RawPolynomial<S>,
     shares_generated: usize,
     t: usize,
@@ -111,14 +111,20 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
         &self,
         pseudonym: &S::Pseudonym,
         msg: impl AsRef<[u8]>,
-    ) -> errors::Result<Option<(SurbPolynomialIndex<S::Pseudonym>, PartialSsaShare<S>)>> {
+    ) -> errors::Result<Option<(SsaPolynomialIndex<S::Pseudonym>, PartialSsaShare<S>)>> {
         if let Some(entry) = self.polynomials.get(pseudonym) {
             let polys = &mut entry.lock().poly_queue;
             while !polys.is_empty() {
                 if let Some(poly) = polys.front_mut()
                     && poly.shares_generated < self.cfg.threshold + self.cfg.surplus_shares
                 {
-                    let x = msg_to_scalar::<S>(pseudonym, msg)?;
+                    let x = msg_to_scalar::<S>(&poly.spi, msg)?;
+                    // Zero would disclose the secret, so we disallow it.
+                    // The chance is almost impossible.
+                    if x.is_zero().into() {
+                        return Err(errors::PixError::InvalidInput);
+                    }
+
                     return Ok(Some((poly.spi, poly.next_share(x))));
                 }
                 polys.pop_front();
@@ -169,7 +175,7 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
                             .into_iter()
                             .enumerate()
                             .map(|(poly_index, poly_commitment)| SsaShareVerifier {
-                                spi: SurbPolynomialIndex::new(*pseudonym, new_index, poly_index as u32),
+                                spi: SsaPolynomialIndex::new(*pseudonym, new_index, poly_index as u32),
                                 poly_commitment,
                             }),
                     );
@@ -179,7 +185,7 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
                             .into_iter()
                             .enumerate()
                             .map(|(poly_index, raw)| IndexedPolynomial {
-                                spi: SurbPolynomialIndex::new(*pseudonym, new_index, poly_index as u32),
+                                spi: SsaPolynomialIndex::new(*pseudonym, new_index, poly_index as u32),
                                 raw,
                                 shares_generated: 0,
                                 t: self.cfg.threshold,
@@ -199,7 +205,7 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
                                 .into_iter()
                                 .enumerate()
                                 .map(|(poly_index, poly_commitment)| SsaShareVerifier {
-                                    spi: SurbPolynomialIndex::new(*pseudonym, new_index, poly_index as u32),
+                                    spi: SsaPolynomialIndex::new(*pseudonym, new_index, poly_index as u32),
                                     poly_commitment,
                                 }),
                         );
@@ -208,7 +214,7 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
                             .poly_queue
                             .extend(raw_polynomials.into_iter().enumerate().map(|(poly_index, raw)| {
                                 IndexedPolynomial {
-                                    spi: SurbPolynomialIndex::new(*pseudonym, new_index, poly_index as u32),
+                                    spi: SsaPolynomialIndex::new(*pseudonym, new_index, poly_index as u32),
                                     raw,
                                     shares_generated: 0,
                                     t: self.cfg.threshold,
@@ -360,11 +366,11 @@ mod tests {
             for _ in 0..12 {
                 let x = hopr_types::crypto_random::random_bytes::<10>();
 
-                let (_, share) = generator
+                let (spi, share) = generator
                     .next_share(&p, x)?
                     .ok_or(anyhow::anyhow!("failed to generate share"))?;
                 let complete_share = DefaultShare {
-                    identifier: msg_to_scalar::<TestSpec>(&p, x)?.into(),
+                    identifier: msg_to_scalar::<TestSpec>(&spi, x)?.into(),
                     value: k256::Scalar::from_repr(share.0).unwrap().into(),
                 };
 
