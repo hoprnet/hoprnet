@@ -1,14 +1,12 @@
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use hopr_protocol_pix::{PixSpec, SsaGeneratorConfig, SsaShareGenerator};
+use hopr_protocol_pix::{PixSpec, Scalar, SsaGeneratorConfig, SsaShareGenerator};
 use hopr_types::{crypto::prelude::SimplePseudonym, crypto_random::Randomizable};
-use vsss_rs::elliptic_curve::Field;
 
 pub struct TestSpec;
 
 impl PixSpec for TestSpec {
-    type Element = k256::ProjectivePoint;
+    type Curve = k256::Secp256k1;
     type Pseudonym = SimplePseudonym;
-    type Scalar = k256::Scalar;
 }
 
 fn bench_new_ssa_commitment(c: &mut Criterion) {
@@ -46,7 +44,7 @@ fn bench_verify(c: &mut Criterion) {
 
     let thresholds = [10, 50, 100, 200];
     let pseudonym = SimplePseudonym::random();
-    let x = k256::Scalar::random(&mut vsss_rs::elliptic_curve::rand_core::OsRng);
+    let x = hopr_types::crypto_random::random_bytes::<10>();
 
     for &t in &thresholds {
         let cfg = SsaGeneratorConfig {
@@ -55,7 +53,7 @@ fn bench_verify(c: &mut Criterion) {
         };
         let generator = SsaShareGenerator::<TestSpec>::new(cfg);
         let (_commitment, verifiers) = generator.new_ssa_commitment(&pseudonym).unwrap();
-        let (_index, share) = generator.next_share(&pseudonym, x).unwrap();
+        let (_index, share) = generator.next_share(&pseudonym, x).unwrap().unwrap();
         let verifier = &verifiers[0];
 
         group.bench_with_input(BenchmarkId::from_parameter(format!("t{}", t)), &t, |b, _| {

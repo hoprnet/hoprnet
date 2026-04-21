@@ -10,23 +10,25 @@ use vsss_rs::{
     },
 };
 
-use crate::{PixSpec, SsaIndex, SsaPolyShare, SsaShareVerifier, SurbPolynomialIndex, errors};
+use crate::{
+    Element, PartialSsaShare, PixSpec, Scalar, SsaIndex, SsaShareVerifier, SurbPolynomialIndex, errors, msg_to_scalar,
+};
 
-type RawPolynomial<S> = Vec<DefaultShare<IdentifierPrimeField<S>, IdentifierPrimeField<S>>>;
-type RawPolynomialVerifier<E> = Vec<ShareVerifierGroup<E>>;
+type RawPolynomial<S> = Vec<DefaultShare<IdentifierPrimeField<Scalar<S>>, IdentifierPrimeField<Scalar<S>>>>;
+type RawPolynomialVerifier<S> = Vec<ShareVerifierGroup<Element<S>>>;
 
 struct IndexedPolynomial<S: PixSpec> {
     spi: SurbPolynomialIndex<S::Pseudonym>,
-    raw: RawPolynomial<S::Scalar>,
+    raw: RawPolynomial<S>,
     shares_generated: usize,
     t: usize,
 }
 
 impl<S: PixSpec> IndexedPolynomial<S> {
-    pub fn next_share(&mut self, x: S::Scalar) -> SsaPolyShare<S> {
+    pub fn next_share(&mut self, x: Scalar<S>) -> PartialSsaShare<S> {
         let eval = self.raw.evaluate(&x.into(), self.t);
         self.shares_generated += 1;
-        SsaPolyShare(eval.0.to_repr())
+        PartialSsaShare(eval.0.to_repr())
     }
 }
 
@@ -36,11 +38,11 @@ struct SsaPseudonymEntry<S: PixSpec> {
 }
 
 fn new_polynomial_with_verifier<S: PixSpec>(
-    secret: S::Scalar,
+    secret: Scalar<S>,
     t: usize,
     rng: impl RngCore + CryptoRng,
-) -> errors::Result<(RawPolynomial<S::Scalar>, RawPolynomialVerifier<S::Element>)> {
-    let mut polynomial = RawPolynomial::create(t);
+) -> errors::Result<(RawPolynomial<S>, RawPolynomialVerifier<S>)> {
+    let mut polynomial = RawPolynomial::<S>::create(t);
     polynomial.fill(&secret.into(), rng, t)?;
 
     #[cfg(not(feature = "rayon"))]
@@ -56,7 +58,7 @@ fn new_polynomial_with_verifier<S: PixSpec>(
     let coeffs_iter = polynomial[1..].iter().map(|c| c.identifier());
 
     // Compute commitments to the coefficients of the polynomial
-    let g = ShareVerifierGroup::<S::Element>::one(); // The generator of the group of verifiers
+    let g = ShareVerifierGroup::<Element<S>>::one(); // The generator of the group of verifiers
     let one = IdentifierPrimeField::one();
     let verifier = once(&one) // The first verifier is the generator
         .chain(once(polynomial[0].value())) //
@@ -102,26 +104,27 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
         }
     }
 
-    /// Generate the next [`SsaPolyShare`] for the given pseudonym.
+    /// Generate the next [`PartialSsaShare`] for the given pseudonym.
     ///
     /// Returns `None` if all polynomials for the given pseudonym have been used up.
     pub fn next_share(
         &self,
         pseudonym: &S::Pseudonym,
-        x: S::Scalar,
-    ) -> Option<(SurbPolynomialIndex<S::Pseudonym>, SsaPolyShare<S>)> {
-        self.polynomials.get(pseudonym).and_then(|entry| {
+        msg: impl AsRef<[u8]>,
+    ) -> errors::Result<Option<(SurbPolynomialIndex<S::Pseudonym>, PartialSsaShare<S>)>> {
+        if let Some(entry) = self.polynomials.get(pseudonym) {
             let polys = &mut entry.lock().poly_queue;
             while !polys.is_empty() {
                 if let Some(poly) = polys.front_mut()
                     && poly.shares_generated < self.cfg.threshold + self.cfg.surplus_shares
                 {
-                    return Some((poly.spi, poly.next_share(x)));
+                    let x = msg_to_scalar::<S>(pseudonym, msg)?;
+                    return Ok(Some((poly.spi, poly.next_share(x))));
                 }
                 polys.pop_front();
             }
-            None
-        })
+        }
+        Ok(None)
     }
 
     /// Generates a new SSA commitment from the sender side, for the given `pseudonym`.
@@ -130,16 +133,16 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
     pub fn new_ssa_commitment(
         &self,
         pseudonym: &S::Pseudonym,
-    ) -> errors::Result<(S::Element, Vec<SsaShareVerifier<S>>)> {
+    ) -> errors::Result<(Element<S>, Vec<SsaShareVerifier<S>>)> {
         let mut rng = vsss_rs::elliptic_curve::rand_core::OsRng;
 
         // Generate sub-secrets for each polynomial
         let sub_secrets = (0..self.cfg.polynomials_per_ssa)
-            .map(|_| <S::Scalar as Field>::random(&mut rng))
+            .map(|_| <Scalar<S> as Field>::random(&mut rng))
             .collect::<Vec<_>>();
 
         // Overall commitment secret is the sum of all sub-secrets
-        let our_commitment_secret = sub_secrets.iter().sum::<S::Scalar>();
+        let our_commitment_secret = sub_secrets.iter().sum::<Scalar<S>>();
 
         #[cfg(not(feature = "rayon"))]
         let sub_secrets_iter = sub_secrets.into_iter();
@@ -148,12 +151,11 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
         let sub_secrets_iter = sub_secrets.into_par_iter();
 
         // Generate polynomial and verifier for each sub-secret
-        let (raw_polynomials, raw_verifiers): (Vec<RawPolynomial<S::Scalar>>, Vec<RawPolynomialVerifier<S::Element>>) =
-            sub_secrets_iter
-                .map(|secret| new_polynomial_with_verifier::<S>(secret, self.cfg.threshold, rng))
-                .collect::<errors::Result<Vec<(RawPolynomial<S::Scalar>, RawPolynomialVerifier<S::Element>)>>>()?
-                .into_iter()
-                .unzip();
+        let (raw_polynomials, raw_verifiers): (Vec<RawPolynomial<S>>, Vec<RawPolynomialVerifier<S>>) = sub_secrets_iter
+            .map(|secret| new_polynomial_with_verifier::<S>(secret, self.cfg.threshold, rng))
+            .collect::<errors::Result<Vec<(RawPolynomial<S>, RawPolynomialVerifier<S>)>>>()?
+            .into_iter()
+            .unzip();
 
         let mut verifiers = Vec::with_capacity(raw_verifiers.len());
 
@@ -218,7 +220,7 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
                 }
             });
 
-        Ok((S::Element::generator() * our_commitment_secret, verifiers))
+        Ok((Element::<S>::generator() * our_commitment_secret, verifiers))
     }
 }
 
@@ -226,15 +228,9 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
 mod tests {
     use hopr_types::{crypto::types::SimplePseudonym, crypto_random::Randomizable};
     use vsss_rs::{FeldmanVerifierSet, ReadableShareSet};
+
     use super::*;
-
-    pub struct TestSpec;
-
-    impl PixSpec for TestSpec {
-        type Element = k256::ProjectivePoint;
-        type Pseudonym = SimplePseudonym;
-        type Scalar = k256::Scalar;
-    }
+    use crate::{msg_to_scalar, tests::TestSpec};
 
     #[test]
     fn ssa_generator_should_generate_consecutive_spis() -> anyhow::Result<()> {
@@ -297,59 +293,46 @@ mod tests {
 
         for i in 0..12_u32 {
             let (spi, _) = generator
-                .next_share(&p1, k256::Scalar::random(vsss_rs::elliptic_curve::rand_core::OsRng))
+                .next_share(&p1, i.to_be_bytes())?
                 .ok_or(anyhow::anyhow!("failed to generate share"))?;
             assert_eq!(spi.pseudonym(), &p1);
             assert_eq!(spi.ssa_index(), 1);
             assert_eq!(spi.poly_index(), i / 4);
         }
-        assert!(
-            generator
-                .next_share(&p1, k256::Scalar::random(vsss_rs::elliptic_curve::rand_core::OsRng))
-                .is_none()
-        );
+        assert!(generator.next_share(&p1, 20_u32.to_be_bytes())?.is_none());
 
         generator.new_ssa_commitment(&p1)?;
 
         for i in 0..12_u32 {
             let (spi, _) = generator
-                .next_share(&p1, k256::Scalar::random(vsss_rs::elliptic_curve::rand_core::OsRng))
+                .next_share(&p1, i.to_be_bytes())?
                 .ok_or(anyhow::anyhow!("failed to generate share"))?;
             assert_eq!(spi.pseudonym(), &p1);
             assert_eq!(spi.ssa_index(), 2);
             assert_eq!(spi.poly_index(), i / 4);
         }
-        assert!(
-            generator
-                .next_share(&p1, k256::Scalar::random(vsss_rs::elliptic_curve::rand_core::OsRng))
-                .is_none()
-        );
+        assert!(generator.next_share(&p1, 20_u32.to_be_bytes())?.is_none());
 
         Ok(())
     }
 
     #[test]
     fn ssa_generator_shares_must_be_verifiable() -> anyhow::Result<()> {
-        let mut rng = vsss_rs::elliptic_curve::rand_core::OsRng;
-
         let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
             polynomials_per_ssa: 10,
             threshold: 10,
             surplus_shares: 2,
         });
 
-        //Secp256k1::
-        //let scalar = GroupDigest::hash_to_scalar(&[b"abc"], &[b"def"]);
-
         let p = SimplePseudonym::random();
         let (_, vs) = generator.new_ssa_commitment(&p)?;
 
         for poly_index in 0..10 {
             for _ in 0..12 {
-                let x = k256::Scalar::random(&mut rng);
+                let x = hopr_types::crypto_random::random_bytes::<10>();
 
                 let (_, share) = generator
-                    .next_share(&p, x)
+                    .next_share(&p, x)?
                     .ok_or(anyhow::anyhow!("failed to generate share"))?;
 
                 vs[poly_index].verify(&share, x)?;
@@ -361,8 +344,6 @@ mod tests {
 
     #[test]
     fn ssa_generator_corresponds_to_standard_verifier_and_recoverer() -> anyhow::Result<()> {
-        let mut rng = vsss_rs::elliptic_curve::rand_core::OsRng;
-
         let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
             polynomials_per_ssa: 10,
             threshold: 10,
@@ -377,13 +358,13 @@ mod tests {
         for poly_index in 0..10 {
             let mut shares = Vec::new();
             for _ in 0..12 {
-                let x = k256::Scalar::random(&mut rng);
+                let x = hopr_types::crypto_random::random_bytes::<10>();
 
                 let (_, share) = generator
-                    .next_share(&p, x)
+                    .next_share(&p, x)?
                     .ok_or(anyhow::anyhow!("failed to generate share"))?;
                 let complete_share = DefaultShare {
-                    identifier: x.into(),
+                    identifier: msg_to_scalar::<TestSpec>(&p, x)?.into(),
                     value: k256::Scalar::from_repr(share.0).unwrap().into(),
                 };
 

@@ -167,6 +167,7 @@ serde_with = { version = "3.18.0", features = ["base64"] }
 serde_urlencoded = "0.7.1"
 serde-saphyr = "0.0.23"
 serial_test = "3.4.0"
+sha3 = "0.11.0"
 signal-hook = "0.4.4"
 smart-default = "0.7.1"
 socket2 = "0.6.3"

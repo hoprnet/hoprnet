@@ -1,5 +1,7 @@
 #[derive(Debug, thiserror::Error)]
 pub enum PixError {
+    #[error("ecc calculation error: {0}")]
+    EccError(#[from] vsss_rs::elliptic_curve::Error),
     #[error("secret sharing error: {0}")]
     VsssError(vsss_rs::Error),
 }

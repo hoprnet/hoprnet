@@ -15,6 +15,7 @@ serde = ["dep:serde"]
 ahash = { workspace = true }
 moka = { workspace = true }
 parking_lot = { workspace = true }
+sha3 = { workspace = true }
 serde = { workspace = true, optional = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
