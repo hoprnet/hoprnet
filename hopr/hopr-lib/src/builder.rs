@@ -1,3 +1,37 @@
+//! Type-state builder for constructing a [`Hopr`] node.
+//!
+//! The builder guides construction through a series of mandatory phases:
+//!
+//! 1. **Identity** — [`HoprBuilder::new`] → [`HoprBuilder::with_identity`]
+//! 2. **Configuration** — [`HoprBuilderWithIdentity::with_config`]
+//! 3. **Component factories** — chain API, graph, network, and cover-traffic
+//! 4. **Session server** (when the `session-server` feature is enabled) —
+//!    [`HoprBuilderConfigured::with_session_server`]
+//! 5. **Build** — [`build_edge`](HoprBuilderWithSession::build_edge) for an
+//!    entry/exit node or [`build_full`](HoprBuilderWithSession::build_full)
+//!    for a relay node with ticket management.
+//!
+//! # Example
+//!
+//! ```rust,no_run
+//! use hopr_lib::{config::HoprLibConfig, builder::{HoprBuilder, ChainKeypair, OffchainKeypair, Keypair}};
+//!
+//! # async fn example() -> anyhow::Result<()> {
+//! let chain_key = ChainKeypair::random();
+//! let offchain_key = OffchainKeypair::random();
+//! let config = HoprLibConfig::default();
+//!
+//! let builder = HoprBuilder::new()
+//!     .with_identity(&chain_key, &offchain_key)
+//!     .with_config(config)
+//!     .with_chain_api(|_ctx| { /* ... */ todo!() })
+//!     .with_graph(|_ctx| { /* ... */ todo!() })
+//!     .with_network(|_ctx| { /* ... */ todo!() })
+//!     .with_cover_traffic(|_ctx| { /* ... */ todo!() });
+//! # Ok(())
+//! # }
+//! ```
+
 use std::{convert::identity, sync::Arc, time::Duration};
 
 use futures::{FutureExt, StreamExt, channel::mpsc::channel};

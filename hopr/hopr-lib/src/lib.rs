@@ -23,8 +23,8 @@ pub mod config;
 pub mod constants;
 /// Lists all errors thrown from this library.
 pub mod errors;
-/// Public domain types for peer discovery.
-pub mod types;
+// Re-export peer discovery types from hopr-api.
+pub use hopr_api::node::{AnnouncedPeer, AnnouncementOrigin};
 /// Utility module with helper types and functionality over hopr-lib behavior.
 pub mod utils;
 
@@ -107,7 +107,6 @@ pub use crate::{
     config::SafeModule,
     constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE},
     errors::{HoprLibError, HoprStatusError},
-    types::{AnnouncedPeer, AnnouncementOrigin},
 };
 
 /// Public routing configuration for session opening in `hopr-lib`.
@@ -191,7 +190,6 @@ impl From<HoprSessionClientConfig> for hopr_transport::SessionClientConfig {
 
 /// Long-running tasks that are spawned by the HOPR node.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, strum::Display, strum::EnumCount)]
-#[allow(dead_code)]
 pub(crate) enum HoprLibProcess {
     #[strum(to_string = "transport: {0}")]
     Transport(HoprTransportProcess),
@@ -365,6 +363,18 @@ where
 // Has* accessor trait implementations
 // ---------------------------------------------------------------------------
 
+/// Converts [`HoprState`] into a [`ComponentStatus`] for a named component.
+///
+/// Returns [`ComponentStatus::Ready`] when the node is [`HoprState::Running`],
+/// otherwise [`ComponentStatus::Initializing`] with the component name.
+fn component_status(state: HoprState, component: &str) -> ComponentStatus {
+    if state == HoprState::Running {
+        ComponentStatus::Ready
+    } else {
+        ComponentStatus::Initializing(format!("{component} not yet running").into())
+    }
+}
+
 impl<Chain, Graph, Net, TMgr> HasChainApi for Hopr<Chain, Graph, Net, TMgr>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
@@ -383,10 +393,10 @@ where
     fn status(&self) -> ComponentStatus {
         // Chain is considered ready once the node has passed the initial funding check
         let state = HoprNodeOperations::status(self);
-        if state == HoprState::Running || state == HoprState::ValidatingNetworkConfig {
+        if state == HoprState::ValidatingNetworkConfig {
             ComponentStatus::Ready
         } else {
-            ComponentStatus::Initializing("chain not yet initialized".into())
+            component_status(state, "chain")
         }
     }
 
@@ -443,11 +453,7 @@ where
     }
 
     fn status(&self) -> ComponentStatus {
-        if HoprNodeOperations::status(self) == HoprState::Running {
-            ComponentStatus::Ready
-        } else {
-            ComponentStatus::Initializing("network not yet running".into())
-        }
+        component_status(HoprNodeOperations::status(self), "network")
     }
 }
 
@@ -484,11 +490,7 @@ where
     }
 
     fn status(&self) -> ComponentStatus {
-        if HoprNodeOperations::status(self) == HoprState::Running {
-            ComponentStatus::Ready
-        } else {
-            ComponentStatus::Initializing("transport not yet running".into())
-        }
+        component_status(HoprNodeOperations::status(self), "transport")
     }
 }
 

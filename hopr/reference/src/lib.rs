@@ -9,26 +9,24 @@ pub mod testing;
 
 use std::sync::Arc;
 
+use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue};
+
 #[cfg(feature = "runtime-tokio")]
-use hopr_chain_connector::{
-    BlockchainConnectorConfig, HoprBlockchainSafeConnector,
-    api::HoprChainApi,
-    blokli_client::{BlokliClient, BlokliClientConfig},
-    create_trustful_hopr_blokli_connector,
+use {
+    hopr_chain_connector::{
+        BlockchainConnectorConfig, HoprBlockchainSafeConnector,
+        api::HoprChainApi,
+        blokli_client::{BlokliClient, BlokliClientConfig},
+        create_trustful_hopr_blokli_connector,
+    },
+    hopr_lib::builder::{ChainKeypair, Keypair, OffchainKeypair},
+    hopr_lib::{Hopr, config::HoprLibConfig},
+    hopr_network_graph::{ChannelGraph, SharedChannelGraph},
+    hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork},
+    validator::Validate,
 };
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_lib;
-#[cfg(feature = "runtime-tokio")]
-use hopr_lib::builder::{ChainKeypair, Keypair, OffchainKeypair};
-#[cfg(feature = "runtime-tokio")]
-use hopr_lib::{Hopr, config::HoprLibConfig};
-#[cfg(feature = "runtime-tokio")]
-use hopr_network_graph::{ChannelGraph, SharedChannelGraph};
-use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue};
-#[cfg(feature = "runtime-tokio")]
-use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork};
-#[cfg(feature = "runtime-tokio")]
-use validator::Validate;
 
 #[cfg(feature = "session-server")]
 use crate::{config::SessionIpForwardingConfig, exit::HoprServerIpForwardingReactor};
