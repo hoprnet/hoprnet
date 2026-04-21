@@ -200,8 +200,8 @@ pub(crate) enum HoprLibProcess {
     ChannelEvents,
     #[strum(to_string = "on received ticket event (winning or rejected)")]
     TicketEvents,
-    #[strum(to_string = "persisting of outgoing ticket indices")]
-    OutIndexSync,
+    #[strum(to_string = "neglecting tickets on closed channels")]
+    ChannelClosureNeglect,
 }
 
 /// Prepare an optimized version of the tokio runtime setup for hopr-lib specifically.

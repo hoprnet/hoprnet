@@ -5,10 +5,8 @@
 //! 1. **Identity** — `HoprBuilder::new` → `HoprBuilder::with_identity`
 //! 2. **Configuration** — `HoprBuilderWithIdentity::with_config`
 //! 3. **Component factories** — chain API, graph, network, and cover-traffic
-//! 4. **Session server** (when the `session-server` feature is enabled) —
-//!    `HoprBuilderConfigured::with_session_server`
-//! 5. **Build** — `build_edge` for an entry/exit node or `build_full`
-//!    for a relay node with ticket management.
+//! 4. **Session server** (when the `session-server` feature is enabled) — `HoprBuilderConfigured::with_session_server`
+//! 5. **Build** — `build_edge` for an entry/exit node or `build_full` for a relay node with ticket management.
 //!
 //! # Example
 //!
@@ -836,12 +834,12 @@ macro_rules! impl_build_methods {
                     })
                     .inspect(|_| {
                         tracing::warn!(
-                            task = %HoprLibProcess::ChannelEvents,
+                            task = %HoprLibProcess::ChannelClosureNeglect,
                             "channel closure ticket neglect task finished"
                         )
                     }),
                 );
-                processes.insert(HoprLibProcess::OutIndexSync, neglect_handle);
+                processes.insert(HoprLibProcess::ChannelClosureNeglect, neglect_handle);
             }
 
             tracing::info!("starting transport for full node");

@@ -29,8 +29,8 @@ use crate::{
 ///
 /// ### Usage in incoming packet pipeline
 /// The incoming packet pipeline usually just calls the
-/// [`insert_incoming_ticket`](hopr_api::tickets::TicketManagement::insert_incoming_ticket) whenever a new winning, redeemable ticket is
-/// received on an incoming channel.
+/// [`insert_incoming_ticket`](hopr_api::tickets::TicketManagement::insert_incoming_ticket) whenever a new winning,
+/// redeemable ticket is received on an incoming channel.
 ///
 /// ### Redeemable ticket extraction
 /// On Relay nodes, the manager maintains FIFO queues of redeemable tickets per incoming channel.

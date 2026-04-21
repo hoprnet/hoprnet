@@ -9,10 +9,9 @@ pub mod testing;
 
 use std::sync::Arc;
 
-use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue};
-
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_lib;
+use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue};
 #[cfg(feature = "runtime-tokio")]
 use {
     hopr_chain_connector::{

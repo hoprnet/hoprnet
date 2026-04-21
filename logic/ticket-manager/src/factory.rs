@@ -333,12 +333,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use hopr_api::{tickets::TicketFactory, types::crypto::prelude::Keypair};
+    use hopr_api::{
+        tickets::{TicketFactory, TicketManagement},
+        types::crypto::prelude::Keypair,
+    };
     use hopr_chain_connector::ChainKeypair;
 
     use super::*;
-    use hopr_api::tickets::TicketManagement;
-
     use crate::{MemoryStore, traits::tests::generate_owned_tickets};
 
     fn create_factory() -> anyhow::Result<HoprTicketFactory<MemoryStore>> {
