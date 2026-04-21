@@ -703,7 +703,7 @@ pub(crate) async fn session_config(
             .value()
             .get_clients()
             .get(&session_id)
-            .map(|client| client.value().2.clone())
+            .map(|client| client.value().configurator.clone())
     });
 
     match configurator {

@@ -120,6 +120,17 @@ impl SessionTargetSpec {
     }
 }
 
+/// A single client connected to a session listener.
+#[derive(Debug)]
+pub struct ClientEntry {
+    /// The socket address of the connected client.
+    pub sock_addr: SocketAddr,
+    /// The abort handle for the client's session processing task.
+    pub abort_handle: AbortHandle,
+    /// The per-session configurator.
+    pub configurator: HoprSessionConfigurator,
+}
+
 /// Entry stored in the session registry table.
 #[derive(Debug)]
 pub struct StoredSessionEntry {
@@ -143,11 +154,11 @@ pub struct StoredSessionEntry {
     /// The abort handle for the Session processing.
     pub abort_handle: AbortHandle,
 
-    clients: Arc<DashMap<SessionId, (SocketAddr, AbortHandle, HoprSessionConfigurator)>>,
+    clients: Arc<DashMap<SessionId, ClientEntry>>,
 }
 
 impl StoredSessionEntry {
-    pub fn get_clients(&self) -> &Arc<DashMap<SessionId, (SocketAddr, AbortHandle, HoprSessionConfigurator)>> {
+    pub fn get_clients(&self) -> &Arc<DashMap<SessionId, ClientEntry>> {
         &self.clients
     }
 }
@@ -200,7 +211,7 @@ impl ListenerJoinHandles {
                 .value()
                 .get_clients()
                 .get(session_id)
-                .map(|client| client.value().2.clone())
+                .map(|client| client.value().configurator.clone())
         })
     }
 }
@@ -448,7 +459,11 @@ where
                             debug!(?sock_addr, %session_id, "new session for incoming TCP connection");
 
                             let (abort_handle, abort_reg) = AbortHandle::new_pair();
-                            active_sessions.insert(session_id, (sock_addr, abort_handle, configurator));
+                            active_sessions.insert(session_id, ClientEntry {
+                                sock_addr,
+                                abort_handle,
+                                configurator,
+                            });
 
                             #[cfg(all(feature = "telemetry", not(test)))]
                             METRIC_ACTIVE_CLIENTS.increment(&["tcp"], 1.0);
@@ -478,9 +493,9 @@ where
 
         // Once the listener is done, abort all active sessions created by the listener
         active_sessions_clone.iter().for_each(|entry| {
-            let (sock_addr, handle, _) = entry.value();
-            debug!(session_id = %entry.key(), ?sock_addr, "aborting opened TCP session after listener has been closed");
-            handle.abort()
+            let client = entry.value();
+            debug!(session_id = %entry.key(), sock_addr = ?client.sock_addr, "aborting opened TCP session after listener has been closed");
+            client.abort_handle.abort()
         });
     });
 
@@ -580,7 +595,11 @@ where
 
     // TODO: add multiple client support to UDP sessions (#7370)
     let session_id = *session.id();
-    clients.insert(session_id, (bind_host, abort_handle.clone(), configurator));
+    clients.insert(session_id, ClientEntry {
+        sock_addr: bind_host,
+        abort_handle: abort_handle.clone(),
+        configurator,
+    });
     hopr_async_runtime::prelude::spawn(async move {
         #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_ACTIVE_CLIENTS.increment(&["udp"], 1.0);
