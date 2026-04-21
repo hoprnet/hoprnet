@@ -1,11 +1,13 @@
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use hopr_protocol_pix::{PixSpec, Scalar, SsaGeneratorConfig, SsaShareGenerator};
 use hopr_types::{crypto::prelude::SimplePseudonym, crypto_random::Randomizable};
+use sha3::Sha3_256;
 
 pub struct TestSpec;
 
 impl PixSpec for TestSpec {
     type Curve = k256::Secp256k1;
+    type Digest = Sha3_256;
     type Pseudonym = SimplePseudonym;
 }
 

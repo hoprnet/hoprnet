@@ -1,11 +1,13 @@
+use digest::{FixedOutput, HashMarker, OutputSizeUser, crypto_common::BlockSizeUser};
 #[cfg(feature = "rayon")]
 use hopr_parallelize::cpu::rayon::prelude::*;
-pub use hopr_types::crypto::prelude::SimplePseudonym;
-use hopr_types::crypto::prelude::{Pseudonym, Sha3_256};
+use hopr_types::crypto::prelude::Pseudonym;
 use vsss_rs::{
     DefaultShare, IdentifierPrimeField, Share, ShareElement, ShareVerifierGroup, ValueGroup,
     elliptic_curve::{
         CurveArithmetic, Group, PrimeCurve, PrimeField,
+        consts::U256,
+        generic_array::typenum::{IsLess, IsLessOrEqual},
         group::{GroupEncoding, cofactor::CofactorGroup},
         hash2curve::{ExpandMsgXmd, FromOkm, GroupDigest},
     },
@@ -22,15 +24,21 @@ pub trait PixSpec
 where
     Scalar<Self>: PrimeField + FromOkm,
     Element<Self>: Group<Scalar = Scalar<Self>> + GroupEncoding + Default + CofactorGroup,
+    <Digest<Self> as OutputSizeUser>::OutputSize: IsLess<U256>,
+    <Digest<Self> as OutputSizeUser>::OutputSize: IsLessOrEqual<<Digest<Self> as BlockSizeUser>::BlockSize>,
 {
     /// Prime order elliptic curve use for commitments.
     type Curve: PrimeCurve + CurveArithmetic + GroupDigest;
+    /// Digest used for hashing operations.
+    type Digest: BlockSizeUser + FixedOutput + std::fmt::Debug + Default + HashMarker;
     /// Pseudonym used to identify groups of SURBs.
     type Pseudonym: Pseudonym + Copy + Send + Sync + 'static;
 }
 
 pub type Scalar<S> = <<S as PixSpec>::Curve as CurveArithmetic>::Scalar;
 pub type Element<S> = <<S as PixSpec>::Curve as CurveArithmetic>::ProjectivePoint;
+
+pub type Digest<S> = <S as PixSpec>::Digest;
 
 /// Type used to index Session Stealth Addresses (SSA).
 ///
@@ -74,7 +82,7 @@ impl<S: PixSpec> Eq for PartialSsaShare<S> where <Scalar<S> as PrimeField>::Repr
 /// 2. Index (i) of the Session Stealth Address (SSA)
 /// 3. Index (j) of the polynomial used to reconstruct the portion of the SSA.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, PartialOrd, Ord)]
-pub struct SsaPolynomialIndex<P = SimplePseudonym> {
+pub struct SsaPolynomialIndex<P> {
     pseudonym: P,
     ssa_index: u32,
     poly_index: u32,
@@ -108,17 +116,18 @@ impl<P> SsaPolynomialIndex<P> {
     }
 }
 
-pub(crate) fn msg_to_scalar<S: PixSpec>(spi: &SsaPolynomialIndex<S::Pseudonym>, msg: impl AsRef<[u8]>) -> errors::Result<Scalar<S>> {
-    Ok(<S::Curve as GroupDigest>::hash_to_scalar::<ExpandMsgXmd<Sha3_256>>(
+pub(crate) fn msg_to_scalar<S: PixSpec>(
+    spi: &SsaPolynomialIndex<S::Pseudonym>,
+    msg: impl AsRef<[u8]>,
+) -> errors::Result<Scalar<S>> {
+    Ok(<S::Curve as GroupDigest>::hash_to_scalar::<ExpandMsgXmd<S::Digest>>(
         &[
             msg.as_ref(),
             spi.pseudonym().as_ref(),
             spi.ssa_index().to_be_bytes().as_ref(),
             spi.poly_index().to_be_bytes().as_ref(),
         ],
-        &[
-            format!("{:?}_XMD:SHA3-256_SSWU_RO_", S::Curve::default()).as_bytes(),
-        ],
+        &[format!("{:?}_XMD:{:?}_SSWU_RO_", S::Curve::default(), S::Digest::default()).as_bytes()],
     )?)
 }
 
@@ -194,6 +203,7 @@ impl<S: PixSpec> SsaShareVerifier<S> {
 #[cfg(test)]
 pub(crate) mod tests {
     use anyhow::Context;
+    use hopr_types::crypto::prelude::SimplePseudonym;
     use vsss_rs::{
         ParticipantIdGeneratorType,
         elliptic_curve::{
@@ -209,6 +219,7 @@ pub(crate) mod tests {
 
     impl PixSpec for TestSpec {
         type Curve = k256::Secp256k1;
+        type Digest = sha3::Sha3_256;
         type Pseudonym = SimplePseudonym;
     }
 

@@ -11,7 +11,7 @@ use vsss_rs::{
 };
 
 use crate::{
-    Element, PartialSsaShare, PixSpec, Scalar, SsaIndex, SsaShareVerifier, SsaPolynomialIndex, errors, msg_to_scalar,
+    Element, PartialSsaShare, PixSpec, Scalar, SsaIndex, SsaPolynomialIndex, SsaShareVerifier, errors, msg_to_scalar,
 };
 
 type RawPolynomial<S> = Vec<DefaultShare<IdentifierPrimeField<Scalar<S>>, IdentifierPrimeField<Scalar<S>>>>;
@@ -93,6 +93,9 @@ pub struct SsaShareGenerator<S: PixSpec> {
     cfg: SsaGeneratorConfig,
 }
 
+/// Tuple consisting of the SSA polynomial index and an SSA share from the corresponding polynomial.
+pub type GeneratedShare<S> = (SsaPolynomialIndex<<S as PixSpec>::Pseudonym>, PartialSsaShare<S>);
+
 impl<S: PixSpec + 'static> SsaShareGenerator<S> {
     pub fn new(cfg: SsaGeneratorConfig) -> Self {
         Self {
@@ -111,7 +114,7 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
         &self,
         pseudonym: &S::Pseudonym,
         msg: impl AsRef<[u8]>,
-    ) -> errors::Result<Option<(SsaPolynomialIndex<S::Pseudonym>, PartialSsaShare<S>)>> {
+    ) -> errors::Result<Option<GeneratedShare<S>>> {
         if let Some(entry) = self.polynomials.get(pseudonym) {
             let polys = &mut entry.lock().poly_queue;
             while !polys.is_empty() {
