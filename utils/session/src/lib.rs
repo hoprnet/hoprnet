@@ -932,6 +932,31 @@ mod tests {
     }
 
     #[test]
+    fn session_target_spec_plain_roundtrip() {
+        let spec = SessionTargetSpec::Plain("localhost:8080".into());
+        let s = spec.to_string();
+        assert_eq!(s, "localhost:8080");
+        assert_eq!(SessionTargetSpec::from_str(&s).unwrap(), SessionTargetSpec::Plain("localhost:8080".into()));
+    }
+
+    #[test]
+    fn session_target_spec_sealed_roundtrip() {
+        let data = vec![0xde, 0xad, 0xbe, 0xef];
+        let spec = SessionTargetSpec::Sealed(data.clone());
+        let s = spec.to_string();
+        assert!(s.starts_with("$$"));
+        assert_eq!(SessionTargetSpec::from_str(&s).unwrap(), SessionTargetSpec::Sealed(data));
+    }
+
+    #[test]
+    fn session_target_spec_service_roundtrip() {
+        let spec = SessionTargetSpec::Service(42);
+        let s = spec.to_string();
+        assert_eq!(s, "#42");
+        assert_eq!(SessionTargetSpec::from_str(&s).unwrap(), SessionTargetSpec::Service(42));
+    }
+
+    #[test]
     fn build_binding_address() {
         let default = "10.0.0.1:10000".parse().unwrap();
 

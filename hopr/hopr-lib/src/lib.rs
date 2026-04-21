@@ -535,6 +535,28 @@ impl<Chain, Graph, Net, TMgr> HoprNodeOperations for Hopr<Chain, Graph, Net, TMg
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn component_status_returns_ready_when_running() {
+        assert_eq!(component_status(HoprState::Running, "test"), ComponentStatus::Ready);
+    }
+
+    #[test]
+    fn component_status_returns_initializing_when_not_running() {
+        let status = component_status(HoprState::Uninitialized, "network");
+        assert_eq!(status, ComponentStatus::Initializing("network not yet running".into()));
+    }
+
+    #[test]
+    fn component_status_includes_component_name_in_message() {
+        let status = component_status(HoprState::Uninitialized, "chain");
+        assert_eq!(status, ComponentStatus::Initializing("chain not yet running".into()));
+    }
+}
+
 /// Converts a PeerId to an OffchainPublicKey.
 ///
 /// This is a standalone utility function, not part of the API traits.
