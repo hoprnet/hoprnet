@@ -194,6 +194,7 @@ pub(crate) enum HoprLibProcess {
     #[strum(to_string = "transport: {0}")]
     Transport(HoprTransportProcess),
     #[strum(to_string = "session server providing the exit node session stream functionality")]
+    #[allow(dead_code)] // constructed only with feature = "session-server"
     SessionServer,
     #[strum(to_string = "subscription for on-chain channel updates")]
     ChannelEvents,
@@ -371,7 +372,7 @@ fn component_status(state: HoprState, component: &str) -> ComponentStatus {
     if state == HoprState::Running {
         ComponentStatus::Ready
     } else {
-        ComponentStatus::Initializing(format!("{component} not yet running").into())
+        ComponentStatus::Initializing(format!("{component} not yet running"))
     }
 }
 
