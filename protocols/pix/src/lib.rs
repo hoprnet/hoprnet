@@ -15,7 +15,9 @@ pub use generator::{SsaGeneratorConfig, SsaShareGenerator};
 
 /// Specification of the Protocol for Incentivization of eXits (PIX).
 pub trait PixSpec {
-    /// Scalar type used in the protocol (for polynomial coefficients)
+    /// Scalar type used in the protocol (for polynomial coefficients).
+    ///
+    /// The protocol can work only with scalars from a prime-order finite field.
     type Scalar: PrimeField;
     /// Element of a large prime order group used for commitments.
     type Element: Group<Scalar = Self::Scalar> + GroupEncoding + Default;
@@ -31,7 +33,9 @@ pub type SsaIndex = u32;
 /// Share of a polynomial used to reconstruct a portion of the Session Stealth Address (SSA).
 ///
 /// This corresponds to the `P_ij(X)` of the polynomial used to reconstruct the j-th portion of i-th SSA
-/// at some value `X`, typically the hash of the corresponding SURB.
+/// at some value `X` (of type [`PixSpec::ShareId`]).
+///
+/// The `X` value is not held by the struct, and it's the responsibility of the user to determine its correct value.
 #[derive(Clone, Copy, Default)]
 pub struct SsaPolyShare<S: PixSpec>(<<S as PixSpec>::Scalar as PrimeField>::Repr);
 

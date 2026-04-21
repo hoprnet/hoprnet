@@ -226,7 +226,6 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
 mod tests {
     use hopr_types::{crypto::types::SimplePseudonym, crypto_random::Randomizable};
     use vsss_rs::{FeldmanVerifierSet, ReadableShareSet};
-
     use super::*;
 
     pub struct TestSpec;
@@ -338,6 +337,9 @@ mod tests {
             threshold: 10,
             surplus_shares: 2,
         });
+
+        //Secp256k1::
+        //let scalar = GroupDigest::hash_to_scalar(&[b"abc"], &[b"def"]);
 
         let p = SimplePseudonym::random();
         let (_, vs) = generator.new_ssa_commitment(&p)?;
