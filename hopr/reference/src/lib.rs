@@ -201,19 +201,22 @@ where
         .with_chain_api(move |_ctx| chain_connector)
         .with_graph(move |_ctx| graph)
         .with_network(move |ctx| {
-            let multiaddresses = vec![
-                (&ctx.cfg.host)
-                    .try_into()
-                    .expect("host config must be a valid multiaddress"),
-            ];
-            let nb = HoprLibp2pNetworkBuilder::new(peer_discovery_rx);
-            futures::executor::block_on(nb.build(
-                &ctx.packet_key,
-                multiaddresses,
-                "/hopr/mix/1.1.0",
-                ctx.cfg.protocol.transport.prefer_local_addresses,
-            ))
-            .expect("network must be constructible")
+            Box::pin(async move {
+                let multiaddresses = vec![
+                    (&ctx.cfg.host)
+                        .try_into()
+                        .expect("host config must be a valid multiaddress"),
+                ];
+                let nb = HoprLibp2pNetworkBuilder::new(peer_discovery_rx);
+                nb.build(
+                    &ctx.packet_key,
+                    multiaddresses,
+                    "/hopr/mix/1.1.0",
+                    ctx.cfg.protocol.transport.prefer_local_addresses,
+                )
+                .await
+                .expect("network must be constructible")
+            })
         })
         .with_cover_traffic(move |ctx| {
             hopr_ct_full_network::FullNetworkDiscovery::new(*ctx.packet_key.public(), prober_cfg, graph_for_ct)

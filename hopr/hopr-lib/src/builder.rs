@@ -24,11 +24,11 @@
 //!     .with_config(config)
 //!     .with_chain_api(|_ctx| { /* ... */ todo!() })
 //!     .with_graph(|_ctx| { /* ... */ todo!() })
-//!     .with_network(|_ctx| { /* ... */ todo!() })
+//!     .with_network(|_ctx| Box::pin(async { /* ... */ todo!() }))
 //!     .with_cover_traffic(|_ctx| { /* ... */ todo!() });
 //! ```
 
-use std::{convert::identity, sync::Arc, time::Duration};
+use std::{convert::identity, future::Future, pin::Pin, sync::Arc, time::Duration};
 
 use futures::{FutureExt, StreamExt, channel::mpsc::channel};
 pub use hopr_api::types::crypto::{
@@ -79,8 +79,10 @@ lazy_static::lazy_static! {
 
 /// Type-erased factory closure producing `T` from a [`BuildCtx`] reference.
 type Factory<T> = Box<dyn FnOnce(&BuildCtx) -> T + Send>;
+type AsyncFactory<T> = Box<dyn FnOnce(BuildCtx) -> Pin<Box<dyn Future<Output = T> + Send>> + Send>;
 
 /// Context available to factory closures during the build step.
+#[derive(Clone)]
 pub struct BuildCtx {
     /// Node's on-chain keypair.
     pub chain_key: ChainKeypair,
@@ -152,7 +154,7 @@ pub struct HoprBuilderConfigured<Chain = (), Graph = (), Net = (), Ct = ()> {
     safe_and_module: Option<(Address, Address)>,
     chain_factory: Option<Factory<Chain>>,
     graph_factory: Option<Factory<Graph>>,
-    network_factory: Option<Factory<(Net, BoxedProcessFn)>>,
+    network_factory: Option<AsyncFactory<(Net, BoxedProcessFn)>>,
     ct_factory: Option<Factory<Ct>>,
 }
 
@@ -194,9 +196,14 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
     }
 
     /// Sets the network factory. Must return `(Net, BoxedProcessFn)`.
+    ///
+    /// The factory receives [`BuildCtx`] by value and returns a boxed future,
+    /// allowing async network construction without blocking the executor.
     pub fn with_network<NewNet>(
         self,
-        f: impl FnOnce(&BuildCtx) -> (NewNet, BoxedProcessFn) + Send + 'static,
+        f: impl FnOnce(BuildCtx) -> Pin<Box<dyn Future<Output = (NewNet, BoxedProcessFn)> + Send>>
+            + Send
+            + 'static,
     ) -> HoprBuilderConfigured<Chain, Graph, NewNet, Ct> {
         HoprBuilderConfigured {
             ctx: self.ctx,
@@ -337,7 +344,9 @@ where
         .ok_or(HoprLibError::BuilderError("missing graph factory"))?)(&ctx);
     let (network, network_process) = (configured
         .network_factory
-        .ok_or(HoprLibError::BuilderError("missing network factory"))?)(&ctx);
+        .ok_or(HoprLibError::BuilderError("missing network factory"))?)
+    (ctx.clone())
+    .await;
     let cover_traffic = (configured
         .ct_factory
         .ok_or(HoprLibError::BuilderError("missing cover traffic factory"))?)(&ctx);

@@ -596,7 +596,7 @@ where
     // TODO: add multiple client support to UDP sessions (#7370)
     let session_id = *session.id();
     clients.insert(session_id, ClientEntry {
-        sock_addr: bind_host,
+        sock_addr: bound_host,
         abort_handle: abort_handle.clone(),
         configurator,
     });
