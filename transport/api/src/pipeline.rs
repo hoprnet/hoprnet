@@ -10,14 +10,14 @@ use hopr_async_runtime::AbortableList;
 use hopr_crypto_packet::HoprSurb;
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
-use hopr_transport_protocol::{TicketEvent, run_packet_pipeline};
+use hopr_transport_protocol::run_packet_pipeline;
 
 use crate::{HoprTransportProcess, config::HoprPacketPipelineConfig};
 
 /// Contains all components required to run the HOPR packet pipeline.
 #[derive(Clone)]
 pub struct HoprPipelineComponents<TEvt, S, Chain, TFact> {
-    /// Sink for [`TicketEvents`](TicketEvent).
+    /// Sink for ticket events.
     pub ticket_events: TEvt,
     /// Store for SURBs and Reply Openers.
     pub surb_store: S,
@@ -50,7 +50,7 @@ where
         + Sync
         + 'static,
     S: SurbStore + Clone + Send + Sync + 'static,
-    TEvt: futures::Sink<TicketEvent> + Clone + Unpin + Send + 'static,
+    TEvt: futures::Sink<hopr_api::node::TicketEvent> + Clone + Unpin + Send + 'static,
     TEvt::Error: std::error::Error,
     TFact: TicketFactory + Clone + Send + Sync + 'static,
     AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,

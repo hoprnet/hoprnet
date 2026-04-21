@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use axum::{extract::State, http::status::StatusCode, response::IntoResponse};
 use hopr_lib::api::{
-    network::Health,
-    node::{HoprNodeNetworkOperations, HoprNodeOperations, state::HoprState},
+    network::{Health, NetworkView},
+    node::{HasNetworkView, HoprNodeOperations, HoprState},
 };
 
 use crate::AppState;
@@ -98,7 +98,7 @@ pub(super) async fn healthyz(State(state): State<Arc<AppState>>) -> impl IntoRes
 #[inline]
 async fn is_minimally_connected(state: Arc<AppState>) -> bool {
     matches!(
-        state.hopr.network_health().await,
+        state.hopr.network_view().health(),
         Health::Orange | Health::Yellow | Health::Green
     )
 }
@@ -109,7 +109,7 @@ async fn is_minimally_connected(state: Arc<AppState>) -> bool {
 /// Returns `false` for all other states (Uninitialized, Initializing, Indexing, Starting).
 #[inline]
 fn is_running(state: Arc<AppState>) -> bool {
-    matches!(state.hopr.status(), HoprState::Running)
+    matches!(HoprNodeOperations::status(&*state.hopr), HoprState::Running)
 }
 
 /// Evaluate a precondition and return the appropriate HTTP response.

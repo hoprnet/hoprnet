@@ -248,7 +248,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                     ack_key_prev_hop: ack_key,
                     ..
                 } = fwd_packet.as_ref();
-                let ticket = ticket.verified_ticket().clone().into_encoded();
+                let ticket = (*ticket.verified_ticket()).into_encoded();
                 out.push(PacketType::Forwarded as u8);
                 out.extend_from_slice(packet_tag);
                 out.extend_from_slice(previous_hop.as_ref());
@@ -335,12 +335,11 @@ fn inspect_ticket_data_in_packet(raw_packet: &[u8]) -> &[u8] {
     }
 }
 
-#[async_trait::async_trait]
 impl<C: PacketDecoder + Send + Sync> PacketDecoder for CapturePacketCodec<C> {
     type Error = C::Error;
 
-    async fn decode(&self, peer: PeerId, data: Box<[u8]>) -> Result<IncomingPacket, IncomingPacketError<Self::Error>> {
-        let packet = self.inner.decode(peer, data).await?;
+    fn decode(&self, peer: PeerId, data: Box<[u8]>) -> Result<IncomingPacket, IncomingPacketError<Self::Error>> {
+        let packet = self.inner.decode(peer, data)?;
 
         if let Err(error) = self.sender.clone().try_send(
             PacketBeforeTransit::IncomingPacket {
@@ -352,38 +351,34 @@ impl<C: PacketDecoder + Send + Sync> PacketDecoder for CapturePacketCodec<C> {
             tracing::debug!(%error, "failed to send incoming packet to capture");
         }
 
-        match &packet {
-            IncomingPacket::Forwarded(fwd_packet) => {
-                let IncomingForwardedPacket { next_hop, data, .. } = fwd_packet.as_ref();
+        if let IncomingPacket::Forwarded(fwd_packet) = &packet {
+            let IncomingForwardedPacket { next_hop, data, .. } = fwd_packet.as_ref();
 
-                if let Err(error) = self.sender.clone().try_send(
-                    PacketBeforeTransit::OutgoingPacket {
-                        me: self.packet_key,
-                        next_hop: *next_hop,
-                        num_surbs: 0,
-                        is_forwarded: true,
-                        data: data.as_ref().into(),
-                        ack_challenge: Default::default(),
-                        signals: None.into(),
-                        ticket: inspect_ticket_data_in_packet(data.as_ref()).into(),
-                    }
-                    .into(),
-                ) {
-                    tracing::debug!(%error, "failed to send forwarded packet to capture");
+            if let Err(error) = self.sender.clone().try_send(
+                PacketBeforeTransit::OutgoingPacket {
+                    me: self.packet_key,
+                    next_hop: *next_hop,
+                    num_surbs: 0,
+                    is_forwarded: true,
+                    data: data.as_ref().into(),
+                    ack_challenge: Default::default(),
+                    signals: None.into(),
+                    ticket: inspect_ticket_data_in_packet(data.as_ref()).into(),
                 }
+                .into(),
+            ) {
+                tracing::debug!(%error, "failed to send forwarded packet to capture");
             }
-            _ => {}
         }
 
         Ok(packet)
     }
 }
 
-#[async_trait::async_trait]
 impl<C: PacketEncoder + Send + Sync> PacketEncoder for CapturePacketCodec<C> {
     type Error = C::Error;
 
-    async fn encode_packet<T: AsRef<[u8]> + Send + 'static, S: Into<PacketSignals> + Send + 'static>(
+    fn encode_packet<T: AsRef<[u8]> + Send + 'static, S: Into<PacketSignals> + Send + 'static>(
         &self,
         data: T,
         routing: ResolvedTransportRouting<HoprSurb>,
@@ -393,7 +388,7 @@ impl<C: PacketEncoder + Send + Sync> PacketEncoder for CapturePacketCodec<C> {
         let signals = signals.into();
         let num_surbs = routing.count_return_paths() as u8;
 
-        let packet = self.inner.encode_packet(data, routing, signals).await?;
+        let packet = self.inner.encode_packet(data, routing, signals)?;
 
         if let Err(error) = self.sender.clone().try_send(
             PacketBeforeTransit::OutgoingPacket {
@@ -414,12 +409,12 @@ impl<C: PacketEncoder + Send + Sync> PacketEncoder for CapturePacketCodec<C> {
         Ok(packet)
     }
 
-    async fn encode_acknowledgements(
+    fn encode_acknowledgements(
         &self,
         acks: &[VerifiedAcknowledgement],
         destination: &OffchainPublicKey,
     ) -> Result<OutgoingPacket, Self::Error> {
-        let packet_ack = self.inner.encode_acknowledgements(acks, destination).await?;
+        let packet_ack = self.inner.encode_acknowledgements(acks, destination)?;
 
         if let Err(error) = self.sender.clone().try_send(
             PacketBeforeTransit::OutgoingAck {

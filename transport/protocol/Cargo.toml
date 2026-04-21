@@ -43,7 +43,7 @@ validator = { workspace = true }
 
 hopr-api = { workspace = true, features = ["network", "types-random"] }
 
-hopr-async-runtime = { workspace = true }
+hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 hopr-crypto-packet = { workspace = true }
 hopr-network-types = { workspace = true }
 hopr-metrics = { optional = true, workspace = true }
@@ -67,7 +67,7 @@ serial_test = { workspace = true }
 test-log = { workspace = true }
 tokio = { workspace = true }
 
-hopr-api = { workspace = true }
+hopr-api = { workspace = true, features = ["node"] }
 hopr-chain-connector = { workspace = true, features = [
   "testing",
   "runtime-tokio",

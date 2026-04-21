@@ -1,4 +1,4 @@
-use hopr_api::node::state::HoprState;
+use hopr_api::node::HoprState;
 pub use hopr_transport::errors::{HoprTransportError, ProbeError, ProtocolError};
 use thiserror::Error;
 
@@ -18,6 +18,9 @@ pub enum HoprLibError {
     #[error("HOPR lib Error: '{0}'")]
     GeneralError(String),
 
+    #[error("hopr object could not be built: {0}")]
+    BuilderError(&'static str),
+
     #[error("configuration validation failed: {0}")]
     ConfigurationError(#[from] validator::ValidationErrors),
 
@@ -30,9 +33,6 @@ pub enum HoprLibError {
     #[error(transparent)]
     TransportError(#[from] HoprTransportError),
 
-    #[error("ticket manager error: {0}")]
-    TicketManagerError(#[source] anyhow::Error),
-
     #[error(transparent)]
     TypeError(#[from] hopr_api::types::primitive::errors::GeneralError),
 
@@ -41,6 +41,9 @@ pub enum HoprLibError {
 
     #[error("rayon thread pool queue full: {0}")]
     SpawnError(#[from] hopr_parallelize::cpu::SpawnError),
+
+    #[error("ticket manager error: {0}")]
+    TicketManager(#[from] hopr_ticket_manager::TicketManagerError),
 
     #[error("unspecified error: {0}")]
     Other(#[source] anyhow::Error),
@@ -51,10 +54,6 @@ pub type Result<T> = std::result::Result<T, HoprLibError>;
 impl HoprLibError {
     pub fn chain<E: Into<anyhow::Error>>(e: E) -> Self {
         Self::ChainError(e.into())
-    }
-
-    pub fn ticket_manager<E: Into<anyhow::Error>>(e: E) -> Self {
-        Self::TicketManagerError(e.into())
     }
 
     pub fn other(e: impl Into<anyhow::Error>) -> Self {

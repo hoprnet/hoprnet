@@ -10,7 +10,10 @@ use axum::{
 };
 use hopr_lib::{
     Address, Multiaddr,
-    api::{network::Health, node::HoprNodeNetworkOperations},
+    api::{
+        network::{Health, NetworkView},
+        node::{HasChainApi, HasNetworkView, IncentiveChannelOperations},
+    },
 };
 use serde::Serialize;
 use serde_with::{DisplayFromStr, serde_as};
@@ -131,7 +134,7 @@ pub(crate) struct NodeInfoResponse {
 pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl IntoResponse, ApiError> {
     let hopr = state.hopr.clone();
 
-    let safe_config = hopr.get_safe_config();
+    let identity = hopr.identity();
 
     let provider_url = state
         .hoprd_cfg
@@ -141,13 +144,14 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
 
     match futures::try_join!(hopr.chain_info(), hopr.get_channel_closure_notice_period()) {
         Ok((info, channel_closure_notice_period)) => {
+            let listening: Vec<Multiaddr> = hopr.network_view().listening_as().into_iter().collect();
             let body = NodeInfoResponse {
-                announced_address: hopr.local_multiaddresses(),
-                listening_address: hopr.local_multiaddresses(),
+                announced_address: listening.clone(),
+                listening_address: listening,
                 provider_url: provider_url.unwrap_or("n/a").to_owned(),
                 hopr_network_name: info.hopr_network_name,
-                hopr_node_safe: safe_config.safe_address,
-                connectivity_status: hopr.network_health().await,
+                hopr_node_safe: identity.safe_address,
+                connectivity_status: hopr.network_view().health(),
                 channel_closure_period: channel_closure_notice_period.as_secs(),
             };
 

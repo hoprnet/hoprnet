@@ -5,14 +5,15 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
-use futures::FutureExt;
 use hopr_lib::{
-    Address, ChannelEntry, ChannelStatus, HoprBalance, Multiaddr,
+    Address, ChannelEntry, ChannelStatus, HoprBalance, IncentiveChannelOperations, Multiaddr,
     api::{
+        chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations},
         graph::{EdgeLinkObservable, traits::EdgeObservableRead},
-        node::HoprNodeNetworkOperations,
+        network::NetworkView,
+        node::{HasChainApi, HasNetworkView, HasTransportApi},
     },
-    errors::{HoprLibError, HoprStatusError, HoprTransportError},
+    errors::{HoprLibError, HoprTransportError},
     prelude::Hash,
 };
 use serde::{Deserialize, Serialize};
@@ -172,18 +173,24 @@ pub(super) async fn show_peer_info(
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    let peer = match hopr.chain_key_to_peerid(&address) {
-        Ok(Some(peer)) => peer,
+    let offchain_key = match hopr.chain_api().chain_key_to_packet_key(&address) {
+        Ok(Some(key)) => key,
         Ok(None) | Err(_) => return (StatusCode::NOT_FOUND, ApiErrorStatus::PeerNotFound).into_response(),
     };
+    let peer: hopr_lib::api::PeerId = offchain_key.into();
 
     // 1. Multiaddresses (announced + observed)
-    let res = futures::try_join!(
-        hopr.multiaddresses_announced_on_chain(&peer),
-        hopr.network_observed_multiaddresses(&peer).map(Ok)
-    );
-    let (announced, observed) = match res {
-        Ok(v) => v,
+    use futures::StreamExt;
+    let announced: Vec<Multiaddr> = match hopr.chain_api().stream_accounts(AccountSelector {
+        offchain_key: Some(offchain_key),
+        ..Default::default()
+    }) {
+        Ok(stream) => {
+            stream
+                .flat_map(|account| futures::stream::iter(account.get_multiaddrs().to_vec()))
+                .collect()
+                .await
+        }
         Err(error) => {
             return (
                 StatusCode::UNPROCESSABLE_ENTITY,
@@ -192,6 +199,12 @@ pub(super) async fn show_peer_info(
                 .into_response();
         }
     };
+
+    let observed: Vec<Multiaddr> = hopr
+        .network_view()
+        .multiaddress_of(&peer)
+        .map(|set| set.into_iter().collect())
+        .unwrap_or_default();
 
     let announced_sources = to_announced_sources(announced);
 
@@ -207,7 +220,7 @@ pub(super) async fn show_peer_info(
                 continue;
             }
             // Resolve this edge's destination to an on-chain address
-            let addr = match hopr.peerid_to_chain_key(&(*dst).into()) {
+            let addr = match hopr.chain_api().packet_key_to_chain_key(dst) {
                 Ok(Some(a)) => a,
                 _ => continue,
             };
@@ -228,9 +241,9 @@ pub(super) async fn show_peer_info(
     };
 
     // 3. Channel state
-    let me = hopr.me_onchain();
-    let outgoing_channel = channel_entry_to_peer_info(hopr.channel(&me, &address));
-    let incoming_channel = channel_entry_to_peer_info(hopr.channel(&address, &me));
+    let me = hopr.identity().node_address;
+    let outgoing_channel = channel_entry_to_peer_info(hopr.channel(me, address).map_err(HoprLibError::chain));
+    let incoming_channel = channel_entry_to_peer_info(hopr.channel(address, me).map_err(HoprLibError::chain));
 
     (
         StatusCode::OK,
@@ -289,31 +302,40 @@ pub(super) async fn ping_peer(
 
     let hopr = state.hopr.clone();
 
-    match hopr.chain_key_to_peerid(&address) {
-        Ok(Some(peer)) => match hopr.ping(&peer).await {
-            Ok((latency, _status)) => {
-                let resp = Json(PingResponse { latency: latency / 2 });
-                Ok((StatusCode::OK, resp).into_response())
-            }
-            Err(HoprLibError::TransportError(HoprTransportError::Protocol(
-                hopr_lib::errors::ProtocolError::Timeout,
-            ))) => Ok((StatusCode::REQUEST_TIMEOUT, ApiErrorStatus::Timeout).into_response()),
-            Err(HoprLibError::TransportError(HoprTransportError::Probe(hopr_lib::ProbeError::TrafficError(_)))) => {
-                Ok((StatusCode::REQUEST_TIMEOUT, ApiErrorStatus::Timeout).into_response())
-            }
-            Err(HoprLibError::TransportError(HoprTransportError::Probe(hopr_lib::ProbeError::PingerError(e)))) => {
-                Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::PingError(e)).into_response())
-            }
-            Err(HoprLibError::TransportError(HoprTransportError::Probe(hopr_lib::ProbeError::NonExistingPeer))) => {
-                Ok((StatusCode::NOT_FOUND, ApiErrorStatus::PeerNotFound).into_response())
-            }
-            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
-                Ok((StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response())
-            }
-            Err(e) => Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response()),
-        },
-        Ok(None) => Ok((StatusCode::NOT_FOUND, ApiErrorStatus::PeerNotFound).into_response()),
-        Err(_) => Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::PeerNotFound).into_response()),
+    let offchain_key = match hopr.chain_api().chain_key_to_packet_key(&address) {
+        Ok(Some(key)) => key,
+        Ok(None) => return Ok((StatusCode::NOT_FOUND, ApiErrorStatus::PeerNotFound).into_response()),
+        Err(e) => {
+            return Ok((
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ApiErrorStatus::UnknownFailure(e.to_string()),
+            )
+                .into_response());
+        }
+    };
+
+    match hopr.transport().ping(&offchain_key).await {
+        Ok((latency, _status)) => {
+            let resp = Json(PingResponse { latency: latency / 2 });
+            Ok((StatusCode::OK, resp).into_response())
+        }
+        Err(HoprTransportError::Protocol(hopr_lib::errors::ProtocolError::Timeout)) => {
+            Ok((StatusCode::REQUEST_TIMEOUT, ApiErrorStatus::Timeout).into_response())
+        }
+        Err(HoprTransportError::Probe(hopr_lib::ProbeError::TrafficError(_))) => {
+            Ok((StatusCode::REQUEST_TIMEOUT, ApiErrorStatus::Timeout).into_response())
+        }
+        Err(HoprTransportError::Probe(hopr_lib::ProbeError::PingerError(e))) => {
+            Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::PingError(e)).into_response())
+        }
+        Err(HoprTransportError::Probe(hopr_lib::ProbeError::NonExistingPeer)) => {
+            Ok((StatusCode::NOT_FOUND, ApiErrorStatus::PeerNotFound).into_response())
+        }
+        Err(e) => Ok((
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ApiErrorStatus::UnknownFailure(e.to_string()),
+        )
+            .into_response()),
     }
 }
 

@@ -111,7 +111,7 @@ hopr-lib = { workspace = true, features = [
 hopr-utils-session = { workspace = true }
 hoprd-api = { workspace = true, features = ["telemetry"] }
 # impls
-hopr-builder = { workspace = true, features = [
+hopr-reference = { workspace = true, features = [
   "runtime-tokio",
   "session-client",
   "session-server",

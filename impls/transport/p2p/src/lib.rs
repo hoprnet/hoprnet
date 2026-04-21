@@ -63,6 +63,7 @@ pub struct HoprNetwork {
     store: Arc<crate::peer_store::NetworkPeerStore>,
     control: libp2p_stream::Control,
     protocol: libp2p::StreamProtocol,
+    event_rx: async_broadcast::InactiveReceiver<hopr_api::network::NetworkEvent>,
 }
 
 impl std::fmt::Debug for HoprNetwork {
@@ -109,6 +110,12 @@ impl NetworkView for HoprNetwork {
             2..4 => Health::Yellow,
             _ => Health::Green,
         }
+    }
+
+    fn subscribe_network_events(
+        &self,
+    ) -> impl futures::Stream<Item = hopr_api::network::NetworkEvent> + Send + 'static {
+        self.event_rx.clone().activate()
     }
 }
 

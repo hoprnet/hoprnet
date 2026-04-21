@@ -333,7 +333,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use hopr_api::{tickets::TicketFactory, types::crypto::prelude::Keypair};
+    use hopr_api::{
+        tickets::{TicketFactory, TicketManagement},
+        types::crypto::prelude::Keypair,
+    };
     use hopr_chain_connector::ChainKeypair;
 
     use super::*;

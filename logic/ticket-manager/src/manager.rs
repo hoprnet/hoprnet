@@ -29,8 +29,8 @@ use crate::{
 ///
 /// ### Usage in incoming packet pipeline
 /// The incoming packet pipeline usually just calls the
-/// [`insert_incoming_ticket`](HoprTicketManager::insert_incoming_ticket) whenever a new winning, redeemable ticket is
-/// received on an incoming channel.
+/// [`insert_incoming_ticket`](hopr_api::tickets::TicketManagement::insert_incoming_ticket) whenever a new winning,
+/// redeemable ticket is received on an incoming channel.
 ///
 /// ### Redeemable ticket extraction
 /// On Relay nodes, the manager maintains FIFO queues of redeemable tickets per incoming channel.
@@ -49,7 +49,7 @@ use crate::{
 /// in the highly performance-sensitive code, on a per-packet basis.
 ///
 /// ### Incoming winning ticket retrieval
-/// The [`insert_incoming_ticket`](HoprTicketManager::insert_incoming_ticket) method is designed to be
+/// The [`insert_incoming_ticket`](hopr_api::tickets::TicketManagement::insert_incoming_ticket) method is designed to be
 /// high-performance and to be called per each incoming packet **after** it has been forwarded to a next hop.
 ///
 /// This operation acquires the write-part of an RW lock (per incoming channel).
@@ -222,75 +222,6 @@ where
     /// the queue. This situation can happen when unredeemed tickets are left in the queue, while the corresponding
     /// channel restarts its lifecycle and a new winning ticket is received.
     /// Otherwise, the returned vector is empty.
-    pub fn insert_incoming_ticket(&self, ticket: RedeemableTicket) -> Result<Vec<VerifiedTicket>, TicketManagerError> {
-        // Do not allocate, because neglecting tickets is a rare operation
-        let mut neglected_tickets = Vec::with_capacity(0);
-
-        let ticket_id = ticket.ticket_id();
-        match self.channel_tickets.0.entry(ticket_id.id) {
-            dashmap::Entry::Occupied(e) => {
-                // High contention on this write lock is possible only when massive numbers of winning tickets
-                // on the same channel are received, or if tickets on the same channel are being
-                // rapidly redeemed or neglected.
-                // Such a scenario is likely not realistic.
-                let mut queue = e.get().queue.write();
-
-                // If the next ticket ready in this queue is from a previous epoch, we must
-                // drain and neglect all the tickets from the queue. The channel has
-                // apparently restarted its lifecycle, and all the tickets from previous epochs
-                // are unredeemable already
-                if let Some(last_ticket) = queue.0.peek().map_err(TicketManagerError::store)? {
-                    if last_ticket.verified_ticket().channel_epoch < ticket.verified_ticket().channel_epoch {
-                        // Count the neglected value and add it to stats
-                        let mut neg = queue.0.drain().map_err(TicketManagerError::store)?;
-                        queue.1.neglected_value += neg.iter().map(|t| t.verified_ticket().amount).sum::<HoprBalance>();
-
-                        // Ensures allocation according to the number of drained tickets
-                        neglected_tickets.append(&mut neg);
-                        tracing::warn!(%ticket_id, num_neglected = neglected_tickets.len(), "winning ticket has neglected unredeemed tickets from previous epochs");
-                    } else if last_ticket.verified_ticket().channel_epoch > ticket.verified_ticket().channel_epoch {
-                        tracing::warn!(%ticket_id, "tried to insert incoming ticket from an older epoch");
-
-                        queue.1.winning_tickets += 1; // Still count the ticket as winning
-                        queue.1.neglected_value += ticket.verified_ticket().amount;
-                        neglected_tickets.push(ticket.ticket);
-                        return Ok(neglected_tickets);
-                    }
-                }
-                queue.0.push(ticket).map_err(TicketManagerError::store)?;
-                queue.1.winning_tickets += 1;
-
-                tracing::debug!(%ticket_id, "winning ticket on channel");
-            }
-            dashmap::Entry::Vacant(v) => {
-                // A hypothetical chance of high contention on this write lock is
-                // only possible when massive numbers of winning tickets on new unique channels are received.
-                // Such a scenario is likely not realistic.
-                let mut store = self.store.write();
-
-                let queue = store
-                    .open_or_create_queue(&ticket.ticket_id().id)
-                    .map_err(TicketManagerError::store)?;
-
-                // Wrap the queue with a ticket value cache adapter
-                let mut queue = ValueCachedQueue::new(queue).map_err(TicketManagerError::store)?;
-
-                // Should not happen: it suggests the queue has been modified outside the manager
-                if !queue.is_empty().map_err(TicketManagerError::store)? {
-                    return Err(TicketManagerError::Other(anyhow::anyhow!(
-                        "fatal error: queue not empty"
-                    )));
-                }
-
-                queue.push(ticket).map_err(TicketManagerError::store)?;
-                v.insert(queue.into()); // The ticket is accounted for in the stats automatically
-                tracing::debug!(%ticket_id, "first winning ticket on channel");
-            }
-        }
-
-        Ok(neglected_tickets)
-    }
-
     /// Returns the total value of unredeemed tickets in the given channel and its latest epoch.
     ///
     /// NOTE: The function is less efficient when the `min_index` is specified, as
@@ -509,6 +440,75 @@ where
                     neglected_value: queue.1.neglected_value + stats.neglected_value,
                 })
             })
+    }
+
+    fn insert_incoming_ticket(&self, ticket: RedeemableTicket) -> Result<Vec<VerifiedTicket>, TicketManagerError> {
+        // Do not allocate, because neglecting tickets is a rare operation
+        let mut neglected_tickets = Vec::with_capacity(0);
+
+        let ticket_id = ticket.ticket_id();
+        match self.channel_tickets.0.entry(ticket_id.id) {
+            dashmap::Entry::Occupied(e) => {
+                // High contention on this write lock is possible only when massive numbers of winning tickets
+                // on the same channel are received, or if tickets on the same channel are being
+                // rapidly redeemed or neglected.
+                // Such a scenario is likely not realistic.
+                let mut queue = e.get().queue.write();
+
+                // If the next ticket ready in this queue is from a previous epoch, we must
+                // drain and neglect all the tickets from the queue. The channel has
+                // apparently restarted its lifecycle, and all the tickets from previous epochs
+                // are unredeemable already
+                if let Some(last_ticket) = queue.0.peek().map_err(TicketManagerError::store)? {
+                    if last_ticket.verified_ticket().channel_epoch < ticket.verified_ticket().channel_epoch {
+                        // Count the neglected value and add it to stats
+                        let mut neg = queue.0.drain().map_err(TicketManagerError::store)?;
+                        queue.1.neglected_value += neg.iter().map(|t| t.verified_ticket().amount).sum::<HoprBalance>();
+
+                        // Ensures allocation according to the number of drained tickets
+                        neglected_tickets.append(&mut neg);
+                        tracing::warn!(%ticket_id, num_neglected = neglected_tickets.len(), "winning ticket has neglected unredeemed tickets from previous epochs");
+                    } else if last_ticket.verified_ticket().channel_epoch > ticket.verified_ticket().channel_epoch {
+                        tracing::warn!(%ticket_id, "tried to insert incoming ticket from an older epoch");
+
+                        queue.1.winning_tickets += 1; // Still count the ticket as winning
+                        queue.1.neglected_value += ticket.verified_ticket().amount;
+                        neglected_tickets.push(ticket.ticket);
+                        return Ok(neglected_tickets);
+                    }
+                }
+                queue.0.push(ticket).map_err(TicketManagerError::store)?;
+                queue.1.winning_tickets += 1;
+
+                tracing::debug!(%ticket_id, "winning ticket on channel");
+            }
+            dashmap::Entry::Vacant(v) => {
+                // A hypothetical chance of high contention on this write lock is
+                // only possible when massive numbers of winning tickets on new unique channels are received.
+                // Such a scenario is likely not realistic.
+                let mut store = self.store.write();
+
+                let queue = store
+                    .open_or_create_queue(&ticket.ticket_id().id)
+                    .map_err(TicketManagerError::store)?;
+
+                // Wrap the queue with a ticket value cache adapter
+                let mut queue = ValueCachedQueue::new(queue).map_err(TicketManagerError::store)?;
+
+                // Should not happen: it suggests the queue has been modified outside the manager
+                if !queue.is_empty().map_err(TicketManagerError::store)? {
+                    return Err(TicketManagerError::Other(anyhow::anyhow!(
+                        "fatal error: queue not empty"
+                    )));
+                }
+
+                queue.push(ticket).map_err(TicketManagerError::store)?;
+                v.insert(queue.into()); // The ticket is accounted for in the stats automatically
+                tracing::debug!(%ticket_id, "first winning ticket on channel");
+            }
+        }
+
+        Ok(neglected_tickets)
     }
 }
 

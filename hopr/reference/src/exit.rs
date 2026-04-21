@@ -57,12 +57,15 @@ impl HoprServerIpForwardingReactor {
 pub const SERVICE_ID_LOOPBACK: ServiceId = 0;
 
 #[async_trait::async_trait]
-impl hopr_lib::traits::session::HoprSessionServer for HoprServerIpForwardingReactor {
+impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
+    type Error = hopr_lib::errors::HoprLibError;
+    type Session = hopr_lib::exports::transport::IncomingSession;
+
     #[tracing::instrument(level = "debug", skip(self, session))]
     async fn process(
         &self,
         mut session: hopr_lib::exports::transport::IncomingSession,
-    ) -> hopr_lib::errors::Result<()> {
+    ) -> Result<(), hopr_lib::errors::HoprLibError> {
         let session_id = *session.session.id();
         match session.target {
             hopr_lib::SessionTarget::UdpStream(udp_target) => {

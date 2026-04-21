@@ -27,8 +27,9 @@ use hopr_api::{
 };
 use hopr_async_runtime::Abortable;
 use hopr_lib::{
-    Address, Hopr, HoprSession, HoprSessionClientConfig, NetworkView, OffchainPublicKey, RoutingOptions, SURB_SIZE,
-    ServiceId, SessionId, SessionTarget, errors::HoprLibError, transfer_session,
+    Address, Hopr, HoprSession, HoprSessionClientConfig, HoprSessionClientOperations, HoprSessionConfigurator,
+    NetworkView, OffchainPublicKey, RoutingOptions, SURB_SIZE, ServiceId, SessionId, SessionTarget,
+    errors::HoprLibError, transfer_session,
 };
 use hopr_network_types::{
     prelude::{ConnectedUdpStream, IpOrHost, IpProtocol, SealedHost, UdpStreamParallelism},
@@ -119,6 +120,17 @@ impl SessionTargetSpec {
     }
 }
 
+/// A single client connected to a session listener.
+#[derive(Debug)]
+pub struct ClientEntry {
+    /// The socket address of the connected client.
+    pub sock_addr: SocketAddr,
+    /// The abort handle for the client's session processing task.
+    pub abort_handle: AbortHandle,
+    /// The per-session configurator.
+    pub configurator: HoprSessionConfigurator,
+}
+
 /// Entry stored in the session registry table.
 #[derive(Debug)]
 pub struct StoredSessionEntry {
@@ -142,11 +154,11 @@ pub struct StoredSessionEntry {
     /// The abort handle for the Session processing.
     pub abort_handle: AbortHandle,
 
-    clients: Arc<DashMap<SessionId, (SocketAddr, AbortHandle)>>,
+    clients: Arc<DashMap<SessionId, ClientEntry>>,
 }
 
 impl StoredSessionEntry {
-    pub fn get_clients(&self) -> &Arc<DashMap<SessionId, (SocketAddr, AbortHandle)>> {
+    pub fn get_clients(&self) -> &Arc<DashMap<SessionId, ClientEntry>> {
         &self.clients
     }
 }
@@ -191,6 +203,19 @@ impl std::fmt::Display for ListenerId {
 #[derive(Default)]
 pub struct ListenerJoinHandles(pub DashMap<ListenerId, StoredSessionEntry>);
 
+impl ListenerJoinHandles {
+    /// Finds the [`HoprSessionConfigurator`] for the given session ID across all listeners.
+    pub fn find_configurator(&self, session_id: &SessionId) -> Option<HoprSessionConfigurator> {
+        self.0.iter().find_map(|entry| {
+            entry
+                .value()
+                .get_clients()
+                .get(session_id)
+                .map(|client| client.value().configurator.clone())
+        })
+    }
+}
+
 impl Abortable for ListenerJoinHandles {
     fn abort_task(&self) {
         self.0.alter_all(|_, v| {
@@ -204,20 +229,22 @@ impl Abortable for ListenerJoinHandles {
     }
 }
 
+type SessionPoolInner = Arc<parking_lot::Mutex<VecDeque<(HoprSession, HoprSessionConfigurator)>>>;
+
 pub struct SessionPool {
-    pool: Option<Arc<parking_lot::Mutex<VecDeque<HoprSession>>>>,
+    pool: Option<SessionPoolInner>,
     ah: Option<AbortHandle>,
 }
 
 impl SessionPool {
     pub const MAX_SESSION_POOL_SIZE: usize = 5;
 
-    pub async fn new<Chain, Graph, Net>(
+    pub async fn new<Chain, Graph, Net, TMgr>(
         size: usize,
         dst: Address,
         target: SessionTarget,
         cfg: HoprSessionClientConfig,
-        hopr: Arc<Hopr<Chain, Graph, Net>>,
+        hopr: Arc<Hopr<Chain, Graph, Net, TMgr>>,
     ) -> Result<Self, anyhow::Error>
     where
         Chain: HoprChainApi + Clone + Send + Sync + 'static,
@@ -232,6 +259,7 @@ impl SessionPool {
         <Graph as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
         <Graph as NetworkGraphWrite>::Observed: EdgeObservableWrite + Send,
         Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
+        TMgr: Send + Sync + 'static,
     {
         let pool = Arc::new(parking_lot::Mutex::new(VecDeque::with_capacity(size)));
         let hopr_clone = hopr.clone();
@@ -245,9 +273,9 @@ impl SessionPool {
                 let cfg = cfg.clone();
                 async move {
                     match hopr.connect_to(dst, target.clone(), cfg.clone()).await {
-                        Ok(s) => {
-                            debug!(session_id = %s.id(), num_session = i, "created a new session in pool");
-                            pool.lock().push_back(s);
+                        Ok((session, configurator)) => {
+                            debug!(session_id = %session.id(), num_session = i, "created a new session in pool");
+                            pool.lock().push_back((session, configurator));
                             Ok(())
                         }
                         Err(error) => {
@@ -263,7 +291,6 @@ impl SessionPool {
         if !pool.lock().is_empty() {
             let pool_clone_1 = pool.clone();
             let pool_clone_2 = pool.clone();
-            let pool_clone_3 = pool.clone();
             Ok(Self {
                 pool: Some(pool),
                 ah: Some(hopr_async_runtime::spawn_as_abortable!(
@@ -274,30 +301,34 @@ impl SessionPool {
                         // Continue the infinite interval stream until there are sessions in the pool
                         futures::future::ready(!pool_clone_1.lock().is_empty())
                     })
-                    .flat_map(move |_| {
-                        // Get all SessionIds of the remaining Sessions in the pool
-                        let ids = pool_clone_2.lock().iter().map(|s| *s.id()).collect::<Vec<_>>();
-                        futures::stream::iter(ids)
-                    })
-                    .for_each(move |id| {
-                        let hopr = hopr.clone();
-                        let pool = pool_clone_3.clone();
+                    .for_each(move |_| {
+                        let pool = pool_clone_2.clone();
                         async move {
-                            // Make sure the Session is still alive, otherwise remove it from the pool
-                            if let Err(error) = hopr.keep_alive_session(&id).await {
-                                error!(%error, %dst, session_id = %id, "session in pool is not alive, removing from pool");
-                                pool.lock().retain(|s| *s.id() != id);
+                            // Collect configurators to ping (release lock before awaiting)
+                            let configurators: Vec<_> = pool.lock().iter().map(|(_, cfg)| cfg.clone()).collect();
+
+                            let mut dead_ids = Vec::new();
+                            for configurator in &configurators {
+                                if let Err(error) = configurator.ping().await {
+                                    let id = *configurator.id();
+                                    error!(%error, session_id = %id, "session in pool is not alive, will remove");
+                                    dead_ids.push(id);
+                                }
+                            }
+
+                            if !dead_ids.is_empty() {
+                                pool.lock().retain(|(_, cfg)| !dead_ids.contains(cfg.id()));
                             }
                         }
                     })
-                ))
+                )),
             })
         } else {
             Ok(Self { pool: None, ah: None })
         }
     }
 
-    pub fn pop(&mut self) -> Option<HoprSession> {
+    pub fn pop(&mut self) -> Option<(HoprSession, HoprSessionConfigurator)> {
         self.pool.as_ref().and_then(|pool| pool.lock().pop_front())
     }
 }
@@ -311,10 +342,10 @@ impl Drop for SessionPool {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn create_tcp_client_binding<Chain, Graph, Net>(
+pub async fn create_tcp_client_binding<Chain, Graph, Net, TMgr>(
     bind_host: std::net::SocketAddr,
     port_range: Option<String>,
-    hopr: Arc<Hopr<Chain, Graph, Net>>,
+    hopr: Arc<Hopr<Chain, Graph, Net, TMgr>>,
     open_listeners: Arc<ListenerJoinHandles>,
     destination: Address,
     target_spec: SessionTargetSpec,
@@ -335,6 +366,7 @@ where
     <Graph as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
     <Graph as NetworkGraphWrite>::Observed: EdgeObservableWrite + Send,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
+    TMgr: Send + Sync + 'static,
 {
     // Bind the TCP socket first
     let (bound_host, tcp_listener) = tcp_listen_on(bind_host, port_range).await.map_err(|e| {
@@ -388,7 +420,7 @@ where
                 let active_sessions = active_sessions_clone_2.clone();
 
                 // Try to pop from the pool only if a client was accepted
-                let maybe_pooled_session = accepted_client.is_ok().then(|| session_pool.pop()).flatten();
+                let maybe_pooled = accepted_client.is_ok().then(|| session_pool.pop()).flatten();
                 async move {
                     match accepted_client {
                         Ok((sock_addr, mut stream)) => {
@@ -406,15 +438,15 @@ where
                             }
 
                             // See if we still have some session pooled
-                            let session = match maybe_pooled_session {
-                                Some(s) => {
+                            let (session, configurator) = match maybe_pooled {
+                                Some((s, c)) => {
                                     debug!(session_id = %s.id(), "using pooled session");
-                                    s
+                                    (s, c)
                                 }
                                 None => {
                                     debug!("no more active sessions in the pool, creating a new one");
                                     match hopr.connect_to(destination, target, data).await {
-                                        Ok(s) => s,
+                                        Ok((s, c)) => (s, c),
                                         Err(error) => {
                                             error!(%error, "failed to establish session");
                                             return;
@@ -427,7 +459,14 @@ where
                             debug!(?sock_addr, %session_id, "new session for incoming TCP connection");
 
                             let (abort_handle, abort_reg) = AbortHandle::new_pair();
-                            active_sessions.insert(session_id, (sock_addr, abort_handle));
+                            active_sessions.insert(
+                                session_id,
+                                ClientEntry {
+                                    sock_addr,
+                                    abort_handle,
+                                    configurator,
+                                },
+                            );
 
                             #[cfg(all(feature = "telemetry", not(test)))]
                             METRIC_ACTIVE_CLIENTS.increment(&["tcp"], 1.0);
@@ -457,9 +496,9 @@ where
 
         // Once the listener is done, abort all active sessions created by the listener
         active_sessions_clone.iter().for_each(|entry| {
-            let (sock_addr, handle) = entry.value();
-            debug!(session_id = %entry.key(), ?sock_addr, "aborting opened TCP session after listener has been closed");
-            handle.abort()
+            let client = entry.value();
+            debug!(session_id = %entry.key(), sock_addr = ?client.sock_addr, "aborting opened TCP session after listener has been closed");
+            client.abort_handle.abort()
         });
     });
 
@@ -494,10 +533,10 @@ pub enum BindError {
     UnknownFailure(String),
 }
 
-pub async fn create_udp_client_binding<Chain, Graph, Net>(
+pub async fn create_udp_client_binding<Chain, Graph, Net, TMgr>(
     bind_host: std::net::SocketAddr,
     port_range: Option<String>,
-    hopr: Arc<Hopr<Chain, Graph, Net>>,
+    hopr: Arc<Hopr<Chain, Graph, Net, TMgr>>,
     open_listeners: Arc<ListenerJoinHandles>,
     destination: Address,
     target_spec: SessionTargetSpec,
@@ -516,6 +555,7 @@ where
     <Graph as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
     <Graph as NetworkGraphWrite>::Observed: EdgeObservableWrite + Send,
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
+    TMgr: Send + Sync + 'static,
 {
     // Bind the UDP socket first
     let (bound_host, udp_socket) = udp_bind_to(bind_host, port_range).await.map_err(|e| {
@@ -534,7 +574,7 @@ where
         .map_err(|e| BindError::UnknownFailure(e.to_string()))?;
 
     // Create a single session for the UDP socket
-    let session = hopr
+    let (session, configurator) = hopr
         .connect_to(destination, target, config.clone())
         .await
         .map_err(|e| BindError::UnknownFailure(e.to_string()))?;
@@ -558,7 +598,14 @@ where
 
     // TODO: add multiple client support to UDP sessions (#7370)
     let session_id = *session.id();
-    clients.insert(session_id, (bind_host, abort_handle.clone()));
+    clients.insert(
+        session_id,
+        ClientEntry {
+            sock_addr: bound_host,
+            abort_handle: abort_handle.clone(),
+            configurator,
+        },
+    );
     hopr_async_runtime::prelude::spawn(async move {
         #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_ACTIVE_CLIENTS.increment(&["udp"], 1.0);
@@ -848,6 +895,77 @@ mod tests {
         jh.timeout(futures_time::time::Duration::from_millis(200)).await??;
 
         Ok(())
+    }
+
+    fn stub_stored_entry() -> StoredSessionEntry {
+        let (abort_handle, _) = AbortHandle::new_pair();
+        StoredSessionEntry {
+            destination: Address::default(),
+            target: SessionTargetSpec::Plain("localhost:8080".into()),
+            forward_path: RoutingOptions::Hops(Default::default()),
+            return_path: RoutingOptions::Hops(Default::default()),
+            max_client_sessions: 5,
+            max_surb_upstream: None,
+            response_buffer: None,
+            session_pool: None,
+            abort_handle,
+            clients: Arc::new(DashMap::new()),
+        }
+    }
+
+    #[test]
+    fn find_configurator_should_return_none_when_no_listeners() {
+        let handles = ListenerJoinHandles::default();
+        let session_id = SessionId::new(1234u64, HoprPseudonym::random());
+        assert!(handles.find_configurator(&session_id).is_none());
+    }
+
+    #[test]
+    fn find_configurator_should_return_none_when_session_not_tracked() {
+        let handles = ListenerJoinHandles::default();
+        let listener_id = ListenerId(IpProtocol::TCP, "127.0.0.1:9091".parse().unwrap());
+        handles.0.insert(listener_id, stub_stored_entry());
+
+        let session_id = SessionId::new(5678u64, HoprPseudonym::random());
+        assert!(handles.find_configurator(&session_id).is_none());
+    }
+
+    #[test]
+    fn stored_session_entry_clients_should_start_empty() {
+        let entry = stub_stored_entry();
+        assert!(entry.get_clients().is_empty());
+        assert_eq!(entry.max_client_sessions, 5);
+    }
+
+    #[test]
+    fn session_target_spec_plain_roundtrip() {
+        let spec = SessionTargetSpec::Plain("localhost:8080".into());
+        let s = spec.to_string();
+        assert_eq!(s, "localhost:8080");
+        assert_eq!(
+            SessionTargetSpec::from_str(&s).unwrap(),
+            SessionTargetSpec::Plain("localhost:8080".into())
+        );
+    }
+
+    #[test]
+    fn session_target_spec_sealed_roundtrip() {
+        let data = vec![0xde, 0xad, 0xbe, 0xef];
+        let spec = SessionTargetSpec::Sealed(data.clone());
+        let s = spec.to_string();
+        assert!(s.starts_with("$$"));
+        assert_eq!(
+            SessionTargetSpec::from_str(&s).unwrap(),
+            SessionTargetSpec::Sealed(data)
+        );
+    }
+
+    #[test]
+    fn session_target_spec_service_roundtrip() {
+        let spec = SessionTargetSpec::Service(42);
+        let s = spec.to_string();
+        assert_eq!(s, "#42");
+        assert_eq!(SessionTargetSpec::from_str(&s).unwrap(), SessionTargetSpec::Service(42));
     }
 
     #[test]

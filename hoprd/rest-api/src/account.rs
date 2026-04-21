@@ -7,7 +7,7 @@ use axum::{
 };
 use hopr_lib::{
     Address, HoprBalance, WxHOPR, XDai, XDaiBalance,
-    errors::{HoprLibError, HoprStatusError},
+    api::node::{HasChainApi, IncentiveChannelOperations},
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
@@ -42,7 +42,7 @@ pub(crate) struct AccountAddressesResponse {
     )]
 pub(super) async fn addresses(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
     let addresses = AccountAddressesResponse {
-        native: state.hopr.me_onchain().to_checksum(),
+        native: state.hopr.identity().node_address.to_checksum(),
     };
 
     (StatusCode::OK, Json(addresses)).into_response()
@@ -185,26 +185,41 @@ pub(super) async fn withdraw(
     State(state): State<Arc<InternalState>>,
     Json(req_data): Json<WithdrawBodyRequest>,
 ) -> impl IntoResponse {
-    let res = if let Ok(native) = XDaiBalance::from_str(&req_data.amount) {
-        state.hopr.withdraw_native(req_data.address, native).await
-    } else if let Ok(hopr) = HoprBalance::from_str(&req_data.amount) {
-        state.hopr.withdraw_tokens(req_data.address, hopr).await
-    } else {
-        Err(HoprLibError::GeneralError("invalid currency".into()))
-    };
-
-    match res {
-        Ok(receipt) => (
-            StatusCode::OK,
-            Json(WithdrawResponse {
-                receipt: receipt.to_string(),
-            }),
-        )
-            .into_response(),
-        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
-            (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
+    if let Ok(native) = XDaiBalance::from_str(&req_data.amount) {
+        match state.hopr.withdraw(&req_data.address, native).await {
+            Ok(output) => (
+                StatusCode::OK,
+                Json(WithdrawResponse {
+                    receipt: output.tx_hash().to_string(),
+                }),
+            )
+                .into_response(),
+            Err(e) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ApiErrorStatus::UnknownFailure(e.to_string()),
+            )
+                .into_response(),
         }
-
-        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+    } else if let Ok(hopr) = HoprBalance::from_str(&req_data.amount) {
+        match state.hopr.withdraw(&req_data.address, hopr).await {
+            Ok(output) => (
+                StatusCode::OK,
+                Json(WithdrawResponse {
+                    receipt: output.tx_hash().to_string(),
+                }),
+            )
+                .into_response(),
+            Err(e) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ApiErrorStatus::UnknownFailure(e.to_string()),
+            )
+                .into_response(),
+        }
+    } else {
+        (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ApiErrorStatus::UnknownFailure("invalid currency".into()),
+        )
+            .into_response()
     }
 }

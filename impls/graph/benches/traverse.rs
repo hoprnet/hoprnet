@@ -5,7 +5,7 @@ use hopr_api::{
     OffchainKeypair, OffchainPublicKey,
     graph::{
         NetworkGraphTraverse, NetworkGraphWrite,
-        costs::EdgeCostFn,
+        function::EdgeValueFn,
         traits::{EdgeObservableWrite, EdgeWeightType},
     },
     types::crypto::prelude::Keypair,
@@ -126,7 +126,7 @@ fn bench_simple_paths(c: &mut Criterion) {
                         black_box(dst_2edge),
                         2,
                         Some(10),
-                        EdgeCostFn::forward(
+                        EdgeValueFn::forward(
                             std::num::NonZeroUsize::new(2).expect("is greater than 1"),
                             DEFAULT_EDGE_PENALTY,
                             DEFAULT_MIN_ACK_RATE,
@@ -142,7 +142,7 @@ fn bench_simple_paths(c: &mut Criterion) {
                         black_box(dst_3edge),
                         3,
                         Some(10),
-                        EdgeCostFn::forward(
+                        EdgeValueFn::forward(
                             std::num::NonZeroUsize::new(3).expect("is greater than 1"),
                             DEFAULT_EDGE_PENALTY,
                             DEFAULT_MIN_ACK_RATE,
@@ -158,7 +158,7 @@ fn bench_simple_paths(c: &mut Criterion) {
                         black_box(dst_4edge),
                         4,
                         Some(10),
-                        EdgeCostFn::forward(
+                        EdgeValueFn::forward(
                             std::num::NonZeroUsize::new(4).expect("is greater than 1"),
                             DEFAULT_EDGE_PENALTY,
                             DEFAULT_MIN_ACK_RATE,

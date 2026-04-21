@@ -196,6 +196,10 @@ impl ChainValues for StubChain {
             redeemed_value: HoprBalance::zero(),
         })
     }
+
+    async fn typical_resolution_time(&self) -> Result<Duration, Self::Error> {
+        Ok(Duration::from_secs(30))
+    }
 }
 
 /// Stub network view satisfying `Net` trait bounds (never used before `run()`).
@@ -225,6 +229,12 @@ impl NetworkView for StubNet {
 
     fn health(&self) -> Health {
         Health::Red
+    }
+
+    fn subscribe_network_events(
+        &self,
+    ) -> impl futures::Stream<Item = hopr_api::network::NetworkEvent> + Send + 'static {
+        futures::stream::empty()
     }
 }
 

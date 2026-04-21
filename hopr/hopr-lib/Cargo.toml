@@ -38,8 +38,8 @@ serde = [
   "hopr-network-types/serde",
   "hopr-transport/serde",
 ]
-session-client = []
-session-server = []
+session-client = ["hopr-api/node-session-client"]
+session-server = ["hopr-api/node-session-server"]
 transport-announce-quic = ["hopr-transport/p2p-announce-quic"]
 
 # === utility features ===
@@ -64,6 +64,7 @@ futures = { workspace = true }
 futures-time = { workspace = true }
 humantime-serde = { workspace = true, optional = true }
 lazy_static = { workspace = true }
+parking_lot = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_with = { workspace = true, optional = true }
 strum = { workspace = true }

@@ -1,5 +1,5 @@
 [package]
-name = "hopr-builder"
+name = "hopr-reference"
 version = "4.1.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
@@ -26,12 +26,14 @@ session-server = [
   "dep:serde",
   "dep:serde_with",
   "dep:smart-default",
+  "dep:tokio",
   "dep:tokio-retry",
   "dep:validator",
   "hopr-lib/session-server",
 ]
 session-client = ["hopr-lib/session-client"]
 testing = [
+  "runtime-tokio",
   "session-client",
   "session-server",
   "dep:async-trait",
@@ -49,11 +51,9 @@ telemetry = ["hopr-lib/telemetry", "dep:hopr-metrics", "dep:lazy_static"]
 anyhow = { workspace = true }
 async-trait = { workspace = true, optional = true }
 futures = { workspace = true }
-futures-concurrency = { workspace = true }
 futures-time = { workspace = true, optional = true }
 hex-literal = { workspace = true, optional = true }
 lazy_static = { workspace = true, optional = true }
-parking_lot = { workspace = true }
 rand = { workspace = true, optional = true }
 rstest = { workspace = true, optional = true }
 smart-default = { workspace = true, optional = true }
@@ -71,8 +71,8 @@ hopr-metrics = { workspace = true, optional = true }
 hopr-chain-connector = { workspace = true }
 hopr-ct-full-network = { workspace = true }
 hopr-network-graph = { workspace = true, features = ["petgraph", "graph-api"] }
+hopr-ticket-manager = { workspace = true }
 hopr-transport-p2p = { workspace = true }
-hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
@@ -81,7 +81,7 @@ serial_test = { workspace = true }
 test-log = { workspace = true }
 tokio = { workspace = true }
 
-hopr-builder = { workspace = true, features = ["testing"] }
+hopr-reference = { workspace = true, features = ["testing"] }
 hopr-api = { workspace = true, features = ["types-random"] }
 hopr-metrics = { workspace = true }
 opentelemetry_sdk = { workspace = true, features = [
