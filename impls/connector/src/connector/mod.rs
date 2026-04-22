@@ -706,6 +706,7 @@ pub(crate) mod tests {
 
         struct MockClient<C>(pub C);
 
+        #[allow(dead_code)]
         #[async_trait::async_trait]
         impl<C: BlokliTransactionClient + Send + Sync> BlokliTransactionClient for MockClient<C> {
             async fn submit_transaction(
@@ -744,6 +745,7 @@ pub(crate) mod tests {
             }
         }
 
+        #[allow(dead_code)]
         #[async_trait::async_trait]
         impl<C: BlokliQueryClient + Send + Sync> BlokliQueryClient for MockClient<C> {
             async fn count_accounts(&self, selector: AccountSelector) -> Result<u32, BlokliClientError> {
@@ -846,6 +848,7 @@ pub(crate) mod tests {
             }
         }
 
+        #[allow(dead_code)]
         #[async_trait::async_trait]
         impl<C: BlokliSubscriptionClient + Send + Sync> BlokliSubscriptionClient for MockClient<C> {
             fn subscribe_channels(

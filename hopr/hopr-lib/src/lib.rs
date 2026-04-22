@@ -474,7 +474,7 @@ where
     }
 
     fn status(&self) -> ComponentStatus {
-        ComponentStatus::Ready
+        component_status(HoprNodeOperations::status(self), "graph")
     }
 }
 
