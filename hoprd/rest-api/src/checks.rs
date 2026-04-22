@@ -75,8 +75,8 @@ pub(super) async fn readyz(State(state): State<Arc<AppState>>) -> impl IntoRespo
 /// - Node running but network not minimally connected (`Health::Unknown` or `Health::Red`)
 ///
 /// This endpoint is used by Kubernetes liveness probes to determine if the pod should be restarted.
-///
-/// Note: Currently `healthyz` and `readyz` have identical behavior.
+/// Unlike `readyz`, this endpoint does NOT check chain availability — transient blokli outages
+/// must not trigger pod restarts.
 #[utoipa::path(
         get,
         path = "/healthyz",
@@ -88,7 +88,9 @@ pub(super) async fn readyz(State(state): State<Arc<AppState>>) -> impl IntoRespo
         tag = "Checks"
     )]
 pub(super) async fn healthyz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    eval_precondition(is_running(&state) && is_minimally_connected(&state) && is_chain_available(&state))
+    // Liveness must not depend on chain availability — transient blokli outages
+    // must not trigger pod restarts (see #7722).
+    eval_precondition(is_running(&state) && is_minimally_connected(&state))
 }
 
 /// Check if the node has minimal network connectivity.

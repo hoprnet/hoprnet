@@ -1,9 +1,4 @@
-use std::{
-    cmp::Ordering,
-    str::FromStr,
-    sync::atomic::{AtomicU8, Ordering as AtomicOrdering},
-    time::Duration,
-};
+use std::{cmp::Ordering, str::FromStr, sync::atomic::Ordering as AtomicOrdering, time::Duration};
 
 use blokli_client::api::{BlokliQueryClient, BlokliSubscriptionClient, BlokliTransactionClient};
 use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
@@ -45,48 +40,22 @@ const MIN_TX_CONFIRM_TIMEOUT: Duration = Duration::from_secs(1);
 const TX_TIMEOUT_MULTIPLIER: u32 = 2;
 const DEFAULT_SYNC_TOLERANCE_PCT: usize = 90;
 
-/// Connector health states encoded as atomic u8.
+/// Connector health states.
 ///
 /// Each value maps to a `ComponentStatus` variant plus a fixed detail message.
-/// Storage and updates are lock-free via `AtomicU8`; reads convert to
-/// `ComponentStatus` which allocates for non-`Ready` variants.
-#[repr(u8)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Storage and updates are lock-free via [`AtomicChainHealthState`]; reads
+/// convert to `ComponentStatus` which allocates for non-`Ready` variants.
+#[atomic_enum::atomic_enum]
+#[derive(PartialEq, Eq)]
 enum ChainHealthState {
-    /// Connected and subscriptions active.
     Ready = 0,
-    /// Waiting for initial connection.
     WaitingForConnection = 1,
-    /// Connecting to blokli.
     Connecting = 2,
-    /// Subscription stream ended unexpectedly.
     SubscriptionEnded = 3,
-    /// Connection sync timed out.
     SyncTimedOut = 4,
-    /// Blokli server reported not healthy.
     ServerNotHealthy = 5,
-    /// Connection failed for another reason.
     ConnectionFailed = 6,
-    /// Connector has been dropped.
     Dropped = 7,
-}
-
-impl TryFrom<u8> for ChainHealthState {
-    type Error = u8;
-
-    fn try_from(v: u8) -> Result<Self, Self::Error> {
-        match v {
-            0 => Ok(Self::Ready),
-            1 => Ok(Self::WaitingForConnection),
-            2 => Ok(Self::Connecting),
-            3 => Ok(Self::SubscriptionEnded),
-            4 => Ok(Self::SyncTimedOut),
-            5 => Ok(Self::ServerNotHealthy),
-            6 => Ok(Self::ConnectionFailed),
-            7 => Ok(Self::Dropped),
-            unknown => Err(unknown),
-        }
-    }
 }
 
 impl From<ChainHealthState> for hopr_api::node::ComponentStatus {
@@ -141,7 +110,7 @@ pub struct HoprBlockchainConnector<C, B, P, R> {
     sequencer: TransactionSequencer<C, R>,
     events: EventsChannel,
     cfg: BlockchainConnectorConfig,
-    health: std::sync::Arc<AtomicU8>,
+    health: std::sync::Arc<AtomicChainHealthState>,
 
     // KeyId <-> OffchainPublicKey mapping
     mapper: HoprKeyMapper<B>,
@@ -188,7 +157,7 @@ where
         let client = std::sync::Arc::new(client);
         Self {
             payload_generator,
-            health: std::sync::Arc::new(AtomicU8::new(ChainHealthState::WaitingForConnection as u8)),
+            health: std::sync::Arc::new(AtomicChainHealthState::new(ChainHealthState::WaitingForConnection)),
             graph: std::sync::Arc::new(parking_lot::RwLock::new(DiGraphMap::with_capacity_and_hasher(
                 EXPECTED_NUM_NODES,
                 EXPECTED_NUM_CHANNELS,
@@ -540,9 +509,18 @@ where
             })
             .await;
 
-            // The subscription stream has ended — the chain connection is degraded
+            // Only transition to SubscriptionEnded if currently Ready or Connecting —
+            // don't overwrite terminal error states (ServerNotHealthy, ConnectionFailed, etc.)
             tracing::warn!("chain subscription stream ended, marking chain health as degraded");
-            health.store(ChainHealthState::SubscriptionEnded as u8, AtomicOrdering::Relaxed);
+            let current = health.load(AtomicOrdering::Relaxed);
+            if matches!(current, ChainHealthState::Connecting | ChainHealthState::Ready) {
+                let _ = health.compare_exchange(
+                    current,
+                    ChainHealthState::SubscriptionEnded,
+                    AtomicOrdering::Relaxed,
+                    AtomicOrdering::Relaxed,
+                );
+            }
         });
 
         connection_ready_rx
@@ -593,8 +571,7 @@ where
             return Err(ConnectorError::InvalidState("connector is already connected"));
         }
 
-        self.health
-            .store(ChainHealthState::Connecting as u8, AtomicOrdering::Relaxed);
+        self.health.store(ChainHealthState::Connecting, AtomicOrdering::Relaxed);
 
         let abort_handle = match self
             .do_connect(self.cfg.connection_sync_timeout.max(MIN_CONNECTION_TIMEOUT))
@@ -603,24 +580,30 @@ where
             Ok(handle) => handle,
             Err(e @ ConnectorError::ServerNotHealthy) => {
                 self.health
-                    .store(ChainHealthState::ServerNotHealthy as u8, AtomicOrdering::Relaxed);
+                    .store(ChainHealthState::ServerNotHealthy, AtomicOrdering::Relaxed);
                 return Err(e);
             }
             Err(e @ ConnectorError::ConnectionTimeout) => {
                 self.health
-                    .store(ChainHealthState::SyncTimedOut as u8, AtomicOrdering::Relaxed);
+                    .store(ChainHealthState::SyncTimedOut, AtomicOrdering::Relaxed);
                 return Err(e);
             }
             Err(e) => {
                 self.health
-                    .store(ChainHealthState::ConnectionFailed as u8, AtomicOrdering::Relaxed);
+                    .store(ChainHealthState::ConnectionFailed, AtomicOrdering::Relaxed);
                 return Err(e);
             }
         };
 
         self.connection_handle = Some(abort_handle);
-        self.health
-            .store(ChainHealthState::Ready as u8, AtomicOrdering::Relaxed);
+        // Only transition to Ready if still Connecting — the subscription task
+        // may have already set SubscriptionEnded in a race.
+        let _ = self.health.compare_exchange(
+            ChainHealthState::Connecting,
+            ChainHealthState::Ready,
+            AtomicOrdering::Relaxed,
+            AtomicOrdering::Relaxed,
+        );
 
         tracing::info!(node = %self.chain_key.public().to_address(), "connected to chain as node");
         Ok(())
@@ -667,9 +650,7 @@ where
 
 impl<B, C, P, R> hopr_api::node::ComponentStatusReporter for HoprBlockchainConnector<C, B, P, R> {
     fn component_status(&self) -> hopr_api::node::ComponentStatus {
-        ChainHealthState::try_from(self.health.load(AtomicOrdering::Relaxed))
-            .unwrap_or(ChainHealthState::ConnectionFailed)
-            .into()
+        self.health.load(AtomicOrdering::Relaxed).into()
     }
 }
 
@@ -695,8 +676,7 @@ impl<B, C, P, R> HoprBlockchainConnector<C, R, B, P> {
 
 impl<B, C, P, R> Drop for HoprBlockchainConnector<C, R, B, P> {
     fn drop(&mut self) {
-        self.health
-            .store(ChainHealthState::Dropped as u8, AtomicOrdering::Relaxed);
+        self.health.store(ChainHealthState::Dropped, AtomicOrdering::Relaxed);
         self.events.0.close();
         if let Some(abort_handle) = self.connection_handle.take() {
             abort_handle.abort();
@@ -788,19 +768,21 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn chain_health_state_roundtrips_through_u8() {
+    fn chain_health_all_variants_convert_to_component_status() {
         use hopr_api::node::ComponentStatus;
-        for v in 0..=7u8 {
-            let state = ChainHealthState::try_from(v).unwrap();
-            assert_eq!(state as u8, v);
-            // Verify Into<ComponentStatus> doesn't panic
+        let variants = [
+            ChainHealthState::Ready,
+            ChainHealthState::WaitingForConnection,
+            ChainHealthState::Connecting,
+            ChainHealthState::SubscriptionEnded,
+            ChainHealthState::SyncTimedOut,
+            ChainHealthState::ServerNotHealthy,
+            ChainHealthState::ConnectionFailed,
+            ChainHealthState::Dropped,
+        ];
+        for state in variants {
             let _: ComponentStatus = state.into();
         }
-    }
-
-    #[test]
-    fn chain_health_state_unknown_u8_is_err() {
-        assert!(ChainHealthState::try_from(255).is_err());
     }
 
     #[test]

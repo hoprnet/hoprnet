@@ -4338,6 +4338,7 @@ dependencies = [
  "anyhow",
  "async-broadcast",
  "async-trait",
+ "atomic_enum",
  "blokli-client",
  "dashmap",
  "futures",
