@@ -784,4 +784,86 @@ pub(crate) mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn chain_health_state_roundtrips_through_u8() {
+        for v in 0..=7u8 {
+            let state = ChainHealthState::from_u8(v);
+            assert_eq!(state as u8, v);
+        }
+    }
+
+    #[test]
+    fn chain_health_state_unknown_u8_falls_back() {
+        assert_eq!(ChainHealthState::from_u8(255), ChainHealthState::ConnectionFailed);
+    }
+
+    #[test]
+    fn chain_health_ready_maps_to_component_ready() {
+        assert!(ChainHealthState::Ready.to_component_status().is_ready());
+    }
+
+    #[test]
+    fn chain_health_degraded_states() {
+        assert!(ChainHealthState::SubscriptionEnded.to_component_status().is_degraded());
+        assert!(ChainHealthState::SyncTimedOut.to_component_status().is_degraded());
+    }
+
+    #[test]
+    fn chain_health_unavailable_states() {
+        assert!(
+            ChainHealthState::ServerNotHealthy
+                .to_component_status()
+                .is_unavailable()
+        );
+        assert!(
+            ChainHealthState::ConnectionFailed
+                .to_component_status()
+                .is_unavailable()
+        );
+        assert!(ChainHealthState::Dropped.to_component_status().is_unavailable());
+    }
+
+    #[test]
+    fn chain_health_initializing_states() {
+        assert!(
+            ChainHealthState::WaitingForConnection
+                .to_component_status()
+                .is_initializing()
+        );
+        assert!(ChainHealthState::Connecting.to_component_status().is_initializing());
+    }
+
+    #[tokio::test]
+    async fn connector_health_starts_as_initializing() -> anyhow::Result<()> {
+        use hopr_api::node::ComponentStatusReporter;
+        let blokli_client = BlokliTestStateBuilder::default().build_static_client();
+        let connector = create_connector(blokli_client)?;
+        assert!(connector.component_status().is_initializing());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connector_health_ready_after_connect() -> anyhow::Result<()> {
+        use hopr_api::node::ComponentStatusReporter;
+        let blokli_client = BlokliTestStateBuilder::default().build_static_client();
+        let mut connector = create_connector(blokli_client)?;
+        connector.connect().await?;
+        assert!(connector.component_status().is_ready());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connector_health_unavailable_when_server_not_healthy() -> anyhow::Result<()> {
+        use hopr_api::node::ComponentStatusReporter;
+        let state = BlokliTestState {
+            health: "DOWN".into(),
+            ..Default::default()
+        };
+        let blokli_client = BlokliTestStateBuilder::from(state).build_static_client();
+        let mut connector = create_connector(blokli_client)?;
+        let _ = connector.connect().await;
+        assert!(connector.component_status().is_unavailable());
+        Ok(())
+    }
 }

@@ -262,3 +262,37 @@ pub(super) async fn status(State(state): State<Arc<InternalState>>) -> impl Into
 
     (StatusCode::OK, Json(body)).into_response()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::borrow::Cow;
+
+    #[test]
+    fn component_status_to_info_ready() {
+        let info = component_status_to_info(&ComponentStatus::Ready);
+        assert_eq!(info.status, "Ready");
+        assert!(info.detail.is_none());
+    }
+
+    #[test]
+    fn component_status_to_info_degraded() {
+        let info = component_status_to_info(&ComponentStatus::Degraded(Cow::Borrowed("low peers")));
+        assert_eq!(info.status, "Degraded");
+        assert_eq!(info.detail.as_deref(), Some("low peers"));
+    }
+
+    #[test]
+    fn component_status_to_info_unavailable() {
+        let info = component_status_to_info(&ComponentStatus::Unavailable("down".into()));
+        assert_eq!(info.status, "Unavailable");
+        assert_eq!(info.detail.as_deref(), Some("down"));
+    }
+
+    #[test]
+    fn component_status_to_info_initializing() {
+        let info = component_status_to_info(&ComponentStatus::Initializing(Cow::Borrowed("starting")));
+        assert_eq!(info.status, "Initializing");
+        assert_eq!(info.detail.as_deref(), Some("starting"));
+    }
+}
