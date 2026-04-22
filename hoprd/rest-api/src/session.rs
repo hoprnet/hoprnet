@@ -373,7 +373,7 @@ pub(crate) struct SessionClientResponse {
         ),
         tag = "Session"
     )]
-pub(crate) async fn create_client<H: crate::HoprNode + hopr_utils_session::SessionFactory>(
+pub(crate) async fn create_client<H: hopr_utils_session::SessionFactory + Send + Sync + 'static>(
     State(state): State<Arc<InternalState<H>>>,
     Path(protocol): Path<IpProtocol>,
     Json(args): Json<SessionClientRequest>,
@@ -512,7 +512,7 @@ pub(crate) async fn create_client<H: crate::HoprNode + hopr_utils_session::Sessi
     ),
     tag = "Session",
 )]
-pub(crate) async fn list_clients<H: crate::HoprNode>(
+pub(crate) async fn list_clients<H: Send + Sync + 'static>(
     State(state): State<Arc<InternalState<H>>>,
     Path(protocol): Path<IpProtocol>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
@@ -644,7 +644,7 @@ impl From<SurbBalancerConfig> for SessionConfig {
     ),
     tag = "Session"
 )]
-pub(crate) async fn adjust_session<H: crate::HoprNode>(
+pub(crate) async fn adjust_session<H: Send + Sync + 'static>(
     State(state): State<Arc<InternalState<H>>>,
     Path(session_id): Path<String>,
     Json(args): Json<SessionConfig>,
@@ -690,7 +690,7 @@ pub(crate) async fn adjust_session<H: crate::HoprNode>(
     ),
     tag = "Session"
 )]
-pub(crate) async fn session_config<H: crate::HoprNode>(
+pub(crate) async fn session_config<H: Send + Sync + 'static>(
     State(state): State<Arc<InternalState<H>>>,
     Path(session_id): Path<String>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
@@ -784,7 +784,7 @@ pub struct SessionCloseClientQuery {
     ),
     tag = "Session",
 )]
-pub(crate) async fn close_client<H: crate::HoprNode>(
+pub(crate) async fn close_client<H: Send + Sync + 'static>(
     State(state): State<Arc<InternalState<H>>>,
     Path(SessionCloseClientQuery { protocol, ip, port }): Path<SessionCloseClientQuery>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {

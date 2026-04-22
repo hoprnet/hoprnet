@@ -6,14 +6,14 @@ use axum::{
     response::IntoResponse,
 };
 use hopr_lib::{
-    Address, HoprBalance, Multiaddr,
+    Address, HoprBalance, IncentiveChannelOperations, Multiaddr,
     api::{
         chain::ChainKeyOperations,
         graph::{
             EdgeLinkObservable,
             traits::{EdgeNetworkObservableRead, EdgeObservableRead},
         },
-        node::{HasChainApi, IncentiveChannelOperations},
+        node::{HasChainApi, HasGraphView},
     },
 };
 use serde_with::{DisplayFromStr, serde_as};
@@ -50,7 +50,9 @@ pub(crate) struct TicketPriceResponse {
         ),
         tag = "Network"
     )]
-pub(super) async fn price<H: crate::HoprNode>(State(state): State<Arc<InternalState<H>>>) -> impl IntoResponse {
+pub(super) async fn price<H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + Send + Sync + 'static>(
+    State(state): State<Arc<InternalState<H>>>,
+) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
     match hopr.get_ticket_price().await {
@@ -87,7 +89,9 @@ pub(crate) struct TicketProbabilityResponse {
         ),
         tag = "Network"
     )]
-pub(super) async fn probability<H: crate::HoprNode>(State(state): State<Arc<InternalState<H>>>) -> impl IntoResponse {
+pub(super) async fn probability<H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + Send + Sync + 'static>(
+    State(state): State<Arc<InternalState<H>>>,
+) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
     match hopr.get_minimum_incoming_ticket_win_probability().await {
@@ -148,7 +152,15 @@ pub(crate) struct ConnectedPeerResponse {
     ),
     tag = "Network"
 )]
-pub(super) async fn connected<H: crate::HoprNode>(State(state): State<Arc<InternalState<H>>>) -> impl IntoResponse {
+pub(super) async fn connected<
+    H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError>
+        + HasGraphView<Graph = hopr_network_graph::SharedChannelGraph>
+        + Send
+        + Sync
+        + 'static,
+>(
+    State(state): State<Arc<InternalState<H>>>,
+) -> impl IntoResponse {
     let hopr = state.hopr.clone();
     let graph = hopr.graph();
     let edges = graph.connected_edges();
@@ -255,7 +267,9 @@ pub(crate) struct AnnouncedPeerResponse {
     ),
     tag = "Network"
 )]
-pub(super) async fn announced<H: crate::HoprNode>(State(state): State<Arc<InternalState<H>>>) -> impl IntoResponse {
+pub(super) async fn announced<H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + Send + Sync + 'static>(
+    State(state): State<Arc<InternalState<H>>>,
+) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
     match hopr.announced_peers().await {
@@ -316,7 +330,13 @@ pub(crate) struct GraphQueryRequest {
     ),
     tag = "Network"
 )]
-pub(super) async fn graph<H: crate::HoprNode>(
+pub(super) async fn graph<
+    H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError>
+        + HasGraphView<Graph = hopr_network_graph::SharedChannelGraph>
+        + Send
+        + Sync
+        + 'static,
+>(
     State(state): State<Arc<InternalState<H>>>,
     Query(query): Query<GraphQueryRequest>,
 ) -> impl IntoResponse {

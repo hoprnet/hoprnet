@@ -11,7 +11,7 @@ use hopr_lib::{
         chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations},
         graph::{EdgeLinkObservable, traits::EdgeObservableRead},
         network::NetworkView,
-        node::{HasChainApi, HasNetworkView, HasTransportApi, TransportOperations},
+        node::{HasChainApi, HasGraphView, HasNetworkView, HasTransportApi, TransportOperations},
     },
     errors::{HoprLibError, HoprTransportError},
     prelude::Hash,
@@ -167,7 +167,14 @@ fn channel_entry_to_peer_info(
     ),
     tag = "Peers",
 )]
-pub(super) async fn show_peer_info<H: crate::HoprNode>(
+pub(super) async fn show_peer_info<
+    H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError>
+        + HasNetworkView
+        + HasGraphView<Graph = hopr_network_graph::SharedChannelGraph>
+        + Send
+        + Sync
+        + 'static,
+>(
     Path(AddressParams { address }): Path<AddressParams>,
     State(state): State<Arc<InternalState<H>>>,
 ) -> impl IntoResponse {
@@ -294,7 +301,9 @@ pub(crate) struct PingResponse {
     ),
     tag = "Peers",
 )]
-pub(super) async fn ping_peer<H: crate::HoprNode>(
+pub(super) async fn ping_peer<
+    H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + HasTransportApi + Send + Sync + 'static,
+>(
     Path(AddressParams { address }): Path<AddressParams>,
     State(state): State<Arc<InternalState<H>>>,
 ) -> Result<impl IntoResponse, ApiError>

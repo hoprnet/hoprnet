@@ -27,8 +27,10 @@ use crate::AppState;
         ),
         tag = "Checks"
     )]
-pub(super) async fn startedz<H: crate::HoprNode>(State(state): State<Arc<AppState<H>>>) -> impl IntoResponse {
-    eval_precondition(is_running(state)) // FIXME: improve this once node state granularity is improved
+pub(super) async fn startedz<H: HoprNodeOperations + Send + Sync + 'static>(
+    State(state): State<Arc<AppState<H>>>,
+) -> impl IntoResponse {
+    eval_precondition(is_running(state))
 }
 
 /// Check whether the node is **ready** to accept connections.
@@ -56,7 +58,9 @@ pub(super) async fn startedz<H: crate::HoprNode>(State(state): State<Arc<AppStat
         ),
         tag = "Checks"
     )]
-pub(super) async fn readyz<H: crate::HoprNode>(State(state): State<Arc<AppState<H>>>) -> impl IntoResponse {
+pub(super) async fn readyz<H: HoprNodeOperations + HasNetworkView + Send + Sync + 'static>(
+    State(state): State<Arc<AppState<H>>>,
+) -> impl IntoResponse {
     eval_precondition(is_running(state.clone()) && is_minimally_connected(state).await)
 }
 
@@ -87,7 +91,9 @@ pub(super) async fn readyz<H: crate::HoprNode>(State(state): State<Arc<AppState<
         ),
         tag = "Checks"
     )]
-pub(super) async fn healthyz<H: crate::HoprNode>(State(state): State<Arc<AppState<H>>>) -> impl IntoResponse {
+pub(super) async fn healthyz<H: HoprNodeOperations + HasNetworkView + Send + Sync + 'static>(
+    State(state): State<Arc<AppState<H>>>,
+) -> impl IntoResponse {
     eval_precondition(is_running(state.clone()) && is_minimally_connected(state).await)
 }
 
@@ -96,7 +102,7 @@ pub(super) async fn healthyz<H: crate::HoprNode>(State(state): State<Arc<AppStat
 /// Returns `true` if the network health is `Orange`, `Yellow`, or `Green`.
 /// Returns `false` if the network health is `Unknown` or `Red`.
 #[inline]
-async fn is_minimally_connected<H: crate::HoprNode>(state: Arc<AppState<H>>) -> bool {
+async fn is_minimally_connected<H: HasNetworkView + Send + Sync + 'static>(state: Arc<AppState<H>>) -> bool {
     matches!(
         state.hopr.network_view().health(),
         Health::Orange | Health::Yellow | Health::Green
@@ -108,7 +114,7 @@ async fn is_minimally_connected<H: crate::HoprNode>(state: Arc<AppState<H>>) -> 
 /// Returns `true` only when `HoprState::Running`.
 /// Returns `false` for all other states (Uninitialized, Initializing, Indexing, Starting).
 #[inline]
-fn is_running<H: crate::HoprNode>(state: Arc<AppState<H>>) -> bool {
+fn is_running<H: HoprNodeOperations>(state: Arc<AppState<H>>) -> bool {
     matches!(HoprNodeOperations::status(&*state.hopr), HoprState::Running)
 }
 
@@ -137,7 +143,7 @@ fn eval_precondition(precondition: bool) -> impl IntoResponse {
         ),
         tag = "Checks"
     )]
-pub(super) async fn eligiblez<H: crate::HoprNode>(State(_state): State<Arc<AppState<H>>>) -> impl IntoResponse {
+pub(super) async fn eligiblez<H: Send + Sync + 'static>(State(_state): State<Arc<AppState<H>>>) -> impl IntoResponse {
     (StatusCode::OK, "").into_response()
 }
 

@@ -82,11 +82,11 @@ impl<T> HoprNode for T where
 {
 }
 
-pub(crate) struct AppState<H: HoprNode> {
+pub(crate) struct AppState<H> {
     pub hopr: Arc<H>,
 }
 
-impl<H: HoprNode> Clone for AppState<H> {
+impl<H> Clone for AppState<H> {
     fn clone(&self) -> Self {
         Self {
             hopr: self.hopr.clone(),
@@ -96,7 +96,7 @@ impl<H: HoprNode> Clone for AppState<H> {
 
 pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
 
-pub(crate) struct InternalState<H: HoprNode> {
+pub(crate) struct InternalState<H> {
     pub hoprd_cfg: serde_json::Value,
     pub auth: Arc<Auth>,
     pub hopr: Arc<H>,
@@ -104,7 +104,7 @@ pub(crate) struct InternalState<H: HoprNode> {
     pub default_listen_host: std::net::SocketAddr,
 }
 
-impl<H: HoprNode> Clone for InternalState<H> {
+impl<H> Clone for InternalState<H> {
     fn clone(&self) -> Self {
         Self {
             hoprd_cfg: self.hoprd_cfg.clone(),
@@ -214,7 +214,7 @@ impl Modify for SecurityAddon {
 }
 
 /// Parameters needed to construct the Rest API via [`serve_api`].
-pub struct RestApiParameters<H: HoprNode> {
+pub struct RestApiParameters<H> {
     pub listener: TcpListener,
     pub hoprd_cfg: serde_json::Value,
     pub cfg: crate::config::Api,

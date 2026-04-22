@@ -7,7 +7,10 @@ use axum::{
 };
 use hopr_lib::{
     Address, ChannelStatus, HoprBalance, IncentiveChannelOperations, IncentiveRedeemOperations,
-    api::{node::HasChainApi, tickets::ChannelStats},
+    api::{
+        node::{HasChainApi, HasTicketManagement},
+        tickets::ChannelStats,
+    },
     prelude::Hash,
 };
 use serde::Deserialize;
@@ -99,7 +102,11 @@ impl From<ChannelStats> for NodeTicketStatisticsResponse {
         ),
         tag = "Tickets"
     )]
-pub(super) async fn show_ticket_statistics<H: crate::HoprNode>(State(state): State<Arc<InternalState<H>>>) -> impl IntoResponse {
+pub(super) async fn show_ticket_statistics<
+    H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + HasTicketManagement + Send + Sync + 'static,
+>(
+    State(state): State<Arc<InternalState<H>>>,
+) -> impl IntoResponse {
     let hopr = state.hopr.clone();
     match hopr.ticket_statistics() {
         Ok(stats) => (StatusCode::OK, Json(NodeTicketStatisticsResponse::from(stats))).into_response(),
@@ -154,7 +161,9 @@ pub(crate) struct RedeemTicketsRequest {
         ),
         tag = "Tickets"
     )]
-pub(super) async fn redeem_tickets<H: crate::HoprNode>(
+pub(super) async fn redeem_tickets<
+    H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + HasTicketManagement + Send + Sync + 'static,
+>(
     State(state): State<Arc<InternalState<H>>>,
     Json(req): Json<RedeemTicketsRequest>,
 ) -> impl IntoResponse {

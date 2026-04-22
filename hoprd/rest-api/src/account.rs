@@ -5,10 +5,7 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
-use hopr_lib::{
-    Address, HoprBalance, WxHOPR, XDai, XDaiBalance,
-    api::node::{HasChainApi, IncentiveChannelOperations},
-};
+use hopr_lib::{Address, HoprBalance, IncentiveChannelOperations, WxHOPR, XDai, XDaiBalance, api::node::HasChainApi};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
@@ -40,7 +37,9 @@ pub(crate) struct AccountAddressesResponse {
         ),
         tag = "Account",
     )]
-pub(super) async fn addresses<H: crate::HoprNode>(State(state): State<Arc<InternalState<H>>>) -> impl IntoResponse {
+pub(super) async fn addresses<H: HasChainApi + Send + Sync + 'static>(
+    State(state): State<Arc<InternalState<H>>>,
+) -> impl IntoResponse {
     let addresses = AccountAddressesResponse {
         native: state.hopr.identity().node_address.to_checksum(),
     };
@@ -97,7 +96,9 @@ pub(crate) struct AccountBalancesResponse {
         ),
         tag = "Account",
     )]
-pub(super) async fn balances<H: crate::HoprNode>(State(state): State<Arc<InternalState<H>>>) -> impl IntoResponse {
+pub(super) async fn balances<H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + Send + Sync + 'static>(
+    State(state): State<Arc<InternalState<H>>>,
+) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
     let mut account_balances = AccountBalancesResponse::default();
@@ -181,7 +182,7 @@ pub(crate) struct WithdrawResponse {
         ),
         tag = "Account",
     )]
-pub(super) async fn withdraw<H: crate::HoprNode>(
+pub(super) async fn withdraw<H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + Send + Sync + 'static>(
     State(state): State<Arc<InternalState<H>>>,
     Json(req_data): Json<WithdrawBodyRequest>,
 ) -> impl IntoResponse {

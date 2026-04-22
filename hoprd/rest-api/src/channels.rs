@@ -167,7 +167,9 @@ pub(crate) struct ChannelsQueryRequest {
         ),
         tag = "Channels",
     )]
-pub(super) async fn list_channels<H: crate::HoprNode>(
+pub(super) async fn list_channels<
+    H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + Send + Sync + 'static,
+>(
     Query(query): Query<ChannelsQueryRequest>,
     State(state): State<Arc<InternalState<H>>>,
 ) -> impl IntoResponse {
@@ -307,7 +309,9 @@ pub(crate) struct OpenChannelResponse {
         ),
         tag = "Channels",
     )]
-pub(super) async fn open_channel<H: crate::HoprNode>(
+pub(super) async fn open_channel<
+    H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + Send + Sync + 'static,
+>(
     State(state): State<Arc<InternalState<H>>>,
     Json(open_req): Json<OpenChannelBodyRequest>,
 ) -> impl IntoResponse {
@@ -379,7 +383,7 @@ fn filter_open_channel<E: std::error::Error>(
 }
 
 /// Resolves the channel with the given counterparty in the specified direction.
-fn resolve_channel<H: crate::HoprNode>(
+fn resolve_channel<H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + Send + Sync>(
     hopr: &H,
     address: &Address,
     direction: ChannelDirection,
@@ -414,7 +418,9 @@ fn resolve_channel<H: crate::HoprNode>(
         ),
         tag = "Channels",
     )]
-pub(super) async fn show_channel<H: crate::HoprNode>(
+pub(super) async fn show_channel<
+    H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + Send + Sync + 'static,
+>(
     Path(AddressParams { address }): Path<AddressParams>,
     Query(ChannelDirectionQuery { direction }): Query<ChannelDirectionQuery>,
     State(state): State<Arc<InternalState<H>>>,
@@ -477,7 +483,9 @@ pub(crate) struct CloseChannelResponse {
         ),
         tag = "Channels",
     )]
-pub(super) async fn close_channel<H: crate::HoprNode>(
+pub(super) async fn close_channel<
+    H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + Send + Sync + 'static,
+>(
     Path(AddressParams { address }): Path<AddressParams>,
     Query(ChannelDirectionQuery { direction }): Query<ChannelDirectionQuery>,
     State(state): State<Arc<InternalState<H>>>,
@@ -571,7 +579,9 @@ pub(crate) struct FundBodyRequest {
         ),
         tag = "Channels",
     )]
-pub(super) async fn fund_channel<H: crate::HoprNode>(
+pub(super) async fn fund_channel<
+    H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + Send + Sync + 'static,
+>(
     Path(AddressParams { address }): Path<AddressParams>,
     State(state): State<Arc<InternalState<H>>>,
     Json(fund_req): Json<FundBodyRequest>,

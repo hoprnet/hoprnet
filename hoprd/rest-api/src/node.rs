@@ -9,10 +9,10 @@ use axum::{
     response::IntoResponse,
 };
 use hopr_lib::{
-    Address, Multiaddr,
+    Address, IncentiveChannelOperations, Multiaddr,
     api::{
         network::{Health, NetworkView},
-        node::{HasChainApi, HasNetworkView, IncentiveChannelOperations},
+        node::{HasChainApi, HasNetworkView},
     },
 };
 use serde::Serialize;
@@ -72,7 +72,9 @@ pub(super) async fn version() -> impl IntoResponse {
     ),
     tag = "Configuration"
     )]
-pub(super) async fn configuration<H: crate::HoprNode>(State(state): State<Arc<InternalState<H>>>) -> impl IntoResponse {
+pub(super) async fn configuration<H: Send + Sync + 'static>(
+    State(state): State<Arc<InternalState<H>>>,
+) -> impl IntoResponse {
     (StatusCode::OK, Json(state.hoprd_cfg.clone())).into_response()
 }
 
@@ -131,7 +133,11 @@ pub(crate) struct NodeInfoResponse {
         ),
         tag = "Node"
     )]
-pub(super) async fn info<H: crate::HoprNode>(State(state): State<Arc<InternalState<H>>>) -> Result<impl IntoResponse, ApiError> {
+pub(super) async fn info<
+    H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + HasNetworkView + Send + Sync + 'static,
+>(
+    State(state): State<Arc<InternalState<H>>>,
+) -> Result<impl IntoResponse, ApiError> {
     let hopr = state.hopr.clone();
 
     let identity = hopr.identity();
