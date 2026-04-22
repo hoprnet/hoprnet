@@ -164,7 +164,7 @@ serde_json = "1.0.149"
 serde_repr = "0.1.20"
 serde_with = { version = "3.18.0", features = ["base64"] }
 serde_urlencoded = "0.7.1"
-serde-saphyr = "0.0.23"
+serde-saphyr = "0.0.24"
 serial_test = "3.4.0"
 signal-hook = "0.4.4"
 smart-default = "0.7.1"
@@ -218,8 +218,8 @@ mimalloc = { version = "0.1.48", default-features = false, features = [
   "secure",
 ] }
 
-hopr-api = { git = "https://github.com/hoprnet/hopr-api", branch = "main" }
-hopr-types = { version = "1.5.3", features = ["use-bindings"] }
+hopr-api = { version = "1.7.0" }
+hopr-types = { version = "1.5.4", features = ["use-bindings"] }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-crypto-keypair = { path = "crypto/keypair", default-features = false }
 hopr-crypto-packet = { path = "crypto/packet", default-features = false }

@@ -6,6 +6,9 @@
 .DS_Store
 db/entity/src/codegen/sqlite
 
+settings.local.json
+.claude/worktrees
+
 openapi.spec.json
 
 # Exclude databases resulting from local execution of hoprd
