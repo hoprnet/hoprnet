@@ -62,7 +62,7 @@ test-log = { workspace = true }
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 
 [package.metadata.cargo-machete]
-ignored = ["serde_bytes"]
+ignored = ["hickory-resolver", "serde_bytes"]
 
 [package.metadata.cargo-shear]
 ignored = ["serde_bytes"]

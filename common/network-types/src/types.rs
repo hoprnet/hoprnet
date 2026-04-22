@@ -1,6 +1,5 @@
 use std::{
     fmt::{Display, Formatter},
-    net::SocketAddr,
     str::FromStr,
 };
 
@@ -72,12 +71,12 @@ impl IpOrHost {
     ///
     /// Uses `tokio` resolver.
     #[cfg(feature = "runtime-tokio")]
-    pub async fn resolve_tokio(self) -> std::io::Result<Vec<SocketAddr>> {
+    pub async fn resolve_tokio(self) -> std::io::Result<Vec<std::net::SocketAddr>> {
         match self {
             IpOrHost::Dns(name, port) => {
                 #[cfg(test)]
                 let resolver = hickory_resolver::Resolver::builder_with_config(
-                    hickory_resolver::config::ResolverConfig::new(),
+                    hickory_resolver::config::ResolverConfig::default(),
                     hickory_resolver::net::runtime::TokioRuntimeProvider::default(),
                 )
                 .build()
@@ -93,7 +92,7 @@ impl IpOrHost {
                     .lookup_ip(&name)
                     .await
                     .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-                Ok(lookup.iter().map(|ip| SocketAddr::new(ip, port)).collect())
+                Ok(lookup.iter().map(|ip| std::net::SocketAddr::new(ip, port)).collect())
             }
             IpOrHost::Ip(addr) => Ok(vec![addr]),
         }
