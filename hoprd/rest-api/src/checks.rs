@@ -197,8 +197,7 @@ mod tests {
     #[tokio::test]
     async fn startedz_should_return_412_when_not_running() -> anyhow::Result<()> {
         let mut mock = MockNodeOps::new();
-        mock.expect_status()
-            .returning(|| HoprState::Uninitialized);
+        mock.expect_status().returning(|| HoprState::Uninitialized);
 
         let resp = startedz_router(mock)
             .oneshot(Request::get("/startedz").body(Body::empty())?)
@@ -250,9 +249,7 @@ mod tests {
             .with_state(Arc::new(AppState {
                 hopr: Arc::new(NoopNode),
             }));
-        let resp = app
-            .oneshot(Request::get("/eligiblez").body(Body::empty())?)
-            .await?;
+        let resp = app.oneshot(Request::get("/eligiblez").body(Body::empty())?).await?;
         assert_eq!(resp.status(), StatusCode::OK);
         Ok(())
     }

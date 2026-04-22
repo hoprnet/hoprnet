@@ -20,10 +20,7 @@ telemetry = [
   "dep:lazy_static",
   "dep:regex",
 ]
-runtime-tokio = [
-  "hopr-lib/runtime-tokio",
-  "hopr-async-runtime/runtime-tokio",
-]
+runtime-tokio = ["hopr-lib/runtime-tokio", "hopr-async-runtime/runtime-tokio"]
 
 [dependencies]
 axum = { workspace = true, features = ["http2"] }

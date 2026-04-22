@@ -78,10 +78,7 @@ impl ChecksNode {
     pub fn new(state: HoprState, health: Health) -> Self {
         let mut net = MockNetView::new();
         net.expect_health().returning(move || health);
-        Self {
-            node_state: state,
-            net,
-        }
+        Self { node_state: state, net }
     }
 }
 
@@ -93,9 +90,11 @@ impl HoprNodeOperations for ChecksNode {
 
 impl HasNetworkView for ChecksNode {
     type NetworkView = MockNetView;
+
     fn network_view(&self) -> &MockNetView {
         &self.net
     }
+
     fn status(&self) -> ComponentStatus {
         ComponentStatus::Ready
     }
@@ -155,10 +154,7 @@ impl ChainReadChannelOperations for StubChain {
         Ok(None)
     }
 
-    fn stream_channels<'a>(
-        &'a self,
-        _selector: ChannelSelector,
-    ) -> Result<BoxStream<'a, ChannelEntry>, Self::Error> {
+    fn stream_channels<'a>(&'a self, _selector: ChannelSelector) -> Result<BoxStream<'a, ChannelEntry>, Self::Error> {
         Ok(Box::pin(stream::empty()))
     }
 }
@@ -199,10 +195,7 @@ impl ChainWriteChannelOperations for StubChain {
 impl ChainReadAccountOperations for StubChain {
     type Error = StubError;
 
-    fn stream_accounts<'a>(
-        &'a self,
-        _selector: AccountSelector,
-    ) -> Result<BoxStream<'a, AccountEntry>, Self::Error> {
+    fn stream_accounts<'a>(&'a self, _selector: AccountSelector) -> Result<BoxStream<'a, AccountEntry>, Self::Error> {
         Ok(Box::pin(stream::empty()))
     }
 
@@ -229,10 +222,8 @@ impl ChainWriteAccountOperations for StubChain {
         &self,
         _multiaddrs: &[Multiaddr],
         _key: &OffchainKeypair,
-    ) -> Result<
-        futures::future::BoxFuture<'life0, Result<ChainReceipt, Self::Error>>,
-        AnnouncementError<Self::Error>,
-    > {
+    ) -> Result<futures::future::BoxFuture<'life0, Result<ChainReceipt, Self::Error>>, AnnouncementError<Self::Error>>
+    {
         Err(AnnouncementError::ProcessingError(StubError(
             "stub cannot announce".into(),
         )))
@@ -249,10 +240,8 @@ impl ChainWriteAccountOperations for StubChain {
     async fn register_safe(
         &self,
         _safe_address: &Address,
-    ) -> Result<
-        futures::future::BoxFuture<'life0, Result<ChainReceipt, Self::Error>>,
-        SafeRegistrationError<Self::Error>,
-    > {
+    ) -> Result<futures::future::BoxFuture<'life0, Result<ChainReceipt, Self::Error>>, SafeRegistrationError<Self::Error>>
+    {
         Err(SafeRegistrationError::ProcessingError(StubError(
             "stub cannot register safe".into(),
         )))

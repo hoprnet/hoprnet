@@ -847,9 +847,7 @@ mod tests {
     #[tokio::test]
     async fn list_clients_should_return_empty_when_no_sessions() -> anyhow::Result<()> {
         let app = session_router();
-        let resp = app
-            .oneshot(Request::get("/session/tcp").body(Body::empty())?)
-            .await?;
+        let resp = app.oneshot(Request::get("/session/tcp").body(Body::empty())?).await?;
         assert_eq!(resp.status(), StatusCode::OK);
 
         let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await?;
