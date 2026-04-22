@@ -11,7 +11,7 @@ use hopr_lib::{
         chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations},
         graph::{EdgeLinkObservable, traits::EdgeObservableRead},
         network::NetworkView,
-        node::{HasChainApi, HasNetworkView, HasTransportApi},
+        node::{HasChainApi, HasNetworkView, HasTransportApi, TransportOperations},
     },
     errors::{HoprLibError, HoprTransportError},
     prelude::Hash,
@@ -167,9 +167,9 @@ fn channel_entry_to_peer_info(
     ),
     tag = "Peers",
 )]
-pub(super) async fn show_peer_info(
+pub(super) async fn show_peer_info<H: crate::HoprNode>(
     Path(AddressParams { address }): Path<AddressParams>,
-    State(state): State<Arc<InternalState>>,
+    State(state): State<Arc<InternalState<H>>>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
@@ -294,10 +294,14 @@ pub(crate) struct PingResponse {
     ),
     tag = "Peers",
 )]
-pub(super) async fn ping_peer(
+pub(super) async fn ping_peer<H: crate::HoprNode>(
     Path(AddressParams { address }): Path<AddressParams>,
-    State(state): State<Arc<InternalState>>,
-) -> Result<impl IntoResponse, ApiError> {
+    State(state): State<Arc<InternalState<H>>>,
+) -> Result<impl IntoResponse, ApiError>
+where
+    <<H as hopr_lib::api::node::HasTransportApi>::Transport as hopr_lib::api::node::TransportOperations>::Error:
+        Into<hopr_lib::errors::HoprTransportError>,
+{
     debug!(%address, "Manually ping peer");
 
     let hopr = state.hopr.clone();
@@ -314,7 +318,7 @@ pub(super) async fn ping_peer(
         }
     };
 
-    match hopr.transport().ping(&offchain_key).await {
+    match hopr.transport().ping(&offchain_key).await.map_err(Into::into) {
         Ok((latency, _status)) => {
             let resp = Json(PingResponse { latency: latency / 2 });
             Ok((StatusCode::OK, resp).into_response())

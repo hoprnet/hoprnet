@@ -13,8 +13,8 @@ use axum::{
 
 use crate::{ApiErrorStatus, Auth, InternalState};
 
-pub(crate) async fn authenticate(
-    State(state): State<InternalState>,
+pub(crate) async fn authenticate<H: crate::HoprNode>(
+    State(state): State<InternalState<H>>,
     _uri: OriginalUri,
     headers: HeaderMap,
     request: Request,

@@ -167,9 +167,9 @@ pub(crate) struct ChannelsQueryRequest {
         ),
         tag = "Channels",
     )]
-pub(super) async fn list_channels(
+pub(super) async fn list_channels<H: crate::HoprNode>(
     Query(query): Query<ChannelsQueryRequest>,
-    State(state): State<Arc<InternalState>>,
+    State(state): State<Arc<InternalState<H>>>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
@@ -307,8 +307,8 @@ pub(crate) struct OpenChannelResponse {
         ),
         tag = "Channels",
     )]
-pub(super) async fn open_channel(
-    State(state): State<Arc<InternalState>>,
+pub(super) async fn open_channel<H: crate::HoprNode>(
+    State(state): State<Arc<InternalState<H>>>,
     Json(open_req): Json<OpenChannelBodyRequest>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
@@ -379,8 +379,8 @@ fn filter_open_channel<E: std::error::Error>(
 }
 
 /// Resolves the channel with the given counterparty in the specified direction.
-fn resolve_channel(
-    hopr: &crate::HoprNode,
+fn resolve_channel<H: crate::HoprNode>(
+    hopr: &H,
     address: &Address,
     direction: ChannelDirection,
 ) -> Result<ChannelEntry, ApiErrorStatus> {
@@ -414,14 +414,14 @@ fn resolve_channel(
         ),
         tag = "Channels",
     )]
-pub(super) async fn show_channel(
+pub(super) async fn show_channel<H: crate::HoprNode>(
     Path(AddressParams { address }): Path<AddressParams>,
     Query(ChannelDirectionQuery { direction }): Query<ChannelDirectionQuery>,
-    State(state): State<Arc<InternalState>>,
+    State(state): State<Arc<InternalState<H>>>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match hopr_async_runtime::prelude::spawn_blocking(move || resolve_channel(&hopr, &address, direction)).await {
+    match hopr_async_runtime::prelude::spawn_blocking(move || resolve_channel(&*hopr, &address, direction)).await {
         Ok(Ok(channel)) => (StatusCode::OK, Json(channel_to_topology_info(&channel))).into_response(),
         Ok(Err(status)) => match status {
             ApiErrorStatus::ChannelNotFound => (StatusCode::NOT_FOUND, status).into_response(),
@@ -477,14 +477,14 @@ pub(crate) struct CloseChannelResponse {
         ),
         tag = "Channels",
     )]
-pub(super) async fn close_channel(
+pub(super) async fn close_channel<H: crate::HoprNode>(
     Path(AddressParams { address }): Path<AddressParams>,
     Query(ChannelDirectionQuery { direction }): Query<ChannelDirectionQuery>,
-    State(state): State<Arc<InternalState>>,
+    State(state): State<Arc<InternalState<H>>>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    let channel_id = match resolve_channel(&hopr, &address, direction) {
+    let channel_id = match resolve_channel(&*hopr, &address, direction) {
         Ok(ch) => *ch.get_id(),
         Err(status) => {
             let code = match status {
@@ -571,14 +571,14 @@ pub(crate) struct FundBodyRequest {
         ),
         tag = "Channels",
     )]
-pub(super) async fn fund_channel(
+pub(super) async fn fund_channel<H: crate::HoprNode>(
     Path(AddressParams { address }): Path<AddressParams>,
-    State(state): State<Arc<InternalState>>,
+    State(state): State<Arc<InternalState<H>>>,
     Json(fund_req): Json<FundBodyRequest>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    let channel_id = match resolve_channel(&hopr, &address, ChannelDirection::Outgoing) {
+    let channel_id = match resolve_channel(&*hopr, &address, ChannelDirection::Outgoing) {
         Ok(ch) => *ch.get_id(),
         Err(status) => {
             let code = match status {
@@ -656,7 +656,7 @@ mod tests {
     #[test]
     fn filter_open_channel_should_return_open_channel() {
         let ch = test_channel(ChannelStatus::Open);
-        let result = filter_open_channel::<HoprLibError>(Ok(Some(ch.clone())));
+        let result = filter_open_channel::<HoprLibError>(Ok(Some(ch)));
         assert!(result.is_ok());
         assert_eq!(result.unwrap().get_id(), ch.get_id());
     }

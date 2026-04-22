@@ -50,7 +50,7 @@ pub(crate) struct TicketPriceResponse {
         ),
         tag = "Network"
     )]
-pub(super) async fn price(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+pub(super) async fn price<H: crate::HoprNode>(State(state): State<Arc<InternalState<H>>>) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
     match hopr.get_ticket_price().await {
@@ -87,7 +87,7 @@ pub(crate) struct TicketProbabilityResponse {
         ),
         tag = "Network"
     )]
-pub(super) async fn probability(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+pub(super) async fn probability<H: crate::HoprNode>(State(state): State<Arc<InternalState<H>>>) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
     match hopr.get_minimum_incoming_ticket_win_probability().await {
@@ -148,7 +148,7 @@ pub(crate) struct ConnectedPeerResponse {
     ),
     tag = "Network"
 )]
-pub(super) async fn connected(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+pub(super) async fn connected<H: crate::HoprNode>(State(state): State<Arc<InternalState<H>>>) -> impl IntoResponse {
     let hopr = state.hopr.clone();
     let graph = hopr.graph();
     let edges = graph.connected_edges();
@@ -255,7 +255,7 @@ pub(crate) struct AnnouncedPeerResponse {
     ),
     tag = "Network"
 )]
-pub(super) async fn announced(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+pub(super) async fn announced<H: crate::HoprNode>(State(state): State<Arc<InternalState<H>>>) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
     match hopr.announced_peers().await {
@@ -316,8 +316,8 @@ pub(crate) struct GraphQueryRequest {
     ),
     tag = "Network"
 )]
-pub(super) async fn graph(
-    State(state): State<Arc<InternalState>>,
+pub(super) async fn graph<H: crate::HoprNode>(
+    State(state): State<Arc<InternalState<H>>>,
     Query(query): Query<GraphQueryRequest>,
 ) -> impl IntoResponse {
     let hopr = &state.hopr;

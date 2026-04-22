@@ -229,6 +229,57 @@ impl Abortable for ListenerJoinHandles {
     }
 }
 
+// ---------------------------------------------------------------------------
+// SessionFactory trait — abstracts session creation for testability
+// ---------------------------------------------------------------------------
+
+/// Trait abstracting HOPR session creation.
+///
+/// Production code uses `Hopr<...>` (via the blanket impl), while the REST API
+/// tests can provide a mock implementation.
+#[async_trait::async_trait]
+pub trait SessionFactory: Send + Sync + 'static {
+    async fn create_session(
+        &self,
+        dest: Address,
+        target: SessionTarget,
+        cfg: HoprSessionClientConfig,
+    ) -> Result<(HoprSession, HoprSessionConfigurator), anyhow::Error>;
+
+    fn session_idle_timeout(&self) -> Option<std::time::Duration>;
+}
+
+#[async_trait::async_trait]
+impl<Chain, Graph, Net, TMgr> SessionFactory for Hopr<Chain, Graph, Net, TMgr>
+where
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+    Graph: NetworkGraphView<NodeId = OffchainPublicKey>
+        + NetworkGraphUpdate
+        + NetworkGraphWrite<NodeId = OffchainPublicKey>
+        + NetworkGraphTraverse<NodeId = OffchainPublicKey>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+    <Graph as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
+    <Graph as NetworkGraphWrite>::Observed: EdgeObservableWrite + Send,
+    Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
+    TMgr: Send + Sync + 'static,
+{
+    async fn create_session(
+        &self,
+        dest: Address,
+        target: SessionTarget,
+        cfg: HoprSessionClientConfig,
+    ) -> Result<(HoprSession, HoprSessionConfigurator), anyhow::Error> {
+        Ok(HoprSessionClientOperations::connect_to(self, dest, target, cfg).await?)
+    }
+
+    fn session_idle_timeout(&self) -> Option<std::time::Duration> {
+        Some(self.config().protocol.session.idle_timeout)
+    }
+}
+
 type SessionPoolInner = Arc<parking_lot::Mutex<VecDeque<(HoprSession, HoprSessionConfigurator)>>>;
 
 pub struct SessionPool {
@@ -239,40 +290,25 @@ pub struct SessionPool {
 impl SessionPool {
     pub const MAX_SESSION_POOL_SIZE: usize = 5;
 
-    pub async fn new<Chain, Graph, Net, TMgr>(
+    pub async fn new(
         size: usize,
         dst: Address,
         target: SessionTarget,
         cfg: HoprSessionClientConfig,
-        hopr: Arc<Hopr<Chain, Graph, Net, TMgr>>,
-    ) -> Result<Self, anyhow::Error>
-    where
-        Chain: HoprChainApi + Clone + Send + Sync + 'static,
-        Graph: NetworkGraphView<NodeId = OffchainPublicKey>
-            + NetworkGraphUpdate
-            + NetworkGraphWrite<NodeId = OffchainPublicKey>
-            + NetworkGraphTraverse<NodeId = OffchainPublicKey>
-            + Clone
-            + Send
-            + Sync
-            + 'static,
-        <Graph as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
-        <Graph as NetworkGraphWrite>::Observed: EdgeObservableWrite + Send,
-        Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
-        TMgr: Send + Sync + 'static,
-    {
+        factory: Arc<dyn SessionFactory>,
+    ) -> Result<Self, anyhow::Error> {
         let pool = Arc::new(parking_lot::Mutex::new(VecDeque::with_capacity(size)));
-        let hopr_clone = hopr.clone();
+        let factory_clone = factory.clone();
         let pool_clone = pool.clone();
         futures::stream::iter(0..size.min(Self::MAX_SESSION_POOL_SIZE))
             .map(Ok)
             .try_for_each_concurrent(Self::MAX_SESSION_POOL_SIZE, move |i| {
                 let pool = pool_clone.clone();
-                let hopr = hopr_clone.clone();
+                let factory = factory_clone.clone();
                 let target = target.clone();
                 let cfg = cfg.clone();
                 async move {
-                    match hopr.connect_to(dst, target.clone(), cfg.clone()).await {
+                    match factory.create_session(dst, target.clone(), cfg.clone()).await {
                         Ok((session, configurator)) => {
                             debug!(session_id = %session.id(), num_session = i, "created a new session in pool");
                             pool.lock().push_back((session, configurator));
@@ -288,14 +324,14 @@ impl SessionPool {
             .await?;
 
         // Spawn a task that periodically sends keep alive messages to the Session in the pool.
-        if !pool.lock().is_empty() {
+        if let Some(timeout) = factory.session_idle_timeout().filter(|_| !pool.lock().is_empty()) {
             let pool_clone_1 = pool.clone();
             let pool_clone_2 = pool.clone();
             Ok(Self {
                 pool: Some(pool),
                 ah: Some(hopr_async_runtime::spawn_as_abortable!(
                     futures_time::stream::interval(futures_time::time::Duration::from(
-                        std::time::Duration::from_secs(1).max(hopr.config().protocol.session.idle_timeout / 2)
+                        std::time::Duration::from_secs(1).max(timeout / 2)
                     ))
                     .take_while(move |_| {
                         // Continue the infinite interval stream until there are sessions in the pool
@@ -342,32 +378,17 @@ impl Drop for SessionPool {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn create_tcp_client_binding<Chain, Graph, Net, TMgr>(
+pub async fn create_tcp_client_binding(
     bind_host: std::net::SocketAddr,
     port_range: Option<String>,
-    hopr: Arc<Hopr<Chain, Graph, Net, TMgr>>,
+    factory: Arc<dyn SessionFactory>,
     open_listeners: Arc<ListenerJoinHandles>,
     destination: Address,
     target_spec: SessionTargetSpec,
     config: HoprSessionClientConfig,
     use_session_pool: Option<usize>,
     max_client_sessions: Option<usize>,
-) -> Result<(std::net::SocketAddr, Option<SessionId>, usize), BindError>
-where
-    Chain: HoprChainApi + Clone + Send + Sync + 'static,
-    Graph: NetworkGraphView<NodeId = OffchainPublicKey>
-        + NetworkGraphUpdate
-        + NetworkGraphWrite<NodeId = OffchainPublicKey>
-        + NetworkGraphTraverse<NodeId = OffchainPublicKey>
-        + Clone
-        + Send
-        + Sync
-        + 'static,
-    <Graph as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
-    <Graph as NetworkGraphWrite>::Observed: EdgeObservableWrite + Send,
-    Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
-    TMgr: Send + Sync + 'static,
-{
+) -> Result<(std::net::SocketAddr, Option<SessionId>, usize), BindError> {
     // Bind the TCP socket first
     let (bound_host, tcp_listener) = tcp_listen_on(bind_host, port_range).await.map_err(|e| {
         if e.kind() == std::io::ErrorKind::AddrInUse {
@@ -392,7 +413,7 @@ where
         destination,
         target.clone(),
         config.clone(),
-        hopr.clone(),
+        factory.clone(),
     )
     .await
     .map_err(|e| BindError::UnknownFailure(e.to_string()))?;
@@ -416,7 +437,7 @@ where
             .for_each(move |accepted_client| {
                 let data = config_clone.clone();
                 let target = target.clone();
-                let hopr = hopr.clone();
+                let factory = factory.clone();
                 let active_sessions = active_sessions_clone_2.clone();
 
                 // Try to pop from the pool only if a client was accepted
@@ -445,7 +466,7 @@ where
                                 }
                                 None => {
                                     debug!("no more active sessions in the pool, creating a new one");
-                                    match hopr.connect_to(destination, target, data).await {
+                                    match factory.create_session(destination, target, data).await {
                                         Ok((s, c)) => (s, c),
                                         Err(error) => {
                                             error!(%error, "failed to establish session");
@@ -533,30 +554,15 @@ pub enum BindError {
     UnknownFailure(String),
 }
 
-pub async fn create_udp_client_binding<Chain, Graph, Net, TMgr>(
+pub async fn create_udp_client_binding(
     bind_host: std::net::SocketAddr,
     port_range: Option<String>,
-    hopr: Arc<Hopr<Chain, Graph, Net, TMgr>>,
+    factory: Arc<dyn SessionFactory>,
     open_listeners: Arc<ListenerJoinHandles>,
     destination: Address,
     target_spec: SessionTargetSpec,
     config: HoprSessionClientConfig,
-) -> Result<(std::net::SocketAddr, Option<SessionId>, usize), BindError>
-where
-    Chain: HoprChainApi + Clone + Send + Sync + 'static,
-    Graph: NetworkGraphView<NodeId = OffchainPublicKey>
-        + NetworkGraphUpdate
-        + NetworkGraphWrite<NodeId = OffchainPublicKey>
-        + NetworkGraphTraverse<NodeId = OffchainPublicKey>
-        + Clone
-        + Send
-        + Sync
-        + 'static,
-    <Graph as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
-    <Graph as NetworkGraphWrite>::Observed: EdgeObservableWrite + Send,
-    Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
-    TMgr: Send + Sync + 'static,
-{
+) -> Result<(std::net::SocketAddr, Option<SessionId>, usize), BindError> {
     // Bind the UDP socket first
     let (bound_host, udp_socket) = udp_bind_to(bind_host, port_range).await.map_err(|e| {
         if e.kind() == std::io::ErrorKind::AddrInUse {
@@ -574,8 +580,8 @@ where
         .map_err(|e| BindError::UnknownFailure(e.to_string()))?;
 
     // Create a single session for the UDP socket
-    let (session, configurator) = hopr
-        .connect_to(destination, target, config.clone())
+    let (session, configurator) = factory
+        .create_session(destination, target, config.clone())
         .await
         .map_err(|e| BindError::UnknownFailure(e.to_string()))?;
 

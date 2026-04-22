@@ -72,7 +72,7 @@ pub(super) async fn version() -> impl IntoResponse {
     ),
     tag = "Configuration"
     )]
-pub(super) async fn configuration(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+pub(super) async fn configuration<H: crate::HoprNode>(State(state): State<Arc<InternalState<H>>>) -> impl IntoResponse {
     (StatusCode::OK, Json(state.hoprd_cfg.clone())).into_response()
 }
 
@@ -131,7 +131,7 @@ pub(crate) struct NodeInfoResponse {
         ),
         tag = "Node"
     )]
-pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl IntoResponse, ApiError> {
+pub(super) async fn info<H: crate::HoprNode>(State(state): State<Arc<InternalState<H>>>) -> Result<impl IntoResponse, ApiError> {
     let hopr = state.hopr.clone();
 
     let identity = hopr.identity();

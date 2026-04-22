@@ -27,7 +27,7 @@ use crate::AppState;
         ),
         tag = "Checks"
     )]
-pub(super) async fn startedz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub(super) async fn startedz<H: crate::HoprNode>(State(state): State<Arc<AppState<H>>>) -> impl IntoResponse {
     eval_precondition(is_running(state)) // FIXME: improve this once node state granularity is improved
 }
 
@@ -56,7 +56,7 @@ pub(super) async fn startedz(State(state): State<Arc<AppState>>) -> impl IntoRes
         ),
         tag = "Checks"
     )]
-pub(super) async fn readyz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub(super) async fn readyz<H: crate::HoprNode>(State(state): State<Arc<AppState<H>>>) -> impl IntoResponse {
     eval_precondition(is_running(state.clone()) && is_minimally_connected(state).await)
 }
 
@@ -87,7 +87,7 @@ pub(super) async fn readyz(State(state): State<Arc<AppState>>) -> impl IntoRespo
         ),
         tag = "Checks"
     )]
-pub(super) async fn healthyz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub(super) async fn healthyz<H: crate::HoprNode>(State(state): State<Arc<AppState<H>>>) -> impl IntoResponse {
     eval_precondition(is_running(state.clone()) && is_minimally_connected(state).await)
 }
 
@@ -96,7 +96,7 @@ pub(super) async fn healthyz(State(state): State<Arc<AppState>>) -> impl IntoRes
 /// Returns `true` if the network health is `Orange`, `Yellow`, or `Green`.
 /// Returns `false` if the network health is `Unknown` or `Red`.
 #[inline]
-async fn is_minimally_connected(state: Arc<AppState>) -> bool {
+async fn is_minimally_connected<H: crate::HoprNode>(state: Arc<AppState<H>>) -> bool {
     matches!(
         state.hopr.network_view().health(),
         Health::Orange | Health::Yellow | Health::Green
@@ -108,7 +108,7 @@ async fn is_minimally_connected(state: Arc<AppState>) -> bool {
 /// Returns `true` only when `HoprState::Running`.
 /// Returns `false` for all other states (Uninitialized, Initializing, Indexing, Starting).
 #[inline]
-fn is_running(state: Arc<AppState>) -> bool {
+fn is_running<H: crate::HoprNode>(state: Arc<AppState<H>>) -> bool {
     matches!(HoprNodeOperations::status(&*state.hopr), HoprState::Running)
 }
 
@@ -137,7 +137,7 @@ fn eval_precondition(precondition: bool) -> impl IntoResponse {
         ),
         tag = "Checks"
     )]
-pub(super) async fn eligiblez(State(_state): State<Arc<AppState>>) -> impl IntoResponse {
+pub(super) async fn eligiblez<H: crate::HoprNode>(State(_state): State<Arc<AppState<H>>>) -> impl IntoResponse {
     (StatusCode::OK, "").into_response()
 }
 

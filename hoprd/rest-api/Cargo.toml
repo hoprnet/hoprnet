@@ -16,13 +16,11 @@ crate-type = ["rlib"]
 default = ["telemetry", "runtime-tokio"]
 telemetry = [
   "hopr-lib/telemetry",
-  "hopr-transport-p2p/telemetry",
   "dep:hopr-metrics",
   "dep:lazy_static",
   "dep:regex",
 ]
 runtime-tokio = [
-  "hopr-transport-p2p/runtime-tokio",
   "hopr-lib/runtime-tokio",
   "hopr-async-runtime/runtime-tokio",
 ]
@@ -57,10 +55,7 @@ hopr-lib = { workspace = true, features = [
 ] }
 
 hopr-async-runtime = { workspace = true }
-hopr-reference = { workspace = true }
-hopr-chain-connector = { workspace = true }
 hopr-network-graph = { workspace = true, features = ["petgraph", "graph-api"] }
-hopr-transport-p2p = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-utils-session = { workspace = true }
 

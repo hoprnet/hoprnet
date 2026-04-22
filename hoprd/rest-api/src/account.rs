@@ -40,7 +40,7 @@ pub(crate) struct AccountAddressesResponse {
         ),
         tag = "Account",
     )]
-pub(super) async fn addresses(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+pub(super) async fn addresses<H: crate::HoprNode>(State(state): State<Arc<InternalState<H>>>) -> impl IntoResponse {
     let addresses = AccountAddressesResponse {
         native: state.hopr.identity().node_address.to_checksum(),
     };
@@ -97,7 +97,7 @@ pub(crate) struct AccountBalancesResponse {
         ),
         tag = "Account",
     )]
-pub(super) async fn balances(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+pub(super) async fn balances<H: crate::HoprNode>(State(state): State<Arc<InternalState<H>>>) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
     let mut account_balances = AccountBalancesResponse::default();
@@ -181,8 +181,8 @@ pub(crate) struct WithdrawResponse {
         ),
         tag = "Account",
     )]
-pub(super) async fn withdraw(
-    State(state): State<Arc<InternalState>>,
+pub(super) async fn withdraw<H: crate::HoprNode>(
+    State(state): State<Arc<InternalState<H>>>,
     Json(req_data): Json<WithdrawBodyRequest>,
 ) -> impl IntoResponse {
     if let Ok(native) = XDaiBalance::from_str(&req_data.amount) {
