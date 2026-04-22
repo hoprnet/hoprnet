@@ -32,12 +32,6 @@ use hopr_api::OffchainPublicKey;
 pub use petgraph::*;
 pub use weight::Observations;
 
-/// Default penalty multiplier for edges lacking probe-based quality observations.
-pub const DEFAULT_EDGE_PENALTY: f64 = 0.5;
-
-/// Default minimum acceptable message acknowledgment rate for path selection.
-pub const DEFAULT_MIN_ACK_RATE: f64 = 0.1;
-
 /// A thread-safe, shareable handle to a [`ChannelGraph`].
 ///
 /// This is a convenience alias. Since [`ChannelGraph`] uses interior mutability,

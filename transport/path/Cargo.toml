@@ -22,6 +22,7 @@ moka = { workspace = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+validator = { workspace = true }
 
 hopr-api = { workspace = true, features = ["chain", "graph"] }
 hopr-statistics = { workspace = true, features = ["weighted"] }

@@ -5,7 +5,7 @@ use hopr_api::OffchainPublicKey;
 use parking_lot::RwLock;
 use petgraph::graph::{DiGraph, NodeIndex};
 
-use crate::{DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE, Observations, errors::ChannelGraphError};
+use crate::{Observations, errors::ChannelGraphError};
 
 /// Internal mutable state of a [`ChannelGraph`], protected by a lock.
 #[derive(Debug, Clone, Default)]
@@ -34,12 +34,16 @@ pub struct ChannelGraph {
 }
 
 impl ChannelGraph {
-    /// Creates a new channel graph with the given self identity and default edge scoring parameters.
+    /// Creates a new channel graph with the given self identity and default edge scoring
+    /// parameters (edge_penalty = 0.5, min_ack_rate = 0.1).
     ///
     /// The `me` key represents the local node which is automatically added
     /// to the graph as the first node.
+    ///
+    /// Production code should prefer [`with_edge_params`](Self::with_edge_params) to
+    /// receive values from [`PathPlannerConfig`](hopr_transport_path::PathPlannerConfig).
     pub fn new(me: OffchainPublicKey) -> Self {
-        Self::with_edge_params(me, DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE)
+        Self::with_edge_params(me, 0.5, 0.1)
     }
 
     /// Creates a new channel graph with custom edge scoring parameters.
