@@ -51,14 +51,14 @@ ahash = "0.8.12"
 anyhow = "1.0.102"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6" }
-assertables = "9.8.6"
+assertables = "9.9.0"
 async-broadcast = "0.7.2"
 async-lock = "3.4.2"
 async-signal = "0.2.14"
 async-trait = "0.1.89"
 asynchronous-codec = { version = "0.7.0" }
 auto_impl = "1.3.0"
-axum = { version = "0.8.8", features = ["http2"] }
+axum = { version = "0.8.9", features = ["http2"] }
 backon = { version = "1.6.0", default-features = false }
 base64 = "0.22.1"
 bimap = "0.6.3"
@@ -73,8 +73,8 @@ chrono = { version = "0.4.44", default-features = false, features = [
   "std",
   "clock",
 ] }
-clap = { version = "4.6.0", features = ["derive", "env", "string"] }
-const_format = "0.2.35"
+clap = { version = "4.6.1", features = ["derive", "env", "string"] }
+const_format = "0.2.36"
 console-subscriber = "0.5.0"
 criterion = { version = "0.8.2", default-features = false, features = [
   "cargo_bench_support",
@@ -97,7 +97,7 @@ halfbrown = "0.4.0"
 hashbrown = "0.17.0"
 hex = "0.4.3"
 hex-literal = "1.1.0"
-hickory-resolver = { version = "0.25.2", default-features = false, features = [
+hickory-resolver = { version = "0.26.0", default-features = false, features = [
   "system-config",
 ] }
 http = "1.4.0"
@@ -144,10 +144,10 @@ postcard = { version = "1.1.3", default-features = false, features = ["alloc"] }
 proc-macro-regex = "~1.1.0"
 progenitor = "0.13.0"
 progenitor-client = "0.13.0"
-rayon = "1.11.0"
+rayon = "1.12.0"
 rand = { version = "0.10.1", features = ["thread_rng"] }
 rand_distr = "0.6.0"
-redb = "4.0.0"
+redb = "4.1.0"
 regex = "1.12.3"
 reqwest = { version = "0.13.2", default-features = false, features = [
   "json",
@@ -173,11 +173,11 @@ strum = { version = "0.28.0", features = ["derive"] }
 subtle = "2.6.1"
 syn = { version = "2.0.117", features = ["full"] }
 tempfile = "3.27.0"
-test-log = { version = "0.2.19", features = ["trace"] }
+test-log = { version = "0.2.20", features = ["trace"] }
 thiserror = "2.0.18"
 tikv-jemallocator = "0.6.1"
 tikv-jemalloc-ctl = { version = "0.6.1", features = ["stats"] }
-tokio = { version = "1.51.1", features = [
+tokio = { version = "1.52.1", features = [
   "rt-multi-thread",
   "macros",
   "tracing",
@@ -186,7 +186,7 @@ tokio-util = { version = "0.7.18", default-features = false, features = [
   "codec",
   "compat",
 ] }
-tokio-retry = "0.3.0"
+tokio-retry = "0.3.1"
 tokio-stream = { version = "0.1.18", features = ["net"] }
 tower-http = { version = "0.6.8", features = [
   "validate-request",
@@ -210,11 +210,11 @@ tracing-subscriber = { version = "0.3.23", features = [
   "registry",
   "std",
 ] }
-typenum = "1.19.0"
-uuid = { version = "1.23.0" }
+typenum = "1.20.0"
+uuid = { version = "1.23.1" }
 validator = { version = "0.20.0", features = ["derive"] }
 vergen-gix = { version = "9.1.0", features = ["build"] }
-mimalloc = { version = "0.1.48", default-features = false, features = [
+mimalloc = { version = "0.1.49", default-features = false, features = [
   "secure",
 ] }
 
