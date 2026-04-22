@@ -101,7 +101,7 @@ jobs:
           set -e
 
           # Extract Bencher Report URL
-          BENCHER_REPORT_URL=$(grep -oE "https://bencher.dev/perf/${BENCHER_PROJECT}/reports/[^[:space:]]+" bencher_output.txt | head -n 1)
+          BENCHER_REPORT_URL=$(grep -oE "https://bencher.dev/console/projects/${BENCHER_PROJECT}/reports/[^[:space:]]+" bencher_output.txt | head -n 1)
           echo "bencher_report_url=${BENCHER_REPORT_URL:-https://bencher.dev/console/projects/${BENCHER_PROJECT}}" >> "$GITHUB_OUTPUT"
 
           exit $EXIT_CODE

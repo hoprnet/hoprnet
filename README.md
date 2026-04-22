@@ -18,6 +18,9 @@
   <a href="https://codecov.io/gh/hoprnet/hoprnet">
     <img src="https://codecov.io/gh/hoprnet/hoprnet/branch/master/graph/badge.svg" alt="codecov">
   </a>
+  <a href="https://bencher.dev/console/projects/hoprnet/perf">
+    <img src="https://img.shields.io/badge/Performance-Bencher-6366f1?style=flat&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iI2ZmZiIgZD0iTTEyIDJMMiA3djEwbDEwIDUgMTAtNVY3bC0xMC01ek00IDguOTVsOC00IDggNGwtOCA0LTgtNHptOCAxMC4xNWwtNi0zVjEwbDYgM3Y2LjE1em04LTMuMTVsbC02IDNWMTBsNi0zdjYuMTV6Ii8+PC9zdmc+" alt="Bencher Performance Dashboard">
+  </a>
 </p>
 
 ## Table of Contents
