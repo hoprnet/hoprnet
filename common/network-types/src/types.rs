@@ -4,7 +4,6 @@ use std::{
     str::FromStr,
 };
 
-use hickory_resolver::name_server::ConnectionProvider;
 use libp2p_identity::PeerId;
 
 use crate::errors::NetworkTypeError;
@@ -74,34 +73,17 @@ impl IpOrHost {
     /// Uses `tokio` resolver.
     #[cfg(feature = "runtime-tokio")]
     pub async fn resolve_tokio(self) -> std::io::Result<Vec<SocketAddr>> {
-        cfg_if::cfg_if! {
-            if #[cfg(test)] {
-                // This resolver setup is used in the tests to be executed in a sandbox environment
-                // which prevents IO access to system-level files.
-                let config = hickory_resolver::config::ResolverConfig::new();
-                let options = hickory_resolver::config::ResolverOpts::default();
-                let resolver = hickory_resolver::Resolver::builder_with_config(config, hickory_resolver::name_server::TokioConnectionProvider::default()).with_options(options).build();
-            } else {
-                let resolver = hickory_resolver::Resolver::builder_tokio()?.build();
-            }
-        };
-
-        self.resolve(resolver).await
-    }
-
-    /// Tries to resolve the DNS name and returns all IP addresses found.
-    /// If this enum is already an IP address and port, it will simply return it.
-    pub async fn resolve<P: ConnectionProvider>(
-        self,
-        resolver: hickory_resolver::Resolver<P>,
-    ) -> std::io::Result<Vec<SocketAddr>> {
         match self {
-            IpOrHost::Dns(name, port) => Ok(resolver
-                .lookup_ip(name)
-                .await?
-                .into_iter()
-                .map(|ip| SocketAddr::new(ip, port))
-                .collect()),
+            IpOrHost::Dns(name, port) => {
+                use std::str::FromStr;
+                let addr = std::net::IpAddr::from_str(&name)
+                    .ok()
+                    .map(|ip| vec![std::net::SocketAddr::new(ip, port)])
+                    .ok_or_else(|| {
+                        std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid DNS name or IP address")
+                    })?;
+                Ok(addr)
+            }
             IpOrHost::Ip(addr) => Ok(vec![addr]),
         }
     }
