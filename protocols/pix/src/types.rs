@@ -1,13 +1,39 @@
+use hopr_types::crypto::crypto_traits;
+use hopr_types::crypto::crypto_traits::{KeyIvInit, StreamCipher};
 use vsss_rs::elliptic_curve::{Curve, PrimeField, generic_array::{GenericArray, ArrayLength}};
 use hopr_types::crypto::prelude::HalfKey;
-use hopr_types::crypto::primitives::Blake3;
-use hopr_types::internal::prelude::CoreTypesError::CryptoError;
-use crate::{PixSpec, Scalar};
+use hopr_types::crypto::primitives::{Blake3, ChaCha20};
+use crate::{PixSpec, Scalar, errors};
 
 /// Type used to index Session Stealth Addresses (SSA).
 ///
 /// Note that SSA Index starts with 1.
 pub type SsaIndex = u32;
+
+fn derive_ssa_encryption_key<S: PixSpec>(spi: &SsaPolynomialIndex<S::Pseudonym>, ack: &HalfKey) -> errors::Result<ChaCha20> {
+    let mut output = Blake3::new_derive_key("HASH_SSA_SHARE")
+        .update_reader(ack.as_ref())
+        .map_err(|_| hopr_types::crypto::errors::CryptoError::InvalidInputValue("invalid ssa encryption key"))?
+        .update_reader(spi.pseudonym.as_ref())
+        .map_err(|_| hopr_types::crypto::errors::CryptoError::InvalidInputValue("invalid ssa encryption key"))?
+        .update_reader(spi.ssa_index.to_be_bytes().as_ref())
+        .map_err(|_| hopr_types::crypto::errors::CryptoError::InvalidInputValue("invalid ssa encryption key"))?
+        .update_reader(spi.poly_index.to_be_bytes().as_ref())
+        .map_err(|_| hopr_types::crypto::errors::CryptoError::InvalidInputValue("invalid ssa encryption key"))?
+        .finalize_xof();
+
+    let mut key = crypto_traits::Key::<ChaCha20>::default();
+    let mut iv = crypto_traits::Iv::<ChaCha20>::default();
+
+    let mut out = vec![0u8; key.len() + iv.len()];
+    output.fill(&mut out);
+
+    let (v_iv, v_key) = out.split_at(iv.len());
+    iv.copy_from_slice(v_iv);
+    key.copy_from_slice(v_key);
+
+    Ok(ChaCha20::new(&key, &iv))
+}
 
 /// Contains an encrypted partial Session Stealth Address (SSA) share.
 ///
@@ -17,14 +43,11 @@ pub type SsaIndex = u32;
 pub struct EncryptedPartialSsaShare<S: PixSpec>(GenericArray<u8, <<S as PixSpec>::Curve as Curve>::FieldBytesSize>);
 
 impl<S: PixSpec> EncryptedPartialSsaShare<S> {
-    pub fn decrypt(self, key: &HalfKey) -> PartialSsaShare<S> {
-        /*let output = Blake3::new_derive_key("HASH_SSA_SHARE")
-            .update_reader(key.as_ref())
-            .map_err(|e| hopr_types::crypto::errors::CryptoError::InvalidInputValue("invalid ssa encryption key"))?
-            .finalize_xof();*/
-        todo!()
-
-
+    pub fn decrypt(self, spi: &SsaPolynomialIndex<S::Pseudonym>,  key: &HalfKey) -> errors::Result<PartialSsaShare<S>> {
+        let mut cipher = derive_ssa_encryption_key::<S>(spi, key)?;
+        let mut data = self.0;
+        cipher.apply_keystream(&mut data);
+        Ok(PartialSsaShare(data))
     }
 }
 
