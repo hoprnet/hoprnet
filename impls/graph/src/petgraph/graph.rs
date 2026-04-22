@@ -41,7 +41,7 @@ impl ChannelGraph {
     /// to the graph as the first node.
     ///
     /// Production code should prefer [`with_edge_params`](Self::with_edge_params) to
-    /// receive values from [`PathPlannerConfig`](hopr_transport_path::PathPlannerConfig).
+    /// receive values from `PathPlannerConfig`.
     pub fn new(me: OffchainPublicKey) -> Self {
         Self::with_edge_params(me, 0.5, 0.1)
     }
