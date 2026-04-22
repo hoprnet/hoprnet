@@ -153,38 +153,41 @@ mod tests {
     use tower::ServiceExt;
 
     use super::*;
-    use crate::testing::StubNode;
+    use crate::testing::{ChecksNode, MockNodeOps, NoopNode};
 
-    fn checks_router(stub: StubNode) -> Router {
-        let state: Arc<AppState<StubNode>> = Arc::new(AppState {
-            hopr: Arc::new(stub),
-        });
+    /// Build a startedz-only router — only needs `HoprNodeOperations`.
+    fn startedz_router(mock: MockNodeOps) -> Router {
         Router::new()
-            .route("/startedz", get(startedz::<StubNode>))
-            .route("/readyz", get(readyz::<StubNode>))
-            .route("/healthyz", get(healthyz::<StubNode>))
-            .route("/eligiblez", get(eligiblez::<StubNode>))
-            .with_state(state)
+            .route("/startedz", get(startedz::<MockNodeOps>))
+            .with_state(Arc::new(AppState { hopr: Arc::new(mock) }))
+    }
+
+    /// Build a readyz/healthyz router — needs `HoprNodeOperations + HasNetworkView`.
+    fn readyz_router(node: ChecksNode) -> Router {
+        Router::new()
+            .route("/readyz", get(readyz::<ChecksNode>))
+            .route("/healthyz", get(healthyz::<ChecksNode>))
+            .with_state(Arc::new(AppState { hopr: Arc::new(node) }))
     }
 
     #[test]
     fn eval_precondition_should_return_ok_when_true() {
-        let response = eval_precondition(true);
-        let (parts, _) = response.into_response().into_parts();
+        let (parts, _) = eval_precondition(true).into_response().into_parts();
         assert_eq!(parts.status, StatusCode::OK);
     }
 
     #[test]
     fn eval_precondition_should_return_precondition_failed_when_false() {
-        let response = eval_precondition(false);
-        let (parts, _) = response.into_response().into_parts();
+        let (parts, _) = eval_precondition(false).into_response().into_parts();
         assert_eq!(parts.status, StatusCode::PRECONDITION_FAILED);
     }
 
     #[tokio::test]
     async fn startedz_should_return_200_when_running() -> anyhow::Result<()> {
-        let app = checks_router(StubNode::running_and_healthy());
-        let resp = app
+        let mut mock = MockNodeOps::new();
+        mock.expect_status().returning(|| HoprState::Running);
+
+        let resp = startedz_router(mock)
             .oneshot(Request::get("/startedz").body(Body::empty())?)
             .await?;
         assert_eq!(resp.status(), StatusCode::OK);
@@ -193,8 +196,11 @@ mod tests {
 
     #[tokio::test]
     async fn startedz_should_return_412_when_not_running() -> anyhow::Result<()> {
-        let app = checks_router(StubNode::running_and_healthy().with_state(HoprState::Uninitialized));
-        let resp = app
+        let mut mock = MockNodeOps::new();
+        mock.expect_status()
+            .returning(|| HoprState::Uninitialized);
+
+        let resp = startedz_router(mock)
             .oneshot(Request::get("/startedz").body(Body::empty())?)
             .await?;
         assert_eq!(resp.status(), StatusCode::PRECONDITION_FAILED);
@@ -203,8 +209,7 @@ mod tests {
 
     #[tokio::test]
     async fn readyz_should_return_200_when_running_and_connected() -> anyhow::Result<()> {
-        let app = checks_router(StubNode::running_and_healthy());
-        let resp = app
+        let resp = readyz_router(ChecksNode::new(HoprState::Running, Health::Green))
             .oneshot(Request::get("/readyz").body(Body::empty())?)
             .await?;
         assert_eq!(resp.status(), StatusCode::OK);
@@ -213,8 +218,7 @@ mod tests {
 
     #[tokio::test]
     async fn readyz_should_return_412_when_running_but_red() -> anyhow::Result<()> {
-        let app = checks_router(StubNode::running_and_healthy().with_health(Health::Red));
-        let resp = app
+        let resp = readyz_router(ChecksNode::new(HoprState::Running, Health::Red))
             .oneshot(Request::get("/readyz").body(Body::empty())?)
             .await?;
         assert_eq!(resp.status(), StatusCode::PRECONDITION_FAILED);
@@ -223,8 +227,7 @@ mod tests {
 
     #[tokio::test]
     async fn readyz_should_return_412_when_not_running() -> anyhow::Result<()> {
-        let app = checks_router(StubNode::running_and_healthy().with_state(HoprState::WaitingForFunds));
-        let resp = app
+        let resp = readyz_router(ChecksNode::new(HoprState::WaitingForFunds, Health::Green))
             .oneshot(Request::get("/readyz").body(Body::empty())?)
             .await?;
         assert_eq!(resp.status(), StatusCode::PRECONDITION_FAILED);
@@ -233,8 +236,7 @@ mod tests {
 
     #[tokio::test]
     async fn healthyz_should_return_200_when_running_and_orange() -> anyhow::Result<()> {
-        let app = checks_router(StubNode::running_and_healthy().with_health(Health::Orange));
-        let resp = app
+        let resp = readyz_router(ChecksNode::new(HoprState::Running, Health::Orange))
             .oneshot(Request::get("/healthyz").body(Body::empty())?)
             .await?;
         assert_eq!(resp.status(), StatusCode::OK);
@@ -243,7 +245,11 @@ mod tests {
 
     #[tokio::test]
     async fn eligiblez_should_always_return_200() -> anyhow::Result<()> {
-        let app = checks_router(StubNode::running_and_healthy());
+        let app = Router::new()
+            .route("/eligiblez", get(eligiblez::<NoopNode>))
+            .with_state(Arc::new(AppState {
+                hopr: Arc::new(NoopNode),
+            }));
         let resp = app
             .oneshot(Request::get("/eligiblez").body(Body::empty())?)
             .await?;

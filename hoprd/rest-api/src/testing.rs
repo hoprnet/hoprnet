@@ -1,8 +1,8 @@
-//! Test infrastructure for REST API handler testing.
+//! Test mocks for REST API handler testing.
 //!
-//! Provides stub types implementing the minimal hopr-api trait subsets that
-//! individual handlers require. Each stub satisfies the narrowed trait bounds
-//! so handlers can be tested in isolation without the full `Hopr<...>` type.
+//! Uses `mockall::mock!` on the narrowed trait interfaces that individual
+//! handlers require. Each mock covers the minimal trait surface for one
+//! group of endpoints.
 
 use std::collections::HashSet;
 
@@ -15,95 +15,78 @@ use hopr_lib::{
 };
 
 // ---------------------------------------------------------------------------
-// Stub for HoprNodeOperations + HasNetworkView (checks, node endpoints)
+// Mock for HoprNodeOperations (startedz)
 // ---------------------------------------------------------------------------
 
-/// Minimal stub satisfying `HoprNodeOperations + HasNetworkView`.
-///
-/// Used by checks endpoints (`startedz`, `readyz`, `healthyz`).
-pub struct StubNode {
-    pub state: HoprState,
-    pub net: StubNetworkView,
+mockall::mock! {
+    pub NodeOps {}
+    impl HoprNodeOperations for NodeOps {
+        fn status(&self) -> HoprState;
+    }
 }
 
-impl StubNode {
-    pub fn running_and_healthy() -> Self {
+// ---------------------------------------------------------------------------
+// Mock for NetworkView
+// ---------------------------------------------------------------------------
+
+mockall::mock! {
+    pub NetView {}
+    #[allow(refining_impl_trait)]
+    impl NetworkView for NetView {
+        fn listening_as(&self) -> HashSet<Multiaddr>;
+        fn multiaddress_of(&self, peer: &PeerId) -> Option<HashSet<Multiaddr>>;
+        fn discovered_peers(&self) -> HashSet<PeerId>;
+        fn connected_peers(&self) -> HashSet<PeerId>;
+        fn is_connected(&self, peer: &PeerId) -> bool;
+        fn health(&self) -> Health;
+        fn subscribe_network_events(&self) -> futures::stream::Empty<NetworkEvent>;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Composite mock for HoprNodeOperations + HasNetworkView (readyz, healthyz)
+// ---------------------------------------------------------------------------
+
+/// Composite mock implementing both `HoprNodeOperations` and `HasNetworkView`.
+///
+/// mockall can't mock two traits with same-named methods (`status`) in one
+/// `mock!` block, so we compose them manually.
+pub struct ChecksNode {
+    pub node_state: HoprState,
+    pub net: MockNetView,
+}
+
+impl ChecksNode {
+    pub fn new(state: HoprState, health: Health) -> Self {
+        let mut net = MockNetView::new();
+        net.expect_health().returning(move || health);
         Self {
-            state: HoprState::Running,
-            net: StubNetworkView {
-                health: Health::Green,
-            },
+            node_state: state,
+            net,
         }
     }
-
-    pub fn with_state(mut self, state: HoprState) -> Self {
-        self.state = state;
-        self
-    }
-
-    pub fn with_health(mut self, health: Health) -> Self {
-        self.net.health = health;
-        self
-    }
 }
 
-impl HoprNodeOperations for StubNode {
+impl HoprNodeOperations for ChecksNode {
     fn status(&self) -> HoprState {
-        self.state
+        self.node_state
     }
 }
 
-impl HasNetworkView for StubNode {
-    type NetworkView = StubNetworkView;
-
-    fn network_view(&self) -> &StubNetworkView {
+impl HasNetworkView for ChecksNode {
+    type NetworkView = MockNetView;
+    fn network_view(&self) -> &MockNetView {
         &self.net
     }
-
     fn status(&self) -> ComponentStatus {
         ComponentStatus::Ready
     }
 }
 
-/// Stub `NetworkView` returning configured health.
-pub struct StubNetworkView {
-    pub health: Health,
-}
-
-impl NetworkView for StubNetworkView {
-    fn listening_as(&self) -> HashSet<Multiaddr> {
-        HashSet::new()
-    }
-
-    fn multiaddress_of(&self, _peer: &PeerId) -> Option<HashSet<Multiaddr>> {
-        None
-    }
-
-    fn discovered_peers(&self) -> HashSet<PeerId> {
-        HashSet::new()
-    }
-
-    fn connected_peers(&self) -> HashSet<PeerId> {
-        HashSet::new()
-    }
-
-    fn is_connected(&self, _peer: &PeerId) -> bool {
-        false
-    }
-
-    fn health(&self) -> Health {
-        self.health
-    }
-
-    fn subscribe_network_events(&self) -> impl futures::Stream<Item = NetworkEvent> + Send + 'static {
-        futures::stream::empty()
-    }
-}
-
 // ---------------------------------------------------------------------------
-// Bare stub satisfying only Send + Sync + 'static
+// Bare unit type for handlers that don't use hopr at all
 // ---------------------------------------------------------------------------
 
-/// Stub satisfying only `Send + Sync + 'static` — for handlers that don't
-/// use `state.hopr` at all (e.g., `configuration`, `list_clients`, `authenticate`).
-pub struct StubUnit;
+/// For handlers bound only on `Send + Sync + 'static`
+/// (`configuration`, `list_clients`, `close_client`, `authenticate`).
+pub struct NoopNode;

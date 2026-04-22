@@ -224,3 +224,6 @@ pub(super) async fn withdraw<H: HasChainApi<ChainError = hopr_lib::errors::HoprL
             .into_response()
     }
 }
+
+// TODO(#7910): Add endpoint tests with mockall mocks for HasChainApi once
+// HoprChainApi sub-traits are mockable (requires hopr-api trait simplification).

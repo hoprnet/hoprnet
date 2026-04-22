@@ -5262,6 +5262,7 @@ dependencies = [
  "hopr-utils-session",
  "human-bandwidth",
  "lazy_static",
+ "mockall",
  "oas3",
  "regex",
  "serde",

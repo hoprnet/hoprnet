@@ -829,18 +829,18 @@ mod tests {
     use tower::ServiceExt;
 
     use super::*;
-    use crate::testing::StubUnit;
+    use crate::testing::NoopNode;
 
     fn session_router() -> Router {
-        let state: Arc<InternalState<StubUnit>> = Arc::new(InternalState {
+        let state: Arc<InternalState<NoopNode>> = Arc::new(InternalState {
             hoprd_cfg: serde_json::json!({}),
             auth: Arc::new(crate::config::Auth::None),
-            hopr: Arc::new(StubUnit),
+            hopr: Arc::new(NoopNode),
             open_listeners: Arc::new(hopr_utils_session::ListenerJoinHandles::default()),
             default_listen_host: "127.0.0.1:0".parse().unwrap(),
         });
         Router::new()
-            .route("/session/{protocol}", get(list_clients::<StubUnit>))
+            .route("/session/{protocol}", get(list_clients::<NoopNode>))
             .with_state(state)
     }
 

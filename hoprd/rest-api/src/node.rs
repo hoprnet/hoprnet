@@ -173,16 +173,16 @@ mod tests {
     use tower::ServiceExt;
 
     use super::*;
-    use crate::testing::StubUnit;
+    use crate::testing::NoopNode;
 
     fn node_router() -> Router {
-        let state: Arc<InternalState<StubUnit>> = Arc::new(InternalState {
+        let state: Arc<InternalState<NoopNode>> = Arc::new(InternalState {
             hoprd_cfg: serde_json::json!({
                 "network": "test-network",
                 "provider": "http://localhost:8545"
             }),
             auth: Arc::new(crate::config::Auth::None),
-            hopr: Arc::new(StubUnit),
+            hopr: Arc::new(NoopNode),
             open_listeners: Arc::new(hopr_utils_session::ListenerJoinHandles::default()),
             default_listen_host: "127.0.0.1:0".parse().unwrap(),
         });
@@ -190,7 +190,7 @@ mod tests {
             .route(&format!("{BASE_PATH}/node/version"), get(version))
             .route(
                 &format!("{BASE_PATH}/node/configuration"),
-                get(configuration::<StubUnit>),
+                get(configuration::<NoopNode>),
             )
             .with_state(state)
     }
@@ -199,7 +199,7 @@ mod tests {
     async fn version_should_return_app_version() -> anyhow::Result<()> {
         let app = node_router();
         let resp = app
-            .oneshot(Request::get(&format!("{BASE_PATH}/node/version")).body(Body::empty())?)
+            .oneshot(Request::get(format!("{BASE_PATH}/node/version")).body(Body::empty())?)
             .await?;
         assert_eq!(resp.status(), StatusCode::OK);
 
@@ -213,7 +213,7 @@ mod tests {
     async fn configuration_should_return_hoprd_config() -> anyhow::Result<()> {
         let app = node_router();
         let resp = app
-            .oneshot(Request::get(&format!("{BASE_PATH}/node/configuration")).body(Body::empty())?)
+            .oneshot(Request::get(format!("{BASE_PATH}/node/configuration")).body(Body::empty())?)
             .await?;
         assert_eq!(resp.status(), StatusCode::OK);
 
