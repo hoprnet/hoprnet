@@ -202,7 +202,6 @@ fn component_status_to_info(status: &ComponentStatus) -> ComponentStatusInfo {
     }
 }))]
 #[serde(rename_all = "camelCase")]
-/// Aggregated status of the HOPR node and its components.
 pub(crate) struct NodeStatusResponse {
     /// Aggregated status across all components.
     #[schema(example = "Ready")]

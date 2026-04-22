@@ -560,28 +560,25 @@ where
     /// derived from component statuses (Running → Degraded → Failed).
     pub fn component_statuses(&self) -> NodeComponentStatuses {
         let base = self.state.load(Ordering::Relaxed);
-        let chain = HasChainApi::status(self);
-        let network = HasNetworkView::status(self);
-        let transport = HasTransportApi::status(self);
-
-        let node_state = if base == HoprState::Running {
-            let statuses = [&chain, &network, &transport];
-            if statuses.iter().any(|s| s.is_unavailable()) {
-                HoprState::Failed
-            } else if statuses.iter().any(|s| s.is_degraded()) {
-                HoprState::Degraded
-            } else {
-                HoprState::Running
-            }
-        } else {
-            base
+        let statuses = NodeComponentStatuses {
+            node_state: base,
+            chain: HasChainApi::status(self),
+            network: HasNetworkView::status(self),
+            transport: HasTransportApi::status(self),
         };
 
-        NodeComponentStatuses {
-            node_state,
-            chain,
-            network,
-            transport,
+        // Derive aggregate HoprState from component statuses once Running
+        if base == HoprState::Running {
+            NodeComponentStatuses {
+                node_state: match statuses.aggregate() {
+                    ComponentStatus::Unavailable(_) => HoprState::Failed,
+                    ComponentStatus::Degraded(_) | ComponentStatus::Initializing(_) => HoprState::Degraded,
+                    ComponentStatus::Ready => HoprState::Running,
+                },
+                ..statuses
+            }
+        } else {
+            statuses
         }
     }
 }

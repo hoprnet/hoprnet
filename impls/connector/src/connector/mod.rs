@@ -48,7 +48,8 @@ const DEFAULT_SYNC_TOLERANCE_PCT: usize = 90;
 /// Connector health states encoded as atomic u8.
 ///
 /// Each value maps to a `ComponentStatus` variant plus a fixed detail message.
-/// This avoids heap allocation and locking when reading health status.
+/// Storage and updates are lock-free via `AtomicU8`; reads convert to
+/// `ComponentStatus` which allocates for non-`Ready` variants.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ChainHealthState {
@@ -81,7 +82,10 @@ impl ChainHealthState {
             5 => Self::ServerNotHealthy,
             6 => Self::ConnectionFailed,
             7 => Self::Dropped,
-            _ => Self::ConnectionFailed,
+            _ => {
+                debug_assert!(false, "unknown ChainHealthState discriminant: {v}");
+                Self::ConnectionFailed
+            }
         }
     }
 
