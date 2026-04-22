@@ -71,35 +71,35 @@ enum ChainHealthState {
     Dropped = 7,
 }
 
-impl ChainHealthState {
-    fn from_u8(v: u8) -> Self {
+impl TryFrom<u8> for ChainHealthState {
+    type Error = u8;
+
+    fn try_from(v: u8) -> Result<Self, Self::Error> {
         match v {
-            0 => Self::Ready,
-            1 => Self::WaitingForConnection,
-            2 => Self::Connecting,
-            3 => Self::SubscriptionEnded,
-            4 => Self::SyncTimedOut,
-            5 => Self::ServerNotHealthy,
-            6 => Self::ConnectionFailed,
-            7 => Self::Dropped,
-            _ => {
-                debug_assert!(false, "unknown ChainHealthState discriminant: {v}");
-                Self::ConnectionFailed
-            }
+            0 => Ok(Self::Ready),
+            1 => Ok(Self::WaitingForConnection),
+            2 => Ok(Self::Connecting),
+            3 => Ok(Self::SubscriptionEnded),
+            4 => Ok(Self::SyncTimedOut),
+            5 => Ok(Self::ServerNotHealthy),
+            6 => Ok(Self::ConnectionFailed),
+            7 => Ok(Self::Dropped),
+            unknown => Err(unknown),
         }
     }
+}
 
-    fn to_component_status(self) -> hopr_api::node::ComponentStatus {
-        use hopr_api::node::ComponentStatus;
-        match self {
-            Self::Ready => ComponentStatus::Ready,
-            Self::WaitingForConnection => ComponentStatus::Initializing("waiting for chain connection".into()),
-            Self::Connecting => ComponentStatus::Initializing("connecting to blokli".into()),
-            Self::SubscriptionEnded => ComponentStatus::Degraded("chain subscription ended".into()),
-            Self::SyncTimedOut => ComponentStatus::Degraded("connection sync timed out".into()),
-            Self::ServerNotHealthy => ComponentStatus::Unavailable("blokli server not healthy".into()),
-            Self::ConnectionFailed => ComponentStatus::Unavailable("chain connection failed".into()),
-            Self::Dropped => ComponentStatus::Unavailable("connector dropped".into()),
+impl From<ChainHealthState> for hopr_api::node::ComponentStatus {
+    fn from(state: ChainHealthState) -> Self {
+        match state {
+            ChainHealthState::Ready => Self::Ready,
+            ChainHealthState::WaitingForConnection => Self::Initializing("waiting for chain connection".into()),
+            ChainHealthState::Connecting => Self::Initializing("connecting to blokli".into()),
+            ChainHealthState::SubscriptionEnded => Self::Degraded("chain subscription ended".into()),
+            ChainHealthState::SyncTimedOut => Self::Degraded("connection sync timed out".into()),
+            ChainHealthState::ServerNotHealthy => Self::Unavailable("blokli server not healthy".into()),
+            ChainHealthState::ConnectionFailed => Self::Unavailable("chain connection failed".into()),
+            ChainHealthState::Dropped => Self::Unavailable("connector dropped".into()),
         }
     }
 }
@@ -667,7 +667,9 @@ where
 
 impl<B, C, P, R> hopr_api::node::ComponentStatusReporter for HoprBlockchainConnector<C, B, P, R> {
     fn component_status(&self) -> hopr_api::node::ComponentStatus {
-        ChainHealthState::from_u8(self.health.load(AtomicOrdering::Relaxed)).to_component_status()
+        ChainHealthState::try_from(self.health.load(AtomicOrdering::Relaxed))
+            .unwrap_or(ChainHealthState::ConnectionFailed)
+            .into()
     }
 }
 
@@ -787,51 +789,54 @@ pub(crate) mod tests {
 
     #[test]
     fn chain_health_state_roundtrips_through_u8() {
+        use hopr_api::node::ComponentStatus;
         for v in 0..=7u8 {
-            let state = ChainHealthState::from_u8(v);
+            let state = ChainHealthState::try_from(v).unwrap();
             assert_eq!(state as u8, v);
+            // Verify Into<ComponentStatus> doesn't panic
+            let _: ComponentStatus = state.into();
         }
     }
 
     #[test]
-    fn chain_health_state_unknown_u8_falls_back() {
-        assert_eq!(ChainHealthState::from_u8(255), ChainHealthState::ConnectionFailed);
+    fn chain_health_state_unknown_u8_is_err() {
+        assert!(ChainHealthState::try_from(255).is_err());
     }
 
     #[test]
     fn chain_health_ready_maps_to_component_ready() {
-        assert!(ChainHealthState::Ready.to_component_status().is_ready());
+        use hopr_api::node::ComponentStatus;
+        let status: ComponentStatus = ChainHealthState::Ready.into();
+        assert!(status.is_ready());
     }
 
     #[test]
     fn chain_health_degraded_states() {
-        assert!(ChainHealthState::SubscriptionEnded.to_component_status().is_degraded());
-        assert!(ChainHealthState::SyncTimedOut.to_component_status().is_degraded());
+        use hopr_api::node::ComponentStatus;
+        let s: ComponentStatus = ChainHealthState::SubscriptionEnded.into();
+        assert!(s.is_degraded());
+        let s: ComponentStatus = ChainHealthState::SyncTimedOut.into();
+        assert!(s.is_degraded());
     }
 
     #[test]
     fn chain_health_unavailable_states() {
-        assert!(
-            ChainHealthState::ServerNotHealthy
-                .to_component_status()
-                .is_unavailable()
-        );
-        assert!(
-            ChainHealthState::ConnectionFailed
-                .to_component_status()
-                .is_unavailable()
-        );
-        assert!(ChainHealthState::Dropped.to_component_status().is_unavailable());
+        use hopr_api::node::ComponentStatus;
+        let s: ComponentStatus = ChainHealthState::ServerNotHealthy.into();
+        assert!(s.is_unavailable());
+        let s: ComponentStatus = ChainHealthState::ConnectionFailed.into();
+        assert!(s.is_unavailable());
+        let s: ComponentStatus = ChainHealthState::Dropped.into();
+        assert!(s.is_unavailable());
     }
 
     #[test]
     fn chain_health_initializing_states() {
-        assert!(
-            ChainHealthState::WaitingForConnection
-                .to_component_status()
-                .is_initializing()
-        );
-        assert!(ChainHealthState::Connecting.to_component_status().is_initializing());
+        use hopr_api::node::ComponentStatus;
+        let s: ComponentStatus = ChainHealthState::WaitingForConnection.into();
+        assert!(s.is_initializing());
+        let s: ComponentStatus = ChainHealthState::Connecting.into();
+        assert!(s.is_initializing());
     }
 
     #[tokio::test]
