@@ -472,6 +472,10 @@ where
     fn graph(&self) -> &Graph {
         self.transport_api.graph()
     }
+
+    fn status(&self) -> ComponentStatus {
+        ComponentStatus::Ready
+    }
 }
 
 impl<Chain, Graph, Net, TMgr> HasTransportApi for Hopr<Chain, Graph, Net, TMgr>

@@ -97,7 +97,7 @@ halfbrown = "0.4.0"
 hashbrown = "0.17.0"
 hex = "0.4.3"
 hex-literal = "1.1.0"
-hickory-resolver = { version = "0.26.0", default-features = false, features = [
+hickory-resolver = { version = "0.25.2", default-features = false, features = [
   "system-config",
 ] }
 http = "1.4.0"
