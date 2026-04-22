@@ -187,7 +187,12 @@ where
     }
 
     let prober_cfg = probe_cfg.unwrap_or_default();
-    let graph: SharedChannelGraph = Arc::new(ChannelGraph::new(*packet_key.public()));
+    let path_cfg = config.protocol.path_planner;
+    let graph: SharedChannelGraph = Arc::new(ChannelGraph::with_edge_params(
+        *packet_key.public(),
+        path_cfg.edge_penalty,
+        path_cfg.min_ack_rate,
+    ));
     let graph_for_ct = graph.clone();
 
     let safe_address = config.safe_module.safe_address;
