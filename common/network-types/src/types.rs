@@ -75,14 +75,25 @@ impl IpOrHost {
     pub async fn resolve_tokio(self) -> std::io::Result<Vec<SocketAddr>> {
         match self {
             IpOrHost::Dns(name, port) => {
-                use std::str::FromStr;
-                let addr = std::net::IpAddr::from_str(&name)
-                    .ok()
-                    .map(|ip| vec![std::net::SocketAddr::new(ip, port)])
-                    .ok_or_else(|| {
-                        std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid DNS name or IP address")
-                    })?;
-                Ok(addr)
+                #[cfg(test)]
+                let resolver = hickory_resolver::Resolver::builder_with_config(
+                    hickory_resolver::config::ResolverConfig::new(),
+                    hickory_resolver::net::runtime::TokioRuntimeProvider::default(),
+                )
+                .build()
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+
+                #[cfg(not(test))]
+                let resolver = hickory_resolver::Resolver::builder_tokio()
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?
+                    .build()
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+
+                let lookup = resolver
+                    .lookup_ip(&name)
+                    .await
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+                Ok(lookup.iter().map(|ip| SocketAddr::new(ip, port)).collect())
             }
             IpOrHost::Ip(addr) => Ok(vec![addr]),
         }
