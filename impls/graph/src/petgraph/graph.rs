@@ -5,7 +5,7 @@ use hopr_api::OffchainPublicKey;
 use parking_lot::RwLock;
 use petgraph::graph::{DiGraph, NodeIndex};
 
-use crate::{Observations, errors::ChannelGraphError};
+use crate::{DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE, Observations, errors::ChannelGraphError};
 
 /// Internal mutable state of a [`ChannelGraph`], protected by a lock.
 #[derive(Debug, Clone, Default)]
@@ -28,15 +28,26 @@ pub(crate) struct InnerGraph {
 #[derive(Debug, Clone)]
 pub struct ChannelGraph {
     pub(crate) me: OffchainPublicKey,
+    pub(crate) edge_penalty: f64,
+    pub(crate) min_ack_rate: f64,
     pub(crate) inner: Arc<RwLock<InnerGraph>>,
 }
 
 impl ChannelGraph {
-    /// Creates a new channel graph with the given self identity.
+    /// Creates a new channel graph with the given self identity and default edge scoring parameters.
     ///
     /// The `me` key represents the local node which is automatically added
     /// to the graph as the first node.
     pub fn new(me: OffchainPublicKey) -> Self {
+        Self::with_edge_params(me, DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE)
+    }
+
+    /// Creates a new channel graph with custom edge scoring parameters.
+    ///
+    /// * `me` – offchain public key of the local node (added as the first graph node).
+    /// * `edge_penalty` – penalty multiplier for edges lacking probe-based quality observations.
+    /// * `min_ack_rate` – minimum acceptable message acknowledgment rate for path selection.
+    pub fn with_edge_params(me: OffchainPublicKey, edge_penalty: f64, min_ack_rate: f64) -> Self {
         let mut graph = DiGraph::new();
         let mut indices = BiHashMap::new();
 
@@ -45,6 +56,8 @@ impl ChannelGraph {
 
         Self {
             me,
+            edge_penalty,
+            min_ack_rate,
             inner: Arc::new(RwLock::new(InnerGraph { graph, indices })),
         }
     }

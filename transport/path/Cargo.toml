@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-path"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Graph-based path planning and selection for the HOPR transport layer"
 edition = "2024"

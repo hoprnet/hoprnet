@@ -4514,7 +4514,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-network-graph"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "assertables",
@@ -4912,7 +4912,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-path"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "bimap",
