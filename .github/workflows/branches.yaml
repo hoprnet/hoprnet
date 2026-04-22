@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: branches-${{ github.ref_name }}
+  group: branches-${{ github.ref_name }}-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:
