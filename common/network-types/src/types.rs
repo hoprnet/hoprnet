@@ -80,18 +80,15 @@ impl IpOrHost {
                     hickory_resolver::net::runtime::TokioRuntimeProvider::default(),
                 )
                 .build()
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+                .map_err(std::io::Error::other)?;
 
                 #[cfg(not(test))]
                 let resolver = hickory_resolver::Resolver::builder_tokio()
-                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?
+                    .map_err(std::io::Error::other)?
                     .build()
-                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+                    .map_err(std::io::Error::other)?;
 
-                let lookup = resolver
-                    .lookup_ip(&name)
-                    .await
-                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+                let lookup = resolver.lookup_ip(&name).await.map_err(std::io::Error::other)?;
                 Ok(lookup.iter().map(|ip| std::net::SocketAddr::new(ip, port)).collect())
             }
             IpOrHost::Ip(addr) => Ok(vec![addr]),

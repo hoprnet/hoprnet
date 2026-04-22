@@ -29,7 +29,6 @@ telemetry = ["dep:hopr-metrics"]
 
 [dependencies]
 arrayvec = { workspace = true }
-cfg-if = { workspace = true }
 flume = { workspace = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
