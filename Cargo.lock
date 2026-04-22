@@ -5250,8 +5250,10 @@ name = "hoprd-api"
 version = "4.11.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "axum",
  "base64 0.22.1",
+ "bimap",
  "bytesize",
  "const_format",
  "futures",
@@ -5270,6 +5272,7 @@ dependencies = [
  "serde_with",
  "smart-default",
  "strum 0.28.0",
+ "thiserror 2.0.18",
  "tokio",
  "tower",
  "tower-http",

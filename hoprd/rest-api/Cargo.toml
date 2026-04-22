@@ -61,9 +61,12 @@ hopr-utils-session = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
+async-trait = { workspace = true }
+bimap = { workspace = true }
 futures = { workspace = true }
 mockall = { workspace = true }
 oas3 = { workspace = true }
+thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt"] }
 tower = { workspace = true, features = ["util"] }
 
