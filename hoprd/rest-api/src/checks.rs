@@ -28,7 +28,7 @@ use crate::AppState;
         tag = "Checks"
     )]
 pub(super) async fn startedz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    eval_precondition(is_running(state)) // FIXME: improve this once node state granularity is improved
+    eval_precondition(is_running(&state))
 }
 
 /// Check whether the node is **ready** to accept connections.
@@ -57,9 +57,7 @@ pub(super) async fn startedz(State(state): State<Arc<AppState>>) -> impl IntoRes
         tag = "Checks"
     )]
 pub(super) async fn readyz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    eval_precondition(
-        is_running(state.clone()) && is_minimally_connected(state.clone()).await && is_chain_available(state),
-    )
+    eval_precondition(is_running(&state) && is_minimally_connected(&state) && is_chain_available(&state))
 }
 
 /// Check whether the node is **healthy**.
@@ -90,9 +88,7 @@ pub(super) async fn readyz(State(state): State<Arc<AppState>>) -> impl IntoRespo
         tag = "Checks"
     )]
 pub(super) async fn healthyz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    eval_precondition(
-        is_running(state.clone()) && is_minimally_connected(state.clone()).await && is_chain_available(state),
-    )
+    eval_precondition(is_running(&state) && is_minimally_connected(&state) && is_chain_available(&state))
 }
 
 /// Check if the node has minimal network connectivity.
@@ -100,28 +96,21 @@ pub(super) async fn healthyz(State(state): State<Arc<AppState>>) -> impl IntoRes
 /// Returns `true` if the network health is `Orange`, `Yellow`, or `Green`.
 /// Returns `false` if the network health is `Unknown` or `Red`.
 #[inline]
-async fn is_minimally_connected(state: Arc<AppState>) -> bool {
+fn is_minimally_connected(state: &AppState) -> bool {
     matches!(
         state.hopr.network_view().health(),
         Health::Orange | Health::Yellow | Health::Green
     )
 }
 
-/// Check if the chain connector is not in an `Unavailable` state.
-///
-/// Returns `true` if the chain component reports any status other than `Unavailable`.
 /// A degraded chain is still considered available for readiness purposes.
 #[inline]
-fn is_chain_available(state: Arc<AppState>) -> bool {
+fn is_chain_available(state: &AppState) -> bool {
     !HasChainApi::status(&*state.hopr).is_unavailable()
 }
 
-/// Check if the node is in the Running state.
-///
-/// Returns `true` only when `HoprState::Running`.
-/// Returns `false` for all other states (Uninitialized, Initializing, Indexing, Starting).
 #[inline]
-fn is_running(state: Arc<AppState>) -> bool {
+fn is_running(state: &AppState) -> bool {
     matches!(HoprNodeOperations::status(&*state.hopr), HoprState::Running)
 }
 

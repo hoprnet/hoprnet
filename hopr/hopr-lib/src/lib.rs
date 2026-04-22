@@ -366,14 +366,14 @@ where
 // ---------------------------------------------------------------------------
 
 /// Maps [`Health`] into a [`ComponentStatus`] for a named component.
-///
-/// Assumes the node is already in the `Running` state.
 fn network_health_to_status(health: Health, component: &str) -> ComponentStatus {
     match health {
         Health::Green | Health::Yellow => ComponentStatus::Ready,
         Health::Orange => ComponentStatus::Degraded(format!("{component}: low connectivity (1 peer)").into()),
-        Health::Red => ComponentStatus::Degraded(format!("{component}: no connected peers").into()),
-        Health::Unknown => ComponentStatus::Unavailable(format!("{component}: network not initialized").into()),
+        // Red is returned both for "zero peers" and "network not initialized"
+        Health::Red | Health::Unknown => {
+            ComponentStatus::Unavailable(format!("{component}: no connected peers").into())
+        }
     }
 }
 
@@ -622,8 +622,8 @@ mod tests {
     }
 
     #[test]
-    fn network_health_red_is_degraded() {
-        assert!(network_health_to_status(Health::Red, "network").is_degraded());
+    fn network_health_red_is_unavailable() {
+        assert!(network_health_to_status(Health::Red, "network").is_unavailable());
     }
 
     #[test]
