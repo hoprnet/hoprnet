@@ -804,6 +804,7 @@ pub(crate) mod tests {
             }
 
             async fn count_channels(&self, selector: ChannelSelector) -> Result<u32, BlokliClientError> {
+                #[allow(deprecated)]
                 self.0.count_channels(selector).await
             }
 
