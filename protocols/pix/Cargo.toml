@@ -34,7 +34,6 @@ hopr-types = { workspace = true, features = ["random", "primitive", "crypto"] }
 anyhow = { workspace = true }
 criterion = { workspace = true }
 k256 = { workspace = true }
-sha3 = "0.10"
 
 [[bench]]
 name = "ssa_generator"

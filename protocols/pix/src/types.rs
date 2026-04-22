@@ -1,8 +1,13 @@
-use hopr_types::crypto::crypto_traits;
-use hopr_types::crypto::crypto_traits::{KeyIvInit, StreamCipher};
-use vsss_rs::elliptic_curve::{Curve, PrimeField, generic_array::{GenericArray, ArrayLength}};
-use hopr_types::crypto::prelude::HalfKey;
-use hopr_types::crypto::primitives::{Blake3, ChaCha20};
+use hopr_types::crypto::{
+    crypto_traits::{self, KeyIvInit, StreamCipher},
+    prelude::HalfKey,
+    primitives::Blake3,
+};
+use vsss_rs::elliptic_curve::{
+    Curve, PrimeField,
+    generic_array::{ArrayLength, GenericArray},
+};
+
 use crate::{PixSpec, Scalar, errors};
 
 /// Type used to index Session Stealth Addresses (SSA).
@@ -10,20 +15,20 @@ use crate::{PixSpec, Scalar, errors};
 /// Note that SSA Index starts with 1.
 pub type SsaIndex = u32;
 
-fn derive_ssa_encryption_key<S: PixSpec>(spi: &SsaPolynomialIndex<S::Pseudonym>, ack: &HalfKey) -> errors::Result<ChaCha20> {
-    let mut output = Blake3::new_derive_key("HASH_SSA_SHARE")
+fn derive_ssa_encryption_key<S: PixSpec>(
+    spi: &SsaPolynomialIndex<S::Pseudonym>,
+    ack: &HalfKey,
+) -> errors::Result<S::Cipher> {
+    let mut output = Blake3::new_derive_key(S::KEY_DERIVATION_CONTEXT)
         .update_reader(ack.as_ref())
-        .map_err(|_| hopr_types::crypto::errors::CryptoError::InvalidInputValue("invalid ssa encryption key"))?
-        .update_reader(spi.pseudonym.as_ref())
-        .map_err(|_| hopr_types::crypto::errors::CryptoError::InvalidInputValue("invalid ssa encryption key"))?
-        .update_reader(spi.ssa_index.to_be_bytes().as_ref())
-        .map_err(|_| hopr_types::crypto::errors::CryptoError::InvalidInputValue("invalid ssa encryption key"))?
-        .update_reader(spi.poly_index.to_be_bytes().as_ref())
+        .and_then(|h| h.update_reader(spi.pseudonym.as_ref()))
+        .and_then(|h| h.update_reader(spi.ssa_index.to_be_bytes().as_ref()))
+        .and_then(|h| h.update_reader(spi.poly_index.to_be_bytes().as_ref()))
         .map_err(|_| hopr_types::crypto::errors::CryptoError::InvalidInputValue("invalid ssa encryption key"))?
         .finalize_xof();
 
-    let mut key = crypto_traits::Key::<ChaCha20>::default();
-    let mut iv = crypto_traits::Iv::<ChaCha20>::default();
+    let mut key = crypto_traits::Key::<S::Cipher>::default();
+    let mut iv = crypto_traits::Iv::<S::Cipher>::default();
 
     let mut out = vec![0u8; key.len() + iv.len()];
     output.fill(&mut out);
@@ -32,7 +37,7 @@ fn derive_ssa_encryption_key<S: PixSpec>(spi: &SsaPolynomialIndex<S::Pseudonym>,
     iv.copy_from_slice(v_iv);
     key.copy_from_slice(v_key);
 
-    Ok(ChaCha20::new(&key, &iv))
+    Ok(S::Cipher::new(&key, &iv))
 }
 
 /// Contains an encrypted partial Session Stealth Address (SSA) share.
@@ -43,7 +48,7 @@ fn derive_ssa_encryption_key<S: PixSpec>(spi: &SsaPolynomialIndex<S::Pseudonym>,
 pub struct EncryptedPartialSsaShare<S: PixSpec>(GenericArray<u8, <<S as PixSpec>::Curve as Curve>::FieldBytesSize>);
 
 impl<S: PixSpec> EncryptedPartialSsaShare<S> {
-    pub fn decrypt(self, spi: &SsaPolynomialIndex<S::Pseudonym>,  key: &HalfKey) -> errors::Result<PartialSsaShare<S>> {
+    pub fn decrypt(self, spi: &SsaPolynomialIndex<S::Pseudonym>, key: &HalfKey) -> errors::Result<PartialSsaShare<S>> {
         let mut cipher = derive_ssa_encryption_key::<S>(spi, key)?;
         let mut data = self.0;
         cipher.apply_keystream(&mut data);
@@ -57,8 +62,10 @@ impl<S: PixSpec> Clone for EncryptedPartialSsaShare<S> {
     }
 }
 
-impl<S: PixSpec> Copy for EncryptedPartialSsaShare<S>
-where <<<S as PixSpec>::Curve as Curve>::FieldBytesSize as ArrayLength<u8>>::ArrayType: Copy {}
+impl<S: PixSpec> Copy for EncryptedPartialSsaShare<S> where
+    <<<S as PixSpec>::Curve as Curve>::FieldBytesSize as ArrayLength<u8>>::ArrayType: Copy
+{
+}
 
 impl<S: PixSpec> AsRef<[u8]> for EncryptedPartialSsaShare<S> {
     fn as_ref(&self) -> &[u8] {
@@ -104,7 +111,7 @@ impl<'de, S: PixSpec> serde::Deserialize<'de> for EncryptedPartialSsaShare<S> {
                 E: serde::de::Error,
             {
                 use vsss_rs::elliptic_curve::generic_array::typenum::Unsigned;
-                
+
                 let expected = <<S as PixSpec>::Curve as Curve>::FieldBytesSize::to_usize();
                 if v.len() != expected {
                     return Err(E::invalid_length(v.len(), &self));
@@ -120,7 +127,7 @@ impl<'de, S: PixSpec> serde::Deserialize<'de> for EncryptedPartialSsaShare<S> {
                 A: serde::de::SeqAccess<'de>,
             {
                 use vsss_rs::elliptic_curve::generic_array::typenum::Unsigned;
-                
+
                 let expected = <<S as PixSpec>::Curve as Curve>::FieldBytesSize::to_usize();
                 let mut bytes = GenericArray::<u8, <<S as PixSpec>::Curve as Curve>::FieldBytesSize>::default();
 
@@ -142,7 +149,6 @@ impl<'de, S: PixSpec> serde::Deserialize<'de> for EncryptedPartialSsaShare<S> {
     }
 }
 
-
 /// Share of a polynomial used to reconstruct a portion of the Session Stealth Address (SSA).
 ///
 /// This corresponds to the `P_ij(X)` of the polynomial used to reconstruct the j-th portion of i-th SSA
@@ -153,8 +159,14 @@ impl<'de, S: PixSpec> serde::Deserialize<'de> for EncryptedPartialSsaShare<S> {
 pub struct PartialSsaShare<S: PixSpec>(pub(crate) <Scalar<S> as PrimeField>::Repr);
 
 impl<S: PixSpec> PartialSsaShare<S> {
-    pub fn encrypt(self, key: &HalfKey) -> EncryptedPartialSsaShare<S> {
-        todo!()
+    pub fn encrypt(
+        mut self,
+        spi: &SsaPolynomialIndex<S::Pseudonym>,
+        key: &HalfKey,
+    ) -> errors::Result<EncryptedPartialSsaShare<S>> {
+        let mut cipher = derive_ssa_encryption_key::<S>(spi, key)?;
+        cipher.apply_keystream(self.0.as_mut());
+        Ok(EncryptedPartialSsaShare(self.0))
     }
 }
 
@@ -235,5 +247,27 @@ impl<P> SsaPolynomialIndex<P> {
 impl<P: std::fmt::Display> std::fmt::Display for SsaPolynomialIndex<P> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}-{}-{}", self.pseudonym, self.ssa_index, self.poly_index)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use hopr_types::{crypto::types::SimplePseudonym, crypto_random::Randomizable};
+    use vsss_rs::elliptic_curve::Field;
+
+    use super::*;
+    use crate::tests::TestSpec;
+
+    #[test]
+    fn ssa_part_shares_should_encrypt_and_decrypt() -> anyhow::Result<()> {
+        let key = HalfKey::random();
+        let spi = SsaPolynomialIndex::new(SimplePseudonym::random(), 1, 0);
+        let scalar = Scalar::<TestSpec>::random(vsss_rs::elliptic_curve::rand_core::OsRng);
+
+        let share_1 = PartialSsaShare::<TestSpec>(scalar.to_repr());
+        let share_2 = share_1.clone().encrypt(&spi, &key)?.decrypt(&spi, &key)?;
+
+        assert_eq!(share_1, share_2);
+        Ok(())
     }
 }

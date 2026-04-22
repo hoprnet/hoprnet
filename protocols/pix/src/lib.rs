@@ -1,18 +1,18 @@
 #[cfg(feature = "rayon")]
 use hopr_parallelize::cpu::rayon::prelude::*;
 use hopr_types::crypto::{
-    crypto_traits::{ BlockSizeUser, OutputSizeUser, FixedOutput, HashMarker },
-    prelude::Pseudonym
+    crypto_traits::{BlockSizeUser, FixedOutput, HashMarker, KeyIvInit, OutputSizeUser, StreamCipher},
+    prelude::Pseudonym,
 };
 use vsss_rs::{
+    DefaultShare, IdentifierPrimeField, Share, ShareElement, ShareVerifierGroup, ValueGroup,
     elliptic_curve::{
-        consts::U256, generic_array::typenum::{IsLess, IsLessOrEqual}, group::{cofactor::CofactorGroup, GroupEncoding}, hash2curve::{ExpandMsgXmd, FromOkm, GroupDigest},
-        CurveArithmetic,
-        Group,
-        PrimeCurve,
-        PrimeField,
-    }, DefaultShare, IdentifierPrimeField, Share, ShareElement, ShareVerifierGroup,
-    ValueGroup,
+        CurveArithmetic, Group, PrimeCurve, PrimeField,
+        consts::U256,
+        generic_array::typenum::{IsLess, IsLessOrEqual},
+        group::{GroupEncoding, cofactor::CofactorGroup},
+        hash2curve::{ExpandMsgXmd, FromOkm, GroupDigest},
+    },
 };
 
 mod errors;
@@ -22,7 +22,7 @@ mod types;
 
 pub use generator::{SsaGeneratorConfig, SsaShareGenerator};
 pub use reconstructor::SsaReconstructor;
-pub use types::{PartialSsaShare, SsaPolynomialIndex, EncryptedPartialSsaShare};
+pub use types::{EncryptedPartialSsaShare, PartialSsaShare, SsaPolynomialIndex};
 
 /// Specification of the Protocol for Incentivization of eXits (PIX).
 pub trait PixSpec
@@ -38,6 +38,10 @@ where
     type Digest: BlockSizeUser + FixedOutput + std::fmt::Debug + Default + HashMarker;
     /// Pseudonym used to identify groups of SURBs.
     type Pseudonym: Pseudonym + Copy + Send + Sync + 'static;
+    /// Stream cipher used to encrypt the SSA shares.
+    type Cipher: StreamCipher + KeyIvInit;
+    /// Context data used to derive the SSA encryption key.
+    const KEY_DERIVATION_CONTEXT: &str = "HASH_SSA_POLY_SHARE";
 }
 
 /// Finite field used to represent the polynomial coefficients.
@@ -65,7 +69,11 @@ pub(crate) fn msg_to_scalar<S: PixSpec>(
 pub(crate) type CompletedShare<S> = DefaultShare<IdentifierPrimeField<Scalar<S>>, IdentifierPrimeField<Scalar<S>>>;
 
 #[inline]
-pub(crate) fn complete_share<S: PixSpec>(spi: SsaPolynomialIndex<S::Pseudonym>, msg: impl AsRef<[u8]>, share: &PartialSsaShare<S>) -> errors::Result<CompletedShare<S>> {
+pub(crate) fn complete_share<S: PixSpec>(
+    spi: SsaPolynomialIndex<S::Pseudonym>,
+    msg: impl AsRef<[u8]>,
+    share: &PartialSsaShare<S>,
+) -> errors::Result<CompletedShare<S>> {
     Ok(DefaultShare {
         identifier: msg_to_scalar::<S>(&spi, msg)?.into(),
         value: Option::from(Scalar::<S>::from_repr(share.0.clone()))
@@ -80,7 +88,6 @@ pub(crate) fn complete_share<S: PixSpec>(spi: SsaPolynomialIndex<S::Pseudonym>, 
 pub struct PartialSsaShareVerifier<S: PixSpec> {
     pub(crate) spi: SsaPolynomialIndex<S::Pseudonym>,
     pub(crate) poly_commitment: Vec<ShareVerifierGroup<Element<S>>>,
-    pub(crate) min_shares: usize,
 }
 
 impl<S: PixSpec> PartialSsaShareVerifier<S> {
@@ -89,12 +96,12 @@ impl<S: PixSpec> PartialSsaShareVerifier<S> {
     pub fn spi(&self) -> &SsaPolynomialIndex<S::Pseudonym> {
         &self.spi
     }
-    
+
     #[inline]
     pub fn min_shares(&self) -> usize {
-        self.min_shares
+        self.poly_commitment.len() - 1
     }
-    
+
     pub(crate) fn verify_complete_share(&self, share: &CompletedShare<S>) -> errors::Result<()> {
         if (share.value().is_zero() | share.identifier().is_zero()).into() {
             return Err(vsss_rs::Error::InvalidShare.into());
@@ -124,9 +131,9 @@ impl<S: PixSpec> PartialSsaShareVerifier<S> {
         // v[1] + v[2]*x + v[3]*x^2 + ... + v[t]*x^t
         let rhs = self.poly_commitment[1].0
             + scalars_iter
-            .enumerate()
-            .map(|(i, c)| (self.poly_commitment[i + 2] * c).0)
-            .sum::<Element<S>>();
+                .enumerate()
+                .map(|(i, c)| (self.poly_commitment[i + 2] * c).0)
+                .sum::<Element<S>>();
 
         let rhs = ValueGroup::from(rhs);
         let lhs = self.poly_commitment[0] * share.value();
@@ -152,12 +159,12 @@ pub(crate) mod tests {
     use anyhow::Context;
     use hopr_types::crypto::prelude::SimplePseudonym;
     use vsss_rs::{
+        ParticipantIdGeneratorType,
         elliptic_curve::{
-            rand_core::{CryptoRng, RngCore},
             Field,
+            rand_core::{CryptoRng, RngCore},
         },
         feldman,
-        ParticipantIdGeneratorType,
     };
 
     use super::*;
@@ -165,8 +172,9 @@ pub(crate) mod tests {
     pub struct TestSpec;
 
     impl PixSpec for TestSpec {
+        type Cipher = hopr_types::crypto::primitives::ChaCha20;
         type Curve = k256::Secp256k1;
-        type Digest = sha3::Sha3_256;
+        type Digest = hopr_types::crypto::primitives::Sha3_256;
         type Pseudonym = SimplePseudonym;
     }
 
@@ -212,12 +220,11 @@ pub(crate) mod tests {
         let verifier: PartialSsaShareVerifier<TestSpec> = PartialSsaShareVerifier {
             spi,
             poly_commitment: verifier,
-            min_shares: 10,
         };
 
         assert_eq!(shares.len(), x.len());
         assert_eq!(verifier.min_shares(), 10);
-        assert_eq!(verifier.poly_commitment.len(), verifier.min_shares() - 1);
+        assert_eq!(verifier.poly_commitment.len() - 1, verifier.min_shares());
 
         for (i, s) in shares.into_iter().enumerate() {
             let share: PartialSsaShare<TestSpec> = PartialSsaShare(s.value.0.to_repr());

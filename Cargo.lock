@@ -4679,7 +4679,6 @@ dependencies = [
  "moka",
  "parking_lot",
  "serde",
- "sha3",
  "smart-default",
  "thiserror 2.0.18",
  "tracing",

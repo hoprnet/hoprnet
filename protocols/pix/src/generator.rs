@@ -3,17 +3,17 @@ use std::collections::VecDeque;
 #[cfg(feature = "rayon")]
 use hopr_parallelize::cpu::rayon::prelude::*;
 use vsss_rs::{
+    DefaultShare, IdentifierPrimeField, Polynomial, Share, ShareElement, ShareVerifierGroup,
     elliptic_curve::{
-        rand_core::{CryptoRng, RngCore}, Field, Group,
-        PrimeField,
-    }, DefaultShare, IdentifierPrimeField, Polynomial, Share, ShareElement,
-    ShareVerifierGroup,
+        Field, Group, PrimeField,
+        rand_core::{CryptoRng, RngCore},
+    },
 };
 
 use crate::{
-    errors, msg_to_scalar, Element, PixSpec, Scalar, PartialSsaShareVerifier,
+    Element, PartialSsaShareVerifier, PixSpec, Scalar, errors, msg_to_scalar,
+    types::{PartialSsaShare, SsaIndex, SsaPolynomialIndex},
 };
-use crate::types::{PartialSsaShare, SsaIndex, SsaPolynomialIndex};
 
 type RawPolynomial<S> = Vec<DefaultShare<IdentifierPrimeField<Scalar<S>>, IdentifierPrimeField<Scalar<S>>>>;
 type RawPolynomialVerifier<S> = Vec<ShareVerifierGroup<Element<S>>>;
@@ -181,7 +181,6 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
                             .map(|(poly_index, poly_commitment)| PartialSsaShareVerifier {
                                 spi: SsaPolynomialIndex::new(*pseudonym, ssa_index, poly_index as u32),
                                 poly_commitment,
-                                min_shares: self.cfg.threshold,
                             }),
                     );
                     std::sync::Arc::new(parking_lot::Mutex::new(SsaPseudonymEntry {
@@ -212,7 +211,6 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
                                 .map(|(poly_index, poly_commitment)| PartialSsaShareVerifier {
                                     spi: SsaPolynomialIndex::new(*pseudonym, ssa_index, poly_index as u32),
                                     poly_commitment,
-                                    min_shares: self.cfg.threshold,
                                 }),
                         );
 

@@ -1,11 +1,17 @@
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use hopr_protocol_pix::{PixSpec, Scalar, SsaGeneratorConfig, SsaShareGenerator};
-use hopr_types::{crypto::prelude::SimplePseudonym, crypto_random::Randomizable};
-use sha3::Sha3_256;
+use hopr_protocol_pix::{PixSpec, SsaGeneratorConfig, SsaShareGenerator};
+use hopr_types::{
+    crypto::{
+        prelude::SimplePseudonym,
+        primitives::{ChaCha20, Sha3_256},
+    },
+    crypto_random::Randomizable,
+};
 
 pub struct TestSpec;
 
 impl PixSpec for TestSpec {
+    type Cipher = ChaCha20;
     type Curve = k256::Secp256k1;
     type Digest = Sha3_256;
     type Pseudonym = SimplePseudonym;
