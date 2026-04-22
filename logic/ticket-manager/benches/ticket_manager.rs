@@ -3,7 +3,7 @@ use std::{hint::black_box, num::NonZero, ops::RangeBounds, time::Duration};
 use criterion::{Criterion, criterion_group, criterion_main};
 use hopr_api::{
     chain::{ChannelEntry, RedeemableTicket, WinningProbability},
-    tickets::TicketFactory,
+    tickets::{TicketFactory, TicketManagement},
     types::{crypto::prelude::*, crypto_random::Randomizable, internal::prelude::*, primitive::prelude::*},
 };
 use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue};

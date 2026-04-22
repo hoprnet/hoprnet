@@ -12,6 +12,7 @@ use hopr_types::{
     primitive::traits::ToHex,
 };
 use tracing::trace;
+use validator::{Validate, ValidationError};
 
 use crate::{
     errors::{PathPlannerError, Result},
@@ -28,7 +29,7 @@ lazy_static::lazy_static! {
 }
 
 /// Configuration for [`PathPlanner`]'s internal path cache.
-#[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault)]
+#[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, Validate)]
 pub struct PathPlannerConfig {
     /// Maximum number of `(source, destination, options)` entries in the path cache.
     #[default = 10_000]
@@ -44,6 +45,26 @@ pub struct PathPlannerConfig {
     /// All returned candidates are validated and cached.
     #[default = 8]
     pub max_cached_paths: usize,
+    /// Penalty multiplier for edges lacking probe-based quality observations.
+    /// Applied during path cost evaluation to down-weight unprobed edges.
+    /// Must be finite and in `0.0..=1.0`.
+    #[default = 0.5]
+    #[validate(custom(function = "validate_unit_interval"))]
+    pub edge_penalty: f64,
+    /// Minimum acceptable message acknowledgment rate for path selection.
+    /// Edges with an ack rate below this threshold are excluded from candidate paths.
+    /// Must be finite and in `0.0..=1.0`.
+    #[default = 0.1]
+    #[validate(custom(function = "validate_unit_interval"))]
+    pub min_ack_rate: f64,
+}
+
+fn validate_unit_interval(value: f64) -> std::result::Result<(), ValidationError> {
+    if value.is_finite() && (0.0..=1.0).contains(&value) {
+        Ok(())
+    } else {
+        Err(ValidationError::new("value must be finite and in 0.0..=1.0"))
+    }
 }
 
 /// Cache key for the path planner: `(source, destination, hops)`.
@@ -558,6 +579,7 @@ mod tests {
             cache_ttl: std::time::Duration::from_secs(60),
             refresh_period: std::time::Duration::from_secs(60),
             max_cached_paths: 2,
+            ..PathPlannerConfig::default()
         }
     }
 
@@ -570,7 +592,8 @@ mod tests {
 
         // Build empty graph (no edges) — selector would fail if called.
         let graph = ChannelGraph::new(me);
-        let selector = HoprGraphPathSelector::new(me, graph, small_config().max_cached_paths);
+        let cfg = small_config();
+        let selector = HoprGraphPathSelector::new(me, graph, cfg.max_cached_paths, cfg.edge_penalty, cfg.min_ack_rate);
 
         let chain_api = TestChainApi::new(me, me_addr(), vec![(dest, dest_addr())]);
         let surb_store = hopr_protocol_hopr::MemorySurbStore::default();
@@ -616,7 +639,8 @@ mod tests {
         mark_edge_full(&graph, &me, &a);
         mark_edge_last(&graph, &a, &dest);
 
-        let selector = HoprGraphPathSelector::new(me, graph, small_config().max_cached_paths);
+        let cfg = small_config();
+        let selector = HoprGraphPathSelector::new(me, graph, cfg.max_cached_paths, cfg.edge_penalty, cfg.min_ack_rate);
 
         let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (dest, dest_addr())])
             .with_open_channel(me_addr(), a_addr())
@@ -655,7 +679,8 @@ mod tests {
 
         // Empty graph — selector would fail; explicit path should not use it.
         let graph = ChannelGraph::new(me);
-        let selector = HoprGraphPathSelector::new(me, graph, small_config().max_cached_paths);
+        let cfg = small_config();
+        let selector = HoprGraphPathSelector::new(me, graph, cfg.max_cached_paths, cfg.edge_penalty, cfg.min_ack_rate);
 
         let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (dest, dest_addr())])
             .with_open_channel(me_addr(), a_addr())
@@ -689,7 +714,8 @@ mod tests {
     async fn return_routing_without_surb_should_return_error() {
         let me = pubkey(&SECRET_ME);
         let graph = ChannelGraph::new(me);
-        let selector = HoprGraphPathSelector::new(me, graph, small_config().max_cached_paths);
+        let cfg = small_config();
+        let selector = HoprGraphPathSelector::new(me, graph, cfg.max_cached_paths, cfg.edge_penalty, cfg.min_ack_rate);
         let chain_api = TestChainApi::new(me, me_addr(), vec![]);
         let surb_store = hopr_protocol_hopr::MemorySurbStore::default();
 
@@ -723,7 +749,8 @@ mod tests {
         mark_edge_full(&graph, &me, &a);
         mark_edge_last(&graph, &a, &dest);
 
-        let selector = HoprGraphPathSelector::new(me, graph, small_config().max_cached_paths);
+        let cfg = small_config();
+        let selector = HoprGraphPathSelector::new(me, graph, cfg.max_cached_paths, cfg.edge_penalty, cfg.min_ack_rate);
         let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (dest, dest_addr())])
             .with_open_channel(me_addr(), a_addr())
             .with_open_channel(a_addr(), dest_addr());
@@ -768,7 +795,8 @@ mod tests {
         mark_edge_full(&graph, &me, &a);
         mark_edge_last(&graph, &a, &dest);
 
-        let selector = HoprGraphPathSelector::new(me, graph, small_config().max_cached_paths);
+        let cfg = small_config();
+        let selector = HoprGraphPathSelector::new(me, graph, cfg.max_cached_paths, cfg.edge_penalty, cfg.min_ack_rate);
         let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (dest, dest_addr())])
             .with_open_channel(me_addr(), a_addr())
             .with_open_channel(a_addr(), dest_addr());
@@ -803,7 +831,8 @@ mod tests {
     async fn background_refresh_should_produce_a_future() {
         let me = pubkey(&SECRET_ME);
         let graph = ChannelGraph::new(me);
-        let selector = HoprGraphPathSelector::new(me, graph, small_config().max_cached_paths);
+        let cfg = small_config();
+        let selector = HoprGraphPathSelector::new(me, graph, cfg.max_cached_paths, cfg.edge_penalty, cfg.min_ack_rate);
         let chain_api = TestChainApi::new(me, me_addr(), vec![]);
         let surb_store = hopr_protocol_hopr::MemorySurbStore::default();
 

@@ -34,7 +34,7 @@ validator = { workspace = true }
 
 hopr-api = { workspace = true, features = ["ct", "types-random", "graph"] }
 
-hopr-async-runtime = { workspace = true }
+hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 hopr-platform = { workspace = true }
 hopr-protocol-app = { workspace = true }
 hopr-transport-tag-allocator = { workspace = true }

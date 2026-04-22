@@ -74,16 +74,6 @@ pub struct HoprLibConfig {
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
     pub safe_module: SafeModule,
-    /// Path to a file that acts as incoming ticket storage.
-    ///
-    /// The file will be in the `redb` file format and can contain already existing tickets.
-    /// If the file does not exist, it will be created.
-    ///
-    /// If omitted, a temporary file will be created and deleted on application exit.
-    ///
-    /// Make sure the file is secure and not accessible by unauthorized users on production.
-    #[cfg_attr(feature = "serde", serde(default))]
-    pub ticket_storage_file: Option<String>,
     /// Defines how often the outgoing ticket indices be saved to the persistent storage.
     ///
     /// If synchronization to a persistent storage does not happen and the node restarts,

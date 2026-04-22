@@ -1,12 +1,14 @@
 use std::ops::Mul;
 
 use anyhow::Context;
-use hopr_builder::testing::{
+use hopr_chain_connector::blokli_client::BlokliQueryClient;
+use hopr_lib::{
+    Address, BytesRepresentable, ChannelId, ChannelStatus, HoprBalance, api::node::IncentiveChannelOperations,
+};
+use hopr_reference::testing::{
     fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, chain_propagation_delay, size_3_cluster_fixture as cluster},
     hopr::ChannelGuard,
 };
-use hopr_chain_connector::blokli_client::BlokliQueryClient;
-use hopr_lib::{Address, BytesRepresentable, ChannelId, ChannelStatus, HoprBalance};
 use rstest::*;
 use serial_test::serial;
 use tokio::time::sleep;
@@ -110,13 +112,13 @@ async fn test_channel_retrieval(cluster: &ClusterGuard) -> anyhow::Result<()> {
 
     let channel_by_parties = ext
         .inner()
-        .channel(&src.address(), &dst.address())
+        .channel(src.address(), dst.address())
         .context("failed to get channel by parties")?
         .context("channel not found")?;
 
     let channel_from_ids = ext
         .inner()
-        .channels_from(&src.address())
+        .channels_from(src.address())
         .await
         .context("failed to get channels from src")?
         .into_iter()
@@ -125,7 +127,7 @@ async fn test_channel_retrieval(cluster: &ClusterGuard) -> anyhow::Result<()> {
 
     let channel_to_ids = ext
         .inner()
-        .channels_to(&dst.address())
+        .channels_to(dst.address())
         .await
         .context("failed to get channels to dst")?
         .into_iter()
@@ -170,7 +172,7 @@ async fn test_withdraw_native(cluster: &ClusterGuard) -> anyhow::Result<()> {
 
     let _ = src
         .inner()
-        .withdraw_native(target_addr, withdrawn_amount)
+        .withdraw(&target_addr, withdrawn_amount)
         .await
         .context("failed to withdraw native")?;
 

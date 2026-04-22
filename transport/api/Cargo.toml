@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport"
-version = "0.25.0"
+version = "0.26.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR transport interface for the core library"
 edition.workspace = true
@@ -58,7 +58,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
-hopr-api = { workspace = true, features = ["types-random", "tickets"] }
+hopr-api = { workspace = true, features = ["types-random", "tickets", "node"] }
 
 hopr-async-runtime = { workspace = true }
 hopr-crypto-packet = { workspace = true }

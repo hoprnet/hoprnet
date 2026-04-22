@@ -1,11 +1,15 @@
 use std::time::Duration;
 
 use anyhow::Context;
-use hopr_builder::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster};
 use hopr_lib::{
-    Address, HoprNodeNetworkOperations,
-    api::graph::traits::{EdgeLinkObservable, EdgeObservableRead},
+    Address,
+    api::{
+        graph::traits::{EdgeLinkObservable, EdgeObservableRead},
+        network::NetworkView,
+        node::{HasNetworkView, HasTransportApi, IncentiveChannelOperations},
+    },
 };
+use hopr_reference::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster};
 use rstest::*;
 use serial_test::serial;
 use tokio::time::sleep;
@@ -38,7 +42,13 @@ async fn all_visible_peers_should_be_listed(cluster: &ClusterGuard) -> anyhow::R
 async fn ping_should_succeed_for_all_visible_nodes(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [src, dst] = cluster.sample_nodes::<2>();
 
-    let _ = src.inner().ping(&dst.peer_id()).await.context("failed to ping peer")?;
+    let dst_key = hopr_lib::peer_id_to_offchain_key(&dst.peer_id())?;
+    let _ = src
+        .inner()
+        .transport()
+        .ping(&dst_key)
+        .await
+        .context("failed to ping peer")?;
 
     Ok(())
 }
@@ -50,7 +60,8 @@ async fn ping_should_succeed_for_all_visible_nodes(cluster: &ClusterGuard) -> an
 /// the operation fails.
 async fn ping_should_fail_for_self(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [random_int] = cluster.sample_nodes::<1>();
-    let res = random_int.inner().ping(&random_int.peer_id()).await;
+    let self_key = hopr_lib::peer_id_to_offchain_key(&random_int.peer_id())?;
+    let res = random_int.inner().transport().ping(&self_key).await;
 
     assert!(res.is_err());
 
@@ -73,7 +84,7 @@ async fn discovery_should_produce_the_same_public_announcements_inside_the_netwo
         .await
         .context("failed to get announced peers")?
         .into_iter()
-        .map(|peer| peer.address)
+        .map(|peer| peer.chain_addr)
         .collect::<Vec<Address>>();
 
     let accounts_addresses_2 = idx2
@@ -82,7 +93,7 @@ async fn discovery_should_produce_the_same_public_announcements_inside_the_netwo
         .await
         .context("failed to get announced peers")?
         .into_iter()
-        .map(|peer| peer.address)
+        .map(|peer| peer.chain_addr)
         .collect::<Vec<Address>>();
 
     assert!(accounts_addresses_1.contains(&idx1.address()));
@@ -107,6 +118,7 @@ async fn probe_warmup_should_populate_graph_edges_for_all_peers(cluster: &Cluste
 
     let peers = node
         .inner()
+        .transport()
         .network_connected_peers()
         .await
         .context("failed to get connected peers")?;
@@ -123,7 +135,8 @@ async fn probe_warmup_should_populate_graph_edges_for_all_peers(cluster: &Cluste
     for _ in 0..30 {
         scored_all = peers.iter().all(|peer| {
             node.inner()
-                .network_peer_info(peer)
+                .transport()
+                .network_peer_observations(peer)
                 .and_then(|obs| obs.immediate_qos().map(|imm| imm.average_probe_rate() > 0.0))
                 .unwrap_or(false)
         });
@@ -137,7 +150,8 @@ async fn probe_warmup_should_populate_graph_edges_for_all_peers(cluster: &Cluste
     for peer in &peers {
         let obs = node
             .inner()
-            .network_peer_info(peer)
+            .transport()
+            .network_peer_observations(peer)
             .context("peer should have observations in the graph")?;
 
         assert!(obs.score() > 0.0, "score should be positive for {peer}");
@@ -163,10 +177,11 @@ async fn all_network_peers_should_return_scored_entries(cluster: &ClusterGuard) 
     for _ in 0..30 {
         all_peers = node
             .inner()
+            .transport()
             .all_network_peers(0.0)
             .await
             .context("failed to get all network peers")?;
-        if all_peers.len() >= expected_count && all_peers.iter().all(|(_, _, obs)| obs.score() > 0.0) {
+        if all_peers.len() >= expected_count && all_peers.iter().all(|(_, obs)| obs.score() > 0.0) {
             break;
         }
         sleep(Duration::from_secs(2)).await;
@@ -174,8 +189,7 @@ async fn all_network_peers_should_return_scored_entries(cluster: &ClusterGuard) 
 
     assert!(!all_peers.is_empty(), "should have at least one peer with score > 0");
 
-    for (addr, peer_id, obs) in &all_peers {
-        assert!(addr.is_some(), "peer {peer_id} should have a chain address");
+    for (peer_id, obs) in &all_peers {
         assert!(obs.score() > 0.0, "peer {peer_id} score should be positive");
         assert!(
             obs.last_update().as_millis() > 0,
@@ -196,7 +210,13 @@ async fn all_network_peers_should_return_scored_entries(cluster: &ClusterGuard) 
 async fn ping_should_record_latency_in_observations(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [src, dst] = cluster.sample_nodes::<2>();
 
-    let (rtt, obs) = src.inner().ping(&dst.peer_id()).await.context("ping should succeed")?;
+    let dst_key = hopr_lib::peer_id_to_offchain_key(&dst.peer_id())?;
+    let (rtt, obs) = src
+        .inner()
+        .transport()
+        .ping(&dst_key)
+        .await
+        .context("ping should succeed")?;
 
     assert!(!rtt.is_zero(), "RTT should be non-zero");
 
@@ -323,7 +343,8 @@ async fn ticket_price_and_probability_should_be_available(cluster: &ClusterGuard
 async fn observed_multiaddresses_should_be_populated_after_warmup(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [src, dst] = cluster.sample_nodes::<2>();
 
-    let addrs = src.inner().network_observed_multiaddresses(&dst.peer_id()).await;
+    let dst_key = hopr_lib::peer_id_to_offchain_key(&dst.peer_id())?;
+    let addrs = src.inner().transport().network_observed_multiaddresses(&dst_key).await;
 
     assert!(
         !addrs.is_empty(),
@@ -342,7 +363,7 @@ async fn observed_multiaddresses_should_be_populated_after_warmup(cluster: &Clus
 async fn network_health_should_not_be_red_after_warmup(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [node] = cluster.sample_nodes::<1>();
 
-    let health = node.inner().network_health().await;
+    let health = node.inner().network_view().health();
 
     assert_ne!(
         health,

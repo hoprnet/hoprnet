@@ -52,7 +52,7 @@ use hopr_api::{
     chain::{ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
     ct::{CoverTrafficGeneration, ProbingTrafficGeneration},
     graph::{NetworkGraphUpdate, NetworkGraphView, traits::EdgeObservableRead},
-    network::{NetworkBuilder, NetworkStreamControl},
+    network::{BoxedProcessFn, NetworkStreamControl},
     types::primitive::prelude::*,
 };
 use hopr_async_runtime::{AbortableList, prelude::spawn, spawn_as_abortable};
@@ -67,7 +67,7 @@ use hopr_transport_probe::{
     Probe,
     ping::{PingConfig, Pinger},
 };
-pub use hopr_transport_protocol::{PeerProtocolCounterRegistry, TicketEvent};
+pub use hopr_transport_protocol::PeerProtocolCounterRegistry;
 pub use hopr_transport_session as session;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::transfer_session;
@@ -149,6 +149,70 @@ pub enum HoprTransportProcess {
     Capture,
 }
 
+/// HOPR protocol specific instantiation of the SessionManager.
+type HoprSessionManager = SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>, Sender<IncomingSession>>;
+
+/// Allows configuration of one specific [`HoprSession`].
+///
+/// The configurator does not prevent the Session from being closed
+/// or the Session manager from being dropped.
+#[derive(Debug, Clone)]
+pub struct HoprSessionConfigurator {
+    id: SessionId,
+    // Makes sure configurator does not extend lifetime of the SessionManager.
+    smgr: std::sync::Weak<HoprSessionManager>,
+}
+
+impl HoprSessionConfigurator {
+    /// [`SessionId`] of the session this object can configure.
+    pub fn id(&self) -> &SessionId {
+        &self.id
+    }
+
+    /// Sends a Session Keep-Alive packet over the Session.
+    ///
+    /// NOTE: This usually carries at least 2 SURBs on the HOPR protocol level and can be
+    /// used for manual SURB balancing.
+    ///
+    /// NOTE: This operation only sends the Session Keep-Alive packet and **DOES NOT** guarantee the other side
+    /// has received it.
+    pub async fn ping(&self) -> errors::Result<()> {
+        Ok(self
+            .smgr
+            .upgrade()
+            .ok_or(HoprTransportError::Other(anyhow::anyhow!("session manager is dropped")))?
+            .ping_session(&self.id)
+            .await?)
+    }
+
+    /// Gets the configuration of the SURB balancer.
+    ///
+    /// Returns an error if the Session is closed, the Session manager is gone.
+    ///
+    /// Returns `Ok(None)` if the Session has been created without a SURB balancer.
+    pub async fn get_surb_balancer_config(&self) -> errors::Result<Option<SurbBalancerConfig>> {
+        Ok(self
+            .smgr
+            .upgrade()
+            .ok_or(HoprTransportError::Other(anyhow::anyhow!("session manager is dropped")))?
+            .get_surb_balancer_config(&self.id)
+            .await?)
+    }
+
+    /// Updates the configuration of the SURB balancer.
+    ///
+    /// Returns an error if the Session is closed, the Session manager is gone, or the
+    /// Session has been created without a SURB balancer.
+    pub async fn update_surb_balancer_config(&self, config: SurbBalancerConfig) -> errors::Result<()> {
+        Ok(self
+            .smgr
+            .upgrade()
+            .ok_or(HoprTransportError::Other(anyhow::anyhow!("session manager is dropped")))?
+            .update_surb_balancer_config(&self.id, config)
+            .await?)
+    }
+}
+
 /// Interface into the physical transport mechanism allowing all off-chain HOPR-related tasks on
 /// the transport.
 pub struct HoprTransport<Chain, Graph, Net> {
@@ -160,7 +224,7 @@ pub struct HoprTransport<Chain, Graph, Net> {
     graph: Graph,
     path_planner: PathPlanner<MemorySurbStore, Chain, HoprGraphPathSelector<Graph>>,
     my_multiaddresses: Vec<Multiaddr>,
-    smgr: SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>, Sender<IncomingSession>>,
+    smgr: Arc<HoprSessionManager>,
     session_telemetry_tag_allocator: Arc<dyn hopr_transport_tag_allocator::TagAllocator + Send + Sync>,
     probing_tag_allocator: Arc<dyn hopr_transport_tag_allocator::TagAllocator + Send + Sync>,
     counters: PeerProtocolCounterRegistry,
@@ -202,7 +266,13 @@ where
     ) -> errors::Result<Self> {
         let me_offchain = *identity.1.public();
         let planner_config = cfg.path_planner;
-        let selector = HoprGraphPathSelector::new(me_offchain, graph.clone(), planner_config.max_cached_paths);
+        let selector = HoprGraphPathSelector::new(
+            me_offchain,
+            graph.clone(),
+            planner_config.max_cached_paths,
+            planner_config.edge_penalty,
+            planner_config.min_ack_rate,
+        );
 
         let tag_allocators = hopr_transport_tag_allocator::create_allocators_from_config(&cfg.session.tag_allocator)?;
 
@@ -261,7 +331,8 @@ where
                     surb_target_notify: true,
                 },
                 session_tag_allocator,
-            ),
+            )
+            .into(),
             chain_api: resolver,
             session_telemetry_tag_allocator,
             probing_tag_allocator,
@@ -276,10 +347,11 @@ where
     /// `HoprTransportProcess::BloomFilterSave`, `HoprTransportProcess::Swarm` and session-related
     /// processes and return join handles to the calling function. These processes are not started immediately but
     /// are waiting for a trigger from this piece of code.
-    pub async fn run<T, TFact, Ct, NetBuilder>(
+    pub async fn run<T, TFact, Ct>(
         &self,
         cover_traffic: Ct,
-        network_builder: NetBuilder,
+        network: Net,
+        network_process: BoxedProcessFn,
         ticket_events: T,
         ticket_factory: TFact,
         on_incoming_session: Sender<IncomingSession>,
@@ -291,10 +363,9 @@ where
         AbortableList<HoprTransportProcess>,
     )>
     where
-        T: futures::Sink<TicketEvent> + Clone + Send + Unpin + 'static,
+        T: futures::Sink<hopr_api::node::TicketEvent> + Clone + Send + Unpin + 'static,
         T::Error: std::error::Error + Clone + Send,
         Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
-        NetBuilder: NetworkBuilder<Network = Net> + Send + Sync + 'static,
         TFact: TicketFactory + Clone + Send + Sync + 'static,
     {
         let mut processes = AbortableList::<HoprTransportProcess>::default();
@@ -304,19 +375,8 @@ where
 
         // -- transport medium
 
-        // NOTE: Private address filtering is implemented at multiple levels for defense-in-depth:
-        // 1. Discovery events are filtered before they reach the transport component
-        // 2. SwarmEvent::NewExternalAddrOfPeer events are filtered using is_public_address()
-        let allow_private_addresses = self.cfg.transport.prefer_local_addresses;
-        let (transport_network, transport_layer_process) = network_builder
-            .build(
-                &self.packet_key,
-                self.my_multiaddresses.clone(),
-                hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL,
-                allow_private_addresses,
-            )
-            .await
-            .map_err(|e| HoprTransportError::Api(e.to_string()))?;
+        let transport_network = network;
+        let transport_layer_process = network_process;
 
         let msg_codec = hopr_transport_protocol::HoprBinaryCodec {};
         let (wire_msg_tx, wire_msg_rx) =
@@ -637,25 +697,16 @@ where
         destination: Address,
         target: SessionTarget,
         cfg: SessionClientConfig,
-    ) -> errors::Result<HoprSession> {
-        Ok(self.smgr.new_session(destination, target, cfg).await?)
-    }
-
-    #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn probe_session(&self, id: &SessionId) -> errors::Result<()> {
-        Ok(self.smgr.ping_session(id).await?)
-    }
-
-    pub async fn session_surb_balancing_cfg(&self, id: &SessionId) -> errors::Result<Option<SurbBalancerConfig>> {
-        Ok(self.smgr.get_surb_balancer_config(id).await?)
-    }
-
-    pub async fn update_session_surb_balancing_cfg(
-        &self,
-        id: &SessionId,
-        cfg: SurbBalancerConfig,
-    ) -> errors::Result<()> {
-        Ok(self.smgr.update_surb_balancer_config(id, cfg).await?)
+    ) -> errors::Result<(HoprSession, HoprSessionConfigurator)> {
+        let session = self.smgr.new_session(destination, target, cfg).await?;
+        let id = *session.id();
+        Ok((
+            session,
+            HoprSessionConfigurator {
+                id,
+                smgr: Arc::downgrade(&self.smgr),
+            },
+        ))
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
@@ -829,4 +880,88 @@ fn build_mixer_cfg_from_env() -> MixerConfig {
     debug!(?mixer_cfg, "Mixer configuration");
 
     mixer_cfg
+}
+
+// ---------------------------------------------------------------------------
+// NetworkView impl for HoprTransport — wraps OnceLock<Net> access
+// ---------------------------------------------------------------------------
+
+impl<Chain, Graph, Net> NetworkView for HoprTransport<Chain, Graph, Net>
+where
+    Net: NetworkView + Send + Sync + 'static,
+{
+    fn listening_as(&self) -> std::collections::HashSet<Multiaddr> {
+        self.network.get().map(|n| n.listening_as()).unwrap_or_default()
+    }
+
+    fn multiaddress_of(&self, peer: &PeerId) -> Option<std::collections::HashSet<Multiaddr>> {
+        self.network.get()?.multiaddress_of(peer)
+    }
+
+    fn discovered_peers(&self) -> std::collections::HashSet<PeerId> {
+        self.network.get().map(|n| n.discovered_peers()).unwrap_or_default()
+    }
+
+    fn connected_peers(&self) -> std::collections::HashSet<PeerId> {
+        self.network.get().map(|n| n.connected_peers()).unwrap_or_default()
+    }
+
+    fn is_connected(&self, peer: &PeerId) -> bool {
+        self.network.get().map(|n| n.is_connected(peer)).unwrap_or(false)
+    }
+
+    fn health(&self) -> Health {
+        self.network.get().map(|n| n.health()).unwrap_or(Health::Red)
+    }
+
+    fn subscribe_network_events(
+        &self,
+    ) -> impl futures::Stream<Item = hopr_api::network::NetworkEvent> + Send + 'static {
+        match self.network.get() {
+            Some(n) => futures::future::Either::Left(n.subscribe_network_events()),
+            None => futures::future::Either::Right(futures::stream::empty()),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TransportOperations impl for HoprTransport
+// ---------------------------------------------------------------------------
+
+#[async_trait::async_trait]
+impl<Chain, Graph, Net> hopr_api::node::TransportOperations for HoprTransport<Chain, Graph, Net>
+where
+    Chain: ChainReadChannelOperations
+        + ChainReadAccountOperations
+        + hopr_api::chain::ChainWriteTicketOperations
+        + ChainKeyOperations
+        + hopr_api::chain::ChainReadTicketOperations
+        + ChainValues
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+    Graph: NetworkGraphView<NodeId = OffchainPublicKey>
+        + NetworkGraphUpdate
+        + hopr_api::graph::NetworkGraphWrite<NodeId = OffchainPublicKey>
+        + hopr_api::graph::NetworkGraphTraverse<NodeId = OffchainPublicKey>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+    <Graph as NetworkGraphView>::Observed: EdgeObservableRead + Send,
+    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
+    <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
+    Net: NetworkView + NetworkStreamControl + Clone + Send + Sync + 'static,
+{
+    type Error = errors::HoprTransportError;
+    type Observable = <Graph as NetworkGraphView>::Observed;
+
+    async fn ping(&self, key: &OffchainPublicKey) -> Result<(Duration, Self::Observable), Self::Error> {
+        self.ping(key).await
+    }
+
+    async fn observed_multiaddresses(&self, key: &OffchainPublicKey) -> Vec<Multiaddr> {
+        self.network_observed_multiaddresses(key).await
+    }
 }

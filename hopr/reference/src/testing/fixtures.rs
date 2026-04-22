@@ -1,5 +1,6 @@
 use std::{convert::identity, ops::Div, str::FromStr, time::Duration};
 
+use futures::StreamExt as _;
 use futures_time::future::FutureExt as _;
 use hex_literal::hex;
 use hopr_chain_connector::{
@@ -10,9 +11,10 @@ use hopr_chain_connector::{
     testing::{BlokliTestClient, BlokliTestStateBuilder, FullStateEmulator},
 };
 use hopr_lib::{
-    Address, ChainKeypair, HopRouting, HoprBalance, HoprNodeNetworkOperations, HoprNodeOperations,
-    HoprSessionClientConfig, HoprState, IpOrHost, Keypair, OffchainKeypair, SealedHost, WinningProbability,
+    Address, ChainKeypair, HopRouting, HoprBalance, HoprNodeOperations, HoprSessionClientConfig,
+    HoprSessionClientOperations, HoprState, IpOrHost, Keypair, OffchainKeypair, SealedHost, WinningProbability,
     XDaiBalance,
+    api::{network::NetworkView, node::HasNetworkView},
     exports::transport::{HoprSession, SessionTarget},
 };
 use rand::seq::{IteratorRandom, SliceRandom};
@@ -108,7 +110,17 @@ impl ClusterGuard {
     ) -> anyhow::Result<()> {
         let deadline = tokio::time::Instant::now() + timeout;
         loop {
-            let channels = observer.inner().all_channels().await.unwrap_or_default();
+            let channels: Vec<hopr_lib::ChannelEntry> = {
+                use hopr_lib::api::{chain::ChainReadChannelOperations, node::HasChainApi};
+                match observer
+                    .inner()
+                    .chain_api()
+                    .stream_channels(hopr_lib::api::chain::ChannelSelector::default())
+                {
+                    Ok(stream) => stream.collect().await,
+                    Err(_) => vec![],
+                }
+            };
 
             let open_count = channels
                 .iter()
@@ -164,7 +176,7 @@ impl ClusterGuard {
             .await;
 
         match session_result {
-            Ok(Ok(s)) => Ok(s),
+            Ok(Ok((session, _configurator))) => Ok(session),
             Ok(Err(e)) => Err(e.into()),
             Err(_) => Err(anyhow::anyhow!("Session opening timed out after {timeout:?}")),
         }
@@ -500,7 +512,7 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
 
                     let config = create_hopr_instance_config(3001 + i as u16, safes[i], win_prob);
 
-                    let (instance, hopr_process) = crate::build_with_chain(
+                    let instance = crate::build_with_chain(
                         &onchain_keys[i],
                         &offchain_keys[i],
                         config,
@@ -513,11 +525,10 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
                     )
                     .await?;
 
-                    let socket = hopr_process.await?;
-                    anyhow::Ok((instance, socket, connector))
+                    anyhow::Ok((instance, connector))
                 });
 
-                result.map(|(instance, socket, connector)| TestedHopr::new(runtime, instance, socket, connector))
+                result.map(|(instance, connector)| TestedHopr::new(runtime, instance, connector))
             })
             .join()
             .map_err(|_| anyhow::anyhow!("hopr node starting thread panicked"))
@@ -566,11 +577,7 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
 async fn wait_for_connectivity(instance: &TestedHopr, swarm_size: usize) {
     info!("Waiting for full connectivity");
     loop {
-        let peers = instance
-            .inner()
-            .network_connected_peers()
-            .await
-            .expect("failed to get connected peers");
+        let peers = instance.inner().network_view().connected_peers();
 
         if peers.len() == swarm_size - 1 {
             break;
@@ -579,24 +586,20 @@ async fn wait_for_connectivity(instance: &TestedHopr, swarm_size: usize) {
         tracing::trace!(
             "{} peers connected on {}, waiting for full mesh",
             peers.len(),
-            instance.instance.me_onchain()
+            instance.address()
         );
         sleep(Duration::from_secs(1)).await;
     }
 
-    // Wait for the probe subsystem to observe all peers, ensuring pings
-    // succeed immediately after the cluster reports full connectivity.
+    // Wait for probe warmup: all connected peers should be individually reachable.
+    // Since `network_peer_info` was removed, we use `is_connected` as the liveness check.
     info!("Waiting for probe warmup");
     loop {
-        let peers = instance
-            .inner()
-            .network_connected_peers()
-            .await
-            .expect("failed to get connected peers");
+        let peers = instance.inner().network_view().connected_peers();
 
         let observed = peers
             .iter()
-            .filter(|p| instance.inner().network_peer_info(p).is_some())
+            .filter(|p| instance.inner().network_view().is_connected(p))
             .count();
 
         if observed == swarm_size - 1 {
@@ -606,7 +609,7 @@ async fn wait_for_connectivity(instance: &TestedHopr, swarm_size: usize) {
         tracing::trace!(
             "{observed}/{} peers observed on {}, waiting for probe warmup",
             swarm_size - 1,
-            instance.instance.me_onchain()
+            instance.address()
         );
         sleep(Duration::from_secs(1)).await;
     }
@@ -619,15 +622,12 @@ async fn wait_for_status(instance: &TestedHopr, expected_status: &HoprState) {
         expected_status
     );
     loop {
-        let status = instance.inner().status();
+        let status = HoprNodeOperations::status(instance.inner());
         if &status == expected_status {
             break;
         }
 
-        tracing::trace!(
-            "{status} on {}, waiting for {expected_status}",
-            instance.instance.me_onchain()
-        );
+        tracing::trace!("{status} on {}, waiting for {expected_status}", instance.address());
         sleep(Duration::from_secs(1)).await;
     }
 }

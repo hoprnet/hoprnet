@@ -47,7 +47,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 
-hopr-async-runtime = { workspace = true }
+hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 hopr-crypto-packet = { workspace = true }
 hopr-types = { workspace = true, features = ["primitive", "random"] }
 
