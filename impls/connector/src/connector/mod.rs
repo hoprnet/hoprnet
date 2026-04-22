@@ -689,4 +689,302 @@ pub(crate) mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn connector_should_handle_inner_tx_failure_during_redemption() -> anyhow::Result<()> {
+        use blokli_client::{
+            api::{
+                AccountSelector, BlokliQueryClient, BlokliSubscriptionClient, BlokliTransactionClient, ChainAddress,
+                ChannelSelector, TxId,
+                types::{SafeExecution, Transaction},
+            },
+            errors::BlokliClientError,
+        };
+        use hopr_api::chain::ChainWriteTicketOperations;
+
+        use crate::testing::BlokliTestStateBuilder;
+
+        struct MockClient<C>(pub C);
+
+        #[async_trait::async_trait]
+        impl<C: BlokliTransactionClient + Send + Sync> BlokliTransactionClient for MockClient<C> {
+            async fn submit_transaction(
+                &self,
+                signed_tx: &[u8],
+            ) -> Result<blokli_client::api::TxReceipt, BlokliClientError> {
+                self.0.submit_transaction(signed_tx).await
+            }
+
+            async fn submit_and_track_transaction(&self, signed_tx: &[u8]) -> Result<TxId, BlokliClientError> {
+                self.0.submit_and_track_transaction(signed_tx).await
+            }
+
+            async fn submit_and_confirm_transaction(
+                &self,
+                signed_tx: &[u8],
+                num_confirmations: usize,
+            ) -> Result<blokli_client::api::TxReceipt, BlokliClientError> {
+                self.0
+                    .submit_and_confirm_transaction(signed_tx, num_confirmations)
+                    .await
+            }
+
+            async fn track_transaction(
+                &self,
+                tx_id: TxId,
+                client_timeout: Duration,
+            ) -> Result<Transaction, BlokliClientError> {
+                let mut tx = self.0.track_transaction(tx_id, client_timeout).await?;
+                tx.safe_execution = Some(SafeExecution {
+                    success: false,
+                    safe_tx_hash: None,
+                    revert_reason: Some("mocked failure".into()),
+                });
+                Ok(tx)
+            }
+        }
+
+        #[async_trait::async_trait]
+        impl<C: BlokliQueryClient + Send + Sync> BlokliQueryClient for MockClient<C> {
+            async fn count_accounts(&self, selector: AccountSelector) -> Result<u32, BlokliClientError> {
+                self.0.count_accounts(selector).await
+            }
+
+            async fn query_accounts(
+                &self,
+                selector: AccountSelector,
+            ) -> Result<Vec<blokli_client::api::types::Account>, BlokliClientError> {
+                self.0.query_accounts(selector).await
+            }
+
+            async fn query_native_balance(
+                &self,
+                address: &ChainAddress,
+            ) -> Result<blokli_client::api::types::NativeBalance, BlokliClientError> {
+                self.0.query_native_balance(address).await
+            }
+
+            async fn query_token_balance(
+                &self,
+                address: &ChainAddress,
+            ) -> Result<blokli_client::api::types::HoprBalance, BlokliClientError> {
+                self.0.query_token_balance(address).await
+            }
+
+            async fn query_transaction_count(&self, address: &ChainAddress) -> Result<u64, BlokliClientError> {
+                self.0.query_transaction_count(address).await
+            }
+
+            async fn query_safe_allowance(
+                &self,
+                address: &ChainAddress,
+            ) -> Result<blokli_client::api::types::SafeHoprAllowance, BlokliClientError> {
+                self.0.query_safe_allowance(address).await
+            }
+
+            async fn query_redeemed_stats(
+                &self,
+                selector: blokli_client::api::RedeemedStatsSelector,
+            ) -> Result<blokli_client::api::types::RedeemedStats, BlokliClientError> {
+                self.0.query_redeemed_stats(selector).await
+            }
+
+            async fn query_safe(
+                &self,
+                selector: blokli_client::api::SafeSelector,
+            ) -> Result<Option<blokli_client::api::types::Safe>, BlokliClientError> {
+                self.0.query_safe(selector).await
+            }
+
+            async fn query_module_address_prediction(
+                &self,
+                input: blokli_client::api::ModulePredictionInput,
+            ) -> Result<ChainAddress, BlokliClientError> {
+                self.0.query_module_address_prediction(input).await
+            }
+
+            async fn count_channels(&self, selector: ChannelSelector) -> Result<u32, BlokliClientError> {
+                self.0.count_channels(selector).await
+            }
+
+            async fn query_channel_stats(
+                &self,
+                selector: ChannelSelector,
+            ) -> Result<blokli_client::api::types::ChannelStats, BlokliClientError> {
+                self.0.query_channel_stats(selector).await
+            }
+
+            async fn query_channels(
+                &self,
+                selector: ChannelSelector,
+            ) -> Result<blokli_client::api::types::ChannelsList, BlokliClientError> {
+                self.0.query_channels(selector).await
+            }
+
+            async fn query_safes_balance(
+                &self,
+                owner_address: Option<ChainAddress>,
+            ) -> Result<blokli_client::api::types::SafesBalance, BlokliClientError> {
+                self.0.query_safes_balance(owner_address).await
+            }
+
+            async fn query_transaction_status(&self, tx_id: TxId) -> Result<Transaction, BlokliClientError> {
+                self.0.query_transaction_status(tx_id).await
+            }
+
+            async fn query_chain_info(&self) -> Result<blokli_client::api::types::ChainInfo, BlokliClientError> {
+                self.0.query_chain_info().await
+            }
+
+            async fn query_version(&self) -> Result<String, BlokliClientError> {
+                self.0.query_version().await
+            }
+
+            async fn query_health(&self) -> Result<String, BlokliClientError> {
+                self.0.query_health().await
+            }
+        }
+
+        #[async_trait::async_trait]
+        impl<C: BlokliSubscriptionClient + Send + Sync> BlokliSubscriptionClient for MockClient<C> {
+            fn subscribe_channels(
+                &self,
+                selector: ChannelSelector,
+            ) -> Result<
+                impl futures::Stream<Item = Result<blokli_client::api::types::Channel, BlokliClientError>> + Send,
+                BlokliClientError,
+            > {
+                self.0.subscribe_channels(selector)
+            }
+
+            fn subscribe_accounts(
+                &self,
+                selector: AccountSelector,
+            ) -> Result<
+                impl futures::Stream<Item = Result<blokli_client::api::types::Account, BlokliClientError>> + Send,
+                BlokliClientError,
+            > {
+                self.0.subscribe_accounts(selector)
+            }
+
+            fn subscribe_graph(
+                &self,
+            ) -> Result<
+                impl futures::Stream<Item = Result<blokli_client::api::types::OpenedChannelsGraphEntry, BlokliClientError>>
+                + Send,
+                BlokliClientError,
+            > {
+                self.0.subscribe_graph()
+            }
+
+            fn subscribe_ticket_params(
+                &self,
+            ) -> Result<
+                impl futures::Stream<Item = Result<blokli_client::api::types::TicketParameters, BlokliClientError>> + Send,
+                BlokliClientError,
+            > {
+                self.0.subscribe_ticket_params()
+            }
+
+            fn subscribe_safe_deployments(
+                &self,
+            ) -> Result<
+                impl futures::Stream<Item = Result<blokli_client::api::types::Safe, BlokliClientError>> + Send,
+                BlokliClientError,
+            > {
+                self.0.subscribe_safe_deployments()
+            }
+
+            fn subscribe_track_transaction(
+                &self,
+                tx_id: TxId,
+            ) -> Result<impl futures::Stream<Item = Result<Transaction, BlokliClientError>> + Send, BlokliClientError>
+            {
+                self.0.subscribe_track_transaction(tx_id)
+            }
+        }
+
+        let offchain_key_1 = OffchainKeypair::from_secret(&hex!(
+            "60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"
+        ))?;
+        let account_1 = AccountEntry {
+            public_key: *offchain_key_1.public(),
+            chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
+            entry_type: AccountType::NotAnnounced,
+            safe_address: Some([1u8; Address::SIZE].into()),
+            key_id: 1.into(),
+        };
+        let offchain_key_2 = OffchainKeypair::from_secret(&hex!(
+            "71bf1f42ebbfcd89c3e197a3fd7cda79b92499e509b6fefa0fe44d02821d146a"
+        ))?;
+        let account_2 = AccountEntry {
+            public_key: *offchain_key_2.public(),
+            chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_2)?.public().to_address(),
+            entry_type: AccountType::NotAnnounced,
+            safe_address: Some([2u8; Address::SIZE].into()),
+            key_id: 2.into(),
+        };
+
+        let channel_1 = ChannelEntry::builder()
+            .between(
+                &ChainKeypair::from_secret(&PRIVATE_KEY_2)?,
+                &ChainKeypair::from_secret(&PRIVATE_KEY_1)?,
+            )
+            .amount(10)
+            .ticket_index(1)
+            .status(ChannelStatus::Open)
+            .epoch(1)
+            .build()?;
+
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_accounts([
+                (account_1, HoprBalance::new_base(100), XDaiBalance::new_base(1)),
+                (account_2, HoprBalance::new_base(100), XDaiBalance::new_base(1)),
+            ])
+            .with_channels([channel_1])
+            .with_hopr_network_chain_info("rotsee")
+            .build_dynamic_client(MODULE_ADDR.into())
+            .with_tx_simulation_delay(Duration::from_millis(100));
+
+        let mock_client = MockClient(blokli_client);
+
+        let mut connector = create_connector(mock_client)?;
+        connector.connect().await?;
+
+        let hkc1 = ChainKeypair::from_secret(&hex!(
+            "e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8"
+        ))?;
+        let hkc2 = ChainKeypair::from_secret(&hex!(
+            "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
+        ))?;
+
+        let ticket = TicketBuilder::default()
+            .counterparty(&ChainKeypair::from_secret(&PRIVATE_KEY_1)?)
+            .amount(1)
+            .index(1)
+            .channel_epoch(1)
+            .eth_challenge(
+                Challenge::from_hint_and_share(
+                    &HalfKeyChallenge::new(hkc1.public().as_ref()),
+                    &HalfKeyChallenge::new(hkc2.public().as_ref()),
+                )?
+                .to_ethereum_challenge(),
+            )
+            .build_signed(&ChainKeypair::from_secret(&PRIVATE_KEY_2)?, &Hash::default())?
+            .into_acknowledged(Response::from_half_keys(
+                &HalfKey::try_from(hkc1.secret().as_ref())?,
+                &HalfKey::try_from(hkc2.secret().as_ref())?,
+            )?)
+            .into_redeemable(&ChainKeypair::from_secret(&PRIVATE_KEY_1)?, &Hash::default())?;
+
+        let res = connector.redeem_ticket(ticket).await?;
+        let err = res.await.unwrap_err();
+
+        assert!(matches!(
+            err,
+            hopr_api::chain::TicketRedeemError::Rejected(_, ref reason) if reason.contains("inner transaction rejected: mocked failure")
+        ));
+
+        Ok(())
+    }
 }
