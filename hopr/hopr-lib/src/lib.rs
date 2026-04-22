@@ -371,9 +371,9 @@ where
 fn network_health_to_status(health: Health, component: &str) -> ComponentStatus {
     match health {
         Health::Green | Health::Yellow => ComponentStatus::Ready,
-        Health::Orange => ComponentStatus::Degraded(format!("{component}: low connectivity (1 peer)")),
-        Health::Red => ComponentStatus::Degraded(format!("{component}: no connected peers")),
-        Health::Unknown => ComponentStatus::Unavailable(format!("{component}: network not initialized")),
+        Health::Orange => ComponentStatus::Degraded(format!("{component}: low connectivity (1 peer)").into()),
+        Health::Red => ComponentStatus::Degraded(format!("{component}: no connected peers").into()),
+        Health::Unknown => ComponentStatus::Unavailable(format!("{component}: network not initialized").into()),
     }
 }
 

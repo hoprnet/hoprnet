@@ -178,15 +178,15 @@ fn component_status_to_info(status: &ComponentStatus) -> ComponentStatusInfo {
         },
         ComponentStatus::Initializing(d) => ComponentStatusInfo {
             status: "Initializing".into(),
-            detail: Some(d.clone()),
+            detail: Some(d.to_string()),
         },
         ComponentStatus::Degraded(d) => ComponentStatusInfo {
             status: "Degraded".into(),
-            detail: Some(d.clone()),
+            detail: Some(d.to_string()),
         },
         ComponentStatus::Unavailable(d) => ComponentStatusInfo {
             status: "Unavailable".into(),
-            detail: Some(d.clone()),
+            detail: Some(d.to_string()),
         },
     }
 }
