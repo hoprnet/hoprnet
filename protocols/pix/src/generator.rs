@@ -3,16 +3,17 @@ use std::collections::VecDeque;
 #[cfg(feature = "rayon")]
 use hopr_parallelize::cpu::rayon::prelude::*;
 use vsss_rs::{
-    DefaultShare, IdentifierPrimeField, Polynomial, Share, ShareElement, ShareVerifierGroup,
     elliptic_curve::{
-        Field, Group, PrimeField,
-        rand_core::{CryptoRng, RngCore},
-    },
+        rand_core::{CryptoRng, RngCore}, Field, Group,
+        PrimeField,
+    }, DefaultShare, IdentifierPrimeField, Polynomial, Share, ShareElement,
+    ShareVerifierGroup,
 };
 
 use crate::{
-    Element, PartialSsaShare, PixSpec, Scalar, SsaIndex, SsaPolynomialIndex, SsaShareVerifier, errors, msg_to_scalar,
+    errors, msg_to_scalar, Element, PixSpec, Scalar, PartialSsaShareVerifier,
 };
+use crate::types::{PartialSsaShare, SsaIndex, SsaPolynomialIndex};
 
 type RawPolynomial<S> = Vec<DefaultShare<IdentifierPrimeField<Scalar<S>>, IdentifierPrimeField<Scalar<S>>>>;
 type RawPolynomialVerifier<S> = Vec<ShareVerifierGroup<Element<S>>>;
@@ -142,7 +143,7 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
     pub fn new_ssa_commitment(
         &self,
         pseudonym: &S::Pseudonym,
-    ) -> errors::Result<(Element<S>, Vec<SsaShareVerifier<S>>)> {
+    ) -> errors::Result<(Element<S>, Vec<PartialSsaShareVerifier<S>>)> {
         let mut rng = vsss_rs::elliptic_curve::rand_core::OsRng;
 
         // Generate sub-secrets for each polynomial
@@ -172,23 +173,24 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
             .entry_by_ref(pseudonym)
             .and_upsert_with(|entry| match entry {
                 None => {
-                    let new_index = 1;
+                    let ssa_index = 1;
                     verifiers.extend(
                         raw_verifiers
                             .into_iter()
                             .enumerate()
-                            .map(|(poly_index, poly_commitment)| SsaShareVerifier {
-                                spi: SsaPolynomialIndex::new(*pseudonym, new_index, poly_index as u32),
+                            .map(|(poly_index, poly_commitment)| PartialSsaShareVerifier {
+                                spi: SsaPolynomialIndex::new(*pseudonym, ssa_index, poly_index as u32),
                                 poly_commitment,
+                                min_shares: self.cfg.threshold,
                             }),
                     );
                     std::sync::Arc::new(parking_lot::Mutex::new(SsaPseudonymEntry {
-                        ssa_index: 1,
+                        ssa_index,
                         poly_queue: raw_polynomials
                             .into_iter()
                             .enumerate()
                             .map(|(poly_index, raw)| IndexedPolynomial {
-                                spi: SsaPolynomialIndex::new(*pseudonym, new_index, poly_index as u32),
+                                spi: SsaPolynomialIndex::new(*pseudonym, ssa_index, poly_index as u32),
                                 raw,
                                 shares_generated: 0,
                                 t: self.cfg.threshold,
@@ -202,14 +204,15 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
                         let mut entry = value.lock();
                         entry.ssa_index += 1;
 
-                        let new_index = entry.ssa_index;
+                        let ssa_index = entry.ssa_index;
                         verifiers.extend(
                             raw_verifiers
                                 .into_iter()
                                 .enumerate()
-                                .map(|(poly_index, poly_commitment)| SsaShareVerifier {
-                                    spi: SsaPolynomialIndex::new(*pseudonym, new_index, poly_index as u32),
+                                .map(|(poly_index, poly_commitment)| PartialSsaShareVerifier {
+                                    spi: SsaPolynomialIndex::new(*pseudonym, ssa_index, poly_index as u32),
                                     poly_commitment,
+                                    min_shares: self.cfg.threshold,
                                 }),
                         );
 
@@ -217,7 +220,7 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
                             .poly_queue
                             .extend(raw_polynomials.into_iter().enumerate().map(|(poly_index, raw)| {
                                 IndexedPolynomial {
-                                    spi: SsaPolynomialIndex::new(*pseudonym, new_index, poly_index as u32),
+                                    spi: SsaPolynomialIndex::new(*pseudonym, ssa_index, poly_index as u32),
                                     raw,
                                     shares_generated: 0,
                                     t: self.cfg.threshold,

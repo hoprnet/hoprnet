@@ -9,16 +9,18 @@ edition.workspace = true
 [features]
 default = ["rayon"]
 rayon = ["hopr-parallelize/rayon"]
-serde = ["dep:serde"]
+serde = ["dep:serde", "vsss-rs/serde", "hopr-types/serde"]
 
 [dependencies]
 ahash = { workspace = true }
-digest = "0.10" # TODO: remove once HashMarker is available in hopr-types and compatible with hopr-api
+async-broadcast = { workspace = true }
+futures = { workspace = true }
 moka = { workspace = true }
 parking_lot = { workspace = true }
 serde = { workspace = true, optional = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
 validator = { workspace = true }
 vsss-rs = { workspace = true, features = [
   "alloc",

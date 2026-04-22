@@ -64,6 +64,7 @@ backon = { version = "1.6.0", default-features = false }
 base64 = "0.22.1"
 bimap = "0.6.3"
 bitvec = "1.0.1"
+blake3 = "1.8.3"
 blokli-client = { git = "https://github.com/hoprnet/blokli", rev = "9bee1183c63ba005c709ada1a275a759d2413d8b" } # Pinned: later revs (c4eb515+) have a broken `testing` feature (BlokliTestClient missing `subscribe_track_transaction`); revert to `branch = "main"` once fixed upstream.
 bloomfilter = { version = "3.0.1" }
 bytesize = { version = "2.3.1", features = ["serde"] }
@@ -167,7 +168,6 @@ serde_with = { version = "3.18.0", features = ["base64"] }
 serde_urlencoded = "0.7.1"
 serde-saphyr = "0.0.23"
 serial_test = "3.4.0"
-sha3 = "0.11.0"
 signal-hook = "0.4.4"
 smart-default = "0.7.1"
 socket2 = "0.6.3"
@@ -222,7 +222,7 @@ mimalloc = { version = "0.1.48", default-features = false, features = [
 ] }
 
 hopr-api = { git = "https://github.com/hoprnet/hopr-api", branch = "main" }
-hopr-types = { version = "1.5.3", features = ["use-bindings"] }
+hopr-types = { version = "1.5.4", features = ["use-bindings"] }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-crypto-keypair = { path = "crypto/keypair", default-features = false }
 hopr-crypto-packet = { path = "crypto/packet", default-features = false, features = [
