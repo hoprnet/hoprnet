@@ -149,21 +149,105 @@ pub(super) async fn eligiblez<H: Send + Sync + 'static>(State(_state): State<Arc
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use axum::{Router, body::Body, http::Request, routing::get};
+    use tower::ServiceExt;
 
-    /// Test that eval_precondition returns 200 OK when the precondition is true
+    use super::*;
+    use crate::testing::StubNode;
+
+    fn checks_router(stub: StubNode) -> Router {
+        let state: Arc<AppState<StubNode>> = Arc::new(AppState {
+            hopr: Arc::new(stub),
+        });
+        Router::new()
+            .route("/startedz", get(startedz::<StubNode>))
+            .route("/readyz", get(readyz::<StubNode>))
+            .route("/healthyz", get(healthyz::<StubNode>))
+            .route("/eligiblez", get(eligiblez::<StubNode>))
+            .with_state(state)
+    }
+
     #[test]
-    fn test_eval_precondition_true_returns_ok() {
+    fn eval_precondition_should_return_ok_when_true() {
         let response = eval_precondition(true);
         let (parts, _) = response.into_response().into_parts();
         assert_eq!(parts.status, StatusCode::OK);
     }
 
-    /// Test that eval_precondition returns 412 PRECONDITION_FAILED when the precondition is false
     #[test]
-    fn test_eval_precondition_false_returns_precondition_failed() {
+    fn eval_precondition_should_return_precondition_failed_when_false() {
         let response = eval_precondition(false);
         let (parts, _) = response.into_response().into_parts();
         assert_eq!(parts.status, StatusCode::PRECONDITION_FAILED);
+    }
+
+    #[tokio::test]
+    async fn startedz_should_return_200_when_running() -> anyhow::Result<()> {
+        let app = checks_router(StubNode::running_and_healthy());
+        let resp = app
+            .oneshot(Request::get("/startedz").body(Body::empty())?)
+            .await?;
+        assert_eq!(resp.status(), StatusCode::OK);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn startedz_should_return_412_when_not_running() -> anyhow::Result<()> {
+        let app = checks_router(StubNode::running_and_healthy().with_state(HoprState::Uninitialized));
+        let resp = app
+            .oneshot(Request::get("/startedz").body(Body::empty())?)
+            .await?;
+        assert_eq!(resp.status(), StatusCode::PRECONDITION_FAILED);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn readyz_should_return_200_when_running_and_connected() -> anyhow::Result<()> {
+        let app = checks_router(StubNode::running_and_healthy());
+        let resp = app
+            .oneshot(Request::get("/readyz").body(Body::empty())?)
+            .await?;
+        assert_eq!(resp.status(), StatusCode::OK);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn readyz_should_return_412_when_running_but_red() -> anyhow::Result<()> {
+        let app = checks_router(StubNode::running_and_healthy().with_health(Health::Red));
+        let resp = app
+            .oneshot(Request::get("/readyz").body(Body::empty())?)
+            .await?;
+        assert_eq!(resp.status(), StatusCode::PRECONDITION_FAILED);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn readyz_should_return_412_when_not_running() -> anyhow::Result<()> {
+        let app = checks_router(StubNode::running_and_healthy().with_state(HoprState::WaitingForFunds));
+        let resp = app
+            .oneshot(Request::get("/readyz").body(Body::empty())?)
+            .await?;
+        assert_eq!(resp.status(), StatusCode::PRECONDITION_FAILED);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn healthyz_should_return_200_when_running_and_orange() -> anyhow::Result<()> {
+        let app = checks_router(StubNode::running_and_healthy().with_health(Health::Orange));
+        let resp = app
+            .oneshot(Request::get("/healthyz").body(Body::empty())?)
+            .await?;
+        assert_eq!(resp.status(), StatusCode::OK);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn eligiblez_should_always_return_200() -> anyhow::Result<()> {
+        let app = checks_router(StubNode::running_and_healthy());
+        let resp = app
+            .oneshot(Request::get("/eligiblez").body(Body::empty())?)
+            .await?;
+        assert_eq!(resp.status(), StatusCode::OK);
+        Ok(())
     }
 }

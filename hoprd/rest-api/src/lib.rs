@@ -10,6 +10,8 @@ mod node;
 mod peers;
 mod root;
 mod session;
+#[cfg(test)]
+pub(crate) mod testing;
 mod tickets;
 
 pub(crate) mod env {

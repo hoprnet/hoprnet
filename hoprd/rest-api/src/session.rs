@@ -822,3 +822,39 @@ pub(crate) async fn close_client<H: Send + Sync + 'static>(
 
     Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::NO_CONTENT, "").into_response())
 }
+
+#[cfg(test)]
+mod tests {
+    use axum::{Router, body::Body, http::Request, routing::get};
+    use tower::ServiceExt;
+
+    use super::*;
+    use crate::testing::StubUnit;
+
+    fn session_router() -> Router {
+        let state: Arc<InternalState<StubUnit>> = Arc::new(InternalState {
+            hoprd_cfg: serde_json::json!({}),
+            auth: Arc::new(crate::config::Auth::None),
+            hopr: Arc::new(StubUnit),
+            open_listeners: Arc::new(hopr_utils_session::ListenerJoinHandles::default()),
+            default_listen_host: "127.0.0.1:0".parse().unwrap(),
+        });
+        Router::new()
+            .route("/session/{protocol}", get(list_clients::<StubUnit>))
+            .with_state(state)
+    }
+
+    #[tokio::test]
+    async fn list_clients_should_return_empty_when_no_sessions() -> anyhow::Result<()> {
+        let app = session_router();
+        let resp = app
+            .oneshot(Request::get("/session/tcp").body(Body::empty())?)
+            .await?;
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await?;
+        let body: serde_json::Value = serde_json::from_slice(&bytes)?;
+        assert_eq!(body.as_array().unwrap().len(), 0);
+        Ok(())
+    }
+}

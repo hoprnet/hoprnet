@@ -166,3 +166,61 @@ pub(super) async fn info<
         Err(error) => Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(error)).into_response()),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use axum::{Router, body::Body, http::Request, routing::get};
+    use tower::ServiceExt;
+
+    use super::*;
+    use crate::testing::StubUnit;
+
+    fn node_router() -> Router {
+        let state: Arc<InternalState<StubUnit>> = Arc::new(InternalState {
+            hoprd_cfg: serde_json::json!({
+                "network": "test-network",
+                "provider": "http://localhost:8545"
+            }),
+            auth: Arc::new(crate::config::Auth::None),
+            hopr: Arc::new(StubUnit),
+            open_listeners: Arc::new(hopr_utils_session::ListenerJoinHandles::default()),
+            default_listen_host: "127.0.0.1:0".parse().unwrap(),
+        });
+        Router::new()
+            .route(&format!("{BASE_PATH}/node/version"), get(version))
+            .route(
+                &format!("{BASE_PATH}/node/configuration"),
+                get(configuration::<StubUnit>),
+            )
+            .with_state(state)
+    }
+
+    #[tokio::test]
+    async fn version_should_return_app_version() -> anyhow::Result<()> {
+        let app = node_router();
+        let resp = app
+            .oneshot(Request::get(&format!("{BASE_PATH}/node/version")).body(Body::empty())?)
+            .await?;
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await?;
+        let body: serde_json::Value = serde_json::from_slice(&bytes)?;
+        assert!(body["version"].as_str().is_some());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn configuration_should_return_hoprd_config() -> anyhow::Result<()> {
+        let app = node_router();
+        let resp = app
+            .oneshot(Request::get(&format!("{BASE_PATH}/node/configuration")).body(Body::empty())?)
+            .await?;
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await?;
+        let body: serde_json::Value = serde_json::from_slice(&bytes)?;
+        assert_eq!(body["network"], "test-network");
+        assert_eq!(body["provider"], "http://localhost:8545");
+        Ok(())
+    }
+}
