@@ -85,6 +85,24 @@ jobs:
             gh pr edit "$PR_NUMBER" --add-label "external"
           fi
 
+  check-allowed-dependencies:
+    name: Disallowed git dependencies in cargo
+    runs-on: depot-ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Validate Cargo dependencies
+        run: |
+          nix develop -c env -u VIRTUAL_ENV UV_CACHE_DIR=.ci/no-git-dependencies/.uv-cache \
+            uv run --project .ci/no-git-dependencies \
+            python .ci/no-git-dependencies/src/no_git_dependencies_check/main.py \
+            --allow blokli-client
+
   checks:
     name: Check
     uses: hoprnet/hopr-workflows/.github/workflows/checks.yaml@bbd22e57cf954c15f0a6051d59329857809141dd # workflow-checks-v1

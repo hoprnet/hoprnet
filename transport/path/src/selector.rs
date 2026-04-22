@@ -3,11 +3,6 @@ use hopr_api::graph::{
 };
 use hopr_types::{crypto::types::OffchainPublicKey, internal::errors::PathError};
 
-// Duplicated from hopr_network_graph::{DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE}
-// — transport/path cannot depend on impls/graph to avoid circular deps.
-const DEFAULT_EDGE_PENALTY: f64 = 0.5;
-const DEFAULT_MIN_ACK_RATE: f64 = 0.1;
-
 use crate::{
     errors::{PathPlannerError, Result},
     traits::{PathSelector, PathWithCost},
@@ -50,62 +45,6 @@ where
         .collect::<Vec<_>>()
 }
 
-/// Extended forward path search: find shorter paths using [`EdgeValueFn::forward_without_self_loopback`]
-/// and append `dest` to each one.
-///
-/// This handles the case where the last edge (relay -> dest) has no graph edge
-/// (e.g. no payment channel) but the path planner can still assume the last hop
-/// is reachable. Paths already found by Phase 1 are excluded via `existing`.
-///
-/// The cost from the shorter traversal is preserved as-is — the missing last
-/// edge contributes a neutral `1.0` multiplier (no quality data available).
-fn compute_extended_forward_paths<G>(
-    graph: &G,
-    src: &OffchainPublicKey,
-    dest: &OffchainPublicKey,
-    shorter_length: std::num::NonZeroUsize,
-    take: usize,
-    existing: &[PathWithCost],
-) -> Vec<PathWithCost>
-where
-    G: NetworkGraphTraverse<NodeId = OffchainPublicKey> + NetworkGraphView<NodeId = OffchainPublicKey>,
-    <G as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
-{
-    let raw = graph.simple_paths_from(
-        src,
-        shorter_length.get(),
-        Some(take),
-        EdgeValueFn::forward_without_self_loopback(DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE),
-    );
-
-    raw.into_iter()
-        .filter_map(|(path, _, cost)| {
-            if cost <= 0.0 {
-                return None;
-            }
-
-            // Strip source and append dest.
-            let mut candidate: Vec<_> = path.into_iter().skip(1).collect();
-
-            // Ensure dest is not already in the path (would create a repeated node).
-            if candidate.contains(dest) {
-                return None;
-            }
-
-            candidate.push(*dest);
-
-            // Skip paths already found by Phase 1 (compare path component only).
-            if existing.iter().any(|pwc| pwc.path == candidate) {
-                return None;
-            }
-
-            tracing::trace!(?candidate, ?cost, "extended forward path candidate");
-            Some(PathWithCost { path: candidate, cost })
-        })
-        .take(take)
-        .collect()
-}
-
 /// A lightweight graph-backed path selector.
 ///
 /// Returns all candidate paths for a `(src, dest, hops)` query directly from
@@ -122,6 +61,8 @@ pub struct HoprGraphPathSelector<G> {
     me: OffchainPublicKey,
     graph: G,
     max_paths: usize,
+    edge_penalty: f64,
+    min_ack_rate: f64,
 }
 
 impl<G> HoprGraphPathSelector<G>
@@ -139,8 +80,68 @@ where
     /// * `me` – the planner's own offchain public key, used to determine path direction.
     /// * `graph` – the network graph to query.
     /// * `max_paths` – maximum number of candidate paths to return per query.
-    pub fn new(me: OffchainPublicKey, graph: G, max_paths: usize) -> Self {
-        Self { me, graph, max_paths }
+    /// * `edge_penalty` – penalty multiplier for edges lacking probe-based quality observations.
+    /// * `min_ack_rate` – minimum acceptable message acknowledgment rate for path selection.
+    pub fn new(me: OffchainPublicKey, graph: G, max_paths: usize, edge_penalty: f64, min_ack_rate: f64) -> Self {
+        Self {
+            me,
+            graph,
+            max_paths,
+            edge_penalty,
+            min_ack_rate,
+        }
+    }
+
+    /// Extended forward path search: find shorter paths using
+    /// [`EdgeValueFn::forward_without_self_loopback`] and append `dest` to each one.
+    ///
+    /// This handles the case where the last edge (relay -> dest) has no graph edge
+    /// (e.g. no payment channel) but the path planner can still assume the last hop
+    /// is reachable. Paths already found by Phase 1 are excluded via `existing`.
+    ///
+    /// The cost from the shorter traversal is preserved as-is — the missing last
+    /// edge contributes a neutral `1.0` multiplier (no quality data available).
+    fn compute_extended_forward_paths(
+        &self,
+        src: &OffchainPublicKey,
+        dest: &OffchainPublicKey,
+        shorter_length: std::num::NonZeroUsize,
+        take: usize,
+        existing: &[PathWithCost],
+    ) -> Vec<PathWithCost> {
+        let raw = self.graph.simple_paths_from(
+            src,
+            shorter_length.get(),
+            Some(take),
+            EdgeValueFn::forward_without_self_loopback(self.edge_penalty, self.min_ack_rate),
+        );
+
+        raw.into_iter()
+            .filter_map(|(path, _, cost)| {
+                if cost <= 0.0 {
+                    return None;
+                }
+
+                // Strip source and append dest.
+                let mut candidate: Vec<_> = path.into_iter().skip(1).collect();
+
+                // Ensure dest is not already in the path (would create a repeated node).
+                if candidate.contains(dest) {
+                    return None;
+                }
+
+                candidate.push(*dest);
+
+                // Skip paths already found by Phase 1 (compare path component only).
+                if existing.iter().any(|pwc| pwc.path == candidate) {
+                    return None;
+                }
+
+                tracing::trace!(?candidate, ?cost, "extended forward path candidate");
+                Some(PathWithCost { path: candidate, cost })
+            })
+            .take(take)
+            .collect()
     }
 }
 
@@ -181,7 +182,7 @@ where
                 &dest,
                 length,
                 self.max_paths,
-                EdgeValueFn::forward(length, DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE),
+                EdgeValueFn::forward(length, self.edge_penalty, self.min_ack_rate),
             );
             tracing::debug!(
                 direction,
@@ -196,7 +197,7 @@ where
                 && let Some(shorter) = std::num::NonZeroUsize::new(length.get() - 1)
             {
                 let remaining = self.max_paths - found.len();
-                let extended = compute_extended_forward_paths(&self.graph, &src, &dest, shorter, remaining, &found);
+                let extended = self.compute_extended_forward_paths(&src, &dest, shorter, remaining, &found);
                 tracing::debug!(
                     direction,
                     phase = 2,
@@ -214,7 +215,7 @@ where
                 &dest,
                 length,
                 self.max_paths,
-                EdgeValueFn::returning(length, DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE),
+                EdgeValueFn::returning(length, self.edge_penalty, self.min_ack_rate),
             );
             tracing::debug!(direction, count = found.len(), "[return] candidates");
             found
@@ -259,7 +260,16 @@ mod tests {
     };
 
     use super::*;
-    use crate::traits::PathSelector;
+    use crate::{PathPlannerConfig, traits::PathSelector};
+
+    fn test_selector(
+        me: OffchainPublicKey,
+        graph: ChannelGraph,
+        max_paths: usize,
+    ) -> HoprGraphPathSelector<ChannelGraph> {
+        let cfg = PathPlannerConfig::default();
+        HoprGraphPathSelector::new(me, graph, max_paths, cfg.edge_penalty, cfg.min_ack_rate)
+    }
 
     const SECRET_0: [u8; 32] = hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d");
     const SECRET_1: [u8; 32] = hex!("71bf1f42ebbfcd89c3e197a3fd7cda79b92499e509b6fefa0fe44d02821d146a");
@@ -323,7 +333,7 @@ mod tests {
         let unreachable = pubkey(&SECRET_1);
         let graph = ChannelGraph::new(me);
         // No edges at all — neither direction has a path.
-        let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS);
+        let selector = test_selector(me, graph, MAX_PATHS);
 
         let fwd = selector.select_path(me, unreachable, 1);
         assert!(fwd.is_err(), "forward: should error when destination is unreachable");
@@ -345,7 +355,7 @@ mod tests {
     #[tokio::test]
     async fn path_should_exclude_source() -> anyhow::Result<()> {
         let (me, _hop, dest, graph) = two_hop_graph();
-        let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS);
+        let selector = test_selector(me, graph, MAX_PATHS);
 
         let fwd = selector.select_path(me, dest, 1).context("forward path")?;
         assert!(!fwd.is_empty());
@@ -390,7 +400,7 @@ mod tests {
         mark_edge_full(&graph, &b, &a);
         mark_edge_last(&graph, &a, &me);
 
-        let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS);
+        let selector = test_selector(me, graph, MAX_PATHS);
 
         let fwd = selector.select_path(me, dest, 2).context("forward 2-hop path")?;
         assert!(!fwd.is_empty());
@@ -413,7 +423,7 @@ mod tests {
     async fn one_hop_path_should_include_relay_and_destination() -> anyhow::Result<()> {
         // Bidirectional: me ↔ relay ↔ dest
         let (me, relay, dest, graph) = two_hop_graph();
-        let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS);
+        let selector = test_selector(me, graph, MAX_PATHS);
 
         let fwd = selector.select_path(me, dest, 1).context("forward 1-hop path")?;
         assert!(!fwd.is_empty());
@@ -465,7 +475,7 @@ mod tests {
         mark_edge_last(&graph, &a, &me);
         mark_edge_last(&graph, &b, &me);
 
-        let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS);
+        let selector = test_selector(me, graph, MAX_PATHS);
 
         let fwd = selector.select_path(me, dest, 1).context("forward path")?;
         assert_eq!(fwd.len(), 2, "forward: both paths via a and b should be returned");
@@ -493,7 +503,7 @@ mod tests {
         graph.add_edge(&dest, &me).unwrap();
         // No observations → cost function will return non-positive cost → pruned.
 
-        let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS);
+        let selector = test_selector(me, graph, MAX_PATHS);
         assert!(
             selector.select_path(me, dest, 1).is_err(),
             "forward: edge with no observations should produce no valid path"
@@ -517,7 +527,7 @@ mod tests {
         mark_edge_full(&graph, &me, &dest);
         mark_edge_full(&graph, &dest, &me);
 
-        let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS);
+        let selector = test_selector(me, graph, MAX_PATHS);
         assert!(
             selector.select_path(me, dest, 2).is_err(),
             "forward: no 2-hop path should exist for a direct edge"
@@ -549,7 +559,7 @@ mod tests {
         mark_edge_full(&graph, &dest, &relay);
         mark_edge_last(&graph, &relay, &me);
 
-        let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS);
+        let selector = test_selector(me, graph, MAX_PATHS);
 
         // Forward path should work via virtual last hop
         let fwd = selector
@@ -604,7 +614,7 @@ mod tests {
         mark_edge_full(&graph, &b, &a);
         mark_edge_last(&graph, &a, &me);
 
-        let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS);
+        let selector = test_selector(me, graph, MAX_PATHS);
 
         let fwd = selector
             .select_path(me, dest, RoutingOptions::MAX_INTERMEDIATE_HOPS)
@@ -642,7 +652,7 @@ mod tests {
         graph.add_edge(&hop, &dest).context("adding edge hop -> dest")?;
         // No mark_edge_full/mark_edge_last → observations are empty → cost = 0
 
-        let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS);
+        let selector = test_selector(me, graph, MAX_PATHS);
 
         let err = selector
             .select_path(me, dest, 1)
@@ -668,7 +678,7 @@ mod tests {
         graph.add_edge(&me, &dest).context("adding edge me -> dest")?;
         mark_edge_full(&graph, &me, &dest);
 
-        let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS);
+        let selector = test_selector(me, graph, MAX_PATHS);
 
         // Ask for 2-hop path. Phase 1 won't find any (no 2-hop path exists).
         // Phase 2 finds me → dest as a shorter_length=1 path, but candidate=[dest]
