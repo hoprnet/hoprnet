@@ -265,8 +265,9 @@ pub(super) async fn status(State(state): State<Arc<InternalState>>) -> impl Into
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::borrow::Cow;
+
+    use super::*;
 
     #[test]
     fn component_status_to_info_ready() {

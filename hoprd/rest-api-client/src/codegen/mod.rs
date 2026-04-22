@@ -1363,13 +1363,12 @@ and indexer state.*/
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub qos: ::std::option::Option<PeerQosInfo>,
     }
-    ///Aggregated status of the HOPR node and its components.
+    ///`NodeStatusResponse`
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Aggregated status of the HOPR node and its components.",
     ///  "examples": [
     ///    {
     ///      "components": {
