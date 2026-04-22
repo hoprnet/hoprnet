@@ -283,7 +283,7 @@ mod tests {
             .ok_or(anyhow!("must resolve"))?
         {
             SocketAddr::V4(addr) => assert_eq!(*addr, "127.0.0.1:1000".parse()?),
-            SocketAddr::V6(addr) => assert_eq!(*addr, "::1:1000".parse()?),
+            SocketAddr::V6(addr) => assert_eq!(*addr, "[::1]:1000".parse()?),
         }
         Ok(())
     }

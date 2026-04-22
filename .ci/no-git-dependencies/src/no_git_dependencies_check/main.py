@@ -23,9 +23,7 @@ def walk(
                 package_name = value.get("package", key)
                 if package_name not in allowed_crates:
                     table_path = ".".join(path + [str(key)])
-                    violations.append(
-                        f"{cargo_toml}: {table_path} uses git = {value.get('git')!r}"
-                    )
+                    violations.append(f"{cargo_toml}: {table_path} uses git = {value.get('git')!r}")
             walk(value, path + [str(key)], cargo_toml, allowed_crates, violations)
     elif isinstance(node, list):
         for index, value in enumerate(node):
