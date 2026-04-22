@@ -1,4 +1,12 @@
-use std::{cmp::Ordering, str::FromStr, time::Duration};
+use std::{
+    cmp::Ordering,
+    str::FromStr,
+    sync::{
+        Arc,
+        atomic::{AtomicU8, Ordering as AtomicOrdering},
+    },
+    time::Duration,
+};
 
 use blokli_client::api::{BlokliQueryClient, BlokliSubscriptionClient, BlokliTransactionClient};
 use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
@@ -40,6 +48,89 @@ const MIN_TX_CONFIRM_TIMEOUT: Duration = Duration::from_secs(1);
 const TX_TIMEOUT_MULTIPLIER: u32 = 2;
 const DEFAULT_SYNC_TOLERANCE_PCT: usize = 90;
 
+// ChainHealth discriminants matching ComponentStatus variants
+const CHAIN_HEALTH_READY: u8 = 0;
+const CHAIN_HEALTH_INITIALIZING: u8 = 1;
+const CHAIN_HEALTH_DEGRADED: u8 = 2;
+const CHAIN_HEALTH_UNAVAILABLE: u8 = 3;
+
+/// Shared chain connection health indicator.
+///
+/// This type is `Clone` and `Send + Sync`, backed by an `Arc<AtomicU8>`.
+/// The connector updates the health status throughout its lifecycle, and
+/// consumers (e.g. `hopr-lib`) can read it without needing a reference
+/// to the connector itself.
+///
+/// Encoded as: 0 = Ready, 1 = Initializing, 2 = Degraded, 3 = Unavailable.
+#[derive(Clone, Debug)]
+pub struct ChainHealth {
+    state: Arc<AtomicU8>,
+    detail: Arc<parking_lot::RwLock<String>>,
+}
+
+impl ChainHealth {
+    /// Creates a new health indicator in the `Initializing` state.
+    pub fn new() -> Self {
+        Self {
+            state: Arc::new(AtomicU8::new(CHAIN_HEALTH_INITIALIZING)),
+            detail: Arc::new(parking_lot::RwLock::new("waiting for chain connection".into())),
+        }
+    }
+
+    /// Returns `true` if the chain is in the `Ready` state.
+    pub fn is_ready(&self) -> bool {
+        self.state.load(AtomicOrdering::Relaxed) == CHAIN_HEALTH_READY
+    }
+
+    /// Returns `true` if the chain is in the `Unavailable` state.
+    pub fn is_unavailable(&self) -> bool {
+        self.state.load(AtomicOrdering::Relaxed) == CHAIN_HEALTH_UNAVAILABLE
+    }
+
+    /// Returns the current health as a `(discriminant, detail)` pair.
+    pub fn get(&self) -> (u8, String) {
+        let disc = self.state.load(AtomicOrdering::Relaxed);
+        let detail = self.detail.read().clone();
+        (disc, detail)
+    }
+
+    fn set_ready(&self) {
+        self.state.store(CHAIN_HEALTH_READY, AtomicOrdering::Relaxed);
+        *self.detail.write() = String::new();
+    }
+
+    fn set_initializing(&self, detail: impl Into<String>) {
+        self.state.store(CHAIN_HEALTH_INITIALIZING, AtomicOrdering::Relaxed);
+        *self.detail.write() = detail.into();
+    }
+
+    fn set_degraded(&self, detail: impl Into<String>) {
+        self.state.store(CHAIN_HEALTH_DEGRADED, AtomicOrdering::Relaxed);
+        *self.detail.write() = detail.into();
+    }
+
+    fn set_unavailable(&self, detail: impl Into<String>) {
+        self.state.store(CHAIN_HEALTH_UNAVAILABLE, AtomicOrdering::Relaxed);
+        *self.detail.write() = detail.into();
+    }
+}
+
+impl Default for ChainHealth {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ChainHealth {
+    /// Returns the raw shared state backing this health indicator.
+    ///
+    /// This is useful for bridging the health status into crates that
+    /// cannot depend on `hopr-chain-connector` directly (e.g. `hopr-lib`).
+    pub fn into_raw(self) -> (Arc<AtomicU8>, Arc<parking_lot::RwLock<String>>) {
+        (self.state, self.detail)
+    }
+}
+
 /// Configuration of the [`HoprBlockchainConnector`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, smart_default::SmartDefault)]
 pub struct BlockchainConnectorConfig {
@@ -77,6 +168,7 @@ pub struct HoprBlockchainConnector<C, B, P, R> {
     sequencer: TransactionSequencer<C, R>,
     events: EventsChannel,
     cfg: BlockchainConnectorConfig,
+    health: ChainHealth,
 
     // KeyId <-> OffchainPublicKey mapping
     mapper: HoprKeyMapper<B>,
@@ -123,6 +215,7 @@ where
         let client = std::sync::Arc::new(client);
         Self {
             payload_generator,
+            health: ChainHealth::new(),
             graph: std::sync::Arc::new(parking_lot::RwLock::new(DiGraphMap::with_capacity_and_hasher(
                 EXPECTED_NUM_NODES,
                 EXPECTED_NUM_CHANNELS,
@@ -224,6 +317,7 @@ where
         }
 
         let ticket_values = self.ticket_values.clone();
+        let health = self.health.clone();
         hopr_async_runtime::prelude::spawn(async move {
             let sync_started = std::time::Instant::now();
 
@@ -472,6 +566,10 @@ where
                 }
             })
             .await;
+
+            // The subscription stream has ended — the chain connection is degraded
+            tracing::warn!("chain subscription stream ended, marking chain health as degraded");
+            health.set_degraded("chain subscription ended");
         });
 
         connection_ready_rx
@@ -522,11 +620,29 @@ where
             return Err(ConnectorError::InvalidState("connector is already connected"));
         }
 
-        let abort_handle = self
+        self.health.set_initializing("connecting to blokli");
+
+        let abort_handle = match self
             .do_connect(self.cfg.connection_sync_timeout.max(MIN_CONNECTION_TIMEOUT))
-            .await?;
+            .await
+        {
+            Ok(handle) => handle,
+            Err(e @ ConnectorError::ServerNotHealthy) => {
+                self.health.set_unavailable("blokli server not healthy");
+                return Err(e);
+            }
+            Err(e @ ConnectorError::ConnectionTimeout) => {
+                self.health.set_degraded("connection sync timed out");
+                return Err(e);
+            }
+            Err(e) => {
+                self.health.set_unavailable(format!("connection failed: {e}"));
+                return Err(e);
+            }
+        };
 
         self.connection_handle = Some(abort_handle);
+        self.health.set_ready();
 
         tracing::info!(node = %self.chain_key.public().to_address(), "connected to chain as node");
         Ok(())
@@ -572,6 +688,14 @@ where
 }
 
 impl<B, C, P, R> HoprBlockchainConnector<C, R, B, P> {
+    /// Returns a shared handle to the chain connection health status.
+    ///
+    /// The returned [`ChainHealth`] is updated throughout the connector's lifecycle
+    /// and can be read from any thread without holding a reference to the connector.
+    pub fn chain_health(&self) -> ChainHealth {
+        self.health.clone()
+    }
+
     #[inline]
     pub(crate) fn check_connection_state(&self) -> Result<(), ConnectorError> {
         self.connection_handle
@@ -593,6 +717,7 @@ impl<B, C, P, R> HoprBlockchainConnector<C, R, B, P> {
 
 impl<B, C, P, R> Drop for HoprBlockchainConnector<C, R, B, P> {
     fn drop(&mut self) {
+        self.health.set_unavailable("connector dropped");
         self.events.0.close();
         if let Some(abort_handle) = self.connection_handle.take() {
             abort_handle.abort();

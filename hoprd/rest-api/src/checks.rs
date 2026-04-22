@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::{extract::State, http::status::StatusCode, response::IntoResponse};
 use hopr_lib::api::{
     network::{Health, NetworkView},
-    node::{HasNetworkView, HoprNodeOperations, HoprState},
+    node::{HasChainApi, HasNetworkView, HoprNodeOperations, HoprState},
 };
 
 use crate::AppState;
@@ -57,7 +57,9 @@ pub(super) async fn startedz(State(state): State<Arc<AppState>>) -> impl IntoRes
         tag = "Checks"
     )]
 pub(super) async fn readyz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    eval_precondition(is_running(state.clone()) && is_minimally_connected(state).await)
+    eval_precondition(
+        is_running(state.clone()) && is_minimally_connected(state.clone()).await && is_chain_available(state),
+    )
 }
 
 /// Check whether the node is **healthy**.
@@ -88,7 +90,9 @@ pub(super) async fn readyz(State(state): State<Arc<AppState>>) -> impl IntoRespo
         tag = "Checks"
     )]
 pub(super) async fn healthyz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    eval_precondition(is_running(state.clone()) && is_minimally_connected(state).await)
+    eval_precondition(
+        is_running(state.clone()) && is_minimally_connected(state.clone()).await && is_chain_available(state),
+    )
 }
 
 /// Check if the node has minimal network connectivity.
@@ -101,6 +105,15 @@ async fn is_minimally_connected(state: Arc<AppState>) -> bool {
         state.hopr.network_view().health(),
         Health::Orange | Health::Yellow | Health::Green
     )
+}
+
+/// Check if the chain connector is not in an `Unavailable` state.
+///
+/// Returns `true` if the chain component reports any status other than `Unavailable`.
+/// A degraded chain is still considered available for readiness purposes.
+#[inline]
+fn is_chain_available(state: Arc<AppState>) -> bool {
+    !HasChainApi::status(&*state.hopr).is_unavailable()
 }
 
 /// Check if the node is in the Running state.

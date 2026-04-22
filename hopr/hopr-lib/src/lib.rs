@@ -68,7 +68,10 @@ pub mod prelude {
 }
 
 use std::{
-    sync::{Arc, atomic::Ordering},
+    sync::{
+        Arc,
+        atomic::{AtomicU8, Ordering},
+    },
     time::Duration,
 };
 
@@ -79,6 +82,7 @@ pub use hopr_api::node::HoprSessionClientOperations;
 use hopr_api::{
     chain::*,
     graph::HoprGraphApi,
+    network::NetworkView as _,
     node::{
         AtomicHoprState, ComponentStatus, EitherErrExt, EventWaitResult, HasChainApi, HasGraphView, HasNetworkView,
         HasTicketManagement, HasTransportApi, NodeOnchainIdentity,
@@ -188,6 +192,47 @@ impl From<HoprSessionClientConfig> for hopr_transport::SessionClientConfig {
     }
 }
 
+// Chain health discriminants — must match the values used by the connector.
+const CHAIN_HEALTH_READY: u8 = 0;
+const CHAIN_HEALTH_INITIALIZING: u8 = 1;
+const CHAIN_HEALTH_DEGRADED: u8 = 2;
+const CHAIN_HEALTH_UNAVAILABLE: u8 = 3;
+
+/// Shared chain connection health indicator.
+///
+/// This is a crate-agnostic handle backed by raw `Arc` primitives so it can
+/// bridge between `hopr-lib` and `hopr-chain-connector` without creating a
+/// direct crate dependency.
+#[derive(Clone, Debug)]
+pub struct ChainHealthHandle {
+    state: Arc<AtomicU8>,
+    detail: Arc<parking_lot::RwLock<String>>,
+}
+
+impl ChainHealthHandle {
+    /// Creates a new handle from raw shared state.
+    pub fn new(state: Arc<AtomicU8>, detail: Arc<parking_lot::RwLock<String>>) -> Self {
+        Self { state, detail }
+    }
+
+    /// Reads the current health as a [`ComponentStatus`].
+    pub fn status(&self) -> ComponentStatus {
+        let detail = self.detail.read().clone();
+        match self.state.load(Ordering::Relaxed) {
+            CHAIN_HEALTH_READY => ComponentStatus::Ready,
+            CHAIN_HEALTH_INITIALIZING => ComponentStatus::Initializing(detail),
+            CHAIN_HEALTH_DEGRADED => ComponentStatus::Degraded(detail),
+            CHAIN_HEALTH_UNAVAILABLE => ComponentStatus::Unavailable(detail),
+            _ => ComponentStatus::Unavailable("unknown chain health state".into()),
+        }
+    }
+
+    /// Returns `true` if the chain is in the `Unavailable` state.
+    pub fn is_unavailable(&self) -> bool {
+        self.state.load(Ordering::Relaxed) == CHAIN_HEALTH_UNAVAILABLE
+    }
+}
+
 /// Long-running tasks that are spawned by the HOPR node.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, strum::Display, strum::EnumCount)]
 pub(crate) enum HoprLibProcess {
@@ -282,6 +327,7 @@ pub struct Hopr<Chain, Graph, Net, TMgr> {
     pub(crate) state: Arc<AtomicHoprState>,
     pub(crate) transport_api: HoprTransport<Chain, Graph, Net>,
     pub(crate) chain_api: Chain,
+    pub(crate) chain_health: Option<ChainHealthHandle>,
     pub(crate) ticket_event_subscribers: TicketEvents,
     pub(crate) ticket_manager: TMgr,
     #[allow(dead_code)] // Handles must stay alive to keep background tasks running
@@ -364,15 +410,15 @@ where
 // Has* accessor trait implementations
 // ---------------------------------------------------------------------------
 
-/// Converts [`HoprState`] into a [`ComponentStatus`] for a named component.
+/// Maps [`Health`] into a [`ComponentStatus`] for a named component.
 ///
-/// Returns [`ComponentStatus::Ready`] when the node is [`HoprState::Running`],
-/// otherwise [`ComponentStatus::Initializing`] with the component name.
-fn component_status(state: HoprState, component: &str) -> ComponentStatus {
-    if state == HoprState::Running {
-        ComponentStatus::Ready
-    } else {
-        ComponentStatus::Initializing(format!("{component} not yet running"))
+/// Assumes the node is already in the `Running` state.
+fn network_health_to_status(health: Health, component: &str) -> ComponentStatus {
+    match health {
+        Health::Green | Health::Yellow => ComponentStatus::Ready,
+        Health::Orange => ComponentStatus::Degraded(format!("{component}: low connectivity (1 peer)")),
+        Health::Red => ComponentStatus::Degraded(format!("{component}: no connected peers")),
+        Health::Unknown => ComponentStatus::Unavailable(format!("{component}: network not initialized")),
     }
 }
 
@@ -392,12 +438,18 @@ where
     }
 
     fn status(&self) -> ComponentStatus {
-        // Chain is considered ready once the node has passed the initial funding check
         let state = HoprNodeOperations::status(self);
-        if state == HoprState::ValidatingNetworkConfig {
-            ComponentStatus::Ready
-        } else {
-            component_status(state, "chain")
+        match state {
+            // Chain is usable during network config validation
+            HoprState::ValidatingNetworkConfig => ComponentStatus::Ready,
+            HoprState::Running => {
+                // Delegate to the shared chain health if available
+                self.chain_health
+                    .as_ref()
+                    .map(ChainHealthHandle::status)
+                    .unwrap_or(ComponentStatus::Ready)
+            }
+            _ => ComponentStatus::Initializing(format!("chain: node state is {state}")),
         }
     }
 
@@ -454,7 +506,10 @@ where
     }
 
     fn status(&self) -> ComponentStatus {
-        component_status(HoprNodeOperations::status(self), "network")
+        if HoprNodeOperations::status(self) != HoprState::Running {
+            return ComponentStatus::Initializing("network: not yet running".into());
+        }
+        network_health_to_status(self.transport_api.health(), "network")
     }
 }
 
@@ -491,7 +546,10 @@ where
     }
 
     fn status(&self) -> ComponentStatus {
-        component_status(HoprNodeOperations::status(self), "transport")
+        if HoprNodeOperations::status(self) != HoprState::Running {
+            return ComponentStatus::Initializing("transport: not yet running".into());
+        }
+        network_health_to_status(self.transport_api.health(), "transport")
     }
 }
 
@@ -513,6 +571,56 @@ where
 
     fn status(&self) -> ComponentStatus {
         ComponentStatus::Ready
+    }
+}
+
+/// Per-component status report for the HOPR node.
+#[derive(Debug, Clone)]
+pub struct NodeComponentStatuses {
+    /// Overall node lifecycle state.
+    pub node_state: HoprState,
+    /// Chain/blokli connector status.
+    pub chain: ComponentStatus,
+    /// P2P network layer status.
+    pub network: ComponentStatus,
+    /// Transport layer status.
+    pub transport: ComponentStatus,
+}
+
+impl NodeComponentStatuses {
+    /// Worst-case aggregation: the overall status is the worst of any component.
+    pub fn aggregate(&self) -> ComponentStatus {
+        let statuses = [&self.chain, &self.network, &self.transport];
+        if statuses.iter().any(|s| s.is_unavailable()) {
+            ComponentStatus::Unavailable("one or more components unavailable".into())
+        } else if statuses.iter().any(|s| s.is_degraded()) {
+            ComponentStatus::Degraded("one or more components degraded".into())
+        } else if statuses.iter().any(|s| s.is_initializing()) {
+            ComponentStatus::Initializing("one or more components initializing".into())
+        } else {
+            ComponentStatus::Ready
+        }
+    }
+}
+
+impl<Chain, Graph, Net, TMgr> Hopr<Chain, Graph, Net, TMgr>
+where
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+    Net: hopr_api::network::NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
+    Graph: HoprGraphApi<HoprNodeId = OffchainPublicKey> + Clone + Send + Sync + 'static,
+    <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
+        hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
+    <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
+    TMgr: Send + Sync + 'static,
+{
+    /// Returns per-component health statuses for the node.
+    pub fn component_statuses(&self) -> NodeComponentStatuses {
+        NodeComponentStatuses {
+            node_state: HoprNodeOperations::status(self),
+            chain: HasChainApi::status(self),
+            network: HasNetworkView::status(self),
+            transport: HasTransportApi::status(self),
+        }
     }
 }
 
@@ -540,20 +648,97 @@ mod tests {
     use super::*;
 
     #[test]
-    fn component_status_returns_ready_when_running() {
-        assert_eq!(component_status(HoprState::Running, "test"), ComponentStatus::Ready);
+    fn network_health_green_is_ready() {
+        assert_eq!(network_health_to_status(Health::Green, "test"), ComponentStatus::Ready);
     }
 
     #[test]
-    fn component_status_returns_initializing_when_not_running() {
-        let status = component_status(HoprState::Uninitialized, "network");
-        assert_eq!(status, ComponentStatus::Initializing("network not yet running".into()));
+    fn network_health_yellow_is_ready() {
+        assert_eq!(network_health_to_status(Health::Yellow, "test"), ComponentStatus::Ready);
     }
 
     #[test]
-    fn component_status_includes_component_name_in_message() {
-        let status = component_status(HoprState::Uninitialized, "chain");
-        assert_eq!(status, ComponentStatus::Initializing("chain not yet running".into()));
+    fn network_health_orange_is_degraded() {
+        assert!(network_health_to_status(Health::Orange, "network").is_degraded());
+    }
+
+    #[test]
+    fn network_health_red_is_degraded() {
+        assert!(network_health_to_status(Health::Red, "network").is_degraded());
+    }
+
+    #[test]
+    fn network_health_unknown_is_unavailable() {
+        assert!(network_health_to_status(Health::Unknown, "network").is_unavailable());
+    }
+
+    #[test]
+    fn chain_health_handle_ready() {
+        let state = Arc::new(AtomicU8::new(CHAIN_HEALTH_READY));
+        let detail = Arc::new(parking_lot::RwLock::new(String::new()));
+        let handle = ChainHealthHandle::new(state, detail);
+        assert_eq!(handle.status(), ComponentStatus::Ready);
+    }
+
+    #[test]
+    fn chain_health_handle_degraded() {
+        let state = Arc::new(AtomicU8::new(CHAIN_HEALTH_DEGRADED));
+        let detail = Arc::new(parking_lot::RwLock::new("subscription ended".into()));
+        let handle = ChainHealthHandle::new(state, detail);
+        assert!(handle.status().is_degraded());
+        assert_eq!(handle.status(), ComponentStatus::Degraded("subscription ended".into()));
+    }
+
+    #[test]
+    fn chain_health_handle_unavailable() {
+        let state = Arc::new(AtomicU8::new(CHAIN_HEALTH_UNAVAILABLE));
+        let detail = Arc::new(parking_lot::RwLock::new("blokli server not healthy".into()));
+        let handle = ChainHealthHandle::new(state, detail);
+        assert!(handle.is_unavailable());
+    }
+
+    #[test]
+    fn aggregate_all_ready() {
+        let statuses = NodeComponentStatuses {
+            node_state: HoprState::Running,
+            chain: ComponentStatus::Ready,
+            network: ComponentStatus::Ready,
+            transport: ComponentStatus::Ready,
+        };
+        assert_eq!(statuses.aggregate(), ComponentStatus::Ready);
+    }
+
+    #[test]
+    fn aggregate_one_degraded() {
+        let statuses = NodeComponentStatuses {
+            node_state: HoprState::Running,
+            chain: ComponentStatus::Ready,
+            network: ComponentStatus::Degraded("low peers".into()),
+            transport: ComponentStatus::Ready,
+        };
+        assert!(statuses.aggregate().is_degraded());
+    }
+
+    #[test]
+    fn aggregate_one_unavailable() {
+        let statuses = NodeComponentStatuses {
+            node_state: HoprState::Running,
+            chain: ComponentStatus::Unavailable("blokli down".into()),
+            network: ComponentStatus::Ready,
+            transport: ComponentStatus::Ready,
+        };
+        assert!(statuses.aggregate().is_unavailable());
+    }
+
+    #[test]
+    fn aggregate_unavailable_wins_over_degraded() {
+        let statuses = NodeComponentStatuses {
+            node_state: HoprState::Running,
+            chain: ComponentStatus::Unavailable("blokli down".into()),
+            network: ComponentStatus::Degraded("low peers".into()),
+            transport: ComponentStatus::Ready,
+        };
+        assert!(statuses.aggregate().is_unavailable());
     }
 }
 
