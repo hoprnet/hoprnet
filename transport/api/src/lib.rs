@@ -266,7 +266,13 @@ where
     ) -> errors::Result<Self> {
         let me_offchain = *identity.1.public();
         let planner_config = cfg.path_planner;
-        let selector = HoprGraphPathSelector::new(me_offchain, graph.clone(), planner_config.max_cached_paths);
+        let selector = HoprGraphPathSelector::new(
+            me_offchain,
+            graph.clone(),
+            planner_config.max_cached_paths,
+            planner_config.edge_penalty,
+            planner_config.min_ack_rate,
+        );
 
         let tag_allocators = hopr_transport_tag_allocator::create_allocators_from_config(&cfg.session.tag_allocator)?;
 

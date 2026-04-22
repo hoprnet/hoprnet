@@ -10,9 +10,11 @@ use hopr_api::{
     },
     types::crypto::prelude::Keypair,
 };
-use hopr_network_graph::{ChannelGraph, DEFAULT_EDGE_PENALTY};
+use hopr_network_graph::ChannelGraph;
+
+const BENCH_EDGE_PENALTY: f64 = 0.5;
 /// Intentionally 0.0 for benchmarks (no ack filtering).
-const DEFAULT_MIN_ACK_RATE: f64 = 0.0;
+const BENCH_MIN_ACK_RATE: f64 = 0.0;
 
 // ── Graph construction helpers ───────────────────────────────────────────────
 
@@ -128,8 +130,8 @@ fn bench_simple_paths(c: &mut Criterion) {
                         Some(10),
                         EdgeValueFn::forward(
                             std::num::NonZeroUsize::new(2).expect("is greater than 1"),
-                            DEFAULT_EDGE_PENALTY,
-                            DEFAULT_MIN_ACK_RATE,
+                            BENCH_EDGE_PENALTY,
+                            BENCH_MIN_ACK_RATE,
                         ),
                     ))
                 });
@@ -144,8 +146,8 @@ fn bench_simple_paths(c: &mut Criterion) {
                         Some(10),
                         EdgeValueFn::forward(
                             std::num::NonZeroUsize::new(3).expect("is greater than 1"),
-                            DEFAULT_EDGE_PENALTY,
-                            DEFAULT_MIN_ACK_RATE,
+                            BENCH_EDGE_PENALTY,
+                            BENCH_MIN_ACK_RATE,
                         ),
                     ))
                 });
@@ -160,8 +162,8 @@ fn bench_simple_paths(c: &mut Criterion) {
                         Some(10),
                         EdgeValueFn::forward(
                             std::num::NonZeroUsize::new(4).expect("is greater than 1"),
-                            DEFAULT_EDGE_PENALTY,
-                            DEFAULT_MIN_ACK_RATE,
+                            BENCH_EDGE_PENALTY,
+                            BENCH_MIN_ACK_RATE,
                         ),
                     ))
                 });

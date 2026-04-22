@@ -10,9 +10,7 @@ use hopr_api::{
 };
 use petgraph::graph::NodeIndex;
 
-use crate::{
-    ChannelGraph, DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE, algorithm::all_simple_paths_multi, graph::InnerGraph,
-};
+use crate::{ChannelGraph, algorithm::all_simple_paths_multi, graph::InnerGraph};
 
 /// A shared cost function that computes a cumulative cost from edge observations.
 pub(crate) type SharedValueFn<C> = Arc<dyn Fn(C, &crate::Observations, usize) -> C + Send + Sync>;
@@ -160,7 +158,7 @@ impl hopr_api::graph::NetworkGraphTraverse for ChannelGraph {
                     })
                     .collect::<HashSet<_>>();
 
-                let value_fn = EdgeValueFn::forward_without_self_loopback(DEFAULT_EDGE_PENALTY, DEFAULT_MIN_ACK_RATE);
+                let value_fn = EdgeValueFn::forward_without_self_loopback(self.edge_penalty, self.min_ack_rate);
 
                 return find_paths(
                     &inner,
