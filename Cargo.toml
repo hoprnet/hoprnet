@@ -63,7 +63,7 @@ backon = { version = "1.6.0", default-features = false }
 base64 = "0.22.1"
 bimap = "0.6.3"
 bitvec = "1.0.1"
-blokli-client = { git = "https://github.com/hoprnet/blokli", rev = "9bee1183c63ba005c709ada1a275a759d2413d8b" } # Pinned: later revs (c4eb515+) have a broken `testing` feature (BlokliTestClient missing `subscribe_track_transaction`); revert to `branch = "main"` once fixed upstream.
+blokli-client = { git = "https://github.com/hoprnet/blokli", rev = "23fc52217df1173efd680e94c0393ba76b4ecac7" } # Pinned: later revs (c4eb515+) have a broken `testing` feature (BlokliTestClient missing `subscribe_track_transaction`); revert to `branch = "main"` once fixed upstream.
 bloomfilter = { version = "3.0.1" }
 bytesize = { version = "2.3.1", features = ["serde"] }
 bytes = "1.11.1"
