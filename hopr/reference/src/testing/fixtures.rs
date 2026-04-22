@@ -512,7 +512,6 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
 
                     let config = create_hopr_instance_config(3001 + i as u16, safes[i], win_prob);
 
-                    let chain_health = connector.chain_health();
                     let instance = crate::build_with_chain(
                         &onchain_keys[i],
                         &offchain_keys[i],
@@ -522,7 +521,6 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
                             ..Default::default()
                         }), // moderate setting to allow probing without saturating relay traffic
                         connector.clone(),
-                        Some(chain_health),
                         EchoServer::new(),
                     )
                     .await?;

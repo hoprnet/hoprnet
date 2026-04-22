@@ -68,10 +68,7 @@ pub mod prelude {
 }
 
 use std::{
-    sync::{
-        Arc,
-        atomic::{AtomicU8, Ordering},
-    },
+    sync::{Arc, atomic::Ordering},
     time::Duration,
 };
 
@@ -84,8 +81,8 @@ use hopr_api::{
     graph::HoprGraphApi,
     network::NetworkView as _,
     node::{
-        AtomicHoprState, ComponentStatus, EitherErrExt, EventWaitResult, HasChainApi, HasGraphView, HasNetworkView,
-        HasTicketManagement, HasTransportApi, NodeOnchainIdentity,
+        AtomicHoprState, ComponentStatus, ComponentStatusReporter, EitherErrExt, EventWaitResult, HasChainApi,
+        HasGraphView, HasNetworkView, HasTicketManagement, HasTransportApi, NodeOnchainIdentity,
     },
 };
 pub use hopr_api::{
@@ -192,47 +189,6 @@ impl From<HoprSessionClientConfig> for hopr_transport::SessionClientConfig {
     }
 }
 
-// Chain health discriminants — must match the values used by the connector.
-const CHAIN_HEALTH_READY: u8 = 0;
-const CHAIN_HEALTH_INITIALIZING: u8 = 1;
-const CHAIN_HEALTH_DEGRADED: u8 = 2;
-const CHAIN_HEALTH_UNAVAILABLE: u8 = 3;
-
-/// Shared chain connection health indicator.
-///
-/// This is a crate-agnostic handle backed by raw `Arc` primitives so it can
-/// bridge between `hopr-lib` and `hopr-chain-connector` without creating a
-/// direct crate dependency.
-#[derive(Clone, Debug)]
-pub struct ChainHealthHandle {
-    state: Arc<AtomicU8>,
-    detail: Arc<parking_lot::RwLock<String>>,
-}
-
-impl ChainHealthHandle {
-    /// Creates a new handle from raw shared state.
-    pub fn new(state: Arc<AtomicU8>, detail: Arc<parking_lot::RwLock<String>>) -> Self {
-        Self { state, detail }
-    }
-
-    /// Reads the current health as a [`ComponentStatus`].
-    pub fn status(&self) -> ComponentStatus {
-        let detail = self.detail.read().clone();
-        match self.state.load(Ordering::Relaxed) {
-            CHAIN_HEALTH_READY => ComponentStatus::Ready,
-            CHAIN_HEALTH_INITIALIZING => ComponentStatus::Initializing(detail),
-            CHAIN_HEALTH_DEGRADED => ComponentStatus::Degraded(detail),
-            CHAIN_HEALTH_UNAVAILABLE => ComponentStatus::Unavailable(detail),
-            _ => ComponentStatus::Unavailable("unknown chain health state".into()),
-        }
-    }
-
-    /// Returns `true` if the chain is in the `Unavailable` state.
-    pub fn is_unavailable(&self) -> bool {
-        self.state.load(Ordering::Relaxed) == CHAIN_HEALTH_UNAVAILABLE
-    }
-}
-
 /// Long-running tasks that are spawned by the HOPR node.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, strum::Display, strum::EnumCount)]
 pub(crate) enum HoprLibProcess {
@@ -327,7 +283,6 @@ pub struct Hopr<Chain, Graph, Net, TMgr> {
     pub(crate) state: Arc<AtomicHoprState>,
     pub(crate) transport_api: HoprTransport<Chain, Graph, Net>,
     pub(crate) chain_api: Chain,
-    pub(crate) chain_health: Option<ChainHealthHandle>,
     pub(crate) ticket_event_subscribers: TicketEvents,
     pub(crate) ticket_manager: TMgr,
     #[allow(dead_code)] // Handles must stay alive to keep background tasks running
@@ -424,7 +379,7 @@ fn network_health_to_status(health: Health, component: &str) -> ComponentStatus 
 
 impl<Chain, Graph, Net, TMgr> HasChainApi for Hopr<Chain, Graph, Net, TMgr>
 where
-    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+    Chain: HoprChainApi + ComponentStatusReporter + Clone + Send + Sync + 'static,
 {
     type ChainApi = Chain;
     type ChainError = HoprLibError;
@@ -438,19 +393,7 @@ where
     }
 
     fn status(&self) -> ComponentStatus {
-        let state = HoprNodeOperations::status(self);
-        match state {
-            // Chain is usable during network config validation
-            HoprState::ValidatingNetworkConfig => ComponentStatus::Ready,
-            HoprState::Running => {
-                // Delegate to the shared chain health if available
-                self.chain_health
-                    .as_ref()
-                    .map(ChainHealthHandle::status)
-                    .unwrap_or(ComponentStatus::Ready)
-            }
-            _ => ComponentStatus::Initializing(format!("chain: node state is {state}")),
-        }
+        self.chain_api.component_status()
     }
 
     fn wait_for_on_chain_event<F>(
@@ -506,9 +449,6 @@ where
     }
 
     fn status(&self) -> ComponentStatus {
-        if HoprNodeOperations::status(self) != HoprState::Running {
-            return ComponentStatus::Initializing("network: not yet running".into());
-        }
         network_health_to_status(self.transport_api.health(), "network")
     }
 }
@@ -526,6 +466,10 @@ where
 
     fn graph(&self) -> &Graph {
         self.transport_api.graph()
+    }
+
+    fn status(&self) -> ComponentStatus {
+        ComponentStatus::Ready
     }
 }
 
@@ -546,9 +490,6 @@ where
     }
 
     fn status(&self) -> ComponentStatus {
-        if HoprNodeOperations::status(self) != HoprState::Running {
-            return ComponentStatus::Initializing("transport: not yet running".into());
-        }
         network_health_to_status(self.transport_api.health(), "transport")
     }
 }
@@ -605,7 +546,7 @@ impl NodeComponentStatuses {
 
 impl<Chain, Graph, Net, TMgr> Hopr<Chain, Graph, Net, TMgr>
 where
-    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+    Chain: HoprChainApi + ComponentStatusReporter + Clone + Send + Sync + 'static,
     Net: hopr_api::network::NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
     Graph: HoprGraphApi<HoprNodeId = OffchainPublicKey> + Clone + Send + Sync + 'static,
     <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
@@ -614,12 +555,33 @@ where
     TMgr: Send + Sync + 'static,
 {
     /// Returns per-component health statuses for the node.
+    ///
+    /// When the node has reached `Running`, the aggregate `node_state` is
+    /// derived from component statuses (Running → Degraded → Failed).
     pub fn component_statuses(&self) -> NodeComponentStatuses {
+        let base = self.state.load(Ordering::Relaxed);
+        let chain = HasChainApi::status(self);
+        let network = HasNetworkView::status(self);
+        let transport = HasTransportApi::status(self);
+
+        let node_state = if base == HoprState::Running {
+            let statuses = [&chain, &network, &transport];
+            if statuses.iter().any(|s| s.is_unavailable()) {
+                HoprState::Failed
+            } else if statuses.iter().any(|s| s.is_degraded()) {
+                HoprState::Degraded
+            } else {
+                HoprState::Running
+            }
+        } else {
+            base
+        };
+
         NodeComponentStatuses {
-            node_state: HoprNodeOperations::status(self),
-            chain: HasChainApi::status(self),
-            network: HasNetworkView::status(self),
-            transport: HasTransportApi::status(self),
+            node_state,
+            chain,
+            network,
+            transport,
         }
     }
 }
@@ -670,31 +632,6 @@ mod tests {
     #[test]
     fn network_health_unknown_is_unavailable() {
         assert!(network_health_to_status(Health::Unknown, "network").is_unavailable());
-    }
-
-    #[test]
-    fn chain_health_handle_ready() {
-        let state = Arc::new(AtomicU8::new(CHAIN_HEALTH_READY));
-        let detail = Arc::new(parking_lot::RwLock::new(String::new()));
-        let handle = ChainHealthHandle::new(state, detail);
-        assert_eq!(handle.status(), ComponentStatus::Ready);
-    }
-
-    #[test]
-    fn chain_health_handle_degraded() {
-        let state = Arc::new(AtomicU8::new(CHAIN_HEALTH_DEGRADED));
-        let detail = Arc::new(parking_lot::RwLock::new("subscription ended".into()));
-        let handle = ChainHealthHandle::new(state, detail);
-        assert!(handle.status().is_degraded());
-        assert_eq!(handle.status(), ComponentStatus::Degraded("subscription ended".into()));
-    }
-
-    #[test]
-    fn chain_health_handle_unavailable() {
-        let state = Arc::new(AtomicU8::new(CHAIN_HEALTH_UNAVAILABLE));
-        let detail = Arc::new(parking_lot::RwLock::new("blokli server not healthy".into()));
-        let handle = ChainHealthHandle::new(state, detail);
-        assert!(handle.is_unavailable());
     }
 
     #[test]

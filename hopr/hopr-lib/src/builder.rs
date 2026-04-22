@@ -132,7 +132,6 @@ impl HoprBuilderWithIdentity {
             graph_factory: None,
             network_factory: None,
             ct_factory: None,
-            chain_health: None,
         }
     }
 }
@@ -155,19 +154,12 @@ pub struct HoprBuilderConfigured<Chain = (), Graph = (), Net = (), Ct = ()> {
     graph_factory: Option<Factory<Graph>>,
     network_factory: Option<AsyncFactory<(Net, BoxedProcessFn)>>,
     ct_factory: Option<Factory<Ct>>,
-    chain_health: Option<crate::ChainHealthHandle>,
 }
 
 impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
     /// Sets the node Safe and module addresses.
     pub fn with_safe_module(mut self, safe: &Address, module: &Address) -> Self {
         self.safe_and_module = Some((*safe, *module));
-        self
-    }
-
-    /// Sets the shared chain health handle for monitoring chain connector status.
-    pub fn with_chain_health(mut self, health: crate::ChainHealthHandle) -> Self {
-        self.chain_health = Some(health);
         self
     }
 
@@ -183,7 +175,6 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
             graph_factory: self.graph_factory,
             network_factory: self.network_factory,
             ct_factory: self.ct_factory,
-            chain_health: self.chain_health,
         }
     }
 
@@ -199,7 +190,6 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
             graph_factory: Some(Box::new(f)),
             network_factory: self.network_factory,
             ct_factory: self.ct_factory,
-            chain_health: self.chain_health,
         }
     }
 
@@ -218,7 +208,6 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
             graph_factory: self.graph_factory,
             network_factory: Some(Box::new(f)),
             ct_factory: self.ct_factory,
-            chain_health: self.chain_health,
         }
     }
 
@@ -234,7 +223,6 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
             graph_factory: self.graph_factory,
             network_factory: self.network_factory,
             ct_factory: Some(Box::new(f)),
-            chain_health: self.chain_health,
         }
     }
 
@@ -312,7 +300,7 @@ struct PreHopr<Chain, Graph, Net, Ct> {
     state: Arc<AtomicHoprState>,
     transport_api: HoprTransport<Chain, Graph, Net>,
     chain_api: Chain,
-    chain_health: Option<crate::ChainHealthHandle>,
+
     ticket_event_subscribers: (
         async_broadcast::Sender<TicketEvent>,
         async_broadcast::InactiveReceiver<TicketEvent>,
@@ -696,7 +684,6 @@ where
         state: Arc::new(AtomicHoprState::new(HoprState::Uninitialized)),
         transport_api,
         chain_api,
-        chain_health: configured.chain_health,
         ticket_event_subscribers: (new_tickets_tx, new_tickets_rx.deactivate()),
         processes,
         session_tx,
@@ -751,7 +738,6 @@ macro_rules! impl_build_methods {
                 transport_id: pre.transport_id,
                 transport_api: pre.transport_api,
                 chain_api: pre.chain_api,
-                chain_health: pre.chain_health,
                 processes,
                 ticket_manager: (),
             };
@@ -883,7 +869,6 @@ macro_rules! impl_build_methods {
                 transport_id: pre.transport_id,
                 transport_api: pre.transport_api,
                 chain_api: pre.chain_api,
-                chain_health: pre.chain_health,
                 processes,
                 ticket_manager,
             };

@@ -74,7 +74,6 @@ pub async fn build_reference(
         config.safe_module.module_address,
     )
     .await?;
-    let chain_health = chain_connector.chain_health();
     chain_connector.connect().await?;
     let chain_connector = Arc::new(chain_connector);
 
@@ -87,7 +86,6 @@ pub async fn build_reference(
         config,
         None,
         chain_connector,
-        Some(chain_health),
         #[cfg(feature = "session-server")]
         session_server,
     )
@@ -109,7 +107,6 @@ pub async fn build_with_chain<
     config: HoprLibConfig,
     probe_cfg: Option<hopr_ct_full_network::ProberConfig>,
     chain_connector: Chain,
-    chain_health: Option<hopr_chain_connector::ChainHealth>,
     #[cfg(feature = "session-server")] server: Srv,
 ) -> anyhow::Result<Arc<Hopr<Chain, SharedChannelGraph, HoprNetwork, SharedTicketManager>>>
 where
@@ -196,7 +193,7 @@ where
     let safe_address = config.safe_module.safe_address;
     let module_address = config.safe_module.module_address;
 
-    let mut builder = hopr_lib::builder::HoprBuilder::new()
+    let builder = hopr_lib::builder::HoprBuilder::new()
         .with_identity(chain_key, packet_key)
         .with_config(config)
         .with_safe_module(&safe_address, &module_address)
@@ -223,11 +220,6 @@ where
         .with_cover_traffic(move |ctx| {
             hopr_ct_full_network::FullNetworkDiscovery::new(*ctx.packet_key.public(), prober_cfg, graph_for_ct)
         });
-
-    if let Some(health) = chain_health {
-        let (state, detail) = health.into_raw();
-        builder = builder.with_chain_health(hopr_lib::ChainHealthHandle::new(state, detail));
-    }
 
     #[cfg(feature = "session-server")]
     let builder = builder.with_session_server(server);

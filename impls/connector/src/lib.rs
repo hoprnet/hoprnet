@@ -10,7 +10,7 @@ pub(crate) mod utils;
 #[cfg(any(test, feature = "testing"))]
 pub use backend::InMemoryBackend;
 pub use backend::{Backend, TempDbBackend, TempDbError};
-pub use connector::{BlockchainConnectorConfig, ChainHealth, HoprBlockchainConnector};
+pub use connector::{BlockchainConnectorConfig, HoprBlockchainConnector};
 pub use hopr_api::{
     chain as api,
     types::chain::payload::{BasicPayloadGenerator, SafePayloadGenerator},

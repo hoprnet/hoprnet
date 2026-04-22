@@ -282,7 +282,6 @@ async fn main_inner(cfg: HoprdConfig, hopr_keys: HoprKeys) -> anyhow::Result<()>
         cfg.hopr.safe_module.module_address,
     )
     .await?;
-    let chain_health = chain_connector.chain_health();
     chain_connector.connect().await?;
     let chain_connector = Arc::new(chain_connector);
 
@@ -298,7 +297,6 @@ async fn main_inner(cfg: HoprdConfig, hopr_keys: HoprKeys) -> anyhow::Result<()>
         hopr_lib_cfg,
         Some(prober_cfg),
         chain_connector.clone(),
-        Some(chain_health),
         HoprServerIpForwardingReactor::new(hopr_keys.packet_key.clone(), cfg.session_ip_forwarding.clone()),
     )
     .await?;
