@@ -351,10 +351,10 @@
           bench-build =
             (rust-builder-local.callPackage nixLib.mkRustPackage (projectBuildArgs // { buildBench = true; }))
             .overrideAttrs
-              (_: {
-                postInstall = ''
+              (old: {
+                postInstall = (if old.postInstall or null != null then old.postInstall else "") + ''
                   mkdir -p $out/bin
-                  find target -maxdepth 4 -type f -executable -name '*_bench*' -exec cp {} $out/bin/ \;
+                  find target -maxdepth 4 -type f -executable -exec cp {} $out/bin/ \;
                 '';
               });
 
@@ -786,7 +786,7 @@
                 pkgs.writeShellScript "bench-run" ''
                   set -euo pipefail
                   nix build -L .#bench-build
-                  for bin in result/bin/*_bench*; do
+                  for bin in result/bin/*; do
                     $bin --bench
                   done
                 ''

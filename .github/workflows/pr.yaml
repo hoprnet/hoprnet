@@ -125,7 +125,7 @@ jobs:
   build-benchmarks:
     name: Build Benchmarks
     needs: [tests]
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: self-hosted-hoprnet-bigger
     permissions:
       contents: read

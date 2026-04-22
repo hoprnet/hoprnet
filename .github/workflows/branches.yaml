@@ -92,7 +92,7 @@ jobs:
           # Capture stdout and stderr, tee to file
           bencher run \
             --project "$BENCHER_PROJECT" \
-            --token "${{ secrets.BENCHER_API_TOKEN }}" \
+            --token "$BENCHER_API_TOKEN" \
             --adapter rust_criterion \
             --branch "$GITHUB_REF_NAME" \
             --err \
