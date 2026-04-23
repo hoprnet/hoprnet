@@ -677,7 +677,7 @@ mod tests {
         };
 
         let store = PeerStore {
-            me: OffchainPublicKey::default(),
+            me: *OFFCHAIN_KEYPAIR.public(),
             get_peers: Arc::new(RwLock::new(VecDeque::new())),
             on_finished: Arc::new(RwLock::new(Vec::new())),
         };
@@ -719,7 +719,7 @@ mod tests {
         };
 
         let store = PeerStore {
-            me: OffchainPublicKey::default(),
+            me: *OFFCHAIN_KEYPAIR.public(),
             get_peers: Arc::new(RwLock::new(VecDeque::new())),
             on_finished: Arc::new(RwLock::new(Vec::new())),
         };
@@ -759,6 +759,7 @@ mod tests {
         };
 
         let store = PeerStore {
+            me: *OFFCHAIN_KEYPAIR.public(),
             get_peers: Arc::new(RwLock::new({
                 let mut neighbors = VecDeque::new();
                 neighbors.push_back(NEIGHBOURS.clone());
@@ -814,6 +815,7 @@ mod tests {
         };
 
         let store = PeerStore {
+            me: *OFFCHAIN_KEYPAIR.public(),
             get_peers: Arc::new(RwLock::new({
                 let mut neighbors = VecDeque::new();
                 neighbors.push_back(NEIGHBOURS.clone());
@@ -869,7 +871,7 @@ mod tests {
         };
 
         let store = PeerStore {
-            me: OffchainPublicKey::default(),
+            me: *OFFCHAIN_KEYPAIR.public(),
             get_peers: Arc::new(RwLock::new(VecDeque::new())),
             on_finished: Arc::new(RwLock::new(Vec::new())),
         };
@@ -933,6 +935,7 @@ mod tests {
         };
 
         let store = PeerStore {
+            me: *OFFCHAIN_KEYPAIR.public(),
             get_peers: Arc::new(RwLock::new({
                 let mut neighbors = VecDeque::new();
                 neighbors.push_back(NEIGHBOURS.clone());
@@ -1055,7 +1058,7 @@ mod tests {
             futures::channel::mpsc::channel::<(OffchainPublicKey, PingQueryReplier)>(100);
 
         let store = PeerStore {
-            me: OffchainPublicKey::default(),
+            me: *OFFCHAIN_KEYPAIR.public(),
             get_peers: Arc::new(RwLock::new(VecDeque::new())),
             on_finished: Arc::new(RwLock::new(Vec::new())),
         };
