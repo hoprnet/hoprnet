@@ -6,7 +6,7 @@ use hopr_api::{
     tickets::{TicketFactory, TicketManagement},
     types::{crypto::prelude::*, crypto_random::Randomizable, internal::prelude::*, primitive::prelude::*},
 };
-use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue};
+use hopr_ticket_manager::{HoprTicketManager, RedbStore};
 
 const TICKET_VALUE: u64 = 10;
 
