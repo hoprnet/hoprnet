@@ -16,6 +16,7 @@ testing = ["dep:hex", "blokli-client/testing"]
 [dependencies]
 ahash = { workspace = true }
 anyhow = { workspace = true }
+atomic_enum = { workspace = true }
 async-broadcast = { workspace = true }
 async-trait = { workspace = true }
 blokli-client = { workspace = true }
