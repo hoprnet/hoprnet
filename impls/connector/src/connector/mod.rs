@@ -706,7 +706,6 @@ pub(crate) mod tests {
 
         struct MockClient<C>(pub C);
 
-        #[allow(dead_code)]
         #[async_trait::async_trait]
         impl<C: BlokliTransactionClient + Send + Sync> BlokliTransactionClient for MockClient<C> {
             async fn submit_transaction(
@@ -745,7 +744,6 @@ pub(crate) mod tests {
             }
         }
 
-        #[allow(dead_code)]
         #[async_trait::async_trait]
         impl<C: BlokliQueryClient + Send + Sync> BlokliQueryClient for MockClient<C> {
             async fn count_accounts(&self, selector: AccountSelector) -> Result<u32, BlokliClientError> {
@@ -754,85 +752,85 @@ pub(crate) mod tests {
 
             async fn query_accounts(
                 &self,
-                selector: AccountSelector,
+                s: AccountSelector,
             ) -> Result<Vec<blokli_client::api::types::Account>, BlokliClientError> {
-                self.0.query_accounts(selector).await
+                self.0.query_accounts(s).await
             }
 
             async fn query_native_balance(
                 &self,
-                address: &ChainAddress,
+                a: &ChainAddress,
             ) -> Result<blokli_client::api::types::NativeBalance, BlokliClientError> {
-                self.0.query_native_balance(address).await
+                self.0.query_native_balance(a).await
             }
 
             async fn query_token_balance(
                 &self,
-                address: &ChainAddress,
+                a: &ChainAddress,
             ) -> Result<blokli_client::api::types::HoprBalance, BlokliClientError> {
-                self.0.query_token_balance(address).await
+                self.0.query_token_balance(a).await
             }
 
-            async fn query_transaction_count(&self, address: &ChainAddress) -> Result<u64, BlokliClientError> {
-                self.0.query_transaction_count(address).await
+            async fn query_transaction_count(&self, a: &ChainAddress) -> Result<u64, BlokliClientError> {
+                self.0.query_transaction_count(a).await
             }
 
             async fn query_safe_allowance(
                 &self,
-                address: &ChainAddress,
+                a: &ChainAddress,
             ) -> Result<blokli_client::api::types::SafeHoprAllowance, BlokliClientError> {
-                self.0.query_safe_allowance(address).await
+                self.0.query_safe_allowance(a).await
             }
 
             async fn query_redeemed_stats(
                 &self,
-                selector: blokli_client::api::RedeemedStatsSelector,
+                s: blokli_client::api::RedeemedStatsSelector,
             ) -> Result<blokli_client::api::types::RedeemedStats, BlokliClientError> {
-                self.0.query_redeemed_stats(selector).await
+                self.0.query_redeemed_stats(s).await
             }
 
             async fn query_safe(
                 &self,
-                selector: blokli_client::api::SafeSelector,
+                s: blokli_client::api::SafeSelector,
             ) -> Result<Option<blokli_client::api::types::Safe>, BlokliClientError> {
-                self.0.query_safe(selector).await
+                self.0.query_safe(s).await
             }
 
             async fn query_module_address_prediction(
                 &self,
-                input: blokli_client::api::ModulePredictionInput,
+                i: blokli_client::api::ModulePredictionInput,
             ) -> Result<ChainAddress, BlokliClientError> {
-                self.0.query_module_address_prediction(input).await
+                self.0.query_module_address_prediction(i).await
             }
 
-            async fn count_channels(&self, selector: ChannelSelector) -> Result<u32, BlokliClientError> {
+            async fn count_channels(&self, s: ChannelSelector) -> Result<u32, BlokliClientError> {
                 #[allow(deprecated)]
-                self.0.count_channels(selector).await
+                self.0.count_channels(s).await
             }
 
             async fn query_channel_stats(
                 &self,
-                selector: ChannelSelector,
+                s: ChannelSelector,
             ) -> Result<blokli_client::api::types::ChannelStats, BlokliClientError> {
-                self.0.query_channel_stats(selector).await
+                self.0.query_channel_stats(s).await
             }
 
             async fn query_channels(
                 &self,
-                selector: ChannelSelector,
+                s: ChannelSelector,
             ) -> Result<blokli_client::api::types::ChannelsList, BlokliClientError> {
-                self.0.query_channels(selector).await
+                self.0.query_channels(s).await
             }
 
             async fn query_safes_balance(
                 &self,
-                owner_address: Option<ChainAddress>,
+                o: Option<ChainAddress>,
             ) -> Result<blokli_client::api::types::SafesBalance, BlokliClientError> {
-                self.0.query_safes_balance(owner_address).await
+                self.0.query_safes_balance(o).await
             }
 
-            async fn query_transaction_status(&self, tx_id: TxId) -> Result<Transaction, BlokliClientError> {
-                self.0.query_transaction_status(tx_id).await
+            async fn query_transaction_status(&self, id: TxId) -> Result<Transaction, BlokliClientError> {
+                self.0.query_transaction_status(id).await
             }
 
             async fn query_chain_info(&self) -> Result<blokli_client::api::types::ChainInfo, BlokliClientError> {
@@ -848,27 +846,26 @@ pub(crate) mod tests {
             }
         }
 
-        #[allow(dead_code)]
         #[async_trait::async_trait]
         impl<C: BlokliSubscriptionClient + Send + Sync> BlokliSubscriptionClient for MockClient<C> {
             fn subscribe_channels(
                 &self,
-                selector: ChannelSelector,
+                s: ChannelSelector,
             ) -> Result<
                 impl futures::Stream<Item = Result<blokli_client::api::types::Channel, BlokliClientError>> + Send,
                 BlokliClientError,
             > {
-                self.0.subscribe_channels(selector)
+                self.0.subscribe_channels(s)
             }
 
             fn subscribe_accounts(
                 &self,
-                selector: AccountSelector,
+                s: AccountSelector,
             ) -> Result<
                 impl futures::Stream<Item = Result<blokli_client::api::types::Account, BlokliClientError>> + Send,
                 BlokliClientError,
             > {
-                self.0.subscribe_accounts(selector)
+                self.0.subscribe_accounts(s)
             }
 
             fn subscribe_graph(
@@ -901,10 +898,10 @@ pub(crate) mod tests {
 
             fn subscribe_track_transaction(
                 &self,
-                tx_id: TxId,
+                id: TxId,
             ) -> Result<impl futures::Stream<Item = Result<Transaction, BlokliClientError>> + Send, BlokliClientError>
             {
-                self.0.subscribe_track_transaction(tx_id)
+                self.0.subscribe_track_transaction(id)
             }
         }
 
