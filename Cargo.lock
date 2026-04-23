@@ -1560,8 +1560,8 @@ dependencies = [
 
 [[package]]
 name = "blokli-client"
-version = "0.24.0"
-source = "git+https://github.com/hoprnet/blokli?rev=23fc52217df1173efd680e94c0393ba76b4ecac7#23fc52217df1173efd680e94c0393ba76b4ecac7"
+version = "0.25.0"
+source = "git+https://github.com/hoprnet/blokli?branch=main#8353acaf6dd96bbe0a35d24c88eadbdc022de2c5"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -4414,7 +4414,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4453,7 +4453,7 @@ dependencies = [
  "anyhow",
  "hex",
  "hopr-platform",
- "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hopr-types",
  "insta",
  "scrypt",
  "serde",
@@ -4477,7 +4477,7 @@ dependencies = [
  "hex-literal",
  "hopr-crypto-sphinx",
  "hopr-parallelize",
- "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hopr-types",
  "lazy_static",
  "mimalloc",
  "parameterized",
@@ -4500,7 +4500,7 @@ dependencies = [
  "elliptic-curve",
  "generic-array 1.3.5",
  "hex",
- "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hopr-types",
  "k256",
  "parameterized",
  "postcard",
@@ -4622,14 +4622,13 @@ version = "1.2.1"
 dependencies = [
  "anyhow",
  "arrayvec",
- "cfg-if",
  "flume",
  "futures",
  "futures-time",
  "hickory-resolver 0.26.0",
  "hopr-async-runtime",
  "hopr-metrics",
- "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hopr-types",
  "lazy_static",
  "libp2p-identity",
  "multiaddr",
@@ -4676,7 +4675,7 @@ version = "1.0.1"
 dependencies = [
  "anyhow",
  "hopr-crypto-packet",
- "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hopr-types",
  "serde",
  "serde_bytes",
  "strum 0.28.0",
@@ -4741,7 +4740,7 @@ dependencies = [
  "hopr-metrics",
  "hopr-network-types",
  "hopr-protocol-app",
- "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hopr-types",
  "indexmap 2.14.0",
  "insta",
  "lazy_static",
@@ -4952,7 +4951,7 @@ dependencies = [
  "futures-timer",
  "hopr-metrics",
  "hopr-transport-mixer",
- "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hopr-types",
  "humantime-serde",
  "insta",
  "lazy_static",
@@ -5008,7 +5007,7 @@ dependencies = [
  "hopr-network-graph",
  "hopr-protocol-hopr",
  "hopr-statistics",
- "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hopr-types",
  "lazy_static",
  "moka",
  "smart-default",
@@ -5119,7 +5118,7 @@ dependencies = [
  "hopr-protocol-session",
  "hopr-protocol-start",
  "hopr-transport-tag-allocator",
- "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hopr-types",
  "humantime-serde",
  "insta",
  "lazy_static",
@@ -5353,7 +5352,7 @@ dependencies = [
  "hopr-chain-connector",
  "hopr-lib",
  "hopr-reference",
- "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hopr-types",
  "hoprd",
  "hoprd-api",
  "hoprd-api-client",
@@ -5916,9 +5915,9 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
 name = "jiff"
-version = "0.2.23"
+version = "0.2.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a3546dc96b6d42c5f24902af9e2538e82e39ad350b0c766eb3fbf2d8f3d8359"
+checksum = "f00b5dbd620d61dfdcb6007c9c1f6054ebd75319f163d886a9055cec1155073d"
 dependencies = [
  "jiff-static",
  "jiff-tzdb-platform",
@@ -5926,14 +5925,14 @@ dependencies = [
  "portable-atomic",
  "portable-atomic-util",
  "serde_core",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
 name = "jiff-static"
-version = "0.2.23"
+version = "0.2.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a8c8b344124222efd714b73bb41f8b5120b27a7cc1c75593a6ff768d9d05aa4"
+checksum = "e000de030ff8022ea1da3f466fbb0f3a809f5e51ed31f6dd931c35181ad8e6d7"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -8401,9 +8400,9 @@ dependencies = [
 
 [[package]]
 name = "ruint"
-version = "1.17.2"
+version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c141e807189ad38a07276942c6623032d3753c8859c146104ac2e4d68865945a"
+checksum = "0298da754d1395046b0afdc2f20ee76d29a8ae310cd30ffa84ed42acba9cb12a"
 dependencies = [
  "alloy-rlp",
  "ark-ff 0.3.0",
@@ -8531,9 +8530,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.38"
+version = "0.23.39"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69f9466fb2c14ea04357e91413efb882e2a6d4a406e625449bc0a5d360d53a21"
+checksum = "7c2c118cb077cca2822033836dfb1b975355dfb784b5e8da48f7b6c5db74e60e"
 dependencies = [
  "log",
  "once_cell",
