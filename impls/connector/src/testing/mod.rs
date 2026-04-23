@@ -1,8 +1,8 @@
 mod emulator;
 
-pub use blokli_client::{BlokliTestClient, BlokliTestState, exports::Entry};
 use blokli_client::BlokliTestStateMutator;
-pub use emulator::{FullStateEmulator, StaticState, ChainMutator};
+pub use blokli_client::{BlokliTestClient, BlokliTestState, exports::Entry};
+pub use emulator::{ChainMutator, FullStateEmulator, StaticState};
 pub use hopr_api::chain::ChainInfo;
 use hopr_api::{
     chain::DeployedSafe,

@@ -382,10 +382,13 @@ impl BlokliTestStateMutator for FullStateEmulator {
                 })?;
 
                 if &channel_ticket_index > ticket_index {
-                    return Err(blokli_client::errors::ErrorKind::MockClientError(blokli_client::errors::InternalTxError(anyhow::anyhow!(
-                        "ticket index of {channel_id} ({channel_ticket_index}) is greater than redeemed ticket index \
-                         {ticket_index}"
-                    )).into())
+                    return Err(blokli_client::errors::ErrorKind::MockClientError(
+                        blokli_client::errors::InternalTxError(anyhow::anyhow!(
+                            "ticket index of {channel_id} ({channel_ticket_index}) is greater than redeemed ticket \
+                             index {ticket_index}"
+                        ))
+                        .into(),
+                    )
                     .into());
                 }
 
@@ -504,7 +507,6 @@ impl BlokliTestStateMutator for FullStateEmulator {
     }
 }
 
-
 /// Allows chaining of two [mutators](BlokliTestStateMutator) into a single one (in order).
 #[derive(Debug, Clone)]
 pub struct ChainMutator<M1, M2> {
@@ -522,7 +524,11 @@ impl<M1, M2> ChainMutator<M1, M2> {
 }
 
 impl<M1: BlokliTestStateMutator, M2: BlokliTestStateMutator> BlokliTestStateMutator for ChainMutator<M1, M2> {
-    fn update_state(&self, signed_tx: &[u8], state: &mut BlokliTestState) -> Result<(), blokli_client::errors::BlokliClientError> {
+    fn update_state(
+        &self,
+        signed_tx: &[u8],
+        state: &mut BlokliTestState,
+    ) -> Result<(), blokli_client::errors::BlokliClientError> {
         self.mutator_1.update_state(signed_tx, state)?;
         self.mutator_2.update_state(signed_tx, state)?;
         Ok(())

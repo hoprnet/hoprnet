@@ -624,12 +624,13 @@ where
 pub(crate) mod tests {
     use blokli_client::BlokliTestState;
     use hex_literal::hex;
-    use hopr_api::chain::ChainWriteTicketOperations;
-    use hopr_api::types::chain::contract_addresses_for_network;
+    use hopr_api::{chain::ChainWriteTicketOperations, types::chain::contract_addresses_for_network};
 
     use super::*;
-    use crate::{InMemoryBackend, testing::BlokliTestStateBuilder};
-    use crate::testing::{ChainMutator, FullStateEmulator};
+    use crate::{
+        InMemoryBackend,
+        testing::{BlokliTestStateBuilder, ChainMutator, FullStateEmulator},
+    };
 
     pub const PRIVATE_KEY_1: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");
     pub const PRIVATE_KEY_2: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
@@ -734,16 +735,22 @@ pub(crate) mod tests {
             .with_channels([channel_1])
             .with_hopr_network_chain_info("rotsee")
             .build_dynamic_client_with_mutator(ChainMutator::new(
-                |_: &[u8], state: &mut BlokliTestState| {
+                move |_: &[u8], state: &mut BlokliTestState| -> Result<(), blokli_client::errors::BlokliClientError> {
                     // Update the channel ticket index, without the client noticing the change
                     // This will cause the transaction to be rejected in the Emulator, and
                     // not by the checks performed by the Connector before the redemption.
                     if let Some(c) = state.get_channel_by_id_mut(&(*channel_1.get_id()).into()) {
                         c.ticket_index = blokli_client::api::types::Uint64("2".into());
+                        Ok(())
+                    } else {
+                        Err(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
+                            "channel unexpectedly not found"
+                        ))
+                        .into())
                     }
                 },
-                FullStateEmulator(MODULE_ADDR.into(), None))
-            )
+                FullStateEmulator(MODULE_ADDR.into(), None),
+            ))
             .with_tx_simulation_delay(Duration::from_millis(100))
             .with_use_internal_txs(true);
 
@@ -776,13 +783,9 @@ pub(crate) mod tests {
             )?)
             .into_redeemable(&ChainKeypair::from_secret(&PRIVATE_KEY_1)?, &Hash::default())?;
 
-
         let res = connector.redeem_ticket(ticket).await?;
         let err = res.await;
-        assert!(matches!(
-            err,
-            Err(hopr_api::chain::TicketRedeemError::Rejected(_, _))
-        ));
+        assert!(matches!(err, Err(hopr_api::chain::TicketRedeemError::Rejected(_, _))));
 
         Ok(())
     }
