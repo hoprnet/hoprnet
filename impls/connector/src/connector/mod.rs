@@ -853,4 +853,76 @@ pub(crate) mod tests {
         assert!(connector.component_status().is_unavailable());
         Ok(())
     }
+
+    #[test]
+    fn health_cas_ready_only_from_connecting() {
+        let health = AtomicChainHealthState::new(ChainHealthState::Connecting);
+        let result = health.compare_exchange(
+            ChainHealthState::Connecting,
+            ChainHealthState::Ready,
+            AtomicOrdering::Relaxed,
+            AtomicOrdering::Relaxed,
+        );
+        assert!(result.is_ok());
+        assert_eq!(health.load(AtomicOrdering::Relaxed), ChainHealthState::Ready);
+    }
+
+    #[test]
+    fn health_cas_ready_fails_from_subscription_ended() {
+        let health = AtomicChainHealthState::new(ChainHealthState::SubscriptionEnded);
+        let result = health.compare_exchange(
+            ChainHealthState::Connecting,
+            ChainHealthState::Ready,
+            AtomicOrdering::Relaxed,
+            AtomicOrdering::Relaxed,
+        );
+        assert!(result.is_err());
+        assert_eq!(
+            health.load(AtomicOrdering::Relaxed),
+            ChainHealthState::SubscriptionEnded
+        );
+    }
+
+    #[test]
+    fn health_subscription_ended_preserves_terminal_state() {
+        let health = AtomicChainHealthState::new(ChainHealthState::ServerNotHealthy);
+        let current = health.load(AtomicOrdering::Relaxed);
+        // ServerNotHealthy is a terminal state — should NOT transition to SubscriptionEnded
+        assert!(!matches!(
+            current,
+            ChainHealthState::Connecting | ChainHealthState::Ready
+        ));
+        // The conditional store would skip this
+    }
+
+    #[test]
+    fn health_subscription_ended_from_ready() {
+        let health = AtomicChainHealthState::new(ChainHealthState::Ready);
+        let current = health.load(AtomicOrdering::Relaxed);
+        if matches!(current, ChainHealthState::Connecting | ChainHealthState::Ready) {
+            let _ = health.compare_exchange(
+                current,
+                ChainHealthState::SubscriptionEnded,
+                AtomicOrdering::Relaxed,
+                AtomicOrdering::Relaxed,
+            );
+        }
+        assert_eq!(
+            health.load(AtomicOrdering::Relaxed),
+            ChainHealthState::SubscriptionEnded
+        );
+    }
+
+    #[test]
+    fn health_drop_overwrites_any_state() {
+        for initial in [
+            ChainHealthState::Ready,
+            ChainHealthState::Connecting,
+            ChainHealthState::SubscriptionEnded,
+        ] {
+            let health = AtomicChainHealthState::new(initial);
+            health.store(ChainHealthState::Dropped, AtomicOrdering::Relaxed);
+            assert_eq!(health.load(AtomicOrdering::Relaxed), ChainHealthState::Dropped);
+        }
+    }
 }

@@ -456,7 +456,12 @@ where
 impl<Chain, Graph, Net, TMgr> HasGraphView for Hopr<Chain, Graph, Net, TMgr>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
-    Graph: HoprGraphApi<HoprNodeId = OffchainPublicKey> + Clone + Send + Sync + 'static,
+    Graph: HoprGraphApi<HoprNodeId = OffchainPublicKey>
+        + hopr_api::graph::NetworkGraphConnectivity<NodeId = OffchainPublicKey>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
     <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
         hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
     <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
@@ -548,7 +553,12 @@ impl<Chain, Graph, Net, TMgr> Hopr<Chain, Graph, Net, TMgr>
 where
     Chain: HoprChainApi + ComponentStatusReporter + Clone + Send + Sync + 'static,
     Net: hopr_api::network::NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
-    Graph: HoprGraphApi<HoprNodeId = OffchainPublicKey> + Clone + Send + Sync + 'static,
+    Graph: HoprGraphApi<HoprNodeId = OffchainPublicKey>
+        + hopr_api::graph::NetworkGraphConnectivity<NodeId = OffchainPublicKey>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
     <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
         hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
     <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
@@ -673,6 +683,44 @@ mod tests {
             transport: ComponentStatus::Ready,
         };
         assert!(statuses.aggregate().is_unavailable());
+    }
+
+    #[test]
+    fn aggregate_one_initializing() {
+        let statuses = NodeComponentStatuses {
+            node_state: HoprState::Running,
+            chain: ComponentStatus::Initializing("starting".into()),
+            network: ComponentStatus::Ready,
+            transport: ComponentStatus::Ready,
+        };
+        assert!(statuses.aggregate().is_initializing());
+    }
+
+    #[test]
+    fn aggregate_degraded_wins_over_initializing() {
+        let statuses = NodeComponentStatuses {
+            node_state: HoprState::Running,
+            chain: ComponentStatus::Initializing("starting".into()),
+            network: ComponentStatus::Degraded("low peers".into()),
+            transport: ComponentStatus::Ready,
+        };
+        assert!(statuses.aggregate().is_degraded());
+    }
+
+    #[test]
+    fn network_health_to_status_includes_component_name() {
+        match network_health_to_status(Health::Orange, "mycomp") {
+            ComponentStatus::Degraded(d) => assert!(d.contains("mycomp"), "detail should contain component name"),
+            other => panic!("expected Degraded, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn network_health_to_status_red_and_unknown_are_same_variant() {
+        let red = network_health_to_status(Health::Red, "x");
+        let unknown = network_health_to_status(Health::Unknown, "x");
+        assert!(red.is_unavailable());
+        assert!(unknown.is_unavailable());
     }
 }
 

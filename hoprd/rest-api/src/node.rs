@@ -296,4 +296,65 @@ mod tests {
         assert_eq!(info.status, "Initializing");
         assert_eq!(info.detail.as_deref(), Some("starting"));
     }
+
+    #[test]
+    fn component_status_to_info_with_owned_cow() {
+        let info = component_status_to_info(&ComponentStatus::Degraded(Cow::Owned("dynamic detail".to_string())));
+        assert_eq!(info.status, "Degraded");
+        assert_eq!(info.detail.as_deref(), Some("dynamic detail"));
+    }
+
+    #[test]
+    fn component_status_to_info_empty_detail() {
+        let info = component_status_to_info(&ComponentStatus::Degraded(Cow::Borrowed("")));
+        assert_eq!(info.detail.as_deref(), Some(""));
+    }
+
+    #[test]
+    fn node_status_response_serializes_correctly() {
+        let body = NodeStatusResponse {
+            overall: "Ready".into(),
+            node_state: "Node is running".into(),
+            components: ComponentStatusesResponse {
+                chain: ComponentStatusInfo {
+                    status: "Ready".into(),
+                    detail: None,
+                },
+                network: ComponentStatusInfo {
+                    status: "Degraded".into(),
+                    detail: Some("low peers".into()),
+                },
+                transport: ComponentStatusInfo {
+                    status: "Ready".into(),
+                    detail: None,
+                },
+            },
+        };
+        let json = serde_json::to_value(&body).unwrap();
+        assert_eq!(json["overall"], "Ready");
+        assert_eq!(json["nodeState"], "Node is running");
+        assert_eq!(json["components"]["chain"]["status"], "Ready");
+        assert!(json["components"]["chain"]["detail"].is_null());
+        assert_eq!(json["components"]["network"]["detail"], "low peers");
+    }
+
+    #[test]
+    fn component_status_info_skips_none_detail_in_json() {
+        let info = ComponentStatusInfo {
+            status: "Ready".into(),
+            detail: None,
+        };
+        let json = serde_json::to_string(&info).unwrap();
+        assert!(!json.contains("detail"), "None detail should be skipped");
+    }
+
+    #[test]
+    fn component_status_info_includes_some_detail_in_json() {
+        let info = ComponentStatusInfo {
+            status: "Degraded".into(),
+            detail: Some("reason".into()),
+        };
+        let json = serde_json::to_string(&info).unwrap();
+        assert!(json.contains("\"detail\":\"reason\""));
+    }
 }
