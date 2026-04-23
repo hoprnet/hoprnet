@@ -50,7 +50,7 @@ jobs:
       contents: read
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40 # v2.19.0
         with:
           disable-sudo: false # sudo is needed for docker compose installation
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -106,14 +106,14 @@ jobs:
 
       - name: Setup GCP
         id: gcp
-        uses: hoprnet/hopr-workflows/actions/setup-gcp@644d936de4e1c8f5c50ba50f8526209455c28b4a # master
+        uses: hoprnet/hopr-workflows/actions/setup-gcp@12c56020e16036982e6cc529848edeedfc705865 # master
         with:
           google_credentials: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
           login_artifact_registry: 'false'
           install_sdk: 'true'
 
       - name: Setup Node.js
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 20.20.2 # Revert to version 20, as the dappnode package is not yet compatible with Node 22
 

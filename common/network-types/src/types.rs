@@ -1,10 +1,8 @@
 use std::{
     fmt::{Display, Formatter},
-    net::SocketAddr,
     str::FromStr,
 };
 
-use hickory_resolver::name_server::ConnectionProvider;
 use libp2p_identity::PeerId;
 
 use crate::errors::NetworkTypeError;
@@ -73,35 +71,26 @@ impl IpOrHost {
     ///
     /// Uses `tokio` resolver.
     #[cfg(feature = "runtime-tokio")]
-    pub async fn resolve_tokio(self) -> std::io::Result<Vec<SocketAddr>> {
-        cfg_if::cfg_if! {
-            if #[cfg(test)] {
-                // This resolver setup is used in the tests to be executed in a sandbox environment
-                // which prevents IO access to system-level files.
-                let config = hickory_resolver::config::ResolverConfig::new();
-                let options = hickory_resolver::config::ResolverOpts::default();
-                let resolver = hickory_resolver::Resolver::builder_with_config(config, hickory_resolver::name_server::TokioConnectionProvider::default()).with_options(options).build();
-            } else {
-                let resolver = hickory_resolver::Resolver::builder_tokio()?.build();
-            }
-        };
-
-        self.resolve(resolver).await
-    }
-
-    /// Tries to resolve the DNS name and returns all IP addresses found.
-    /// If this enum is already an IP address and port, it will simply return it.
-    pub async fn resolve<P: ConnectionProvider>(
-        self,
-        resolver: hickory_resolver::Resolver<P>,
-    ) -> std::io::Result<Vec<SocketAddr>> {
+    pub async fn resolve_tokio(self) -> std::io::Result<Vec<std::net::SocketAddr>> {
         match self {
-            IpOrHost::Dns(name, port) => Ok(resolver
-                .lookup_ip(name)
-                .await?
-                .into_iter()
-                .map(|ip| SocketAddr::new(ip, port))
-                .collect()),
+            IpOrHost::Dns(name, port) => {
+                #[cfg(test)]
+                let resolver = hickory_resolver::Resolver::builder_with_config(
+                    hickory_resolver::config::ResolverConfig::default(),
+                    hickory_resolver::net::runtime::TokioRuntimeProvider::default(),
+                )
+                .build()
+                .map_err(std::io::Error::other)?;
+
+                #[cfg(not(test))]
+                let resolver = hickory_resolver::Resolver::builder_tokio()
+                    .map_err(std::io::Error::other)?
+                    .build()
+                    .map_err(std::io::Error::other)?;
+
+                let lookup = resolver.lookup_ip(&name).await.map_err(std::io::Error::other)?;
+                Ok(lookup.iter().map(|ip| std::net::SocketAddr::new(ip, port)).collect())
+            }
             IpOrHost::Ip(addr) => Ok(vec![addr]),
         }
     }
@@ -294,7 +283,7 @@ mod tests {
             .ok_or(anyhow!("must resolve"))?
         {
             SocketAddr::V4(addr) => assert_eq!(*addr, "127.0.0.1:1000".parse()?),
-            SocketAddr::V6(addr) => assert_eq!(*addr, "::1:1000".parse()?),
+            SocketAddr::V6(addr) => assert_eq!(*addr, "[::1]:1000".parse()?),
         }
         Ok(())
     }
