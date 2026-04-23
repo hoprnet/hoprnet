@@ -153,11 +153,7 @@ pub(crate) struct ConnectedPeerResponse {
     tag = "Network"
 )]
 pub(super) async fn connected<
-    H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError>
-        + HasGraphView
-        + Send
-        + Sync
-        + 'static,
+    H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + HasGraphView + Send + Sync + 'static,
 >(
     State(state): State<Arc<InternalState<H>>>,
 ) -> impl IntoResponse {
@@ -331,11 +327,7 @@ pub(crate) struct GraphQueryRequest {
     tag = "Network"
 )]
 pub(super) async fn graph<
-    H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError>
-        + HasGraphView
-        + Send
-        + Sync
-        + 'static,
+    H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + HasGraphView + Send + Sync + 'static,
 >(
     State(state): State<Arc<InternalState<H>>>,
     Query(query): Query<GraphQueryRequest>,
@@ -379,7 +371,11 @@ pub(super) async fn graph<
             attrs.push(format!("lat={}ms", latency.as_millis()));
         }
         use std::fmt::Write;
-        let _ = writeln!(dot, "  \"{src_label}\" -> \"{dst_label}\" [label=\"{}\"];", attrs.join(" "));
+        let _ = writeln!(
+            dot,
+            "  \"{src_label}\" -> \"{dst_label}\" [label=\"{}\"];",
+            attrs.join(" ")
+        );
     }
     dot.push_str("}\n");
 

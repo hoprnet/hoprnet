@@ -541,10 +541,7 @@ impl TicketManagement for StubTicketManager {
         Ok(vec![])
     }
 
-    fn ticket_stats(
-        &self,
-        _channel_id: Option<&hopr_lib::api::chain::ChannelId>,
-    ) -> Result<ChannelStats, Self::Error> {
+    fn ticket_stats(&self, _channel_id: Option<&hopr_lib::api::chain::ChannelId>) -> Result<ChannelStats, Self::Error> {
         Ok(ChannelStats::default())
     }
 

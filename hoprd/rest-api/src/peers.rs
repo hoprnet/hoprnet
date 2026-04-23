@@ -168,12 +168,7 @@ fn channel_entry_to_peer_info(
     tag = "Peers",
 )]
 pub(super) async fn show_peer_info<
-    H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError>
-        + HasNetworkView
-        + HasGraphView
-        + Send
-        + Sync
-        + 'static,
+    H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + HasNetworkView + HasGraphView + Send + Sync + 'static,
 >(
     Path(AddressParams { address }): Path<AddressParams>,
     State(state): State<Arc<InternalState<H>>>,

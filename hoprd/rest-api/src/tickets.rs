@@ -318,10 +318,7 @@ mod tests {
         });
 
         Router::new()
-            .route(
-                "/tickets/statistics",
-                get(show_ticket_statistics::<MockChainNode>),
-            )
+            .route("/tickets/statistics", get(show_ticket_statistics::<MockChainNode>))
             .with_state(state)
     }
 
