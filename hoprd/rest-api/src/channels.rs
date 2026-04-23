@@ -889,6 +889,7 @@ mod tests {
 
     use std::sync::Arc;
 
+    use anyhow::Context;
     use axum::{Router, body::Body, http::Request, routing::get};
     use tower::ServiceExt;
 
@@ -923,10 +924,14 @@ mod tests {
 
         // StubChain::stream_channels returns empty stream, so channels_to/channels_from
         // both return empty Vecs
-        assert!(json["incoming"].is_array());
-        assert_eq!(json["incoming"].as_array().unwrap().len(), 0);
-        assert!(json["outgoing"].is_array());
-        assert_eq!(json["outgoing"].as_array().unwrap().len(), 0);
+        assert_eq!(
+            json["incoming"].as_array().context("incoming should be an array")?.len(),
+            0
+        );
+        assert_eq!(
+            json["outgoing"].as_array().context("outgoing should be an array")?.len(),
+            0
+        );
 
         Ok(())
     }
