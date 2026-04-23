@@ -4,7 +4,7 @@ use anyhow::Context;
 use hopr_lib::{
     Address,
     api::{
-        graph::traits::{EdgeLinkObservable, EdgeObservableRead},
+        graph::{NetworkGraphConnectivity, traits::{EdgeLinkObservable, EdgeObservableRead}},
         network::NetworkView,
         node::{HasNetworkView, HasTransportApi, IncentiveChannelOperations},
     },

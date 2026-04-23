@@ -7,7 +7,7 @@ use std::fmt::Write;
 use hopr_api::{
     OffchainPublicKey,
     graph::{
-        NetworkGraphConnectivity,
+        NetworkGraphConnectivity, NetworkGraphView,
         traits::{EdgeLinkObservable, EdgeObservableRead, EdgeProtocolObservable},
     },
 };

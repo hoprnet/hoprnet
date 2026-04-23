@@ -267,7 +267,7 @@ mod tests {
     use hex_literal::hex;
     use hopr_api::{
         graph::{
-            EdgeLinkObservable, NetworkGraphView, NetworkGraphWrite,
+            EdgeLinkObservable, NetworkGraphConnectivity, NetworkGraphView, NetworkGraphWrite,
             traits::{EdgeObservableRead, EdgeObservableWrite, EdgeWeightType},
         },
         types::crypto::prelude::{Keypair, OffchainKeypair},
