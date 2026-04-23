@@ -13,14 +13,20 @@ deployed_safes:
   "0202020202020202020202020202020202020202":
     address: "0202020202020202020202020202020202020202"
     chain_key: bea83ba0fcee21da44a30c893f466e6bf0c29bbb
+    owners:
+      - bea83ba0fcee21da44a30c893f466e6bf0c29bbb
     module_address: "1111111111111111111111111111111111111111"
     registered_nodes:
       - 668430def9eacd2b5064acf85d73fb0b351a1c8c
+    threshold: "1"
   "0101010101010101010101010101010101010101":
     address: "0101010101010101010101010101010101010101"
     chain_key: bea83ba0fcee21da44a30c893f466e6bf0c29bbb
+    owners:
+      - bea83ba0fcee21da44a30c893f466e6bf0c29bbb
     module_address: "1111111111111111111111111111111111111111"
     registered_nodes: []
+    threshold: "1"
 safe_redeem_stats: {}
 tx_counts: {}
 channels: {}
