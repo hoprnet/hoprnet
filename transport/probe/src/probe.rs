@@ -482,6 +482,7 @@ mod tests {
 
     #[derive(Debug, Clone)]
     pub struct PeerStore {
+        me: OffchainPublicKey,
         get_peers: Arc<RwLock<VecDeque<Vec<OffchainPublicKey>>>>,
         #[allow(clippy::type_complexity)]
         on_finished: Arc<RwLock<Vec<(OffchainPublicKey, crate::errors::Result<Duration>)>>>,
@@ -523,6 +524,10 @@ mod tests {
     impl NetworkGraphView for PeerStore {
         type NodeId = OffchainPublicKey;
         type Observed = TestEdgeObservations;
+
+        fn identity(&self) -> &OffchainPublicKey {
+            &self.me
+        }
 
         fn node_count(&self) -> usize {
             self.get_peers.read().unwrap().front().map_or(0, |v| v.len())
@@ -672,6 +677,7 @@ mod tests {
         };
 
         let store = PeerStore {
+            me: OffchainPublicKey::default(),
             get_peers: Arc::new(RwLock::new(VecDeque::new())),
             on_finished: Arc::new(RwLock::new(Vec::new())),
         };
@@ -713,6 +719,7 @@ mod tests {
         };
 
         let store = PeerStore {
+            me: OffchainPublicKey::default(),
             get_peers: Arc::new(RwLock::new(VecDeque::new())),
             on_finished: Arc::new(RwLock::new(Vec::new())),
         };
@@ -862,6 +869,7 @@ mod tests {
         };
 
         let store = PeerStore {
+            me: OffchainPublicKey::default(),
             get_peers: Arc::new(RwLock::new(VecDeque::new())),
             on_finished: Arc::new(RwLock::new(Vec::new())),
         };
@@ -1047,6 +1055,7 @@ mod tests {
             futures::channel::mpsc::channel::<(OffchainPublicKey, PingQueryReplier)>(100);
 
         let store = PeerStore {
+            me: OffchainPublicKey::default(),
             get_peers: Arc::new(RwLock::new(VecDeque::new())),
             on_finished: Arc::new(RwLock::new(Vec::new())),
         };
