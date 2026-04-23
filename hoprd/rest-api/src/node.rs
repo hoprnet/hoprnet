@@ -9,10 +9,10 @@ use axum::{
     response::IntoResponse,
 };
 use hopr_lib::{
-    Address, Multiaddr,
+    Address, IncentiveChannelOperations, Multiaddr,
     api::{
         network::{Health, NetworkView},
-        node::{ComponentStatus, HasChainApi, HasNetworkView, IncentiveChannelOperations},
+        node::{ComponentStatus, HasChainApi, HasNetworkView},
     },
 };
 use serde::Serialize;
@@ -72,7 +72,9 @@ pub(super) async fn version() -> impl IntoResponse {
     ),
     tag = "Configuration"
     )]
-pub(super) async fn configuration(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+pub(super) async fn configuration<H: Send + Sync + 'static>(
+    State(state): State<Arc<InternalState<H>>>,
+) -> impl IntoResponse {
     (StatusCode::OK, Json(state.hoprd_cfg.clone())).into_response()
 }
 
@@ -135,7 +137,11 @@ pub(crate) struct NodeInfoResponse {
         ),
         tag = "Node"
     )]
-pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl IntoResponse, ApiError> {
+pub(super) async fn info<
+    H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + HasNetworkView + Send + Sync + 'static,
+>(
+    State(state): State<Arc<InternalState<H>>>,
+) -> Result<impl IntoResponse, ApiError> {
     let hopr = state.hopr.clone();
 
     let identity = hopr.identity();
@@ -245,18 +251,44 @@ pub(crate) struct ComponentStatusInfo {
     ),
     tag = "Node"
 )]
-pub(super) async fn status(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+pub(super) async fn status<
+    H: hopr_lib::api::node::HoprNodeOperations
+        + HasChainApi<ChainError = hopr_lib::errors::HoprLibError>
+        + HasNetworkView
+        + hopr_lib::api::node::HasTransportApi
+        + Send
+        + Sync
+        + 'static,
+>(
+    State(state): State<Arc<InternalState<H>>>,
+) -> impl IntoResponse {
+    use hopr_lib::api::node::{HasTransportApi, HoprNodeOperations};
+
     let hopr = &state.hopr;
-    let statuses = hopr.component_statuses();
-    let overall = statuses.aggregate();
+
+    let chain = HasChainApi::status(&**hopr);
+    let network = HasNetworkView::status(&**hopr);
+    let transport = HasTransportApi::status(&**hopr);
+    let node_state = HoprNodeOperations::status(&**hopr);
+
+    let statuses = [&chain, &network, &transport];
+    let overall = if statuses.iter().any(|s| s.is_unavailable()) {
+        ComponentStatus::Unavailable("one or more components unavailable".into())
+    } else if statuses.iter().any(|s| s.is_degraded()) {
+        ComponentStatus::Degraded("one or more components degraded".into())
+    } else if statuses.iter().any(|s| s.is_initializing()) {
+        ComponentStatus::Initializing("one or more components initializing".into())
+    } else {
+        ComponentStatus::Ready
+    };
 
     let body = NodeStatusResponse {
         overall: overall.to_string(),
-        node_state: statuses.node_state.to_string(),
+        node_state: node_state.to_string(),
         components: ComponentStatusesResponse {
-            chain: component_status_to_info(&statuses.chain),
-            network: component_status_to_info(&statuses.network),
-            transport: component_status_to_info(&statuses.transport),
+            chain: component_status_to_info(&chain),
+            network: component_status_to_info(&network),
+            transport: component_status_to_info(&transport),
         },
     };
 
@@ -267,7 +299,60 @@ pub(super) async fn status(State(state): State<Arc<InternalState>>) -> impl Into
 mod tests {
     use std::borrow::Cow;
 
+    use axum::{Router, body::Body, http::Request, routing::get};
+    use tower::ServiceExt;
+
     use super::*;
+    use crate::testing::NoopNode;
+
+    fn node_router() -> Router {
+        let state: Arc<InternalState<NoopNode>> = Arc::new(InternalState {
+            hoprd_cfg: serde_json::json!({
+                "network": "test-network",
+                "provider": "http://localhost:8545"
+            }),
+            auth: Arc::new(crate::config::Auth::None),
+            hopr: Arc::new(NoopNode),
+            open_listeners: Arc::new(hopr_utils_session::ListenerJoinHandles::default()),
+            default_listen_host: "127.0.0.1:0".parse().unwrap(),
+        });
+        Router::new()
+            .route(&format!("{BASE_PATH}/node/version"), get(version))
+            .route(
+                &format!("{BASE_PATH}/node/configuration"),
+                get(configuration::<NoopNode>),
+            )
+            .with_state(state)
+    }
+
+    #[tokio::test]
+    async fn version_should_return_app_version() -> anyhow::Result<()> {
+        let app = node_router();
+        let resp = app
+            .oneshot(Request::get(format!("{BASE_PATH}/node/version")).body(Body::empty())?)
+            .await?;
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await?;
+        let body: serde_json::Value = serde_json::from_slice(&bytes)?;
+        assert!(body["version"].as_str().is_some());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn configuration_should_return_hoprd_config() -> anyhow::Result<()> {
+        let app = node_router();
+        let resp = app
+            .oneshot(Request::get(format!("{BASE_PATH}/node/configuration")).body(Body::empty())?)
+            .await?;
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await?;
+        let body: serde_json::Value = serde_json::from_slice(&bytes)?;
+        assert_eq!(body["network"], "test-network");
+        assert_eq!(body["provider"], "http://localhost:8545");
+        Ok(())
+    }
 
     #[test]
     fn component_status_to_info_ready() {

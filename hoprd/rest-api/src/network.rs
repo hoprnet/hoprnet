@@ -6,14 +6,14 @@ use axum::{
     response::IntoResponse,
 };
 use hopr_lib::{
-    Address, HoprBalance, Multiaddr,
+    Address, HoprBalance, IncentiveChannelOperations, Multiaddr,
     api::{
         chain::ChainKeyOperations,
         graph::{
-            EdgeLinkObservable, NetworkGraphConnectivity,
-            traits::{EdgeNetworkObservableRead, EdgeObservableRead},
+            EdgeLinkObservable, NetworkGraphConnectivity, NetworkGraphView,
+            traits::{EdgeNetworkObservableRead, EdgeObservableRead, EdgeProtocolObservable},
         },
-        node::{HasChainApi, IncentiveChannelOperations},
+        node::{HasChainApi, HasGraphView},
     },
 };
 use serde_with::{DisplayFromStr, serde_as};
@@ -50,7 +50,9 @@ pub(crate) struct TicketPriceResponse {
         ),
         tag = "Network"
     )]
-pub(super) async fn price(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+pub(super) async fn price<H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + Send + Sync + 'static>(
+    State(state): State<Arc<InternalState<H>>>,
+) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
     match hopr.get_ticket_price().await {
@@ -87,7 +89,9 @@ pub(crate) struct TicketProbabilityResponse {
         ),
         tag = "Network"
     )]
-pub(super) async fn probability(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+pub(super) async fn probability<H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + Send + Sync + 'static>(
+    State(state): State<Arc<InternalState<H>>>,
+) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
     match hopr.get_minimum_incoming_ticket_win_probability().await {
@@ -148,12 +152,16 @@ pub(crate) struct ConnectedPeerResponse {
     ),
     tag = "Network"
 )]
-pub(super) async fn connected(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+pub(super) async fn connected<
+    H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + HasGraphView + Send + Sync + 'static,
+>(
+    State(state): State<Arc<InternalState<H>>>,
+) -> impl IntoResponse {
     let hopr = state.hopr.clone();
     let graph = hopr.graph();
     let edges = graph.connected_edges();
 
-    let me_key = graph.me();
+    let me_key = graph.identity();
 
     // Collect peers that are connected (is_connected == true) with immediate QoS data.
     let mut peers = Vec::new();
@@ -255,7 +263,9 @@ pub(crate) struct AnnouncedPeerResponse {
     ),
     tag = "Network"
 )]
-pub(super) async fn announced(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+pub(super) async fn announced<H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + Send + Sync + 'static>(
+    State(state): State<Arc<InternalState<H>>>,
+) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
     match hopr.announced_peers().await {
@@ -316,8 +326,10 @@ pub(crate) struct GraphQueryRequest {
     ),
     tag = "Network"
 )]
-pub(super) async fn graph(
-    State(state): State<Arc<InternalState>>,
+pub(super) async fn graph<
+    H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + HasGraphView + Send + Sync + 'static,
+>(
+    State(state): State<Arc<InternalState<H>>>,
     Query(query): Query<GraphQueryRequest>,
 ) -> impl IntoResponse {
     let hopr = &state.hopr;
@@ -345,9 +357,32 @@ pub(super) async fn graph(
         key_to_addr.insert(*key, label);
     }
 
-    let label_fn = |key: &hopr_lib::OffchainPublicKey| key_to_addr.get(key).cloned().unwrap_or_else(|| key.to_string());
+    let label = |key: &hopr_lib::OffchainPublicKey| key_to_addr.get(key).cloned().unwrap_or_else(|| key.to_string());
 
-    let dot = hopr_network_graph::render::render_edges_as_dot(&edges, &label_fn);
+    // Render DOT (Graphviz) format inline using trait methods on the observations.
+    let mut dot = String::from("digraph hopr {\n");
+    for (src, dst, obs) in &edges {
+        let src_label = label(src);
+        let dst_label = label(dst);
+        let mut attrs = vec![format!("score={:.2}", obs.score())];
+        if let Some(imm) = obs.immediate_qos()
+            && let Some(latency) = imm.average_latency()
+        {
+            attrs.push(format!("lat={}ms", latency.as_millis()));
+        }
+        if let Some(inter) = obs.intermediate_qos()
+            && let Some(cap) = inter.capacity()
+        {
+            attrs.push(format!("cap={cap}"));
+        }
+        use std::fmt::Write;
+        let _ = writeln!(
+            dot,
+            "  \"{src_label}\" -> \"{dst_label}\" [label=\"{}\"];",
+            attrs.join(" ")
+        );
+    }
+    dot.push_str("}\n");
 
     (StatusCode::OK, [(axum::http::header::CONTENT_TYPE, "text/plain")], dot).into_response()
 }
@@ -437,6 +472,90 @@ mod tests {
         assert_eq!(json["origin"], "chain");
         assert!(json["multiaddrs"].is_array());
         assert!(json["address"].is_string());
+        Ok(())
+    }
+
+    // ── Endpoint-level tests ───────────────────────────────────────────────
+
+    use std::sync::Arc;
+
+    use anyhow::Context;
+    use axum::{Router, body::Body, http::Request, routing::get};
+    use tower::ServiceExt;
+
+    use crate::testing::MockChainNode;
+
+    fn network_router(node: MockChainNode) -> Router {
+        let state = Arc::new(crate::InternalState {
+            hoprd_cfg: serde_json::Value::Null,
+            auth: Arc::new(crate::config::Auth::Token("test".into())),
+            hopr: Arc::new(node),
+            open_listeners: Arc::new(hopr_utils_session::ListenerJoinHandles::default()),
+            default_listen_host: "127.0.0.1:0".parse().unwrap(),
+        });
+
+        Router::new()
+            .route("/network/price", get(price::<MockChainNode>))
+            .route("/network/probability", get(probability::<MockChainNode>))
+            .route("/network/announced", get(announced::<MockChainNode>))
+            .with_state(state)
+    }
+
+    #[tokio::test]
+    async fn price_should_return_ticket_price() -> anyhow::Result<()> {
+        let node = MockChainNode::random();
+
+        let resp = network_router(node)
+            .oneshot(Request::get("/network/price").body(Body::empty())?)
+            .await?;
+
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX).await?;
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
+
+        // StubChain::minimum_ticket_price returns HoprBalance::zero()
+        assert!(json.get("price").is_some(), "response should contain 'price' field");
+        assert!(json["price"].is_string(), "price should be a string");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn probability_should_return_win_probability() -> anyhow::Result<()> {
+        let node = MockChainNode::random();
+
+        let resp = network_router(node)
+            .oneshot(Request::get("/network/probability").body(Body::empty())?)
+            .await?;
+
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX).await?;
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
+
+        // StubChain::minimum_incoming_ticket_win_prob returns WinningProbability::ALWAYS (1.0)
+        assert_eq!(json["probability"], 1.0);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn announced_should_return_empty_when_no_peers() -> anyhow::Result<()> {
+        let node = MockChainNode::random();
+
+        let resp = network_router(node)
+            .oneshot(Request::get("/network/announced").body(Body::empty())?)
+            .await?;
+
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX).await?;
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
+
+        // StubChain::stream_accounts returns empty stream
+        assert_eq!(json.as_array().context("response should be an array")?.len(), 0);
+
         Ok(())
     }
 }

@@ -167,9 +167,11 @@ pub(crate) struct ChannelsQueryRequest {
         ),
         tag = "Channels",
     )]
-pub(super) async fn list_channels(
+pub(super) async fn list_channels<
+    H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + Send + Sync + 'static,
+>(
     Query(query): Query<ChannelsQueryRequest>,
-    State(state): State<Arc<InternalState>>,
+    State(state): State<Arc<InternalState<H>>>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
@@ -307,8 +309,10 @@ pub(crate) struct OpenChannelResponse {
         ),
         tag = "Channels",
     )]
-pub(super) async fn open_channel(
-    State(state): State<Arc<InternalState>>,
+pub(super) async fn open_channel<
+    H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + Send + Sync + 'static,
+>(
+    State(state): State<Arc<InternalState<H>>>,
     Json(open_req): Json<OpenChannelBodyRequest>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
@@ -379,8 +383,8 @@ fn filter_open_channel<E: std::error::Error>(
 }
 
 /// Resolves the channel with the given counterparty in the specified direction.
-fn resolve_channel(
-    hopr: &crate::HoprNode,
+fn resolve_channel<H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + Send + Sync>(
+    hopr: &H,
     address: &Address,
     direction: ChannelDirection,
 ) -> Result<ChannelEntry, ApiErrorStatus> {
@@ -414,14 +418,16 @@ fn resolve_channel(
         ),
         tag = "Channels",
     )]
-pub(super) async fn show_channel(
+pub(super) async fn show_channel<
+    H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + Send + Sync + 'static,
+>(
     Path(AddressParams { address }): Path<AddressParams>,
     Query(ChannelDirectionQuery { direction }): Query<ChannelDirectionQuery>,
-    State(state): State<Arc<InternalState>>,
+    State(state): State<Arc<InternalState<H>>>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match hopr_async_runtime::prelude::spawn_blocking(move || resolve_channel(&hopr, &address, direction)).await {
+    match hopr_async_runtime::prelude::spawn_blocking(move || resolve_channel(&*hopr, &address, direction)).await {
         Ok(Ok(channel)) => (StatusCode::OK, Json(channel_to_topology_info(&channel))).into_response(),
         Ok(Err(status)) => match status {
             ApiErrorStatus::ChannelNotFound => (StatusCode::NOT_FOUND, status).into_response(),
@@ -477,14 +483,16 @@ pub(crate) struct CloseChannelResponse {
         ),
         tag = "Channels",
     )]
-pub(super) async fn close_channel(
+pub(super) async fn close_channel<
+    H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + Send + Sync + 'static,
+>(
     Path(AddressParams { address }): Path<AddressParams>,
     Query(ChannelDirectionQuery { direction }): Query<ChannelDirectionQuery>,
-    State(state): State<Arc<InternalState>>,
+    State(state): State<Arc<InternalState<H>>>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    let channel_id = match resolve_channel(&hopr, &address, direction) {
+    let channel_id = match resolve_channel(&*hopr, &address, direction) {
         Ok(ch) => *ch.get_id(),
         Err(status) => {
             let code = match status {
@@ -571,14 +579,16 @@ pub(crate) struct FundBodyRequest {
         ),
         tag = "Channels",
     )]
-pub(super) async fn fund_channel(
+pub(super) async fn fund_channel<
+    H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + Send + Sync + 'static,
+>(
     Path(AddressParams { address }): Path<AddressParams>,
-    State(state): State<Arc<InternalState>>,
+    State(state): State<Arc<InternalState<H>>>,
     Json(fund_req): Json<FundBodyRequest>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    let channel_id = match resolve_channel(&hopr, &address, ChannelDirection::Outgoing) {
+    let channel_id = match resolve_channel(&*hopr, &address, ChannelDirection::Outgoing) {
         Ok(ch) => *ch.get_id(),
         Err(status) => {
             let code = match status {
@@ -656,7 +666,7 @@ mod tests {
     #[test]
     fn filter_open_channel_should_return_open_channel() {
         let ch = test_channel(ChannelStatus::Open);
-        let result = filter_open_channel::<HoprLibError>(Ok(Some(ch.clone())));
+        let result = filter_open_channel::<HoprLibError>(Ok(Some(ch)));
         assert!(result.is_ok());
         assert_eq!(result.unwrap().get_id(), ch.get_id());
     }
@@ -873,5 +883,62 @@ mod tests {
     fn address_params_should_reject_invalid_address() {
         let json = serde_json::json!({ "address": "not-an-address" });
         assert!(serde_json::from_value::<AddressParams>(json).is_err());
+    }
+
+    // ── Endpoint-level tests ───────────────────────────────────────────────
+
+    use std::sync::Arc;
+
+    use anyhow::Context;
+    use axum::{Router, body::Body, http::Request, routing::get};
+    use tower::ServiceExt;
+
+    use crate::testing::MockChainNode;
+
+    fn channels_router(node: MockChainNode) -> Router {
+        let state = Arc::new(crate::InternalState {
+            hoprd_cfg: serde_json::Value::Null,
+            auth: Arc::new(crate::config::Auth::Token("test".into())),
+            hopr: Arc::new(node),
+            open_listeners: Arc::new(hopr_utils_session::ListenerJoinHandles::default()),
+            default_listen_host: "127.0.0.1:0".parse().unwrap(),
+        });
+
+        Router::new()
+            .route("/channels", get(list_channels::<MockChainNode>))
+            .with_state(state)
+    }
+
+    #[tokio::test]
+    async fn list_channels_should_return_empty_when_no_channels() -> anyhow::Result<()> {
+        let node = MockChainNode::random();
+
+        let resp = channels_router(node)
+            .oneshot(Request::get("/channels").body(Body::empty())?)
+            .await?;
+
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX).await?;
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
+
+        // StubChain::stream_channels returns empty stream, so channels_to/channels_from
+        // both return empty Vecs
+        assert_eq!(
+            json["incoming"]
+                .as_array()
+                .context("incoming should be an array")?
+                .len(),
+            0
+        );
+        assert_eq!(
+            json["outgoing"]
+                .as_array()
+                .context("outgoing should be an array")?
+                .len(),
+            0
+        );
+
+        Ok(())
     }
 }
