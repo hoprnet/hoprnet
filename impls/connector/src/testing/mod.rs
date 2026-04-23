@@ -99,12 +99,12 @@ impl BlokliTestStateBuilder {
                             blokli_client::api::types::Safe {
                                 address: safe_addr,
                                 chain_key: hex::encode(account.chain_addr),
-                                owners: vec![hex::encode(account.chain_addr)],
+                                owners: [hex::encode(account.chain_addr)].to_vec(),
                                 module_address: hex::encode(
                                     &Hash::create(&[account.chain_addr.as_ref()]).as_ref()[0..Address::SIZE],
                                 ),
                                 registered_nodes: vec![],
-                                threshold: None,
+                                threshold: Some("1".to_string()),
                             },
                         );
                     }
@@ -161,10 +161,10 @@ impl BlokliTestStateBuilder {
                 blokli_client::api::types::Safe {
                     address: hex::encode(safe.address),
                     chain_key: hex::encode(safe.owner),
-                    owners: vec![hex::encode(safe.owner)],
+                    owners: [hex::encode(safe.owner)].to_vec(),
                     module_address: hex::encode(safe.module),
                     registered_nodes: safe.registered_nodes.into_iter().map(hex::encode).collect(),
-                    threshold: None,
+                    threshold: Some("1".to_string()),
                 },
             )
         }));
