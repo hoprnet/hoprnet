@@ -11,7 +11,7 @@ use hopr_lib::{
         chain::ChainKeyOperations,
         graph::{
             EdgeLinkObservable, NetworkGraphConnectivity, NetworkGraphView,
-            traits::{EdgeNetworkObservableRead, EdgeObservableRead},
+            traits::{EdgeNetworkObservableRead, EdgeObservableRead, EdgeProtocolObservable},
         },
         node::{HasChainApi, HasGraphView},
     },
@@ -369,6 +369,11 @@ pub(super) async fn graph<
             && let Some(latency) = imm.average_latency()
         {
             attrs.push(format!("lat={}ms", latency.as_millis()));
+        }
+        if let Some(inter) = obs.intermediate_qos()
+            && let Some(cap) = inter.capacity()
+        {
+            attrs.push(format!("cap={cap}"));
         }
         use std::fmt::Write;
         let _ = writeln!(
