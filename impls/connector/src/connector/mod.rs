@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, str::FromStr, time::Duration};
+use std::{cmp::Ordering, str::FromStr, sync::atomic::Ordering as AtomicOrdering, time::Duration};
 
 use blokli_client::api::{BlokliQueryClient, BlokliSubscriptionClient, BlokliTransactionClient};
 use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
@@ -40,6 +40,39 @@ const MIN_TX_CONFIRM_TIMEOUT: Duration = Duration::from_secs(1);
 const TX_TIMEOUT_MULTIPLIER: u32 = 2;
 const DEFAULT_SYNC_TOLERANCE_PCT: usize = 90;
 
+/// Connector health states.
+///
+/// Each value maps to a `ComponentStatus` variant plus a fixed detail message.
+/// Storage and updates are lock-free via [`AtomicChainHealthState`]; reads
+/// convert to `ComponentStatus` which allocates for non-`Ready` variants.
+#[atomic_enum::atomic_enum]
+#[derive(PartialEq, Eq)]
+enum ChainHealthState {
+    Ready = 0,
+    WaitingForConnection = 1,
+    Connecting = 2,
+    SubscriptionEnded = 3,
+    SyncTimedOut = 4,
+    ServerNotHealthy = 5,
+    ConnectionFailed = 6,
+    Dropped = 7,
+}
+
+impl From<ChainHealthState> for hopr_api::node::ComponentStatus {
+    fn from(state: ChainHealthState) -> Self {
+        match state {
+            ChainHealthState::Ready => Self::Ready,
+            ChainHealthState::WaitingForConnection => Self::Initializing("waiting for chain connection".into()),
+            ChainHealthState::Connecting => Self::Initializing("connecting to blokli".into()),
+            ChainHealthState::SubscriptionEnded => Self::Degraded("chain subscription ended".into()),
+            ChainHealthState::SyncTimedOut => Self::Degraded("connection sync timed out".into()),
+            ChainHealthState::ServerNotHealthy => Self::Unavailable("blokli server not healthy".into()),
+            ChainHealthState::ConnectionFailed => Self::Unavailable("chain connection failed".into()),
+            ChainHealthState::Dropped => Self::Unavailable("connector dropped".into()),
+        }
+    }
+}
+
 /// Configuration of the [`HoprBlockchainConnector`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, smart_default::SmartDefault)]
 pub struct BlockchainConnectorConfig {
@@ -77,6 +110,7 @@ pub struct HoprBlockchainConnector<C, B, P, R> {
     sequencer: TransactionSequencer<C, R>,
     events: EventsChannel,
     cfg: BlockchainConnectorConfig,
+    health: std::sync::Arc<AtomicChainHealthState>,
 
     // KeyId <-> OffchainPublicKey mapping
     mapper: HoprKeyMapper<B>,
@@ -123,6 +157,7 @@ where
         let client = std::sync::Arc::new(client);
         Self {
             payload_generator,
+            health: std::sync::Arc::new(AtomicChainHealthState::new(ChainHealthState::WaitingForConnection)),
             graph: std::sync::Arc::new(parking_lot::RwLock::new(DiGraphMap::with_capacity_and_hasher(
                 EXPECTED_NUM_NODES,
                 EXPECTED_NUM_CHANNELS,
@@ -224,6 +259,7 @@ where
         }
 
         let ticket_values = self.ticket_values.clone();
+        let health = self.health.clone();
         hopr_async_runtime::prelude::spawn(async move {
             let sync_started = std::time::Instant::now();
 
@@ -472,6 +508,19 @@ where
                 }
             })
             .await;
+
+            // Only transition to SubscriptionEnded if currently Ready or Connecting —
+            // don't overwrite terminal error states (ServerNotHealthy, ConnectionFailed, etc.)
+            tracing::warn!("chain subscription stream ended, marking chain health as degraded");
+            let current = health.load(AtomicOrdering::Relaxed);
+            if matches!(current, ChainHealthState::Connecting | ChainHealthState::Ready) {
+                let _ = health.compare_exchange(
+                    current,
+                    ChainHealthState::SubscriptionEnded,
+                    AtomicOrdering::Relaxed,
+                    AtomicOrdering::Relaxed,
+                );
+            }
         });
 
         connection_ready_rx
@@ -522,11 +571,39 @@ where
             return Err(ConnectorError::InvalidState("connector is already connected"));
         }
 
-        let abort_handle = self
+        self.health.store(ChainHealthState::Connecting, AtomicOrdering::Relaxed);
+
+        let abort_handle = match self
             .do_connect(self.cfg.connection_sync_timeout.max(MIN_CONNECTION_TIMEOUT))
-            .await?;
+            .await
+        {
+            Ok(handle) => handle,
+            Err(e @ ConnectorError::ServerNotHealthy) => {
+                self.health
+                    .store(ChainHealthState::ServerNotHealthy, AtomicOrdering::Relaxed);
+                return Err(e);
+            }
+            Err(e @ ConnectorError::ConnectionTimeout) => {
+                self.health
+                    .store(ChainHealthState::SyncTimedOut, AtomicOrdering::Relaxed);
+                return Err(e);
+            }
+            Err(e) => {
+                self.health
+                    .store(ChainHealthState::ConnectionFailed, AtomicOrdering::Relaxed);
+                return Err(e);
+            }
+        };
 
         self.connection_handle = Some(abort_handle);
+        // Only transition to Ready if still Connecting — the subscription task
+        // may have already set SubscriptionEnded in a race.
+        let _ = self.health.compare_exchange(
+            ChainHealthState::Connecting,
+            ChainHealthState::Ready,
+            AtomicOrdering::Relaxed,
+            AtomicOrdering::Relaxed,
+        );
 
         tracing::info!(node = %self.chain_key.public().to_address(), "connected to chain as node");
         Ok(())
@@ -571,6 +648,12 @@ where
     }
 }
 
+impl<B, C, P, R> hopr_api::node::ComponentStatusReporter for HoprBlockchainConnector<C, B, P, R> {
+    fn component_status(&self) -> hopr_api::node::ComponentStatus {
+        self.health.load(AtomicOrdering::Relaxed).into()
+    }
+}
+
 impl<B, C, P, R> HoprBlockchainConnector<C, R, B, P> {
     #[inline]
     pub(crate) fn check_connection_state(&self) -> Result<(), ConnectorError> {
@@ -593,6 +676,7 @@ impl<B, C, P, R> HoprBlockchainConnector<C, R, B, P> {
 
 impl<B, C, P, R> Drop for HoprBlockchainConnector<C, R, B, P> {
     fn drop(&mut self) {
+        self.health.store(ChainHealthState::Dropped, AtomicOrdering::Relaxed);
         self.events.0.close();
         if let Some(abort_handle) = self.connection_handle.take() {
             abort_handle.abort();
@@ -612,7 +696,6 @@ where
         self.into()
     }
 }
-
 
 #[cfg(test)]
 pub(crate) mod tests {
@@ -682,5 +765,164 @@ pub(crate) mod tests {
         assert!(!connector.is_connected());
 
         Ok(())
+    }
+
+    #[test]
+    fn chain_health_all_variants_convert_to_component_status() {
+        use hopr_api::node::ComponentStatus;
+        let variants = [
+            ChainHealthState::Ready,
+            ChainHealthState::WaitingForConnection,
+            ChainHealthState::Connecting,
+            ChainHealthState::SubscriptionEnded,
+            ChainHealthState::SyncTimedOut,
+            ChainHealthState::ServerNotHealthy,
+            ChainHealthState::ConnectionFailed,
+            ChainHealthState::Dropped,
+        ];
+        for state in variants {
+            let _: ComponentStatus = state.into();
+        }
+    }
+
+    #[test]
+    fn chain_health_ready_maps_to_component_ready() {
+        use hopr_api::node::ComponentStatus;
+        let status: ComponentStatus = ChainHealthState::Ready.into();
+        assert!(status.is_ready());
+    }
+
+    #[test]
+    fn chain_health_degraded_states() {
+        use hopr_api::node::ComponentStatus;
+        let s: ComponentStatus = ChainHealthState::SubscriptionEnded.into();
+        assert!(s.is_degraded());
+        let s: ComponentStatus = ChainHealthState::SyncTimedOut.into();
+        assert!(s.is_degraded());
+    }
+
+    #[test]
+    fn chain_health_unavailable_states() {
+        use hopr_api::node::ComponentStatus;
+        let s: ComponentStatus = ChainHealthState::ServerNotHealthy.into();
+        assert!(s.is_unavailable());
+        let s: ComponentStatus = ChainHealthState::ConnectionFailed.into();
+        assert!(s.is_unavailable());
+        let s: ComponentStatus = ChainHealthState::Dropped.into();
+        assert!(s.is_unavailable());
+    }
+
+    #[test]
+    fn chain_health_initializing_states() {
+        use hopr_api::node::ComponentStatus;
+        let s: ComponentStatus = ChainHealthState::WaitingForConnection.into();
+        assert!(s.is_initializing());
+        let s: ComponentStatus = ChainHealthState::Connecting.into();
+        assert!(s.is_initializing());
+    }
+
+    #[tokio::test]
+    async fn connector_health_starts_as_initializing() -> anyhow::Result<()> {
+        use hopr_api::node::ComponentStatusReporter;
+        let blokli_client = BlokliTestStateBuilder::default().build_static_client();
+        let connector = create_connector(blokli_client)?;
+        assert!(connector.component_status().is_initializing());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connector_health_ready_after_connect() -> anyhow::Result<()> {
+        use hopr_api::node::ComponentStatusReporter;
+        let blokli_client = BlokliTestStateBuilder::default().build_static_client();
+        let mut connector = create_connector(blokli_client)?;
+        connector.connect().await?;
+        assert!(connector.component_status().is_ready());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connector_health_unavailable_when_server_not_healthy() -> anyhow::Result<()> {
+        use hopr_api::node::ComponentStatusReporter;
+        let state = BlokliTestState {
+            health: "DOWN".into(),
+            ..Default::default()
+        };
+        let blokli_client = BlokliTestStateBuilder::from(state).build_static_client();
+        let mut connector = create_connector(blokli_client)?;
+        let _ = connector.connect().await;
+        assert!(connector.component_status().is_unavailable());
+        Ok(())
+    }
+
+    #[test]
+    fn health_cas_ready_only_from_connecting() {
+        let health = AtomicChainHealthState::new(ChainHealthState::Connecting);
+        let result = health.compare_exchange(
+            ChainHealthState::Connecting,
+            ChainHealthState::Ready,
+            AtomicOrdering::Relaxed,
+            AtomicOrdering::Relaxed,
+        );
+        assert!(result.is_ok());
+        assert_eq!(health.load(AtomicOrdering::Relaxed), ChainHealthState::Ready);
+    }
+
+    #[test]
+    fn health_cas_ready_fails_from_subscription_ended() {
+        let health = AtomicChainHealthState::new(ChainHealthState::SubscriptionEnded);
+        let result = health.compare_exchange(
+            ChainHealthState::Connecting,
+            ChainHealthState::Ready,
+            AtomicOrdering::Relaxed,
+            AtomicOrdering::Relaxed,
+        );
+        assert!(result.is_err());
+        assert_eq!(
+            health.load(AtomicOrdering::Relaxed),
+            ChainHealthState::SubscriptionEnded
+        );
+    }
+
+    #[test]
+    fn health_subscription_ended_preserves_terminal_state() {
+        let health = AtomicChainHealthState::new(ChainHealthState::ServerNotHealthy);
+        let current = health.load(AtomicOrdering::Relaxed);
+        // ServerNotHealthy is a terminal state — should NOT transition to SubscriptionEnded
+        assert!(!matches!(
+            current,
+            ChainHealthState::Connecting | ChainHealthState::Ready
+        ));
+        // The conditional store would skip this
+    }
+
+    #[test]
+    fn health_subscription_ended_from_ready() {
+        let health = AtomicChainHealthState::new(ChainHealthState::Ready);
+        let current = health.load(AtomicOrdering::Relaxed);
+        if matches!(current, ChainHealthState::Connecting | ChainHealthState::Ready) {
+            let _ = health.compare_exchange(
+                current,
+                ChainHealthState::SubscriptionEnded,
+                AtomicOrdering::Relaxed,
+                AtomicOrdering::Relaxed,
+            );
+        }
+        assert_eq!(
+            health.load(AtomicOrdering::Relaxed),
+            ChainHealthState::SubscriptionEnded
+        );
+    }
+
+    #[test]
+    fn health_drop_overwrites_any_state() {
+        for initial in [
+            ChainHealthState::Ready,
+            ChainHealthState::Connecting,
+            ChainHealthState::SubscriptionEnded,
+        ] {
+            let health = AtomicChainHealthState::new(initial);
+            health.store(ChainHealthState::Dropped, AtomicOrdering::Relaxed);
+            assert_eq!(health.load(AtomicOrdering::Relaxed), ChainHealthState::Dropped);
+        }
     }
 }

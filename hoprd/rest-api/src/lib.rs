@@ -140,6 +140,7 @@ impl<H> Clone for InternalState<H> {
         network::graph,
         node::configuration,
         node::info,
+        node::status,
         node::version,
         peers::ping_peer,
         peers::show_peer_info,
@@ -164,7 +165,7 @@ impl<H> Clone for InternalState<H> {
             network::ConnectedPeerResponse,
             network::AnnouncedPeerResponse,
             network::AnnouncementOriginResponse,
-            node::NodeInfoResponse, node::NodeVersionResponse,
+            node::NodeInfoResponse, node::NodeVersionResponse, node::NodeStatusResponse, node::ComponentStatusesResponse, node::ComponentStatusInfo,
             peers::MultiaddressSource, peers::NodePeerInfoResponse, peers::PeerChannelInfo, peers::PeerQosInfo, peers::PingResponse,
             session::SessionClientRequest, session::SessionCapability, session::RoutingOptions, session::SessionTargetSpec, session::SessionClientResponse, session::IpProtocol, session::SessionConfig,
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket, tickets::RedeemTicketsRequest,
@@ -342,6 +343,7 @@ where
                 .route("/node/version", get(node::version))
                 .route("/node/configuration", get(node::configuration::<H>))
                 .route("/node/info", get(node::info::<H>))
+                .route("/node/status", get(node::status::<H>))
                 .route("/peers/{address}/ping", post(peers::ping_peer::<H>))
                 .route("/session/config/{id}", get(session::session_config::<H>))
                 .route("/session/config/{id}", post(session::adjust_session::<H>))

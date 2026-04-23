@@ -925,11 +925,17 @@ mod tests {
         // StubChain::stream_channels returns empty stream, so channels_to/channels_from
         // both return empty Vecs
         assert_eq!(
-            json["incoming"].as_array().context("incoming should be an array")?.len(),
+            json["incoming"]
+                .as_array()
+                .context("incoming should be an array")?
+                .len(),
             0
         );
         assert_eq!(
-            json["outgoing"].as_array().context("outgoing should be an array")?.len(),
+            json["outgoing"]
+                .as_array()
+                .context("outgoing should be an array")?
+                .len(),
             0
         );
 

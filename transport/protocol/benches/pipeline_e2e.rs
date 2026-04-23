@@ -9,11 +9,14 @@ use futures::{
     SinkExt, StreamExt,
     channel::{mpsc, oneshot},
 };
-use hopr_api::types::{
-    crypto::keypairs::Keypair,
-    crypto_random::Randomizable,
-    internal::{path::ValidatedPath, prelude::*, routing::ResolvedTransportRouting},
-    primitive::prelude::HoprBalance,
+use hopr_api::{
+    node::TicketEvent,
+    types::{
+        crypto::keypairs::Keypair,
+        crypto_random::Randomizable,
+        internal::{path::ValidatedPath, prelude::*, routing::ResolvedTransportRouting},
+        primitive::prelude::HoprBalance,
+    },
 };
 use hopr_crypto_packet::{HoprSurb, prelude::HoprPacket};
 use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut};
@@ -24,7 +27,6 @@ use hopr_protocol_hopr::{
 use hopr_test_stubs::{StubChainApi, StubPathResolver};
 use hopr_ticket_manager::{HoprTicketFactory, MemoryStore};
 use hopr_transport_mixer::config::MixerConfig;
-use hopr_transport_protocol::TicketEvent;
 use libp2p::PeerId;
 
 const SAMPLE_SIZE: usize = 30;

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::{extract::State, http::status::StatusCode, response::IntoResponse};
 use hopr_lib::api::{
     network::{Health, NetworkView},
-    node::{HasNetworkView, HoprNodeOperations, HoprState},
+    node::{HasChainApi, HasNetworkView, HoprNodeOperations, HoprState},
 };
 
 use crate::AppState;
@@ -30,22 +30,20 @@ use crate::AppState;
 pub(super) async fn startedz<H: HoprNodeOperations + Send + Sync + 'static>(
     State(state): State<Arc<AppState<H>>>,
 ) -> impl IntoResponse {
-    eval_precondition(is_running(state))
+    eval_precondition(is_running(&state))
 }
 
 /// Check whether the node is **ready** to accept connections.
 ///
-/// Ready means that the node is running and has at least minimal connectivity.
+/// Ready means that the node is running, has at least minimal connectivity,
+/// and the chain connector is available.
 ///
 /// # Behavior
 ///
-/// Both conditions must be true for 200 OK:
+/// All conditions must be true for 200 OK:
 /// 1. Node must be in Running state (`HoprState::Running`)
 /// 2. Network must be minimally connected (`Health::Orange`, `Health::Yellow`, or `Health::Green`)
-///
-/// Returns 412 PRECONDITION_FAILED if either condition is false:
-/// - Node not running (any other `HoprState`)
-/// - Node running but network not minimally connected (`Health::Unknown` or `Health::Red`)
+/// 3. Chain connector must not be unavailable
 ///
 /// This endpoint is used by Kubernetes readiness probes to determine if the pod should receive traffic.
 #[utoipa::path(
@@ -58,29 +56,18 @@ pub(super) async fn startedz<H: HoprNodeOperations + Send + Sync + 'static>(
         ),
         tag = "Checks"
     )]
-pub(super) async fn readyz<H: HoprNodeOperations + HasNetworkView + Send + Sync + 'static>(
+pub(super) async fn readyz<H: HoprNodeOperations + HasNetworkView + HasChainApi + Send + Sync + 'static>(
     State(state): State<Arc<AppState<H>>>,
 ) -> impl IntoResponse {
-    eval_precondition(is_running(state.clone()) && is_minimally_connected(state).await)
+    eval_precondition(is_running(&state) && is_minimally_connected(&state) && is_chain_available(&state))
 }
 
 /// Check whether the node is **healthy**.
 ///
 /// Healthy means that the node is running and has at least minimal connectivity.
 ///
-/// # Behavior
-///
-/// Both conditions must be true for 200 OK:
-/// 1. Node must be in Running state (`HoprState::Running`)
-/// 2. Network must be minimally connected (`Health::Orange`, `Health::Yellow`, or `Health::Green`)
-///
-/// Returns 412 PRECONDITION_FAILED if either condition is false:
-/// - Node not running (any other `HoprState`)
-/// - Node running but network not minimally connected (`Health::Unknown` or `Health::Red`)
-///
-/// This endpoint is used by Kubernetes liveness probes to determine if the pod should be restarted.
-///
-/// Note: Currently `healthyz` and `readyz` have identical behavior.
+/// Unlike `readyz`, this endpoint does NOT check chain availability — transient blokli outages
+/// must not trigger pod restarts (see #7722).
 #[utoipa::path(
         get,
         path = "/healthyz",
@@ -94,34 +81,31 @@ pub(super) async fn readyz<H: HoprNodeOperations + HasNetworkView + Send + Sync 
 pub(super) async fn healthyz<H: HoprNodeOperations + HasNetworkView + Send + Sync + 'static>(
     State(state): State<Arc<AppState<H>>>,
 ) -> impl IntoResponse {
-    eval_precondition(is_running(state.clone()) && is_minimally_connected(state).await)
+    eval_precondition(is_running(&state) && is_minimally_connected(&state))
 }
 
 /// Check if the node has minimal network connectivity.
-///
-/// Returns `true` if the network health is `Orange`, `Yellow`, or `Green`.
-/// Returns `false` if the network health is `Unknown` or `Red`.
 #[inline]
-async fn is_minimally_connected<H: HasNetworkView + Send + Sync + 'static>(state: Arc<AppState<H>>) -> bool {
+fn is_minimally_connected<H: HasNetworkView>(state: &AppState<H>) -> bool {
     matches!(
         state.hopr.network_view().health(),
         Health::Orange | Health::Yellow | Health::Green
     )
 }
 
-/// Check if the node is in the Running state.
-///
-/// Returns `true` only when `HoprState::Running`.
-/// Returns `false` for all other states (Uninitialized, Initializing, Indexing, Starting).
+/// A degraded chain is still considered available for readiness purposes.
 #[inline]
-fn is_running<H: HoprNodeOperations>(state: Arc<AppState<H>>) -> bool {
+fn is_chain_available<H: HasChainApi>(state: &AppState<H>) -> bool {
+    !HasChainApi::status(&*state.hopr).is_unavailable()
+}
+
+/// Check if the node is in the Running state.
+#[inline]
+fn is_running<H: HoprNodeOperations>(state: &AppState<H>) -> bool {
     matches!(HoprNodeOperations::status(&*state.hopr), HoprState::Running)
 }
 
 /// Evaluate a precondition and return the appropriate HTTP response.
-///
-/// Returns 200 OK if `precondition` is `true`.
-/// Returns 412 PRECONDITION_FAILED if `precondition` is `false`.
 #[inline]
 fn eval_precondition(precondition: bool) -> impl IntoResponse {
     if precondition {
@@ -155,14 +139,12 @@ mod tests {
     use super::*;
     use crate::testing::{ChecksNode, MockNodeOps, NoopNode};
 
-    /// Build a startedz-only router — only needs `HoprNodeOperations`.
     fn startedz_router(mock: MockNodeOps) -> Router {
         Router::new()
             .route("/startedz", get(startedz::<MockNodeOps>))
             .with_state(Arc::new(AppState { hopr: Arc::new(mock) }))
     }
 
-    /// Build a readyz/healthyz router — needs `HoprNodeOperations + HasNetworkView`.
     fn readyz_router(node: ChecksNode) -> Router {
         Router::new()
             .route("/readyz", get(readyz::<ChecksNode>))

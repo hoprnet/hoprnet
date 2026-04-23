@@ -4285,7 +4285,8 @@ dependencies = [
 [[package]]
 name = "hopr-api"
 version = "1.8.0"
-source = "git+https://github.com/hoprnet/hopr-api?rev=d24e705412baca373b439bc8a61e6124c04ecaad#d24e705412baca373b439bc8a61e6124c04ecaad"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d55e4b9a4d2ce967af9d16a9b2c092fffa6acb4c5f887264662771894805693c"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -4339,6 +4340,7 @@ dependencies = [
  "anyhow",
  "async-broadcast",
  "async-trait",
+ "atomic_enum",
  "blokli-client",
  "dashmap",
  "futures",
@@ -8752,7 +8754,7 @@ checksum = "09fbdfe7a27a1b1633dfc0c4c8e65940b8d819c5ddb9cca48ebc3223b00c8b14"
 dependencies = [
  "ahash",
  "annotate-snippets",
- "base64 0.21.7",
+ "base64 0.22.1",
  "encoding_rs_io",
  "getrandom 0.3.4",
  "nohash-hasher",

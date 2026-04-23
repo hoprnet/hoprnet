@@ -73,13 +73,26 @@ mockall::mock! {
 pub struct ChecksNode {
     pub node_state: HoprState,
     pub net: MockNetView,
+    pub chain: StubChain,
+    pub identity: NodeOnchainIdentity,
 }
 
 impl ChecksNode {
     pub fn new(state: HoprState, health: Health) -> Self {
         let mut net = MockNetView::new();
         net.expect_health().returning(move || health);
-        Self { node_state: state, net }
+        let chain_key = ChainKeypair::random();
+        let offchain_key = OffchainKeypair::random();
+        Self {
+            node_state: state,
+            net,
+            identity: NodeOnchainIdentity {
+                node_address: chain_key.public().to_address(),
+                safe_address: Address::default(),
+                module_address: Address::default(),
+            },
+            chain: StubChain::new(&offchain_key, &chain_key),
+        }
     }
 }
 
@@ -98,6 +111,35 @@ impl HasNetworkView for ChecksNode {
 
     fn status(&self) -> ComponentStatus {
         ComponentStatus::Ready
+    }
+}
+
+impl HasChainApi for ChecksNode {
+    type ChainApi = StubChain;
+    type ChainError = HoprLibError;
+
+    fn identity(&self) -> &NodeOnchainIdentity {
+        &self.identity
+    }
+
+    fn chain_api(&self) -> &StubChain {
+        &self.chain
+    }
+
+    fn status(&self) -> ComponentStatus {
+        ComponentStatus::Ready
+    }
+
+    fn wait_for_on_chain_event<F>(
+        &self,
+        _predicate: F,
+        _context: String,
+        _timeout: Duration,
+    ) -> EventWaitResult<<Self::ChainApi as hopr_lib::api::chain::HoprChainApi>::ChainError, Self::ChainError>
+    where
+        F: Fn(&hopr_lib::api::chain::ChainEvent) -> bool + Send + Sync + 'static,
+    {
+        unimplemented!("not needed for checks tests")
     }
 }
 
@@ -141,7 +183,6 @@ impl StubChain {
         }
     }
 }
-
 
 // --- ChainReadChannelOperations ---
 
@@ -436,6 +477,12 @@ impl ChainWriteTicketOperations for StubChain {
             ticket.ticket,
             StubError("stubs do not redeem tickets".into()),
         ))
+    }
+}
+
+impl hopr_lib::api::node::ComponentStatusReporter for StubChain {
+    fn component_status(&self) -> ComponentStatus {
+        ComponentStatus::Ready
     }
 }
 

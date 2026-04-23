@@ -549,10 +549,7 @@ mod tests {
         let json: serde_json::Value = serde_json::from_slice(&body)?;
 
         // StubChain::stream_accounts returns empty stream
-        assert_eq!(
-            json.as_array().context("response should be an array")?.len(),
-            0
-        );
+        assert_eq!(json.as_array().context("response should be an array")?.len(), 0);
 
         Ok(())
     }

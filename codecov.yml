@@ -23,6 +23,11 @@ comment:
   require_head: yes
 
 ignore:
+  - ".cargo/**"
+  - ".ci/**"
+  - ".claude/**"
+  - ".github/**"
+  - ".processes/**"
   - "localcluster/**"
   - "common/test-stubs/**"
   - "**/benches/**"
