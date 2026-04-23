@@ -473,4 +473,88 @@ mod tests {
         assert!(json["address"].is_string());
         Ok(())
     }
+
+    // ── Endpoint-level tests ───────────────────────────────────────────────
+
+    use std::sync::Arc;
+
+    use axum::{Router, body::Body, http::Request, routing::get};
+    use tower::ServiceExt;
+
+    use crate::testing::MockChainNode;
+
+    fn network_router(node: MockChainNode) -> Router {
+        let state = Arc::new(crate::InternalState {
+            hoprd_cfg: serde_json::Value::Null,
+            auth: Arc::new(crate::config::Auth::Token("test".into())),
+            hopr: Arc::new(node),
+            open_listeners: Arc::new(hopr_utils_session::ListenerJoinHandles::default()),
+            default_listen_host: "127.0.0.1:0".parse().unwrap(),
+        });
+
+        Router::new()
+            .route("/network/price", get(price::<MockChainNode>))
+            .route("/network/probability", get(probability::<MockChainNode>))
+            .route("/network/announced", get(announced::<MockChainNode>))
+            .with_state(state)
+    }
+
+    #[tokio::test]
+    async fn price_should_return_ticket_price() -> anyhow::Result<()> {
+        let node = MockChainNode::random();
+
+        let resp = network_router(node)
+            .oneshot(Request::get("/network/price").body(Body::empty())?)
+            .await?;
+
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX).await?;
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
+
+        // StubChain::minimum_ticket_price returns HoprBalance::zero()
+        assert!(json.get("price").is_some(), "response should contain 'price' field");
+        assert!(json["price"].is_string(), "price should be a string");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn probability_should_return_win_probability() -> anyhow::Result<()> {
+        let node = MockChainNode::random();
+
+        let resp = network_router(node)
+            .oneshot(Request::get("/network/probability").body(Body::empty())?)
+            .await?;
+
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX).await?;
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
+
+        // StubChain::minimum_incoming_ticket_win_prob returns WinningProbability::ALWAYS (1.0)
+        assert_eq!(json["probability"], 1.0);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn announced_should_return_empty_when_no_peers() -> anyhow::Result<()> {
+        let node = MockChainNode::random();
+
+        let resp = network_router(node)
+            .oneshot(Request::get("/network/announced").body(Body::empty())?)
+            .await?;
+
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX).await?;
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
+
+        // StubChain::stream_accounts returns empty stream
+        assert!(json.is_array());
+        assert_eq!(json.as_array().unwrap().len(), 0);
+
+        Ok(())
+    }
 }

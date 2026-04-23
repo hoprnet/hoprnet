@@ -293,4 +293,42 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn withdraw_should_return_422_for_invalid_currency() -> anyhow::Result<()> {
+        let node = MockChainNode::random();
+
+        let state = Arc::new(crate::InternalState {
+            hoprd_cfg: serde_json::Value::Null,
+            auth: Arc::new(crate::config::Auth::Token("test".into())),
+            hopr: Arc::new(node),
+            open_listeners: Arc::new(hopr_utils_session::ListenerJoinHandles::default()),
+            default_listen_host: "127.0.0.1:0".parse().unwrap(),
+        });
+
+        let router = Router::new()
+            .route("/account/withdraw", axum::routing::post(withdraw::<MockChainNode>))
+            .with_state(state);
+
+        let body = serde_json::json!({
+            "amount": "invalid",
+            "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe"
+        });
+
+        let resp = router
+            .oneshot(
+                Request::post("/account/withdraw")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_vec(&body)?))?,
+            )
+            .await?;
+
+        assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
+
+        let resp_body = axum::body::to_bytes(resp.into_body(), usize::MAX).await?;
+        let json: serde_json::Value = serde_json::from_slice(&resp_body)?;
+        assert_eq!(json["error"], "invalid currency");
+
+        Ok(())
+    }
 }

@@ -24,9 +24,10 @@ use hopr_lib::{
         chain::{self, *},
         network::{Health, NetworkEvent, NetworkView},
         node::{
-            ComponentStatus, EventWaitResult, HasChainApi, HasNetworkView, HoprNodeOperations, HoprState,
-            NodeOnchainIdentity,
+            ComponentStatus, EventWaitResult, HasChainApi, HasNetworkView, HasTicketManagement, HoprNodeOperations,
+            HoprState, NodeOnchainIdentity, TicketEvent,
         },
+        tickets::{ChannelStats, RedemptionResult, TicketManagement},
         types::primitive::prelude::{Balance, Currency, KeyIdMapping, KeyIdent},
     },
     errors::HoprLibError,
@@ -509,5 +510,64 @@ impl HasChainApi for MockChainNode {
         F: Fn(&ChainEvent) -> bool + Send + Sync + 'static,
     {
         Err(StubError("not needed for REST API tests".into()))
+    }
+}
+
+// ===========================================================================
+// StubTicketManager — minimal TicketManagement for test doubles
+// ===========================================================================
+
+/// Stub ticket manager returning zero stats and empty streams.
+#[derive(Debug, Clone)]
+pub struct StubTicketManager;
+
+impl TicketManagement for StubTicketManager {
+    type Error = StubError;
+
+    fn redeem_stream<C: ChainWriteTicketOperations + Send + Sync + 'static>(
+        &self,
+        _client: C,
+        _channel_id: hopr_lib::api::chain::ChannelId,
+        _min_amount: Option<HoprBalance>,
+    ) -> Result<impl futures::Stream<Item = Result<RedemptionResult, Self::Error>> + Send, Self::Error> {
+        Ok(stream::empty())
+    }
+
+    fn neglect_tickets(
+        &self,
+        _channel_id: &hopr_lib::api::chain::ChannelId,
+        _max_ticket_index: Option<u64>,
+    ) -> Result<Vec<hopr_lib::api::tickets::VerifiedTicket>, Self::Error> {
+        Ok(vec![])
+    }
+
+    fn ticket_stats(
+        &self,
+        _channel_id: Option<&hopr_lib::api::chain::ChannelId>,
+    ) -> Result<ChannelStats, Self::Error> {
+        Ok(ChannelStats::default())
+    }
+
+    fn insert_incoming_ticket(
+        &self,
+        _ticket: hopr_lib::api::types::internal::prelude::RedeemableTicket,
+    ) -> Result<Vec<hopr_lib::api::tickets::VerifiedTicket>, Self::Error> {
+        Ok(vec![])
+    }
+}
+
+impl HasTicketManagement for MockChainNode {
+    type TicketManager = StubTicketManager;
+
+    fn ticket_management(&self) -> &StubTicketManager {
+        &StubTicketManager
+    }
+
+    fn subscribe_ticket_events(&self) -> impl futures::Stream<Item = TicketEvent> + Send + 'static {
+        stream::empty()
+    }
+
+    fn status(&self) -> ComponentStatus {
+        ComponentStatus::Ready
     }
 }

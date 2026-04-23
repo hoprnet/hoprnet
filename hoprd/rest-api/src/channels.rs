@@ -884,4 +884,50 @@ mod tests {
         let json = serde_json::json!({ "address": "not-an-address" });
         assert!(serde_json::from_value::<AddressParams>(json).is_err());
     }
+
+    // ── Endpoint-level tests ───────────────────────────────────────────────
+
+    use std::sync::Arc;
+
+    use axum::{Router, body::Body, http::Request, routing::get};
+    use tower::ServiceExt;
+
+    use crate::testing::MockChainNode;
+
+    fn channels_router(node: MockChainNode) -> Router {
+        let state = Arc::new(crate::InternalState {
+            hoprd_cfg: serde_json::Value::Null,
+            auth: Arc::new(crate::config::Auth::Token("test".into())),
+            hopr: Arc::new(node),
+            open_listeners: Arc::new(hopr_utils_session::ListenerJoinHandles::default()),
+            default_listen_host: "127.0.0.1:0".parse().unwrap(),
+        });
+
+        Router::new()
+            .route("/channels", get(list_channels::<MockChainNode>))
+            .with_state(state)
+    }
+
+    #[tokio::test]
+    async fn list_channels_should_return_empty_when_no_channels() -> anyhow::Result<()> {
+        let node = MockChainNode::random();
+
+        let resp = channels_router(node)
+            .oneshot(Request::get("/channels").body(Body::empty())?)
+            .await?;
+
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX).await?;
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
+
+        // StubChain::stream_channels returns empty stream, so channels_to/channels_from
+        // both return empty Vecs
+        assert!(json["incoming"].is_array());
+        assert_eq!(json["incoming"].as_array().unwrap().len(), 0);
+        assert!(json["outgoing"].is_array());
+        assert_eq!(json["outgoing"].as_array().unwrap().len(), 0);
+
+        Ok(())
+    }
 }
