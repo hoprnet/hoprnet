@@ -46,7 +46,7 @@ jobs:
       - name: Set environment variables
         id: vars
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             echo "The workflow is triggered by other pipeline"
             echo "source_repo=${{ inputs.source_repo }}" | tee -a $GITHUB_OUTPUT
             echo "source_branch=${{ inputs.source_branch }}"  | tee -a $GITHUB_OUTPUT
