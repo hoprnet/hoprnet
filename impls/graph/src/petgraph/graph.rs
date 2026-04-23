@@ -76,10 +76,6 @@ impl hopr_api::graph::NetworkGraphView for ChannelGraph {
     type NodeId = OffchainPublicKey;
     type Observed = Observations;
 
-    fn identity(&self) -> &OffchainPublicKey {
-        &self.me
-    }
-
     fn node_count(&self) -> usize {
         self.inner.read().graph.node_count()
     }
@@ -111,6 +107,10 @@ impl hopr_api::graph::NetworkGraphView for ChannelGraph {
         let dest_idx = inner.indices.get_by_left(dest)?;
         let edge_idx = inner.graph.find_edge(*src_idx, *dest_idx)?;
         inner.graph.edge_weight(edge_idx).copied()
+    }
+
+    fn identity(&self) -> &OffchainPublicKey {
+        &self.me
     }
 }
 
@@ -383,7 +383,7 @@ mod tests {
         let graph = ChannelGraph::new(me);
         let peers: Vec<_> = [SECRET_1, SECRET_2, SECRET_3, SECRET_4, SECRET_5]
             .iter()
-            .map(|s| pubkey_from(s))
+            .map(pubkey_from)
             .collect();
         for &peer in &peers {
             graph.add_node(peer);

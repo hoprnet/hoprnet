@@ -5,10 +5,7 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
-use hopr_lib::{
-    Address, HoprBalance, WxHOPR, XDai, XDaiBalance,
-    api::node::{HasChainApi, IncentiveChannelOperations},
-};
+use hopr_lib::{Address, HoprBalance, IncentiveChannelOperations, WxHOPR, XDai, XDaiBalance, api::node::HasChainApi};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
@@ -40,7 +37,9 @@ pub(crate) struct AccountAddressesResponse {
         ),
         tag = "Account",
     )]
-pub(super) async fn addresses(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+pub(super) async fn addresses<H: HasChainApi + Send + Sync + 'static>(
+    State(state): State<Arc<InternalState<H>>>,
+) -> impl IntoResponse {
     let addresses = AccountAddressesResponse {
         native: state.hopr.identity().node_address.to_checksum(),
     };
@@ -97,7 +96,9 @@ pub(crate) struct AccountBalancesResponse {
         ),
         tag = "Account",
     )]
-pub(super) async fn balances(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+pub(super) async fn balances<H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + Send + Sync + 'static>(
+    State(state): State<Arc<InternalState<H>>>,
+) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
     let mut account_balances = AccountBalancesResponse::default();
@@ -181,8 +182,8 @@ pub(crate) struct WithdrawResponse {
         ),
         tag = "Account",
     )]
-pub(super) async fn withdraw(
-    State(state): State<Arc<InternalState>>,
+pub(super) async fn withdraw<H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + Send + Sync + 'static>(
+    State(state): State<Arc<InternalState<H>>>,
     Json(req_data): Json<WithdrawBodyRequest>,
 ) -> impl IntoResponse {
     if let Ok(native) = XDaiBalance::from_str(&req_data.amount) {
@@ -221,5 +222,113 @@ pub(super) async fn withdraw(
             ApiErrorStatus::UnknownFailure("invalid currency".into()),
         )
             .into_response()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use axum::{Router, body::Body, http::Request, routing::get};
+    use tower::ServiceExt;
+
+    use super::*;
+    use crate::testing::MockChainNode;
+
+    fn account_router(node: MockChainNode) -> Router {
+        let state = Arc::new(crate::InternalState {
+            hoprd_cfg: serde_json::Value::Null,
+            auth: Arc::new(crate::config::Auth::Token("test".into())),
+            hopr: Arc::new(node),
+            open_listeners: Arc::new(hopr_utils_session::ListenerJoinHandles::default()),
+            default_listen_host: "127.0.0.1:0".parse().unwrap(),
+        });
+
+        Router::new()
+            .route("/account/addresses", get(addresses::<MockChainNode>))
+            .route("/account/balances", get(balances::<MockChainNode>))
+            .with_state(state)
+    }
+
+    #[tokio::test]
+    async fn addresses_returns_node_address_as_checksum() -> anyhow::Result<()> {
+        let node = MockChainNode::random();
+        let expected_addr = node.identity.node_address.to_checksum();
+
+        let resp = account_router(node)
+            .oneshot(Request::get("/account/addresses").body(Body::empty())?)
+            .await?;
+
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX).await?;
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
+        assert_eq!(json["native"], expected_addr);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn balances_returns_zero_balances_from_stub() -> anyhow::Result<()> {
+        let node = MockChainNode::random();
+
+        let resp = account_router(node)
+            .oneshot(Request::get("/account/balances").body(Body::empty())?)
+            .await?;
+
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX).await?;
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
+
+        // StubChain returns Balance::zero() for all balance queries and safe_allowance
+        assert!(json["native"].is_string(), "native balance should be present");
+        assert!(json["hopr"].is_string(), "hopr balance should be present");
+        assert!(json["safeNative"].is_string(), "safeNative balance should be present");
+        assert!(json["safeHopr"].is_string(), "safeHopr balance should be present");
+        assert!(
+            json["safeHoprAllowance"].is_string(),
+            "safeHoprAllowance should be present"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn withdraw_should_return_422_for_invalid_currency() -> anyhow::Result<()> {
+        let node = MockChainNode::random();
+
+        let state = Arc::new(crate::InternalState {
+            hoprd_cfg: serde_json::Value::Null,
+            auth: Arc::new(crate::config::Auth::Token("test".into())),
+            hopr: Arc::new(node),
+            open_listeners: Arc::new(hopr_utils_session::ListenerJoinHandles::default()),
+            default_listen_host: "127.0.0.1:0".parse().unwrap(),
+        });
+
+        let router = Router::new()
+            .route("/account/withdraw", axum::routing::post(withdraw::<MockChainNode>))
+            .with_state(state);
+
+        let body = serde_json::json!({
+            "amount": "invalid",
+            "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe"
+        });
+
+        let resp = router
+            .oneshot(
+                Request::post("/account/withdraw")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_vec(&body)?))?,
+            )
+            .await?;
+
+        assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
+
+        let resp_body = axum::body::to_bytes(resp.into_body(), usize::MAX).await?;
+        let json: serde_json::Value = serde_json::from_slice(&resp_body)?;
+        assert_eq!(json["error"], "invalid currency");
+
+        Ok(())
     }
 }

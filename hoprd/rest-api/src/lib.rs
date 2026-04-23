@@ -10,6 +10,8 @@ mod node;
 mod peers;
 mod root;
 mod session;
+#[cfg(test)]
+pub(crate) mod testing;
 mod tickets;
 
 pub(crate) mod env {
@@ -27,12 +29,7 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{delete, get, post},
 };
-use hopr_chain_connector::HoprBlockchainSafeConnector;
-use hopr_lib::{Hopr, api::types::primitive::prelude::Address, errors::HoprLibError};
-use hopr_network_graph::SharedChannelGraph;
-use hopr_reference::SharedTicketManager;
-// pub use hopr_reference::config::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
-use hopr_transport_p2p::HoprNetwork;
+use hopr_lib::{api::types::primitive::prelude::Address, errors::HoprLibError};
 use hopr_utils_session::ListenerJoinHandles;
 use serde::Serialize;
 use tokio::net::TcpListener;
@@ -55,24 +52,70 @@ use crate::config::Auth;
 
 pub(crate) const BASE_PATH: &str = const_format::formatcp!("/api/v{}", env!("CARGO_PKG_VERSION_MAJOR"));
 
-type HoprBlokliConnector = HoprBlockchainSafeConnector<hopr_chain_connector::blokli_client::BlokliClient>;
+/// Combined trait bound for the HOPR node type parameter used throughout the REST API.
+///
+/// Any type `H: HoprNode` can be used as the node implementation backing the API.
+/// In production this is `Hopr<Chain, Graph, Net, TMgr>`; in tests it can be a mock.
+pub trait HoprNode:
+    hopr_lib::api::node::HoprNodeOperations
+    + hopr_lib::api::node::HasChainApi<ChainError = hopr_lib::errors::HoprLibError>
+    + hopr_lib::api::node::HasNetworkView
+    + hopr_lib::api::node::HasGraphView
+    + hopr_lib::api::node::HasTransportApi
+    + hopr_lib::api::node::HasTicketManagement
+    + hopr_lib::HoprSessionClientOperations
+    + Send
+    + Sync
+    + 'static
+{
+}
 
-pub(crate) type HoprNode = Hopr<Arc<HoprBlokliConnector>, SharedChannelGraph, HoprNetwork, SharedTicketManager>;
+impl<T> HoprNode for T where
+    T: hopr_lib::api::node::HoprNodeOperations
+        + hopr_lib::api::node::HasChainApi<ChainError = hopr_lib::errors::HoprLibError>
+        + hopr_lib::api::node::HasNetworkView
+        + hopr_lib::api::node::HasGraphView
+        + hopr_lib::api::node::HasTransportApi
+        + hopr_lib::api::node::HasTicketManagement
+        + hopr_lib::HoprSessionClientOperations
+        + Send
+        + Sync
+        + 'static
+{
+}
 
-#[derive(Clone)]
-pub(crate) struct AppState {
-    pub hopr: Arc<HoprNode>,
+pub(crate) struct AppState<H> {
+    pub hopr: Arc<H>,
+}
+
+impl<H> Clone for AppState<H> {
+    fn clone(&self) -> Self {
+        Self {
+            hopr: self.hopr.clone(),
+        }
+    }
 }
 
 pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
 
-#[derive(Clone)]
-pub(crate) struct InternalState {
+pub(crate) struct InternalState<H> {
     pub hoprd_cfg: serde_json::Value,
     pub auth: Arc<Auth>,
-    pub hopr: Arc<HoprNode>,
+    pub hopr: Arc<H>,
     pub open_listeners: Arc<ListenerJoinHandles>,
     pub default_listen_host: std::net::SocketAddr,
+}
+
+impl<H> Clone for InternalState<H> {
+    fn clone(&self) -> Self {
+        Self {
+            hoprd_cfg: self.hoprd_cfg.clone(),
+            auth: self.auth.clone(),
+            hopr: self.hopr.clone(),
+            open_listeners: self.open_listeners.clone(),
+            default_listen_host: self.default_listen_host,
+        }
+    }
 }
 
 #[derive(OpenApi)]
@@ -174,17 +217,23 @@ impl Modify for SecurityAddon {
 }
 
 /// Parameters needed to construct the Rest API via [`serve_api`].
-pub struct RestApiParameters {
+pub struct RestApiParameters<H> {
     pub listener: TcpListener,
     pub hoprd_cfg: serde_json::Value,
     pub cfg: crate::config::Api,
-    pub hopr: Arc<HoprNode>,
+    pub hopr: Arc<H>,
     pub session_listener_sockets: Arc<ListenerJoinHandles>,
     pub default_session_listen_host: std::net::SocketAddr,
 }
 
 /// Starts the Rest API listener and router.
-pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> {
+pub async fn serve_api<H: HoprNode + hopr_utils_session::SessionFactory>(
+    params: RestApiParameters<H>,
+) -> Result<(), std::io::Error>
+where
+    <<H as hopr_lib::api::node::HasTransportApi>::Transport as hopr_lib::api::node::TransportOperations>::Error:
+        Into<hopr_lib::errors::HoprTransportError>,
+{
     let RestApiParameters {
         listener,
         hoprd_cfg,
@@ -206,13 +255,17 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn build_api(
+async fn build_api<H: HoprNode + hopr_utils_session::SessionFactory>(
     hoprd_cfg: serde_json::Value,
     cfg: crate::config::Api,
-    hopr: Arc<HoprNode>,
+    hopr: Arc<H>,
     open_listeners: Arc<ListenerJoinHandles>,
     default_listen_host: std::net::SocketAddr,
-) -> Router {
+) -> Router
+where
+    <<H as hopr_lib::api::node::HasTransportApi>::Transport as hopr_lib::api::node::TransportOperations>::Error:
+        Into<hopr_lib::errors::HoprTransportError>,
+{
     let state = AppState { hopr };
     let inner_state = InternalState {
         auth: Arc::new(cfg.auth.clone()),
@@ -230,10 +283,10 @@ async fn build_api(
         )
         .merge(
             Router::new()
-                .route("/startedz", get(checks::startedz))
-                .route("/readyz", get(checks::readyz))
-                .route("/healthyz", get(checks::healthyz))
-                .route("/eligiblez", get(checks::eligiblez))
+                .route("/startedz", get(checks::startedz::<H>))
+                .route("/readyz", get(checks::readyz::<H>))
+                .route("/healthyz", get(checks::healthyz::<H>))
+                .route("/eligiblez", get(checks::eligiblez::<H>))
                 .layer(
                     ServiceBuilder::new().layer(
                         CorsLayer::new()
@@ -250,7 +303,7 @@ async fn build_api(
                 .route("/metrics", get(root::metrics))
                 .layer(axum::middleware::from_fn_with_state(
                     inner_state.clone(),
-                    middleware::preconditions::authenticate,
+                    middleware::preconditions::authenticate::<H>,
                 ))
                 .layer(
                     ServiceBuilder::new()
@@ -271,36 +324,36 @@ async fn build_api(
         .nest(
             BASE_PATH,
             Router::new()
-                .route("/account/addresses", get(account::addresses))
-                .route("/account/balances", get(account::balances))
-                .route("/account/withdraw", post(account::withdraw))
-                .route("/peers/{address}", get(peers::show_peer_info))
-                .route("/channels", get(channels::list_channels))
-                .route("/channels", post(channels::open_channel))
-                .route("/channels/{address}", get(channels::show_channel))
-                .route("/channels/{address}", delete(channels::close_channel))
-                .route("/channels/{address}/fund", post(channels::fund_channel))
-                .route("/tickets/redeem", post(tickets::redeem_tickets))
-                .route("/tickets/statistics", get(tickets::show_ticket_statistics))
-                .route("/network/price", get(network::price))
-                .route("/network/probability", get(network::probability))
-                .route("/network/connected", get(network::connected))
-                .route("/network/announced", get(network::announced))
-                .route("/network/graph", get(network::graph))
+                .route("/account/addresses", get(account::addresses::<H>))
+                .route("/account/balances", get(account::balances::<H>))
+                .route("/account/withdraw", post(account::withdraw::<H>))
+                .route("/peers/{address}", get(peers::show_peer_info::<H>))
+                .route("/channels", get(channels::list_channels::<H>))
+                .route("/channels", post(channels::open_channel::<H>))
+                .route("/channels/{address}", get(channels::show_channel::<H>))
+                .route("/channels/{address}", delete(channels::close_channel::<H>))
+                .route("/channels/{address}/fund", post(channels::fund_channel::<H>))
+                .route("/tickets/redeem", post(tickets::redeem_tickets::<H>))
+                .route("/tickets/statistics", get(tickets::show_ticket_statistics::<H>))
+                .route("/network/price", get(network::price::<H>))
+                .route("/network/probability", get(network::probability::<H>))
+                .route("/network/connected", get(network::connected::<H>))
+                .route("/network/announced", get(network::announced::<H>))
+                .route("/network/graph", get(network::graph::<H>))
                 .route("/node/version", get(node::version))
-                .route("/node/configuration", get(node::configuration))
-                .route("/node/info", get(node::info))
-                .route("/node/status", get(node::status))
-                .route("/peers/{address}/ping", post(peers::ping_peer))
-                .route("/session/config/{id}", get(session::session_config))
-                .route("/session/config/{id}", post(session::adjust_session))
-                .route("/session/{protocol}", post(session::create_client))
-                .route("/session/{protocol}", get(session::list_clients))
-                .route("/session/{protocol}/{ip}/{port}", delete(session::close_client))
+                .route("/node/configuration", get(node::configuration::<H>))
+                .route("/node/info", get(node::info::<H>))
+                .route("/node/status", get(node::status::<H>))
+                .route("/peers/{address}/ping", post(peers::ping_peer::<H>))
+                .route("/session/config/{id}", get(session::session_config::<H>))
+                .route("/session/config/{id}", post(session::adjust_session::<H>))
+                .route("/session/{protocol}", post(session::create_client::<H>))
+                .route("/session/{protocol}", get(session::list_clients::<H>))
+                .route("/session/{protocol}/{ip}/{port}", delete(session::close_client::<H>))
                 .with_state(inner_state.clone().into())
                 .layer(axum::middleware::from_fn_with_state(
                     inner_state.clone(),
-                    middleware::preconditions::authenticate,
+                    middleware::preconditions::authenticate::<H>,
                 ))
                 .layer(
                     ServiceBuilder::new()
