@@ -36,8 +36,8 @@ concurrency:
 
 jobs:
   build:
-    # The original event_name registered is 'pull_request_target' even the trigger action is 'workflow_call'
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request_target' && contains(inputs.labels, format('package:{0},',inputs.dappnode_repository)))
+    # The original event_name registered is 'pull_request' even the trigger action is 'workflow_call'
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(inputs.labels, format('package:{0},',inputs.dappnode_repository)))
     name: Build package
     runs-on: ubuntu-latest
     steps:
@@ -50,7 +50,7 @@ jobs:
       - name: Set environment variables
         id: vars
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             echo "The workflow is triggered by other pipeline"
             echo "source_repo=${{ inputs.source_repo }}" | tee -a $GITHUB_OUTPUT
             echo "source_branch=${{ inputs.source_branch }}"  | tee -a $GITHUB_OUTPUT

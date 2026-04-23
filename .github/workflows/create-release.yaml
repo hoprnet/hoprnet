@@ -37,7 +37,7 @@ jobs:
       - name: Set environment variables
         id: vars
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             echo "The workflow is triggered by other pipeline"
             echo "base_branch=${{ inputs.base_branch }}"  | tee -a $GITHUB_OUTPUT
             echo "head_branch=${{ inputs.head_branch }}"  | tee -a $GITHUB_OUTPUT
@@ -51,7 +51,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0 # Required for tagging
-          # Using a PAT because this job can be invoked from `pull_request_target`
+          # Using a PAT because this job can be invoked from `pull_request`
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           ref: ${{ steps.vars.outputs.base_branch }}
 
