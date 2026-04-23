@@ -373,8 +373,8 @@ pub(crate) struct SessionClientResponse {
         ),
         tag = "Session"
     )]
-pub(crate) async fn create_client(
-    State(state): State<Arc<InternalState>>,
+pub(crate) async fn create_client<H: hopr_utils_session::SessionFactory + Send + Sync + 'static>(
+    State(state): State<Arc<InternalState<H>>>,
     Path(protocol): Path<IpProtocol>,
     Json(args): Json<SessionClientRequest>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
@@ -402,7 +402,7 @@ pub(crate) async fn create_client(
             create_tcp_client_binding(
                 bind_host,
                 port_range,
-                state.hopr.clone(),
+                state.hopr.clone() as Arc<dyn hopr_utils_session::SessionFactory>,
                 state.open_listeners.clone(),
                 destination,
                 target_spec,
@@ -432,7 +432,7 @@ pub(crate) async fn create_client(
             create_udp_client_binding(
                 bind_host,
                 port_range,
-                state.hopr.clone(),
+                state.hopr.clone() as Arc<dyn hopr_utils_session::SessionFactory>,
                 state.open_listeners.clone(),
                 destination,
                 target_spec,
@@ -512,8 +512,8 @@ pub(crate) async fn create_client(
     ),
     tag = "Session",
 )]
-pub(crate) async fn list_clients(
-    State(state): State<Arc<InternalState>>,
+pub(crate) async fn list_clients<H: Send + Sync + 'static>(
+    State(state): State<Arc<InternalState<H>>>,
     Path(protocol): Path<IpProtocol>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let response = state
@@ -644,8 +644,8 @@ impl From<SurbBalancerConfig> for SessionConfig {
     ),
     tag = "Session"
 )]
-pub(crate) async fn adjust_session(
-    State(state): State<Arc<InternalState>>,
+pub(crate) async fn adjust_session<H: Send + Sync + 'static>(
+    State(state): State<Arc<InternalState<H>>>,
     Path(session_id): Path<String>,
     Json(args): Json<SessionConfig>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
@@ -690,8 +690,8 @@ pub(crate) async fn adjust_session(
     ),
     tag = "Session"
 )]
-pub(crate) async fn session_config(
-    State(state): State<Arc<InternalState>>,
+pub(crate) async fn session_config<H: Send + Sync + 'static>(
+    State(state): State<Arc<InternalState<H>>>,
     Path(session_id): Path<String>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let session_id =
@@ -784,8 +784,8 @@ pub struct SessionCloseClientQuery {
     ),
     tag = "Session",
 )]
-pub(crate) async fn close_client(
-    State(state): State<Arc<InternalState>>,
+pub(crate) async fn close_client<H: Send + Sync + 'static>(
+    State(state): State<Arc<InternalState<H>>>,
     Path(SessionCloseClientQuery { protocol, ip, port }): Path<SessionCloseClientQuery>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let listening_ip: IpAddr = ip
@@ -821,4 +821,38 @@ pub(crate) async fn close_client(
     }
 
     Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::NO_CONTENT, "").into_response())
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::{Router, body::Body, http::Request, routing::get};
+    use tower::ServiceExt;
+
+    use super::*;
+    use crate::testing::NoopNode;
+
+    fn session_router() -> Router {
+        let state: Arc<InternalState<NoopNode>> = Arc::new(InternalState {
+            hoprd_cfg: serde_json::json!({}),
+            auth: Arc::new(crate::config::Auth::None),
+            hopr: Arc::new(NoopNode),
+            open_listeners: Arc::new(hopr_utils_session::ListenerJoinHandles::default()),
+            default_listen_host: "127.0.0.1:0".parse().unwrap(),
+        });
+        Router::new()
+            .route("/session/{protocol}", get(list_clients::<NoopNode>))
+            .with_state(state)
+    }
+
+    #[tokio::test]
+    async fn list_clients_should_return_empty_when_no_sessions() -> anyhow::Result<()> {
+        let app = session_router();
+        let resp = app.oneshot(Request::get("/session/tcp").body(Body::empty())?).await?;
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await?;
+        let body: serde_json::Value = serde_json::from_slice(&bytes)?;
+        assert_eq!(body.as_array().unwrap().len(), 0);
+        Ok(())
+    }
 }

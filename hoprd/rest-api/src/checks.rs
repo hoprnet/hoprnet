@@ -27,23 +27,23 @@ use crate::AppState;
         ),
         tag = "Checks"
     )]
-pub(super) async fn startedz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub(super) async fn startedz<H: HoprNodeOperations + Send + Sync + 'static>(
+    State(state): State<Arc<AppState<H>>>,
+) -> impl IntoResponse {
     eval_precondition(is_running(&state))
 }
 
 /// Check whether the node is **ready** to accept connections.
 ///
-/// Ready means that the node is running and has at least minimal connectivity.
+/// Ready means that the node is running, has at least minimal connectivity,
+/// and the chain connector is available.
 ///
 /// # Behavior
 ///
-/// Both conditions must be true for 200 OK:
+/// All conditions must be true for 200 OK:
 /// 1. Node must be in Running state (`HoprState::Running`)
 /// 2. Network must be minimally connected (`Health::Orange`, `Health::Yellow`, or `Health::Green`)
-///
-/// Returns 412 PRECONDITION_FAILED if either condition is false:
-/// - Node not running (any other `HoprState`)
-/// - Node running but network not minimally connected (`Health::Unknown` or `Health::Red`)
+/// 3. Chain connector must not be unavailable
 ///
 /// This endpoint is used by Kubernetes readiness probes to determine if the pod should receive traffic.
 #[utoipa::path(
@@ -56,7 +56,9 @@ pub(super) async fn startedz(State(state): State<Arc<AppState>>) -> impl IntoRes
         ),
         tag = "Checks"
     )]
-pub(super) async fn readyz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub(super) async fn readyz<H: HoprNodeOperations + HasNetworkView + HasChainApi + Send + Sync + 'static>(
+    State(state): State<Arc<AppState<H>>>,
+) -> impl IntoResponse {
     eval_precondition(is_running(&state) && is_minimally_connected(&state) && is_chain_available(&state))
 }
 
@@ -64,19 +66,8 @@ pub(super) async fn readyz(State(state): State<Arc<AppState>>) -> impl IntoRespo
 ///
 /// Healthy means that the node is running and has at least minimal connectivity.
 ///
-/// # Behavior
-///
-/// Both conditions must be true for 200 OK:
-/// 1. Node must be in Running state (`HoprState::Running`)
-/// 2. Network must be minimally connected (`Health::Orange`, `Health::Yellow`, or `Health::Green`)
-///
-/// Returns 412 PRECONDITION_FAILED if either condition is false:
-/// - Node not running (any other `HoprState`)
-/// - Node running but network not minimally connected (`Health::Unknown` or `Health::Red`)
-///
-/// This endpoint is used by Kubernetes liveness probes to determine if the pod should be restarted.
 /// Unlike `readyz`, this endpoint does NOT check chain availability — transient blokli outages
-/// must not trigger pod restarts.
+/// must not trigger pod restarts (see #7722).
 #[utoipa::path(
         get,
         path = "/healthyz",
@@ -87,18 +78,15 @@ pub(super) async fn readyz(State(state): State<Arc<AppState>>) -> impl IntoRespo
         ),
         tag = "Checks"
     )]
-pub(super) async fn healthyz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    // Liveness must not depend on chain availability — transient blokli outages
-    // must not trigger pod restarts (see #7722).
+pub(super) async fn healthyz<H: HoprNodeOperations + HasNetworkView + Send + Sync + 'static>(
+    State(state): State<Arc<AppState<H>>>,
+) -> impl IntoResponse {
     eval_precondition(is_running(&state) && is_minimally_connected(&state))
 }
 
 /// Check if the node has minimal network connectivity.
-///
-/// Returns `true` if the network health is `Orange`, `Yellow`, or `Green`.
-/// Returns `false` if the network health is `Unknown` or `Red`.
 #[inline]
-fn is_minimally_connected(state: &AppState) -> bool {
+fn is_minimally_connected<H: HasNetworkView>(state: &AppState<H>) -> bool {
     matches!(
         state.hopr.network_view().health(),
         Health::Orange | Health::Yellow | Health::Green
@@ -107,19 +95,17 @@ fn is_minimally_connected(state: &AppState) -> bool {
 
 /// A degraded chain is still considered available for readiness purposes.
 #[inline]
-fn is_chain_available(state: &AppState) -> bool {
+fn is_chain_available<H: HasChainApi>(state: &AppState<H>) -> bool {
     !HasChainApi::status(&*state.hopr).is_unavailable()
 }
 
+/// Check if the node is in the Running state.
 #[inline]
-fn is_running(state: &AppState) -> bool {
+fn is_running<H: HoprNodeOperations>(state: &AppState<H>) -> bool {
     matches!(HoprNodeOperations::status(&*state.hopr), HoprState::Running)
 }
 
 /// Evaluate a precondition and return the appropriate HTTP response.
-///
-/// Returns 200 OK if `precondition` is `true`.
-/// Returns 412 PRECONDITION_FAILED if `precondition` is `false`.
 #[inline]
 fn eval_precondition(precondition: bool) -> impl IntoResponse {
     if precondition {
@@ -141,27 +127,112 @@ fn eval_precondition(precondition: bool) -> impl IntoResponse {
         ),
         tag = "Checks"
     )]
-pub(super) async fn eligiblez(State(_state): State<Arc<AppState>>) -> impl IntoResponse {
+pub(super) async fn eligiblez<H: Send + Sync + 'static>(State(_state): State<Arc<AppState<H>>>) -> impl IntoResponse {
     (StatusCode::OK, "").into_response()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use axum::{Router, body::Body, http::Request, routing::get};
+    use tower::ServiceExt;
 
-    /// Test that eval_precondition returns 200 OK when the precondition is true
+    use super::*;
+    use crate::testing::{ChecksNode, MockNodeOps, NoopNode};
+
+    fn startedz_router(mock: MockNodeOps) -> Router {
+        Router::new()
+            .route("/startedz", get(startedz::<MockNodeOps>))
+            .with_state(Arc::new(AppState { hopr: Arc::new(mock) }))
+    }
+
+    fn readyz_router(node: ChecksNode) -> Router {
+        Router::new()
+            .route("/readyz", get(readyz::<ChecksNode>))
+            .route("/healthyz", get(healthyz::<ChecksNode>))
+            .with_state(Arc::new(AppState { hopr: Arc::new(node) }))
+    }
+
     #[test]
-    fn test_eval_precondition_true_returns_ok() {
-        let response = eval_precondition(true);
-        let (parts, _) = response.into_response().into_parts();
+    fn eval_precondition_should_return_ok_when_true() {
+        let (parts, _) = eval_precondition(true).into_response().into_parts();
         assert_eq!(parts.status, StatusCode::OK);
     }
 
-    /// Test that eval_precondition returns 412 PRECONDITION_FAILED when the precondition is false
     #[test]
-    fn test_eval_precondition_false_returns_precondition_failed() {
-        let response = eval_precondition(false);
-        let (parts, _) = response.into_response().into_parts();
+    fn eval_precondition_should_return_precondition_failed_when_false() {
+        let (parts, _) = eval_precondition(false).into_response().into_parts();
         assert_eq!(parts.status, StatusCode::PRECONDITION_FAILED);
+    }
+
+    #[tokio::test]
+    async fn startedz_should_return_200_when_running() -> anyhow::Result<()> {
+        let mut mock = MockNodeOps::new();
+        mock.expect_status().returning(|| HoprState::Running);
+
+        let resp = startedz_router(mock)
+            .oneshot(Request::get("/startedz").body(Body::empty())?)
+            .await?;
+        assert_eq!(resp.status(), StatusCode::OK);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn startedz_should_return_412_when_not_running() -> anyhow::Result<()> {
+        let mut mock = MockNodeOps::new();
+        mock.expect_status().returning(|| HoprState::Uninitialized);
+
+        let resp = startedz_router(mock)
+            .oneshot(Request::get("/startedz").body(Body::empty())?)
+            .await?;
+        assert_eq!(resp.status(), StatusCode::PRECONDITION_FAILED);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn readyz_should_return_200_when_running_and_connected() -> anyhow::Result<()> {
+        let resp = readyz_router(ChecksNode::new(HoprState::Running, Health::Green))
+            .oneshot(Request::get("/readyz").body(Body::empty())?)
+            .await?;
+        assert_eq!(resp.status(), StatusCode::OK);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn readyz_should_return_412_when_running_but_red() -> anyhow::Result<()> {
+        let resp = readyz_router(ChecksNode::new(HoprState::Running, Health::Red))
+            .oneshot(Request::get("/readyz").body(Body::empty())?)
+            .await?;
+        assert_eq!(resp.status(), StatusCode::PRECONDITION_FAILED);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn readyz_should_return_412_when_not_running() -> anyhow::Result<()> {
+        let resp = readyz_router(ChecksNode::new(HoprState::WaitingForFunds, Health::Green))
+            .oneshot(Request::get("/readyz").body(Body::empty())?)
+            .await?;
+        assert_eq!(resp.status(), StatusCode::PRECONDITION_FAILED);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn healthyz_should_return_200_when_running_and_orange() -> anyhow::Result<()> {
+        let resp = readyz_router(ChecksNode::new(HoprState::Running, Health::Orange))
+            .oneshot(Request::get("/healthyz").body(Body::empty())?)
+            .await?;
+        assert_eq!(resp.status(), StatusCode::OK);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn eligiblez_should_always_return_200() -> anyhow::Result<()> {
+        let app = Router::new()
+            .route("/eligiblez", get(eligiblez::<NoopNode>))
+            .with_state(Arc::new(AppState {
+                hopr: Arc::new(NoopNode),
+            }));
+        let resp = app.oneshot(Request::get("/eligiblez").body(Body::empty())?).await?;
+        assert_eq!(resp.status(), StatusCode::OK);
+        Ok(())
     }
 }
