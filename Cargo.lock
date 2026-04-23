@@ -4364,9 +4364,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "1.7.0"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b31d3a590ba684849fa2e8054480568853c3c9109a8c769c31a26dceba4a00f"
+checksum = "d55e4b9a4d2ce967af9d16a9b2c092fffa6acb4c5f887264662771894805693c"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -4420,6 +4420,7 @@ dependencies = [
  "anyhow",
  "async-broadcast",
  "async-trait",
+ "atomic_enum",
  "blokli-client",
  "dashmap",
  "futures",
@@ -4452,7 +4453,7 @@ dependencies = [
  "anyhow",
  "hex",
  "hopr-platform",
- "hopr-types",
+ "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "insta",
  "scrypt",
  "serde",
@@ -4476,7 +4477,7 @@ dependencies = [
  "hex-literal",
  "hopr-crypto-sphinx",
  "hopr-parallelize",
- "hopr-types",
+ "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static",
  "mimalloc",
  "parameterized",
@@ -4499,7 +4500,7 @@ dependencies = [
  "elliptic-curve",
  "generic-array 1.3.5",
  "hex",
- "hopr-types",
+ "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "k256",
  "parameterized",
  "postcard",
@@ -4628,7 +4629,7 @@ dependencies = [
  "hickory-resolver 0.26.0",
  "hopr-async-runtime",
  "hopr-metrics",
- "hopr-types",
+ "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static",
  "libp2p-identity",
  "multiaddr",
@@ -4675,7 +4676,7 @@ version = "1.0.1"
 dependencies = [
  "anyhow",
  "hopr-crypto-packet",
- "hopr-types",
+ "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde",
  "serde_bytes",
  "strum 0.28.0",
@@ -4740,7 +4741,7 @@ dependencies = [
  "hopr-metrics",
  "hopr-network-types",
  "hopr-protocol-app",
- "hopr-types",
+ "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "indexmap 2.14.0",
  "insta",
  "lazy_static",
@@ -4951,7 +4952,7 @@ dependencies = [
  "futures-timer",
  "hopr-metrics",
  "hopr-transport-mixer",
- "hopr-types",
+ "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "humantime-serde",
  "insta",
  "lazy_static",
@@ -5007,7 +5008,7 @@ dependencies = [
  "hopr-network-graph",
  "hopr-protocol-hopr",
  "hopr-statistics",
- "hopr-types",
+ "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static",
  "moka",
  "smart-default",
@@ -5118,7 +5119,7 @@ dependencies = [
  "hopr-protocol-session",
  "hopr-protocol-start",
  "hopr-transport-tag-allocator",
- "hopr-types",
+ "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "humantime-serde",
  "insta",
  "lazy_static",
@@ -5352,7 +5353,7 @@ dependencies = [
  "hopr-chain-connector",
  "hopr-lib",
  "hopr-reference",
- "hopr-types",
+ "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "hoprd",
  "hoprd-api",
  "hoprd-api-client",
@@ -5925,7 +5926,7 @@ dependencies = [
  "portable-atomic",
  "portable-atomic-util",
  "serde_core",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]

@@ -692,6 +692,71 @@ pub mod types {
         ///Receipt for the channel close transaction.
         pub receipt: ::std::string::String,
     }
+    ///`ComponentStatusInfo`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "status"
+    ///  ],
+    ///  "properties": {
+    ///    "detail": {
+    ///      "type": [
+    ///        "string",
+    ///        "null"
+    ///      ]
+    ///    },
+    ///    "status": {
+    ///      "examples": [
+    ///        "Ready"
+    ///      ],
+    ///      "type": "string"
+    ///    }
+    ///  }
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    pub struct ComponentStatusInfo {
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub detail: ::std::option::Option<::std::string::String>,
+        pub status: ::std::string::String,
+    }
+    ///`ComponentStatusesResponse`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "chain",
+    ///    "network",
+    ///    "transport"
+    ///  ],
+    ///  "properties": {
+    ///    "chain": {
+    ///      "$ref": "#/components/schemas/ComponentStatusInfo"
+    ///    },
+    ///    "network": {
+    ///      "$ref": "#/components/schemas/ComponentStatusInfo"
+    ///    },
+    ///    "transport": {
+    ///      "$ref": "#/components/schemas/ComponentStatusInfo"
+    ///    }
+    ///  }
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    pub struct ComponentStatusesResponse {
+        pub chain: ComponentStatusInfo,
+        pub network: ComponentStatusInfo,
+        pub transport: ComponentStatusInfo,
+    }
     ///Immediate observation data for a connected peer.
     ///
     /// <details><summary>JSON schema</summary>
@@ -1099,6 +1164,7 @@ and indexer state.*/
     ///      "announcedAddress": [
     ///        "/ip4/10.0.2.100/tcp/19092"
     ///      ],
+    ///      "chainStatus": "Ready",
     ///      "channelClosurePeriod": 15,
     ///      "connectivityStatus": "Green",
     ///      "hoprNetworkName": "rotsee",
@@ -1112,6 +1178,7 @@ and indexer state.*/
     ///  "type": "object",
     ///  "required": [
     ///    "announcedAddress",
+    ///    "chainStatus",
     ///    "channelClosurePeriod",
     ///    "connectivityStatus",
     ///    "hoprNetworkName",
@@ -1130,6 +1197,13 @@ and indexer state.*/
     ///      "items": {
     ///        "type": "string"
     ///      }
+    ///    },
+    ///    "chainStatus": {
+    ///      "description": "Chain/blokli connector status.",
+    ///      "examples": [
+    ///        "Ready"
+    ///      ],
+    ///      "type": "string"
     ///    },
     ///    "channelClosurePeriod": {
     ///      "description": "Channel closure period in seconds",
@@ -1183,6 +1257,9 @@ and indexer state.*/
     pub struct NodeInfoResponse {
         #[serde(rename = "announcedAddress")]
         pub announced_address: ::std::vec::Vec<::std::string::String>,
+        ///Chain/blokli connector status.
+        #[serde(rename = "chainStatus")]
+        pub chain_status: ::std::string::String,
         ///Channel closure period in seconds
         #[serde(rename = "channelClosurePeriod")]
         pub channel_closure_period: i64,
@@ -1285,6 +1362,66 @@ and indexer state.*/
         pub outgoing_channel: ::std::option::Option<PeerChannelInfo>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub qos: ::std::option::Option<PeerQosInfo>,
+    }
+    ///`NodeStatusResponse`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "examples": [
+    ///    {
+    ///      "components": {
+    ///        "chain": {
+    ///          "status": "Ready"
+    ///        },
+    ///        "network": {
+    ///          "status": "Ready"
+    ///        },
+    ///        "transport": {
+    ///          "status": "Ready"
+    ///        }
+    ///      },
+    ///      "nodeState": "Node is running",
+    ///      "overall": "Ready"
+    ///    }
+    ///  ],
+    ///  "type": "object",
+    ///  "required": [
+    ///    "components",
+    ///    "nodeState",
+    ///    "overall"
+    ///  ],
+    ///  "properties": {
+    ///    "components": {
+    ///      "$ref": "#/components/schemas/ComponentStatusesResponse"
+    ///    },
+    ///    "nodeState": {
+    ///      "description": "Current node lifecycle state.",
+    ///      "examples": [
+    ///        "Node is running"
+    ///      ],
+    ///      "type": "string"
+    ///    },
+    ///    "overall": {
+    ///      "description": "Aggregated status across all components.",
+    ///      "examples": [
+    ///        "Ready"
+    ///      ],
+    ///      "type": "string"
+    ///    }
+    ///  }
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    pub struct NodeStatusResponse {
+        pub components: ComponentStatusesResponse,
+        ///Current node lifecycle state.
+        #[serde(rename = "nodeState")]
+        pub node_state: ::std::string::String,
+        ///Aggregated status across all components.
+        pub overall: ::std::string::String,
     }
     ///Received tickets statistics.
     ///
@@ -3136,6 +3273,45 @@ Sends a `GET` request to `/api/v4/node/info`
             .build()?;
         let info = OperationInfo {
             operation_id: "info",
+        };
+        self.pre(&mut request, &info).await?;
+        let result = self.exec(request, &info).await;
+        self.post(&result, &info).await?;
+        let response = result?;
+        match response.status().as_u16() {
+            200u16 => ResponseValue::from_response(response).await,
+            _ => Err(Error::UnexpectedResponse(response)),
+        }
+    }
+    /**Get the aggregated status of this HOPR node and its individual components
+
+Get the aggregated status of this HOPR node and its individual components
+
+Sends a `GET` request to `/api/v4/node/status`
+
+*/
+    pub async fn status<'a>(
+        &'a self,
+    ) -> Result<ResponseValue<types::NodeStatusResponse>, Error<()>> {
+        let url = format!("{}/api/v4/node/status", self.baseurl,);
+        let mut header_map = ::reqwest::header::HeaderMap::with_capacity(1usize);
+        header_map
+            .append(
+                ::reqwest::header::HeaderName::from_static("api-version"),
+                ::reqwest::header::HeaderValue::from_static(Self::api_version()),
+            );
+        #[allow(unused_mut)]
+        let mut request = self
+            .client
+            .get(url)
+            .header(
+                ::reqwest::header::ACCEPT,
+                ::reqwest::header::HeaderValue::from_static("application/json"),
+            )
+            .headers(header_map)
+            .build()?;
+        let info = OperationInfo {
+            operation_id: "status",
         };
         self.pre(&mut request, &info).await?;
         let result = self.exec(request, &info).await;

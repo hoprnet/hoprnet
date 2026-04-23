@@ -300,6 +300,7 @@ struct PreHopr<Chain, Graph, Net, Ct> {
     state: Arc<AtomicHoprState>,
     transport_api: HoprTransport<Chain, Graph, Net>,
     chain_api: Chain,
+
     ticket_event_subscribers: (
         async_broadcast::Sender<TicketEvent>,
         async_broadcast::InactiveReceiver<TicketEvent>,
