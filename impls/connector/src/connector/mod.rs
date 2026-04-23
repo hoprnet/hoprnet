@@ -613,17 +613,6 @@ where
     }
 }
 
-impl<B, C, P, R> hopr_api::node::ComponentStatusReporter for HoprBlockchainConnector<C, B, P, R>
-where
-    B: Send + Sync,
-    C: Send + Sync,
-    P: Send + Sync,
-    R: Send + Sync,
-{
-    fn component_status(&self) -> hopr_api::node::ComponentStatus {
-        hopr_api::node::ComponentStatus::Ready
-    }
-}
 
 #[cfg(test)]
 pub(crate) mod tests {

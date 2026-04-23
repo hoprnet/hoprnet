@@ -372,13 +372,13 @@ fn component_status(state: HoprState, component: &str) -> ComponentStatus {
     if state == HoprState::Running {
         ComponentStatus::Ready
     } else {
-        ComponentStatus::Initializing(format!("{component} not yet running").into())
+        ComponentStatus::Initializing(format!("{component} not yet running"))
     }
 }
 
 impl<Chain, Graph, Net, TMgr> HasChainApi for Hopr<Chain, Graph, Net, TMgr>
 where
-    Chain: HoprChainApi + hopr_api::node::ComponentStatusReporter + Clone + Send + Sync + 'static,
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
     type ChainApi = Chain;
     type ChainError = HoprLibError;

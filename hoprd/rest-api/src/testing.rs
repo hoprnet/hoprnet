@@ -142,11 +142,6 @@ impl StubChain {
     }
 }
 
-impl hopr_lib::api::node::ComponentStatusReporter for StubChain {
-    fn component_status(&self) -> ComponentStatus {
-        ComponentStatus::Ready
-    }
-}
 
 // --- ChainReadChannelOperations ---
 

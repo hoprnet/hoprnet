@@ -383,7 +383,7 @@ mod tests {
         let graph = ChannelGraph::new(me);
         let peers: Vec<_> = [SECRET_1, SECRET_2, SECRET_3, SECRET_4, SECRET_5]
             .iter()
-            .map(|s| pubkey_from(s))
+            .map(pubkey_from)
             .collect();
         for &peer in &peers {
             graph.add_node(peer);
