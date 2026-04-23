@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::{extract::State, http::status::StatusCode, response::IntoResponse};
 use hopr_lib::api::{
     network::{Health, NetworkView},
-    node::{HasNetworkView, HoprNodeOperations, HoprState},
+    node::{HasChainApi, HasNetworkView, HoprNodeOperations, HoprState},
 };
 
 use crate::AppState;
@@ -28,7 +28,7 @@ use crate::AppState;
         tag = "Checks"
     )]
 pub(super) async fn startedz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    eval_precondition(is_running(state)) // FIXME: improve this once node state granularity is improved
+    eval_precondition(is_running(&state))
 }
 
 /// Check whether the node is **ready** to accept connections.
@@ -57,7 +57,7 @@ pub(super) async fn startedz(State(state): State<Arc<AppState>>) -> impl IntoRes
         tag = "Checks"
     )]
 pub(super) async fn readyz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    eval_precondition(is_running(state.clone()) && is_minimally_connected(state).await)
+    eval_precondition(is_running(&state) && is_minimally_connected(&state) && is_chain_available(&state))
 }
 
 /// Check whether the node is **healthy**.
@@ -75,8 +75,8 @@ pub(super) async fn readyz(State(state): State<Arc<AppState>>) -> impl IntoRespo
 /// - Node running but network not minimally connected (`Health::Unknown` or `Health::Red`)
 ///
 /// This endpoint is used by Kubernetes liveness probes to determine if the pod should be restarted.
-///
-/// Note: Currently `healthyz` and `readyz` have identical behavior.
+/// Unlike `readyz`, this endpoint does NOT check chain availability — transient blokli outages
+/// must not trigger pod restarts.
 #[utoipa::path(
         get,
         path = "/healthyz",
@@ -88,7 +88,9 @@ pub(super) async fn readyz(State(state): State<Arc<AppState>>) -> impl IntoRespo
         tag = "Checks"
     )]
 pub(super) async fn healthyz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    eval_precondition(is_running(state.clone()) && is_minimally_connected(state).await)
+    // Liveness must not depend on chain availability — transient blokli outages
+    // must not trigger pod restarts (see #7722).
+    eval_precondition(is_running(&state) && is_minimally_connected(&state))
 }
 
 /// Check if the node has minimal network connectivity.
@@ -96,19 +98,21 @@ pub(super) async fn healthyz(State(state): State<Arc<AppState>>) -> impl IntoRes
 /// Returns `true` if the network health is `Orange`, `Yellow`, or `Green`.
 /// Returns `false` if the network health is `Unknown` or `Red`.
 #[inline]
-async fn is_minimally_connected(state: Arc<AppState>) -> bool {
+fn is_minimally_connected(state: &AppState) -> bool {
     matches!(
         state.hopr.network_view().health(),
         Health::Orange | Health::Yellow | Health::Green
     )
 }
 
-/// Check if the node is in the Running state.
-///
-/// Returns `true` only when `HoprState::Running`.
-/// Returns `false` for all other states (Uninitialized, Initializing, Indexing, Starting).
+/// A degraded chain is still considered available for readiness purposes.
 #[inline]
-fn is_running(state: Arc<AppState>) -> bool {
+fn is_chain_available(state: &AppState) -> bool {
+    !HasChainApi::status(&*state.hopr).is_unavailable()
+}
+
+#[inline]
+fn is_running(state: &AppState) -> bool {
     matches!(HoprNodeOperations::status(&*state.hopr), HoprState::Running)
 }
 

@@ -10,7 +10,7 @@ use hopr_lib::{
     api::{
         chain::ChainKeyOperations,
         graph::{
-            EdgeLinkObservable,
+            EdgeLinkObservable, NetworkGraphConnectivity,
             traits::{EdgeNetworkObservableRead, EdgeObservableRead},
         },
         node::{HasChainApi, IncentiveChannelOperations},
