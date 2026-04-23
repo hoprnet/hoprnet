@@ -6,7 +6,10 @@ use std::fmt::Write;
 
 use hopr_api::{
     OffchainPublicKey,
-    graph::traits::{EdgeLinkObservable, EdgeObservableRead, EdgeProtocolObservable},
+    graph::{
+        NetworkGraphConnectivity,
+        traits::{EdgeLinkObservable, EdgeObservableRead, EdgeProtocolObservable},
+    },
 };
 
 use crate::ChannelGraph;

@@ -9,7 +9,7 @@ use hopr_lib::{
     Address, ChannelEntry, ChannelStatus, HoprBalance, IncentiveChannelOperations, Multiaddr,
     api::{
         chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations},
-        graph::{EdgeLinkObservable, traits::EdgeObservableRead},
+        graph::{EdgeLinkObservable, NetworkGraphConnectivity, traits::EdgeObservableRead},
         network::NetworkView,
         node::{HasChainApi, HasNetworkView, HasTransportApi},
     },
