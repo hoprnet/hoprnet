@@ -52,7 +52,6 @@ hopr-lib = { workspace = true, features = [
 ] }
 
 hopr-async-runtime = { workspace = true }
-hopr-network-graph = { workspace = true, features = ["petgraph", "graph-api"] }
 hopr-metrics = { workspace = true, optional = true }
 hopr-utils-session = { workspace = true }
 

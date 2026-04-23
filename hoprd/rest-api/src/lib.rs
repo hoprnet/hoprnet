@@ -60,7 +60,7 @@ pub trait HoprNode:
     hopr_lib::api::node::HoprNodeOperations
     + hopr_lib::api::node::HasChainApi<ChainError = hopr_lib::errors::HoprLibError>
     + hopr_lib::api::node::HasNetworkView
-    + hopr_lib::api::node::HasGraphView<Graph = hopr_network_graph::SharedChannelGraph>
+    + hopr_lib::api::node::HasGraphView
     + hopr_lib::api::node::HasTransportApi
     + hopr_lib::api::node::HasTicketManagement
     + hopr_lib::HoprSessionClientOperations
@@ -74,7 +74,7 @@ impl<T> HoprNode for T where
     T: hopr_lib::api::node::HoprNodeOperations
         + hopr_lib::api::node::HasChainApi<ChainError = hopr_lib::errors::HoprLibError>
         + hopr_lib::api::node::HasNetworkView
-        + hopr_lib::api::node::HasGraphView<Graph = hopr_network_graph::SharedChannelGraph>
+        + hopr_lib::api::node::HasGraphView
         + hopr_lib::api::node::HasTransportApi
         + hopr_lib::api::node::HasTicketManagement
         + hopr_lib::HoprSessionClientOperations

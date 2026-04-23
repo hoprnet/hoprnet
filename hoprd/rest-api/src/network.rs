@@ -10,7 +10,7 @@ use hopr_lib::{
     api::{
         chain::ChainKeyOperations,
         graph::{
-            EdgeLinkObservable,
+            EdgeLinkObservable, NetworkGraphConnectivity, NetworkGraphView,
             traits::{EdgeNetworkObservableRead, EdgeObservableRead},
         },
         node::{HasChainApi, HasGraphView},
@@ -154,7 +154,7 @@ pub(crate) struct ConnectedPeerResponse {
 )]
 pub(super) async fn connected<
     H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError>
-        + HasGraphView<Graph = hopr_network_graph::SharedChannelGraph>
+        + HasGraphView
         + Send
         + Sync
         + 'static,
@@ -165,7 +165,7 @@ pub(super) async fn connected<
     let graph = hopr.graph();
     let edges = graph.connected_edges();
 
-    let me_key = graph.me();
+    let me_key = graph.identity();
 
     // Collect peers that are connected (is_connected == true) with immediate QoS data.
     let mut peers = Vec::new();
@@ -332,7 +332,7 @@ pub(crate) struct GraphQueryRequest {
 )]
 pub(super) async fn graph<
     H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError>
-        + HasGraphView<Graph = hopr_network_graph::SharedChannelGraph>
+        + HasGraphView
         + Send
         + Sync
         + 'static,
@@ -365,9 +365,23 @@ pub(super) async fn graph<
         key_to_addr.insert(*key, label);
     }
 
-    let label_fn = |key: &hopr_lib::OffchainPublicKey| key_to_addr.get(key).cloned().unwrap_or_else(|| key.to_string());
+    let label = |key: &hopr_lib::OffchainPublicKey| key_to_addr.get(key).cloned().unwrap_or_else(|| key.to_string());
 
-    let dot = hopr_network_graph::render::render_edges_as_dot(&edges, &label_fn);
+    // Render DOT (Graphviz) format inline using trait methods on the observations.
+    let mut dot = String::from("digraph hopr {\n");
+    for (src, dst, obs) in &edges {
+        let src_label = label(src);
+        let dst_label = label(dst);
+        let mut attrs = vec![format!("score={:.2}", obs.score())];
+        if let Some(imm) = obs.immediate_qos()
+            && let Some(latency) = imm.average_latency()
+        {
+            attrs.push(format!("lat={}ms", latency.as_millis()));
+        }
+        use std::fmt::Write;
+        let _ = writeln!(dot, "  \"{src_label}\" -> \"{dst_label}\" [label=\"{}\"];", attrs.join(" "));
+    }
+    dot.push_str("}\n");
 
     (StatusCode::OK, [(axum::http::header::CONTENT_TYPE, "text/plain")], dot).into_response()
 }

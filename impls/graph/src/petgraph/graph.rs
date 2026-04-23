@@ -72,60 +72,6 @@ impl ChannelGraph {
     }
 }
 
-impl ChannelGraph {
-    /// Returns all edges in the graph as `(source, destination, observations)` triples.
-    ///
-    /// Only nodes that participate in at least one edge appear in the result.
-    /// Isolated nodes (no incoming or outgoing edges) are omitted.
-    pub fn connected_edges(&self) -> Vec<(OffchainPublicKey, OffchainPublicKey, Observations)> {
-        let inner = self.inner.read();
-        inner
-            .graph
-            .edge_indices()
-            .filter_map(|ei| {
-                let (src_idx, dst_idx) = inner.graph.edge_endpoints(ei)?;
-                let src = inner.graph.node_weight(src_idx)?;
-                let dst = inner.graph.node_weight(dst_idx)?;
-                let obs = inner.graph.edge_weight(ei)?;
-                Some((*src, *dst, *obs))
-            })
-            .collect()
-    }
-
-    /// Returns edges reachable from `self.me` via directed BFS.
-    ///
-    /// Only edges where both the source and destination are reachable from our
-    /// node are included. This filters out disconnected subgraphs that we
-    /// cannot actually route through.
-    pub fn reachable_edges(&self) -> Vec<(OffchainPublicKey, OffchainPublicKey, Observations)> {
-        let inner = self.inner.read();
-        let Some(&me_idx) = inner.indices.get_by_left(&self.me) else {
-            return vec![];
-        };
-
-        let mut reachable = std::collections::HashSet::new();
-        let mut bfs = petgraph::visit::Bfs::new(&inner.graph, me_idx);
-        while let Some(node_idx) = bfs.next(&inner.graph) {
-            reachable.insert(node_idx);
-        }
-
-        inner
-            .graph
-            .edge_indices()
-            .filter_map(|ei| {
-                let (src_idx, dst_idx) = inner.graph.edge_endpoints(ei)?;
-                if !reachable.contains(&src_idx) || !reachable.contains(&dst_idx) {
-                    return None;
-                }
-                let src = inner.graph.node_weight(src_idx)?;
-                let dst = inner.graph.node_weight(dst_idx)?;
-                let obs = inner.graph.edge_weight(ei)?;
-                Some((*src, *dst, *obs))
-            })
-            .collect()
-    }
-}
-
 impl hopr_api::graph::NetworkGraphView for ChannelGraph {
     type NodeId = OffchainPublicKey;
     type Observed = Observations;
@@ -161,6 +107,58 @@ impl hopr_api::graph::NetworkGraphView for ChannelGraph {
         let dest_idx = inner.indices.get_by_left(dest)?;
         let edge_idx = inner.graph.find_edge(*src_idx, *dest_idx)?;
         inner.graph.edge_weight(edge_idx).copied()
+    }
+
+    fn identity(&self) -> &OffchainPublicKey {
+        &self.me
+    }
+}
+
+impl hopr_api::graph::NetworkGraphConnectivity for ChannelGraph {
+    type NodeId = OffchainPublicKey;
+    type Observed = Observations;
+
+    fn connected_edges(&self) -> Vec<(OffchainPublicKey, OffchainPublicKey, Observations)> {
+        let inner = self.inner.read();
+        inner
+            .graph
+            .edge_indices()
+            .filter_map(|ei| {
+                let (src_idx, dst_idx) = inner.graph.edge_endpoints(ei)?;
+                let src = inner.graph.node_weight(src_idx)?;
+                let dst = inner.graph.node_weight(dst_idx)?;
+                let obs = inner.graph.edge_weight(ei)?;
+                Some((*src, *dst, *obs))
+            })
+            .collect()
+    }
+
+    fn reachable_edges(&self) -> Vec<(OffchainPublicKey, OffchainPublicKey, Observations)> {
+        let inner = self.inner.read();
+        let Some(&me_idx) = inner.indices.get_by_left(&self.me) else {
+            return vec![];
+        };
+
+        let mut reachable = std::collections::HashSet::new();
+        let mut bfs = petgraph::visit::Bfs::new(&inner.graph, me_idx);
+        while let Some(node_idx) = bfs.next(&inner.graph) {
+            reachable.insert(node_idx);
+        }
+
+        inner
+            .graph
+            .edge_indices()
+            .filter_map(|ei| {
+                let (src_idx, dst_idx) = inner.graph.edge_endpoints(ei)?;
+                if !reachable.contains(&src_idx) || !reachable.contains(&dst_idx) {
+                    return None;
+                }
+                let src = inner.graph.node_weight(src_idx)?;
+                let dst = inner.graph.node_weight(dst_idx)?;
+                let obs = inner.graph.edge_weight(ei)?;
+                Some((*src, *dst, *obs))
+            })
+            .collect()
     }
 }
 

@@ -461,7 +461,12 @@ where
 impl<Chain, Graph, Net, TMgr> HasGraphView for Hopr<Chain, Graph, Net, TMgr>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
-    Graph: HoprGraphApi<HoprNodeId = OffchainPublicKey> + Clone + Send + Sync + 'static,
+    Graph: HoprGraphApi<HoprNodeId = OffchainPublicKey>
+        + hopr_api::graph::NetworkGraphConnectivity<NodeId = OffchainPublicKey>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
     <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
         hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
     <Graph as hopr_api::graph::NetworkGraphWrite>::Observed: hopr_api::graph::traits::EdgeObservableWrite + Send,
@@ -471,6 +476,10 @@ where
 
     fn graph(&self) -> &Graph {
         self.transport_api.graph()
+    }
+
+    fn status(&self) -> ComponentStatus {
+        component_status(HoprNodeOperations::status(self), "graph")
     }
 }
 

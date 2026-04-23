@@ -9,7 +9,7 @@ use hopr_lib::{
     Address, ChannelEntry, ChannelStatus, HoprBalance, IncentiveChannelOperations, Multiaddr,
     api::{
         chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations},
-        graph::{EdgeLinkObservable, traits::EdgeObservableRead},
+        graph::{EdgeLinkObservable, NetworkGraphConnectivity, NetworkGraphView, traits::EdgeObservableRead},
         network::NetworkView,
         node::{HasChainApi, HasGraphView, HasNetworkView, HasTransportApi, TransportOperations},
     },
@@ -170,7 +170,7 @@ fn channel_entry_to_peer_info(
 pub(super) async fn show_peer_info<
     H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError>
         + HasNetworkView
-        + HasGraphView<Graph = hopr_network_graph::SharedChannelGraph>
+        + HasGraphView
         + Send
         + Sync
         + 'static,
@@ -218,7 +218,7 @@ pub(super) async fn show_peer_info<
     // 2. QoS data from graph
     let qos = {
         let graph = hopr.graph();
-        let me_key = graph.me();
+        let me_key = graph.identity();
         let edges = graph.connected_edges();
 
         let mut found = None;

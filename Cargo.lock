@@ -833,7 +833,7 @@ version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40c48f72fd53cd289104fc64099abca73db4166ad86ea0b4341abe65af83dadc"
 dependencies = [
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -844,7 +844,7 @@ checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
 dependencies = [
  "anstyle",
  "once_cell_polyfill",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1573,7 +1573,7 @@ dependencies = [
  "futures",
  "futures-time",
  "hex",
- "hopr-types 1.5.4",
+ "hopr-types 1.5.4 (git+https://github.com/hoprnet/hopr-types?branch=main)",
  "http",
  "indexmap 2.14.0",
  "launchdarkly-sdk-transport",
@@ -2439,7 +2439,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ab67060fc6b8ef687992d439ca0fa36e7ed17e9a0b16b25b601e8757df720de"
 dependencies = [
  "data-encoding",
- "syn 1.0.109",
+ "syn 2.0.117",
 ]
 
 [[package]]
@@ -2805,7 +2805,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4283,8 +4283,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "1.7.0"
-source = "git+https://github.com/hoprnet/hopr-api?branch=main#23335c70eb5dc87609ebfcf345ae393151f49250"
+version = "1.8.0"
+source = "git+https://github.com/hoprnet/hopr-api?rev=d24e705412baca373b439bc8a61e6124c04ecaad#d24e705412baca373b439bc8a61e6124c04ecaad"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -4292,7 +4292,7 @@ dependencies = [
  "chrono",
  "futures",
  "futures-concurrency",
- "hopr-types 1.5.3",
+ "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "libp2p-identity",
  "multiaddr",
  "serde",
@@ -4370,7 +4370,7 @@ dependencies = [
  "anyhow",
  "hex",
  "hopr-platform",
- "hopr-types 1.5.3",
+ "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "insta",
  "scrypt",
  "serde",
@@ -4394,7 +4394,7 @@ dependencies = [
  "hex-literal",
  "hopr-crypto-sphinx",
  "hopr-parallelize",
- "hopr-types 1.5.3",
+ "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static",
  "mimalloc",
  "parameterized",
@@ -4417,7 +4417,7 @@ dependencies = [
  "elliptic-curve",
  "generic-array 1.3.5",
  "hex",
- "hopr-types 1.5.3",
+ "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "k256",
  "parameterized",
  "postcard",
@@ -4546,7 +4546,7 @@ dependencies = [
  "hickory-resolver",
  "hopr-async-runtime",
  "hopr-metrics",
- "hopr-types 1.5.3",
+ "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static",
  "libp2p-identity",
  "multiaddr",
@@ -4593,7 +4593,7 @@ version = "1.0.1"
 dependencies = [
  "anyhow",
  "hopr-crypto-packet",
- "hopr-types 1.5.3",
+ "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde",
  "serde_bytes",
  "strum 0.28.0",
@@ -4658,7 +4658,7 @@ dependencies = [
  "hopr-metrics",
  "hopr-network-types",
  "hopr-protocol-app",
- "hopr-types 1.5.3",
+ "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "indexmap 2.14.0",
  "insta",
  "lazy_static",
@@ -4869,7 +4869,7 @@ dependencies = [
  "futures-timer",
  "hopr-metrics",
  "hopr-transport-mixer",
- "hopr-types 1.5.3",
+ "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "humantime-serde",
  "insta",
  "lazy_static",
@@ -4925,7 +4925,7 @@ dependencies = [
  "hopr-network-graph",
  "hopr-protocol-hopr",
  "hopr-statistics",
- "hopr-types 1.5.3",
+ "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static",
  "moka",
  "smart-default",
@@ -5036,7 +5036,7 @@ dependencies = [
  "hopr-protocol-session",
  "hopr-protocol-start",
  "hopr-transport-tag-allocator",
- "hopr-types 1.5.3",
+ "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "humantime-serde",
  "insta",
  "lazy_static",
@@ -5075,9 +5075,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-types"
-version = "1.5.3"
+version = "1.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3efb3f42c72ab2b00945ba3bd581131a2679fb3f3672940828730d402d8733a3"
+checksum = "0d918bfe437f576b2395aa776e12bf678ba652fee5085a6ce77c8355f11fbbb0"
 dependencies = [
  "aes",
  "anyhow",
@@ -5260,7 +5260,6 @@ dependencies = [
  "hopr-async-runtime",
  "hopr-lib",
  "hopr-metrics",
- "hopr-network-graph",
  "hopr-utils-session",
  "human-bandwidth",
  "lazy_static",
@@ -5317,7 +5316,7 @@ dependencies = [
  "hopr-chain-connector",
  "hopr-lib",
  "hopr-reference",
- "hopr-types 1.5.3",
+ "hopr-types 1.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "hoprd",
  "hoprd-api",
  "hoprd-api-client",
@@ -5492,7 +5491,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.6.3",
  "system-configuration",
  "tokio",
  "tower-service",
@@ -5887,7 +5886,7 @@ dependencies = [
  "portable-atomic",
  "portable-atomic-util",
  "serde_core",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6850,7 +6849,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7817,7 +7816,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash",
  "rustls",
- "socket2 0.5.10",
+ "socket2 0.6.3",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -7854,7 +7853,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.5.10",
+ "socket2 0.6.3",
  "tracing",
  "windows-sys 0.60.2",
 ]
@@ -8422,7 +8421,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -9157,7 +9156,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a766e1110788c36f4fa1c2b71b387a7815aa65f88ce0229841826633d93723e"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -9357,7 +9356,7 @@ dependencies = [
  "getrandom 0.4.2",
  "once_cell",
  "rustix",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -10436,7 +10435,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
