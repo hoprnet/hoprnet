@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: branches-${{ github.ref_name }}
+  group: branches-${{ github.ref_name }}-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:
@@ -39,3 +39,87 @@ jobs:
     secrets:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
       codecov_token: ${{ secrets.CODECOV_TOKEN }}
+  build-benchmarks:
+    name: Build Benchmarks
+    needs: coverage
+    runs-on: self-hosted-hoprnet-bigger
+    permissions:
+      contents: read
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          disable-sudo: true
+          egress-policy: audit
+      - name: Setup Nix
+        uses: hoprnet/hopr-workflows/actions/setup-nix@43b03a7b5df777770d95c6524f48be34184b26fa # setup-nix-v1
+        with:
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Build benchmarks
+        run: nix build -L .#bench-build
+  run-benchmarks:
+    name: Run Benchmarks
+    needs: build-benchmarks
+    runs-on: self-hosted-hoprnet-bigger
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          disable-sudo: true
+          egress-policy: audit
+      - name: Setup Nix
+        uses: hoprnet/hopr-workflows/actions/setup-nix@43b03a7b5df777770d95c6524f48be34184b26fa # setup-nix-v1
+        with:
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Install Bencher CLI
+        uses: bencherdev/bencher@0f8f620172ccd6225d40a7590598eb7b41718af8
+      - name: Execute and Upload
+        id: bencher
+        shell: bash
+        run: |
+          set +e
+          # Capture stdout and stderr, tee to file
+          bencher run \
+            --project "$BENCHER_PROJECT" \
+            --token "$BENCHER_API_TOKEN" \
+            --adapter rust_criterion \
+            --branch "$GITHUB_REF_NAME" \
+            --err \
+            "nix run .#bench-run" 2>&1 | tee bencher_output.txt
+          EXIT_CODE=${PIPESTATUS[0]}
+          set -e
+
+          # Extract Bencher Report URL
+          BENCHER_REPORT_URL=$(grep -oE "https://bencher.dev/console/projects/${BENCHER_PROJECT}/reports/[^[:space:]]+" bencher_output.txt | head -n 1)
+          echo "bencher_report_url=${BENCHER_REPORT_URL:-https://bencher.dev/console/projects/${BENCHER_PROJECT}}" >> "$GITHUB_OUTPUT"
+
+          exit $EXIT_CODE
+        env:
+          BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BENCHER_PROJECT: ${{ github.event.repository.name }}
+      - name: Notify performance drop
+        uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
+        if: failure()
+        with:
+          api-key: ${{ secrets.ZULIP_API_KEY }}
+          email: ${{ secrets.ZULIP_EMAIL }}
+          organization-url: "https://hopr.zulipchat.com"
+          type: "stream"
+          to: "HOPRd"
+          topic: "Benchmark regressions"
+          content: |
+            The benchmark results for branch `${{ github.repository }} ${{ github.ref_name }}` at commit (${{ github.sha }}) have dropped, or failed.
+
+            Please check the specific [Bencher Report](${{ steps.bencher.outputs.bencher_report_url }}) for more details.

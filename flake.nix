@@ -348,9 +348,15 @@
           );
 
           # Compile benchmarks without running them, used for CI build verification.
-          bench-build = rust-builder-local.callPackage nixLib.mkRustPackage (
-            projectBuildArgs // { buildBench = true; }
-          );
+          bench-build =
+            (rust-builder-local.callPackage nixLib.mkRustPackage (projectBuildArgs // { buildBench = true; }))
+            .overrideAttrs
+              (old: {
+                postInstall = (if old.postInstall or null != null then old.postInstall else "") + ''
+                  mkdir -p $out/bin
+                  find target -maxdepth 4 -type f -executable -exec cp {} $out/bin/ \;
+                '';
+              });
 
           profileDeps = with pkgs; [
             gdb
@@ -774,6 +780,19 @@
             inherit update-github-labels find-port-ci;
             check = run-check;
             audit = run-audit;
+            bench-run = {
+              type = "app";
+              program = toString (
+                pkgs.writeShellScript "bench-run" ''
+                  set -euo pipefail
+                  nix build -L .#bench-build
+                  for bin in result/bin/*; do
+                    $bin --bench
+                  done
+                ''
+              );
+              meta.description = "Run all benchmarks";
+            };
           };
 
           packages =
