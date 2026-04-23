@@ -42,15 +42,21 @@ jobs:
   benchmarks:
     name: Benchmarks
     needs: coverage
-    uses: hoprnet/hopr-workflows/.github/workflows/benchmarks.yaml@main
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+    uses: hoprnet/hopr-workflows/.github/workflows/benchmarks.yaml@emilmajchrzak-dev-59-unify-running-benchmarks
     with:
       source_branch: ${{ github.ref_name }}
       runner: self-hosted-hoprnet-bigger
-      project: ${{ github.event.repository.name }}
-      run_benchmarks: true
-      is_pr: false
+      bencher_project: ${{ github.event.repository.name }}
+      should_build: true
+      should_execute: true
+      build_command: "nix build -L .#bench-build"
+      run_command: "nix run .#bench-run"
     secrets:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
       bencher_api_token: ${{ secrets.BENCHER_API_TOKEN }}
-      zulip_api_key: ${{ secrets.ZULIP_API_KEY }}
-      zulip_email: ${{ secrets.ZULIP_EMAIL }}
+      ZULIP_API_KEY: ${{ secrets.ZULIP_API_KEY }}
+      ZULIP_EMAIL: ${{ secrets.ZULIP_EMAIL }}

@@ -126,15 +126,23 @@ jobs:
     name: Benchmarks
     needs: [tests]
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-    uses: hoprnet/hopr-workflows/.github/workflows/benchmarks.yaml@main
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+    uses: hoprnet/hopr-workflows/.github/workflows/benchmarks.yaml@emilmajchrzak-dev-59-unify-running-benchmarks
     with:
       source_branch: ${{ github.event.pull_request.head.ref }}
       runner: self-hosted-hoprnet-bigger
-      project: ${{ github.event.repository.name }}
-      run_benchmarks: false
-      is_pr: true
+      bencher_project: ${{ github.event.repository.name }}
+      should_build: true
+      should_execute: false
+      build_command: "nix build -L .#bench-build"
+      run_command: "nix run .#bench-run"
     secrets:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      ZULIP_API_KEY: ${{ secrets.ZULIP_API_KEY }}
+      ZULIP_EMAIL: ${{ secrets.ZULIP_EMAIL }}
 
   build-binaries:
     name: Binary ${{ matrix.architecture }}
