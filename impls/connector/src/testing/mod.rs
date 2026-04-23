@@ -1,7 +1,8 @@
 mod emulator;
 
 pub use blokli_client::{BlokliTestClient, BlokliTestState, exports::Entry};
-pub use emulator::{FullStateEmulator, StaticState};
+use blokli_client::BlokliTestStateMutator;
+pub use emulator::{FullStateEmulator, StaticState, ChainMutator};
 pub use hopr_api::chain::ChainInfo;
 use hopr_api::{
     chain::DeployedSafe,
@@ -98,10 +99,12 @@ impl BlokliTestStateBuilder {
                             blokli_client::api::types::Safe {
                                 address: safe_addr,
                                 chain_key: hex::encode(account.chain_addr),
+                                owners: vec![hex::encode(account.chain_addr)],
                                 module_address: hex::encode(
                                     &Hash::create(&[account.chain_addr.as_ref()]).as_ref()[0..Address::SIZE],
                                 ),
                                 registered_nodes: vec![],
+                                threshold: None,
                             },
                         );
                     }
@@ -158,8 +161,10 @@ impl BlokliTestStateBuilder {
                 blokli_client::api::types::Safe {
                     address: hex::encode(safe.address),
                     chain_key: hex::encode(safe.owner),
+                    owners: vec![hex::encode(safe.owner)],
                     module_address: hex::encode(safe.module),
                     registered_nodes: safe.registered_nodes.into_iter().map(hex::encode).collect(),
+                    threshold: None,
                 },
             )
         }));
@@ -328,7 +333,17 @@ impl BlokliTestStateBuilder {
     /// client will see the changes made by others.
     #[must_use]
     pub fn build_dynamic_client(self, module_address: Address) -> BlokliTestClient<FullStateEmulator> {
-        BlokliTestClient::new(self.0, FullStateEmulator(module_address, None))
+        self.build_dynamic_client_with_mutator(FullStateEmulator(module_address, None))
+    }
+
+    /// Builds the state and returns a [`BlokliTestClient`] that can also mutate the state.
+    ///
+    /// This is useful for more advanced dynamic tests which involve on-chain interactions.
+    ///
+    /// See [`BlokliTestStateBuilder::build_dynamic_client`] for simplified usage.
+    #[must_use]
+    pub fn build_dynamic_client_with_mutator<M: BlokliTestStateMutator>(self, mutator: M) -> BlokliTestClient<M> {
+        BlokliTestClient::new(self.0, mutator)
     }
 
     /// Similar to [`BlokliTestStateBuilder::build_dynamic_client`], but also creates

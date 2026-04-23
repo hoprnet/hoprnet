@@ -1569,8 +1569,8 @@ dependencies = [
 
 [[package]]
 name = "blokli-client"
-version = "0.24.0"
-source = "git+https://github.com/hoprnet/blokli?branch=main#23fc52217df1173efd680e94c0393ba76b4ecac7"
+version = "0.25.0"
+source = "git+https://github.com/hoprnet/blokli?branch=lukas%2Fallow-internal-tx-failure-state-in-tests#042bdca4a3141deda6e5f0eac1e3576f920006c7"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -8810,7 +8810,7 @@ checksum = "f83ad47c2f14654528a89495f8d0dbc64173176f8512c7c72386cbe81009f661"
 dependencies = [
  "ahash",
  "annotate-snippets",
- "base64 0.22.1",
+ "base64 0.21.7",
  "encoding_rs_io",
  "getrandom 0.3.4",
  "nohash-hasher",
