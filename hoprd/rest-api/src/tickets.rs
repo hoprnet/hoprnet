@@ -7,7 +7,10 @@ use axum::{
 };
 use hopr_lib::{
     Address, ChannelStatus, HoprBalance, IncentiveChannelOperations, IncentiveRedeemOperations,
-    api::{node::HasChainApi, tickets::ChannelStats},
+    api::{
+        node::{HasChainApi, HasTicketManagement},
+        tickets::ChannelStats,
+    },
     prelude::Hash,
 };
 use serde::Deserialize;
@@ -99,7 +102,11 @@ impl From<ChannelStats> for NodeTicketStatisticsResponse {
         ),
         tag = "Tickets"
     )]
-pub(super) async fn show_ticket_statistics(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+pub(super) async fn show_ticket_statistics<
+    H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + HasTicketManagement + Send + Sync + 'static,
+>(
+    State(state): State<Arc<InternalState<H>>>,
+) -> impl IntoResponse {
     let hopr = state.hopr.clone();
     match hopr.ticket_statistics() {
         Ok(stats) => (StatusCode::OK, Json(NodeTicketStatisticsResponse::from(stats))).into_response(),
@@ -154,8 +161,10 @@ pub(crate) struct RedeemTicketsRequest {
         ),
         tag = "Tickets"
     )]
-pub(super) async fn redeem_tickets(
-    State(state): State<Arc<InternalState>>,
+pub(super) async fn redeem_tickets<
+    H: HasChainApi<ChainError = hopr_lib::errors::HoprLibError> + HasTicketManagement + Send + Sync + 'static,
+>(
+    State(state): State<Arc<InternalState<H>>>,
     Json(req): Json<RedeemTicketsRequest>,
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
@@ -288,5 +297,50 @@ mod tests {
         assert_eq!(json["channelEpoch"], 2);
         assert_eq!(json["signature"], "0xdeadbeef");
         assert!(json.get("channelId").is_some());
+    }
+
+    // ── Endpoint-level tests ───────────────────────────────────────────────
+
+    use std::sync::Arc;
+
+    use axum::{Router, body::Body, http::Request, routing::get};
+    use tower::ServiceExt;
+
+    use crate::testing::MockChainNode;
+
+    fn tickets_router(node: MockChainNode) -> Router {
+        let state = Arc::new(crate::InternalState {
+            hoprd_cfg: serde_json::Value::Null,
+            auth: Arc::new(crate::config::Auth::Token("test".into())),
+            hopr: Arc::new(node),
+            open_listeners: Arc::new(hopr_utils_session::ListenerJoinHandles::default()),
+            default_listen_host: "127.0.0.1:0".parse().unwrap(),
+        });
+
+        Router::new()
+            .route("/tickets/statistics", get(show_ticket_statistics::<MockChainNode>))
+            .with_state(state)
+    }
+
+    #[tokio::test]
+    async fn ticket_statistics_should_return_stats() -> anyhow::Result<()> {
+        let node = MockChainNode::random();
+
+        let resp = tickets_router(node)
+            .oneshot(Request::get("/tickets/statistics").body(Body::empty())?)
+            .await?;
+
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX).await?;
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
+
+        // StubTicketManager::ticket_stats returns ChannelStats::default() (all zeros)
+        assert_eq!(json["winningCount"], 0);
+        assert!(json["unredeemedValue"].is_string());
+        assert!(json["neglectedValue"].is_string());
+        assert!(json["rejectedValue"].is_string());
+
+        Ok(())
     }
 }

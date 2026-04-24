@@ -473,7 +473,7 @@ mod tests {
 
         let rtt = std::time::Duration::from_millis(80);
         let telemetry: Result<EdgeTransportTelemetry<TestNeighbor, TestPath>, NetworkGraphError<TestPath>> =
-            Ok(EdgeTransportTelemetry::Neighbor(TestNeighbor { peer: peer, rtt }));
+            Ok(EdgeTransportTelemetry::Neighbor(TestNeighbor { peer, rtt }));
         graph.record_edge(hopr_api::graph::MeasurableEdge::Probe(telemetry));
 
         assert!(graph.has_edge(&me, &peer), "probe should create edge via upsert");
@@ -494,7 +494,7 @@ mod tests {
         for _ in 0..5 {
             let telemetry: Result<EdgeTransportTelemetry<TestNeighbor, TestPath>, NetworkGraphError<TestPath>> =
                 Ok(EdgeTransportTelemetry::Neighbor(TestNeighbor {
-                    peer: peer,
+                    peer,
                     rtt: std::time::Duration::from_millis(60),
                 }));
             graph.record_edge(hopr_api::graph::MeasurableEdge::Probe(telemetry));
