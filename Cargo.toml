@@ -300,4 +300,4 @@ similar.opt-level = 3
 ignored = ["oas3", "serde_bytes", "humantime-serde"]
 
 [patch.crates-io]
-hopr-api = { path = "/Users/teebor/Fun/hoprnet.org/hopr-api" }
+hopr-api = { git = "https://github.com/hoprnet/hopr-api", rev = "714ac8c991c0444b7d1acd1a92119ba2252a4a12" }
