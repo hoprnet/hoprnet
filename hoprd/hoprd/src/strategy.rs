@@ -3,10 +3,6 @@
 //! This module owns:
 //! - [`hopr_default_strategies`] — the default HOPRd strategy configuration
 //! - [`build_strategies`] — maps a [`MultiStrategyConfig`] to a runnable [`MultiStrategy`]
-//!
-//! Separating dispatch here (rather than inside `hopr-strategy`) keeps the library crate
-//! free of application-specific concerns and allows external strategies to be composed
-//! alongside the built-in ones.
 
 use std::{sync::Arc, time::Duration};
 
