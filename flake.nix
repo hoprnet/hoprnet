@@ -352,9 +352,14 @@
             (rust-builder-local.callPackage nixLib.mkRustPackage (projectBuildArgs // { buildBench = true; }))
             .overrideAttrs
               (old: {
-                postInstall = (if old.postInstall or null != null then old.postInstall else "") + ''
-                  mkdir -p $out/bin
-                  find target -maxdepth 4 -type f -executable -exec cp {} $out/bin/ \;
+                postInstall = (if old ? postInstall && old.postInstall != null then old.postInstall else "") + ''
+                  mkdir -p "$out/bin"
+                  # Find actual executables in deps/, excluding libraries, metadata, and integration tests
+                  find target -maxdepth 4 -path '*/deps/*' -type f -executable \
+                    -not -name "lib*" \
+                    -not -name "*.*" \
+                    -not -name "*test*" \
+                    -exec cp {} "$out/bin/" \;
                 '';
               });
 
@@ -786,8 +791,14 @@
                 pkgs.writeShellScript "bench-run" ''
                   set -euo pipefail
                   nix build -L .#bench-build
-                  for bin in result/bin/*; do
-                    $bin --bench
+                  shopt -s nullglob
+                  bins=(result/bin/*)
+                  if [ ''${#bins[@]} -eq 0 ]; then
+                    echo "No benchmark binaries found under result/bin" >&2
+                    exit 1
+                  fi
+                  for bin in "''${bins[@]}"; do
+                    "$bin" --bench
                   done
                 ''
               );

@@ -136,7 +136,7 @@ jobs:
       runner: self-hosted-hoprnet-bigger
       bencher_project: ${{ github.event.repository.name }}
       should_build: true
-      should_execute: false
+      should_run: false
       build_command: "nix build -L .#bench-build"
       run_command: "nix run .#bench-run"
     secrets:
