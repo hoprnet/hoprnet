@@ -529,30 +529,50 @@ where
 {
     fn subscribe_to_actionable_events(
         &self,
+        filter: Option<&[hopr_api::node::ActionableEventDiscriminant]>,
     ) -> Result<futures::stream::BoxStream<'static, hopr_api::node::ActionableEvent>, String> {
-        use futures_concurrency::prelude::*;
-        use hopr_api::node::ActionableEvent;
+        use futures::StreamExt as _;
+        use hopr_api::node::{ActionableEvent, ActionableEventDiscriminant};
 
-        let chain_stream = self
-            .chain_api
-            .subscribe()
-            .map_err(|e| e.to_string())?
-            .map(ActionableEvent::Chain);
+        let wants = |d: ActionableEventDiscriminant| filter.is_none_or(|f| f.contains(&d));
 
-        let network_stream = self
-            .transport_api
-            .subscribe_network_events()
-            .map(ActionableEvent::Network);
+        let mut streams = Vec::<futures::stream::BoxStream<'static, ActionableEvent>>::new();
 
-        let ticket_stream = self
-            .ticket_event_subscribers
-            .1
-            .activate_cloned()
-            .map(ActionableEvent::Ticket);
+        if wants(ActionableEventDiscriminant::Chain) {
+            streams.push(
+                self.chain_api
+                    .subscribe()
+                    .map_err(|e| e.to_string())?
+                    .map(ActionableEvent::Chain)
+                    .boxed(),
+            );
+        }
 
-        // `Merge` rotates the starting stream on every poll, preventing any single
-        // source from starving the others under burst conditions.
-        Ok((chain_stream, network_stream, ticket_stream).merge().boxed())
+        if wants(ActionableEventDiscriminant::Network) {
+            streams.push(
+                self.transport_api
+                    .subscribe_network_events()
+                    .map(ActionableEvent::Network)
+                    .boxed(),
+            );
+        }
+
+        if wants(ActionableEventDiscriminant::Ticket) {
+            streams.push(
+                self.ticket_event_subscribers
+                    .1
+                    .activate_cloned()
+                    .map(ActionableEvent::Ticket)
+                    .boxed(),
+            );
+        }
+
+        if streams.is_empty() {
+            return Ok(futures::stream::empty().boxed());
+        }
+
+        // `select_all` round-robins across active sources, preventing starvation.
+        Ok(futures::stream::select_all(streams).boxed())
     }
 }
 

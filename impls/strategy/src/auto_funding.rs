@@ -25,7 +25,7 @@ use hopr_lib::{
             ChainReadChannelOperations, ChainReadSafeOperations, ChainValues, ChainWriteChannelOperations,
             ChannelSelector, SafeSelector,
         },
-        node::{ActionableEventSource, HasChainApi},
+        node::{ActionableEventDiscriminant, ActionableEventSource, HasChainApi},
     },
 };
 use serde::{Deserialize, Serialize};
@@ -296,7 +296,7 @@ where
         let tick_stream = futures_time::stream::interval(self.interval.into()).map(|_| Event::Tick);
         let event_stream = self
             .node
-            .subscribe_to_actionable_events()
+            .subscribe_to_actionable_events(Some(&[ActionableEventDiscriminant::Chain]))
             .map_err(|e| StrategyError::Other(anyhow::anyhow!(e)))?
             .map(|e| Event::Actionable(Box::new(e)));
 
@@ -453,6 +453,7 @@ mod tests {
     {
         fn subscribe_to_actionable_events(
             &self,
+            _filter: Option<&[ActionableEventDiscriminant]>,
         ) -> Result<futures::stream::BoxStream<'static, ActionableEvent>, String> {
             Ok(self
                 .0

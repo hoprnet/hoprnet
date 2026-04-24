@@ -4429,7 +4429,7 @@ dependencies = [
 [[package]]
 name = "hopr-api"
 version = "1.9.0"
-source = "git+https://github.com/hoprnet/hopr-api?rev=714ac8c991c0444b7d1acd1a92119ba2252a4a12#714ac8c991c0444b7d1acd1a92119ba2252a4a12"
+source = "git+https://github.com/hoprnet/hopr-api?rev=54fe63329ef0c4d10ef03786f080defb61912bd6#54fe63329ef0c4d10ef03786f080defb61912bd6"
 dependencies = [
  "async-trait",
  "atomic_enum",

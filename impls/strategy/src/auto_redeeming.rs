@@ -17,7 +17,10 @@ use hopr_lib::{
     ChannelChange, ChannelDirection, ChannelEntry, ChannelId, ChannelStatus, HoprBalance, VerifiedTicket,
     api::{
         chain::{ChainEvent, ChainReadChannelOperations, ChainWriteTicketOperations, ChannelSelector},
-        node::{ActionableEvent, ActionableEventSource, HasChainApi, HasTicketManagement, TicketEvent},
+        node::{
+            ActionableEvent, ActionableEventDiscriminant, ActionableEventSource, HasChainApi, HasTicketManagement,
+            TicketEvent,
+        },
         tickets::TicketManagement,
     },
 };
@@ -327,7 +330,10 @@ where
         let tick_stream = futures_time::stream::interval(self.interval.into()).map(|_| Event::Tick);
         let event_stream = self
             .node
-            .subscribe_to_actionable_events()
+            .subscribe_to_actionable_events(Some(&[
+                ActionableEventDiscriminant::Chain,
+                ActionableEventDiscriminant::Ticket,
+            ]))
             .map_err(|e| StrategyError::Other(anyhow::anyhow!(e)))?
             .map(|e| Event::Actionable(Box::new(e)));
 
@@ -551,6 +557,7 @@ mod tests {
     {
         fn subscribe_to_actionable_events(
             &self,
+            _filter: Option<&[ActionableEventDiscriminant]>,
         ) -> Result<futures::stream::BoxStream<'static, ActionableEvent>, String> {
             Ok(self
                 .chain
