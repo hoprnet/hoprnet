@@ -157,7 +157,7 @@ reqwest = { version = "0.13.2", default-features = false, features = [
 ringbuffer = "0.16.0"
 rust-stream-ext-concurrent = "2.0.0"
 rstest = { version = "0.26.1" }
-scrypt = { version = "0.11.0", default-features = false }
+scrypt = { version = "0.12.0", default-features = false }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_bytes = "0.11.19"
 serde_cbor_2 = "0.13.0"
@@ -215,7 +215,7 @@ typenum = "1.20.0"
 uuid = { version = "1.23.1" }
 validator = { version = "0.20.0", features = ["derive"] }
 vergen-gix = { version = "9.1.0", features = ["build"] }
-mimalloc = { version = "0.1.49", default-features = false, features = [
+mimalloc = { version = "0.1.50", default-features = false, features = [
   "secure",
 ] }
 
