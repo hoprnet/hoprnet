@@ -36,7 +36,7 @@ jobs:
             # - architecture: aarch64-darwin
             #   runner: depot-macos-15
             #   build_command: nix build -L .#binary-hoprd-aarch64-darwin
-    uses: hoprnet/hopr-workflows/.github/workflows/build-binaries.yaml@build-binaries-v2
+    uses: hoprnet/hopr-workflows/.github/workflows/build-binaries.yaml@a178becb8c3711ae955bad477861bfefe6feceae # build-binaries-v2
     permissions:
       contents: read
     with:
@@ -56,7 +56,7 @@ jobs:
     name: Docker
     needs: build-binaries
     if: github.event.pull_request.merged == true
-    uses: hoprnet/hopr-workflows/.github/workflows/build-docker.yaml@build-docker-v1
+    uses: hoprnet/hopr-workflows/.github/workflows/build-docker.yaml@43b03a7b5df777770d95c6524f48be34184b26fa # build-docker-v1
     permissions:
       contents: read
       pull-requests: write
