@@ -70,7 +70,7 @@ pub struct AutoFundingStrategyConfig {
     pub funding_amount: HoprBalance,
 }
 
-/// Builder for [`AutoFundingStrategyInner`].
+/// Builder for [`AutoFundingStrategy`].
 ///
 /// Call [`new`](AutoFundingStrategy::new) with the strategy configuration,
 /// then [`build`](AutoFundingStrategy::build) to wire in a node and obtain a

@@ -84,7 +84,7 @@ pub struct AutoRedeemingStrategyConfig {
     pub redeem_on_winning: bool,
 }
 
-/// Builder for [`AutoRedeemingStrategyInner`].
+/// Builder for [`AutoRedeemingStrategy`].
 ///
 /// Call [`new`](AutoRedeemingStrategy::new) with the strategy configuration,
 /// then [`build`](AutoRedeemingStrategy::build) to wire in a node and obtain a
