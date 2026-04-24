@@ -46,7 +46,7 @@ jobs:
       contents: read
       checks: write
       pull-requests: write
-    uses: hoprnet/hopr-workflows/.github/workflows/benchmarks.yaml@emilmajchrzak-dev-59-unify-running-benchmarks
+    uses: hoprnet/hopr-workflows/.github/workflows/benchmarks.yaml@c06be87b06af5bfcc48d98ebe95787c994e2d2c0 # workflow-benchmark-v1
     with:
       source_branch: ${{ github.ref_name }}
       runner: self-hosted-hoprnet-bigger
