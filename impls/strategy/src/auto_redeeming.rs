@@ -12,7 +12,7 @@ use std::{
 
 use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt};
-use hopr_async_runtime::{AbortableList, spawn_as_abortable};
+use hopr_async_runtime::{prelude::AbortHandle, spawn_as_abortable};
 use hopr_lib::{
     ChannelChange, ChannelDirection, ChannelEntry, ChannelId, ChannelStatus, HoprBalance, VerifiedTicket,
     api::{
@@ -21,7 +21,7 @@ use hopr_lib::{
         tickets::TicketManagement,
     },
 };
-use parking_lot::lock_api::RwLockUpgradableReadGuard;
+use moka::notification::RemovalCause;
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use validator::Validate;
@@ -30,6 +30,10 @@ use crate::{
     errors::{StrategyError, StrategyError::CriteriaNotSatisfied},
     strategy::Strategy as StrategyTrait,
 };
+
+/// Maximum time a single channel redemption run is allowed to take.
+/// Exceeded entries are logged as errors and their tasks are aborted.
+const REDEMPTION_TIMEOUT: Duration = Duration::from_secs(300);
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
@@ -111,11 +115,21 @@ impl AutoRedeemingStrategy {
         N::ChainApi: ChainReadChannelOperations + ChainWriteTicketOperations + Clone + Send + Sync + 'static,
         N::TicketManager: TicketManagement + Clone + Send + Sync + 'static,
     {
+        let running_redemptions = moka::sync::CacheBuilder::new(1024)
+            .time_to_live(REDEMPTION_TIMEOUT)
+            .eviction_listener(|key: Arc<ChannelId>, value: AbortHandle, cause| {
+                if matches!(cause, RemovalCause::Expired) {
+                    tracing::error!(%key, "redemption timed out after {:?}; aborting", REDEMPTION_TIMEOUT);
+                }
+                value.abort();
+            })
+            .build();
+
         Box::new(AutoRedeemingStrategyInner {
             cfg: self.cfg,
             interval: self.interval,
             node,
-            running_redemptions: Arc::new(parking_lot::RwLock::new(AbortableList::default())),
+            running_redemptions,
         })
     }
 }
@@ -127,8 +141,12 @@ struct AutoRedeemingStrategyInner<N: HasChainApi + HasTicketManagement> {
     node: Arc<N>,
     cfg: AutoRedeemingStrategyConfig,
     interval: Duration,
-    // Makes sure all ongoing ticket redemptions to be terminated once the strategy is dropped.
-    running_redemptions: Arc<parking_lot::RwLock<AbortableList<ChannelId>>>,
+    /// Bookkeeping for in-progress per-channel redemptions.
+    ///
+    /// Entries are removed when a redemption completes naturally (via [`moka::sync::Cache::invalidate`]).
+    /// Entries that exceed [`REDEMPTION_TIMEOUT`] are evicted by the cache; the eviction listener
+    /// logs an error and aborts the background task.
+    running_redemptions: moka::sync::Cache<ChannelId, AbortHandle>,
 }
 
 impl<N> AutoRedeemingStrategyInner<N>
@@ -139,49 +157,43 @@ where
     <N as HasTicketManagement>::TicketManager: TicketManagement + Clone + Send + Sync + 'static,
 {
     fn enqueue_redemption(&self, channel_id: &ChannelId) -> Result<(), StrategyError> {
-        let redemptions = self.running_redemptions.upgradable_read();
-        if !redemptions.contains(channel_id) {
-            tracing::debug!(%channel_id, "attempting to start redemption in channel");
-
-            let tmgr = self.node.ticket_management().clone();
-            let client = self.node.chain_api().clone();
-            let min_value = self.cfg.minimum_redeem_ticket_value;
-            let channel_id = *channel_id;
-            let redemptions_clone = self.running_redemptions.clone();
-
-            RwLockUpgradableReadGuard::upgrade(redemptions).insert(
-                channel_id,
-                spawn_as_abortable!(async move {
-                    let redeem_result = match tmgr
-                        .redeem_stream(client.clone(), channel_id, min_value.into())
-                        .map_err(StrategyError::other)
-                    {
-                        Ok(stream) => {
-                            stream
-                                .map_err(StrategyError::other)
-                                .try_for_each(|res| {
-                                    tracing::debug!(?res, %channel_id, "ticket redemption completed");
-                                    futures::future::ok(())
-                                })
-                                .await
-                        }
-                        err => {
-                            // Add small delay to avoid the write lock acquired for insertion
-                            // still being held.
-                            hopr_async_runtime::prelude::sleep(Duration::from_millis(100)).await;
-                            err.map(|_| ())
-                        }
-                    };
-
-                    tracing::debug!(?redeem_result, %channel_id, "redemption in channel complete");
-                    redemptions_clone.write().abort_one(&channel_id);
-                }),
-            );
-            Ok(())
-        } else {
+        if self.running_redemptions.contains_key(channel_id) {
             tracing::debug!(%channel_id, "existing on-going redemption");
-            Err(StrategyError::InProgress)
+            return Err(StrategyError::InProgress);
         }
+
+        tracing::debug!(%channel_id, "attempting to start redemption in channel");
+
+        let tmgr = self.node.ticket_management().clone();
+        let client = self.node.chain_api().clone();
+        let min_value = self.cfg.minimum_redeem_ticket_value;
+        let channel_id = *channel_id;
+        let redemptions = self.running_redemptions.clone();
+
+        let abort_handle = spawn_as_abortable!(async move {
+            let redeem_result = match tmgr
+                .redeem_stream(client.clone(), channel_id, min_value.into())
+                .map_err(StrategyError::other)
+            {
+                Ok(stream) => {
+                    stream
+                        .map_err(StrategyError::other)
+                        .try_for_each(|res| {
+                            tracing::debug!(?res, %channel_id, "ticket redemption completed");
+                            futures::future::ok(())
+                        })
+                        .await
+                }
+                err => err.map(|_| ()),
+            };
+
+            tracing::debug!(?redeem_result, %channel_id, "redemption in channel complete");
+            // Remove the entry so the cache does not eventually time it out.
+            redemptions.invalidate(&channel_id);
+        });
+
+        self.running_redemptions.insert(channel_id, abort_handle);
+        Ok(())
     }
 
     /// Handle an acknowledged winning ticket. Called from `run()` on `TicketEvent::WinningTicket`.
@@ -532,11 +544,23 @@ mod tests {
         }
     }
 
-    async fn await_redemption_queue_empty(redeems: Arc<parking_lot::RwLock<AbortableList<ChannelId>>>) {
+    fn make_redemptions_cache() -> moka::sync::Cache<ChannelId, AbortHandle> {
+        moka::sync::CacheBuilder::new(1024)
+            .time_to_live(REDEMPTION_TIMEOUT)
+            .eviction_listener(|key: Arc<ChannelId>, value: AbortHandle, cause| {
+                if matches!(cause, RemovalCause::Expired) {
+                    tracing::error!(%key, "redemption timed out; aborting (test cache)");
+                }
+                value.abort();
+            })
+            .build()
+    }
+
+    async fn await_redemption_queue_empty(redeems: moka::sync::Cache<ChannelId, AbortHandle>) {
         loop {
             hopr_async_runtime::prelude::sleep(Duration::from_millis(100)).await;
-
-            if redeems.read().is_empty() {
+            redeems.run_pending_tasks();
+            if redeems.entry_count() == 0 {
                 break;
             }
         }
@@ -551,7 +575,7 @@ mod tests {
             cfg,
             interval: Duration::from_secs(60),
             node: Arc::new(TestNode { chain: connector, tmgr }),
-            running_redemptions: Arc::new(parking_lot::RwLock::new(AbortableList::default())),
+            running_redemptions: make_redemptions_cache(),
         }
     }
 

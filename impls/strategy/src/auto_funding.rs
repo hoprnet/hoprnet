@@ -144,7 +144,8 @@ where
     /// Attempt to fund a channel if not already in-flight.
     ///
     /// Returns `Ok(true)` if a funding task was spawned, `Ok(false)` if skipped.
-    async fn try_fund_channel(&self, channel: &ChannelEntry) -> crate::errors::Result<bool> {
+    /// This function is synchronous: the actual chain call is dispatched to a background task.
+    fn try_fund_channel(&self, channel: &ChannelEntry) -> crate::errors::Result<bool> {
         let channel_id = *channel.get_id();
 
         if !self.in_flight.insert(channel_id) {
@@ -243,7 +244,7 @@ where
                     break;
                 }
 
-                match self.try_fund_channel(&channel).await {
+                match self.try_fund_channel(&channel) {
                     Ok(true) => safe_balance_budget -= self.cfg.funding_amount,
                     Ok(false) => {}
                     Err(e) => warn!(%channel, error = %e, "on_tick: failed to fund channel"),
@@ -314,7 +315,7 @@ where
                         if ch.direction(&me) == Some(ChannelDirection::Outgoing)
                             && ch.balance.le(&self.cfg.min_stake_threshold)
                             && ch.status == ChannelStatus::Open
-                            && let Err(e) = self.try_fund_channel(&ch).await
+                            && let Err(e) = self.try_fund_channel(&ch)
                         {
                             warn!(%ch, %e, "failed to fund channel on balance decrease event");
                         }
@@ -366,7 +367,7 @@ where
         }
 
         if new.le(&self.cfg.min_stake_threshold) && channel.status == ChannelStatus::Open {
-            self.try_fund_channel(channel).await?;
+            self.try_fund_channel(channel)?;
         }
         Ok(())
     }
