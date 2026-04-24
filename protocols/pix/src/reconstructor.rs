@@ -7,7 +7,7 @@ use vsss_rs::{
 };
 
 use crate::{
-    CompletedShare, Element, PartialSsaShare, PartialSsaShareVerifier, PixSpec, Scalar, SsaPolynomialIndex,
+    CompletedShare, PixGroup, PartialSsaShare, PartialSsaShareVerifier, PixSpec, PixScalar, SsaPolynomialIndex,
     complete_share, errors,
     types::{EncryptedPartialSsaShare, SsaIndex},
 };
@@ -17,19 +17,19 @@ pub type AffineElement<S> = <<S as PixSpec>::Curve as CurveArithmetic>::AffinePo
 struct SsaBuilder<S: PixSpec> {
     commitment: AffineElement<S>,
     num_parts: usize,
-    builder: Scalar<S>,
+    builder: PixScalar<S>,
 }
 
 impl<S: PixSpec> SsaBuilder<S> {
-    pub fn new(commitment: Element<S>, num_parts: NonZeroUsize) -> Self {
+    pub fn new(commitment: PixGroup<S>, num_parts: NonZeroUsize) -> Self {
         Self {
             commitment: commitment.to_affine(),
             num_parts: num_parts.get(),
-            builder: Scalar::<S>::default(),
+            builder: PixScalar::<S>::default(),
         }
     }
 
-    pub fn add_ssa_part(&mut self, sub_secret: Scalar<S>) -> errors::Result<Option<Scalar<S>>> {
+    pub fn add_ssa_part(&mut self, sub_secret: PixScalar<S>) -> errors::Result<Option<PixScalar<S>>> {
         if let Some(n) = self.num_parts.checked_sub(1) {
             self.builder += sub_secret;
             if n > 0 {
@@ -38,7 +38,7 @@ impl<S: PixSpec> SsaBuilder<S> {
             }
         }
 
-        if self.commitment == (Element::<S>::generator() * self.builder).to_affine() {
+        if self.commitment == (PixGroup::<S>::generator() * self.builder).to_affine() {
             Ok(Some(self.builder))
         } else {
             Err(errors::PixError::InvalidSsa)
@@ -61,10 +61,10 @@ impl<S: PixSpec> SsaPartReconstructor<S> {
 
     pub fn add_share(
         &mut self,
-        spi: SsaPolynomialIndex<S::Pseudonym>,
+        spi: SsaPolynomialIndex<S>,
         msg: impl AsRef<[u8]>,
         share: PartialSsaShare<S>,
-    ) -> errors::Result<Option<Scalar<S>>> {
+    ) -> errors::Result<Option<PixScalar<S>>> {
         let share = complete_share(spi, msg, &share)?;
 
         self.verifier.verify_complete_share(&share)?;
@@ -77,9 +77,9 @@ impl<S: PixSpec> SsaPartReconstructor<S> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(PartialEq, Eq)]
 struct AwaitingPartialShare<S: PixSpec> {
-    spi: SsaPolynomialIndex<S::Pseudonym>,
+    spi: SsaPolynomialIndex<S>,
     msg: Box<[u8]>,
     enc_share: EncryptedPartialSsaShare<S>,
 }
@@ -96,19 +96,20 @@ impl<S: PixSpec> Clone for AwaitingPartialShare<S> {
 
 pub struct SsaReconstructor<S: PixSpec> {
     channel: (
-        async_broadcast::Sender<Scalar<S>>,
-        async_broadcast::InactiveReceiver<Scalar<S>>,
+        async_broadcast::Sender<PixScalar<S>>,
+        async_broadcast::InactiveReceiver<PixScalar<S>>,
     ),
     ssa_builders: moka::sync::Cache<SsaIndex, std::sync::Arc<parking_lot::Mutex<SsaBuilder<S>>>>,
     ssa_verifiers: moka::sync::Cache<
-        SsaPolynomialIndex<S::Pseudonym>,
+        SsaPolynomialIndex<S>,
         std::sync::Arc<parking_lot::Mutex<SsaPartReconstructor<S>>>,
     >,
     awaiting_acks: moka::sync::Cache<HalfKeyChallenge, AwaitingPartialShare<S>>,
 }
 
 impl<S: PixSpec + 'static> SsaReconstructor<S> {
-    pub fn add_ssa_commitment(&self, ssa_index: SsaIndex, num_parts: NonZeroUsize, ssa_commitment: Element<S>) {
+    // TODO: replace this with add_verifier_part
+    pub fn add_ssa_commitment(&self, ssa_index: SsaIndex, num_parts: NonZeroUsize, ssa_commitment: PixGroup<S>) {
         self.ssa_builders.insert(
             ssa_index,
             std::sync::Arc::new(parking_lot::Mutex::new(SsaBuilder::new(ssa_commitment, num_parts))),
@@ -125,7 +126,7 @@ impl<S: PixSpec + 'static> SsaReconstructor<S> {
     pub fn add_share(
         &self,
         challenge: HalfKeyChallenge,
-        spi: SsaPolynomialIndex<S::Pseudonym>,
+        spi: SsaPolynomialIndex<S>,
         msg: impl AsRef<[u8]>,
         enc: EncryptedPartialSsaShare<S>,
     ) -> errors::Result<()> {
@@ -174,7 +175,7 @@ impl<S: PixSpec + 'static> SsaReconstructor<S> {
         Ok(())
     }
 
-    pub fn ssa_stream(&self) -> impl futures::Stream<Item = Scalar<S>> {
+    pub fn ssa_stream(&self) -> impl futures::Stream<Item = PixScalar<S>> {
         self.channel.1.activate_cloned()
     }
 }

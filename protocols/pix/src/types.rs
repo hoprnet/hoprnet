@@ -8,15 +8,20 @@ use vsss_rs::elliptic_curve::{
     generic_array::{ArrayLength, GenericArray},
 };
 
-use crate::{PixSpec, Scalar, errors};
+use crate::{PixSpec, PixScalar, errors};
 
 /// Type used to index Session Stealth Addresses (SSA).
 ///
 /// Note that SSA Index starts with 1.
 pub type SsaIndex = u32;
 
+/// Type used to index polynomials that reconstruct parts of a Session Stealth Addresses (SSA).
+///
+/// Note that Polynomial Index starts with 0.
+pub type PolynomialIndex = u32;
+
 fn derive_ssa_encryption_key<S: PixSpec>(
-    spi: &SsaPolynomialIndex<S::Pseudonym>,
+    spi: &SsaPolynomialIndex<S>,
     ack: &HalfKey,
 ) -> errors::Result<S::Cipher> {
     let mut output = Blake3::new_derive_key(S::KEY_DERIVATION_CONTEXT)
@@ -48,7 +53,7 @@ fn derive_ssa_encryption_key<S: PixSpec>(
 pub struct EncryptedPartialSsaShare<S: PixSpec>(GenericArray<u8, <<S as PixSpec>::Curve as Curve>::FieldBytesSize>);
 
 impl<S: PixSpec> EncryptedPartialSsaShare<S> {
-    pub fn decrypt(self, spi: &SsaPolynomialIndex<S::Pseudonym>, key: &HalfKey) -> errors::Result<PartialSsaShare<S>> {
+    pub fn decrypt(self, spi: &SsaPolynomialIndex<S>, key: &HalfKey) -> errors::Result<PartialSsaShare<S>> {
         let mut cipher = derive_ssa_encryption_key::<S>(spi, key)?;
         let mut data = self.0;
         cipher.apply_keystream(&mut data);
@@ -156,12 +161,12 @@ impl<'de, S: PixSpec> serde::Deserialize<'de> for EncryptedPartialSsaShare<S> {
 ///
 /// The `X` value is not held by the struct, and it's the responsibility of the user to determine its correct value.
 #[derive(Default)]
-pub struct PartialSsaShare<S: PixSpec>(pub(crate) <Scalar<S> as PrimeField>::Repr);
+pub struct PartialSsaShare<S: PixSpec>(pub(crate) <PixScalar<S> as PrimeField>::Repr);
 
 impl<S: PixSpec> PartialSsaShare<S> {
     pub fn encrypt(
         mut self,
-        spi: &SsaPolynomialIndex<S::Pseudonym>,
+        spi: &SsaPolynomialIndex<S>,
         key: &HalfKey,
     ) -> errors::Result<EncryptedPartialSsaShare<S>> {
         let mut cipher = derive_ssa_encryption_key::<S>(spi, key)?;
@@ -170,8 +175,8 @@ impl<S: PixSpec> PartialSsaShare<S> {
     }
 }
 
-impl<S: PixSpec> AsRef<<Scalar<S> as PrimeField>::Repr> for PartialSsaShare<S> {
-    fn as_ref(&self) -> &<Scalar<S> as PrimeField>::Repr {
+impl<S: PixSpec> AsRef<<PixScalar<S> as PrimeField>::Repr> for PartialSsaShare<S> {
+    fn as_ref(&self) -> &<PixScalar<S> as PrimeField>::Repr {
         &self.0
     }
 }
@@ -183,7 +188,7 @@ impl<S: PixSpec> Clone for PartialSsaShare<S> {
 
 impl<S: PixSpec> std::fmt::Debug for PartialSsaShare<S>
 where
-    <Scalar<S> as PrimeField>::Repr: std::fmt::Debug,
+    <PixScalar<S> as PrimeField>::Repr: std::fmt::Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("PartialSsaShare").field(&self.0).finish()
@@ -192,14 +197,14 @@ where
 
 impl<S: PixSpec> PartialEq for PartialSsaShare<S>
 where
-    <Scalar<S> as PrimeField>::Repr: PartialEq,
+    <PixScalar<S> as PrimeField>::Repr: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
     }
 }
 
-impl<S: PixSpec> Eq for PartialSsaShare<S> where <Scalar<S> as PrimeField>::Repr: Eq {}
+impl<S: PixSpec> Eq for PartialSsaShare<S> where <PixScalar<S> as PrimeField>::Repr: Eq {}
 
 /// Defines the index of a polynomial in a Session Stealth Address (SSA) corresponding
 /// to a specific Session.
@@ -208,16 +213,16 @@ impl<S: PixSpec> Eq for PartialSsaShare<S> where <Scalar<S> as PrimeField>::Repr
 /// 1. The Pseudonym part of the `HoprSenderId` - fixed for the given Session.
 /// 2. Index (i) of the Session Stealth Address (SSA)
 /// 3. Index (j) of the polynomial used to reconstruct the portion of the SSA.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, PartialOrd, Ord)]
+#[derive(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct SsaPolynomialIndex<P> {
-    pseudonym: P,
-    ssa_index: u32,
-    poly_index: u32,
+pub struct SsaPolynomialIndex<S: PixSpec> {
+    pseudonym: S::Pseudonym,
+    ssa_index: SsaIndex,
+    poly_index: PolynomialIndex,
 }
 
-impl<P> SsaPolynomialIndex<P> {
-    pub fn new(pseudonym: P, ssa_index: u32, poly_index: u32) -> Self {
+impl<S: PixSpec> SsaPolynomialIndex<S> {
+    pub fn new(pseudonym: S::Pseudonym, ssa_index: SsaIndex, poly_index: PolynomialIndex) -> Self {
         Self {
             pseudonym,
             ssa_index,
@@ -227,7 +232,7 @@ impl<P> SsaPolynomialIndex<P> {
 
     /// Pseudonym part of the `HoprSenderId`.
     #[inline]
-    pub fn pseudonym(&self) -> &P {
+    pub fn pseudonym(&self) -> &S::Pseudonym {
         &self.pseudonym
     }
 
@@ -239,16 +244,73 @@ impl<P> SsaPolynomialIndex<P> {
 
     /// Index (j-value) of the polynomial used to reconstruct the portion of the SSA.
     #[inline]
-    pub fn poly_index(&self) -> u32 {
+    pub fn poly_index(&self) -> PolynomialIndex {
         self.poly_index
     }
 }
 
-impl<P: std::fmt::Display> std::fmt::Display for SsaPolynomialIndex<P> {
+impl<S: PixSpec> std::fmt::Display for SsaPolynomialIndex<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}-{}-{}", self.pseudonym, self.ssa_index, self.poly_index)
+        write!(f, "SPI-{}-{}:{}", self.pseudonym, self.ssa_index, self.poly_index)
+    } 
+}
+
+impl<S: PixSpec> std::fmt::Debug for SsaPolynomialIndex<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SsaPolynomialIndex")
+            .field("pseudonym", &self.pseudonym.to_string())
+            .field("ssa_index", &self.ssa_index)
+            .field("poly_index", &self.poly_index)
+            .finish()
     }
 }
+
+impl<S: PixSpec> Clone for SsaPolynomialIndex<S> {
+    fn clone(&self) -> Self {
+        Self {
+            pseudonym: self.pseudonym,
+            ssa_index: self.ssa_index,
+            poly_index: self.poly_index,
+        }
+    }
+}
+
+impl<S: PixSpec> Copy for SsaPolynomialIndex<S> {}
+
+impl<S: PixSpec> PartialEq for SsaPolynomialIndex<S> {
+    fn eq(&self, other: &Self) -> bool {
+        self.pseudonym == other.pseudonym && self.ssa_index == other.ssa_index && self.poly_index == other.poly_index
+    }   
+}
+
+impl<S: PixSpec> Eq for SsaPolynomialIndex<S> {}
+
+impl<S: PixSpec> std::hash::Hash for SsaPolynomialIndex<S> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.pseudonym.hash(state);
+        self.ssa_index.hash(state);
+        self.poly_index.hash(state);
+    }
+}
+
+impl<S> PartialOrd for SsaPolynomialIndex<S>
+where S: PixSpec, S::Pseudonym: Ord {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }  
+}
+
+impl<S> Ord for SsaPolynomialIndex<S>
+where S: PixSpec, S::Pseudonym: Ord {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.pseudonym
+            .cmp(&other.pseudonym)
+            .then_with(|| self.ssa_index.cmp(&other.ssa_index))
+            .then_with(|| self.poly_index.cmp(&other.poly_index))
+    }
+}
+
+
 
 #[cfg(test)]
 mod tests {
@@ -261,8 +323,8 @@ mod tests {
     #[test]
     fn ssa_part_shares_should_encrypt_and_decrypt() -> anyhow::Result<()> {
         let key = HalfKey::random();
-        let spi = SsaPolynomialIndex::new(SimplePseudonym::random(), 1, 0);
-        let scalar = Scalar::<TestSpec>::random(vsss_rs::elliptic_curve::rand_core::OsRng);
+        let spi = SsaPolynomialIndex::<TestSpec>::new(SimplePseudonym::random(), 1, 0);
+        let scalar = PixScalar::<TestSpec>::random(vsss_rs::elliptic_curve::rand_core::OsRng);
 
         let share_1 = PartialSsaShare::<TestSpec>(scalar.to_repr());
         let share_2 = share_1.clone().encrypt(&spi, &key)?.decrypt(&spi, &key)?;

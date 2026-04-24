@@ -4758,6 +4758,7 @@ dependencies = [
  "hopr-types",
  "k256",
  "moka",
+ "num-traits",
  "parking_lot",
  "serde",
  "smart-default",
@@ -4816,7 +4817,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-start"
-version = "1.2.0"
+version = "1.4.0"
 dependencies = [
  "anyhow",
  "aquamarine",

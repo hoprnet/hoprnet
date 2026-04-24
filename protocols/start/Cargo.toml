@@ -1,6 +1,6 @@
 [package]
 name = "hopr-protocol-start"
-version = "1.2.0"
+version = "1.4.0"
 edition.workspace = true
 rust-version.workspace = true
 authors = ["HOPR Association <tech@hoprnet.org>"]

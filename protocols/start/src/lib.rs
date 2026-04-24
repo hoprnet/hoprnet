@@ -105,15 +105,51 @@ pub struct StartEstablished<I> {
 #[derive(Debug, Clone, PartialEq, Eq, strum::EnumDiscriminants)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(derive(strum::FromRepr, strum::EnumCount), repr(u8))]
-pub enum StartProtocol<I, T, C> {
+pub enum StartProtocol<I, T, C, S: hopr_protocol_pix::PixSpec> {
     /// Request to initiate a new session.
     StartSession(StartInitiation<T, C>),
     /// Confirmation that a new session has been established by the counterparty.
     SessionEstablished(StartEstablished<I>),
+    /// Client's request to fill Client commitments to establish a Session Stealth Address (SSA).
+    SsaRequest(SsaClientCommitmentMessage<S>),
+    /// Server-side commitment to Session Stealth Address (SSA).
+    SsaCommit(SsaServerCommitmentMessage<S>),
     /// Counterparty could not establish a new session due to an error.
     SessionError(StartErrorType),
     /// A ping message to keep the session alive.
     KeepAlive(KeepAliveMessage<I>),
+}
+
+/// Filling up the Client's commitment to the Session Stealth Address (SSA).
+///
+/// Whenever the Server receives a new SSA index, it must respond with [`SsaServerCommitmentMessage`]
+/// finalizing the handshake to establish a new SSA.
+///
+/// The overall commitment to a single new SSA usually requires multiple messages, all
+/// sharing the same [`SsaIndex`](hopr_protocol_pix::SsaIndex) in the [`spi`](hopr_protocol_pix::SsaPolynomialIndex).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SsaClientCommitmentMessage<S: hopr_protocol_pix::PixSpec> {
+    /// Contains the pseudonym, SSA ID, and the SSA-part polynomial index.
+    pub spi: hopr_protocol_pix::SsaPolynomialIndex<S>,
+    pub coefficient_index: u16,
+    /// Contains the indexed serialized coefficient commitments of a single SSA-part polynomial.
+    ///
+    /// This might not be the complete set yet and might require multiple messages to deliver
+    /// the complete polynomial commitment.
+    ///
+    /// The term with index 0 is the Client's commitment to the SSA part (polynomial constant term).
+    /// Once all commitments to all polynomials are delivered, the Server can construct the SSA commitment
+    /// by summing up all polynomial constant term commitments for the given [`SsaIndex`](hopr_protocol_pix::SsaIndex).
+    pub coefficient_commitments: std::collections::HashMap<u32, hopr_protocol_pix::PixGroupRepr<S>>,
+}
+
+/// Sent by the Server to finalize the commitment to a single new Session Stealth Address (SSA).
+///
+/// This happens whenever the Server has received
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SsaServerCommitmentMessage<S: hopr_protocol_pix::PixSpec> {
+    /// Server's commitment to the SSA.
+    pub commitment: hopr_protocol_pix::PixGroupRepr<S>,
 }
 
 /// Keep-alive message for a Session with the identifier `T`.
@@ -167,14 +203,14 @@ impl<I> From<I> for KeepAliveMessage<I> {
     }
 }
 
-impl<I, T, C> StartProtocol<I, T, C> {
+impl<I, T, C, S> StartProtocol<I, T, C, S> {
     /// Fixed [`Tag`] of every protocol message.
     pub const START_PROTOCOL_MESSAGE_TAG: Tag = Tag::Reserved(ReservedTag::SessionStart as u64);
     /// Current version of the Start protocol.
-    pub const START_PROTOCOL_VERSION: u8 = 0x02;
+    pub const START_PROTOCOL_VERSION: u8 = 0x03;
 }
 
-impl<I, T, C> StartProtocol<I, T, C>
+impl<I, T, C, S> StartProtocol<I, T, C, S>
 where
     I: serde::Serialize + for<'de> serde::Deserialize<'de>,
     T: serde::Serialize + for<'de> serde::Deserialize<'de>,

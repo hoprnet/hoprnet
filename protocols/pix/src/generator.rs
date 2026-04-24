@@ -11,22 +11,23 @@ use vsss_rs::{
 };
 
 use crate::{
-    Element, PartialSsaShareVerifier, PixSpec, Scalar, errors, msg_to_scalar,
-    types::{PartialSsaShare, SsaIndex, SsaPolynomialIndex},
+    PixGroup, PartialSsaShareVerifier, PixSpec, PixScalar, errors, msg_to_scalar,
+    types::{PartialSsaShare, SsaPolynomialIndex},
 };
+use crate::types::SsaIndex;
 
-type RawPolynomial<S> = Vec<DefaultShare<IdentifierPrimeField<Scalar<S>>, IdentifierPrimeField<Scalar<S>>>>;
-type RawPolynomialVerifier<S> = Vec<ShareVerifierGroup<Element<S>>>;
+type RawPolynomial<S> = Vec<DefaultShare<IdentifierPrimeField<PixScalar<S>>, IdentifierPrimeField<PixScalar<S>>>>;
+type RawPolynomialVerifier<S> = Vec<ShareVerifierGroup<PixGroup<S>>>;
 
 struct IndexedPolynomial<S: PixSpec> {
-    spi: SsaPolynomialIndex<S::Pseudonym>,
+    spi: SsaPolynomialIndex<S>,
     raw: RawPolynomial<S>,
     shares_generated: usize,
     t: usize,
 }
 
 impl<S: PixSpec> IndexedPolynomial<S> {
-    pub fn next_share(&mut self, x: Scalar<S>) -> PartialSsaShare<S> {
+    pub fn next_share(&mut self, x: PixScalar<S>) -> PartialSsaShare<S> {
         let eval = self.raw.evaluate(&x.into(), self.t);
         self.shares_generated += 1;
         PartialSsaShare(eval.0.to_repr())
@@ -39,7 +40,7 @@ struct SsaPseudonymEntry<S: PixSpec> {
 }
 
 fn new_polynomial_with_verifier<S: PixSpec>(
-    secret: Scalar<S>,
+    secret: PixScalar<S>,
     t: usize,
     rng: impl RngCore + CryptoRng,
 ) -> errors::Result<(RawPolynomial<S>, RawPolynomialVerifier<S>)> {
@@ -59,7 +60,7 @@ fn new_polynomial_with_verifier<S: PixSpec>(
     let coeffs_iter = polynomial[1..].iter().map(|c| c.identifier());
 
     // Compute commitments to the coefficients of the polynomial
-    let g = ShareVerifierGroup::<Element<S>>::one(); // The generator of the group of verifiers
+    let g = ShareVerifierGroup::<PixGroup<S>>::one(); // The generator of the group of verifiers
     let one = IdentifierPrimeField::one();
     let verifier = once(&one) // The first verifier is the generator
         .chain(once(polynomial[0].value())) //
@@ -95,7 +96,7 @@ pub struct SsaShareGenerator<S: PixSpec> {
 }
 
 /// Tuple consisting of the SSA polynomial index and an SSA share from the corresponding polynomial.
-pub type GeneratedShare<S> = (SsaPolynomialIndex<<S as PixSpec>::Pseudonym>, PartialSsaShare<S>);
+pub type GeneratedShare<S> = (SsaPolynomialIndex<S>, PartialSsaShare<S>);
 
 impl<S: PixSpec + 'static> SsaShareGenerator<S> {
     pub fn new(cfg: SsaGeneratorConfig) -> Self {
@@ -143,16 +144,16 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
     pub fn new_ssa_commitment(
         &self,
         pseudonym: &S::Pseudonym,
-    ) -> errors::Result<(Element<S>, Vec<PartialSsaShareVerifier<S>>)> {
+    ) -> errors::Result<(PixGroup<S>, Vec<PartialSsaShareVerifier<S>>)> {
         let mut rng = vsss_rs::elliptic_curve::rand_core::OsRng;
 
         // Generate sub-secrets for each polynomial
         let sub_secrets = (0..self.cfg.polynomials_per_ssa)
-            .map(|_| <Scalar<S> as Field>::random(&mut rng))
+            .map(|_| <PixScalar<S> as Field>::random(&mut rng))
             .collect::<Vec<_>>();
 
         // Overall commitment secret is the sum of all sub-secrets
-        let our_commitment_secret = sub_secrets.iter().sum::<Scalar<S>>();
+        let our_commitment_secret = sub_secrets.iter().sum::<PixScalar<S>>();
 
         #[cfg(not(feature = "rayon"))]
         let sub_secrets_iter = sub_secrets.into_iter();
@@ -230,7 +231,7 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
                 }
             });
 
-        Ok((Element::<S>::generator() * our_commitment_secret, verifiers))
+        Ok((PixGroup::<S>::generator() * our_commitment_secret, verifiers))
     }
 }
 
