@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info};
 use validator::Validate;
 
-use crate::{Strategy, errors, strategy::Strategy as StrategyTrait};
+use crate::{errors, strategy::Strategy as StrategyTrait};
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
@@ -124,7 +124,7 @@ where
 
 impl<N: HasChainApi> Display for ClosureFinalizerStrategyInner<N> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", Strategy::ClosureFinalizer(self.cfg))
+        write!(f, "closure_finalizer")
     }
 }
 
@@ -311,6 +311,40 @@ mod tests {
             .next()
             .timeout(futures_time::time::Duration::from_secs(2))
             .await?;
+
+        Ok(())
+    }
+
+    /// Tests the public builder API: `ClosureFinalizerStrategy::new(...).build(node)` must
+    /// return a `Box<dyn Strategy + Send>` with the expected Display string.
+    #[tokio::test]
+    async fn test_build_returns_strategy_trait_object() -> anyhow::Result<()> {
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_generated_accounts(
+                &[&*ALICE, &*BOB],
+                false,
+                XDaiBalance::new_base(1),
+                HoprBalance::new_base(1000),
+            )
+            .with_channels([])
+            .build_dynamic_client([1; Address::SIZE].into());
+
+        let mut chain_connector =
+            create_trustful_hopr_blokli_connector(&ALICE_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
+        chain_connector.connect().await?;
+        let node = Arc::new(ChainNode(Arc::new(chain_connector)));
+
+        let strategy: Box<dyn crate::strategy::Strategy + Send> = super::ClosureFinalizerStrategy::new(
+            ClosureFinalizerStrategyConfig::default(),
+            std::time::Duration::from_secs(60),
+        )
+        .build(node);
+
+        assert_eq!(strategy.to_string(), "closure_finalizer");
+        // Verify the box is Send (compile-time check via trait object)
+        fn assert_send<T: Send>(_: T) {}
+        assert_send(strategy);
 
         Ok(())
     }

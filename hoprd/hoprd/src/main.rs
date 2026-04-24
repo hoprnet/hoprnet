@@ -303,7 +303,7 @@ async fn main_inner(cfg: HoprdConfig, hopr_keys: HoprKeys) -> anyhow::Result<()>
     }
 
     tracing::debug!("initializing strategies");
-    let mut multi_strategy = hopr_strategy::strategy::MultiStrategy::build(cfg.strategy.clone(), Arc::clone(&node));
+    let mut multi_strategy = hoprd::strategy::build_strategies(&cfg.strategy, Arc::clone(&node));
     tracing::debug!(strategy = %multi_strategy, "initialized strategies");
 
     tracing::debug!("starting up strategies");

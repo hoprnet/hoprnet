@@ -20,8 +20,6 @@ telemetry = ["dep:hopr-metrics"]
 auto-funding = []
 auto-redeeming = []
 closure-finalizer = []
-## The `hopr` feature bundles the default HOPR network strategy set.
-hopr = ["auto-redeeming"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -47,6 +45,7 @@ hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]
 chrono = { workspace = true }
+serde_json = { workspace = true }
 hex-literal = { workspace = true }
 hopr-lib = { workspace = true, features = ["runtime-tokio"] }
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }

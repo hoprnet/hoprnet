@@ -3,8 +3,9 @@
 //! Runs multiple sub-strategies concurrently. Each sub-strategy manages its own
 //! event subscription and internal timers via the `Strategy::run` method.
 //!
-//! `MultiStrategy` spawns one async task per sub-strategy. The `on_fail_continue`
-//! flag controls whether a sub-strategy failure aborts the whole group:
+//! `MultiStrategy` is a pure combinator: it accepts any `Box<dyn Strategy + Send>` —
+//! including strategies defined outside this crate — and runs them all concurrently.
+//! The `on_fail_continue` flag controls whether a sub-strategy failure aborts the whole group:
 //! - `true` → OR chain: continue after individual failures
 //! - `false` → AND chain: abort all on first failure
 //!
@@ -12,91 +13,11 @@
 use std::fmt::{Debug, Display, Formatter};
 
 use async_trait::async_trait;
-use hopr_lib::api::{
-    chain::{
-        ChainReadChannelOperations, ChainReadSafeOperations, ChainValues, ChainWriteChannelOperations,
-        ChainWriteTicketOperations,
-    },
-    node::{ActionableEventSource, HasChainApi, HasTicketManagement},
-    tickets::TicketManagement,
-};
 use serde::{Deserialize, Serialize};
-#[cfg(all(feature = "telemetry", not(test)))]
-use strum::VariantNames;
-use tracing::{error, warn};
+use tracing::warn;
 use validator::{Validate, ValidationError};
 
-#[cfg(feature = "auto-funding")]
-use crate::auto_funding::AutoFundingStrategy;
-#[cfg(feature = "auto-redeeming")]
-use crate::auto_redeeming::AutoRedeemingStrategy;
-#[cfg(feature = "closure-finalizer")]
-use crate::channel_finalizer::ClosureFinalizerStrategy;
-use crate::{Strategy as StrategyEnum, errors::Result};
-
-#[cfg(all(feature = "telemetry", not(test)))]
-lazy_static::lazy_static! {
-    static ref METRIC_ENABLED_STRATEGIES: hopr_metrics::MultiGauge =
-        hopr_metrics::MultiGauge::new("hopr_strategy_enabled_strategies", "List of enabled strategies", &["strategy"]).unwrap();
-}
-
-/// A strategy that runs until cancelled or a fatal error occurs.
-///
-/// Each implementation subscribes to the node's event stream and/or creates internal
-/// timers in [`run`](Strategy::run). The trait is trivially object-safe: `run` takes only
-/// `&mut self`, so strategies can be held as `Box<dyn Strategy + Send>`.
-#[async_trait]
-pub trait Strategy: Display + Send {
-    /// Run the strategy. Returns only on cancellation or fatal error.
-    async fn run(&mut self) -> Result<()>;
-}
-
-/// Combined node interface used exclusively by [`MultiStrategy::build`].
-///
-/// Individual strategy `build` functions each declare only the subset of traits
-/// they actually call. `HoprNode` is the union of all those subsets, so a single
-/// concrete HOPR node that satisfies `HoprNode` can be passed to `MultiStrategy`
-/// without any per-strategy narrowing at the call site.
-///
-/// Blanket-implemented for every type that satisfies all constituent sub-traits.
-///
-/// Test wrappers that implement only a subset of traits still work — they bypass
-/// `MultiStrategy::build` and construct the private `*Inner<N>` runner types
-/// directly, using only the bounds those types actually require.
-pub trait HoprNode:
-    ActionableEventSource
-    + HasChainApi<
-        ChainApi: ChainReadChannelOperations
-                      + ChainReadSafeOperations
-                      + ChainValues
-                      + ChainWriteChannelOperations
-                      + ChainWriteTicketOperations
-                      + Clone
-                      + Send
-                      + Sync
-                      + 'static,
-    > + HasTicketManagement<TicketManager: TicketManagement + Clone + Send + Sync + 'static>
-    + Send
-    + Sync
-    + 'static
-{
-}
-
-impl<T> HoprNode for T
-where
-    T: ActionableEventSource + HasChainApi + HasTicketManagement + Send + Sync + 'static,
-    T::ChainApi: ChainReadChannelOperations
-        + ChainReadSafeOperations
-        + ChainValues
-        + ChainWriteChannelOperations
-        + ChainWriteTicketOperations
-        + Clone
-        + Send
-        + Sync
-        + 'static,
-    T::TicketManager: TicketManagement + Clone + Send + Sync + 'static,
-{
-}
+use crate::{StrategyKind, errors::Result};
 
 #[inline]
 fn just_true() -> bool {
@@ -109,7 +30,7 @@ fn sixty_seconds() -> std::time::Duration {
 }
 
 #[inline]
-fn empty_vector() -> Vec<StrategyEnum> {
+fn empty_vector() -> Vec<StrategyKind> {
     vec![]
 }
 
@@ -121,6 +42,20 @@ fn validate_execution_interval(interval: &std::time::Duration) -> std::result::R
     } else {
         Ok(())
     }
+}
+
+/// A strategy that runs until cancelled or a fatal error occurs.
+///
+/// Each implementation subscribes to the node's event stream and/or creates internal
+/// timers in [`run`](Strategy::run). The trait is trivially object-safe: `run` takes only
+/// `&mut self`, so strategies can be held as `Box<dyn Strategy + Send>`.
+///
+/// Any type implementing this trait can be composed into a [`MultiStrategy`] without
+/// any changes to this crate.
+#[async_trait]
+pub trait Strategy: Display + Send {
+    /// Run the strategy. Returns only on cancellation or fatal error.
+    async fn run(&mut self) -> Result<()>;
 }
 
 /// Configuration options for the `MultiStrategy` group.
@@ -155,71 +90,47 @@ pub struct MultiStrategyConfig {
     /// Default is empty, which makes the `MultiStrategy` behave as passive.
     #[default(_code = "vec![]")]
     #[serde(default = "empty_vector")]
-    pub strategies: Vec<StrategyEnum>,
+    pub strategies: Vec<StrategyKind>,
 }
 
 /// Runs a group of sub-strategies concurrently, each in its own async task.
+///
+/// `MultiStrategy` is strategy-kind-agnostic: it only knows about
+/// `Box<dyn Strategy + Send>`. Any type implementing [`Strategy`] — including
+/// ones defined outside this crate — can be composed here.
 pub struct MultiStrategy {
     strategies: Vec<Box<dyn Strategy + Send>>,
-    cfg: MultiStrategyConfig,
+    on_fail_continue: bool,
 }
 
 impl MultiStrategy {
-    /// Builds a `MultiStrategy` from config and a node reference.
+    /// Creates a new `MultiStrategy` from pre-built strategy objects.
     ///
-    /// Each sub-strategy receives a clone of `node` and starts its own event
-    /// subscription inside `run()`. The generic `N` is erased at construction time.
-    pub fn build<N: HoprNode>(cfg: MultiStrategyConfig, node: std::sync::Arc<N>) -> Box<dyn Strategy + Send> {
-        let mut strategies = Vec::<Box<dyn Strategy + Send>>::new();
-
-        #[cfg(all(feature = "telemetry", not(test)))]
-        StrategyEnum::VARIANTS
-            .iter()
-            .for_each(|s| METRIC_ENABLED_STRATEGIES.set(&[*s], 0_f64));
-
-        for strategy in cfg.strategies.iter() {
-            match strategy {
-                #[cfg(feature = "auto-redeeming")]
-                StrategyEnum::AutoRedeeming(sub_cfg) => strategies.push(
-                    AutoRedeemingStrategy::new(*sub_cfg, cfg.execution_interval).build(std::sync::Arc::clone(&node)),
-                ),
-                #[cfg(feature = "auto-funding")]
-                StrategyEnum::AutoFunding(sub_cfg) => strategies.push(
-                    AutoFundingStrategy::new(*sub_cfg, cfg.execution_interval).build(std::sync::Arc::clone(&node)),
-                ),
-                #[cfg(feature = "closure-finalizer")]
-                StrategyEnum::ClosureFinalizer(sub_cfg) => strategies.push(
-                    ClosureFinalizerStrategy::new(*sub_cfg, cfg.execution_interval).build(std::sync::Arc::clone(&node)),
-                ),
-                StrategyEnum::Multi(sub_cfg) => {
-                    if cfg.allow_recursive {
-                        let mut cfg_clone = sub_cfg.clone();
-                        cfg_clone.allow_recursive = false;
-                        strategies.push(Self::build(cfg_clone, std::sync::Arc::clone(&node)))
-                    } else {
-                        error!("recursive multi-strategy not allowed and skipped")
-                    }
-                }
-                StrategyEnum::Passive => {} // passive = empty sub-strategy list
-            }
-
-            #[cfg(all(feature = "telemetry", not(test)))]
-            METRIC_ENABLED_STRATEGIES.set(&[&strategy.to_string()], 1_f64);
+    /// Strategies are passed in already constructed; `MultiStrategy` does not know or
+    /// care about the concrete types. Pass an empty `strategies` vec to get a passive
+    /// strategy that blocks forever.
+    pub fn new(strategies: Vec<Box<dyn Strategy + Send>>, on_fail_continue: bool) -> Self {
+        Self {
+            strategies,
+            on_fail_continue,
         }
-
-        Box::new(Self { strategies, cfg })
     }
 }
 
 impl Debug for MultiStrategy {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", StrategyEnum::Multi(self.cfg.clone()))
+        write!(f, "MultiStrategy({} sub-strategies)", self.strategies.len())
     }
 }
 
 impl Display for MultiStrategy {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", StrategyEnum::Multi(self.cfg.clone()))
+        let names: Vec<String> = self.strategies.iter().map(|s| s.to_string()).collect();
+        if names.is_empty() {
+            write!(f, "multi_strategy(passive)")
+        } else {
+            write!(f, "multi_strategy({})", names.join(", "))
+        }
     }
 }
 
@@ -236,7 +147,7 @@ impl Strategy for MultiStrategy {
             return Ok(());
         }
 
-        let on_fail_continue = self.cfg.on_fail_continue;
+        let on_fail_continue = self.on_fail_continue;
         let tasks: Vec<_> = strategies
             .into_iter()
             .map(|mut s| spawn(async move { s.run().await }))
@@ -297,19 +208,26 @@ mod tests {
         }
     }
 
+    /// An externally-defined strategy — simulates a plugin or application-defined strategy.
+    struct ExternalStrategy {
+        ran: bool,
+    }
+    impl Display for ExternalStrategy {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            write!(f, "external")
+        }
+    }
+    #[async_trait]
+    impl Strategy for ExternalStrategy {
+        async fn run(&mut self) -> Result<()> {
+            self.ran = true;
+            Ok(())
+        }
+    }
+
     #[tokio::test]
     async fn test_multi_strategy_logical_or_flow() -> anyhow::Result<()> {
-        let cfg = MultiStrategyConfig {
-            on_fail_continue: true,
-            allow_recursive: true,
-            execution_interval: std::time::Duration::from_secs(60),
-            strategies: Vec::new(),
-        };
-
-        let mut ms = MultiStrategy {
-            strategies: vec![Box::new(FailStrategy), Box::new(OkStrategy)],
-            cfg,
-        };
+        let mut ms = MultiStrategy::new(vec![Box::new(FailStrategy), Box::new(OkStrategy)], true);
         // With on_fail_continue=true, even if FailStrategy errors, the multi-strategy succeeds.
         ms.run().await?;
         Ok(())
@@ -317,17 +235,39 @@ mod tests {
 
     #[tokio::test]
     async fn test_multi_strategy_logical_and_flow() {
-        let cfg = MultiStrategyConfig {
-            on_fail_continue: false,
-            allow_recursive: true,
-            execution_interval: std::time::Duration::from_secs(60),
-            strategies: Vec::new(),
-        };
-
-        let mut ms = MultiStrategy {
-            strategies: vec![Box::new(FailStrategy), Box::new(OkStrategy)],
-            cfg,
-        };
+        let mut ms = MultiStrategy::new(vec![Box::new(FailStrategy), Box::new(OkStrategy)], false);
         ms.run().await.expect_err("multi-strategy should fail");
+    }
+
+    #[tokio::test]
+    async fn test_multi_strategy_accepts_external_strategy() -> anyhow::Result<()> {
+        // Demonstrates that any impl Strategy can be composed without modifying hopr-strategy.
+        let mut ms = MultiStrategy::new(
+            vec![Box::new(OkStrategy), Box::new(ExternalStrategy { ran: false })],
+            true,
+        );
+        ms.run().await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_multi_strategy_empty_is_passive() {
+        // An empty MultiStrategy blocks forever — verify it does not complete immediately.
+        let mut ms = MultiStrategy::new(vec![], true);
+        let result =
+            futures_time::future::FutureExt::timeout(ms.run(), futures_time::time::Duration::from_millis(50)).await;
+        assert!(result.is_err(), "empty MultiStrategy should block (timeout expected)");
+    }
+
+    #[test]
+    fn test_multi_strategy_display() {
+        let ms = MultiStrategy::new(vec![Box::new(OkStrategy), Box::new(FailStrategy)], true);
+        assert_eq!(ms.to_string(), "multi_strategy(ok, fail)");
+    }
+
+    #[test]
+    fn test_multi_strategy_display_passive() {
+        let ms = MultiStrategy::new(vec![], false);
+        assert_eq!(ms.to_string(), "multi_strategy(passive)");
     }
 }

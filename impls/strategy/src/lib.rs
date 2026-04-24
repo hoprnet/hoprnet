@@ -8,8 +8,7 @@
 //! - [closure finalizer](crate::channel_finalizer) (feature `closure-finalizer`)
 //! - [multiple strategy chains](crate::strategy)
 //!
-//! Individual strategies are gated behind Cargo features.  Enable the `hopr` feature
-//! to get the default HOPR network strategy set (currently `auto-redeeming`).
+//! Individual strategies are gated behind Cargo features.
 //!
 //! ## Configuring strategies in HOPRd
 //!
@@ -34,17 +33,9 @@
 //!       funding_amount: 20
 //! ```
 
-#[cfg(feature = "auto-redeeming")]
-use std::str::FromStr;
-use std::time::Duration;
-
-#[cfg(feature = "auto-redeeming")]
-use hopr_lib::HoprBalance;
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumString, VariantNames};
 
-#[cfg(feature = "auto-redeeming")]
-use crate::Strategy::AutoRedeeming;
 #[cfg(feature = "auto-funding")]
 use crate::auto_funding::AutoFundingStrategyConfig;
 #[cfg(feature = "auto-redeeming")]
@@ -63,9 +54,13 @@ pub mod errors;
 pub mod strategy;
 
 /// Lists all possible strategies with their respective configurations.
+///
+/// This is a pure serde config type — it is used for YAML deserialization and
+/// carries no runtime behaviour. The runtime combinator is [`strategy::MultiStrategy`],
+/// which accepts any `Box<dyn strategy::Strategy + Send>`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Display, EnumString, VariantNames)]
 #[strum(serialize_all = "snake_case")]
-pub enum Strategy {
+pub enum StrategyKind {
     #[cfg(feature = "auto-redeeming")]
     AutoRedeeming(AutoRedeemingStrategyConfig),
     #[cfg(feature = "auto-funding")]
@@ -76,35 +71,31 @@ pub enum Strategy {
     Passive,
 }
 
-/// Default HOPR node strategies (in order).
-///
-/// ## Auto-redeem Strategy
-/// - redeem single tickets on channel close if worth at least 1 wxHOPR
-pub fn hopr_default_strategies() -> MultiStrategyConfig {
-    MultiStrategyConfig {
-        on_fail_continue: true,
-        allow_recursive: false,
-        execution_interval: Duration::from_secs(60),
-        strategies: vec![
-            // AutoFunding(AutoFundingStrategyConfig {
-            // min_stake_threshold: Balance::new_from_str("1000000000000000000", BalanceType::HOPR),
-            // funding_amount: Balance::new_from_str("10000000000000000000", BalanceType::HOPR),
-            // }),
-            #[cfg(feature = "auto-redeeming")]
-            AutoRedeeming(AutoRedeemingStrategyConfig {
-                redeem_all_on_close: true,
-                minimum_redeem_ticket_value: HoprBalance::from_str("1 wxHOPR").unwrap(),
-                redeem_on_winning: true,
-            }),
-        ],
-    }
-}
-
-impl Default for Strategy {
-    fn default() -> Self {
-        Self::Multi(hopr_default_strategies())
-    }
-}
-
 /// An alias for the strategy configuration type.
 pub type StrategyConfig = MultiStrategyConfig;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Ensures that every StrategyKind variant serializes and deserializes correctly.
+    #[test]
+    fn test_strategy_kind_serde_roundtrip() {
+        let variants: Vec<StrategyKind> = vec![
+            #[cfg(feature = "auto-redeeming")]
+            StrategyKind::AutoRedeeming(Default::default()),
+            #[cfg(feature = "auto-funding")]
+            StrategyKind::AutoFunding(Default::default()),
+            #[cfg(feature = "closure-finalizer")]
+            StrategyKind::ClosureFinalizer(Default::default()),
+            StrategyKind::Multi(Default::default()),
+            StrategyKind::Passive,
+        ];
+
+        for variant in variants {
+            let serialized = serde_json::to_string(&variant).expect("serialization failed");
+            let deserialized: StrategyKind = serde_json::from_str(&serialized).expect("deserialization failed");
+            assert_eq!(variant, deserialized, "roundtrip failed for {variant}");
+        }
+    }
+}

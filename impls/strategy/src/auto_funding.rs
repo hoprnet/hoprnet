@@ -33,7 +33,7 @@ use serde_with::{DisplayFromStr, serde_as};
 use tracing::{debug, info, warn};
 use validator::{Validate, ValidationError};
 
-use crate::{Strategy, errors::StrategyError, strategy::Strategy as StrategyTrait};
+use crate::{errors::StrategyError, strategy::Strategy as StrategyTrait};
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
@@ -261,13 +261,13 @@ where
 
 impl<N: HasChainApi> Debug for AutoFundingStrategyInner<N> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", Strategy::AutoFunding(self.cfg))
+        write!(f, "AutoFundingStrategy({:?})", self.cfg)
     }
 }
 
 impl<N: HasChainApi> Display for AutoFundingStrategyInner<N> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", Strategy::AutoFunding(self.cfg))
+        write!(f, "auto_funding")
     }
 }
 
@@ -963,6 +963,38 @@ mod tests {
 
         assert_eq!(afs.in_flight.len(), 1, "in-flight set should still have one entry");
         assert!(afs.in_flight.contains(c1.get_id()), "channel should still be in-flight");
+
+        Ok(())
+    }
+
+    /// Tests the public builder API: `AutoFundingStrategy::new(...).build(node)` must
+    /// return a `Box<dyn Strategy + Send>` with the expected Display string.
+    #[tokio::test]
+    async fn test_build_returns_strategy_trait_object() -> anyhow::Result<()> {
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_generated_accounts(
+                &[&*ALICE, &*BOB],
+                false,
+                XDaiBalance::new_base(1),
+                HoprBalance::new_base(1000),
+            )
+            .with_channels([])
+            .build_dynamic_client([1; Address::SIZE].into());
+
+        let mut chain_connector =
+            create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
+        chain_connector.connect().await?;
+        let node = Arc::new(ChainNode(Arc::new(chain_connector)));
+
+        let strategy: Box<dyn crate::strategy::Strategy + Send> =
+            super::AutoFundingStrategy::new(AutoFundingStrategyConfig::default(), std::time::Duration::from_secs(60))
+                .build(node);
+
+        assert_eq!(strategy.to_string(), "auto_funding");
+        // Verify the box is Send (compile-time check via trait object)
+        fn assert_send<T: Send>(_: T) {}
+        assert_send(strategy);
 
         Ok(())
     }

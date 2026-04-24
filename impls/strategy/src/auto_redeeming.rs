@@ -27,7 +27,6 @@ use serde_with::{DisplayFromStr, serde_as};
 use validator::Validate;
 
 use crate::{
-    Strategy,
     errors::{StrategyError, StrategyError::CriteriaNotSatisfied},
     strategy::Strategy as StrategyTrait,
 };
@@ -272,13 +271,13 @@ where
 
 impl<N: HasChainApi + HasTicketManagement> Debug for AutoRedeemingStrategyInner<N> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", Strategy::AutoRedeeming(self.cfg))
+        write!(f, "AutoRedeemingStrategy({:?})", self.cfg)
     }
 }
 
 impl<N: HasChainApi + HasTicketManagement> Display for AutoRedeemingStrategyInner<N> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", Strategy::AutoRedeeming(self.cfg))
+        write!(f, "auto_redeeming")
     }
 }
 
@@ -760,6 +759,37 @@ mod tests {
         await_redemption_queue_empty(ars.running_redemptions.clone())
             .timeout(futures_time::time::Duration::from_secs(5))
             .await?;
+
+        Ok(())
+    }
+
+    /// Tests the public builder API: `AutoRedeemingStrategy::new(...).build(node)` must
+    /// return a `Box<dyn Strategy + Send>` with the expected Display string.
+    #[tokio::test]
+    async fn test_build_returns_strategy_trait_object() -> anyhow::Result<()> {
+        let mut connector = create_trustful_hopr_blokli_connector(
+            &BOB,
+            Default::default(),
+            CHAIN_CLIENT.clone(),
+            [1u8; Address::SIZE].into(),
+        )
+        .await?;
+        connector.connect().await?;
+
+        let mock_tmgr = MockTicketMgmt::new();
+        let node = Arc::new(TestNode {
+            chain: Arc::new(connector),
+            tmgr: Arc::new(mock_tmgr),
+        });
+
+        let strategy: Box<dyn crate::strategy::Strategy + Send> =
+            super::AutoRedeemingStrategy::new(AutoRedeemingStrategyConfig::default(), Duration::from_secs(60))
+                .build(node);
+
+        assert_eq!(strategy.to_string(), "auto_redeeming");
+        // Verify the box is Send (compile-time check via trait object)
+        fn assert_send<T: Send>(_: T) {}
+        assert_send(strategy);
 
         Ok(())
     }
