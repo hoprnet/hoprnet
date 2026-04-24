@@ -73,7 +73,8 @@ impl Display for MultiStrategy {
 #[async_trait]
 impl Strategy for MultiStrategy {
     async fn run(&mut self) -> Result<()> {
-        use hopr_async_runtime::prelude::spawn;
+        use futures::StreamExt as _;
+        use hopr_async_runtime::prelude::{AbortHandle, abortable, spawn};
 
         let strategies = std::mem::take(&mut self.strategies);
 
@@ -84,18 +85,43 @@ impl Strategy for MultiStrategy {
         }
 
         let on_fail_continue = self.on_fail_continue;
-        let tasks: Vec<_> = strategies
-            .into_iter()
-            .map(|mut s| spawn(async move { s.run().await }))
-            .collect();
 
-        let results = futures::future::join_all(tasks).await;
+        // Spawn each sub-strategy as an abortable task.
+        // Keeping all AbortHandles in a RAII guard ensures every sub-task is cancelled
+        // when MultiStrategy is dropped (graceful shutdown) or when the first failure
+        // triggers an early return in AND mode.
+        let mut join_handles = Vec::new();
+        let mut abort_handles: Vec<AbortHandle> = Vec::new();
+        for mut s in strategies {
+            let (proc, abort_handle) = abortable(async move { s.run().await });
+            join_handles.push(spawn(proc));
+            abort_handles.push(abort_handle);
+        }
 
+        struct AbortGuard(Vec<AbortHandle>);
+        impl Drop for AbortGuard {
+            fn drop(&mut self) {
+                for h in &self.0 {
+                    h.abort();
+                }
+            }
+        }
+        let _guard = AbortGuard(abort_handles);
+
+        // Process completions as they arrive so AND mode can abort siblings immediately.
+        let mut pending: futures::stream::FuturesUnordered<_> = join_handles.into_iter().collect();
         let mut last_error = None;
-        for result in results {
-            let task_result = result.map_err(|e| crate::errors::StrategyError::Other(e.into()))?;
-            if let Err(e) = task_result {
+
+        while let Some(join_result) = pending.next().await {
+            let strategy_result = match join_result {
+                Err(e) => Err(crate::errors::StrategyError::Other(e.into())),
+                Ok(Ok(result)) => result,
+                Ok(Err(_aborted)) => continue, // aborted by the guard — expected during shutdown
+            };
+
+            if let Err(e) = strategy_result {
                 if !on_fail_continue {
+                    // _guard drops here, aborting all remaining sub-tasks.
                     return Err(e);
                 }
                 warn!(%e, "sub-strategy failed, continuing per on_fail_continue=true");

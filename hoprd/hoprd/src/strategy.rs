@@ -11,9 +11,7 @@ use hopr_lib::api::{
 use hopr_strategy::strategy::{MultiStrategy, Strategy};
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
-#[cfg(all(feature = "telemetry", not(test)))]
-use strum::VariantNames;
-use strum::{Display as StrumDisplay, EnumString};
+use strum::{Display as StrumDisplay, VariantNames};
 use tracing::error;
 use validator::{Validate, ValidationError};
 
@@ -58,7 +56,7 @@ fn validate_execution_interval(interval: &Duration) -> std::result::Result<(), V
 /// This is a pure serde config type — it is used for YAML deserialization and
 /// carries no runtime behaviour. The runtime combinator is [`hopr_strategy::strategy::MultiStrategy`],
 /// which accepts any `Box<dyn Strategy + Send>`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, StrumDisplay, EnumString, VariantNames)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, StrumDisplay, VariantNames)]
 #[strum(serialize_all = "snake_case")]
 pub enum StrategyKind {
     #[cfg(feature = "runtime-tokio")]

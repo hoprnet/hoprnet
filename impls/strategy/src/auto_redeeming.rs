@@ -122,10 +122,23 @@ fn new_redemption_cache() -> moka::sync::Cache<ChannelId, AbortHandle> {
     moka::sync::CacheBuilder::new(1024)
         .time_to_live(REDEMPTION_TIMEOUT)
         .eviction_listener(|key: Arc<ChannelId>, value: AbortHandle, cause| {
-            if matches!(cause, RemovalCause::Expired) {
-                tracing::error!(%key, "redemption timed out after {:?}; aborting", REDEMPTION_TIMEOUT);
+            match cause {
+                RemovalCause::Expired => {
+                    // TTL elapsed — log an error and abort the stalled redemption task.
+                    tracing::error!(%key, "redemption timed out after {:?}; aborting", REDEMPTION_TIMEOUT);
+                    value.abort();
+                }
+                RemovalCause::Size => {
+                    // Cache capacity exceeded — let the task run to natural completion
+                    // rather than aborting work that is likely still making progress.
+                    tracing::warn!(%key, "redemption cache at capacity; entry evicted without abort");
+                }
+                _ => {
+                    // Explicit invalidation (task completed) or replacement.
+                    // The abortable future is already resolved; abort() is a no-op.
+                    value.abort();
+                }
             }
-            value.abort();
         })
         .build()
 }
@@ -143,6 +156,14 @@ struct AutoRedeemingStrategyInner<N: HasChainApi + HasTicketManagement> {
     /// Entries that exceed [`REDEMPTION_TIMEOUT`] are evicted by the cache; the eviction listener
     /// logs an error and aborts the background task.
     running_redemptions: moka::sync::Cache<ChannelId, AbortHandle>,
+}
+
+impl<N: HasChainApi + HasTicketManagement> Drop for AutoRedeemingStrategyInner<N> {
+    fn drop(&mut self) {
+        // Moka does not invoke the eviction listener when the cache is dropped.
+        // Abort all in-flight redemption tasks manually to prevent runaway background work.
+        self.running_redemptions.iter().for_each(|(_, handle)| handle.abort());
+    }
 }
 
 impl<N> AutoRedeemingStrategyInner<N>
