@@ -36,6 +36,14 @@
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumString, VariantNames};
 
+/// Shared serde default helpers used across multiple strategy configs.
+pub(crate) fn just_true() -> bool {
+    true
+}
+pub(crate) fn just_false() -> bool {
+    false
+}
+
 #[cfg(feature = "auto-funding")]
 use crate::auto_funding::AutoFundingStrategyConfig;
 #[cfg(feature = "auto-redeeming")]

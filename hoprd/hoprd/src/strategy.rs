@@ -10,16 +10,13 @@
 
 use std::{sync::Arc, time::Duration};
 
-use hopr_lib::{
-    HoprBalance,
-    api::{
-        chain::{
-            ChainReadChannelOperations, ChainReadSafeOperations, ChainValues, ChainWriteChannelOperations,
-            ChainWriteTicketOperations,
-        },
-        node::{ActionableEventSource, HasChainApi, HasTicketManagement},
-        tickets::TicketManagement,
+use hopr_lib::api::{
+    chain::{
+        ChainReadChannelOperations, ChainReadSafeOperations, ChainValues, ChainWriteChannelOperations,
+        ChainWriteTicketOperations,
     },
+    node::{ActionableEventSource, HasChainApi, HasTicketManagement},
+    tickets::TicketManagement,
 };
 use hopr_strategy::{
     StrategyKind,
@@ -45,8 +42,6 @@ lazy_static::lazy_static! {
 /// ## Strategies included
 /// - `AutoRedeeming`: redeems single tickets on channel close if worth at least 1 wxHOPR
 pub fn hopr_default_strategies() -> MultiStrategyConfig {
-    use std::str::FromStr;
-
     use hopr_strategy::auto_redeeming::AutoRedeemingStrategyConfig;
 
     MultiStrategyConfig {
@@ -54,9 +49,8 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
         allow_recursive: false,
         execution_interval: Duration::from_secs(60),
         strategies: vec![StrategyKind::AutoRedeeming(AutoRedeemingStrategyConfig {
-            redeem_all_on_close: true,
-            minimum_redeem_ticket_value: HoprBalance::from_str("1 wxHOPR").unwrap(),
             redeem_on_winning: true,
+            ..Default::default()
         })],
     }
 }
@@ -122,7 +116,9 @@ where
         }
 
         #[cfg(all(feature = "telemetry", not(test)))]
-        METRIC_ENABLED_STRATEGIES.set(&[&strategy.to_string()], 1_f64);
+        if !matches!(strategy, StrategyKind::Passive) {
+            METRIC_ENABLED_STRATEGIES.set(&[&strategy.to_string()], 1_f64);
+        }
     }
 
     Box::new(MultiStrategy::new(strategies, cfg.on_fail_continue))

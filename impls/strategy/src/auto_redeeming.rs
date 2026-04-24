@@ -28,6 +28,7 @@ use validator::Validate;
 
 use crate::{
     errors::{StrategyError, StrategyError::CriteriaNotSatisfied},
+    just_false, just_true,
     strategy::Strategy as StrategyTrait,
 };
 
@@ -39,14 +40,6 @@ const REDEMPTION_TIMEOUT: Duration = Duration::from_secs(300);
 lazy_static::lazy_static! {
     static ref METRIC_COUNT_AUTO_REDEEMS:  hopr_metrics::SimpleCounter =
          hopr_metrics::SimpleCounter::new("hopr_strategy_auto_redeem_redeem_count", "Count of initiated automatic redemptions").unwrap();
-}
-
-fn just_true() -> bool {
-    true
-}
-
-fn just_false() -> bool {
-    false
 }
 
 fn min_redeem_hopr() -> HoprBalance {
@@ -115,23 +108,26 @@ impl AutoRedeemingStrategy {
         N::ChainApi: ChainReadChannelOperations + ChainWriteTicketOperations + Clone + Send + Sync + 'static,
         N::TicketManager: TicketManagement + Clone + Send + Sync + 'static,
     {
-        let running_redemptions = moka::sync::CacheBuilder::new(1024)
-            .time_to_live(REDEMPTION_TIMEOUT)
-            .eviction_listener(|key: Arc<ChannelId>, value: AbortHandle, cause| {
-                if matches!(cause, RemovalCause::Expired) {
-                    tracing::error!(%key, "redemption timed out after {:?}; aborting", REDEMPTION_TIMEOUT);
-                }
-                value.abort();
-            })
-            .build();
-
         Box::new(AutoRedeemingStrategyInner {
             cfg: self.cfg,
             interval: self.interval,
             node,
-            running_redemptions,
+            running_redemptions: new_redemption_cache(),
         })
     }
+}
+
+/// Construct the moka cache used to track in-progress per-channel redemptions.
+fn new_redemption_cache() -> moka::sync::Cache<ChannelId, AbortHandle> {
+    moka::sync::CacheBuilder::new(1024)
+        .time_to_live(REDEMPTION_TIMEOUT)
+        .eviction_listener(|key: Arc<ChannelId>, value: AbortHandle, cause| {
+            if matches!(cause, RemovalCause::Expired) {
+                tracing::error!(%key, "redemption timed out after {:?}; aborting", REDEMPTION_TIMEOUT);
+            }
+            value.abort();
+        })
+        .build()
 }
 
 /// Private generic runner — constructed by [`AutoRedeemingStrategy::build`].
@@ -544,18 +540,6 @@ mod tests {
         }
     }
 
-    fn make_redemptions_cache() -> moka::sync::Cache<ChannelId, AbortHandle> {
-        moka::sync::CacheBuilder::new(1024)
-            .time_to_live(REDEMPTION_TIMEOUT)
-            .eviction_listener(|key: Arc<ChannelId>, value: AbortHandle, cause| {
-                if matches!(cause, RemovalCause::Expired) {
-                    tracing::error!(%key, "redemption timed out; aborting (test cache)");
-                }
-                value.abort();
-            })
-            .build()
-    }
-
     async fn await_redemption_queue_empty(redeems: moka::sync::Cache<ChannelId, AbortHandle>) {
         loop {
             hopr_async_runtime::prelude::sleep(Duration::from_millis(100)).await;
@@ -575,7 +559,7 @@ mod tests {
             cfg,
             interval: Duration::from_secs(60),
             node: Arc::new(TestNode { chain: connector, tmgr }),
-            running_redemptions: make_redemptions_cache(),
+            running_redemptions: new_redemption_cache(),
         }
     }
 

@@ -1,5 +1,5 @@
 use std::{
-    fmt::{Display, Formatter},
+    fmt::{Debug, Display, Formatter},
     ops::Sub,
     sync::Arc,
     time::Duration,
@@ -11,7 +11,7 @@ use hopr_lib::{
     ChannelStatusDiscriminants, Utc,
     api::{
         chain::{ChainReadChannelOperations, ChainWriteChannelOperations, ChannelSelector},
-        node::{ActionableEventSource, HasChainApi},
+        node::HasChainApi,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -69,7 +69,7 @@ impl ClosureFinalizerStrategy {
     /// of the concrete node type.
     pub fn build<N>(self, node: Arc<N>) -> Box<dyn StrategyTrait + Send>
     where
-        N: HasChainApi + ActionableEventSource + Send + Sync + 'static,
+        N: HasChainApi + Send + Sync + 'static,
         N::ChainApi: ChainReadChannelOperations + ChainWriteChannelOperations + Clone + Send + Sync + 'static,
     {
         Box::new(ClosureFinalizerStrategyInner {
@@ -89,7 +89,7 @@ struct ClosureFinalizerStrategyInner<N: HasChainApi> {
 
 impl<N> ClosureFinalizerStrategyInner<N>
 where
-    N: HasChainApi + ActionableEventSource + Send + Sync + 'static,
+    N: HasChainApi + Send + Sync + 'static,
     <N as HasChainApi>::ChainApi:
         ChainReadChannelOperations + ChainWriteChannelOperations + Clone + Send + Sync + 'static,
 {
@@ -122,6 +122,12 @@ where
     }
 }
 
+impl<N: HasChainApi> Debug for ClosureFinalizerStrategyInner<N> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClosureFinalizerStrategy({:?})", self.cfg)
+    }
+}
+
 impl<N: HasChainApi> Display for ClosureFinalizerStrategyInner<N> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "closure_finalizer")
@@ -131,7 +137,7 @@ impl<N: HasChainApi> Display for ClosureFinalizerStrategyInner<N> {
 #[async_trait]
 impl<N> StrategyTrait for ClosureFinalizerStrategyInner<N>
 where
-    N: HasChainApi + ActionableEventSource + Send + Sync + 'static,
+    N: HasChainApi + Send + Sync + 'static,
     <N as HasChainApi>::ChainApi:
         ChainReadChannelOperations + ChainWriteChannelOperations + Clone + Send + Sync + 'static,
 {
@@ -161,10 +167,7 @@ mod tests {
         Address, BytesRepresentable, ChainKeypair, ChannelEntry, ChannelStatus, HoprBalance, Keypair, XDaiBalance,
         api::{
             chain::{ChainEvent, ChainEvents, HoprChainApi},
-            node::{
-                ActionableEvent, ComponentStatus, ComponentStatusReporter, EventWaitResult, HasChainApi,
-                NodeOnchainIdentity,
-            },
+            node::{ComponentStatus, ComponentStatusReporter, EventWaitResult, HasChainApi, NodeOnchainIdentity},
         },
     };
     use lazy_static::lazy_static;
@@ -216,22 +219,6 @@ mod tests {
             F: Fn(&ChainEvent) -> bool + Send + Sync + 'static,
         {
             unimplemented!("tests do not call wait_for_on_chain_event")
-        }
-    }
-
-    impl<C> ActionableEventSource for ChainNode<C>
-    where
-        C: ChainEvents + Send + Sync + 'static,
-    {
-        fn subscribe_to_actionable_events(
-            &self,
-        ) -> Result<futures::stream::BoxStream<'static, ActionableEvent>, String> {
-            Ok(self
-                .0
-                .subscribe()
-                .map_err(|e| e.to_string())?
-                .map(ActionableEvent::Chain)
-                .boxed())
         }
     }
 

@@ -17,12 +17,7 @@ use serde::{Deserialize, Serialize};
 use tracing::warn;
 use validator::{Validate, ValidationError};
 
-use crate::{StrategyKind, errors::Result};
-
-#[inline]
-fn just_true() -> bool {
-    true
-}
+use crate::{StrategyKind, errors::Result, just_true};
 
 #[inline]
 fn sixty_seconds() -> std::time::Duration {
@@ -37,7 +32,7 @@ fn empty_vector() -> Vec<StrategyKind> {
 fn validate_execution_interval(interval: &std::time::Duration) -> std::result::Result<(), ValidationError> {
     if interval < &std::time::Duration::from_secs(10) {
         Err(ValidationError::new(
-            "strategy execution interval must be at least 1 second",
+            "strategy execution interval must be at least 10 seconds",
         ))
     } else {
         Ok(())

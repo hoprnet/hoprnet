@@ -394,7 +394,6 @@ mod tests {
     };
 
     use super::*;
-    use crate::auto_funding::{AutoFundingStrategyConfig, AutoFundingStrategyInner};
 
     lazy_static::lazy_static! {
         static ref BOB_KP: ChainKeypair = ChainKeypair::from_secret(&hex!(
