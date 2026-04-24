@@ -104,7 +104,7 @@ pub fn register_prefix_provider(prefix: &str, provider: SdkMeterProvider) -> boo
         prefix: prefix.to_string(),
         provider,
     });
-    prefix_providers.sort_by(|a, b| b.prefix.len().cmp(&a.prefix.len()));
+    prefix_providers.sort_by_key(|b| std::cmp::Reverse(b.prefix.len()));
     true
 }
 

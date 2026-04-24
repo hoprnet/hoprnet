@@ -28,15 +28,30 @@ pub(crate) struct InnerGraph {
 #[derive(Debug, Clone)]
 pub struct ChannelGraph {
     pub(crate) me: OffchainPublicKey,
+    pub(crate) edge_penalty: f64,
+    pub(crate) min_ack_rate: f64,
     pub(crate) inner: Arc<RwLock<InnerGraph>>,
 }
 
 impl ChannelGraph {
-    /// Creates a new channel graph with the given self identity.
+    /// Creates a new channel graph with the given self identity and default edge scoring
+    /// parameters (edge_penalty = 0.5, min_ack_rate = 0.1).
     ///
     /// The `me` key represents the local node which is automatically added
     /// to the graph as the first node.
+    ///
+    /// Production code should prefer [`with_edge_params`](Self::with_edge_params) to
+    /// receive values from `PathPlannerConfig`.
     pub fn new(me: OffchainPublicKey) -> Self {
+        Self::with_edge_params(me, 0.5, 0.1)
+    }
+
+    /// Creates a new channel graph with custom edge scoring parameters.
+    ///
+    /// * `me` – offchain public key of the local node (added as the first graph node).
+    /// * `edge_penalty` – penalty multiplier for edges lacking probe-based quality observations.
+    /// * `min_ack_rate` – minimum acceptable message acknowledgment rate for path selection.
+    pub fn with_edge_params(me: OffchainPublicKey, edge_penalty: f64, min_ack_rate: f64) -> Self {
         let mut graph = DiGraph::new();
         let mut indices = BiHashMap::new();
 
@@ -45,6 +60,8 @@ impl ChannelGraph {
 
         Self {
             me,
+            edge_penalty,
+            min_ack_rate,
             inner: Arc::new(RwLock::new(InnerGraph { graph, indices })),
         }
     }
@@ -52,60 +69,6 @@ impl ChannelGraph {
     /// Returns the self-identity key of this graph.
     pub fn me(&self) -> &OffchainPublicKey {
         &self.me
-    }
-}
-
-impl ChannelGraph {
-    /// Returns all edges in the graph as `(source, destination, observations)` triples.
-    ///
-    /// Only nodes that participate in at least one edge appear in the result.
-    /// Isolated nodes (no incoming or outgoing edges) are omitted.
-    pub fn connected_edges(&self) -> Vec<(OffchainPublicKey, OffchainPublicKey, Observations)> {
-        let inner = self.inner.read();
-        inner
-            .graph
-            .edge_indices()
-            .filter_map(|ei| {
-                let (src_idx, dst_idx) = inner.graph.edge_endpoints(ei)?;
-                let src = inner.graph.node_weight(src_idx)?;
-                let dst = inner.graph.node_weight(dst_idx)?;
-                let obs = inner.graph.edge_weight(ei)?;
-                Some((*src, *dst, *obs))
-            })
-            .collect()
-    }
-
-    /// Returns edges reachable from `self.me` via directed BFS.
-    ///
-    /// Only edges where both the source and destination are reachable from our
-    /// node are included. This filters out disconnected subgraphs that we
-    /// cannot actually route through.
-    pub fn reachable_edges(&self) -> Vec<(OffchainPublicKey, OffchainPublicKey, Observations)> {
-        let inner = self.inner.read();
-        let Some(&me_idx) = inner.indices.get_by_left(&self.me) else {
-            return vec![];
-        };
-
-        let mut reachable = std::collections::HashSet::new();
-        let mut bfs = petgraph::visit::Bfs::new(&inner.graph, me_idx);
-        while let Some(node_idx) = bfs.next(&inner.graph) {
-            reachable.insert(node_idx);
-        }
-
-        inner
-            .graph
-            .edge_indices()
-            .filter_map(|ei| {
-                let (src_idx, dst_idx) = inner.graph.edge_endpoints(ei)?;
-                if !reachable.contains(&src_idx) || !reachable.contains(&dst_idx) {
-                    return None;
-                }
-                let src = inner.graph.node_weight(src_idx)?;
-                let dst = inner.graph.node_weight(dst_idx)?;
-                let obs = inner.graph.edge_weight(ei)?;
-                Some((*src, *dst, *obs))
-            })
-            .collect()
     }
 }
 
@@ -144,6 +107,10 @@ impl hopr_api::graph::NetworkGraphView for ChannelGraph {
         let dest_idx = inner.indices.get_by_left(dest)?;
         let edge_idx = inner.graph.find_edge(*src_idx, *dest_idx)?;
         inner.graph.edge_weight(edge_idx).copied()
+    }
+
+    fn identity(&self) -> &OffchainPublicKey {
+        &self.me
     }
 }
 
@@ -247,12 +214,60 @@ impl hopr_api::graph::NetworkGraphWrite for ChannelGraph {
     }
 }
 
+impl hopr_api::graph::NetworkGraphConnectivity for ChannelGraph {
+    type NodeId = OffchainPublicKey;
+    type Observed = Observations;
+
+    fn connected_edges(&self) -> Vec<(OffchainPublicKey, OffchainPublicKey, Observations)> {
+        let inner = self.inner.read();
+        inner
+            .graph
+            .edge_indices()
+            .filter_map(|ei| {
+                let (src_idx, dst_idx) = inner.graph.edge_endpoints(ei)?;
+                let src = inner.graph.node_weight(src_idx)?;
+                let dst = inner.graph.node_weight(dst_idx)?;
+                let obs = inner.graph.edge_weight(ei)?;
+                Some((*src, *dst, *obs))
+            })
+            .collect()
+    }
+
+    fn reachable_edges(&self) -> Vec<(OffchainPublicKey, OffchainPublicKey, Observations)> {
+        let inner = self.inner.read();
+        let Some(&me_idx) = inner.indices.get_by_left(&self.me) else {
+            return vec![];
+        };
+
+        let mut reachable = std::collections::HashSet::new();
+        let mut bfs = petgraph::visit::Bfs::new(&inner.graph, me_idx);
+        while let Some(node_idx) = bfs.next(&inner.graph) {
+            reachable.insert(node_idx);
+        }
+
+        inner
+            .graph
+            .edge_indices()
+            .filter_map(|ei| {
+                let (src_idx, dst_idx) = inner.graph.edge_endpoints(ei)?;
+                if !reachable.contains(&src_idx) || !reachable.contains(&dst_idx) {
+                    return None;
+                }
+                let src = inner.graph.node_weight(src_idx)?;
+                let dst = inner.graph.node_weight(dst_idx)?;
+                let obs = inner.graph.edge_weight(ei)?;
+                Some((*src, *dst, *obs))
+            })
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use hex_literal::hex;
     use hopr_api::{
         graph::{
-            EdgeLinkObservable, NetworkGraphView, NetworkGraphWrite,
+            EdgeLinkObservable, NetworkGraphConnectivity, NetworkGraphView, NetworkGraphWrite,
             traits::{EdgeObservableRead, EdgeObservableWrite, EdgeWeightType},
         },
         types::crypto::prelude::{Keypair, OffchainKeypair},
@@ -368,7 +383,7 @@ mod tests {
         let graph = ChannelGraph::new(me);
         let peers: Vec<_> = [SECRET_1, SECRET_2, SECRET_3, SECRET_4, SECRET_5]
             .iter()
-            .map(|s| pubkey_from(s))
+            .map(pubkey_from)
             .collect();
         for &peer in &peers {
             graph.add_node(peer);

@@ -29,7 +29,6 @@ telemetry = ["dep:hopr-metrics"]
 
 [dependencies]
 arrayvec = { workspace = true }
-cfg-if = { workspace = true }
 flume = { workspace = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
@@ -62,7 +61,7 @@ test-log = { workspace = true }
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 
 [package.metadata.cargo-machete]
-ignored = ["serde_bytes"]
+ignored = ["hickory-resolver", "serde_bytes"]
 
 [package.metadata.cargo-shear]
 ignored = ["serde_bytes"]

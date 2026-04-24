@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-connector"
-version = "0.19.0"
+version = "0.19.1"
 edition.workspace = true
 rust-version.workspace = true
 authors = ["HOPR Association <tech@hoprnet.org>"]
@@ -16,6 +16,7 @@ testing = ["dep:hex", "blokli-client/testing"]
 [dependencies]
 ahash = { workspace = true }
 anyhow = { workspace = true }
+atomic_enum = { workspace = true }
 async-broadcast = { workspace = true }
 async-trait = { workspace = true }
 blokli-client = { workspace = true }

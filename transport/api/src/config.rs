@@ -47,6 +47,7 @@ pub struct HoprProtocolConfig {
     #[cfg_attr(feature = "serde", serde(default))]
     pub session: SessionGlobalConfig,
     /// Path planner configuration
+    #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(skip))]
     pub path_planner: hopr_transport_path::PathPlannerConfig,
     /// Interval at which per-peer protocol conformance counters are flushed

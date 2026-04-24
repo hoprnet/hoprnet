@@ -60,7 +60,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40 # v2.19.0
         with:
           disable-sudo: true
           egress-policy: audit
@@ -84,6 +84,23 @@ jobs:
           if [[ "$HEAD_REPO" != "$BASE_REPO" ]]; then
             gh pr edit "$PR_NUMBER" --add-label "external"
           fi
+
+  check-allowed-dependencies:
+    name: Disallowed git dependencies in cargo
+    runs-on: depot-ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Validate Cargo dependencies
+        uses: hoprnet/hopr-workflows/actions/nix-action@c2aca7e56d25c4a786049ccf816c7f1af8721de8 # nix-action-v1
+        with:
+          source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          command: |
+            nix develop -c env -u VIRTUAL_ENV UV_CACHE_DIR=.ci/no-git-dependencies/.uv-cache \
+              uv run --project .ci/no-git-dependencies \
+              python .ci/no-git-dependencies/src/no_git_dependencies_check/main.py \
+              --allow blokli-client
 
   checks:
     name: Check
@@ -121,6 +138,30 @@ jobs:
     secrets:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
       codecov_token: ${{ secrets.CODECOV_TOKEN }}
+
+  build-benchmarks:
+    name: Build Benchmarks
+    needs: [tests]
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: self-hosted-hoprnet-bigger
+    permissions:
+      contents: read
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          disable-sudo: true
+          egress-policy: audit
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Setup Nix
+        uses: hoprnet/hopr-workflows/actions/setup-nix@43b03a7b5df777770d95c6524f48be34184b26fa # setup-nix-v1
+        with:
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      - name: Build benchmarks
+        run: nix build -L .#bench-build
 
   build-binaries:
     name: Binary ${{ matrix.architecture }}
