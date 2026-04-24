@@ -4428,8 +4428,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "1.9.0"
-source = "git+https://github.com/hoprnet/hopr-api?rev=54fe63329ef0c4d10ef03786f080defb61912bd6#54fe63329ef0c4d10ef03786f080defb61912bd6"
+version = "1.8.1"
+source = "git+https://github.com/hoprnet/hopr-api?rev=4efb9c7fd301db61629b307bff1b80541bb5069d#4efb9c7fd301db61629b307bff1b80541bb5069d"
 dependencies = [
  "async-trait",
  "atomic_enum",

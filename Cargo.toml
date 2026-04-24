@@ -219,7 +219,7 @@ mimalloc = { version = "0.1.50", default-features = false, features = [
   "secure",
 ] }
 
-hopr-api = { version = "1.9.0" }
+hopr-api = { version = "1.8.1" }
 hopr-types = { version = "1.5.4", features = ["use-bindings"] }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-crypto-keypair = { path = "crypto/keypair", default-features = false }
@@ -300,4 +300,4 @@ similar.opt-level = 3
 ignored = ["oas3", "serde_bytes", "humantime-serde"]
 
 [patch.crates-io]
-hopr-api = { git = "https://github.com/hoprnet/hopr-api", rev = "54fe63329ef0c4d10ef03786f080defb61912bd6" }
+hopr-api = { git = "https://github.com/hoprnet/hopr-api", rev = "4efb9c7fd301db61629b307bff1b80541bb5069d" }
