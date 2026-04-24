@@ -298,7 +298,7 @@ pub struct HoprdConfig {
     #[validate(nested)]
     #[serde(default = "crate::strategy::hopr_default_strategies")]
     #[default(crate::strategy::hopr_default_strategies())]
-    pub strategy: hopr_strategy::StrategyConfig,
+    pub strategy: crate::strategy::MultiStrategyConfig,
 }
 
 impl HoprdConfig {

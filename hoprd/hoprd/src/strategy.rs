@@ -1,9 +1,3 @@
-//! HOPR-specific strategy wiring.
-//!
-//! This module owns:
-//! - [`hopr_default_strategies`] — the default HOPRd strategy configuration
-//! - [`build_strategies`] — maps a [`MultiStrategyConfig`] to a runnable [`MultiStrategy`]
-
 use std::{sync::Arc, time::Duration};
 
 use hopr_lib::api::{
@@ -14,13 +8,14 @@ use hopr_lib::api::{
     node::{ActionableEventSource, HasChainApi, HasTicketManagement},
     tickets::TicketManagement,
 };
-use hopr_strategy::{
-    StrategyKind,
-    strategy::{MultiStrategy, MultiStrategyConfig, Strategy},
-};
+use hopr_strategy::strategy::{MultiStrategy, Strategy};
+use serde::{Deserialize, Serialize};
+use smart_default::SmartDefault;
 #[cfg(all(feature = "telemetry", not(test)))]
 use strum::VariantNames;
+use strum::{Display as StrumDisplay, EnumString};
 use tracing::error;
+use validator::{Validate, ValidationError};
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
@@ -31,6 +26,81 @@ lazy_static::lazy_static! {
             &["strategy"],
         )
         .unwrap();
+}
+
+#[inline]
+fn just_true() -> bool {
+    true
+}
+
+#[inline]
+fn sixty_seconds() -> Duration {
+    Duration::from_secs(60)
+}
+
+#[inline]
+fn empty_strategies() -> Vec<StrategyKind> {
+    vec![]
+}
+
+fn validate_execution_interval(interval: &Duration) -> std::result::Result<(), ValidationError> {
+    if interval < &Duration::from_secs(10) {
+        Err(ValidationError::new(
+            "strategy execution interval must be at least 10 seconds",
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+/// Lists all possible strategies with their respective configurations.
+///
+/// This is a pure serde config type — it is used for YAML deserialization and
+/// carries no runtime behaviour. The runtime combinator is [`hopr_strategy::strategy::MultiStrategy`],
+/// which accepts any `Box<dyn Strategy + Send>`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, StrumDisplay, EnumString, VariantNames)]
+#[strum(serialize_all = "snake_case")]
+pub enum StrategyKind {
+    AutoRedeeming(hopr_strategy::auto_redeeming::AutoRedeemingStrategyConfig),
+    AutoFunding(hopr_strategy::auto_funding::AutoFundingStrategyConfig),
+    ClosureFinalizer(hopr_strategy::channel_finalizer::ClosureFinalizerStrategyConfig),
+    Multi(MultiStrategyConfig),
+    Passive,
+}
+
+/// Configuration options for the `MultiStrategy` group.
+#[derive(Debug, Clone, PartialEq, SmartDefault, Validate, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MultiStrategyConfig {
+    /// If `false`, the first sub-strategy failure stops the entire group.
+    /// If `true`, failures are logged and execution continues.
+    ///
+    /// Default is `true`.
+    #[default = true]
+    #[serde(default = "just_true")]
+    pub on_fail_continue: bool,
+
+    /// Indicate whether the `MultiStrategy` can contain another `MultiStrategy`.
+    ///
+    /// Default is `true`.
+    #[default = true]
+    #[serde(default = "just_true")]
+    pub allow_recursive: bool,
+
+    /// Execution interval for periodic scans within each sub-strategy.
+    ///
+    /// Default is 60 seconds, minimum is 10 seconds.
+    #[default(sixty_seconds())]
+    #[serde(default = "sixty_seconds", with = "humantime_serde")]
+    #[validate(custom(function = "validate_execution_interval"))]
+    pub execution_interval: Duration,
+
+    /// Configuration of individual sub-strategies.
+    ///
+    /// Default is empty, which makes the `MultiStrategy` behave as passive.
+    #[default(_code = "vec![]")]
+    #[serde(default = "empty_strategies")]
+    pub strategies: Vec<StrategyKind>,
 }
 
 /// Default HOPRd strategy configuration.

@@ -3,9 +3,9 @@
 //! during node runtime.
 //!
 //! - [passive strategy](crate::strategy::MultiStrategy)
-//! - [auto funding strategy](crate::auto_funding) (feature `auto-funding`)
-//! - [auto redeeming strategy](crate::auto_redeeming) (feature `auto-redeeming`)
-//! - [closure finalizer](crate::channel_finalizer) (feature `closure-finalizer`)
+//! - [auto funding strategy](crate::auto_funding) (feature `strategy-auto-funding`)
+//! - [auto redeeming strategy](crate::auto_redeeming) (feature `strategy-auto-redeeming`)
+//! - [closure finalizer](crate::channel_finalizer) (feature `strategy-closure-finalizer`)
 //! - [multiple strategy chains](crate::strategy)
 //!
 //! Individual strategies are gated behind Cargo features.
@@ -33,9 +33,6 @@
 //!       funding_amount: 20
 //! ```
 
-use serde::{Deserialize, Serialize};
-use strum::{Display, EnumString, VariantNames};
-
 /// Shared serde default helpers used across multiple strategy configs.
 pub(crate) fn just_true() -> bool {
     true
@@ -44,66 +41,11 @@ pub(crate) fn just_false() -> bool {
     false
 }
 
-#[cfg(feature = "auto-funding")]
-use crate::auto_funding::AutoFundingStrategyConfig;
-#[cfg(feature = "auto-redeeming")]
-use crate::auto_redeeming::AutoRedeemingStrategyConfig;
-#[cfg(feature = "closure-finalizer")]
-use crate::channel_finalizer::ClosureFinalizerStrategyConfig;
-use crate::strategy::MultiStrategyConfig;
-
-#[cfg(feature = "auto-funding")]
+#[cfg(feature = "strategy-auto-funding")]
 pub mod auto_funding;
-#[cfg(feature = "auto-redeeming")]
+#[cfg(feature = "strategy-auto-redeeming")]
 pub mod auto_redeeming;
-#[cfg(feature = "closure-finalizer")]
+#[cfg(feature = "strategy-closure-finalizer")]
 pub mod channel_finalizer;
 pub mod errors;
 pub mod strategy;
-
-/// Lists all possible strategies with their respective configurations.
-///
-/// This is a pure serde config type — it is used for YAML deserialization and
-/// carries no runtime behaviour. The runtime combinator is [`strategy::MultiStrategy`],
-/// which accepts any `Box<dyn strategy::Strategy + Send>`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Display, EnumString, VariantNames)]
-#[strum(serialize_all = "snake_case")]
-pub enum StrategyKind {
-    #[cfg(feature = "auto-redeeming")]
-    AutoRedeeming(AutoRedeemingStrategyConfig),
-    #[cfg(feature = "auto-funding")]
-    AutoFunding(AutoFundingStrategyConfig),
-    #[cfg(feature = "closure-finalizer")]
-    ClosureFinalizer(ClosureFinalizerStrategyConfig),
-    Multi(MultiStrategyConfig),
-    Passive,
-}
-
-/// An alias for the strategy configuration type.
-pub type StrategyConfig = MultiStrategyConfig;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// Ensures that every StrategyKind variant serializes and deserializes correctly.
-    #[test]
-    fn test_strategy_kind_serde_roundtrip() {
-        let variants: Vec<StrategyKind> = vec![
-            #[cfg(feature = "auto-redeeming")]
-            StrategyKind::AutoRedeeming(Default::default()),
-            #[cfg(feature = "auto-funding")]
-            StrategyKind::AutoFunding(Default::default()),
-            #[cfg(feature = "closure-finalizer")]
-            StrategyKind::ClosureFinalizer(Default::default()),
-            StrategyKind::Multi(Default::default()),
-            StrategyKind::Passive,
-        ];
-
-        for variant in variants {
-            let serialized = serde_json::to_string(&variant).expect("serialization failed");
-            let deserialized: StrategyKind = serde_json::from_str(&serialized).expect("deserialization failed");
-            assert_eq!(variant, deserialized, "roundtrip failed for {variant}");
-        }
-    }
-}

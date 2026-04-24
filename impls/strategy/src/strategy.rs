@@ -8,36 +8,12 @@
 //! The `on_fail_continue` flag controls whether a sub-strategy failure aborts the whole group:
 //! - `true` → OR chain: continue after individual failures
 //! - `false` → AND chain: abort all on first failure
-//!
-//! For details on default parameters see [`MultiStrategyConfig`].
 use std::fmt::{Debug, Display, Formatter};
 
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 use tracing::warn;
-use validator::{Validate, ValidationError};
 
-use crate::{StrategyKind, errors::Result, just_true};
-
-#[inline]
-fn sixty_seconds() -> std::time::Duration {
-    std::time::Duration::from_secs(60)
-}
-
-#[inline]
-fn empty_vector() -> Vec<StrategyKind> {
-    vec![]
-}
-
-fn validate_execution_interval(interval: &std::time::Duration) -> std::result::Result<(), ValidationError> {
-    if interval < &std::time::Duration::from_secs(10) {
-        Err(ValidationError::new(
-            "strategy execution interval must be at least 10 seconds",
-        ))
-    } else {
-        Ok(())
-    }
-}
+use crate::errors::Result;
 
 /// A strategy that runs until cancelled or a fatal error occurs.
 ///
@@ -51,41 +27,6 @@ fn validate_execution_interval(interval: &std::time::Duration) -> std::result::R
 pub trait Strategy: Display + Send {
     /// Run the strategy. Returns only on cancellation or fatal error.
     async fn run(&mut self) -> Result<()>;
-}
-
-/// Configuration options for the `MultiStrategy` group.
-#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct MultiStrategyConfig {
-    /// If `false`, the first sub-strategy failure stops the entire group.
-    /// If `true`, failures are logged and execution continues.
-    ///
-    /// Default is `true`.
-    #[default = true]
-    #[serde(default = "just_true")]
-    pub on_fail_continue: bool,
-
-    /// Indicate whether the `MultiStrategy` can contain another `MultiStrategy`.
-    ///
-    /// Default is `true`.
-    #[default = true]
-    #[serde(default = "just_true")]
-    pub allow_recursive: bool,
-
-    /// Execution interval for periodic scans within each sub-strategy.
-    ///
-    /// Default is 60 seconds, minimum is 10 seconds.
-    #[default(sixty_seconds())]
-    #[serde(default = "sixty_seconds", with = "humantime_serde")]
-    #[validate(custom(function = "validate_execution_interval"))]
-    pub execution_interval: std::time::Duration,
-
-    /// Configuration of individual sub-strategies.
-    ///
-    /// Default is empty, which makes the `MultiStrategy` behave as passive.
-    #[default(_code = "vec![]")]
-    #[serde(default = "empty_vector")]
-    pub strategies: Vec<StrategyKind>,
 }
 
 /// Runs a group of sub-strategies concurrently, each in its own async task.
