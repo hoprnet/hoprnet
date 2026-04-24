@@ -1,6 +1,6 @@
 [package]
 name = "hopr-strategy"
-version = "0.17.2"
+version = "0.18.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains implementations of different HOPR strategies"
 edition.workspace = true
@@ -16,6 +16,12 @@ crate-type = ["rlib"]
 default = []
 runtime-tokio = ["hopr-lib/runtime-tokio", "hopr-async-runtime/runtime-tokio"]
 telemetry = ["dep:hopr-metrics"]
+## Strategy features — each enables one strategy implementation.
+auto-funding = []
+auto-redeeming = []
+closure-finalizer = []
+## The `hopr` feature bundles the default HOPR network strategy set.
+hopr = ["auto-redeeming"]
 
 [dependencies]
 anyhow = { workspace = true }

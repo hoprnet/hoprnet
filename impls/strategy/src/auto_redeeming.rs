@@ -6,6 +6,7 @@
 use std::{
     fmt::{Debug, Display, Formatter},
     str::FromStr,
+    sync::Arc,
     time::Duration,
 };
 
@@ -15,7 +16,8 @@ use hopr_async_runtime::{AbortableList, spawn_as_abortable};
 use hopr_lib::{
     ChannelChange, ChannelDirection, ChannelEntry, ChannelId, ChannelStatus, HoprBalance, VerifiedTicket,
     api::{
-        chain::{ChainReadChannelOperations, ChainWriteTicketOperations, ChannelSelector},
+        chain::{ChainEvent, ChainReadChannelOperations, ChainWriteTicketOperations, ChannelSelector},
+        node::{ActionableEvent, ActionableEventSource, HasChainApi, HasTicketManagement, TicketEvent},
         tickets::TicketManagement,
     },
 };
@@ -27,7 +29,7 @@ use validator::Validate;
 use crate::{
     Strategy,
     errors::{StrategyError, StrategyError::CriteriaNotSatisfied},
-    strategy::SingularStrategy,
+    strategy::{HoprStrategyNode, Strategy as StrategyTrait},
 };
 
 #[cfg(all(feature = "telemetry", not(test)))]
@@ -83,50 +85,62 @@ pub struct AutoRedeemingStrategyConfig {
     pub redeem_on_winning: bool,
 }
 
-/// The `AutoRedeemingStrategy` automatically sends an acknowledged ticket
-/// for redemption once encountered.
-/// The strategy does not await the result of the redemption.
-pub struct AutoRedeemingStrategy<A, T> {
+/// Builder for [`AutoRedeemingStrategyInner`].
+///
+/// Call [`new`](AutoRedeemingStrategy::new) with the strategy configuration,
+/// then [`build`](AutoRedeemingStrategy::build) to wire in a node and obtain a
+/// runnable `Box<dyn Strategy + Send>`.
+pub struct AutoRedeemingStrategy {
     cfg: AutoRedeemingStrategyConfig,
-    hopr_chain_actions: A,
-    ticket_manager: T,
+    interval: Duration,
+}
+
+impl AutoRedeemingStrategy {
+    /// Create a new builder with the given configuration.
+    pub fn new(cfg: AutoRedeemingStrategyConfig, interval: Duration) -> Self {
+        Self { cfg, interval }
+    }
+
+    /// Wire in a node and return a running-ready strategy.
+    ///
+    /// The generic `N` is erased at construction time; the returned
+    /// `Box<dyn Strategy + Send>` can be held and spawned without knowledge
+    /// of the concrete node type.
+    pub fn build<N: HoprStrategyNode>(self, node: Arc<N>) -> Box<dyn StrategyTrait + Send> {
+        Box::new(AutoRedeemingStrategyInner {
+            cfg: self.cfg,
+            interval: self.interval,
+            node,
+            running_redemptions: Arc::new(parking_lot::RwLock::new(AbortableList::default())),
+        })
+    }
+}
+
+/// Private generic runner — constructed by [`AutoRedeemingStrategy::build`].
+///
+/// The strategy does not await the result of the redemption.
+struct AutoRedeemingStrategyInner<N: HasChainApi + HasTicketManagement> {
+    node: Arc<N>,
+    cfg: AutoRedeemingStrategyConfig,
+    interval: Duration,
     // Makes sure all ongoing ticket redemptions to be terminated once the strategy is dropped.
-    running_redemptions: std::sync::Arc<parking_lot::RwLock<AbortableList<ChannelId>>>,
+    running_redemptions: Arc<parking_lot::RwLock<AbortableList<ChannelId>>>,
 }
 
-impl<A, T> Debug for AutoRedeemingStrategy<A, T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", Strategy::AutoRedeeming(self.cfg))
-    }
-}
-
-impl<A, T> Display for AutoRedeemingStrategy<A, T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", Strategy::AutoRedeeming(self.cfg))
-    }
-}
-
-impl<A, T> AutoRedeemingStrategy<A, T>
+impl<N> AutoRedeemingStrategyInner<N>
 where
-    A: ChainReadChannelOperations + ChainWriteTicketOperations + Clone + Send + Sync + 'static,
-    T: TicketManagement + Clone + Sync + Send + 'static,
+    N: HasChainApi + HasTicketManagement + ActionableEventSource + Send + Sync + 'static,
+    <N as HasChainApi>::ChainApi:
+        ChainReadChannelOperations + ChainWriteTicketOperations + Clone + Send + Sync + 'static,
+    <N as HasTicketManagement>::TicketManager: TicketManagement + Clone + Send + Sync + 'static,
 {
-    pub fn new(cfg: AutoRedeemingStrategyConfig, hopr_chain_actions: A, ticket_manager: T) -> Self {
-        Self {
-            cfg,
-            hopr_chain_actions,
-            ticket_manager,
-            running_redemptions: std::sync::Arc::new(parking_lot::RwLock::new(AbortableList::default())),
-        }
-    }
-
     fn enqueue_redemption(&self, channel_id: &ChannelId) -> Result<(), StrategyError> {
         let redemptions = self.running_redemptions.upgradable_read();
         if !redemptions.contains(channel_id) {
             tracing::debug!(%channel_id, "attempting to start redemption in channel");
 
-            let tmgr = self.ticket_manager.clone();
-            let client = self.hopr_chain_actions.clone();
+            let tmgr = self.node.ticket_management().clone();
+            let client = self.node.chain_api().clone();
             let min_value = self.cfg.minimum_redeem_ticket_value;
             let channel_id = *channel_id;
             let redemptions_clone = self.running_redemptions.clone();
@@ -165,22 +179,70 @@ where
             Err(StrategyError::InProgress)
         }
     }
-}
 
-#[async_trait]
-impl<A, T> SingularStrategy for AutoRedeemingStrategy<A, T>
-where
-    A: ChainReadChannelOperations + ChainWriteTicketOperations + Clone + Send + Sync + 'static,
-    T: TicketManagement + Clone + Sync + Send + 'static,
-{
+    /// Handle an acknowledged winning ticket. Called from `run()` on `TicketEvent::WinningTicket`.
+    async fn on_acknowledged_winning_ticket(&self, ack: &VerifiedTicket) -> crate::errors::Result<()> {
+        if self.cfg.redeem_on_winning && ack.verified_ticket().amount.ge(&self.cfg.minimum_redeem_ticket_value) {
+            let chain_api = self.node.chain_api().clone();
+            let channel_id = *ack.channel_id();
+            let maybe_channel = hopr_async_runtime::prelude::spawn_blocking(move || {
+                chain_api.channel_by_id(&channel_id).map_err(StrategyError::other)
+            })
+            .await
+            .map_err(StrategyError::other)??;
+
+            if let Some(channel) = maybe_channel {
+                tracing::info!(%ack, "redeeming");
+
+                if ack.verified_ticket().index < channel.ticket_index {
+                    tracing::error!(%ack, "acknowledged ticket is older than channel ticket index");
+                    return Err(CriteriaNotSatisfied);
+                }
+
+                self.enqueue_redemption(channel.get_id())?;
+                Ok(())
+            } else {
+                Err(CriteriaNotSatisfied)
+            }
+        } else {
+            Err(CriteriaNotSatisfied)
+        }
+    }
+
+    /// Handle a channel status change. Called from `run()` on `ChainEvent::ChannelClosureInitiated`.
+    async fn on_own_channel_changed(
+        &self,
+        channel: &ChannelEntry,
+        direction: ChannelDirection,
+        change: ChannelChange,
+    ) -> crate::errors::Result<()> {
+        if direction != ChannelDirection::Incoming || !self.cfg.redeem_all_on_close {
+            return Ok(());
+        }
+
+        if let ChannelChange::Status { left: old, right: new } = change {
+            if old != ChannelStatus::Open || !matches!(new, ChannelStatus::PendingToClose(_)) {
+                tracing::debug!(?channel, "ignoring channel state change that's not in PendingToClose");
+                return Ok(());
+            }
+            tracing::info!(%channel, "channel transitioned to PendingToClose, checking if it has tickets to redeem");
+            self.enqueue_redemption(channel.get_id())?;
+            Ok(())
+        } else {
+            Err(CriteriaNotSatisfied)
+        }
+    }
+
+    /// Periodic scan: redeem tickets in all eligible channels.
     async fn on_tick(&self) -> crate::errors::Result<()> {
         if !self.cfg.redeem_on_winning {
             tracing::debug!("trying to redeem all tickets in all channels");
 
-            self.hopr_chain_actions
+            let chain = self.node.chain_api();
+            chain
                 .stream_channels(
                     ChannelSelector::default()
-                        .with_destination(*self.hopr_chain_actions.me())
+                        .with_destination(*chain.me())
                         .with_redeemable_channels(Duration::from_secs(30).into()),
                 )
                 .map_err(StrategyError::other)?
@@ -201,61 +263,84 @@ where
             Err(CriteriaNotSatisfied)
         }
     }
+}
 
-    async fn on_acknowledged_winning_ticket(&self, ack: &VerifiedTicket) -> crate::errors::Result<()> {
-        if self.cfg.redeem_on_winning && ack.verified_ticket().amount.ge(&self.cfg.minimum_redeem_ticket_value) {
-            let chain_api = self.hopr_chain_actions.clone();
-            let channel_id = *ack.channel_id();
-            let maybe_channel = hopr_async_runtime::prelude::spawn_blocking(move || {
-                chain_api.channel_by_id(&channel_id).map_err(StrategyError::other)
-            })
-            .await
-            .map_err(StrategyError::other)??;
-
-            if let Some(channel) = maybe_channel {
-                tracing::info!(%ack, "redeeming");
-
-                if ack.verified_ticket().index < channel.ticket_index {
-                    tracing::error!(%ack, "acknowledged ticket is older than channel ticket index");
-                    return Err(CriteriaNotSatisfied);
-                }
-
-                // Raises an error if redemption in this channel is ongoing
-                self.enqueue_redemption(channel.get_id())?;
-
-                Ok(())
-            } else {
-                Err(CriteriaNotSatisfied)
-            }
-        } else {
-            Err(CriteriaNotSatisfied)
-        }
+impl<N: HasChainApi + HasTicketManagement> Debug for AutoRedeemingStrategyInner<N> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", Strategy::AutoRedeeming(self.cfg))
     }
+}
 
-    async fn on_own_channel_changed(
-        &self,
-        channel: &ChannelEntry,
-        direction: ChannelDirection,
-        change: ChannelChange,
-    ) -> crate::errors::Result<()> {
-        if direction != ChannelDirection::Incoming || !self.cfg.redeem_all_on_close {
-            return Ok(());
+impl<N: HasChainApi + HasTicketManagement> Display for AutoRedeemingStrategyInner<N> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", Strategy::AutoRedeeming(self.cfg))
+    }
+}
+
+#[async_trait]
+impl<N> StrategyTrait for AutoRedeemingStrategyInner<N>
+where
+    N: HasChainApi + HasTicketManagement + ActionableEventSource + Send + Sync + 'static,
+    <N as HasChainApi>::ChainApi:
+        ChainReadChannelOperations + ChainWriteTicketOperations + Clone + Send + Sync + 'static,
+    <N as HasTicketManagement>::TicketManager: TicketManagement + Clone + Send + Sync + 'static,
+{
+    async fn run(&mut self) -> crate::errors::Result<()> {
+        enum Event {
+            Tick,
+            Actionable(Box<ActionableEvent>),
         }
 
-        if let ChannelChange::Status { left: old, right: new } = change {
-            if old != ChannelStatus::Open || !matches!(new, ChannelStatus::PendingToClose(_)) {
-                tracing::debug!(?channel, "ignoring channel state change that's not in PendingToClose");
-                return Ok(());
+        let tick_stream = futures_time::stream::interval(self.interval.into()).map(|_| Event::Tick);
+        let event_stream = self
+            .node
+            .subscribe_to_actionable_events()
+            .map_err(|e| StrategyError::Other(anyhow::anyhow!(e)))?
+            .map(|e| Event::Actionable(Box::new(e)));
+
+        let mut combined = futures_concurrency::stream::Merge::merge((tick_stream, event_stream));
+        let me = *self.node.chain_api().me();
+
+        while let Some(event) = combined.next().await {
+            match event {
+                Event::Tick => {
+                    if let Err(e) = self.on_tick().await
+                        && !matches!(e, StrategyError::CriteriaNotSatisfied)
+                    {
+                        tracing::error!(%e, "auto-redeeming tick failed");
+                    }
+                }
+                Event::Actionable(ev) => match *ev {
+                    ActionableEvent::Ticket(TicketEvent::WinningTicket(rt)) => {
+                        if let Err(e) = self.on_acknowledged_winning_ticket(&rt.ticket).await
+                            && !matches!(e, StrategyError::CriteriaNotSatisfied)
+                        {
+                            tracing::error!(%e, "auto-redeeming failed on winning ticket");
+                        }
+                    }
+                    ActionableEvent::Chain(ChainEvent::ChannelClosureInitiated(channel)) => {
+                        if let Some(dir) = channel.direction(&me)
+                            && let Err(e) = self
+                                .on_own_channel_changed(
+                                    &channel,
+                                    dir,
+                                    ChannelChange::Status {
+                                        left: ChannelStatus::Open,
+                                        right: channel.status,
+                                    },
+                                )
+                                .await
+                            && !matches!(e, StrategyError::CriteriaNotSatisfied | StrategyError::InProgress)
+                        {
+                            tracing::error!(%e, "auto-redeeming failed on channel closure");
+                        }
+                    }
+                    _ => {}
+                },
             }
-            tracing::info!(%channel, "channel transitioned to PendingToClose, checking if it has tickets to redeem");
-
-            // Raises an error if redemption in this channel is ongoing
-            self.enqueue_redemption(channel.get_id())?;
-
-            Ok(())
-        } else {
-            Err(CriteriaNotSatisfied)
         }
+
+        Ok(())
     }
 }
 
@@ -276,8 +361,15 @@ mod tests {
     };
     use hopr_chain_connector::{HoprBlockchainSafeConnector, create_trustful_hopr_blokli_connector, testing::*};
     use hopr_lib::{
-        Address, BytesRepresentable, ChainKeypair, HalfKey, Hash, Keypair, RedeemableTicket, Response, TicketBuilder,
-        UnitaryFloatOps, WinningProbability, XDaiBalance,
+        Address, BytesRepresentable, ChainKeypair, HalfKey, Hash, HoprBalance, Keypair, RedeemableTicket, Response,
+        TicketBuilder, UnitaryFloatOps, WinningProbability, XDaiBalance,
+        api::{
+            chain::{ChainEvent, ChainEvents, ChainWriteTicketOperations, HoprChainApi},
+            node::{
+                ActionableEvent, ComponentStatus, ComponentStatusReporter, EventWaitResult, HasChainApi,
+                HasTicketManagement, NodeOnchainIdentity, TicketEvent,
+            },
+        },
     };
 
     use super::*;
@@ -339,6 +431,8 @@ mod tests {
             .build_static_client();
     }
 
+    type TestConnector = Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>;
+
     fn generate_random_ack_ticket(index: u64, worth_packets: u32) -> anyhow::Result<RedeemableTicket> {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
@@ -357,7 +451,82 @@ mod tests {
             .into_redeemable(&BOB, &Hash::default())?)
     }
 
-    type TestConnector = Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>;
+    /// Minimal node wrapper combining a chain connector and a ticket manager for tests.
+    struct TestNode<C, T> {
+        chain: C,
+        tmgr: T,
+    }
+
+    impl<C, T> HasChainApi for TestNode<C, T>
+    where
+        C: HoprChainApi + ComponentStatusReporter + Clone + Send + Sync + 'static,
+        T: Send + Sync + 'static,
+    {
+        type ChainApi = C;
+        type ChainError = <C as HoprChainApi>::ChainError;
+
+        fn identity(&self) -> &NodeOnchainIdentity {
+            static IDENTITY: std::sync::OnceLock<NodeOnchainIdentity> = std::sync::OnceLock::new();
+            IDENTITY.get_or_init(NodeOnchainIdentity::default)
+        }
+
+        fn chain_api(&self) -> &C {
+            &self.chain
+        }
+
+        fn status(&self) -> ComponentStatus {
+            self.chain.component_status()
+        }
+
+        fn wait_for_on_chain_event<F>(
+            &self,
+            _predicate: F,
+            _context: String,
+            _timeout: std::time::Duration,
+        ) -> EventWaitResult<<C as HoprChainApi>::ChainError, <C as HoprChainApi>::ChainError>
+        where
+            F: Fn(&ChainEvent) -> bool + Send + Sync + 'static,
+        {
+            unimplemented!("tests do not call wait_for_on_chain_event")
+        }
+    }
+
+    impl<C, T> HasTicketManagement for TestNode<C, T>
+    where
+        C: Send + Sync + 'static,
+        T: TicketManagement + Clone + Send + Sync + 'static,
+    {
+        type TicketManager = T;
+
+        fn ticket_management(&self) -> &T {
+            &self.tmgr
+        }
+
+        fn subscribe_ticket_events(&self) -> impl futures::Stream<Item = TicketEvent> + Send + 'static {
+            futures::stream::empty()
+        }
+
+        fn status(&self) -> ComponentStatus {
+            ComponentStatus::Ready
+        }
+    }
+
+    impl<C, T> ActionableEventSource for TestNode<C, T>
+    where
+        C: ChainEvents + Send + Sync + 'static,
+        T: Send + Sync + 'static,
+    {
+        fn subscribe_to_actionable_events(
+            &self,
+        ) -> Result<futures::stream::BoxStream<'static, ActionableEvent>, String> {
+            Ok(self
+                .chain
+                .subscribe()
+                .map_err(|e| e.to_string())?
+                .map(ActionableEvent::Chain)
+                .boxed())
+        }
+    }
 
     async fn await_redemption_queue_empty(redeems: Arc<parking_lot::RwLock<AbortableList<ChannelId>>>) {
         loop {
@@ -366,6 +535,19 @@ mod tests {
             if redeems.read().is_empty() {
                 break;
             }
+        }
+    }
+
+    fn make_strategy<T: TicketManagement + Clone + Send + Sync + 'static>(
+        cfg: AutoRedeemingStrategyConfig,
+        connector: TestConnector,
+        tmgr: T,
+    ) -> AutoRedeemingStrategyInner<TestNode<TestConnector, T>> {
+        AutoRedeemingStrategyInner {
+            cfg,
+            interval: Duration::from_secs(60),
+            node: Arc::new(TestNode { chain: connector, tmgr }),
+            running_redemptions: Arc::new(parking_lot::RwLock::new(AbortableList::default())),
         }
     }
 
@@ -401,7 +583,7 @@ mod tests {
                 Ok(futures::stream::once(futures::future::ok(RedemptionResult::Redeemed(ack_ticket.ticket))).boxed())
             });
 
-        let ars = AutoRedeemingStrategy::new(cfg, Arc::new(connector), Arc::new(mock_tmgr));
+        let ars = make_strategy(cfg, Arc::new(connector), Arc::new(mock_tmgr));
 
         ars.on_acknowledged_winning_ticket(&ack_ticket.ticket).await?;
         assert!(ars.on_tick().await.is_err());
@@ -451,7 +633,7 @@ mod tests {
             )
             .return_once(|_: TestConnector, _, _| Ok(futures::stream::empty().boxed()));
 
-        let ars = AutoRedeemingStrategy::new(cfg, Arc::new(connector), Arc::new(mock_tmgr));
+        let ars = make_strategy(cfg, Arc::new(connector), Arc::new(mock_tmgr));
         ars.on_tick().await?;
 
         await_redemption_queue_empty(ars.running_redemptions.clone())
@@ -492,7 +674,7 @@ mod tests {
             )
             .return_once(move |_: TestConnector, _, _| Ok(futures::stream::empty().boxed()));
 
-        let ars = AutoRedeemingStrategy::new(cfg, Arc::new(connector), Arc::new(mock_tmgr));
+        let ars = make_strategy(cfg, Arc::new(connector), Arc::new(mock_tmgr));
         ars.on_own_channel_changed(
             &channel,
             ChannelDirection::Incoming,
@@ -546,7 +728,7 @@ mod tests {
                 .boxed())
             });
 
-        let ars = AutoRedeemingStrategy::new(cfg, Arc::new(connector), Arc::new(mock_tmgr));
+        let ars = make_strategy(cfg, Arc::new(connector), Arc::new(mock_tmgr));
         ars.on_acknowledged_winning_ticket(&ack_ticket_1.ticket).await?;
         assert!(matches!(
             ars.on_acknowledged_winning_ticket(&ack_ticket_1.ticket).await,

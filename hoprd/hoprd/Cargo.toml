@@ -24,6 +24,7 @@ runtime-tokio = [
   "opentelemetry_sdk?/experimental_logs_batch_log_processor_with_async_runtime",
   "opentelemetry_sdk?/experimental_metrics_periodicreader_with_async_runtime",
   "hopr-strategy/runtime-tokio",
+  "hopr-strategy/hopr",
   "hopr-transport-p2p/runtime-tokio",
 ]
 telemetry = [

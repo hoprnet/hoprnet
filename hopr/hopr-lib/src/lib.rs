@@ -520,6 +520,42 @@ where
     }
 }
 
+impl<Chain, Graph, Net, TMgr> hopr_api::node::ActionableEventSource for Hopr<Chain, Graph, Net, TMgr>
+where
+    Chain: HoprChainApi + Send + Sync + 'static,
+    Graph: Send + Sync + 'static,
+    Net: hopr_api::network::NetworkView + Send + Sync + 'static,
+    TMgr: Send + Sync + 'static,
+{
+    fn subscribe_to_actionable_events(
+        &self,
+    ) -> Result<futures::stream::BoxStream<'static, hopr_api::node::ActionableEvent>, String> {
+        use hopr_api::node::ActionableEvent;
+
+        let chain_stream = self
+            .chain_api
+            .subscribe()
+            .map_err(|e| e.to_string())?
+            .map(ActionableEvent::Chain)
+            .boxed();
+
+        let network_stream = self
+            .transport_api
+            .subscribe_network_events()
+            .map(ActionableEvent::Network)
+            .boxed();
+
+        let ticket_stream = self
+            .ticket_event_subscribers
+            .1
+            .activate_cloned()
+            .map(ActionableEvent::Ticket)
+            .boxed();
+
+        Ok(futures::stream::select_all([chain_stream, network_stream, ticket_stream]).boxed())
+    }
+}
+
 /// Per-component status report for the HOPR node.
 #[derive(Debug, Clone)]
 pub struct NodeComponentStatuses {

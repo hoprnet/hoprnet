@@ -219,7 +219,7 @@ mimalloc = { version = "0.1.50", default-features = false, features = [
   "secure",
 ] }
 
-hopr-api = { version = "1.8.0" }
+hopr-api = { version = "1.9.0" }
 hopr-types = { version = "1.5.4", features = ["use-bindings"] }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-crypto-keypair = { path = "crypto/keypair", default-features = false }
@@ -298,3 +298,6 @@ similar.opt-level = 3
 
 [workspace.metadata.cargo-shear]
 ignored = ["oas3", "serde_bytes", "humantime-serde"]
+
+[patch.crates-io]
+hopr-api = { path = "/Users/teebor/Fun/hoprnet.org/hopr-api" }
