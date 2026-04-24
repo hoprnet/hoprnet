@@ -1,6 +1,15 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", "schedule:earlyMondays"],
+  "extends": [
+    "config:recommended",
+    "schedule:earlyMondays",
+    "group:allNonMajor",
+    "group:allDigest",
+    ":disableDependencyDashboard"
+  ],
+  "prCreation": "not-pending",
+  "semanticCommits": "enabled",
+  "rangeStrategy": "bump",
   "pinDigests": true,
   "nix": { "enabled": true },
   "vulnerabilityAlerts": {
@@ -13,6 +22,7 @@
     {
       "matchManagers": ["github-actions"],
       "groupName": "github-actions",
+      "pinDigests": true,
       "commitMessageTopic": "GitHub Actions"
     },
     {
@@ -45,6 +55,21 @@
       "labels": ["security"],
       "groupName": "cargo security updates",
       "commitMessageTopic": "Cargo security updates"
+    },
+    {
+      "matchCategories": ["docker"],
+      "pinDigests": true
+    },
+    {
+      "description": "Disable known-incompatible crate updates",
+      "matchPackageNames": [
+        "libp2p-stream",
+        "parameterized",
+        "cipher",
+        "chacha20",
+        "digest"
+      ],
+      "enabled": false
     }
   ]
 }
