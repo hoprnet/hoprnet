@@ -28,7 +28,7 @@ jobs:
           - architecture: x86_64-linux
             runner: depot-ubuntu-24.04-8
             build_command: nix build -L .#binary-hoprd-x86_64-linux
-    uses: hoprnet/hopr-workflows/.github/workflows/build-binaries.yaml@build-binaries-v2
+    uses: hoprnet/hopr-workflows/.github/workflows/build-binaries.yaml@a178becb8c3711ae955bad477861bfefe6feceae # build-binaries-v2
     permissions:
       contents: read
     with:
@@ -46,7 +46,7 @@ jobs:
       gpg_private_key: ${{ secrets.GPG_HOPRNET_PRIVATE_KEY }}
   build-docker:
     name: Docker
-    uses: hoprnet/hopr-workflows/.github/workflows/build-docker.yaml@build-docker-v1
+    uses: hoprnet/hopr-workflows/.github/workflows/build-docker.yaml@43b03a7b5df777770d95c6524f48be34184b26fa # build-docker-v1
     needs: build-binaries
     permissions:
       contents: read

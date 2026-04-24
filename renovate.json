@@ -1,0 +1,75 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "schedule:earlyMondays",
+    "group:allNonMajor",
+    "group:allDigest",
+    ":disableDependencyDashboard"
+  ],
+  "prCreation": "not-pending",
+  "semanticCommits": "enabled",
+  "rangeStrategy": "bump",
+  "pinDigests": true,
+  "nix": { "enabled": true },
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"],
+    "schedule": ["at any time"],
+    "automerge": true
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "github-actions",
+      "pinDigests": true,
+      "commitMessageTopic": "GitHub Actions"
+    },
+    {
+      "matchManagers": ["nix"],
+      "groupName": "nix flake updates",
+      "commitMessageTopic": "Nix flake inputs"
+    },
+    {
+      "description": "Expedite nix security updates — bypass weekly schedule",
+      "matchManagers": ["nix"],
+      "matchCategories": ["security"],
+      "schedule": ["at any time"],
+      "automerge": true,
+      "labels": ["security"],
+      "groupName": "nix security updates",
+      "commitMessageTopic": "Nix security updates"
+    },
+    {
+      "matchManagers": ["cargo"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "cargo dependencies",
+      "commitMessageTopic": "Cargo dependencies"
+    },
+    {
+      "description": "Expedite cargo security updates — bypass weekly schedule",
+      "matchManagers": ["cargo"],
+      "matchCategories": ["security"],
+      "schedule": ["at any time"],
+      "automerge": true,
+      "labels": ["security"],
+      "groupName": "cargo security updates",
+      "commitMessageTopic": "Cargo security updates"
+    },
+    {
+      "matchCategories": ["docker"],
+      "pinDigests": true
+    },
+    {
+      "description": "Disable known-incompatible crate updates",
+      "matchPackageNames": [
+        "libp2p-stream",
+        "parameterized",
+        "cipher",
+        "chacha20",
+        "digest"
+      ],
+      "enabled": false
+    }
+  ]
+}
