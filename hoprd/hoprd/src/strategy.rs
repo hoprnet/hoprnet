@@ -61,8 +61,11 @@ fn validate_execution_interval(interval: &Duration) -> std::result::Result<(), V
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, StrumDisplay, EnumString, VariantNames)]
 #[strum(serialize_all = "snake_case")]
 pub enum StrategyKind {
+    #[cfg(feature = "runtime-tokio")]
     AutoRedeeming(hopr_strategy::auto_redeeming::AutoRedeemingStrategyConfig),
+    #[cfg(feature = "runtime-tokio")]
     AutoFunding(hopr_strategy::auto_funding::AutoFundingStrategyConfig),
+    #[cfg(feature = "runtime-tokio")]
     ClosureFinalizer(hopr_strategy::channel_finalizer::ClosureFinalizerStrategyConfig),
     Multi(MultiStrategyConfig),
     Passive,
@@ -108,17 +111,21 @@ pub struct MultiStrategyConfig {
 /// ## Strategies included
 /// - `AutoRedeeming`: redeems single tickets on channel close if worth at least 1 wxHOPR
 pub fn hopr_default_strategies() -> MultiStrategyConfig {
-    use hopr_strategy::auto_redeeming::AutoRedeemingStrategyConfig;
-
-    MultiStrategyConfig {
-        on_fail_continue: true,
-        allow_recursive: false,
-        execution_interval: Duration::from_secs(60),
-        strategies: vec![StrategyKind::AutoRedeeming(AutoRedeemingStrategyConfig {
-            redeem_on_winning: true,
-            ..Default::default()
-        })],
+    #[cfg(feature = "runtime-tokio")]
+    {
+        use hopr_strategy::auto_redeeming::AutoRedeemingStrategyConfig;
+        return MultiStrategyConfig {
+            on_fail_continue: true,
+            allow_recursive: false,
+            execution_interval: Duration::from_secs(60),
+            strategies: vec![StrategyKind::AutoRedeeming(AutoRedeemingStrategyConfig {
+                redeem_on_winning: true,
+                ..Default::default()
+            })],
+        };
     }
+    #[allow(unreachable_code)]
+    MultiStrategyConfig::default()
 }
 
 /// Builds a [`MultiStrategy`] from a [`MultiStrategyConfig`] and a node reference.
@@ -157,14 +164,17 @@ where
 
     for strategy in cfg.strategies.iter() {
         match strategy {
+            #[cfg(feature = "runtime-tokio")]
             StrategyKind::AutoRedeeming(sub_cfg) => strategies.push(
                 hopr_strategy::auto_redeeming::AutoRedeemingStrategy::new(*sub_cfg, cfg.execution_interval)
                     .build(Arc::clone(&node)),
             ),
+            #[cfg(feature = "runtime-tokio")]
             StrategyKind::AutoFunding(sub_cfg) => strategies.push(
                 hopr_strategy::auto_funding::AutoFundingStrategy::new(*sub_cfg, cfg.execution_interval)
                     .build(Arc::clone(&node)),
             ),
+            #[cfg(feature = "runtime-tokio")]
             StrategyKind::ClosureFinalizer(sub_cfg) => strategies.push(
                 hopr_strategy::channel_finalizer::ClosureFinalizerStrategy::new(*sub_cfg, cfg.execution_interval)
                     .build(Arc::clone(&node)),
