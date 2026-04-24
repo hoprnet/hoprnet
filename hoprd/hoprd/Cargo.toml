@@ -104,7 +104,6 @@ opentelemetry-prometheus-text-exporter = { workspace = true, optional = true }
 tracing-opentelemetry = { workspace = true, optional = true }
 
 hopr-strategy = { workspace = true }
-hopr-api = { workspace = true, features = ["network"] }
 hopr-lib = { workspace = true, features = [
   "runtime-tokio",
   "session-client",

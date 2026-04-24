@@ -5309,7 +5309,6 @@ dependencies = [
  "flagset",
  "futures",
  "home",
- "hopr-api",
  "hopr-chain-connector",
  "hopr-ct-full-network",
  "hopr-lib",
