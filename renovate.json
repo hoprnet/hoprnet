@@ -30,6 +30,22 @@
       "labels": ["security"],
       "groupName": "nix security updates",
       "commitMessageTopic": "Nix security updates"
+    },
+    {
+      "matchManagers": ["cargo"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "cargo dependencies",
+      "commitMessageTopic": "Cargo dependencies"
+    },
+    {
+      "description": "Expedite cargo security updates — bypass weekly schedule",
+      "matchManagers": ["cargo"],
+      "matchCategories": ["security"],
+      "schedule": ["at any time"],
+      "automerge": true,
+      "labels": ["security"],
+      "groupName": "cargo security updates",
+      "commitMessageTopic": "Cargo security updates"
     }
   ]
 }
