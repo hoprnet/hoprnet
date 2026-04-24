@@ -23,7 +23,6 @@
     {
       "description": "Expedite nix security updates — bypass weekly schedule",
       "matchManagers": ["nix"],
-      "matchUpdateTypes": ["patch"],
       "matchCategories": ["security"],
       "schedule": ["at any time"],
       "automerge": true,
