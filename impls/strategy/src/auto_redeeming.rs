@@ -29,7 +29,7 @@ use validator::Validate;
 use crate::{
     Strategy,
     errors::{StrategyError, StrategyError::CriteriaNotSatisfied},
-    strategy::{HoprStrategyNode, Strategy as StrategyTrait},
+    strategy::Strategy as StrategyTrait,
 };
 
 #[cfg(all(feature = "telemetry", not(test)))]
@@ -106,7 +106,12 @@ impl AutoRedeemingStrategy {
     /// The generic `N` is erased at construction time; the returned
     /// `Box<dyn Strategy + Send>` can be held and spawned without knowledge
     /// of the concrete node type.
-    pub fn build<N: HoprStrategyNode>(self, node: Arc<N>) -> Box<dyn StrategyTrait + Send> {
+    pub fn build<N>(self, node: Arc<N>) -> Box<dyn StrategyTrait + Send>
+    where
+        N: HasChainApi + HasTicketManagement + ActionableEventSource + Send + Sync + 'static,
+        N::ChainApi: ChainReadChannelOperations + ChainWriteTicketOperations + Clone + Send + Sync + 'static,
+        N::TicketManager: TicketManagement + Clone + Send + Sync + 'static,
+    {
         Box::new(AutoRedeemingStrategyInner {
             cfg: self.cfg,
             interval: self.interval,

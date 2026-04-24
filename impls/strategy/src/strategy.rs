@@ -51,21 +51,19 @@ pub trait Strategy: Display + Send {
     async fn run(&mut self) -> Result<()>;
 }
 
-/// Combined node interface accepted by all strategy `build` functions.
+/// Combined node interface used exclusively by [`MultiStrategy::build`].
 ///
-/// Blanket-implemented for every type that satisfies all constituent sub-traits,
-/// so the concrete HOPR node satisfies it automatically.
+/// Individual strategy `build` functions each declare only the subset of traits
+/// they actually call. `HoprNode` is the union of all those subsets, so a single
+/// concrete HOPR node that satisfies `HoprNode` can be passed to `MultiStrategy`
+/// without any per-strategy narrowing at the call site.
 ///
-/// Callers use `N: HoprStrategyNode` as a single, uniform bound:
+/// Blanket-implemented for every type that satisfies all constituent sub-traits.
 ///
-/// ```rust,ignore
-/// AutoFundingStrategy::new(cfg, interval).build(Arc::clone(&node))
-/// ```
-///
-/// Test wrappers that only implement a subset of traits can still directly
-/// construct the private `*Inner<N>` runner types — they do not go through
-/// `build` and therefore do not need to satisfy `HoprStrategyNode`.
-pub trait HoprStrategyNode:
+/// Test wrappers that implement only a subset of traits still work — they bypass
+/// `MultiStrategy::build` and construct the private `*Inner<N>` runner types
+/// directly, using only the bounds those types actually require.
+pub trait HoprNode:
     ActionableEventSource
     + HasChainApi<
         ChainApi: ChainReadChannelOperations
@@ -84,7 +82,7 @@ pub trait HoprStrategyNode:
 {
 }
 
-impl<T> HoprStrategyNode for T
+impl<T> HoprNode for T
 where
     T: ActionableEventSource + HasChainApi + HasTicketManagement + Send + Sync + 'static,
     T::ChainApi: ChainReadChannelOperations
@@ -171,7 +169,7 @@ impl MultiStrategy {
     ///
     /// Each sub-strategy receives a clone of `node` and starts its own event
     /// subscription inside `run()`. The generic `N` is erased at construction time.
-    pub fn build<N: HoprStrategyNode>(cfg: MultiStrategyConfig, node: std::sync::Arc<N>) -> Box<dyn Strategy + Send> {
+    pub fn build<N: HoprNode>(cfg: MultiStrategyConfig, node: std::sync::Arc<N>) -> Box<dyn Strategy + Send> {
         let mut strategies = Vec::<Box<dyn Strategy + Send>>::new();
 
         #[cfg(all(feature = "telemetry", not(test)))]

@@ -18,10 +18,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info};
 use validator::Validate;
 
-use crate::{
-    Strategy, errors,
-    strategy::{HoprStrategyNode, Strategy as StrategyTrait},
-};
+use crate::{Strategy, errors, strategy::Strategy as StrategyTrait};
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
@@ -70,7 +67,11 @@ impl ClosureFinalizerStrategy {
     /// The generic `N` is erased at construction time; the returned
     /// `Box<dyn Strategy + Send>` can be held and spawned without knowledge
     /// of the concrete node type.
-    pub fn build<N: HoprStrategyNode>(self, node: Arc<N>) -> Box<dyn StrategyTrait + Send> {
+    pub fn build<N>(self, node: Arc<N>) -> Box<dyn StrategyTrait + Send>
+    where
+        N: HasChainApi + ActionableEventSource + Send + Sync + 'static,
+        N::ChainApi: ChainReadChannelOperations + ChainWriteChannelOperations + Clone + Send + Sync + 'static,
+    {
         Box::new(ClosureFinalizerStrategyInner {
             node,
             cfg: self.cfg,

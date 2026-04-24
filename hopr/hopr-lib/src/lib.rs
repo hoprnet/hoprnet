@@ -530,29 +530,29 @@ where
     fn subscribe_to_actionable_events(
         &self,
     ) -> Result<futures::stream::BoxStream<'static, hopr_api::node::ActionableEvent>, String> {
+        use futures_concurrency::prelude::*;
         use hopr_api::node::ActionableEvent;
 
         let chain_stream = self
             .chain_api
             .subscribe()
             .map_err(|e| e.to_string())?
-            .map(ActionableEvent::Chain)
-            .boxed();
+            .map(ActionableEvent::Chain);
 
         let network_stream = self
             .transport_api
             .subscribe_network_events()
-            .map(ActionableEvent::Network)
-            .boxed();
+            .map(ActionableEvent::Network);
 
         let ticket_stream = self
             .ticket_event_subscribers
             .1
             .activate_cloned()
-            .map(ActionableEvent::Ticket)
-            .boxed();
+            .map(ActionableEvent::Ticket);
 
-        Ok(futures::stream::select_all([chain_stream, network_stream, ticket_stream]).boxed())
+        // `Merge` rotates the starting stream on every poll, preventing any single
+        // source from starving the others under burst conditions.
+        Ok((chain_stream, network_stream, ticket_stream).merge().boxed())
     }
 }
 
