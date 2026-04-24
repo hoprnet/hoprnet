@@ -30,7 +30,6 @@ futures-time = { workspace = true }
 futures-concurrency = { workspace = true }
 humantime-serde = { workspace = true }
 lazy_static = { workspace = true }
-parking_lot = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
 smart-default = { workspace = true }

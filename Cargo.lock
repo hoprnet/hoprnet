@@ -4909,7 +4909,6 @@ dependencies = [
  "lazy_static",
  "mockall",
  "moka",
- "parking_lot",
  "serde",
  "serde_json",
  "serde_with",
