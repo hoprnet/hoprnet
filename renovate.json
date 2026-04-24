@@ -1,0 +1,35 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "schedule:earlyMondays"],
+  "pinDigests": true,
+  "nix": { "enabled": true },
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"],
+    "schedule": ["at any time"],
+    "automerge": true
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "github-actions",
+      "commitMessageTopic": "GitHub Actions"
+    },
+    {
+      "matchManagers": ["nix"],
+      "groupName": "nix flake updates",
+      "commitMessageTopic": "Nix flake inputs"
+    },
+    {
+      "description": "Expedite nix security updates — bypass weekly schedule",
+      "matchManagers": ["nix"],
+      "matchUpdateTypes": ["patch"],
+      "matchCategories": ["security"],
+      "schedule": ["at any time"],
+      "automerge": true,
+      "labels": ["security"],
+      "groupName": "nix security updates",
+      "commitMessageTopic": "Nix security updates"
+    }
+  ]
+}
