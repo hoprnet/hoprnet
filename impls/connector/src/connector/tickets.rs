@@ -130,8 +130,8 @@ where
                     .map_err(|e| TicketRedeemError::ProcessingError(ticket.ticket, e))?
                     .map_err(move |tx_tracking_error|
                         // For ticket redemption, certain errors are to be handled differently
-                        if let Some(reject_error) = tx_tracking_error.as_transaction_rejection_error() {
-                            TicketRedeemError::Rejected(ticket.ticket, format!("on-chain rejection: {reject_error:?}"))
+                        if let ConnectorError::InnerTxFailed(reason) = tx_tracking_error {
+                            TicketRedeemError::Rejected(ticket.ticket, format!("inner transaction rejected: {reason}"))
                         } else {
                             TicketRedeemError::ProcessingError(ticket.ticket, tx_tracking_error)
                         })

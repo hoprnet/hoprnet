@@ -640,6 +640,13 @@ where
             .enqueue_transaction(tx_req, tx_timeout.max(MIN_TX_CONFIRM_TIMEOUT))
             .await?
             .and_then(|tx| {
+                if let Some(tx_exec) = tx.safe_execution
+                    && !tx_exec.success
+                {
+                    return futures::future::err(ConnectorError::InnerTxFailed(
+                        tx_exec.revert_reason.unwrap_or("n/a".into()),
+                    ));
+                }
                 futures::future::ready(
                     ChainReceipt::from_str(&tx.transaction_hash.0)
                         .map_err(|_| ConnectorError::TypeConversion("invalid tx hash".into())),
@@ -701,10 +708,13 @@ where
 pub(crate) mod tests {
     use blokli_client::BlokliTestState;
     use hex_literal::hex;
-    use hopr_api::types::chain::contract_addresses_for_network;
+    use hopr_api::{chain::ChainWriteTicketOperations, types::chain::contract_addresses_for_network};
 
     use super::*;
-    use crate::{InMemoryBackend, testing::BlokliTestStateBuilder};
+    use crate::{
+        InMemoryBackend,
+        testing::{BlokliTestStateBuilder, ChainMutator, FullStateEmulator},
+    };
 
     pub const PRIVATE_KEY_1: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");
     pub const PRIVATE_KEY_2: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
@@ -763,6 +773,103 @@ pub(crate) mod tests {
 
         assert!(matches!(res, Err(ConnectorError::ServerNotHealthy)));
         assert!(!connector.is_connected());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connector_should_handle_inner_tx_failure_during_redemption() -> anyhow::Result<()> {
+        let offchain_key_1 = OffchainKeypair::from_secret(&hex!(
+            "60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d"
+        ))?;
+        let account_1 = AccountEntry {
+            public_key: *offchain_key_1.public(),
+            chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
+            entry_type: AccountType::NotAnnounced,
+            safe_address: Some([1u8; Address::SIZE].into()),
+            key_id: 1.into(),
+        };
+        let offchain_key_2 = OffchainKeypair::from_secret(&hex!(
+            "71bf1f42ebbfcd89c3e197a3fd7cda79b92499e509b6fefa0fe44d02821d146a"
+        ))?;
+        let account_2 = AccountEntry {
+            public_key: *offchain_key_2.public(),
+            chain_addr: ChainKeypair::from_secret(&PRIVATE_KEY_2)?.public().to_address(),
+            entry_type: AccountType::NotAnnounced,
+            safe_address: Some([2u8; Address::SIZE].into()),
+            key_id: 2.into(),
+        };
+
+        let channel_1 = ChannelEntry::builder()
+            .between(
+                &ChainKeypair::from_secret(&PRIVATE_KEY_2)?,
+                &ChainKeypair::from_secret(&PRIVATE_KEY_1)?,
+            )
+            .amount(10)
+            .ticket_index(1)
+            .status(ChannelStatus::Open)
+            .epoch(1)
+            .build()?;
+
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_accounts([
+                (account_1, HoprBalance::new_base(100), XDaiBalance::new_base(1)),
+                (account_2, HoprBalance::new_base(100), XDaiBalance::new_base(1)),
+            ])
+            .with_channels([channel_1])
+            .with_hopr_network_chain_info("rotsee")
+            .build_dynamic_client_with_mutator(ChainMutator::new(
+                move |_: &[u8], state: &mut BlokliTestState| -> Result<(), blokli_client::errors::BlokliClientError> {
+                    // Update the channel ticket index, without the client noticing the change
+                    // This will cause the transaction to be rejected in the Emulator, and
+                    // not by the checks performed by the Connector before the redemption.
+                    if let Some(c) = state.get_channel_by_id_mut(&(*channel_1.get_id()).into()) {
+                        c.ticket_index = blokli_client::api::types::Uint64("2".into());
+                        Ok(())
+                    } else {
+                        Err(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
+                            "channel unexpectedly not found"
+                        ))
+                        .into())
+                    }
+                },
+                FullStateEmulator(MODULE_ADDR.into(), None),
+            ))
+            .with_tx_simulation_delay(Duration::from_millis(100))
+            .with_use_internal_txs(true);
+
+        let mut connector = create_connector(blokli_client.clone())?;
+        connector.connect().await?;
+
+        let hkc1 = ChainKeypair::from_secret(&hex!(
+            "e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8"
+        ))?;
+        let hkc2 = ChainKeypair::from_secret(&hex!(
+            "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
+        ))?;
+
+        let ticket = TicketBuilder::default()
+            .counterparty(&ChainKeypair::from_secret(&PRIVATE_KEY_1)?)
+            .amount(1)
+            .index(1)
+            .channel_epoch(1)
+            .eth_challenge(
+                Challenge::from_hint_and_share(
+                    &HalfKeyChallenge::new(hkc1.public().as_ref()),
+                    &HalfKeyChallenge::new(hkc2.public().as_ref()),
+                )?
+                .to_ethereum_challenge(),
+            )
+            .build_signed(&ChainKeypair::from_secret(&PRIVATE_KEY_2)?, &Hash::default())?
+            .into_acknowledged(Response::from_half_keys(
+                &HalfKey::try_from(hkc1.secret().as_ref())?,
+                &HalfKey::try_from(hkc2.secret().as_ref())?,
+            )?)
+            .into_redeemable(&ChainKeypair::from_secret(&PRIVATE_KEY_1)?, &Hash::default())?;
+
+        let res = connector.redeem_ticket(ticket).await?;
+        let err = res.await;
+        assert!(matches!(err, Err(hopr_api::chain::TicketRedeemError::Rejected(_, _))));
 
         Ok(())
     }
