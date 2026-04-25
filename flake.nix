@@ -493,8 +493,24 @@
           docs = rust-builder-local-nightly.callPackage nixLib.mkRustPackage (
             projectBuildArgs // { buildDocs = true; }
           );
+
+          # pre-commit in nixpkgs bundles heavyweight test-only dependencies
+          # (dotnet-sdk, nodejs, go, coursier, …) into nativeBuildInputs via
+          # its preCheck string interpolation, even though doCheck is already
+          # false on Darwin. Filter them out so `direnv allow` / `nix develop`
+          # doesn't have to build dotnet from source.
+          pre-commit-lightweight = pkgs.pre-commit.overridePythonAttrs {
+            nativeCheckInputs = [ ];
+            doCheck = false;
+            doInstallCheck = false;
+            dontUsePytestCheck = true;
+            preCheck = "";
+            postCheck = "";
+          };
+
           pre-commit-check = pre-commit.lib.${system}.run {
             src = ./.;
+            package = pre-commit-lightweight;
             hooks = {
               # https://github.com/cachix/git-hooks.nix
               treefmt.enable = false;
@@ -523,7 +539,6 @@
                 language = "system";
               };
             };
-            tools = pkgs;
             excludes = [ ".gcloudignore" ];
           };
 
@@ -658,30 +673,9 @@
             ];
           };
 
-          run-check = flake-utils.lib.mkApp {
-            drv = pkgs.writeShellScriptBin "run-check" ''
-              set -e
-              check=$1
-              if [ -z "$check" ]; then
-                nix flake show --json 2>/dev/null | \
-                  jq -r '.checks."${system}" | to_entries | .[].key' | \
-                  xargs -I '{}' nix build ".#checks."${system}".{}"
-              else
-              	nix build ".#checks."${system}".$check"
-              fi
-            '';
-          };
-          run-audit = flake-utils.lib.mkApp {
-            drv = pkgs.writeShellApplication {
-              name = "audit";
-              runtimeInputs = [
-                pkgs.cargo
-                pkgs-unstable.cargo-audit
-              ];
-              text = ''
-                cargo audit
-              '';
-            };
+          run-check = nixLib.mkCheckApp { inherit system; };
+          run-audit = nixLib.mkAuditApp {
+            rustToolchainFile = ./rust-toolchain.toml;
           };
 
           find-port-ci = flake-utils.lib.mkApp {
