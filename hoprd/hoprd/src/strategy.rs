@@ -116,9 +116,8 @@ pub struct MultiStrategyConfig {
 /// Default HOPRd strategy configuration.
 ///
 /// ## Strategies included
-/// - `AutoRedeeming` *(requires `runtime-tokio` feature)*: redeems single tickets on channel
-///   close if worth at least 1 wxHOPR. When `runtime-tokio` is not enabled, returns an empty
-///   `MultiStrategyConfig` (passive behaviour).
+/// - `AutoRedeeming` *(requires `runtime-tokio` feature)*: redeems single tickets on channel close if worth at least 1
+///   wxHOPR. When `runtime-tokio` is not enabled, returns an empty `MultiStrategyConfig` (passive behaviour).
 pub fn hopr_default_strategies() -> MultiStrategyConfig {
     #[cfg(feature = "runtime-tokio")]
     {
