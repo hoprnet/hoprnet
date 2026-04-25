@@ -69,6 +69,21 @@ pub enum StrategyKind {
     Passive,
 }
 
+impl validator::Validate for StrategyKind {
+    fn validate(&self) -> std::result::Result<(), validator::ValidationErrors> {
+        match self {
+            #[cfg(feature = "runtime-tokio")]
+            Self::AutoRedeeming(cfg) => cfg.validate(),
+            #[cfg(feature = "runtime-tokio")]
+            Self::AutoFunding(cfg) => cfg.validate(),
+            #[cfg(feature = "runtime-tokio")]
+            Self::ClosureFinalizer(cfg) => cfg.validate(),
+            Self::Multi(cfg) => cfg.validate(),
+            Self::Passive => Ok(()),
+        }
+    }
+}
+
 /// Configuration options for the `MultiStrategy` group.
 #[derive(Debug, Clone, PartialEq, SmartDefault, Validate, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -95,6 +110,7 @@ pub struct MultiStrategyConfig {
     /// Default is empty, which makes the `MultiStrategy` behave as passive.
     #[default(_code = "vec![]")]
     #[serde(default = "empty_strategies")]
+    #[validate(nested)]
     pub strategies: Vec<StrategyKind>,
 }
 
