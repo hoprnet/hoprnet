@@ -213,6 +213,8 @@ where
         });
 
         self.running_redemptions.insert(channel_id, abort_handle);
+        #[cfg(all(feature = "telemetry", not(test)))]
+        METRIC_COUNT_AUTO_REDEEMS.increment();
         Ok(())
     }
 
@@ -796,6 +798,219 @@ mod tests {
             .timeout(futures_time::time::Duration::from_secs(5))
             .await?;
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_on_tick_returns_criteria_not_satisfied_when_redeem_on_winning_true() -> anyhow::Result<()> {
+        let mut connector = create_trustful_hopr_blokli_connector(
+            &BOB,
+            Default::default(),
+            CHAIN_CLIENT.clone(),
+            [1u8; Address::SIZE].into(),
+        )
+        .await?;
+        connector.connect().await?;
+
+        let cfg = AutoRedeemingStrategyConfig {
+            redeem_on_winning: true,
+            ..Default::default()
+        };
+        let ars = make_strategy(cfg, Arc::new(connector), Arc::new(MockTicketMgmt::new()));
+
+        assert!(matches!(ars.on_tick().await, Err(StrategyError::CriteriaNotSatisfied)));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_on_acknowledged_winning_ticket_skips_when_redeem_on_winning_false() -> anyhow::Result<()> {
+        let ack_ticket = generate_random_ack_ticket(0, 5)?;
+
+        let mut connector = create_trustful_hopr_blokli_connector(
+            &BOB,
+            Default::default(),
+            CHAIN_CLIENT.clone(),
+            [1u8; Address::SIZE].into(),
+        )
+        .await?;
+        connector.connect().await?;
+
+        let cfg = AutoRedeemingStrategyConfig {
+            redeem_on_winning: false,
+            ..Default::default()
+        };
+        let ars = make_strategy(cfg, Arc::new(connector), Arc::new(MockTicketMgmt::new()));
+
+        assert!(matches!(
+            ars.on_acknowledged_winning_ticket(&ack_ticket.ticket).await,
+            Err(StrategyError::CriteriaNotSatisfied)
+        ));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_on_acknowledged_winning_ticket_skips_below_minimum_value() -> anyhow::Result<()> {
+        // Ticket worth 1 packet, but minimum is 10 packets.
+        let ack_ticket = generate_random_ack_ticket(0, 1)?;
+
+        let mut connector = create_trustful_hopr_blokli_connector(
+            &BOB,
+            Default::default(),
+            CHAIN_CLIENT.clone(),
+            [1u8; Address::SIZE].into(),
+        )
+        .await?;
+        connector.connect().await?;
+
+        let cfg = AutoRedeemingStrategyConfig {
+            redeem_on_winning: true,
+            minimum_redeem_ticket_value: HoprBalance::from(*PRICE_PER_PACKET * 10),
+            ..Default::default()
+        };
+        let ars = make_strategy(cfg, Arc::new(connector), Arc::new(MockTicketMgmt::new()));
+
+        assert!(matches!(
+            ars.on_acknowledged_winning_ticket(&ack_ticket.ticket).await,
+            Err(StrategyError::CriteriaNotSatisfied)
+        ));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_on_own_channel_changed_skips_outgoing_direction() -> anyhow::Result<()> {
+        let pending_status = ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100)));
+
+        let mut connector = create_trustful_hopr_blokli_connector(
+            &BOB,
+            Default::default(),
+            CHAIN_CLIENT.clone(),
+            [1u8; Address::SIZE].into(),
+        )
+        .await?;
+        connector.connect().await?;
+
+        let cfg = AutoRedeemingStrategyConfig {
+            redeem_all_on_close: true,
+            ..Default::default()
+        };
+        let ars = make_strategy(cfg, Arc::new(connector), Arc::new(MockTicketMgmt::new()));
+
+        assert!(
+            ars.on_own_channel_changed(
+                &CHANNEL_1,
+                ChannelDirection::Outgoing,
+                ChannelChange::Status {
+                    left: ChannelStatus::Open,
+                    right: pending_status
+                },
+            )
+            .await
+            .is_ok()
+        );
+        assert_eq!(ars.running_redemptions.entry_count(), 0);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_on_own_channel_changed_skips_when_redeem_all_on_close_false() -> anyhow::Result<()> {
+        let pending_status = ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100)));
+
+        let mut connector = create_trustful_hopr_blokli_connector(
+            &BOB,
+            Default::default(),
+            CHAIN_CLIENT.clone(),
+            [1u8; Address::SIZE].into(),
+        )
+        .await?;
+        connector.connect().await?;
+
+        let cfg = AutoRedeemingStrategyConfig {
+            redeem_all_on_close: false,
+            ..Default::default()
+        };
+        let ars = make_strategy(cfg, Arc::new(connector), Arc::new(MockTicketMgmt::new()));
+
+        assert!(
+            ars.on_own_channel_changed(
+                &CHANNEL_1,
+                ChannelDirection::Incoming,
+                ChannelChange::Status {
+                    left: ChannelStatus::Open,
+                    right: pending_status
+                },
+            )
+            .await
+            .is_ok()
+        );
+        assert_eq!(ars.running_redemptions.entry_count(), 0);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_on_own_channel_changed_returns_error_for_non_status_change() -> anyhow::Result<()> {
+        let mut connector = create_trustful_hopr_blokli_connector(
+            &BOB,
+            Default::default(),
+            CHAIN_CLIENT.clone(),
+            [1u8; Address::SIZE].into(),
+        )
+        .await?;
+        connector.connect().await?;
+
+        let cfg = AutoRedeemingStrategyConfig {
+            redeem_all_on_close: true,
+            ..Default::default()
+        };
+        let ars = make_strategy(cfg, Arc::new(connector), Arc::new(MockTicketMgmt::new()));
+
+        assert!(matches!(
+            ars.on_own_channel_changed(
+                &CHANNEL_1,
+                ChannelDirection::Incoming,
+                ChannelChange::Balance {
+                    left: 5.into(),
+                    right: 3.into()
+                },
+            )
+            .await,
+            Err(StrategyError::CriteriaNotSatisfied)
+        ));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_on_own_channel_changed_skips_non_open_to_pending_transition() -> anyhow::Result<()> {
+        let pending_status = ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100)));
+
+        let mut connector = create_trustful_hopr_blokli_connector(
+            &BOB,
+            Default::default(),
+            CHAIN_CLIENT.clone(),
+            [1u8; Address::SIZE].into(),
+        )
+        .await?;
+        connector.connect().await?;
+
+        let cfg = AutoRedeemingStrategyConfig {
+            redeem_all_on_close: true,
+            ..Default::default()
+        };
+        let ars = make_strategy(cfg, Arc::new(connector), Arc::new(MockTicketMgmt::new()));
+
+        // Transition from PendingToClose → something (not from Open), should be ignored.
+        assert!(
+            ars.on_own_channel_changed(
+                &CHANNEL_1,
+                ChannelDirection::Incoming,
+                ChannelChange::Status {
+                    left: pending_status,
+                    right: ChannelStatus::Closed
+                },
+            )
+            .await
+            .is_ok()
+        );
+        assert_eq!(ars.running_redemptions.entry_count(), 0);
         Ok(())
     }
 

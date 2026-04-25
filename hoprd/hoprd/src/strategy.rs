@@ -153,12 +153,36 @@ where
         + Sync
         + 'static,
 {
-    let mut strategies = Vec::<Box<dyn Strategy + Send>>::new();
-
+    // Seed all gauges to 0 exactly once at the top level — recursive calls via
+    // StrategyKind::Multi must not reset them or they would clobber values set
+    // by earlier iterations of the outer loop.
     #[cfg(all(feature = "telemetry", not(test)))]
     StrategyKind::VARIANTS
         .iter()
         .for_each(|s| METRIC_ENABLED_STRATEGIES.set(&[*s], 0_f64));
+
+    build_strategies_inner(cfg, node)
+}
+
+fn build_strategies_inner<N>(cfg: &MultiStrategyConfig, node: Arc<N>) -> Box<dyn Strategy + Send>
+where
+    N: ActionableEventSource
+        + HasChainApi<
+            ChainApi: ChainReadChannelOperations
+                          + ChainReadSafeOperations
+                          + ChainValues
+                          + ChainWriteChannelOperations
+                          + ChainWriteTicketOperations
+                          + Clone
+                          + Send
+                          + Sync
+                          + 'static,
+        > + HasTicketManagement<TicketManager: TicketManagement + Clone + Send + Sync + 'static>
+        + Send
+        + Sync
+        + 'static,
+{
+    let mut strategies = Vec::<Box<dyn Strategy + Send>>::new();
 
     for strategy in cfg.strategies.iter() {
         match strategy {
@@ -181,7 +205,7 @@ where
                 if cfg.allow_recursive {
                     let mut sub = sub_cfg.clone();
                     sub.allow_recursive = false;
-                    strategies.push(build_strategies(&sub, Arc::clone(&node)));
+                    strategies.push(build_strategies_inner(&sub, Arc::clone(&node)));
                 } else {
                     error!("recursive multi-strategy not allowed and skipped");
                 }

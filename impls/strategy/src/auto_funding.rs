@@ -311,13 +311,25 @@ where
                     }
                 }
                 Event::Actionable(ev) => match *ev {
-                    ActionableEvent::Chain(ChainEvent::ChannelBalanceDecreased(ch, _)) => {
+                    ActionableEvent::Chain(ChainEvent::ChannelBalanceDecreased(ch, _))
                         if ch.direction(&me) == Some(ChannelDirection::Outgoing)
                             && ch.balance.le(&self.cfg.min_stake_threshold)
-                            && ch.status == ChannelStatus::Open
-                            && let Err(e) = self.try_fund_channel(&ch)
-                        {
-                            warn!(%ch, %e, "failed to fund channel on balance decrease event");
+                            && ch.status == ChannelStatus::Open =>
+                    {
+                        // Guard against over-commitment: skip if the safe cannot
+                        // cover even a single funding round.
+                        match self.safe_balance_budget().await {
+                            Ok(budget) if budget < self.cfg.funding_amount => {
+                                debug!(%ch, %budget, "event-driven funding skipped: safe balance below funding amount");
+                            }
+                            Ok(_) => {
+                                if let Err(e) = self.try_fund_channel(&ch) {
+                                    warn!(%ch, %e, "failed to fund channel on balance decrease event");
+                                }
+                            }
+                            Err(e) => {
+                                warn!(%ch, %e, "event-driven funding skipped: could not fetch safe balance");
+                            }
                         }
                     }
                     ActionableEvent::Chain(ChainEvent::ChannelBalanceIncreased(ch, _))
@@ -965,6 +977,96 @@ mod tests {
         assert_eq!(afs.in_flight.len(), 1, "in-flight set should still have one entry");
         assert!(afs.in_flight.contains(c1.get_id()), "channel should still be in-flight");
 
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn test_on_own_channel_changed_balance_skips_incoming_direction() -> anyhow::Result<()> {
+        let stake_limit = HoprBalance::from(7_u32);
+        let fund_amount = HoprBalance::from(5_u32);
+
+        let c1 = ChannelEntry::builder()
+            .between(*CHRIS, *BOB) // CHRIS → BOB: from BOB's perspective this is Incoming
+            .amount(3)
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(0_u32)
+            .build()?;
+
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_generated_accounts(
+                &[&*ALICE, &*BOB, &*CHRIS, &*DAVE],
+                false,
+                XDaiBalance::new_base(1),
+                HoprBalance::new_base(1000),
+            )
+            .with_channels([c1])
+            .build_dynamic_client([1; Address::SIZE].into());
+
+        let mut chain_connector =
+            create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
+        chain_connector.connect().await?;
+
+        let afs = AutoFundingStrategyInner {
+            cfg: AutoFundingStrategyConfig {
+                min_stake_threshold: stake_limit,
+                funding_amount: fund_amount,
+            },
+            interval: std::time::Duration::from_secs(60),
+            node: Arc::new(ChainNode(Arc::new(chain_connector))),
+            in_flight: Arc::new(DashSet::new()),
+        };
+
+        // Incoming direction: should be a no-op regardless of balance.
+        afs.on_own_channel_changed_balance(&c1, ChannelDirection::Incoming, HoprBalance::zero(), c1.balance)
+            .await?;
+        assert!(afs.in_flight.is_empty(), "incoming channel should never be funded");
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn test_on_own_channel_changed_balance_skips_when_above_threshold() -> anyhow::Result<()> {
+        let stake_limit = HoprBalance::from(7_u32);
+        let fund_amount = HoprBalance::from(5_u32);
+
+        let c1 = ChannelEntry::builder()
+            .between(*BOB, *CHRIS)
+            .amount(10) // balance 10 > stake_limit 7, so no funding
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(0_u32)
+            .build()?;
+
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_generated_accounts(
+                &[&*ALICE, &*BOB, &*CHRIS, &*DAVE],
+                false,
+                XDaiBalance::new_base(1),
+                HoprBalance::new_base(1000),
+            )
+            .with_channels([c1])
+            .build_dynamic_client([1; Address::SIZE].into());
+
+        let mut chain_connector =
+            create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
+        chain_connector.connect().await?;
+
+        let afs = AutoFundingStrategyInner {
+            cfg: AutoFundingStrategyConfig {
+                min_stake_threshold: stake_limit,
+                funding_amount: fund_amount,
+            },
+            interval: std::time::Duration::from_secs(60),
+            node: Arc::new(ChainNode(Arc::new(chain_connector))),
+            in_flight: Arc::new(DashSet::new()),
+        };
+
+        // Balance (10) > min_stake_threshold (7): no funding should be triggered.
+        afs.on_own_channel_changed_balance(&c1, ChannelDirection::Outgoing, HoprBalance::zero(), c1.balance)
+            .await?;
+        assert!(afs.in_flight.is_empty(), "channel above threshold should not be funded");
         Ok(())
     }
 

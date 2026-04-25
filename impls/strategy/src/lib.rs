@@ -34,9 +34,11 @@
 //! ```
 
 /// Shared serde default helpers used across multiple strategy configs.
+#[cfg(feature = "strategy-auto-redeeming")]
 pub(crate) fn just_true() -> bool {
     true
 }
+#[cfg(feature = "strategy-auto-redeeming")]
 pub(crate) fn just_false() -> bool {
     false
 }
