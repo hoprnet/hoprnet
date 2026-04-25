@@ -5,9 +5,8 @@
 //!
 //! `MultiStrategy` is a pure combinator: it accepts any `Box<dyn Strategy + Send>` —
 //! including strategies defined outside this crate — and runs them all concurrently.
-//! The `on_fail_continue` flag controls whether a sub-strategy failure aborts the whole group:
-//! - `true` → OR chain: continue after individual failures
-//! - `false` → AND chain: abort all on first failure
+//! Sub-strategies are fully isolated: a failure in one is logged and does not affect
+//! the others.
 use std::fmt::{Debug, Display, Formatter};
 
 use async_trait::async_trait;
@@ -36,7 +35,6 @@ pub trait Strategy: Display + Send {
 /// ones defined outside this crate — can be composed here.
 pub struct MultiStrategy {
     strategies: Vec<Box<dyn Strategy + Send>>,
-    on_fail_continue: bool,
 }
 
 impl MultiStrategy {
@@ -45,11 +43,8 @@ impl MultiStrategy {
     /// Strategies are passed in already constructed; `MultiStrategy` does not know or
     /// care about the concrete types. Pass an empty `strategies` vec to get a passive
     /// strategy that blocks forever.
-    pub fn new(strategies: Vec<Box<dyn Strategy + Send>>, on_fail_continue: bool) -> Self {
-        Self {
-            strategies,
-            on_fail_continue,
-        }
+    pub fn new(strategies: Vec<Box<dyn Strategy + Send>>) -> Self {
+        Self { strategies }
     }
 }
 
@@ -84,12 +79,9 @@ impl Strategy for MultiStrategy {
             return Ok(());
         }
 
-        let on_fail_continue = self.on_fail_continue;
-
         // Spawn each sub-strategy as an abortable task.
         // Keeping all AbortHandles in a RAII guard ensures every sub-task is cancelled
-        // when MultiStrategy is dropped (graceful shutdown) or when the first failure
-        // triggers an early return in AND mode.
+        // when MultiStrategy is dropped (graceful shutdown).
         let mut join_handles = Vec::new();
         let mut abort_handles: Vec<AbortHandle> = Vec::new();
         for mut s in strategies {
@@ -108,9 +100,9 @@ impl Strategy for MultiStrategy {
         }
         let _guard = AbortGuard(abort_handles);
 
-        // Process completions as they arrive so AND mode can abort siblings immediately.
+        // Process completions as they arrive. Sub-strategies are fully isolated:
+        // a failure in one is logged but does not affect the others.
         let mut pending: futures::stream::FuturesUnordered<_> = join_handles.into_iter().collect();
-        let mut last_error = None;
 
         while let Some(join_result) = pending.next().await {
             let strategy_result = match join_result {
@@ -120,17 +112,8 @@ impl Strategy for MultiStrategy {
             };
 
             if let Err(e) = strategy_result {
-                if !on_fail_continue {
-                    // _guard drops here, aborting all remaining sub-tasks.
-                    return Err(e);
-                }
-                warn!(%e, "sub-strategy failed, continuing per on_fail_continue=true");
-                last_error = Some(e);
+                warn!(%e, "sub-strategy failed");
             }
-        }
-
-        if let Some(e) = last_error {
-            warn!(%e, "multi-strategy: some sub-strategies failed");
         }
 
         Ok(())
@@ -188,26 +171,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_multi_strategy_logical_or_flow() -> anyhow::Result<()> {
-        let mut ms = MultiStrategy::new(vec![Box::new(FailStrategy), Box::new(OkStrategy)], true);
-        // With on_fail_continue=true, even if FailStrategy errors, the multi-strategy succeeds.
+    async fn test_multi_strategy_sub_failure_does_not_propagate() -> anyhow::Result<()> {
+        // A failing sub-strategy is isolated: the MultiStrategy still returns Ok.
+        let mut ms = MultiStrategy::new(vec![Box::new(FailStrategy), Box::new(OkStrategy)]);
         ms.run().await?;
         Ok(())
     }
 
     #[tokio::test]
-    async fn test_multi_strategy_logical_and_flow() {
-        let mut ms = MultiStrategy::new(vec![Box::new(FailStrategy), Box::new(OkStrategy)], false);
-        ms.run().await.expect_err("multi-strategy should fail");
-    }
-
-    #[tokio::test]
     async fn test_multi_strategy_accepts_external_strategy() -> anyhow::Result<()> {
         // Demonstrates that any impl Strategy can be composed without modifying hopr-strategy.
-        let mut ms = MultiStrategy::new(
-            vec![Box::new(OkStrategy), Box::new(ExternalStrategy { ran: false })],
-            true,
-        );
+        let mut ms = MultiStrategy::new(vec![Box::new(OkStrategy), Box::new(ExternalStrategy { ran: false })]);
         ms.run().await?;
         Ok(())
     }
@@ -215,7 +189,7 @@ mod tests {
     #[tokio::test]
     async fn test_multi_strategy_empty_is_passive() {
         // An empty MultiStrategy blocks forever — verify it does not complete immediately.
-        let mut ms = MultiStrategy::new(vec![], true);
+        let mut ms = MultiStrategy::new(vec![]);
         let result =
             futures_time::future::FutureExt::timeout(ms.run(), futures_time::time::Duration::from_millis(50)).await;
         assert!(result.is_err(), "empty MultiStrategy should block (timeout expected)");
@@ -223,13 +197,13 @@ mod tests {
 
     #[test]
     fn test_multi_strategy_display() {
-        let ms = MultiStrategy::new(vec![Box::new(OkStrategy), Box::new(FailStrategy)], true);
+        let ms = MultiStrategy::new(vec![Box::new(OkStrategy), Box::new(FailStrategy)]);
         assert_eq!(ms.to_string(), "multi_strategy(ok, fail)");
     }
 
     #[test]
     fn test_multi_strategy_display_passive() {
-        let ms = MultiStrategy::new(vec![], false);
+        let ms = MultiStrategy::new(vec![]);
         assert_eq!(ms.to_string(), "multi_strategy(passive)");
     }
 }

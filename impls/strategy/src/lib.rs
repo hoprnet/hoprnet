@@ -25,7 +25,6 @@
 //!
 //! ```yaml
 //! strategy:
-//!   on_fail_continue: true
 //!   allow_recursive: true
 //!   execution_interval: 60
 //!   strategies:

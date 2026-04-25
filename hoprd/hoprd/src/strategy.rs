@@ -73,14 +73,6 @@ pub enum StrategyKind {
 #[derive(Debug, Clone, PartialEq, SmartDefault, Validate, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MultiStrategyConfig {
-    /// If `false`, the first sub-strategy failure stops the entire group.
-    /// If `true`, failures are logged and execution continues.
-    ///
-    /// Default is `true`.
-    #[default = true]
-    #[serde(default = "just_true")]
-    pub on_fail_continue: bool,
-
     /// Indicate whether the `MultiStrategy` can contain another `MultiStrategy`.
     ///
     /// Default is `true`. Nesting is limited to one level: when this is `true`, nested
@@ -115,7 +107,6 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
     {
         use hopr_strategy::auto_redeeming::AutoRedeemingStrategyConfig;
         return MultiStrategyConfig {
-            on_fail_continue: true,
             allow_recursive: false,
             execution_interval: Duration::from_secs(60),
             strategies: vec![StrategyKind::AutoRedeeming(AutoRedeemingStrategyConfig {
@@ -222,5 +213,5 @@ where
         }
     }
 
-    Box::new(MultiStrategy::new(strategies, cfg.on_fail_continue))
+    Box::new(MultiStrategy::new(strategies))
 }
