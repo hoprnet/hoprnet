@@ -12,7 +12,6 @@ use hopr_strategy::strategy::{MultiStrategy, Strategy};
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 use strum::{Display as StrumDisplay, VariantNames};
-use tracing::error;
 use validator::{Validate, ValidationError};
 
 #[cfg(all(feature = "telemetry", not(test)))]
@@ -117,7 +116,9 @@ pub struct MultiStrategyConfig {
 /// Default HOPRd strategy configuration.
 ///
 /// ## Strategies included
-/// - `AutoRedeeming`: redeems single tickets on channel close if worth at least 1 wxHOPR
+/// - `AutoRedeeming` *(requires `runtime-tokio` feature)*: redeems single tickets on channel
+///   close if worth at least 1 wxHOPR. When `runtime-tokio` is not enabled, returns an empty
+///   `MultiStrategyConfig` (passive behaviour).
 pub fn hopr_default_strategies() -> MultiStrategyConfig {
     #[cfg(feature = "runtime-tokio")]
     {
@@ -216,7 +217,7 @@ where
                     sub.allow_recursive = false;
                     strategies.push(build_strategies_inner(&sub, Arc::clone(&node)));
                 } else {
-                    error!("recursive multi-strategy not allowed and skipped");
+                    tracing::error!("recursive multi-strategy not allowed and skipped");
                     continue; // skip the telemetry update: nothing was actually built
                 }
             }
