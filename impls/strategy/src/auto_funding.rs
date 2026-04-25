@@ -293,6 +293,11 @@ where
             Actionable(Box<ActionableEvent>),
         }
 
+        // Run the first scan immediately at startup without waiting for the initial interval.
+        if let Err(e) = self.on_tick().await {
+            tracing::error!(%e, "auto-funding tick failed");
+        }
+
         let tick_stream = futures_time::stream::interval(self.interval.into()).map(|_| Event::Tick);
         let event_stream = self
             .node

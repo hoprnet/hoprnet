@@ -142,6 +142,11 @@ where
         ChainReadChannelOperations + ChainWriteChannelOperations + Clone + Send + Sync + 'static,
 {
     async fn run(&mut self) -> errors::Result<()> {
+        // Run the first scan immediately at startup without waiting for the initial interval.
+        if let Err(e) = self.on_tick().await {
+            tracing::error!(%e, "closure finalizer tick failed");
+        }
+
         let tick_stream = futures_time::stream::interval(self.interval.into()).map(|_| ());
 
         futures::pin_mut!(tick_stream);

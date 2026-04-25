@@ -329,6 +329,13 @@ where
             Actionable(Box<ActionableEvent>),
         }
 
+        // Run the first scan immediately at startup without waiting for the initial interval.
+        if let Err(e) = self.on_tick().await
+            && !matches!(e, StrategyError::CriteriaNotSatisfied)
+        {
+            tracing::error!(%e, "auto-redeeming tick failed");
+        }
+
         let tick_stream = futures_time::stream::interval(self.interval.into()).map(|_| Event::Tick);
         let event_stream = self
             .node

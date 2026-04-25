@@ -83,7 +83,9 @@ pub struct MultiStrategyConfig {
 
     /// Indicate whether the `MultiStrategy` can contain another `MultiStrategy`.
     ///
-    /// Default is `true`.
+    /// Default is `true`. Nesting is limited to one level: when this is `true`, nested
+    /// `Multi` groups have their own `allow_recursive` forced to `false`, so three-deep
+    /// nesting is silently flattened.
     #[default = true]
     #[serde(default = "just_true")]
     pub allow_recursive: bool,
@@ -208,6 +210,7 @@ where
                     strategies.push(build_strategies_inner(&sub, Arc::clone(&node)));
                 } else {
                     error!("recursive multi-strategy not allowed and skipped");
+                    continue; // skip the telemetry update: nothing was actually built
                 }
             }
             StrategyKind::Passive => {} // passive = empty sub-strategy list
