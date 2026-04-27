@@ -139,29 +139,27 @@ jobs:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
       codecov_token: ${{ secrets.CODECOV_TOKEN }}
 
-  build-benchmarks:
-    name: Build Benchmarks
+  benchmarks:
+    name: Benchmarks
     needs: [tests]
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: self-hosted-hoprnet-bigger
     permissions:
       contents: read
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40 # v2.19.0
-        with:
-          disable-sudo: true
-          egress-policy: audit
-      - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-      - name: Setup Nix
-        uses: hoprnet/hopr-workflows/actions/setup-nix@c8d45034bb33307dfda3b4dfcd1fc4000cadc05a # setup-nix-v1
-        with:
-          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      - name: Build benchmarks
-        run: nix build -L .#bench-build
+      checks: write
+      pull-requests: write
+    uses: hoprnet/hopr-workflows/.github/workflows/benchmarks.yaml@c06be87b06af5bfcc48d98ebe95787c994e2d2c0 # workflow-benchmark-v1
+    with:
+      source_branch: ${{ github.event.pull_request.head.ref }}
+      runner: self-hosted-hoprnet-bigger
+      bencher_project: ${{ github.event.repository.name }}
+      should_build: true
+      should_run: false
+      build_command: "nix build -L .#bench-build"
+      run_command: "nix run .#bench-run"
+    secrets:
+      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      ZULIP_API_KEY: ${{ secrets.ZULIP_API_KEY }}
+      ZULIP_EMAIL: ${{ secrets.ZULIP_EMAIL }}
 
   build-binaries:
     name: Binary ${{ matrix.architecture }}

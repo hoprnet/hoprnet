@@ -46,5 +46,5 @@ rust-stream-ext-concurrent = { workspace = true }
 ignored = ["humantime-serde"]
 
 [[bench]]
-name = "mixer_throughput"
+name = "mixer_throughput_bench"
 harness = false
