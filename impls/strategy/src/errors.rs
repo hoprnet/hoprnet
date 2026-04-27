@@ -13,8 +13,8 @@ pub enum StrategyError {
     #[error("non-specific strategy error: {0}")]
     Other(anyhow::Error),
 
-    #[error(transparent)]
-    HoprLib(#[from] hopr_lib::errors::HoprLibError),
+    #[error("HOPR error: {0}")]
+    HoprError(String),
 
     #[error("lower-level error: {0}")]
     GeneralError(#[from] GeneralError),
