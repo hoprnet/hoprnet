@@ -70,11 +70,11 @@ ignored = ["serde_bytes"]
 ignored = ["serde_bytes"]
 
 [[bench]]
-name = "packet_benches"
+name = "packet_bench"
 harness = false
 
 [[bench]]
-name = "por_benches"
+name = "por_bench"
 harness = false
 
 [[bench]]

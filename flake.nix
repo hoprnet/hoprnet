@@ -354,11 +354,8 @@
               (old: {
                 postInstall = (if old ? postInstall && old.postInstall != null then old.postInstall else "") + ''
                   mkdir -p "$out/bin"
-                  # Find actual executables in deps/, excluding libraries, metadata, and integration tests
-                  find target -maxdepth 4 -path '*/deps/*' -type f -executable \
-                    -not -name "lib*" \
+                  find target -maxdepth 4 -path '*/deps/*' -type f -name "*_bench-*" \
                     -not -name "*.*" \
-                    -not -name "*test*" \
                     -exec cp {} "$out/bin/" \;
                 '';
               });
@@ -536,6 +533,14 @@
                 entry = "bash .github/scripts/generate-metrics-docs.sh --fix";
                 files = "(METRICS\\.md|\\.rs)$";
                 pass_filenames = false;
+                language = "system";
+              };
+              check-bench-names = {
+                enable = true;
+                name = "Benchmark names must end with _bench";
+                entry = "bash .github/scripts/check-bench-names.sh";
+                files = "Cargo\\.toml$";
+                pass_filenames = true;
                 language = "system";
               };
             };

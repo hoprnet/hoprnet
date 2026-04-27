@@ -63,11 +63,11 @@ hopr-chain-connector = { workspace = true, features = [
 
 
 [[bench]]
-name = "bloom_filter"
+name = "bloom_filter_bench"
 harness = false
 
 [[bench]]
-name = "codec"
+name = "codec_bench"
 harness = false
 
 [package.metadata.cargo-machete]
