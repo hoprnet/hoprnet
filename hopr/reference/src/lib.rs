@@ -200,7 +200,7 @@ where
     let safe_address = config.safe_module.safe_address;
     let module_address = config.safe_module.module_address;
 
-    let builder = hopr_lib::builder::HoprBuilder::default()
+    let builder = hopr_lib::builder::HoprBuilder
         .with_identity(chain_key, packet_key)
         .with_config(config)
         .with_safe_module(&safe_address, &module_address)

@@ -2,7 +2,7 @@
 //!
 //! The builder guides construction through a series of mandatory phases:
 //!
-//! 1. **Identity** — `HoprBuilder::default` → `HoprBuilder::with_identity`
+//! 1. **Identity** — `HoprBuilder` → `HoprBuilder::with_identity`
 //! 2. **Configuration** — `HoprBuilderWithIdentity::with_config`
 //! 3. **Component factories** — chain API, graph, network, and cover-traffic
 //! 4. **Session server** (when the `session-server` feature is enabled) — `HoprBuilderConfigured::with_session_server`
@@ -17,7 +17,7 @@
 //! let offchain_key = OffchainKeypair::random();
 //! let config = HoprLibConfig::default();
 //!
-//! let builder = HoprBuilder::default()
+//! let builder = HoprBuilder
 //!     .with_identity(&chain_key, &offchain_key)
 //!     .with_config(config)
 //!     .with_chain_api(|_ctx| { /* ... */ todo!() })
