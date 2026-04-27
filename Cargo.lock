@@ -4615,7 +4615,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-lib"
-version = "4.0.2-rc.1"
+version = "4.0.1-rc.1"
 dependencies = [
  "anyhow",
  "async-broadcast",
