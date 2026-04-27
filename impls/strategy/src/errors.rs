@@ -14,7 +14,7 @@ pub enum StrategyError {
     Other(anyhow::Error),
 
     #[error("HOPR error: {0}")]
-    HoprError(String),
+    HoprError(anyhow::Error),
 
     #[error("lower-level error: {0}")]
     GeneralError(#[from] GeneralError),
