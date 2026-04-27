@@ -298,6 +298,3 @@ similar.opt-level = 3
 
 [workspace.metadata.cargo-shear]
 ignored = ["oas3", "serde_bytes", "humantime-serde"]
-
-[patch.crates-io]
-hopr-api = { git = "https://github.com/hoprnet/hopr-api", rev = "4969527ce28f7f99ee8f4baa6810a8f1654c6a44" }
