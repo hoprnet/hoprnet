@@ -189,6 +189,8 @@ On top of the default configuration options generated for the command line, the 
 - `HOPRD_LOG_FORMAT` - override for the default stdout log formatter (follows tracing formatting options)
 - `HOPRD_USE_OPENTELEMETRY` - enable the OpenTelemetry output for this node
 - `HOPRD_OTEL_SIGNALS` - comma-separated OTLP signals to export when OpenTelemetry is enabled (`traces`, `logs`, `metrics`), defaults to `traces`
+- `HOPRD_OTLP_ENDPOINT` - base URL of an OTLP endpoint. Transport is inferred from URL scheme (`grpc://...`, `http://...`, or `https://...`)
+- `HOPRD_METRIC_EXPORT_INTERVAL` - OTLP metric export interval config in `default,prefix=interval` form (for example `15000,hopr_session=1000`). Intervals support raw milliseconds (`15000`) or suffixes (`1s`, `250ms`, `1m`).
 - `OTEL_SERVICE_NAME` - the name of this node for the OpenTelemetry service
 - `HOPR_INTERNAL_CHAIN_DISCOVERY_CHANNEL_CAPACITY` - the maximum capacity of the channel for chain generated discovery signals for the p2p transport
 - `HOPR_INTERNAL_DISCOVERY_UPDATES_CAPACITY` - the maximum capacity of the transport component handling chain discovery events
@@ -452,8 +454,8 @@ Once an instrumented tokio is built into hoprd, the application can be instrumen
 - `HOPRD_USE_OPENTELEMETRY` - `true` to enable the OpenTelemetry streaming, `false` to disable it
 - `HOPRD_OTEL_SIGNALS` - comma-separated signal list from `traces`, `logs`, `metrics` (default: `traces`)
 - `OTEL_SERVICE_NAME` - identifier used as `service.name` for this instance (for example `my_hoprd_instance`)
-- `OTEL_EXPORTER_OTLP_ENDPOINT` - base URL of an OTLP endpoint. Transport is inferred from URL scheme (`grpc://...`, `http://...`, or `https://...`)
-- `OTEL_METRIC_EXPORT_INTERVAL` - duration in ms between each push
+- `HOPRD_OTLP_ENDPOINT` - base URL of an OTLP endpoint. Transport is inferred from URL scheme (`grpc://...`, `http://...`, or `https://...`)
+- `HOPRD_METRIC_EXPORT_INTERVAL` - OTLP metric export interval config in `default,prefix=interval` form (for example `15000,hopr_session=1000`). Intervals support raw milliseconds (`15000`) or suffixes (`1s`, `250ms`, `1m`).
 
 Examples:
 
@@ -461,7 +463,7 @@ Examples:
 - Metrics only: `HOPRD_OTEL_SIGNALS=metrics`
 - Full export: `HOPRD_OTEL_SIGNALS=traces,logs,metrics`
 - OTEL traces, logs, and metrics include `node_address` and `node_peer_id`.
-- OTLP logs are emitted as structured objects (typed fields/attributes), and use OTLP HTTP JSON protocol when `OTEL_EXPORTER_OTLP_ENDPOINT` is `http(s)://...`.
+- OTLP logs are emitted as structured objects (typed fields/attributes), and use OTLP HTTP JSON protocol when `HOPRD_OTLP_ENDPOINT` is `http(s)://...`.
 - With metrics enabled, OTEL exports keep Prometheus family naming (`<metric>`, `<metric>_count`, `<metric>_sum`, `<metric>_bucket`) and labels (`le` for histogram buckets, `quantile` for summaries).
 - Session snapshot metrics are also exported directly to OTEL (`hopr_session_*` series with `session_id` attribute) without being added to the Prometheus `/metrics` endpoint.
 

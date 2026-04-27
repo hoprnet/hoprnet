@@ -30,6 +30,9 @@ use {
     },
 };
 
+const HOPRD_OTLP_ENDPOINT_ENV_KEY: &str = "HOPRD_OTLP_ENDPOINT";
+const LEGACY_OTLP_ENDPOINT_ENV_KEY: &str = "OTEL_EXPORTER_OTLP_ENDPOINT";
+
 flagset::flags! {
     #[repr(u8)]
     #[derive(PartialOrd, Ord, strum::EnumString, strum::Display)]
@@ -56,7 +59,7 @@ enum OtlpTransport {
 
 impl OtlpTransport {
     fn from_env() -> Self {
-        match std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT") {
+        match std::env::var(LEGACY_OTLP_ENDPOINT_ENV_KEY) {
             Ok(raw_url) => Self::from_str(raw_url.trim().split_once("://").map(|(scheme, _)| scheme).unwrap_or(""))
                 .unwrap_or(Self::Grpc),
             Err(_) => Self::Grpc,
@@ -70,6 +73,34 @@ struct OtlpConfig {
     service_name: String,
     transport: OtlpTransport,
     signals: flagset::FlagSet<OtlpSignal>,
+}
+
+fn apply_hoprd_otlp_endpoint_override() {
+    let Ok(value) = std::env::var(HOPRD_OTLP_ENDPOINT_ENV_KEY) else {
+        return;
+    };
+
+    let endpoint = value.trim();
+    if endpoint.is_empty() {
+        tracing::warn!(
+            env_key = HOPRD_OTLP_ENDPOINT_ENV_KEY,
+            "empty OTLP endpoint value ignored"
+        );
+        return;
+    }
+
+    if let Ok(existing) = std::env::var(LEGACY_OTLP_ENDPOINT_ENV_KEY) {
+        let existing = existing.trim();
+        if !existing.is_empty() && existing != endpoint {
+            tracing::warn!(
+                env_key = HOPRD_OTLP_ENDPOINT_ENV_KEY,
+                overridden_env_key = LEGACY_OTLP_ENDPOINT_ENV_KEY,
+                "custom HOPRD OTLP endpoint overrides OTEL exporter endpoint"
+            );
+        }
+    }
+
+    unsafe { std::env::set_var(LEGACY_OTLP_ENDPOINT_ENV_KEY, endpoint) };
 }
 
 impl OtlpConfig {
@@ -916,6 +947,7 @@ pub(super) fn init_metrics(
 }
 
 pub(super) fn init_telemetry(node_identity: NodeTelemetryIdentity) -> anyhow::Result<TelemetryHandles> {
+    apply_hoprd_otlp_endpoint_override();
     let mut telemetry_handles = init_logging(node_identity.clone())?;
     init_metrics(&mut telemetry_handles, node_identity)?;
     Ok(telemetry_handles)
