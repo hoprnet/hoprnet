@@ -65,9 +65,10 @@ use hopr_api::{
 use hopr_async_runtime::prelude::spawn;
 pub use hopr_async_runtime::{Abortable, AbortableList};
 pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
+use hopr_transport::{ApplicationDataIn, ApplicationDataOut, HoprTransport, HoprTransportProcess, OffchainPublicKey};
+#[cfg(feature = "session-client")]
 use hopr_transport::{
-    ApplicationDataIn, ApplicationDataOut, HoprSession, HoprSessionConfigurator, HoprTransport, HoprTransportProcess,
-    OffchainPublicKey, SessionCapabilities, SessionCapability, SessionTarget, SurbBalancerConfig,
+    HoprSession, HoprSessionConfigurator, SessionCapabilities, SessionCapability, SessionTarget, SurbBalancerConfig,
 };
 use tracing::debug;
 
