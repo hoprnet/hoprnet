@@ -7,8 +7,12 @@ use axum::{
 };
 use base64::Engine;
 use hopr_lib::{
-    HopRouting, HoprSessionClientConfig, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities, SessionId,
-    SessionTarget, SurbBalancerConfig, api::types::primitive::prelude::Address, errors::HoprLibError,
+    HopRouting, HoprSessionClientConfig,
+    api::types::primitive::prelude::Address,
+    errors::HoprLibError,
+    exports::transport::{
+        SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities, SessionId, SessionTarget, SurbBalancerConfig,
+    },
 };
 use hopr_utils_session::{ListenerId, build_binding_host, create_tcp_client_binding, create_udp_client_binding};
 use serde::{Deserialize, Serialize};
@@ -103,16 +107,19 @@ pub enum SessionCapability {
     NoRateControl,
 }
 
-impl From<SessionCapability> for hopr_lib::SessionCapabilities {
-    fn from(cap: SessionCapability) -> hopr_lib::SessionCapabilities {
+impl From<SessionCapability> for hopr_lib::exports::transport::SessionCapabilities {
+    fn from(cap: SessionCapability) -> hopr_lib::exports::transport::SessionCapabilities {
         match cap {
-            SessionCapability::Segmentation => hopr_lib::SessionCapability::Segmentation.into(),
+            SessionCapability::Segmentation => hopr_lib::exports::transport::SessionCapability::Segmentation.into(),
             SessionCapability::Retransmission => {
-                hopr_lib::SessionCapability::RetransmissionNack | hopr_lib::SessionCapability::RetransmissionAck
+                hopr_lib::exports::transport::SessionCapability::RetransmissionNack
+                    | hopr_lib::exports::transport::SessionCapability::RetransmissionAck
             }
-            SessionCapability::RetransmissionAckOnly => hopr_lib::SessionCapability::RetransmissionAck.into(),
-            SessionCapability::NoDelay => hopr_lib::SessionCapability::NoDelay.into(),
-            SessionCapability::NoRateControl => hopr_lib::SessionCapability::NoRateControl.into(),
+            SessionCapability::RetransmissionAckOnly => {
+                hopr_lib::exports::transport::SessionCapability::RetransmissionAck.into()
+            }
+            SessionCapability::NoDelay => hopr_lib::exports::transport::SessionCapability::NoDelay.into(),
+            SessionCapability::NoRateControl => hopr_lib::exports::transport::SessionCapability::NoRateControl.into(),
         }
     }
 }
@@ -249,9 +256,9 @@ impl SessionClientRequest {
                     })
                     .unwrap_or_else(|| match target_protocol {
                         IpProtocol::TCP => {
-                            hopr_lib::SessionCapability::RetransmissionAck
-                                | hopr_lib::SessionCapability::RetransmissionNack
-                                | hopr_lib::SessionCapability::Segmentation
+                            hopr_lib::exports::transport::SessionCapability::RetransmissionAck
+                                | hopr_lib::exports::transport::SessionCapability::RetransmissionNack
+                                | hopr_lib::exports::transport::SessionCapability::Segmentation
                         }
                         // Only Segmentation capability for UDP per default
                         _ => SessionCapability::Segmentation.into(),

@@ -64,13 +64,9 @@ use hopr_api::{
 use hopr_async_runtime::prelude::spawn;
 pub use hopr_async_runtime::{Abortable, AbortableList};
 pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
-#[cfg(feature = "runtime-tokio")]
-pub use hopr_transport::transfer_session;
-// Transport-native types (not available via hopr_lib::api)
-pub use hopr_transport::{
-    ApplicationData, ApplicationDataIn, ApplicationDataOut, HoprSession, HoprSessionConfigurator, HoprTransport,
-    HoprTransportProcess, IncomingSession, OffchainPublicKey, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities,
-    SessionCapability, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig, Tag, peer_id_to_public_key,
+use hopr_transport::{
+    ApplicationDataIn, ApplicationDataOut, HoprSession, HoprSessionConfigurator, HoprTransport, HoprTransportProcess,
+    OffchainPublicKey, SessionCapabilities, SessionCapability, SessionTarget, SurbBalancerConfig,
 };
 use tracing::debug;
 

@@ -48,12 +48,12 @@ use hopr_api::{
 };
 use hopr_async_runtime::{AbortableList, prelude::spawn};
 use hopr_network_types::addr::is_public_address;
-use hopr_transport::HoprTransport;
+use hopr_transport::{HoprTransport, IncomingSession};
 use validator::Validate;
 
 use crate::{
-    Hopr, HoprLibError, HoprLibProcess, IncomingSession, MIN_NATIVE_BALANCE, NODE_READY_TIMEOUT,
-    SUGGESTED_NATIVE_BALANCE, config::HoprLibConfig, constants,
+    Hopr, HoprLibError, HoprLibProcess, MIN_NATIVE_BALANCE, NODE_READY_TIMEOUT, SUGGESTED_NATIVE_BALANCE,
+    config::HoprLibConfig, constants,
 };
 
 #[cfg(all(feature = "telemetry", not(test)))]

@@ -27,15 +27,17 @@ use hopr_api::{
 };
 use hopr_async_runtime::Abortable;
 use hopr_lib::{
-    Hopr, HoprSession, HoprSessionClientConfig, HoprSessionConfigurator, OffchainPublicKey, SURB_SIZE, ServiceId,
-    SessionId, SessionTarget,
+    Hopr, HoprSessionClientConfig,
     api::{
         network::NetworkView,
         node::HoprSessionClientOperations,
         types::{internal::routing::RoutingOptions, primitive::prelude::Address},
     },
     errors::HoprLibError,
-    transfer_session,
+    exports::transport::{
+        HoprSession, HoprSessionConfigurator, OffchainPublicKey, SURB_SIZE, ServiceId, SessionId, SessionTarget,
+        transfer_session,
+    },
 };
 use hopr_network_types::{
     prelude::{ConnectedUdpStream, IpOrHost, IpProtocol, SealedHost, UdpStreamParallelism},
@@ -785,7 +787,6 @@ mod tests {
     use futures_time::future::FutureExt as TimeFutureExt;
     use hopr_api::types::crypto::crypto_traits::Randomizable;
     use hopr_lib::{
-        ApplicationData, ApplicationDataIn, ApplicationDataOut, HoprSession, SessionId,
         api::types::{
             internal::{
                 prelude::HoprPseudonym,
@@ -793,6 +794,7 @@ mod tests {
             },
             primitive::prelude::Address,
         },
+        exports::transport::{ApplicationData, ApplicationDataIn, ApplicationDataOut, HoprSession, SessionId},
     };
     use hopr_transport::session::HoprSessionConfig;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};

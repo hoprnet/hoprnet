@@ -2506,6 +2506,7 @@ at least the size of 2 Session packet payloads.*/
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     pub struct TicketProbabilityResponse {
+        ///Winning probability of a ticket.
         pub probability: f64,
     }
     ///Request body for the withdrawal endpoint.

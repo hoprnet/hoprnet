@@ -18,7 +18,6 @@ use async_trait::async_trait;
 use bimap::BiMap;
 use futures::stream::{self, BoxStream};
 use hopr_lib::{
-    OffchainPublicKey,
     api::{
         Multiaddr, PeerId,
         chain::{self, *},
@@ -31,7 +30,7 @@ use hopr_lib::{
         types::{
             crypto::{
                 keypairs::Keypair,
-                prelude::{ChainKeypair, OffchainKeypair},
+                prelude::{ChainKeypair, OffchainKeypair, OffchainPublicKey},
             },
             internal::prelude::WinningProbability,
             primitive::prelude::{Address, Balance, Currency, HoprBalance, KeyIdMapping, KeyIdent},

@@ -2,12 +2,12 @@ use std::{str::FromStr, time::Duration};
 
 use anyhow::Context;
 use hopr_lib::{
-    HopRouting, HoprSessionClientConfig, SessionCapabilities, SessionTarget,
+    HopRouting, HoprSessionClientConfig,
     api::node::HoprSessionClientOperations,
     errors::HoprTransportError,
     exports::{
         network::types::prelude::{IpOrHost, SealedHost},
-        transport::{SessionManagerError, TransportSessionError},
+        transport::{SessionCapabilities, SessionManagerError, SessionTarget, TransportSessionError},
     },
 };
 use hopr_reference::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster};

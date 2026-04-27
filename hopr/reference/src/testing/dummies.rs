@@ -1,5 +1,5 @@
 use futures::AsyncReadExt;
-use hopr_lib::{IncomingSession, api::node::HoprSessionServer, errors::HoprLibError};
+use hopr_lib::{api::node::HoprSessionServer, errors::HoprLibError, exports::transport::IncomingSession};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, FuturesAsyncWriteCompatExt};
 
 #[derive(Debug, Clone, Default)]

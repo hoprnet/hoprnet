@@ -97,8 +97,10 @@ pub async fn build_reference(
 #[cfg(feature = "runtime-tokio")]
 pub async fn build_with_chain<
     Chain,
-    #[cfg(feature = "session-server")] Srv: hopr_lib::api::node::HoprSessionServer<Session = hopr_lib::IncomingSession, Error: std::fmt::Display>
-        + Clone
+    #[cfg(feature = "session-server")] Srv: hopr_lib::api::node::HoprSessionServer<
+            Session = hopr_lib::exports::transport::IncomingSession,
+            Error: std::fmt::Display,
+        > + Clone
         + Send
         + 'static,
 >(

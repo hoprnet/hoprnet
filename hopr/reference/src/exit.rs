@@ -1,14 +1,15 @@
 use std::{net::SocketAddr, num::NonZeroUsize};
 
 use hopr_lib::{
-    ServiceId,
     api::types::crypto::prelude::OffchainKeypair,
     errors::HoprLibError,
-    exports::network::types::{
-        prelude::ForeignDataMode,
-        udp::{ConnectedUdpStream, UdpStreamParallelism},
+    exports::{
+        network::types::{
+            prelude::ForeignDataMode,
+            udp::{ConnectedUdpStream, UdpStreamParallelism},
+        },
+        transport::{ServiceId, SessionTarget, transfer_session},
     },
-    transfer_session,
 };
 
 use crate::config::SessionIpForwardingConfig;
@@ -72,7 +73,7 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
     ) -> Result<(), hopr_lib::errors::HoprLibError> {
         let session_id = *session.session.id();
         match session.target {
-            hopr_lib::SessionTarget::UdpStream(udp_target) => {
+            SessionTarget::UdpStream(udp_target) => {
                 let kp = self.keypair.clone();
                 let udp_target = hopr_lib::utils::hopr_parallelize::cpu::spawn_blocking(
                     move || udp_target.unseal(&kp),
@@ -163,7 +164,7 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
 
                 Ok(())
             }
-            hopr_lib::SessionTarget::TcpStream(tcp_target) => {
+            SessionTarget::TcpStream(tcp_target) => {
                 let kp = self.keypair.clone();
                 let tcp_target = hopr_lib::utils::hopr_parallelize::cpu::spawn_blocking(
                     move || tcp_target.unseal(&kp),
@@ -240,7 +241,7 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
 
                 Ok(())
             }
-            hopr_lib::SessionTarget::ExitNode(SERVICE_ID_LOOPBACK) => {
+            SessionTarget::ExitNode(SERVICE_ID_LOOPBACK) => {
                 tracing::debug!(?session_id, "bridging the session to the loopback service");
                 let (mut reader, mut writer) = tokio::io::split(session.session);
 
@@ -259,7 +260,7 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
 
                 Ok(())
             }
-            hopr_lib::SessionTarget::ExitNode(_) => Err(HoprLibError::GeneralError(
+            SessionTarget::ExitNode(_) => Err(HoprLibError::GeneralError(
                 "server does not support internal session processing".into(),
             )),
         }

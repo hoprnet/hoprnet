@@ -347,7 +347,7 @@ pub(super) async fn graph<
         unique_keys.insert(*dst);
     }
 
-    let mut key_to_addr: HashMap<hopr_lib::OffchainPublicKey, String> = HashMap::new();
+    let mut key_to_addr: HashMap<hopr_lib::exports::transport::OffchainPublicKey, String> = HashMap::new();
     for key in &unique_keys {
         let label = match hopr.chain_api().packet_key_to_chain_key(key) {
             Ok(Some(addr)) => addr.to_string(),
@@ -356,7 +356,9 @@ pub(super) async fn graph<
         key_to_addr.insert(*key, label);
     }
 
-    let label = |key: &hopr_lib::OffchainPublicKey| key_to_addr.get(key).cloned().unwrap_or_else(|| key.to_string());
+    let label = |key: &hopr_lib::exports::transport::OffchainPublicKey| {
+        key_to_addr.get(key).cloned().unwrap_or_else(|| key.to_string())
+    };
 
     // Render DOT (Graphviz) format inline using trait methods on the observations.
     let mut dot = String::from("digraph hopr {\n");
