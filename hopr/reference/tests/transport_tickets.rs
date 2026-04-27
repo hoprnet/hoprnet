@@ -9,8 +9,8 @@ use hopr_api::{
 };
 use hopr_reference::{
     hopr_lib::{
-        HoprLibError,
         api::types::primitive::prelude::{HoprBalance, UnitaryFloatOps},
+        errors::HoprLibError,
     },
     testing::{
         fixtures::{ClusterGuard, MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, TestNodeConfig, cluster_fixture},

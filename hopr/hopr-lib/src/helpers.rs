@@ -43,7 +43,7 @@ pub(crate) async fn wait_for_funds<R: ChainValues>(
         current_delay = current_delay.mul_f64(multiplier);
     }
 
-    Err(HoprLibError::GeneralError(format!(
+    Err(HoprLibError::InsufficientFunds(format!(
         "failed to fund the node within {} seconds",
         max_delay.as_secs()
     )))

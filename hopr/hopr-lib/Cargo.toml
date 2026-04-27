@@ -84,7 +84,6 @@ hopr-network-types = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-parallelize = { workspace = true, features = ["rayon"] }
 hopr-transport = { workspace = true }
-hopr-ticket-manager = { workspace = true }
 
 [dev-dependencies]
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }

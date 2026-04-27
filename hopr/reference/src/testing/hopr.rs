@@ -233,7 +233,7 @@ impl ChannelGuard {
                         }
                         _ => {}
                     }
-                    Ok::<_, hopr_lib::HoprLibError>(false)
+                    Ok::<_, hopr_lib::errors::HoprLibError>(false)
                 },
                 Duration::from_secs(30),
             )
@@ -270,7 +270,7 @@ impl Drop for ChannelGuard {
                                     }
                                     _ => {}
                                 }
-                                Ok::<_, hopr_lib::HoprLibError>(false)
+                                Ok::<_, hopr_lib::errors::HoprLibError>(false)
                             },
                             Duration::from_secs(30),
                         )

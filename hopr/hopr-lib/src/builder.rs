@@ -406,7 +406,7 @@ where
     tracing::info!(address = %me_onchain, %balance, %minimum_balance, "node information");
 
     if balance.le(&minimum_balance) {
-        return Err(HoprLibError::GeneralError(
+        return Err(HoprLibError::InsufficientFunds(
             "cannot start the node without a sufficiently funded wallet".into(),
         ));
     }

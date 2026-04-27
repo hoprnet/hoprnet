@@ -4634,7 +4634,6 @@ dependencies = [
  "hopr-network-types",
  "hopr-parallelize",
  "hopr-platform",
- "hopr-ticket-manager",
  "hopr-transport",
  "humantime-serde",
  "lazy_static",

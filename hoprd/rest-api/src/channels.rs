@@ -16,7 +16,7 @@ use hopr_lib::{
             primitive::prelude::{Address, AsUnixTimestamp, HoprBalance},
         },
     },
-    errors::{HoprLibError, HoprStatusError},
+    errors::HoprLibError,
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
@@ -329,7 +329,7 @@ pub(super) async fn open_channel<
             }),
         )
             .into_response(),
-        Err(hopr_lib::api::node::EitherErr::Right(HoprLibError::StatusError(HoprStatusError::NotThereYet(..)))) => {
+        Err(hopr_lib::api::node::EitherErr::Right(HoprLibError::NotReady(..))) => {
             (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
         }
         Err(e) => (
@@ -514,7 +514,7 @@ pub(super) async fn close_channel<
             }),
         )
             .into_response(),
-        Err(hopr_lib::api::node::EitherErr::Right(HoprLibError::StatusError(HoprStatusError::NotThereYet(..)))) => {
+        Err(hopr_lib::api::node::EitherErr::Right(HoprLibError::NotReady(..))) => {
             (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
         }
         Err(e) => (
@@ -610,7 +610,7 @@ pub(super) async fn fund_channel<
             }),
         )
             .into_response(),
-        Err(hopr_lib::api::node::EitherErr::Right(HoprLibError::StatusError(HoprStatusError::NotThereYet(..)))) => {
+        Err(hopr_lib::api::node::EitherErr::Right(HoprLibError::NotReady(..))) => {
             (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
         }
         Err(e) => (

@@ -72,10 +72,8 @@ use hopr_transport::{
 };
 use tracing::debug;
 
-pub use crate::{
-    constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE},
-    errors::{HoprLibError, HoprStatusError},
-};
+pub use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
+use crate::errors::HoprLibError;
 
 /// Public routing configuration for session opening in `hopr-lib`.
 ///
@@ -279,7 +277,7 @@ where
         if HoprNodeOperations::status(self) == state {
             Ok(())
         } else {
-            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(state, error)))
+            Err(HoprLibError::NotReady(state, error))
         }
     }
 }
@@ -387,15 +385,28 @@ where
                 let res = event_stream
                     .next()
                     .timeout(futures_time::time::Duration::from(timeout))
-                    .map_err(|_| HoprLibError::GeneralError(format!("{ctx} timed out after {timeout:?}")).into_right())
+                    .map_err(|_| {
+                        HoprLibError::Timeout {
+                            context: format!("{ctx} (after {timeout:?})"),
+                        }
+                        .into_right()
+                    })
                     .await?
                     .ok_or(
-                        HoprLibError::GeneralError(format!("failed to yield an on-chain event for {ctx}")).into_right(),
+                        HoprLibError::Timeout {
+                            context: format!("on-chain event for {ctx}"),
+                        }
+                        .into_right(),
                     );
                 debug!(%ctx, ?res, "on-chain event waiting done");
                 res
             })
-            .map_err(move |_| HoprLibError::GeneralError(format!("failed to spawn future for {context}")).into_right())
+            .map_err(move |_| {
+                HoprLibError::Timeout {
+                    context: format!("spawn for {context}"),
+                }
+                .into_right()
+            })
             .and_then(futures::future::ready)
             .boxed(),
             handle,
