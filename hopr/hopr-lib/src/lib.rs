@@ -31,7 +31,7 @@ pub use hopr_api as api;
 /// Exports of libraries necessary for API and interface operations.
 ///
 /// Use `hopr_lib::api::types::*` for all type access.
-/// This module retains only network-specific types not available in `hopr_lib::api`.
+/// This module retains transport and network-specific types not available in `hopr_lib::api`.
 #[doc(hidden)]
 pub mod exports {
     pub mod network {
@@ -393,19 +393,14 @@ where
                     })
                     .await?
                     .ok_or(
-                        HoprLibError::Timeout {
-                            context: format!("on-chain event for {ctx}"),
-                        }
-                        .into_right(),
+                        HoprLibError::GeneralError(format!("on-chain event stream for {ctx} ended unexpectedly"))
+                            .into_right(),
                     );
                 debug!(%ctx, ?res, "on-chain event waiting done");
                 res
             })
             .map_err(move |_| {
-                HoprLibError::Timeout {
-                    context: format!("spawn for {context}"),
-                }
-                .into_right()
+                HoprLibError::GeneralError(format!("failed to spawn on-chain event wait for {context}")).into_right()
             })
             .and_then(futures::future::ready)
             .boxed(),
