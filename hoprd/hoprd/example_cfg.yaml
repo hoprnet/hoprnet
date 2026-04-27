@@ -42,9 +42,6 @@ api:
     port: 3001
 # Configuration of HOPR channel strategies.
 strategy:
-  # Will not continue executing the next strategy in the chain
-  # if one of them failed.
-  on_fail_continue: true
   # Allows nesting strategy chains via !MultiStrategy
   allow_recursive: false
   # Sets the interval between strategy executions in seconds.

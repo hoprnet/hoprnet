@@ -4428,9 +4428,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "1.8.0"
+version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d55e4b9a4d2ce967af9d16a9b2c092fffa6acb4c5f887264662771894805693c"
+checksum = "d7b63138c13e08d2bbc8bd73bd97628a8aaccf17848ce29a62026150a0e24e22"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -4889,7 +4889,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-strategy"
-version = "0.17.2"
+version = "0.18.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4908,11 +4908,10 @@ dependencies = [
  "insta",
  "lazy_static",
  "mockall",
- "parking_lot",
+ "moka",
  "serde",
  "serde_with",
  "smart-default",
- "strum 0.28.0",
  "test-log",
  "thiserror 2.0.18",
  "tokio",
@@ -5308,7 +5307,6 @@ dependencies = [
  "flagset",
  "futures",
  "home",
- "hopr-api",
  "hopr-chain-connector",
  "hopr-ct-full-network",
  "hopr-lib",
@@ -5321,6 +5319,7 @@ dependencies = [
  "hoprd-api",
  "humansize",
  "humantime-serde",
+ "lazy_static",
  "mimalloc",
  "opentelemetry",
  "opentelemetry-otlp",

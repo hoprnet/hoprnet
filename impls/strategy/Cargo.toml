@@ -1,6 +1,6 @@
 [package]
 name = "hopr-strategy"
-version = "0.17.2"
+version = "0.18.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains implementations of different HOPR strategies"
 edition.workspace = true
@@ -16,6 +16,10 @@ crate-type = ["rlib"]
 default = []
 runtime-tokio = ["hopr-lib/runtime-tokio", "hopr-async-runtime/runtime-tokio"]
 telemetry = ["dep:hopr-metrics"]
+## Strategy features — each enables one strategy implementation.
+strategy-auto-funding = []
+strategy-auto-redeeming = []
+strategy-closure-finalizer = []
 
 [dependencies]
 anyhow = { workspace = true }
@@ -26,11 +30,9 @@ futures-time = { workspace = true }
 futures-concurrency = { workspace = true }
 humantime-serde = { workspace = true }
 lazy_static = { workspace = true }
-parking_lot = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
 smart-default = { workspace = true }
-strum = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 validator = { workspace = true }
@@ -38,6 +40,7 @@ validator = { workspace = true }
 hopr-lib = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
+moka = { workspace = true, features = ["sync"] }
 
 [dev-dependencies]
 chrono = { workspace = true }

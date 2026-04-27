@@ -3,10 +3,7 @@ use std::{num::NonZeroUsize, process::ExitCode, str::FromStr, sync::Arc};
 use async_signal::{Signal, Signals};
 use futures::{FutureExt, StreamExt, future::abortable};
 use hopr_chain_connector::{HoprBlockchainSafeConnector, blokli_client::BlokliClient};
-use hopr_lib::{
-    AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, api::node::HasTicketManagement,
-    config::HoprLibConfig,
-};
+use hopr_lib::{AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, config::HoprLibConfig};
 use hopr_network_graph::SharedChannelGraph;
 use hopr_transport_p2p::HoprNetwork;
 use hoprd::{cli::CliArgs, config::HoprdConfig, errors::HoprdError};
@@ -211,7 +208,6 @@ fn main() -> ExitCode {
 
 #[cfg(feature = "runtime-tokio")]
 async fn main_inner(cfg: HoprdConfig, hopr_keys: HoprKeys) -> anyhow::Result<()> {
-    use hopr_api::chain::ChainEvents;
     use hopr_chain_connector::{BlockchainConnectorConfig, blokli_client, create_trustful_hopr_blokli_connector};
     use hopr_reference::exit::HoprServerIpForwardingReactor;
 
@@ -306,24 +302,18 @@ async fn main_inner(cfg: HoprdConfig, hopr_keys: HoprKeys) -> anyhow::Result<()>
         processes.extend_from(list);
     }
 
-    let multi_strategy = Arc::new(hopr_strategy::strategy::MultiStrategy::new(
-        cfg.strategy.clone(),
-        chain_connector.clone(),
-        node.ticket_management().clone(),
-    ));
-    tracing::debug!(strategies = ?multi_strategy, "initialized strategies");
+    tracing::debug!("initializing strategies");
+    let mut multi_strategy = hoprd::strategy::build_strategies(&cfg.strategy, Arc::clone(&node));
+    tracing::debug!(strategy = %multi_strategy, "initialized strategies");
 
     tracing::debug!("starting up strategies");
     processes.insert(
         HoprdProcess::Strategies,
-        hopr_strategy::stream_events_to_strategy_with_tick(
-            multi_strategy,
-            chain_connector.subscribe()?,
-            node.subscribe_ticket_events()
-                .filter_map(|e| futures::future::ready(e.try_as_winning_ticket().map(|t| t.ticket))),
-            cfg.strategy.execution_interval,
-            hopr_keys.chain_key.public().to_address(),
-        ),
+        tokio::spawn(async move {
+            if let Err(e) = multi_strategy.run().await {
+                tracing::error!(%e, "strategy terminated with error");
+            }
+        }),
     );
 
     let mut signals =

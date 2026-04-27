@@ -24,6 +24,9 @@ runtime-tokio = [
   "opentelemetry_sdk?/experimental_logs_batch_log_processor_with_async_runtime",
   "opentelemetry_sdk?/experimental_metrics_periodicreader_with_async_runtime",
   "hopr-strategy/runtime-tokio",
+  "hopr-strategy/strategy-auto-funding",
+  "hopr-strategy/strategy-auto-redeeming",
+  "hopr-strategy/strategy-closure-finalizer",
   "hopr-transport-p2p/runtime-tokio",
 ]
 telemetry = [
@@ -64,6 +67,7 @@ allocator-jemalloc-stats = [
 anyhow = { workspace = true }
 async-signal = { workspace = true }
 clap = { workspace = true }
+lazy_static = { workspace = true }
 console-subscriber = { workspace = true, optional = true }
 futures = { workspace = true }
 flagset = { workspace = true, optional = true }
@@ -100,7 +104,6 @@ opentelemetry-prometheus-text-exporter = { workspace = true, optional = true }
 tracing-opentelemetry = { workspace = true, optional = true }
 
 hopr-strategy = { workspace = true }
-hopr-api = { workspace = true, features = ["network"] }
 hopr-lib = { workspace = true, features = [
   "runtime-tokio",
   "session-client",
@@ -144,7 +147,7 @@ hopr-lib = { workspace = true, features = [
 ] }
 
 [package.metadata.cargo-machete]
-ignored = ["humantime-serde"]
+ignored = ["humantime-serde", "lazy_static"]
 
 [package.metadata.cargo-shear]
-ignored = ["humantime-serde"]
+ignored = ["humantime-serde", "lazy_static"]
