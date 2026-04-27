@@ -47,6 +47,7 @@ use std::{
 };
 
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt, pin_mut};
+use futures_concurrency::stream::Merge as _;
 use futures_time::future::FutureExt as FuturesTimeFutureExt;
 use hopr_api::{
     PeerId,
@@ -54,9 +55,9 @@ use hopr_api::{
     graph::HoprGraphApi,
     network::{Health, NetworkStreamControl, NetworkView},
     node::{
-        AtomicHoprState, ComponentStatus, ComponentStatusReporter, EitherErrExt, EventWaitResult, HasChainApi,
-        HasGraphView, HasNetworkView, HasTicketManagement, HasTransportApi, HoprNodeOperations, HoprState,
-        NodeOnchainIdentity,
+        ActionableEvent, ActionableEventDiscriminant, AtomicHoprState, ComponentStatus, ComponentStatusReporter,
+        EitherErrExt, EventWaitResult, HasChainApi, HasGraphView, HasNetworkView, HasTicketManagement, HasTransportApi,
+        HoprNodeOperations, HoprState, NodeOnchainIdentity,
     },
     tickets::TicketManagement,
     types::{crypto::prelude::OffchainKeypair, internal::routing::DestinationRouting},
@@ -71,7 +72,6 @@ use hopr_transport::{
 use tracing::debug;
 
 pub use crate::{
-    config::SafeModule,
     constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE},
     errors::{HoprLibError, HoprStatusError},
 };
@@ -495,12 +495,8 @@ where
 {
     fn subscribe_to_actionable_events(
         &self,
-        filter: Option<&[hopr_api::node::ActionableEventDiscriminant]>,
-    ) -> Result<futures::stream::BoxStream<'static, hopr_api::node::ActionableEvent>, String> {
-        use futures::StreamExt as _;
-        use futures_concurrency::stream::Merge as _;
-        use hopr_api::node::{ActionableEvent, ActionableEventDiscriminant};
-
+        filter: Option<&[ActionableEventDiscriminant]>,
+    ) -> Result<futures::stream::BoxStream<'static, ActionableEvent>, String> {
         let wants = |d: ActionableEventDiscriminant| filter.is_none_or(|f| f.contains(&d));
 
         let mut streams = Vec::<futures::stream::BoxStream<'static, ActionableEvent>>::new();

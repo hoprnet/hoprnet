@@ -1,10 +1,9 @@
 use std::time::Duration;
 
 use hopr_lib::{
-    SafeModule,
     api::types::{internal::prelude::WinningProbability, primitive::prelude::HoprBalance},
     config::{
-        HoprLibConfig, HoprPacketPipelineConfig, HoprProtocolConfig, HostConfig, HostType, ProbeConfig,
+        HoprLibConfig, HoprPacketPipelineConfig, HoprProtocolConfig, HostConfig, HostType, ProbeConfig, SafeModule,
         SessionGlobalConfig, TagAllocatorConfig, TransportConfig,
     },
     exports::transport::config::HoprCodecConfig,

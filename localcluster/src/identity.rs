@@ -9,11 +9,12 @@ use hopr_chain_connector::{
     reexports::chain::exports::alloy::hex,
 };
 use hopr_lib::{
-    HoprKeys, SafeModule,
+    HoprKeys,
     api::types::{
         crypto::{crypto_traits::Randomizable, keypairs::Keypair, prelude::ChainKeypair},
         primitive::prelude::XDaiBalance,
     },
+    config::SafeModule,
 };
 use hopr_reference::config::SessionIpForwardingConfig;
 use hoprd::config::{Db, HoprdConfig, Identity, UserHoprLibConfig, UserHoprNetworkConfig};
