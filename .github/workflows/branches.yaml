@@ -46,7 +46,7 @@ jobs:
       contents: read
       checks: write
       pull-requests: write
-    uses: hoprnet/hopr-workflows/.github/workflows/benchmarks.yaml@13489274cf2d23929227fcd62bb8ac2341615b3e # 0.1.0
+    uses: hoprnet/hopr-workflows/.github/workflows/benchmarks.yaml@13489274cf2d23929227fcd62bb8ac2341615b3e # workflow-benchmark-v2
     with:
       source_branch: ${{ github.ref_name }}
       runner: self-hosted-hoprnet-bigger
