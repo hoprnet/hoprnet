@@ -30,8 +30,11 @@ use {
     },
 };
 
+use crate::telemetry_common;
+
 const HOPRD_OTLP_ENDPOINT_ENV_KEY: &str = "HOPRD_OTLP_ENDPOINT";
 const LEGACY_OTLP_ENDPOINT_ENV_KEY: &str = "OTEL_EXPORTER_OTLP_ENDPOINT";
+const HOPRD_METRIC_EXPORT_INTERVAL_ENV_KEY: &str = "HOPRD_METRIC_EXPORT_INTERVAL";
 
 flagset::flags! {
     #[repr(u8)]
@@ -59,7 +62,7 @@ enum OtlpTransport {
 
 impl OtlpTransport {
     fn from_env() -> Self {
-        match std::env::var(LEGACY_OTLP_ENDPOINT_ENV_KEY) {
+        match otlp_endpoint_from_env() {
             Ok(raw_url) => Self::from_str(raw_url.trim().split_once("://").map(|(scheme, _)| scheme).unwrap_or(""))
                 .unwrap_or(Self::Grpc),
             Err(_) => Self::Grpc,
@@ -789,9 +792,42 @@ fn enabled_signal_names(config: &OtlpConfig, signals: &[OtlpSignal]) -> String {
         .join(",")
 }
 
+fn otlp_endpoint_from_env() -> Result<String, std::env::VarError> {
+    match std::env::var(HOPRD_OTLP_ENDPOINT_ENV_KEY) {
+        Ok(endpoint) => Ok(endpoint),
+        Err(std::env::VarError::NotPresent) => std::env::var(LEGACY_OTLP_ENDPOINT_ENV_KEY),
+        Err(error) => Err(error),
+    }
+}
+
+fn with_otlp_endpoint_override<B>(builder: B) -> B
+where
+    B: opentelemetry_otlp::WithExportConfig,
+{
+    match otlp_endpoint_from_env() {
+        Ok(endpoint) if !endpoint.trim().is_empty() => builder.with_endpoint(endpoint),
+        _ => builder,
+    }
+}
+
+fn metric_export_interval_override() -> Option<Duration> {
+    let raw_interval = std::env::var(HOPRD_METRIC_EXPORT_INTERVAL_ENV_KEY).ok()?;
+    match raw_interval.trim().parse::<u64>() {
+        Ok(interval_ms) => Some(Duration::from_millis(interval_ms)),
+        Err(error) => {
+            tracing::warn!(
+                env_var = HOPRD_METRIC_EXPORT_INTERVAL_ENV_KEY,
+                value = %raw_interval,
+                error = %error,
+                "Ignoring invalid metric export interval override"
+            );
+            None
+        }
+    }
+}
+
 pub(super) fn init_logging(node_identity: NodeTelemetryIdentity) -> anyhow::Result<TelemetryHandles> {
     let mut telemetry_handles = TelemetryHandles::default();
-    let registry = crate::telemetry_common::build_base_subscriber()?;
     let config = OtlpConfig::from_env();
 
     if config.enabled {
@@ -799,16 +835,20 @@ pub(super) fn init_logging(node_identity: NodeTelemetryIdentity) -> anyhow::Resu
 
         let trace_layer = if config.has_signal(OtlpSignal::Traces) {
             let exporter = match config.transport {
-                OtlpTransport::Grpc => opentelemetry_otlp::SpanExporter::builder()
-                    .with_tonic()
-                    .with_protocol(opentelemetry_otlp::Protocol::Grpc)
-                    .with_timeout(Duration::from_secs(5))
-                    .build()?,
-                OtlpTransport::Http => opentelemetry_otlp::SpanExporter::builder()
-                    .with_http()
-                    .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
-                    .with_timeout(Duration::from_secs(5))
-                    .build()?,
+                OtlpTransport::Grpc => with_otlp_endpoint_override(
+                    opentelemetry_otlp::SpanExporter::builder()
+                        .with_tonic()
+                        .with_protocol(opentelemetry_otlp::Protocol::Grpc)
+                        .with_timeout(Duration::from_secs(5)),
+                )
+                .build()?,
+                OtlpTransport::Http => with_otlp_endpoint_override(
+                    opentelemetry_otlp::SpanExporter::builder()
+                        .with_http()
+                        .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
+                        .with_timeout(Duration::from_secs(5)),
+                )
+                .build()?,
             };
             let batch_processor =
                 opentelemetry_sdk::trace::span_processor_with_async_runtime::BatchSpanProcessor::builder(
@@ -826,23 +866,27 @@ pub(super) fn init_logging(node_identity: NodeTelemetryIdentity) -> anyhow::Resu
                 .build();
             let tracer = tracer_provider.tracer(env!("CARGO_PKG_NAME"));
             telemetry_handles.tracer_provider = Some(tracer_provider);
-            Some(tracing_opentelemetry::layer().with_tracer(tracer))
+            Some(tracing_opentelemetry::layer::<tracing_subscriber::registry::Registry>().with_tracer(tracer))
         } else {
             None
         };
 
         let logs_layer = if config.has_signal(OtlpSignal::Logs) {
             let exporter = match config.transport {
-                OtlpTransport::Grpc => opentelemetry_otlp::LogExporter::builder()
-                    .with_tonic()
-                    .with_protocol(opentelemetry_otlp::Protocol::Grpc)
-                    .with_timeout(Duration::from_secs(5))
-                    .build()?,
-                OtlpTransport::Http => opentelemetry_otlp::LogExporter::builder()
-                    .with_http()
-                    .with_protocol(opentelemetry_otlp::Protocol::HttpJson)
-                    .with_timeout(Duration::from_secs(5))
-                    .build()?,
+                OtlpTransport::Grpc => with_otlp_endpoint_override(
+                    opentelemetry_otlp::LogExporter::builder()
+                        .with_tonic()
+                        .with_protocol(opentelemetry_otlp::Protocol::Grpc)
+                        .with_timeout(Duration::from_secs(5)),
+                )
+                .build()?,
+                OtlpTransport::Http => with_otlp_endpoint_override(
+                    opentelemetry_otlp::LogExporter::builder()
+                        .with_http()
+                        .with_protocol(opentelemetry_otlp::Protocol::HttpJson)
+                        .with_timeout(Duration::from_secs(5)),
+                )
+                .build()?,
             };
 
             let batch_processor =
@@ -864,14 +908,13 @@ pub(super) fn init_logging(node_identity: NodeTelemetryIdentity) -> anyhow::Resu
         let enabled_signals = enabled_signal_names(&config, &[OtlpSignal::Traces, OtlpSignal::Logs]);
         let metrics_requested = config.has_signal(OtlpSignal::Metrics);
 
-        match (trace_layer, logs_layer) {
-            (Some(trace_layer), Some(logs_layer)) => {
-                tracing::subscriber::set_global_default(registry.with(trace_layer).with(logs_layer))?
-            }
-            (Some(trace_layer), None) => tracing::subscriber::set_global_default(registry.with(trace_layer))?,
-            (None, Some(logs_layer)) => tracing::subscriber::set_global_default(registry.with(logs_layer))?,
-            (None, None) => tracing::subscriber::set_global_default(registry)?,
-        }
+        let otel_layers = match (trace_layer, logs_layer) {
+            (Some(trace), Some(logs)) => vec![trace.boxed(), logs.boxed()],
+            (Some(trace), None) => vec![trace.boxed()],
+            (None, Some(logs)) => vec![logs.boxed()],
+            (None, None) => Vec::new(),
+        };
+        telemetry_common::install_otel_layers(otel_layers)?;
 
         tracing::info!(
             otel_service_name = %config.service_name,
@@ -882,8 +925,6 @@ pub(super) fn init_logging(node_identity: NodeTelemetryIdentity) -> anyhow::Resu
             node_peer_id = %node_identity.node_peer_id,
             "OpenTelemetry initialized"
         );
-    } else {
-        tracing::subscriber::set_global_default(registry)?;
     }
 
     Ok(telemetry_handles)
@@ -904,23 +945,30 @@ pub(super) fn init_metrics(
 
     let resource = build_otel_resource(&config, &node_identity);
     let exporter = match config.transport {
-        OtlpTransport::Grpc => opentelemetry_otlp::MetricExporter::builder()
-            .with_tonic()
-            .with_protocol(opentelemetry_otlp::Protocol::Grpc)
-            .with_timeout(Duration::from_secs(5))
-            .build()?,
-        OtlpTransport::Http => opentelemetry_otlp::MetricExporter::builder()
-            .with_http()
-            .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
-            .with_timeout(Duration::from_secs(5))
-            .build()?,
+        OtlpTransport::Grpc => with_otlp_endpoint_override(
+            opentelemetry_otlp::MetricExporter::builder()
+                .with_tonic()
+                .with_protocol(opentelemetry_otlp::Protocol::Grpc)
+                .with_timeout(Duration::from_secs(5)),
+        )
+        .build()?,
+        OtlpTransport::Http => with_otlp_endpoint_override(
+            opentelemetry_otlp::MetricExporter::builder()
+                .with_http()
+                .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
+                .with_timeout(Duration::from_secs(5)),
+        )
+        .build()?,
     };
 
-    let reader = opentelemetry_sdk::metrics::periodic_reader_with_async_runtime::PeriodicReader::builder(
+    let mut reader_builder = opentelemetry_sdk::metrics::periodic_reader_with_async_runtime::PeriodicReader::builder(
         exporter,
         opentelemetry_sdk::runtime::Tokio,
-    )
-    .build();
+    );
+    if let Some(interval) = metric_export_interval_override() {
+        reader_builder = reader_builder.with_interval(interval);
+    }
+    let reader = reader_builder.build();
     let meter_provider = SdkMeterProvider::builder()
         .with_reader(reader)
         .with_resource(resource)
