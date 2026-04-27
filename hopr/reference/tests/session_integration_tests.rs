@@ -1,11 +1,20 @@
 use futures::StreamExt;
 use hopr_api::types::crypto_random::Randomizable;
 use hopr_lib::{
-    Address, ApplicationDataIn, ApplicationDataOut, ChainKeypair, ConnectedUdpStream, HoprPseudonym, Keypair,
-    UdpStreamParallelism,
+    api::types::{
+        crypto::{keypairs::Keypair, prelude::ChainKeypair},
+        internal::{
+            prelude::HoprPseudonym,
+            routing::{DestinationRouting, RoutingOptions},
+        },
+        primitive::prelude::Address,
+    },
     exports::{
-        transport::session::{Capabilities, Capability, HoprSession, HoprSessionConfig, SessionId, transfer_session},
-        types::internal::routing::{DestinationRouting, RoutingOptions},
+        network::types::udp::{ConnectedUdpStream, UdpStreamParallelism},
+        transport::{
+            ApplicationDataIn, ApplicationDataOut,
+            session::{Capabilities, Capability, HoprSession, HoprSessionConfig, SessionId, transfer_session},
+        },
     },
 };
 use rstest::*;

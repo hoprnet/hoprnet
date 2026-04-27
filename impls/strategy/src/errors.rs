@@ -1,4 +1,4 @@
-use hopr_lib::GeneralError;
+use hopr_lib::api::types::primitive::errors::GeneralError;
 use thiserror::Error;
 
 /// Enumerates all errors in this crate.
@@ -13,8 +13,8 @@ pub enum StrategyError {
     #[error("non-specific strategy error: {0}")]
     Other(anyhow::Error),
 
-    #[error(transparent)]
-    HoprLib(#[from] hopr_lib::errors::HoprLibError),
+    #[error("HOPR error: {0}")]
+    HoprError(anyhow::Error),
 
     #[error("lower-level error: {0}")]
     GeneralError(#[from] GeneralError),

@@ -13,15 +13,16 @@ use std::{
 use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt};
 use hopr_async_runtime::{prelude::AbortHandle, spawn_as_abortable};
-use hopr_lib::{
-    ChannelChange, ChannelDirection, ChannelEntry, ChannelId, ChannelStatus, HoprBalance, VerifiedTicket,
-    api::{
-        chain::{ChainEvent, ChainReadChannelOperations, ChainWriteTicketOperations, ChannelSelector},
-        node::{
-            ActionableEvent, ActionableEventDiscriminant, ActionableEventSource, HasChainApi, HasTicketManagement,
-            TicketEvent,
-        },
-        tickets::TicketManagement,
+use hopr_lib::api::{
+    chain::{ChainEvent, ChainReadChannelOperations, ChainWriteTicketOperations, ChannelSelector},
+    node::{
+        ActionableEvent, ActionableEventDiscriminant, ActionableEventSource, HasChainApi, HasTicketManagement,
+        TicketEvent,
+    },
+    tickets::TicketManagement,
+    types::{
+        internal::prelude::{ChannelChange, ChannelDirection, ChannelEntry, ChannelId, ChannelStatus, VerifiedTicket},
+        primitive::prelude::HoprBalance,
     },
 };
 use moka::notification::RemovalCause;
@@ -408,15 +409,19 @@ mod tests {
         types::crypto_random::Randomizable,
     };
     use hopr_chain_connector::{HoprBlockchainSafeConnector, create_trustful_hopr_blokli_connector, testing::*};
-    use hopr_lib::{
-        Address, BytesRepresentable, ChainKeypair, HalfKey, Hash, HoprBalance, Keypair, RedeemableTicket, Response,
-        TicketBuilder, UnitaryFloatOps, WinningProbability, XDaiBalance,
-        api::{
-            chain::{ChainEvent, ChainEvents, ChainWriteTicketOperations, HoprChainApi},
-            node::{
-                ActionableEvent, ComponentStatus, ComponentStatusReporter, EventWaitResult, HasChainApi,
-                HasTicketManagement, NodeOnchainIdentity, TicketEvent,
+    use hopr_lib::api::{
+        chain::{ChainEvent, ChainEvents, ChainWriteTicketOperations, HoprChainApi},
+        node::{
+            ActionableEvent, ComponentStatus, ComponentStatusReporter, EventWaitResult, HasChainApi,
+            HasTicketManagement, NodeOnchainIdentity, TicketEvent,
+        },
+        types::{
+            crypto::{
+                keypairs::Keypair,
+                prelude::{ChainKeypair, HalfKey, Hash, Response},
             },
+            internal::prelude::{RedeemableTicket, TicketBuilder, WinningProbability},
+            primitive::prelude::{Address, BytesRepresentable, HoprBalance, UnitaryFloatOps, XDaiBalance},
         },
     };
 

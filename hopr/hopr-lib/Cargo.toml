@@ -61,6 +61,7 @@ cfg_eval = { workspace = true, optional = true }
 cfg-if = { workspace = true }
 const_format = { workspace = true }
 futures = { workspace = true }
+futures-concurrency = { workspace = true }
 futures-time = { workspace = true }
 humantime-serde = { workspace = true, optional = true }
 lazy_static = { workspace = true }
@@ -83,7 +84,6 @@ hopr-network-types = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-parallelize = { workspace = true, features = ["rayon"] }
 hopr-transport = { workspace = true }
-hopr-ticket-manager = { workspace = true }
 
 [dev-dependencies]
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }

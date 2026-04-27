@@ -97,8 +97,10 @@ pub async fn build_reference(
 #[cfg(feature = "runtime-tokio")]
 pub async fn build_with_chain<
     Chain,
-    #[cfg(feature = "session-server")] Srv: hopr_lib::api::node::HoprSessionServer<Session = hopr_lib::IncomingSession, Error: std::fmt::Display>
-        + Clone
+    #[cfg(feature = "session-server")] Srv: hopr_lib::api::node::HoprSessionServer<
+            Session = hopr_lib::exports::transport::IncomingSession,
+            Error: std::fmt::Display,
+        > + Clone
         + Send
         + 'static,
 >(
@@ -198,7 +200,7 @@ where
     let safe_address = config.safe_module.safe_address;
     let module_address = config.safe_module.module_address;
 
-    let builder = hopr_lib::builder::HoprBuilder::new()
+    let builder = hopr_lib::builder::HoprBuilder
         .with_identity(chain_key, packet_key)
         .with_config(config)
         .with_safe_module(&safe_address, &module_address)

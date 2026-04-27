@@ -2,7 +2,7 @@
 //!
 //! The builder guides construction through a series of mandatory phases:
 //!
-//! 1. **Identity** — `HoprBuilder::new` → `HoprBuilder::with_identity`
+//! 1. **Identity** — `HoprBuilder` → `HoprBuilder::with_identity`
 //! 2. **Configuration** — `HoprBuilderWithIdentity::with_config`
 //! 3. **Component factories** — chain API, graph, network, and cover-traffic
 //! 4. **Session server** (when the `session-server` feature is enabled) — `HoprBuilderConfigured::with_session_server`
@@ -17,7 +17,7 @@
 //! let offchain_key = OffchainKeypair::random();
 //! let config = HoprLibConfig::default();
 //!
-//! let builder = HoprBuilder::new()
+//! let builder = HoprBuilder
 //!     .with_identity(&chain_key, &offchain_key)
 //!     .with_config(config)
 //!     .with_chain_api(|_ctx| { /* ... */ todo!() })
@@ -46,15 +46,14 @@ use hopr_api::{
         primitive::prelude::{Address, UnitaryFloatOps},
     },
 };
-use hopr_async_runtime::AbortableList;
+use hopr_async_runtime::{AbortableList, prelude::spawn};
 use hopr_network_types::addr::is_public_address;
-use hopr_transport::HoprTransport;
-use tokio::spawn;
+use hopr_transport::{HoprTransport, IncomingSession};
 use validator::Validate;
 
 use crate::{
-    Hopr, HoprLibError, HoprLibProcess, IncomingSession, MIN_NATIVE_BALANCE, NODE_READY_TIMEOUT,
-    SUGGESTED_NATIVE_BALANCE, config::HoprLibConfig, constants,
+    Hopr, HoprLibError, HoprLibProcess, MIN_NATIVE_BALANCE, NODE_READY_TIMEOUT, SUGGESTED_NATIVE_BALANCE,
+    config::HoprLibConfig, constants,
 };
 
 #[cfg(all(feature = "telemetry", not(test)))]
@@ -99,10 +98,6 @@ pub struct BuildCtx {
 pub struct HoprBuilder;
 
 impl HoprBuilder {
-    pub fn new() -> Self {
-        Self
-    }
-
     /// Sets the node's on-chain and off-chain identity.
     pub fn with_identity(self, chain_key: &ChainKeypair, offchain_key: &OffchainKeypair) -> HoprBuilderWithIdentity {
         HoprBuilderWithIdentity {
@@ -407,7 +402,7 @@ where
     tracing::info!(address = %me_onchain, %balance, %minimum_balance, "node information");
 
     if balance.le(&minimum_balance) {
-        return Err(HoprLibError::GeneralError(
+        return Err(HoprLibError::InsufficientFunds(
             "cannot start the node without a sufficiently funded wallet".into(),
         ));
     }

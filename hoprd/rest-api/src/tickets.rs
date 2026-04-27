@@ -5,13 +5,14 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
-use hopr_lib::{
-    Address, ChannelStatus, HoprBalance, IncentiveChannelOperations, IncentiveRedeemOperations,
-    api::{
-        node::{HasChainApi, HasTicketManagement},
-        tickets::ChannelStats,
+use hopr_lib::api::{
+    node::{HasChainApi, HasTicketManagement, IncentiveChannelOperations, IncentiveRedeemOperations},
+    tickets::ChannelStats,
+    types::{
+        crypto::prelude::Hash,
+        internal::prelude::ChannelStatus,
+        primitive::prelude::{Address, HoprBalance},
     },
-    prelude::Hash,
 };
 use serde::Deserialize;
 use serde_with::{DisplayFromStr, serde_as};

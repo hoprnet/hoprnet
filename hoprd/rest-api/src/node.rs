@@ -8,12 +8,11 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
-use hopr_lib::{
-    Address, IncentiveChannelOperations, Multiaddr,
-    api::{
-        network::{Health, NetworkView},
-        node::{ComponentStatus, HasChainApi, HasNetworkView},
-    },
+use hopr_lib::api::{
+    Multiaddr,
+    network::{Health, NetworkView},
+    node::{ComponentStatus, HasChainApi, HasNetworkView, IncentiveChannelOperations},
+    types::primitive::prelude::Address,
 };
 use serde::Serialize;
 use serde_with::{DisplayFromStr, serde_as};
