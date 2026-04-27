@@ -296,9 +296,9 @@ pub struct HoprdConfig {
     /// Strategies represent automatically executable behavior performed by
     /// the node given pre-configured triggers.
     #[validate(nested)]
-    #[serde(default = "hopr_strategy::hopr_default_strategies")]
-    #[default(hopr_strategy::hopr_default_strategies())]
-    pub strategy: hopr_strategy::StrategyConfig,
+    #[serde(default = "crate::strategy::hopr_default_strategies")]
+    #[default(crate::strategy::hopr_default_strategies())]
+    pub strategy: crate::strategy::MultiStrategyConfig,
 }
 
 impl HoprdConfig {

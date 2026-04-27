@@ -1,6 +1,7 @@
 use std::{
-    fmt::{Display, Formatter},
+    fmt::{Debug, Display, Formatter},
     ops::Sub,
+    sync::Arc,
     time::Duration,
 };
 
@@ -8,13 +9,16 @@ use async_trait::async_trait;
 use futures::StreamExt;
 use hopr_lib::{
     ChannelStatusDiscriminants, Utc,
-    api::chain::{ChainReadChannelOperations, ChainWriteChannelOperations, ChannelSelector},
+    api::{
+        chain::{ChainReadChannelOperations, ChainWriteChannelOperations, ChannelSelector},
+        node::HasChainApi,
+    },
 };
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info};
 use validator::Validate;
 
-use crate::{Strategy, errors, strategy::SingularStrategy};
+use crate::{errors, strategy::Strategy as StrategyTrait};
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
@@ -42,41 +46,60 @@ pub struct ClosureFinalizerStrategyConfig {
     pub max_closure_overdue: Duration,
 }
 
-/// Strategy which runs per tick and finalizes `PendingToClose` channels
-/// which have elapsed the grace period.
-pub struct ClosureFinalizerStrategy<A> {
+/// Builder for [`ClosureFinalizerStrategy`].
+///
+/// Call [`new`](ClosureFinalizerStrategy::new) with the strategy configuration,
+/// then [`build`](ClosureFinalizerStrategy::build) to wire in a node and obtain a
+/// runnable `Box<dyn Strategy + Send>`.
+pub struct ClosureFinalizerStrategy {
     cfg: ClosureFinalizerStrategyConfig,
-    hopr_chain_actions: A,
+    interval: Duration,
 }
 
-impl<A> ClosureFinalizerStrategy<A> {
-    /// Constructs the strategy.
-    pub fn new(cfg: ClosureFinalizerStrategyConfig, hopr_chain_actions: A) -> Self {
-        Self {
-            hopr_chain_actions,
-            cfg,
-        }
+impl ClosureFinalizerStrategy {
+    /// Create a new builder with the given configuration.
+    pub fn new(cfg: ClosureFinalizerStrategyConfig, interval: Duration) -> Self {
+        Self { cfg, interval }
+    }
+
+    /// Wire in a node and return a running-ready strategy.
+    ///
+    /// The generic `N` is erased at construction time; the returned
+    /// `Box<dyn Strategy + Send>` can be held and spawned without knowledge
+    /// of the concrete node type.
+    pub fn build<N>(self, node: Arc<N>) -> Box<dyn StrategyTrait + Send>
+    where
+        N: HasChainApi + Send + Sync + 'static,
+        N::ChainApi: ChainReadChannelOperations + ChainWriteChannelOperations + Clone + Send + Sync + 'static,
+    {
+        Box::new(ClosureFinalizerStrategyInner {
+            node,
+            cfg: self.cfg,
+            interval: self.interval,
+        })
     }
 }
 
-impl<A> Display for ClosureFinalizerStrategy<A> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", Strategy::ClosureFinalizer(self.cfg))
-    }
+/// Private generic runner — constructed by [`ClosureFinalizerStrategy::build`].
+struct ClosureFinalizerStrategyInner<N: HasChainApi> {
+    node: Arc<N>,
+    cfg: ClosureFinalizerStrategyConfig,
+    interval: Duration,
 }
 
-#[async_trait]
-impl<A> SingularStrategy for ClosureFinalizerStrategy<A>
+impl<N> ClosureFinalizerStrategyInner<N>
 where
-    A: ChainReadChannelOperations + ChainWriteChannelOperations + Send + Sync,
+    N: HasChainApi + Send + Sync + 'static,
+    <N as HasChainApi>::ChainApi:
+        ChainReadChannelOperations + ChainWriteChannelOperations + Clone + Send + Sync + 'static,
 {
     async fn on_tick(&self) -> errors::Result<()> {
         let now = Utc::now();
-        let mut outgoing_channels = self
-            .hopr_chain_actions
+        let chain = self.node.chain_api();
+        let mut outgoing_channels = chain
             .stream_channels(
                 ChannelSelector::default()
-                    .with_source(*self.hopr_chain_actions.me())
+                    .with_source(*chain.me())
                     .with_allowed_states(&[ChannelStatusDiscriminants::PendingToClose])
                     .with_closure_time_range(now.sub(self.cfg.max_closure_overdue)..=now),
             )
@@ -84,10 +107,9 @@ where
 
         while let Some(channel) = outgoing_channels.next().await {
             info!(%channel, "channel closure finalizer: finalizing closure");
-            match self.hopr_chain_actions.close_channel(channel.get_id()).await {
+            match self.node.chain_api().close_channel(channel.get_id()).await {
                 Ok(_) => {
-                    // Currently, we're not interested in awaiting the Close transactions to confirmation
-                    debug!(%channel, "channel closure finalizer: finalizing closure");
+                    debug!(%channel, "channel closure finalizer: submitted close transaction");
                     #[cfg(all(feature = "telemetry", not(test)))]
                     METRIC_COUNT_CLOSURE_FINALIZATIONS.increment();
                 }
@@ -100,16 +122,58 @@ where
     }
 }
 
+impl<N: HasChainApi> Debug for ClosureFinalizerStrategyInner<N> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClosureFinalizerStrategy({:?})", self.cfg)
+    }
+}
+
+impl<N: HasChainApi> Display for ClosureFinalizerStrategyInner<N> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "closure_finalizer")
+    }
+}
+
+#[async_trait]
+impl<N> StrategyTrait for ClosureFinalizerStrategyInner<N>
+where
+    N: HasChainApi + Send + Sync + 'static,
+    <N as HasChainApi>::ChainApi:
+        ChainReadChannelOperations + ChainWriteChannelOperations + Clone + Send + Sync + 'static,
+{
+    async fn run(&mut self) -> errors::Result<()> {
+        // Run the first scan immediately at startup without waiting for the initial interval.
+        if let Err(e) = self.on_tick().await {
+            tracing::error!(%e, "closure finalizer tick failed");
+        }
+
+        let tick_stream = futures_time::stream::interval(self.interval.into()).map(|_| ());
+
+        futures::pin_mut!(tick_stream);
+        while tick_stream.next().await.is_some() {
+            if let Err(e) = self.on_tick().await {
+                tracing::error!(%e, "closure finalizer tick failed");
+            }
+        }
+
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use std::{ops::Add, time::SystemTime};
+    use std::{ops::Add, sync::Arc, time::SystemTime};
 
+    use futures::StreamExt;
     use futures_time::future::FutureExt;
     use hex_literal::hex;
     use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
     use hopr_lib::{
         Address, BytesRepresentable, ChainKeypair, ChannelEntry, ChannelStatus, HoprBalance, Keypair, XDaiBalance,
-        api::chain::{ChainEvent, ChainEvents},
+        api::{
+            chain::{ChainEvent, ChainEvents, HoprChainApi},
+            node::{ComponentStatus, ComponentStatusReporter, EventWaitResult, HasChainApi, NodeOnchainIdentity},
+        },
     };
     use lazy_static::lazy_static;
 
@@ -125,6 +189,42 @@ mod tests {
         static ref CHARLIE: Address = hex!("250eefb2586ab0873befe90b905126810960ee7c").into();
         static ref DAVE: Address = hex!("68499f50ff68d523385dc60686069935d17d762a").into();
         static ref EUGENE: Address = hex!("0c1da65d269f89b05e3775bf8fcd21a138e8cbeb").into();
+    }
+
+    /// Wraps a chain API implementor as a minimal node for strategy tests.
+    struct ChainNode<C>(C);
+
+    impl<C> HasChainApi for ChainNode<C>
+    where
+        C: HoprChainApi + ComponentStatusReporter + Clone + Send + Sync + 'static,
+    {
+        type ChainApi = C;
+        type ChainError = <C as HoprChainApi>::ChainError;
+
+        fn identity(&self) -> &NodeOnchainIdentity {
+            static IDENTITY: std::sync::OnceLock<NodeOnchainIdentity> = std::sync::OnceLock::new();
+            IDENTITY.get_or_init(NodeOnchainIdentity::default)
+        }
+
+        fn chain_api(&self) -> &C {
+            &self.0
+        }
+
+        fn status(&self) -> ComponentStatus {
+            self.0.component_status()
+        }
+
+        fn wait_for_on_chain_event<F>(
+            &self,
+            _predicate: F,
+            _context: String,
+            _timeout: std::time::Duration,
+        ) -> EventWaitResult<<C as HoprChainApi>::ChainError, <C as HoprChainApi>::ChainError>
+        where
+            F: Fn(&ChainEvent) -> bool + Send + Sync + 'static,
+        {
+            unimplemented!("tests do not call wait_for_on_chain_event")
+        }
     }
 
     #[tokio::test]
@@ -149,7 +249,6 @@ mod tests {
                 HoprBalance::new_base(1000),
             )
             .with_channels([
-                // Should leave this channel opened
                 ChannelEntry::builder()
                     .between(*ALICE, *BOB)
                     .amount(10)
@@ -157,7 +256,6 @@ mod tests {
                     .status(ChannelStatus::Open)
                     .epoch(0)
                     .build()?,
-                // Should leave this unfinalized, because the channel closure period has not yet elapsed
                 ChannelEntry::builder()
                     .between(*ALICE, *CHARLIE)
                     .amount(10)
@@ -167,9 +265,7 @@ mod tests {
                     ))
                     .epoch(1)
                     .build()?,
-                // Should finalize closure of this channel
                 channel_to_be_closed,
-                // Should leave this unfinalized, because the channel closure is long overdue
                 ChannelEntry::builder()
                     .between(*ALICE, *EUGENE)
                     .amount(10)
@@ -186,11 +282,16 @@ mod tests {
             create_trustful_hopr_blokli_connector(&ALICE_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
                 .await?;
         chain_connector.connect().await?;
+        let chain_connector = Arc::new(chain_connector);
         let events = chain_connector.subscribe()?;
 
         let cfg = ClosureFinalizerStrategyConfig { max_closure_overdue };
 
-        let strat = ClosureFinalizerStrategy::new(cfg, chain_connector);
+        let strat = ClosureFinalizerStrategyInner {
+            node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
+            cfg,
+            interval: Duration::from_secs(60),
+        };
         strat.on_tick().await?;
 
         events
@@ -203,7 +304,39 @@ mod tests {
             .timeout(futures_time::time::Duration::from_secs(2))
             .await?;
 
-        // Cannot do snapshot testing here, since the execution is time-dependent
+        Ok(())
+    }
+
+    /// Tests the public builder API: `ClosureFinalizerStrategy::new(...).build(node)` must
+    /// return a `Box<dyn Strategy + Send>` with the expected Display string.
+    #[tokio::test]
+    async fn test_build_returns_strategy_trait_object() -> anyhow::Result<()> {
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_generated_accounts(
+                &[&*ALICE, &*BOB],
+                false,
+                XDaiBalance::new_base(1),
+                HoprBalance::new_base(1000),
+            )
+            .with_channels([])
+            .build_dynamic_client([1; Address::SIZE].into());
+
+        let mut chain_connector =
+            create_trustful_hopr_blokli_connector(&ALICE_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
+        chain_connector.connect().await?;
+        let node = Arc::new(ChainNode(Arc::new(chain_connector)));
+
+        let strategy: Box<dyn crate::strategy::Strategy + Send> = super::ClosureFinalizerStrategy::new(
+            ClosureFinalizerStrategyConfig::default(),
+            std::time::Duration::from_secs(60),
+        )
+        .build(node);
+
+        assert_eq!(strategy.to_string(), "closure_finalizer");
+        // Verify the box is Send (compile-time check via trait object)
+        fn assert_send<T: Send>(_: T) {}
+        assert_send(strategy);
 
         Ok(())
     }

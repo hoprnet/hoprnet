@@ -520,6 +520,62 @@ where
     }
 }
 
+impl<Chain, Graph, Net, TMgr> hopr_api::node::ActionableEventSource for Hopr<Chain, Graph, Net, TMgr>
+where
+    Chain: HoprChainApi + Send + Sync + 'static,
+    Graph: Send + Sync + 'static,
+    Net: hopr_api::network::NetworkView + Send + Sync + 'static,
+    TMgr: Send + Sync + 'static,
+{
+    fn subscribe_to_actionable_events(
+        &self,
+        filter: Option<&[hopr_api::node::ActionableEventDiscriminant]>,
+    ) -> Result<futures::stream::BoxStream<'static, hopr_api::node::ActionableEvent>, String> {
+        use futures::StreamExt as _;
+        use hopr_api::node::{ActionableEvent, ActionableEventDiscriminant};
+
+        let wants = |d: ActionableEventDiscriminant| filter.is_none_or(|f| f.contains(&d));
+
+        let mut streams = Vec::<futures::stream::BoxStream<'static, ActionableEvent>>::new();
+
+        if wants(ActionableEventDiscriminant::Chain) {
+            streams.push(
+                self.chain_api
+                    .subscribe()
+                    .map_err(|e| e.to_string())?
+                    .map(ActionableEvent::Chain)
+                    .boxed(),
+            );
+        }
+
+        if wants(ActionableEventDiscriminant::Network) {
+            streams.push(
+                self.transport_api
+                    .subscribe_network_events()
+                    .map(ActionableEvent::Network)
+                    .boxed(),
+            );
+        }
+
+        if wants(ActionableEventDiscriminant::Ticket) {
+            streams.push(
+                self.ticket_event_subscribers
+                    .1
+                    .activate_cloned()
+                    .map(ActionableEvent::Ticket)
+                    .boxed(),
+            );
+        }
+
+        if streams.is_empty() {
+            return Ok(futures::stream::empty().boxed());
+        }
+
+        // `select_all` round-robins across active sources, preventing starvation.
+        Ok(futures::stream::select_all(streams).boxed())
+    }
+}
+
 /// Per-component status report for the HOPR node.
 #[derive(Debug, Clone)]
 pub struct NodeComponentStatuses {
