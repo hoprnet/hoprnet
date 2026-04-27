@@ -6,15 +6,21 @@ use axum::{
     response::IntoResponse,
 };
 use hopr_lib::{
-    Address, ChannelEntry, ChannelStatus, HoprBalance, IncentiveChannelOperations, Multiaddr,
     api::{
+        Multiaddr,
         chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations},
         graph::{EdgeLinkObservable, NetworkGraphConnectivity, NetworkGraphView, traits::EdgeObservableRead},
         network::NetworkView,
-        node::{HasChainApi, HasGraphView, HasNetworkView, HasTransportApi, TransportOperations},
+        node::{
+            HasChainApi, HasGraphView, HasNetworkView, HasTransportApi, IncentiveChannelOperations, TransportOperations,
+        },
+        types::{
+            crypto::prelude::Hash,
+            internal::prelude::{ChannelEntry, ChannelStatus},
+            primitive::prelude::{Address, HoprBalance},
+        },
     },
     errors::{HoprLibError, HoprTransportError},
-    prelude::Hash,
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, DurationMilliSeconds, serde_as};
@@ -330,13 +336,13 @@ where
         Err(HoprTransportError::Protocol(hopr_lib::errors::ProtocolError::Timeout)) => {
             Ok((StatusCode::REQUEST_TIMEOUT, ApiErrorStatus::Timeout).into_response())
         }
-        Err(HoprTransportError::Probe(hopr_lib::ProbeError::TrafficError(_))) => {
+        Err(HoprTransportError::Probe(hopr_lib::errors::ProbeError::TrafficError(_))) => {
             Ok((StatusCode::REQUEST_TIMEOUT, ApiErrorStatus::Timeout).into_response())
         }
-        Err(HoprTransportError::Probe(hopr_lib::ProbeError::PingerError(e))) => {
+        Err(HoprTransportError::Probe(hopr_lib::errors::ProbeError::PingerError(e))) => {
             Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::PingError(e)).into_response())
         }
-        Err(HoprTransportError::Probe(hopr_lib::ProbeError::NonExistingPeer)) => {
+        Err(HoprTransportError::Probe(hopr_lib::errors::ProbeError::NonExistingPeer)) => {
             Ok((StatusCode::NOT_FOUND, ApiErrorStatus::PeerNotFound).into_response())
         }
         Err(e) => Ok((

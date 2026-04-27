@@ -1,6 +1,6 @@
 [package]
 name = "hopr-lib"
-version = "4.0.1-rc.1"
+version = "4.0.2-rc.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -61,6 +61,7 @@ cfg_eval = { workspace = true, optional = true }
 cfg-if = { workspace = true }
 const_format = { workspace = true }
 futures = { workspace = true }
+futures-concurrency = { workspace = true }
 futures-time = { workspace = true }
 humantime-serde = { workspace = true, optional = true }
 lazy_static = { workspace = true }

@@ -11,11 +11,23 @@ use hopr_chain_connector::{
     testing::{BlokliTestClient, BlokliTestStateBuilder, FullStateEmulator},
 };
 use hopr_lib::{
-    Address, ChainKeypair, HopRouting, HoprBalance, HoprNodeOperations, HoprSessionClientConfig,
-    HoprSessionClientOperations, HoprState, IpOrHost, Keypair, OffchainKeypair, SealedHost, WinningProbability,
-    XDaiBalance,
-    api::{network::NetworkView, node::HasNetworkView},
-    exports::transport::{HoprSession, SessionTarget},
+    HopRouting, HoprSessionClientConfig,
+    api::{
+        network::NetworkView,
+        node::{HasNetworkView, HoprNodeOperations, HoprSessionClientOperations, HoprState},
+        types::{
+            crypto::{
+                keypairs::Keypair,
+                prelude::{ChainKeypair, OffchainKeypair},
+            },
+            internal::prelude::{ChannelEntry, ChannelStatus, WinningProbability},
+            primitive::prelude::{Address, HoprBalance, XDaiBalance},
+        },
+    },
+    exports::{
+        network::types::prelude::{IpOrHost, SealedHost},
+        transport::{HoprSession, SessionTarget},
+    },
 };
 use rand::seq::{IteratorRandom, SliceRandom};
 use rstest::fixture;
@@ -110,7 +122,7 @@ impl ClusterGuard {
     ) -> anyhow::Result<()> {
         let deadline = tokio::time::Instant::now() + timeout;
         loop {
-            let channels: Vec<hopr_lib::ChannelEntry> = {
+            let channels: Vec<ChannelEntry> = {
                 use hopr_lib::api::{chain::ChainReadChannelOperations, node::HasChainApi};
                 match observer
                     .inner()
@@ -122,10 +134,7 @@ impl ClusterGuard {
                 }
             };
 
-            let open_count = channels
-                .iter()
-                .filter(|c| c.status == hopr_lib::ChannelStatus::Open)
-                .count();
+            let open_count = channels.iter().filter(|c| c.status == ChannelStatus::Open).count();
 
             if open_count >= expected_channels {
                 tracing::info!(open_count, expected_channels, "channel graph converged");

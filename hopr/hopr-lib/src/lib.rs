@@ -23,48 +23,22 @@ pub mod config;
 pub mod constants;
 /// Lists all errors thrown from this library.
 pub mod errors;
-// Re-export peer discovery types from hopr-api.
-pub use hopr_api::node::{AnnouncedPeer, AnnouncementOrigin};
 /// Utility module with helper types and functionality over hopr-lib behavior.
 pub mod utils;
 
 pub use hopr_api as api;
 
 /// Exports of libraries necessary for API and interface operations.
+///
+/// Use `hopr_lib::api::types::*` for all type access.
+/// This module retains only network-specific types not available in `hopr_lib::api`.
 #[doc(hidden)]
 pub mod exports {
-    pub mod types {
-        pub use hopr_api::types::{chain, internal, primitive};
-    }
-
-    pub mod crypto {
-        pub use hopr_api::types::crypto as types;
-        pub use hopr_crypto_keypair as keypair;
-    }
-
     pub mod network {
         pub use hopr_network_types as types;
     }
 
     pub use hopr_transport as transport;
-}
-
-/// Export of relevant types for easier integration.
-#[doc(hidden)]
-pub mod prelude {
-    #[cfg(feature = "runtime-tokio")]
-    pub use super::exports::network::types::{
-        prelude::ForeignDataMode,
-        udp::{ConnectedUdpStream, UdpStreamParallelism},
-    };
-    pub use super::exports::{
-        crypto::{
-            keypair::key_pair::HoprKeys,
-            types::prelude::{ChainKeypair, Hash, OffchainKeypair},
-        },
-        transport::{OffchainPublicKey, socket::HoprSocket},
-        types::primitive::prelude::Address,
-    };
 }
 
 use std::{
@@ -74,34 +48,30 @@ use std::{
 
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt, pin_mut};
 use futures_time::future::FutureExt as FuturesTimeFutureExt;
-#[cfg(feature = "session-client")]
-pub use hopr_api::node::HoprSessionClientOperations;
 use hopr_api::{
+    PeerId,
     chain::*,
     graph::HoprGraphApi,
-    network::NetworkView as _,
+    network::{Health, NetworkStreamControl, NetworkView},
     node::{
         AtomicHoprState, ComponentStatus, ComponentStatusReporter, EitherErrExt, EventWaitResult, HasChainApi,
-        HasGraphView, HasNetworkView, HasTicketManagement, HasTransportApi, NodeOnchainIdentity,
+        HasGraphView, HasNetworkView, HasTicketManagement, HasTransportApi, HoprNodeOperations, HoprState,
+        NodeOnchainIdentity,
     },
-};
-pub use hopr_api::{
-    graph::EdgeLinkObservable,
-    network::NetworkStreamControl,
-    node::{
-        EitherErr, HoprNodeOperations, HoprState, IncentiveChannelOperations, IncentiveRedeemOperations,
-        TransportOperations,
-    },
-    tickets::{ChannelStats, RedemptionResult, TicketManagement, TicketManagementExt},
-    types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*},
+    tickets::TicketManagement,
+    types::{crypto::prelude::OffchainKeypair, internal::routing::DestinationRouting},
 };
 use hopr_async_runtime::prelude::spawn;
 pub use hopr_async_runtime::{Abortable, AbortableList};
 pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
-pub use hopr_network_types::prelude::*;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport::transfer_session;
-pub use hopr_transport::*;
+// Transport-native types (not available via hopr_lib::api)
+pub use hopr_transport::{
+    ApplicationData, ApplicationDataIn, ApplicationDataOut, HoprSession, HoprSessionConfigurator, HoprTransport,
+    HoprTransportProcess, IncomingSession, OffchainPublicKey, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities,
+    SessionCapability, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig, Tag, peer_id_to_public_key,
+};
 use tracing::debug;
 
 pub use crate::{
@@ -252,7 +222,7 @@ pub fn prepare_tokio_runtime(
 }
 
 /// Type alias used to send and receive transport data via a running HOPR node.
-pub type HoprTransportIO = socket::HoprSocket<
+pub type HoprTransportIO = hopr_transport::socket::HoprSocket<
     futures::channel::mpsc::Receiver<ApplicationDataIn>,
     futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>,
 >;
@@ -337,7 +307,7 @@ where
 
     async fn connect_to(
         &self,
-        destination: Address,
+        destination: hopr_api::types::primitive::prelude::Address,
         target: Self::Target,
         cfg: Self::Config,
     ) -> Result<(Self::Session, Self::SessionConfigurator), Self::Error> {
@@ -532,6 +502,7 @@ where
         filter: Option<&[hopr_api::node::ActionableEventDiscriminant]>,
     ) -> Result<futures::stream::BoxStream<'static, hopr_api::node::ActionableEvent>, String> {
         use futures::StreamExt as _;
+        use futures_concurrency::stream::Merge as _;
         use hopr_api::node::{ActionableEvent, ActionableEventDiscriminant};
 
         let wants = |d: ActionableEventDiscriminant| filter.is_none_or(|f| f.contains(&d));
@@ -571,8 +542,8 @@ where
             return Ok(futures::stream::empty().boxed());
         }
 
-        // `select_all` round-robins across active sources, preventing starvation.
-        Ok(futures::stream::select_all(streams).boxed())
+        // `Merge` provides fair polling distribution across active sources.
+        Ok(streams.merge().boxed())
     }
 }
 

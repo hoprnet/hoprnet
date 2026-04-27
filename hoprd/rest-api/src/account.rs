@@ -5,7 +5,10 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
-use hopr_lib::{Address, HoprBalance, IncentiveChannelOperations, WxHOPR, XDai, XDaiBalance, api::node::HasChainApi};
+use hopr_lib::api::{
+    node::{HasChainApi, IncentiveChannelOperations},
+    types::primitive::prelude::{Address, HoprBalance, WxHOPR, XDai, XDaiBalance},
+};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 

@@ -7,13 +7,16 @@ use axum::{
 };
 use futures::{StreamExt, TryFutureExt};
 use hopr_lib::{
-    Address, AsUnixTimestamp, ChannelEntry, ChannelStatus, HoprBalance, IncentiveChannelOperations,
     api::{
         chain::{ChainReadChannelOperations, ChannelSelector},
-        node::HasChainApi,
+        node::{HasChainApi, IncentiveChannelOperations},
+        types::{
+            crypto::prelude::Hash,
+            internal::prelude::{ChannelEntry, ChannelStatus},
+            primitive::prelude::{Address, AsUnixTimestamp, HoprBalance},
+        },
     },
     errors::{HoprLibError, HoprStatusError},
-    prelude::Hash,
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
@@ -326,7 +329,7 @@ pub(super) async fn open_channel<
             }),
         )
             .into_response(),
-        Err(hopr_lib::EitherErr::Right(HoprLibError::StatusError(HoprStatusError::NotThereYet(..)))) => {
+        Err(hopr_lib::api::node::EitherErr::Right(HoprLibError::StatusError(HoprStatusError::NotThereYet(..)))) => {
             (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
         }
         Err(e) => (
@@ -511,7 +514,7 @@ pub(super) async fn close_channel<
             }),
         )
             .into_response(),
-        Err(hopr_lib::EitherErr::Right(HoprLibError::StatusError(HoprStatusError::NotThereYet(..)))) => {
+        Err(hopr_lib::api::node::EitherErr::Right(HoprLibError::StatusError(HoprStatusError::NotThereYet(..)))) => {
             (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
         }
         Err(e) => (
@@ -607,7 +610,7 @@ pub(super) async fn fund_channel<
             }),
         )
             .into_response(),
-        Err(hopr_lib::EitherErr::Right(HoprLibError::StatusError(HoprStatusError::NotThereYet(..)))) => {
+        Err(hopr_lib::api::node::EitherErr::Right(HoprLibError::StatusError(HoprStatusError::NotThereYet(..)))) => {
             (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
         }
         Err(e) => (

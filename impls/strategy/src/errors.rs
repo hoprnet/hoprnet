@@ -1,4 +1,4 @@
-use hopr_lib::GeneralError;
+use hopr_lib::api::types::primitive::errors::GeneralError;
 use thiserror::Error;
 
 /// Enumerates all errors in this crate.

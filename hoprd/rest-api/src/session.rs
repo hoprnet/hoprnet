@@ -7,8 +7,8 @@ use axum::{
 };
 use base64::Engine;
 use hopr_lib::{
-    Address, HopRouting, HoprSessionClientConfig, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities, SessionId,
-    SessionTarget, SurbBalancerConfig, errors::HoprLibError,
+    HopRouting, HoprSessionClientConfig, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities, SessionId,
+    SessionTarget, SurbBalancerConfig, api::types::primitive::prelude::Address, errors::HoprLibError,
 };
 use hopr_utils_session::{ListenerId, build_binding_host, create_tcp_client_binding, create_udp_client_binding};
 use serde::{Deserialize, Serialize};
@@ -125,7 +125,7 @@ pub enum RoutingOptions {
 }
 
 impl TryFrom<RoutingOptions> for hopr_lib::HopRouting {
-    type Error = hopr_lib::GeneralError;
+    type Error = hopr_lib::api::types::primitive::errors::GeneralError;
 
     /// Converts API routing options into protocol-level hop routing.
     fn try_from(value: RoutingOptions) -> Result<Self, Self::Error> {
@@ -225,7 +225,14 @@ impl SessionClientRequest {
     pub(crate) async fn into_protocol_session_config(
         self,
         target_protocol: IpProtocol,
-    ) -> Result<(hopr_lib::Address, SessionTarget, HoprSessionClientConfig), ApiErrorStatus> {
+    ) -> Result<
+        (
+            hopr_lib::api::types::primitive::prelude::Address,
+            SessionTarget,
+            HoprSessionClientConfig,
+        ),
+        ApiErrorStatus,
+    > {
         let target_spec: hopr_utils_session::SessionTargetSpec = self.target.clone().into();
         Ok((
             self.destination,
@@ -735,11 +742,11 @@ pub enum IpProtocol {
     UDP,
 }
 
-impl From<IpProtocol> for hopr_lib::IpProtocol {
-    fn from(protocol: IpProtocol) -> hopr_lib::IpProtocol {
+impl From<IpProtocol> for hopr_lib::exports::network::types::prelude::IpProtocol {
+    fn from(protocol: IpProtocol) -> hopr_lib::exports::network::types::prelude::IpProtocol {
         match protocol {
-            IpProtocol::TCP => hopr_lib::IpProtocol::TCP,
-            IpProtocol::UDP => hopr_lib::IpProtocol::UDP,
+            IpProtocol::TCP => hopr_lib::exports::network::types::prelude::IpProtocol::TCP,
+            IpProtocol::UDP => hopr_lib::exports::network::types::prelude::IpProtocol::UDP,
         }
     }
 }
@@ -796,7 +803,7 @@ pub(crate) async fn close_client<H: Send + Sync + 'static>(
         let open_listeners = &state.open_listeners.0;
 
         let mut to_remove = Vec::new();
-        let protocol: hopr_lib::IpProtocol = protocol.into();
+        let protocol: hopr_lib::exports::network::types::prelude::IpProtocol = protocol.into();
 
         // Find all listeners with protocol, listening IP and optionally port number (if > 0)
         open_listeners

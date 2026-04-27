@@ -3,11 +3,16 @@ use std::{fmt::Formatter, sync::Arc, time::Duration};
 use anyhow::Context;
 use futures::future::join_all;
 use hopr_lib::{
-    Address, ChannelEntry, ChannelStatus, Hash, HoprBalance, HoprNodeOperations, HoprState, IncentiveChannelOperations,
-    PeerId,
-    api::node::HasChainApi,
+    api::{
+        PeerId,
+        node::{HasChainApi, HoprNodeOperations, HoprState, IncentiveChannelOperations},
+        types::{
+            crypto::prelude::Hash,
+            internal::prelude::{ChannelEntry, ChannelStatus},
+            primitive::prelude::{Address, HoprBalance},
+        },
+    },
     config::{HoprLibConfig, SessionGlobalConfig},
-    prelude,
 };
 
 use crate::testing::{TestingConnector, TestingHopr};
@@ -120,7 +125,7 @@ impl TestedHopr {
         self.instance.config()
     }
 
-    pub async fn channel_from_hash(&self, channel_hash: &prelude::Hash) -> Option<ChannelEntry> {
+    pub async fn channel_from_hash(&self, channel_hash: &Hash) -> Option<ChannelEntry> {
         IncentiveChannelOperations::channel_by_id(&*self.instance, channel_hash).unwrap_or(None)
     }
 

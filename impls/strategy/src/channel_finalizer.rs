@@ -7,12 +7,10 @@ use std::{
 
 use async_trait::async_trait;
 use futures::StreamExt;
-use hopr_lib::{
-    ChannelStatusDiscriminants, Utc,
-    api::{
-        chain::{ChainReadChannelOperations, ChainWriteChannelOperations, ChannelSelector},
-        node::HasChainApi,
-    },
+use hopr_lib::api::{
+    chain::{ChainReadChannelOperations, ChainWriteChannelOperations, ChannelSelector},
+    node::HasChainApi,
+    types::{internal::prelude::ChannelStatusDiscriminants, primitive::prelude::Utc},
 };
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info};
@@ -168,11 +166,13 @@ mod tests {
     use futures_time::future::FutureExt;
     use hex_literal::hex;
     use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
-    use hopr_lib::{
-        Address, BytesRepresentable, ChainKeypair, ChannelEntry, ChannelStatus, HoprBalance, Keypair, XDaiBalance,
-        api::{
-            chain::{ChainEvent, ChainEvents, HoprChainApi},
-            node::{ComponentStatus, ComponentStatusReporter, EventWaitResult, HasChainApi, NodeOnchainIdentity},
+    use hopr_lib::api::{
+        chain::{ChainEvent, ChainEvents, HoprChainApi},
+        node::{ComponentStatus, ComponentStatusReporter, EventWaitResult, HasChainApi, NodeOnchainIdentity},
+        types::{
+            crypto::{keypairs::Keypair, prelude::ChainKeypair},
+            internal::prelude::{ChannelEntry, ChannelStatus},
+            primitive::prelude::{Address, BytesRepresentable, HoprBalance, XDaiBalance},
         },
     };
     use lazy_static::lazy_static;

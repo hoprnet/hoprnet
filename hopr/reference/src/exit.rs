@@ -1,9 +1,13 @@
 use std::{net::SocketAddr, num::NonZeroUsize};
 
 use hopr_lib::{
-    OffchainKeypair, ServiceId,
+    ServiceId,
+    api::types::crypto::prelude::OffchainKeypair,
     errors::HoprLibError,
-    prelude::{ConnectedUdpStream, ForeignDataMode, UdpStreamParallelism},
+    exports::network::types::{
+        prelude::ForeignDataMode,
+        udp::{ConnectedUdpStream, UdpStreamParallelism},
+    },
     transfer_session,
 };
 

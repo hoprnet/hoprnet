@@ -46,10 +46,9 @@ use hopr_api::{
         primitive::prelude::{Address, UnitaryFloatOps},
     },
 };
-use hopr_async_runtime::AbortableList;
+use hopr_async_runtime::{AbortableList, prelude::spawn};
 use hopr_network_types::addr::is_public_address;
 use hopr_transport::HoprTransport;
-use tokio::spawn;
 use validator::Validate;
 
 use crate::{

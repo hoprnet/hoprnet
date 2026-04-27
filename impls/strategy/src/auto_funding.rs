@@ -18,14 +18,15 @@ use std::{
 use async_trait::async_trait;
 use dashmap::DashSet;
 use futures::StreamExt;
-use hopr_lib::{
-    ChannelDirection, ChannelEntry, ChannelId, ChannelStatus, ChannelStatusDiscriminants, HoprBalance,
-    api::{
-        chain::{
-            ChainReadChannelOperations, ChainReadSafeOperations, ChainValues, ChainWriteChannelOperations,
-            ChannelSelector, SafeSelector,
-        },
-        node::{ActionableEventDiscriminant, ActionableEventSource, HasChainApi},
+use hopr_lib::api::{
+    chain::{
+        ChainReadChannelOperations, ChainReadSafeOperations, ChainValues, ChainWriteChannelOperations, ChannelSelector,
+        SafeSelector,
+    },
+    node::{ActionableEventDiscriminant, ActionableEventSource, HasChainApi},
+    types::{
+        internal::prelude::{ChannelDirection, ChannelEntry, ChannelId, ChannelStatus, ChannelStatusDiscriminants},
+        primitive::prelude::HoprBalance,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -398,15 +399,16 @@ mod tests {
     use futures_time::future::FutureExt;
     use hex_literal::hex;
     use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
-    use hopr_lib::{
-        Address, BytesRepresentable, ChainKeypair, ChannelDirection, ChannelEntry, ChannelStatus, HoprBalance, Keypair,
-        XDaiBalance,
-        api::{
-            chain::{ChainEvent, ChainEvents, HoprChainApi},
-            node::{
-                ActionableEvent, ComponentStatus, ComponentStatusReporter, EventWaitResult, HasChainApi,
-                NodeOnchainIdentity,
-            },
+    use hopr_lib::api::{
+        chain::{ChainEvent, ChainEvents, HoprChainApi},
+        node::{
+            ActionableEvent, ComponentStatus, ComponentStatusReporter, EventWaitResult, HasChainApi,
+            NodeOnchainIdentity,
+        },
+        types::{
+            crypto::{keypairs::Keypair, prelude::ChainKeypair},
+            internal::prelude::{ChannelDirection, ChannelEntry, ChannelStatus},
+            primitive::prelude::{Address, BytesRepresentable, HoprBalance, XDaiBalance},
         },
     };
 

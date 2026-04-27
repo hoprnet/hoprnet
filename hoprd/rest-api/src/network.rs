@@ -5,16 +5,15 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
-use hopr_lib::{
-    Address, HoprBalance, IncentiveChannelOperations, Multiaddr,
-    api::{
-        chain::ChainKeyOperations,
-        graph::{
-            EdgeLinkObservable, NetworkGraphConnectivity, NetworkGraphView,
-            traits::{EdgeNetworkObservableRead, EdgeObservableRead, EdgeProtocolObservable},
-        },
-        node::{HasChainApi, HasGraphView},
+use hopr_lib::api::{
+    Multiaddr,
+    chain::ChainKeyOperations,
+    graph::{
+        EdgeLinkObservable, NetworkGraphConnectivity, NetworkGraphView,
+        traits::{EdgeNetworkObservableRead, EdgeObservableRead, EdgeProtocolObservable},
     },
+    node::{HasChainApi, HasGraphView, IncentiveChannelOperations},
+    types::primitive::prelude::{Address, HoprBalance},
 };
 use serde_with::{DisplayFromStr, serde_as};
 
@@ -218,11 +217,11 @@ pub(crate) enum AnnouncementOriginResponse {
     Dht,
 }
 
-impl From<hopr_lib::AnnouncementOrigin> for AnnouncementOriginResponse {
-    fn from(origin: hopr_lib::AnnouncementOrigin) -> Self {
+impl From<hopr_lib::api::node::AnnouncementOrigin> for AnnouncementOriginResponse {
+    fn from(origin: hopr_lib::api::node::AnnouncementOrigin) -> Self {
         match origin {
-            hopr_lib::AnnouncementOrigin::Chain => Self::Chain,
-            hopr_lib::AnnouncementOrigin::DHT => Self::Dht,
+            hopr_lib::api::node::AnnouncementOrigin::Chain => Self::Chain,
+            hopr_lib::api::node::AnnouncementOrigin::DHT => Self::Dht,
         }
     }
 }
@@ -447,7 +446,7 @@ mod tests {
     #[test]
     fn chain_origin_should_convert_from_domain_type() {
         assert_eq!(
-            AnnouncementOriginResponse::from(hopr_lib::AnnouncementOrigin::Chain),
+            AnnouncementOriginResponse::from(hopr_lib::api::node::AnnouncementOrigin::Chain),
             AnnouncementOriginResponse::Chain
         );
     }
@@ -455,7 +454,7 @@ mod tests {
     #[test]
     fn dht_origin_should_convert_from_domain_type() {
         assert_eq!(
-            AnnouncementOriginResponse::from(hopr_lib::AnnouncementOrigin::DHT),
+            AnnouncementOriginResponse::from(hopr_lib::api::node::AnnouncementOrigin::DHT),
             AnnouncementOriginResponse::Dht
         );
     }
