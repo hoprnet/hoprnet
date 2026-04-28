@@ -137,8 +137,8 @@ impl HoprBuilderWithIdentity {
 
 /// Configured builder accepting factory closures for components.
 ///
-/// When the `session-server` feature is enabled, [`with_session_server`](HoprBuilderConfigured::with_session_server)
-/// must be called before building — it returns a [`HoprBuilderWithSession`] which
+/// When the `session-server` feature is enabled, `with_session_server`
+/// must be called before building — it returns a `HoprBuilderWithSession` which
 /// has the `build_edge` / `build_full` methods.
 ///
 /// When the feature is disabled, `build_edge` / `build_full` are available directly.
