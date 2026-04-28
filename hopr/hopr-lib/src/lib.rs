@@ -638,6 +638,15 @@ impl<Chain, Graph, Net, TMgr> HoprNodeOperations for Hopr<Chain, Graph, Net, TMg
     }
 }
 
+/// Prometheus-formatted metrics collected by the hopr-lib components.
+///
+/// This is a free-standing convenience wrapper around
+/// [`Hopr::collect_hopr_metrics`] that avoids the caller having to supply
+/// the four generic type parameters.
+pub fn collect_hopr_metrics() -> errors::Result<String> {
+    Hopr::<(), (), (), ()>::collect_hopr_metrics()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
