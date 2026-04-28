@@ -640,11 +640,15 @@ impl<Chain, Graph, Net, TMgr> HoprNodeOperations for Hopr<Chain, Graph, Net, TMg
 
 /// Prometheus-formatted metrics collected by the hopr-lib components.
 ///
-/// This is a free-standing convenience wrapper around
-/// [`Hopr::collect_hopr_metrics`] that avoids the caller having to supply
-/// the four generic type parameters.
+/// Returns an error when the crate is compiled without the `telemetry` feature.
 pub fn collect_hopr_metrics() -> errors::Result<String> {
-    Hopr::<(), (), (), ()>::collect_hopr_metrics()
+    cfg_if::cfg_if! {
+        if #[cfg(all(feature = "telemetry", not(test)))] {
+            hopr_metrics::gather_all_metrics().map_err(HoprLibError::other)
+        } else {
+            Err(HoprLibError::GeneralError("BUILT WITHOUT METRICS SUPPORT".into()))
+        }
+    }
 }
 
 #[cfg(test)]
