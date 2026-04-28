@@ -789,9 +789,12 @@
               program = toString (
                 pkgs.writeShellScript "bench-run" ''
                   set -euo pipefail
-                  nix build -L .#bench-build
                   shopt -s nullglob
                   bins=(result/bin/*)
+                  if [ ''${#bins[@]} -eq 0 ]; then
+                    nix build -L .#bench-build
+                    bins=(result/bin/*)
+                  fi
                   if [ ''${#bins[@]} -eq 0 ]; then
                     echo "No benchmark binaries found under result/bin" >&2
                     exit 1
