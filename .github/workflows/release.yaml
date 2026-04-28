@@ -19,65 +19,8 @@ concurrency:
 permissions:
   contents: read
 jobs:
-  build-binaries:
-    name: Binary ${{ matrix.architecture }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - architecture: x86_64-linux
-            runner: depot-ubuntu-24.04-8
-            build_command: nix build -L .#binary-hoprd-x86_64-linux
-    uses: hoprnet/hopr-workflows/.github/workflows/build-binaries.yaml@a178becb8c3711ae955bad477861bfefe6feceae # build-binaries-v2
-    permissions:
-      contents: read
-    with:
-      source_branch: ${{ github.ref_name }}
-      version_type: release
-      architecture: ${{ matrix.architecture }}
-      cachix_cache_name: hoprnet
-      build_file: ./hopr/hopr-lib/Cargo.toml
-      build_command: ${{ matrix.build_command }}
-      binary: hoprd
-      runner: ${{ matrix.runner }}
-    secrets:
-      gcp_service_account: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
-      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      gpg_private_key: ${{ secrets.GPG_HOPRNET_PRIVATE_KEY }}
-  build-docker:
-    name: Docker
-    uses: hoprnet/hopr-workflows/.github/workflows/build-docker.yaml@43b03a7b5df777770d95c6524f48be34184b26fa # build-docker-v1
-    needs: build-binaries
-    permissions:
-      contents: read
-      pull-requests: write
-      id-token: write
-    with:
-      source_branch: ${{ github.ref_name }}
-      version_type: release
-      build_matrix: >-
-        [
-          {
-            "runner": "depot-ubuntu-24.04-4",
-            "architecture": "x86_64-linux",
-            "build_command": "nix build -L .#docker-hoprd-x86_64-linux",
-            "smoke_test_command": "nix develop -c just smoke-test"
-          }
-        ]
-      cachix_cache_name: hoprnet
-      build_file: ./hopr/hopr-lib/Cargo.toml
-      docker_image_name: hoprd
-      docker_image_format: skopeo
-    secrets:
-      gcp_service_account: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
-      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      docker_hub_username: ${{ secrets.DOCKER_HUB_USERNAME }}
-      docker_hub_token: ${{ secrets.DOCKER_HUB_TOKEN }}
   release:
     name: Close release
-    needs:
-      - build-binaries
-      - build-docker
     runs-on: depot-ubuntu-24.04
     permissions:
       contents: write
@@ -97,24 +40,6 @@ jobs:
           zulip_topic: Releases
           gcp_service_account: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
           github_token: ${{ secrets.GH_RUNNER_TOKEN }}
-  deploy-staging:
-    name: Deploy Gnosis Staging
-    runs-on: depot-ubuntu-24.04
-    needs: [build-docker, release]
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - name: Restart Hoprd
-        uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4.0.1
-        with:
-          token: ${{ secrets.GNOSIS_GITHUB_WORKFLOW_TOKEN }}
-          repository: gnosis/gnosis_vpn-infrastructure
-          event-type: restart_hoprd
-          client-payload: |-
-            {
-              "environment": "staging"
-            }
   build-dappnode:
     name: Build dappNode
     needs:
