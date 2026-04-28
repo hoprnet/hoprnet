@@ -14,6 +14,7 @@ pub use hopr_lib;
 use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue};
 #[cfg(feature = "runtime-tokio")]
 use {
+    hopr_ticket_manager::{HoprTicketFactory, MemoryStore},
     hopr_chain_connector::{
         BlockchainConnectorConfig, HoprBlockchainSafeConnector,
         api::HoprChainApi,
@@ -37,6 +38,19 @@ pub type SharedTicketManager = Arc<HoprTicketManager<RedbStore, RedbTicketQueue>
 #[cfg(feature = "runtime-tokio")]
 pub type ReferenceHopr =
     Hopr<Arc<HoprBlockchainSafeConnector<BlokliClient>>, SharedChannelGraph, HoprNetwork, SharedTicketManager>;
+
+/// The HOPR edge node type using canonical implementations.
+///
+/// Edge nodes originate packets but do not relay or redeem incoming tickets,
+/// so the ticket manager type parameter is `()`.
+#[cfg(feature = "runtime-tokio")]
+pub type EdgeHopr =
+    Hopr<Arc<HoprBlockchainSafeConnector<BlokliClient>>, SharedChannelGraph, HoprNetwork, ()>;
+
+/// Re-export so downstream crates (e.g. `edgli`) do not need a direct
+/// `hopr-chain-connector` dependency.
+#[cfg(feature = "runtime-tokio")]
+pub use hopr_chain_connector;
 
 /// Builds a reference HOPR node using canonical implementations.
 #[cfg(feature = "runtime-tokio")]
@@ -232,6 +246,119 @@ where
     let builder = builder.with_session_server(server);
 
     let node = builder.build_full(ticket_manager, ticket_factory).await?;
+
+    Ok(Arc::new(node))
+}
+
+/// Builds a HOPR edge node with a custom chain connector using canonical
+/// implementations for all other components.
+///
+/// Compared to [`build_with_chain`], this function:
+/// - Uses a [`MemoryStore`]-backed [`HoprTicketFactory`] (no persistent storage,
+///   no ticket manager) — edge nodes originate packets but do not redeem tickets.
+/// - Does not sync ticket state with on-chain channel state.
+/// - Does not accept a session-server argument.
+/// - Calls `build_edge` rather than `build_full`, leaving `TMgr = ()`.
+///
+/// Cover traffic and all other wiring are identical to [`build_with_chain`].
+#[cfg(feature = "runtime-tokio")]
+pub async fn build_edge_with_chain<Chain>(
+    chain_key: &ChainKeypair,
+    packet_key: &OffchainKeypair,
+    config: HoprLibConfig,
+    probe_cfg: Option<hopr_ct_full_network::ProberConfig>,
+    chain_connector: Chain,
+) -> anyhow::Result<Arc<Hopr<Chain, SharedChannelGraph, HoprNetwork, ()>>>
+where
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+{
+    if let Some(ref pcfg) = probe_cfg {
+        pcfg.validate()
+            .map_err(|e| anyhow::anyhow!("invalid ProberConfig: {e}"))?;
+        let probe_timeout = config.protocol.probe.timeout;
+        anyhow::ensure!(
+            pcfg.interval >= probe_timeout,
+            "ProberConfig interval ({:?}) must be >= ProbeConfig timeout ({:?})",
+            pcfg.interval,
+            probe_timeout,
+        );
+    }
+
+    let ticket_factory = Arc::new(HoprTicketFactory::new(MemoryStore::default()));
+
+    // Chain→peer-discovery wiring
+    let (peer_discovery_tx, peer_discovery_rx) = futures::channel::mpsc::channel(2048);
+    {
+        use futures::{SinkExt, StreamExt};
+        use hopr_lib::api::chain::StateSyncOptions;
+        let chain_events = chain_connector
+            .subscribe_with_state_sync([StateSyncOptions::PublicAccounts])
+            .map_err(|e| anyhow::anyhow!("failed to subscribe to chain events: {e}"))?;
+        let tx = peer_discovery_tx;
+        tokio::spawn(async move {
+            chain_events
+                .for_each(|event| {
+                    let mut tx = tx.clone();
+                    async move {
+                        if let hopr_lib::api::types::chain::chain_events::ChainEvent::Announcement(account) = event {
+                            let peer_id: hopr_lib::api::PeerId = account.public_key.into();
+                            if let Err(error) = tx
+                                .send(hopr_transport_p2p::PeerDiscovery::Announce(
+                                    peer_id,
+                                    account.get_multiaddrs().to_vec(),
+                                ))
+                                .await
+                            {
+                                tracing::error!(%peer_id, %error, "failed to send peer discovery event");
+                            }
+                        }
+                    }
+                })
+                .await;
+        });
+    }
+
+    let prober_cfg = probe_cfg.unwrap_or_default();
+    let path_cfg = config.protocol.path_planner;
+    let graph: SharedChannelGraph = Arc::new(ChannelGraph::with_edge_params(
+        *packet_key.public(),
+        path_cfg.edge_penalty,
+        path_cfg.min_ack_rate,
+    ));
+    let graph_for_ct = graph.clone();
+
+    let safe_address = config.safe_module.safe_address;
+    let module_address = config.safe_module.module_address;
+
+    let node = hopr_lib::builder::HoprBuilder
+        .with_identity(chain_key, packet_key)
+        .with_config(config)
+        .with_safe_module(&safe_address, &module_address)
+        .with_chain_api(move |_ctx| chain_connector)
+        .with_graph(move |_ctx| graph)
+        .with_network(move |ctx| {
+            Box::pin(async move {
+                let multiaddresses = vec![
+                    (&ctx.cfg.host)
+                        .try_into()
+                        .expect("host config must be a valid multiaddress"),
+                ];
+                let nb = HoprLibp2pNetworkBuilder::new(peer_discovery_rx);
+                nb.build(
+                    &ctx.packet_key,
+                    multiaddresses,
+                    "/hopr/mix/1.1.0",
+                    ctx.cfg.protocol.transport.prefer_local_addresses,
+                )
+                .await
+                .expect("network must be constructible")
+            })
+        })
+        .with_cover_traffic(move |ctx| {
+            hopr_ct_full_network::FullNetworkDiscovery::new(*ctx.packet_key.public(), prober_cfg, graph_for_ct)
+        })
+        .build_edge(ticket_factory)
+        .await?;
 
     Ok(Arc::new(node))
 }
