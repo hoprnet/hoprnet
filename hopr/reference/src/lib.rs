@@ -11,7 +11,13 @@ use std::sync::Arc;
 
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_lib;
+/// Re-export the canonical channel graph type for downstream crates.
+#[cfg(feature = "runtime-tokio")]
+pub use hopr_network_graph::SharedChannelGraph;
 use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue};
+/// Re-export the canonical network type for downstream crates.
+#[cfg(feature = "runtime-tokio")]
+pub use hopr_transport_p2p::HoprNetwork;
 #[cfg(feature = "runtime-tokio")]
 use {
     hopr_chain_connector::{
@@ -27,14 +33,6 @@ use {
     validator::Validate,
 };
 
-/// Re-export the canonical channel graph type for downstream crates.
-#[cfg(feature = "runtime-tokio")]
-pub use hopr_network_graph::SharedChannelGraph;
-
-/// Re-export the canonical network type for downstream crates.
-#[cfg(feature = "runtime-tokio")]
-pub use hopr_transport_p2p::HoprNetwork;
-
 #[cfg(feature = "session-server")]
 use crate::{config::SessionIpForwardingConfig, exit::HoprServerIpForwardingReactor};
 
@@ -49,8 +47,8 @@ struct NoopSessionServer;
 #[cfg(feature = "session-server")]
 #[async_trait::async_trait]
 impl hopr_lib::api::node::HoprSessionServer for NoopSessionServer {
-    type Session = hopr_lib::exports::transport::IncomingSession;
     type Error = std::convert::Infallible;
+    type Session = hopr_lib::exports::transport::IncomingSession;
 
     async fn process(&self, _session: Self::Session) -> Result<(), Self::Error> {
         Ok(())

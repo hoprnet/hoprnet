@@ -58,7 +58,6 @@ async-trait = { workspace = true }
 async-broadcast = { workspace = true }
 backon = { workspace = true, features = ["futures-timer-sleep"] }
 cfg_eval = { workspace = true, optional = true }
-cfg-if = { workspace = true }
 const_format = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }

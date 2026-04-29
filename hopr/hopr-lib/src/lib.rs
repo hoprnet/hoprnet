@@ -637,7 +637,6 @@ where
     }
 }
 
-
 impl<Chain, Graph, Net, TMgr> HoprNodeOperations for Hopr<Chain, Graph, Net, TMgr> {
     fn status(&self) -> HoprState {
         self.state.load(Ordering::Relaxed)
