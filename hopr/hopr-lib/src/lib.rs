@@ -619,6 +619,7 @@ where
     }
 }
 
+#[cfg(feature = "telemetry")]
 impl<Chain, Graph, Net, TMgr> Hopr<Chain, Graph, Net, TMgr> {
     /// Prometheus formatted metrics collected by the hopr-lib components.
     ///
@@ -638,19 +639,10 @@ impl<Chain, Graph, Net, TMgr> HoprNodeOperations for Hopr<Chain, Graph, Net, TMg
 
 /// Prometheus-formatted metrics collected by the hopr-lib components.
 ///
-/// Returns an error when the crate is compiled without the `telemetry` feature
-/// or when running inside unit tests (metrics are disabled in test builds even
-/// if `telemetry` is enabled).
+/// Only available when compiled with the `telemetry` feature.
+#[cfg(feature = "telemetry")]
 pub fn collect_hopr_metrics() -> errors::Result<String> {
-    cfg_if::cfg_if! {
-        if #[cfg(all(feature = "telemetry", not(test)))] {
-            hopr_metrics::gather_all_metrics().map_err(HoprLibError::other)
-        } else {
-            Err(HoprLibError::GeneralError(
-                "metrics unavailable: enable the `telemetry` feature and run outside unit tests".into(),
-            ))
-        }
-    }
+    hopr_metrics::gather_all_metrics().map_err(HoprLibError::other)
 }
 
 #[cfg(test)]

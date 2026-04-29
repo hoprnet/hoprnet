@@ -23,10 +23,18 @@ use {
     },
     hopr_lib::builder::{ChainKeypair, Keypair, OffchainKeypair},
     hopr_lib::{Hopr, config::HoprLibConfig},
-    hopr_network_graph::{ChannelGraph, SharedChannelGraph},
-    hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork},
+    hopr_network_graph::ChannelGraph,
+    hopr_transport_p2p::HoprLibp2pNetworkBuilder,
     validator::Validate,
 };
+
+/// Re-export the canonical channel graph type for downstream crates.
+#[cfg(feature = "runtime-tokio")]
+pub use hopr_network_graph::SharedChannelGraph;
+
+/// Re-export the canonical network type for downstream crates.
+#[cfg(feature = "runtime-tokio")]
+pub use hopr_transport_p2p::HoprNetwork;
 
 #[cfg(feature = "session-server")]
 use crate::{config::SessionIpForwardingConfig, exit::HoprServerIpForwardingReactor};
@@ -34,18 +42,17 @@ use crate::{config::SessionIpForwardingConfig, exit::HoprServerIpForwardingReact
 /// Shareable [`HoprTicketManager`] with [`RedbStore`] backend.
 pub type SharedTicketManager = Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>;
 
-/// The reference HOPR node type using canonical implementations.
+/// The full relay HOPR node type using canonical implementations.
 #[cfg(feature = "runtime-tokio")]
-pub type ReferenceHopr =
+pub type FullHopr =
     Hopr<Arc<HoprBlockchainSafeConnector<BlokliClient>>, SharedChannelGraph, HoprNetwork, SharedTicketManager>;
 
-/// The HOPR edge node type using canonical implementations.
+/// Generic edge node type with `TMgr = ()`.
 ///
 /// Edge nodes originate packets but do not relay or redeem incoming tickets,
-/// so the ticket manager type parameter is `()`.
+/// so the ticket manager type parameter is fixed to `()`.
 #[cfg(feature = "runtime-tokio")]
-pub type EdgeHopr =
-    Hopr<Arc<HoprBlockchainSafeConnector<BlokliClient>>, SharedChannelGraph, HoprNetwork, ()>;
+pub type EdgeHopr<Chain, Graph, Net> = Hopr<Chain, Graph, Net, ()>;
 
 /// Re-export so downstream crates (e.g. `edgli`) do not need a direct
 /// `hopr-chain-connector` dependency.
@@ -59,7 +66,7 @@ pub async fn build_reference(
     config: HoprLibConfig,
     blokli_url: String,
     #[cfg(feature = "session-server")] server_config: SessionIpForwardingConfig,
-) -> anyhow::Result<Arc<ReferenceHopr>> {
+) -> anyhow::Result<Arc<FullHopr>> {
     let (chain_key, packet_key) = identity;
 
     let mut chain_connector = create_trustful_hopr_blokli_connector(
@@ -263,8 +270,7 @@ where
 /// Cover traffic and all other wiring are identical to [`build_with_chain`].
 #[cfg(feature = "runtime-tokio")]
 pub async fn build_edge_with_chain<Chain>(
-    chain_key: &ChainKeypair,
-    packet_key: &OffchainKeypair,
+    identity: (&ChainKeypair, &OffchainKeypair),
     config: HoprLibConfig,
     probe_cfg: Option<hopr_ct_full_network::ProberConfig>,
     chain_connector: Chain,
@@ -272,6 +278,8 @@ pub async fn build_edge_with_chain<Chain>(
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
+    let (chain_key, packet_key) = identity;
+
     if let Some(ref pcfg) = probe_cfg {
         pcfg.validate()
             .map_err(|e| anyhow::anyhow!("invalid ProberConfig: {e}"))?;
@@ -285,6 +293,23 @@ where
     }
 
     let ticket_factory = Arc::new(HoprTicketFactory::new(MemoryStore::default()));
+
+    // Sync ticket factory with on-chain outgoing channel state so that after a
+    // restart the factory resumes from the correct ticket index per channel.
+    {
+        use futures::StreamExt;
+        use hopr_lib::api::chain::ChannelSelector;
+
+        let me = chain_connector.me();
+        let outgoing_channels: Vec<_> = chain_connector
+            .stream_channels(ChannelSelector::default().with_source(*me))
+            .map_err(|e| anyhow::anyhow!("failed to stream outgoing channels: {e}"))?
+            .collect()
+            .await;
+        ticket_factory
+            .sync_from_outgoing_channels(&outgoing_channels)
+            .map_err(|e| anyhow::anyhow!("failed to sync ticket factory: {e}"))?;
+    }
 
     // Chain→peer-discovery wiring
     let (peer_discovery_tx, peer_discovery_rx) = futures::channel::mpsc::channel(2048);
