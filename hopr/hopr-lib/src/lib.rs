@@ -619,17 +619,6 @@ where
     }
 }
 
-#[cfg(feature = "telemetry")]
-impl<Chain, Graph, Net, TMgr> Hopr<Chain, Graph, Net, TMgr> {
-    /// Prometheus formatted metrics collected by the hopr-lib components.
-    ///
-    /// Delegates to the crate-level [`collect_hopr_metrics`] free-standing function.
-    /// Prefer calling [`collect_hopr_metrics`] directly to avoid specifying the
-    /// generic type parameters.
-    pub fn collect_hopr_metrics() -> errors::Result<String> {
-        collect_hopr_metrics()
-    }
-}
 
 impl<Chain, Graph, Net, TMgr> HoprNodeOperations for Hopr<Chain, Graph, Net, TMgr> {
     fn status(&self) -> HoprState {
