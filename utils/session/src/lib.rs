@@ -27,12 +27,8 @@ use hopr_api::{
 };
 use hopr_async_runtime::Abortable;
 use hopr_lib::{
-    Hopr, HopRouting, HoprSessionClientConfig,
-    api::{
-        network::NetworkView,
-        node::HoprSessionClientOperations,
-        types::primitive::prelude::Address,
-    },
+    HopRouting, Hopr, HoprSessionClientConfig,
+    api::{network::NetworkView, node::HoprSessionClientOperations, types::primitive::prelude::Address},
     errors::HoprLibError,
     exports::transport::{
         HoprSession, HoprSessionConfigurator, OffchainPublicKey, SURB_SIZE, ServiceId, SessionId, SessionTarget,
