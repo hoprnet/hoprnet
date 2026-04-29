@@ -42,10 +42,6 @@ use crate::{config::SessionIpForwardingConfig, exit::HoprServerIpForwardingReact
 pub type SharedTicketManager = Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>;
 
 /// The canonical HOPR node type using the Blokli chain connector and canonical implementations.
-///
-/// Used for both full relay nodes (with session server) and edge/entry nodes
-/// (without session server) — both use the same [`SharedTicketManager`] so that
-/// outgoing ticket indices and any incoming tickets are correctly tracked.
 #[cfg(feature = "runtime-tokio")]
 pub type FullHopr =
     Hopr<Arc<HoprBlockchainSafeConnector<BlokliClient>>, SharedChannelGraph, HoprNetwork, SharedTicketManager>;
