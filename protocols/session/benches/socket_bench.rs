@@ -58,7 +58,7 @@ pub fn stateless_socket_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("stateless_socket_benchmark");
     const KB: usize = 1024;
 
-    group.sample_size(100000);
+    group.sample_size(50000);
 
     for size in [/* 16 * KB, 64 * KB, */ 128 * KB, 1024 * KB].iter() {
         let mut alice_data = vec![0u8; *size];

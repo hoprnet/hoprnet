@@ -109,66 +109,71 @@ fn build_graph(node_count: usize, density: usize) -> (ChannelGraph, Vec<Offchain
 fn bench_simple_paths(c: &mut Criterion) {
     let mut group = c.benchmark_group("NetworkGraphTraverse/simple_paths");
 
-    for size in [10_usize, 100, 1_000] {
-        for density in [10_usize, 100, 1_000] {
-            let (graph, keys) = build_graph(size, density);
-            let me = &keys[0];
-            let epn = (size - 1).min(density); // effective edges per node
+    for (size, density) in [
+        (10, 10),
+        (100, 10),
+        (100, 100),
+        (1_000, 10),
+        (1_000, 100),
+        (1_000, 1_000),
+    ] {
+        let (graph, keys) = build_graph(size, density);
+        let me = &keys[0];
+        let epn = (size - 1).min(density); // effective edges per node
 
-            let dst_2edge = &keys[(epn + 1).min(size - 1)];
-            let dst_3edge = &keys[(2 * epn + 1).min(size - 1)];
-            let dst_4edge = &keys[(3 * epn + 1).min(size - 1)];
+        let dst_2edge = &keys[(epn + 1).min(size - 1)];
+        let dst_3edge = &keys[(2 * epn + 1).min(size - 1)];
+        let dst_4edge = &keys[(3 * epn + 1).min(size - 1)];
 
-            let param = format!("{size}nodes/{density}x");
+        let param = format!("{size}nodes/{density}x");
 
-            group.bench_with_input(BenchmarkId::new("2-edge", &param), &size, |b, _| {
-                b.iter(|| {
-                    black_box(graph.simple_paths(
-                        me,
-                        black_box(dst_2edge),
-                        2,
-                        Some(10),
-                        EdgeValueFn::forward(
-                            std::num::NonZeroUsize::new(2).expect("is greater than 1"),
-                            BENCH_EDGE_PENALTY,
-                            BENCH_MIN_ACK_RATE,
-                        ),
-                    ))
-                });
+        group.bench_with_input(BenchmarkId::new("2-edge", &param), &size, |b, _| {
+            b.iter(|| {
+                black_box(graph.simple_paths(
+                    me,
+                    black_box(dst_2edge),
+                    2,
+                    Some(10),
+                    EdgeValueFn::forward(
+                        std::num::NonZeroUsize::new(2).expect("is greater than 1"),
+                        BENCH_EDGE_PENALTY,
+                        BENCH_MIN_ACK_RATE,
+                    ),
+                ))
             });
+        });
 
-            group.bench_with_input(BenchmarkId::new("3-edge", &param), &size, |b, _| {
-                b.iter(|| {
-                    black_box(graph.simple_paths(
-                        me,
-                        black_box(dst_3edge),
-                        3,
-                        Some(10),
-                        EdgeValueFn::forward(
-                            std::num::NonZeroUsize::new(3).expect("is greater than 1"),
-                            BENCH_EDGE_PENALTY,
-                            BENCH_MIN_ACK_RATE,
-                        ),
-                    ))
-                });
+        group.bench_with_input(BenchmarkId::new("3-edge", &param), &size, |b, _| {
+            b.iter(|| {
+                black_box(graph.simple_paths(
+                    me,
+                    black_box(dst_3edge),
+                    3,
+                    Some(10),
+                    EdgeValueFn::forward(
+                        std::num::NonZeroUsize::new(3).expect("is greater than 1"),
+                        BENCH_EDGE_PENALTY,
+                        BENCH_MIN_ACK_RATE,
+                    ),
+                ))
             });
+        });
 
-            group.bench_with_input(BenchmarkId::new("4-edge", &param), &size, |b, _| {
-                b.iter(|| {
-                    black_box(graph.simple_paths(
-                        me,
-                        black_box(dst_4edge),
-                        4,
-                        Some(10),
-                        EdgeValueFn::forward(
-                            std::num::NonZeroUsize::new(4).expect("is greater than 1"),
-                            BENCH_EDGE_PENALTY,
-                            BENCH_MIN_ACK_RATE,
-                        ),
-                    ))
-                });
+        group.bench_with_input(BenchmarkId::new("4-edge", &param), &size, |b, _| {
+            b.iter(|| {
+                black_box(graph.simple_paths(
+                    me,
+                    black_box(dst_4edge),
+                    4,
+                    Some(10),
+                    EdgeValueFn::forward(
+                        std::num::NonZeroUsize::new(4).expect("is greater than 1"),
+                        BENCH_EDGE_PENALTY,
+                        BENCH_MIN_ACK_RATE,
+                    ),
+                ))
             });
-        }
+        });
     }
 
     group.finish();
@@ -191,23 +196,28 @@ fn bench_simple_paths(c: &mut Criterion) {
 fn bench_simple_loopback(c: &mut Criterion) {
     let mut group = c.benchmark_group("NetworkGraphTraverse/simple_loopback_to_self");
 
-    for size in [10_usize, 100, 1_000] {
-        for density in [10_usize, 100, 1_000] {
-            let (graph, _keys) = build_graph(size, density);
-            let param = format!("{size}nodes/{density}x");
+    for (size, density) in [
+        (10, 10),
+        (100, 10),
+        (100, 100),
+        (1_000, 10),
+        (1_000, 100),
+        (1_000, 1_000),
+    ] {
+        let (graph, _keys) = build_graph(size, density);
+        let param = format!("{size}nodes/{density}x");
 
-            group.bench_with_input(BenchmarkId::new("2-edge", &param), &size, |b, _| {
-                b.iter(|| black_box(graph.simple_loopback_to_self(2, Some(10))));
-            });
+        group.bench_with_input(BenchmarkId::new("2-edge", &param), &size, |b, _| {
+            b.iter(|| black_box(graph.simple_loopback_to_self(2, Some(10))));
+        });
 
-            group.bench_with_input(BenchmarkId::new("3-edge", &param), &size, |b, _| {
-                b.iter(|| black_box(graph.simple_loopback_to_self(3, Some(10))));
-            });
+        group.bench_with_input(BenchmarkId::new("3-edge", &param), &size, |b, _| {
+            b.iter(|| black_box(graph.simple_loopback_to_self(3, Some(10))));
+        });
 
-            group.bench_with_input(BenchmarkId::new("4-edge", &param), &size, |b, _| {
-                b.iter(|| black_box(graph.simple_loopback_to_self(4, Some(10))));
-            });
-        }
+        group.bench_with_input(BenchmarkId::new("4-edge", &param), &size, |b, _| {
+            b.iter(|| black_box(graph.simple_loopback_to_self(4, Some(10))));
+        });
     }
 
     group.finish();
