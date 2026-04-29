@@ -4478,7 +4478,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.19.1"
+version = "0.20.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4494,6 +4494,7 @@ dependencies = [
  "hex-literal",
  "hopr-api",
  "hopr-async-runtime",
+ "hopr-metrics",
  "insta",
  "lazy_static",
  "moka",

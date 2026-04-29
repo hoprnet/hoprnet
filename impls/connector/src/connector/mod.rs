@@ -73,6 +73,20 @@ impl From<ChainHealthState> for hopr_api::node::ComponentStatus {
     }
 }
 
+#[cfg(all(feature = "telemetry", not(test)))]
+lazy_static::lazy_static! {
+    pub static ref METRIC_BLOKLI_ERRORS: hopr_metrics::SimpleCounter =
+        hopr_metrics::SimpleCounter::new(
+            "hopr_blokli_errors_total",
+            "Total number of Blokli errors encountered",
+    ).unwrap();
+    pub static ref METRIC_BLOKLI_REQUESTS: hopr_metrics::SimpleCounter =
+        hopr_metrics::SimpleCounter::new(
+            "hopr_blokli_request_count",
+            "Total number of Blokli requests",
+    ).unwrap();
+}
+
 /// Configuration of the [`HoprBlockchainConnector`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, smart_default::SmartDefault)]
 pub struct BlockchainConnectorConfig {

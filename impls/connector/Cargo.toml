@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-connector"
-version = "0.19.1"
+version = "0.20.0"
 edition.workspace = true
 rust-version.workspace = true
 authors = ["HOPR Association <tech@hoprnet.org>"]
@@ -12,6 +12,7 @@ license = "GPL-3.0-only"
 [features]
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 testing = ["dep:hex", "blokli-client/testing"]
+telemetry = ["dep:lazy_static", "dep:hopr-metrics"]
 
 [dependencies]
 ahash = { workspace = true }
@@ -25,6 +26,7 @@ futures = { workspace = true }
 futures-time = { workspace = true }
 futures-concurrency = { workspace = true }
 hex = { workspace = true, optional = true }
+lazy_static = { workspace = true, optional = true }
 moka = { workspace = true, features = ["future", "sync"] }
 parking_lot = { workspace = true }
 petgraph = { workspace = true, features = ["rayon", "graphmap"] }
@@ -43,6 +45,7 @@ hopr-api = { workspace = true, features = [
   "types-with-bindings",
 ] }
 hopr-async-runtime = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]
 blokli-client = { workspace = true, features = ["testing"] }
