@@ -115,6 +115,13 @@ impl From<HopRouting> for hopr_api::types::internal::routing::RoutingOptions {
     }
 }
 
+#[cfg(feature = "session-client")]
+impl std::fmt::Display for HopRouting {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}-hop routing", self.hop_count())
+    }
+}
+
 /// Session client configuration for `hopr-lib`.
 ///
 /// Unlike transport-level configuration, this API intentionally does not expose
@@ -252,6 +259,17 @@ pub struct Hopr<Chain, Graph, Net, TMgr> {
     pub(crate) ticket_manager: TMgr,
     #[allow(dead_code)] // Handles must stay alive to keep background tasks running
     pub(crate) processes: AbortableList<HoprLibProcess>,
+}
+
+impl<Chain, Graph, Net, TMgr> std::fmt::Debug for Hopr<Chain, Graph, Net, TMgr> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Hopr")
+            .field("identity", &self.chain_id)
+            .field("state", &self.state.load(std::sync::atomic::Ordering::Relaxed))
+            .field("config", &self.cfg)
+            .field("processes", &self.processes)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<Chain, Graph, Net, TMgr> Hopr<Chain, Graph, Net, TMgr>
