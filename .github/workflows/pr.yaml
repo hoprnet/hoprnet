@@ -138,6 +138,28 @@ jobs:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
       codecov_token: ${{ secrets.CODECOV_TOKEN }}
 
+  benchmarks:
+    name: Benchmarks
+    needs: [tests]
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+    uses: hoprnet/hopr-workflows/.github/workflows/benchmarks.yaml@c06be87b06af5bfcc48d98ebe95787c994e2d2c0 # workflow-benchmark-v1
+    with:
+      source_branch: ${{ github.event.pull_request.head.ref }}
+      runner: self-hosted-hoprnet-bigger
+      bencher_project: ${{ github.event.repository.name }}
+      should_build: true
+      should_run: false
+      build_command: "nix build -L .#bench-build"
+      run_command: "nix run .#bench-run"
+    secrets:
+      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      ZULIP_API_KEY: ${{ secrets.ZULIP_API_KEY }}
+      ZULIP_EMAIL: ${{ secrets.ZULIP_EMAIL }}
+
   docs:
     name: Docs
     runs-on: depot-ubuntu-24.04-4

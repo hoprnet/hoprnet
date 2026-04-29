@@ -1,5 +1,5 @@
 {
-  description = "hopr-lib and hoprd repository";
+  description = "hopr-lib repository";
 
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
@@ -159,7 +159,6 @@
           hoprPackages = {
             # ticket-inspector: diagnostic CLI for inspecting the tickets database
             binary-ticket-inspector = rust-builder-local.callPackage nixLib.mkRustPackage ticketInspectorBuildArgs;
-            # also used for Docker image
             binary-ticket-inspector-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage ticketInspectorBuildArgs;
             binary-ticket-inspector-aarch64-linux = rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage ticketInspectorBuildArgs;
             test-unit =
@@ -253,9 +252,22 @@
                   '';
                 });
 
-            hopr-lib-clippy = rust-builder-local.callPackage nixLib.mkRustPackage (
+            workspace-clippy = rust-builder-local.callPackage nixLib.mkRustPackage (
               libraryBuildArgs // { runClippy = true; }
             );
+
+            # Build all workspace benchmarks without running them; copies binaries to $out/bin
+            bench-build =
+              (rust-builder-local.callPackage nixLib.mkRustPackage (libraryBuildArgs // { buildBench = true; }))
+              .overrideAttrs
+                (old: {
+                  postInstall = (if old ? postInstall && old.postInstall != null then old.postInstall else "") + ''
+                    mkdir -p "$out/bin"
+                    find target -maxdepth 4 -path '*/deps/*' -type f -name "*_bench-*" \
+                      -not -name "*.*" \
+                      -exec cp {} "$out/bin/" \;
+                  '';
+                });
           };
 
           docs = rust-builder-local-nightly.callPackage nixLib.mkRustPackage (
@@ -538,7 +550,7 @@
             };
           };
 
-          checks = { inherit (hoprPackages) hopr-lib-clippy; };
+          checks = { inherit (hoprPackages) workspace-clippy; };
 
           apps = {
             inherit update-github-labels find-port-ci;
