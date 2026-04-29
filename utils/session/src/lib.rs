@@ -27,11 +27,11 @@ use hopr_api::{
 };
 use hopr_async_runtime::Abortable;
 use hopr_lib::{
-    Hopr, HoprSessionClientConfig,
+    Hopr, HopRouting, HoprSessionClientConfig,
     api::{
         network::NetworkView,
         node::HoprSessionClientOperations,
-        types::{internal::routing::RoutingOptions, primitive::prelude::Address},
+        types::primitive::prelude::Address,
     },
     errors::HoprLibError,
     exports::transport::{
@@ -147,9 +147,9 @@ pub struct StoredSessionEntry {
     /// Target of the Session.
     pub target: SessionTargetSpec,
     /// Forward path used for the Session.
-    pub forward_path: RoutingOptions,
+    pub forward_path: HopRouting,
     /// Return path used for the Session.
-    pub return_path: RoutingOptions,
+    pub return_path: HopRouting,
     /// The maximum number of client sessions that the listener can spawn.
     pub max_client_sessions: usize,
     /// The maximum number of SURB packets that can be sent upstream.
@@ -536,8 +536,8 @@ pub async fn create_tcp_client_binding(
         StoredSessionEntry {
             destination,
             target: target_spec,
-            forward_path: config.forward_path.into(),
-            return_path: config.return_path.into(),
+            forward_path: config.forward_path,
+            return_path: config.return_path,
             clients: active_sessions,
             max_client_sessions: max_clients,
             max_surb_upstream: config
@@ -638,8 +638,8 @@ pub async fn create_udp_client_binding(
         StoredSessionEntry {
             destination,
             target: target_spec,
-            forward_path: config.forward_path.into(),
-            return_path: config.return_path.into(),
+            forward_path: config.forward_path,
+            return_path: config.return_path,
             max_client_sessions: max_clients,
             max_surb_upstream: config
                 .surb_management
@@ -787,6 +787,7 @@ mod tests {
     use futures_time::future::FutureExt as TimeFutureExt;
     use hopr_api::types::crypto::crypto_traits::Randomizable;
     use hopr_lib::{
+        HopRouting,
         api::types::{
             internal::{
                 prelude::HoprPseudonym,
@@ -922,8 +923,8 @@ mod tests {
         StoredSessionEntry {
             destination: Address::default(),
             target: SessionTargetSpec::Plain("localhost:8080".into()),
-            forward_path: RoutingOptions::Hops(Default::default()),
-            return_path: RoutingOptions::Hops(Default::default()),
+            forward_path: HopRouting::default(),
+            return_path: HopRouting::default(),
             max_client_sessions: 5,
             max_surb_upstream: None,
             response_buffer: None,
