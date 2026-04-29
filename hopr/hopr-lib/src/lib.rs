@@ -621,14 +621,12 @@ where
 
 impl<Chain, Graph, Net, TMgr> Hopr<Chain, Graph, Net, TMgr> {
     /// Prometheus formatted metrics collected by the hopr-lib components.
+    ///
+    /// Delegates to the crate-level [`collect_hopr_metrics`] free-standing function.
+    /// Prefer calling [`collect_hopr_metrics`] directly to avoid specifying the
+    /// generic type parameters.
     pub fn collect_hopr_metrics() -> errors::Result<String> {
-        cfg_if::cfg_if! {
-            if #[cfg(all(feature = "telemetry", not(test)))] {
-                hopr_metrics::gather_all_metrics().map_err(HoprLibError::other)
-            } else {
-                Err(HoprLibError::GeneralError("BUILT WITHOUT METRICS SUPPORT".into()))
-            }
-        }
+        collect_hopr_metrics()
     }
 }
 
@@ -640,13 +638,17 @@ impl<Chain, Graph, Net, TMgr> HoprNodeOperations for Hopr<Chain, Graph, Net, TMg
 
 /// Prometheus-formatted metrics collected by the hopr-lib components.
 ///
-/// Returns an error when the crate is compiled without the `telemetry` feature.
+/// Returns an error when the crate is compiled without the `telemetry` feature
+/// or when running inside unit tests (metrics are disabled in test builds even
+/// if `telemetry` is enabled).
 pub fn collect_hopr_metrics() -> errors::Result<String> {
     cfg_if::cfg_if! {
         if #[cfg(all(feature = "telemetry", not(test)))] {
             hopr_metrics::gather_all_metrics().map_err(HoprLibError::other)
         } else {
-            Err(HoprLibError::GeneralError("BUILT WITHOUT METRICS SUPPORT".into()))
+            Err(HoprLibError::GeneralError(
+                "metrics unavailable: enable the `telemetry` feature and run outside unit tests".into(),
+            ))
         }
     }
 }
