@@ -38,6 +38,25 @@ pub use hopr_transport_p2p::HoprNetwork;
 #[cfg(feature = "session-server")]
 use crate::{config::SessionIpForwardingConfig, exit::HoprServerIpForwardingReactor};
 
+/// No-op session server used by [`build_edge`] when the `session-server` feature is enabled.
+///
+/// Edge nodes do not serve incoming sessions, so the builder still needs a concrete type
+/// to satisfy the `build_with_chain` signature — this type simply drops every session.
+#[cfg(feature = "session-server")]
+#[derive(Debug, Clone, Default)]
+struct NoopSessionServer;
+
+#[cfg(feature = "session-server")]
+#[async_trait::async_trait]
+impl hopr_lib::api::node::HoprSessionServer for NoopSessionServer {
+    type Session = hopr_lib::exports::transport::IncomingSession;
+    type Error = std::convert::Infallible;
+
+    async fn process(&self, _session: Self::Session) -> Result<(), Self::Error> {
+        Ok(())
+    }
+}
+
 /// Shareable [`HoprTicketManager`] with [`RedbStore`] backend.
 pub type SharedTicketManager = Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>;
 
@@ -123,6 +142,8 @@ pub async fn build_edge(
         config,
         None,
         chain_connector,
+        #[cfg(feature = "session-server")]
+        NoopSessionServer,
     )
     .await
 }
