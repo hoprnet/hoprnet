@@ -68,6 +68,20 @@ pub use hopr_chain_connector;
 // Private helpers
 // ---------------------------------------------------------------------------
 
+#[cfg(feature = "runtime-tokio")]
+fn validate_probe_cfg(probe_cfg: &hopr_ct_full_network::ProberConfig, probe_timeout: std::time::Duration) -> anyhow::Result<()> {
+    probe_cfg
+        .validate()
+        .map_err(|e| anyhow::anyhow!("invalid ProberConfig: {e}"))?;
+    anyhow::ensure!(
+        probe_cfg.interval >= probe_timeout,
+        "ProberConfig interval ({:?}) must be >= ProbeConfig timeout ({:?})",
+        probe_cfg.interval,
+        probe_timeout,
+    );
+    Ok(())
+}
+
 /// Shorthand for the fully-configured builder type returned by [`configure_node`].
 #[cfg(feature = "runtime-tokio")]
 type NodeBuilder<Chain> = HoprBuilderConfigured<
@@ -306,15 +320,7 @@ where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
     if let Some(ref pcfg) = probe_cfg {
-        pcfg.validate()
-            .map_err(|e| anyhow::anyhow!("invalid ProberConfig: {e}"))?;
-        let probe_timeout = config.protocol.probe.timeout;
-        anyhow::ensure!(
-            pcfg.interval >= probe_timeout,
-            "ProberConfig interval ({:?}) must be >= ProbeConfig timeout ({:?})",
-            pcfg.interval,
-            probe_timeout,
-        );
+        validate_probe_cfg(pcfg, config.protocol.probe.timeout)?;
     }
 
     let backend = RedbStore::new_temp().map_err(hopr_ticket_manager::TicketManagerError::store)?;
@@ -370,15 +376,7 @@ where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
     if let Some(ref pcfg) = probe_cfg {
-        pcfg.validate()
-            .map_err(|e| anyhow::anyhow!("invalid ProberConfig: {e}"))?;
-        let probe_timeout = config.protocol.probe.timeout;
-        anyhow::ensure!(
-            pcfg.interval >= probe_timeout,
-            "ProberConfig interval ({:?}) must be >= ProbeConfig timeout ({:?})",
-            pcfg.interval,
-            probe_timeout,
-        );
+        validate_probe_cfg(pcfg, config.protocol.probe.timeout)?;
     }
 
     let backend = RedbStore::new_temp().map_err(hopr_ticket_manager::TicketManagerError::store)?;
@@ -391,20 +389,19 @@ where
         use hopr_lib::api::chain::ChannelSelector;
 
         let me = chain_connector.me();
-        let incoming_channels: Vec<_> = chain_connector
+        let incoming_stream = chain_connector
             .stream_channels(ChannelSelector::default().with_destination(*me))
-            .map_err(|e| anyhow::anyhow!("failed to stream incoming channels: {e}"))?
-            .collect()
-            .await;
+            .map_err(|e| anyhow::anyhow!("failed to stream incoming channels: {e}"))?;
+        let outgoing_stream = chain_connector
+            .stream_channels(ChannelSelector::default().with_source(*me))
+            .map_err(|e| anyhow::anyhow!("failed to stream outgoing channels: {e}"))?;
+
+        let (incoming_channels, outgoing_channels): (Vec<_>, Vec<_>) =
+            futures::join!(incoming_stream.collect(), outgoing_stream.collect());
+
         ticket_manager
             .sync_from_incoming_channels(&incoming_channels)
             .map_err(|e| anyhow::anyhow!("failed to sync ticket manager: {e}"))?;
-
-        let outgoing_channels: Vec<_> = chain_connector
-            .stream_channels(ChannelSelector::default().with_source(*me))
-            .map_err(|e| anyhow::anyhow!("failed to stream outgoing channels: {e}"))?
-            .collect()
-            .await;
         ticket_factory
             .sync_from_outgoing_channels(&outgoing_channels)
             .map_err(|e| anyhow::anyhow!("failed to sync ticket factory: {e}"))?;
