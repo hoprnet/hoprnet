@@ -45,7 +45,7 @@ use crate::{
         simple::SimpleBalancerController,
     },
     errors::{SessionManagerError, TransportSessionError},
-    types::{ByteCapabilities, ClosureReason, HoprSessionConfig, HoprStartProtocol},
+    types::{ClosureReason, HoprSessionCapabilities, HoprSessionConfig, HoprStartProtocol},
     utils,
     utils::{SurbNotificationMode, insert_into_next_slot},
 };
@@ -616,7 +616,7 @@ where
         let start_session_msg = HoprStartProtocol::StartSession(StartInitiation {
             challenge,
             target,
-            capabilities: ByteCapabilities(cfg.capabilities),
+            capabilities: HoprSessionCapabilities(cfg.capabilities),
             additional_data: if !cfg.capabilities.contains(Capability::NoRateControl) {
                 cfg.surb_management
                     .map(|c| c.target_surb_buffer_size)
@@ -628,7 +628,7 @@ where
                                 .max(MIN_SURB_BUFFER_DURATION)
                                 .as_secs(),
                     )
-                    .min(u32::MAX as u64) as u32
+                    .min(u32::MAX as u64)
             } else {
                 0
             },
@@ -1058,7 +1058,7 @@ where
     async fn handle_incoming_session_initiation(
         &self,
         pseudonym: HoprPseudonym,
-        session_req: StartInitiation<SessionTarget, ByteCapabilities>,
+        session_req: StartInitiation<SessionTarget, HoprSessionCapabilities>,
     ) -> crate::errors::Result<()> {
         trace!(challenge = session_req.challenge, "received session initiation request");
 
@@ -1116,7 +1116,9 @@ where
                 // The Session request carries a "hint" as additional data telling what
                 // the Session initiator has configured as its target buffer size in the Balancer.
                 let target_surb_buffer_size = if session_req.additional_data > 0 {
-                    (session_req.additional_data as u64).min(self.cfg.maximum_surb_buffer_size as u64)
+                    session_req
+                        .additional_data
+                        .min(self.cfg.maximum_surb_buffer_size as u64)
                 } else {
                     self.cfg.initial_return_session_egress_rate as u64
                         * self
@@ -2299,7 +2301,7 @@ mod tests {
                 StartInitiation {
                     challenge: MIN_CHALLENGE,
                     target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                    capabilities: ByteCapabilities(Capabilities::empty()),
+                    capabilities: HoprSessionCapabilities(Capabilities::empty()),
                     additional_data: 0,
                 },
             )

@@ -31,9 +31,9 @@ use crate::{Capabilities, Capability, errors::TransportSessionError};
 
 /// Wrapper for [`Capabilities`] that makes conversion to/from `u8` possible.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ByteCapabilities(pub Capabilities);
+pub struct HoprSessionCapabilities(pub Capabilities);
 
-impl TryFrom<u8> for ByteCapabilities {
+impl TryFrom<u8> for HoprSessionCapabilities {
     type Error = GeneralError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
@@ -43,32 +43,32 @@ impl TryFrom<u8> for ByteCapabilities {
     }
 }
 
-impl From<ByteCapabilities> for u8 {
-    fn from(value: ByteCapabilities) -> Self {
+impl From<HoprSessionCapabilities> for u8 {
+    fn from(value: HoprSessionCapabilities) -> Self {
         *value.0.as_ref()
     }
 }
 
-impl From<ByteCapabilities> for Capabilities {
-    fn from(value: ByteCapabilities) -> Self {
+impl From<HoprSessionCapabilities> for Capabilities {
+    fn from(value: HoprSessionCapabilities) -> Self {
         value.0
     }
 }
 
-impl From<Capabilities> for ByteCapabilities {
+impl From<Capabilities> for HoprSessionCapabilities {
     fn from(value: Capabilities) -> Self {
         Self(value)
     }
 }
 
-impl AsRef<Capabilities> for ByteCapabilities {
+impl AsRef<Capabilities> for HoprSessionCapabilities {
     fn as_ref(&self) -> &Capabilities {
         &self.0
     }
 }
 
 /// Start protocol instantiation for HOPR.
-pub type HoprStartProtocol = StartProtocol<SessionId, SessionTarget, ByteCapabilities, Box<[u8]>>; // TODO: enhance for PIX
+pub type HoprStartProtocol = StartProtocol<SessionId, SessionTarget, HoprSessionCapabilities, Box<[u8]>>; // TODO: enhance for PIX
 
 /// Calculates the maximum number of decimal digits needed to represent an N-byte unsigned integer.
 ///
@@ -578,9 +578,9 @@ mod tests {
     #[test]
     fn byte_capabilities_roundtrip_via_u8() -> anyhow::Result<()> {
         let flags: Capabilities = Capability::Segmentation.into();
-        let caps = ByteCapabilities::from(flags);
+        let caps = HoprSessionCapabilities::from(flags);
         let byte_val: u8 = caps.into();
-        let restored = ByteCapabilities::try_from(byte_val)?;
+        let restored = HoprSessionCapabilities::try_from(byte_val)?;
         assert_eq!(caps, restored);
         Ok(())
     }
@@ -588,12 +588,12 @@ mod tests {
     #[test]
     fn byte_capabilities_invalid_bits_are_rejected() {
         // 0xFF has bits set that don't correspond to any Capability
-        assert!(ByteCapabilities::try_from(0xFF_u8).is_err());
+        assert!(HoprSessionCapabilities::try_from(0xFF_u8).is_err());
     }
 
     #[test]
     fn byte_capabilities_empty_is_zero() {
-        let caps = ByteCapabilities::from(Capabilities::empty());
+        let caps = HoprSessionCapabilities::from(Capabilities::empty());
         let byte_val: u8 = caps.into();
         assert_eq!(byte_val, 0);
     }
@@ -601,9 +601,9 @@ mod tests {
     #[test]
     fn byte_capabilities_combined_flags() -> anyhow::Result<()> {
         let caps: Capabilities = Capability::Segmentation | Capability::NoRateControl;
-        let byte_caps = ByteCapabilities::from(caps);
+        let byte_caps = HoprSessionCapabilities::from(caps);
         let byte_val: u8 = byte_caps.into();
-        let restored = ByteCapabilities::try_from(byte_val)?;
+        let restored = HoprSessionCapabilities::try_from(byte_val)?;
         assert_eq!(*restored.as_ref(), caps);
         Ok(())
     }

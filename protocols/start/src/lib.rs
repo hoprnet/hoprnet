@@ -11,10 +11,9 @@
 //! (see [`RFC7049`](https://datatracker.ietf.org/doc/html/rfc7049)) and therefore must implement
 //! `serde::Serialize + serde::Deserialize`.
 //! The capability type `C` must be expressible as a single unsigned byte.
-//! 
-//! The `G` type is used to represent the Session Stealth Address commitment representation.
-//! It is typically a [`PixGroupRepr`](hopr_protocol_pix::PixGroupRepr).
 //!
+//! The `G` type is used to represent the Session Stealth Address commitment representation.
+//! It is typically a [`PixGroupRepr`](hopr_protocol_pix::PixGroupRepr)
 //!
 //! See [`StartProtocol`] docs for the protocol diagram.
 
@@ -57,7 +56,7 @@ pub struct StartErrorType {
 /// - `C` are session capabilities
 ///
 /// The `additional_data` are set dependent on the `capabilities`
-/// or set to `0x00000000` to be ignored.
+/// or set to `0x0000000000000000` to be ignored.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StartInitiation<T, C> {
     /// Random challenge for this initiation.
@@ -68,8 +67,8 @@ pub struct StartInitiation<T, C> {
     ///
     /// This might also contain information required for the PIX protocol.
     pub capabilities: C,
-    /// Additional options (might be `capabilities` dependent), ignored if `0x00000000`.
-    pub additional_data: u32,
+    /// Additional options (might be `capabilities` dependent), ignored if `0x0000000000000000`.
+    pub additional_data: u64,
 }
 
 /// Message of the Start protocol that confirms the establishment of a session.
@@ -351,7 +350,7 @@ where
         Ok(
             match StartProtocolDiscriminants::from_repr(disc).ok_or(StartProtocolError::UnknownMessage)? {
                 StartProtocolDiscriminants::StartSession => {
-                    if data.len() <= data_offset + size_of::<StartChallenge>() + 1 + size_of::<u32>() {
+                    if data.len() <= data_offset + size_of::<StartChallenge>() + 1 + size_of::<u64>() {
                         return Err(StartProtocolError::InvalidLength);
                     }
 
@@ -364,14 +363,14 @@ where
                         capabilities: data[data_offset + size_of::<StartChallenge>()]
                             .try_into()
                             .map_err(|_| StartProtocolError::ParseError("init.capabilities".into()))?,
-                        additional_data: u32::from_be_bytes(
+                        additional_data: u64::from_be_bytes(
                             data[data_offset + size_of::<StartChallenge>() + 1
-                                ..data_offset + size_of::<StartChallenge>() + 1 + size_of::<u32>()]
+                                ..data_offset + size_of::<StartChallenge>() + 1 + size_of::<u64>()]
                                 .try_into()
                                 .map_err(|_| StartProtocolError::ParseError("init.additional_data".into()))?,
                         ),
                         target: serde_cbor_2::from_slice(
-                            &data[data_offset + size_of::<StartChallenge>() + 1 + size_of::<u32>()..],
+                            &data[data_offset + size_of::<StartChallenge>() + 1 + size_of::<u64>()..],
                         )?,
                     })
                 }

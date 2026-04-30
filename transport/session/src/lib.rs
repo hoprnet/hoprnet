@@ -23,7 +23,7 @@ pub use manager::{DispatchResult, MIN_SURB_BUFFER_DURATION, SessionManager, Sess
 #[cfg(feature = "telemetry")]
 pub use telemetry::{SessionAckMode, SessionLifecycleState};
 pub use types::{
-    ByteCapabilities, HoprSession, HoprSessionConfig, IncomingSession, ServiceId, SessionId, SessionTarget,
+    HoprSession, HoprSessionCapabilities, HoprSessionConfig, IncomingSession, ServiceId, SessionId, SessionTarget,
 };
 #[cfg(feature = "runtime-tokio")]
 pub use utils::transfer_session;
@@ -61,7 +61,13 @@ flagset::flags! {
         /// Disable SURB-based egress rate control.
         ///
         /// This applies only to the recipient of the Session (Exit).
+        ///
+        /// If not set, the lower half of additional data may contain information about the desired SURB buffer size.
         NoRateControl = 0b0001_0000,
+        /// Indicates to the Session recipient (Exit) that this Session should use the PIX protocol.
+        ///
+        /// The upper half of additional data may be used to configure the PIX protocol parameters.
+        UsePIX = 0b0010_0000,
     }
 }
 
