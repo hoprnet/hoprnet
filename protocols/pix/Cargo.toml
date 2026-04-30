@@ -2,6 +2,7 @@
 name = "hopr-protocol-pix"
 version = "0.1.0"
 description = "Protocol for Incentivizing eXit nodes (PIX) as specified in HOPR RFC-0012"
+license = "GPL-3.0-only"
 rust-version.workspace = true
 authors.workspace = true
 edition.workspace = true
