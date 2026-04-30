@@ -138,11 +138,12 @@ mod tests {
     async fn connector_should_query_existing_safe() -> anyhow::Result<()> {
         let me = ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address();
         let safe_addr = [1u8; Address::SIZE].into();
+        let node_addr = [2u8; Address::SIZE].into();
         let safe = DeployedSafe {
             address: safe_addr,
             owner: me,
             module: MODULE_ADDR.into(),
-            registered_nodes: vec![],
+            registered_nodes: vec![node_addr],
         };
         let blokli_client = BlokliTestStateBuilder::default()
             .with_balances([(me, XDaiBalance::new_base(10))])
@@ -153,8 +154,14 @@ mod tests {
         let connector = create_connector(blokli_client)?;
 
         assert_eq!(Some(safe.clone()), connector.safe_info(SafeSelector::Owner(me)).await?);
-        assert_eq!(Some(safe), connector.safe_info(SafeSelector::Address(safe_addr)).await?);
-
+        assert_eq!(
+            Some(safe.clone()),
+            connector.safe_info(SafeSelector::Address(safe_addr)).await?
+        );
+        assert_eq!(
+            Some(safe),
+            connector.safe_info(SafeSelector::NodeAddress(node_addr)).await?
+        );
         insta::assert_yaml_snapshot!(*connector.client.snapshot());
 
         Ok(())

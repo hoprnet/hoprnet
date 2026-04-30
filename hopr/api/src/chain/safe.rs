@@ -26,6 +26,8 @@ pub enum SafeSelector {
     Owner(Address),
     /// Selects Safes with the given address.
     Address(Address),
+    /// Selects Safes linked to the given node address
+    NodeAddress(Address),
 }
 
 impl SafeSelector {
@@ -33,6 +35,7 @@ impl SafeSelector {
         match self {
             SafeSelector::Owner(owner) => &safe.owner == owner,
             SafeSelector::Address(address) => &safe.address == address,
+            SafeSelector::NodeAddress(node_address) => safe.registered_nodes.contains(node_address),
         }
     }
 }

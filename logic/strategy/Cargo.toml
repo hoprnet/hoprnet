@@ -1,6 +1,6 @@
 [package]
 name = "hopr-strategy"
-version = "0.17.2"
+version = "0.17.3"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains implementations of different HOPR strategies"
 edition = "2024"
