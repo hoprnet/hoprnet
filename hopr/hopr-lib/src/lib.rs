@@ -115,6 +115,13 @@ impl From<HopRouting> for hopr_api::types::internal::routing::RoutingOptions {
     }
 }
 
+#[cfg(feature = "session-client")]
+impl std::fmt::Display for HopRouting {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}-hop routing", self.hop_count())
+    }
+}
+
 /// Session client configuration for `hopr-lib`.
 ///
 /// Unlike transport-level configuration, this API intentionally does not expose
@@ -252,6 +259,17 @@ pub struct Hopr<Chain, Graph, Net, TMgr> {
     pub(crate) ticket_manager: TMgr,
     #[allow(dead_code)] // Handles must stay alive to keep background tasks running
     pub(crate) processes: AbortableList<HoprLibProcess>,
+}
+
+impl<Chain, Graph, Net, TMgr> std::fmt::Debug for Hopr<Chain, Graph, Net, TMgr> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Hopr")
+            .field("identity", &self.chain_id)
+            .field("state", &self.state.load(std::sync::atomic::Ordering::Relaxed))
+            .field("config", &self.cfg)
+            .field("processes", &self.processes)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<Chain, Graph, Net, TMgr> Hopr<Chain, Graph, Net, TMgr>
@@ -619,23 +637,18 @@ where
     }
 }
 
-impl<Chain, Graph, Net, TMgr> Hopr<Chain, Graph, Net, TMgr> {
-    /// Prometheus formatted metrics collected by the hopr-lib components.
-    pub fn collect_hopr_metrics() -> errors::Result<String> {
-        cfg_if::cfg_if! {
-            if #[cfg(all(feature = "telemetry", not(test)))] {
-                hopr_metrics::gather_all_metrics().map_err(HoprLibError::other)
-            } else {
-                Err(HoprLibError::GeneralError("BUILT WITHOUT METRICS SUPPORT".into()))
-            }
-        }
-    }
-}
-
 impl<Chain, Graph, Net, TMgr> HoprNodeOperations for Hopr<Chain, Graph, Net, TMgr> {
     fn status(&self) -> HoprState {
         self.state.load(Ordering::Relaxed)
     }
+}
+
+/// Prometheus-formatted metrics collected by the hopr-lib components.
+///
+/// Only available when compiled with the `telemetry` feature.
+#[cfg(feature = "telemetry")]
+pub fn collect_hopr_metrics() -> errors::Result<String> {
+    hopr_metrics::gather_all_metrics().map_err(HoprLibError::other)
 }
 
 #[cfg(test)]

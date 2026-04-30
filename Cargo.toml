@@ -222,7 +222,7 @@ mimalloc = { version = "0.1.50", default-features = false, features = [
   "secure",
 ] }
 
-hopr-api = { version = "1.8.1" }
+hopr-api = { version = "1.8.2" }
 hopr-types = { version = "1.5.4", features = ["use-bindings"] }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-crypto-keypair = { path = "crypto/keypair", default-features = false }

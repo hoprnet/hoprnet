@@ -4456,9 +4456,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "1.8.1"
+version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7b63138c13e08d2bbc8bd73bd97628a8aaccf17848ce29a62026150a0e24e22"
+checksum = "1ed6b52e38053a83ad25a0a0eb53e09a1dc8bcb9b69b11d9d693a59e662d69de"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -4506,7 +4506,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.19.1"
+version = "0.19.2"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4649,7 +4649,6 @@ dependencies = [
  "async-broadcast",
  "async-trait",
  "backon",
- "cfg-if",
  "cfg_eval",
  "const_format",
  "futures",
@@ -4941,7 +4940,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-strategy"
-version = "0.18.0"
+version = "0.18.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5460,7 +5459,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-localcluster"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "anyhow",
  "clap",
