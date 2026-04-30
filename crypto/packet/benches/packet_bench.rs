@@ -27,7 +27,8 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 const SAMPLE_SIZE: usize = 100_000;
 
 /// Pairs of (hops, surb_count) to benchmark.
-const PACKET_BENCHMARK: [(usize, usize); 7] = [
+#[cfg(feature = "run-all-benchmarks")]
+const PACKET_BENCHMARK: &[(usize, usize)] = &[
     (0, 0), // 0-hop 0 SURBs = used for packet acknowledgements
     (1, 1), // 1-hop 1 SURB = common GnosisVPN use-case
     (1, 2), // 1-hop 2 SURBs = GnosisVPN use-case with asymmetric traffic (non-TCP)
@@ -35,6 +36,10 @@ const PACKET_BENCHMARK: [(usize, usize); 7] = [
     (2, 2), // 2-hop 2 SURBs = GnosisVPN use-case with asymmetric traffic (non-TCP)
     (3, 1), // 3-hop 1 SURB = common GnosisVPN use-case
     (3, 2), // 3-hop 2 SURBs = GnosisVPN use-case with asymmetric traffic (non-TCP)
+];
+#[cfg(not(feature = "run-all-benchmarks"))]
+const PACKET_BENCHMARK: &[(usize, usize)] = &[
+    (3, 2), // 3-hop 2 SURBs = worst case
 ];
 
 lazy_static::lazy_static! {
@@ -65,7 +70,7 @@ pub fn packet_sending_bench(c: &mut Criterion) {
     group.measurement_time(std::time::Duration::from_secs(30));
     group.throughput(Throughput::Elements(1));
 
-    for (hops, surb_count) in PACKET_BENCHMARK {
+    for &(hops, surb_count) in PACKET_BENCHMARK {
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{hops}_hop_{surb_count}_surbs")),
             &(hops, surb_count),
@@ -118,7 +123,11 @@ pub fn packet_sending_bench(c: &mut Criterion) {
 
     // This benchmark does not depend on the number of SURBs, because they are created in the precomputation step
 
-    for hops in [0, 1, 2, 3] {
+    for &hops in if cfg!(feature = "run-all-benchmarks") {
+        &[0, 1, 2, 3][..]
+    } else {
+        &[3][..]
+    } {
         group.bench_with_input(BenchmarkId::from_parameter(format!("{hops}_hop")), &hops, |b, &hops| {
             // The number of hops for ticket creation does not matter for benchmark purposes
             let tb = TicketBuilder::zero_hop().counterparty(destination_chain.public().to_address());
@@ -161,7 +170,7 @@ pub fn packet_precompute_bench(c: &mut Criterion) {
     group.throughput(Throughput::Elements(1));
     group.measurement_time(std::time::Duration::from_secs(30));
 
-    for (hops, surb_count) in PACKET_BENCHMARK {
+    for &(hops, surb_count) in PACKET_BENCHMARK {
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{hops}_hop_{surb_count}_surbs")),
             &(hops, surb_count),

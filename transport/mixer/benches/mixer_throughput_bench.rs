@@ -85,14 +85,19 @@ fn send_continuous_channel_load_through_sink_pipe(
 }
 
 pub fn mixer_channel_throughput_minimal_mixing(c: &mut Criterion) {
+    let sizes: &[usize] = if cfg!(feature = "run-all-benchmarks") {
+        &[
+            10 * 1024 * 2 * RANDOM_GIBBERISH.len(),
+            40 * 1024 * 2 * RANDOM_GIBBERISH.len(),
+        ]
+    } else {
+        &[40 * 1024 * 2 * RANDOM_GIBBERISH.len()]
+    };
     mixer_throughput(
         c,
         minimal_delay_mixer_cfg(),
         "mixer_channel",
-        &[
-            10 * 1024 * 2 * RANDOM_GIBBERISH.len(),
-            40 * 1024 * 2 * RANDOM_GIBBERISH.len(),
-        ],
+        sizes,
         send_continuous_channel_load,
     );
 }

@@ -11,6 +11,7 @@ crate-type = ["rlib"]
 
 [features]
 default = []
+run-all-benchmarks = []
 telemetry = ["dep:hopr-metrics", "hopr-protocol-hopr/telemetry"]
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 serde = [

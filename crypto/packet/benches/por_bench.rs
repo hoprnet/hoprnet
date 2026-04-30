@@ -33,7 +33,11 @@ pub fn proof_of_relay_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("proof_of_relay_bench");
     group.sample_size(SAMPLE_SIZE);
 
-    for hop in [0, 1, 2, 3].iter() {
+    for hop in if cfg!(feature = "run-all-benchmarks") {
+        &[0, 1, 2, 3][..]
+    } else {
+        &[3][..]
+    } {
         group.throughput(Throughput::Elements(1));
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("por_create_{hop}_hop")),

@@ -109,12 +109,11 @@ fn build_graph(node_count: usize, density: usize) -> (ChannelGraph, Vec<Offchain
 fn bench_simple_paths(c: &mut Criterion) {
     let mut group = c.benchmark_group("NetworkGraphTraverse/simple_paths");
 
-    for (size, density) in [
-        (10, 10),
-        (100, 10),
-        (100, 100),
-        (1_000, 1_000),
-    ] {
+    for &(size, density) in if cfg!(feature = "run-all-benchmarks") {
+        &[(10, 10), (100, 10), (100, 100), (1_000, 1_000)][..]
+    } else {
+        &[(1_000, 1_000)][..]
+    } {
         let (graph, keys) = build_graph(size, density);
         let me = &keys[0];
         let epn = (size - 1).min(density); // effective edges per node
@@ -194,18 +193,20 @@ fn bench_simple_paths(c: &mut Criterion) {
 fn bench_simple_loopback(c: &mut Criterion) {
     let mut group = c.benchmark_group("NetworkGraphTraverse/simple_loopback_to_self");
 
-    for (size, density) in [
-        (10, 10),
-        (100, 10),
-        (100, 100),
-        (1_000, 100),
-        (1_000, 1_000),
-    ] {
+    for &(size, density) in if cfg!(feature = "run-all-benchmarks") {
+        &[(10, 10), (100, 10), (100, 100), (1_000, 100), (1_000, 1_000)][..]
+    } else {
+        &[(1_000, 1_000)][..]
+    } {
         let (graph, _keys) = build_graph(size, density);
         let param = format!("{size}nodes/{density}x");
         // At 1000nodes/1000x the graph is nearly complete — take_count=10 is hit at every depth,
         // so 3-edge and 4-edge produce identical results to 2-edge.
-        let depths: &[usize] = if size == 1_000 && density == 1_000 { &[2] } else { &[2, 3, 4] };
+        let depths: &[usize] = if size == 1_000 && density == 1_000 {
+            &[2]
+        } else {
+            &[2, 3, 4]
+        };
 
         for &depth in depths {
             group.bench_with_input(BenchmarkId::new(&format!("{depth}-edge"), &param), &size, |b, _| {
