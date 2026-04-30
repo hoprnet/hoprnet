@@ -114,7 +114,7 @@ pub trait AsUnixTimestamp {
 
 impl AsUnixTimestamp for std::time::SystemTime {
     fn as_unix_timestamp(&self) -> std::time::Duration {
-        self.saturating_sub(std::time::SystemTime::UNIX_EPOCH)
+        SaturatingSub::saturating_sub(self, std::time::SystemTime::UNIX_EPOCH)
     }
 }
 

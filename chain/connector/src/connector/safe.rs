@@ -153,10 +153,7 @@ mod tests {
 
         let connector = create_connector(blokli_client)?;
 
-        assert_eq!(
-            Some(safe.clone()),
-            connector.safe_info(SafeSelector::NodeAddress(me)).await?
-        );
+        assert_eq!(Some(safe.clone()), connector.safe_info(SafeSelector::Owner(me)).await?);
         assert_eq!(
             Some(safe.clone()),
             connector.safe_info(SafeSelector::Address(safe_addr)).await?

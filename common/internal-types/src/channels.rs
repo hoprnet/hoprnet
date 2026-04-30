@@ -59,7 +59,7 @@ impl PartialEq for ChannelStatus {
             (Self::Open, Self::Open) => true,
             (Self::Closed, Self::Closed) => true,
             (Self::PendingToClose(ct_1), Self::PendingToClose(ct_2)) => {
-                let diff = ct_1.max(ct_2).saturating_sub(*ct_1.min(ct_2));
+                let diff = hopr_primitive_types::traits::SaturatingSub::saturating_sub(ct_1, *ct_2);
                 diff.as_secs() == 0
             }
             _ => false,
@@ -178,7 +178,9 @@ impl ChannelEntry {
     pub fn remaining_closure_time(&self, current_time: SystemTime) -> Option<Duration> {
         match self.status {
             ChannelStatus::Open => None,
-            ChannelStatus::PendingToClose(closure_time) => Some(closure_time.saturating_sub(current_time)),
+            ChannelStatus::PendingToClose(closure_time) => Some(
+                hopr_primitive_types::traits::SaturatingSub::saturating_sub(&closure_time, current_time),
+            ),
             ChannelStatus::Closed => Some(Duration::ZERO),
         }
     }
