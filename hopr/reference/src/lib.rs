@@ -14,7 +14,7 @@ pub use hopr_lib;
 /// Re-export the canonical channel graph type for downstream crates.
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_network_graph::SharedChannelGraph;
-use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue};
+use hopr_ticket_manager::{HoprTicketFactory, HoprTicketManager, RedbStore, RedbTicketQueue};
 /// Re-export the canonical network type for downstream crates.
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_p2p::HoprNetwork;
@@ -26,7 +26,7 @@ use {
         blokli_client::{BlokliClient, BlokliClientConfig},
         create_trustful_hopr_blokli_connector,
     },
-    hopr_lib::builder::{ChainKeypair, Keypair, OffchainKeypair},
+    hopr_lib::builder::{ChainKeypair, HoprBuilderConfigured, Keypair, OffchainKeypair},
     hopr_lib::{Hopr, api::types::primitive::prelude::Address, config::HoprLibConfig},
     hopr_network_graph::ChannelGraph,
     hopr_transport_p2p::HoprLibp2pNetworkBuilder,
@@ -36,10 +36,9 @@ use {
 #[cfg(feature = "session-server")]
 use crate::{config::SessionIpForwardingConfig, exit::HoprServerIpForwardingReactor};
 
-/// No-op session server used by [`build_edge`] when the `session-server` feature is enabled.
-///
-/// Edge nodes do not serve incoming sessions, so the builder still needs a concrete type
-/// to satisfy the `build_with_chain` signature — this type simply drops every session.
+/// No-op session server used by [`build_edge_with_chain`] when the `session-server` feature is
+/// enabled. Edge nodes do not serve incoming sessions; this type satisfies the builder's
+/// session-server type parameter without doing any work.
 #[cfg(feature = "session-server")]
 #[derive(Debug, Clone, Default)]
 struct NoopSessionServer;
@@ -58,10 +57,25 @@ impl hopr_lib::api::node::HoprSessionServer for NoopSessionServer {
 /// Shareable [`HoprTicketManager`] with [`RedbStore`] backend.
 pub type SharedTicketManager = Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>;
 
-/// The canonical HOPR node type using the Blokli chain connector and canonical implementations.
+/// The canonical full relay HOPR node type using the Blokli chain connector.
 #[cfg(feature = "runtime-tokio")]
-pub type FullHopr =
-    Hopr<Arc<HoprBlockchainSafeConnector<BlokliClient>>, SharedChannelGraph, HoprNetwork, SharedTicketManager>;
+pub type FullHopr<
+    Chain = Arc<HoprBlockchainSafeConnector<BlokliClient>>,
+    Graph = SharedChannelGraph,
+    Net = HoprNetwork,
+    TMgr = SharedTicketManager,
+> = Hopr<Chain, Graph, Net, TMgr>;
+
+/// The canonical edge (entry/exit) HOPR node type using the Blokli chain connector.
+///
+/// Unlike [`FullHopr`], this type carries no ticket manager (`TMgr = ()`); edge nodes
+/// originate outgoing tickets but never relay incoming ones.
+#[cfg(feature = "runtime-tokio")]
+pub type EdgeHopr<
+    Chain = Arc<HoprBlockchainSafeConnector<BlokliClient>>,
+    Graph = SharedChannelGraph,
+    Net = HoprNetwork,
+> = Hopr<Chain, Graph, Net, ()>;
 
 /// Re-export so downstream crates (e.g. `edgli`) do not need a direct
 /// `hopr-chain-connector` dependency.
@@ -72,11 +86,20 @@ pub use hopr_chain_connector;
 // Private helpers
 // ---------------------------------------------------------------------------
 
+/// Shorthand for the fully-configured builder type returned by [`configure_node`].
+#[cfg(feature = "runtime-tokio")]
+type NodeBuilder<Chain> = HoprBuilderConfigured<
+    Chain,
+    SharedChannelGraph,
+    HoprNetwork,
+    hopr_ct_full_network::FullNetworkDiscovery<SharedChannelGraph>,
+>;
+
 /// Creates and connects the default Blokli chain connector used by the
 /// convenience builder functions ([`build_edge`] and [`build_full_with_session_server`]).
 ///
 /// Callers that need a non-default connector configuration should create the
-/// connector themselves and call [`build_with_chain`] directly.
+/// connector themselves and call [`build_edge_with_chain`] or [`build_full_with_chain`] directly.
 #[cfg(feature = "runtime-tokio")]
 async fn create_default_blokli_connector(
     chain_key: &ChainKeypair,
@@ -113,146 +136,19 @@ async fn create_default_blokli_connector(
     Ok(Arc::new(chain_connector))
 }
 
-// ---------------------------------------------------------------------------
-// Level-1 convenience builders (opinionated config, creates connector internally)
-// ---------------------------------------------------------------------------
-
-/// Builds an edge (entry/exit) [`FullHopr`] node using the default Blokli chain connector.
-///
-/// This is the opinionated convenience builder for edge nodes — it creates the
-/// chain connector from `blokli_url` using well-known defaults and delegates all
-/// subsystem wiring to [`build_with_chain`].
-///
-/// For a non-default connector configuration use [`build_with_chain`] directly.
+/// Wires all ticket-agnostic subsystems (chain forwarder, graph, network, cover-traffic)
+/// and returns a fully configured builder ready for the edge or full build terminal.
 #[cfg(feature = "runtime-tokio")]
-pub async fn build_edge(
-    identity: (&ChainKeypair, &OffchainKeypair),
-    config: HoprLibConfig,
-    blokli_url: String,
-) -> anyhow::Result<Arc<FullHopr>> {
-    let (chain_key, packet_key) = identity;
-    let module_address = config.safe_module.module_address;
-    let chain_connector = create_default_blokli_connector(chain_key, blokli_url, module_address).await?;
-
-    build_with_chain(
-        chain_key,
-        packet_key,
-        config,
-        None,
-        chain_connector,
-        #[cfg(feature = "session-server")]
-        NoopSessionServer,
-    )
-    .await
-}
-
-/// Builds a full relay [`FullHopr`] node with a session server using the default
-/// Blokli chain connector.
-///
-/// This is the opinionated convenience builder for relay nodes that also serve
-/// incoming sessions. It creates the chain connector from `blokli_url` using
-/// well-known defaults and delegates all subsystem wiring to [`build_with_chain`].
-///
-/// For a non-default connector configuration use [`build_with_chain`] directly.
-#[cfg(feature = "runtime-tokio")]
-pub async fn build_full_with_session_server(
-    identity: (&ChainKeypair, &OffchainKeypair),
-    config: HoprLibConfig,
-    blokli_url: String,
-    #[cfg(feature = "session-server")] server_config: SessionIpForwardingConfig,
-) -> anyhow::Result<Arc<FullHopr>> {
-    let (chain_key, packet_key) = identity;
-    let module_address = config.safe_module.module_address;
-    let chain_connector = create_default_blokli_connector(chain_key, blokli_url, module_address).await?;
-
-    #[cfg(feature = "session-server")]
-    let session_server = HoprServerIpForwardingReactor::new(packet_key.clone(), server_config);
-
-    build_with_chain(
-        chain_key,
-        packet_key,
-        config,
-        None,
-        chain_connector,
-        #[cfg(feature = "session-server")]
-        session_server,
-    )
-    .await
-}
-
-// ---------------------------------------------------------------------------
-// Level-2 flexible builder (bring your own chain connector)
-// ---------------------------------------------------------------------------
-
-/// Builds a HOPR node with a custom chain connector using canonical implementations
-/// for all other components.
-///
-/// This is the shared internal entry point used by both [`build_edge`] and
-/// [`build_full_with_session_server`]. Call it directly when you need a
-/// non-default chain connector (e.g. custom [`BlockchainConnectorConfig`] or a
-/// test-only chain connector).
-#[cfg(feature = "runtime-tokio")]
-pub async fn build_with_chain<
-    Chain,
-    #[cfg(feature = "session-server")] Srv: hopr_lib::api::node::HoprSessionServer<
-            Session = hopr_lib::exports::transport::IncomingSession,
-            Error: std::fmt::Display,
-        > + Clone
-        + Send
-        + 'static,
->(
+async fn configure_node<Chain>(
     chain_key: &ChainKeypair,
     packet_key: &OffchainKeypair,
     config: HoprLibConfig,
     probe_cfg: Option<hopr_ct_full_network::ProberConfig>,
     chain_connector: Chain,
-    #[cfg(feature = "session-server")] server: Srv,
-) -> anyhow::Result<Arc<Hopr<Chain, SharedChannelGraph, HoprNetwork, SharedTicketManager>>>
+) -> anyhow::Result<NodeBuilder<Chain>>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
-    if let Some(ref pcfg) = probe_cfg {
-        pcfg.validate()
-            .map_err(|e| anyhow::anyhow!("invalid ProberConfig: {e}"))?;
-        let probe_timeout = config.protocol.probe.timeout;
-        anyhow::ensure!(
-            pcfg.interval >= probe_timeout,
-            "ProberConfig interval ({:?}) must be >= ProbeConfig timeout ({:?})",
-            pcfg.interval,
-            probe_timeout,
-        );
-    }
-
-    let backend = RedbStore::new_temp().map_err(hopr_ticket_manager::TicketManagerError::store)?;
-    let (ticket_manager, ticket_factory) = HoprTicketManager::new_with_factory(backend);
-    let ticket_manager = Arc::new(ticket_manager);
-    let ticket_factory = Arc::new(ticket_factory);
-
-    // Sync ticket manager and factory with on-chain state
-    {
-        use futures::StreamExt;
-        use hopr_lib::api::chain::ChannelSelector;
-
-        let me = chain_connector.me();
-        let incoming_channels: Vec<_> = chain_connector
-            .stream_channels(ChannelSelector::default().with_destination(*me))
-            .map_err(|e| anyhow::anyhow!("failed to stream incoming channels: {e}"))?
-            .collect()
-            .await;
-        ticket_manager
-            .sync_from_incoming_channels(&incoming_channels)
-            .map_err(|e| anyhow::anyhow!("failed to sync ticket manager: {e}"))?;
-
-        let outgoing_channels: Vec<_> = chain_connector
-            .stream_channels(ChannelSelector::default().with_source(*me))
-            .map_err(|e| anyhow::anyhow!("failed to stream outgoing channels: {e}"))?
-            .collect()
-            .await;
-        ticket_factory
-            .sync_from_outgoing_channels(&outgoing_channels)
-            .map_err(|e| anyhow::anyhow!("failed to sync ticket factory: {e}"))?;
-    }
-
     // Chain→peer-discovery wiring
     let (peer_discovery_tx, peer_discovery_rx) = futures::channel::mpsc::channel(2048);
     {
@@ -325,9 +221,195 @@ where
             hopr_ct_full_network::FullNetworkDiscovery::new(*ctx.packet_key.public(), prober_cfg, graph_for_ct)
         });
 
-    #[cfg(feature = "session-server")]
-    let builder = builder.with_session_server(server);
+    Ok(builder)
+}
 
+// ---------------------------------------------------------------------------
+// Level-1 convenience builders (opinionated config, creates connector internally)
+// ---------------------------------------------------------------------------
+
+/// Builds an edge (entry/exit) [`EdgeHopr`] node using the default Blokli chain connector.
+///
+/// For a non-default connector configuration use [`build_edge_with_chain`] directly.
+#[cfg(feature = "runtime-tokio")]
+pub async fn build_edge(
+    identity: (&ChainKeypair, &OffchainKeypair),
+    config: HoprLibConfig,
+    blokli_url: String,
+) -> anyhow::Result<Arc<EdgeHopr>> {
+    let (chain_key, packet_key) = identity;
+    let module_address = config.safe_module.module_address;
+    let chain_connector = create_default_blokli_connector(chain_key, blokli_url, module_address).await?;
+
+    build_edge_with_chain(chain_key, packet_key, config, None, chain_connector).await
+}
+
+/// Builds a full relay [`FullHopr`] node with a session server using the default
+/// Blokli chain connector.
+///
+/// For a non-default connector configuration use [`build_full_with_chain`] directly.
+#[cfg(feature = "runtime-tokio")]
+pub async fn build_full_with_session_server(
+    identity: (&ChainKeypair, &OffchainKeypair),
+    config: HoprLibConfig,
+    blokli_url: String,
+    #[cfg(feature = "session-server")] server_config: SessionIpForwardingConfig,
+) -> anyhow::Result<Arc<FullHopr>> {
+    let (chain_key, packet_key) = identity;
+    let module_address = config.safe_module.module_address;
+    let chain_connector = create_default_blokli_connector(chain_key, blokli_url, module_address).await?;
+
+    #[cfg(feature = "session-server")]
+    let session_server = HoprServerIpForwardingReactor::new(packet_key.clone(), server_config);
+
+    build_full_with_chain(
+        chain_key,
+        packet_key,
+        config,
+        None,
+        chain_connector,
+        #[cfg(feature = "session-server")]
+        session_server,
+    )
+    .await
+}
+
+// ---------------------------------------------------------------------------
+// Level-2 flexible builders (bring your own chain connector)
+// ---------------------------------------------------------------------------
+
+/// Builds an edge (entry/exit) HOPR node with a custom chain connector.
+///
+/// Edge nodes do not relay incoming packets and carry no ticket manager
+/// (`TMgr = ()`), which is reflected in the [`EdgeHopr`] return type.
+/// Use this when you need a non-default chain connector; otherwise prefer [`build_edge`].
+#[cfg(feature = "runtime-tokio")]
+pub async fn build_edge_with_chain<Chain>(
+    chain_key: &ChainKeypair,
+    packet_key: &OffchainKeypair,
+    config: HoprLibConfig,
+    probe_cfg: Option<hopr_ct_full_network::ProberConfig>,
+    chain_connector: Chain,
+) -> anyhow::Result<Arc<EdgeHopr<Chain>>>
+where
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+{
+    if let Some(ref pcfg) = probe_cfg {
+        pcfg.validate()
+            .map_err(|e| anyhow::anyhow!("invalid ProberConfig: {e}"))?;
+        let probe_timeout = config.protocol.probe.timeout;
+        anyhow::ensure!(
+            pcfg.interval >= probe_timeout,
+            "ProberConfig interval ({:?}) must be >= ProbeConfig timeout ({:?})",
+            pcfg.interval,
+            probe_timeout,
+        );
+    }
+
+    let backend = RedbStore::new_temp().map_err(hopr_ticket_manager::TicketManagerError::store)?;
+    let ticket_factory = Arc::new(HoprTicketFactory::new(backend));
+
+    {
+        use futures::StreamExt;
+        use hopr_lib::api::chain::ChannelSelector;
+
+        let me = chain_connector.me();
+        let outgoing_channels: Vec<_> = chain_connector
+            .stream_channels(ChannelSelector::default().with_source(*me))
+            .map_err(|e| anyhow::anyhow!("failed to stream outgoing channels: {e}"))?
+            .collect()
+            .await;
+        ticket_factory
+            .sync_from_outgoing_channels(&outgoing_channels)
+            .map_err(|e| anyhow::anyhow!("failed to sync ticket factory: {e}"))?;
+    }
+
+    let builder = configure_node(chain_key, packet_key, config, probe_cfg, chain_connector).await?;
+
+    #[cfg(feature = "session-server")]
+    let node = builder
+        .with_session_server(NoopSessionServer)
+        .build_edge(ticket_factory)
+        .await?;
+    #[cfg(not(feature = "session-server"))]
+    let node = builder.build_edge(ticket_factory).await?;
+
+    Ok(Arc::new(node))
+}
+
+/// Builds a full relay HOPR node with a custom chain connector and session server.
+///
+/// Use this when you need a non-default chain connector; otherwise prefer
+/// [`build_full_with_session_server`].
+#[cfg(feature = "runtime-tokio")]
+pub async fn build_full_with_chain<
+    Chain,
+    #[cfg(feature = "session-server")] Srv: hopr_lib::api::node::HoprSessionServer<
+            Session = hopr_lib::exports::transport::IncomingSession,
+            Error: std::fmt::Display,
+        > + Clone
+        + Send
+        + 'static,
+>(
+    chain_key: &ChainKeypair,
+    packet_key: &OffchainKeypair,
+    config: HoprLibConfig,
+    probe_cfg: Option<hopr_ct_full_network::ProberConfig>,
+    chain_connector: Chain,
+    #[cfg(feature = "session-server")] server: Srv,
+) -> anyhow::Result<Arc<FullHopr<Chain>>>
+where
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+{
+    if let Some(ref pcfg) = probe_cfg {
+        pcfg.validate()
+            .map_err(|e| anyhow::anyhow!("invalid ProberConfig: {e}"))?;
+        let probe_timeout = config.protocol.probe.timeout;
+        anyhow::ensure!(
+            pcfg.interval >= probe_timeout,
+            "ProberConfig interval ({:?}) must be >= ProbeConfig timeout ({:?})",
+            pcfg.interval,
+            probe_timeout,
+        );
+    }
+
+    let backend = RedbStore::new_temp().map_err(hopr_ticket_manager::TicketManagerError::store)?;
+    let (ticket_manager, ticket_factory) = HoprTicketManager::new_with_factory(backend);
+    let ticket_manager = Arc::new(ticket_manager);
+    let ticket_factory = Arc::new(ticket_factory);
+
+    {
+        use futures::StreamExt;
+        use hopr_lib::api::chain::ChannelSelector;
+
+        let me = chain_connector.me();
+        let incoming_channels: Vec<_> = chain_connector
+            .stream_channels(ChannelSelector::default().with_destination(*me))
+            .map_err(|e| anyhow::anyhow!("failed to stream incoming channels: {e}"))?
+            .collect()
+            .await;
+        ticket_manager
+            .sync_from_incoming_channels(&incoming_channels)
+            .map_err(|e| anyhow::anyhow!("failed to sync ticket manager: {e}"))?;
+
+        let outgoing_channels: Vec<_> = chain_connector
+            .stream_channels(ChannelSelector::default().with_source(*me))
+            .map_err(|e| anyhow::anyhow!("failed to stream outgoing channels: {e}"))?
+            .collect()
+            .await;
+        ticket_factory
+            .sync_from_outgoing_channels(&outgoing_channels)
+            .map_err(|e| anyhow::anyhow!("failed to sync ticket factory: {e}"))?;
+    }
+
+    let builder = configure_node(chain_key, packet_key, config, probe_cfg, chain_connector).await?;
+
+    #[cfg(feature = "session-server")]
+    let node = builder
+        .with_session_server(server)
+        .build_full(ticket_manager, ticket_factory)
+        .await?;
+    #[cfg(not(feature = "session-server"))]
     let node = builder.build_full(ticket_manager, ticket_factory).await?;
 
     Ok(Arc::new(node))
