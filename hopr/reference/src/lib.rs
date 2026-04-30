@@ -36,24 +36,6 @@ use {
 #[cfg(feature = "session-server")]
 use crate::{config::SessionIpForwardingConfig, exit::HoprServerIpForwardingReactor};
 
-/// No-op session server used by [`build_edge`] when the `session-server` feature is enabled.
-/// Edge nodes do not serve incoming sessions; this type satisfies the builder's session-server
-/// type parameter without doing any work.
-#[cfg(feature = "session-server")]
-#[derive(Debug, Clone, Default)]
-pub struct NoopSessionServer;
-
-#[cfg(feature = "session-server")]
-#[async_trait::async_trait]
-impl hopr_lib::api::node::HoprSessionServer for NoopSessionServer {
-    type Error = std::convert::Infallible;
-    type Session = hopr_lib::exports::transport::IncomingSession;
-
-    async fn process(&self, _session: Self::Session) -> Result<(), Self::Error> {
-        Ok(())
-    }
-}
-
 /// Shareable [`HoprTicketManager`] with [`RedbStore`] backend.
 pub type SharedTicketManager = Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>;
 
@@ -232,10 +214,18 @@ where
 ///
 /// For a non-default connector configuration use [`build_edge_with_chain`] directly.
 #[cfg(feature = "runtime-tokio")]
-pub async fn build_edge(
+pub async fn build_edge<
+    #[cfg(feature = "session-server")] Srv: hopr_lib::api::node::HoprSessionServer<
+            Session = hopr_lib::exports::transport::IncomingSession,
+            Error: std::fmt::Display,
+        > + Clone
+        + Send
+        + 'static,
+>(
     identity: (&ChainKeypair, &OffchainKeypair),
     config: HoprLibConfig,
     blokli_url: String,
+    #[cfg(feature = "session-server")] server: Srv,
 ) -> anyhow::Result<Arc<EdgeHopr>> {
     let (chain_key, packet_key) = identity;
     let module_address = config.safe_module.module_address;
@@ -248,7 +238,7 @@ pub async fn build_edge(
         None,
         chain_connector,
         #[cfg(feature = "session-server")]
-        NoopSessionServer,
+        server,
     )
     .await
 }
