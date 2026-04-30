@@ -36,7 +36,7 @@ native_balances:
     balance: 0 xDai
   bea83ba0fcee21da44a30c893f466e6bf0c29bbb:
     __typename: NativeBalance
-    balance: 0.999999999999999999 xDai
+    balance: 0.999999999999999998 xDai
   259bed99d230648d7c8a116af59abdd15c9f4f1e:
     __typename: NativeBalance
     balance: 0 xDai
@@ -100,7 +100,8 @@ deployed_safes:
     address: 259bed99d230648d7c8a116af59abdd15c9f4f1e
     chain_key: bea83ba0fcee21da44a30c893f466e6bf0c29bbb
     module_address: ff263744a4621e2cac0f4882cc623bee3c9aef8d
-    registered_nodes: []
+    registered_nodes:
+      - bea83ba0fcee21da44a30c893f466e6bf0c29bbb
   0f944bc36fdcf97fff6807174eeb839ecd6035bd:
     address: 0f944bc36fdcf97fff6807174eeb839ecd6035bd
     chain_key: b6021e0860dd9d96c9ff0a73e2e5ba3a466ba234
@@ -112,7 +113,7 @@ deployed_safes:
     module_address: c6cf223b5fa5a0002e5f975453407134b848c312
     registered_nodes: []
 tx_counts:
-  bea83ba0fcee21da44a30c893f466e6bf0c29bbb: 1
+  bea83ba0fcee21da44a30c893f466e6bf0c29bbb: 2
 channels:
   8a0da13eba62860787c9f93a665d2235d8e9632c491dc577ce9dd28d5be8a091:
     balance: 0.00000000000000001 wxHOPR
