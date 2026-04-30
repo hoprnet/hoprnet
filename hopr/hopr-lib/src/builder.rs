@@ -553,12 +553,6 @@ where
         let graph_updater = graph.clone();
         let chain_reader = chain_api.clone();
 
-        // The node's own chain→packet key mapping may not be in the key database when channel
-        // events fire. Edge nodes that announce with empty multiaddresses (publish: false) get
-        // AccountType::Announced([]) which has has_announced_with_routing_info() == false, so
-        // they are excluded from the PublicAccounts state sync. There is also a race between the
-        // background account-stream inserting the own account and channel capacity lookup running.
-        // Resolve both problems by short-circuiting to the known own keys.
         let own_chain_addr = me_onchain;
         let own_packet_key = *transport_id.public();
 
