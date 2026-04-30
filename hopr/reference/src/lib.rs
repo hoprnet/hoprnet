@@ -11,7 +11,13 @@ use std::sync::Arc;
 
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_lib;
+/// Re-export the canonical channel graph type for downstream crates.
+#[cfg(feature = "runtime-tokio")]
+pub use hopr_network_graph::SharedChannelGraph;
 use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue};
+/// Re-export the canonical network type for downstream crates.
+#[cfg(feature = "runtime-tokio")]
+pub use hopr_transport_p2p::HoprNetwork;
 #[cfg(feature = "runtime-tokio")]
 use {
     hopr_chain_connector::{
@@ -21,33 +27,62 @@ use {
         create_trustful_hopr_blokli_connector,
     },
     hopr_lib::builder::{ChainKeypair, Keypair, OffchainKeypair},
-    hopr_lib::{Hopr, config::HoprLibConfig},
-    hopr_network_graph::{ChannelGraph, SharedChannelGraph},
-    hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork},
+    hopr_lib::{Hopr, api::types::primitive::prelude::Address, config::HoprLibConfig},
+    hopr_network_graph::ChannelGraph,
+    hopr_transport_p2p::HoprLibp2pNetworkBuilder,
     validator::Validate,
 };
 
 #[cfg(feature = "session-server")]
 use crate::{config::SessionIpForwardingConfig, exit::HoprServerIpForwardingReactor};
 
+/// No-op session server used by [`build_edge`] when the `session-server` feature is enabled.
+///
+/// Edge nodes do not serve incoming sessions, so the builder still needs a concrete type
+/// to satisfy the `build_with_chain` signature — this type simply drops every session.
+#[cfg(feature = "session-server")]
+#[derive(Debug, Clone, Default)]
+struct NoopSessionServer;
+
+#[cfg(feature = "session-server")]
+#[async_trait::async_trait]
+impl hopr_lib::api::node::HoprSessionServer for NoopSessionServer {
+    type Error = std::convert::Infallible;
+    type Session = hopr_lib::exports::transport::IncomingSession;
+
+    async fn process(&self, _session: Self::Session) -> Result<(), Self::Error> {
+        Ok(())
+    }
+}
+
 /// Shareable [`HoprTicketManager`] with [`RedbStore`] backend.
 pub type SharedTicketManager = Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>;
 
-/// The reference HOPR node type using canonical implementations.
+/// The canonical HOPR node type using the Blokli chain connector and canonical implementations.
 #[cfg(feature = "runtime-tokio")]
-pub type ReferenceHopr =
+pub type FullHopr =
     Hopr<Arc<HoprBlockchainSafeConnector<BlokliClient>>, SharedChannelGraph, HoprNetwork, SharedTicketManager>;
 
-/// Builds a reference HOPR node using canonical implementations.
+/// Re-export so downstream crates (e.g. `edgli`) do not need a direct
+/// `hopr-chain-connector` dependency.
 #[cfg(feature = "runtime-tokio")]
-pub async fn build_reference(
-    identity: (&ChainKeypair, &OffchainKeypair),
-    config: HoprLibConfig,
-    blokli_url: String,
-    #[cfg(feature = "session-server")] server_config: SessionIpForwardingConfig,
-) -> anyhow::Result<Arc<ReferenceHopr>> {
-    let (chain_key, packet_key) = identity;
+pub use hopr_chain_connector;
 
+// ---------------------------------------------------------------------------
+// Private helpers
+// ---------------------------------------------------------------------------
+
+/// Creates and connects the default Blokli chain connector used by the
+/// convenience builder functions ([`build_edge`] and [`build_full_with_session_server`]).
+///
+/// Callers that need a non-default connector configuration should create the
+/// connector themselves and call [`build_with_chain`] directly.
+#[cfg(feature = "runtime-tokio")]
+async fn create_default_blokli_connector(
+    chain_key: &ChainKeypair,
+    blokli_url: String,
+    module_address: Address,
+) -> anyhow::Result<Arc<HoprBlockchainSafeConnector<BlokliClient>>> {
     let mut chain_connector = create_trustful_hopr_blokli_connector(
         chain_key,
         BlockchainConnectorConfig {
@@ -71,11 +106,64 @@ pub async fn build_reference(
                 ..Default::default()
             },
         ),
-        config.safe_module.module_address,
+        module_address,
     )
     .await?;
     chain_connector.connect().await?;
-    let chain_connector = Arc::new(chain_connector);
+    Ok(Arc::new(chain_connector))
+}
+
+// ---------------------------------------------------------------------------
+// Level-1 convenience builders (opinionated config, creates connector internally)
+// ---------------------------------------------------------------------------
+
+/// Builds an edge (entry/exit) [`FullHopr`] node using the default Blokli chain connector.
+///
+/// This is the opinionated convenience builder for edge nodes — it creates the
+/// chain connector from `blokli_url` using well-known defaults and delegates all
+/// subsystem wiring to [`build_with_chain`].
+///
+/// For a non-default connector configuration use [`build_with_chain`] directly.
+#[cfg(feature = "runtime-tokio")]
+pub async fn build_edge(
+    identity: (&ChainKeypair, &OffchainKeypair),
+    config: HoprLibConfig,
+    blokli_url: String,
+) -> anyhow::Result<Arc<FullHopr>> {
+    let (chain_key, packet_key) = identity;
+    let module_address = config.safe_module.module_address;
+    let chain_connector = create_default_blokli_connector(chain_key, blokli_url, module_address).await?;
+
+    build_with_chain(
+        chain_key,
+        packet_key,
+        config,
+        None,
+        chain_connector,
+        #[cfg(feature = "session-server")]
+        NoopSessionServer,
+    )
+    .await
+}
+
+/// Builds a full relay [`FullHopr`] node with a session server using the default
+/// Blokli chain connector.
+///
+/// This is the opinionated convenience builder for relay nodes that also serve
+/// incoming sessions. It creates the chain connector from `blokli_url` using
+/// well-known defaults and delegates all subsystem wiring to [`build_with_chain`].
+///
+/// For a non-default connector configuration use [`build_with_chain`] directly.
+#[cfg(feature = "runtime-tokio")]
+pub async fn build_full_with_session_server(
+    identity: (&ChainKeypair, &OffchainKeypair),
+    config: HoprLibConfig,
+    blokli_url: String,
+    #[cfg(feature = "session-server")] server_config: SessionIpForwardingConfig,
+) -> anyhow::Result<Arc<FullHopr>> {
+    let (chain_key, packet_key) = identity;
+    let module_address = config.safe_module.module_address;
+    let chain_connector = create_default_blokli_connector(chain_key, blokli_url, module_address).await?;
 
     #[cfg(feature = "session-server")]
     let session_server = HoprServerIpForwardingReactor::new(packet_key.clone(), server_config);
@@ -92,8 +180,17 @@ pub async fn build_reference(
     .await
 }
 
+// ---------------------------------------------------------------------------
+// Level-2 flexible builder (bring your own chain connector)
+// ---------------------------------------------------------------------------
+
 /// Builds a HOPR node with a custom chain connector using canonical implementations
 /// for all other components.
+///
+/// This is the shared internal entry point used by both [`build_edge`] and
+/// [`build_full_with_session_server`]. Call it directly when you need a
+/// non-default chain connector (e.g. custom [`BlockchainConnectorConfig`] or a
+/// test-only chain connector).
 #[cfg(feature = "runtime-tokio")]
 pub async fn build_with_chain<
     Chain,

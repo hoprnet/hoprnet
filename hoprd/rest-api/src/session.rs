@@ -538,10 +538,8 @@ pub(crate) async fn list_clients<H: Send + Sync + 'static>(
         .map(|v| {
             let ListenerId(_, addr) = *v.key();
             let entry = v.value();
-            let forward_path = hopr_lib::HopRouting::try_from(entry.forward_path.count_hops())
-                .expect("stored routing options always have bounded hop count");
-            let return_path = hopr_lib::HopRouting::try_from(entry.return_path.count_hops())
-                .expect("stored routing options always have bounded hop count");
+            let forward_path = entry.forward_path;
+            let return_path = entry.return_path;
             SessionClientResponse {
                 protocol,
                 ip: addr.ip().to_string(),
