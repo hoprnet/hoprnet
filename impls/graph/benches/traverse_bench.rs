@@ -113,8 +113,6 @@ fn bench_simple_paths(c: &mut Criterion) {
         (10, 10),
         (100, 10),
         (100, 100),
-        (1_000, 10),
-        (1_000, 100),
         (1_000, 1_000),
     ] {
         let (graph, keys) = build_graph(size, density);
@@ -200,24 +198,20 @@ fn bench_simple_loopback(c: &mut Criterion) {
         (10, 10),
         (100, 10),
         (100, 100),
-        (1_000, 10),
         (1_000, 100),
         (1_000, 1_000),
     ] {
         let (graph, _keys) = build_graph(size, density);
         let param = format!("{size}nodes/{density}x");
+        // At 1000nodes/1000x the graph is nearly complete — take_count=10 is hit at every depth,
+        // so 3-edge and 4-edge produce identical results to 2-edge.
+        let depths: &[usize] = if size == 1_000 && density == 1_000 { &[2] } else { &[2, 3, 4] };
 
-        group.bench_with_input(BenchmarkId::new("2-edge", &param), &size, |b, _| {
-            b.iter(|| black_box(graph.simple_loopback_to_self(2, Some(10))));
-        });
-
-        group.bench_with_input(BenchmarkId::new("3-edge", &param), &size, |b, _| {
-            b.iter(|| black_box(graph.simple_loopback_to_self(3, Some(10))));
-        });
-
-        group.bench_with_input(BenchmarkId::new("4-edge", &param), &size, |b, _| {
-            b.iter(|| black_box(graph.simple_loopback_to_self(4, Some(10))));
-        });
+        for &depth in depths {
+            group.bench_with_input(BenchmarkId::new(&format!("{depth}-edge"), &param), &size, |b, _| {
+                b.iter(|| black_box(graph.simple_loopback_to_self(depth, Some(10))));
+            });
+        }
     }
 
     group.finish();
