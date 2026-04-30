@@ -183,7 +183,7 @@ impl<
         let me = *self.hopr_chain_actions.me();
         let safe = self
             .hopr_chain_actions
-            .safe_info(SafeSelector::Owner(me))
+            .safe_info(SafeSelector::NodeAddress(me))
             .await
             .map_err(|e| StrategyError::Other(e.into()))?;
 
@@ -333,6 +333,22 @@ mod tests {
         static ref DAVE: Address = hex!("68499f50ff68d523385dc60686069935d17d762a").into();
     }
 
+    async fn register_test_safe<C>(chain_connector: &C, node_address: Address) -> anyhow::Result<()>
+    where
+        C: HoprChainApi + ChainReadAccountOperations + ChainWriteAccountOperations,
+    {
+        let account = chain_connector
+            .stream_accounts(AccountSelector::default().with_chain_key(node_address))?
+            .next()
+            .await
+            .context("missing test account for node")?;
+        let safe_address = account.safe_address.context("missing test safe address for node")?;
+
+        chain_connector.register_safe(&safe_address).await?.await?;
+
+        Ok(())
+    }
+
     #[test_log::test(tokio::test)]
     async fn test_auto_funding_strategy() -> anyhow::Result<()> {
         let stake_limit = HoprBalance::from(7_u32);
@@ -368,6 +384,7 @@ mod tests {
         let mut chain_connector =
             create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
                 .await?;
+        register_test_safe(&chain_connector, *BOB).await?;
         chain_connector.connect().await?;
         let events = chain_connector.subscribe()?;
 
@@ -472,6 +489,7 @@ mod tests {
         let mut chain_connector =
             create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
                 .await?;
+        register_test_safe(&chain_connector, *BOB).await?;
         chain_connector.connect().await?;
         let events = chain_connector.subscribe()?;
 
@@ -519,6 +537,7 @@ mod tests {
         let mut chain_connector =
             create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
                 .await?;
+        register_test_safe(&chain_connector, *BOB).await?;
         chain_connector.connect().await?;
         let events = chain_connector.subscribe()?;
 
@@ -573,6 +592,7 @@ mod tests {
         let mut chain_connector =
             create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
                 .await?;
+        register_test_safe(&chain_connector, *BOB).await?;
         chain_connector.connect().await?;
         let events = chain_connector.subscribe()?;
 
@@ -637,6 +657,7 @@ mod tests {
         let mut chain_connector =
             create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
                 .await?;
+        register_test_safe(&chain_connector, *BOB).await?;
         chain_connector.connect().await?;
         let _events = chain_connector.subscribe()?;
 
@@ -710,6 +731,7 @@ mod tests {
         let mut chain_connector =
             create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
                 .await?;
+        register_test_safe(&chain_connector, *BOB).await?;
         chain_connector.connect().await?;
         let _events = chain_connector.subscribe()?;
 
@@ -784,6 +806,7 @@ mod tests {
         let mut chain_connector =
             create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
                 .await?;
+        register_test_safe(&chain_connector, *BOB).await?;
         chain_connector.connect().await?;
         let _events = chain_connector.subscribe()?;
 
