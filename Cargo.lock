@@ -4621,7 +4621,6 @@ dependencies = [
  "async-broadcast",
  "async-trait",
  "backon",
- "cfg-if",
  "cfg_eval",
  "const_format",
  "futures",

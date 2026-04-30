@@ -32,7 +32,6 @@ pub fn create_hopr_instance_config(host_port: u16, safe: NodeSafeConfig, winn_pr
         safe_module: hopr_lib::config::SafeModule {
             safe_address: safe.safe_address,
             module_address: safe.module_address,
-            ..Default::default()
         },
         protocol: hopr_lib::config::HoprProtocolConfig {
             transport: hopr_lib::config::TransportConfig {
