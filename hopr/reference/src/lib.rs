@@ -338,10 +338,7 @@ where
     let builder = configure_node(chain_key, packet_key, config, probe_cfg, chain_connector).await?;
 
     #[cfg(feature = "session-server")]
-    let node = builder
-        .with_session_server(server)
-        .build_edge(ticket_factory)
-        .await?;
+    let node = builder.with_session_server(server).build_edge(ticket_factory).await?;
     #[cfg(not(feature = "session-server"))]
     let node = builder.build_edge(ticket_factory).await?;
 
