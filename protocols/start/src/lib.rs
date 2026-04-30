@@ -76,10 +76,6 @@ pub struct StartInitiation<T, C> {
 pub struct StartEstablished<I> {
     /// Challenge that was used in the [initiation message](StartInitiation) to establish correspondence.
     pub orig_challenge: StartChallenge,
-    /// Additional options, ignored if `0x00000000`.
-    ///
-    /// This can usually contain information whether the Session requires PIX.
-    pub additional_data: u32,
     /// Session ID that was selected by the recipient.
     pub session_id: I,
 }
@@ -130,9 +126,6 @@ pub enum StartProtocol<I, T, C, S> {
 ///
 /// The generic argument `G` typically represents a [`PixGroupRepr`](hopr_protocol_pix::PixGroupRepr).
 ///
-/// Whenever the Server receives a new SSA index, it must respond with [`SsaServerCommitmentMessage`]
-/// finalizing the handshake to establish a new SSA.
-///
 /// The overall commitment to a single new SSA usually requires multiple messages, all
 /// sharing the same [`SsaIndex`](hopr_protocol_pix::SsaIndex) in the [`spi`](hopr_protocol_pix::SsaPolynomialIndex).
 ///
@@ -158,9 +151,10 @@ pub struct SsaClientCommitmentMessage<G> {
     pub coefficient_commitments: std::collections::HashMap<hopr_protocol_pix::PolynomialIndex, G>,
 }
 
-/// Sent by the Server to finalize the commitment to a single new Session Stealth Address (SSA).
+/// Sent by the Server to deliver the commitment to a single new Session Stealth Address (SSA).
 ///
-/// This happens whenever the Server has received
+/// This message typically follows the [`StartEstablished`] message if PIX capabilities
+/// were requested in the [`StartInitiation`] message, and the Server accepts it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SsaServerCommitmentMessage<G> {
     /// Server's commitment to the SSA.
@@ -333,7 +327,7 @@ where
                     })
                 }
                 StartProtocolDiscriminants::SessionEstablished => {
-                    if data.len() <= data_offset + size_of::<StartChallenge>() + size_of::<u32>() {
+                    if data.len() <= data_offset + size_of::<StartChallenge>() {
                         return Err(StartProtocolError::InvalidLength);
                     }
                     StartProtocol::SessionEstablished(StartEstablished {
@@ -342,15 +336,7 @@ where
                                 .try_into()
                                 .map_err(|_| StartProtocolError::ParseError("est.challenge".into()))?,
                         ),
-                        additional_data: u32::from_be_bytes(
-                            data[data_offset + size_of::<StartChallenge>()
-                                ..data_offset + size_of::<StartChallenge>() + size_of::<u32>()]
-                                .try_into()
-                                .map_err(|_| StartProtocolError::ParseError("est.additional_data".into()))?,
-                        ),
-                        session_id: serde_cbor_2::from_slice(
-                            &data[data_offset + size_of::<u32>() + size_of::<StartChallenge>()..],
-                        )?,
+                        session_id: serde_cbor_2::from_slice(&data[data_offset + size_of::<StartChallenge>()..])?,
                     })
                 }
                 StartProtocolDiscriminants::SessionError => {
@@ -471,7 +457,6 @@ mod tests {
     fn start_protocol_session_established_message_should_encode_and_decode() -> anyhow::Result<()> {
         let msg_1 = StartProtocol::SessionEstablished(StartEstablished {
             orig_challenge: 0,
-            additional_data: 0,
             session_id: 10_i32,
         });
 
@@ -552,7 +537,6 @@ mod tests {
 
         let msg = StartProtocol::<String, String, u8, Box<[u8]>>::SessionEstablished(StartEstablished {
             orig_challenge: StartChallenge::MAX,
-            additional_data: 0,
             session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
         });
 

@@ -1275,7 +1275,6 @@ where
             // Set our peer ID in the session ID sent back to them.
             let data = HoprStartProtocol::SessionEstablished(StartEstablished {
                 orig_challenge: session_req.challenge,
-                additional_data: 0, // TODO: enhance with PIX info
                 session_id,
             });
 

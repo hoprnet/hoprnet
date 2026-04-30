@@ -140,7 +140,6 @@ mod tests {
 
         let msg = HoprStartProtocol::SessionEstablished(StartEstablished {
             orig_challenge: StartChallenge::MAX,
-            additional_data: 0,
             session_id: SessionId::new(u64::MAX, HoprPseudonym::random()),
         });
 

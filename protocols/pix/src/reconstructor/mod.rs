@@ -1,3 +1,5 @@
+mod events;
+
 use std::num::NonZeroUsize;
 
 use hopr_types::{crypto::prelude::HalfKeyChallenge, internal::prelude::VerifiedAcknowledgement};
