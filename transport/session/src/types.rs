@@ -68,7 +68,7 @@ impl AsRef<Capabilities> for ByteCapabilities {
 }
 
 /// Start protocol instantiation for HOPR.
-pub type HoprStartProtocol = StartProtocol<SessionId, SessionTarget, ByteCapabilities>;
+pub type HoprStartProtocol = StartProtocol<SessionId, SessionTarget, ByteCapabilities, Box<[u8]>>; // TODO: enhance for PIX
 
 /// Calculates the maximum number of decimal digits needed to represent an N-byte unsigned integer.
 ///

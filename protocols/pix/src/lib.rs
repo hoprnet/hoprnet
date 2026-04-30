@@ -22,7 +22,7 @@ mod types;
 
 pub use generator::{SsaGeneratorConfig, SsaShareGenerator};
 pub use reconstructor::SsaReconstructor;
-pub use types::{EncryptedPartialSsaShare, PartialSsaShare, SsaPolynomialIndex};
+pub use types::{EncryptedPartialSsaShare, PartialSsaShare, PolynomialIndex, SsaIndex, SsaPolynomialIndex};
 
 /// Specification of the Protocol for Incentivization of eXits (PIX) instantiation.
 pub trait PixSpec
@@ -69,7 +69,8 @@ pub(crate) fn msg_to_scalar<S: PixSpec>(
     )?)
 }
 
-pub(crate) type CompletedShare<S> = DefaultShare<IdentifierPrimeField<PixScalar<S>>, IdentifierPrimeField<PixScalar<S>>>;
+pub(crate) type CompletedShare<S> =
+    DefaultShare<IdentifierPrimeField<PixScalar<S>>, IdentifierPrimeField<PixScalar<S>>>;
 
 #[inline]
 pub(crate) fn complete_share<S: PixSpec>(
@@ -112,25 +113,34 @@ impl<S: PixSpec> PartialSsaShareVerifier<S> {
         self.poly_commitment.len() - 1
     }
 
-    /// Converts this verifier into a tuple containing the [`SsaPolynomialIndex`] and the serialized polynomial coefficient commitments.
+    /// Converts this verifier into a tuple containing the [`SsaPolynomialIndex`] and the serialized polynomial
+    /// coefficient commitments.
     pub fn into_serializable_commitments(self) -> (SsaPolynomialIndex<S>, Vec<PixGroupRepr<S>>) {
-        (self.spi, self.poly_commitment.into_iter().map(|c| c.to_bytes()).collect())
+        (
+            self.spi,
+            self.poly_commitment.into_iter().map(|c| c.to_bytes()).collect(),
+        )
     }
 
     /// Tries to create a new verifier from [`SsaPolynomialIndex`] and serialized polynomial coefficient commitments.
-    pub fn from_serializable_commitments(spi: SsaPolynomialIndex<S>, poly_commitments: Vec<PixGroupRepr<S>>) -> errors::Result<Self> {
+    pub fn from_serializable_commitments(
+        spi: SsaPolynomialIndex<S>,
+        poly_commitments: Vec<PixGroupRepr<S>>,
+    ) -> errors::Result<Self> {
         if poly_commitments.is_empty() {
             return Err(errors::PixError::InvalidInput);
         }
 
-        let poly_commitment = poly_commitments.into_iter()
-            .map(|c| Option::<PixGroup<S>>::from(PixGroup::<S>::from_bytes(&c))
-                .map(ShareVerifierGroup::<PixGroup<S>>::from)
-                .ok_or(errors::PixError::InvalidInput))
+        let poly_commitment = poly_commitments
+            .into_iter()
+            .map(|c| {
+                Option::<PixGroup<S>>::from(PixGroup::<S>::from_bytes(&c))
+                    .map(ShareVerifierGroup::<PixGroup<S>>::from)
+                    .ok_or(errors::PixError::InvalidInput)
+            })
             .collect::<errors::Result<Vec<_>>>()?;
         Ok(Self { spi, poly_commitment })
     }
-
 
     pub(crate) fn verify_complete_share(&self, share: &CompletedShare<S>) -> errors::Result<()> {
         if (share.value().is_zero() | share.identifier().is_zero()).into() {
@@ -203,10 +213,10 @@ pub(crate) mod tests {
     pub struct TestSpec;
 
     impl PixSpec for TestSpec {
+        type Cipher = hopr_types::crypto::primitives::ChaCha20;
         type Curve = k256::Secp256k1;
         type Digest = hopr_types::crypto::primitives::Sha3_256;
         type Pseudonym = SimplePseudonym;
-        type Cipher = hopr_types::crypto::primitives::ChaCha20;
     }
 
     type Share<S> = DefaultShare<IdentifierPrimeField<PixScalar<S>>, IdentifierPrimeField<PixScalar<S>>>;
@@ -287,7 +297,8 @@ pub(crate) mod tests {
         assert!(PartialSsaShareVerifier::<TestSpec>::from_serializable_commitments(spi, vec![]).is_err());
 
         let (spi, poly_commitments) = verifier_1.clone().into_serializable_commitments();
-        let verifier_2: PartialSsaShareVerifier<TestSpec> = PartialSsaShareVerifier::from_serializable_commitments(spi, poly_commitments)?;
+        let verifier_2: PartialSsaShareVerifier<TestSpec> =
+            PartialSsaShareVerifier::from_serializable_commitments(spi, poly_commitments)?;
         assert_eq!(verifier_1, verifier_2);
 
         Ok(())

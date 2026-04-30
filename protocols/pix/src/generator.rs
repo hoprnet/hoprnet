@@ -11,10 +11,9 @@ use vsss_rs::{
 };
 
 use crate::{
-    PixGroup, PartialSsaShareVerifier, PixSpec, PixScalar, errors, msg_to_scalar,
-    types::{PartialSsaShare, SsaPolynomialIndex},
+    PartialSsaShareVerifier, PixGroup, PixScalar, PixSpec, errors, msg_to_scalar,
+    types::{PartialSsaShare, SsaIndex, SsaPolynomialIndex},
 };
-use crate::types::SsaIndex;
 
 type RawPolynomial<S> = Vec<DefaultShare<IdentifierPrimeField<PixScalar<S>>, IdentifierPrimeField<PixScalar<S>>>>;
 type RawPolynomialVerifier<S> = Vec<ShareVerifierGroup<PixGroup<S>>>;

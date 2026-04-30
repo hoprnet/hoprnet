@@ -8,7 +8,7 @@ use vsss_rs::elliptic_curve::{
     generic_array::{ArrayLength, GenericArray},
 };
 
-use crate::{PixSpec, PixScalar, errors};
+use crate::{PixScalar, PixSpec, errors};
 
 /// Type used to index Session Stealth Addresses (SSA).
 ///
@@ -20,10 +20,7 @@ pub type SsaIndex = u32;
 /// Note that Polynomial Index starts with 0.
 pub type PolynomialIndex = u32;
 
-fn derive_ssa_encryption_key<S: PixSpec>(
-    spi: &SsaPolynomialIndex<S>,
-    ack: &HalfKey,
-) -> errors::Result<S::Cipher> {
+fn derive_ssa_encryption_key<S: PixSpec>(spi: &SsaPolynomialIndex<S>, ack: &HalfKey) -> errors::Result<S::Cipher> {
     let mut output = Blake3::new_derive_key(S::KEY_DERIVATION_CONTEXT)
         .update_reader(ack.as_ref())
         .and_then(|h| h.update_reader(spi.pseudonym.as_ref()))
@@ -252,7 +249,7 @@ impl<S: PixSpec> SsaPolynomialIndex<S> {
 impl<S: PixSpec> std::fmt::Display for SsaPolynomialIndex<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "SPI-{}-{}:{}", self.pseudonym, self.ssa_index, self.poly_index)
-    } 
+    }
 }
 
 impl<S: PixSpec> std::fmt::Debug for SsaPolynomialIndex<S> {
@@ -280,7 +277,7 @@ impl<S: PixSpec> Copy for SsaPolynomialIndex<S> {}
 impl<S: PixSpec> PartialEq for SsaPolynomialIndex<S> {
     fn eq(&self, other: &Self) -> bool {
         self.pseudonym == other.pseudonym && self.ssa_index == other.ssa_index && self.poly_index == other.poly_index
-    }   
+    }
 }
 
 impl<S: PixSpec> Eq for SsaPolynomialIndex<S> {}
@@ -294,14 +291,20 @@ impl<S: PixSpec> std::hash::Hash for SsaPolynomialIndex<S> {
 }
 
 impl<S> PartialOrd for SsaPolynomialIndex<S>
-where S: PixSpec, S::Pseudonym: Ord {
+where
+    S: PixSpec,
+    S::Pseudonym: Ord,
+{
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
-    }  
+    }
 }
 
 impl<S> Ord for SsaPolynomialIndex<S>
-where S: PixSpec, S::Pseudonym: Ord {
+where
+    S: PixSpec,
+    S::Pseudonym: Ord,
+{
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.pseudonym
             .cmp(&other.pseudonym)
@@ -309,8 +312,6 @@ where S: PixSpec, S::Pseudonym: Ord {
             .then_with(|| self.poly_index.cmp(&other.poly_index))
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {

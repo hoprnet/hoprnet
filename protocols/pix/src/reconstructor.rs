@@ -7,7 +7,7 @@ use vsss_rs::{
 };
 
 use crate::{
-    CompletedShare, PixGroup, PartialSsaShare, PartialSsaShareVerifier, PixSpec, PixScalar, SsaPolynomialIndex,
+    CompletedShare, PartialSsaShare, PartialSsaShareVerifier, PixGroup, PixScalar, PixSpec, SsaPolynomialIndex,
     complete_share, errors,
     types::{EncryptedPartialSsaShare, SsaIndex},
 };
@@ -100,10 +100,8 @@ pub struct SsaReconstructor<S: PixSpec> {
         async_broadcast::InactiveReceiver<PixScalar<S>>,
     ),
     ssa_builders: moka::sync::Cache<SsaIndex, std::sync::Arc<parking_lot::Mutex<SsaBuilder<S>>>>,
-    ssa_verifiers: moka::sync::Cache<
-        SsaPolynomialIndex<S>,
-        std::sync::Arc<parking_lot::Mutex<SsaPartReconstructor<S>>>,
-    >,
+    ssa_verifiers:
+        moka::sync::Cache<SsaPolynomialIndex<S>, std::sync::Arc<parking_lot::Mutex<SsaPartReconstructor<S>>>>,
     awaiting_acks: moka::sync::Cache<HalfKeyChallenge, AwaitingPartialShare<S>>,
 }
 

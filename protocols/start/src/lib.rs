@@ -60,7 +60,9 @@ pub struct StartInitiation<T, C> {
     pub challenge: StartChallenge,
     /// Target of the session, i.e., what should the other party do with the traffic.
     pub target: T,
-    /// Capabilities of the session.
+    /// Requested capabilities of the session.
+    ///
+    /// This might also contain information required for the PIX protocol.
     pub capabilities: C,
     /// Additional options (might be `capabilities` dependent), ignored if `0x00000000`.
     pub additional_data: u32,
@@ -74,6 +76,10 @@ pub struct StartInitiation<T, C> {
 pub struct StartEstablished<I> {
     /// Challenge that was used in the [initiation message](StartInitiation) to establish correspondence.
     pub orig_challenge: StartChallenge,
+    /// Additional options, ignored if `0x00000000`.
+    ///
+    /// This can usually contain information whether the Session requires PIX.
+    pub additional_data: u32,
     /// Session ID that was selected by the recipient.
     pub session_id: I,
 }
@@ -105,7 +111,7 @@ pub struct StartEstablished<I> {
 #[derive(Debug, Clone, PartialEq, Eq, strum::EnumDiscriminants)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(derive(strum::FromRepr, strum::EnumCount), repr(u8))]
-pub enum StartProtocol<I, T, C, S: hopr_protocol_pix::PixSpec> {
+pub enum StartProtocol<I, T, C, S> {
     /// Request to initiate a new session.
     StartSession(StartInitiation<T, C>),
     /// Confirmation that a new session has been established by the counterparty.
@@ -122,34 +128,43 @@ pub enum StartProtocol<I, T, C, S: hopr_protocol_pix::PixSpec> {
 
 /// Filling up the Client's commitment to the Session Stealth Address (SSA).
 ///
+/// The generic argument `G` typically represents a [`PixGroupRepr`](hopr_protocol_pix::PixGroupRepr).
+///
 /// Whenever the Server receives a new SSA index, it must respond with [`SsaServerCommitmentMessage`]
 /// finalizing the handshake to establish a new SSA.
 ///
 /// The overall commitment to a single new SSA usually requires multiple messages, all
 /// sharing the same [`SsaIndex`](hopr_protocol_pix::SsaIndex) in the [`spi`](hopr_protocol_pix::SsaPolynomialIndex).
+///
+/// Each of these messages contains commitments to polynomial coefficients that all belong
+/// to the same coefficient.
+///
+/// The client always begins sending a message with `coefficient_index` equal to 0 to
+/// deliver the commitment to the SSA first.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SsaClientCommitmentMessage<S: hopr_protocol_pix::PixSpec> {
-    /// Contains the pseudonym, SSA ID, and the SSA-part polynomial index.
-    pub spi: hopr_protocol_pix::SsaPolynomialIndex<S>,
+pub struct SsaClientCommitmentMessage<G> {
+    /// Index of the Session Stealth Address (SSA) that is being committed.
+    pub ssa: hopr_protocol_pix::SsaIndex,
+    /// Index of the polynomial coefficient that is being committed.
+    ///
+    /// Zero value indicates the polynomial constant term commitment, which when summed over
+    /// all polynomials for a given [`SsaIndex`](hopr_protocol_pix::SsaIndex) results in the SSA commitment.
     pub coefficient_index: u16,
-    /// Contains the indexed serialized coefficient commitments of a single SSA-part polynomial.
+    /// Contains the serialized coefficient commitments of multiple polynomials,
+    /// all belonging to the same `coefficient_index` in each polynomial.
     ///
     /// This might not be the complete set yet and might require multiple messages to deliver
-    /// the complete polynomial commitment.
-    ///
-    /// The term with index 0 is the Client's commitment to the SSA part (polynomial constant term).
-    /// Once all commitments to all polynomials are delivered, the Server can construct the SSA commitment
-    /// by summing up all polynomial constant term commitments for the given [`SsaIndex`](hopr_protocol_pix::SsaIndex).
-    pub coefficient_commitments: std::collections::HashMap<u32, hopr_protocol_pix::PixGroupRepr<S>>,
+    /// the complete commitment to the given coefficient of all polynomials for the given SSA.
+    pub coefficient_commitments: std::collections::HashMap<hopr_protocol_pix::PolynomialIndex, G>,
 }
 
 /// Sent by the Server to finalize the commitment to a single new Session Stealth Address (SSA).
 ///
 /// This happens whenever the Server has received
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SsaServerCommitmentMessage<S: hopr_protocol_pix::PixSpec> {
+pub struct SsaServerCommitmentMessage<G> {
     /// Server's commitment to the SSA.
-    pub commitment: hopr_protocol_pix::PixGroupRepr<S>,
+    pub commitment: G,
 }
 
 /// Keep-alive message for a Session with the identifier `T`.
@@ -157,7 +172,7 @@ pub struct SsaServerCommitmentMessage<S: hopr_protocol_pix::PixSpec> {
 pub struct KeepAliveMessage<I> {
     /// Session ID.
     pub session_id: I,
-    /// Additional flags that govern how the `additional_data` field is interpreted, or 0.
+    /// Additional flags that govern how the `additional_data` field is interpreted or 0.
     pub flags: KeepAliveFlags,
     /// Additional data (usually `flags` dependent), ignored if `0x00000000`.
     pub additional_data: u64,
@@ -210,11 +225,12 @@ impl<I, T, C, S> StartProtocol<I, T, C, S> {
     pub const START_PROTOCOL_VERSION: u8 = 0x03;
 }
 
-impl<I, T, C, S> StartProtocol<I, T, C, S>
+impl<I, T, C, G> StartProtocol<I, T, C, G>
 where
     I: serde::Serialize + for<'de> serde::Deserialize<'de>,
     T: serde::Serialize + for<'de> serde::Deserialize<'de>,
     C: Into<u8> + TryFrom<u8>,
+    G: AsRef<[u8]> + for<'a> TryFrom<&'a [u8]>,
 {
     /// Tries to encode the message into binary format and [`Tag`]
     pub fn encode(self) -> errors::Result<(Tag, Box<[u8]>)> {
@@ -245,6 +261,12 @@ where
                 data.extend_from_slice(&ping.additional_data.to_be_bytes());
                 let session_id = serde_cbor_2::to_vec(&ping.session_id)?;
                 data.extend(session_id);
+            }
+            StartProtocol::SsaRequest(_) => {
+                unimplemented!()
+            }
+            StartProtocol::SsaCommit(_) => {
+                unimplemented!()
             }
         }
 
@@ -311,7 +333,7 @@ where
                     })
                 }
                 StartProtocolDiscriminants::SessionEstablished => {
-                    if data.len() <= data_offset + size_of::<StartChallenge>() {
+                    if data.len() <= data_offset + size_of::<StartChallenge>() + size_of::<u32>() {
                         return Err(StartProtocolError::InvalidLength);
                     }
                     StartProtocol::SessionEstablished(StartEstablished {
@@ -320,7 +342,15 @@ where
                                 .try_into()
                                 .map_err(|_| StartProtocolError::ParseError("est.challenge".into()))?,
                         ),
-                        session_id: serde_cbor_2::from_slice(&data[data_offset + size_of::<StartChallenge>()..])?,
+                        additional_data: u32::from_be_bytes(
+                            data[data_offset + size_of::<StartChallenge>()
+                                ..data_offset + size_of::<StartChallenge>() + size_of::<u32>()]
+                                .try_into()
+                                .map_err(|_| StartProtocolError::ParseError("est.additional_data".into()))?,
+                        ),
+                        session_id: serde_cbor_2::from_slice(
+                            &data[data_offset + size_of::<u32>() + size_of::<StartChallenge>()..],
+                        )?,
                     })
                 }
                 StartProtocolDiscriminants::SessionError => {
@@ -353,30 +383,38 @@ where
                         session_id: serde_cbor_2::from_slice(&data[data_offset + 1 + size_of::<u64>()..])?,
                     })
                 }
+                StartProtocolDiscriminants::SsaRequest => {
+                    unimplemented!()
+                }
+                StartProtocolDiscriminants::SsaCommit => {
+                    unimplemented!()
+                }
             },
         )
     }
 }
 
-impl<I, T, C> TryFrom<StartProtocol<I, T, C>> for ApplicationData
+impl<I, T, C, G> TryFrom<StartProtocol<I, T, C, G>> for ApplicationData
 where
     I: serde::Serialize + for<'de> serde::Deserialize<'de>,
     T: serde::Serialize + for<'de> serde::Deserialize<'de>,
     C: Into<u8> + TryFrom<u8>,
+    G: AsRef<[u8]> + for<'a> TryFrom<&'a [u8]>,
 {
     type Error = StartProtocolError;
 
-    fn try_from(value: StartProtocol<I, T, C>) -> Result<Self, Self::Error> {
+    fn try_from(value: StartProtocol<I, T, C, G>) -> Result<Self, Self::Error> {
         let (application_tag, plain_text) = value.encode()?;
         Ok(ApplicationData::new(application_tag, plain_text.into_vec())?)
     }
 }
 
-impl<I, T, C> TryFrom<ApplicationData> for StartProtocol<I, T, C>
+impl<I, T, C, G> TryFrom<ApplicationData> for StartProtocol<I, T, C, G>
 where
     I: serde::Serialize + for<'de> serde::Deserialize<'de>,
     T: serde::Serialize + for<'de> serde::Deserialize<'de>,
     C: Into<u8> + TryFrom<u8>,
+    G: AsRef<[u8]> + for<'a> TryFrom<&'a [u8]>,
 {
     type Error = StartProtocolError;
 
@@ -402,10 +440,10 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        let expected: Tag = StartProtocol::<(), (), ()>::START_PROTOCOL_MESSAGE_TAG;
+        let expected: Tag = StartProtocol::<(), (), (), ()>::START_PROTOCOL_MESSAGE_TAG;
         assert_eq!(tag, expected);
 
-        let msg_2 = StartProtocol::<i32, String, u8>::decode(tag, &msg)?;
+        let msg_2 = StartProtocol::<i32, String, u8, Box<[u8]>>::decode(tag, &msg)?;
 
         assert_eq!(msg_1, msg_2);
         Ok(())
@@ -413,7 +451,7 @@ mod tests {
 
     #[test]
     fn start_protocol_message_start_session_message_should_allow_for_at_least_one_surb() -> anyhow::Result<()> {
-        let msg = StartProtocol::<i32, String, u8>::StartSession(StartInitiation {
+        let msg = StartProtocol::<i32, String, u8, Box<[u8]>>::StartSession(StartInitiation {
             challenge: 0,
             target: "127.0.0.1:1234".to_string(),
             capabilities: 0xff,
@@ -433,14 +471,15 @@ mod tests {
     fn start_protocol_session_established_message_should_encode_and_decode() -> anyhow::Result<()> {
         let msg_1 = StartProtocol::SessionEstablished(StartEstablished {
             orig_challenge: 0,
+            additional_data: 0,
             session_id: 10_i32,
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        let expected: Tag = StartProtocol::<(), (), ()>::START_PROTOCOL_MESSAGE_TAG;
+        let expected: Tag = StartProtocol::<(), (), (), ()>::START_PROTOCOL_MESSAGE_TAG;
         assert_eq!(tag, expected);
 
-        let msg_2 = StartProtocol::<i32, String, u8>::decode(tag, &msg)?;
+        let msg_2 = StartProtocol::<i32, String, u8, Box<[u8]>>::decode(tag, &msg)?;
 
         assert_eq!(msg_1, msg_2);
         Ok(())
@@ -454,10 +493,10 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        let expected: Tag = StartProtocol::<(), (), ()>::START_PROTOCOL_MESSAGE_TAG;
+        let expected: Tag = StartProtocol::<(), (), (), ()>::START_PROTOCOL_MESSAGE_TAG;
         assert_eq!(tag, expected);
 
-        let msg_2 = StartProtocol::<i32, String, u8>::decode(tag, &msg)?;
+        let msg_2 = StartProtocol::<i32, String, u8, Box<[u8]>>::decode(tag, &msg)?;
 
         assert_eq!(msg_1, msg_2);
         Ok(())
@@ -472,10 +511,10 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        let expected: Tag = StartProtocol::<(), (), ()>::START_PROTOCOL_MESSAGE_TAG;
+        let expected: Tag = StartProtocol::<(), (), (), ()>::START_PROTOCOL_MESSAGE_TAG;
         assert_eq!(tag, expected);
 
-        let msg_2 = StartProtocol::<i32, String, u8>::decode(tag, &msg)?;
+        let msg_2 = StartProtocol::<i32, String, u8, Box<[u8]>>::decode(tag, &msg)?;
 
         assert_eq!(msg_1, msg_2);
 
@@ -486,10 +525,10 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        let expected: Tag = StartProtocol::<(), (), ()>::START_PROTOCOL_MESSAGE_TAG;
+        let expected: Tag = StartProtocol::<(), (), (), ()>::START_PROTOCOL_MESSAGE_TAG;
         assert_eq!(tag, expected);
 
-        let msg_2 = StartProtocol::<i32, String, u8>::decode(tag, &msg)?;
+        let msg_2 = StartProtocol::<i32, String, u8, Box<[u8]>>::decode(tag, &msg)?;
 
         assert_eq!(msg_1, msg_2);
         Ok(())
@@ -497,7 +536,7 @@ mod tests {
 
     #[test]
     fn start_protocol_messages_must_fit_within_hopr_packet() -> anyhow::Result<()> {
-        let msg = StartProtocol::<i32, String, u8>::StartSession(StartInitiation {
+        let msg = StartProtocol::<i32, String, u8, Box<[u8]>>::StartSession(StartInitiation {
             challenge: StartChallenge::MAX,
             target: "example-of-a-very-very-long-second-level-name.on-a-very-very-long-domain-name.info:65530"
                 .to_string(),
@@ -511,8 +550,9 @@ mod tests {
             HoprPacket::PAYLOAD_SIZE
         );
 
-        let msg = StartProtocol::<String, String, u8>::SessionEstablished(StartEstablished {
+        let msg = StartProtocol::<String, String, u8, Box<[u8]>>::SessionEstablished(StartEstablished {
             orig_challenge: StartChallenge::MAX,
+            additional_data: 0,
             session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
         });
 
@@ -522,7 +562,7 @@ mod tests {
             HoprPacket::PAYLOAD_SIZE
         );
 
-        let msg = StartProtocol::<String, String, u8>::SessionError(StartErrorType {
+        let msg = StartProtocol::<String, String, u8, Box<[u8]>>::SessionError(StartErrorType {
             challenge: StartChallenge::MAX,
             reason: StartErrorReason::NoSlotsAvailable,
         });
@@ -533,7 +573,7 @@ mod tests {
             HoprPacket::PAYLOAD_SIZE
         );
 
-        let msg = StartProtocol::<String, String, u8>::KeepAlive(KeepAliveMessage {
+        let msg = StartProtocol::<String, String, u8, Box<[u8]>>::KeepAlive(KeepAliveMessage {
             session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
             flags: None.into(),
             additional_data: 0,
@@ -549,7 +589,7 @@ mod tests {
 
     #[test]
     fn start_protocol_message_keep_alive_message_should_allow_for_maximum_surbs() -> anyhow::Result<()> {
-        let msg = StartProtocol::<String, String, u8>::KeepAlive(KeepAliveMessage {
+        let msg = StartProtocol::<String, String, u8, Box<[u8]>>::KeepAlive(KeepAliveMessage {
             session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
             flags: None.into(),
             additional_data: 0,

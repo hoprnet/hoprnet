@@ -1275,6 +1275,7 @@ where
             // Set our peer ID in the session ID sent back to them.
             let data = HoprStartProtocol::SessionEstablished(StartEstablished {
                 orig_challenge: session_req.challenge,
+                additional_data: 0, // TODO: enhance with PIX info
                 session_id,
             });
 
@@ -1461,6 +1462,10 @@ where
                 } else {
                     debug!(%session_id, "received keep-alive request for an unknown session");
                 }
+            }
+            HoprStartProtocol::SsaRequest(_) | HoprStartProtocol::SsaCommit(_) => {
+                // TODO: implement PIX message handlers here
+                unimplemented!()
             }
         }
 
