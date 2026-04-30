@@ -17,8 +17,13 @@ pub type SsaIndex = u32;
 
 /// Type used to index polynomials that reconstruct parts of a Session Stealth Addresses (SSA).
 ///
-/// Note that Polynomial Index starts with 0.
+/// The index is 0-based.
 pub type PolynomialIndex = u32;
+
+/// Type used to index coefficients in a polynomial.
+///
+/// The index is 0-based.
+pub type CoefficientIndex = u16;
 
 fn derive_ssa_encryption_key<S: PixSpec>(spi: &SsaPolynomialIndex<S>, ack: &HalfKey) -> errors::Result<S::Cipher> {
     let mut output = Blake3::new_derive_key(S::KEY_DERIVATION_CONTEXT)

@@ -1462,7 +1462,7 @@ where
                     debug!(%session_id, "received keep-alive request for an unknown session");
                 }
             }
-            HoprStartProtocol::SsaRequest(_) | HoprStartProtocol::SsaCommit(_) => {
+            HoprStartProtocol::SsaCommit(_) | HoprStartProtocol::SsaRequest(_) => {
                 // TODO: implement PIX message handlers here
                 unimplemented!()
             }

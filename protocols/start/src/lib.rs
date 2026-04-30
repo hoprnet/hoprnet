@@ -4,13 +4,17 @@
 //! [`RFC-0012`](https://github.com/hoprnet/rfc/tree/main/rfcs/RFC-0012-session-start-protocol).
 //! and is implemented via the [`StartProtocol`] enum.
 //!
-//! The protocol is defined via generic arguments `I` (for Session ID), `T` (for Session Target)
-//! and `C` (for Session capabilities).
+//! The protocol is defined via generic arguments `I` (for Session ID), `T` (for Session Target),
+//! `C` (for Session capabilities) and `G` (for Session Stealth Address commitment representation).
 //!
 //! Per `RFC-0012`, the types `I` and `T` are serialized/deserialized to the CBOR binary format
 //! (see [`RFC7049`](https://datatracker.ietf.org/doc/html/rfc7049)) and therefore must implement
 //! `serde::Serialize + serde::Deserialize`.
 //! The capability type `C` must be expressible as a single unsigned byte.
+//! 
+//! The `G` type is used to represent the Session Stealth Address commitment representation.
+//! It is typically a [`PixGroupRepr`](hopr_protocol_pix::PixGroupRepr).
+//!
 //!
 //! See [`StartProtocol`] docs for the protocol diagram.
 
@@ -95,6 +99,7 @@ pub struct StartEstablished<I> {
 ///     Note right of Exit: SessionID [Pseudonym, Tag]
 ///     Exit->>Entry: SessionEstablished (Challenge, SessionID_Entry)
 ///     Note left of Entry: SessionID [Pseudonym, Tag]
+///     Exit->>Entry: SsaCommit (Challenge, SessionID_Entry)
 ///     Entry->>Exit: KeepAlive (SessionID)
 ///     Note over Entry,Exit: Data
 ///     else If Exit cannot accept a new session
@@ -107,15 +112,15 @@ pub struct StartEstablished<I> {
 #[derive(Debug, Clone, PartialEq, Eq, strum::EnumDiscriminants)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(derive(strum::FromRepr, strum::EnumCount), repr(u8))]
-pub enum StartProtocol<I, T, C, S> {
+pub enum StartProtocol<I, T, C, G> {
     /// Request to initiate a new session.
     StartSession(StartInitiation<T, C>),
     /// Confirmation that a new session has been established by the counterparty.
     SessionEstablished(StartEstablished<I>),
     /// Client's request to fill Client commitments to establish a Session Stealth Address (SSA).
-    SsaRequest(SsaClientCommitmentMessage<S>),
+    SsaCommit(SsaClientCommitmentMessage<G>),
     /// Server-side commitment to Session Stealth Address (SSA).
-    SsaCommit(SsaServerCommitmentMessage<S>),
+    SsaRequest(SsaServerCommitmentMessage<G>),
     /// Counterparty could not establish a new session due to an error.
     SessionError(StartErrorType),
     /// A ping message to keep the session alive.
@@ -126,11 +131,11 @@ pub enum StartProtocol<I, T, C, S> {
 ///
 /// The generic argument `G` typically represents a [`PixGroupRepr`](hopr_protocol_pix::PixGroupRepr).
 ///
-/// The overall commitment to a single new SSA usually requires multiple messages, all
-/// sharing the same [`SsaIndex`](hopr_protocol_pix::SsaIndex) in the [`spi`](hopr_protocol_pix::SsaPolynomialIndex).
+/// The overall Client's commitment to a single new SSA usually requires multiple messages, all
+/// sharing the same [`SsaIndex`](hopr_protocol_pix::SsaIndex).
 ///
 /// Each of these messages contains commitments to polynomial coefficients that all belong
-/// to the same coefficient.
+/// to the same coefficient in each polynomial.
 ///
 /// The client always begins sending a message with `coefficient_index` equal to 0 to
 /// deliver the commitment to the SSA first.
@@ -141,7 +146,8 @@ pub struct SsaClientCommitmentMessage<G> {
     /// Index of the polynomial coefficient that is being committed.
     ///
     /// Zero value indicates the polynomial constant term commitment, which when summed over
-    /// all polynomials for a given [`SsaIndex`](hopr_protocol_pix::SsaIndex) results in the SSA commitment.
+    /// all polynomials for a given [`SsaIndex`](hopr_protocol_pix::SsaIndex)
+    /// results in the Client's SSA commitment.
     pub coefficient_index: u16,
     /// Contains the serialized coefficient commitments of multiple polynomials,
     /// all belonging to the same `coefficient_index` in each polynomial.
@@ -153,11 +159,16 @@ pub struct SsaClientCommitmentMessage<G> {
 
 /// Sent by the Server to deliver the commitment to a single new Session Stealth Address (SSA).
 ///
-/// This message typically follows the [`StartEstablished`] message if PIX capabilities
-/// were requested in the [`StartInitiation`] message, and the Server accepts it.
+/// This message is typically sent for the first time right after the [`StartEstablished`] message
+/// if PIX capabilities were requested in the [`StartInitiation`] message, and the Server accepts it.
+///
+/// It is then subsequently sent every time the Server needs the next SSA
+/// (with an index greater than the last one) to be committed to.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SsaServerCommitmentMessage<G> {
-    /// Server's commitment to the SSA.
+    /// Index of the Session Stealth Address (SSA) that is being committed by the Server.
+    pub ssa: hopr_protocol_pix::SsaIndex,
+    /// Server's serialized commitment to the SSA.
     pub commitment: G,
 }
 
@@ -212,7 +223,12 @@ impl<I> From<I> for KeepAliveMessage<I> {
     }
 }
 
-impl<I, T, C, S> StartProtocol<I, T, C, S> {
+impl<I, T, C, G> StartProtocol<I, T, C, G> {
+    /// Size of the PIX coefficient commitment representation in bytes.
+    pub const PIX_COEFF_COMMITMENT_REPR_SIZE: usize = size_of::<G>();
+    /// Size of the Start protocol message header in bytes.
+    pub const START_HEADER_SIZE: usize =
+        size_of_val(&Self::START_PROTOCOL_MESSAGE_TAG) + size_of::<u8>() + size_of::<u16>();
     /// Fixed [`Tag`] of every protocol message.
     pub const START_PROTOCOL_MESSAGE_TAG: Tag = Tag::Reserved(ReservedTag::SessionStart as u64);
     /// Current version of the Start protocol.
@@ -221,10 +237,10 @@ impl<I, T, C, S> StartProtocol<I, T, C, S> {
 
 impl<I, T, C, G> StartProtocol<I, T, C, G>
 where
-    I: serde::Serialize + for<'de> serde::Deserialize<'de>,
-    T: serde::Serialize + for<'de> serde::Deserialize<'de>,
-    C: Into<u8> + TryFrom<u8>,
-    G: AsRef<[u8]> + for<'a> TryFrom<&'a [u8]>,
+    I: serde::Serialize,
+    T: serde::Serialize,
+    C: Into<u8>,
+    G: AsRef<[u8]>,
 {
     /// Tries to encode the message into binary format and [`Tag`]
     pub fn encode(self) -> errors::Result<(Tag, Box<[u8]>)> {
@@ -256,11 +272,36 @@ where
                 let session_id = serde_cbor_2::to_vec(&ping.session_id)?;
                 data.extend(session_id);
             }
-            StartProtocol::SsaRequest(_) => {
-                unimplemented!()
+            StartProtocol::SsaCommit(commit) => {
+                data.extend_from_slice(&commit.ssa.to_be_bytes());
+                data.extend_from_slice(&commit.coefficient_index.to_be_bytes());
+
+                let avail_space = data.spare_capacity_mut().len();
+
+                if commit.coefficient_commitments.is_empty()
+                    || (size_of::<hopr_protocol_pix::CoefficientIndex>() + size_of::<G>())
+                        * commit.coefficient_commitments.len()
+                        > avail_space
+                {
+                    return Err(StartProtocolError::NumberOfCommitments);
+                }
+                let num_polys = commit.coefficient_commitments.len() as hopr_protocol_pix::PolynomialIndex;
+                data.extend_from_slice(&num_polys.to_be_bytes());
+
+                for (index, commitment) in commit.coefficient_commitments {
+                    let commitment_repr = commitment.as_ref();
+                    debug_assert_eq!(commitment_repr.len(), Self::PIX_COEFF_COMMITMENT_REPR_SIZE);
+
+                    data.extend_from_slice(&index.to_be_bytes());
+                    data.extend_from_slice(commitment_repr);
+                }
             }
-            StartProtocol::SsaCommit(_) => {
-                unimplemented!()
+            StartProtocol::SsaRequest(req) => {
+                let commitment_repr = req.commitment.as_ref();
+                debug_assert_eq!(commitment_repr.len(), Self::PIX_COEFF_COMMITMENT_REPR_SIZE);
+
+                data.extend_from_slice(&req.ssa.to_be_bytes());
+                data.extend_from_slice(commitment_repr);
             }
         }
 
@@ -269,7 +310,15 @@ where
 
         Ok((Self::START_PROTOCOL_MESSAGE_TAG, out.into_boxed_slice()))
     }
+}
 
+impl<I, T, C, G> StartProtocol<I, T, C, G>
+where
+    I: for<'de> serde::Deserialize<'de>,
+    T: for<'de> serde::Deserialize<'de>,
+    C: TryFrom<u8>,
+    G: for<'a> TryFrom<&'a [u8]>,
+{
     /// Tries to decode the message from the binary representation and [`Tag`].
     ///
     /// The `tag` must be currently [`START_PROTOCOL_MESSAGE_TAG`](Self::START_PROTOCOL_MESSAGE_TAG)
@@ -369,11 +418,96 @@ where
                         session_id: serde_cbor_2::from_slice(&data[data_offset + 1 + size_of::<u64>()..])?,
                     })
                 }
-                StartProtocolDiscriminants::SsaRequest => {
-                    unimplemented!()
-                }
                 StartProtocolDiscriminants::SsaCommit => {
-                    unimplemented!()
+                    if data.len()
+                        < data_offset
+                            + size_of::<hopr_protocol_pix::SsaIndex>()
+                            + size_of::<hopr_protocol_pix::CoefficientIndex>()
+                            + 2 * size_of::<hopr_protocol_pix::PolynomialIndex>()
+                            + Self::PIX_COEFF_COMMITMENT_REPR_SIZE
+                    {
+                        return Err(StartProtocolError::InvalidLength);
+                    }
+
+                    let ssa = hopr_protocol_pix::SsaIndex::from_be_bytes(
+                        data[data_offset..data_offset + size_of::<hopr_protocol_pix::SsaIndex>()]
+                            .try_into()
+                            .map_err(|_| StartProtocolError::ParseError("ssa_index".into()))?,
+                    );
+                    let coefficient_index = hopr_protocol_pix::CoefficientIndex::from_be_bytes(
+                        data[data_offset + size_of::<hopr_protocol_pix::SsaIndex>()
+                            ..data_offset
+                                + size_of::<hopr_protocol_pix::SsaIndex>()
+                                + size_of::<hopr_protocol_pix::CoefficientIndex>()]
+                            .try_into()
+                            .map_err(|_| StartProtocolError::ParseError("coefficient_index".into()))?,
+                    );
+                    let num_polys = hopr_protocol_pix::PolynomialIndex::from_be_bytes(
+                        data[data_offset
+                            + size_of::<hopr_protocol_pix::SsaIndex>()
+                            + size_of::<hopr_protocol_pix::CoefficientIndex>()
+                            ..data_offset
+                                + size_of::<hopr_protocol_pix::SsaIndex>()
+                                + size_of::<hopr_protocol_pix::CoefficientIndex>()
+                                + size_of::<hopr_protocol_pix::PolynomialIndex>()]
+                            .try_into()
+                            .map_err(|_| StartProtocolError::ParseError("polynomial_index".into()))?,
+                    );
+                    if num_polys == 0 {
+                        return Err(StartProtocolError::NumberOfCommitments);
+                    }
+
+                    let mut coefficient_commitments = std::collections::HashMap::with_capacity(num_polys as usize);
+                    let mut next_offset = data_offset
+                        + size_of::<hopr_protocol_pix::SsaIndex>()
+                        + size_of::<hopr_protocol_pix::CoefficientIndex>()
+                        + size_of::<hopr_protocol_pix::PolynomialIndex>();
+                    while next_offset < data.len() {
+                        let index = hopr_protocol_pix::PolynomialIndex::from_be_bytes(
+                            data[next_offset..next_offset + size_of::<hopr_protocol_pix::PolynomialIndex>()]
+                                .try_into()
+                                .map_err(|_| StartProtocolError::ParseError("polynomial_index".into()))?,
+                        );
+                        next_offset += size_of::<hopr_protocol_pix::PolynomialIndex>();
+                        let commitment =
+                            G::try_from(&data[next_offset..next_offset + Self::PIX_COEFF_COMMITMENT_REPR_SIZE])
+                                .map_err(|_| StartProtocolError::ParseError("commitment".into()))?;
+                        next_offset += Self::PIX_COEFF_COMMITMENT_REPR_SIZE;
+
+                        coefficient_commitments.insert(index, commitment);
+                    }
+
+                    if coefficient_commitments.len() != num_polys as usize {
+                        return Err(StartProtocolError::NumberOfCommitments);
+                    }
+
+                    StartProtocol::SsaCommit(SsaClientCommitmentMessage {
+                        ssa,
+                        coefficient_index,
+                        coefficient_commitments,
+                    })
+                }
+                StartProtocolDiscriminants::SsaRequest => {
+                    if data.len()
+                        < data_offset + size_of::<hopr_protocol_pix::SsaIndex>() + Self::PIX_COEFF_COMMITMENT_REPR_SIZE
+                    {
+                        return Err(StartProtocolError::InvalidLength);
+                    }
+
+                    StartProtocol::SsaRequest(SsaServerCommitmentMessage {
+                        ssa: hopr_protocol_pix::SsaIndex::from_be_bytes(
+                            data[data_offset..data_offset + size_of::<hopr_protocol_pix::SsaIndex>()]
+                                .try_into()
+                                .map_err(|_| StartProtocolError::ParseError("ssa index".into()))?,
+                        ),
+                        commitment: G::try_from(
+                            &data[data_offset + size_of::<hopr_protocol_pix::SsaIndex>()
+                                ..data_offset
+                                    + size_of::<hopr_protocol_pix::SsaIndex>()
+                                    + Self::PIX_COEFF_COMMITMENT_REPR_SIZE],
+                        )
+                        .map_err(|_| StartProtocolError::ParseError("commitment".into()))?,
+                    })
                 }
             },
         )
@@ -484,6 +618,49 @@ mod tests {
         let msg_2 = StartProtocol::<i32, String, u8, Box<[u8]>>::decode(tag, &msg)?;
 
         assert_eq!(msg_1, msg_2);
+        Ok(())
+    }
+
+    #[test]
+    fn start_protocol_session_ssa_request_message_should_encode_and_decode() -> anyhow::Result<()> {
+        let msg_1 = StartProtocol::SsaRequest(SsaServerCommitmentMessage {
+            ssa: hopr_protocol_pix::SsaIndex::MAX,
+            commitment: [0u8; 33],
+        });
+
+        let (tag, msg) = msg_1.clone().encode()?;
+        let expected: Tag = StartProtocol::<(), (), (), [u8; 33]>::START_PROTOCOL_MESSAGE_TAG;
+        assert_eq!(tag, expected);
+
+        let msg_2 = StartProtocol::<i32, String, u8, [u8; 33]>::decode(tag, &msg)?;
+        assert_eq!(msg_1, msg_2);
+        Ok(())
+    }
+
+    #[test]
+    fn start_protocol_session_ssa_commit_message_should_encode_and_decode() -> anyhow::Result<()> {
+        assert_eq!(
+            33,
+            StartProtocol::<i32, String, u8, [u8; 33]>::PIX_COEFF_COMMITMENT_REPR_SIZE
+        );
+
+        let max_coeffs = (ApplicationData::PAYLOAD_SIZE
+            - StartProtocol::<i32, String, u8, [u8; 33]>::START_HEADER_SIZE)
+            / (size_of::<u32>() + StartProtocol::<i32, String, u8, [u8; 33]>::PIX_COEFF_COMMITMENT_REPR_SIZE);
+
+        let msg_1 = StartProtocol::SsaCommit(SsaClientCommitmentMessage {
+            ssa: hopr_protocol_pix::SsaIndex::MAX,
+            coefficient_index: hopr_protocol_pix::CoefficientIndex::MAX,
+            coefficient_commitments: (0..max_coeffs).map(|i| (i as u32, [0u8; 33])).collect(),
+        });
+
+        let (tag, msg) = msg_1.clone().encode()?;
+        let expected: Tag = StartProtocol::<(), (), (), [u8; 33]>::START_PROTOCOL_MESSAGE_TAG;
+        assert_eq!(tag, expected);
+
+        let msg_2 = StartProtocol::<i32, String, u8, [u8; 33]>::decode(tag, &msg)?;
+        assert_eq!(msg_1, msg_2);
+
         Ok(())
     }
 

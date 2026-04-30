@@ -22,7 +22,9 @@ mod types;
 
 pub use generator::{SsaGeneratorConfig, SsaShareGenerator};
 pub use reconstructor::SsaReconstructor;
-pub use types::{EncryptedPartialSsaShare, PartialSsaShare, PolynomialIndex, SsaIndex, SsaPolynomialIndex};
+pub use types::{
+    CoefficientIndex, EncryptedPartialSsaShare, PartialSsaShare, PolynomialIndex, SsaIndex, SsaPolynomialIndex,
+};
 
 /// Specification of the Protocol for Incentivization of eXits (PIX) instantiation.
 pub trait PixSpec
