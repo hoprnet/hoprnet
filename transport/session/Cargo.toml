@@ -14,7 +14,7 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-run-all-benchmarks = []
+all-benchmarks = []
 runtime-tokio = [
   "hopr-network-types/runtime-tokio",
   "hopr-protocol-session/runtime-tokio",

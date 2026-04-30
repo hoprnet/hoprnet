@@ -14,7 +14,7 @@ crate-type = ["rlib"]
 
 [features]
 default = ["rayon"]
-run-all-benchmarks = []
+all-benchmarks = []
 
 rayon = ["hopr-parallelize/rayon"]
 serde = [

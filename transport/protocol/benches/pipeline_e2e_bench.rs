@@ -36,14 +36,14 @@ const SENDER_IDX: usize = 0;
 const PAYLOAD_SIZE: usize = HoprPacket::PAYLOAD_SIZE;
 const CHANNEL_CAPACITY: usize = 2048;
 
-#[cfg(feature = "run-all-benchmarks")]
+#[cfg(feature = "all-benchmarks")]
 const HOPS: &[usize] = &[0, 1, 2, 3];
-#[cfg(not(feature = "run-all-benchmarks"))]
+#[cfg(not(feature = "all-benchmarks"))]
 const HOPS: &[usize] = &[3];
 
-#[cfg(feature = "run-all-benchmarks")]
+#[cfg(feature = "all-benchmarks")]
 const PACKET_COUNTS: &[usize] = &[1_000, 2_500, 5_000];
-#[cfg(not(feature = "run-all-benchmarks"))]
+#[cfg(not(feature = "all-benchmarks"))]
 const PACKET_COUNTS: &[usize] = &[5_000];
 const WIN_PROB: f64 = 0.01;
 

@@ -60,32 +60,8 @@ fn send_continuous_channel_load(item: &str, iterations: usize, cfg: MixerConfig)
     })
 }
 
-// Benchmark the throughput of the mixer channel when used in a pipe
-fn send_continuous_channel_load_through_sink_pipe(
-    item: &'static str,
-    iterations: usize,
-    cfg: MixerConfig,
-) -> BoxFuture<'static, ()> {
-    Box::pin(async move {
-        let (o_tx, o_rx) = futures::channel::mpsc::unbounded();
-        let (tx, mut rx) = channel(cfg);
-
-        let pipe = tokio::task::spawn(o_rx.map(Ok).forward(tx));
-
-        for _ in 0..iterations {
-            o_tx.unbounded_send(item).expect("send must succeed");
-        }
-
-        for _ in 0..iterations {
-            rx.next().await.expect("receive must succeed");
-        }
-
-        pipe.abort();
-    })
-}
-
 pub fn mixer_channel_throughput_minimal_mixing(c: &mut Criterion) {
-    let sizes: &[usize] = if cfg!(feature = "run-all-benchmarks") {
+    let sizes: &[usize] = if cfg!(feature = "all-benchmarks") {
         &[
             10 * 1024 * 2 * RANDOM_GIBBERISH.len(),
             40 * 1024 * 2 * RANDOM_GIBBERISH.len(),

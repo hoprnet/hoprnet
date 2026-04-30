@@ -37,7 +37,7 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
     let mut group = c.benchmark_group("protocol_throughput_pipeline");
     group.sample_size(SAMPLE_SIZE);
     group.measurement_time(std::time::Duration::from_secs(30));
-    for bytes in if cfg!(feature = "run-all-benchmarks") {
+    for bytes in if cfg!(feature = "all-benchmarks") {
         &[5 * 1024 * 2 * PAYLOAD_SIZE, 10 * 1024 * 2 * PAYLOAD_SIZE][..]
     } else {
         &[10 * 1024 * 2 * PAYLOAD_SIZE][..]

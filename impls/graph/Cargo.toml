@@ -14,7 +14,7 @@ crate-type = ["rlib"]
 
 [features]
 default = ["petgraph"]
-run-all-benchmarks = []
+all-benchmarks = []
 petgraph = ["dep:petgraph", "dep:indexmap"]
 graph-api = ["petgraph"]
 

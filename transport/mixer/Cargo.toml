@@ -14,7 +14,7 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-run-all-benchmarks = []
+all-benchmarks = []
 telemetry = ["dep:hopr-metrics", "dep:lazy_static"]
 serde = ["dep:serde", "dep:humantime-serde"]
 

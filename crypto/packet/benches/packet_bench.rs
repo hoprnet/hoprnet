@@ -27,7 +27,7 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 const SAMPLE_SIZE: usize = 100_000;
 
 /// Pairs of (hops, surb_count) to benchmark.
-#[cfg(feature = "run-all-benchmarks")]
+#[cfg(feature = "all-benchmarks")]
 const PACKET_BENCHMARK: &[(usize, usize)] = &[
     (0, 0), // 0-hop 0 SURBs = used for packet acknowledgements
     (1, 1), // 1-hop 1 SURB = common GnosisVPN use-case
@@ -37,7 +37,7 @@ const PACKET_BENCHMARK: &[(usize, usize)] = &[
     (3, 1), // 3-hop 1 SURB = common GnosisVPN use-case
     (3, 2), // 3-hop 2 SURBs = GnosisVPN use-case with asymmetric traffic (non-TCP)
 ];
-#[cfg(not(feature = "run-all-benchmarks"))]
+#[cfg(not(feature = "all-benchmarks"))]
 const PACKET_BENCHMARK: &[(usize, usize)] = &[
     (3, 2), // 3-hop 2 SURBs = worst case
 ];
@@ -123,7 +123,7 @@ pub fn packet_sending_bench(c: &mut Criterion) {
 
     // This benchmark does not depend on the number of SURBs, because they are created in the precomputation step
 
-    for &hops in if cfg!(feature = "run-all-benchmarks") {
+    for &hops in if cfg!(feature = "all-benchmarks") {
         &[0, 1, 2, 3][..]
     } else {
         &[3][..]

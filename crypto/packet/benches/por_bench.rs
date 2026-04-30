@@ -33,7 +33,7 @@ pub fn proof_of_relay_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("proof_of_relay_bench");
     group.sample_size(SAMPLE_SIZE);
 
-    for hop in if cfg!(feature = "run-all-benchmarks") {
+    for hop in if cfg!(feature = "all-benchmarks") {
         &[0, 1, 2, 3][..]
     } else {
         &[3][..]

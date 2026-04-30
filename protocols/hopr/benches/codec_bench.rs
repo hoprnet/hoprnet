@@ -60,7 +60,7 @@ pub fn create_decoder(receiver: &Node) -> TestDecoder {
 }
 
 /// Pairs of (hops, surb_count) to benchmark.
-#[cfg(feature = "run-all-benchmarks")]
+#[cfg(feature = "all-benchmarks")]
 const PACKET_BENCHMARK: &[(usize, usize)] = &[
     (0, 0), // 0-hop 0 SURBs = used for packet acknowledgements
     (1, 1), // 1-hop 1 SURB = common GnosisVPN use-case
@@ -70,7 +70,7 @@ const PACKET_BENCHMARK: &[(usize, usize)] = &[
     (3, 1), // 3-hop 1 SURB = common GnosisVPN use-case
     (3, 2), // 3-hop 2 SURBs = GnosisVPN use-case with asymmetric traffic (non-TCP)
 ];
-#[cfg(not(feature = "run-all-benchmarks"))]
+#[cfg(not(feature = "all-benchmarks"))]
 const PACKET_BENCHMARK: &[(usize, usize)] = &[
     (3, 2), // 3-hop 2 SURBs = worst case
 ];
