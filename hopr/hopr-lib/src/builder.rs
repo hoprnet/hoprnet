@@ -596,8 +596,7 @@ where
                                         }
                                         chain_reader.chain_key_to_packet_key(&addr).map_err(anyhow::Error::from)
                                     };
-                                    resolve(src_addr)
-                                        .and_then(|src| resolve(dst_addr).map(|dst| src.zip(dst)))
+                                    resolve(src_addr).and_then(|src| resolve(dst_addr).map(|dst| src.zip(dst)))
                                 })
                                 .await
                                 .map_err(anyhow::Error::from)
