@@ -41,8 +41,6 @@ futures = { workspace = true }
 insta = { workspace = true, features = ["yaml"] }
 rstest = { workspace = true }
 tokio = { workspace = true, features = ["time"] }
-rust-stream-ext-concurrent = { workspace = true }
-
 [package.metadata.cargo-machete]
 ignored = ["humantime-serde"]
 

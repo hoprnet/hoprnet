@@ -5024,7 +5024,6 @@ dependencies = [
  "lazy_static",
  "parking_lot",
  "rstest",
- "rust-stream-ext-concurrent",
  "serde",
  "smart-default",
  "thiserror 2.0.18",

@@ -92,8 +92,7 @@ fn build_graph(node_count: usize, density: usize) -> (ChannelGraph, Vec<Offchain
 // ── Benchmark: NetworkGraphTraverse::simple_paths ────────────────────────────
 
 /// Benchmarks [`NetworkGraphTraverse::simple_paths`] for 2-edge, 3-edge, and
-/// 4-edge routes across all combinations of three node counts (10 / 100 / 1 000)
-/// and three edge densities (10× / 100× / 1 000×).
+/// 4-edge routes.
 ///
 /// The benchmark ID encodes both dimensions, e.g. `2-edge/100nodes/100x`.
 ///
@@ -106,6 +105,15 @@ fn build_graph(node_count: usize, density: usize) -> (ChannelGraph, Vec<Offchain
 ///
 /// `take_count` is capped at 10 to reflect realistic production usage and to
 /// keep the benchmark runtime bounded at high densities.
+///
+/// # Feature-gated coverage
+///
+/// Without `all-benchmarks`: runs only `(1_000 nodes, 1_000× density)` at
+/// all three depths (2-, 3-, 4-edge).
+///
+/// With `all-benchmarks`: runs the full matrix —
+/// `(10, 100, 1_000) nodes × (10, 10, 100, 1_000)× density` — at all three
+/// depths for every configuration.
 fn bench_simple_paths(c: &mut Criterion) {
     let mut group = c.benchmark_group("NetworkGraphTraverse/simple_paths");
 
@@ -179,8 +187,7 @@ fn bench_simple_paths(c: &mut Criterion) {
 // ── Benchmark: NetworkGraphTraverse::simple_loopback_to_self ─────────────────
 
 /// Benchmarks [`NetworkGraphTraverse::simple_loopback_to_self`] for 2-edge,
-/// 3-edge, and 4-edge loopback routes across all combinations of three node
-/// counts (10 / 100 / 1 000) and three edge densities (10× / 100× / 1 000×).
+/// 3-edge, and 4-edge loopback routes.
 ///
 /// The benchmark ID encodes both dimensions, e.g. `3-edge/1000nodes/100x`.
 ///
@@ -190,6 +197,16 @@ fn bench_simple_paths(c: &mut Criterion) {
 /// in addition to the path-enumeration depth.
 ///
 /// `take_count` is capped at 10.
+///
+/// # Feature-gated coverage
+///
+/// Without `all-benchmarks`: runs only `(1_000 nodes, 1_000× density)` at
+/// 2-edge depth (nearly-complete graph, single configuration).
+///
+/// With `all-benchmarks`: runs the full matrix —
+/// `(10, 100, 1_000) nodes × (10, 100, 1_000)× density` — and extends depth
+/// to `[2, 3, 4]`-edge for all but the `1_000/1_000` case (where all depths
+/// collapse to identical results due to `take_count` saturation).
 fn bench_simple_loopback(c: &mut Criterion) {
     let mut group = c.benchmark_group("NetworkGraphTraverse/simple_loopback_to_self");
 
