@@ -23,48 +23,22 @@ pub mod config;
 pub mod constants;
 /// Lists all errors thrown from this library.
 pub mod errors;
-// Re-export peer discovery types from hopr-api.
-pub use hopr_api::node::{AnnouncedPeer, AnnouncementOrigin};
 /// Utility module with helper types and functionality over hopr-lib behavior.
 pub mod utils;
 
 pub use hopr_api as api;
 
 /// Exports of libraries necessary for API and interface operations.
+///
+/// Use `hopr_lib::api::types::*` for all type access.
+/// This module retains transport and network-specific types not available in `hopr_lib::api`.
 #[doc(hidden)]
 pub mod exports {
-    pub mod types {
-        pub use hopr_api::types::{chain, internal, primitive};
-    }
-
-    pub mod crypto {
-        pub use hopr_api::types::crypto as types;
-        pub use hopr_crypto_keypair as keypair;
-    }
-
     pub mod network {
         pub use hopr_network_types as types;
     }
 
     pub use hopr_transport as transport;
-}
-
-/// Export of relevant types for easier integration.
-#[doc(hidden)]
-pub mod prelude {
-    #[cfg(feature = "runtime-tokio")]
-    pub use super::exports::network::types::{
-        prelude::ForeignDataMode,
-        udp::{ConnectedUdpStream, UdpStreamParallelism},
-    };
-    pub use super::exports::{
-        crypto::{
-            keypair::key_pair::HoprKeys,
-            types::prelude::{ChainKeypair, Hash, OffchainKeypair},
-        },
-        transport::{OffchainPublicKey, socket::HoprSocket},
-        types::primitive::prelude::Address,
-    };
 }
 
 use std::{
@@ -73,42 +47,33 @@ use std::{
 };
 
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt, pin_mut};
+use futures_concurrency::stream::Merge as _;
 use futures_time::future::FutureExt as FuturesTimeFutureExt;
-#[cfg(feature = "session-client")]
-pub use hopr_api::node::HoprSessionClientOperations;
 use hopr_api::{
+    PeerId,
     chain::*,
     graph::HoprGraphApi,
-    network::NetworkView as _,
+    network::{Health, NetworkStreamControl, NetworkView},
     node::{
-        AtomicHoprState, ComponentStatus, ComponentStatusReporter, EitherErrExt, EventWaitResult, HasChainApi,
-        HasGraphView, HasNetworkView, HasTicketManagement, HasTransportApi, NodeOnchainIdentity,
+        ActionableEvent, ActionableEventDiscriminant, AtomicHoprState, ComponentStatus, ComponentStatusReporter,
+        EitherErrExt, EventWaitResult, HasChainApi, HasGraphView, HasNetworkView, HasTicketManagement, HasTransportApi,
+        HoprNodeOperations, HoprState, NodeOnchainIdentity,
     },
-};
-pub use hopr_api::{
-    graph::EdgeLinkObservable,
-    network::NetworkStreamControl,
-    node::{
-        EitherErr, HoprNodeOperations, HoprState, IncentiveChannelOperations, IncentiveRedeemOperations,
-        TransportOperations,
-    },
-    tickets::{ChannelStats, RedemptionResult, TicketManagement, TicketManagementExt},
-    types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*},
+    tickets::TicketManagement,
+    types::{crypto::prelude::OffchainKeypair, internal::routing::DestinationRouting},
 };
 use hopr_async_runtime::prelude::spawn;
 pub use hopr_async_runtime::{Abortable, AbortableList};
 pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
-pub use hopr_network_types::prelude::*;
-#[cfg(feature = "runtime-tokio")]
-pub use hopr_transport::transfer_session;
-pub use hopr_transport::*;
+use hopr_transport::{ApplicationDataIn, ApplicationDataOut, HoprTransport, HoprTransportProcess, OffchainPublicKey};
+#[cfg(feature = "session-client")]
+use hopr_transport::{
+    HoprSession, HoprSessionConfigurator, SessionCapabilities, SessionCapability, SessionTarget, SurbBalancerConfig,
+};
 use tracing::debug;
 
-pub use crate::{
-    config::SafeModule,
-    constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE},
-    errors::{HoprLibError, HoprStatusError},
-};
+pub use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
+use crate::errors::HoprLibError;
 
 /// Public routing configuration for session opening in `hopr-lib`.
 ///
@@ -252,7 +217,7 @@ pub fn prepare_tokio_runtime(
 }
 
 /// Type alias used to send and receive transport data via a running HOPR node.
-pub type HoprTransportIO = socket::HoprSocket<
+pub type HoprTransportIO = hopr_transport::socket::HoprSocket<
     futures::channel::mpsc::Receiver<ApplicationDataIn>,
     futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>,
 >;
@@ -312,7 +277,7 @@ where
         if HoprNodeOperations::status(self) == state {
             Ok(())
         } else {
-            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(state, error)))
+            Err(HoprLibError::NotReady(state, error))
         }
     }
 }
@@ -337,7 +302,7 @@ where
 
     async fn connect_to(
         &self,
-        destination: Address,
+        destination: hopr_api::types::primitive::prelude::Address,
         target: Self::Target,
         cfg: Self::Config,
     ) -> Result<(Self::Session, Self::SessionConfigurator), Self::Error> {
@@ -420,15 +385,23 @@ where
                 let res = event_stream
                     .next()
                     .timeout(futures_time::time::Duration::from(timeout))
-                    .map_err(|_| HoprLibError::GeneralError(format!("{ctx} timed out after {timeout:?}")).into_right())
+                    .map_err(|_| {
+                        HoprLibError::Timeout {
+                            context: format!("{ctx} (after {timeout:?})"),
+                        }
+                        .into_right()
+                    })
                     .await?
                     .ok_or(
-                        HoprLibError::GeneralError(format!("failed to yield an on-chain event for {ctx}")).into_right(),
+                        HoprLibError::GeneralError(format!("on-chain event stream for {ctx} ended unexpectedly"))
+                            .into_right(),
                     );
                 debug!(%ctx, ?res, "on-chain event waiting done");
                 res
             })
-            .map_err(move |_| HoprLibError::GeneralError(format!("failed to spawn future for {context}")).into_right())
+            .map_err(move |_| {
+                HoprLibError::GeneralError(format!("failed to spawn on-chain event wait for {context}")).into_right()
+            })
             .and_then(futures::future::ready)
             .boxed(),
             handle,
@@ -517,6 +490,59 @@ where
 
     fn status(&self) -> ComponentStatus {
         ComponentStatus::Ready
+    }
+}
+
+impl<Chain, Graph, Net, TMgr> hopr_api::node::ActionableEventSource for Hopr<Chain, Graph, Net, TMgr>
+where
+    Chain: HoprChainApi + Send + Sync + 'static,
+    Graph: Send + Sync + 'static,
+    Net: hopr_api::network::NetworkView + Send + Sync + 'static,
+    TMgr: Send + Sync + 'static,
+{
+    fn subscribe_to_actionable_events(
+        &self,
+        filter: Option<&[ActionableEventDiscriminant]>,
+    ) -> Result<futures::stream::BoxStream<'static, ActionableEvent>, String> {
+        let wants = |d: ActionableEventDiscriminant| filter.is_none_or(|f| f.contains(&d));
+
+        let mut streams = Vec::<futures::stream::BoxStream<'static, ActionableEvent>>::new();
+
+        if wants(ActionableEventDiscriminant::Chain) {
+            streams.push(
+                self.chain_api
+                    .subscribe()
+                    .map_err(|e| e.to_string())?
+                    .map(ActionableEvent::Chain)
+                    .boxed(),
+            );
+        }
+
+        if wants(ActionableEventDiscriminant::Network) {
+            streams.push(
+                self.transport_api
+                    .subscribe_network_events()
+                    .map(ActionableEvent::Network)
+                    .boxed(),
+            );
+        }
+
+        if wants(ActionableEventDiscriminant::Ticket) {
+            streams.push(
+                self.ticket_event_subscribers
+                    .1
+                    .activate_cloned()
+                    .map(ActionableEvent::Ticket)
+                    .boxed(),
+            );
+        }
+
+        if streams.is_empty() {
+            return Ok(futures::stream::empty().boxed());
+        }
+
+        // `Merge` provides fair polling distribution across active sources.
+        Ok(streams.merge().boxed())
     }
 }
 

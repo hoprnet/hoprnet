@@ -39,5 +39,5 @@ insta = { workspace = true, features = ["yaml"] }
 tokio = { workspace = true }
 
 [[bench]]
-name = "traverse"
+name = "traverse_bench"
 harness = false

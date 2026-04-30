@@ -5,16 +5,15 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
-use hopr_lib::{
-    Address, HoprBalance, IncentiveChannelOperations, Multiaddr,
-    api::{
-        chain::ChainKeyOperations,
-        graph::{
-            EdgeLinkObservable, NetworkGraphConnectivity, NetworkGraphView,
-            traits::{EdgeNetworkObservableRead, EdgeObservableRead, EdgeProtocolObservable},
-        },
-        node::{HasChainApi, HasGraphView},
+use hopr_lib::api::{
+    Multiaddr,
+    chain::ChainKeyOperations,
+    graph::{
+        EdgeLinkObservable, NetworkGraphConnectivity, NetworkGraphView,
+        traits::{EdgeNetworkObservableRead, EdgeObservableRead, EdgeProtocolObservable},
     },
+    node::{HasChainApi, HasGraphView, IncentiveChannelOperations},
+    types::primitive::prelude::{Address, HoprBalance},
 };
 use serde_with::{DisplayFromStr, serde_as};
 
@@ -218,11 +217,11 @@ pub(crate) enum AnnouncementOriginResponse {
     Dht,
 }
 
-impl From<hopr_lib::AnnouncementOrigin> for AnnouncementOriginResponse {
-    fn from(origin: hopr_lib::AnnouncementOrigin) -> Self {
+impl From<hopr_lib::api::node::AnnouncementOrigin> for AnnouncementOriginResponse {
+    fn from(origin: hopr_lib::api::node::AnnouncementOrigin) -> Self {
         match origin {
-            hopr_lib::AnnouncementOrigin::Chain => Self::Chain,
-            hopr_lib::AnnouncementOrigin::DHT => Self::Dht,
+            hopr_lib::api::node::AnnouncementOrigin::Chain => Self::Chain,
+            hopr_lib::api::node::AnnouncementOrigin::DHT => Self::Dht,
         }
     }
 }
@@ -348,7 +347,7 @@ pub(super) async fn graph<
         unique_keys.insert(*dst);
     }
 
-    let mut key_to_addr: HashMap<hopr_lib::OffchainPublicKey, String> = HashMap::new();
+    let mut key_to_addr: HashMap<hopr_lib::exports::transport::OffchainPublicKey, String> = HashMap::new();
     for key in &unique_keys {
         let label = match hopr.chain_api().packet_key_to_chain_key(key) {
             Ok(Some(addr)) => addr.to_string(),
@@ -357,7 +356,9 @@ pub(super) async fn graph<
         key_to_addr.insert(*key, label);
     }
 
-    let label = |key: &hopr_lib::OffchainPublicKey| key_to_addr.get(key).cloned().unwrap_or_else(|| key.to_string());
+    let label = |key: &hopr_lib::exports::transport::OffchainPublicKey| {
+        key_to_addr.get(key).cloned().unwrap_or_else(|| key.to_string())
+    };
 
     // Render DOT (Graphviz) format inline using trait methods on the observations.
     let mut dot = String::from("digraph hopr {\n");
@@ -447,7 +448,7 @@ mod tests {
     #[test]
     fn chain_origin_should_convert_from_domain_type() {
         assert_eq!(
-            AnnouncementOriginResponse::from(hopr_lib::AnnouncementOrigin::Chain),
+            AnnouncementOriginResponse::from(hopr_lib::api::node::AnnouncementOrigin::Chain),
             AnnouncementOriginResponse::Chain
         );
     }
@@ -455,7 +456,7 @@ mod tests {
     #[test]
     fn dht_origin_should_convert_from_domain_type() {
         assert_eq!(
-            AnnouncementOriginResponse::from(hopr_lib::AnnouncementOrigin::DHT),
+            AnnouncementOriginResponse::from(hopr_lib::api::node::AnnouncementOrigin::DHT),
             AnnouncementOriginResponse::Dht
         );
     }

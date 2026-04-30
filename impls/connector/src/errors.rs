@@ -28,6 +28,9 @@ pub enum ConnectorError {
     #[error("channel {0} is closed")]
     ChannelClosed(ChannelId),
 
+    #[error("inner safe transaction failed: {0}")]
+    InnerTxFailed(String),
+
     #[error("type conversion error: {0}")]
     TypeConversion(String),
 

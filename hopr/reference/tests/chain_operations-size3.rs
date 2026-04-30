@@ -2,8 +2,12 @@ use std::ops::Mul;
 
 use anyhow::Context;
 use hopr_chain_connector::blokli_client::BlokliQueryClient;
-use hopr_lib::{
-    Address, BytesRepresentable, ChannelId, ChannelStatus, HoprBalance, api::node::IncentiveChannelOperations,
+use hopr_lib::api::{
+    node::IncentiveChannelOperations,
+    types::{
+        internal::prelude::{ChannelId, ChannelStatus},
+        primitive::prelude::{Address, BytesRepresentable, HoprBalance, XDai, XDaiBalance},
+    },
 };
 use hopr_reference::testing::{
     fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, chain_propagation_delay, size_3_cluster_fixture as cluster},
@@ -154,7 +158,7 @@ async fn test_withdraw_native(cluster: &ClusterGuard) -> anyhow::Result<()> {
 
     // We use a standalone fixed address to prevent side effects from other tests.
     let target_addr: Address = [0xad_u8; Address::SIZE].into();
-    let withdrawn_amount = "0.005 xDai".parse::<hopr_lib::XDaiBalance>()?;
+    let withdrawn_amount = "0.005 xDai".parse::<XDaiBalance>()?;
 
     let balance = cluster
         .chain_client
@@ -166,7 +170,7 @@ async fn test_withdraw_native(cluster: &ClusterGuard) -> anyhow::Result<()> {
 
     let initial_balance_src = src
         .inner()
-        .get_balance::<hopr_lib::XDai>()
+        .get_balance::<XDai>()
         .await
         .context("should get node xdai balance")?;
 
@@ -178,7 +182,7 @@ async fn test_withdraw_native(cluster: &ClusterGuard) -> anyhow::Result<()> {
 
     let final_balance_src = src
         .inner()
-        .get_balance::<hopr_lib::XDai>()
+        .get_balance::<XDai>()
         .await
         .context("should get node xdai balance")?;
 

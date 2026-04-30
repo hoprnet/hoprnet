@@ -16,7 +16,7 @@ crate-type = ["rlib"]
 hex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-scrypt = { workspace = true }
+scrypt = { workspace = true, features = ["phc"] }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 typenum = { workspace = true }

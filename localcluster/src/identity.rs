@@ -8,7 +8,14 @@ use hopr_chain_connector::{
     create_trustful_safeless_hopr_blokli_connector,
     reexports::chain::exports::alloy::hex,
 };
-use hopr_lib::{ChainKeypair, HoprKeys, Keypair, SafeModule, XDaiBalance, crypto_traits::Randomizable};
+use hopr_lib::{
+    HoprKeys,
+    api::types::{
+        crypto::{crypto_traits::Randomizable, keypairs::Keypair, prelude::ChainKeypair},
+        primitive::prelude::XDaiBalance,
+    },
+    config::SafeModule,
+};
 use hopr_reference::config::SessionIpForwardingConfig;
 use hoprd::config::{Db, HoprdConfig, Identity, UserHoprLibConfig, UserHoprNetworkConfig};
 use hoprd_api::config::{Api, Auth};

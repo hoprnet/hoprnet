@@ -277,7 +277,7 @@ impl HoprKeys {
             KdfparamsType::Scrypt { dklen, n, p, r, salt } => {
                 let mut key = vec![0u8; dklen as usize];
                 let log_n = (n as f32).log2() as u8;
-                let scrypt_params = ScryptParams::new(log_n, r, p, dklen.into())
+                let scrypt_params = ScryptParams::new_with_output_len(log_n, r, p, dklen.into())
                     .map_err(|err| KeyPairError::KeyDerivationError(err.to_string()))?;
                 // derive "master key" and store it in `key`
                 scrypt(password.as_ref(), &salt, &scrypt_params, &mut key)
@@ -368,7 +368,7 @@ impl HoprKeys {
 
         // Derive the key.
         let mut key = [0u8; HOPR_KDF_PARAMS_DKLEN as usize];
-        let scrypt_params = ScryptParams::new(
+        let scrypt_params = ScryptParams::new_with_output_len(
             HOPR_KDF_PARAMS_LOG_N,
             HOPR_KDF_PARAMS_R,
             HOPR_KDF_PARAMS_P,

@@ -2,7 +2,7 @@
 use futures::future::try_join_all;
 use hopr_chain_connector::blokli_client::BlokliQueryClient;
 #[cfg(feature = "session-client")]
-use hopr_lib::HoprBalance;
+use hopr_lib::api::types::primitive::prelude::HoprBalance;
 use hopr_reference::testing::{
     fixtures::{
         MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, TestNodeConfig, chain_propagation_delay, cluster_fixture,

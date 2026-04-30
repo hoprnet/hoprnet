@@ -8,7 +8,10 @@ use hopr_api::{
     node::{HasChainApi, HasTicketManagement, IncentiveChannelOperations, IncentiveRedeemOperations},
 };
 use hopr_reference::{
-    hopr_lib::{HoprBalance, HoprLibError, UnitaryFloatOps},
+    hopr_lib::{
+        api::types::primitive::prelude::{HoprBalance, UnitaryFloatOps},
+        errors::HoprLibError,
+    },
     testing::{
         fixtures::{ClusterGuard, MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, TestNodeConfig, cluster_fixture},
         hopr::ChannelGuard,

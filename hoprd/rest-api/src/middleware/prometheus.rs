@@ -1,6 +1,6 @@
 use axum::{extract::Request, middleware::Next, response::Response};
 #[cfg(all(feature = "telemetry", not(test)))]
-use hopr_lib::AsUnixTimestamp;
+use hopr_lib::api::types::primitive::prelude::AsUnixTimestamp;
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {

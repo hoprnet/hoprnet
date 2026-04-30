@@ -79,11 +79,11 @@ hopr-test-stubs = { workspace = true }
 hopr-transport-protocol = { path = ".", features = ["serde"] }
 
 [[bench]]
-name = "protocol_throughput_emulated"
+name = "protocol_throughput_emulated_bench"
 harness = false
 
 [[bench]]
-name = "pipeline_e2e"
+name = "pipeline_e2e_bench"
 harness = false
 
 [package.metadata.cargo-machete]

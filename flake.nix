@@ -352,9 +352,11 @@
             (rust-builder-local.callPackage nixLib.mkRustPackage (projectBuildArgs // { buildBench = true; }))
             .overrideAttrs
               (old: {
-                postInstall = (if old.postInstall or null != null then old.postInstall else "") + ''
-                  mkdir -p $out/bin
-                  find target -maxdepth 4 -type f -executable -exec cp {} $out/bin/ \;
+                postInstall = (if old ? postInstall && old.postInstall != null then old.postInstall else "") + ''
+                  mkdir -p "$out/bin"
+                  find target -maxdepth 4 -path '*/deps/*' -type f -name "*_bench-*" \
+                    -not -name "*.*" \
+                    -exec cp {} "$out/bin/" \;
                 '';
               });
 
@@ -488,8 +490,24 @@
           docs = rust-builder-local-nightly.callPackage nixLib.mkRustPackage (
             projectBuildArgs // { buildDocs = true; }
           );
+
+          # pre-commit in nixpkgs bundles heavyweight test-only dependencies
+          # (dotnet-sdk, nodejs, go, coursier, …) into nativeBuildInputs via
+          # its preCheck string interpolation, even though doCheck is already
+          # false on Darwin. Filter them out so `direnv allow` / `nix develop`
+          # doesn't have to build dotnet from source.
+          pre-commit-lightweight = pkgs.pre-commit.overridePythonAttrs {
+            nativeCheckInputs = [ ];
+            doCheck = false;
+            doInstallCheck = false;
+            dontUsePytestCheck = true;
+            preCheck = "";
+            postCheck = "";
+          };
+
           pre-commit-check = pre-commit.lib.${system}.run {
             src = ./.;
+            package = pre-commit-lightweight;
             hooks = {
               # https://github.com/cachix/git-hooks.nix
               treefmt.enable = false;
@@ -517,8 +535,15 @@
                 pass_filenames = false;
                 language = "system";
               };
+              check-bench-names = {
+                enable = true;
+                name = "Benchmark names must end with _bench";
+                entry = "bash .github/scripts/check-bench-names.sh";
+                files = "Cargo\\.toml$";
+                pass_filenames = true;
+                language = "system";
+              };
             };
-            tools = pkgs;
             excludes = [ ".gcloudignore" ];
           };
 
@@ -653,30 +678,9 @@
             ];
           };
 
-          run-check = flake-utils.lib.mkApp {
-            drv = pkgs.writeShellScriptBin "run-check" ''
-              set -e
-              check=$1
-              if [ -z "$check" ]; then
-                nix flake show --json 2>/dev/null | \
-                  jq -r '.checks."${system}" | to_entries | .[].key' | \
-                  xargs -I '{}' nix build ".#checks."${system}".{}"
-              else
-              	nix build ".#checks."${system}".$check"
-              fi
-            '';
-          };
-          run-audit = flake-utils.lib.mkApp {
-            drv = pkgs.writeShellApplication {
-              name = "audit";
-              runtimeInputs = [
-                pkgs.cargo
-                pkgs-unstable.cargo-audit
-              ];
-              text = ''
-                cargo audit
-              '';
-            };
+          run-check = nixLib.mkCheckApp { inherit system; };
+          run-audit = nixLib.mkAuditApp {
+            rustToolchainFile = ./rust-toolchain.toml;
           };
 
           find-port-ci = flake-utils.lib.mkApp {
@@ -785,9 +789,18 @@
               program = toString (
                 pkgs.writeShellScript "bench-run" ''
                   set -euo pipefail
-                  nix build -L .#bench-build
-                  for bin in result/bin/*; do
-                    $bin --bench
+                  shopt -s nullglob
+                  bins=(result/bin/*)
+                  if [ ''${#bins[@]} -eq 0 ]; then
+                    nix build -L .#bench-build
+                    bins=(result/bin/*)
+                  fi
+                  if [ ''${#bins[@]} -eq 0 ]; then
+                    echo "No benchmark binaries found under result/bin" >&2
+                    exit 1
+                  fi
+                  for bin in "''${bins[@]}"; do
+                    "$bin" --bench
                   done
                 ''
               );

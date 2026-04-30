@@ -1,10 +1,10 @@
 use std::time::Duration;
 
 use hopr_lib::{
-    HoprBalance, HoprProtocolConfig, SafeModule, TagAllocatorConfig, WinningProbability,
+    api::types::{internal::prelude::WinningProbability, primitive::prelude::HoprBalance},
     config::{
-        HoprLibConfig, HoprPacketPipelineConfig, HostConfig, HostType, ProbeConfig, SessionGlobalConfig,
-        TransportConfig,
+        HoprLibConfig, HoprPacketPipelineConfig, HoprProtocolConfig, HostConfig, HostType, ProbeConfig, SafeModule,
+        SessionGlobalConfig, TagAllocatorConfig, TransportConfig,
     },
     exports::transport::config::HoprCodecConfig,
 };
@@ -296,9 +296,9 @@ pub struct HoprdConfig {
     /// Strategies represent automatically executable behavior performed by
     /// the node given pre-configured triggers.
     #[validate(nested)]
-    #[serde(default = "hopr_strategy::hopr_default_strategies")]
-    #[default(hopr_strategy::hopr_default_strategies())]
-    pub strategy: hopr_strategy::StrategyConfig,
+    #[serde(default = "crate::strategy::hopr_default_strategies")]
+    #[default(crate::strategy::hopr_default_strategies())]
+    pub strategy: crate::strategy::MultiStrategyConfig,
 }
 
 impl HoprdConfig {
@@ -338,7 +338,7 @@ mod tests {
 
     use anyhow::Context;
     use clap::{Args, Command, FromArgMatches};
-    use hopr_lib::Address;
+    use hopr_lib::api::types::primitive::prelude::Address;
     use tempfile::NamedTempFile;
 
     use super::*;

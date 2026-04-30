@@ -55,5 +55,5 @@ path = "src/bin/ticket_inspector.rs"
 required-features = ["redb", "cli"]
 
 [[bench]]
-name = "ticket_manager"
+name = "ticket_manager_bench"
 harness = false

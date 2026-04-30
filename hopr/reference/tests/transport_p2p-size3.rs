@@ -1,16 +1,14 @@
 use std::time::Duration;
 
 use anyhow::Context;
-use hopr_lib::{
-    Address,
-    api::{
-        graph::{
-            NetworkGraphConnectivity,
-            traits::{EdgeLinkObservable, EdgeObservableRead},
-        },
-        network::NetworkView,
-        node::{HasNetworkView, HasTransportApi, IncentiveChannelOperations},
+use hopr_lib::api::{
+    graph::{
+        NetworkGraphConnectivity,
+        traits::{EdgeLinkObservable, EdgeObservableRead},
     },
+    network::NetworkView,
+    node::{HasNetworkView, HasTransportApi, IncentiveChannelOperations},
+    types::primitive::prelude::Address,
 };
 use hopr_reference::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster};
 use rstest::*;
