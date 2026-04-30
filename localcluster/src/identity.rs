@@ -146,7 +146,10 @@ pub async fn generate(config: &GenerationConfig) -> anyhow::Result<()> {
         }
 
         eprint!("\x1b[2K\rNode {id}: Checking Safe deployment...");
-        let safe = if let Some(safe) = node_connector.safe_info(SafeSelector::Owner(node_address)).await? {
+        let safe = if let Some(safe) = node_connector
+            .safe_info(SafeSelector::NodeAddress(node_address))
+            .await?
+        {
             safe
         } else {
             // Send 1000 wxHOPR tokens to the new node address from Anvil 0 account
@@ -171,7 +174,10 @@ pub async fn generate(config: &GenerationConfig) -> anyhow::Result<()> {
             let node_connector_clone = node_connector.clone();
             let jh = tokio::task::spawn(async move {
                 node_connector_clone
-                    .await_safe_deployment(SafeSelector::Owner(node_address), std::time::Duration::from_secs(10))
+                    .await_safe_deployment(
+                        SafeSelector::NodeAddress(node_address),
+                        std::time::Duration::from_secs(10),
+                    )
                     .await
             });
             node_connector.deploy_safe(initial_token_balance).await?.await?;

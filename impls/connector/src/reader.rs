@@ -136,6 +136,9 @@ where
         let selector = match selector {
             SafeSelector::Owner(owner_address) => blokli_client::api::SafeSelector::ChainKey(owner_address.into()),
             SafeSelector::Address(safe_address) => blokli_client::api::SafeSelector::SafeAddress(safe_address.into()),
+            SafeSelector::NodeAddress(node_address) => {
+                blokli_client::api::SafeSelector::RegisteredNode(node_address.into())
+            }
         };
 
         if let Some(safe) = self.0.query_safe(selector).await? {

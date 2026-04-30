@@ -201,7 +201,7 @@ where
         let chain = self.node.chain_api().clone();
 
         let safe = chain
-            .safe_info(SafeSelector::Owner(me))
+            .safe_info(SafeSelector::NodeAddress(me))
             .await
             .map_err(|e| StrategyError::Other(e.into()))?;
 
