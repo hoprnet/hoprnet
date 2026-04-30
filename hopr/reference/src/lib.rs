@@ -284,8 +284,7 @@ pub async fn build_full_with_session_server(
 /// Use this when you need a non-default chain connector; otherwise prefer [`build_edge`].
 ///
 /// When the `session-server` feature is enabled a session server must be provided.
-/// Edge nodes typically pass [`NoopSessionServer`] here (as [`build_edge`] does) to
-/// discard incoming sessions, but callers may supply any compliant implementation.
+/// Callers that do not need to handle incoming sessions can pass a server that discards them.
 #[cfg(feature = "runtime-tokio")]
 pub async fn build_edge_with_chain<
     Chain,
