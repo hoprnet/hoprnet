@@ -281,19 +281,18 @@ where
                 data.extend_from_slice(&commit.ssa.to_be_bytes());
                 data.extend_from_slice(&commit.coefficient_index.to_be_bytes());
 
-                let avail_space = data.spare_capacity_mut().len();
-
-                let session_id = serde_cbor_2::to_vec(&commit.session_id)?;
-
-                if commit.coefficient_commitments.is_empty()
-                    || (size_of::<hopr_protocol_pix::CoefficientIndex>() + size_of::<G>())
-                        * commit.coefficient_commitments.len()
-                        > avail_space - session_id.len()
-                {
-                    return Err(StartProtocolError::NumberOfCommitments);
-                }
                 let num_polys = commit.coefficient_commitments.len() as hopr_protocol_pix::PolynomialIndex;
                 data.extend_from_slice(&num_polys.to_be_bytes());
+
+
+                let session_id = serde_cbor_2::to_vec(&commit.session_id)?;
+                let total_coeff_commit_len = (size_of::<hopr_protocol_pix::PolynomialIndex>() + size_of::<G>())
+                * commit.coefficient_commitments.len();
+
+                let avail_space = data.spare_capacity_mut().len() - session_id.len();
+                if commit.coefficient_commitments.is_empty() || total_coeff_commit_len > avail_space {
+                    return Err(StartProtocolError::NumberOfCommitments);
+                }
 
                 for (index, commitment) in commit.coefficient_commitments {
                     let commitment_repr = commitment.as_ref();
