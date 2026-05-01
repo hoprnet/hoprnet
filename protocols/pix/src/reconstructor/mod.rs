@@ -13,6 +13,7 @@ use crate::{
     complete_share, errors,
     types::{EncryptedPartialSsaShare, SsaIndex},
 };
+use crate::reconstructor::events::ReconstructorEvent;
 
 pub type AffineElement<S> = <<S as PixSpec>::Curve as CurveArithmetic>::AffinePoint;
 
@@ -96,31 +97,81 @@ impl<S: PixSpec> Clone for AwaitingPartialShare<S> {
     }
 }
 
+/// Configuration for the SSA reconstructor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault, validator::Validate)]
+pub struct SsaReconstructorConfig {
+    /// Number of polynomials needed to reconstruct a single SSA.
+    ///
+    /// Default is 1000, must be between 2 and 1 000 000.
+    #[default(1000)]
+    #[validator(range(min = 2, max = 1_000_000))]
+    pub polys_per_ssa: usize,
+    /// Number of shares needed to reconstruct a single polynomial.
+    ///
+    /// Default is 100, must be between 2 and 1000.
+    #[default(100)]
+    #[validator(range(min = 2, max = 1000))]
+    pub poly_threshold: usize,
+    /// Maximum time an SSA can be incomplete before it is discarded.
+    ///
+    /// Default is 10 minutes.
+    #[default(std::time::Duration::from_secs(600))]
+    pub incomplete_ssa_lifetime: std::time::Duration,
+    /// Maximum time a verifier can be unused before it is discarded.
+    ///
+    /// Default is 30 minutes.
+    #[default(std::time::Duration::from_secs(1800))]
+    pub unused_verifier_lifetime: std::time::Duration,
+    /// Maximum number of awaited acknowledgements to extract a single share.
+    ///
+    /// Default is 10 000 000, must be at least 10 000.
+    #[default(10_000_000)]
+    #[validator(range(min = 10000))]
+    pub max_awaiting_acks: usize,
+    /// Maximum time an acknowledgement can be awaited before it is discarded.
+    ///
+    /// Default is 30 seconds.
+    #[default(std::time::Duration::from_secs(30))]
+    pub max_ack_await_time: std::time::Duration,
+}
+
 pub struct SsaReconstructor<S: PixSpec> {
     channel: (
-        async_broadcast::Sender<PixScalar<S>>,
-        async_broadcast::InactiveReceiver<PixScalar<S>>,
+        async_broadcast::Sender<ReconstructorEvent<S>>,
+        async_broadcast::InactiveReceiver<ReconstructorEvent<S>>,
     ),
     ssa_builders: moka::sync::Cache<SsaIndex, std::sync::Arc<parking_lot::Mutex<SsaBuilder<S>>>>,
     ssa_verifiers:
         moka::sync::Cache<SsaPolynomialIndex<S>, std::sync::Arc<parking_lot::Mutex<SsaPartReconstructor<S>>>>,
     awaiting_acks: moka::sync::Cache<HalfKeyChallenge, AwaitingPartialShare<S>>,
+    pseudonym: S::Pseudonym,
+    cfg: SsaReconstructorConfig,
 }
 
 impl<S: PixSpec + 'static> SsaReconstructor<S> {
-    // TODO: replace this with add_verifier_part
-    pub fn add_ssa_commitment(&self, ssa_index: SsaIndex, num_parts: NonZeroUsize, ssa_commitment: PixGroup<S>) {
-        self.ssa_builders.insert(
-            ssa_index,
-            std::sync::Arc::new(parking_lot::Mutex::new(SsaBuilder::new(ssa_commitment, num_parts))),
-        );
+
+    pub fn new(pseudonym: S::Pseudonym, cfg: SsaReconstructorConfig) -> Self {
+        let (mut event_send, event_recv) = async_broadcast::broadcast(1024);
+        event_send.set_await_active(false);
+        event_send.set_overflow(true);
+        Self {
+            channel: (event_send, event_recv.deactivate()),
+            ssa_builders: moka::sync::CacheBuilder::new(3 * cfg.polys_per_ssa as u64)
+                .time_to_idle(cfg.incomplete_ssa_lifetime)
+                .build(),
+            ssa_verifiers: moka::sync::CacheBuilder::new(3 * cfg.polys_per_ssa as u64)
+                .time_to_idle(cfg.unused_verifier_lifetime)
+                .build(),
+            awaiting_acks: moka::sync::CacheBuilder::new(cfg.max_awaiting_acks as u64)
+                .time_to_live(cfg.max_ack_await_time)
+                .build(),
+            pseudonym,
+            cfg
+        }
     }
 
-    pub fn add_verifier(&self, verifier: PartialSsaShareVerifier<S>) {
-        self.ssa_verifiers.insert(
-            verifier.spi,
-            std::sync::Arc::new(parking_lot::Mutex::new(SsaPartReconstructor::new(verifier))),
-        );
+    pub fn add_client_commitment_data(ssa_index: SsaIndex) -> errors::Result<()> {
+        todo!()
     }
 
     pub fn add_share(
@@ -168,14 +219,15 @@ impl<S: PixSpec + 'static> SsaReconstructor<S> {
             return Ok(());
         };
 
-        if let Err(error) = self.channel.0.try_broadcast(ssa) {
+        if let Err(error) = self.channel.0
+            .try_broadcast(ReconstructorEvent::SsaRecovered(share.spi.ssa_index(), ssa)) {
             tracing::error!(%error, "failed to broadcast new ssa");
         }
 
         Ok(())
     }
 
-    pub fn ssa_stream(&self) -> impl futures::Stream<Item = PixScalar<S>> {
+    pub fn event_stream(&self) -> impl futures::Stream<Item = ReconstructorEvent<S>> {
         self.channel.1.activate_cloned()
     }
 }
