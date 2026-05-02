@@ -1,3 +1,4 @@
+use futures::StreamExt;
 #[cfg(feature = "rayon")]
 use hopr_parallelize::cpu::rayon::prelude::*;
 use hopr_types::crypto::{
@@ -103,15 +104,20 @@ impl<S: PixSpec> PartialSsaShareVerifier<S> {
         &self.spi
     }
 
-    /// Number of polynomial coefficient commitments.
+    /// Returns the commitment to the constant term of the polynomial.
     #[inline]
-    pub fn num_coeffs(&self) -> usize {
-        self.poly_commitment.len()
+    pub fn constant_term(&self) -> &PixGroup<S> {
+        // Constant term is the second entry, first is always the generator.
+        &self.poly_commitment[1].0
     }
 
     /// Minimum number of shares required to reconstruct the polynomial corresponding to this verifier.
     #[inline]
     pub fn min_shares(&self) -> usize {
+        // For a polynomial of degree t, there has to be t+1 shares to reconstruct it.
+        // However, there are t+2 commitments for a polynomial of degree t (t+1 coefficient commitments + 1 generator),
+        // so the minimum number of shares required to reconstruct the polynomial is equal
+        // to the number of commitments minus 1.
         self.poly_commitment.len() - 1
     }
 
@@ -120,11 +126,17 @@ impl<S: PixSpec> PartialSsaShareVerifier<S> {
     pub fn into_serializable_commitments(self) -> (SsaPolynomialIndex<S>, Vec<PixGroupRepr<S>>) {
         (
             self.spi,
-            self.poly_commitment.into_iter().map(|c| c.to_bytes()).collect(),
+            self.poly_commitment
+                .into_iter()
+                .filter(|s| s.0 != PixGroup::<S>::generator()) // Generator is typically the first entry
+                .map(|c| c.to_bytes())
+                .collect(),
         )
     }
 
     /// Tries to create a new verifier from [`SsaPolynomialIndex`] and serialized polynomial coefficient commitments.
+    ///
+    /// The `poly_commitments` do not need to contain the generator, because it is added automatically.
     pub fn from_serializable_commitments(
         spi: SsaPolynomialIndex<S>,
         poly_commitments: Vec<PixGroupRepr<S>>,
@@ -133,13 +145,22 @@ impl<S: PixSpec> PartialSsaShareVerifier<S> {
             return Err(errors::PixError::InvalidInput);
         }
 
-        let poly_commitment = poly_commitments
+        let recv_commitments = poly_commitments
             .into_iter()
             .map(|c| {
                 Option::<PixGroup<S>>::from(PixGroup::<S>::from_bytes(&c))
                     .map(ShareVerifierGroup::<PixGroup<S>>::from)
                     .ok_or(errors::PixError::InvalidInput)
             })
+            .filter(|res: &errors::Result<ShareVerifierGroup<PixGroup<S>>>| {
+                // Explicitly filter out the generator, because we're adding it later.
+                // It is therefore allowed for the generator not to be present in the commitments.
+                res.is_err() || res.as_ref().is_ok_and(|e| e.0 != PixGroup::<S>::generator())
+            });
+
+        // Re-add the generator as the first entry
+        let poly_commitment = std::iter::once(Ok(ShareVerifierGroup::<PixGroup<S>>::generator()))
+            .chain(recv_commitments)
             .collect::<errors::Result<Vec<_>>>()?;
         Ok(Self { spi, poly_commitment })
     }
@@ -259,6 +280,8 @@ pub(crate) mod tests {
             .collect::<Vec<_>>();
 
         let (shares, verifier) = standard_shamir_generate::<TestSpec>(secret, 10, &x, &mut rng)?;
+
+        assert_eq!(verifier.len(), 11);
 
         let verifier: PartialSsaShareVerifier<TestSpec> = PartialSsaShareVerifier {
             spi,

@@ -101,7 +101,7 @@ impl SurbReceiverInfo {
         let mut ret = [0u8; Self::SIZE];
         ret[0..ProofOfRelayValues::SIZE].copy_from_slice(&pov.0);
         // Share is currently not used but will be used in the future
-        ret[ProofOfRelayValues::SIZE..ProofOfRelayValues::SIZE + 32].copy_from_slice(&reserved);
+        ret[ProofOfRelayValues::SIZE..ProofOfRelayValues::SIZE + 36].copy_from_slice(&reserved);
         Self(ret)
     }
 

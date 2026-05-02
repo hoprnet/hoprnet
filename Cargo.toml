@@ -217,7 +217,7 @@ typenum = "1.20.0"
 uuid = { version = "1.23.1" }
 validator = { version = "0.20.0", features = ["derive"] }
 vergen-gix = { version = "9.1.0", features = ["build"] }
-vsss-rs = { version = "5.3.0", default-features = false }
+vsss-rs = { version = "5.4.0", default-features = false }
 mimalloc = { version = "0.1.50", default-features = false, features = [
   "secure",
 ] }

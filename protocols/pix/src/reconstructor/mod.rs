@@ -5,15 +5,15 @@ use std::num::NonZeroUsize;
 use hopr_types::{crypto::prelude::HalfKeyChallenge, internal::prelude::VerifiedAcknowledgement};
 use vsss_rs::{
     ReadableShareSet,
-    elliptic_curve::{CurveArithmetic, Group, group::Curve},
+    elliptic_curve::{CurveArithmetic, Group, group::{Curve, GroupEncoding}},
 };
 
 use crate::{
-    CompletedShare, PartialSsaShare, PartialSsaShareVerifier, PixGroup, PixScalar, PixSpec, SsaPolynomialIndex,
-    complete_share, errors,
+    CoefficientIndex, CompletedShare, PartialSsaShare, PartialSsaShareVerifier, PixGroup, PixGroupRepr, PixScalar,
+    PixSpec, PolynomialIndex, SsaPolynomialIndex, complete_share, errors,
+    reconstructor::events::ReconstructorEvent,
     types::{EncryptedPartialSsaShare, SsaIndex},
 };
-use crate::reconstructor::events::ReconstructorEvent;
 
 pub type AffineElement<S> = <<S as PixSpec>::Curve as CurveArithmetic>::AffinePoint;
 
@@ -24,11 +24,11 @@ struct SsaBuilder<S: PixSpec> {
 }
 
 impl<S: PixSpec> SsaBuilder<S> {
-    pub fn new(commitment: PixGroup<S>, num_parts: NonZeroUsize) -> Self {
+    pub fn new(commitment: PixGroup<S>, num_parts: usize) -> Self {
         Self {
             commitment: commitment.to_affine(),
-            num_parts: num_parts.get(),
             builder: PixScalar::<S>::default(),
+            num_parts,
         }
     }
 
@@ -97,6 +97,91 @@ impl<S: PixSpec> Clone for AwaitingPartialShare<S> {
     }
 }
 
+struct SsaVerifierBuilder<S: PixSpec> {
+    ssa_index: SsaIndex,
+    poly_threshold: usize,
+    num_polys: usize,
+    pseudonym: S::Pseudonym,
+    committed_polynomials:
+        std::collections::HashMap<PolynomialIndex, std::collections::HashMap<CoefficientIndex, PixGroupRepr<S>>>,
+    complete: bool,
+}
+
+type SsaBuilderVerifier<S> = (SsaBuilder<S>, Vec<PartialSsaShareVerifier<S>>);
+
+impl<S: PixSpec> SsaVerifierBuilder<S> {
+    pub fn new(ssa_index: SsaIndex, pseudonym: S::Pseudonym, poly_threshold: usize, num_polys: usize) -> Self {
+        Self {
+            ssa_index,
+            poly_threshold,
+            num_polys,
+            pseudonym,
+            committed_polynomials: std::collections::HashMap::new(),
+            complete: false,
+        }
+    }
+
+    pub fn add_transposed(
+        &mut self,
+        coeff_index: CoefficientIndex,
+        polynomial_coeff_commitments: std::collections::HashMap<PolynomialIndex, PixGroupRepr<S>>,
+    ) -> errors::Result<Option<SsaBuilderVerifier<S>>> {
+        if self.complete {
+            return Err(errors::PixError::DuplicateCommitment);
+        }
+
+        for (polynomial_index, polynomial_coeff_commitment) in polynomial_coeff_commitments {
+            let polynomial = self.committed_polynomials.entry(polynomial_index).or_default();
+            polynomial.entry(coeff_index).or_insert(polynomial_coeff_commitment);
+        }
+
+        tracing::trace!(
+            "SSA #{} commitment is {:.2}% complete",
+            self.ssa_index,
+            self.committed_polynomials.iter().map(|(_, p)| p.len()).sum::<usize>() as f64 * 100.0 / (self.num_polys * self.poly_threshold) as f64
+        );
+
+        // Check if we already have all the committed polynomials and all coefficient commitments in them
+        self.complete = self.committed_polynomials.len() == self.num_polys
+            && self
+            .committed_polynomials
+            .iter()
+            .all(|(_, committed_poly)| committed_poly.len() == self.poly_threshold);
+
+        if self.complete {
+            tracing::debug!("SSA #{} is complete", self.ssa_index);
+
+            let complete_ssa_verifier = self
+                .committed_polynomials
+                .drain()
+                .map(|(polynomial_index, mut polynomial)| {
+                    PartialSsaShareVerifier::from_serializable_commitments(
+                        SsaPolynomialIndex::new(self.pseudonym, self.ssa_index, polynomial_index),
+                        (0..self.poly_threshold as CoefficientIndex)
+                            .map(|coeff_idx| {
+                                polynomial
+                                    .remove(&coeff_idx)
+                                    .expect("polynomial coeffs must be already present")
+                            })
+                            .collect(),
+                    )
+                })
+                .collect::<errors::Result<Vec<_>>>()?;
+
+            // Full SSA commitment is the sum of all constant term commitments on all polynomials
+            let full_ssa_commitment: PixGroup<S> = complete_ssa_verifier.iter().map(|v| v.constant_term()).sum();
+            tracing::debug!("SSA #{} client commitment is: {}", self.ssa_index,  hex::encode(full_ssa_commitment.to_bytes()));
+
+            return Ok(Some((
+                SsaBuilder::new(full_ssa_commitment, self.num_polys),
+                complete_ssa_verifier,
+            )));
+        }
+
+        Ok(None)
+    }
+}
+
 /// Configuration for the SSA reconstructor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault, validator::Validate)]
 pub struct SsaReconstructorConfig {
@@ -104,19 +189,24 @@ pub struct SsaReconstructorConfig {
     ///
     /// Default is 1000, must be between 2 and 1 000 000.
     #[default(1000)]
-    #[validator(range(min = 2, max = 1_000_000))]
+    #[validate(range(min = 2, max = 1_000_000))]
     pub polys_per_ssa: usize,
     /// Number of shares needed to reconstruct a single polynomial.
     ///
     /// Default is 100, must be between 2 and 1000.
     #[default(100)]
-    #[validator(range(min = 2, max = 1000))]
+    #[validate(range(min = 2, max = 1000))]
     pub poly_threshold: usize,
     /// Maximum time an SSA can be incomplete before it is discarded.
     ///
     /// Default is 10 minutes.
     #[default(std::time::Duration::from_secs(600))]
     pub incomplete_ssa_lifetime: std::time::Duration,
+    /// Time until the complete commitment to an SSA must be received.
+    ///
+    /// Default is 2 minutes.
+    #[default(std::time::Duration::from_secs(120))]
+    pub incomplete_commitment_lifetime: std::time::Duration,
     /// Maximum time a verifier can be unused before it is discarded.
     ///
     /// Default is 30 minutes.
@@ -126,7 +216,7 @@ pub struct SsaReconstructorConfig {
     ///
     /// Default is 10 000 000, must be at least 10 000.
     #[default(10_000_000)]
-    #[validator(range(min = 10000))]
+    #[validate(range(min = 10000))]
     pub max_awaiting_acks: usize,
     /// Maximum time an acknowledgement can be awaited before it is discarded.
     ///
@@ -140,6 +230,7 @@ pub struct SsaReconstructor<S: PixSpec> {
         async_broadcast::Sender<ReconstructorEvent<S>>,
         async_broadcast::InactiveReceiver<ReconstructorEvent<S>>,
     ),
+    commitment_builder: moka::sync::Cache<SsaIndex, std::sync::Arc<parking_lot::Mutex<SsaVerifierBuilder<S>>>>,
     ssa_builders: moka::sync::Cache<SsaIndex, std::sync::Arc<parking_lot::Mutex<SsaBuilder<S>>>>,
     ssa_verifiers:
         moka::sync::Cache<SsaPolynomialIndex<S>, std::sync::Arc<parking_lot::Mutex<SsaPartReconstructor<S>>>>,
@@ -149,13 +240,15 @@ pub struct SsaReconstructor<S: PixSpec> {
 }
 
 impl<S: PixSpec + 'static> SsaReconstructor<S> {
-
     pub fn new(pseudonym: S::Pseudonym, cfg: SsaReconstructorConfig) -> Self {
         let (mut event_send, event_recv) = async_broadcast::broadcast(1024);
         event_send.set_await_active(false);
         event_send.set_overflow(true);
         Self {
             channel: (event_send, event_recv.deactivate()),
+            commitment_builder: moka::sync::CacheBuilder::new(10)
+                .time_to_idle(cfg.incomplete_commitment_lifetime)
+                .build(),
             ssa_builders: moka::sync::CacheBuilder::new(3 * cfg.polys_per_ssa as u64)
                 .time_to_idle(cfg.incomplete_ssa_lifetime)
                 .build(),
@@ -166,12 +259,23 @@ impl<S: PixSpec + 'static> SsaReconstructor<S> {
                 .time_to_live(cfg.max_ack_await_time)
                 .build(),
             pseudonym,
-            cfg
+            cfg,
         }
     }
 
-    pub fn add_client_commitment_data(ssa_index: SsaIndex) -> errors::Result<()> {
-        todo!()
+    pub fn add_client_commitment_data(
+        &self,
+        ssa_index: SsaIndex,
+        coeff_index: CoefficientIndex,
+        polynomial_coeff_commitments: std::collections::HashMap<PolynomialIndex, PixGroupRepr<S>>) -> errors::Result<()> {
+
+        let commitment_builder = self.commitment_builder.get_with(ssa_index, || std::sync::Arc::new(parking_lot::Mutex::new(SsaVerifierBuilder::new(ssa_index, self.pseudonym, self.cfg.poly_threshold, self.cfg.polys_per_ssa))));
+
+        let mut commitment_builder = commitment_builder.lock();
+
+
+
+        Ok(())
     }
 
     pub fn add_share(
@@ -219,8 +323,11 @@ impl<S: PixSpec + 'static> SsaReconstructor<S> {
             return Ok(());
         };
 
-        if let Err(error) = self.channel.0
-            .try_broadcast(ReconstructorEvent::SsaRecovered(share.spi.ssa_index(), ssa)) {
+        if let Err(error) = self
+            .channel
+            .0
+            .try_broadcast(ReconstructorEvent::SsaRecovered(share.spi.ssa_index(), ssa))
+        {
             tracing::error!(%error, "failed to broadcast new ssa");
         }
 

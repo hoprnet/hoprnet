@@ -5,6 +5,8 @@ pub enum PixError {
     InvalidInput,
     #[error("ssa commitment does not match ssa")]
     InvalidSsa,
+    #[error("received duplicate commitment")]
+    DuplicateCommitment,
     #[error("missing commitment for building ssa")]
     MissingSsaCommitment,
     #[error("missing verifier for partial ssa reconstruction")]

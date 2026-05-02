@@ -16,6 +16,7 @@ serde = ["dep:serde", "vsss-rs/serde", "hopr-types/serde"]
 ahash = { workspace = true }
 async-broadcast = { workspace = true }
 futures = { workspace = true }
+hex = { workspace = true }
 moka = { workspace = true }
 parking_lot = { workspace = true }
 serde = { workspace = true, optional = true }

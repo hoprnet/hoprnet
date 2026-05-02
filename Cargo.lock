@@ -4817,6 +4817,7 @@ dependencies = [
  "async-broadcast",
  "criterion",
  "futures",
+ "hex",
  "hopr-parallelize",
  "hopr-types",
  "k256",
@@ -10595,9 +10596,9 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "vsss-rs"
-version = "5.3.0"
+version = "5.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed0a54dd3144312d7eccd667e7ad1fa1f6c345025ec574e7201f95b1b8640601"
+checksum = "6ec751bdcc8bda099e269b24cc6b4ad14f9ce8b0490c1599174070e792ecd70c"
 dependencies = [
  "crypto-bigint 0.5.5",
  "crypto-bigint 0.6.1",
