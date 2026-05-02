@@ -1,7 +1,5 @@
 mod events;
 
-use std::num::NonZeroUsize;
-
 use hopr_types::{crypto::prelude::HalfKeyChallenge, internal::prelude::VerifiedAcknowledgement};
 use vsss_rs::{
     ReadableShareSet,
@@ -107,7 +105,7 @@ struct SsaVerifierBuilder<S: PixSpec> {
     complete: bool,
 }
 
-type SsaBuilderVerifier<S> = (SsaBuilder<S>, Vec<PartialSsaShareVerifier<S>>);
+type SsaBuilderVerifier<S> = (SsaBuilder<S>, Vec<SsaPartReconstructor<S>>);
 
 impl<S: PixSpec> SsaVerifierBuilder<S> {
     pub fn new(ssa_index: SsaIndex, pseudonym: S::Pseudonym, poly_threshold: usize, num_polys: usize) -> Self {
@@ -126,11 +124,20 @@ impl<S: PixSpec> SsaVerifierBuilder<S> {
         coeff_index: CoefficientIndex,
         polynomial_coeff_commitments: std::collections::HashMap<PolynomialIndex, PixGroupRepr<S>>,
     ) -> errors::Result<Option<SsaBuilderVerifier<S>>> {
+        // Cannot add more commitments if we already have all
         if self.complete {
             return Err(errors::PixError::DuplicateCommitment);
         }
 
+        if coeff_index >= self.poly_threshold as CoefficientIndex {
+            return Err(errors::PixError::InvalidInput);
+        }
+
         for (polynomial_index, polynomial_coeff_commitment) in polynomial_coeff_commitments {
+            if polynomial_index >= self.num_polys as PolynomialIndex {
+                return Err(errors::PixError::InvalidInput);
+            }
+
             let polynomial = self.committed_polynomials.entry(polynomial_index).or_default();
             polynomial.entry(coeff_index).or_insert(polynomial_coeff_commitment);
         }
@@ -166,15 +173,16 @@ impl<S: PixSpec> SsaVerifierBuilder<S> {
                             .collect(),
                     )
                 })
+                .map(|v| v.map(SsaPartReconstructor::new))
                 .collect::<errors::Result<Vec<_>>>()?;
 
             // Full SSA commitment is the sum of all constant term commitments on all polynomials
-            let full_ssa_commitment: PixGroup<S> = complete_ssa_verifier.iter().map(|v| v.constant_term()).sum();
+            let full_ssa_commitment: PixGroup<S> = complete_ssa_verifier.iter().map(|v| v.verifier.constant_term()).sum();
             tracing::debug!("SSA #{} client commitment is: {}", self.ssa_index,  hex::encode(full_ssa_commitment.to_bytes()));
 
             return Ok(Some((
                 SsaBuilder::new(full_ssa_commitment, self.num_polys),
-                complete_ssa_verifier,
+                complete_ssa_verifier
             )));
         }
 
@@ -269,12 +277,19 @@ impl<S: PixSpec + 'static> SsaReconstructor<S> {
         coeff_index: CoefficientIndex,
         polynomial_coeff_commitments: std::collections::HashMap<PolynomialIndex, PixGroupRepr<S>>) -> errors::Result<()> {
 
-        let commitment_builder = self.commitment_builder.get_with(ssa_index, || std::sync::Arc::new(parking_lot::Mutex::new(SsaVerifierBuilder::new(ssa_index, self.pseudonym, self.cfg.poly_threshold, self.cfg.polys_per_ssa))));
+        let maybe_complete_ssa_commitment = self.commitment_builder
+            .get_with(ssa_index, || std::sync::Arc::new(parking_lot::Mutex::new(SsaVerifierBuilder::new(ssa_index, self.pseudonym, self.cfg.poly_threshold, self.cfg.polys_per_ssa))))
+            .lock()
+            .add_transposed(coeff_index, polynomial_coeff_commitments)?;
 
-        let mut commitment_builder = commitment_builder.lock();
+        if let Some((ssa_builder, ssa_reconstructors)) = maybe_complete_ssa_commitment {
+            self.ssa_builders.insert(ssa_index, std::sync::Arc::new(parking_lot::Mutex::new(ssa_builder)));
+            for ssa_reconstructor in ssa_reconstructors {
+                self.ssa_verifiers.insert(ssa_reconstructor.verifier.spi, std::sync::Arc::new(parking_lot::Mutex::new(ssa_reconstructor)));
+            }
 
-
-
+        }
+        
         Ok(())
     }
 
