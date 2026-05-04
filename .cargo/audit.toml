@@ -7,6 +7,7 @@ ignore = [
   "RUSTSEC-2026-0049", # `rustls-webpki` - needs alloy removal
   "RUSTSEC-2026-0097", # workspace already pins `rand` 0.10.1, but Cargo.lock still contains transitive `rand` 0.9.3; remove this ignore once upstream deps stop pulling 0.9.3
   "RUSTSEC-2026-0098", # `rustls-webpki` 0.101.7 pulled transitively by blokli-client -> eventsource-client 0.16.2 -> hyper-rustls 0.24.2; our own `rustls-webpki` bumped to >=0.103.12 in Cargo.lock. Drop once blokli-client upgrades eventsource-client (see https://github.com/hoprnet/blokli/issues/107)
+  "RUSTSEC-2026-0119", # `hickory-proto` 0.25.2 pulled by libp2p-dns 0.44.0 -> libp2p 0.56.0; cannot upgrade without a major libp2p bump. The 0.26.x instance is fixed (hickory-proto 0.26.1).
 ]
 informational_warnings = ["unmaintained"]
 severity_threshold = "low"
