@@ -67,7 +67,8 @@ where
 
         trace!(delay_ms = random_delay.as_millis(), "mixer: delaying item");
 
-        this.heap.push(Reverse(DelayedData::from((Instant::now() + random_delay, item))));
+        this.heap
+            .push(Reverse(DelayedData::from((Instant::now() + random_delay, item))));
 
         #[cfg(all(feature = "telemetry", not(test)))]
         {

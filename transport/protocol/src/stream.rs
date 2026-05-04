@@ -262,21 +262,19 @@ where
                         .await;
 
                     match cached {
-                        Ok(cached) => {
-                            match cached.with_timeout(per_peer_send_timeout).send(msg).await {
-                                Ok(()) => tracing::trace!(%peer, "message sent to peer"),
-                                Err(SinkTimeoutError::Timeout) => {
-                                    #[cfg(all(feature = "telemetry", not(test)))]
-                                    METRIC_PER_PEER_SEND_TIMEOUT.increment();
-                                    tracing::warn!(%peer, "per-peer egress send timed out, dropping packet");
-                                    cache.invalidate(&peer).await;
-                                }
-                                Err(SinkTimeoutError::Inner(error)) => {
-                                    tracing::error!(%peer, %error, "error sending message to peer");
-                                    cache.invalidate(&peer).await;
-                                }
+                        Ok(cached) => match cached.with_timeout(per_peer_send_timeout).send(msg).await {
+                            Ok(()) => tracing::trace!(%peer, "message sent to peer"),
+                            Err(SinkTimeoutError::Timeout) => {
+                                #[cfg(all(feature = "telemetry", not(test)))]
+                                METRIC_PER_PEER_SEND_TIMEOUT.increment();
+                                tracing::warn!(%peer, "per-peer egress send timed out, dropping packet");
+                                cache.invalidate(&peer).await;
                             }
-                        }
+                            Err(SinkTimeoutError::Inner(error)) => {
+                                tracing::error!(%peer, %error, "error sending message to peer");
+                                cache.invalidate(&peer).await;
+                            }
+                        },
                         Err(error) => {
                             tracing::debug!(%peer, %error, "failed to open a stream to peer");
                         }
