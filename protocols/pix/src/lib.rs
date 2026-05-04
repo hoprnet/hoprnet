@@ -21,9 +21,9 @@ mod reconstructor;
 mod types;
 
 pub use generator::{SsaGeneratorConfig, SsaShareGenerator};
-pub use reconstructor::SsaReconstructor;
+pub use reconstructor::{ReconstructorEvent, SsaReconstructor, SsaReconstructorConfig};
 pub use types::{
-    CoefficientIndex, EncryptedPartialSsaShare, PartialSsaShare, PolynomialIndex, SsaIndex, SsaPolynomialId,
+    CoefficientIndex, EncryptedPartialSsaShare, PartialSsaShare, PolynomialIndex, SsaId, SsaIndex, SsaPolynomialId,
 };
 
 /// Specification of the Protocol for Incentivization of eXits (PIX) instantiation.

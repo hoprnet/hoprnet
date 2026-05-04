@@ -1,12 +1,12 @@
 mod events;
 mod utils;
 
+pub use events::ReconstructorEvent;
 use hopr_types::{crypto::prelude::HalfKeyChallenge, internal::prelude::VerifiedAcknowledgement};
-use utils::{AwaitingPartialShare, SsaBuilder, SsaCommitmentBuilder, SsaPartBuilder};
+use utils::{AwaitingPartialShare, CommitmentResult, SsaBuilder, SsaCommitmentBuilder, SsaPartBuilder};
 
 use crate::{
-    CoefficientIndex, PixGroupRepr, PixSpec, PolynomialIndex, SsaPolynomialId, errors,
-    reconstructor::{events::ReconstructorEvent, utils::CommitmentResult},
+    CoefficientIndex, PixGroupRepr, PixScalar, PixSpec, PolynomialIndex, SsaPolynomialId, errors,
     types::{EncryptedPartialSsaShare, SsaId},
 };
 
@@ -15,9 +15,9 @@ use crate::{
 pub struct SsaReconstructorConfig {
     /// Number of polynomials needed to reconstruct a single SSA.
     ///
-    /// Default is 1000, must be between 2 and 1 000 000.
+    /// Default is 1000, must be between 2 and 65 535.
     #[default(1000)]
-    #[validate(range(min = 2, max = 1_000_000))]
+    #[validate(range(min = 2, max = 65535))]
     pub polys_per_ssa: usize,
     /// Number of shares needed to reconstruct a single polynomial.
     ///
@@ -118,7 +118,7 @@ impl<S: PixSpec + 'static> SsaReconstructor<S> {
             .commitment_builder
             .get_with(id, || {
                 if let Err(error) = self.channel.0.try_broadcast(ReconstructorEvent::NewSsa(id)) {
-                    tracing::error!(%error, "failed to broadcast new ssa");
+                    tracing::error!(%id, %error, "failed to broadcast new ssa");
                 }
                 std::sync::Arc::new(parking_lot::Mutex::new(SsaCommitmentBuilder::new(
                     id,
@@ -139,7 +139,7 @@ impl<S: PixSpec + 'static> SsaReconstructor<S> {
                     .0
                     .try_broadcast(ReconstructorEvent::SsaCommitmentKnown(id, commitment))
                 {
-                    tracing::error!(%error, "failed to broadcast new ssa commitment");
+                    tracing::error!(%id, %error, "failed to broadcast new ssa commitment");
                 }
             }
             CommitmentResult::Completed(ssa_builder, ssa_reconstructors) => {
@@ -159,7 +159,7 @@ impl<S: PixSpec + 'static> SsaReconstructor<S> {
                     .0
                     .try_broadcast(ReconstructorEvent::SsaFullyCommitted(id, commitment))
                 {
-                    tracing::error!(%error, "failed to broadcast new ssa commitment");
+                    tracing::error!(%id, %error, "failed to broadcast new ssa commitment");
                 }
             }
         }
@@ -191,11 +191,18 @@ impl<S: PixSpec + 'static> SsaReconstructor<S> {
 
     /// Checks if the incoming verified acknowledgement is associated with a pending encrypted share,
     /// and if so, decrypts and adds the share to the corresponding reconstructor.
-    pub fn new_acknowledgement(&self, ack: VerifiedAcknowledgement) -> errors::Result<()> {
+    ///
+    /// If the acknowledgement has completed an SSA recovery, its [`SsaId`] and corresponding [`PixScalar`] are
+    /// returned. This is the same data contained in the raised [`ReconstructorEvent::SsaRecovered`] event. The user
+    /// can freely ignore the returned success value if they are actively processing the event stream.
+    pub fn new_acknowledgement(
+        &self,
+        ack: VerifiedAcknowledgement,
+    ) -> errors::Result<Option<(SsaId<S>, PixScalar<S>)>> {
         let challenge = ack.ack_key_share().to_challenge()?;
         let Some(share) = self.awaiting_acks.remove(&challenge) else {
             tracing::trace!(?challenge, "received ack for unknown share");
-            return Ok(());
+            return Ok(None);
         };
 
         let reconstructor = self
@@ -206,7 +213,7 @@ impl<S: PixSpec + 'static> SsaReconstructor<S> {
         let partial_share = share.enc_share.decrypt(&share.spi, ack.ack_key_share())?;
         let Some(ssa_part) = reconstructor.lock().add_share(share.spi, share.msg, partial_share)? else {
             tracing::trace!(spi = %share.spi, "ssa part not yet complete, waiting for more shares");
-            return Ok(());
+            return Ok(None);
         };
 
         let builder = self
@@ -215,7 +222,7 @@ impl<S: PixSpec + 'static> SsaReconstructor<S> {
             .ok_or(errors::PixError::MissingSsaCommitment)?;
         let Some(ssa) = builder.lock().add_recovered_ssa_part(ssa_part)? else {
             tracing::trace!(spi = %share.spi, "ssa not yet complete, waiting for more ssa parts");
-            return Ok(());
+            return Ok(None);
         };
 
         if let Err(error) = self
@@ -226,11 +233,11 @@ impl<S: PixSpec + 'static> SsaReconstructor<S> {
             tracing::error!(%error, "failed to broadcast new ssa");
         }
 
-        Ok(())
+        Ok(Some((*share.spi.as_ref(), ssa)))
     }
 
     /// Returns the output stream of [`ReconstructorEvents`](ReconstructorEvent).
-    pub fn event_stream(&self) -> impl futures::Stream<Item = ReconstructorEvent<S>> {
+    pub fn event_stream(&self) -> impl futures::Stream<Item = ReconstructorEvent<S>> + use<S> {
         self.channel.1.activate_cloned()
     }
 }

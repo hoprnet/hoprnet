@@ -15,7 +15,7 @@ use crate::{PixScalar, PixSpec, errors};
 /// Type used to index Session Stealth Addresses (SSA).
 ///
 /// Note that SSA Index starts with 1.
-pub type SsaIndex = u32;
+pub type SsaIndex = u32; // TODO: change this to NonZeroU32
 
 /// Type used to index polynomials that reconstruct parts of a Session Stealth Addresses (SSA).
 ///
@@ -311,6 +311,8 @@ where
 }
 
 /// Uniquely identifies a Session Stealth Address (SSA).
+///
+/// This consists of a pseudonym and [`SsaIndex`].
 pub struct SsaId<S: PixSpec> {
     pseudonym: S::Pseudonym,
     ssa_index: SsaIndex,

@@ -4827,6 +4827,7 @@ dependencies = [
  "smart-default",
  "strum 0.28.0",
  "thiserror 2.0.18",
+ "tokio",
  "tracing",
  "validator",
  "vsss-rs",

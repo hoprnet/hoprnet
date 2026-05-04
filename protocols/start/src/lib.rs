@@ -297,6 +297,9 @@ where
                     let commitment_repr = commitment.as_ref();
                     debug_assert_eq!(commitment_repr.len(), Self::PIX_COEFF_COMMITMENT_REPR_SIZE);
 
+                    // Prepending 16-bit representation of the polynomial index
+                    // will possibly consume less space than putting an entire 1024-bit bitmap
+                    // of polynomials present in each message (assuming 1024 polynomials per SSA).
                     data.extend_from_slice(&index.to_be_bytes());
                     data.extend_from_slice(commitment_repr);
                 }
