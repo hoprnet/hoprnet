@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport"
-version = "0.26.0"
+version = "0.27.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR transport interface for the core library"
 edition.workspace = true
@@ -42,6 +42,7 @@ serde = [
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+bytes = { workspace = true }
 cfg-if = { workspace = true }
 futures = { workspace = true }
 futures-time = { workspace = true }

@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use hopr_api::types::{crypto::prelude::*, internal::prelude::*};
 use hopr_crypto_packet::prelude::*;
 
@@ -8,7 +9,7 @@ pub struct OutgoingPacket {
     /// Challenge to be solved from the acknowledgement of the next hop.
     pub ack_challenge: HalfKeyChallenge,
     /// Encoded HOPR packet.
-    pub data: Box<[u8]>,
+    pub data: Bytes,
 }
 
 impl std::fmt::Debug for OutgoingPacket {
@@ -68,7 +69,7 @@ pub struct IncomingForwardedPacket {
     /// Offchain public key of the next hop.
     pub next_hop: OffchainPublicKey,
     /// Data to be forwarded to the next hop.
-    pub data: Box<[u8]>,
+    pub data: Bytes,
     /// Challenge to be solved from the acknowledgement received from the next hop.
     pub ack_challenge: HalfKeyChallenge,
     /// Ticket to be acknowledged by solving the `ack_challenge`.

@@ -31,6 +31,7 @@ use std::{
     time::Duration,
 };
 
+use bytes::Bytes;
 use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
 use futures::{
     FutureExt, StreamExt,
@@ -383,7 +384,7 @@ where
             hopr_transport_protocol::stream::process_stream_protocol(msg_codec, transport_network.clone()).await?;
 
         let (mixing_channel_tx, mixing_channel_rx) =
-            hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(build_mixer_cfg_from_env());
+            hopr_transport_mixer::channel::<(PeerId, Bytes)>(build_mixer_cfg_from_env());
 
         // the process is terminated when the input stream runs out
         let _mixing_process_before_sending_out = spawn(

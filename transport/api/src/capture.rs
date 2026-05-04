@@ -1,5 +1,6 @@
 use std::{borrow::Cow, fs::File};
 
+use bytes::Bytes;
 use futures::{StreamExt, pin_mut};
 use hopr_api::types::{
     crypto::types::OffchainPublicKey,
@@ -338,7 +339,7 @@ fn inspect_ticket_data_in_packet(raw_packet: &[u8]) -> &[u8] {
 impl<C: PacketDecoder + Send + Sync> PacketDecoder for CapturePacketCodec<C> {
     type Error = C::Error;
 
-    fn decode(&self, peer: PeerId, data: Box<[u8]>) -> Result<IncomingPacket, IncomingPacketError<Self::Error>> {
+    fn decode(&self, peer: PeerId, data: Bytes) -> Result<IncomingPacket, IncomingPacketError<Self::Error>> {
         let packet = self.inner.decode(peer, data)?;
 
         if let Err(error) = self.sender.clone().try_send(
@@ -399,7 +400,7 @@ impl<C: PacketEncoder + Send + Sync> PacketEncoder for CapturePacketCodec<C> {
                 data: data_clone.into(),
                 ack_challenge: packet.ack_challenge.as_ref().into(),
                 signals,
-                ticket: inspect_ticket_data_in_packet(&packet.data).into(),
+                ticket: inspect_ticket_data_in_packet(packet.data.as_ref()).into(),
             }
             .into(),
         ) {

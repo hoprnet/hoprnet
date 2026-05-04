@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-protocol"
-version = "1.6.3"
+version = "1.7.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -24,6 +24,7 @@ serde = [
 [dependencies]
 anyhow = { workspace = true }
 ahash = { workspace = true }
+bytes = { workspace = true }
 dashmap = { workspace = true }
 futures = { workspace = true }
 futures-time = { workspace = true }

@@ -6,6 +6,7 @@ use std::{
 };
 
 use anyhow::Context;
+use bytes::Bytes;
 use futures::{SinkExt, StreamExt};
 use futures_concurrency::stream::StreamGroup;
 use futures_time::future::FutureExt;
@@ -96,8 +97,8 @@ fn create_dummy_channel(from: Address, to: Address) -> ChannelEntry {
 
 #[allow(dead_code)]
 pub type WireChannels = (
-    futures::channel::mpsc::UnboundedSender<(PeerId, Box<[u8]>)>,
-    hopr_transport_mixer::channel::Receiver<(PeerId, Box<[u8]>)>,
+    futures::channel::mpsc::UnboundedSender<(PeerId, Bytes)>,
+    hopr_transport_mixer::channel::Receiver<(PeerId, Bytes)>,
 );
 
 #[allow(dead_code)]
@@ -150,9 +151,9 @@ pub async fn peer_setup_for(
     for i in 0..peer_count {
         let (received_ack_tickets_tx, received_ack_tickets_rx) = futures::channel::mpsc::unbounded::<TicketEvent>();
 
-        let (wire_msg_send_tx, wire_msg_send_rx) = futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
+        let (wire_msg_send_tx, wire_msg_send_rx) = futures::channel::mpsc::unbounded::<(PeerId, Bytes)>();
         let (mixer_channel_tx, mixer_channel_rx) =
-            hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(MixerConfig::default());
+            hopr_transport_mixer::channel::<(PeerId, Bytes)>(MixerConfig::default());
 
         let (api_send_tx, api_send_rx) =
             futures::channel::mpsc::unbounded::<(ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)>();
