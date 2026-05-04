@@ -4,10 +4,11 @@
 use std::sync::Arc;
 
 use futures::{
-    AsyncRead, AsyncReadExt, AsyncWrite, FutureExt, StreamExt,
+    AsyncRead, AsyncReadExt, AsyncWrite, FutureExt, SinkExt as _, StreamExt,
     channel::mpsc::{Receiver, Sender, channel},
 };
 use hopr_api::network::NetworkStreamControl;
+use hopr_network_types::timeout::{SinkTimeoutError, TimeoutSinkExt};
 use libp2p::PeerId;
 use tokio_util::{
     codec::{Decoder, Encoder, FramedRead, FramedWrite},
@@ -16,10 +17,10 @@ use tokio_util::{
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_PEER_BUFFER_FULL_DROP: hopr_metrics::SimpleCounter =
+    static ref METRIC_PER_PEER_SEND_TIMEOUT: hopr_metrics::SimpleCounter =
         hopr_metrics::SimpleCounter::new(
-            "hopr_egress_per_peer_buffer_full_dropped",
-            "Number of packets dropped because the per-peer egress buffer was full",
+            "hopr_egress_per_peer_send_timed_out",
+            "Number of packets dropped due to per-peer egress send timeout",
         )
         .unwrap();
 }
@@ -28,6 +29,10 @@ lazy_static::lazy_static! {
 
 /// Global timeout for the `BidirectionalStreamControl::open` operation.
 const GLOBAL_STREAM_OPEN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
+
+/// Timeout for sending a single message into the per-peer mpsc buffer.
+/// If the buffer stays full for longer than this, the message is dropped.
+const DEFAULT_PER_PEER_SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(50);
 const MAX_CONCURRENT_PACKETS: usize = 30;
 
 /// Default pending-write-buffer byte threshold on the framed writer before a flush is
@@ -164,6 +169,12 @@ where
         .filter(|&n: &usize| n > 0)
         .unwrap_or(DEFAULT_FRAME_WRITER_BACKPRESSURE_BYTES);
 
+    let per_peer_send_timeout = std::env::var("HOPR_TRANSPORT_PER_PEER_SEND_TIMEOUT_MS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .map(std::time::Duration::from_millis)
+        .unwrap_or(DEFAULT_PER_PEER_SEND_TIMEOUT);
+
     // Pack the handles only needed to open a NEW peer stream into a single Arc. This
     // lets us pay one Arc bump per packet at the closure level instead of three (control,
     // codec, tx_in), and defers the per-field `.clone()` to the cache-miss path that
@@ -251,18 +262,19 @@ where
                         .await;
 
                     match cached {
-                        Ok(mut cached) => {
-                            if let Err(err) = cached.try_send(msg) {
-                                if err.is_full() {
+                        Ok(cached) => {
+                            match cached.with_timeout(per_peer_send_timeout).send(msg).await {
+                                Ok(()) => tracing::trace!(%peer, "message sent to peer"),
+                                Err(SinkTimeoutError::Timeout) => {
                                     #[cfg(all(feature = "telemetry", not(test)))]
-                                    METRIC_PEER_BUFFER_FULL_DROP.increment();
-                                    tracing::warn!(%peer, "per-peer egress buffer full, dropping packet");
-                                } else {
-                                    tracing::error!(%peer, "per-peer egress channel disconnected");
+                                    METRIC_PER_PEER_SEND_TIMEOUT.increment();
+                                    tracing::warn!(%peer, "per-peer egress send timed out, dropping packet");
+                                    cache.invalidate(&peer).await;
                                 }
-                                cache.invalidate(&peer).await;
-                            } else {
-                                tracing::trace!(%peer, "message sent to peer");
+                                Err(SinkTimeoutError::Inner(error)) => {
+                                    tracing::error!(%peer, %error, "error sending message to peer");
+                                    cache.invalidate(&peer).await;
+                                }
                             }
                         }
                         Err(error) => {
