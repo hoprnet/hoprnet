@@ -3,6 +3,7 @@ mod common;
 
 use std::{str::FromStr, sync::Arc};
 
+use bytes::Bytes;
 use common::{CHAIN_DATA, PEERS, PEERS_CHAIN, random_packets_of_count, resolve_mock_path};
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use futures::{SinkExt, StreamExt};
@@ -80,10 +81,10 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                             futures::channel::mpsc::unbounded::<TicketEvent>();
 
                         let (wire_msg_send_tx, wire_msg_send_rx) =
-                            futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
+                            futures::channel::mpsc::unbounded::<(PeerId, Bytes)>();
 
                         let (_wire_msg_recv_tx, wire_msg_recv_rx) =
-                            futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
+                            futures::channel::mpsc::unbounded::<(PeerId, Bytes)>();
 
                         let (api_send_tx, api_send_rx) = futures::channel::mpsc::unbounded::<(
                             ResolvedTransportRouting<HoprSurb>,

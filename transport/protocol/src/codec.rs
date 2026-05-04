@@ -1,13 +1,14 @@
+use bytes::Bytes;
 use tokio_util::codec::{Decoder, Encoder};
 
 #[derive(Clone)]
 pub struct FixedLengthCodec<const SIZE: usize>;
 
-impl<const SIZE: usize> Encoder<Box<[u8]>> for FixedLengthCodec<SIZE> {
+impl<const SIZE: usize> Encoder<Bytes> for FixedLengthCodec<SIZE> {
     type Error = std::io::Error;
 
     #[tracing::instrument(level = "trace", skip(self, item, dst), name = "encode data", fields(size = item.len(), protocol = "msg"), ret, err)]
-    fn encode(&mut self, item: Box<[u8]>, dst: &mut tokio_util::bytes::BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, item: Bytes, dst: &mut tokio_util::bytes::BytesMut) -> Result<(), Self::Error> {
         dst.extend_from_slice(&item);
         Ok(())
     }
@@ -15,19 +16,13 @@ impl<const SIZE: usize> Encoder<Box<[u8]>> for FixedLengthCodec<SIZE> {
 
 impl<const SIZE: usize> Decoder for FixedLengthCodec<SIZE> {
     type Error = std::io::Error;
-    type Item = Box<[u8]>;
+    type Item = Bytes;
 
     #[tracing::instrument(level = "trace", skip(self, src), name = "decode data", fields(size = src.len(), protocol = "msg"), ret(Debug), err)]
     fn decode(&mut self, src: &mut tokio_util::bytes::BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         let len = src.len();
         if len >= SIZE {
-            // `split_to` already hands us a contiguous, non-owning view onto the buffer.
-            // `to_vec` issues a single memcpy into a fresh Vec; the prior `Box::from_iter`
-            // walked byte-by-byte via the `Bytes` iterator, paying a branch + bounds
-            // check per byte on the inbound packet hot path.
-            let packet = src.split_to(SIZE);
-
-            Ok(Some(packet.to_vec().into_boxed_slice()))
+            Ok(Some(src.split_to(SIZE).freeze()))
         } else {
             tracing::trace!(
                 available_bytes = len,
@@ -52,8 +47,8 @@ mod tests {
         let mut codec = FixedLengthCodec::<TEST_SIZE>;
         let mut buf = tokio_util::bytes::BytesMut::new();
 
-        let random_data_of_expected_packet_size: Box<[u8]> =
-            Box::from(hopr_api::types::crypto_random::random_bytes::<TEST_SIZE>());
+        let random_data_of_expected_packet_size: Bytes =
+            Bytes::copy_from_slice(&hopr_api::types::crypto_random::random_bytes::<TEST_SIZE>());
 
         codec.encode(random_data_of_expected_packet_size.clone(), &mut buf)?;
 
@@ -73,8 +68,8 @@ mod tests {
         let mut buf = tokio_util::bytes::BytesMut::new();
 
         const LESS_THAN_PAYLOAD_SIZE: usize = TEST_SIZE - 1;
-        let random_data_too_few_bytes: Box<[u8]> =
-            Box::from(hopr_api::types::crypto_random::random_bytes::<LESS_THAN_PAYLOAD_SIZE>());
+        let random_data_too_few_bytes: Bytes =
+            Bytes::copy_from_slice(&hopr_api::types::crypto_random::random_bytes::<LESS_THAN_PAYLOAD_SIZE>());
 
         codec.encode(random_data_too_few_bytes, &mut buf)?;
 
@@ -94,8 +89,8 @@ mod tests {
         let mut buf = tokio_util::bytes::BytesMut::new();
 
         const MORE_THAN_PAYLOAD_SIZE: usize = TEST_SIZE + 1;
-        let random_data_more_bytes_than_needed: Box<[u8]> =
-            Box::from(hopr_api::types::crypto_random::random_bytes::<MORE_THAN_PAYLOAD_SIZE>());
+        let random_data_more_bytes_than_needed: Bytes =
+            Bytes::copy_from_slice(&hopr_api::types::crypto_random::random_bytes::<MORE_THAN_PAYLOAD_SIZE>());
 
         codec.encode(random_data_more_bytes_than_needed.clone(), &mut buf)?;
 

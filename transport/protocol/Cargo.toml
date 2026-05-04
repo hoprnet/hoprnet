@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-protocol"
-version = "1.6.3"
+version = "1.8.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -24,6 +24,7 @@ serde = [
 [dependencies]
 anyhow = { workspace = true }
 ahash = { workspace = true }
+bytes = { workspace = true }
 dashmap = { workspace = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
@@ -41,7 +42,7 @@ tokio-util = { workspace = true, features = ["codec", "compat"] }
 tracing = { workspace = true }
 validator = { workspace = true }
 
-hopr-api = { workspace = true, features = ["network", "types-random"] }
+hopr-api = { workspace = true, features = ["network", "node", "types-random"] }
 
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 hopr-crypto-packet = { workspace = true }
