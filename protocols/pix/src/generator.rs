@@ -12,14 +12,14 @@ use vsss_rs::{
 
 use crate::{
     PartialSsaShareVerifier, PixGroup, PixScalar, PixSpec, errors, msg_to_scalar,
-    types::{PartialSsaShare, SsaIndex, SsaPolynomialIndex},
+    types::{PartialSsaShare, SsaId, SsaIndex, SsaPolynomialId},
 };
 
 type RawPolynomial<S> = Vec<DefaultShare<IdentifierPrimeField<PixScalar<S>>, IdentifierPrimeField<PixScalar<S>>>>;
 type RawPolynomialVerifier<S> = Vec<ShareVerifierGroup<PixGroup<S>>>;
 
 struct IndexedPolynomial<S: PixSpec> {
-    spi: SsaPolynomialIndex<S>,
+    spi: SsaPolynomialId<S>,
     raw: RawPolynomial<S>,
     shares_generated: usize,
     t: usize,
@@ -95,7 +95,7 @@ pub struct SsaShareGenerator<S: PixSpec> {
 }
 
 /// Tuple consisting of the SSA polynomial index and an SSA share from the corresponding polynomial.
-pub type GeneratedShare<S> = (SsaPolynomialIndex<S>, PartialSsaShare<S>);
+pub type GeneratedShare<S> = (SsaPolynomialId<S>, PartialSsaShare<S>);
 
 impl<S: PixSpec + 'static> SsaShareGenerator<S> {
     pub fn new(cfg: SsaGeneratorConfig) -> Self {
@@ -179,7 +179,7 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
                             .into_iter()
                             .enumerate()
                             .map(|(poly_index, poly_commitment)| PartialSsaShareVerifier {
-                                spi: SsaPolynomialIndex::new(*pseudonym, ssa_index, poly_index as u32),
+                                spi: SsaPolynomialId::new(SsaId::new(*pseudonym, ssa_index), poly_index as u32),
                                 poly_commitment,
                             }),
                     );
@@ -189,7 +189,7 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
                             .into_iter()
                             .enumerate()
                             .map(|(poly_index, raw)| IndexedPolynomial {
-                                spi: SsaPolynomialIndex::new(*pseudonym, ssa_index, poly_index as u32),
+                                spi: SsaPolynomialId::new(SsaId::new(*pseudonym, ssa_index), poly_index as u32),
                                 raw,
                                 shares_generated: 0,
                                 t: self.cfg.threshold,
@@ -209,7 +209,7 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
                                 .into_iter()
                                 .enumerate()
                                 .map(|(poly_index, poly_commitment)| PartialSsaShareVerifier {
-                                    spi: SsaPolynomialIndex::new(*pseudonym, ssa_index, poly_index as u32),
+                                    spi: SsaPolynomialId::new(SsaId::new(*pseudonym, ssa_index), poly_index as u32),
                                     poly_commitment,
                                 }),
                         );
@@ -218,7 +218,7 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
                             .poly_queue
                             .extend(raw_polynomials.into_iter().enumerate().map(|(poly_index, raw)| {
                                 IndexedPolynomial {
-                                    spi: SsaPolynomialIndex::new(*pseudonym, ssa_index, poly_index as u32),
+                                    spi: SsaPolynomialId::new(SsaId::new(*pseudonym, ssa_index), poly_index as u32),
                                     raw,
                                     shares_generated: 0,
                                     t: self.cfg.threshold,

@@ -23,7 +23,7 @@ mod types;
 pub use generator::{SsaGeneratorConfig, SsaShareGenerator};
 pub use reconstructor::SsaReconstructor;
 pub use types::{
-    CoefficientIndex, EncryptedPartialSsaShare, PartialSsaShare, PolynomialIndex, SsaIndex, SsaPolynomialIndex,
+    CoefficientIndex, EncryptedPartialSsaShare, PartialSsaShare, PolynomialIndex, SsaIndex, SsaPolynomialId,
 };
 
 /// Specification of the Protocol for Incentivization of eXits (PIX) instantiation.
@@ -57,7 +57,7 @@ pub type PixGroupRepr<S> = <PixGroup<S> as GroupEncoding>::Repr; // This interna
 pub type PixDigest<S> = <S as PixSpec>::Digest;
 
 pub(crate) fn msg_to_scalar<S: PixSpec>(
-    spi: &SsaPolynomialIndex<S>,
+    spi: &SsaPolynomialId<S>,
     msg: impl AsRef<[u8]>,
 ) -> errors::Result<PixScalar<S>> {
     Ok(<S::Curve as GroupDigest>::hash_to_scalar::<ExpandMsgXmd<S::Digest>>(
@@ -75,8 +75,8 @@ pub(crate) type CompletedShare<S> =
     DefaultShare<IdentifierPrimeField<PixScalar<S>>, IdentifierPrimeField<PixScalar<S>>>;
 
 #[inline]
-pub(crate) fn complete_share<S: PixSpec>(
-    spi: SsaPolynomialIndex<S>,
+pub(crate) fn into_completed_share<S: PixSpec>(
+    spi: SsaPolynomialId<S>,
     msg: impl AsRef<[u8]>,
     share: &PartialSsaShare<S>,
 ) -> errors::Result<CompletedShare<S>> {
@@ -88,18 +88,18 @@ pub(crate) fn complete_share<S: PixSpec>(
     })
 }
 
-/// Verifier for shares of a polynomial with the given [`SsaPolynomialIndex`].
+/// Verifier for shares of a polynomial with the given [`SsaPolynomialId`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 //#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PartialSsaShareVerifier<S: PixSpec> {
-    pub(crate) spi: SsaPolynomialIndex<S>,
+    pub(crate) spi: SsaPolynomialId<S>,
     pub(crate) poly_commitment: Vec<ShareVerifierGroup<PixGroup<S>>>,
 }
 
 impl<S: PixSpec> PartialSsaShareVerifier<S> {
-    /// Returns the [`SsaPolynomialIndex`] of the polynomial corresponding to this verifier.
+    /// Returns the [`SsaPolynomialId`] of the polynomial corresponding to this verifier.
     #[inline]
-    pub fn spi(&self) -> &SsaPolynomialIndex<S> {
+    pub fn spi(&self) -> &SsaPolynomialId<S> {
         &self.spi
     }
 
@@ -120,9 +120,9 @@ impl<S: PixSpec> PartialSsaShareVerifier<S> {
         self.poly_commitment.len() - 1
     }
 
-    /// Converts this verifier into a tuple containing the [`SsaPolynomialIndex`] and the serialized polynomial
+    /// Converts this verifier into a tuple containing the [`SsaPolynomialId`] and the serialized polynomial
     /// coefficient commitments.
-    pub fn into_serializable_commitments(self) -> (SsaPolynomialIndex<S>, Vec<PixGroupRepr<S>>) {
+    pub fn into_serializable_commitments(self) -> (SsaPolynomialId<S>, Vec<PixGroupRepr<S>>) {
         (
             self.spi,
             self.poly_commitment
@@ -133,11 +133,11 @@ impl<S: PixSpec> PartialSsaShareVerifier<S> {
         )
     }
 
-    /// Tries to create a new verifier from [`SsaPolynomialIndex`] and serialized polynomial coefficient commitments.
+    /// Tries to create a new verifier from [`SsaPolynomialId`] and serialized polynomial coefficient commitments.
     ///
     /// The `poly_commitments` do not need to contain the generator, because it is added automatically.
     pub fn from_serializable_commitments(
-        spi: SsaPolynomialIndex<S>,
+        spi: SsaPolynomialId<S>,
         poly_commitments: Vec<PixGroupRepr<S>>,
     ) -> errors::Result<Self> {
         if poly_commitments.is_empty() {
@@ -164,7 +164,7 @@ impl<S: PixSpec> PartialSsaShareVerifier<S> {
         Ok(Self { spi, poly_commitment })
     }
 
-    pub(crate) fn verify_complete_share(&self, share: &CompletedShare<S>) -> errors::Result<()> {
+    pub(crate) fn verify_completed_share(&self, share: &CompletedShare<S>) -> errors::Result<()> {
         if (share.value().is_zero() | share.identifier().is_zero()).into() {
             return Err(vsss_rs::Error::InvalidShare.into());
         }
@@ -212,7 +212,7 @@ impl<S: PixSpec> PartialSsaShareVerifier<S> {
     /// Verifies that the given `share` corresponding to `msg` belongs to the polynomial associated with this verifier.
     #[inline]
     pub fn verify(&self, share: &PartialSsaShare<S>, msg: impl AsRef<[u8]>) -> errors::Result<()> {
-        self.verify_complete_share(&complete_share(self.spi, msg, share)?)
+        self.verify_completed_share(&into_completed_share(self.spi, msg, share)?)
     }
 }
 
@@ -230,6 +230,7 @@ pub(crate) mod tests {
     };
 
     use super::*;
+    use crate::types::SsaId;
 
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
     pub struct TestSpec;
@@ -273,7 +274,7 @@ pub(crate) mod tests {
         let mut rng = vsss_rs::elliptic_curve::rand_core::OsRng;
         let secret = k256::Scalar::random(&mut rng);
 
-        let spi = SsaPolynomialIndex::new(SimplePseudonym::try_from([0u8; 10].as_ref())?, 1, 1);
+        let spi = SsaPolynomialId::new(SsaId::new(SimplePseudonym::try_from([0u8; 10].as_ref())?, 1), 1);
         let x = (0..=20_u32)
             .map(|i| msg_to_scalar::<TestSpec>(&spi, i.to_be_bytes()).unwrap())
             .collect::<Vec<_>>();
@@ -306,7 +307,7 @@ pub(crate) mod tests {
         let mut rng = vsss_rs::elliptic_curve::rand_core::OsRng;
         let secret = k256::Scalar::random(&mut rng);
 
-        let spi = SsaPolynomialIndex::new(SimplePseudonym::try_from([0u8; 10].as_ref())?, 1, 1);
+        let spi = SsaPolynomialId::new(SsaId::new(SimplePseudonym::try_from([0u8; 10].as_ref())?, 1), 1);
         let x = (0..=20_u32)
             .map(|i| msg_to_scalar::<TestSpec>(&spi, i.to_be_bytes()).unwrap())
             .collect::<Vec<_>>();
