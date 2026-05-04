@@ -4617,7 +4617,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-lib"
-version = "4.0.1-rc.1"
+version = "4.0.2-rc.1"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -4962,7 +4962,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.27.0"
+version = "0.28.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4996,6 +4996,7 @@ dependencies = [
  "pcap-file",
  "proc-macro-regex",
  "rstest",
+ "rust-stream-ext-concurrent",
  "serde",
  "smart-default",
  "strum 0.28.0",
@@ -5086,7 +5087,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-probe"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "async-trait",
