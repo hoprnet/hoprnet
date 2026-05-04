@@ -1569,8 +1569,9 @@ dependencies = [
 
 [[package]]
 name = "blokli-client"
-version = "0.25.0"
-source = "git+https://github.com/hoprnet/blokli?branch=main#97f38aa19c014ea670def67c6b5f627e7e7274a4"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0815759c61c8ccb53569f714beda0e292d12253126699160b21cb15f115b3fcd"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -1590,6 +1591,7 @@ dependencies = [
  "parking_lot",
  "rand 0.9.4",
  "reqwest 0.12.28",
+ "semver 1.0.28",
  "serde",
  "serde_json",
  "smart-default",
