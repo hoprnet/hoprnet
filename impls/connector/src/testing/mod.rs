@@ -160,8 +160,8 @@ impl BlokliTestStateBuilder {
                 hex::encode(safe.address),
                 blokli_client::api::types::Safe {
                     address: hex::encode(safe.address),
-                    chain_key: hex::encode(safe.owner),
-                    owners: [hex::encode(safe.owner)].to_vec(),
+                    chain_key: hex::encode(safe.deployer),
+                    owners: safe.owners.into_iter().map(hex::encode).collect(),
                     module_address: hex::encode(safe.module),
                     registered_nodes: safe.registered_nodes.into_iter().map(hex::encode).collect(),
                     threshold: Some("1".to_string()),

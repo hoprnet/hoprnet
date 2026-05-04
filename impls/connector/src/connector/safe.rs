@@ -77,11 +77,11 @@ where
         balance: HoprBalance,
     ) -> Result<BoxFuture<'a, Result<ChainReceipt, Self::Error>>, Self::Error> {
         let admin = self.chain_key.public().to_address();
-        if self
+        if !self
             .client
             .query_safe(blokli_client::api::SafeSelector::ChainKey(admin.into()))
             .await?
-            .is_some()
+            .is_empty()
         {
             return Err(ConnectorError::InvalidState("safe already deployed for this signer"));
         }
@@ -151,9 +151,10 @@ mod tests {
 
         let safe = DeployedSafe {
             address: safe_addr,
-            owner: me,
+            owners: vec![me],
             module: MODULE_ADDR.into(),
             registered_nodes: vec![node_addr],
+            deployer: me,
         };
         let blokli_client = BlokliTestStateBuilder::default()
             .with_balances([(me, XDaiBalance::new_base(10))])

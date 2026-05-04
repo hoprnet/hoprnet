@@ -218,13 +218,18 @@ pub(crate) fn model_to_chain_info(
 pub(crate) fn model_to_deployed_safe(model: blokli_client::api::types::Safe) -> Result<DeployedSafe, ConnectorError> {
     Ok(DeployedSafe {
         address: Address::from_hex(&model.address)?,
-        owner: Address::from_hex(&model.chain_key)?,
+        owners: model
+            .owners
+            .into_iter()
+            .map(|addr| Address::from_hex(&addr))
+            .collect::<Result<Vec<_>, _>>()?,
         module: Address::from_hex(&model.module_address)?,
         registered_nodes: model
             .registered_nodes
             .into_iter()
             .map(|addr| Address::from_hex(&addr))
             .collect::<Result<Vec<_>, _>>()?,
+        deployer: Address::from_hex(&model.chain_key)?,
     })
 }
 
