@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use futures::{
-    AsyncRead, AsyncReadExt, AsyncWrite, FutureExt, SinkExt as _, StreamExt,
+    AsyncRead, AsyncReadExt, AsyncWrite, FutureExt, StreamExt,
     channel::mpsc::{Receiver, Sender, channel},
 };
 use hopr_api::network::NetworkStreamControl;
@@ -13,6 +13,16 @@ use tokio_util::{
     codec::{Decoder, Encoder, FramedRead, FramedWrite},
     compat::{FuturesAsyncReadCompatExt, FuturesAsyncWriteCompatExt},
 };
+
+#[cfg(all(feature = "telemetry", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_PEER_BUFFER_FULL_DROP: hopr_metrics::SimpleCounter =
+        hopr_metrics::SimpleCounter::new(
+            "hopr_egress_per_peer_buffer_full_dropped",
+            "Number of packets dropped because the per-peer egress buffer was full",
+        )
+        .unwrap();
+}
 
 // TODO: see if these constants should be configurable instead
 
@@ -242,8 +252,14 @@ where
 
                     match cached {
                         Ok(mut cached) => {
-                            if let Err(error) = cached.send(msg).await {
-                                tracing::error!(%peer, %error, "error sending message to peer");
+                            if let Err(err) = cached.try_send(msg) {
+                                if err.is_full() {
+                                    #[cfg(all(feature = "telemetry", not(test)))]
+                                    METRIC_PEER_BUFFER_FULL_DROP.increment();
+                                    tracing::warn!(%peer, "per-peer egress buffer full, dropping packet");
+                                } else {
+                                    tracing::error!(%peer, "per-peer egress channel disconnected");
+                                }
                                 cache.invalidate(&peer).await;
                             } else {
                                 tracing::trace!(%peer, "message sent to peer");
