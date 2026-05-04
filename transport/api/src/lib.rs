@@ -61,7 +61,9 @@ use hopr_network_types::prelude::*;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 use hopr_protocol_hopr::MemorySurbStore;
 use hopr_transport_mixer::MixerConfig;
-use hopr_transport_path::{BackgroundPathCacheRefreshable, HoprGraphPathSelector, PathPlanner};
+#[cfg(feature = "runtime-tokio")]
+use hopr_transport_path::BackgroundPathCacheRefreshable;
+use hopr_transport_path::{HoprGraphPathSelector, PathPlanner};
 pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
 use hopr_transport_probe::{
     Probe,
