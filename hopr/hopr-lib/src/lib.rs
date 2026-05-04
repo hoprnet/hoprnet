@@ -225,7 +225,7 @@ pub fn prepare_tokio_runtime(
 
 /// Type alias used to send and receive transport data via a running HOPR node.
 pub type HoprTransportIO = hopr_transport::socket::HoprSocket<
-    futures::channel::mpsc::Receiver<ApplicationDataIn>,
+    futures::stream::BoxStream<'static, ApplicationDataIn>,
     futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>,
 >;
 

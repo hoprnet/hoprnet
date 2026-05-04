@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use futures::{FutureExt, SinkExt, StreamExt, pin_mut};
+use futures::{FutureExt, SinkExt, StreamExt};
 use futures_concurrency::stream::StreamExt as _;
 use hopr_api::{
     ct::{ProbeRouting, ProbingTrafficGeneration},
@@ -29,6 +29,144 @@ use crate::{
 type CacheNeighborKey = (HoprPseudonym, NeighborProbe);
 type CacheNeighborValue = (Box<NodeId>, std::time::Duration, Option<PingQueryReplier>);
 
+/// Result of classifying one incoming message through the probe layer.
+pub enum ProbeDispatch {
+    /// The message was a probe message and has been consumed internally.
+    Consumed,
+    /// The message was not related to probing; caller should route it further.
+    Passthrough(HoprPseudonym, ApplicationDataIn),
+}
+
+/// Shared state used to classify incoming messages as probe or non-probe.
+///
+/// Obtained from [`Probe::continuously_scan`]. Use [`filter_stream`](ProbeClassifierState::filter_stream)
+/// to wrap an incoming stream so that probe messages are consumed internally and non-probe messages
+/// are yielded to the caller.
+#[derive(Clone)]
+pub struct ProbeClassifierState<G> {
+    active_neighbor_probes: moka::future::Cache<CacheNeighborKey, CacheNeighborValue>,
+    active_path_probes: moka::future::Cache<Tag, (PathTelemetry, Arc<AllocatedTag>)>,
+    network_graph: G,
+}
+
+impl<G> ProbeClassifierState<G>
+where
+    G: NetworkGraphUpdate + Clone + Send + Sync + 'static,
+{
+    /// Classify one incoming `(pseudonym, data)` pair.
+    ///
+    /// The `push_to_network` sink is used to send pong replies when the message is a Ping.
+    /// Returns `Consumed` if the message was a probe, or `Passthrough` for all other messages.
+    pub async fn classify<T>(
+        &self,
+        mut push_to_network: T,
+        pseudonym: HoprPseudonym,
+        in_data: ApplicationDataIn,
+    ) -> ProbeDispatch
+    where
+        T: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Unpin + Send + 'static,
+        T::Error: Send,
+    {
+        let tag: Tag = in_data.data.application_tag;
+
+        if let Some((path_telemetry, _allocated_tag)) = self.active_path_probes.remove(&tag).await {
+            tracing::debug!(%tag, "loopback probe successfully received");
+            self.network_graph
+                .record_edge::<NeighborTelemetry, PathTelemetry>(hopr_api::graph::MeasurableEdge::Probe(Ok(
+                    EdgeTransportTelemetry::Loopback(path_telemetry),
+                )));
+        } else if tag == ReservedTag::Ping.into() {
+            let message: anyhow::Result<Message> = in_data
+                .data
+                .try_into()
+                .map_err(|e| anyhow::anyhow!("failed to convert data into message: {e}"));
+
+            match message {
+                Ok(message) => match message {
+                    Message::Telemetry(_) => {
+                        tracing::warn!(%pseudonym, "received telemetry on reserved ping tag, ignoring");
+                    }
+                    Message::Probe(NeighborProbe::Ping(ping)) => {
+                        tracing::debug!(%pseudonym, nonce = hex::encode(ping), "received ping");
+                        tracing::trace!(%pseudonym, nonce = hex::encode(ping), "wrapping a pong in the found SURB");
+
+                        let message = Message::Probe(NeighborProbe::Pong(ping));
+                        if let Ok(data) = message.try_into() {
+                            let routing = DestinationRouting::Return(pseudonym.into());
+                            let data = ApplicationDataOut::with_no_packet_info(data);
+                            if let Err(_error) = push_to_network.send((routing, data)).await {
+                                tracing::error!(%pseudonym, "failed to send back a pong");
+                            }
+                        } else {
+                            tracing::error!(%pseudonym, "failed to convert pong message into data");
+                        }
+                    }
+                    Message::Probe(NeighborProbe::Pong(pong)) => {
+                        tracing::debug!(%pseudonym, nonce = hex::encode(pong), "received pong");
+                        if let Some((peer, start, replier)) = self
+                            .active_neighbor_probes
+                            .remove(&(pseudonym, NeighborProbe::Ping(pong)))
+                            .await
+                        {
+                            let latency = current_time().as_unix_timestamp().saturating_sub(start);
+
+                            if let NodeId::Offchain(opk) = peer.as_ref() {
+                                tracing::debug!(%pseudonym, nonce = hex::encode(pong), latency_ms = latency.as_millis(), "probe successful");
+                                self.network_graph.record_edge::<NeighborTelemetry, PathTelemetry>(
+                                    hopr_api::graph::MeasurableEdge::Probe(Ok(EdgeTransportTelemetry::Neighbor(
+                                        NeighborTelemetry {
+                                            peer: *opk,
+                                            rtt: latency,
+                                        },
+                                    ))),
+                                )
+                            } else {
+                                tracing::warn!(%pseudonym, nonce = hex::encode(pong), latency_ms = latency.as_millis(), "probe successful to non-offchain peer");
+                            }
+
+                            if let Some(replier) = replier {
+                                replier.notify(Ok(latency));
+                            }
+                        } else {
+                            tracing::warn!(%pseudonym, nonce = hex::encode(pong), possible_reasons = "[timeout, adversary]", "received pong for unknown probe");
+                        }
+                    }
+                },
+                Err(error) => tracing::error!(%pseudonym, %error, "cannot deserialize message"),
+            }
+        } else {
+            return ProbeDispatch::Passthrough(pseudonym, in_data);
+        }
+
+        ProbeDispatch::Consumed
+    }
+
+    /// Wraps `stream` as an in-place filter: probe messages are handled internally (telemetry,
+    /// pong replies via `push_to_network`), non-probe messages are yielded.
+    pub fn filter_stream<T, S>(
+        self,
+        push_to_network: T,
+        stream: S,
+    ) -> impl futures::Stream<Item = (HoprPseudonym, ApplicationDataIn)>
+    where
+        T: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Unpin + Send + Sync + 'static,
+        T::Error: Send,
+        S: futures::Stream<Item = (HoprPseudonym, ApplicationDataIn)>,
+    {
+        use futures::StreamExt;
+        stream.filter_map(move |(pseudonym, data)| {
+            let state = self.clone();
+            let push = push_to_network.clone();
+            async move {
+                match state.classify(push, pseudonym, data).await {
+                    ProbeDispatch::Consumed => None,
+                    ProbeDispatch::Passthrough(ps, d) => Some((ps, d)),
+                }
+            }
+        })
+    }
+}
+
 /// Probe functionality builder.
 ///
 /// The builder holds information about this node's own addresses and the configuration for the probing process. It is
@@ -46,20 +184,21 @@ impl Probe {
     }
 
     /// The main function that assembles and starts the probing process.
-    pub async fn continuously_scan<T, U, V, Up, Tr, G>(
+    ///
+    /// Returns the abortable list of background tasks (probe emission) and a
+    /// [`ProbeClassifierState`] for inline classification of incoming messages.
+    /// Use [`ProbeClassifierState::filter_stream`] to wrap the incoming stream.
+    pub async fn continuously_scan<T, V, Tr, G>(
         self,
-        api: (T, U),      // lower (tx, rx) channels for sending and receiving messages
+        api_out: T,       // lower tx channel for sending outgoing probes and pong replies
         manual_events: V, // explicit requests from the API
-        move_up: Up,      // forward up non-probing messages from the network
         probing_traffic_generator: Tr,
         network_graph: G,
-    ) -> AbortableList<HoprProbeProcess>
+    ) -> (AbortableList<HoprProbeProcess>, ProbeClassifierState<G>)
     where
-        T: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + 'static,
+        T: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
         T::Error: Send,
-        U: futures::Stream<Item = (HoprPseudonym, ApplicationDataIn)> + Send + Sync + 'static,
         V: futures::Stream<Item = (OffchainPublicKey, PingQueryReplier)> + Send + Sync + 'static,
-        Up: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Clone + Send + Sync + 'static,
         Tr: ProbingTrafficGeneration + Send + Sync + 'static,
         G: NetworkGraphView + NetworkGraphUpdate + Clone + Send + Sync + 'static,
     {
@@ -147,9 +286,7 @@ impl Probe {
                 )
                 .build();
 
-        let active_probes_rx = active_neighbor_probes.clone();
-        let active_path_probes_rx = active_path_probes.clone();
-        let push_to_network = api.0.clone();
+        let push_to_network = api_out.clone();
 
         let mut processes = AbortableList::default();
 
@@ -168,6 +305,8 @@ impl Probe {
                 }));
 
         let tag_allocator = self.tag_allocator.clone();
+        let classifier_neighbor_probes = active_neighbor_probes.clone();
+        let classifier_path_probes = active_path_probes.clone();
         processes.insert(
             HoprProbeProcess::Emit,
             hopr_async_runtime::spawn_as_abortable!(async move {
@@ -206,7 +345,7 @@ impl Probe {
                                                 ..Default::default()
                                             }),
                                         };
-                                        pin_mut!(push_to_network);
+                                        let mut push_to_network = push_to_network.clone();
 
                                         if let Err(_error) = push_to_network.send((routing, data)).await {
                                             tracing::error!("failed to send out a ping");
@@ -247,7 +386,7 @@ impl Probe {
                                             tag_value,
                                             message.to_bytes().as_ref(),
                                         ) {
-                                            pin_mut!(push_to_network);
+                                            let mut push_to_network = push_to_network.clone();
 
                                             // Loopback telemetry probes are self-routed and never replied to via
                                             // SURB, so no SURBs should be bundled. See hoprnet/hoprnet#7972.
@@ -293,92 +432,13 @@ impl Probe {
             }),
         );
 
-        // -- Process probes --
-        processes.insert(
-            HoprProbeProcess::Process,
-            hopr_async_runtime::spawn_as_abortable!(api.1.for_each_concurrent(max_parallel_probes, move |(pseudonym, in_data)| {
-                let active_probes = active_probes_rx.clone();
-                let active_path_probes = active_path_probes_rx.clone();
-                let push_to_network = api.0.clone();
-                let move_up = move_up.clone();
-                let store = network_graph.clone();
+        let classifier = ProbeClassifierState {
+            active_neighbor_probes: classifier_neighbor_probes,
+            active_path_probes: classifier_path_probes,
+            network_graph,
+        };
 
-                async move {
-                    let tag: Tag = in_data.data.application_tag;
-
-                    // Check if this is a loopback path telemetry probe returning on its allocated tag.
-                    // Removing the entry drops the AllocatedTag, returning it to the pool.
-                    if let Some((path_telemetry, _allocated_tag)) = active_path_probes.remove(&tag).await {
-                        tracing::debug!(%tag, "loopback probe successfully received");
-                        store.record_edge::<NeighborTelemetry, PathTelemetry>(
-                            hopr_api::graph::MeasurableEdge::Probe(Ok(EdgeTransportTelemetry::Loopback(path_telemetry)))
-                        );
-                    } else if tag == ReservedTag::Ping.into() {
-                        let message: anyhow::Result<Message> = in_data.data.try_into().map_err(|e| anyhow::anyhow!("failed to convert data into message: {e}"));
-
-                        match message {
-                            Ok(message) => {
-                                match message {
-                                    Message::Telemetry(_) => {
-                                        tracing::warn!(%pseudonym, "received telemetry on reserved ping tag, ignoring");
-                                    },
-                                    Message::Probe(NeighborProbe::Ping(ping)) => {
-                                        tracing::debug!(%pseudonym, nonce = hex::encode(ping), "received ping");
-                                        tracing::trace!(%pseudonym, nonce = hex::encode(ping), "wrapping a pong in the found SURB");
-
-                                        let message = Message::Probe(NeighborProbe::Pong(ping));
-                                        if let Ok(data) = message.try_into() {
-                                            let routing = DestinationRouting::Return(pseudonym.into());
-                                            let data = ApplicationDataOut::with_no_packet_info(data);
-                                            pin_mut!(push_to_network);
-
-                                            if let Err(_error) = push_to_network.send((routing, data)).await {
-                                                tracing::error!(%pseudonym, "failed to send back a pong");
-                                            }
-                                        } else {
-                                            tracing::error!(%pseudonym, "failed to convert pong message into data");
-                                        }
-                                    },
-                                    Message::Probe(NeighborProbe::Pong(pong)) => {
-                                        tracing::debug!(%pseudonym, nonce = hex::encode(pong), "received pong");
-                                        if let Some((peer, start, replier)) = active_probes.remove(&(pseudonym, NeighborProbe::Ping(pong))).await {
-                                            let latency = current_time()
-                                                .as_unix_timestamp()
-                                                .saturating_sub(start);
-
-                                            if let NodeId::Offchain(opk) = peer.as_ref() {
-                                                tracing::debug!(%pseudonym, nonce = hex::encode(pong), latency_ms = latency.as_millis(), "probe successful");
-                                                store.record_edge::<NeighborTelemetry, PathTelemetry>(hopr_api::graph::MeasurableEdge::Probe(Ok(EdgeTransportTelemetry::Neighbor(NeighborTelemetry {
-                                                    peer: *opk,
-                                                    rtt: latency,
-                                                }))))
-                                            } else {
-                                                tracing::warn!(%pseudonym, nonce = hex::encode(pong), latency_ms = latency.as_millis(), "probe successful to non-offchain peer");
-                                            }
-
-                                            if let Some(replier) = replier {
-                                                replier.notify(Ok(latency))
-                                            };
-                                        } else {
-                                            tracing::warn!(%pseudonym, nonce = hex::encode(pong), possible_reasons = "[timeout, adversary]", "received pong for unknown probe");
-                                        };
-                                    },
-                                }
-                            },
-                            Err(error) => tracing::error!(%pseudonym, %error, "cannot deserialize message"),
-                        }
-                    } else {
-                        // If the message is not a probing message, forward it up
-                        pin_mut!(move_up);
-                        if move_up.send((pseudonym, in_data)).await.is_err() {
-                            tracing::error!(%pseudonym, error = "receiver error", "failed to send message up");
-                        }
-                    }
-                }
-            }).inspect(|_| tracing::warn!(task = "transport (probe - processing incoming)", "long-running background task finished")))
-        );
-
-        processes
+        (processes, classifier)
     }
 }
 
@@ -498,13 +558,13 @@ mod tests {
 
             match telemetry {
                 hopr_api::graph::MeasurableEdge::Probe(Ok(EdgeTransportTelemetry::Neighbor(neighbor_telemetry))) => {
-                    let peer: OffchainPublicKey = neighbor_telemetry.peer().clone();
+                    let peer: OffchainPublicKey = *neighbor_telemetry.peer();
                     let duration = neighbor_telemetry.rtt();
                     on_finished.push((peer, Ok(duration)));
                 }
                 hopr_api::graph::MeasurableEdge::Probe(Err(NetworkGraphError::ProbeNeighborTimeout(peer))) => {
                     on_finished.push((
-                        peer.as_ref().clone(),
+                        *peer.as_ref(),
                         Err(ProbeError::TrafficError(NetworkGraphError::ProbeNeighborTimeout(peer))),
                     ));
                 }
@@ -548,18 +608,19 @@ mod tests {
         }
     }
 
+    type TestClassifier = ProbeClassifierState<PeerStore>;
+
     struct TestInterface {
-        from_probing_up_rx: futures::channel::mpsc::Receiver<(HoprPseudonym, ApplicationDataIn)>,
+        probe_classifier: TestClassifier,
         from_probing_to_network_rx: futures::channel::mpsc::Receiver<(DestinationRouting, ApplicationDataOut)>,
-        from_network_to_probing_tx: futures::channel::mpsc::Sender<(HoprPseudonym, ApplicationDataIn)>,
+        from_probing_to_network_tx: futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>,
         manual_probe_tx: futures::channel::mpsc::Sender<(OffchainPublicKey, PingQueryReplier)>,
     }
 
-    async fn test_with_probing<F, St, Fut>(cfg: ProbeConfig, store: St, test: F) -> anyhow::Result<()>
+    async fn test_with_probing<F, Fut>(cfg: ProbeConfig, store: PeerStore, test: F) -> anyhow::Result<()>
     where
         Fut: std::future::Future<Output = anyhow::Result<()>>,
         F: Fn(TestInterface) -> Fut + Send + Sync + 'static,
-        St: NetworkGraphUpdate + NetworkGraphView<NodeId = OffchainPublicKey> + Clone + Send + Sync + 'static,
     {
         let tag_allocators = hopr_transport_tag_allocator::create_allocators(
             ReservedTag::range().end..u16::MAX as u64 + 1,
@@ -577,30 +638,16 @@ mod tests {
 
         let probe = Probe::new(cfg, probing_allocator);
 
-        let (from_probing_up_tx, from_probing_up_rx) =
-            futures::channel::mpsc::channel::<(HoprPseudonym, ApplicationDataIn)>(100);
-
         let (from_probing_to_network_tx, from_probing_to_network_rx) =
             futures::channel::mpsc::channel::<(DestinationRouting, ApplicationDataOut)>(100);
-
-        let (from_network_to_probing_tx, from_network_to_probing_rx) =
-            futures::channel::mpsc::channel::<(HoprPseudonym, ApplicationDataIn)>(100);
 
         let (manual_probe_tx, manual_probe_rx) =
             futures::channel::mpsc::channel::<(OffchainPublicKey, PingQueryReplier)>(100);
 
-        let interface = TestInterface {
-            from_probing_up_rx,
-            from_probing_to_network_rx,
-            from_network_to_probing_tx,
-            manual_probe_tx,
-        };
-
-        let jhs = probe
+        let (jhs, probe_classifier) = probe
             .continuously_scan(
-                (from_probing_to_network_tx, from_network_to_probing_rx),
+                from_probing_to_network_tx.clone(),
                 manual_probe_rx,
-                from_probing_up_tx,
                 ImmediateNeighborProber::new(
                     ProberConfig {
                         interval: cfg.interval,
@@ -612,6 +659,13 @@ mod tests {
             )
             .await;
 
+        let interface = TestInterface {
+            probe_classifier,
+            from_probing_to_network_rx,
+            from_probing_to_network_tx,
+            manual_probe_tx,
+        };
+
         let result = test(interface).await;
 
         jhs.abort_all();
@@ -622,11 +676,13 @@ mod tests {
     const NO_PROBE_PASSES: f64 = 0.0;
     const ALL_PROBES_PASS: f64 = 1.0;
 
-    /// Channel that can drop any probes and concurrently replies to a probe correctly
-    fn concurrent_channel(
+    /// Simulates the network: receives outgoing probe packets and feeds pong responses back
+    /// through the classifier (mirroring what the remote peer + packet pipeline would do).
+    fn concurrent_classify(
         delay: Option<std::time::Duration>,
         pass_rate: f64,
-        from_network_to_probing_tx: futures::channel::mpsc::Sender<(HoprPseudonym, ApplicationDataIn)>,
+        classifier: TestClassifier,
+        push_to_network: futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>,
     ) -> impl Fn((DestinationRouting, ApplicationDataOut)) -> BoxFuture<'static, ()> {
         debug_assert!(
             (NO_PROBE_PASSES..=ALL_PROBES_PASS).contains(&pass_rate),
@@ -634,7 +690,8 @@ mod tests {
         );
 
         move |(path, data_out): (DestinationRouting, ApplicationDataOut)| -> BoxFuture<'static, ()> {
-            let mut from_network_to_probing_tx = from_network_to_probing_tx.clone();
+            let classifier = classifier.clone();
+            let push_to_network = push_to_network.clone();
 
             Box::pin(async move {
                 if let DestinationRouting::Forward { pseudonym, .. } = path {
@@ -643,23 +700,23 @@ mod tests {
                         let pong_message = Message::Probe(NeighborProbe::Pong(ping));
 
                         if let Some(delay) = delay {
-                            // Simulate a delay if specified
                             tokio::time::sleep(delay).await;
                         }
 
                         if rand::random_range(NO_PROBE_PASSES..=ALL_PROBES_PASS) < pass_rate {
-                            from_network_to_probing_tx
-                                .send((
-                                    pseudonym.expect("the pseudonym is always known from cache"),
+                            let pseudonym = pseudonym.expect("the pseudonym is always known from cache");
+                            classifier
+                                .classify(
+                                    push_to_network,
+                                    pseudonym,
                                     ApplicationDataIn {
                                         data: pong_message
                                             .try_into()
                                             .expect("failed to convert pong message into data"),
                                         packet_info: Default::default(),
                                     },
-                                ))
-                                .await
-                                .expect("failed to send pong message");
+                                )
+                                .await;
                         }
                     }
                 };
@@ -685,7 +742,8 @@ mod tests {
         test_with_probing(cfg, store, move |iface: TestInterface| async move {
             let mut manual_probe_tx = iface.manual_probe_tx;
             let from_probing_to_network_rx = iface.from_probing_to_network_rx;
-            let from_network_to_probing_tx = iface.from_network_to_probing_tx;
+            let from_probing_to_network_tx = iface.from_probing_to_network_tx;
+            let probe_classifier = iface.probe_classifier;
 
             let (tx, mut rx) = futures::channel::mpsc::channel::<std::result::Result<Duration, ()>>(128);
             manual_probe_tx.send((NEIGHBOURS[0], PingQueryReplier::new(tx))).await?;
@@ -694,7 +752,7 @@ mod tests {
                 from_probing_to_network_rx
                     .for_each_concurrent(
                         cfg.max_parallel_probes + 1,
-                        concurrent_channel(None, ALL_PROBES_PASS, from_network_to_probing_tx),
+                        concurrent_classify(None, ALL_PROBES_PASS, probe_classifier, from_probing_to_network_tx),
                     )
                     .await;
             });
@@ -727,7 +785,8 @@ mod tests {
         test_with_probing(cfg, store, move |iface: TestInterface| async move {
             let mut manual_probe_tx = iface.manual_probe_tx;
             let from_probing_to_network_rx = iface.from_probing_to_network_rx;
-            let from_network_to_probing_tx = iface.from_network_to_probing_tx;
+            let from_probing_to_network_tx = iface.from_probing_to_network_tx;
+            let probe_classifier = iface.probe_classifier;
 
             let (tx, mut rx) = futures::channel::mpsc::channel::<std::result::Result<Duration, ()>>(128);
             manual_probe_tx.send((NEIGHBOURS[0], PingQueryReplier::new(tx))).await?;
@@ -736,7 +795,7 @@ mod tests {
                 from_probing_to_network_rx
                     .for_each_concurrent(
                         cfg.max_parallel_probes + 1,
-                        concurrent_channel(None, NO_PROBE_PASSES, from_network_to_probing_tx),
+                        concurrent_classify(None, NO_PROBE_PASSES, probe_classifier, from_probing_to_network_tx),
                     )
                     .await;
             });
@@ -770,13 +829,14 @@ mod tests {
 
         test_with_probing(cfg, store.clone(), move |iface: TestInterface| async move {
             let from_probing_to_network_rx = iface.from_probing_to_network_rx;
-            let from_network_to_probing_tx = iface.from_network_to_probing_tx;
+            let from_probing_to_network_tx = iface.from_probing_to_network_tx;
+            let probe_classifier = iface.probe_classifier;
 
             let _jh: hopr_async_runtime::prelude::JoinHandle<()> = tokio::spawn(async move {
                 from_probing_to_network_rx
                     .for_each_concurrent(
                         cfg.max_parallel_probes + 1,
-                        concurrent_channel(None, ALL_PROBES_PASS, from_network_to_probing_tx),
+                        concurrent_classify(None, ALL_PROBES_PASS, probe_classifier, from_probing_to_network_tx),
                     )
                     .await;
             });
@@ -828,13 +888,19 @@ mod tests {
 
         test_with_probing(cfg, store.clone(), move |iface: TestInterface| async move {
             let from_probing_to_network_rx = iface.from_probing_to_network_rx;
-            let from_network_to_probing_tx = iface.from_network_to_probing_tx;
+            let from_probing_to_network_tx = iface.from_probing_to_network_tx;
+            let probe_classifier = iface.probe_classifier;
 
             let _jh: hopr_async_runtime::prelude::JoinHandle<()> = tokio::spawn(async move {
                 from_probing_to_network_rx
                     .for_each_concurrent(
                         cfg.max_parallel_probes + 1,
-                        concurrent_channel(Some(timeout), ALL_PROBES_PASS, from_network_to_probing_tx),
+                        concurrent_classify(
+                            Some(timeout),
+                            ALL_PROBES_PASS,
+                            probe_classifier,
+                            from_probing_to_network_tx,
+                        ),
                     )
                     .await;
             });
@@ -877,7 +943,8 @@ mod tests {
         };
 
         test_with_probing(cfg, store, move |iface: TestInterface| async move {
-            let mut from_network_to_probing_tx = iface.from_network_to_probing_tx;
+            let probe_classifier = iface.probe_classifier;
+            let from_probing_to_network_tx = iface.from_probing_to_network_tx;
             let mut from_probing_to_network_rx = iface.from_probing_to_network_rx;
 
             // Build a Ping message with the reserved Ping tag
@@ -889,17 +956,18 @@ mod tests {
             let ping_msg = Message::Probe(ping);
             let app_data: ApplicationData = ping_msg.try_into().context("converting ping to ApplicationData")?;
 
-            // Send the ping as if another node sent it to us
-            from_network_to_probing_tx
-                .send((
+            // Classify the ping directly — the classifier sends the pong reply to push_to_network
+            let result = probe_classifier
+                .classify(
+                    from_probing_to_network_tx,
                     HoprPseudonym::random(),
                     ApplicationDataIn {
                         data: app_data,
                         packet_info: Default::default(),
                     },
-                ))
-                .await
-                .context("sending ping to probe")?;
+                )
+                .await;
+            anyhow::ensure!(matches!(result, ProbeDispatch::Consumed), "ping should be consumed");
 
             // The probe should reply with a Pong on the network channel
             let (routing, data_out) = tokio::time::timeout(Duration::from_secs(2), from_probing_to_network_rx.next())
@@ -945,27 +1013,26 @@ mod tests {
         };
 
         test_with_probing(cfg, store.clone(), move |iface: TestInterface| async move {
-            let mut from_network_to_probing_tx = iface.from_network_to_probing_tx;
-            let mut from_probing_up_rx = iface.from_probing_up_rx;
+            let probe_classifier = iface.probe_classifier;
+            let from_probing_to_network_tx = iface.from_probing_to_network_tx;
 
             let expected_data = ApplicationData::new(Tag::MAX, b"Hello, this is a test message!")?;
 
-            from_network_to_probing_tx
-                .send((
+            let result = probe_classifier
+                .classify(
+                    from_probing_to_network_tx,
                     HoprPseudonym::random(),
                     ApplicationDataIn {
                         data: expected_data.clone(),
                         packet_info: Default::default(),
                     },
-                ))
-                .await?;
+                )
+                .await;
 
-            let actual = tokio::time::timeout(cfg.timeout, from_probing_up_rx.next())
-                .await?
-                .ok_or_else(|| anyhow::anyhow!("Did not return any data in time"))?
-                .1;
-
-            assert_eq!(actual.data, expected_data);
+            match result {
+                ProbeDispatch::Passthrough(_, actual) => assert_eq!(actual.data, expected_data),
+                ProbeDispatch::Consumed => anyhow::bail!("expected Passthrough, got Consumed"),
+            }
 
             Ok(())
         })
@@ -1048,12 +1115,8 @@ mod tests {
 
         let probe = Probe::new(cfg, probing_allocator);
 
-        let (from_probing_up_tx, _from_probing_up_rx) =
-            futures::channel::mpsc::channel::<(HoprPseudonym, ApplicationDataIn)>(100);
         let (from_probing_to_network_tx, mut from_probing_to_network_rx) =
             futures::channel::mpsc::channel::<(DestinationRouting, ApplicationDataOut)>(100);
-        let (_from_network_to_probing_tx, from_network_to_probing_rx) =
-            futures::channel::mpsc::channel::<(HoprPseudonym, ApplicationDataIn)>(100);
         let (mut manual_probe_tx, manual_probe_rx) =
             futures::channel::mpsc::channel::<(OffchainPublicKey, PingQueryReplier)>(100);
 
@@ -1066,14 +1129,8 @@ mod tests {
         // Kick off the probing process before triggering — the strategy's stream drives
         // the loopback case, and we push to `manual_probe_tx` below for the neighbor case.
         let is_manual = matches!(strategy, TestProbeStrategy::ManualNeighbor);
-        let jhs = probe
-            .continuously_scan(
-                (from_probing_to_network_tx, from_network_to_probing_rx),
-                manual_probe_rx,
-                from_probing_up_tx,
-                strategy,
-                store,
-            )
+        let (jhs, _probe_classifier) = probe
+            .continuously_scan(from_probing_to_network_tx, manual_probe_rx, strategy, store)
             .await;
 
         if is_manual {
