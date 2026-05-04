@@ -10,10 +10,9 @@ use futures::{FutureExt, Sink};
 use futures_timer::Delay;
 use tracing::trace;
 
-use crate::{config::MixerConfig, data::DelayedData};
-
 #[cfg(all(feature = "telemetry", not(test)))]
 use crate::channel::{METRIC_MIXER_AVERAGE_DELAY, METRIC_QUEUE_SIZE};
+use crate::{config::MixerConfig, data::DelayedData};
 
 /// A [`Sink`] adapter that applies random delays to items before forwarding them to an inner sink.
 ///

@@ -302,7 +302,7 @@ pub fn random_packets_of_count(size: usize) -> Vec<ApplicationData> {
 }
 
 /// A large pool of random bytes used as a ring buffer for generating test payloads.
-static RANDOM_BYTE_POOL: LazyLock<[u8; 4096]> = LazyLock::new(|| random_bytes::<4096>());
+static RANDOM_BYTE_POOL: LazyLock<[u8; 4096]> = LazyLock::new(random_bytes::<4096>);
 
 /// Creates a single packet with a payload of the given size (filled from a static random byte pool).
 pub fn random_packet_of_size(payload_size: usize) -> ApplicationData {
