@@ -224,8 +224,17 @@ where
                             }
                             let node_ids: Vec<NodeId> = pwc.path.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
                             match ValidatedPath::new(source, node_ids, &chain_resolver).await {
-                                Ok(vp) => valid_paths.push((vp, pwc.cost)),
-                                Err(e) => trace!(error = %e, "path candidate failed validation"),
+                                Ok(vp) => {
+                                    // Post-resolution: catch non-adjacent chain-address duplicates
+                                    // (ValidatedPath::new only checks consecutive collisions).
+                                    let chain_addrs: &[_] = &**vp.chain_path();
+                                    if chain_addrs.iter().enumerate().any(|(i, a)| chain_addrs[..i].contains(a)) {
+                                        tracing::warn!(path = %vp, "skipping path candidate with repeated chain addresses");
+                                        continue;
+                                    }
+                                    valid_paths.push((vp, pwc.cost))
+                                }
+                                Err(e) => tracing::warn!(error = %e, "path candidate failed validation"),
                             }
                         }
 
@@ -407,8 +416,15 @@ where
                             }
                             let node_ids: Vec<NodeId> = pwc.path.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
                             match ValidatedPath::new(src, node_ids, &chain_resolver).await {
-                                Ok(vp) => valid_paths.push((vp, pwc.cost)),
-                                Err(e) => trace!(error = %e, "background refresh: path candidate failed validation"),
+                                Ok(vp) => {
+                                    let chain_addrs: &[_] = &**vp.chain_path();
+                                    if chain_addrs.iter().enumerate().any(|(i, a)| chain_addrs[..i].contains(a)) {
+                                        tracing::warn!(path = %vp, "background refresh: skipping candidate with repeated chain addresses");
+                                        continue;
+                                    }
+                                    valid_paths.push((vp, pwc.cost))
+                                }
+                                Err(e) => tracing::warn!(error = %e, "background refresh: path candidate failed validation"),
                             }
                         }
 

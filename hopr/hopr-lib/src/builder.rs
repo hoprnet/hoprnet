@@ -575,6 +575,7 @@ where
                     let win_probability = win_probability.clone();
 
                     async move {
+                        tracing::debug!(event = %chain_event, "processing chain event");
                         match chain_event {
                             ChainEvent::Announcement(account) => {
                                 tracing::debug!(
@@ -650,7 +651,9 @@ where
                                     }
                                 }
                             }
-                            ChainEvent::ChannelClosureInitiated(_) => {}
+                            ChainEvent::ChannelClosureInitiated(channel) => {
+                                tracing::debug!(%channel, "channel closure initiated; no graph update");
+                            }
                             ChainEvent::WinningProbabilityIncreased(prob)
                             | ChainEvent::WinningProbabilityDecreased(prob) => {
                                 tracing::debug!(%prob, "recording winning probability change");
@@ -660,7 +663,9 @@ where
                                 tracing::debug!(%price, "recording ticket price change");
                                 *ticket_price.write() = price;
                             }
-                            _ => {}
+                            _ => {
+                                tracing::debug!("chain event not relevant to graph; skipping");
+                            }
                         }
                     }
                 })
