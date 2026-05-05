@@ -33,6 +33,14 @@ where
         .filter_map(|(path, _, cost)| {
             tracing::trace!(?path, ?cost, "evaluating candidate path");
             if cost > 0.0 {
+                // Guard: all nodes in [src, intermediates..., dest] must be distinct.
+                // simple_paths guarantees this in theory but the check is cheap insurance
+                // against implementation edge cases (e.g. graph with stale duplicate keys).
+                let has_dup = path.iter().enumerate().any(|(i, n)| path[..i].contains(n));
+                if has_dup {
+                    tracing::warn!(?path, "dropping path candidate with repeated nodes");
+                    return None;
+                }
                 // Drop the first element (src) — callers expect [intermediates..., dest].
                 Some(PathWithCost {
                     path: path.into_iter().skip(1).collect::<Vec<_>>(),
@@ -122,14 +130,22 @@ where
                     return None;
                 }
 
-                // Strip source and append dest.
-                let mut candidate: Vec<_> = path.into_iter().skip(1).collect();
+                // Strip source to get intermediate hops only.
+                let intermediates: Vec<_> = path.into_iter().skip(1).collect();
 
-                // Ensure dest is not already in the path (would create a repeated node).
-                if candidate.contains(dest) {
+                // Ensure the complete path [src, intermediates..., dest] has no repeated nodes.
+                // This supersedes the narrower dest-only check: it also catches src appearing as
+                // an intermediate hop and duplicate relays within the intermediates list.
+                let full: Vec<&OffchainPublicKey> = std::iter::once(src)
+                    .chain(intermediates.iter())
+                    .chain(std::iter::once(dest))
+                    .collect();
+                if full.iter().enumerate().any(|(i, n)| full[..i].contains(n)) {
                     return None;
                 }
 
+                // Append dest to form the complete candidate path [intermediates..., dest].
+                let mut candidate = intermediates;
                 candidate.push(*dest);
 
                 // Skip paths already found by Phase 1 (compare path component only).
@@ -668,8 +684,9 @@ mod tests {
     async fn selector_should_reject_extended_path_containing_destination() -> anyhow::Result<()> {
         // Build: me → dest (1-hop, with observations).
         // When Phase 2 does extended search with shorter_length=1, it finds me → dest.
-        // After stripping src, candidate is [dest]. Since candidate.contains(dest), it should be filtered.
-        // Meanwhile Phase 1 for 2-hop finds nothing (no 2-hop path exists).
+        // After stripping src, intermediates = [dest]. The full uniqueness check on
+        // [me, dest, dest] detects the repeated dest → filtered.
+        // Phase 1 for 2-hop finds nothing (no 2-hop path exists).
         // So overall: no valid paths.
         let me = pubkey(&SECRET_0);
         let dest = pubkey(&SECRET_1);
@@ -682,10 +699,38 @@ mod tests {
 
         // Ask for 2-hop path. Phase 1 won't find any (no 2-hop path exists).
         // Phase 2 finds me → dest as a shorter_length=1 path, but candidate=[dest]
-        // which contains dest → filtered by the self-loop guard.
+        // which contains dest → filtered by the full-path uniqueness guard.
         let err = selector
             .select_path(me, dest, 2)
             .expect_err("extended path ending at dest should be rejected");
+        anyhow::ensure!(
+            matches!(err, PathPlannerError::Path(PathError::PathNotFound(..))),
+            "expected PathNotFound, got: {err}"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn selector_should_reject_one_hop_path_where_relay_equals_destination() -> anyhow::Result<()> {
+        // Scenario: me → dest (direct edge, observed). No other relay exists.
+        // For 1-hop, Phase 1 needs a 2-edge path [me, relay, dest].
+        // The only candidate is [me, dest, dest] — dest appears as both relay and destination.
+        // simple_paths rejects this (visited set prevents revisiting dest).
+        // Phase 2 (shorter_length=1) finds [me, dest], strips src → intermediates=[dest],
+        // full path = [me, dest, dest] → uniqueness check filters it.
+        // Result: PathNotFound.
+        let me = pubkey(&SECRET_0);
+        let dest = pubkey(&SECRET_1);
+        let graph = ChannelGraph::new(me);
+        graph.add_node(dest);
+        graph.add_edge(&me, &dest).context("adding edge me -> dest")?;
+        mark_edge_full(&graph, &me, &dest);
+
+        let selector = test_selector(me, graph, MAX_PATHS);
+
+        let err = selector
+            .select_path(me, dest, 1)
+            .expect_err("1-hop path where relay == dest should be rejected");
         anyhow::ensure!(
             matches!(err, PathPlannerError::Path(PathError::PathNotFound(..))),
             "expected PathNotFound, got: {err}"

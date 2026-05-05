@@ -155,10 +155,23 @@ where
                     ?explicit_path,
                     "resolving intermediate path"
                 );
+                let intermediates: Vec<NodeId> = explicit_path.into_iter().collect();
+                let all: Vec<NodeId> = std::iter::once(source)
+                    .chain(intermediates.iter().copied())
+                    .chain(std::iter::once(destination))
+                    .collect();
+                let has_dup = all.iter().enumerate().any(|(i, n)| all[..i].contains(n));
+                if has_dup {
+                    return Err(PathPlannerError::Path(PathError::PathNotFound(
+                        intermediates.len(),
+                        source.to_string(),
+                        destination.to_string(),
+                    )));
+                }
                 let resolver = ChainPathResolver::from(&*self.resolver);
                 ValidatedPath::new(
                     source,
-                    explicit_path
+                    intermediates
                         .into_iter()
                         .chain(std::iter::once(destination))
                         .collect::<Vec<_>>(),
@@ -194,6 +207,21 @@ where
                         let chain_resolver = ChainPathResolver::from(&*resolver);
                         let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::new();
                         for pwc in candidates {
+                            // Defence-in-depth: reject candidates where any offchain key
+                            // repeats in [src_key, path...]. The selector already checks this
+                            // in packet-key space, but this guard catches any cross-keyspace
+                            // collision that slips through to the planner.
+                            let path_has_dup = pwc.path.iter().enumerate().any(|(i, n)| {
+                                *n == src_key || pwc.path[..i].contains(n)
+                            });
+                            if path_has_dup {
+                                tracing::warn!(
+                                    %src_key,
+                                    path = ?pwc.path,
+                                    "skipping path candidate with repeated offchain keys"
+                                );
+                                continue;
+                            }
                             let node_ids: Vec<NodeId> = pwc.path.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
                             match ValidatedPath::new(source, node_ids, &chain_resolver).await {
                                 Ok(vp) => valid_paths.push((vp, pwc.cost)),
@@ -366,6 +394,17 @@ where
                         let chain_resolver = ChainPathResolver::from(&*resolver);
                         let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::new();
                         for pwc in candidates {
+                            let path_has_dup = pwc.path.iter().enumerate().any(|(i, n)| {
+                                *n == src_key || pwc.path[..i].contains(n)
+                            });
+                            if path_has_dup {
+                                tracing::warn!(
+                                    %src_key,
+                                    path = ?pwc.path,
+                                    "background refresh: skipping candidate with repeated offchain keys"
+                                );
+                                continue;
+                            }
                             let node_ids: Vec<NodeId> = pwc.path.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
                             match ValidatedPath::new(src, node_ids, &chain_resolver).await {
                                 Ok(vp) => valid_paths.push((vp, pwc.cost)),
@@ -708,6 +747,43 @@ mod tests {
         } else {
             panic!("expected Forward routing");
         }
+    }
+
+    #[tokio::test]
+    async fn explicit_intermediate_path_with_dest_as_relay_should_return_error() {
+        // Validate that the planner rejects an IntermediatePath where the intermediate
+        // node equals the destination — the full path [me, dest, dest] has a repeated node.
+        let me = pubkey(&SECRET_ME);
+        let dest = pubkey(&SECRET_DEST);
+
+        let graph = ChannelGraph::new(me);
+        let cfg = small_config();
+        let selector = HoprGraphPathSelector::new(me, graph, cfg.max_cached_paths, cfg.edge_penalty, cfg.min_ack_rate);
+        let chain_api = TestChainApi::new(me, me_addr(), vec![(dest, dest_addr())]);
+        let surb_store = hopr_protocol_hopr::MemorySurbStore::default();
+        let planner = PathPlanner::new(me, surb_store, chain_api, selector, small_config());
+
+        use hopr_types::primitive::prelude::BoundedVec;
+        // Explicitly set dest as the only intermediate hop — degenerate: relay == destination.
+        let intermediate_path =
+            BoundedVec::try_from(vec![NodeId::Offchain(dest)]).expect("valid");
+
+        let routing = DestinationRouting::Forward {
+            destination: Box::new(NodeId::Offchain(dest)),
+            pseudonym: None,
+            forward_options: RoutingOptions::IntermediatePath(intermediate_path),
+            return_options: None,
+        };
+
+        let result = planner.resolve_routing(100, 0, routing).await;
+        assert!(
+            result.is_err(),
+            "path with relay == destination should be rejected"
+        );
+        assert!(
+            matches!(result.unwrap_err(), PathPlannerError::Path(PathError::PathNotFound(..))),
+            "error should be PathNotFound"
+        );
     }
 
     #[tokio::test]
