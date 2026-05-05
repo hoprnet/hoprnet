@@ -663,9 +663,7 @@ where
                                 tracing::debug!(%price, "recording ticket price change");
                                 *ticket_price.write() = price;
                             }
-                            _ => {
-                                tracing::debug!("chain event not relevant to graph; skipping");
-                            }
+                            _ => {}
                         }
                     }
                 })
