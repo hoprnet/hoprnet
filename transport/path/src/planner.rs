@@ -199,8 +199,7 @@ where
                                 Ok(vp) => {
                                     // Post-resolution: catch non-adjacent chain-address duplicates
                                     // (ValidatedPath::new only checks consecutive collisions).
-                                    let chain_addrs: &[_] = &**vp.chain_path();
-                                    if chain_addrs.iter().enumerate().any(|(i, a)| chain_addrs[..i].contains(a)) {
+                                    if vp.chain_path().iter().enumerate().any(|(i, a)| vp.chain_path()[..i].contains(a)) {
                                         tracing::debug!(path = %vp, "skipping path candidate with repeated chain addresses");
                                         continue;
                                     }
@@ -378,8 +377,7 @@ where
                             let node_ids: Vec<NodeId> = pwc.path.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
                             match ValidatedPath::new(src, node_ids, &chain_resolver).await {
                                 Ok(vp) => {
-                                    let chain_addrs: &[_] = &**vp.chain_path();
-                                    if chain_addrs.iter().enumerate().any(|(i, a)| chain_addrs[..i].contains(a)) {
+                                    if vp.chain_path().iter().enumerate().any(|(i, a)| vp.chain_path()[..i].contains(a)) {
                                         tracing::debug!(path = %vp, "background refresh: skipping candidate with repeated chain addresses");
                                         continue;
                                     }
