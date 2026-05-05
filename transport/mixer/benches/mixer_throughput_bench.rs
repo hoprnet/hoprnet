@@ -1,6 +1,6 @@
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use futures::{StreamExt, future::BoxFuture};
-use hopr_transport_mixer::{channel, config::MixerConfig};
+use futures::{SinkExt, StreamExt, future::BoxFuture};
+use hopr_transport_mixer::{MixerSink, channel, config::MixerConfig};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 
 const SAMPLE_SIZE: usize = 10;
@@ -132,6 +132,38 @@ fn send_continuous_stream_load(item: &str, iterations: usize, cfg: MixerConfig) 
     })
 }
 
+fn send_continuous_sink_load(item: &'static str, iterations: usize, cfg: MixerConfig) -> BoxFuture<'static, ()> {
+    Box::pin(async move {
+        // Pre-allocate the inner mpsc large enough to absorb all flushed items at once,
+        // avoiding backpressure that would require concurrent draining.
+        let (tx, mut rx) = futures::channel::mpsc::channel(iterations);
+        let mut sink = MixerSink::new(tx, cfg);
+
+        for _ in 0..iterations {
+            sink.start_send_unpin(item).expect("start_send must succeed");
+        }
+
+        sink.flush().await.expect("flush must succeed");
+
+        for _ in 0..iterations {
+            rx.next().await.expect("receive must succeed");
+        }
+    })
+}
+
+pub fn mixer_sink_throughput_minimal_mixing(c: &mut Criterion) {
+    mixer_throughput(
+        c,
+        minimal_delay_mixer_cfg(),
+        "mixer_sink",
+        &[
+            10 * 1024 * 2 * RANDOM_GIBBERISH.len(),
+            40 * 1024 * 2 * RANDOM_GIBBERISH.len(),
+        ],
+        send_continuous_sink_load,
+    );
+}
+
 pub fn mixer_stream_throughput_minimal_mixing(c: &mut Criterion) {
     mixer_throughput(
         c,
@@ -146,6 +178,7 @@ criterion_group!(
     benches,
     mixer_channel_throughput_minimal_mixing,
     mixer_channel_throughput_through_sink_minimal_mixing,
+    mixer_sink_throughput_minimal_mixing,
     mixer_stream_throughput_minimal_mixing
 );
 criterion_main!(benches);

@@ -7,6 +7,7 @@ use std::{
 };
 
 use anyhow::Context;
+use bytes::Bytes;
 use futures::{
     SinkExt, StreamExt,
     channel::mpsc::{Receiver, Sender},
@@ -32,8 +33,8 @@ pub(crate) struct Interface {
     #[allow(dead_code)]
     pub send_heartbeat: futures::channel::mpsc::UnboundedSender<(PeerId, PingQueryReplier)>,
     // ---
-    pub send_msg: Sender<(PeerId, Box<[u8]>)>,
-    pub recv_msg: Receiver<(PeerId, Box<[u8]>)>,
+    pub send_msg: Sender<(PeerId, Bytes)>,
+    pub recv_msg: Receiver<(PeerId, Bytes)>,
 }
 #[allow(clippy::upper_case_acronyms)]
 pub(crate) enum Announcement {
@@ -88,11 +89,11 @@ async fn build_p2p_swarm(
 const TRANSPORT_PAYLOAD_SIZE: usize = HoprPacket::SIZE;
 
 lazy_static! {
-    pub static ref RANDOM_GIBBERISH: Box<[u8]> =
-        Box::from(hopr_api::types::crypto_random::random_bytes::<TRANSPORT_PAYLOAD_SIZE>());
+    pub static ref RANDOM_GIBBERISH: Bytes =
+        Bytes::copy_from_slice(&hopr_api::types::crypto_random::random_bytes::<TRANSPORT_PAYLOAD_SIZE>());
 }
 
-pub fn generate_packets_of_hopr_payload_size(count: usize) -> Vec<Box<[u8]>> {
+pub fn generate_packets_of_hopr_payload_size(count: usize) -> Vec<Bytes> {
     let mut packets = Vec::with_capacity(count);
     for _ in 0..count {
         packets.push(RANDOM_GIBBERISH.clone());
