@@ -60,36 +60,18 @@
 mod config;
 pub use config::*;
 
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::{Display, Formatter},
-    sync::Arc,
-    time::{Duration, Instant},
-};
+mod events;
+mod pipeline;
+mod strategy;
+pub use strategy::ChannelLifecycleStrategy;
 
-use async_trait::async_trait;
+use std::{sync::Arc, time::Instant};
+
 use dashmap::{DashMap, DashSet};
-use futures::StreamExt as _;
-use hopr_lib::api::{
-    PeerId,
-    chain::{
-        AccountSelector, ChainEvent, ChainReadAccountOperations, ChainReadChannelOperations, ChainReadSafeOperations,
-        ChainValues, ChainWriteChannelOperations, ChannelSelector, SafeSelector,
-    },
-    graph::{EdgeObservableRead as _, NetworkGraphView as _},
-    network::NetworkView as _,
-    node::{
-        ActionableEvent, ActionableEventDiscriminant, ActionableEventSource, HasChainApi, HasGraphView, HasNetworkView,
-    },
-    types::{
-        crypto::prelude::OffchainPublicKey,
-        internal::prelude::{ChannelDirection, ChannelEntry, ChannelId, ChannelStatus},
-        primitive::prelude::{Address, HoprBalance},
-    },
+use hopr_lib::api::types::{
+    internal::prelude::ChannelId,
+    primitive::prelude::{Address, HoprBalance},
 };
-use tracing::{debug, info, warn};
-
-use crate::{errors::StrategyError, strategy::Strategy as StrategyTrait};
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
@@ -115,66 +97,7 @@ lazy_static::lazy_static! {
         ).unwrap();
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Builder
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Builder for [`ChannelLifecycleStrategy`].
-///
-/// Cadence (`tick_interval`, `jitter`) lives in the config struct — operators
-/// can tune it without touching wiring code.
-///
-/// Call [`new`](ChannelLifecycleStrategy::new) with the strategy configuration,
-/// then [`build`](ChannelLifecycleStrategy::build) to wire in a node and obtain
-/// a runnable `Box<dyn Strategy + Send>`.
-pub struct ChannelLifecycleStrategy {
-    cfg: ChannelLifecycleConfig,
-}
-
-impl ChannelLifecycleStrategy {
-    /// Create a new builder with the given configuration.
-    pub fn new(cfg: ChannelLifecycleConfig) -> Self {
-        Self { cfg }
-    }
-
-    /// Wire in a node and return a running-ready strategy.
-    ///
-    /// The generic `N` is erased at construction time; the returned
-    /// `Box<dyn Strategy + Send>` can be held and spawned without knowledge
-    /// of the concrete node type.
-    pub fn build<N>(self, node: Arc<N>) -> Box<dyn StrategyTrait + Send>
-    where
-        N: HasChainApi + HasNetworkView + HasGraphView + ActionableEventSource + Send + Sync + 'static,
-        N::ChainApi: ChainReadChannelOperations
-            + ChainReadSafeOperations
-            + ChainReadAccountOperations
-            + ChainValues
-            + ChainWriteChannelOperations
-            + Clone
-            + Send
-            + Sync
-            + 'static,
-    {
-        Box::new(ChannelLifecycleStrategyInner {
-            cfg: self.cfg,
-            node,
-            open_in_flight: Arc::new(DashSet::new()),
-            fund_in_flight: Arc::new(DashSet::new()),
-            close_in_flight: Arc::new(DashSet::new()),
-            finalize_in_flight: Arc::new(DashSet::new()),
-            cooldown: Arc::new(DashMap::new()),
-            start_epoch: Instant::now(),
-            last_observed: Arc::new(DashMap::new()),
-            peer_ticket_activity: Arc::new(DashMap::new()),
-        })
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Inner type
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Per-channel observation snapshot for proactive funding.
+/// Per-channel observation snapshot used by the proactive funding estimate.
 #[derive(Clone)]
 struct ChannelObservation {
     balance: HoprBalance,
@@ -182,785 +105,55 @@ struct ChannelObservation {
     at: Instant,
 }
 
+/// The running strategy instance.  Generic over the node type `N` so that
+/// callers can provide any node implementation satisfying the required traits.
+///
+/// Constructed via [`ChannelLifecycleStrategy::build`]; the builder erases `N`
+/// behind `Box<dyn Strategy + Send>`.
 struct ChannelLifecycleStrategyInner<N> {
     cfg: ChannelLifecycleConfig,
     node: Arc<N>,
-    /// Destination addresses for channels being opened.
+    /// Destination addresses for channels currently being opened.
     open_in_flight: Arc<DashSet<Address>>,
-    /// Channel IDs with in-flight funding transactions.
+    /// Channel IDs with an in-flight funding transaction.
     fund_in_flight: Arc<DashSet<ChannelId>>,
-    /// Channel IDs with in-flight closure transactions.
+    /// Channel IDs with an in-flight closure transaction.
     close_in_flight: Arc<DashSet<ChannelId>>,
-    /// Channel IDs with in-flight finalization transactions.
+    /// Channel IDs with an in-flight finalization transaction.
     finalize_in_flight: Arc<DashSet<ChannelId>>,
-    /// Peer addresses and the instant until which they are on cooldown.
+    /// Peer addresses mapped to the `Instant` when their cooldown expires.
     cooldown: Arc<DashMap<Address, Instant>>,
-    /// When this strategy instance started running.
+    /// When this strategy instance started; used by the restart guard.
     start_epoch: Instant,
     /// Most-recently recorded balance/ticket_index snapshot per channel.
     last_observed: Arc<DashMap<ChannelId, ChannelObservation>>,
-    /// Ticket count delta recorded from TicketRedeemed events, keyed by dest addr.
+    /// Cumulative ticket count increments from `TicketRedeemed` events.
     peer_ticket_activity: Arc<DashMap<Address, u64>>,
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helper methods
-// ─────────────────────────────────────────────────────────────────────────────
-
-impl<N> ChannelLifecycleStrategyInner<N>
-where
-    N: HasChainApi + HasNetworkView + HasGraphView + ActionableEventSource + Send + Sync + 'static,
-    N::ChainApi: ChainReadChannelOperations
-        + ChainReadSafeOperations
-        + ChainReadAccountOperations
-        + ChainValues
-        + ChainWriteChannelOperations
-        + Clone
-        + Send
-        + Sync
-        + 'static,
-{
-    /// Returns the available safe balance or `HoprBalance::zero()` if the safe
-    /// is not registered.
-    async fn safe_balance_budget(&self) -> crate::errors::Result<HoprBalance> {
-        let me = *self.node.chain_api().me();
-        let chain = self.node.chain_api().clone();
-
-        let safe = chain
-            .safe_info(SafeSelector::NodeAddress(me))
-            .await
-            .map_err(|e| StrategyError::Other(e.into()))?;
-
-        let Some(safe) = safe else {
-            warn!(%me, "channel-lifecycle: safe not registered");
-            return Ok(HoprBalance::zero());
-        };
-
-        chain
-            .balance(safe.address)
-            .await
-            .map_err(|e| StrategyError::Other(e.into()))
-    }
-
-    /// Returns the chain's estimated transaction confirmation time.  Falls back
-    /// to the configured fallback duration on error.
-    async fn est_tx_time(&self) -> Duration {
-        match self.node.chain_api().typical_resolution_time().await {
-            Ok(d) => d,
-            Err(e) => {
-                debug!(%e, "channel-lifecycle: typical_resolution_time failed, using fallback");
-                self.cfg.proactive_funding.fallback_chain_op_duration
-            }
-        }
-    }
-
-    /// Returns the on-chain notice period for channel closure.  Falls back to
-    /// a 5-minute default on error (conservative: don't finalize too early).
-    async fn closure_notice_period(&self) -> Duration {
-        match self.node.chain_api().channel_closure_notice_period().await {
-            Ok(d) => d,
-            Err(e) => {
-                warn!(%e, "channel-lifecycle: could not fetch channel_closure_notice_period");
-                Duration::from_secs(5 * 60)
-            }
-        }
-    }
-
-    /// Returns total in-flight chain-write count (open + fund + close + finalize).
-    fn total_in_flight(&self) -> usize {
-        self.open_in_flight.len()
-            + self.fund_in_flight.len()
-            + self.close_in_flight.len()
-            + self.finalize_in_flight.len()
-    }
-
-    /// Returns the composite quality score for a peer given its offchain key.
-    ///
-    /// Blends the graph edge score with a normalised ticket activity signal.
-    fn peer_score_for(&self, peer_offchain: &OffchainPublicKey, dest_addr: &Address) -> f64 {
-        let my_key = self.node.graph().identity();
-        let edge_score = self
-            .node
-            .graph()
-            .edge(my_key, peer_offchain)
-            .map(|e| e.score())
-            .unwrap_or(0.0);
-
-        // Ticket activity: normalise relative to the max seen activity (cap at 1.0).
-        let ticket_delta = self.peer_ticket_activity.get(dest_addr).map(|v| *v).unwrap_or(0);
-        let max_activity = self
-            .peer_ticket_activity
-            .iter()
-            .map(|e| *e.value())
-            .max()
-            .unwrap_or(1)
-            .max(1);
-        let ticket_score = (ticket_delta as f64) / (max_activity as f64);
-
-        self.cfg.eligibility.peer_quality_weight * edge_score
-            + self.cfg.eligibility.ticket_activity_weight * ticket_score
-    }
-
-    /// Returns `true` if the channel should be funded proactively based on the
-    /// estimated drain rate and the time a transaction would take to confirm.
-    fn proactive_fund_needed(&self, channel: &ChannelEntry, est_tx_secs: f64, min_ticket_price_wei: f64) -> bool {
-        if !self.cfg.proactive_funding.enabled {
-            return false;
-        }
-
-        let obs = match self.last_observed.get(channel.get_id()) {
-            Some(o) => o.clone(),
-            None => return false,
-        };
-
-        let lookback_secs = self.cfg.proactive_funding.depletion_lookback.as_secs_f64().max(1.0);
-        let elapsed = obs.at.elapsed().as_secs_f64().max(0.01);
-
-        // Balance-based drain: how much balance was consumed since last observation.
-        let balance_now = obs.balance.amount().low_u128() as f64;
-        let balance_then = channel.balance.amount().low_u128() as f64;
-        let balance_delta = (balance_then - balance_now).max(0.0);
-        let balance_drain_rate =
-            (self.cfg.proactive_funding.balance_drain_weight * balance_delta / elapsed.min(lookback_secs)).max(0.0);
-
-        // Ticket-index-based drain: how many tickets were redeemed × min price.
-        let ticket_delta = channel.ticket_index.saturating_sub(obs.ticket_index) as f64;
-        let ticket_drain_rate =
-            (self.cfg.proactive_funding.ticket_index_drain_weight * ticket_delta * min_ticket_price_wei
-                / elapsed.min(lookback_secs))
-            .max(0.0);
-
-        let drain_rate = balance_drain_rate + ticket_drain_rate;
-        let projected_drain = drain_rate * est_tx_secs * self.cfg.proactive_funding.safety_margin;
-
-        let balance_after = channel.balance.amount().low_u128() as f64 - projected_drain;
-        let threshold = self.cfg.funding.lower_balance_threshold.amount().low_u128() as f64;
-
-        balance_after < threshold
-    }
-
-    /// Attempt to fund a channel.  Returns `true` if a task was spawned.
-    fn try_fund_channel(&self, channel: &ChannelEntry, topup: HoprBalance) -> bool {
-        let channel_id = *channel.get_id();
-
-        if !self.fund_in_flight.insert(channel_id) {
-            return false;
-        }
-        if self.total_in_flight() > self.cfg.concurrency.max_concurrent_actions {
-            self.fund_in_flight.remove(&channel_id);
-            return false;
-        }
-
-        info!(%channel, %topup, "channel-lifecycle: funding channel");
-        #[cfg(all(feature = "telemetry", not(test)))]
-        METRIC_CHANNEL_FUNDS.increment();
-
-        let chain = self.node.chain_api().clone();
-        let in_flight = Arc::clone(&self.fund_in_flight);
-
-        hopr_async_runtime::prelude::spawn(async move {
-            match chain.fund_channel(&channel_id, topup).await {
-                Ok(confirmation) => {
-                    if let Err(e) = confirmation.await {
-                        warn!(%channel_id, %e, "channel-lifecycle: funding tx failed");
-                        in_flight.remove(&channel_id);
-                    }
-                    // On success: ChannelBalanceIncreased clears in_flight via event handler.
-                }
-                Err(e) => {
-                    warn!(%channel_id, %e, "channel-lifecycle: failed to submit funding tx");
-                    in_flight.remove(&channel_id);
-                }
-            }
-        });
-
-        true
-    }
-
-    /// Attempt to close a channel.  Returns `true` if a task was spawned.
-    fn try_close_channel(&self, channel: &ChannelEntry) -> bool {
-        let channel_id = *channel.get_id();
-
-        if !self.close_in_flight.insert(channel_id) {
-            return false;
-        }
-        if self.total_in_flight() > self.cfg.concurrency.max_concurrent_actions {
-            self.close_in_flight.remove(&channel_id);
-            return false;
-        }
-
-        info!(%channel, "channel-lifecycle: closing channel");
-        #[cfg(all(feature = "telemetry", not(test)))]
-        METRIC_CHANNEL_CLOSES.increment();
-
-        let chain = self.node.chain_api().clone();
-        let in_flight = Arc::clone(&self.close_in_flight);
-
-        hopr_async_runtime::prelude::spawn(async move {
-            match chain.close_channel(&channel_id).await {
-                Ok(confirmation) => {
-                    if let Err(e) = confirmation.await {
-                        warn!(%channel_id, %e, "channel-lifecycle: close tx failed");
-                        in_flight.remove(&channel_id);
-                    }
-                    // On success: ChannelClosureInitiated event clears in_flight.
-                }
-                Err(e) => {
-                    warn!(%channel_id, %e, "channel-lifecycle: failed to submit close tx");
-                    in_flight.remove(&channel_id);
-                }
-            }
-        });
-
-        true
-    }
-
-    /// Attempt to finalize a pending closure.  Returns `true` if a task was spawned.
-    fn try_finalize_channel(&self, channel: &ChannelEntry) -> bool {
-        let channel_id = *channel.get_id();
-
-        if !self.finalize_in_flight.insert(channel_id) {
-            return false;
-        }
-        if self.total_in_flight() > self.cfg.concurrency.max_concurrent_actions {
-            self.finalize_in_flight.remove(&channel_id);
-            return false;
-        }
-
-        info!(%channel, "channel-lifecycle: finalizing closure");
-        #[cfg(all(feature = "telemetry", not(test)))]
-        METRIC_CHANNEL_FINALIZES.increment();
-
-        let chain = self.node.chain_api().clone();
-        let in_flight = Arc::clone(&self.finalize_in_flight);
-
-        hopr_async_runtime::prelude::spawn(async move {
-            match chain.close_channel(&channel_id).await {
-                Ok(confirmation) => {
-                    if let Err(e) = confirmation.await {
-                        warn!(%channel_id, %e, "channel-lifecycle: finalize tx failed");
-                        in_flight.remove(&channel_id);
-                    }
-                    // On success: ChannelClosed event clears in_flight.
-                }
-                Err(e) => {
-                    warn!(%channel_id, %e, "channel-lifecycle: failed to submit finalize tx");
-                    in_flight.remove(&channel_id);
-                }
-            }
-        });
-
-        true
-    }
-
-    /// Attempt to open a new channel to `dest`.  Returns `true` if a task was spawned.
-    fn try_open_channel(&self, dest: Address, amount: HoprBalance) -> bool {
-        if !self.open_in_flight.insert(dest) {
-            return false;
-        }
-        if self.total_in_flight() > self.cfg.concurrency.max_concurrent_actions {
-            self.open_in_flight.remove(&dest);
-            return false;
-        }
-
-        info!(%dest, %amount, "channel-lifecycle: opening channel");
-        #[cfg(all(feature = "telemetry", not(test)))]
-        METRIC_CHANNEL_OPENS.increment();
-
-        let chain = self.node.chain_api().clone();
-        let in_flight = Arc::clone(&self.open_in_flight);
-
-        hopr_async_runtime::prelude::spawn(async move {
-            match chain.open_channel(&dest, amount).await {
-                Ok(confirmation) => {
-                    if let Err(e) = confirmation.await {
-                        warn!(%dest, %e, "channel-lifecycle: open tx failed");
-                        in_flight.remove(&dest);
-                    }
-                    // On success: ChannelOpened event clears in_flight.
-                }
-                Err(e) => {
-                    warn!(%dest, %e, "channel-lifecycle: failed to submit open tx");
-                    in_flight.remove(&dest);
-                }
-            }
-        });
-
-        true
-    }
-
-    // ─────────────────────────────────────────────────────────────────────
-    // Pipeline
-    // ─────────────────────────────────────────────────────────────────────
-
-    async fn run_pipeline(&self) {
-        if let Err(e) = self.pipeline_inner().await {
-            warn!(%e, "channel-lifecycle: pipeline error");
-        }
-    }
-
-    async fn pipeline_inner(&self) -> crate::errors::Result<()> {
-        let chain = self.node.chain_api();
-        let me = *chain.me();
-
-        // ── 1. Snapshot ──────────────────────────────────────────────────────
-        let est_tx_time = self.est_tx_time().await;
-        let est_tx_secs = est_tx_time.as_secs_f64();
-
-        // Fetch current safe balance once for the whole pass.
-        let safe_balance = self.safe_balance_budget().await?;
-
-        // Collect all outgoing channels.
-        let mut all_channels: Vec<ChannelEntry> = Vec::new();
-        {
-            let mut s = chain
-                .stream_channels(ChannelSelector::default().with_source(me))
-                .map_err(|e| StrategyError::Other(e.into()))?;
-            while let Some(ch) = s.next().await {
-                all_channels.push(ch);
-            }
-        }
-
-        // Update per-channel observations for proactive funding.
-        for ch in &all_channels {
-            let id = *ch.get_id();
-            self.last_observed
-                .entry(id)
-                .and_modify(|obs| {
-                    if obs.balance != ch.balance || obs.ticket_index != ch.ticket_index {
-                        *obs = ChannelObservation {
-                            balance: ch.balance,
-                            ticket_index: ch.ticket_index,
-                            at: Instant::now(),
-                        };
-                    }
-                })
-                .or_insert_with(|| ChannelObservation {
-                    balance: ch.balance,
-                    ticket_index: ch.ticket_index,
-                    at: Instant::now(),
-                });
-        }
-
-        // Fetch minimum ticket price for proactive drain estimation.
-        let min_ticket_price_wei = chain
-            .minimum_ticket_price()
-            .await
-            .map(|p| p.amount().low_u128() as f64)
-            .unwrap_or(0.0);
-
-        // Peer→address map from announced accounts (needed for the open pass).
-        let mut peer_addr_map: HashMap<PeerId, (OffchainPublicKey, Address)> = HashMap::new();
-        {
-            let mut accounts = chain
-                .stream_accounts(AccountSelector::default())
-                .map_err(|e| StrategyError::Other(e.into()))?;
-            while let Some(account) = accounts.next().await {
-                let peer_id = PeerId::from(&account.public_key);
-                peer_addr_map.insert(peer_id, (account.public_key, account.chain_addr));
-            }
-        }
-
-        // Reverse map: chain address → offchain public key (for close pass).
-        let addr_to_key: HashMap<Address, OffchainPublicKey> =
-            peer_addr_map.values().map(|(pk, addr)| (*addr, *pk)).collect();
-
-        let open_channels: Vec<&ChannelEntry> = all_channels
-            .iter()
-            .filter(|c| c.status == ChannelStatus::Open)
-            .collect();
-        let open_count = open_channels.len() + self.open_in_flight.len();
-
-        // ── 2. Fund pass ─────────────────────────────────────────────────────
-        if safe_balance >= self.cfg.funding.min_safe_balance_required || !self.cfg.funding.stop_when_unfunded {
-            let mut safe_remaining = safe_balance;
-
-            for ch in &open_channels {
-                if self.fund_in_flight.contains(ch.get_id()) {
-                    continue;
-                }
-                let needs_topup = ch.balance <= self.cfg.funding.lower_balance_threshold;
-                let needs_proactive = self.proactive_fund_needed(ch, est_tx_secs, min_ticket_price_wei);
-
-                if needs_topup || needs_proactive {
-                    if safe_remaining < self.cfg.funding.topup_balance {
-                        debug!("channel-lifecycle: safe balance exhausted in fund pass");
-                        break;
-                    }
-                    if self.try_fund_channel(ch, self.cfg.funding.topup_balance) {
-                        safe_remaining -= self.cfg.funding.topup_balance;
-                    }
-                }
-            }
-        }
-
-        // ── 3. Close pass ─────────────────────────────────────────────────────
-        let grace_elapsed = self.start_epoch.elapsed() >= self.cfg.restart.startup_close_grace_period;
-
-        if grace_elapsed {
-            let mut close_count = self.close_in_flight.len();
-
-            for ch in &open_channels {
-                if close_count >= self.cfg.closure.close_max_concurrent {
-                    break;
-                }
-                if self.close_in_flight.contains(ch.get_id()) {
-                    continue;
-                }
-                // Never drop below min_open_channels.
-                let remaining_open = open_count.saturating_sub(close_count);
-                if remaining_open <= self.cfg.population.min_open_channels {
-                    break;
-                }
-
-                if self.should_close(ch, &addr_to_key) && self.try_close_channel(ch) {
-                    close_count += 1;
-                }
-            }
-        }
-
-        // ── 4. Finalize pass ──────────────────────────────────────────────────
-        if self.cfg.finalizer.enabled {
-            let notice_period = self.closure_notice_period().await;
-            let overdue = notice_period + self.cfg.finalizer.max_closure_overdue;
-            let mut finalize_count = self.finalize_in_flight.len();
-
-            for ch in &all_channels {
-                if finalize_count >= self.cfg.finalizer.finalize_max_concurrent {
-                    break;
-                }
-                if self.finalize_in_flight.contains(ch.get_id()) {
-                    continue;
-                }
-                if let ChannelStatus::PendingToClose(closure_time) = ch.status {
-                    let elapsed_since_closure = closure_time.elapsed().unwrap_or(Duration::ZERO);
-                    if elapsed_since_closure >= overdue && self.try_finalize_channel(ch) {
-                        finalize_count += 1;
-                    }
-                }
-            }
-        }
-
-        // ── 5. Open pass ──────────────────────────────────────────────────────
-        let deficit = self.cfg.population.target_open_channels.saturating_sub(open_count);
-
-        if deficit == 0 {
-            return Ok(());
-        }
-
-        if self.cfg.funding.stop_when_unfunded && safe_balance < self.cfg.funding.initial_balance {
-            debug!(%safe_balance, "channel-lifecycle: safe balance too low to open new channels");
-            return Ok(());
-        }
-
-        let existing_dests: HashSet<Address> = all_channels.iter().map(|c| c.destination).collect();
-        let connected = self.node.network_view().connected_peers();
-
-        let mut candidates: Vec<(Address, OffchainPublicKey, f64)> = connected
-            .into_iter()
-            .filter_map(|peer_id| {
-                let &(offchain_key, chain_addr) = peer_addr_map.get(&peer_id)?;
-                // Skip self.
-                if chain_addr == me {
-                    return None;
-                }
-                // Skip if we already have a channel.
-                if existing_dests.contains(&chain_addr) {
-                    return None;
-                }
-                // Skip if already opening.
-                if self.open_in_flight.contains(&chain_addr) {
-                    return None;
-                }
-                // Skip if on cooldown.
-                if self
-                    .cooldown
-                    .get(&chain_addr)
-                    .is_some_and(|until| Instant::now() < *until)
-                {
-                    return None;
-                }
-                // Allowlist/blocklist.
-                if self
-                    .cfg
-                    .eligibility
-                    .allowlist
-                    .as_ref()
-                    .is_some_and(|l| !l.contains(&chain_addr))
-                {
-                    return None;
-                }
-                if self.cfg.eligibility.blocklist.contains(&chain_addr) {
-                    return None;
-                }
-                // Connectivity check.
-                if self.cfg.eligibility.require_currently_connected && !self.node.network_view().is_connected(&peer_id)
-                {
-                    return None;
-                }
-
-                let score = self.peer_score_for(&offchain_key, &chain_addr);
-                if score < self.cfg.eligibility.min_peer_quality_score {
-                    return None;
-                }
-
-                Some((chain_addr, offchain_key, score))
-            })
-            .collect();
-
-        // Sort descending by score, take the top `deficit`.
-        candidates.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
-        candidates.truncate(deficit);
-
-        let mut safe_remaining = safe_balance;
-        for (addr, _, _) in candidates {
-            if safe_remaining < self.cfg.funding.initial_balance {
-                break;
-            }
-            if self.try_open_channel(addr, self.cfg.funding.initial_balance) {
-                safe_remaining -= self.cfg.funding.initial_balance;
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Returns `true` if the channel is eligible for closure.
-    ///
-    /// `addr_to_key` maps chain addresses to offchain public keys; built from
-    /// the account stream in `pipeline_inner`.  Pass an empty map to skip the
-    /// quality-score and staleness checks.
-    fn should_close(&self, ch: &ChannelEntry, addr_to_key: &HashMap<Address, OffchainPublicKey>) -> bool {
-        // Drained below threshold.
-        if ch.balance <= self.cfg.closure.close_when_drained_below {
-            return true;
-        }
-
-        let dest = ch.destination;
-        if let Some(pk) = addr_to_key.get(&dest) {
-            // Peer quality dropped below threshold.
-            let score = self.peer_score_for(pk, &dest);
-            if score < self.cfg.closure.close_below_quality_score {
-                return true;
-            }
-
-            // Staleness: use graph edge `last_update` as last-seen proxy.
-            let my_key = self.node.graph().identity();
-            if let Some(edge) = self.node.graph().edge(my_key, pk) {
-                let stale = edge.last_update() > self.cfg.closure.close_when_peer_unseen_for;
-                let guard_passed = !self.cfg.eligibility.require_observed_since_start
-                    || self.start_epoch.elapsed() >= self.cfg.restart.startup_close_grace_period;
-                if stale && guard_passed {
-                    return true;
-                }
-            }
-        }
-
-        false
-    }
-
-    // ─────────────────────────────────────────────────────────────────────
-    // Event fast-lane handlers
-    // ─────────────────────────────────────────────────────────────────────
-
-    async fn on_balance_decreased(&self, ch: ChannelEntry, me: Address) {
-        if ch.direction(&me) != Some(ChannelDirection::Outgoing) {
-            return;
-        }
-        if ch.status != ChannelStatus::Open {
-            return;
-        }
-        if self.fund_in_flight.contains(ch.get_id()) {
-            return;
-        }
-
-        // Update observation to record the decrease.
-        self.last_observed
-            .entry(*ch.get_id())
-            .and_modify(|obs| {
-                obs.balance = ch.balance;
-                obs.at = Instant::now();
-            })
-            .or_insert_with(|| ChannelObservation {
-                balance: ch.balance,
-                ticket_index: ch.ticket_index,
-                at: Instant::now(),
-            });
-
-        if ch.balance <= self.cfg.funding.lower_balance_threshold {
-            match self.safe_balance_budget().await {
-                Ok(budget) if budget >= self.cfg.funding.topup_balance => {
-                    self.try_fund_channel(&ch, self.cfg.funding.topup_balance);
-                }
-                Ok(budget) => {
-                    debug!(%ch, %budget, "channel-lifecycle: event-driven funding skipped: safe too low");
-                }
-                Err(e) => {
-                    warn!(%ch, %e, "channel-lifecycle: event-driven funding: could not fetch safe balance");
-                }
-            }
-        }
-    }
-
-    fn on_balance_increased(&self, ch: ChannelEntry) {
-        self.fund_in_flight.remove(ch.get_id());
-        self.last_observed.entry(*ch.get_id()).and_modify(|obs| {
-            obs.balance = ch.balance;
-        });
-        debug!(%ch, "channel-lifecycle: cleared fund in-flight after balance increase");
-    }
-
-    fn on_channel_opened(&self, ch: ChannelEntry) {
-        self.open_in_flight.remove(&ch.destination);
-        debug!(%ch, "channel-lifecycle: channel opened, cleared open in-flight");
-    }
-
-    fn on_channel_closure_initiated(&self, ch: ChannelEntry) {
-        self.close_in_flight.remove(ch.get_id());
-        debug!(%ch, "channel-lifecycle: closure initiated, cleared close in-flight");
-    }
-
-    fn on_channel_closed(&self, ch: ChannelEntry) {
-        self.finalize_in_flight.remove(ch.get_id());
-        self.last_observed.remove(ch.get_id());
-        // Start cooldown for this peer.
-        let until = Instant::now() + self.cfg.population.peer_reopen_cooldown;
-        self.cooldown.insert(ch.destination, until);
-        debug!(%ch, "channel-lifecycle: channel closed, peer on cooldown");
-    }
-
-    fn on_ticket_redeemed(&self, ch: ChannelEntry) {
-        // Record ticket activity for the peer.
-        self.peer_ticket_activity
-            .entry(ch.destination)
-            .and_modify(|v| *v += 1)
-            .or_insert(1);
-        // Update ticket index observation.
-        self.last_observed.entry(*ch.get_id()).and_modify(|obs| {
-            obs.ticket_index = ch.ticket_index;
-        });
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Display + Strategy
-// ─────────────────────────────────────────────────────────────────────────────
-
-impl<N> Display for ChannelLifecycleStrategyInner<N> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "channel_lifecycle")
-    }
-}
-
-#[async_trait]
-impl<N> StrategyTrait for ChannelLifecycleStrategyInner<N>
-where
-    N: HasChainApi + HasNetworkView + HasGraphView + ActionableEventSource + Send + Sync + 'static,
-    N::ChainApi: ChainReadChannelOperations
-        + ChainReadSafeOperations
-        + ChainReadAccountOperations
-        + ChainValues
-        + ChainWriteChannelOperations
-        + Clone
-        + Send
-        + Sync
-        + 'static,
-{
-    async fn run(&mut self) -> crate::errors::Result<()> {
-        // Run first pipeline scan immediately.
-        self.run_pipeline().await;
-
-        let me = *self.node.chain_api().me();
-
-        // Jitter: derive a fixed per-run offset from system-time nanoseconds so
-        // nodes restarted simultaneously spread out their ticks.
-        let jitter_ns = self.cfg.jitter.as_nanos() as u64;
-        let jitter_offset = if jitter_ns > 0 {
-            Duration::from_nanos(
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .subsec_nanos() as u64
-                    % jitter_ns,
-            )
-        } else {
-            Duration::ZERO
-        };
-        let effective_interval = self.cfg.tick_interval + jitter_offset;
-
-        let tick_stream = futures_time::stream::interval(effective_interval.into()).map(|_| LoopEvent::Tick);
-
-        let event_stream = self
-            .node
-            .subscribe_to_actionable_events(Some(&[ActionableEventDiscriminant::Chain]))
-            .map_err(|e| StrategyError::Other(anyhow::anyhow!(e)))?
-            .filter_map(|ev| {
-                futures::future::ready(match ev {
-                    ActionableEvent::Chain(e) => Some(LoopEvent::Chain(Box::new(e))),
-                    _ => None,
-                })
-            });
-
-        let mut driver = futures_concurrency::stream::Merge::merge((tick_stream, event_stream));
-
-        while let Some(evt) = driver.next().await {
-            match evt {
-                LoopEvent::Tick => {
-                    self.run_pipeline().await;
-                }
-                LoopEvent::Chain(e) => match *e {
-                    ChainEvent::ChannelBalanceDecreased(ch, _) => {
-                        self.on_balance_decreased(ch, me).await;
-                    }
-                    ChainEvent::ChannelBalanceIncreased(ch, _) => {
-                        self.on_balance_increased(ch);
-                    }
-                    ChainEvent::ChannelOpened(ch) => {
-                        self.on_channel_opened(ch);
-                    }
-                    ChainEvent::ChannelClosureInitiated(ch) => {
-                        self.on_channel_closure_initiated(ch);
-                    }
-                    ChainEvent::ChannelClosed(ch) => {
-                        self.on_channel_closed(ch);
-                    }
-                    ChainEvent::TicketRedeemed(ch, _) => {
-                        self.on_ticket_redeemed(ch);
-                    }
-                    _ => {}
-                },
-            }
-        }
-
-        Ok(())
-    }
-}
-
-enum LoopEvent {
-    Tick,
-    Chain(Box<hopr_lib::api::chain::ChainEvent>),
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Tests
-// ─────────────────────────────────────────────────────────────────────────────
-
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet, sync::Arc, time::Duration};
+    use std::{
+        collections::HashSet,
+        sync::Arc,
+        time::{Duration, Instant},
+    };
 
+    use dashmap::DashMap;
+    use futures::StreamExt as _;
     use hex_literal::hex;
     use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
     use hopr_lib::api::{
         PeerId,
         chain::{
-            AccountSelector, ChainEvent, ChainEvents, ChainReadAccountOperations, ChainWriteAccountOperations,
-            HoprChainApi,
+            AccountSelector, ChainEvent, ChainEvents, ChainReadAccountOperations, ChainReadChannelOperations,
+            ChainWriteAccountOperations, ChannelSelector, HoprChainApi,
         },
         node::{
-            ActionableEvent, ComponentStatus, ComponentStatusReporter, EventWaitResult, HasChainApi, HasGraphView,
-            HasNetworkView, NodeOnchainIdentity,
+            ActionableEvent, ActionableEventDiscriminant, ActionableEventSource, ComponentStatus,
+            ComponentStatusReporter, EventWaitResult, HasChainApi, HasGraphView, HasNetworkView, NodeOnchainIdentity,
         },
+        types::crypto::prelude::OffchainPublicKey,
         types::{
             crypto::{keypairs::Keypair, prelude::ChainKeypair},
             internal::prelude::{ChannelEntry, ChannelStatus},
@@ -1034,9 +227,6 @@ mod tests {
         }
     }
 
-    // Stub implementations for HasNetworkView and HasGraphView for tests that
-    // don't exercise network/graph paths.
-
     struct StubNetworkView;
 
     impl hopr_lib::api::network::NetworkView for StubNetworkView {
@@ -1081,7 +271,6 @@ mod tests {
         }
     }
 
-    // Stub graph — no edges, quality 0.5 for any hypothetical edge.
     struct StubGraph;
 
     impl hopr_lib::api::graph::NetworkGraphView for StubGraph {
@@ -1159,8 +348,6 @@ mod tests {
     }
 
     struct StubEdge;
-
-    // EdgeObservable is auto-implemented via blanket impl for EdgeObservableRead + EdgeObservableWrite.
 
     impl hopr_lib::api::graph::EdgeObservableRead for StubEdge {
         type ImmediateMeasurement = StubMeasurement;
@@ -1310,10 +497,8 @@ mod tests {
         let strategy = ChannelLifecycleStrategy::new(cfg);
         let _inner = strategy.build(node);
 
-        // Run pipeline once
         futures_time::future::FutureExt::timeout(
             async {
-                // Give time for the spawn to complete
                 tokio::time::sleep(Duration::from_millis(500)).await;
             },
             futures_time::time::Duration::from_millis(2000),
@@ -1321,7 +506,6 @@ mod tests {
         .await
         .ok();
 
-        // Verify a fund transaction was submitted (balance should have increased)
         let channels: Vec<ChannelEntry> = {
             use futures::StreamExt as _;
             connector
@@ -1340,11 +524,10 @@ mod tests {
     fn restart_grace_should_block_close_pass() {
         let cfg = ChannelLifecycleConfig {
             restart: RestartGuardConfig {
-                startup_close_grace_period: Duration::from_secs(3600), // 1 hour
+                startup_close_grace_period: Duration::from_secs(3600),
             },
             ..Default::default()
         };
-        // The grace period is 1 hour from now — must not have elapsed immediately.
         let start_epoch = Instant::now();
         let grace_elapsed = start_epoch.elapsed() >= cfg.restart.startup_close_grace_period;
         assert!(
@@ -1353,8 +536,6 @@ mod tests {
         );
     }
 
-    /// Tests the public builder API: `ChannelLifecycleStrategy::new(...).build(node)` must
-    /// return a `Box<dyn Strategy + Send>` with the expected Display string.
     #[test_log::test(tokio::test)]
     async fn display_should_return_channel_lifecycle() -> anyhow::Result<()> {
         let blokli_sim = BlokliTestStateBuilder::default()
