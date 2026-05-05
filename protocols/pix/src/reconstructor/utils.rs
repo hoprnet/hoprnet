@@ -26,6 +26,7 @@ impl<S: PixSpec> SsaBuilder<S> {
 
     pub fn add_recovered_ssa_part(&mut self, sub_secret: PixScalar<S>) -> errors::Result<Option<PixScalar<S>>> {
         if let Some(n) = self.num_polys.checked_sub(1) {
+            self.num_polys = n;
             self.builder += sub_secret;
             if n > 0 {
                 // SSA private scalar is not yet complete
@@ -100,14 +101,17 @@ impl<S: PixSpec> PartialEq for AwaitingPartialShare<S> {
 impl<S: PixSpec> Eq for AwaitingPartialShare<S> {}
 type CommittedPolynomial<S> = std::collections::HashMap<CoefficientIndex, PixGroupRepr<S>>;
 
-/// Result of building a SSA commitment.
+/// Result of building an SSA commitment.
 pub enum CommitmentResult<S: PixSpec> {
     /// Not enough commitments have been received yet.
     NotReady,
     /// There are enough commitments to build at least the SSA commitment.
     SsaCommitment(PixGroupRepr<S>),
     /// All coefficients have been committed.
-    Completed(SsaBuilder<S>, Vec<SsaPartBuilder<S>>),
+    ///
+    /// If the last entry is `false`, it indicates the `SsaCommitment` variant was never returned.
+    /// That suggests that all the commitments were collected in one step.
+    Completed(SsaBuilder<S>, Vec<SsaPartBuilder<S>>, bool),
 }
 
 /// Builds [`CommittedSsa`] from the incoming client polynomial coefficient commitments of
@@ -118,6 +122,7 @@ pub struct SsaCommitmentBuilder<S: PixSpec> {
     num_polys: usize,
     committed_polynomials: std::collections::HashMap<PolynomialIndex, CommittedPolynomial<S>>,
     complete: bool,
+    ssa_committed: bool,
 }
 
 impl<S: PixSpec> SsaCommitmentBuilder<S> {
@@ -128,6 +133,7 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
             num_polys,
             committed_polynomials: std::collections::HashMap::new(),
             complete: false,
+            ssa_committed: false,
         }
     }
 
@@ -196,8 +202,9 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
             Ok(CommitmentResult::Completed(
                 SsaBuilder::new(full_ssa_commitment, self.num_polys),
                 complete_ssa_verifier,
+                self.ssa_committed, // If this is false, it means we got everything in one go
             ))
-        } else if self.committed_polynomials.values().all(|p| p.get(&0).is_some()) {
+        } else if !self.ssa_committed && self.committed_polynomials.values().all(|p| p.get(&0).is_some()) {
             // Check if we already have at least all the constant term commitments on all polynomials.
             tracing::debug!("SSA commitment is complete");
 
@@ -209,10 +216,11 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
                     Option::<PixGroup<S>>::from(PixGroup::<S>::from_bytes(const_term))
                         .ok_or(errors::PixError::InvalidInput)
                 })
-                .sum::<errors::Result<PixGroup<S>>>()?;
+                .sum::<errors::Result<PixGroup<S>>>()?
+                .to_bytes();
 
-            // Check if we have at least the constant term commitment on all polynomials.
-            Ok(CommitmentResult::SsaCommitment(full_ssa_commitment.to_bytes()))
+            self.ssa_committed = true;
+            Ok(CommitmentResult::SsaCommitment(full_ssa_commitment))
         } else {
             Ok(CommitmentResult::NotReady)
         }

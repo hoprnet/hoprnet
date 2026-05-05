@@ -11,7 +11,8 @@ use vsss_rs::{
 };
 
 use crate::{
-    PartialSsaShareVerifier, PixGroup, PixScalar, PixSpec, errors, msg_to_scalar,
+    DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, PartialSsaShareVerifier, PixGroup, PixScalar, PixSpec, errors,
+    msg_to_scalar,
     types::{PartialSsaShare, SsaId, SsaIndex, SsaPolynomialId},
 };
 
@@ -75,14 +76,20 @@ fn new_polynomial_with_verifier<S: PixSpec>(
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SsaGeneratorConfig {
     /// The number of polynomials to generate per SSA commitment.
-    #[default(1024)]
-    #[validate(range(min = 1))]
+    ///
+    /// Default is [`DEFAULT_POLYS_PER_SSA`], must be between 2 and 65535.
+    #[default(DEFAULT_POLYS_PER_SSA)]
+    #[validate(range(min = 2, max = 65535))]
     pub polynomials_per_ssa: usize,
     /// Minimum number of shares required to reconstruct each SSA polynomial.
-    #[default(200)]
-    #[validate(range(min = 2))]
+    ///
+    /// Default is [`DEFAULT_POLY_THRESHOLD`], must be between 2 and 1000.
+    #[default(DEFAULT_POLY_THRESHOLD)]
+    #[validate(range(min = 2, max = 1000))]
     pub threshold: usize,
     /// Additional number of shares to generate beyond the threshold for redundancy.
+    ///
+    /// Default is 20.
     #[default(20)]
     pub surplus_shares: usize,
 }

@@ -37,6 +37,9 @@ hopr-types = { workspace = true, features = ["random", "primitive", "crypto"] }
 anyhow = { workspace = true }
 criterion = { workspace = true }
 k256 = { workspace = true }
+futures-time = { workspace = true }
+rand = { workspace = true }
+test-log = { workspace = true }
 tokio = { workspace = true }
 
 [[bench]]

@@ -6,7 +6,8 @@ use hopr_types::{crypto::prelude::HalfKeyChallenge, internal::prelude::VerifiedA
 use utils::{AwaitingPartialShare, CommitmentResult, SsaBuilder, SsaCommitmentBuilder, SsaPartBuilder};
 
 use crate::{
-    CoefficientIndex, PixGroupRepr, PixScalar, PixSpec, PolynomialIndex, SsaPolynomialId, errors,
+    CoefficientIndex, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, PixGroupRepr, PixScalar, PixSpec, PolynomialIndex,
+    SsaPolynomialId, errors,
     types::{EncryptedPartialSsaShare, SsaId},
 };
 
@@ -15,14 +16,14 @@ use crate::{
 pub struct SsaReconstructorConfig {
     /// Number of polynomials needed to reconstruct a single SSA.
     ///
-    /// Default is 1000, must be between 2 and 65 535.
-    #[default(1000)]
+    /// Default is [`DEFAULT_POLYS_PER_SSA`], must be between 2 and 65 535.
+    #[default(DEFAULT_POLYS_PER_SSA)]
     #[validate(range(min = 2, max = 65535))]
     pub polys_per_ssa: usize,
     /// Number of shares needed to reconstruct a single polynomial.
     ///
-    /// Default is 100, must be between 2 and 1000.
-    #[default(100)]
+    /// Default is [`DEFAULT_POLY_THRESHOLD`], must be between 2 and 1000.
+    #[default(DEFAULT_POLY_THRESHOLD)]
     #[validate(range(min = 2, max = 1000))]
     pub poly_threshold: usize,
     /// Maximum time an SSA can be incomplete before it is discarded.
@@ -142,7 +143,7 @@ impl<S: PixSpec + 'static> SsaReconstructor<S> {
                     tracing::error!(%id, %error, "failed to broadcast new ssa commitment");
                 }
             }
-            CommitmentResult::Completed(ssa_builder, ssa_reconstructors) => {
+            CommitmentResult::Completed(ssa_builder, ssa_reconstructors, did_commit_already) => {
                 let commitment = ssa_builder.commitment;
                 self.ssa_builders
                     .insert(id, std::sync::Arc::new(parking_lot::Mutex::new(ssa_builder)));
@@ -152,6 +153,17 @@ impl<S: PixSpec + 'static> SsaReconstructor<S> {
                         ssa_reconstructor.verifier.spi,
                         std::sync::Arc::new(parking_lot::Mutex::new(ssa_reconstructor)),
                     );
+                }
+
+                // Send the commitment event if it has not already happened before.
+                // This is to cover situations when everything arrives at once.
+                if !did_commit_already
+                    && let Err(error) = self
+                        .channel
+                        .0
+                        .try_broadcast(ReconstructorEvent::SsaCommitmentKnown(id, commitment))
+                {
+                    tracing::error!(%id, %error, "failed to broadcast new ssa commitment");
                 }
 
                 if let Err(error) = self
@@ -216,6 +228,8 @@ impl<S: PixSpec + 'static> SsaReconstructor<S> {
             return Ok(None);
         };
 
+        tracing::trace!(spi = %share.spi, "ssa part complete");
+
         let builder = self
             .ssa_builders
             .get(share.spi.as_ref())
@@ -225,15 +239,13 @@ impl<S: PixSpec + 'static> SsaReconstructor<S> {
             return Ok(None);
         };
 
-        if let Err(error) = self
-            .channel
-            .0
-            .try_broadcast(ReconstructorEvent::SsaRecovered(*share.spi.as_ref(), ssa))
-        {
+        let id = *share.spi.as_ref();
+        tracing::info!(%id, "ssa recovered");
+        if let Err(error) = self.channel.0.try_broadcast(ReconstructorEvent::SsaRecovered(id, ssa)) {
             tracing::error!(%error, "failed to broadcast new ssa");
         }
 
-        Ok(Some((*share.spi.as_ref(), ssa)))
+        Ok(Some((id, ssa)))
     }
 
     /// Returns the output stream of [`ReconstructorEvents`](ReconstructorEvent).

@@ -9,7 +9,7 @@ pub enum ReconstructorEvent<S: PixSpec> {
     /// Emitted when a new SSA is completely committed to by the client and can therefore
     /// be used to for RP traffic.
     SsaFullyCommitted(SsaId<S>, PixGroupRepr<S>),
-    /// Emitted whenever the private scalar of a SSA is fully reconstructed.
+    /// Emitted whenever the private scalar of an SSA is fully reconstructed.
     SsaRecovered(SsaId<S>, PixScalar<S>),
 }
 
@@ -44,11 +44,8 @@ impl<S: PixSpec> Eq for ReconstructorEvent<S> {}
 
 impl<S: PixSpec> Clone for ReconstructorEvent<S> {
     fn clone(&self) -> Self {
-        match self {
-            Self::NewSsa(id) => Self::NewSsa(*id),
-            Self::SsaFullyCommitted(id, commitment) => Self::SsaFullyCommitted(*id, *commitment),
-            Self::SsaRecovered(id, ssa) => Self::SsaRecovered(*id, *ssa),
-            Self::SsaCommitmentKnown(id, addr) => Self::SsaCommitmentKnown(*id, *addr),
-        }
+        *self
     }
 }
+
+impl<S: PixSpec> Copy for ReconstructorEvent<S> {}

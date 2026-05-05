@@ -26,6 +26,11 @@ pub use types::{
     CoefficientIndex, EncryptedPartialSsaShare, PartialSsaShare, PolynomialIndex, SsaId, SsaIndex, SsaPolynomialId,
 };
 
+/// Number of polynomials per SSA.
+pub const DEFAULT_POLYS_PER_SSA: usize = 1000;
+/// Minimum number of shares to recover a part of an SSA.
+pub const DEFAULT_POLY_THRESHOLD: usize = 100;
+
 /// Specification of the Protocol for Incentivization of eXits (PIX) instantiation.
 pub trait PixSpec
 where
