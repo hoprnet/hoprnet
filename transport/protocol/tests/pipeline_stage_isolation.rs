@@ -157,21 +157,17 @@ async fn relay_forward_and_ack_stages_fire_for_each_packet() -> anyhow::Result<(
         Duration::from_millis(300),
         (&mut ticket_channels[0]).take(1).collect::<Vec<_>>(),
     )
-    .await;
-    assert!(
-        sender_tickets.is_err() || sender_tickets.unwrap().is_empty(),
-        "sender must not win any tickets"
-    );
+    .await
+    .unwrap_or_default();
+    assert!(sender_tickets.is_empty(), "sender must not win any tickets");
 
     let recipient_tickets = tokio::time::timeout(
         Duration::from_millis(300),
         (&mut ticket_channels[2]).take(1).collect::<Vec<_>>(),
     )
-    .await;
-    assert!(
-        recipient_tickets.is_err() || recipient_tickets.unwrap().is_empty(),
-        "recipient must not win any tickets"
-    );
+    .await
+    .unwrap_or_default();
+    assert!(recipient_tickets.is_empty(), "recipient must not win any tickets");
 
     Ok(())
 }

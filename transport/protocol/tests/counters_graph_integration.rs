@@ -57,7 +57,7 @@ async fn counters_drain_matches_packet_count() -> anyhow::Result<()> {
     let relay_key = *PEERS[1].public();
     let entry = sender_drain.iter().find(|(k, ..)| *k == relay_key);
     assert!(entry.is_some(), "sender counter must track messages sent to the relay");
-    let (_, msgs_sent, _) = entry.unwrap();
+    let (_, msgs_sent, _) = entry.expect("sender counter must track messages sent to the relay");
     assert_eq!(*msgs_sent, packet_count as u64, "sent count must match packet_count");
 
     Ok(())

@@ -30,14 +30,15 @@ async fn relay_throughput_with_real_tickets() -> anyhow::Result<()> {
     let nodes: Vec<&_> = cluster.iter().collect();
     let (src, relay, dst) = (nodes[0], nodes[1], nodes[2]);
 
-    // Open channels for the 1-hop path: src→relay→dst and back
+    // Open all 4 channels concurrently — forward and return paths.
     let funding = FUNDING_AMOUNT.parse::<HoprBalance>()?;
-    let channels = vec![
-        ChannelGuard::open_channel_between_nodes(src.instance.clone(), relay.instance.clone(), funding).await?,
-        ChannelGuard::open_channel_between_nodes(relay.instance.clone(), dst.instance.clone(), funding).await?,
-        ChannelGuard::open_channel_between_nodes(dst.instance.clone(), relay.instance.clone(), funding).await?,
-        ChannelGuard::open_channel_between_nodes(relay.instance.clone(), src.instance.clone(), funding).await?,
-    ];
+    let channels = try_join_all([
+        ChannelGuard::open_channel_between_nodes(src.instance.clone(), relay.instance.clone(), funding),
+        ChannelGuard::open_channel_between_nodes(relay.instance.clone(), dst.instance.clone(), funding),
+        ChannelGuard::open_channel_between_nodes(dst.instance.clone(), relay.instance.clone(), funding),
+        ChannelGuard::open_channel_between_nodes(relay.instance.clone(), src.instance.clone(), funding),
+    ])
+    .await?;
 
     let chain_info = cluster.chain_client.query_chain_info().await?;
     let timeout = chain_propagation_delay(&chain_info) * 12;
@@ -79,13 +80,14 @@ async fn concurrent_sessions_independent_no_deadlock() -> anyhow::Result<()> {
 
     let funding = FUNDING_AMOUNT.parse::<HoprBalance>()?;
 
-    // Open channels for two paths through the relay
-    let channels = vec![
-        ChannelGuard::open_channel_between_nodes(src.instance.clone(), relay.instance.clone(), funding).await?,
-        ChannelGuard::open_channel_between_nodes(relay.instance.clone(), dst_a.instance.clone(), funding).await?,
-        ChannelGuard::open_channel_between_nodes(dst_a.instance.clone(), relay.instance.clone(), funding).await?,
-        ChannelGuard::open_channel_between_nodes(relay.instance.clone(), src.instance.clone(), funding).await?,
-    ];
+    // Open all 4 channels concurrently — forward and return paths.
+    let channels = try_join_all([
+        ChannelGuard::open_channel_between_nodes(src.instance.clone(), relay.instance.clone(), funding),
+        ChannelGuard::open_channel_between_nodes(relay.instance.clone(), dst_a.instance.clone(), funding),
+        ChannelGuard::open_channel_between_nodes(dst_a.instance.clone(), relay.instance.clone(), funding),
+        ChannelGuard::open_channel_between_nodes(relay.instance.clone(), src.instance.clone(), funding),
+    ])
+    .await?;
 
     let chain_info = cluster.chain_client.query_chain_info().await?;
     let timeout = chain_propagation_delay(&chain_info) * 12;
