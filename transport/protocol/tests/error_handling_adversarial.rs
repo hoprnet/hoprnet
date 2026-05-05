@@ -3,8 +3,8 @@ mod common;
 use std::time::Duration;
 
 use common::{
-    PEERS, PEERS_CHAIN, corrupt_bytes, emulate_channel_communication, inject_raw_wire, make_routing, peer_setup_for,
-    random_packets_of_count, resolve_mock_path,
+    PEERS, PEERS_CHAIN, corrupt_bytes, emulate_channel_communication, inject_raw_wire, make_outgoing_packets,
+    make_routing, peer_setup_for, random_packets_of_count, resolve_mock_path,
 };
 use futures::{SinkExt, StreamExt};
 use futures_time::future::FutureExt;
@@ -145,15 +145,7 @@ async fn pipeline_continues_after_garbage_input() -> anyhow::Result<()> {
     }
 
     // Then send valid packets through the normal path
-    let out_msgs: Vec<_> = packets
-        .iter()
-        .map(|msg| {
-            (
-                make_routing(path.clone()),
-                ApplicationDataOut::with_no_packet_info(msg.clone()),
-            )
-        })
-        .collect();
+    let out_msgs = make_outgoing_packets(&packets, path);
     apis[0].0.send_all(&mut futures::stream::iter(out_msgs).map(Ok)).await?;
 
     // All valid packets must arrive
@@ -213,15 +205,7 @@ async fn flooding_garbage_does_not_starve_valid_traffic() -> anyhow::Result<()> 
         })
     };
 
-    let out_msgs: Vec<_> = packets
-        .iter()
-        .map(|msg| {
-            (
-                make_routing(path.clone()),
-                ApplicationDataOut::with_no_packet_info(msg.clone()),
-            )
-        })
-        .collect();
+    let out_msgs = make_outgoing_packets(&packets, path);
     apis[0].0.send_all(&mut futures::stream::iter(out_msgs).map(Ok)).await?;
     garbage_task.await?;
 
@@ -277,15 +261,7 @@ async fn corrupt_wire_frame_does_not_crash_pipeline() -> anyhow::Result<()> {
     inject_raw_wire(&relay_wire_tx, sender_id, vec![0u8; 500]);
 
     // Valid packets must still flow after the pipeline processes the corrupt frames
-    let out_msgs: Vec<_> = packets
-        .iter()
-        .map(|msg| {
-            (
-                make_routing(path.clone()),
-                ApplicationDataOut::with_no_packet_info(msg.clone()),
-            )
-        })
-        .collect();
+    let out_msgs = make_outgoing_packets(&packets, path);
     apis[0].0.send_all(&mut futures::stream::iter(out_msgs).map(Ok)).await?;
 
     let recv = (&mut apis[2].1)

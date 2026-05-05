@@ -3,13 +3,12 @@ mod common;
 use std::time::Duration;
 
 use common::{
-    PEERS, PEERS_CHAIN, emulate_channel_communication, make_routing, peer_setup_for_with_counters,
+    PEERS, PEERS_CHAIN, emulate_channel_communication, make_outgoing_packets, peer_setup_for_with_counters,
     random_packets_of_count, resolve_mock_path,
 };
 use futures::{SinkExt, StreamExt};
 use futures_time::future::FutureExt;
 use hopr_api::types::crypto::prelude::*;
-use hopr_protocol_app::prelude::ApplicationDataOut;
 use serial_test::serial;
 
 const TIMEOUT: Duration = Duration::from_secs(10);
@@ -31,15 +30,7 @@ async fn counters_drain_matches_packet_count() -> anyhow::Result<()> {
 
     tokio::task::spawn(emulate_channel_communication(wire_apis));
 
-    let out_msgs: Vec<_> = packets
-        .iter()
-        .map(|msg| {
-            (
-                make_routing(path.clone()),
-                ApplicationDataOut::with_no_packet_info(msg.clone()),
-            )
-        })
-        .collect();
+    let out_msgs = make_outgoing_packets(&packets, path);
     apis[0].0.send_all(&mut futures::stream::iter(out_msgs).map(Ok)).await?;
 
     let recv = (&mut apis[2].1)
@@ -106,15 +97,7 @@ async fn counter_drain_resets_state() -> anyhow::Result<()> {
 
     tokio::task::spawn(emulate_channel_communication(wire_apis));
 
-    let out_msgs: Vec<_> = packets
-        .iter()
-        .map(|msg| {
-            (
-                make_routing(path.clone()),
-                ApplicationDataOut::with_no_packet_info(msg.clone()),
-            )
-        })
-        .collect();
+    let out_msgs = make_outgoing_packets(&packets, path);
     apis[0].0.send_all(&mut futures::stream::iter(out_msgs).map(Ok)).await?;
 
     (&mut apis[2].1)

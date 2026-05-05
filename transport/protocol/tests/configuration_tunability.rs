@@ -3,13 +3,12 @@ mod common;
 use std::time::Duration;
 
 use common::{
-    PEERS_CHAIN, emulate_channel_communication, make_routing, peer_setup_for_with_cfg, random_packets_of_count,
-    resolve_mock_path,
+    PEERS_CHAIN, emulate_channel_communication, make_outgoing_packets, peer_setup_for_with_cfg,
+    random_packets_of_count, resolve_mock_path,
 };
 use futures::{SinkExt, StreamExt};
 use futures_time::future::FutureExt;
 use hopr_api::types::crypto::prelude::*;
-use hopr_protocol_app::prelude::ApplicationDataOut;
 use hopr_transport_protocol::{AcknowledgementPipelineConfig, PacketPipelineConfig};
 use serial_test::serial;
 use validator::Validate;
@@ -42,15 +41,7 @@ async fn ack_buffer_interval_minimum_still_delivers_packets() -> anyhow::Result<
 
     tokio::task::spawn(emulate_channel_communication(wire_apis));
 
-    let out_msgs: Vec<_> = packets
-        .iter()
-        .map(|msg| {
-            (
-                make_routing(path.clone()),
-                ApplicationDataOut::with_no_packet_info(msg.clone()),
-            )
-        })
-        .collect();
+    let out_msgs = make_outgoing_packets(&packets, path);
     apis[0].0.send_all(&mut futures::stream::iter(out_msgs).map(Ok)).await?;
 
     let recv = (&mut apis[2].1)
@@ -93,15 +84,7 @@ async fn output_concurrency_zero_falls_back_to_default() -> anyhow::Result<()> {
 
     tokio::task::spawn(emulate_channel_communication(wire_apis));
 
-    let out_msgs: Vec<_> = packets
-        .iter()
-        .map(|msg| {
-            (
-                make_routing(path.clone()),
-                ApplicationDataOut::with_no_packet_info(msg.clone()),
-            )
-        })
-        .collect();
+    let out_msgs = make_outgoing_packets(&packets, path);
     apis[0].0.send_all(&mut futures::stream::iter(out_msgs).map(Ok)).await?;
 
     let recv = (&mut apis[2].1)

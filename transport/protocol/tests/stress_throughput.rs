@@ -3,13 +3,13 @@ mod common;
 use std::time::Duration;
 
 use common::{
-    PEERS_CHAIN, emulate_channel_communication, make_routing, peer_setup_for, random_packet_of_size,
+    PEERS_CHAIN, emulate_channel_communication, make_outgoing_packets, peer_setup_for, random_packet_of_size,
     random_packets_of_count, resolve_mock_path,
 };
 use futures::{SinkExt, StreamExt};
 use futures_time::future::FutureExt;
 use hopr_api::types::{crypto::prelude::*, crypto_random::random_integer};
-use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataOut};
+use hopr_protocol_app::prelude::ApplicationData;
 use serial_test::serial;
 
 const LONG_TIMEOUT: Duration = Duration::from_secs(60);
@@ -31,15 +31,7 @@ async fn sustained_500_packets_no_loss() -> anyhow::Result<()> {
 
     tokio::task::spawn(emulate_channel_communication(wire_apis));
 
-    let out_msgs: Vec<_> = packets
-        .iter()
-        .map(|msg| {
-            (
-                make_routing(path.clone()),
-                ApplicationDataOut::with_no_packet_info(msg.clone()),
-            )
-        })
-        .collect();
+    let out_msgs = make_outgoing_packets(&packets, path);
     apis[0].0.send_all(&mut futures::stream::iter(out_msgs).map(Ok)).await?;
 
     let recv = (&mut apis[2].1)
@@ -80,15 +72,7 @@ async fn burst_idle_burst_all_delivered() -> anyhow::Result<()> {
     tokio::task::spawn(emulate_channel_communication(wire_apis));
 
     // First burst
-    let out_a: Vec<_> = packets_a
-        .iter()
-        .map(|msg| {
-            (
-                make_routing(path.clone()),
-                ApplicationDataOut::with_no_packet_info(msg.clone()),
-            )
-        })
-        .collect();
+    let out_a = make_outgoing_packets(&packets_a, path.clone());
     apis[0].0.send_all(&mut futures::stream::iter(out_a).map(Ok)).await?;
 
     let recv_a = (&mut apis[2].1)
@@ -109,15 +93,7 @@ async fn burst_idle_burst_all_delivered() -> anyhow::Result<()> {
     tokio::time::sleep(Duration::from_secs(2)).await;
 
     // Second burst
-    let out_b: Vec<_> = packets_b
-        .iter()
-        .map(|msg| {
-            (
-                make_routing(path.clone()),
-                ApplicationDataOut::with_no_packet_info(msg.clone()),
-            )
-        })
-        .collect();
+    let out_b = make_outgoing_packets(&packets_b, path);
     apis[0].0.send_all(&mut futures::stream::iter(out_b).map(Ok)).await?;
 
     let recv_b = (&mut apis[2].1)
@@ -164,15 +140,7 @@ async fn mixed_payload_sizes_all_delivered() -> anyhow::Result<()> {
 
     tokio::task::spawn(emulate_channel_communication(wire_apis));
 
-    let out_msgs: Vec<_> = packets
-        .iter()
-        .map(|msg| {
-            (
-                make_routing(path.clone()),
-                ApplicationDataOut::with_no_packet_info(msg.clone()),
-            )
-        })
-        .collect();
+    let out_msgs = make_outgoing_packets(&packets, path);
     apis[0].0.send_all(&mut futures::stream::iter(out_msgs).map(Ok)).await?;
 
     let recv = (&mut apis[2].1)
@@ -217,15 +185,7 @@ async fn five_peer_throughput_all_relays_win() -> anyhow::Result<()> {
 
     tokio::task::spawn(emulate_channel_communication(wire_apis));
 
-    let out_msgs: Vec<_> = packets
-        .iter()
-        .map(|msg| {
-            (
-                make_routing(path.clone()),
-                ApplicationDataOut::with_no_packet_info(msg.clone()),
-            )
-        })
-        .collect();
+    let out_msgs = make_outgoing_packets(&packets, path);
     apis[0].0.send_all(&mut futures::stream::iter(out_msgs).map(Ok)).await?;
 
     let recv = (&mut apis[4].1)
