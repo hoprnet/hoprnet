@@ -122,11 +122,15 @@ where
                     return None;
                 }
 
-                // Strip source to get intermediate hops only, then append dest as the
-                // virtual last hop. Path-level uniqueness is enforced downstream by
-                // `ValidatedPath::new` (consecutive chain-key collisions) plus the
-                // planner's post-resolution non-adjacent chain-address scan.
-                let mut candidate: Vec<_> = path.into_iter().skip(1).collect();
+                // Strip source to get intermediate hops only.
+                // Guard: if dest already appears as an intermediate, appending it
+                // again creates a [dest, dest] loop that ValidatedPath::new would
+                // reject — skip early instead of generating noise.
+                let candidate: Vec<_> = path.into_iter().skip(1).collect();
+                if candidate.contains(dest) {
+                    return None;
+                }
+                let mut candidate = candidate;
                 candidate.push(*dest);
 
                 // Skip paths already found by Phase 1 (compare path component only).
@@ -633,6 +637,79 @@ mod tests {
             assert!(!pwc.path.contains(&dest));
         }
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn selector_should_reject_extended_path_containing_destination() -> anyhow::Result<()> {
+        // If me has a direct edge to dest (e.g. an edge node with a channel to its
+        // exit server), Phase 2 must not emit [dest, dest] — appending dest to a
+        // candidate that already ends in dest forms a loop that ValidatedPath::new
+        // would catch anyway, but we want the guard to skip it cleanly.
+        let me = pubkey(&SECRET_0);
+        let relay = pubkey(&SECRET_1);
+        let dest = pubkey(&SECRET_2);
+        let graph = ChannelGraph::new(me);
+        graph.add_node(relay);
+        graph.add_node(dest);
+        // me → dest: direct channel (this is what the own_chain_addr fix exposes)
+        graph.add_edge(&me, &dest).unwrap();
+        mark_edge_full(&graph, &me, &dest);
+        // me → relay: for 1-hop via relay
+        graph.add_edge(&me, &relay).unwrap();
+        mark_edge_full(&graph, &me, &relay);
+        // Return path
+        graph.add_edge(&dest, &relay).unwrap();
+        graph.add_edge(&relay, &me).unwrap();
+        mark_edge_full(&graph, &dest, &relay);
+        mark_edge_last(&graph, &relay, &me);
+
+        let selector = test_selector(me, graph, MAX_PATHS);
+
+        let fwd = selector
+            .select_path(me, dest, 1)
+            .context("forward path with dest as direct neighbor")?;
+        assert!(!fwd.is_empty(), "should find at least one path via relay");
+        for pwc in &fwd {
+            assert_eq!(pwc.path.len(), 2, "path must be [relay, dest]");
+            assert_eq!(pwc.path[0], relay, "first node must be relay, not dest");
+            assert_eq!(pwc.path[1], dest);
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn selector_should_reject_one_hop_path_where_relay_equals_destination() -> anyhow::Result<()> {
+        // Same as above but without relay→dest edge — only Phase 2 (virtual last hop)
+        // is in play. The guard must skip the me→dest edge as a relay candidate.
+        let me = pubkey(&SECRET_0);
+        let relay = pubkey(&SECRET_1);
+        let dest = pubkey(&SECRET_2);
+        let graph = ChannelGraph::new(me);
+        graph.add_node(relay);
+        graph.add_node(dest);
+        // me → dest: direct channel (no relay→dest edge)
+        graph.add_edge(&me, &dest).unwrap();
+        mark_edge_full(&graph, &me, &dest);
+        // me → relay (relay is a valid intermediate; no relay→dest edge needed for Phase 2)
+        graph.add_edge(&me, &relay).unwrap();
+        mark_edge_full(&graph, &me, &relay);
+        // Return path
+        graph.add_edge(&dest, &relay).unwrap();
+        graph.add_edge(&relay, &me).unwrap();
+        mark_edge_full(&graph, &dest, &relay);
+        mark_edge_last(&graph, &relay, &me);
+
+        let selector = test_selector(me, graph, MAX_PATHS);
+
+        let fwd = selector
+            .select_path(me, dest, 1)
+            .context("forward path — dest is direct neighbor, relay is intermediate")?;
+        assert!(!fwd.is_empty(), "should find path via relay (virtual last hop)");
+        for pwc in &fwd {
+            assert_eq!(pwc.path[0], relay, "intermediate must be relay, not dest");
+            assert_ne!(pwc.path[0], dest, "dest must not appear as intermediate");
+        }
         Ok(())
     }
 
