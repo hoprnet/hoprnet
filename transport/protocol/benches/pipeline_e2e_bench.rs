@@ -36,8 +36,15 @@ const SENDER_IDX: usize = 0;
 const PAYLOAD_SIZE: usize = HoprPacket::PAYLOAD_SIZE;
 const CHANNEL_CAPACITY: usize = 2048;
 
-const HOPS: [usize; 4] = [0, 1, 2, 3];
-const PACKET_COUNTS: [usize; 3] = [1_000, 2_500, 5_000];
+#[cfg(feature = "all-benchmarks")]
+const HOPS: &[usize] = &[0, 1, 2, 3];
+#[cfg(not(feature = "all-benchmarks"))]
+const HOPS: &[usize] = &[3];
+
+#[cfg(feature = "all-benchmarks")]
+const PACKET_COUNTS: &[usize] = &[1_000, 2_500, 5_000];
+#[cfg(not(feature = "all-benchmarks"))]
+const PACKET_COUNTS: &[usize] = &[5_000];
 const WIN_PROB: f64 = 0.01;
 
 /// Drains encoded packets from the mixer output and feeds pre-generated ack
@@ -150,7 +157,7 @@ fn pipeline_e2e_forward(c: &mut Criterion) {
     // Return:  PEERS[hops] → PEERS[hops-1..=0] (symmetric hop count).
     let paths: Vec<(ValidatedPath, ValidatedPath)> = runtime.block_on(async {
         let mut paths = Vec::with_capacity(HOPS.len());
-        for &hops in &HOPS {
+        for &hops in HOPS {
             let dest_idx = hops + 1; // index of the destination peer
 
             let forward = ValidatedPath::new(
@@ -193,7 +200,7 @@ fn pipeline_e2e_forward(c: &mut Criterion) {
     group.measurement_time(Duration::from_secs(MEASUREMENT_TIME_SECS));
 
     for (hop_idx, &hops) in HOPS.iter().enumerate() {
-        for &packet_count in &PACKET_COUNTS {
+        for &packet_count in PACKET_COUNTS {
             let total_bytes = (packet_count * PAYLOAD_SIZE) as u64;
             let id = format!("{hops}hop_{packet_count}pkt");
 

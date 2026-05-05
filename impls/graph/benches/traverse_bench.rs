@@ -92,8 +92,7 @@ fn build_graph(node_count: usize, density: usize) -> (ChannelGraph, Vec<Offchain
 // ── Benchmark: NetworkGraphTraverse::simple_paths ────────────────────────────
 
 /// Benchmarks [`NetworkGraphTraverse::simple_paths`] for 2-edge, 3-edge, and
-/// 4-edge routes across all combinations of three node counts (10 / 100 / 1 000)
-/// and three edge densities (10× / 100× / 1 000×).
+/// 4-edge routes.
 ///
 /// The benchmark ID encodes both dimensions, e.g. `2-edge/100nodes/100x`.
 ///
@@ -106,17 +105,23 @@ fn build_graph(node_count: usize, density: usize) -> (ChannelGraph, Vec<Offchain
 ///
 /// `take_count` is capped at 10 to reflect realistic production usage and to
 /// keep the benchmark runtime bounded at high densities.
+///
+/// # Feature-gated coverage
+///
+/// Without `all-benchmarks`: runs only `(1_000 nodes, 1_000× density)` at
+/// all three depths (2-, 3-, 4-edge).
+///
+/// With `all-benchmarks`: runs the full matrix —
+/// `(10, 100, 1_000) nodes × (10, 10, 100, 1_000)× density` — at all three
+/// depths for every configuration.
 fn bench_simple_paths(c: &mut Criterion) {
     let mut group = c.benchmark_group("NetworkGraphTraverse/simple_paths");
 
-    for (size, density) in [
-        (10, 10),
-        (100, 10),
-        (100, 100),
-        (1_000, 10),
-        (1_000, 100),
-        (1_000, 1_000),
-    ] {
+    for &(size, density) in if cfg!(feature = "all-benchmarks") {
+        &[(10, 10), (100, 10), (100, 100), (1_000, 1_000)][..]
+    } else {
+        &[(1_000, 1_000)][..]
+    } {
         let (graph, keys) = build_graph(size, density);
         let me = &keys[0];
         let epn = (size - 1).min(density); // effective edges per node
@@ -182,8 +187,7 @@ fn bench_simple_paths(c: &mut Criterion) {
 // ── Benchmark: NetworkGraphTraverse::simple_loopback_to_self ─────────────────
 
 /// Benchmarks [`NetworkGraphTraverse::simple_loopback_to_self`] for 2-edge,
-/// 3-edge, and 4-edge loopback routes across all combinations of three node
-/// counts (10 / 100 / 1 000) and three edge densities (10× / 100× / 1 000×).
+/// 3-edge, and 4-edge loopback routes.
 ///
 /// The benchmark ID encodes both dimensions, e.g. `3-edge/1000nodes/100x`.
 ///
@@ -193,31 +197,39 @@ fn bench_simple_paths(c: &mut Criterion) {
 /// in addition to the path-enumeration depth.
 ///
 /// `take_count` is capped at 10.
+///
+/// # Feature-gated coverage
+///
+/// Without `all-benchmarks`: runs only `(1_000 nodes, 1_000× density)` at
+/// 2-edge depth (nearly-complete graph, single configuration).
+///
+/// With `all-benchmarks`: runs the full matrix —
+/// `(10, 100, 1_000) nodes × (10, 100, 1_000)× density` — and extends depth
+/// to `[2, 3, 4]`-edge for all but the `1_000/1_000` case (where all depths
+/// collapse to identical results due to `take_count` saturation).
 fn bench_simple_loopback(c: &mut Criterion) {
     let mut group = c.benchmark_group("NetworkGraphTraverse/simple_loopback_to_self");
 
-    for (size, density) in [
-        (10, 10),
-        (100, 10),
-        (100, 100),
-        (1_000, 10),
-        (1_000, 100),
-        (1_000, 1_000),
-    ] {
+    for &(size, density) in if cfg!(feature = "all-benchmarks") {
+        &[(10, 10), (100, 10), (100, 100), (1_000, 100), (1_000, 1_000)][..]
+    } else {
+        &[(1_000, 1_000)][..]
+    } {
         let (graph, _keys) = build_graph(size, density);
         let param = format!("{size}nodes/{density}x");
+        // At 1000nodes/1000x the graph is nearly complete — take_count=10 is hit at every depth,
+        // so 3-edge and 4-edge produce identical results to 2-edge.
+        let depths: &[usize] = if size == 1_000 && density == 1_000 {
+            &[2]
+        } else {
+            &[2, 3, 4]
+        };
 
-        group.bench_with_input(BenchmarkId::new("2-edge", &param), &size, |b, _| {
-            b.iter(|| black_box(graph.simple_loopback_to_self(2, Some(10))));
-        });
-
-        group.bench_with_input(BenchmarkId::new("3-edge", &param), &size, |b, _| {
-            b.iter(|| black_box(graph.simple_loopback_to_self(3, Some(10))));
-        });
-
-        group.bench_with_input(BenchmarkId::new("4-edge", &param), &size, |b, _| {
-            b.iter(|| black_box(graph.simple_loopback_to_self(4, Some(10))));
-        });
+        for &depth in depths {
+            group.bench_with_input(BenchmarkId::new(&format!("{depth}-edge"), &param), &size, |b, _| {
+                b.iter(|| black_box(graph.simple_loopback_to_self(depth, Some(10))));
+            });
+        }
     }
 
     group.finish();

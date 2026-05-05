@@ -84,29 +84,6 @@ fn send_continuous_channel_load_through_sink_pipe(
     })
 }
 
-pub fn mixer_channel_throughput_minimal_mixing(c: &mut Criterion) {
-    mixer_throughput(
-        c,
-        minimal_delay_mixer_cfg(),
-        "mixer_channel",
-        &[
-            10 * 1024 * 2 * RANDOM_GIBBERISH.len(),
-            40 * 1024 * 2 * RANDOM_GIBBERISH.len(),
-        ],
-        send_continuous_channel_load,
-    );
-}
-
-pub fn mixer_channel_throughput_through_sink_minimal_mixing(c: &mut Criterion) {
-    mixer_throughput(
-        c,
-        minimal_delay_mixer_cfg(),
-        "mixer_channel_sink_pipe",
-        &[40 * 1024 * 2 * RANDOM_GIBBERISH.len()],
-        send_continuous_channel_load_through_sink_pipe,
-    );
-}
-
 fn send_continuous_stream_load(item: &str, iterations: usize, cfg: MixerConfig) -> BoxFuture<'_, ()> {
     Box::pin(async move {
         let (tx, rx) = futures::channel::mpsc::unbounded();
@@ -176,8 +153,6 @@ pub fn mixer_stream_throughput_minimal_mixing(c: &mut Criterion) {
 
 criterion_group!(
     benches,
-    mixer_channel_throughput_minimal_mixing,
-    mixer_channel_throughput_through_sink_minimal_mixing,
     mixer_sink_throughput_minimal_mixing,
     mixer_stream_throughput_minimal_mixing
 );

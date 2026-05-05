@@ -11,6 +11,7 @@ license = "GPL-3.0-only"
 
 [features]
 default = ["rayon"]
+all-benchmarks = []
 rayon = ["hopr-crypto-packet/rayon", "hopr-parallelize/rayon"]
 serde = [
   "dep:cfg_eval",
