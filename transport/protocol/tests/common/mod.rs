@@ -426,8 +426,10 @@ pub fn inject_raw_wire(
     wire_tx: &futures::channel::mpsc::UnboundedSender<(PeerId, Box<[u8]>)>,
     sender: PeerId,
     bytes: impl Into<Box<[u8]>>,
-) {
-    let _ = wire_tx.unbounded_send((sender, bytes.into()));
+) -> anyhow::Result<()> {
+    wire_tx
+        .unbounded_send((sender, bytes.into()))
+        .map_err(|e| anyhow::anyhow!("inject_raw_wire: channel closed: {e}"))
 }
 
 pub fn corrupt_bytes(bytes: &[u8], byte_idx: usize) -> Box<[u8]> {

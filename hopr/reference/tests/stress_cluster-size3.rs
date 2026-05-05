@@ -1,3 +1,6 @@
+// Reference cluster stress tests for the session-client feature.
+#![cfg(feature = "session-client")]
+
 use futures::future::try_join_all;
 use hopr_chain_connector::blokli_client::BlokliQueryClient;
 use hopr_lib::api::types::primitive::prelude::HoprBalance;
@@ -19,7 +22,6 @@ const FUNDING_AMOUNT: &str = "100 wxHOPR";
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
-#[cfg(feature = "session-client")]
 async fn relay_throughput_with_real_tickets() -> anyhow::Result<()> {
     const DATA_SIZE: usize = 10 * 1024; // 10KB
 
@@ -61,14 +63,13 @@ async fn relay_throughput_with_real_tickets() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Creates two independent sessions to different destinations concurrently and writes
-/// data through both, verifying that the pipeline handles parallel sessions without
+/// Creates two independent sessions over the same 1-hop path concurrently and writes
+/// distinct data through both, verifying that the pipeline handles parallel sessions without
 /// cross-contamination or deadlock.
 #[rstest]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
-#[cfg(feature = "session-client")]
 async fn concurrent_sessions_independent_no_deadlock() -> anyhow::Result<()> {
     const DATA_SIZE: usize = 4 * 1024; // 4KB per session
 

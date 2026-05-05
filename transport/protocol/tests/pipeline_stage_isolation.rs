@@ -50,12 +50,13 @@ async fn near_max_payload_encodes_decodes_correctly() -> anyhow::Result<()> {
         "payload must survive encode/decode"
     );
 
-    (&mut ticket_channels[1])
+    let winning = (&mut ticket_channels[1])
         .take(1)
         .filter(|e| futures::future::ready(e.is_winning_ticket()))
         .count()
         .timeout(futures_time::time::Duration::from(TIMEOUT))
         .await?;
+    assert_eq!(winning, 1, "relay must win exactly one ticket for the forwarded packet");
 
     Ok(())
 }
@@ -86,7 +87,7 @@ async fn valid_frames_arrive_despite_interleaved_garbage() -> anyhow::Result<()>
     apis[0].0.send_all(&mut futures::stream::iter(out_msgs).map(Ok)).await?;
 
     // Also inject a garbage frame directly into relay's wire input
-    inject_raw_wire(&relay_wire_tx, sender_id, vec![0xAB; 256]);
+    inject_raw_wire(&relay_wire_tx, sender_id, vec![0xAB; 256])?;
 
     let recv = (&mut apis[2].1)
         .take(valid_count)
@@ -162,6 +163,16 @@ async fn relay_forward_and_ack_stages_fire_for_each_packet() -> anyhow::Result<(
         "sender must not win any tickets"
     );
 
+    let recipient_tickets = tokio::time::timeout(
+        Duration::from_millis(300),
+        (&mut ticket_channels[2]).take(1).collect::<Vec<_>>(),
+    )
+    .await;
+    assert!(
+        recipient_tickets.is_err() || recipient_tickets.unwrap().is_empty(),
+        "recipient must not win any tickets"
+    );
+
     Ok(())
 }
 
@@ -228,8 +239,17 @@ async fn concurrent_sends_all_delivered() -> anyhow::Result<()> {
 
     tokio::task::spawn(emulate_channel_communication(wire_apis));
 
-    let out_msgs = make_outgoing_packets(&packets, path);
-    apis[0].0.send_all(&mut futures::stream::iter(out_msgs).map(Ok)).await?;
+    let sender = apis[0].0.clone();
+    futures::future::try_join_all(packets.into_iter().map(|msg| {
+        let mut sender = sender.clone();
+        let routing = make_routing(path.clone());
+        async move {
+            sender
+                .send((routing, ApplicationDataOut::with_no_packet_info(msg)))
+                .await
+        }
+    }))
+    .await?;
 
     let recv = (&mut apis[2].1)
         .take(packet_count)
