@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-connector"
-version = "0.19.1"
+version = "0.19.2"
 edition.workspace = true
 rust-version.workspace = true
 authors = ["HOPR Association <tech@hoprnet.org>"]
@@ -38,6 +38,7 @@ tempfile = { workspace = true }
 
 hopr-api = { workspace = true, features = [
   "chain",
+  "node",
   "types-random",
   "serde",
   "types-with-bindings",

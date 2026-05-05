@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use futures::{SinkExt, StreamExt, future::Either};
 use futures_time::{future::FutureExt as TimeExt, stream::StreamExt as TimeStreamExt};
 use hopr_api::{
@@ -76,7 +77,7 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
 ) where
     AppOut: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
     E: PacketEncoder + Send + Sync + 'static,
-    WOut: futures::Sink<(PeerId, Box<[u8]>), Error = SinkTimeoutError<WOutErr>> + Clone + Unpin + Send + 'static,
+    WOut: futures::Sink<(PeerId, Bytes), Error = SinkTimeoutError<WOutErr>> + Clone + Unpin + Send + 'static,
     WOutErr: std::error::Error,
 {
     let res = app_outgoing
@@ -162,8 +163,8 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
     counters: crate::counters::PeerProtocolCounterRegistry,
     concurrency: usize,
 ) where
-    WIn: futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + 'static,
-    WOut: futures::Sink<(PeerId, Box<[u8]>)> + Clone + Unpin + Send + 'static,
+    WIn: futures::Stream<Item = (PeerId, Bytes)> + Send + 'static,
+    WOut: futures::Sink<(PeerId, Bytes)> + Clone + Unpin + Send + 'static,
     WOut::Error: std::error::Error,
     D: PacketDecoder + Sync + Send + 'static,
     T: UnacknowledgedTicketProcessor + Send + 'static,
@@ -422,7 +423,7 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
 ) where
     AckOut: futures::Stream<Item = (OffchainPublicKey, Option<HalfKey>)> + Send + 'static,
     E: PacketEncoder + Sync + Send + 'static,
-    WOut: futures::Sink<(PeerId, Box<[u8]>)> + Clone + Unpin + Send + 'static,
+    WOut: futures::Sink<(PeerId, Bytes)> + Clone + Unpin + Send + 'static,
     WOut::Error: std::error::Error,
 {
     ack_outgoing
@@ -701,9 +702,9 @@ pub fn run_packet_pipeline<WIn, WOut, C, D, T, TEvt, AppOut, AppIn>(
     counters: crate::counters::PeerProtocolCounterRegistry,
 ) -> AbortableList<PacketPipelineProcesses>
 where
-    WOut: futures::Sink<(PeerId, Box<[u8]>)> + Clone + Unpin + Send + 'static,
+    WOut: futures::Sink<(PeerId, Bytes)> + Clone + Unpin + Send + 'static,
     WOut::Error: std::error::Error,
-    WIn: futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + 'static,
+    WIn: futures::Stream<Item = (PeerId, Bytes)> + Send + 'static,
     C: PacketEncoder + Sync + Send + 'static,
     D: PacketDecoder + Sync + Send + 'static,
     T: UnacknowledgedTicketProcessor + Sync + Send + 'static,

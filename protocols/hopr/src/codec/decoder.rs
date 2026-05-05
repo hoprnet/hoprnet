@@ -1,5 +1,6 @@
 use std::{ops::Mul, time::Duration};
 
+use bytes::{BufMut, Bytes, BytesMut};
 use hopr_api::{
     chain::*,
     types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*},
@@ -178,7 +179,7 @@ where
     type Error = HoprProtocolError;
 
     #[tracing::instrument(skip(self, sender, data), level = "trace", fields(%sender))]
-    fn decode(&self, sender: PeerId, data: Box<[u8]>) -> Result<IncomingPacket, IncomingPacketError<Self::Error>> {
+    fn decode(&self, sender: PeerId, data: Bytes) -> Result<IncomingPacket, IncomingPacketError<Self::Error>> {
         #[cfg(feature = "trace-timing")]
         let decode_start = std::time::Instant::now();
         tracing::trace!(data_len = data.len(), "decoding packet");
@@ -311,9 +312,9 @@ where
                     })?
                 });
 
-                let mut payload = Vec::with_capacity(HoprPacket::SIZE);
-                payload.extend_from_slice(fwd.outgoing.packet.as_ref());
-                payload.extend_from_slice(&fwd.outgoing.ticket.into_encoded());
+                let mut payload = BytesMut::with_capacity(HoprPacket::SIZE);
+                payload.put_slice(fwd.outgoing.packet.as_ref());
+                payload.put_slice(&fwd.outgoing.ticket.into_encoded());
 
                 #[cfg(feature = "trace-timing")]
                 tracing::trace!(
@@ -326,7 +327,7 @@ where
                         packet_tag: fwd.packet_tag,
                         previous_hop: fwd.previous_hop,
                         next_hop: fwd.outgoing.next_hop,
-                        data: payload.into_boxed_slice(),
+                        data: payload.freeze(),
                         ack_challenge: fwd.outgoing.ack_challenge,
                         received_ticket: verified_unack_ticket,
                         ack_key_prev_hop: fwd.ack_key,

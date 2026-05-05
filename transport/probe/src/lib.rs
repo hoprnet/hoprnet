@@ -33,7 +33,7 @@ pub use hopr_api::{
 pub use crate::{
     config::ProbeConfig,
     content::Message as TrafficReturnedObservation,
-    probe::Probe,
+    probe::{Probe, ProbeClassifierState, ProbeDispatch},
     types::{NeighborTelemetry, PathTelemetry},
 };
 
@@ -41,6 +41,4 @@ pub use crate::{
 pub enum HoprProbeProcess {
     #[strum(to_string = "probe emission")]
     Emit,
-    #[strum(to_string = "probe processing")]
-    Process,
 }

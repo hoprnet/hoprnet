@@ -16,7 +16,8 @@ deployed_safes:
     owners:
       - 668430def9eacd2b5064acf85d73fb0b351a1c8c
     module_address: "1111111111111111111111111111111111111111"
-    registered_nodes: []
+    registered_nodes:
+      - "0202020202020202020202020202020202020202"
     threshold: "1"
 safe_redeem_stats: {}
 tx_counts: {}
@@ -39,5 +40,8 @@ chain_info:
   expected_block_time: "5"
   finality: "3"
 version: "1"
+client_compatibility:
+  api_version: "1"
+  supported_client_versions: ^0.26
 health: OK
 active_txs: {}

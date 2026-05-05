@@ -201,7 +201,7 @@ where
         let chain = self.node.chain_api().clone();
 
         let safe = chain
-            .safe_info(SafeSelector::Owner(me))
+            .safe_info(SafeSelector::NodeAddress(me))
             .await
             .map_err(|e| StrategyError::Other(e.into()))?;
 
@@ -395,12 +395,16 @@ where
 mod tests {
     use std::str::FromStr;
 
+    use anyhow::Context;
     use futures::StreamExt;
     use futures_time::future::FutureExt;
     use hex_literal::hex;
     use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
     use hopr_lib::api::{
-        chain::{ChainEvent, ChainEvents, HoprChainApi},
+        chain::{
+            AccountSelector, ChainEvent, ChainEvents, ChainReadAccountOperations, ChainWriteAccountOperations,
+            HoprChainApi,
+        },
         node::{
             ActionableEvent, ComponentStatus, ComponentStatusReporter, EventWaitResult, HasChainApi,
             NodeOnchainIdentity,
@@ -481,6 +485,22 @@ mod tests {
                 .map(ActionableEvent::Chain)
                 .boxed())
         }
+    }
+
+    async fn register_test_safe<C>(chain_connector: &C, node_address: Address) -> anyhow::Result<()>
+    where
+        C: HoprChainApi + ChainReadAccountOperations + ChainWriteAccountOperations,
+    {
+        let account = chain_connector
+            .stream_accounts(AccountSelector::default().with_chain_key(node_address))?
+            .next()
+            .await
+            .context("missing test account for node")?;
+        let safe_address = account.safe_address.context("missing test safe address for node")?;
+
+        chain_connector.register_safe(&safe_address).await?.await?;
+
+        Ok(())
     }
 
     #[test_log::test(tokio::test)]
@@ -630,6 +650,7 @@ mod tests {
             create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
                 .await?;
         chain_connector.connect().await?;
+        register_test_safe(&chain_connector, *BOB).await?;
         let chain_connector = Arc::new(chain_connector);
         let events = chain_connector.subscribe()?;
 
@@ -687,6 +708,7 @@ mod tests {
             create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
                 .await?;
         chain_connector.connect().await?;
+        register_test_safe(&chain_connector, *BOB).await?;
         let chain_connector = Arc::new(chain_connector);
         let events = chain_connector.subscribe()?;
 
@@ -764,6 +786,7 @@ mod tests {
             create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
                 .await?;
         chain_connector.connect().await?;
+        register_test_safe(&chain_connector, *BOB).await?;
         let chain_connector = Arc::new(chain_connector);
         let events = chain_connector.subscribe()?;
 
@@ -833,6 +856,7 @@ mod tests {
             create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
                 .await?;
         chain_connector.connect().await?;
+        register_test_safe(&chain_connector, *BOB).await?;
         let chain_connector = Arc::new(chain_connector);
         let _events = chain_connector.subscribe()?;
 
@@ -896,6 +920,7 @@ mod tests {
             create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
                 .await?;
         chain_connector.connect().await?;
+        register_test_safe(&chain_connector, *BOB).await?;
         let chain_connector = Arc::new(chain_connector);
         let _events = chain_connector.subscribe()?;
 
@@ -959,6 +984,7 @@ mod tests {
             create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
                 .await?;
         chain_connector.connect().await?;
+        register_test_safe(&chain_connector, *BOB).await?;
         let chain_connector = Arc::new(chain_connector);
         let _events = chain_connector.subscribe()?;
 
