@@ -69,7 +69,10 @@ pub use hopr_chain_connector;
 // ---------------------------------------------------------------------------
 
 #[cfg(feature = "runtime-tokio")]
-fn validate_probe_cfg(probe_cfg: &hopr_ct_full_network::ProberConfig, probe_timeout: std::time::Duration) -> anyhow::Result<()> {
+fn validate_probe_cfg(
+    probe_cfg: &hopr_ct_full_network::ProberConfig,
+    probe_timeout: std::time::Duration,
+) -> anyhow::Result<()> {
     probe_cfg
         .validate()
         .map_err(|e| anyhow::anyhow!("invalid ProberConfig: {e}"))?;
