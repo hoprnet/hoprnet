@@ -26,6 +26,7 @@ pub struct PopulationConfig {
     pub peer_reopen_cooldown: Duration,
 }
 
+#[inline]
 fn default_peer_reopen_cooldown() -> Duration {
     Duration::from_secs(30 * 60)
 }
@@ -76,6 +77,7 @@ pub struct EligibilityConfig {
     pub blocklist: HashSet<Address>,
 }
 
+#[inline]
 fn default_peer_staleness_threshold() -> Duration {
     Duration::from_secs(24 * 60 * 60)
 }
@@ -150,9 +152,11 @@ pub struct ProactiveFundingConfig {
     pub ticket_index_drain_weight: f64,
 }
 
+#[inline]
 fn default_fallback_chain_op_duration() -> Duration {
     Duration::from_secs(60)
 }
+#[inline]
 fn default_depletion_lookback() -> Duration {
     Duration::from_secs(10 * 60)
 }
@@ -182,6 +186,7 @@ pub struct ClosureConfig {
     pub close_max_concurrent: usize,
 }
 
+#[inline]
 fn default_close_when_peer_unseen_for() -> Duration {
     Duration::from_secs(24 * 60 * 60)
 }
@@ -208,6 +213,7 @@ pub struct FinalizerConfig {
     pub finalize_max_concurrent: usize,
 }
 
+#[inline]
 fn default_max_closure_overdue() -> Duration {
     Duration::from_secs(30 * 60)
 }
@@ -225,6 +231,7 @@ pub struct RestartGuardConfig {
     pub startup_close_grace_period: Duration,
 }
 
+#[inline]
 fn default_startup_close_grace_period() -> Duration {
     Duration::from_secs(10 * 60)
 }
@@ -273,9 +280,11 @@ pub struct ChannelLifecycleConfig {
     pub concurrency: ConcurrencyConfig,
 }
 
+#[inline]
 fn default_tick_interval() -> Duration {
     Duration::from_secs(60)
 }
+#[inline]
 fn default_jitter() -> Duration {
     Duration::from_secs(5)
 }
