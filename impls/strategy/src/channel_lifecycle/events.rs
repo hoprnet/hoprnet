@@ -31,8 +31,7 @@ where
         + Sync
         + 'static,
 {
-    /// Called when a `ChannelBalanceDecreased` event arrives.  Immediately
-    /// funds the channel if the balance has dropped below threshold.
+    /// Funds the channel immediately if balance dropped below threshold.
     pub(super) async fn on_balance_decreased(&self, ch: ChannelEntry, me: Address) {
         if ch.direction(&me) != Some(ChannelDirection::Outgoing) {
             return;
@@ -71,7 +70,6 @@ where
         }
     }
 
-    /// Called when a `ChannelBalanceIncreased` event arrives (funding confirmed).
     pub(super) fn on_balance_increased(&self, ch: ChannelEntry) {
         self.fund_in_flight.remove(ch.get_id());
         self.last_observed.entry(*ch.get_id()).and_modify(|obs| {
@@ -80,30 +78,27 @@ where
         debug!(%ch, "channel-lifecycle: cleared fund in-flight after balance increase");
     }
 
-    /// Called when a `ChannelOpened` event arrives (open tx confirmed).
     pub(super) fn on_channel_opened(&self, ch: ChannelEntry) {
         self.open_in_flight.remove(&ch.destination);
         debug!(%ch, "channel-lifecycle: channel opened, cleared open in-flight");
     }
 
-    /// Called when a `ChannelClosureInitiated` event arrives (first close tx confirmed).
     pub(super) fn on_channel_closure_initiated(&self, ch: ChannelEntry) {
         self.close_in_flight.remove(ch.get_id());
         debug!(%ch, "channel-lifecycle: closure initiated, cleared close in-flight");
     }
 
-    /// Called when a `ChannelClosed` event arrives (channel fully closed).
     /// Starts the peer cooldown so the channel is not immediately re-opened.
     pub(super) fn on_channel_closed(&self, ch: ChannelEntry) {
         self.finalize_in_flight.remove(ch.get_id());
         self.last_observed.remove(ch.get_id());
+        self.peer_ticket_activity.remove(&ch.destination);
         let until = Instant::now() + self.cfg.population.peer_reopen_cooldown;
         self.cooldown.insert(ch.destination, until);
         debug!(%ch, "channel-lifecycle: channel closed, peer on cooldown");
     }
 
-    /// Called when a `TicketRedeemed` event arrives.  Records activity for
-    /// the proactive drain-rate estimate.
+    /// Records ticket activity for the proactive drain-rate estimate.
     pub(super) fn on_ticket_redeemed(&self, ch: ChannelEntry) {
         self.peer_ticket_activity
             .entry(ch.destination)

@@ -104,7 +104,10 @@ where
 
     /// Composite quality score for a peer, blending the graph edge score with
     /// a normalised ticket-activity signal.
-    fn peer_score_for(&self, peer_offchain: &OffchainPublicKey, dest_addr: &Address) -> f64 {
+    ///
+    /// `max_activity` is the maximum ticket-activity value across all peers,
+    /// computed once per tick to avoid O(N×M) iteration.
+    fn peer_score_for(&self, peer_offchain: &OffchainPublicKey, dest_addr: &Address, max_activity: u64) -> f64 {
         let my_key = self.node.graph().identity();
         let edge_score = self
             .node
@@ -114,13 +117,6 @@ where
             .unwrap_or(0.0);
 
         let ticket_delta = self.peer_ticket_activity.get(dest_addr).map(|v| *v).unwrap_or(0);
-        let max_activity = self
-            .peer_ticket_activity
-            .iter()
-            .map(|e| *e.value())
-            .max()
-            .unwrap_or(1)
-            .max(1);
         let ticket_score = (ticket_delta as f64) / (max_activity as f64);
 
         self.cfg.eligibility.peer_quality_weight * edge_score
@@ -134,9 +130,8 @@ where
             return false;
         }
 
-        let obs = match self.last_observed.get(channel.get_id()) {
-            Some(o) => o.clone(),
-            None => return false,
+        let Some(obs) = self.last_observed.get(channel.get_id()) else {
+            return false;
         };
 
         let lookback_secs = self.cfg.proactive_funding.depletion_lookback.as_secs_f64().max(1.0);
@@ -336,8 +331,9 @@ where
         let me = *chain.me();
 
         // ── 1. Snapshot ──────────────────────────────────────────────────────
-        let est_tx_secs = self.est_tx_time().await.as_secs_f64();
-        let safe_balance = self.safe_balance_budget().await?;
+        let (est_tx_time_val, safe_balance_result) = futures::join!(self.est_tx_time(), self.safe_balance_budget());
+        let est_tx_secs = est_tx_time_val.as_secs_f64();
+        let safe_balance = safe_balance_result?;
 
         let mut all_channels: Vec<ChannelEntry> = Vec::new();
         {
@@ -395,6 +391,9 @@ where
             .collect();
         let open_count = open_channels.len() + self.open_in_flight.len();
 
+        // Computed once here so close and open passes don't each iterate all activity.
+        let max_activity: u64 = self.peer_ticket_activity.iter().map(|e| *e.value()).max().unwrap_or(1);
+
         // ── 2. Fund pass ─────────────────────────────────────────────────────
         if safe_balance >= self.cfg.funding.min_safe_balance_required || !self.cfg.funding.stop_when_unfunded {
             let mut safe_remaining = safe_balance;
@@ -434,7 +433,7 @@ where
                     break;
                 }
 
-                if self.should_close(ch, &addr_to_key) && self.try_close_channel(ch) {
+                if self.should_close(ch, &addr_to_key, max_activity) && self.try_close_channel(ch) {
                     close_count += 1;
                 }
             }
@@ -513,7 +512,7 @@ where
                     return None;
                 }
 
-                let score = self.peer_score_for(&offchain_key, &chain_addr);
+                let score = self.peer_score_for(&offchain_key, &chain_addr, max_activity);
                 if score < self.cfg.eligibility.min_peer_quality_score {
                     return None;
                 }
@@ -538,18 +537,19 @@ where
         Ok(())
     }
 
-    /// Returns `true` if the channel meets the criteria for closure.
-    ///
-    /// `addr_to_key` maps chain addresses to offchain public keys, built from
-    /// the account stream in `pipeline_inner`.
-    fn should_close(&self, ch: &ChannelEntry, addr_to_key: &HashMap<Address, OffchainPublicKey>) -> bool {
+    fn should_close(
+        &self,
+        ch: &ChannelEntry,
+        addr_to_key: &HashMap<Address, OffchainPublicKey>,
+        max_activity: u64,
+    ) -> bool {
         if ch.balance <= self.cfg.closure.close_when_drained_below {
             return true;
         }
 
         let dest = ch.destination;
         if let Some(pk) = addr_to_key.get(&dest) {
-            let score = self.peer_score_for(pk, &dest);
+            let score = self.peer_score_for(pk, &dest, max_activity);
             if score < self.cfg.closure.close_below_quality_score {
                 return true;
             }
