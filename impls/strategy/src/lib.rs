@@ -6,7 +6,7 @@
 //! - [auto funding strategy](crate::auto_funding) (feature `strategy-auto-funding`)
 //! - [auto redeeming strategy](crate::auto_redeeming) (feature `strategy-auto-redeeming`)
 //! - [closure finalizer](crate::channel_finalizer) (feature `strategy-closure-finalizer`)
-//! - [channel lifecycle strategy](crate::channel_lifecycle) (feature `strategy-channel-lifecycle`)
+//! - channel lifecycle strategy (feature `strategy-channel-lifecycle`)
 //! - [multiple strategy chains](crate::strategy)
 //!
 //! Individual strategies are gated behind Cargo features.

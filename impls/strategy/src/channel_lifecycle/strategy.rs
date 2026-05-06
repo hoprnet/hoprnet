@@ -19,9 +19,8 @@ use hopr_lib::api::{
     },
 };
 
-use crate::{errors::StrategyError, strategy::Strategy as StrategyTrait};
-
 use super::{ChannelLifecycleConfig, ChannelLifecycleStrategyInner};
+use crate::{errors::StrategyError, strategy::Strategy as StrategyTrait};
 
 /// Builder for [`ChannelLifecycleStrategy`].
 ///
