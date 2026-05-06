@@ -521,7 +521,7 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
 
                     let config = create_hopr_instance_config(3001 + i as u16, safes[i], win_prob);
 
-                    let instance = crate::build_with_chain(
+                    let instance = crate::build_full_with_chain(
                         &onchain_keys[i],
                         &offchain_keys[i],
                         config,
