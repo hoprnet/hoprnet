@@ -63,8 +63,6 @@ pub use config::*;
 mod events;
 mod pipeline;
 mod strategy;
-pub use strategy::ChannelLifecycleStrategy;
-
 use std::{sync::Arc, time::Instant};
 
 use dashmap::{DashMap, DashSet};
@@ -72,6 +70,7 @@ use hopr_lib::api::types::{
     internal::prelude::ChannelId,
     primitive::prelude::{Address, HoprBalance},
 };
+pub use strategy::ChannelLifecycleStrategy;
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
@@ -153,9 +152,11 @@ mod tests {
             ActionableEvent, ActionableEventDiscriminant, ActionableEventSource, ComponentStatus,
             ComponentStatusReporter, EventWaitResult, HasChainApi, HasGraphView, HasNetworkView, NodeOnchainIdentity,
         },
-        types::crypto::prelude::OffchainPublicKey,
         types::{
-            crypto::{keypairs::Keypair, prelude::ChainKeypair},
+            crypto::{
+                keypairs::Keypair,
+                prelude::{ChainKeypair, OffchainPublicKey},
+            },
             internal::prelude::{ChannelEntry, ChannelStatus},
             primitive::prelude::{Address, BytesRepresentable, HoprBalance, XDaiBalance},
         },
@@ -233,21 +234,27 @@ mod tests {
         fn listening_as(&self) -> HashSet<hopr_lib::api::Multiaddr> {
             HashSet::new()
         }
+
         fn multiaddress_of(&self, _peer: &PeerId) -> Option<HashSet<hopr_lib::api::Multiaddr>> {
             None
         }
+
         fn discovered_peers(&self) -> HashSet<PeerId> {
             HashSet::new()
         }
+
         fn connected_peers(&self) -> HashSet<PeerId> {
             HashSet::new()
         }
+
         fn is_connected(&self, _peer: &PeerId) -> bool {
             false
         }
+
         fn health(&self) -> hopr_lib::api::network::Health {
             hopr_lib::api::network::Health::Red
         }
+
         fn subscribe_network_events(
             &self,
         ) -> impl futures::Stream<Item = hopr_lib::api::network::NetworkEvent> + Send + 'static {
@@ -274,21 +281,25 @@ mod tests {
     struct StubGraph;
 
     impl hopr_lib::api::graph::NetworkGraphView for StubGraph {
-        type Observed = StubEdge;
         type NodeId = OffchainPublicKey;
+        type Observed = StubEdge;
 
         fn node_count(&self) -> usize {
             0
         }
+
         fn contains_node(&self, _key: &OffchainPublicKey) -> bool {
             false
         }
+
         fn nodes(&self) -> futures::stream::BoxStream<'static, OffchainPublicKey> {
             Box::pin(futures::stream::empty())
         }
+
         fn edge(&self, _src: &OffchainPublicKey, _dest: &OffchainPublicKey) -> Option<StubEdge> {
             None
         }
+
         fn identity(&self) -> &OffchainPublicKey {
             static KEY: std::sync::OnceLock<OffchainPublicKey> = std::sync::OnceLock::new();
             KEY.get_or_init(|| {
@@ -308,6 +319,7 @@ mod tests {
         fn connected_edges(&self) -> Vec<(OffchainPublicKey, OffchainPublicKey, StubEdge)> {
             Vec::new()
         }
+
         fn reachable_edges(&self) -> Vec<(OffchainPublicKey, OffchainPublicKey, StubEdge)> {
             Vec::new()
         }
@@ -356,12 +368,15 @@ mod tests {
         fn last_update(&self) -> Duration {
             Duration::ZERO
         }
+
         fn immediate_qos(&self) -> Option<&Self::ImmediateMeasurement> {
             None
         }
+
         fn intermediate_qos(&self) -> Option<&Self::IntermediateMeasurement> {
             None
         }
+
         fn score(&self) -> f64 {
             0.5
         }
@@ -375,12 +390,15 @@ mod tests {
 
     impl hopr_lib::api::graph::EdgeLinkObservable for StubMeasurement {
         fn record(&mut self, _: hopr_lib::api::graph::traits::EdgeTransportMeasurement) {}
+
         fn average_latency(&self) -> Option<Duration> {
             None
         }
+
         fn average_probe_rate(&self) -> f64 {
             0.0
         }
+
         fn score(&self) -> f64 {
             0.0
         }

@@ -27,9 +27,8 @@ use hopr_lib::api::{
 };
 use tracing::{debug, info, warn};
 
-use crate::errors::StrategyError;
-
 use super::{ChannelLifecycleStrategyInner, ChannelObservation};
+use crate::errors::StrategyError;
 
 impl<N> ChannelLifecycleStrategyInner<N>
 where
@@ -525,7 +524,7 @@ where
         candidates.truncate(deficit);
 
         let mut safe_remaining = safe_balance;
-        for (addr, _, _) in candidates {
+        for (addr, ..) in candidates {
             if safe_remaining < self.cfg.funding.initial_balance {
                 break;
             }
