@@ -418,9 +418,10 @@ pub fn build_blokli_client() -> BlokliTestClient<FullStateEmulator> {
         .with_deployed_safes(NODE_SAFES_MODULES.iter().zip(NODE_CHAIN_KEYS.iter()).map(
             |((safe_address, module_address), chain_key)| DeployedSafe {
                 address: *safe_address,
-                owner: chain_key.public().to_address(),
+                owners: vec![chain_key.public().to_address()],
                 module: *module_address,
                 registered_nodes: vec![],
+                deployer: chain_key.public().to_address(),
             },
         ))
         .with_minimum_win_prob(WinningProbability::try_from(MINIMUM_INCOMING_WIN_PROB).unwrap())
