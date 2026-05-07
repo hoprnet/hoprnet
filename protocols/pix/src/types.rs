@@ -361,7 +361,7 @@ impl<S: PixSpec> std::hash::Hash for SsaId<S> {
 
 impl<S: PixSpec> std::fmt::Display for SsaId<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}-SSA#{}", self.pseudonym, self.ssa_index)
+        write!(f, "{}-ssa#{}", self.pseudonym, self.ssa_index)
     }
 }
 

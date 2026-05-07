@@ -339,4 +339,19 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn reconstructor_invalid_acknowledgement() -> anyhow::Result<()> {
+        let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig { ..Default::default() });
+
+        let ack_key = HalfKey::random();
+        let relay_pk = OffchainKeypair::random();
+        let ack = VerifiedAcknowledgement::new(ack_key, &relay_pk);
+
+        // This should return None for unknown challenge
+        assert!(reconstructor.new_acknowledgement(ack)?.is_none());
+
+        Ok(())
+    }
+
 }
