@@ -15,7 +15,7 @@ use vsss_rs::{
     },
 };
 
-mod errors;
+pub mod errors;
 mod generator;
 mod reconstructor;
 mod types;

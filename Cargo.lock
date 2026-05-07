@@ -1568,8 +1568,9 @@ dependencies = [
 
 [[package]]
 name = "blokli-client"
-version = "0.25.0"
-source = "git+https://github.com/hoprnet/blokli?branch=main#8353acaf6dd96bbe0a35d24c88eadbdc022de2c5"
+version = "0.29.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b0c49aad21c0d9dac90f52c45894e7f23a7201d0264c07a4546c1df603ca3158"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -1587,11 +1588,13 @@ dependencies = [
  "indexmap 2.14.0",
  "launchdarkly-sdk-transport",
  "parking_lot",
- "rand 0.9.4",
+ "rand 0.10.1",
  "reqwest 0.12.28",
+ "semver 1.0.28",
  "serde",
  "serde_json",
  "smart-default",
+ "strum 0.28.0",
  "thiserror 2.0.18",
  "tracing",
  "url",
@@ -3252,9 +3255,9 @@ checksum = "037711b3d59c33004d3856fbdc83b99d4ff37a24768fa1be9ce3538a1cde4393"
 
 [[package]]
 name = "futures-time"
-version = "3.0.1"
+version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17f4f4272ec2be25287f1e184066c249b1f6b6d4d982d7c2f56f424096ae64e2"
+checksum = "24076708e74fbd55fb36079acbba19988175140026cc67a878b91b0c3751220b"
 dependencies = [
  "async-channel 1.9.0",
  "async-io",
@@ -4394,9 +4397,9 @@ dependencies = [
 
 [[package]]
 name = "hickory-resolver"
-version = "0.26.0"
+version = "0.26.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a10bd64d950b4d38ca21e25c8ae230712e4955fb8290cfcb29a5e5dc6017e544"
+checksum = "f0d58d28879ceecde6607729660c2667a081ccdc082e082675042793960f178c"
 dependencies = [
  "cfg-if",
  "futures-util",
@@ -4456,9 +4459,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "1.8.2"
+version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ed6b52e38053a83ad25a0a0eb53e09a1dc8bcb9b69b11d9d693a59e662d69de"
+checksum = "253cae294dced141adf9e102a09bd4bcbac36efaf13451d1fad93661b59c5a16"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -4506,7 +4509,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.19.2"
+version = "0.20.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4643,7 +4646,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-lib"
-version = "4.0.1-rc.1"
+version = "4.0.2-rc.1"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -4716,7 +4719,7 @@ dependencies = [
  "flume",
  "futures",
  "futures-time",
- "hickory-resolver 0.26.0",
+ "hickory-resolver 0.26.1",
  "hopr-async-runtime",
  "hopr-metrics",
  "hopr-types",
@@ -4775,12 +4778,13 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-hopr"
-version = "4.5.0"
+version = "4.6.0"
 dependencies = [
  "anyhow",
  "async-trait",
  "auto_impl",
  "bloomfilter",
+ "bytes",
  "cfg_eval",
  "criterion",
  "hex",
@@ -4901,7 +4905,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-reference"
-version = "4.1.0"
+version = "4.1.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5016,11 +5020,12 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.26.0"
+version = "0.28.1"
 dependencies = [
  "anyhow",
  "async-trait",
  "bimap",
+ "bytes",
  "cfg-if",
  "futures",
  "futures-time",
@@ -5049,6 +5054,7 @@ dependencies = [
  "pcap-file",
  "proc-macro-regex",
  "rstest",
+ "rust-stream-ext-concurrent",
  "serde",
  "smart-default",
  "strum 0.28.0",
@@ -5061,7 +5067,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-mixer"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "bytesize",
@@ -5092,6 +5098,7 @@ dependencies = [
  "async-broadcast",
  "async-trait",
  "backon",
+ "bytes",
  "dashmap",
  "futures",
  "hopr-api",
@@ -5138,7 +5145,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-probe"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5171,12 +5178,13 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "1.6.3"
+version = "1.8.1"
 dependencies = [
  "ahash",
  "anyhow",
  "async-trait",
  "async_channel_io",
+ "bytes",
  "bytesize",
  "criterion",
  "dashmap",

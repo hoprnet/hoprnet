@@ -253,3 +253,90 @@ impl<S: PixSpec + 'static> SsaReconstructor<S> {
         self.channel.1.activate_cloned()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use hopr_types::{crypto::prelude::*, crypto_random::Randomizable};
+
+    use super::*;
+    use crate::{PartialSsaShare, tests::TestSpec};
+
+    #[test]
+    fn reconstructor_invalid_commitment_inputs() {
+        let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig {
+            polys_per_ssa: 2,
+            poly_threshold: 2,
+            ..Default::default()
+        });
+
+        let ssa_id = SsaId::new(SimplePseudonym::random(), 1);
+
+        // 1. Invalid coefficient index (>= threshold)
+        let result = reconstructor.add_client_commitment_data(
+            ssa_id,
+            2, // threshold is 2, so 2 is invalid
+            HashMap::new(),
+        );
+        assert!(matches!(result, Err(errors::PixError::InvalidInput)));
+
+        // 2. Invalid polynomial index (>= polys_per_ssa)
+        let mut invalid_poly_map = HashMap::new();
+        invalid_poly_map.insert(2 as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
+        let result = reconstructor.add_client_commitment_data(ssa_id, 0, invalid_poly_map);
+        assert!(matches!(result, Err(errors::PixError::InvalidInput)));
+    }
+
+    #[test]
+    fn reconstructor_duplicate_commitments() -> anyhow::Result<()> {
+        let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig {
+            polys_per_ssa: 2,
+            poly_threshold: 2,
+            ..Default::default()
+        });
+
+        let ssa_id = SsaId::new(SimplePseudonym::random(), 1);
+
+        // Fill all commitments
+        for coeff in 0..2 {
+            let mut poly_map = HashMap::new();
+            for poly in 0..2 {
+                poly_map.insert(poly as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
+            }
+            reconstructor.add_client_commitment_data(ssa_id, coeff as CoefficientIndex, poly_map)?;
+        }
+
+        // Now adding more should fail with DuplicateCommitment
+        let result = reconstructor.add_client_commitment_data(ssa_id, 0, HashMap::new());
+        assert!(matches!(result, Err(errors::PixError::DuplicateCommitment)));
+
+        Ok(())
+    }
+
+    #[test]
+    fn reconstructor_missing_verifier() -> anyhow::Result<()> {
+        let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig { ..Default::default() });
+
+        let ack_key = HalfKey::random();
+        let challenge = ack_key.to_challenge()?;
+        let relay_pk = OffchainKeypair::random();
+        let ack = VerifiedAcknowledgement::new(ack_key, &relay_pk);
+
+        // Add a pending share but NO commitment (so no verifier is created)
+        let ssa_id = SsaId::new(SimplePseudonym::random(), 1);
+        let spi = SsaPolynomialId::new(ssa_id, 0);
+
+        // We need a valid-looking encrypted share even if it's junk.
+        // EncryptedPartialSsaShare is basically a wrapper around bytes.
+        let enc_share = PartialSsaShare::default().encrypt(&spi, &ack_key)?;
+
+        reconstructor.add_pending_share(challenge, spi, b"msg", enc_share)?;
+
+        // This should fail with MissingVerifier
+        let result = reconstructor.new_acknowledgement(ack);
+        assert!(matches!(result, Err(errors::PixError::MissingVerifier)));
+
+        Ok(())
+    }
+}
