@@ -1569,9 +1569,9 @@ dependencies = [
 
 [[package]]
 name = "blokli-client"
-version = "0.26.0"
+version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0815759c61c8ccb53569f714beda0e292d12253126699160b21cb15f115b3fcd"
+checksum = "b0c49aad21c0d9dac90f52c45894e7f23a7201d0264c07a4546c1df603ca3158"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -1589,12 +1589,13 @@ dependencies = [
  "indexmap 2.14.0",
  "launchdarkly-sdk-transport",
  "parking_lot",
- "rand 0.9.4",
+ "rand 0.10.1",
  "reqwest 0.12.28",
  "semver 1.0.28",
  "serde",
  "serde_json",
  "smart-default",
+ "strum 0.28.0",
  "thiserror 2.0.18",
  "tracing",
  "url",
@@ -4430,9 +4431,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "1.8.2"
+version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ed6b52e38053a83ad25a0a0eb53e09a1dc8bcb9b69b11d9d693a59e662d69de"
+checksum = "253cae294dced141adf9e102a09bd4bcbac36efaf13451d1fad93661b59c5a16"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -4480,7 +4481,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.19.2"
+version = "0.20.0"
 dependencies = [
  "ahash",
  "anyhow",

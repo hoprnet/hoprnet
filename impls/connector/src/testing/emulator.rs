@@ -113,7 +113,10 @@ impl BlokliTestStateMutator for FullStateEmulator {
                             keyid: next_key_id as i32,
                             multi_addresses: multiaddress.iter().map(|a| a.to_string()).collect(),
                             packet_key: hex::encode(packet_key),
-                            safe_address: state.get_safe_by_owner(&sender.into()).map(|s| s.address.clone()),
+                            safe_address: state
+                                .get_safe_by_owner(&sender.into())
+                                .first()
+                                .map(|s| s.address.clone()),
                         },
                     );
                     tracing::debug!(%sender, %packet_key, ?multiaddress, "node announced");
