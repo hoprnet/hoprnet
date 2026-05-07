@@ -80,6 +80,7 @@ mod tests {
             safe_address: Some([2u8; Address::SIZE].into()),
             key_id: 1.into(),
         };
+        let deployer_addr = ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address();
 
         let blokli_client = BlokliTestStateBuilder::default()
             .with_accounts([(account_2.clone(), HoprBalance::new_base(100), XDaiBalance::new_base(1))])
@@ -91,9 +92,10 @@ mod tests {
             .with_safe_allowances([([3u8; Address::SIZE].into(), HoprBalance::new_base(10000))])
             .with_deployed_safes([DeployedSafe {
                 address: [3u8; Address::SIZE].into(),
-                owner: ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
+                owners: vec![deployer_addr],
                 module: MODULE_ADDR.into(),
                 registered_nodes: vec![],
+                deployer: deployer_addr,
             }])
             .with_hopr_network_chain_info("rotsee")
             .build_dynamic_client(MODULE_ADDR.into())

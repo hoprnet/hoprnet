@@ -134,18 +134,18 @@ where
 
     async fn safe_info(&self, selector: SafeSelector) -> Result<Option<DeployedSafe>, Self::Error> {
         let selector = match selector {
-            // This assumes that the deployer of a safe (chain_key) is always the owner of the safe. Assumption holds
-            // always for edge-clients, but may not hold for other nodes. Assumption could be lifted if needed by
-            // introducing a new selector variant that would explicitly query for safes by owner/chain_key.
-            SafeSelector::Owner(owner_address) => blokli_client::api::SafeSelector::ChainKey(owner_address.into()),
             SafeSelector::Address(safe_address) => blokli_client::api::SafeSelector::SafeAddress(safe_address.into()),
+            SafeSelector::Deployer(deployer_address) => {
+                blokli_client::api::SafeSelector::ChainKey(deployer_address.into())
+            }
             SafeSelector::NodeAddress(node_address) => {
                 blokli_client::api::SafeSelector::RegisteredNode(node_address.into())
             }
+            SafeSelector::Owner(owner_address) => blokli_client::api::SafeSelector::Owner(owner_address.into()),
         };
 
-        if let Some(safe) = self.0.query_safe(selector).await? {
-            Ok(Some(model_to_deployed_safe(safe)?))
+        if let Some(safe) = self.0.query_safe(selector).await?.first() {
+            Ok(Some(model_to_deployed_safe(safe.clone())?))
         } else {
             Ok(None)
         }
@@ -207,9 +207,10 @@ mod tests {
         let blokli_client = BlokliTestStateBuilder::default()
             .with_deployed_safes([DeployedSafe {
                 address: [1u8; Address::SIZE].into(),
-                owner: [2u8; Address::SIZE].into(),
+                owners: vec![[2u8; Address::SIZE].into()],
                 module: [3u8; Address::SIZE].into(),
                 registered_nodes: vec![],
+                deployer: [2u8; Address::SIZE].into(),
             }])
             .with_hopr_network_chain_info("rotsee")
             .build_static_client();
