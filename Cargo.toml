@@ -64,7 +64,7 @@ backon = { version = "1.6.0", default-features = false }
 base64 = "0.22.1"
 bimap = "0.6.3"
 bitvec = "1.0.1"
-blokli-client = { git = "https://github.com/hoprnet/blokli", branch = "jean/return-all-safes-matching-selector" }
+blokli-client = "0.29.0"
 bloomfilter = { version = "3.0.1" }
 bytesize = { version = "2.3.1", features = ["serde"] }
 bytes = "1.11.1"
@@ -219,8 +219,7 @@ mimalloc = { version = "0.1.50", default-features = false, features = [
   "secure",
 ] }
 
-# hopr-api = { version = "1.8.2" }
-hopr-api = { git = "https://github.com/hoprnet/hopr-api/", branch = "main" }
+hopr-api = "1.9.0"
 hopr-types = { version = "1.5.4", features = ["use-bindings"] }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-crypto-keypair = { path = "crypto/keypair", default-features = false }
