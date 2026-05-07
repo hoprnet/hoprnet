@@ -429,7 +429,7 @@ where
         // ── 2. Fund pass ─────────────────────────────────────────────────────
         if safe_balance >= self.cfg.funding.min_safe_balance_required || !self.cfg.funding.stop_when_unfunded {
             for ch in &open_channels {
-                if self.fund_in_flight.contains(ch.get_id()) {
+                if self.fund_in_flight.contains(ch.get_id()) || self.close_in_flight.contains(ch.get_id()) {
                     continue;
                 }
                 let needs_topup = ch.balance <= self.cfg.funding.lower_balance_threshold;
@@ -456,7 +456,7 @@ where
                 if close_count >= self.cfg.closure.close_max_concurrent {
                     break;
                 }
-                if self.close_in_flight.contains(ch.get_id()) {
+                if self.close_in_flight.contains(ch.get_id()) || self.fund_in_flight.contains(ch.get_id()) {
                     continue;
                 }
                 let remaining_open = open_count.saturating_sub(close_count);
