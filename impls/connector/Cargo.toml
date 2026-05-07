@@ -38,6 +38,7 @@ tempfile = { workspace = true }
 
 hopr-api = { workspace = true, features = [
   "chain",
+  "node",
   "types-random",
   "serde",
   "types-with-bindings",

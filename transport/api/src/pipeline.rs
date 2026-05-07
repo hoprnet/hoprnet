@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use hopr_api::{
     chain::{ChainKeyOperations, ChainReadChannelOperations, ChainReadTicketOperations, ChainValues},
     tickets::TicketFactory,
@@ -38,9 +39,9 @@ pub fn run_hopr_packet_pipeline<WIn, WOut, Chain, S, TEvt, TFact, AppOut, AppIn>
     cfg: HoprPacketPipelineConfig,
 ) -> AbortableList<HoprTransportProcess>
 where
-    WOut: futures::Sink<(PeerId, Box<[u8]>)> + Clone + Unpin + Send + 'static,
+    WOut: futures::Sink<(PeerId, Bytes)> + Clone + Unpin + Send + 'static,
     WOut::Error: std::error::Error,
-    WIn: futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + 'static,
+    WIn: futures::Stream<Item = (PeerId, Bytes)> + Send + 'static,
     Chain: ChainKeyOperations
         + ChainReadChannelOperations
         + ChainReadTicketOperations

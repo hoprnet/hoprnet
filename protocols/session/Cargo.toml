@@ -11,6 +11,7 @@ license = "GPL-3.0-only"
 
 [features]
 default = ["hashbrown"]
+all-benchmarks = []
 serde = ["dep:serde", "dep:serde_bytes", "hopr-crypto-packet/serde"]
 telemetry = ["dep:auto_impl", "dep:hopr-metrics", "dep:lazy_static"]
 runtime-tokio = ["dep:tokio", "hopr-async-runtime/runtime-tokio"]

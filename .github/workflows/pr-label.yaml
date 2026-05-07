@@ -50,3 +50,25 @@ jobs:
     secrets:
       GCP_SA_GITHUB_RUNNER: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
       GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+
+  benchmarks:
+    name: Benchmarks
+    if: github.event.label.name == 'perf:benchmark' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+    uses: hoprnet/hopr-workflows/.github/workflows/benchmarks.yaml@13489274cf2d23929227fcd62bb8ac2341615b3e # workflow-benchmark-v2
+    with:
+      source_branch: ${{ github.event.pull_request.head.ref }}
+      runner: self-hosted-hoprnet-bigger
+      bencher_project: ${{ github.event.repository.name }}
+      should_build: true
+      should_run: true
+      build_command: "nix build -L .#bench-build"
+      run_command: "nix run .#bench-run"
+    secrets:
+      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      bencher_api_token: ${{ secrets.BENCHER_API_TOKEN }}
+      ZULIP_API_KEY: ${{ secrets.ZULIP_API_KEY }}
+      ZULIP_EMAIL: ${{ secrets.ZULIP_EMAIL }}
