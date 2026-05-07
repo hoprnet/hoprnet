@@ -91,13 +91,13 @@ where
     }
 
     /// Returns the on-chain notice period for channel closure, falling back
-    /// to a conservative 5-minute default on error.
+    /// to the standard 3-minute default on error.
     async fn closure_notice_period(&self) -> Duration {
         match self.node.chain_api().channel_closure_notice_period().await {
             Ok(d) => d,
             Err(e) => {
                 warn!(%e, "channel-lifecycle: could not fetch channel_closure_notice_period");
-                Duration::from_secs(5 * 60)
+                Duration::from_secs(3 * 60)
             }
         }
     }
@@ -611,7 +611,7 @@ where
         chain: &N::ChainApi,
     ) -> crate::errors::Result<HashMap<PeerId, (OffchainPublicKey, Address)>> {
         let cached = {
-            let guard = self.peer_addr_cache.lock().expect("peer_addr_cache mutex poisoned");
+            let guard = self.peer_addr_cache.lock();
             guard.as_ref().and_then(|c| {
                 if c.refreshed_at.elapsed() < PEER_ADDR_CACHE_TTL {
                     Some(c.map.clone())
@@ -634,7 +634,7 @@ where
             map.insert(peer_id, (account.public_key, account.chain_addr));
         }
 
-        *self.peer_addr_cache.lock().expect("peer_addr_cache mutex poisoned") = Some(PeerAddrCache {
+        *self.peer_addr_cache.lock() = Some(PeerAddrCache {
             refreshed_at: Instant::now(),
             map: map.clone(),
         });

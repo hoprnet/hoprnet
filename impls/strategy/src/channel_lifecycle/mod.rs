@@ -63,11 +63,7 @@ pub use config::*;
 mod events;
 mod pipeline;
 mod strategy;
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-    time::Instant,
-};
+use std::{collections::HashMap, sync::Arc, time::Instant};
 
 use dashmap::{DashMap, DashSet};
 use hopr_lib::api::{
@@ -78,6 +74,7 @@ use hopr_lib::api::{
         primitive::prelude::{Address, HoprBalance},
     },
 };
+use parking_lot::Mutex;
 pub use strategy::ChannelLifecycleStrategy;
 
 #[cfg(all(feature = "telemetry", not(test)))]
@@ -659,9 +656,8 @@ mod tests {
     /// off-chain bookkeeping from observations after restart.
     #[test]
     fn new_instance_should_have_empty_state_after_old_dropped() {
-        use std::sync::Mutex;
-
         use dashmap::DashSet;
+        use parking_lot::Mutex;
 
         fn fresh_inner(cfg: ChannelLifecycleConfig) -> ChannelLifecycleStrategyInner<()> {
             ChannelLifecycleStrategyInner {
@@ -723,10 +719,11 @@ mod tests {
         );
         assert!(
             inner2.last_observed.is_empty(),
-            "balance/ticket-index history should not persist across drop — proactive funding warms up over the first few ticks"
+            "balance/ticket-index history should not persist across drop — proactive funding warms up over the first \
+             few ticks"
         );
         assert!(
-            inner2.peer_addr_cache.lock().expect("not poisoned").is_none(),
+            inner2.peer_addr_cache.lock().is_none(),
             "peer-addr cache should not persist across drop"
         );
         assert!(

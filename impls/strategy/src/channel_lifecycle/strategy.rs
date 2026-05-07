@@ -1,7 +1,7 @@
 //! Builder, `Display`, and `Strategy` trait implementation.
 
 use std::{
-    fmt::{Display, Formatter},
+    fmt::{Debug, Display, Formatter},
     sync::Arc,
     time::Duration,
 };
@@ -69,8 +69,14 @@ impl ChannelLifecycleStrategy {
             start_epoch: std::time::Instant::now(),
             last_observed: Arc::new(DashMap::new()),
             peer_ticket_activity: Arc::new(DashMap::new()),
-            peer_addr_cache: Arc::new(std::sync::Mutex::new(None)),
+            peer_addr_cache: Arc::new(parking_lot::Mutex::new(None)),
         })
+    }
+}
+
+impl<N> Debug for ChannelLifecycleStrategyInner<N> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ChannelLifecycleStrategy({:?})", self.cfg)
     }
 }
 
