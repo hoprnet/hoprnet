@@ -154,6 +154,7 @@ mod tests {
         time::{Duration, Instant},
     };
 
+    use anyhow::Context as _;
     use dashmap::DashMap;
     use futures::StreamExt as _;
     use hex_literal::hex;
@@ -469,7 +470,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(tokio::test)]
+    #[tokio::test]
     async fn default_config_should_have_sensible_values() {
         let cfg = ChannelLifecycleConfig::default();
         assert_eq!(cfg.population.min_open_channels, 5);
@@ -479,10 +480,8 @@ mod tests {
         assert_eq!(cfg.eligibility.min_peer_quality_score, 0.5);
     }
 
-    #[test_log::test(tokio::test)]
+    #[tokio::test]
     async fn strategy_should_fund_channel_below_threshold() -> anyhow::Result<()> {
-        use anyhow::Context as _;
-
         let stake_limit = HoprBalance::from(3_u32);
         let fund_amount = HoprBalance::from(5_u32);
         let initial_balance = HoprBalance::from(2_u32);
@@ -572,7 +571,7 @@ mod tests {
         );
     }
 
-    #[test_log::test(tokio::test)]
+    #[tokio::test]
     async fn display_should_return_channel_lifecycle() -> anyhow::Result<()> {
         let blokli_sim = BlokliTestStateBuilder::default()
             .with_generated_accounts(
