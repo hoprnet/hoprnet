@@ -621,4 +621,117 @@ mod tests {
         let on_cooldown = cooldown.get(&dest).map(|v| Instant::now() < *v).unwrap_or(false);
         assert!(on_cooldown, "peer should be on cooldown");
     }
+
+    /// Documents the restart guard's per-instance semantics: a freshly-built
+    /// strategy starts a new grace window, regardless of how long the previous
+    /// instance had been running.  The close pass is suppressed on the new
+    /// instance until its own `startup_close_grace_period` elapses.
+    #[test]
+    fn restart_grace_should_re_apply_on_new_instance() {
+        let cfg = ChannelLifecycleConfig {
+            restart: RestartGuardConfig {
+                startup_close_grace_period: Duration::from_secs(60),
+            },
+            ..Default::default()
+        };
+
+        // Old instance was running long enough that its grace window had elapsed.
+        let old_start_epoch = Instant::now() - Duration::from_secs(65);
+        assert!(
+            old_start_epoch.elapsed() >= cfg.restart.startup_close_grace_period,
+            "old instance's grace should have elapsed"
+        );
+
+        // After dropping the old instance and constructing a new one,
+        // `start_epoch` resets — the new grace window starts from now.
+        let new_start_epoch = Instant::now();
+        assert!(
+            new_start_epoch.elapsed() < cfg.restart.startup_close_grace_period,
+            "new instance's grace should not have elapsed — restart guard re-applies per instance"
+        );
+    }
+
+    /// Documents that no per-instance runtime state (in-flight sets, cooldown,
+    /// observation history, ticket-activity counters, peer-addr cache) survives
+    /// dropping the strategy.  A new instance starts cold; only on-chain state
+    /// (channels, balances) is observable to it.  This is intentional: the
+    /// strategy treats the chain as the source of truth and rebuilds its
+    /// off-chain bookkeeping from observations after restart.
+    #[test]
+    fn new_instance_should_have_empty_state_after_old_dropped() {
+        use std::sync::Mutex;
+
+        use dashmap::DashSet;
+
+        fn fresh_inner(cfg: ChannelLifecycleConfig) -> ChannelLifecycleStrategyInner<()> {
+            ChannelLifecycleStrategyInner {
+                cfg,
+                node: Arc::new(()),
+                open_in_flight: Arc::new(DashSet::new()),
+                fund_in_flight: Arc::new(DashSet::new()),
+                close_in_flight: Arc::new(DashSet::new()),
+                finalize_in_flight: Arc::new(DashSet::new()),
+                cooldown: Arc::new(DashMap::new()),
+                start_epoch: Instant::now(),
+                last_observed: Arc::new(DashMap::new()),
+                peer_ticket_activity: Arc::new(DashMap::new()),
+                peer_addr_cache: Arc::new(Mutex::new(None)),
+            }
+        }
+
+        let cfg = ChannelLifecycleConfig::default();
+
+        // Simulate accumulated state on the first instance.
+        let inner1 = fresh_inner(cfg.clone());
+        inner1
+            .cooldown
+            .insert(*CHRIS, Instant::now() + Duration::from_secs(3600));
+        inner1.peer_ticket_activity.insert(*ALICE, 42);
+        inner1.open_in_flight.insert(*DAVE);
+        let old_start_epoch = inner1.start_epoch;
+
+        drop(inner1);
+        std::thread::sleep(Duration::from_millis(5));
+
+        // The new instance is built from scratch — none of the previous state
+        // is reachable.
+        let inner2 = fresh_inner(cfg);
+
+        assert!(
+            inner2.open_in_flight.is_empty(),
+            "open_in_flight should not persist across drop"
+        );
+        assert!(
+            inner2.fund_in_flight.is_empty(),
+            "fund_in_flight should not persist across drop"
+        );
+        assert!(
+            inner2.close_in_flight.is_empty(),
+            "close_in_flight should not persist across drop"
+        );
+        assert!(
+            inner2.finalize_in_flight.is_empty(),
+            "finalize_in_flight should not persist across drop"
+        );
+        assert!(
+            inner2.cooldown.is_empty(),
+            "cooldown should not persist across drop — recently closed peers may be reopened by the new instance"
+        );
+        assert!(
+            inner2.peer_ticket_activity.is_empty(),
+            "ticket activity counters should not persist across drop"
+        );
+        assert!(
+            inner2.last_observed.is_empty(),
+            "balance/ticket-index history should not persist across drop — proactive funding warms up over the first few ticks"
+        );
+        assert!(
+            inner2.peer_addr_cache.lock().expect("not poisoned").is_none(),
+            "peer-addr cache should not persist across drop"
+        );
+        assert!(
+            inner2.start_epoch > old_start_epoch,
+            "start_epoch should reset on a new instance — restart guard re-applies"
+        );
+    }
 }
