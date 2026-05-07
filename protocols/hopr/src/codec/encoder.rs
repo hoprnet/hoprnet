@@ -1,3 +1,4 @@
+use bytes::{BufMut, BytesMut};
 use hopr_api::{
     chain::*,
     types::{
@@ -117,14 +118,14 @@ where
             "cannot send out packet that is not outgoing",
         ))?;
 
-        let mut transport_payload = Vec::with_capacity(HoprPacket::SIZE);
-        transport_payload.extend_from_slice(out.packet.as_ref());
-        transport_payload.extend_from_slice(&out.ticket.into_encoded());
+        let mut transport_payload = BytesMut::with_capacity(HoprPacket::SIZE);
+        transport_payload.put_slice(out.packet.as_ref());
+        transport_payload.put_slice(&out.ticket.into_encoded());
 
         Ok(OutgoingPacket {
             next_hop: out.next_hop,
             ack_challenge: out.ack_challenge,
-            data: transport_payload.into_boxed_slice(),
+            data: transport_payload.freeze(),
         })
     }
 }

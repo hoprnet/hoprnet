@@ -3,6 +3,7 @@ mod common;
 
 use std::{str::FromStr, time::Duration};
 
+use bytes::Bytes;
 use common::{PEERS, PEERS_CHAIN, random_packets_of_count};
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use futures::{
@@ -35,17 +36,24 @@ const SENDER_IDX: usize = 0;
 const PAYLOAD_SIZE: usize = HoprPacket::PAYLOAD_SIZE;
 const CHANNEL_CAPACITY: usize = 2048;
 
-const HOPS: [usize; 4] = [0, 1, 2, 3];
-const PACKET_COUNTS: [usize; 3] = [1_000, 2_500, 5_000];
+#[cfg(feature = "all-benchmarks")]
+const HOPS: &[usize] = &[0, 1, 2, 3];
+#[cfg(not(feature = "all-benchmarks"))]
+const HOPS: &[usize] = &[3];
+
+#[cfg(feature = "all-benchmarks")]
+const PACKET_COUNTS: &[usize] = &[1_000, 2_500, 5_000];
+#[cfg(not(feature = "all-benchmarks"))]
+const PACKET_COUNTS: &[usize] = &[5_000];
 const WIN_PROB: f64 = 0.01;
 
 /// Drains encoded packets from the mixer output and feeds pre-generated ack
 /// packets back through the wire-in channel. Signals completion once `expected`
 /// packets have been received.
 async fn network_stub(
-    mut wire_out_rx: hopr_transport_mixer::channel::Receiver<(PeerId, Box<[u8]>)>,
-    mut wire_in_tx: mpsc::Sender<(PeerId, Box<[u8]>)>,
-    ack_buffer: Vec<(PeerId, Box<[u8]>)>,
+    mut wire_out_rx: hopr_transport_mixer::channel::Receiver<(PeerId, Bytes)>,
+    mut wire_in_tx: mpsc::Sender<(PeerId, Bytes)>,
+    ack_buffer: Vec<(PeerId, Bytes)>,
     expected: usize,
     hops: usize,
     done_tx: oneshot::Sender<()>,
@@ -121,7 +129,7 @@ fn pipeline_e2e_forward(c: &mut Criterion) {
 
     // Pre-generate ack buffer using an encoder for PEERS[1] (next hop)
     let max_packets = *PACKET_COUNTS.last().unwrap();
-    let ack_buffer: Vec<(PeerId, Box<[u8]>)> = runtime.block_on(async {
+    let ack_buffer: Vec<(PeerId, Bytes)> = runtime.block_on(async {
         let ack_encoder = HoprEncoder::new(
             PEERS_CHAIN[1].clone(),
             chain_api.clone(),
@@ -149,7 +157,7 @@ fn pipeline_e2e_forward(c: &mut Criterion) {
     // Return:  PEERS[hops] → PEERS[hops-1..=0] (symmetric hop count).
     let paths: Vec<(ValidatedPath, ValidatedPath)> = runtime.block_on(async {
         let mut paths = Vec::with_capacity(HOPS.len());
-        for &hops in &HOPS {
+        for &hops in HOPS {
             let dest_idx = hops + 1; // index of the destination peer
 
             let forward = ValidatedPath::new(
@@ -192,7 +200,7 @@ fn pipeline_e2e_forward(c: &mut Criterion) {
     group.measurement_time(Duration::from_secs(MEASUREMENT_TIME_SECS));
 
     for (hop_idx, &hops) in HOPS.iter().enumerate() {
-        for &packet_count in &PACKET_COUNTS {
+        for &packet_count in PACKET_COUNTS {
             let total_bytes = (packet_count * PAYLOAD_SIZE) as u64;
             let id = format!("{hops}hop_{packet_count}pkt");
 
@@ -208,9 +216,9 @@ fn pipeline_e2e_forward(c: &mut Criterion) {
                         // -- SETUP (not timed) --
                         let packets = random_packets_of_count(packet_count);
 
-                        let (mixer_tx, mixer_rx) = hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(mixer_cfg);
+                        let (mixer_tx, mixer_rx) = hopr_transport_mixer::channel::<(PeerId, Bytes)>(mixer_cfg);
 
-                        let (wire_in_tx, wire_in_rx) = mpsc::channel::<(PeerId, Box<[u8]>)>(CHANNEL_CAPACITY);
+                        let (wire_in_tx, wire_in_rx) = mpsc::channel::<(PeerId, Bytes)>(CHANNEL_CAPACITY);
 
                         let (api_send_tx, api_send_rx) =
                             mpsc::channel::<(ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)>(CHANNEL_CAPACITY);

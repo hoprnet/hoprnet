@@ -190,9 +190,10 @@ mod tests {
         let blokli_client = BlokliTestStateBuilder::default()
             .with_deployed_safes([DeployedSafe {
                 address: [1u8; Address::SIZE].into(),
-                owner: [2u8; Address::SIZE].into(),
+                owners: vec![[2u8; Address::SIZE].into()],
                 module: [3u8; Address::SIZE].into(),
                 registered_nodes: vec![],
+                deployer: [2u8; Address::SIZE].into(),
             }])
             .with_hopr_network_chain_info("rotsee")
             .build_static_client();

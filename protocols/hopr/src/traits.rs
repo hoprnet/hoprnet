@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use hopr_api::types::{crypto::prelude::*, internal::prelude::*};
 use hopr_crypto_packet::prelude::*;
 
@@ -83,7 +84,7 @@ pub trait PacketDecoder {
 
     /// Decodes the `data` received from the given [`sender`](PeerId)
     /// returns the corresponding [`IncomingPacket`] if the decoding into a HOPR packet was successful.
-    fn decode(&self, sender: PeerId, data: Box<[u8]>) -> Result<IncomingPacket, IncomingPacketError<Self::Error>>;
+    fn decode(&self, sender: PeerId, data: Bytes) -> Result<IncomingPacket, IncomingPacketError<Self::Error>>;
 }
 
 /// Defines errors returned by `UnacknowledgedTicketProcessor::acknowledge_ticket`.

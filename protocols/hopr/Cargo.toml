@@ -1,6 +1,6 @@
 [package]
 name = "hopr-protocol-hopr"
-version = "4.5.0"
+version = "4.6.0"
 edition.workspace = true
 rust-version.workspace = true
 authors = ["HOPR Association <tech@hoprnet.org>"]
@@ -11,6 +11,7 @@ license = "GPL-3.0-only"
 
 [features]
 default = ["rayon"]
+all-benchmarks = []
 rayon = ["hopr-crypto-packet/rayon", "hopr-parallelize/rayon"]
 serde = [
   "dep:cfg_eval",
@@ -26,6 +27,7 @@ trace-timing = ["hopr-platform/trace-timing"]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 auto_impl = { workspace = true }
+bytes = { workspace = true }
 cfg_eval = { workspace = true, optional = true }
 bloomfilter = { workspace = true }
 hex = { workspace = true }

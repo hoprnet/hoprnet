@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport"
-version = "0.26.0"
+version = "0.28.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR transport interface for the core library"
 edition.workspace = true
@@ -42,6 +42,7 @@ serde = [
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+bytes = { workspace = true }
 cfg-if = { workspace = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
@@ -50,6 +51,7 @@ lazy_static = { workspace = true }
 moka = { workspace = true }
 multiaddr = { workspace = true }
 proc-macro-regex = { workspace = true }
+rust-stream-ext-concurrent = { workspace = true }
 pcap-file = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 smart-default = { workspace = true }

@@ -3,6 +3,7 @@ mod common;
 
 use std::{str::FromStr, sync::Arc};
 
+use bytes::Bytes;
 use common::{CHAIN_DATA, PEERS, PEERS_CHAIN, random_packets_of_count, resolve_mock_path};
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use futures::{SinkExt, StreamExt};
@@ -23,7 +24,7 @@ use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, HoprUnacknowledgedTicketProcessor,
     HoprUnacknowledgedTicketProcessorConfig, MemorySurbStore, SurbStoreConfig,
 };
-use hopr_ticket_manager::{HoprTicketFactory, HoprTicketManager, RedbStore};
+use hopr_ticket_manager::{HoprTicketFactory, RedbStore};
 use libp2p::PeerId;
 
 const SAMPLE_SIZE: usize = 50;
@@ -36,7 +37,11 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
     let mut group = c.benchmark_group("protocol_throughput_pipeline");
     group.sample_size(SAMPLE_SIZE);
     group.measurement_time(std::time::Duration::from_secs(30));
-    for bytes in [5 * 1024 * 2 * PAYLOAD_SIZE, 10 * 1024 * 2 * PAYLOAD_SIZE].iter() {
+    for bytes in if cfg!(feature = "all-benchmarks") {
+        &[5 * 1024 * 2 * PAYLOAD_SIZE, 10 * 1024 * 2 * PAYLOAD_SIZE][..]
+    } else {
+        &[10 * 1024 * 2 * PAYLOAD_SIZE][..]
+    } {
         group.throughput(Throughput::Bytes(*bytes as u64));
         group.bench_with_input(
             BenchmarkId::from_parameter(format!(
@@ -79,11 +84,9 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                         let (received_ack_tickets_tx, _received_ack_tickets_rx) =
                             futures::channel::mpsc::unbounded::<TicketEvent>();
 
-                        let (wire_msg_send_tx, wire_msg_send_rx) =
-                            futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
+                        let (wire_out_tx, wire_out_rx) = futures::channel::mpsc::unbounded::<(PeerId, Bytes)>();
 
-                        let (_wire_msg_recv_tx, wire_msg_recv_rx) =
-                            futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
+                        let (_wire_in_tx, wire_in_rx) = futures::channel::mpsc::unbounded::<(PeerId, Bytes)>();
 
                         let (api_send_tx, api_send_rx) = futures::channel::mpsc::unbounded::<(
                             ResolvedTransportRouting<HoprSurb>,
@@ -128,7 +131,7 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
 
                         let processes = hopr_transport_protocol::run_packet_pipeline(
                             PEERS[TESTED_PEER_ID].clone(),
-                            (wire_msg_send_tx, wire_msg_send_rx),
+                            (wire_out_tx, wire_in_rx),
                             (encoder, decoder),
                             ticket_proc,
                             received_ack_tickets_tx,
@@ -170,7 +173,7 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                             })
                             .await;
 
-                        assert_eq!(wire_msg_recv_rx.take(count).count().await, count);
+                        assert_eq!(wire_out_rx.take(count).count().await, count);
 
                         processes.abort_all();
                     }

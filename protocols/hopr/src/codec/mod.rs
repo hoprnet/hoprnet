@@ -267,7 +267,7 @@ mod tests {
         let decoder = create_decoder(&receiver);
 
         let sender_peer_id = PEERS[1].1.public().into();
-        let invalid_data = vec![0u8; 100].into_boxed_slice();
+        let invalid_data = bytes::Bytes::from(vec![0u8; 100]);
 
         let result = decoder.decode(sender_peer_id, invalid_data);
         assert!(result.is_err());

@@ -60,7 +60,8 @@ pub fn create_decoder(receiver: &Node) -> TestDecoder {
 }
 
 /// Pairs of (hops, surb_count) to benchmark.
-const PACKET_BENCHMARK: [(usize, usize); 7] = [
+#[cfg(feature = "all-benchmarks")]
+const PACKET_BENCHMARK: &[(usize, usize)] = &[
     (0, 0), // 0-hop 0 SURBs = used for packet acknowledgements
     (1, 1), // 1-hop 1 SURB = common GnosisVPN use-case
     (1, 2), // 1-hop 2 SURBs = GnosisVPN use-case with asymmetric traffic (non-TCP)
@@ -68,6 +69,10 @@ const PACKET_BENCHMARK: [(usize, usize); 7] = [
     (2, 2), // 2-hop 2 SURBs = GnosisVPN use-case with asymmetric traffic (non-TCP)
     (3, 1), // 3-hop 1 SURB = common GnosisVPN use-case
     (3, 2), // 3-hop 2 SURBs = GnosisVPN use-case with asymmetric traffic (non-TCP)
+];
+#[cfg(not(feature = "all-benchmarks"))]
+const PACKET_BENCHMARK: &[(usize, usize)] = &[
+    (3, 2), // 3-hop 2 SURBs = worst case
 ];
 
 fn hopr_encoder_bench(c: &mut Criterion) {
@@ -79,7 +84,7 @@ fn hopr_encoder_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("hopr_encoder");
     group.throughput(Throughput::Elements(1));
 
-    for (hops, rps) in PACKET_BENCHMARK {
+    for &(hops, rps) in PACKET_BENCHMARK {
         let path = runtime
             .block_on(async {
                 ValidatedPath::new(
@@ -133,7 +138,7 @@ fn hopr_encoder_bench(c: &mut Criterion) {
     }
 
     let ack_recipient = *PEERS[1].1.public();
-    for num_acks in [1, 2, 5, 10] {
+    for num_acks in [10] {
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("ack_batch_{num_acks}")),
             &num_acks,
