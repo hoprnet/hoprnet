@@ -1,3 +1,6 @@
+// Test harness shared across hopr-transport-protocol integration tests.
+#![allow(dead_code)]
+
 use std::{
     collections::HashMap,
     str::FromStr,
@@ -31,6 +34,7 @@ use hopr_protocol_hopr::{
 };
 use hopr_ticket_manager::{HoprTicketFactory, RedbStore};
 use hopr_transport_mixer::config::MixerConfig;
+use hopr_transport_protocol::{PacketPipelineConfig, PeerProtocolCounterRegistry};
 use lazy_static::lazy_static;
 use libp2p::PeerId;
 use tracing::debug;
@@ -95,22 +99,18 @@ fn create_dummy_channel(from: Address, to: Address) -> ChannelEntry {
         .unwrap()
 }
 
-#[allow(dead_code)]
 pub type WireChannels = (
     futures::channel::mpsc::UnboundedSender<(PeerId, Bytes)>,
     hopr_transport_mixer::channel::Receiver<(PeerId, Bytes)>,
 );
 
-#[allow(dead_code)]
 pub type LogicalChannels = (
     futures::channel::mpsc::UnboundedSender<(ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)>,
     futures::channel::mpsc::UnboundedReceiver<(HoprPseudonym, ApplicationDataIn)>,
 );
 
-#[allow(dead_code)]
 pub type TicketChannel = futures::channel::mpsc::UnboundedReceiver<TicketEvent>;
 
-#[allow(dead_code)]
 pub async fn peer_setup_for(
     count: usize,
 ) -> anyhow::Result<(
@@ -119,110 +119,8 @@ pub async fn peer_setup_for(
     Vec<TicketChannel>,
     AbortableList<usize>,
 )> {
-    let peer_count = count;
-
-    assert!(peer_count <= PEERS.len());
-    assert!(peer_count >= 3);
-
-    // Begin tests
-    for i in 0..peer_count {
-        let peer_type = {
-            if i == 0 {
-                "sender"
-            } else if i == (peer_count - 1) {
-                "recipient"
-            } else {
-                "relayer"
-            }
-        };
-
-        debug!(
-            "peer {i} ({peer_type})    = {} ({})",
-            PEERS[i].public().to_peerid_str(),
-            PEERS_CHAIN[i].public().to_address()
-        );
-    }
-
-    let mut wire_channels = HashMap::new();
-    let mut logical_channels = Vec::new();
-    let mut ticket_channels = Vec::new();
-    let mut processes = AbortableList::default();
-
-    for i in 0..peer_count {
-        let (received_ack_tickets_tx, received_ack_tickets_rx) = futures::channel::mpsc::unbounded::<TicketEvent>();
-
-        let (wire_msg_send_tx, wire_msg_send_rx) = futures::channel::mpsc::unbounded::<(PeerId, Bytes)>();
-        let (mixer_channel_tx, mixer_channel_rx) =
-            hopr_transport_mixer::channel::<(PeerId, Bytes)>(MixerConfig::default());
-
-        let (api_send_tx, api_send_rx) =
-            futures::channel::mpsc::unbounded::<(ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)>();
-        let (api_recv_tx, api_recv_rx) = futures::channel::mpsc::unbounded::<(HoprPseudonym, ApplicationDataIn)>();
-
-        let mut connector = create_trustful_hopr_blokli_connector(
-            &PEERS_CHAIN[i],
-            Default::default(),
-            CHAIN_DATA.clone().build_static_client(),
-            Default::default(),
-        )
-        .await?;
-        connector.connect().await?;
-
-        let connector = Arc::new(connector);
-        let surb_store = MemorySurbStore::new(SurbStoreConfig::default());
-        let channels_dst = connector.domain_separators().await?.channel;
-
-        let codec_config = HoprCodecConfig {
-            outgoing_ticket_price: Some(*DEFAULT_PRICE_PER_PACKET),
-            min_incoming_ticket_price: None,
-            outgoing_win_prob: Some(WinningProbability::ALWAYS),
-        };
-
-        let ticket_proc = HoprUnacknowledgedTicketProcessor::new(
-            connector.clone(),
-            PEERS_CHAIN[i].clone(),
-            channels_dst,
-            HoprUnacknowledgedTicketProcessorConfig::default(),
-        );
-
-        let ticket_factory = Arc::new(HoprTicketFactory::new(RedbStore::new_temp()?));
-
-        let encoder = HoprEncoder::new(
-            PEERS_CHAIN[i].clone(),
-            connector.clone(),
-            surb_store.clone(),
-            ticket_factory.clone(),
-            channels_dst,
-            codec_config,
-        );
-
-        let decoder = HoprDecoder::new(
-            (PEERS[i].clone(), PEERS_CHAIN[i].clone()),
-            connector.clone(),
-            surb_store,
-            ticket_factory.clone(),
-            channels_dst,
-            codec_config,
-        );
-
-        let node_processes = hopr_transport_protocol::run_packet_pipeline(
-            PEERS[i].clone(),
-            (mixer_channel_tx, wire_msg_send_rx),
-            (encoder, decoder),
-            ticket_proc,
-            received_ack_tickets_tx,
-            Default::default(),
-            (api_recv_tx, api_send_rx),
-            Default::default(),
-        );
-
-        wire_channels.insert(PeerId::from(*PEERS[i].public()), (wire_msg_send_tx, mixer_channel_rx));
-        logical_channels.push((api_send_tx, api_recv_rx));
-        ticket_channels.push(received_ack_tickets_rx);
-        processes.insert(i, node_processes);
-    }
-
-    Ok((wire_channels, logical_channels, ticket_channels, processes))
+    let (w, l, t, p, _) = peer_setup_for_with_all(count, Default::default()).await?;
+    Ok((w, l, t, p))
 }
 
 #[tracing::instrument(level = "debug", skip(components))]
@@ -301,10 +199,8 @@ pub fn random_packets_of_count(size: usize) -> Vec<ApplicationData> {
         .expect("data generation must not fail")
 }
 
-/// A large pool of random bytes used as a ring buffer for generating test payloads.
 static RANDOM_BYTE_POOL: LazyLock<[u8; 4096]> = LazyLock::new(random_bytes::<4096>);
 
-/// Creates a single packet with a payload of the given size (filled from a static random byte pool).
 pub fn random_packet_of_size(payload_size: usize) -> ApplicationData {
     let pool = &*RANDOM_BYTE_POOL;
     let start = random_integer(0u64, Some(pool.len() as u64)) as usize;
@@ -312,11 +208,29 @@ pub fn random_packet_of_size(payload_size: usize) -> ApplicationData {
     ApplicationData::new(random_integer(16u64, Some(65535u64)), data).expect("data generation must not fail")
 }
 
-/// Sends packets from peer 0 to the last peer and returns the received packets
-/// along with the ticket channels for further inspection.
-///
-/// This is a lower-level helper than `send_relay_receive_channel_of_n_peers` that
-/// allows callers to inspect intermediate results.
+pub fn make_routing(path: ValidatedPath) -> ResolvedTransportRouting<HoprSurb> {
+    ResolvedTransportRouting::Forward {
+        pseudonym: SimplePseudonym([0xde, 0xad, 0xbe, 0xef, 0xca, 0xfe, 0xba, 0xbe, 0x11, 0x22]),
+        forward_path: path,
+        return_paths: vec![],
+    }
+}
+
+pub fn make_outgoing_packets(
+    packets: &[ApplicationData],
+    path: ValidatedPath,
+) -> Vec<(ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> {
+    packets
+        .iter()
+        .map(|msg| {
+            (
+                make_routing(path.clone()),
+                ApplicationDataOut::with_no_packet_info(msg.clone()),
+            )
+        })
+        .collect()
+}
+
 pub async fn send_and_receive_packets(
     peer_count: usize,
     test_msgs: &[ApplicationData],
@@ -346,20 +260,7 @@ pub async fn send_and_receive_packets(
 
     tokio::task::spawn(emulate_channel_communication(wire_apis));
 
-    let out_msgs = test_msgs
-        .iter()
-        .map(|msg| {
-            (
-                ResolvedTransportRouting::Forward {
-                    pseudonym: SimplePseudonym([0xde, 0xad, 0xbe, 0xef, 0xca, 0xfe, 0xba, 0xbe, 0x11, 0x22]),
-                    forward_path: packet_path.clone(),
-                    return_paths: vec![],
-                },
-                ApplicationDataOut::with_no_packet_info(msg.clone()),
-            )
-        })
-        .collect::<Vec<_>>();
-
+    let out_msgs = make_outgoing_packets(test_msgs, packet_path);
     apis[0].0.send_all(&mut futures::stream::iter(out_msgs).map(Ok)).await?;
 
     let (_apis_send, mut apis_recv): (Vec<_>, Vec<_>) = apis.into_iter().unzip();
@@ -372,6 +273,172 @@ pub async fn send_and_receive_packets(
         .await?;
 
     Ok((recv_packets, ticket_channels, processes))
+}
+
+// Sets up N peers with the given `PacketPipelineConfig` and returns per-peer counter registries.
+async fn peer_setup_for_with_all(
+    count: usize,
+    cfg: PacketPipelineConfig,
+) -> anyhow::Result<(
+    HashMap<PeerId, WireChannels>,
+    Vec<LogicalChannels>,
+    Vec<TicketChannel>,
+    AbortableList<usize>,
+    Vec<PeerProtocolCounterRegistry>,
+)> {
+    let peer_count = count;
+
+    assert!(peer_count <= PEERS.len());
+    assert!(peer_count >= 3);
+
+    for i in 0..peer_count {
+        let peer_type = if i == 0 {
+            "sender"
+        } else if i == peer_count - 1 {
+            "recipient"
+        } else {
+            "relayer"
+        };
+        debug!(
+            "peer {i} ({peer_type})    = {} ({})",
+            PEERS[i].public().to_peerid_str(),
+            PEERS_CHAIN[i].public().to_address()
+        );
+    }
+
+    let mut wire_channels = HashMap::new();
+    let mut logical_channels = Vec::new();
+    let mut ticket_channels = Vec::new();
+    let mut processes = AbortableList::default();
+    let mut counter_registries = Vec::new();
+
+    for i in 0..peer_count {
+        let (received_ack_tickets_tx, received_ack_tickets_rx) = futures::channel::mpsc::unbounded::<TicketEvent>();
+
+        let (wire_msg_send_tx, wire_msg_send_rx) = futures::channel::mpsc::unbounded::<(PeerId, Bytes)>();
+        let (mixer_channel_tx, mixer_channel_rx) =
+            hopr_transport_mixer::channel::<(PeerId, Bytes)>(MixerConfig::default());
+
+        let (api_send_tx, api_send_rx) =
+            futures::channel::mpsc::unbounded::<(ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)>();
+        let (api_recv_tx, api_recv_rx) = futures::channel::mpsc::unbounded::<(HoprPseudonym, ApplicationDataIn)>();
+
+        let mut connector = create_trustful_hopr_blokli_connector(
+            &PEERS_CHAIN[i],
+            Default::default(),
+            CHAIN_DATA.clone().build_static_client(),
+            Default::default(),
+        )
+        .await?;
+        connector.connect().await?;
+
+        let connector = Arc::new(connector);
+        let surb_store = MemorySurbStore::new(SurbStoreConfig::default());
+        let channels_dst = connector.domain_separators().await?.channel;
+
+        let codec_config = HoprCodecConfig {
+            outgoing_ticket_price: Some(*DEFAULT_PRICE_PER_PACKET),
+            min_incoming_ticket_price: None,
+            outgoing_win_prob: Some(WinningProbability::ALWAYS),
+        };
+
+        let ticket_proc = HoprUnacknowledgedTicketProcessor::new(
+            connector.clone(),
+            PEERS_CHAIN[i].clone(),
+            channels_dst,
+            HoprUnacknowledgedTicketProcessorConfig::default(),
+        );
+
+        let ticket_factory = Arc::new(HoprTicketFactory::new(RedbStore::new_temp()?));
+
+        let encoder = HoprEncoder::new(
+            PEERS_CHAIN[i].clone(),
+            connector.clone(),
+            surb_store.clone(),
+            ticket_factory.clone(),
+            channels_dst,
+            codec_config,
+        );
+
+        let decoder = HoprDecoder::new(
+            (PEERS[i].clone(), PEERS_CHAIN[i].clone()),
+            connector.clone(),
+            surb_store,
+            ticket_factory.clone(),
+            channels_dst,
+            codec_config,
+        );
+
+        let counters = PeerProtocolCounterRegistry::default();
+
+        let node_processes = hopr_transport_protocol::run_packet_pipeline(
+            PEERS[i].clone(),
+            (mixer_channel_tx, wire_msg_send_rx),
+            (encoder, decoder),
+            ticket_proc,
+            received_ack_tickets_tx,
+            cfg,
+            (api_recv_tx, api_send_rx),
+            counters.clone(),
+        );
+
+        wire_channels.insert(PeerId::from(*PEERS[i].public()), (wire_msg_send_tx, mixer_channel_rx));
+        logical_channels.push((api_send_tx, api_recv_rx));
+        ticket_channels.push(received_ack_tickets_rx);
+        counter_registries.push(counters);
+        processes.insert(i, node_processes);
+    }
+
+    Ok((
+        wire_channels,
+        logical_channels,
+        ticket_channels,
+        processes,
+        counter_registries,
+    ))
+}
+
+pub async fn peer_setup_for_with_cfg(
+    count: usize,
+    cfg: PacketPipelineConfig,
+) -> anyhow::Result<(
+    HashMap<PeerId, WireChannels>,
+    Vec<LogicalChannels>,
+    Vec<TicketChannel>,
+    AbortableList<usize>,
+)> {
+    let (w, l, t, p, _) = peer_setup_for_with_all(count, cfg).await?;
+    Ok((w, l, t, p))
+}
+
+pub async fn peer_setup_for_with_counters(
+    count: usize,
+) -> anyhow::Result<(
+    HashMap<PeerId, WireChannels>,
+    Vec<LogicalChannels>,
+    Vec<TicketChannel>,
+    AbortableList<usize>,
+    Vec<PeerProtocolCounterRegistry>,
+)> {
+    peer_setup_for_with_all(count, Default::default()).await
+}
+
+pub fn inject_raw_wire(
+    wire_tx: &futures::channel::mpsc::UnboundedSender<(PeerId, Bytes)>,
+    sender: PeerId,
+    bytes: impl Into<Bytes>,
+) -> anyhow::Result<()> {
+    wire_tx
+        .unbounded_send((sender, bytes.into()))
+        .map_err(|e| anyhow::anyhow!("inject_raw_wire: channel closed: {e}"))
+}
+
+pub fn corrupt_bytes(bytes: &[u8], byte_idx: usize) -> Box<[u8]> {
+    let mut out: Box<[u8]> = bytes.into();
+    if let Some(b) = out.get_mut(byte_idx) {
+        *b ^= 0xFF;
+    }
+    out
 }
 
 pub async fn send_relay_receive_channel_of_n_peers(
@@ -404,21 +471,7 @@ pub async fn send_relay_receive_channel_of_n_peers(
 
     tokio::task::spawn(emulate_channel_communication(wire_apis));
 
-    let out_msgs = test_msgs
-        .iter()
-        .take(packet_count)
-        .map(|msg| {
-            (
-                ResolvedTransportRouting::Forward {
-                    pseudonym: SimplePseudonym([0xde, 0xad, 0xbe, 0xef, 0xca, 0xfe, 0xba, 0xbe, 0x11, 0x22]),
-                    forward_path: packet_path.clone(),
-                    return_paths: vec![],
-                },
-                ApplicationDataOut::with_no_packet_info(msg.clone()),
-            )
-        })
-        .collect::<Vec<_>>();
-
+    let out_msgs = make_outgoing_packets(&test_msgs, packet_path);
     apis[0].0.send_all(&mut futures::stream::iter(out_msgs).map(Ok)).await?;
 
     let (_apis_send, mut apis_recv): (Vec<_>, Vec<_>) = apis.into_iter().unzip();
@@ -426,7 +479,6 @@ pub async fn send_relay_receive_channel_of_n_peers(
     let last_node_recv = apis_recv.remove(peer_count - 1);
     let mut recv_packets = last_node_recv
         .take(packet_count)
-        .map(|packet| packet)
         .collect::<Vec<_>>()
         .timeout(futures_time::time::Duration::from(TIMEOUT_SECONDS))
         .await?;
