@@ -63,12 +63,20 @@ pub use config::*;
 mod events;
 mod pipeline;
 mod strategy;
-use std::{sync::Arc, time::Instant};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+    time::Instant,
+};
 
 use dashmap::{DashMap, DashSet};
-use hopr_lib::api::types::{
-    internal::prelude::ChannelId,
-    primitive::prelude::{Address, HoprBalance},
+use hopr_lib::api::{
+    PeerId,
+    types::{
+        crypto::prelude::OffchainPublicKey,
+        internal::prelude::ChannelId,
+        primitive::prelude::{Address, HoprBalance},
+    },
 };
 pub use strategy::ChannelLifecycleStrategy;
 
@@ -104,6 +112,14 @@ struct ChannelObservation {
     at: Instant,
 }
 
+/// Cached `peer_id → (offchain key, chain address)` map plus the timestamp at
+/// which it was last refreshed.  Lets the snapshot pass skip the full account
+/// stream on most ticks.
+struct PeerAddrCache {
+    refreshed_at: Instant,
+    map: HashMap<PeerId, (OffchainPublicKey, Address)>,
+}
+
 /// The running strategy instance.  Generic over the node type `N` so that
 /// callers can provide any node implementation satisfying the required traits.
 ///
@@ -128,6 +144,9 @@ struct ChannelLifecycleStrategyInner<N> {
     last_observed: Arc<DashMap<ChannelId, ChannelObservation>>,
     /// Cumulative ticket count increments from `TicketRedeemed` events.
     peer_ticket_activity: Arc<DashMap<Address, u64>>,
+    /// TTL-cached peer-id → (offchain key, chain address) map.  Avoids
+    /// streaming the full on-chain account list on every tick.
+    peer_addr_cache: Arc<Mutex<Option<PeerAddrCache>>>,
 }
 
 #[cfg(test)]
@@ -304,10 +323,9 @@ mod tests {
             static KEY: std::sync::OnceLock<OffchainPublicKey> = std::sync::OnceLock::new();
             KEY.get_or_init(|| {
                 use hopr_lib::api::types::crypto::keypairs::Keypair as _;
-                hopr_lib::api::types::crypto::prelude::OffchainKeypair::from_secret(&[1u8; 32])
+                *hopr_lib::api::types::crypto::prelude::OffchainKeypair::from_secret(&[1u8; 32])
                     .expect("test key")
                     .public()
-                    .clone()
             })
         }
     }
@@ -466,8 +484,11 @@ mod tests {
 
     #[test_log::test(tokio::test)]
     async fn strategy_should_fund_channel_below_threshold() -> anyhow::Result<()> {
+        use anyhow::Context as _;
+
         let stake_limit = HoprBalance::from(3_u32);
         let fund_amount = HoprBalance::from(5_u32);
+        let initial_balance = HoprBalance::from(2_u32);
 
         let c1 = ChannelEntry::builder()
             .between(*BOB, *ALICE)
@@ -487,8 +508,6 @@ mod tests {
             .with_channels([c1])
             .build_dynamic_client([1; Address::SIZE].into());
 
-        let _snapshot = blokli_sim.snapshot();
-
         let mut connector =
             create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
                 .await?;
@@ -499,6 +518,8 @@ mod tests {
         let node = Arc::new(ChainNode(Arc::clone(&connector)));
 
         let cfg = ChannelLifecycleConfig {
+            tick_interval: Duration::from_millis(100),
+            jitter: Duration::ZERO,
             funding: FundingConfig {
                 lower_balance_threshold: stake_limit,
                 topup_balance: fund_amount,
@@ -512,28 +533,28 @@ mod tests {
             ..Default::default()
         };
 
-        let strategy = ChannelLifecycleStrategy::new(cfg);
-        let _inner = strategy.build(node);
+        let mut strategy: Box<dyn crate::strategy::Strategy + Send> = ChannelLifecycleStrategy::new(cfg).build(node);
 
-        futures_time::future::FutureExt::timeout(
-            async {
-                tokio::time::sleep(Duration::from_millis(500)).await;
-            },
-            futures_time::time::Duration::from_millis(2000),
-        )
-        .await
-        .ok();
+        let handle = tokio::spawn(async move {
+            let _ = strategy.run().await;
+        });
 
-        let channels: Vec<ChannelEntry> = {
-            use futures::StreamExt as _;
-            connector
-                .stream_channels(ChannelSelector::default().with_source(*BOB))
-                .unwrap()
-                .collect()
-                .await
-        };
+        // Drive at least one full pipeline pass so the fund-pass has a chance
+        // to submit a `fund_channel` tx and the chain layer to confirm it.
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        handle.abort();
+        let _ = handle.await;
 
-        assert!(!channels.is_empty(), "should still have at least one channel");
+        let channels: Vec<ChannelEntry> = connector
+            .stream_channels(ChannelSelector::default().with_source(*BOB))
+            .context("failed to stream channels for BOB")?
+            .collect()
+            .await;
+
+        assert!(
+            channels.iter().any(|c| c.balance > initial_balance),
+            "expected the under-funded channel to be topped up; got {channels:?}"
+        );
 
         Ok(())
     }

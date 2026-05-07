@@ -69,6 +69,7 @@ impl ChannelLifecycleStrategy {
             start_epoch: std::time::Instant::now(),
             last_observed: Arc::new(DashMap::new()),
             peer_ticket_activity: Arc::new(DashMap::new()),
+            peer_addr_cache: Arc::new(std::sync::Mutex::new(None)),
         })
     }
 }
@@ -99,16 +100,16 @@ where
         let me = *self.node.chain_api().me();
 
         // Derive a fixed per-run jitter offset from system-time nanoseconds so
-        // nodes restarted simultaneously spread out their ticks.
-        let jitter_ns = self.cfg.jitter.as_nanos() as u64;
+        // nodes restarted simultaneously spread out their ticks.  Use the full
+        // nanosecond reading (not just the sub-second component) so the jitter
+        // window is not silently capped at <1 s.
+        let jitter_ns = self.cfg.jitter.as_nanos();
         let jitter_offset = if jitter_ns > 0 {
-            Duration::from_nanos(
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .subsec_nanos() as u64
-                    % jitter_ns,
-            )
+            let now_ns = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos();
+            Duration::from_nanos((now_ns % jitter_ns) as u64)
         } else {
             Duration::ZERO
         };

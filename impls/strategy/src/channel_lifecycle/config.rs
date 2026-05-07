@@ -39,12 +39,6 @@ pub struct EligibilityConfig {
     #[default = true]
     pub require_currently_connected: bool,
 
-    /// A peer is considered stale — and its channel eligible for closure — once
-    /// it has not been observed for this long.  Default: 24 hours.
-    #[serde(default = "default_peer_staleness_threshold", with = "humantime_serde")]
-    #[default(default_peer_staleness_threshold())]
-    pub peer_staleness_threshold: Duration,
-
     /// Peer quality score threshold `[0.0, 1.0]` for opening new channels.
     /// Default: 0.5.
     #[default = 0.5]
@@ -60,10 +54,10 @@ pub struct EligibilityConfig {
     #[default = 0.4]
     pub ticket_activity_weight: f64,
 
-    /// Only close a channel to a peer that has been observed since startup
-    /// (not just stale from a previous run).  Disabled when `false` allows
-    /// closures based solely on the last-seen timestamp in the DB.
-    /// Default: true — see `RestartGuardConfig`.
+    /// Only close a channel when the peer has been observed since the strategy
+    /// started running (i.e. `edge.last_update()` is more recent than
+    /// `start_epoch.elapsed()`).  Protects against retiring channels for which
+    /// the local view is still warming up after a restart.  Default: true.
     #[default = true]
     pub require_observed_since_start: bool,
 
@@ -75,11 +69,6 @@ pub struct EligibilityConfig {
     /// Never open channels to addresses in this list.  Default: empty.
     #[default(HashSet::new())]
     pub blocklist: HashSet<Address>,
-}
-
-#[inline]
-fn default_peer_staleness_threshold() -> Duration {
-    Duration::from_secs(24 * 60 * 60)
 }
 
 /// Initial and top-up balances for channel funding.
@@ -96,13 +85,13 @@ pub struct FundingConfig {
     #[default(HoprBalance::new_base(1))]
     pub topup_balance: HoprBalance,
 
-    /// Channel balance below which a top-up is triggered.  Default: 0.1 wxHOPR.
+    /// Channel balance below which a top-up is triggered.  Default: 1 wxHOPR.
     #[serde_as(as = "DisplayFromStr")]
     #[default(HoprBalance::new_base(1))]
     pub lower_balance_threshold: HoprBalance,
 
     /// Minimum safe balance required before opening or funding any channel.
-    /// Default: 0.1 wxHOPR.
+    /// Default: 1 wxHOPR.
     #[serde_as(as = "DisplayFromStr")]
     #[default(HoprBalance::new_base(1))]
     pub min_safe_balance_required: HoprBalance,
@@ -240,10 +229,6 @@ fn default_startup_close_grace_period() -> Duration {
 #[serde_as]
 #[derive(Debug, Clone, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct ConcurrencyConfig {
-    /// Number of channels evaluated concurrently within each pass.  Default: 8.
-    #[default = 8]
-    pub per_pass_concurrency: usize,
-
     /// Maximum simultaneous in-flight chain-write operations (open + fund +
     /// close + finalize combined).  Additional operations are deferred to the
     /// next tick.  Default: 4.

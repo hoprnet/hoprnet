@@ -21,14 +21,20 @@ use hopr_lib::api::{
     node::{ActionableEventSource, HasChainApi, HasGraphView, HasNetworkView},
     types::{
         crypto::prelude::OffchainPublicKey,
-        internal::prelude::{ChannelEntry, ChannelStatus},
+        internal::prelude::{ChannelEntry, ChannelId, ChannelStatus},
         primitive::prelude::{Address, HoprBalance},
     },
 };
 use tracing::{debug, info, warn};
 
-use super::{ChannelLifecycleStrategyInner, ChannelObservation};
+use super::{ChannelLifecycleStrategyInner, ChannelObservation, PeerAddrCache};
 use crate::errors::StrategyError;
+
+/// TTL for the cached peer-id → (offchain key, chain address) map.  On-chain
+/// account registrations change rarely; refreshing every 5 minutes is more
+/// than enough for new entries to be picked up while avoiding a full account
+/// stream on every tick.
+const PEER_ADDR_CACHE_TTL: Duration = Duration::from_secs(5 * 60);
 
 impl<N> ChannelLifecycleStrategyInner<N>
 where
@@ -59,7 +65,10 @@ where
             .map_err(|e| StrategyError::Other(e.into()))?;
 
         let Some(safe) = safe else {
-            warn!(%me, "channel-lifecycle: safe not registered");
+            // The fund/open passes already gate on `min_safe_balance_required`,
+            // so this branch is only an informational signal — keep it at
+            // `debug!` to avoid log spam in misconfigured environments.
+            debug!(%me, "channel-lifecycle: safe not registered");
             return Ok(HoprBalance::zero());
         };
 
@@ -105,7 +114,8 @@ where
     /// a normalised ticket-activity signal.
     ///
     /// `max_activity` is the maximum ticket-activity value across all peers,
-    /// computed once per tick to avoid O(N×M) iteration.
+    /// computed once per tick to avoid O(N×M) iteration.  Callers must floor
+    /// it at `1` so the division below cannot produce NaN.
     fn peer_score_for(&self, peer_offchain: &OffchainPublicKey, dest_addr: &Address, max_activity: u64) -> f64 {
         let my_key = self.node.graph().identity();
         let edge_score = self
@@ -116,7 +126,7 @@ where
             .unwrap_or(0.0);
 
         let ticket_delta = self.peer_ticket_activity.get(dest_addr).map(|v| *v).unwrap_or(0);
-        let ticket_score = (ticket_delta as f64) / (max_activity as f64);
+        let ticket_score = (ticket_delta as f64) / (max_activity.max(1) as f64);
 
         self.cfg.eligibility.peer_quality_weight * edge_score
             + self.cfg.eligibility.ticket_activity_weight * ticket_score
@@ -124,21 +134,34 @@ where
 
     /// Returns `true` if the channel should be proactively funded before the
     /// next transaction confirms.
-    fn proactive_fund_needed(&self, channel: &ChannelEntry, est_tx_secs: f64, min_ticket_price_wei: f64) -> bool {
+    ///
+    /// `prev_obs` must hold the observation captured at the **start of the
+    /// current tick**, before the snapshot pass refreshed `last_observed` —
+    /// otherwise `prev_obs.balance` and `channel.balance` are equal and the
+    /// drain estimate collapses to zero.
+    fn proactive_fund_needed(
+        &self,
+        channel: &ChannelEntry,
+        prev_obs: &HashMap<ChannelId, ChannelObservation>,
+        est_tx_secs: f64,
+        min_ticket_price_wei: f64,
+    ) -> bool {
         if !self.cfg.proactive_funding.enabled {
             return false;
         }
 
-        let Some(obs) = self.last_observed.get(channel.get_id()) else {
+        let Some(obs) = prev_obs.get(channel.get_id()) else {
             return false;
         };
 
         let lookback_secs = self.cfg.proactive_funding.depletion_lookback.as_secs_f64().max(1.0);
         let elapsed = obs.at.elapsed().as_secs_f64().max(0.01);
 
-        let balance_now = obs.balance.amount().low_u128() as f64;
-        let balance_then = channel.balance.amount().low_u128() as f64;
-        let balance_delta = (balance_then - balance_now).max(0.0);
+        // `obs` is the older snapshot; `channel` is the current on-chain state.
+        // A drain decreases the balance, so the delta is `previous - current`.
+        let balance_prev = obs.balance.amount().low_u128() as f64;
+        let balance_current = channel.balance.amount().low_u128() as f64;
+        let balance_delta = (balance_prev - balance_current).max(0.0);
         let balance_drain_rate =
             (self.cfg.proactive_funding.balance_drain_weight * balance_delta / elapsed.min(lookback_secs)).max(0.0);
 
@@ -151,7 +174,7 @@ where
         let drain_rate = balance_drain_rate + ticket_drain_rate;
         let projected_drain = drain_rate * est_tx_secs * self.cfg.proactive_funding.safety_margin;
 
-        let balance_after = channel.balance.amount().low_u128() as f64 - projected_drain;
+        let balance_after = balance_current - projected_drain;
         let threshold = self.cfg.funding.lower_balance_threshold.amount().low_u128() as f64;
 
         balance_after < threshold
@@ -344,6 +367,14 @@ where
             }
         }
 
+        // Capture the previous-tick observation snapshot *before* refreshing
+        // `last_observed` — `proactive_fund_needed` needs to compare against
+        // the older balance/ticket_index, otherwise the delta is always 0.
+        let prev_observations: HashMap<ChannelId, ChannelObservation> = all_channels
+            .iter()
+            .filter_map(|ch| self.last_observed.get(ch.get_id()).map(|v| (*ch.get_id(), v.clone())))
+            .collect();
+
         for ch in &all_channels {
             let id = *ch.get_id();
             self.last_observed
@@ -370,16 +401,7 @@ where
             .map(|p| p.amount().low_u128() as f64)
             .unwrap_or(0.0);
 
-        let mut peer_addr_map: HashMap<PeerId, (OffchainPublicKey, Address)> = HashMap::new();
-        {
-            let mut accounts = chain
-                .stream_accounts(AccountSelector::default())
-                .map_err(|e| StrategyError::Other(e.into()))?;
-            while let Some(account) = accounts.next().await {
-                let peer_id = PeerId::from(&account.public_key);
-                peer_addr_map.insert(peer_id, (account.public_key, account.chain_addr));
-            }
-        }
+        let peer_addr_map = self.peer_addr_map(chain).await?;
 
         let addr_to_key: HashMap<Address, OffchainPublicKey> =
             peer_addr_map.values().map(|(pk, addr)| (*addr, *pk)).collect();
@@ -390,19 +412,29 @@ where
             .collect();
         let open_count = open_channels.len() + self.open_in_flight.len();
 
-        // Computed once here so close and open passes don't each iterate all activity.
-        let max_activity: u64 = self.peer_ticket_activity.iter().map(|e| *e.value()).max().unwrap_or(1);
+        // Computed once here so close and open passes don't each iterate all
+        // activity.  Floored at 1 to keep `peer_score_for` from dividing by 0.
+        let max_activity: u64 = self
+            .peer_ticket_activity
+            .iter()
+            .map(|e| *e.value())
+            .max()
+            .unwrap_or(0)
+            .max(1);
+
+        // The fund and open passes share this budget so opens cannot promise
+        // stake the funding txs already staked in this same tick.
+        let mut safe_remaining = safe_balance;
 
         // ── 2. Fund pass ─────────────────────────────────────────────────────
         if safe_balance >= self.cfg.funding.min_safe_balance_required || !self.cfg.funding.stop_when_unfunded {
-            let mut safe_remaining = safe_balance;
-
             for ch in &open_channels {
                 if self.fund_in_flight.contains(ch.get_id()) {
                     continue;
                 }
                 let needs_topup = ch.balance <= self.cfg.funding.lower_balance_threshold;
-                let needs_proactive = self.proactive_fund_needed(ch, est_tx_secs, min_ticket_price_wei);
+                let needs_proactive =
+                    self.proactive_fund_needed(ch, &prev_observations, est_tx_secs, min_ticket_price_wei);
 
                 if needs_topup || needs_proactive {
                     if safe_remaining < self.cfg.funding.topup_balance {
@@ -466,8 +498,8 @@ where
             return Ok(());
         }
 
-        if self.cfg.funding.stop_when_unfunded && safe_balance < self.cfg.funding.initial_balance {
-            debug!(%safe_balance, "channel-lifecycle: safe balance too low to open new channels");
+        if self.cfg.funding.stop_when_unfunded && safe_remaining < self.cfg.funding.initial_balance {
+            debug!(%safe_remaining, "channel-lifecycle: safe balance too low to open new channels");
             return Ok(());
         }
 
@@ -523,7 +555,6 @@ where
         candidates.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
         candidates.truncate(deficit);
 
-        let mut safe_remaining = safe_balance;
         for (addr, ..) in candidates {
             if safe_remaining < self.cfg.funding.initial_balance {
                 break;
@@ -555,9 +586,13 @@ where
 
             let my_key = self.node.graph().identity();
             if let Some(edge) = self.node.graph().edge(my_key, pk) {
-                let stale = edge.last_update() > self.cfg.closure.close_when_peer_unseen_for;
-                let guard_passed = !self.cfg.eligibility.require_observed_since_start
-                    || self.start_epoch.elapsed() >= self.cfg.restart.startup_close_grace_period;
+                let last_update = edge.last_update();
+                let stale = last_update > self.cfg.closure.close_when_peer_unseen_for;
+                // Treat "edge updated within strategy lifetime" as "peer
+                // observed since start"; this differs from — and complements —
+                // the outer `startup_close_grace_period` time-based guard.
+                let observed_since_start = last_update < self.start_epoch.elapsed();
+                let guard_passed = !self.cfg.eligibility.require_observed_since_start || observed_since_start;
                 if stale && guard_passed {
                     return true;
                 }
@@ -565,5 +600,45 @@ where
         }
 
         false
+    }
+
+    /// Return the cached peer-id → (offchain key, chain address) map,
+    /// refreshing it from the on-chain account stream when the cache is empty
+    /// or older than [`PEER_ADDR_CACHE_TTL`].  Filtered to accounts with a
+    /// published off-chain key, which is the only set we can address as peers.
+    async fn peer_addr_map(
+        &self,
+        chain: &N::ChainApi,
+    ) -> crate::errors::Result<HashMap<PeerId, (OffchainPublicKey, Address)>> {
+        let cached = {
+            let guard = self.peer_addr_cache.lock().expect("peer_addr_cache mutex poisoned");
+            guard.as_ref().and_then(|c| {
+                if c.refreshed_at.elapsed() < PEER_ADDR_CACHE_TTL {
+                    Some(c.map.clone())
+                } else {
+                    None
+                }
+            })
+        };
+
+        if let Some(map) = cached {
+            return Ok(map);
+        }
+
+        let mut map: HashMap<PeerId, (OffchainPublicKey, Address)> = HashMap::new();
+        let mut accounts = chain
+            .stream_accounts(AccountSelector::default().with_public_only(true))
+            .map_err(|e| StrategyError::Other(e.into()))?;
+        while let Some(account) = accounts.next().await {
+            let peer_id = PeerId::from(&account.public_key);
+            map.insert(peer_id, (account.public_key, account.chain_addr));
+        }
+
+        *self.peer_addr_cache.lock().expect("peer_addr_cache mutex poisoned") = Some(PeerAddrCache {
+            refreshed_at: Instant::now(),
+            map: map.clone(),
+        });
+
+        Ok(map)
     }
 }
