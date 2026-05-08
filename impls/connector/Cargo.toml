@@ -8,7 +8,6 @@ description = "Implementation of HOPR Chain APIs using Blokli client"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
-publish = false
 
 [features]
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
