@@ -5,6 +5,8 @@ authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR transport interface for the core library"
 edition.workspace = true
 rust-version.workspace = true
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
 [lib]

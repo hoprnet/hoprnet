@@ -4,6 +4,9 @@ version = "1.8.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
+description = "HOPR transport protocol codec and packet processing"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
 [lib]
