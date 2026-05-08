@@ -114,7 +114,7 @@ jobs:
           - architecture: aarch64-darwin
             runner: depot-macos-15
             required_label: "lib:aarch64-darwin"
-    uses: hoprnet/hopr-workflows/.github/workflows/build-library.yaml@build-library-v2
+    uses: hoprnet/hopr-workflows/.github/workflows/build-library.yaml@ausias/publish-library #build-library-v2
     permissions:
       contents: read
     with:
@@ -122,7 +122,6 @@ jobs:
       version_type: commit
       architecture: ${{ matrix.architecture }}
       cachix_cache_name: hoprnet
-      package_name: hopr-lib
       runner: ${{ matrix.runner }}
       enabled: ${{ matrix.required_label == '' || contains(github.event.pull_request.labels.*.name, matrix.required_label) }}
     secrets:

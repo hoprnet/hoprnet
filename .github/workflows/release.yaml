@@ -29,7 +29,6 @@ jobs:
       version_type: release
       architecture: x86_64-linux
       cachix_cache_name: hoprnet
-      package_name: hopr-lib
       runner: depot-ubuntu-24.04-4
     secrets:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
