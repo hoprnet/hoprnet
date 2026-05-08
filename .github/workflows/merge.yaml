@@ -42,6 +42,30 @@ jobs:
             nix develop -c cargo fetch
         env:
           PRIVATE_CARGO_REGISTRY_PROXY_URL: ${{ secrets.PRIVATE_CARGO_REGISTRY_PROXY_URL }}
+  build-library:
+    name: Library ${{ matrix.architecture }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: x86_64-linux
+            runner: depot-ubuntu-24.04-4
+          - architecture: aarch64-linux
+            runner: depot-ubuntu-24.04-arm-4
+          - architecture: aarch64-darwin
+            runner: depot-macos-15
+    uses: hoprnet/hopr-workflows/.github/workflows/build-library.yaml@build-library-v2
+    permissions:
+      contents: read
+    with:
+      source_branch: ${{ github.event.pull_request.base.ref }}
+      version_type: pr
+      architecture: ${{ matrix.architecture }}
+      cachix_cache_name: hoprnet
+      package_name: hopr-lib
+      runner: ${{ matrix.runner }}
+    secrets:
+      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
   docs:
     name: Docs
     if: github.event.pull_request.merged == true
