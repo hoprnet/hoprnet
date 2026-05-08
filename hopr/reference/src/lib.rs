@@ -36,25 +36,6 @@ use {
 #[cfg(feature = "session-server")]
 use crate::{config::SessionIpForwardingConfig, exit::HoprServerIpForwardingReactor};
 
-/// No-op session server used by [`build_edge`] when the `session-server` feature is enabled.
-///
-/// Edge nodes do not serve incoming sessions, so the builder still needs a concrete type
-/// to satisfy the `build_with_chain` signature — this type simply drops every session.
-#[cfg(feature = "session-server")]
-#[derive(Debug, Clone, Default)]
-struct NoopSessionServer;
-
-#[cfg(feature = "session-server")]
-#[async_trait::async_trait]
-impl hopr_lib::api::node::HoprSessionServer for NoopSessionServer {
-    type Error = std::convert::Infallible;
-    type Session = hopr_lib::exports::transport::IncomingSession;
-
-    async fn process(&self, _session: Self::Session) -> Result<(), Self::Error> {
-        Ok(())
-    }
-}
-
 /// Shareable [`HoprTicketManager`] with [`RedbStore`] backend.
 pub type SharedTicketManager = Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>;
 
@@ -254,10 +235,18 @@ where
 ///
 /// For a non-default connector configuration use [`build_edge_with_chain`] directly.
 #[cfg(feature = "runtime-tokio")]
-pub async fn build_edge(
+pub async fn build_edge<
+    #[cfg(feature = "session-server")] Srv: hopr_lib::api::node::HoprSessionServer<
+            Session = hopr_lib::exports::transport::IncomingSession,
+            Error: std::fmt::Display,
+        > + Clone
+        + Send
+        + 'static,
+>(
     identity: (&ChainKeypair, &OffchainKeypair),
     config: HoprLibConfig,
     blokli_url: String,
+    #[cfg(feature = "session-server")] server: Srv,
 ) -> anyhow::Result<Arc<EdgeHopr>> {
     let (chain_key, packet_key) = identity;
     let module_address = config.safe_module.module_address;
@@ -270,7 +259,7 @@ pub async fn build_edge(
         None,
         chain_connector,
         #[cfg(feature = "session-server")]
-        NoopSessionServer,
+        server,
     )
     .await
 }
@@ -318,6 +307,9 @@ pub async fn build_full_with_session_server(
 /// Edge nodes do not relay incoming packets and carry no ticket manager
 /// (`TMgr = ()`), which is reflected in the [`EdgeHopr`] return type.
 /// Use this when you need a non-default chain connector; otherwise prefer [`build_edge`].
+///
+/// When the `session-server` feature is enabled a session server must be provided.
+/// Callers that do not need to handle incoming sessions can pass a server that discards them.
 #[cfg(feature = "runtime-tokio")]
 pub async fn build_edge_with_chain<
     Chain,
