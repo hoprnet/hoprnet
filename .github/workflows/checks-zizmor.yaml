@@ -10,8 +10,6 @@ on:
       - ready_for_review
     paths:
       - ".github/**"
-  merge_group:
-    types: [checks_requested]
 
 concurrency:
   group: ${{ github.event.pull_request.head.ref || github.ref_name }}-zizmor
