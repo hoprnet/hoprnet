@@ -40,6 +40,9 @@ pub enum PacketError {
     SphinxError(#[from] hopr_crypto_sphinx::errors::SphinxError),
 
     #[error(transparent)]
+    PixError(#[from] hopr_protocol_pix::errors::PixError),
+
+    #[error(transparent)]
     Other(#[from] GeneralError),
 }
 

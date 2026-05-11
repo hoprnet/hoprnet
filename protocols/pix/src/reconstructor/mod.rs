@@ -221,8 +221,8 @@ impl<S: PixSpec + 'static> SsaReconstructor<S> {
             .ssa_verifiers
             .get(&share.spi)
             .ok_or(errors::PixError::MissingVerifier)?;
-
-        let partial_share = share.enc_share.decrypt(&share.spi, ack.ack_key_share())?;
+        
+        let partial_share = share.enc_share.decrypt(share.spi.pseudonym(), ack.ack_key_share())?;
         let Some(ssa_part) = reconstructor.lock().add_share(share.spi, share.msg, partial_share)? else {
             tracing::trace!(spi = %share.spi, "ssa part not yet complete, waiting for more shares");
             return Ok(None);

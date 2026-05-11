@@ -157,6 +157,15 @@ pub enum DispatchResult {
     Unrelated(ApplicationDataIn),
 }
 
+/// Configuration for the PIX protocol.
+#[derive(Clone, Debug, PartialEq, Eq, smart_default::SmartDefault)]
+pub struct PixConfig {
+    #[default(1024)]
+    pub polys_per_ssa: usize,
+    #[default(100)]
+    pub poly_threshold: usize,
+}
+
 /// Configuration for the [`SessionManager`].
 #[derive(Clone, Debug, PartialEq, smart_default::SmartDefault)]
 pub struct SessionManagerConfig {
@@ -243,6 +252,13 @@ pub struct SessionManagerConfig {
     /// Default is true.
     #[default(true)]
     pub surb_target_notify: bool,
+    /// Configuration for the PIX protocol.
+    ///
+    /// If not set, the Session manager will not support the usage of PIX protocol.
+    ///
+    /// Default is set to [`PixConfig::default()`](PixConfig).
+    #[default(Some(PixConfig::default()))]
+    pub pix_config: Option<PixConfig>,
 }
 
 /// Manages lifecycles of Sessions.

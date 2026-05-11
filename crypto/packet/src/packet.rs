@@ -12,18 +12,13 @@ use hopr_types::{
     primitive::prelude::*,
 };
 
-use crate::{
-    HoprPseudonym, HoprReplyOpener, HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, PAYLOAD_SIZE_INT,
-    errors::{
-        PacketError::{PacketConstructionError, PacketDecodingError},
-        Result,
-    },
-    por::{
-        ProofOfRelayString, ProofOfRelayValues, SurbReceiverInfo, derive_ack_key_share, generate_proof_of_relay,
-        pre_verify,
-    },
-    types::{HoprPacketMessage, HoprPacketParts, PacketSignals},
-};
+use crate::{HoprPseudonym, HoprReplyOpener, HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, PAYLOAD_SIZE_INT, errors::{
+    PacketError::{PacketConstructionError, PacketDecodingError},
+    Result,
+}, por::{
+    ProofOfRelayString, ProofOfRelayValues, SurbReceiverInfo, derive_ack_key_share, generate_proof_of_relay,
+    pre_verify,
+}, types::{HoprPacketMessage, HoprPacketParts, PacketSignals}, HoprPixSpec, HoprEncryptedPartialSsaShare};
 
 /// Represents an outgoing packet that has been only partially instantiated.
 ///
@@ -54,17 +49,25 @@ struct PathKeyData {
     pub por_strings: Vec<ProofOfRelayString>,
     /// Proof of Relay values for the first ticket on the path.
     pub por_values: ProofOfRelayValues,
+    /// Solution to the first PoR challenge.
+    /// 
+    /// This is set only for non-zero hop paths.
+    pub first_relayer_solution: Option<HalfKey>,
 }
 
 impl PathKeyData {
     fn new(path: &[OffchainPublicKey]) -> Result<Self> {
         let shared_keys = HoprSphinxSuite::new_shared_keys(path)?;
-        let (por_strings, por_values) = generate_proof_of_relay(&shared_keys.secrets)?;
+        let (
+            por_strings,
+            (por_values, first_relayer_solution)
+        ) = generate_proof_of_relay(&shared_keys.secrets)?;
 
         Ok(Self {
             shared_keys,
             por_strings,
             por_values,
+            first_relayer_solution,
         })
     }
 
@@ -95,7 +98,8 @@ impl PartialHoprPacket {
     /// * `chain_keypair` private key of the local node.
     /// * `ticket` ticket builder for the first hop on the path.
     /// * `mapper` of the public key identifiers.
-    /// * `domain_separator` channels contract domain separator.
+    /// * `pix_share_gen` generator for the pix share.
+    /// * `domain_separator` channel contract domain separator.
     pub fn new<
         M: ProtocolKeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>,
         P: NonEmptyPath<OffchainPublicKey> + Send,
@@ -105,6 +109,7 @@ impl PartialHoprPacket {
         chain_keypair: &ChainKeypair,
         ticket: TicketBuilder,
         mapper: &M,
+        pix_share_gen: &hopr_protocol_pix::SsaShareGenerator<HoprPixSpec>,
         domain_separator: &Hash,
     ) -> Result<Self> {
         match routing {
@@ -123,6 +128,7 @@ impl PartialHoprPacket {
                     shared_keys,
                     por_strings,
                     por_values,
+                    ..
                 } = key_data
                     .next()
                     .ok_or_else(|| PacketConstructionError("empty path".into()))?;
@@ -135,7 +141,7 @@ impl PartialHoprPacket {
                 let (surbs, openers): (Vec<_>, Vec<_>) = key_data
                     .zip(return_paths)
                     .zip(receiver_data.into_sequence())
-                    .map(|((key_data, rp), data)| create_surb_for_path((rp, key_data), data, mapper))
+                    .map(|((key_data, rp), data)| create_surb_for_path((rp, key_data), data, mapper, pix_share_gen))
                     .collect::<Result<Vec<_>>>()?
                     .into_iter()
                     .unzip();
@@ -398,6 +404,7 @@ fn create_surb_for_path<
     return_path: (P, PathKeyData),
     recv_data: HoprSenderId,
     mapper: &M,
+    pix_share_gen: &hopr_protocol_pix::SsaShareGenerator<HoprPixSpec>,
 ) -> Result<(HoprSurb, HoprReplyOpener)> {
     let (
         return_path,
@@ -405,10 +412,19 @@ fn create_surb_for_path<
             shared_keys,
             por_strings,
             por_values,
+            first_relayer_solution,
         },
     ) = return_path;
 
-    Ok(create_surb::<HoprSphinxSuite, HoprSphinxHeaderSpec>(
+    // The first relayer challenge solution is known only if this is not a 0-hop return path.
+    // It is a logical protocol bug otherwise.
+    debug_assert!(
+        (return_path.len() == 1 && first_relayer_solution.is_none()) ||
+        (return_path.len() > 1 && first_relayer_solution.is_some()),
+        "multi-hop return path must have a first relayer challenge solution"
+    );
+
+    let (mut surb, ro) = create_surb::<HoprSphinxSuite, HoprSphinxHeaderSpec>(
         shared_keys,
         &return_path
             .iter()
@@ -420,9 +436,20 @@ fn create_surb_for_path<
             .collect::<Result<Vec<_>>>()?,
         &por_strings,
         recv_data,
-        SurbReceiverInfo::new(por_values, [0u8; 36]),
+        SurbReceiverInfo::new(por_values, HoprEncryptedPartialSsaShare::default()),
     )
-    .map(|(s, r)| (s, (recv_data.surb_id(), r)))?)
+        .map(|(s, r)| (s, (recv_data.surb_id(), r)))?;
+
+    // Existence of the first-relayer challenge solution indicates this is not a 0-hop return path.
+    if let Some(first_solution) = first_relayer_solution &&
+        let Some((id, share)) = pix_share_gen.next_share(&recv_data.pseudonym(), surb.get_hash(b"HOPR_SURB_DATA"))?
+    {
+        // Replace the empty encrypted share with the generated one, encrypted using the first relayer ticket challenge solution.
+        let enc_share = share.encrypt(&id, &first_solution)?;
+        surb.additional_data_receiver = SurbReceiverInfo::new(por_values, enc_share);
+    }
+
+    Ok((surb, ro))
 }
 
 impl HoprPacket {
@@ -463,9 +490,10 @@ impl HoprPacket {
         ticket: TicketBuilder,
         mapper: &M,
         domain_separator: &Hash,
+        pix_share_gen: &hopr_protocol_pix::SsaShareGenerator<HoprPixSpec>,
         signals: S,
     ) -> Result<(Self, Vec<HoprReplyOpener>)> {
-        PartialHoprPacket::new(pseudonym, routing, chain_keypair, ticket, mapper, domain_separator)?
+        PartialHoprPacket::new(pseudonym, routing, chain_keypair, ticket, mapper, pix_share_gen, domain_separator)?
             .into_hopr_packet(msg, signals)
     }
 
@@ -574,7 +602,7 @@ mod tests {
     use hex_literal::hex;
     use hopr_types::crypto_random::Randomizable;
     use parameterized::parameterized;
-
+    use hopr_protocol_pix::SsaGeneratorConfig;
     use super::*;
     use crate::types::PacketSignal;
 
@@ -675,6 +703,8 @@ mod tests {
             .map(|h| TransportPath::new(PEERS[0..=h].iter().rev().map(|kp| *kp.1.public())))
             .collect::<std::result::Result<Vec<_>, hopr_types::internal::errors::PathError>>()?;
 
+        let ssa_gen = hopr_protocol_pix::SsaShareGenerator::new(SsaGeneratorConfig::default());
+
         Ok(HoprPacket::into_outgoing(
             msg,
             &pseudonym,
@@ -686,6 +716,7 @@ mod tests {
             ticket,
             &*MAPPER,
             &Hash::default(),
+            &ssa_gen,
             FLAGS,
         )?)
     }
@@ -704,6 +735,8 @@ mod tests {
             surb.additional_data_receiver.proof_of_relay_values().chain_length() as usize,
         )?;
 
+        let ssa_gen = hopr_protocol_pix::SsaShareGenerator::new(SsaGeneratorConfig::default());
+
         Ok(HoprPacket::into_outgoing(
             msg,
             hopr_pseudonym,
@@ -712,6 +745,7 @@ mod tests {
             ticket,
             &*MAPPER,
             &Hash::default(),
+            &ssa_gen,
             FLAGS,
         )?
         .0)

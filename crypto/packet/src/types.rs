@@ -212,11 +212,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::{
-        HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb,
-        packet::HoprPacket,
-        por::{SurbReceiverInfo, generate_proof_of_relay},
-    };
+    use crate::{HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, packet::HoprPacket, por::{SurbReceiverInfo, generate_proof_of_relay}, HoprEncryptedPartialSsaShare};
 
     lazy_static::lazy_static! {
         static ref PEERS: [(ChainKeypair, OffchainKeypair); 4] = [
@@ -247,7 +243,7 @@ mod tests {
         Ok((0..count)
             .map(|_| {
                 let shared_keys = HoprSphinxSuite::new_shared_keys(&path)?;
-                let (por_strings, por_values) = generate_proof_of_relay(&shared_keys.secrets)
+                let (por_strings, (por_values, _)) = generate_proof_of_relay(&shared_keys.secrets)
                     .map_err(|e| CryptoError::Other(GeneralError::NonSpecificError(e.to_string())))?;
 
                 create_surb::<HoprSphinxSuite, HoprSphinxHeaderSpec>(
@@ -255,7 +251,7 @@ mod tests {
                     &path_ids,
                     &por_strings,
                     recv_data,
-                    SurbReceiverInfo::new(por_values, [0u8; 36]),
+                    SurbReceiverInfo::new(por_values, HoprEncryptedPartialSsaShare::default()),
                 )
                 .map(|(s, _)| s)
             })

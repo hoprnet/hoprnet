@@ -78,7 +78,7 @@ pub use hopr_transport_session::{
     SURB_SIZE, ServiceId, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
     errors::{SessionManagerError, TransportSessionError},
 };
-use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
+use hopr_transport_session::{DispatchResult, PixConfig, SessionManager, SessionManagerConfig};
 #[cfg(feature = "telemetry")]
 pub use hopr_transport_session::{SessionAckMode, SessionLifecycleState};
 pub use hopr_transport_tag_allocator::TagAllocatorConfig;
@@ -332,6 +332,7 @@ where
                     maximum_surb_buffer_size: cfg.packet.surb_store.rb_capacity,
                     surb_balance_notify_period: None,
                     surb_target_notify: true,
+                    pix_config: Some(PixConfig::default()),
                 },
                 session_tag_allocator,
             )

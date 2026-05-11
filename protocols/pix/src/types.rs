@@ -5,27 +5,33 @@ use hopr_types::crypto::{
     prelude::HalfKey,
     primitives::Blake3,
 };
+use hopr_types::primitive::prelude::{BytesRepresentable, GeneralError};
 use vsss_rs::elliptic_curve::{
     Curve, PrimeField,
     generic_array::{ArrayLength, GenericArray},
 };
-
+use vsss_rs::elliptic_curve::generic_array::typenum::{Sum, U4, Unsigned};
+use std::ops::Add;
 use crate::{PixScalar, PixSpec, errors};
 
 /// Type used to index Session Stealth Addresses (SSA).
 ///
 /// Note that SSA Index starts with 1.
-pub type SsaIndex = u32; // TODO: change this to NonZeroU32
+pub type SsaIndex = u16; // TODO: change this to NonZeroU16
 
 /// Type used to index polynomials that reconstruct parts of a Session Stealth Addresses (SSA).
 ///
 /// The index is 0-based.
-pub type PolynomialIndex = u32;
+pub type PolynomialIndex = u16;
 
 /// Type used to index coefficients in a polynomial.
 ///
 /// The index is 0-based.
 pub type CoefficientIndex = u16;
+
+/// Size of the [`SsaIndex`] and [`PolynomialIndex`] prefix prepended to the encrypted share.
+pub type SsaPolyIndexPrefixSize = U4;
+
 
 fn derive_ssa_encryption_key<S: PixSpec>(spi: &SsaPolynomialId<S>, ack: &HalfKey) -> errors::Result<S::Cipher> {
     let mut output = Blake3::new_derive_key(S::KEY_DERIVATION_CONTEXT)
@@ -49,49 +55,134 @@ fn derive_ssa_encryption_key<S: PixSpec>(spi: &SsaPolynomialId<S>, ack: &HalfKey
     Ok(S::Cipher::new(&key, &iv))
 }
 
+/// Size of the field-bytes portion of the encrypted share.
+pub type FieldBytesSize<S> = <<S as PixSpec>::Curve as Curve>::FieldBytesSize;
+
+/// Total size of the [`EncryptedPartialSsaShare`] internal representation:
+/// [`SsaPolyIndexPrefixSize`] + [`FieldBytesSize`].
+pub type EncShareSize<S> = Sum<FieldBytesSize<S>, SsaPolyIndexPrefixSize>;
+
 /// Contains an encrypted partial Session Stealth Address (SSA) share.
+///
+/// The internal byte layout is:
+/// 1. [`SsaIndex`] (big-endian, 2 bytes)
+/// 2. [`PolynomialIndex`] (big-endian, 2 bytes)
+/// 3. The encrypted scalar share ([`FieldBytesSize`] bytes)
 ///
 /// This share can be [decrypted](EncryptedPartialSsaShare::decrypt) to [`PartialSsaShare`]
 /// to be verified and used for reconstruction.
 #[derive(Debug)]
-pub struct EncryptedPartialSsaShare<S: PixSpec>(GenericArray<u8, <<S as PixSpec>::Curve as Curve>::FieldBytesSize>);
+pub struct EncryptedPartialSsaShare<S: PixSpec>(GenericArray<u8, EncShareSize<S>>)
+where
+    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
+    EncShareSize<S>: ArrayLength<u8>;
 
-impl<S: PixSpec> EncryptedPartialSsaShare<S> {
-    pub fn decrypt(self, spi: &SsaPolynomialId<S>, key: &HalfKey) -> errors::Result<PartialSsaShare<S>> {
-        let mut cipher = derive_ssa_encryption_key::<S>(spi, key)?;
-        let mut data = self.0;
-        cipher.apply_keystream(&mut data);
-        Ok(PartialSsaShare(data))
+impl<S: PixSpec> EncryptedPartialSsaShare<S>
+where
+    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
+    EncShareSize<S>: ArrayLength<u8>,
+{
+    /// [`SsaIndex`] embedded in this encrypted share.
+    pub fn ssa_index(&self) -> SsaIndex {
+        SsaIndex::from_be_bytes([self.0[0], self.0[1]])
+    }
+
+    /// [`PolynomialIndex`] embedded in this encrypted share.
+    pub fn poly_index(&self) -> PolynomialIndex {
+        PolynomialIndex::from_be_bytes([self.0[2], self.0[3]])
+    }
+
+    pub fn decrypt(self, pseudonym: &S::Pseudonym, key: &HalfKey) -> errors::Result<PartialSsaShare<S>> {
+        let spi = SsaPolynomialId::new(SsaId::new(*pseudonym, self.ssa_index()), self.poly_index());
+        let mut cipher = derive_ssa_encryption_key::<S>(&spi, key)?;
+        let mut share = <PixScalar<S> as PrimeField>::Repr::default();
+        share.as_mut().copy_from_slice(&self.0[SsaPolyIndexPrefixSize::USIZE..]);
+        cipher.apply_keystream(share.as_mut());
+        Ok(PartialSsaShare(share))
     }
 }
 
-impl<S: PixSpec> Clone for EncryptedPartialSsaShare<S> {
+impl<S: PixSpec> Clone for EncryptedPartialSsaShare<S>
+where
+    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
+    EncShareSize<S>: ArrayLength<u8>,
+{
     fn clone(&self) -> Self {
         Self(self.0.clone())
     }
 }
 
-impl<S: PixSpec> Copy for EncryptedPartialSsaShare<S> where
-    <<<S as PixSpec>::Curve as Curve>::FieldBytesSize as ArrayLength<u8>>::ArrayType: Copy
+impl<S: PixSpec> Copy for EncryptedPartialSsaShare<S>
+where
+    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
+    EncShareSize<S>: ArrayLength<u8>,
+    <EncShareSize<S> as ArrayLength<u8>>::ArrayType: Copy,
 {
 }
 
-impl<S: PixSpec> AsRef<[u8]> for EncryptedPartialSsaShare<S> {
+impl<S: PixSpec> AsRef<[u8]> for EncryptedPartialSsaShare<S>
+where
+    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
+    EncShareSize<S>: ArrayLength<u8>,
+{
     fn as_ref(&self) -> &[u8] {
         &self.0
     }
 }
 
-impl<S: PixSpec> PartialEq for EncryptedPartialSsaShare<S> {
+impl<'a, S: PixSpec> TryFrom<&'a [u8]> for EncryptedPartialSsaShare<S>
+where
+    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
+    EncShareSize<S>: ArrayLength<u8>,
+{
+    type Error = GeneralError;
+
+    fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
+        if value.len() != Self::SIZE {
+            return Err(GeneralError::ParseError("EncryptedPartialSsaShare.size".into()));
+        }
+        Ok(Self(GenericArray::clone_from_slice(value)))
+    }
+}
+
+impl<S: PixSpec> BytesRepresentable for EncryptedPartialSsaShare<S>
+where
+    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
+    EncShareSize<S>: ArrayLength<u8>,
+{
+    const SIZE: usize = EncShareSize::<S>::USIZE;
+}
+
+impl<S: PixSpec> PartialEq for EncryptedPartialSsaShare<S>
+where
+    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
+    EncShareSize<S>: ArrayLength<u8>,
+{
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
     }
 }
 
-impl<S: PixSpec> Eq for EncryptedPartialSsaShare<S> {}
+impl<S: PixSpec> Eq for EncryptedPartialSsaShare<S>
+where
+    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
+    EncShareSize<S>: ArrayLength<u8>,
+{
+}
+
+impl<S: PixSpec> Default for EncryptedPartialSsaShare<S>
+{
+    fn default() -> Self {
+        Self(GenericArray::default())
+    }
+}
 
 #[cfg(feature = "serde")]
-impl<S: PixSpec> serde::Serialize for EncryptedPartialSsaShare<S> {
+impl<S: PixSpec> serde::Serialize for EncryptedPartialSsaShare<S>
+where
+    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
+    EncShareSize<S>: ArrayLength<u8>,
+{
     fn serialize<Ser>(&self, serializer: Ser) -> Result<Ser::Ok, Ser::Error>
     where
         Ser: serde::Serializer,
@@ -101,14 +192,22 @@ impl<S: PixSpec> serde::Serialize for EncryptedPartialSsaShare<S> {
 }
 
 #[cfg(feature = "serde")]
-impl<'de, S: PixSpec> serde::Deserialize<'de> for EncryptedPartialSsaShare<S> {
+impl<'de, S: PixSpec> serde::Deserialize<'de> for EncryptedPartialSsaShare<S>
+where
+    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
+    EncShareSize<S>: ArrayLength<u8>,
+{
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         struct EncryptedPartialSsaShareVisitor<S: PixSpec>(std::marker::PhantomData<S>);
 
-        impl<'de, S: PixSpec> serde::de::Visitor<'de> for EncryptedPartialSsaShareVisitor<S> {
+        impl<'de, S: PixSpec> serde::de::Visitor<'de> for EncryptedPartialSsaShareVisitor<S>
+        where
+            FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
+            EncShareSize<S>: ArrayLength<u8>,
+        {
             type Value = EncryptedPartialSsaShare<S>;
 
             fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -119,14 +218,12 @@ impl<'de, S: PixSpec> serde::Deserialize<'de> for EncryptedPartialSsaShare<S> {
             where
                 E: serde::de::Error,
             {
-                use vsss_rs::elliptic_curve::generic_array::typenum::Unsigned;
-
-                let expected = <<S as PixSpec>::Curve as Curve>::FieldBytesSize::to_usize();
+                let expected = EncShareSize::<S>::USIZE;
                 if v.len() != expected {
                     return Err(E::invalid_length(v.len(), &self));
                 }
 
-                let mut bytes = GenericArray::<u8, <<S as PixSpec>::Curve as Curve>::FieldBytesSize>::default();
+                let mut bytes = GenericArray::<u8, EncShareSize<S>>::default();
                 bytes.copy_from_slice(v);
                 Ok(EncryptedPartialSsaShare(bytes))
             }
@@ -135,10 +232,8 @@ impl<'de, S: PixSpec> serde::Deserialize<'de> for EncryptedPartialSsaShare<S> {
             where
                 A: serde::de::SeqAccess<'de>,
             {
-                use vsss_rs::elliptic_curve::generic_array::typenum::Unsigned;
-
-                let expected = <<S as PixSpec>::Curve as Curve>::FieldBytesSize::to_usize();
-                let mut bytes = GenericArray::<u8, <<S as PixSpec>::Curve as Curve>::FieldBytesSize>::default();
+                let expected = EncShareSize::<S>::USIZE;
+                let mut bytes = GenericArray::<u8, EncShareSize<S>>::default();
 
                 for i in 0..expected {
                     bytes[i] = seq
@@ -168,10 +263,19 @@ impl<'de, S: PixSpec> serde::Deserialize<'de> for EncryptedPartialSsaShare<S> {
 pub struct PartialSsaShare<S: PixSpec>(pub(crate) <PixScalar<S> as PrimeField>::Repr);
 
 impl<S: PixSpec> PartialSsaShare<S> {
-    pub fn encrypt(mut self, spi: &SsaPolynomialId<S>, key: &HalfKey) -> errors::Result<EncryptedPartialSsaShare<S>> {
+    pub fn encrypt(mut self, spi: &SsaPolynomialId<S>, key: &HalfKey) -> errors::Result<EncryptedPartialSsaShare<S>>
+    where
+        FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
+        EncShareSize<S>: ArrayLength<u8>,
+    {
         let mut cipher = derive_ssa_encryption_key::<S>(spi, key)?;
         cipher.apply_keystream(self.0.as_mut());
-        Ok(EncryptedPartialSsaShare(self.0))
+
+        let mut out = GenericArray::<u8, EncShareSize<S>>::default();
+        out[0..size_of::<SsaIndex>()].copy_from_slice(&spi.ssa_index().to_be_bytes());
+        out[size_of::<SsaIndex>()..size_of::<SsaIndex>() + size_of::<PolynomialIndex>()].copy_from_slice(&spi.poly_index().to_be_bytes());
+        out[size_of::<SsaIndex>() + size_of::<PolynomialIndex>()..].copy_from_slice(self.0.as_ref());
+        Ok(EncryptedPartialSsaShare(out))
     }
 }
 
@@ -403,13 +507,20 @@ mod tests {
     use crate::tests::TestSpec;
 
     #[test]
+    fn size_of_indices_must_match() {
+        let actual = size_of::<SsaIndex>() + size_of::<PolynomialIndex>();
+        let expected = SsaPolyIndexPrefixSize::USIZE;
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
     fn ssa_part_shares_should_encrypt_and_decrypt() -> anyhow::Result<()> {
         let key = HalfKey::random();
         let spi = SsaPolynomialId::<TestSpec>::new(SsaId::new(SimplePseudonym::random(), 1), 0);
         let scalar = PixScalar::<TestSpec>::random(vsss_rs::elliptic_curve::rand_core::OsRng);
 
         let share_1 = PartialSsaShare::<TestSpec>(scalar.to_repr());
-        let share_2 = share_1.clone().encrypt(&spi, &key)?.decrypt(&spi, &key)?;
+        let share_2 = share_1.clone().encrypt(&spi, &key)?.decrypt(spi.pseudonym(), &key)?;
 
         assert_eq!(share_1, share_2);
         Ok(())

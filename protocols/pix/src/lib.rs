@@ -4,12 +4,17 @@ use hopr_types::crypto::{
     crypto_traits::{BlockSizeUser, FixedOutput, HashMarker, KeyIvInit, OutputSizeUser, StreamCipher},
     prelude::Pseudonym,
 };
+use std::ops::Add;
+
 use vsss_rs::{
     DefaultShare, IdentifierPrimeField, Share, ShareElement, ShareVerifierGroup, ValueGroup,
     elliptic_curve::{
-        CurveArithmetic, Group, PrimeCurve, PrimeField,
+        Curve, CurveArithmetic, Group, PrimeCurve, PrimeField,
         consts::U256,
-        generic_array::typenum::{IsLess, IsLessOrEqual},
+        generic_array::{
+            ArrayLength,
+            typenum::{IsLess, IsLessOrEqual, U4},
+        },
         group::{GroupEncoding, cofactor::CofactorGroup},
         hash2curve::{ExpandMsgXmd, FromOkm, GroupDigest},
     },
@@ -39,6 +44,8 @@ where
     PixGroupRepr<Self>: std::fmt::Debug + PartialEq + Eq,
     <PixDigest<Self> as OutputSizeUser>::OutputSize: IsLess<U256>,
     <PixDigest<Self> as OutputSizeUser>::OutputSize: IsLessOrEqual<<PixDigest<Self> as BlockSizeUser>::BlockSize>,
+    <Self::Curve as Curve>::FieldBytesSize: Add<U4>,
+    <<Self::Curve as Curve>::FieldBytesSize as Add<U4>>::Output: ArrayLength<u8>,
 {
     /// Prime order elliptic curve use for commitments.
     type Curve: PrimeCurve + CurveArithmetic + GroupDigest;

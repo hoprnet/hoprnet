@@ -18,6 +18,7 @@
 
 use hopr_crypto_sphinx::prelude::*;
 use hopr_types::{internal::prelude::*, primitive::prelude::*};
+use hopr_types::crypto::prelude::SimplePseudonym;
 
 /// Lists all errors in this crate.
 pub mod errors;
@@ -86,6 +87,21 @@ pub type HoprReplyOpener = (routing::HoprSurbId, ReplyOpener);
 ///
 /// **DO NOT USE this value for calculations outside of this crate: use `HoprPacket::PAYLOAD_SIZE` instead!**
 pub(crate) const PAYLOAD_SIZE_INT: usize = DefaultSphinxPacketSize::USIZE - 1; // minus padding byte
+
+/// Current specification of the PIX protocol in HOPR.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct HoprPixSpec;
+
+impl hopr_protocol_pix::PixSpec for HoprPixSpec {
+    type Curve = k256::Secp256k1;
+    type Digest = hopr_types::crypto::primitives::Blake3;
+    type Pseudonym = SimplePseudonym;
+    type Cipher = hopr_types::crypto::primitives::ChaCha20;
+}
+
+/// HOPR-specific encrypted partial SSA share type from the PIX protocol.
+pub type HoprEncryptedPartialSsaShare = hopr_protocol_pix::EncryptedPartialSsaShare<HoprPixSpec>;
 
 #[cfg(test)]
 mod tests {
