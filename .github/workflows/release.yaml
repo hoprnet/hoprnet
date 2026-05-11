@@ -28,7 +28,7 @@ jobs:
       source_branch: ${{ github.ref_name }}
       version_type: release
       architecture: x86_64-linux
-      cachix_cache_name: hoprnet
+      package_name: hopr-lib
       runner: depot-ubuntu-24.04-4
     secrets:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -42,13 +42,11 @@ jobs:
       contents: write
     steps:
       - name: Release version
-        uses: hoprnet/hopr-workflows/actions/release-version@4e3c270b51ed1817bc0b0f6996dfc8a7b0e757c1 # release-version-v2
+        uses: hoprnet/hopr-workflows/actions/release-version@release-version-v4
         with:
           source_branch: ${{ github.ref_name }}
           file: ./hopr/hopr-lib/Cargo.toml
           release_type: ${{ inputs.release_type }}
-          package_name: hoprd
-          cachix_cache_name: hoprnet
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           zulip_api_key: ${{ secrets.ZULIP_API_KEY }}
           zulip_email: ${{ secrets.ZULIP_EMAIL }}

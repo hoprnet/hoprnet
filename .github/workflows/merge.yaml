@@ -61,7 +61,7 @@ jobs:
       source_branch: ${{ github.event.pull_request.base.ref }}
       version_type: pr
       architecture: ${{ matrix.architecture }}
-      cachix_cache_name: hoprnet
+      package_name: hopr-lib
       runner: ${{ matrix.runner }}
     secrets:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
