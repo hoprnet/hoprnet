@@ -34,7 +34,7 @@ use hopr_protocol_hopr::{
 };
 use hopr_ticket_manager::{HoprTicketFactory, RedbStore};
 use hopr_transport_mixer::config::MixerConfig;
-use hopr_transport_protocol::{PacketPipelineConfig, PeerProtocolCounterRegistry};
+use hopr_transport::protocol::{PacketPipelineConfig, PeerProtocolCounterRegistry};
 use lazy_static::lazy_static;
 use libp2p::PeerId;
 use tracing::debug;
@@ -371,7 +371,7 @@ async fn peer_setup_for_with_all(
 
         let counters = PeerProtocolCounterRegistry::default();
 
-        let node_processes = hopr_transport_protocol::run_packet_pipeline(
+        let node_processes = hopr_transport::protocol::run_packet_pipeline(
             PEERS[i].clone(),
             (mixer_channel_tx, wire_msg_send_rx),
             (encoder, decoder),

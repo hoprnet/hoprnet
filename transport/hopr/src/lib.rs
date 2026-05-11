@@ -12,6 +12,8 @@
 //! 4. algorithms associated with the transport layer operational management
 //! 5. interface specifications to allow modular behavioral extensions
 
+/// Transport binary protocol layer (codec, pipeline, heartbeat, stream).
+pub mod protocol;
 /// Configuration of the [crate::HoprTransport].
 pub mod config;
 /// Constants used and exposed by the crate.
@@ -69,7 +71,7 @@ use hopr_transport_probe::{
     Probe,
     ping::{PingConfig, Pinger},
 };
-pub use hopr_transport_protocol::PeerProtocolCounterRegistry;
+pub use crate::protocol::PeerProtocolCounterRegistry;
 pub use hopr_transport_session as session;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::transfer_session;
@@ -135,7 +137,7 @@ pub enum HoprTransportProcess {
     #[strum(to_string = "component responsible for the transport medium (libp2p swarm)")]
     Medium,
     #[strum(to_string = "HOPR packet pipeline ({0})")]
-    Pipeline(hopr_transport_protocol::PacketPipelineProcesses),
+    Pipeline(crate::protocol::PacketPipelineProcesses),
     #[strum(to_string = "session manager sub-process #{0}")]
     SessionsManagement(usize),
     #[strum(to_string = "network probing sub-process: {0}")]
@@ -381,9 +383,9 @@ where
         let transport_network = network;
         let transport_layer_process = network_process;
 
-        let msg_codec = hopr_transport_protocol::HoprBinaryCodec {};
+        let msg_codec = crate::protocol::HoprBinaryCodec {};
         let (wire_msg_tx, wire_msg_rx) =
-            hopr_transport_protocol::stream::process_stream_protocol(msg_codec, transport_network.clone()).await?;
+            crate::protocol::stream::process_stream_protocol(msg_codec, transport_network.clone()).await?;
 
         let mixing_channel_tx = hopr_transport_mixer::MixerSink::new(wire_msg_tx, build_mixer_cfg_from_env());
 

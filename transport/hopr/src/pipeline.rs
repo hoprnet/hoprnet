@@ -11,7 +11,7 @@ use hopr_utils::runtime::AbortableList;
 use hopr_crypto_packet::HoprSurb;
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
-use hopr_transport_protocol::run_packet_pipeline;
+use crate::protocol::run_packet_pipeline;
 
 use crate::{HoprTransportProcess, config::HoprPacketPipelineConfig};
 
@@ -27,7 +27,7 @@ pub struct HoprPipelineComponents<TEvt, S, Chain, TFact> {
     /// Ticket factory for creating outgoing tickets
     pub ticket_factory: TFact,
     /// Per-peer protocol conformance counters.
-    pub counters: hopr_transport_protocol::PeerProtocolCounterRegistry,
+    pub counters: crate::protocol::PeerProtocolCounterRegistry,
 }
 
 pub fn run_hopr_packet_pipeline<WIn, WOut, Chain, S, TEvt, TFact, AppOut, AppIn>(

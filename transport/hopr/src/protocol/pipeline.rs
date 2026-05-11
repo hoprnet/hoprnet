@@ -14,7 +14,7 @@ use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::Instrument;
 use validator::{Validate, ValidationError, ValidationErrors};
 
-use crate::PeerId;
+use hopr_api::PeerId;
 
 /// Default concurrency for the incoming acknowledgement processing pipeline when not overridden
 /// via [`AcknowledgementPipelineConfig::ack_input_concurrency`].
@@ -72,7 +72,7 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
     app_outgoing: AppOut,
     encoder: std::sync::Arc<E>,
     wire_outgoing: WOut,
-    counters: crate::counters::PeerProtocolCounterRegistry,
+    counters: super::counters::PeerProtocolCounterRegistry,
     concurrency: usize,
 ) where
     AppOut: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
@@ -160,7 +160,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
     ticket_events: TEvt,
     (ack_outgoing, ack_incoming): (AckOut, AckIn),
     app_incoming: AppIn,
-    counters: crate::counters::PeerProtocolCounterRegistry,
+    counters: super::counters::PeerProtocolCounterRegistry,
     concurrency: usize,
 ) where
     WIn: futures::Stream<Item = (PeerId, Bytes)> + Send + 'static,
@@ -510,7 +510,7 @@ async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
     ack_incoming: AckIn,
     ticket_events: TEvt,
     ticket_proc: std::sync::Arc<T>,
-    counters: crate::counters::PeerProtocolCounterRegistry,
+    counters: super::counters::PeerProtocolCounterRegistry,
     concurrency: usize,
 ) where
     AckIn: futures::Stream<Item = (OffchainPublicKey, Vec<Acknowledgement>)> + Send + 'static,
@@ -699,7 +699,7 @@ pub fn run_packet_pipeline<WIn, WOut, C, D, T, TEvt, AppOut, AppIn>(
     ticket_events: TEvt,
     cfg: PacketPipelineConfig,
     api: (AppOut, AppIn),
-    counters: crate::counters::PeerProtocolCounterRegistry,
+    counters: super::counters::PeerProtocolCounterRegistry,
 ) -> AbortableList<PacketPipelineProcesses>
 where
     WOut: futures::Sink<(PeerId, Bytes)> + Clone + Unpin + Send + 'static,

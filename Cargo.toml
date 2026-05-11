@@ -17,7 +17,6 @@ members = [
   "transport/mixer",
   "transport/path",
   "transport/probe",
-  "transport/protocol",
   "transport/session",
   "transport/tag-allocator",
   "utils-session",
@@ -181,7 +180,6 @@ hopr-transport = { path = "transport/hopr", default-features = false }
 hopr-transport-mixer = { path = "transport/mixer", default-features = false }
 hopr-transport-path = { path = "transport/path", default-features = false }
 hopr-transport-probe = { path = "transport/probe", default-features = false }
-hopr-transport-protocol = { path = "transport/protocol", default-features = false }
 hopr-transport-session = { path = "transport/session", default-features = false }
 hopr-transport-tag-allocator = { path = "transport/tag-allocator", default-features = false }
 hopr-chain-connector = { path = "impls/connector" }

@@ -125,7 +125,7 @@ where
 pub async fn process_stream_protocol<C, V>(
     codec: C,
     control: V,
-) -> crate::errors::Result<(
+) -> super::errors::Result<(
     Sender<(PeerId, <C as Decoder>::Item)>, // impl Sink<(PeerId, <C as Decoder>::Item)>,
     Receiver<(PeerId, <C as Decoder>::Item)>, // impl Stream<Item = (PeerId, <C as Decoder>::Item)>,
 )>
@@ -149,7 +149,7 @@ where
     let incoming = control
         .clone()
         .accept()
-        .map_err(|e| crate::errors::ProtocolError::Logic(format!("failed to listen on protocol: {e}")))?;
+        .map_err(|e| super::errors::ProtocolError::Logic(format!("failed to listen on protocol: {e}")))?;
 
     let max_concurrent_packets = std::env::var("HOPR_TRANSPORT_MAX_CONCURRENT_PACKETS")
         .ok()

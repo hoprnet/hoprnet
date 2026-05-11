@@ -257,7 +257,7 @@ fn pipeline_e2e_forward(c: &mut Criterion) {
                             codec_config,
                         );
 
-                        let processes = hopr_transport_protocol::run_packet_pipeline(
+                        let processes = hopr_transport::protocol::run_packet_pipeline(
                             PEERS[SENDER_IDX].clone(),
                             (mixer_tx, wire_in_rx),
                             (encoder, decoder),

@@ -64,15 +64,15 @@ async fn build_p2p_swarm(
         .build(
             &random_keypair,
             vec![multiaddress.clone()],
-            hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL,
+            hopr_transport::protocol::CURRENT_HOPR_MSG_PROTOCOL,
             true,
         )
         .await
         .map_err(|e| anyhow::anyhow!("failed to build network: {e}"))?;
 
-    let msg_codec = hopr_transport_protocol::HoprBinaryCodec {};
+    let msg_codec = hopr_transport::protocol::HoprBinaryCodec {};
     let (wire_msg_tx, wire_msg_rx) =
-        hopr_transport_protocol::stream::process_stream_protocol(msg_codec, network.clone()).await?;
+        hopr_transport::protocol::stream::process_stream_protocol(msg_codec, network.clone()).await?;
 
     let api = Interface {
         me: peer_id,

@@ -8,7 +8,7 @@ pub enum NetworkError {
     DisallowedOperationOnOwnPeerIdError,
 }
 use hopr_ticket_manager::TicketManagerError;
-pub use hopr_transport_protocol::errors::ProtocolError;
+pub use crate::protocol::errors::ProtocolError;
 use hopr_transport_session::errors::TransportSessionError;
 use thiserror::Error;
 

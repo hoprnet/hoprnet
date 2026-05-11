@@ -129,7 +129,7 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                             codec_config,
                         );
 
-                        let processes = hopr_transport_protocol::run_packet_pipeline(
+                        let processes = hopr_transport::protocol::run_packet_pipeline(
                             PEERS[TESTED_PEER_ID].clone(),
                             (wire_out_tx, wire_in_rx),
                             (encoder, decoder),

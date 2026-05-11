@@ -56,4 +56,4 @@ hopr-crypto-packet = { workspace = true }
 
 hopr-utils = { workspace = true, features = ["platform"] }
 hopr-transport-probe = { workspace = true }
-hopr-transport-protocol = { workspace = true }
+hopr-transport = { workspace = true }

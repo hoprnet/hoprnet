@@ -9,7 +9,7 @@ use std::{
 use hopr_api::Multiaddr;
 pub use hopr_protocol_hopr::{HoprCodecConfig, HoprUnacknowledgedTicketProcessorConfig, SurbStoreConfig};
 pub use hopr_transport_probe::config::ProbeConfig;
-use hopr_transport_protocol::PacketPipelineConfig;
+use crate::protocol::PacketPipelineConfig;
 use hopr_transport_session::{MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION};
 use proc_macro_regex::regex;
 use validator::{Validate, ValidationError, ValidationErrors};

@@ -9,7 +9,7 @@ use common::{
 use futures::{SinkExt, StreamExt};
 use futures_time::future::FutureExt;
 use hopr_api::types::crypto::prelude::*;
-use hopr_transport_protocol::{AcknowledgementPipelineConfig, PacketPipelineConfig};
+use hopr_transport::protocol::{AcknowledgementPipelineConfig, PacketPipelineConfig};
 use serial_test::serial;
 use validator::Validate;
 
